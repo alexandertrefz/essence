@@ -130,7 +130,9 @@ export function viewOf<ItemType extends AnyType>(
 // at every step and each O(1) shrink is a whole copy again — draining a
 // front-built List one item at a time would stay quadratic, which is the very
 // thing the shrink is for. So they fix their counts here and leave the
-// receiver's representation exactly as they found it.
+// receiver's representation exactly as they found it — with the one exception
+// `upgradedForSuffix` below is, which MOVES a box's seam rather than trimming a
+// run, once, so that the rest of a drain from the front is windows.
 export function runsOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListView<ItemType> {
@@ -299,7 +301,8 @@ function stampClosed<ItemType extends AnyType>(
 // while COPYING NOTHING are exactly the windows that still contain the seam
 // between the runs — starting at or before it and stopping at or after it — and
 // a window lying wholly inside one run has to be copied. A flat box keeps its
-// seam at zero, which leaves it the prefixes and nothing else.
+// seam at zero, which leaves it the prefixes and nothing else — until it is
+// asked for a suffix, when `upgradedForSuffix` below moves its seam to the end.
 //
 // NOTE: The answer is a STALE box, and that is the point. It holds both of the
 // receiver's Arrays and views less of them, so the first read trims it —
@@ -329,6 +332,52 @@ function sharedWindowOf<ItemType extends AnyType>(
 		length,
 		front: view.front,
 		frontLen,
+	}
+}
+
+// NOTE: A box whose seam is at zero — flat, or a front run viewed at zero —
+// can share no suffix, so a drain from the front of an APPEND-built List copied
+// the whole back run at every turn and was quadratic: `removeFirst()` measured
+// 121 ms against 20 for the prepend-built drain of 20,000 items, 442 at 40,000
+// and 943 at 60,000. Asked for a suffix, such a box UPGRADES ITSELF here: its
+// back run becomes a front run stored reversed, its back becomes empty, and
+// every later suffix is a shared window of it. One copy pays for the whole
+// drain — the same three drains measure 20, 21 and 25 ms after it, and
+// `remove(at 0)`'s 193, 713 and 1606 became 19, 22 and 21. The receiver's
+// representation changes under it, and that is invisible for the reason
+// `materialise`'s demotion is: the same items answer, and nothing can ask
+// whether two values are the same value.
+//
+// NOTE: The callers apply THE HALF RULE — upgrade only when the prefix dropped
+// is no longer than the suffix kept — because the upgrade copies the whole run
+// where the plain path copies the window. Under the rule the upgrade costs at
+// most twice the copy it replaces, and `lastItems(2)` of a flat List a Program
+// holds still copies two items rather than the List: 24 ms for two thousand of
+// them on 200,000 items, with or without this.
+//
+// NOTE: The bulk `slice` and in-place `reverse` are what makes the one copy
+// cheap; a walk pushing the items one at a time is what `ownItemsOf` measured
+// four to sixteen times slower. The empty back is a FRESH Array rather than
+// `noItems`, since the receiver may later be appended to in place, and pushing
+// onto the shared empty run is what `noItems` must never see.
+function upgradedForSuffix<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	view: ListView<ItemType>,
+): ListView<ItemType> {
+	let front = view.back.slice(0, view.backCount).reverse()
+	let back: Array<ItemType> = []
+
+	originalList.value = back
+	originalList.length = 0
+	originalList.front = front
+	originalList.frontLen = view.backCount
+
+	return {
+		front,
+		frontCount: view.backCount,
+		back,
+		backCount: 0,
+		total: view.backCount,
 	}
 }
 
@@ -756,10 +805,22 @@ export function slice<ItemType extends AnyType>(
 		return sharedWindowOf(originalList, view, first, last)
 	}
 
-	// NOTE: Every other window lies wholly inside ONE run, since the two above
-	// are the only ways to miss the seam, so what is left is a copy out of that
-	// run — a bulk one for the back, and a reversed walk for the front, whose
-	// head is stored last.
+	// NOTE: A suffix of a box whose seam is at zero, under the half rule —
+	// `removeFirst()` and `removeFirst(count)` are this window, and after the
+	// upgrade the whole drain is windows.
+	if (view.frontCount === 0 && last === length && first <= length - first) {
+		return sharedWindowOf(
+			originalList,
+			upgradedForSuffix(originalList, view),
+			first,
+			last,
+		)
+	}
+
+	// NOTE: Every other window lies wholly inside ONE run, since containing the
+	// seam and being moved onto it are the only ways not to, so what is left is
+	// a copy out of that run — a bulk one for the back, and a reversed walk for
+	// the front, whose head is stored last.
 	if (last < view.frontCount) {
 		let count = last - first
 		// NOTE: The argument is the answer's LENGTH. The rule below suggests
@@ -797,9 +858,12 @@ export function slice<ItemType extends AnyType>(
 //
 // NOTE: Dropping the FIRST item of a box with a front run, or the LAST of one
 // with a back run, is a window rather than a fill: it shrinks the run it touches
-// and shares both. The last item of a box whose back is empty lives at the
-// bottom of the front run, where no view can reach it, so that one goes the
-// general way rather than growing front-tail surgery for it.
+// and shares both. Dropping the first item of a box whose seam is at zero
+// upgrades it first, as `slice` does for the same window, so `remove(at 0)`
+// drains an append-built List in the time `removeFirst()` does. The last item
+// of a box whose back is empty lives at the bottom of the front run, where no
+// view can reach it, so that one goes the general way rather than growing
+// front-tail surgery for it.
 export function remove<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	at: IntegerType,
@@ -814,6 +878,15 @@ export function remove<ItemType extends AnyType>(
 
 	if (position === 0 && view.frontCount > 0) {
 		return sharedWindowOf(originalList, view, 1, view.total)
+	}
+
+	if (position === 0 && total >= 2) {
+		return sharedWindowOf(
+			originalList,
+			upgradedForSuffix(originalList, view),
+			1,
+			total,
+		)
 	}
 
 	if (position === view.total - 1 && view.backCount > 0) {

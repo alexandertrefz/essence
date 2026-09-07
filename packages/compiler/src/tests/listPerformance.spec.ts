@@ -37,6 +37,17 @@ const CEILING_MILLISECONDS = 1_000
 const DRAIN_TURNS = 20_000
 const DRAIN_CEILING_MILLISECONDS = 300
 
+// NOTE: The same drain of a List built by APPENDING, which is the half the
+// tests above did not cover and the half that was quadratic: a flat box could
+// share no suffix, so every step copied the whole back run. Now a box whose
+// seam is at zero upgrades itself once when a suffix is asked of it, and the
+// rest of the drain is windows. Sixty thousand turns rather than twenty, so
+// that the quadratic drain stands clear of the ceiling: measured best of
+// three on this machine, subprocess startup included, `remove(at 0)` took
+// 1606 ms and `removeFirst()` 943 ms before the upgrade, against 21 and 25 ms
+// after it — and 23 for the prepend-built drain of the same length.
+const APPEND_DRAIN_TURNS = 60_000
+
 // NOTE: A subprocess rather than an import, because what is being measured is
 // the Program's own wall time and a test runner's process has already paid for
 // whatever it loaded — and because a build this size allocates enough that
@@ -94,17 +105,22 @@ function buildingSource(method: string): string {
 
 // NOTE: The List is built by prepending, so every item of it lives in the front
 // run — and then it is emptied from that end, one item per turn, which is where
-// the front run pays for itself. The seed carries one item that is never
-// removed, so the drain runs out of turns rather than out of items and the
-// printed length is one.
-function drainingSource(step: string): string {
+// the front run pays for itself. Or it is built by appending, so every item
+// lives in the back run and the first step of the drain has to move them. The
+// seed carries one item that is never removed, so the drain runs out of turns
+// rather than out of items and the printed length is one.
+function drainingSource(
+	built: "prepend" | "append",
+	turns: number,
+	step: string,
+): string {
 	return `implementation {
-	constant built = loop(from 1, through ${DRAIN_TURNS}, startingWith [0], step (
+	constant built = loop(from 1, through ${turns}, startingWith [0], step (
 		index,
 		list,
-	) { <- list::prepend(index) })
+	) { <- list::${built}(index) })
 
-	constant drained = loop(from 1, through ${DRAIN_TURNS}, startingWith built, step (
+	constant drained = loop(from 1, through ${turns}, startingWith built, step (
 		_,
 		list,
 	) { <- list::${step} })
@@ -128,7 +144,10 @@ describe("List performance", () => {
 
 	it("drains twenty thousand items from the front in well under the quadratic time", () => {
 		expect(
-			millisecondsToRun(drainingSource("remove(at 0)"), "1"),
+			millisecondsToRun(
+				drainingSource("prepend", DRAIN_TURNS, "remove(at 0)"),
+				"1",
+			),
 		).toBeLessThan(DRAIN_CEILING_MILLISECONDS)
 	})
 
@@ -141,7 +160,28 @@ describe("List performance", () => {
 	// this machine, best of five, when that was measured.
 	it("drains twenty thousand items through removeFirst just as fast", () => {
 		expect(
-			millisecondsToRun(drainingSource("removeFirst()"), "1"),
+			millisecondsToRun(
+				drainingSource("prepend", DRAIN_TURNS, "removeFirst()"),
+				"1",
+			),
+		).toBeLessThan(DRAIN_CEILING_MILLISECONDS)
+	})
+
+	it("drains sixty thousand appended items from the front in well under the quadratic time", () => {
+		expect(
+			millisecondsToRun(
+				drainingSource("append", APPEND_DRAIN_TURNS, "remove(at 0)"),
+				"1",
+			),
+		).toBeLessThan(DRAIN_CEILING_MILLISECONDS)
+	})
+
+	it("drains sixty thousand appended items through removeFirst just as fast", () => {
+		expect(
+			millisecondsToRun(
+				drainingSource("append", APPEND_DRAIN_TURNS, "removeFirst()"),
+				"1",
+			),
 		).toBeLessThan(DRAIN_CEILING_MILLISECONDS)
 	})
 })

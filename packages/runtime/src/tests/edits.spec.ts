@@ -411,12 +411,74 @@ describe("what an edit shares", () => {
 		expect(answer.length).toBe(2)
 	})
 
-	test("dropping the first item of a box with no front copies", () => {
+	// NOTE: A box whose seam is at zero can share no suffix as it stands, so
+	// asked for one it moves its seam to the end first: the back run becomes a
+	// front run, and the answer is a window of that. The receiver answers the
+	// same items in its new shape, and the fresh back it is left with is its
+	// own, so a later append pushes onto it in place.
+	test("dropping the first item of a box with no front upgrades it and shares", () => {
 		let receiver = flatSix()
+		let original = receiver.value
 		let answer = remove(receiver, integer(0))
 
-		expect(answer.value).not.toBe(receiver.value)
+		expect(receiver.front).toBeDefined()
+		expect(receiver.frontLen).toBe(6)
+		expect(receiver.length).toBe(0)
+		expect(receiver.value).not.toBe(original)
+		expect(answer.front).toBe(receiver.front)
+		expect(answer.value).toBe(receiver.value)
+		expect(answer.frontLen).toBe(5)
+		expect(answer.length).toBe(0)
 		expect(itemsOf(receiver)).toEqual([11, 22, 33, 44, 55, 66])
+		expect(itemsOf(answer)).toEqual([22, 33, 44, 55, 66])
+
+		let grown = append(receiver, integer(77))
+
+		expect(grown.value).toBe(receiver.value)
+		expect(itemsOf(grown)).toEqual([11, 22, 33, 44, 55, 66, 77])
+		expect(itemsOf(answer)).toEqual([22, 33, 44, 55, 66])
+	})
+
+	test("a suffix of a flat box upgrades it and shares", () => {
+		let receiver = flatSix()
+		let answer = slice(receiver, integer(2), integer(6))
+
+		expect(receiver.frontLen).toBe(6)
+		expect(answer.front).toBe(receiver.front)
+		expect(answer.frontLen).toBe(4)
+		expect(answer.length).toBe(0)
+		expect(itemsOf(answer)).toEqual([33, 44, 55, 66])
+		expect(itemsOf(receiver)).toEqual([11, 22, 33, 44, 55, 66])
+	})
+
+	// NOTE: The half rule — an upgrade copies the whole run where the plain
+	// path copies the window, so a suffix shorter than the prefix it drops is
+	// copied out as it always was, and the receiver is left flat.
+	test("a short suffix of a flat box copies rather than upgrading", () => {
+		let receiver = flatSix()
+		let answer = slice(receiver, integer(4), integer(6))
+
+		expect(receiver.front).toBeUndefined()
+		expect(answer.front).toBeUndefined()
+		expect(answer.value).not.toBe(receiver.value)
+		expect(itemsOf(answer)).toEqual([55, 66])
+	})
+
+	test("a front run viewed at zero upgrades like a flat box", () => {
+		let receiver = remove(prependedOnly([11, 22]), integer(0))
+		let widened = append(remove(receiver, integer(0)), integer(33))
+		let grown = append(widened, integer(44))
+		let seamAtZero = runsOf(grown)
+
+		expect(seamAtZero.frontCount).toBe(0)
+		expect(seamAtZero.backCount).toBe(2)
+
+		let answer = slice(grown, integer(1), integer(2))
+
+		expect(grown.frontLen).toBe(2)
+		expect(answer.front).toBe(grown.front)
+		expect(itemsOf(answer)).toEqual([44])
+		expect(itemsOf(grown)).toEqual([33, 44])
 	})
 
 	test("replace copies only the run the position falls in", () => {
@@ -652,24 +714,72 @@ describe("a shared answer is invisible", () => {
 // less of it in view, so the whole drain moves no items at all — and reading a
 // box in the middle of the chain must not disturb the rest of it.
 describe("draining from the front", () => {
-	test("every step answers the items that are left", () => {
-		let drained = prependedOnly([11, 22, 33, 44, 55, 66])
-		let seen: Array<Array<number>> = []
+	// NOTE: Both ways a List can have been built, because which end it was
+	// built at used to decide whether taking it apart from the front copied
+	// the whole of it at every step.
+	for (let [built, build] of [
+		["a prepend-built", prependedOnly],
+		[
+			"an append-built",
+			(items: Array<number>) => createList(items.map(integer)),
+		],
+	] as const) {
+		test(`every step of ${built} drain answers the items that are left`, () => {
+			let drained = build([11, 22, 33, 44, 55, 66])
+			let seen: Array<Array<number>> = []
 
-		for (let step = 0; step < 6; step++) {
+			for (let step = 0; step < 6; step++) {
+				drained = remove(drained, integer(0))
+				seen.push(itemsOf(drained))
+			}
+
+			expect(seen).toEqual([
+				[22, 33, 44, 55, 66],
+				[33, 44, 55, 66],
+				[44, 55, 66],
+				[55, 66],
+				[66],
+				[],
+			])
+			expect(itemsOf(remove(drained, integer(0)))).toEqual([])
+		})
+
+		test(`every step of ${built} removeFirst drain answers the items that are left`, () => {
+			let drained = build([11, 22, 33, 44, 55, 66])
+			let seen: Array<Array<number>> = []
+
+			for (let step = 0; step < 6; step++) {
+				drained = slice(drained, integer(1), length(drained))
+				seen.push(itemsOf(drained))
+			}
+
+			expect(seen).toEqual([
+				[22, 33, 44, 55, 66],
+				[33, 44, 55, 66],
+				[44, 55, 66],
+				[55, 66],
+				[66],
+				[],
+			])
+		})
+	}
+
+	test("an append-built drain moves no items after its first step", () => {
+		let drained = createList([11, 22, 33, 44, 55, 66].map(integer))
+
+		drained = remove(drained, integer(0))
+
+		let front = drained.front
+
+		expect(front).toBeDefined()
+
+		for (let step = 0; step < 4; step++) {
 			drained = remove(drained, integer(0))
-			seen.push(itemsOf(drained))
+
+			expect(drained.front).toBe(front)
 		}
 
-		expect(seen).toEqual([
-			[22, 33, 44, 55, 66],
-			[33, 44, 55, 66],
-			[44, 55, 66],
-			[55, 66],
-			[66],
-			[],
-		])
-		expect(itemsOf(remove(drained, integer(0)))).toEqual([])
+		expect(itemsOf(drained)).toEqual([66])
 	})
 
 	test("a version held from the middle of the drain keeps its items", () => {
