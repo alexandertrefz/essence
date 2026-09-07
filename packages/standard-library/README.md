@@ -28,8 +28,10 @@ The modes a Method takes are Choices declared beside it: `Side`, `Rounding`,
 `NumberFormat`, `CaseSensitivity`, `NormalizationForm`, `SortOrder`, `Stream`
 and `Step`.
 A Choice whose Cases all carry no payload derives both its `Equatable` and its
-`Printable` conformance, so seven of those Namespaces declare the two and hold
-no body at all: `#Less` prints `Less` without anybody writing that down.
+`Printable` conformance, so seven of those eight have a Namespace that declares
+the two and holds no body at all: `#Less` prints `Less` without anybody writing
+that down. `Step` has none, because both of its Cases carry a payload and only a
+Choice of Cases that carry none derives a `toString`.
 
 The only things NOT declared here are the ones no declaration could produce:
 the bare Type tags — `Boolean`, `String`, `Integer`, `Rational`, `Algebraic`,

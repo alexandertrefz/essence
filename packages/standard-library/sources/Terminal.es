@@ -1,5 +1,8 @@
 import {
-	from "./Protocols.es" { Printable }
+	from "./Protocols.es" {
+		Equatable
+		Printable
+	}
 	from "./String.es" { String }
 }
 
@@ -15,6 +18,11 @@ declarations {
 		Output,
 		Error,
 	}
+
+	§ Equality and printing are both derived for a Choice of Cases that carry
+	§ no payload. This Namespace declares the two and writes neither; see
+	§ DEVELOPMENT.md, Why bodies look the way they do.
+	namespace Stream for Stream is Equatable, is Printable {}
 
 	§ Three Methods, because the audiences are three. The `print` Method is for
 	§ the Program's reader, `inspect` is for its author, and `write` is the

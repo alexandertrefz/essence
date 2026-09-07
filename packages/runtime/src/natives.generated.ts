@@ -383,6 +383,10 @@ export type SortOrderNatives = {
 
 }
 
+export type StreamNatives = {
+
+}
+
 export type RecordNatives = {
 	// is(_: Record) -> Boolean
 	is: (self: RecordType, argument1: RecordType) => BooleanType
@@ -833,6 +837,9 @@ export const $Rounding: RoundingNatives = RoundingModule
 
 declare const SortOrderModule: typeof import("./SortOrder")
 export const $SortOrder: SortOrderNatives = SortOrderModule
+
+declare const StreamModule: typeof import("./Stream")
+export const $Stream: StreamNatives = StreamModule
 
 declare const RecordModule: typeof import("./Record")
 export const $Record: RecordNatives = RecordModule
