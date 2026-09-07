@@ -826,7 +826,7 @@ declarations {
 
 		§§ Answers whether the Number has the same numeric value as another Number.
 		§§
-		§§ An Integer and a Rational are the same Number when their values are equal, so `1 is 1/1` holds.
+		§§ An Integer and a Rational are the same Number when their values are equal, so `1 is 1/1` holds. The answer is read off `compare`. So two Transcendentals that both carry π and e can stop the Program at the precision cutoff `compare` names.
 		§§
 		§§ @param _ — the Number to compare against
 		§§ @returns — `true` when both Numbers have the same numeric value.
@@ -835,6 +835,8 @@ declarations {
 		}
 
 		§§ Orders the Number against another Number by numeric value, across every member of the tower.
+		§§
+		§§ Every pair is ordered exactly, with one exception. A Transcendental carrying both π and e is ordered against another Number by refining enclosures, and the refinement stops at 32768 decimal places. A pair that still agrees there stops the Program with an error, since deciding it exactly is an open problem. The bounded form is `Transcendental::compare(to:withPrecision:)`, which answers empty instead.
 		§§
 		§§ @param to — the Number to order against
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.

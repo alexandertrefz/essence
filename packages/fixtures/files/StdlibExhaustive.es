@@ -1436,6 +1436,21 @@ third"::lines())
 		"Transcendental.isNot(_ Transcendental) [equal]",
 		Number.Pi::isNot(Number.Pi),
 	)
+	show(
+		"Transcendental.compare(to: Transcendental, withPrecision: PositiveInteger)",
+		Number.Pi::compare(to Number.E, withPrecision 1),
+	)
+	show(
+		"Transcendental.compare(to: Transcendental, withPrecision: PositiveInteger) [not told apart]",
+		Number.Pi::compare(
+			to Number.E::multiply(with 1156/1000),
+			withPrecision 2,
+		),
+	)
+	show(
+		"Transcendental.compare(to: Transcendental, withPrecision: PositiveInteger) [terms cancel]",
+		Number.Pi::compare(to Number.Pi::add(1), withPrecision 1),
+	)
 	show("Transcendental.add(_ Integer)", Number.Pi::add(1))
 	show("Transcendental.add(_ Rational)", Number.Pi::add(1/2))
 	show("Transcendental.add(_ Transcendental)", Number.Pi::add(Number.Pi))

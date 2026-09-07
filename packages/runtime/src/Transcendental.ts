@@ -485,31 +485,113 @@ export function absolute(
 		: transcendental
 }
 
-// NOTE: The difference of two values is again a form in the span; its sign is
-// decided by `signOfForm` — exactly for single-base differences, through the
-// cutoff refinement for several-base ones.
+// NOTE: `transcendental − other`, which is again a form in the span: the
+// rational parts' difference and the canonical terms of the coefficients'
+// differences, with the terms that cancelled gone. Both comparisons below are
+// read off it.
+function differenceForm(
+	transcendental: TranscendentalType,
+	other: TranscendentalType,
+): { rationalPart: BigRational; terms: Array<TranscendentalTerm> } {
+	return {
+		rationalPart: subtractRationals(
+			rationalPartOf(transcendental),
+			rationalPartOf(other),
+		),
+		terms: canonicalTerms([
+			...coefficientsOf(transcendental),
+			...scaledCoefficients(other, { numerator: -1n, denominator: 1n }),
+		]),
+	}
+}
+
+function orderingOfRational(rational: BigRational): OrderingType {
+	if (rational.numerator === 0n) {
+		return equal
+	}
+
+	return rational.numerator < 0n ? less : greater
+}
+
+// NOTE: The sign of the difference form is decided by `signOfForm` — exactly
+// for single-base differences, through the cutoff refinement for several-base
+// ones.
 export function compareTranscendentals(
 	transcendental: TranscendentalType,
 	other: TranscendentalType,
 ): OrderingType {
-	const rationalDifference = subtractRationals(
-		rationalPartOf(transcendental),
-		rationalPartOf(other),
-	)
-	const differenceTerms = canonicalTerms([
-		...coefficientsOf(transcendental),
-		...scaledCoefficients(other, { numerator: -1n, denominator: 1n }),
-	])
+	const { rationalPart, terms } = differenceForm(transcendental, other)
 
-	if (differenceTerms.length === 0) {
-		if (rationalDifference.numerator === 0n) {
-			return equal
-		}
-
-		return rationalDifference.numerator < 0n ? less : greater
+	if (terms.length === 0) {
+		return orderingOfRational(rationalPart)
 	}
 
-	return signOfForm(rationalDifference, differenceTerms) < 0n ? less : greater
+	return signOfForm(rationalPart, terms) < 0n ? less : greater
+}
+
+// NOTE: How wide `scaledFormInterval` is, in units of its own scale: the
+// rational part contributes 4, and each term 4 plus three times its
+// coefficient, since a base's enclosure is three units wide and the
+// coefficient scales it. Read by the bounded comparison to pick guard digits.
+function scaledFormWidth(terms: ReadonlyArray<TranscendentalTerm>): bigint {
+	let width = 4n
+
+	for (const term of terms) {
+		const magnitude =
+			term.coefficientNumerator < 0n
+				? -term.coefficientNumerator
+				: term.coefficientNumerator
+		const coefficient =
+			(magnitude + term.coefficientDenominator - 1n) /
+			term.coefficientDenominator
+
+		width += 3n * coefficient + 4n
+	}
+
+	return width
+}
+
+// NOTE: The bounded form of the comparison above, and the one Method of the
+// Namespace named `compare`. The difference form is enclosed once and the
+// answer is read off that enclosure: an interval clear of zero is a sign, an
+// interval straddling zero is empty. A difference whose terms all cancelled is
+// a Rational and is signed exactly whatever the width.
+//
+// The enclosure is computed with enough guard digits that it is UNDER one unit
+// of the caller's last decimal place wide — `scaledFormWidth` units at the
+// guarded scale, which the guard's power of ten exceeds. That is what makes the
+// promise in the §§ block true in both directions: two values a unit of the
+// last place or more apart can not share an interval that narrow with zero, so
+// they are always told apart, and empty is answered only for two closer than
+// that. Nothing here refines, so nothing reaches the precision cutoff — that is
+// what a caller buys by naming a width, and why the answer is an Optional.
+export function compare(
+	transcendental: TranscendentalType,
+	other: TranscendentalType,
+	digits: IntegerType,
+): OptionalType<OrderingType> {
+	const { rationalPart, terms } = differenceForm(transcendental, other)
+
+	if (terms.length === 0) {
+		return createValue(orderingOfRational(rationalPart))
+	}
+
+	const guardDigits = BigInt(scaledFormWidth(terms).toString().length)
+	const enclosure = scaledFormInterval(
+		rationalPart,
+		terms,
+		BigInt(digits.value) + guardDigits,
+	)
+
+	if (enclosure.high < 0n) {
+		return createValue(less)
+	}
+
+	if (enclosure.low > 0n) {
+		return createValue(greater)
+	}
+
+	return createEmpty()
 }
 
 export function add(

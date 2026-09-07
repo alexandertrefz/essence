@@ -3,8 +3,10 @@ import {
 	from "./Integer.es" {
 		Integer
 		NonZeroInteger
+		PositiveInteger
 	}
 	from "./Optional.es" { Optional }
+	from "./Ordering.es" { Ordering }
 	from "./Protocols.es" {
 		Equatable
 		Printable
@@ -20,12 +22,15 @@ declarations {
 	§ A number that is provably not algebraic. For now it is the linear
 	§ slice `a + b·π + c·e` over the bases Pi and E, which keeps Pi, Tau and
 	§ E exact. Whether a value over both bases can equal another number is
-	§ an open problem, so Transcendental does not conform to Comparable.
-	§ Comparison against another kind is still total, through the covering
-	§ `Number`.
+	§ an open problem, so Transcendental does not conform to Comparable. A
+	§ conformance would promise a total `compare`, and the one the runtime
+	§ has stops at a precision cutoff. Every comparison is still reachable,
+	§ against a Transcendental as much as against another kind, through the
+	§ covering `Number`'s rung, which carries that cutoff. The bounded
+	§ `compare(to:withPrecision:)` below is the form that never reaches it.
 	namespace Transcendental for Transcendental is Equatable, is Printable {
-		§ `is` and `absolute` are native. Neither reaches a primitive this
-		§ Namespace declares. Equality is decided by the canonical form
+		§ `is`, `compare` and `absolute` are native. None reaches a primitive
+		§ this Namespace declares. Equality is decided by the canonical form
 		§ itself, and the sign of `a + b·π + c·e` needs an ordering
 		§ Transcendental declares nowhere. Reading the covering `Number`
 		§ instead puts the whole numeric tower behind an equality check; see
@@ -38,6 +43,18 @@ declarations {
 		§§ @param _ — the Transcendental to compare with
 		§§ @returns — `true` when the canonical forms agree.
 		is(_ other: Transcendental) -> Boolean
+
+		§§ Orders the Transcendental against another one, to a given number of decimal places.
+		§§
+		§§ The difference of the two is enclosed in an interval under one unit of the last decimal place wide. The answer is read off that interval. Two values one unit of that place or more apart are always told apart. The answer is empty only for two values closer than that. Two values whose π and e terms cancel differ by a Rational, and compare exactly at any width. No call here reaches the precision cutoff that `Number::compare` can, since nothing is refined past the width given.
+		§§
+		§§ @param to — the Transcendental to order against
+		§§ @param withPrecision — the number of decimal places the two are told apart to
+		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`, or nothing when the two are not told apart at that width.
+		compare(
+			to other: Transcendental,
+			withPrecision digits: PositiveInteger,
+		) -> Optional<Ordering>
 
 		§§ Answers the Transcendental as a String, in the exact symbolic form: `π`, `2·π`, `e` or `1 + π + e`.
 		toString() -> String
