@@ -99,10 +99,13 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(38_000)
 	})
 
-	// NOTE: 45,846 measured. The two tests above watch a Dictionary being shaken
+	// NOTE: 47,554 measured. The two tests above watch a Dictionary being shaken
 	// away whole; this one records what a Program that DOES hold one carries —
 	// the store, every native the file reaches, the written form, the kind
-	// registry and the registration that fills it.
+	// registry and the registration that fills it. The composite key encoding
+	// — a Case or a Record spelled into a text from its parts — is 1,708 of
+	// those bytes, and rides in with every Dictionary whatever its keys are,
+	// because the encoding is one function with an arm per kind.
 	//
 	// NOTE: What it watches for is the registry being BYPASSED, which would put
 	// the rendering in front of every Program whether it holds a Dictionary or
@@ -110,7 +113,7 @@ describe("Bundle Size", () => {
 	// the whole store into the two files above. The evidence that neither has
 	// happened is that those two do not move when this one does.
 	it("charges a Dictionary Program for the container it uses", async () => {
-		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(46_700)
+		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(48_700)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far

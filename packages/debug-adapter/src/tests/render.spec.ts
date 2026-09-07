@@ -120,7 +120,7 @@ function boxAt(
 		store: {
 			slots,
 			index: new Map(),
-			fractions: new Map(),
+			texts: new Map(),
 			generation: Math.max(
 				0,
 				...slots.flatMap((slot) =>
