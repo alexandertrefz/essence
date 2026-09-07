@@ -10260,17 +10260,19 @@ describe("Enricher", () => {
 		// NOTE: The other side of the same rule. A value the Program COMPUTES is
 		// a value nothing has decided anything about, however plainly it was
 		// computed a line above — which is what keeps every unproven entry
-		// reachable.
+		// reachable. A DIFFERENCE, because it is the arithmetic no refinement
+		// of Integer closes over: a sum and a product of two written Integers
+		// each answer a `PositiveInteger` and carry that proof on.
 		it("should prove nothing about a computed receiver", () => {
 			expect(
-				answerOf(`constant two = 1::add(1)
+				answerOf(`constant two = 3::subtract(1)
 					constant root = two::squareRoot()`),
 			).toBe("Optional<Integer | Algebraic>")
 		})
 
 		it("should spend the proof on the Namespace that takes it", () => {
 			expect(answerOf("constant root = 4::squareRoot()")).toBe(
-				"Integer | Algebraic",
+				"PositiveInteger | Algebraic",
 			)
 			expect(answerOf("constant first = [1, 2]::firstItem()")).toBe(
 				"Integer",
@@ -10285,14 +10287,17 @@ describe("Enricher", () => {
 			).toBe("Algebraic")
 		})
 
-		// NOTE: What the proof may never do is make an answer WIDER. `raise`
-		// answers an Integer for a non-negative exponent whatever the receiver
-		// proves, `add` is total either way, and a receiver proving only that it
-		// is not negative reaches no `raise` of its own — so a negative exponent
-		// there is still the entry that can come back empty.
+		// NOTE: What the proof may never do is make an answer WIDER. A power at
+		// a non-negative exponent and a sum are whole numbers whatever the
+		// receiver proves, and each answers the tightest Integer the operands
+		// prove between them. A receiver proving only that it is not negative
+		// reaches no `raise` of its own, so a negative exponent there is still
+		// the entry that can come back empty.
 		it("should never widen an answer the base already gave", () => {
-			expect(answerOf("constant power = 2::raise(to 10)")).toBe("Integer")
-			expect(answerOf("constant sum = 1::add(2)")).toBe("Integer")
+			expect(answerOf("constant power = 2::raise(to 10)")).toBe(
+				"PositiveInteger",
+			)
+			expect(answerOf("constant sum = 1::add(2)")).toBe("PositiveInteger")
 			expect(answerOf("constant power = 0::raise(to -1)")).toBe(
 				"Optional<Integer | Rational>",
 			)
@@ -10300,11 +10305,18 @@ describe("Enricher", () => {
 
 		// NOTE: And where the proof tightens the answer it says so — a product
 		// of two proven Integers is proven itself, which is what `namespace
-		// NonZeroInteger` was written to carry.
+		// NonZeroInteger` was written to carry. Two written factors prove both
+		// halves of the sign as well, and `namespace PositiveInteger` is
+		// narrower than either of the two it holds the proofs of, so it is the
+		// one the call reaches.
 		it("should answer with the refinement a refined entry declares", () => {
 			expect(answerOf("constant product = 2::multiply(with 3)")).toBe(
-				"NonZeroInteger",
+				"PositiveInteger",
 			)
+			expect(
+				answerOf(`constant count: NonZeroInteger = 3
+					constant product = count::multiply(with 4)`),
+			).toBe("NonZeroInteger")
 		})
 
 		// NOTE: The proofs the library MINTS. A count is never negative, a count
@@ -10312,9 +10324,9 @@ describe("Enricher", () => {
 		// never negative and a denominator in lowest terms is always positive
 		// — and each of those answers says so, so that the next call can spend
 		// it: `2::raise(to items::length())` reaches the entry taking a
-		// `NonNegativeInteger` exponent and answers an Integer rather than the
-		// Union, and `absolute()::squareRoot()` answers the root itself rather
-		// than an Optional.
+		// `NonNegativeInteger` exponent and answers a whole number rather than
+		// the Union, and `absolute()::squareRoot()` answers the root itself
+		// rather than an Optional.
 		it("should mint the count and sign proofs a native answer carries", () => {
 			expect(
 				answerOf(`constant items: List<Integer> = [1, 2, 3]
@@ -10357,7 +10369,7 @@ describe("Enricher", () => {
 			expect(
 				answerOf(`constant items: NonEmptyList<Integer> = [1, 2, 3]
 					constant power = 2::raise(to items::length())`),
-			).toBe("Integer")
+			).toBe("PositiveInteger")
 			expect(
 				answerOf(`constant computed = 1::subtract(2)
 					constant root = computed::absolute()::squareRoot()`),
@@ -10365,7 +10377,11 @@ describe("Enricher", () => {
 			expect(
 				answerOf(`constant computed = 1/4::add(1/4)
 					constant scaled = 10::raise(to computed::denominator())`),
-			).toBe("Integer")
+			).toBe("PositiveInteger")
+			expect(
+				answerOf(`constant items: List<Integer> = [1, 2, 3]
+					constant width = items::length()::add(1)`),
+			).toBe("PositiveInteger")
 		})
 
 		// NOTE: A Program's own Alias is a candidate beside the builtins, and a

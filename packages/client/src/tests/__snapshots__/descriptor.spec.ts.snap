@@ -3698,7 +3698,7 @@ exports[`A Module described describes Refused.es 1`] = `
           },
         ],
         "kind": "union",
-        "shown": "Integer | Algebraic",
+        "shown": "PositiveInteger | Algebraic",
       },
     },
     "shallow": {

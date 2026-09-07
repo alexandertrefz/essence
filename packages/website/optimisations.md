@@ -223,18 +223,26 @@ What is lowered, and nothing else:
   `@::add(other::negate())` — is one allocation where it was two, and no call on
   the path that is taken.
 - **NonZeroInteger**: `multiply`, and only where both operands are exactly
-  `Integer`. This is where a written receiver's product goes — `2::multiply(with
-  3)` proves both operands away — as well as a receiver a branch narrowed. A
+  `Integer`. This is where a receiver a branch narrowed takes its product — a
+  written receiver's goes to `PositiveInteger` below, which is narrower still. A
   checked refinement is erased before the first pass runs, so such a call holds
   two ordinary Integers, and the Method it would have reached is Integer's own
   product re-exported under the refined Namespace's name. Same operator, same
   operands, same answer: the evidence was spent while compiling and there is
-  nothing left of it to run. The Namespace declares three more
-  entries, and each is left as the call it is. Two of them scale an Algebraic or
-  a Transcendental — the overload index is not what tells those apart, since the
-  operands are, and `scalarOperands` answers null for anything but two Integers
-  — and `raise` is refused by name as well as by `lowerInteger`, whose reason is
-  that the answer's size is the exponent's value rather than its length.
+  nothing left of it to run. Every other entry the Namespace declares is left as
+  the call it is. Two of them scale an Algebraic or a Transcendental — the
+  overload index is not what tells those apart, since the operands are, and
+  `scalarOperands` answers null for anything but two Integers — `raise` is
+  refused by name as well as by `lowerInteger`, whose reason is that the
+  answer's size is the exponent's value rather than its length, and `divide`,
+  `absolute` and `negate` are not an operator over two Integers at all.
+- **NonNegativeInteger** and **PositiveInteger**: `add` and `multiply`, on that
+  same guard of two exact Integers. A written Integer proves both halves of its
+  sign, so `1::add(2)` and `2::multiply(with 3)` are `PositiveInteger`'s sum and
+  product now, and each of the two Namespaces re-exports Integer's own
+  arithmetic under its own name — so the lowering is the one above, reached by
+  another name. `raise` and `squareRoot` are left as the calls they are, for the
+  reasons Integer's own are.
 - **Boolean**: `negate`, `and`, `or`, which become `!`, `&&` and `||`.
 - **String**: `is` and the provided `isNot`, which become one call to the
   runtime's `stringEquals`. Two Strings are equal when their CHARACTERS are — the same
@@ -937,14 +945,15 @@ What is folded is Integer and Rational arithmetic (`add`, `subtract`,
 String concatenation (`append`, `prepend`), and an interpolation hole whose value
 is a literal and whose witness names a standard library `toString`. A written
 receiver proves what it can about itself, so `60::multiply(with 60)` is
-`NonZeroInteger`'s product rather than `Integer`'s by the time this reads it —
+`PositiveInteger`'s product rather than `Integer`'s by the time this reads it —
 that rung folds too, on the same two-written-Integers guard
-`lower-scalar-operations` reads it by. `1/2::multiply(with 2/3)` is
-`NonZeroRational`'s product for the same reason, and folds on the matching guard
-of two written Rationals. `NonZeroRational.reciprocal` is left as the call it
-is: it takes one operand apart rather than combining two, and nobody has weighed
-it. Where every hole of an interpolated String folds, the whole String becomes a
-literal — and `pool-constants` then declares it once.
+`lower-scalar-operations` reads it by, and so do `NonZeroInteger`'s and
+`NonNegativeInteger`'s. `1/2::multiply(with 2/3)` is `NonZeroRational`'s product
+for the same reason, and folds on the matching guard of two written Rationals.
+`NonZeroRational.reciprocal` is left as the call it is: it takes one operand
+apart rather than combining two, and nobody has weighed it. Where every hole of
+an interpolated String folds, the whole String becomes a literal — and
+`pool-constants` then declares it once.
 
 Safe because the Compiler works the answer out THE SAME WAY the Program would
 have. Essence arithmetic is exact — the fold is carried out in bigints and pairs

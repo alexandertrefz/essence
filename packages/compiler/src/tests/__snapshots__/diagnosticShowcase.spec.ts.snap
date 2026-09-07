@@ -370,7 +370,7 @@ Error: No Method named 'lenght' for this value
     │                                │    
     │                                ╰──── no Method of this name
     │ 
-    │ Note: Searched Namespaces 'Integer', 'NonZeroInteger', 'NonNegativeInteger', 'Number'.
+    │ Note: Searched Namespaces 'Integer', 'NonZeroInteger', 'NonNegativeInteger', 'PositiveInteger', 'Number'.
 ────╯
 
 [no-matching-overload]
@@ -1462,9 +1462,9 @@ Warning: This 'defaultingTo' Argument can never be read
     │                                      ────────┬───────  
     │                                              ╰───────── this fallback can never be read
     │ 
-    │ Help: Drop the 'defaultingTo' Argument; the call already answers a Rational.
+    │ Help: Drop the 'defaultingTo' Argument; the call already answers a NonZeroRational.
     │ 
-    │ Note: Without it the call answers a Rational, which is never empty.
+    │ Note: Without it the call answers a NonZeroRational, which is never empty.
 ────╯
 
 [fallback-never-used]

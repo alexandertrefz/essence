@@ -399,29 +399,37 @@ third"::lines())
 	§ A RECEIVER written down proves the same things about itself, and reaches
 	§ the refined Namespace that spends the proof. So a computed receiver is
 	§ what keeps a call on the entry `Integer` declares, and each refined
-	§ Namespace is called under a label of its own further down.
-	constant computedTwo   = 1::add(1)
-	constant computedThree = 1::add(2)
-	constant computedEight = 4::add(4)
-	constant computedNine  = 4::add(5)
-	constant computedTen   = 5::add(5)
+	§ Namespace is called under a label of its own further down. Each is
+	§ computed with `subtract`, the one operation no refined Namespace closes
+	§ over: a sum of two written Integers is `PositiveInteger`'s own now, and
+	§ would carry its proof into every call below.
+	constant computedTwo   = 3::subtract(1)
+	constant computedThree = 4::subtract(1)
+	constant computedFive  = 6::subtract(1)
+	constant computedEight = 9::subtract(1)
+	constant computedNine  = 10::subtract(1)
+	constant computedTen   = 11::subtract(1)
 	constant computedZero  = 1::subtract(1)
 
-	constant computedHundred       = 99::add(1)
+	constant computedSixtySix      = 67::subtract(1)
+	constant computedHundred       = 101::subtract(1)
+	constant computedDividend      = 1111::subtract(1)
 	constant computedNegativeThree = 0::subtract(3)
+	constant computedNegativeFive  = 0::subtract(5)
 
 	§ A written Rational proves it is not zero exactly as a written Integer
 	§ does, so these keep the calls below on the entries taking a Rational that
 	§ might be. Each is the sum of two halves of itself, which the exact
 	§ arithmetic answers in lowest terms — so each holds the parts the written
-	§ form holds.
+	§ form holds. The negative one is a difference, for the same reason.
 	constant computedHalf          = 1/4::add(1/4)
 	constant computedSixth         = 1/12::add(1/12)
 	constant computedThreeQuarters = 1/2::add(1/4)
+	constant computedNegativeThreeQuarters = 0/1::subtract(3/4)
 
 	§ One over the range a JavaScript number holds exactly, computed so that
 	§ the multiplication below is Integer's own.
-	constant computedHugeInteger = 9_007_199_254_740_990::add(1)
+	constant computedHugeInteger = 9_007_199_254_740_992::subtract(1)
 
 	show("Integer.is(_ Integer)", 7::is(7))
 	show("Integer.is(_ Integer) [differing]", 7::is(8))
@@ -431,7 +439,7 @@ third"::lines())
 	show("Integer.is(_ Rational) [fractional]", 7::is(1/2))
 	show("Integer.isNot(_ Rational)", 7::isNot(1/2))
 	show("Integer.isNot(_ Rational) [equal]", 7::isNot(7/1))
-	show("Integer.add(_ Integer)", 66::add(34))
+	show("Integer.add(_ Integer)", computedSixtySix::add(34))
 	show("Integer.add(_ Integer) [negative]", 66::add(-100))
 	show("Integer.add(_ Rational)", 1::add(1/2))
 	show("Integer.add(_ Transcendental)", 1::add(Number.Pi))
@@ -442,7 +450,7 @@ third"::lines())
 	show("Integer.divide(by: Integer) [by zero]", 1::divide(by 0))
 	show("Integer.divide(by: Rational)", 1::divide(by computedHalf))
 	show("Integer.divide(by: Rational) [by zero]", 1::divide(by 0/1))
-	show("Integer.divide(by: NonZeroInteger)", 1110::divide(by 2))
+	show("Integer.divide(by: NonZeroInteger)", computedDividend::divide(by 2))
 	show("Integer.divide(by: NonZeroRational)", 1::divide(by 1/2))
 	show(
 		"Integer.divide(by: Integer, defaultingTo: Rational)",
@@ -523,9 +531,9 @@ third"::lines())
 		"Integer.squareRoot(defaultingTo: Integer | Algebraic) [negative]",
 		-1::squareRoot(defaultingTo 0),
 	)
-	show("Integer.absolute()", -5::absolute())
-	show("Integer.absolute() [positive]", 5::absolute())
-	show("Integer.negate()", 5::negate())
+	show("Integer.absolute()", computedNegativeFive::absolute())
+	show("Integer.absolute() [positive]", computedFive::absolute())
+	show("Integer.negate()", computedFive::negate())
 	show("Integer.negate() [zero]", 0::negate())
 	show("Integer.round(toward?: Rounding) [no direction named]", 5::round())
 	show("Integer.round(toward?: Rounding)", -5::round(toward #Up))
@@ -717,7 +725,8 @@ third"::lines())
 	§ so does `raise`: a base that is not zero has a power at every exponent,
 	§ negative ones included. Its second entry takes the exponent's proof as
 	§ well, so the base entry is reached with a computed one.
-	constant provenSix: NonZeroInteger = 6
+	constant provenSix: NonZeroInteger         = 6
+	constant provenNegativeSix: NonZeroInteger = -6
 
 	show(
 		"NonZeroInteger.multiply(with: NonZeroInteger)",
@@ -737,21 +746,80 @@ third"::lines())
 		provenSix::raise(to computedTwo),
 	)
 	show("NonZeroInteger.raise(to: NonNegativeInteger)", provenSix::raise(to 2))
+	show("NonZeroInteger.divide(by: NonZeroInteger)", provenSix::divide(by 4))
+	show(
+		"NonZeroInteger.divide(by: NonZeroInteger) [reaches reciprocal bare]",
+		provenSix::divide(by 4)::reciprocal(),
+	)
+	show("NonZeroInteger.absolute()", provenNegativeSix::absolute())
+	show("NonZeroInteger.absolute() [positive]", provenSix::absolute())
+	show("NonZeroInteger.negate()", provenSix::negate())
+	show("NonZeroInteger.negate() [negative]", provenNegativeSix::negate())
 
 	§ ——— NonNegativeInteger ————————————————————————————————————————————————
-	§ The one Method a sign proves. The receivers are declared rather than
+	§ The Methods a sign proves. The receivers are declared rather than
 	§ written, so that the calls above keep reaching Integer's own entry: a
-	§ written `4` proves its sign for itself and comes here instead.
+	§ written `4` proves its sign for itself and comes here instead. The
+	§ `add` entries are told apart by what is known about the SUMMAND, and a
+	§ written `0` proves only that it is not negative.
 	constant provenFour: NonNegativeInteger  = 4
 	constant provenThree: NonNegativeInteger = 3
 	constant provenZero: NonNegativeInteger  = 0
 
+	show("NonNegativeInteger.add(_ PositiveInteger)", provenFour::add(3))
+	show(
+		"NonNegativeInteger.add(_ PositiveInteger) [zero receiver]",
+		provenZero::add(3),
+	)
+	show("NonNegativeInteger.add(_ NonNegativeInteger)", provenFour::add(0))
+	show(
+		"NonNegativeInteger.add(_ NonNegativeInteger) [both zero]",
+		provenZero::add(0),
+	)
+	show(
+		"NonNegativeInteger.multiply(with: NonNegativeInteger)",
+		provenFour::multiply(with 3),
+	)
+	show(
+		"NonNegativeInteger.multiply(with: NonNegativeInteger) [zero]",
+		provenFour::multiply(with 0),
+	)
 	show("NonNegativeInteger.squareRoot()", provenFour::squareRoot())
 	show(
 		"NonNegativeInteger.squareRoot() [irrational]",
 		provenThree::squareRoot(),
 	)
 	show("NonNegativeInteger.squareRoot() [zero]", provenZero::squareRoot())
+
+	§ ——— PositiveInteger ——————————————————————————————————————————————————
+	§ Both proofs at once, and a written Integer above zero is one of these
+	§ for itself: `4::squareRoot()` comes here rather than to the Namespace
+	§ above. The receivers are declared all the same, for the reason the two
+	§ blocks above declare theirs.
+	constant provenPositiveFour: PositiveInteger = 4
+
+	show(
+		"PositiveInteger.add(_ NonNegativeInteger)",
+		provenPositiveFour::add(0),
+	)
+	show(
+		"PositiveInteger.add(_ NonNegativeInteger) [positive summand]",
+		provenPositiveFour::add(3),
+	)
+	show(
+		"PositiveInteger.multiply(with: PositiveInteger)",
+		provenPositiveFour::multiply(with 3),
+	)
+	show(
+		"PositiveInteger.raise(to: NonNegativeInteger)",
+		provenPositiveFour::raise(to 3),
+	)
+	show(
+		"PositiveInteger.raise(to: NonNegativeInteger) [zero exponent]",
+		provenPositiveFour::raise(to 0),
+	)
+	show("PositiveInteger.squareRoot()", provenPositiveFour::squareRoot())
+	show("PositiveInteger.squareRoot() [irrational]", 3::squareRoot())
 
 	§ ——— Rational —————————————————————————————————————————————————————————
 	§ The two entries of `of` are told apart by what is known about the
@@ -905,10 +973,10 @@ third"::lines())
 		"Rational.squareRoot(defaultingTo: Rational | Algebraic) [negative]",
 		-1/2::squareRoot(defaultingTo 0/1),
 	)
-	show("Rational.numerator()", 3/4::numerator())
+	show("Rational.numerator()", computedThreeQuarters::numerator())
 	show("Rational.denominator()", 3/4::denominator())
-	show("Rational.absolute()", -3/4::absolute())
-	show("Rational.negate()", 3/4::negate())
+	show("Rational.absolute()", computedNegativeThreeQuarters::absolute())
+	show("Rational.negate()", computedThreeQuarters::negate())
 	show("Rational.reciprocal()", computedThreeQuarters::reciprocal())
 	show("Rational.reciprocal() [of zero]", 0/1::reciprocal())
 	show(
@@ -1101,12 +1169,19 @@ third"::lines())
 	§ The Methods a proven Rational has that a bare one does not, and the
 	§ sister of the NonZeroInteger block above. `multiply` needs both operands
 	§ proven, and a value written down is its own proof — as a receiver as much
-	§ as as an Argument. So both calls here are written where they stand.
+	§ as as an Argument. So every call here is written where it stands.
 	show(
 		"NonZeroRational.multiply(with: NonZeroRational)",
 		1/2::multiply(with 2/3),
 	)
 	show("NonZeroRational.reciprocal()", 3/4::reciprocal())
+	show("NonZeroRational.numerator()", 3/4::numerator())
+	show("NonZeroRational.numerator() [negative]", -3/4::numerator())
+	show("NonZeroRational.absolute()", -3/4::absolute())
+	show("NonZeroRational.absolute() [positive]", 3/4::absolute())
+	show("NonZeroRational.negate()", 3/4::negate())
+	show("NonZeroRational.negate() [negative]", -3/4::negate())
+	show("NonZeroRational.negate() [not reduced]", 2/4::negate())
 
 	§ ——— Algebraic ————————————————————————————————————————————————————————
 	withTwoRoots((_ rootTwo: Algebraic, _ rootThree: Algebraic) -> {} {

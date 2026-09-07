@@ -697,10 +697,13 @@ declarations {
 	§ answers every Method above. This Namespace holds the entries the proof
 	§ changes the answer of, and it changes it in three ways.
 	§
-	§ One is closure: the answer is a NonZeroInteger too. Only multiplication
-	§ qualifies, because a product is zero exactly when one of its factors is.
-	§ A sum or a difference of two non-zero Integers can be zero, as `1` and
-	§ `-1` show. Negation would close, and nothing needs it.
+	§ One is closure: the answer carries a proof too. A product is zero
+	§ exactly when one of its factors is. Negation keeps a value away from
+	§ zero, and a distance from zero is above it. So `multiply`, `negate` and
+	§ `absolute` close. A quotient of two non-zero Integers is a non-zero
+	§ Rational, which is what lets it reach `NonZeroRational::reciprocal`
+	§ bare. A sum or a difference of two non-zero Integers can be zero, as
+	§ `1` and `-1` show, so neither is written here.
 	§
 	§ The second tightens another kind's answer. An irrational times an Integer
 	§ is a Union, because a zero factor collapses it to a Rational. A proven
@@ -747,6 +750,14 @@ declarations {
 			}
 		}
 
+		§§ Divides this NonZeroInteger by a divisor proven not to be zero.
+		§§
+		§§ Neither operand is zero, so the quotient is not zero either. So the answer is a NonZeroRational, and it reaches `reciprocal` without an Optional in between.
+		§§
+		§§ @param by — the divisor, proven not to be zero
+		§§ @returns — the exact quotient, which is not zero.
+		divide(by other: NonZeroInteger) -> NonZeroRational
+
 		§§ Raises this NonZeroInteger to the given power.
 		§§
 		§§ A base that is not zero has every power, so the answer is the power itself rather than an Optional. An exponent proven not to be negative narrows that answer to an Integer.
@@ -767,20 +778,118 @@ declarations {
 			§§ @returns — the power.
 			(to exponent: NonNegativeInteger) -> Integer
 		}
+
+		§§ Answers this NonZeroInteger without its sign, which is its distance from zero.
+		§§
+		§§ The receiver is not zero, so its distance from zero is above zero. So the answer is a PositiveInteger.
+		§§
+		§§ @returns — the distance, which is above zero.
+		absolute() -> PositiveInteger
+
+		§§ Answers this NonZeroInteger with its sign flipped.
+		§§
+		§§ Negation keeps a value away from zero, so the answer is a NonZeroInteger too.
+		§§
+		§§ @returns — the negation, which is not zero.
+		negate() -> NonZeroInteger
 	}
 
 	§ The other half of the sign. A negative Integer is the only one with no
 	§ real square root, so a receiver proven not to be negative answers the
-	§ root itself. No other Method of `Integer` turns on this proof. And no
-	§ operation closes over it: a difference of two non-negative Integers can
-	§ be negative, as `1` and `2` show.
+	§ root itself. Two operations close over the proof. A sum and a product
+	§ of two non-negative Integers are non-negative, and a sum with a
+	§ positive one is positive. A difference is not, as `1` and `2` show.
+	§
+	§ The `add` entry taking a PositiveInteger stands first. Both entries ask
+	§ for a proof, so they are probed in the order they are written. A
+	§ positive Argument fits the wider entry as well. See DEVELOPMENT.md, Why
+	§ bodies look the way they do.
 	namespace NonNegativeInteger for NonNegativeInteger {
+		§§ Adds an Integer proven not to be negative to this NonNegativeInteger.
+		§§
+		§§ A sum of two non-negative Integers is never negative, and a positive summand makes it positive.
+		overload add {
+			§§ Adds an Integer proven to be positive.
+			§§
+			§§ The receiver is not negative and the other summand is above zero, so the sum is above zero.
+			§§
+			§§ @param _ — the PositiveInteger to add
+			§§ @returns — the sum, which is above zero.
+			(_ other: PositiveInteger) -> PositiveInteger
+
+			§§ Adds an Integer proven not to be negative.
+			§§
+			§§ Neither summand is negative, so the sum is not negative either.
+			§§
+			§§ @param _ — the NonNegativeInteger to add
+			§§ @returns — the sum, which is never negative.
+			(_ other: NonNegativeInteger) -> NonNegativeInteger
+		}
+
+		§§ Multiplies this NonNegativeInteger with an Integer proven not to be negative.
+		§§
+		§§ Neither factor is negative, so the product is not negative either.
+		§§
+		§§ @param with — the NonNegativeInteger to multiply with
+		§§ @returns — the product, which is never negative.
+		multiply(with other: NonNegativeInteger) -> NonNegativeInteger
+
 		§§ Answers the exact square root of this NonNegativeInteger.
 		§§
 		§§ A negative Integer is the only one with no real root, and the receiver is proven not to be one. So the answer is the root itself rather than an Optional. A perfect square answers an Integer, and every other value answers an exact Algebraic.
 		§§
 		§§ @returns — the root.
 		squareRoot() -> Integer | Algebraic
+	}
+
+	§ Both halves of the sign at once. A PositiveInteger reaches every entry
+	§ of the two Namespaces above, and this one holds the entries where
+	§ holding both proofs tightens the answer further. A sum with a
+	§ non-negative Integer, a product with a positive one and a power at a
+	§ non-negative exponent are all positive. So is the root of a positive
+	§ perfect square.
+	§
+	§ Every entry is native, and is Integer's own operation under this
+	§ Namespace's name. The reason is the one `NonZeroInteger` gives. A
+	§ refinement erases before anything runs, and the proof was spent while
+	§ compiling.
+	§
+	§ `multiply` has to be written here as much as `add`. A written `2` is a
+	§ PositiveInteger, and `2::multiply(with 3)` fits the `NonZeroInteger`
+	§ entry and the `NonNegativeInteger` entry alike. Neither of those two
+	§ targets is narrower than the other, so without an entry on the
+	§ narrowest target the call would be `ambiguous-namespace`.
+	namespace PositiveInteger for PositiveInteger {
+		§§ Adds an Integer proven not to be negative to this PositiveInteger.
+		§§
+		§§ The receiver is above zero and the other summand is not below it, so the sum is above zero.
+		§§
+		§§ @param _ — the NonNegativeInteger to add
+		§§ @returns — the sum, which is above zero.
+		add(_ other: NonNegativeInteger) -> PositiveInteger
+
+		§§ Multiplies this PositiveInteger with another.
+		§§
+		§§ Both factors are above zero, so the product is above zero.
+		§§
+		§§ @param with — the PositiveInteger to multiply with
+		§§ @returns — the product, which is above zero.
+		multiply(with other: PositiveInteger) -> PositiveInteger
+
+		§§ Raises this PositiveInteger to an exponent proven not to be negative.
+		§§
+		§§ Every such power is whole and above zero. Zero as an exponent answers one.
+		§§
+		§§ @param to — the exponent, proven not to be negative
+		§§ @returns — the power, which is above zero.
+		raise(to exponent: NonNegativeInteger) -> PositiveInteger
+
+		§§ Answers the exact square root of this PositiveInteger.
+		§§
+		§§ A perfect square above zero has a root above zero, and every other value answers an exact Algebraic.
+		§§
+		§§ @returns — the root.
+		squareRoot() -> PositiveInteger | Algebraic
 	}
 }
 

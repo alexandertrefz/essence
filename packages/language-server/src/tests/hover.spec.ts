@@ -513,7 +513,9 @@ describe("Hover in a line's margins", () => {
 	it("answers between two tokens with what spans them", () => {
 		// NOTE: The space between `constant` and `total` is in the
 		// declaration's head, and the head answers for it.
-		expect(hover(source, { line: 2, column: 10 })).toBe("total: Integer")
+		expect(hover(source, { line: 2, column: 10 })).toBe(
+			"total: PositiveInteger",
+		)
 		expect(hover(source, { line: 4, column: 14 })).toBe("String")
 	})
 })
@@ -1490,7 +1492,7 @@ describe("Hover over a written receiver", () => {
 
 		expect(hover(source, { line: 2, column: 18 })).toBe("PositiveInteger")
 		expect(hover(source, { line: 2, column: 22 })).toBe(
-			"squareRoot() -> Integer | Algebraic",
+			"squareRoot() -> PositiveInteger | Algebraic",
 		)
 	})
 
@@ -1588,11 +1590,13 @@ describe("Hover over a written receiver", () => {
 	})
 
 	// NOTE: The other side of it. A value the Program computed proves nothing,
-	// so the name it was bound to hovers as the Type it was written with.
+	// so the name it was bound to hovers as the Type it was written with. A
+	// difference, because a sum of two written Integers is a `PositiveInteger`
+	// and carries that proof to the next call.
 	it("leaves a computed receiver as the Type it was computed to", () => {
 		let source = [
 			"implementation {",
-			"\tconstant two = 1::add(1)",
+			"\tconstant two = 3::subtract(1)",
 			"\tconstant root = two::squareRoot()",
 			"}",
 		].join("\n")

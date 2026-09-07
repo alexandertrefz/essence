@@ -388,6 +388,33 @@ const pureMethods: Record<string, ReadonlySet<string>> = {
 	]),
 	String: new Set(["is", "isNot", "compare", "toString"]),
 	Rational: new Set(["toString"]),
+	// NOTE: The refinements of `Integer`, which is where a WRITTEN operand's
+	// arithmetic goes: `1::add(2)` is `PositiveInteger`'s sum and
+	// `2::multiply(with 3)` is its product, because a refined target beats the
+	// base target for a Method both declare. Each entry is `Integer`'s own
+	// Function under another name — the same bigint operation, on operands
+	// whose proof was spent while compiling — so each earns its place on the
+	// three counts `Integer`'s entries earn theirs on.
+	//
+	// NOTE: What is deliberately absent here. `NonZeroInteger::divide` answers
+	// an exact Rational, whose gcd is what keeps `Rational`'s arithmetic off
+	// this table at all; `raise` is `a ** b`, refused for `Integer` already;
+	// and `squareRoot` is a trial division whose cost is the receiver's size.
+	NonZeroInteger: new Set(["multiply", "negate", "absolute"]),
+	NonNegativeInteger: new Set(["add", "multiply"]),
+	PositiveInteger: new Set(["add", "multiply"]),
+}
+
+// NOTE: The Type a Namespace's values carry, where that is not the Namespace's
+// own name. A checked refinement erases before the first pass runs, so a call
+// that reached a refined Namespace holds Arguments of the BASE Type — every
+// operand of `PositiveInteger`'s sum IS an Integer by the time the Optimiser
+// reads it — and the Type rule below would refuse every one of them for a name
+// no value can ever carry.
+const pureNamespaceTypes: Record<string, string> = {
+	NonZeroInteger: "Integer",
+	NonNegativeInteger: "Integer",
+	PositiveInteger: "Integer",
 }
 
 function isPureMethodInvocation(
@@ -419,9 +446,11 @@ function isPureMethodInvocation(
 		return false
 	}
 
+	let valueType = pureNamespaceTypes[node.base.name] ?? node.base.name
+
 	return node.arguments.every(
 		(argument) =>
-			argument.value.type.type === node.base.name &&
+			argument.value.type.type === valueType &&
 			isPureExpression(argument.value, shadowed),
 	)
 }

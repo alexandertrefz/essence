@@ -109,6 +109,18 @@ function lower(
 		// because the answer's size is the exponent's value rather than its length.
 		case "NonZeroInteger":
 			return member === "multiply" ? lowerInteger(node, member) : node
+		// NOTE: The two other refinements of Integer, and the one holding both
+		// proofs, for the same reason. Each closes over `add` or `multiply` or
+		// both by re-exporting Integer's own sum and product — the same
+		// operator over the same operands, with the proof already spent — so
+		// `length::add(1)` lowers to the `+` it lowered to before the count
+		// carried a proof. Nothing else these Namespaces declare is a bigint
+		// operator: `raise` and `squareRoot` are refused for `Integer` as well.
+		case "NonNegativeInteger":
+		case "PositiveInteger":
+			return member === "add" || member === "multiply"
+				? lowerInteger(node, member)
+				: node
 		case "Boolean":
 			return lowerBoolean(node, member, shadowed)
 		case "String":

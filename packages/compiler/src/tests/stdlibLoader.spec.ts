@@ -1346,11 +1346,13 @@ describe("Standard Library Loader", () => {
 			"String",
 			"Boolean",
 			"Integer",
-			// NOTE: The two Namespaces a proven Integer can reach besides
+			// NOTE: The three Namespaces a proven Integer can reach besides
 			// `Integer`, listed after it for the same reason `NestedList` is
-			// listed after `List` — see `builtinMemberOrder`.
+			// listed after `List`, and the one holding both proofs after the
+			// two it narrows — see `builtinMemberOrder`.
 			"NonZeroInteger",
 			"NonNegativeInteger",
+			"PositiveInteger",
 			"Rational",
 			// NOTE: The one Namespace a proven Rational can reach besides
 			// `Rational`, listed after it for the same reason — see

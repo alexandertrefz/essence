@@ -62,8 +62,10 @@ implementation {
 
 	§ A power is empty only where a zero base meets a negative exponent, and a
 	§ base the Program computed might be zero. An Optional held in data
-	§ collapses with `value(defaultingTo:)`.
-	constant base            = 1::add(1)
+	§ collapses with `value(defaultingTo:)`. The base is a difference, which is
+	§ the arithmetic no proof survives: a sum of two written Integers is
+	§ `PositiveInteger`'s own and would carry that proof into the power.
+	constant base            = 3::subtract(1)
 	constant reciprocalPower = base::raise(to -2)
 	Terminal.inspect(reciprocalPower::value(defaultingTo 0)) § 1/4
 

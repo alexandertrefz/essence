@@ -1559,11 +1559,12 @@ describe("Validator", () => {
 		// entry taking a divisor proven not to be zero, and a divisor written
 		// where it stands is its own proof — so a written `2` reaches that
 		// entry and answers with a Rational rather than an Optional, which is
-		// asserted alongside.
+		// asserted alongside. A DIFFERENCE is what computes one: a sum and a
+		// product of two written Integers each carry a proof of their own.
 		it("should type Divisions as Optional<Rational>", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant two = 1::add(1)
+					constant two = 3::subtract(1)
 
 					constant a: Optional<Rational> = 1::divide(by two)
 					constant b: Optional<Rational> = 1/2::divide(by two)
@@ -1575,7 +1576,7 @@ describe("Validator", () => {
 			).toEqual([])
 
 			let diagnostics = diagnosticsFor(`implementation {
-				constant two = 1::add(1)
+				constant two = 3::subtract(1)
 
 				constant a: Rational = 1::divide(by two)
 			}`)
