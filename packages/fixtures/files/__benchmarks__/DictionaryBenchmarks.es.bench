@@ -14,6 +14,15 @@ benchmark "A List of entries/counts a thousand keys"
 benchmark "A List of entries/looks a thousand keys up"
 	4110000 ns
 
+benchmark "Choice keys/builds a thousand"
+	160000 ns
+
+benchmark "Choice keys/looks a thousand up"
+	165000 ns
+
+benchmark "Choice keys/looks three payload-free Cases up ten thousand times"
+	400000 ns
+
 benchmark "Dictionary/counts a thousand keys"
 	78000 ns
 
@@ -36,7 +45,13 @@ benchmark "Dictionary/writes a hundred Dictionaries from one"
 	39300000 ns
 
 benchmark "Record keys/builds a thousand"
-	8400000 ns
+	200000 ns
 
 benchmark "Record keys/looks a thousand up"
-	9200000 ns
+	210000 ns
+
+benchmark "Scan-path keys/builds a thousand"
+	8000000 ns
+
+benchmark "Scan-path keys/looks a thousand up"
+	8500000 ns
