@@ -587,7 +587,7 @@ declarations {
 
 		§§ Answers the positions the List has, in order.
 		§§
-		§§ The positions count from zero and stop before the length. The empty List answers no positions.
+		§§ The positions count from zero and stop before the length. The empty List answers no positions. The answer is a whole List of positions: to walk the items beside their positions in one pass, use `enumerate()`.
 		§§
 		§§ @returns — the List of positions.
 		indices() -> List<Integer> {
@@ -1362,7 +1362,7 @@ declarations {
 
 		§§ Answers the positions the List has, in order.
 		§§
-		§§ The positions count from zero and stop before the length.
+		§§ The positions count from zero and stop before the length. The answer is a whole List of positions: to walk the items beside their positions in one pass, use `enumerate()`.
 		§§
 		§§ @returns — the List of positions, which is never empty.
 		indices() -> NonEmptyList<Integer> {
