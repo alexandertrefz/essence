@@ -1224,6 +1224,21 @@ third"::lines())
 	show("NonZeroRational.negate() [negative]", -3/4::negate())
 	show("NonZeroRational.negate() [not reduced]", 2/4::negate())
 
+	§ ——— Scalar ———————————————————————————————————————————————————————————
+	§ The two Methods of the Union `Integer | Rational`, which take an
+	§ Argument of that Union — the one shape no member Namespace's own
+	§ arithmetic accepts. A receiver annotated as the Union reaches them; a
+	§ written Integer or Rational is its own kind and reaches that kind's
+	§ rung, so both operands here carry the annotation.
+	constant scalarReceiver: Scalar = 3
+	constant scalarArgument: Scalar = 1/2
+
+	show("Scalar.add(_ Scalar)", scalarReceiver::add(scalarArgument))
+	show(
+		"Scalar.multiply(with: Scalar)",
+		scalarReceiver::multiply(with scalarArgument),
+	)
+
 	§ ——— Algebraic ————————————————————————————————————————————————————————
 	withTwoRoots((_ rootTwo: Algebraic, _ rootThree: Algebraic) -> {} {
 		show("Algebraic.is(_ Algebraic)", rootTwo::is(rootTwo))
@@ -1730,11 +1745,8 @@ third"::lines())
 	show("Number.sum(_ List<Integer>) [empty]", Number.sum(noNumbers))
 	show("Number.sum(_ List<Rational>)", Number.sum([1/2, 1/3]))
 	show("Number.sum(_ List<Rational>) [empty]", Number.sum(noRationals))
-	show("Number.sum(_ List<Integer | Rational>)", Number.sum([1, 1/2, 1/2]))
-	show(
-		"Number.sum(_ List<Integer | Rational>) [empty]",
-		Number.sum(noMixedNumbers),
-	)
+	show("Number.sum(_ List<Scalar>)", Number.sum([1, 1/2, 1/2]))
+	show("Number.sum(_ List<Scalar>) [empty]", Number.sum(noMixedNumbers))
 	show("Number.product(_ List<Integer>)", Number.product([2, 3, 4]))
 	show("Number.product(_ List<Integer>) [empty]", Number.product(noNumbers))
 	show("Number.product(_ List<Rational>)", Number.product([1/2, 2/3]))
@@ -1742,12 +1754,9 @@ third"::lines())
 		"Number.product(_ List<Rational>) [empty]",
 		Number.product(noRationals),
 	)
+	show("Number.product(_ List<Scalar>)", Number.product([2, 1/2, 3]))
 	show(
-		"Number.product(_ List<Integer | Rational>)",
-		Number.product([2, 1/2, 3]),
-	)
-	show(
-		"Number.product(_ List<Integer | Rational>) [empty]",
+		"Number.product(_ List<Scalar>) [empty]",
 		Number.product(noMixedNumbers),
 	)
 	show("Number.average(_ List<Integer>)", Number.average(twoNumbers))
@@ -1757,12 +1766,9 @@ third"::lines())
 		"Number.average(_ List<Rational>) [empty]",
 		Number.average(noRationals),
 	)
+	show("Number.average(_ List<Scalar>)", Number.average(twoMixedNumbers))
 	show(
-		"Number.average(_ List<Integer | Rational>)",
-		Number.average(twoMixedNumbers),
-	)
-	show(
-		"Number.average(_ List<Integer | Rational>) [empty]",
+		"Number.average(_ List<Scalar>) [empty]",
 		Number.average(noMixedNumbers),
 	)
 	show(
@@ -1782,11 +1788,11 @@ third"::lines())
 		Number.average(noRationals, defaultingTo 0/1),
 	)
 	show(
-		"Number.average(_ List<Integer | Rational>, defaultingTo: Rational)",
+		"Number.average(_ List<Scalar>, defaultingTo: Rational)",
 		Number.average(twoMixedNumbers, defaultingTo 0/1),
 	)
 	show(
-		"Number.average(_ List<Integer | Rational>, defaultingTo: Rational) [empty]",
+		"Number.average(_ List<Scalar>, defaultingTo: Rational) [empty]",
 		Number.average(noMixedNumbers, defaultingTo 0/1),
 	)
 	§ The same Lists written where they stand, which is the proof these entries
@@ -1794,10 +1800,7 @@ third"::lines())
 	§ Optional.
 	show("Number.average(_ NonEmptyList<Integer>)", Number.average([1, 2]))
 	show("Number.average(_ NonEmptyList<Rational>)", Number.average([1/2, 1/3]))
-	show(
-		"Number.average(_ NonEmptyList<Integer | Rational>)",
-		Number.average([1, 1/2]),
-	)
+	show("Number.average(_ NonEmptyList<Scalar>)", Number.average([1, 1/2]))
 	show("Number.lowestNumber(_ Integer, _ Integer)", Number.lowestNumber(3, 2))
 	show(
 		"Number.lowestNumber(_ Rational, _ Rational)",
@@ -1828,11 +1831,11 @@ third"::lines())
 		Number.lowestNumber(noRationals),
 	)
 	show(
-		"Number.lowestNumber(_ List<Integer | Rational>)",
+		"Number.lowestNumber(_ List<Scalar>)",
 		Number.lowestNumber(twoMixedNumbers),
 	)
 	show(
-		"Number.lowestNumber(_ List<Integer | Rational>) [empty]",
+		"Number.lowestNumber(_ List<Scalar>) [empty]",
 		Number.lowestNumber(noMixedNumbers),
 	)
 	show(
@@ -1852,11 +1855,11 @@ third"::lines())
 		Number.lowestNumber(noRationals, defaultingTo 0/1),
 	)
 	show(
-		"Number.lowestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational)",
+		"Number.lowestNumber(_ List<Scalar>, defaultingTo: Scalar)",
 		Number.lowestNumber(twoMixedNumbers, defaultingTo 0),
 	)
 	show(
-		"Number.lowestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational) [empty]",
+		"Number.lowestNumber(_ List<Scalar>, defaultingTo: Scalar) [empty]",
 		Number.lowestNumber(noMixedNumbers, defaultingTo 0),
 	)
 	show(
@@ -1874,7 +1877,7 @@ third"::lines())
 		Number.lowestNumber([1/2, 1/3]),
 	)
 	show(
-		"Number.lowestNumber(_ NonEmptyList<Integer | Rational>)",
+		"Number.lowestNumber(_ NonEmptyList<Scalar>)",
 		Number.lowestNumber([1, 1/2]),
 	)
 	show(
@@ -1910,11 +1913,11 @@ third"::lines())
 		Number.highestNumber(noRationals),
 	)
 	show(
-		"Number.highestNumber(_ List<Integer | Rational>)",
+		"Number.highestNumber(_ List<Scalar>)",
 		Number.highestNumber(twoMixedNumbers),
 	)
 	show(
-		"Number.highestNumber(_ List<Integer | Rational>) [empty]",
+		"Number.highestNumber(_ List<Scalar>) [empty]",
 		Number.highestNumber(noMixedNumbers),
 	)
 	show(
@@ -1934,11 +1937,11 @@ third"::lines())
 		Number.highestNumber(noRationals, defaultingTo 0/1),
 	)
 	show(
-		"Number.highestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational)",
+		"Number.highestNumber(_ List<Scalar>, defaultingTo: Scalar)",
 		Number.highestNumber(twoMixedNumbers, defaultingTo 0),
 	)
 	show(
-		"Number.highestNumber(_ List<Integer | Rational>, defaultingTo: Integer | Rational) [empty]",
+		"Number.highestNumber(_ List<Scalar>, defaultingTo: Scalar) [empty]",
 		Number.highestNumber(noMixedNumbers, defaultingTo 0),
 	)
 	show(
@@ -1950,7 +1953,7 @@ third"::lines())
 		Number.highestNumber([1/2, 1/3]),
 	)
 	show(
-		"Number.highestNumber(_ NonEmptyList<Integer | Rational>)",
+		"Number.highestNumber(_ NonEmptyList<Scalar>)",
 		Number.highestNumber([1, 1/2]),
 	)
 
@@ -3517,21 +3520,21 @@ third"::lines())
 	show("NumberList.lowestNumber()", mixedNumbers::lowestNumber())
 	show("NumberList.lowestNumber() [empty]", noMixedNumbers::lowestNumber())
 	show(
-		"NumberList.lowestNumber(defaultingTo: Integer | Rational)",
+		"NumberList.lowestNumber(defaultingTo: Scalar)",
 		mixedNumbers::lowestNumber(defaultingTo 0),
 	)
 	show(
-		"NumberList.lowestNumber(defaultingTo: Integer | Rational) [empty]",
+		"NumberList.lowestNumber(defaultingTo: Scalar) [empty]",
 		noMixedNumbers::lowestNumber(defaultingTo 0),
 	)
 	show("NumberList.highestNumber()", mixedNumbers::highestNumber())
 	show("NumberList.highestNumber() [empty]", noMixedNumbers::highestNumber())
 	show(
-		"NumberList.highestNumber(defaultingTo: Integer | Rational)",
+		"NumberList.highestNumber(defaultingTo: Scalar)",
 		mixedNumbers::highestNumber(defaultingTo 0),
 	)
 	show(
-		"NumberList.highestNumber(defaultingTo: Integer | Rational) [empty]",
+		"NumberList.highestNumber(defaultingTo: Scalar) [empty]",
 		noMixedNumbers::highestNumber(defaultingTo 0),
 	)
 
@@ -3605,23 +3608,23 @@ third"::lines())
 		rows::sum(on .r),
 	)
 	show(
-		"KeyedNumberList.sum<ItemType>(on: (_ ItemType) -> Integer | Rational)",
+		"KeyedNumberList.sum<ItemType>(on: (_ ItemType) -> Scalar)",
 		rows::sum(on .m),
 	)
 	show(
-		"KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Integer | Rational)",
+		"KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Scalar)",
 		rows::average(on .n),
 	)
 	show(
-		"KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Integer | Rational) [empty]",
+		"KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Scalar) [empty]",
 		noRows::average(on .n),
 	)
 	show(
-		"KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Integer | Rational, defaultingTo: Rational)",
+		"KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Scalar, defaultingTo: Rational)",
 		rows::average(on .r, defaultingTo 0/1),
 	)
 	show(
-		"KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Integer | Rational, defaultingTo: Rational) [empty]",
+		"KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Scalar, defaultingTo: Rational) [empty]",
 		noRows::average(on .r, defaultingTo 0/1),
 	)
 
@@ -3630,7 +3633,7 @@ third"::lines())
 	§ of numbers, whose mean is bare. `sum(on:)` is total already, so a proven
 	§ receiver keeps reaching `KeyedNumberList` for it.
 	show(
-		"NonEmptyKeyedNumberList.average<ItemType>(on: (_ ItemType) -> Integer | Rational)",
+		"NonEmptyKeyedNumberList.average<ItemType>(on: (_ ItemType) -> Scalar)",
 		provenRows::average(on .n),
 	)
 	show(

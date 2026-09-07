@@ -4,7 +4,10 @@ import {
 		List
 		NonEmptyList
 	}
-	from "./Number.es" { Number }
+	from "./Number.es" {
+		Number
+		Scalar
+	}
 	from "./Optional.es" { Optional }
 	from "./Rational.es" { Rational }
 }
@@ -18,8 +21,8 @@ declarations {
 	§ the same statics, whose proven entries answer a proven List bare.
 	§
 	§ A Namespace targets one Type, so `List<Integer>`, `List<Rational>` and
-	§ `List<Integer | Rational>` each need their own, and a receiver reaches
-	§ the one its items decide. A List of Strings matches none of them, and
+	§ `List<Scalar>` each need their own, and a receiver reaches the one its
+	§ items decide. A List of Strings matches none of them, and
 	§ `["a", "b"]::lowestNumber()` is refused.
 
 	§ `sum` and `product` answer an Integer, because the sum and the product
@@ -184,13 +187,13 @@ declarations {
 		}
 	}
 
-	namespace NumberList for List<Integer | Rational> {
+	namespace NumberList for List<Scalar> {
 		§§ Adds every item together.
 		§§
 		§§ The empty List totals zero. A whole total answers as an Integer, and a fractional one as a Rational.
 		§§
 		§§ @returns — the total.
-		sum() -> Integer | Rational {
+		sum() -> Scalar {
 			<- Number.sum(@)
 		}
 
@@ -199,7 +202,7 @@ declarations {
 		§§ The empty List answers one. A whole product answers as an Integer, and a fractional one as a Rational.
 		§§
 		§§ @returns — the product.
-		product() -> Integer | Rational {
+		product() -> Scalar {
 			<- Number.product(@)
 		}
 
@@ -230,7 +233,7 @@ declarations {
 			§§ The lowest item.
 			§§
 			§§ @returns — the lowest item, or nothing for the empty List.
-			() -> Optional<Integer | Rational> {
+			() -> Optional<Scalar> {
 				<- Number.lowestNumber(@)
 			}
 
@@ -238,7 +241,7 @@ declarations {
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the lowest item, or the fallback in its place.
-			(defaultingTo fallback: Integer | Rational) -> Integer | Rational {
+			(defaultingTo fallback: Scalar) -> Scalar {
 				<- @::lowestNumber()::value(defaultingTo fallback)
 			}
 		}
@@ -250,7 +253,7 @@ declarations {
 			§§ The highest item.
 			§§
 			§§ @returns — the highest item, or nothing for the empty List.
-			() -> Optional<Integer | Rational> {
+			() -> Optional<Scalar> {
 				<- Number.highestNumber(@)
 			}
 
@@ -258,7 +261,7 @@ declarations {
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the highest item, or the fallback in its place.
-			(defaultingTo fallback: Integer | Rational) -> Integer | Rational {
+			(defaultingTo fallback: Scalar) -> Scalar {
 				<- @::highestNumber()::value(defaultingTo fallback)
 			}
 		}
@@ -309,9 +312,7 @@ declarations {
 			§§
 			§§ @param on — the key read off each item
 			§§ @returns — the total.
-			(
-				on key: (_: ItemType) -> Integer | Rational,
-			) -> Integer | Rational {
+			(on key: (_: ItemType) -> Scalar) -> Scalar {
 				<- @::map(key)::sum()
 			}
 		}
@@ -324,9 +325,7 @@ declarations {
 			§§
 			§§ @param on — the key read off each item
 			§§ @returns — the mean, or nothing for the empty List.
-			(
-				on key: (_: ItemType) -> Integer | Rational,
-			) -> Optional<Rational> {
+			(on key: (_: ItemType) -> Scalar) -> Optional<Rational> {
 				<- @::map(key)::average()
 			}
 
@@ -336,7 +335,7 @@ declarations {
 			§§ @param defaultingTo — the mean to answer with when there is none
 			§§ @returns — the mean, or the fallback in its place.
 			(
-				on key: (_: ItemType) -> Integer | Rational,
+				on key: (_: ItemType) -> Scalar,
 				defaultingTo fallback: Rational,
 			) -> Rational {
 				<- @::average(on key)::value(defaultingTo fallback)
@@ -395,18 +394,18 @@ declarations {
 		}
 	}
 
-	namespace NonEmptyNumberList for NonEmptyList<Integer | Rational> {
+	namespace NonEmptyNumberList for NonEmptyList<Scalar> {
 		§§ The lowest item, which a non-empty List always has.
 		§§
 		§§ @returns — the lowest item.
-		lowestNumber() -> Integer | Rational {
+		lowestNumber() -> Scalar {
 			<- Number.lowestNumber(@)
 		}
 
 		§§ The highest item, which a non-empty List always has.
 		§§
 		§§ @returns — the highest item.
-		highestNumber() -> Integer | Rational {
+		highestNumber() -> Scalar {
 			<- Number.highestNumber(@)
 		}
 
@@ -433,7 +432,7 @@ declarations {
 		§§
 		§§ @param on — the key read off each item
 		§§ @returns — the mean.
-		average(on key: (_: ItemType) -> Integer | Rational) -> Rational {
+		average(on key: (_: ItemType) -> Scalar) -> Rational {
 			<- @::map(key)::average()
 		}
 	}

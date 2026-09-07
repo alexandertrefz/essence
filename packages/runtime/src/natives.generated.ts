@@ -257,6 +257,10 @@ export type NonZeroRationalNatives = {
 	negate: (self: RationalType) => RationalType
 }
 
+export type ScalarNatives = {
+
+}
+
 export type AlgebraicNatives = {
 	// compare(to: Algebraic) -> Ordering
 	compare: (self: AlgebraicType, to: AlgebraicType) => OrderingType
@@ -741,6 +745,10 @@ export const $NonZeroRationalArity: AssertArities<typeof import("./NonZeroRation
 	reciprocal: 1
 	negate: 1
 }> = true
+
+declare const ScalarModule: typeof import("./Scalar")
+export const $Scalar: ScalarNatives = ScalarModule
+export const $ScalarAbsent: AssertNoEssenceExports<typeof import("./Scalar"), "add" | "multiply"> = true
 
 declare const AlgebraicModule: typeof import("./Algebraic")
 export const $Algebraic: AlgebraicNatives = AlgebraicModule

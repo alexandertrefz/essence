@@ -1740,8 +1740,11 @@ export {
 				// NOTE: The receiver is a written `2`, which proves it is
 				// neither zero nor negative — so the refined Namespaces are in
 				// the search too, in the same table order the rest are in.
+				// `Scalar` and `Number` are the two Union Namespaces an Integer
+				// is a member of, and they come after the Integer ones for the
+				// reason `builtinMemberOrder` gives.
 				expect(unknownMethod?.notes[0]).toContain(
-					"'Integer', 'NonZeroInteger', 'NonNegativeInteger', 'PositiveInteger', 'Number', 'Alpha', 'Zulu'",
+					"'Integer', 'NonZeroInteger', 'NonNegativeInteger', 'PositiveInteger', 'Scalar', 'Number', 'Alpha', 'Zulu'",
 				)
 			},
 		)
