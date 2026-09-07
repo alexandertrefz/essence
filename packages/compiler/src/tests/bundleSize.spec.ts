@@ -99,13 +99,14 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(38_000)
 	})
 
-	// NOTE: 47,554 measured. The two tests above watch a Dictionary being shaken
+	// NOTE: 47,631 measured. The two tests above watch a Dictionary being shaken
 	// away whole; this one records what a Program that DOES hold one carries —
 	// the store, every native the file reaches, the written form, the kind
 	// registry and the registration that fills it. The composite key encoding
 	// — a Case or a Record spelled into a text from its parts — is 1,708 of
 	// those bytes, and rides in with every Dictionary whatever its keys are,
-	// because the encoding is one function with an arm per kind.
+	// because the encoding is one function with an arm per kind; the two
+	// filters below it are 77 more.
 	//
 	// NOTE: What it watches for is the registry being BYPASSED, which would put
 	// the rendering in front of every Program whether it holds a Dictionary or

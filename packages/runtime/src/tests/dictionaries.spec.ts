@@ -7,6 +7,7 @@ import {
 	createDictionary,
 	encodeKey,
 	entries as entriesOf,
+	everyEntry,
 	is as dictionaryIs,
 	isEmpty,
 	keys as keysOf,
@@ -14,6 +15,7 @@ import {
 	map as mapEntries,
 	of as dictionaryOf,
 	remove as removeAt,
+	removeEvery,
 	set as setAt,
 	TOMBSTONE,
 	toString as dictionaryToString,
@@ -2037,6 +2039,102 @@ describe("map", () => {
 
 		expect(lengthOf(mapped).value).toBe(0)
 		expect(writtenForm(mapped)).toBe("[=]")
+	})
+})
+
+// NOTE: The filter and its complement share `map`'s claim — the kept slots
+// carry the receiver's keys and encodings, and the answer is a store of its
+// own — and add one of their own: a slot that took the scan path on the
+// receiver takes it on the answer, because its `null` encoding is carried over
+// and counted, so a later lookup on the answer still falls through to the walk
+// that finds it.
+describe("everyEntry and removeEvery", () => {
+	const isEven = (each: { value: AnyType }) =>
+		createBoolean(numberOf(each.value) % 2 === 0)
+
+	test("the kept keys and their encodings are the receiver's own", () => {
+		let held = dictionary(
+			[text("a"), integer(1)],
+			[createRational(1n, 2n), integer(2)],
+			[text("c"), integer(3)],
+			[asValue(createCase("Colour#Red")), integer(4)],
+		)
+		let even = everyEntry(held, isEven)
+		let odd = removeEvery(held, isEven)
+
+		expect(writtenForm(even)).toBe(`[1/2 = 2, Colour#Red = 4]`)
+		expect(writtenForm(odd)).toBe(`["a" = 1, "c" = 3]`)
+		expect(even.store.slots[0].key).toBe(held.store.slots[1].key)
+		expect(even.store.slots[0].encoded).toBe(held.store.slots[1].encoded)
+		expect(even.store.texts.get("1/2")).toBe(even.store.slots[0])
+		expect(even.store.texts.get("c10:Colour#Red{};")).toBe(
+			even.store.slots[1],
+		)
+		expect(odd.store.index.get("a")).toBe(odd.store.slots[0])
+		expect(odd.store.index.get("c")).toBe(odd.store.slots[1])
+		expect(even.store.unencoded).toBe(0)
+		expect(odd.store.unencoded).toBe(0)
+	})
+
+	test("the check is called once per live entry, in order, with the entry Record", () => {
+		let held = dictionary(
+			[text("a"), integer(1)],
+			[text("b"), integer(2)],
+			[text("c"), integer(3)],
+		)
+		let without = removeAt(held, text("b"), equality)
+		let seen: Array<string> = []
+
+		removeEvery(without, (each) => {
+			seen.push(`${textOf(each.key)}=${numberOf(each.value)}`)
+
+			return createBoolean(false)
+		})
+
+		expect(seen).toEqual(["a=1", "c=3"])
+	})
+
+	test("a scan-path key stays a scan-path key in the answer", () => {
+		let listed = createRecord({ items: createList([integer(1)]) })
+		let held = dictionary([listed, integer(2)], [text("a"), integer(1)])
+		let even = everyEntry(held, isEven)
+
+		expect(held.store.unencoded).toBe(1)
+		expect(lengthOf(even).value).toBe(1)
+		expect(even.store.slots[0].encoded).toBeNull()
+		expect(even.store.unencoded).toBe(1)
+		expect(
+			heldNumber(
+				valueAt(
+					even,
+					createRecord({ items: createList([integer(1)]) }),
+					equality,
+				),
+			),
+		).toBe(2)
+	})
+
+	test("the answer is a store of its own that can be written to", () => {
+		let held = dictionary([text("a"), integer(1)], [text("b"), integer(2)])
+		let even = everyEntry(held, isEven)
+		let written = setAt(even, text("a"), integer(9), equality)
+		let afterBase = setAt(held, text("b"), integer(50), equality)
+
+		expect(even.store).not.toBe(held.store)
+		expect(writtenForm(even)).toBe(`["b" = 2]`)
+		expect(writtenForm(written)).toBe(`["b" = 2, "a" = 9]`)
+		expect(writtenForm(afterBase)).toBe(`["a" = 1, "b" = 50]`)
+		expect(writtenForm(even)).toBe(`["b" = 2]`)
+	})
+
+	test("a check that keeps nothing answers the empty Dictionary", () => {
+		let held = dictionary([text("a"), integer(1)])
+		let none = everyEntry(held, () => createBoolean(false))
+		let all = removeEvery(held, () => createBoolean(true))
+
+		expect(writtenForm(none)).toBe("[=]")
+		expect(writtenForm(all)).toBe("[=]")
+		expect(lengthOf(everyEntry(dictionary(), isEven)).value).toBe(0)
 	})
 })
 
