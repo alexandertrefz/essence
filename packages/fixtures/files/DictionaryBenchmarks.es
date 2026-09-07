@@ -22,9 +22,6 @@ implementation {
 	§     read out, `value(at:defaultingTo:)`           280 µs   28.0 ns/key
 	§     printed, `toString()`                         635 µs   63.5 ns/entry
 	§   Dictionary, a hundred writes from ONE base     32.7 ms    327 µs/fork
-	§   Record keys — the scan path — a thousand of them
-	§     set in, `set(_:to:)`                         7.48 ms   7.48 µs/key
-	§     read out, `value(at:defaultingTo:)`          8.00 ms   8.00 µs/key
 	§   A List becoming a Dictionary, ten thousand items
 	§     `tallied()`                                   254 µs   25.4 ns/item
 	§     `groupedBy(key:)`                             337 µs   33.7 ns/item
@@ -43,20 +40,63 @@ implementation {
 	§ out of a thousand entries in 30.1 ns and out of ten thousand in 28.0 ns
 	§ — flat, which is what an O(1) lookup means — and a key is written into
 	§ a thousand entries in 67.8 ns and into ten thousand in 68.3 ns, flat in
-	§ the same way. A Record key costs a hundred times more and grows with
-	§ the entries, which is the scan path being exactly what it says it is. A
-	§ write taken from a base that has already been written from costs 327 µs
-	§ against 48.7 ns on the tip: 32.7 ns for each of the ten thousand
-	§ entries it repacks, once per fork, which is the O(n) the NOTE names.
+	§ the same way. A write taken from a base that has already been written
+	§ from costs 327 µs against 48.7 ns on the tip: 32.7 ns for each of the
+	§ ten thousand entries it repacks, once per fork, which is the O(n) the
+	§ NOTE names.
+	§
+	§ The composite keys were measured later, on the same machine under Bun
+	§ 1.4.2 — the best of three runs, each a thousand keys:
+	§
+	§   Record keys, encoded by their members
+	§     set in, `set(_:to:)`                          181 µs    181 ns/key
+	§     read out, `value(at:defaultingTo:)`           186 µs    186 ns/key
+	§   Choice keys, encoded by tag and payload
+	§     set in, `set(_:to:)`                          143 µs    143 ns/key
+	§     read out, `value(at:defaultingTo:)`           140 µs    140 ns/key
+	§   A payload-free Choice, ten thousand reads of three keys
+	§     read out, `value(at:defaultingTo:)`           344 µs   34.4 ns/read
+	§   A key with no encoding — the scan path
+	§     set in, `set(_:to:)`                         6.98 ms   6.98 µs/key
+	§     read out, `value(at:defaultingTo:)`          7.97 ms   7.97 µs/key
+	§
+	§ A Record key and a Case are encoded by their parts now, so each is
+	§ found in one step as a String is, at a few times a String's cost for
+	§ the text the parts are spelled into. The same Record-key suite
+	§ recorded 7.48 ms to set and 8.00 ms to read out before the encoding,
+	§ which is the scan path's cost at a thousand entries: a Record holding
+	§ a List still pays it, and the last suite keeps that number on record.
 
 	§ An entry as the baseline holds it. It is the Record a Dictionary hands
 	§ every callback, written down as the Type of a List's items.
 	type Entry = { key: String, value: Integer }
 
-	§ A key with no canonical encoding. A Record is found by asking the
-	§ Record's own `is`, which is a walk over the entries rather than one
-	§ step into an index — the scan path, measured for what it is.
+	§ A Record key. Its members both encode, so the key does: it is found in
+	§ one step, under a text spelled from the members.
 	type Seat = { row: Integer, seat: Integer }
+
+	§ A Choice key with a payload. A Case encodes by its tag and then by its
+	§ payload, under the equality the language derives for it, so a thousand
+	§ distinct payloads are a thousand keys found in one step each.
+	choice Ticket {
+		Numbered { number: Integer },
+		Standing,
+	}
+
+	§ A payload-free Choice. Every value of it is one of three interned
+	§ instances, and a Dictionary keyed by one is the most ordinary
+	§ Dictionary there is, so its lookups are measured on their own.
+	choice Lane {
+		Left,
+		Middle,
+		Right,
+	}
+
+	§ A key with no canonical encoding: a member holding a List has none, so
+	§ the Record has none. It is found by asking the Record's own `is` over
+	§ the entries rather than by one step into an index — the scan path,
+	§ measured for what it is.
+	type Tagged = { row: Integer, tags: List<String> }
 
 	§ One row of a season, for the two Methods that turn a List into a
 	§ Dictionary.
@@ -101,6 +141,46 @@ implementation {
 	constant taken: Dictionary<Seat, Integer> = seats::reduce(
 		startingWith noSeats,
 		(dictionary, seat) { <- dictionary::set(seat, to 1) },
+	)
+
+	constant tickets: List<Ticket> = List.of(integersFrom 0, through 999)
+		::map((number) -> Ticket { <- #Numbered({ number }) })
+
+	constant noTickets: Dictionary<Ticket, Integer> = [=]
+
+	constant sold: Dictionary<Ticket, Integer> = tickets::reduce(
+		startingWith noTickets,
+		(dictionary, ticket) { <- dictionary::set(ticket, to 1) },
+	)
+
+	§ Ten thousand reads spread over the three Lanes, so that the lookups
+	§ measure the encoded path for each of them rather than one key's.
+	constant lanes: List<Lane> = List.of(integersFrom 0, through 9999)
+		::map((number) -> Lane {
+			constant remainder = number::remainder(dividingBy 3)
+
+			<- define {
+				as #Left   if remainder::is(0)
+				as #Middle if remainder::is(1)
+				as #Right  otherwise
+			}
+		})
+
+	constant noLanes: Dictionary<Lane, Integer> = [=]
+
+	constant counted: Dictionary<Lane, Integer> = noLanes
+		::set(#Left, to 1)
+		::set(#Middle, to 2)
+		::set(#Right, to 3)
+
+	constant tagged: List<Tagged> = List.of(integersFrom 0, through 999)
+		::map((number) { <- { row = number, tags = ["a"] } })
+
+	constant noTagged: Dictionary<Tagged, Integer> = [=]
+
+	constant labelled: Dictionary<Tagged, Integer> = tagged::reduce(
+		startingWith noTagged,
+		(dictionary, key) { <- dictionary::set(key, to 1) },
 	)
 
 	§ Ten thousand results over a hundred teams, so grouping and tallying
@@ -238,9 +318,9 @@ tests {
 		}
 	}
 
-	§ A key the runtime has no encoding for is found by asking the key's own
-	§ `is` over the entries the box can see. It is correct for every key Type
-	§ the language has, and it is a walk.
+	§ A Record key whose members all encode is found under a text spelled
+	§ from them, in one step. What the text costs over a String's own
+	§ encoding is what these two measure.
 	suite "Record keys" {
 		benchmark "builds a thousand" {
 			constant filled = seats::reduce(
@@ -254,6 +334,60 @@ tests {
 		benchmark "looks a thousand up" {
 			constant total = seats::reduce(startingWith 0, (sum, seat) {
 				<- sum::add(taken::value(at seat, defaultingTo 0))
+			})
+
+			expect total::is(1000)
+		}
+	}
+
+	§ A Case is found the same way, under its tag and its payload. The
+	§ baselines beside this file are what hold a Choice key to the encoded
+	§ path: the scan path measured forty times these numbers at a thousand
+	§ entries, so a Choice key that fell back onto it would fail the run
+	§ rather than quietly cost what it cost before.
+	suite "Choice keys" {
+		benchmark "builds a thousand" {
+			constant filled = tickets::reduce(
+				startingWith noTickets,
+				(dictionary, ticket) { <- dictionary::set(ticket, to 1) },
+			)
+
+			expect filled::length()::is(1000)
+		}
+
+		benchmark "looks a thousand up" {
+			constant total = tickets::reduce(startingWith 0, (sum, ticket) {
+				<- sum::add(sold::value(at ticket, defaultingTo 0))
+			})
+
+			expect total::is(1000)
+		}
+
+		benchmark "looks three payload-free Cases up ten thousand times" {
+			constant total = lanes::reduce(startingWith 0, (sum, lane) {
+				<- sum::add(counted::value(at lane, defaultingTo 0))
+			})
+
+			expect total::is(19999)
+		}
+	}
+
+	§ A key the runtime has no encoding for is found by asking the key's own
+	§ `is` over the entries the box can see. It is correct for every key Type
+	§ the language has, and it is a walk.
+	suite "Scan-path keys" {
+		benchmark "builds a thousand" {
+			constant filled = tagged::reduce(
+				startingWith noTagged,
+				(dictionary, key) { <- dictionary::set(key, to 1) },
+			)
+
+			expect filled::length()::is(1000)
+		}
+
+		benchmark "looks a thousand up" {
+			constant total = tagged::reduce(startingWith 0, (sum, key) {
+				<- sum::add(labelled::value(at key, defaultingTo 0))
 			})
 
 			expect total::is(1000)
