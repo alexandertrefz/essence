@@ -310,7 +310,7 @@ describe("NonEmptyDictionary", () => {
 })
 
 describe("The bridges from a List", () => {
-	describe("groupedBy", () => {
+	describe("group(on:)", () => {
 		it("groups in the order the keys first appear", async () => {
 			expect(
 				await run(`implementation {
@@ -319,7 +319,7 @@ describe("The bridges from a List", () => {
 						{ name = "sam", home = "south" },
 						{ name = "kim", home = "north" },
 					]
-					constant groups = fixtures::groupedBy(key (f) { <- f.home })
+					constant groups = fixtures::group(on (f) { <- f.home })
 
 					Terminal.inspect(groups::keys())
 					Terminal.inspect(
@@ -343,7 +343,7 @@ describe("The bridges from a List", () => {
 					constant votes = ["a", "b", "a"]
 
 					Terminal.inspect(
-						votes::groupedBy(key (vote) { <- vote })::map(
+						votes::group(on (vote) { <- vote })::map(
 							({ key, value }) { <- value::firstItem() },
 						),
 					)
@@ -356,9 +356,9 @@ describe("The bridges from a List", () => {
 				await run(`implementation {
 					constant none: List<String> = []
 
-					Terminal.inspect(none::groupedBy(key (vote) { <- vote }))
+					Terminal.inspect(none::group(on (vote) { <- vote }))
 					Terminal.inspect(
-						none::groupedBy(key (vote) { <- vote })::isEmpty(),
+						none::group(on (vote) { <- vote })::isEmpty(),
 					)
 				}`),
 			).toEqual(["[=]", "true"])
@@ -378,23 +378,41 @@ describe("The bridges from a List", () => {
 
 					Terminal.inspect(
 						seats
-							::groupedBy(key (seat) { <- { row = seat.row } })
+							::group(on (seat) { <- { row = seat.row } })
 							::map(({ key, value }) { <- value::length() }),
 					)
 				}`),
 			).toEqual(["[ { row = 1 } = 2, { row = 2 } = 1 ]"])
 		})
+
+		// NOTE: The List of groups the deleted `List::group(on:)` answered is
+		// one `entries()` away, and a group is a NonEmptyList there too.
+		it("recovers the List of groups through entries", async () => {
+			expect(
+				await run(`implementation {
+					constant votes = ["a", "b", "a"]
+
+					Terminal.inspect(
+						votes::group(on (vote) { <- vote })::entries()::map(
+							({ key, value }) { <- { key, first = value::firstItem() } },
+						),
+					)
+				}`),
+			).toEqual([
+				'[ { key = "a", first = "a" }, { key = "b", first = "b" } ]',
+			])
+		})
 	})
 
-	describe("tallied", () => {
+	describe("tally()", () => {
 		it("counts each item, in the order the items first appear", async () => {
 			expect(
 				await run(`implementation {
 					constant votes = ["a", "b", "a", "c", "a"]
 					constant none: List<String> = []
 
-					Terminal.inspect(votes::tallied())
-					Terminal.inspect(none::tallied())
+					Terminal.inspect(votes::tally())
+					Terminal.inspect(none::tally())
 				}`),
 			).toEqual(['[ "a" = 3, "b" = 1, "c" = 1 ]', "[=]"])
 		})
@@ -409,7 +427,7 @@ describe("The bridges from a List", () => {
 					constant votes = ["a", "b", "a"]
 
 					Terminal.inspect(
-						votes::tallied()::values()::map((count) {
+						votes::tally()::values()::map((count) {
 							<- count::raise(to -1)
 						}),
 					)
@@ -422,7 +440,7 @@ describe("The bridges from a List", () => {
 				codesFor(`implementation {
 					constant votes = ["a", "b", "a"]
 
-					Terminal.inspect(votes::tallied()::value(at "x", defaultingTo 0))
+					Terminal.inspect(votes::tally()::value(at "x", defaultingTo 0))
 				}`),
 			).toEqual(["no-matching-overload"])
 		})
@@ -440,14 +458,14 @@ describe("The bridges from a List", () => {
 
 					Terminal.inspect(
 						proven
-							::groupedBy(key (vote) { <- vote })
+							::group(on (vote) { <- vote })
 							::length()
 							::raise(to -1),
 					)
 					Terminal.inspect(
-						proven::tallied()::length()::raise(to -1),
+						proven::tally()::length()::raise(to -1),
 					)
-					Terminal.inspect(proven::tallied()::keys()::firstItem())
+					Terminal.inspect(proven::tally()::keys()::firstItem())
 				}`),
 			).toEqual(["1/2", "1/2", '"a"'])
 		})
@@ -457,7 +475,7 @@ describe("The bridges from a List", () => {
 				codesFor(`implementation {
 					constant votes = ["a", "b"]
 					constant refused: NonEmptyDictionary<String, PositiveInteger> =
-						votes::tallied()
+						votes::tally()
 				}`),
 			).toEqual(["assignment-type-mismatch"])
 		})

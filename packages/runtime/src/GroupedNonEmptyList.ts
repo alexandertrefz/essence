@@ -8,4 +8,4 @@
 // List with an item in it puts that item in a group, so the Dictionary either
 // answers holds an entry — which is the whole of what these two names say that
 // `GroupedList`'s can not.
-export { groupedBy, tallied } from "./GroupedList"
+export { group, tally } from "./GroupedList"

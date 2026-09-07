@@ -163,9 +163,9 @@ export const builtinMemberOrder: Array<string> = [
 	// and the proven form of it — so they sit with the Dictionary Namespaces a
 	// reader finds them beside in `Dictionary.es` rather than with the List
 	// ones, which costs nothing: neither shares a Method name with any
-	// Namespace above, so the position decides only where `groupedBy` and
-	// `tallied` are offered, which is after every List Namespace's own members
-	// either way.
+	// Namespace above, so the position decides only where `group` and `tally`
+	// are offered, which is after every List Namespace's own members either
+	// way.
 	"GroupedList",
 	"GroupedNonEmptyList",
 	// NOTE: Last, and not because it is newest. `Randomness` targets a Type
