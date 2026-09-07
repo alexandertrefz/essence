@@ -20,10 +20,14 @@ import { typeKeySymbol } from "./type"
 
 // NOTE: The quadratic slice of the real algebraic irrationals: every value is
 // `rationalPart + radicalCoefficient·√radicand`, held exactly as reduced
-// bigint rationals. Invariants: the radicand is squarefree and at least 2,
-// and the radicalCoefficient is never zero — a value that would break either
-// is returned as a Rational instead, so an Algebraic is irrational by
-// construction.
+// bigint rationals. Invariants: the radicand is at least 2 and is not a perfect
+// square, and the radicalCoefficient is never zero — a value that would break
+// either is returned as a Rational instead, so an Algebraic is irrational by
+// construction. The radicand is squarefree as far as `extractSquarePart`
+// normalises it, which is every square factor whose root is below 2^16 and a
+// remainder that is a square outright; two spellings of one radical that the
+// bound leaves apart are brought together where they meet, by
+// `overCommonRadicand`, so every comparison below is exact all the same.
 export type AlgebraicType = {
 	[typeKeySymbol]: "Algebraic"
 	rationalPartNumerator: bigint
@@ -42,31 +46,91 @@ function rationalValueOf(rational: BigRational): RationalType {
 
 // #region Construction & normalization
 
-// NOTE: Splits a positive integer into `square² · squarefree`, so that
-// `√radicand` can be normalized (√12 → 2·√3). Trial division — fine for the
-// sizes real programs produce.
+// NOTE: floor(√value) by Newton's method on bigints. The first estimate is
+// 2^⌈bits/2⌉, which is at least the root, so the iteration only ever descends
+// and stops at the floor. Shared by the normalisation below, by the test two
+// radicands meet under, and by the interval evaluation at the end of the file.
+export function integerSquareRoot(value: bigint): bigint {
+	if (value < 2n) {
+		return value
+	}
+
+	let estimate = 1n << BigInt((value.toString(2).length + 1) >> 1)
+	let next = (estimate + value / estimate) >> 1n
+
+	while (next < estimate) {
+		estimate = next
+		next = (estimate + value / estimate) >> 1n
+	}
+
+	return estimate
+}
+
+// NOTE: Where trial division stops. Past it the remainder is asked one
+// question — is it a perfect square? — by `integerSquareRoot`, so the root of
+// a large prime costs at most 65,535 divisions and one Newton root rather than
+// a walk up to its own root: `10^16 + 61` measured 2488 ms under unbounded
+// trial division and 1.25 ms here, best of three, and the unbounded growth was
+// √n — `10^12 + 39` measured 27.0 ms there and the same 1.25 ms here, since a
+// bounded cost is the bound. The price is a radicand `p²·q` whose p and q are
+// BOTH above the bound, which stays as written; see `overCommonRadicand` for
+// what that costs.
+const TRIAL_DIVISION_BOUND = 65536n
+
+// NOTE: Splits a non-negative integer into `square² · squarefree`, so that
+// `√radicand` can be normalised (√12 → 2·√3). Every factor found is divided
+// out wholly, and an odd multiplicity leaves one copy in the squarefree part,
+// so `2·65537²` normalises to `65537·√2` although 65537 is past the bound: what
+// is left after the small factors is exactly the square. A remainder the loop
+// left because its own root was reached is 1 or a prime, and the square test
+// is harmless on both. Zero is the one radicand whose "square" is 0 — 0 = 0²
+// — and the coefficient it scales to zero is what collapses √0 to the
+// rational part in `rebuildAlgebraic`.
 function extractSquarePart(radicand: bigint): {
 	square: bigint
 	squarefree: bigint
 } {
 	let square = 1n
-	let squarefree = radicand
+	let squarefree = 1n
+	let remainder = radicand
 
-	for (let factor = 2n; factor * factor <= squarefree; factor++) {
-		const factorSquared = factor * factor
+	for (
+		let factor = 2n;
+		factor <= TRIAL_DIVISION_BOUND && factor * factor <= remainder;
+		factor++
+	) {
+		if (remainder % factor !== 0n) {
+			continue
+		}
 
-		while (squarefree % factorSquared === 0n) {
-			squarefree = squarefree / factorSquared
-			square = square * factor
+		let multiplicity = 0n
+
+		while (remainder % factor === 0n) {
+			remainder = remainder / factor
+			multiplicity += 1n
+		}
+
+		square = square * factor ** (multiplicity / 2n)
+
+		if (multiplicity % 2n === 1n) {
+			squarefree = squarefree * factor
 		}
 	}
 
-	return { square, squarefree }
+	const root = integerSquareRoot(remainder)
+
+	if (root * root === remainder) {
+		square = square * root
+		remainder = 1n
+	}
+
+	return { square, squarefree: squarefree * remainder }
 }
 
-// NOTE: The single gateway every operation funnels through — it enforces the
-// invariants, which is what makes an Algebraic provably irrational and its
-// equality decidable by plain structural comparison.
+// NOTE: The single gateway every NEW radicand funnels through — it normalises
+// the radicand and enforces the invariants, which is what makes an Algebraic
+// provably irrational. An operation that keeps its operand's radicand goes
+// through `rebuildAlgebraic` below instead.
 export function createAlgebraic(
 	rationalPart: BigRational,
 	radicalCoefficient: BigRational,
@@ -77,28 +141,36 @@ export function createAlgebraic(
 	}
 
 	const { square, squarefree } = extractSquarePart(radicand)
-	const coefficient = multiplyRationals(radicalCoefficient, {
-		numerator: square,
-		denominator: 1n,
-	})
 
-	// NOTE: `squarefree` is 0 for exactly one radicand — 0 itself, which
-	// `extractSquarePart` leaves whole because its trial division starts above
-	// it. √0 is 0, not an irrational, so the radical contributes nothing and
-	// the value is its rational part. Collapsing it here is what upholds
-	// "the radicand is squarefree and at least 2": without it a `√0` escapes
-	// with a non-zero radical coefficient and every sign routine reads it as
-	// strictly positive.
-	if (
-		squarefree === 0n ||
-		squarefree === 1n ||
-		coefficient.numerator === 0n
-	) {
+	return rebuildAlgebraic(
+		rationalPart,
+		multiplyRationals(radicalCoefficient, {
+			numerator: square,
+			denominator: 1n,
+		}),
+		squarefree,
+	)
+}
+
+// NOTE: The gateway for a radicand that has already been through
+// `createAlgebraic` — every operation that keeps its operand's radicand, which
+// is all of them but a root and a product across radicals. Normalising again
+// would run the trial division a second time on a radicand that can not have
+// changed: 1,000 additions on √(10^16 + 61) measured 1283 ms through
+// `createAlgebraic` and 0.15 ms through this, best of three. It still collapses
+// a cancelled radical to a Rational, which is the one invariant an operation
+// can break.
+function rebuildAlgebraic(
+	rationalPart: BigRational,
+	coefficient: BigRational,
+	radicand: bigint,
+): AlgebraicType | RationalType {
+	if (radicand === 1n || coefficient.numerator === 0n) {
 		// NOTE: The radical collapsed — the value is rational after all.
 		return rationalValueOf(
 			addRationals(
 				rationalPart,
-				squarefree === 1n
+				radicand === 1n
 					? coefficient
 					: { numerator: 0n, denominator: 1n },
 			),
@@ -111,7 +183,7 @@ export function createAlgebraic(
 		rationalPartDenominator: rationalPart.denominator,
 		radicalCoefficientNumerator: coefficient.numerator,
 		radicalCoefficientDenominator: coefficient.denominator,
-		radicand: squarefree,
+		radicand,
 	}
 }
 
@@ -127,6 +199,59 @@ function radicalCoefficientOf(algebraic: AlgebraicType): BigRational {
 		numerator: algebraic.radicalCoefficientNumerator,
 		denominator: algebraic.radicalCoefficientDenominator,
 	}
+}
+
+// NOTE: Two radicands name one radical exactly when their product is a perfect
+// square: √d = (s/e)·√e with s = √(d·e). Two distinct squarefree radicands
+// never do, so this is the seam where a radicand the trial-division bound left
+// as `p²·q` meets its normalised spelling, or another un-normalised one. The
+// larger radicand is rewritten over the smaller, which is the more normalised
+// of the two, and the caller then runs the same-radicand arithmetic it already
+// has — so a sum, a product, an ordering and an equality across the two
+// spellings all answer what they answer for one. `null` says the radicals are
+// genuinely different. One Newton root of `d·e` per meeting of two radicands,
+// which the same-radicand fast path never pays: 100,000 comparisons of √2
+// against √3 measured 76.6 ms here against 68.9 ms without the alignment,
+// best of five, while the same-radicand pairs measured 15.9 and 17.7 ms
+// against 15.2 and 16.6 — the price is a tenth on the one path that pays it.
+function overCommonRadicand(
+	first: AlgebraicType,
+	second: AlgebraicType,
+): [AlgebraicType, AlgebraicType] | null {
+	if (first.radicand === second.radicand) {
+		return [first, second]
+	}
+
+	const product = first.radicand * second.radicand
+	const root = integerSquareRoot(product)
+
+	if (root * root !== product) {
+		return null
+	}
+
+	if (first.radicand > second.radicand) {
+		return [rewrittenOver(first, second.radicand, root), second]
+	}
+
+	return [first, rewrittenOver(second, first.radicand, root)]
+}
+
+// NOTE: `a + b·√d` as `a + (b·root/e)·√e`, where root = √(d·e). The coefficient
+// stays non-zero and the radicand is one an Algebraic already carries, so the
+// rebuild can not collapse and the cast holds.
+function rewrittenOver(
+	algebraic: AlgebraicType,
+	radicand: bigint,
+	root: bigint,
+): AlgebraicType {
+	return rebuildAlgebraic(
+		rationalPartOf(algebraic),
+		multiplyRationals(radicalCoefficientOf(algebraic), {
+			numerator: root,
+			denominator: radicand,
+		}),
+		radicand,
+	) as AlgebraicType
 }
 
 // NOTE: The exact square root of a non-negative rational, staying in the
@@ -192,18 +317,27 @@ export function signOfLinearRadical(
 	const difference = subtractRationals(rationalSquared, radicalSquared)
 	const differenceSign = rationalSign(difference)
 
+	// NOTE: |a| = |b|·√d with the two signs opposed is exactly `a + b·√d = 0`,
+	// so 0 is the sign — and it is also unreachable: it would make √d rational,
+	// and the gateway never hands out a radicand that is a perfect square.
+	// Answered rather than thrown, so that the routine is total whatever
+	// radicand it is handed.
 	if (differenceSign === 0n) {
-		// NOTE: |a| = |b|·√d would make √d rational — impossible for a
-		// squarefree radicand ≥ 2.
-		throw new Error("An Algebraic invariant was violated.")
+		return 0n
 	}
 
 	return differenceSign > 0n ? rationalSignValue : radicalSignValue
 }
 
-// NOTE: The exact sign of `a + b·√d − c·√e` with distinct squarefree radicands
-// — needed to compare two Algebraics over different radicals. One careful
-// squaring reduces it to the single-radical case.
+// NOTE: The exact sign of `a + b·√d − c·√e` over two genuinely different
+// radicals — `overCommonRadicand` has already said the two are not one — needed
+// to compare two Algebraics over different radicals. One careful squaring
+// reduces it to the single-radical case, and nothing in it asks the radicands
+// to be squarefree: the squaring is an identity, and the sign it hands to
+// `signOfLinearRadical` is decided by comparing rational squares, which is
+// exact for any radicand that is not a perfect square. No enclosure is
+// consulted, for the reason none could decide the one case that matters:
+// two spellings of one number, which the alignment above answers exactly.
 function signOfTwoRadicalDifference(
 	rationalPart: BigRational,
 	radicalCoefficient: BigRational,
@@ -274,15 +408,18 @@ export function signOfDifference(
 		rationalPartOf(first),
 		rationalPartOf(second),
 	)
+	const aligned = overCommonRadicand(first, second)
 
-	if (first.radicand === second.radicand) {
+	if (aligned !== null) {
+		const [left, right] = aligned
+
 		return signOfLinearRadical(
 			rationalPart,
 			subtractRationals(
-				radicalCoefficientOf(first),
-				radicalCoefficientOf(second),
+				radicalCoefficientOf(left),
+				radicalCoefficientOf(right),
 			),
-			first.radicand,
+			left.radicand,
 		)
 	}
 
@@ -318,18 +455,10 @@ export function scaledIntervalOf(
 ): { low: bigint; high: bigint } {
 	const scale = 10n ** digits
 
-	// NOTE: floor(√(radicand · scale²)) by Newton's method on bigints.
-	const target = algebraic.radicand * scale * scale
-	let estimate = target
-	let next = (estimate + 1n) / 2n
-
-	while (next < estimate) {
-		estimate = next
-		next = (estimate + target / estimate) / 2n
-	}
-
-	const radicalLow = estimate
-	const radicalHigh = estimate + 1n
+	// NOTE: floor(√(radicand · scale²)) and its successor enclose √radicand at
+	// this scale.
+	const radicalLow = integerSquareRoot(algebraic.radicand * scale * scale)
+	const radicalHigh = radicalLow + 1n
 
 	const coefficient = radicalCoefficientOf(algebraic)
 	const scaledCoefficientTimesRadical = (candidate: bigint): bigint =>
@@ -372,7 +501,7 @@ export function add(
 ): AlgebraicType {
 	// NOTE: Adding a rational moves the rational part and can never collapse
 	// the radical — the result is total.
-	return createAlgebraic(
+	return rebuildAlgebraic(
 		addRationals(rationalPartOf(algebraic), bigRationalOf(other)),
 		radicalCoefficientOf(algebraic),
 		algebraic.radicand,
@@ -385,7 +514,7 @@ export function multiply(
 ): AlgebraicType | RationalType {
 	const factor = bigRationalOf(other)
 
-	return createAlgebraic(
+	return rebuildAlgebraic(
 		multiplyRationals(rationalPartOf(algebraic), factor),
 		multiplyRationals(radicalCoefficientOf(algebraic), factor),
 		algebraic.radicand,
@@ -403,7 +532,7 @@ export function divide(
 	}
 
 	return createValue(
-		createAlgebraic(
+		rebuildAlgebraic(
 			divideRationals(rationalPartOf(algebraic), divisor),
 			divideRationals(radicalCoefficientOf(algebraic), divisor),
 			algebraic.radicand,
@@ -424,23 +553,28 @@ export function divideByNonZero(
 
 // NOTE: Same-radicand arithmetic stays inside the slice (and may collapse to
 // a Rational — √2·√2 = 2); different radicands generally do not — those come
-// back empty until the general algebraic representation exists.
+// back empty until the general algebraic representation exists. "Same" is
+// decided by `overCommonRadicand`, so two spellings of one radical add.
 export function addAlgebraic(
 	algebraic: AlgebraicType,
 	other: AlgebraicType,
 ): OptionalType<AlgebraicType | RationalType> {
-	if (algebraic.radicand !== other.radicand) {
+	const aligned = overCommonRadicand(algebraic, other)
+
+	if (aligned === null) {
 		return createEmpty()
 	}
 
+	const [first, second] = aligned
+
 	return createValue(
-		createAlgebraic(
-			addRationals(rationalPartOf(algebraic), rationalPartOf(other)),
+		rebuildAlgebraic(
+			addRationals(rationalPartOf(first), rationalPartOf(second)),
 			addRationals(
-				radicalCoefficientOf(algebraic),
-				radicalCoefficientOf(other),
+				radicalCoefficientOf(first),
+				radicalCoefficientOf(second),
 			),
-			algebraic.radicand,
+			first.radicand,
 		),
 	)
 }
@@ -449,21 +583,24 @@ export function multiplyWithAlgebraic(
 	algebraic: AlgebraicType,
 	other: AlgebraicType,
 ): OptionalType<AlgebraicType | RationalType> {
-	const firstRational = rationalPartOf(algebraic)
-	const firstRadical = radicalCoefficientOf(algebraic)
-	const secondRational = rationalPartOf(other)
-	const secondRadical = radicalCoefficientOf(other)
+	const aligned = overCommonRadicand(algebraic, other)
 
-	if (algebraic.radicand === other.radicand) {
+	if (aligned !== null) {
+		const [first, second] = aligned
+		const firstRational = rationalPartOf(first)
+		const firstRadical = radicalCoefficientOf(first)
+		const secondRational = rationalPartOf(second)
+		const secondRadical = radicalCoefficientOf(second)
+
 		// NOTE: (a + b·√d)(a' + b'·√d) = aa' + bb'·d + (ab' + a'b)·√d.
 		return createValue(
-			createAlgebraic(
+			rebuildAlgebraic(
 				addRationals(
 					multiplyRationals(firstRational, secondRational),
 					multiplyRationals(
 						multiplyRationals(firstRadical, secondRadical),
 						{
-							numerator: algebraic.radicand,
+							numerator: first.radicand,
 							denominator: 1n,
 						},
 					),
@@ -472,10 +609,15 @@ export function multiplyWithAlgebraic(
 					multiplyRationals(firstRational, secondRadical),
 					multiplyRationals(secondRational, firstRadical),
 				),
-				algebraic.radicand,
+				first.radicand,
 			),
 		)
 	}
+
+	const firstRational = rationalPartOf(algebraic)
+	const firstRadical = radicalCoefficientOf(algebraic)
+	const secondRational = rationalPartOf(other)
+	const secondRadical = radicalCoefficientOf(other)
 
 	// NOTE: Across radicands only pure radicals stay quadratic:
 	// b·√d · b'·√e = bb'·√(d·e).
@@ -542,7 +684,7 @@ export function reciprocalOf(
 		),
 	)
 
-	return createAlgebraic(
+	return rebuildAlgebraic(
 		divideRationals(rationalPart, conjugateNorm),
 		divideRationals(
 			{
@@ -556,8 +698,8 @@ export function reciprocalOf(
 }
 
 // NOTE: Negation flips both components and touches neither invariant — the
-// radicand stays squarefree and the coefficient stays non-zero, so the result
-// is an Algebraic without consulting the `createAlgebraic` gateway.
+// radicand is untouched and the coefficient stays non-zero, so the result is
+// an Algebraic without consulting either gateway.
 export function negate(algebraic: AlgebraicType): AlgebraicType {
 	return {
 		[typeKeySymbol]: "Algebraic",
