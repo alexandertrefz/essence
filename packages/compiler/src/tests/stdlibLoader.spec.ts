@@ -1344,6 +1344,10 @@ describe("Standard Library Loader", () => {
 		).toEqual([
 			"Terminal",
 			"String",
+			// NOTE: The one Namespace a proven String can reach besides
+			// `String`, listed after it for the same reason `NonZeroInteger`
+			// is listed after `Integer` — see `builtinMemberOrder`.
+			"NonEmptyString",
 			"Boolean",
 			"Integer",
 			// NOTE: The three Namespaces a proven Integer can reach besides

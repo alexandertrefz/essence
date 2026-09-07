@@ -154,7 +154,12 @@ type MeasuredString = StringType & {
 // ASCII String, best of three: 415 µs to segment against 14 µs to split, and
 // `reverse` reads through here — `slice`, `character(at:)` and `ends` read
 // the units directly for such a String and come here for every other.
-function graphemesIn(string: StringType): Array<string> {
+//
+// NOTE: Exported for `NonEmptyString.ts`, which reads the two ends of the view
+// off it — the same reason `List.ts` exports `viewOf` for `NonEmptyList.ts`. A
+// refined Namespace answers a character where this one answers an Optional, and
+// the view is what either answer is read from.
+export function graphemesIn(string: StringType): Array<string> {
 	let measured = string as MeasuredString
 	let segments = measured[graphemesKey]
 

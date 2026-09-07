@@ -357,7 +357,7 @@ Error: No Method named 'lenght' for this value
     │ 
     │ Help: Did you mean 'length'?
     │ 
-    │ Note: Searched Namespace 'String'.
+    │ Note: Searched Namespaces 'String', 'NonEmptyString'.
 ────╯
 
 [unknown-method]

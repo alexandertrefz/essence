@@ -17,6 +17,7 @@
 export const runtimeNamespaceNames = [
 	"Terminal",
 	"String",
+	"NonEmptyString",
 	"Integer",
 	"NonZeroInteger",
 	"NonNegativeInteger",

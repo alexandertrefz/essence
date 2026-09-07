@@ -10232,16 +10232,44 @@ describe("Enricher", () => {
 			)
 		})
 
-		// NOTE: A written String proves `NonEmptyString`, which no Namespace
-		// targets — so the call falls to `String`'s own, which is what a
-		// refinement adding Methods and taking none away means.
+		// NOTE: A written String proves `NonEmptyString`, and the Namespace over
+		// that proof declares no `trim` — trimming is one of the three Methods
+		// that CAN empty a String. So the call falls to `String`'s own, which
+		// is what a refinement adding Methods and taking none away means.
 		it("should reach the base Namespace where nothing targets the proof", () => {
-			expect(receiverTypeOf('constant length = "abc"::length()')).toBe(
+			expect(receiverTypeOf('constant text = "abc"::trim()')).toBe(
 				"NonEmptyString",
 			)
-			expect(answerOf('constant length = "abc"::length()')).toBe(
-				"NonNegativeInteger",
+			expect(answerOf('constant text = "abc"::trim()')).toBe("String")
+		})
+
+		// NOTE: And where the proof IS targeted, every answer it tightens says
+		// so: the count is above zero, the characters are a List with
+		// something in it, and either end is a character rather than an
+		// Optional.
+		it("should spend the proof a written String carries", () => {
+			expect(answerOf('constant count = "abc"::length()')).toBe(
+				"PositiveInteger",
 			)
+			expect(answerOf('constant characters = "abc"::characters()')).toBe(
+				"NonEmptyList<String>",
+			)
+			expect(answerOf('constant first = "abc"::firstCharacter()')).toBe(
+				"String",
+			)
+			expect(answerOf('constant last = "abc"::lastCharacter()')).toBe(
+				"String",
+			)
+			expect(answerOf('constant loud = "abc"::uppercase()')).toBe(
+				"NonEmptyString",
+			)
+			expect(answerOf('constant twice = "abc"::repeat(times 2)')).toBe(
+				"NonEmptyString",
+			)
+			expect(
+				answerOf(`constant text = "abc"::append("d")
+					constant first = text::firstCharacter()`),
+			).toBe("Optional<String>")
 		})
 
 		// NOTE: A written List is counted by its BRACKETS, and an empty pair

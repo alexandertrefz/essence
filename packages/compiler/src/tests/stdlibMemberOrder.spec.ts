@@ -81,6 +81,10 @@ const ACCESSORS = new Set([
 	"words",
 	"lines",
 	"character",
+	// NOTE: A String's two ends, which `List` names `firstItem` and `lastItem`
+	// — the same part of a value read under the name its own Type gives it.
+	"firstCharacter",
+	"lastCharacter",
 	"value",
 ])
 

@@ -38,6 +38,11 @@ export const builtinMemberOrder: Array<string> = [
 	"Terminal",
 	"loop",
 	"String",
+	// NOTE: Directly after `String`, for the reason `NonZeroInteger` sits
+	// directly after `Integer` — the general Namespace has to be met FIRST so
+	// that `NonEmptyString::firstCharacter` reads as the extra a proven String
+	// has.
+	"NonEmptyString",
 	"Boolean",
 	"Integer",
 	// NOTE: Directly after `Integer`, for the reason `NestedList` sits directly
