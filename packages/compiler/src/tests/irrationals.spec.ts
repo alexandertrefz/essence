@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import * as algebraic from "@essence-lang/runtime/Algebraic"
+import { multiplyRationals } from "@essence-lang/runtime/bigRational"
 import { createBoolean } from "@essence-lang/runtime/Boolean"
 import * as integer from "@essence-lang/runtime/Integer"
 import { anyIs, anyIsNot } from "@essence-lang/runtime/internalHelpers"
@@ -12,8 +16,12 @@ import * as rational from "@essence-lang/runtime/Rational"
 import * as transcendental from "@essence-lang/runtime/Transcendental"
 import { type AnyType, typeKeySymbol } from "@essence-lang/runtime/type"
 
+import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
-import { parse } from "../parser/index"
+import { optimise } from "../optimiser/index"
+import { parse, parseWithDiagnostics } from "../parser/index"
+import { rewrite } from "../rewriter/index"
+import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
 const bigRational = (numerator: bigint, denominator = 1n) => ({
@@ -52,6 +60,83 @@ function diagnosticsFor(source: string) {
 
 	return [...diagnostics, ...validate(program)].filter(
 		(diagnostic) => diagnostic.severity === "error",
+	)
+}
+
+// NOTE: The same runner `rationals.spec.ts` has: a Program compiled through the
+// whole pipeline and run, its printed lines collected. The direct tests above
+// reach the runtime by the names it happens to export; this reaches the Essence
+// bodies — `Algebraic::is` is written on `compare` — the way a Program does.
+async function run(source: string): Promise<Array<string>> {
+	let parsed = parseWithDiagnostics(source)
+
+	expect(containsErrors(parsed.diagnostics)).toBe(false)
+
+	let enriched = enrich(parsed.program)
+
+	expect(containsErrors(enriched.diagnostics)).toBe(false)
+	expect(containsErrors(validate(enriched.program))).toBe(false)
+
+	let javaScript = rewrite(optimise(simplify(enriched.program)))
+	let directory = mkdtempSync(join(tmpdir(), "essence-irrationals-"))
+	let file = join(directory, "program.ts")
+
+	writeFileSync(file, javaScript)
+
+	let output: Array<string> = []
+	let originalLog = console.log
+
+	console.log = (...args: Array<unknown>) => {
+		output.push(args.map((argument) => String(argument)).join(" "))
+	}
+
+	try {
+		await import(file)
+	} finally {
+		console.log = originalLog
+		rmSync(directory, { recursive: true, force: true })
+	}
+
+	return output
+}
+
+// NOTE: Primes just past the trial-division bound of `extractSquarePart`
+// (2^16), so that a radicand `p²·q` built from two of them is one the
+// normalisation leaves as written. Each was checked prime by trial division
+// when the list was made.
+const primesPastTheBound = [
+	65537n,
+	65539n,
+	65543n,
+	65551n,
+	65557n,
+	65563n,
+	65579n,
+	65581n,
+	65587n,
+	65599n,
+]
+
+// NOTE: A deterministic pseudo-random sequence — a linear congruential step —
+// so the property tests draw the same cases on every run and a failure names
+// a case that can be re-run.
+function* deterministicNumbers(seed: number): Generator<number> {
+	let state = seed
+
+	while (true) {
+		state = (state * 1103515245 + 12345) % 2147483648
+
+		yield state
+	}
+}
+
+function approximately(value: algebraic.AlgebraicType): number {
+	return (
+		Number(value.rationalPartNumerator) /
+			Number(value.rationalPartDenominator) +
+		(Number(value.radicalCoefficientNumerator) /
+			Number(value.radicalCoefficientDenominator)) *
+			Math.sqrt(Number(value.radicand))
 	)
 }
 
@@ -179,6 +264,315 @@ describe("Irrationals", () => {
 			expect(algebraic.compare(radical(2n), radical(2n))).toEqual(
 				ordering.equal,
 			)
+		})
+
+		// NOTE: `integerSquareRoot` is what the perfect-square test and the
+		// enclosure rest on, so it is pinned at the edges: 0 and 1 are their
+		// own roots, a square answers its root exactly, and the number below
+		// a square answers one less.
+		it("takes the integer square root exactly at the edges", () => {
+			expect(algebraic.integerSquareRoot(0n)).toBe(0n)
+			expect(algebraic.integerSquareRoot(1n)).toBe(1n)
+			expect(algebraic.integerSquareRoot(2n)).toBe(1n)
+			expect(algebraic.integerSquareRoot(3n)).toBe(1n)
+			expect(algebraic.integerSquareRoot(4n)).toBe(2n)
+			expect(algebraic.integerSquareRoot(10n ** 40n)).toBe(10n ** 20n)
+			expect(algebraic.integerSquareRoot(10n ** 40n - 1n)).toBe(
+				10n ** 20n - 1n,
+			)
+			expect(algebraic.integerSquareRoot(10n ** 40n + 1n)).toBe(
+				10n ** 20n,
+			)
+		})
+
+		// NOTE: Trial division stops at 2^16, and the remainder is tested for
+		// being a perfect square outright — so a square factor PAST the bound
+		// is still found whenever it is all that is left once the small factors
+		// are out. 65537 is the first prime past the bound.
+		it("normalises a square factor past the trial-division bound", () => {
+			const value = radical(2n * 65537n * 65537n)
+
+			expect(value.radicand).toBe(2n)
+			expect(value.radicalCoefficientNumerator).toBe(65537n)
+			expect(algebraic.toString(value).value).toBe("65537·√2")
+
+			const whole = algebraic.createAlgebraic(
+				bigRational(0n),
+				bigRational(1n),
+				65537n * 65537n * 65539n * 65539n,
+			)
+
+			expect(whole[typeKeySymbol]).toBe("Rational")
+		})
+
+		// NOTE: The trade-off the bound makes: a radicand `p²·q` with p AND q
+		// past 2^16 is neither smooth nor a square, so it stays as written. The
+		// promise that survives is that it is still the same NUMBER as its
+		// normalised spelling — equal, ordered the same against everything, and
+		// added and multiplied as one radical — because two radicands whose
+		// product is a square are aligned wherever they meet.
+		describe("an un-normalised radicand", () => {
+			const pairs = primesPastTheBound.flatMap((p, index) =>
+				primesPastTheBound
+					.slice(index + 1)
+					.map((q): [bigint, bigint] => [p, q]),
+			)
+
+			it("stays as written", () => {
+				const [p, q] = pairs[0]!
+				const value = radical(p * p * q)
+
+				expect(value.radicand).toBe(p * p * q)
+				expect(value.radicalCoefficientNumerator).toBe(1n)
+			})
+
+			it("compares equal to its normalised spelling, and orders around it", () => {
+				const numbers = deterministicNumbers(7)
+
+				for (const [p, q] of pairs) {
+					const a = bigRational(
+						BigInt((numbers.next().value % 41) - 20),
+						BigInt((numbers.next().value % 7) + 1),
+					)
+					const b = bigRational(
+						BigInt((numbers.next().value % 19) + 1),
+						BigInt((numbers.next().value % 5) + 1),
+					)
+					const written = algebraic.createAlgebraic(
+						a,
+						b,
+						p * p * q,
+					) as algebraic.AlgebraicType
+					const normalised = algebraic.createAlgebraic(
+						a,
+						multiplyRationals(b, bigRational(p)),
+						q,
+					) as algebraic.AlgebraicType
+
+					expect(written.radicand).toBe(p * p * q)
+					expect(normalised.radicand).toBe(q)
+					expect(algebraic.compare(written, normalised)).toEqual(
+						ordering.equal,
+					)
+					expect(algebraic.compare(normalised, written)).toEqual(
+						ordering.equal,
+					)
+
+					const above = algebraic.add(
+						written,
+						integer.createInteger(1n),
+					)
+
+					expect(algebraic.compare(above, normalised)).toEqual(
+						ordering.greater,
+					)
+					expect(algebraic.compare(normalised, above)).toEqual(
+						ordering.less,
+					)
+					expect(algebraic.compare(written, above)).toEqual(
+						ordering.less,
+					)
+				}
+			})
+
+			it("adds and multiplies with its normalised spelling as one radical", () => {
+				const [p, q] = pairs[3]!
+				const written = radical(p * p * q)
+				const normalised = algebraic.createAlgebraic(
+					bigRational(0n),
+					bigRational(p),
+					q,
+				) as algebraic.AlgebraicType
+
+				const sum = unwrap(algebraic.addAlgebraic(written, normalised))
+
+				expect(sum[typeKeySymbol]).toBe("Algebraic")
+				expect((sum as algebraic.AlgebraicType).radicand).toBe(q)
+				expect(
+					(sum as algebraic.AlgebraicType)
+						.radicalCoefficientNumerator,
+				).toBe(2n * p)
+
+				// NOTE: √(p²q) · p√q = p²·q, a Rational — the product of one
+				// radical with itself.
+				const product = unwrap(
+					algebraic.multiplyWithAlgebraic(written, normalised),
+				)
+
+				expect(product[typeKeySymbol]).toBe("Rational")
+				expect((product as rational.RationalType).numerator).toBe(
+					p * p * q,
+				)
+
+				const difference = unwrap(
+					algebraic.addAlgebraic(
+						written,
+						algebraic.negate(normalised),
+					),
+				)
+
+				expect(difference[typeKeySymbol]).toBe("Rational")
+				expect((difference as rational.RationalType).numerator).toBe(0n)
+			})
+
+			// NOTE: Two un-normalised radicands over genuinely different
+			// radicals go through the two-radical squaring, which asks nothing
+			// of them being squarefree. A double is precise enough to say
+			// which way each pair falls, since the pairs are kept apart.
+			it("orders against a genuinely different radical exactly", () => {
+				const numbers = deterministicNumbers(11)
+				let decided = 0
+
+				for (const [p, q] of pairs) {
+					for (const r of primesPastTheBound.slice(0, 4)) {
+						if (r === q || r === p) {
+							continue
+						}
+
+						const a = bigRational(
+							BigInt((numbers.next().value % 41) - 20),
+							1n,
+						)
+						const c = bigRational(
+							BigInt((numbers.next().value % 41) - 20),
+							1n,
+						)
+						const left = algebraic.createAlgebraic(
+							a,
+							bigRational(1n),
+							p * p * q,
+						) as algebraic.AlgebraicType
+						const right = algebraic.createAlgebraic(
+							c,
+							bigRational(p),
+							r,
+						) as algebraic.AlgebraicType
+						const gap = approximately(left) - approximately(right)
+
+						if (Math.abs(gap) < 1e-3) {
+							continue
+						}
+
+						decided += 1
+
+						expect(algebraic.compare(left, right)).toEqual(
+							gap < 0 ? ordering.less : ordering.greater,
+						)
+						expect(algebraic.compare(right, left)).toEqual(
+							gap < 0 ? ordering.greater : ordering.less,
+						)
+					}
+				}
+
+				expect(decided).toBeGreaterThan(100)
+			})
+
+			// NOTE: The same pair the way a Program meets it. `Algebraic::is` is
+			// written on `compare`, the inequalities are `Orderable`'s provided
+			// bodies over it, and a Union receiver reaches `Number::is` and the
+			// sixteen-cell `Number.compare` — every one of those has to read
+			// √(65537²·65539) and 65537·√65539 as one number, and the same-radical
+			// arithmetic has to find the radical they share.
+			it("is one number to every Essence body that meets it", async () => {
+				expect(
+					await run(`implementation {
+						constant written = 281496452005891::squareRoot()
+						constant normalised = 65539::squareRoot()::multiply(with 65537)
+
+						Terminal.inspect(written::is(normalised))
+						Terminal.inspect(normalised::is(written))
+						Terminal.inspect(written::isLessThan(normalised))
+						Terminal.inspect(written::isLessThanOrEqualTo(normalised))
+						Terminal.inspect(written::add(1)::isGreaterThan(normalised))
+						Terminal.inspect(Number.compare(written, to normalised))
+
+						match written -> {} {
+							case Algebraic {
+								constant root = @
+
+								match normalised -> {} {
+									case Algebraic {
+										Terminal.inspect(root::is(@))
+										Terminal.inspect(root::compare(to @))
+										Terminal.inspect(root::add(@))
+										Terminal.inspect(root::subtract(@))
+										Terminal.inspect(root::multiply(with @))
+										Terminal.inspect(root::divide(by @))
+										Terminal.inspect(root::isLessThan(@::add(1)))
+									}
+
+									case Integer { Terminal.inspect("normalised collapsed") }
+								}
+							}
+
+							case Integer { Terminal.inspect("written collapsed") }
+						}
+					}`),
+				).toEqual([
+					"true",
+					"true",
+					"false",
+					"true",
+					"true",
+					"Ordering#Equal",
+					"true",
+					"Ordering#Equal",
+					"Optional#Value(131074·√65539)",
+					"Optional#Value(0/1)",
+					"Optional#Value(281496452005891/1)",
+					"Optional#Value(1/1)",
+					"true",
+				])
+			})
+		})
+
+		// NOTE: The zero branch of the linear sign — |a| = |b|·√d with the signs
+		// opposed — is exactly `a + b·√d = 0`, and answers 0 instead of throwing.
+		// The gateway never builds a radicand it could fire on, so the only way
+		// to reach it is by hand.
+		it("answers zero for a linear radical that is exactly zero", () => {
+			expect(
+				algebraic.signOfLinearRadical(
+					bigRational(2n),
+					bigRational(-1n),
+					4n,
+				),
+			).toBe(0n)
+			expect(
+				algebraic.signOfLinearRadical(
+					bigRational(-2n),
+					bigRational(1n),
+					4n,
+				),
+			).toBe(0n)
+		})
+
+		// NOTE: The one claim here about TIME. Unbounded trial division walks up
+		// to the root of the radicand, so a sixteen-digit prime measured 2488 ms
+		// and a twenty-five-digit one would be hours; bounded at 2^16 with a
+		// perfect-square test on the remainder, the same root measured 1.25 ms,
+		// best of three. The ceiling is 50 ms — well above the bounded cost on
+		// a slow machine, and fifty times below the unbounded one on a fast one.
+		// Best of three, so a runner under load has three chances.
+		it("takes the root of a sixteen-digit prime in milliseconds", () => {
+			const prime = 10000000000000061n
+			let best = Number.POSITIVE_INFINITY
+
+			for (let attempt = 0; attempt < 3; attempt++) {
+				const started = performance.now()
+				const root = unwrap(
+					integer.squareRoot__overload$1(
+						integer.createInteger(prime),
+					),
+				)
+
+				best = Math.min(best, performance.now() - started)
+
+				expect(root[typeKeySymbol]).toBe("Algebraic")
+				expect((root as algebraic.AlgebraicType).radicand).toBe(prime)
+			}
+
+			expect(best).toBeLessThan(50)
 		})
 	})
 

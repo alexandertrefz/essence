@@ -42,6 +42,8 @@ declarations {
 		compare(to other: Algebraic) -> Ordering
 
 		§§ Answers the Algebraic as a String, in the exact symbolic form: `√2`, `3·√2` or `1 + √2`.
+		§§
+		§§ One radical has one printed form, with one exception. Normalisation divides out square factors up to 65536, so a radicand `p²·q` with both primes above that is printed as written. The equal `p·√q` prints in the normalised form.
 		toString() -> String
 
 		§§ Answers the exact sum of the Algebraic and a number.
