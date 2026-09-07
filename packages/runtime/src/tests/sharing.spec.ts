@@ -21,6 +21,7 @@ import {
 	item__overload$1 as item,
 	join,
 	everyItem,
+	lastIndex__overload$3 as lastIndexWhere,
 	length,
 	type ListType,
 	map,
@@ -425,6 +426,37 @@ describe("every native against an upgraded receiver", () => {
 			itemsOf(sortOn(integers(), key, ascending, integerOrder)),
 		).toEqual([])
 		expect(reads).toBe(10)
+	})
+
+	// NOTE: The one walk that runs backwards: the last accepted item is found
+	// whichever run it is in, and the check is not offered any item after it.
+	test("lastIndex(where:) walks backwards across the run boundary and stops", () => {
+		let offered: Array<number> = []
+		let accepting = (limit: number) => (item: IntegerType) => {
+			offered.push(Number(item.value))
+
+			return createBoolean(Number(item.value) <= limit)
+		}
+		let positionOf = (answer: ReturnType<typeof lastIndexWhere>) =>
+			answer[typeKeySymbol] === "Optional#Empty"
+				? null
+				: Number(answer.item.value)
+
+		expect(positionOf(lastIndexWhere(upgraded(), accepting(9)))).toBe(4)
+		expect(offered).toEqual([5])
+
+		offered = []
+		expect(positionOf(lastIndexWhere(upgraded(), accepting(2)))).toBe(1)
+		expect(offered).toEqual([5, 4, 3, 2])
+
+		offered = []
+		expect(positionOf(lastIndexWhere(upgraded(), accepting(1)))).toBe(0)
+		expect(offered).toEqual([5, 4, 3, 2, 1])
+
+		offered = []
+		expect(positionOf(lastIndexWhere(upgraded(), accepting(0)))).toBeNull()
+		expect(offered).toEqual([5, 4, 3, 2, 1])
+		expect(positionOf(lastIndexWhere(integers(), accepting(9)))).toBeNull()
 	})
 
 	test("split and pair", () => {
