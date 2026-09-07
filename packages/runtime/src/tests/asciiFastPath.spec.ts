@@ -1,12 +1,15 @@
 import { describe, expect, test } from "bun:test"
 
-import { createInteger } from "../Integer"
+import { createInteger, type IntegerType } from "../Integer"
 import type { OptionalType } from "../Optional"
 import { bothEnds, end, start } from "../Side"
 import {
 	character__overload$1 as character,
+	count,
 	createString,
 	ends,
+	firstIndex__overload$1 as firstIndex,
+	lastIndex__overload$1 as lastIndex,
 	length,
 	lowercase,
 	repeat,
@@ -22,11 +25,27 @@ import { typeKeySymbol } from "../type"
 const string = (value: string) => createString(value)
 const int = (value: number) => createInteger(value)
 
+// NOTE: An Optional position read back as a plain number, `-1` for an empty
+// answer — the shape `indexOf` answers, which is what the ASCII route IS and
+// what the grapheme route has to agree with.
+function positionOf(answer: OptionalType<IntegerType>): number {
+	return answer[typeKeySymbol] === "Optional#Empty"
+		? -1
+		: Number(answer.item.value)
+}
+
 // NOTE: The character a position answers, or nothing — unwrapped here so that
 // the assertions below read the answer rather than the Optional around it.
 function characterOf(answer: OptionalType<StringType>): StringType | undefined {
 	return answer[typeKeySymbol] === "Optional#Empty" ? undefined : answer.item
 }
+
+const first = (text: string, part: string) =>
+	positionOf(firstIndex(string(text), string(part)))
+const last = (text: string, part: string) =>
+	positionOf(lastIndex(string(text), string(part)))
+const occurrences = (text: string, part: string) =>
+	Number(count(string(text), string(part)).value)
 
 // NOTE: The two Symbol keys `String.ts` remembers a String's ASCII-ness and
 // character count under, found by their descriptions — they are private to
@@ -50,14 +69,15 @@ const isUnmarked = (value: StringType) =>
 	remembered(value, "$graphemeCount") === undefined
 
 // NOTE: The same text twice, composed and decomposed — canonically equivalent,
-// different code points — so that what a Method answers off one can be held
-// against what it answers off the other. See `graphemes.spec.ts`.
+// different code points — so that a search across the two proves it matches by
+// canonical equivalence rather than by unit. See `graphemes.spec.ts`.
 const composed = "café".normalize("NFC")
 const decomposed = "café".normalize("NFD")
+const family = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}"
 
 // NOTE: `split`, `ends`, `slice` and `character(at:)` take the intrinsic on
-// the same condition, and each has to answer what the walk over the view
-// answers.
+// the same condition the searches take it on, and each has to answer what the
+// walk over the view answers.
 describe("cutting by either route", () => {
 	test("split, ends, slice and character answer alike on ASCII", () => {
 		let pieces = (text: string, separator: string) =>
@@ -87,6 +107,91 @@ describe("cutting by either route", () => {
 		)
 		expect(characterOf(character(string("hello"), int(5)))).toBeUndefined()
 		expect(characterOf(character(string("hello"), int(-6)))).toBeUndefined()
+	})
+})
+
+describe("searching by either route", () => {
+	// NOTE: Two ASCII Strings are searched by the JavaScript intrinsics, and
+	// these are the intrinsics' own answers: the first occurrence, the LAST
+	// occurrence even where it overlaps an earlier one, and the occurrences
+	// that do not overlap — the ones `split` cuts at.
+	test("ASCII on both sides answers by unit", () => {
+		expect(first("banana", "an")).toBe(1)
+		expect(last("banana", "an")).toBe(3)
+		expect(occurrences("banana", "an")).toBe(2)
+
+		expect(first("aaa", "aa")).toBe(0)
+		expect(last("aaa", "aa")).toBe(1)
+		expect(occurrences("aaa", "aa")).toBe(1)
+		expect(occurrences("aaaa", "aa")).toBe(2)
+
+		expect(first("banana", "zz")).toBe(-1)
+		expect(last("banana", "zz")).toBe(-1)
+		expect(occurrences("banana", "zz")).toBe(0)
+
+		expect(first("", "a")).toBe(-1)
+		expect(last("", "a")).toBe(-1)
+		expect(occurrences("", "a")).toBe(0)
+	})
+
+	// NOTE: The one rule for the empty part, stated above `contains` in
+	// `String.es`: it matches nowhere, except as a position at either end.
+	test("the empty part is a position at either end and no occurrence", () => {
+		expect(first("hello", "")).toBe(0)
+		expect(last("hello", "")).toBe(5)
+		expect(occurrences("hello", "")).toBe(0)
+
+		expect(first("", "")).toBe(0)
+		expect(last("", "")).toBe(0)
+		expect(occurrences("", "")).toBe(0)
+
+		// NOTE: The length is counted by grapheme, whichever route the empty
+		// part would have taken.
+		expect(last(`a${family}b`, "")).toBe(3)
+	})
+
+	// NOTE: A side the scan refuses goes through the grapheme view, and the
+	// positions are then by grapheme: a joined emoji is ONE position, a base
+	// and its combining mark are one, and a composed part is found inside a
+	// decomposed String.
+	test("a non-ASCII side is searched by grapheme and by canonical equivalence", () => {
+		expect(first(`a${family}b`, "b")).toBe(2)
+		expect(last(`a${family}b${family}`, "b")).toBe(2)
+		expect(occurrences(`${family}a${family}`, family)).toBe(2)
+
+		expect(first(decomposed, composed.slice(3))).toBe(3)
+		expect(last(`${decomposed}${composed}`, "é")).toBe(7)
+		expect(occurrences(`${decomposed} ${composed}`, "é")).toBe(2)
+
+		expect(first("x\u0301y", "x")).toBe(-1)
+		expect(occurrences("x\u0301yx", "x")).toBe(1)
+		expect(last("x\u0301yx", "x")).toBe(2)
+	})
+
+	// NOTE: A carriage return declines the ASCII route (see `isSingleUnitAscii`),
+	// because CR LF is one cluster — so a line feed inside one is not found,
+	// while the pair is.
+	test("a carriage return is searched as part of its cluster", () => {
+		expect(first("a\r\nb", "\n")).toBe(-1)
+		expect(first("a\r\nb", "\r\n")).toBe(1)
+		expect(last("a\r\nb", "b")).toBe(2)
+		expect(occurrences("a\r\nb\r\n", "\r\n")).toBe(2)
+	})
+
+	// NOTE: The routes have to meet where one side qualifies and the other
+	// does not: U+037E is the Greek question mark, whose NFC form is the ASCII
+	// semicolon, so an ASCII String holds it by canonical equivalence.
+	test("an ASCII receiver and a non-ASCII part still agree on the answer", () => {
+		expect(first("a;b", "\u037E")).toBe(1)
+		expect(last("a;b;", "\u037E")).toBe(3)
+		expect(occurrences("a;b;", "\u037E")).toBe(2)
+		expect(first("abc", "é")).toBe(-1)
+		expect(ends(string("abc"), string("é")).value).toBeFalse()
+
+		expect(first("añb", "b")).toBe(2)
+		expect(last("añb", "a")).toBe(0)
+		expect(occurrences("añbñb", "b")).toBe(2)
+		expect(ends(string("añb"), string("b")).value).toBeTrue()
 	})
 })
 

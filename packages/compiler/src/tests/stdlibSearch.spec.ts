@@ -370,10 +370,10 @@ describe("Stdlib searching Methods", () => {
 		})
 	})
 
-	// NOTE: `lastIndex` used to be derived from `split(on:)`, which scans left
-	// to right and CONSUMES each match it finds, so it answered the last
-	// non-overlapping match rather than the last occurrence. It is the first
-	// occurrence of the reversed part in the reversed String now.
+	// NOTE: A `lastIndex` derived from `split(on:)`, which scans left to right
+	// and CONSUMES each match it finds, answers the last non-overlapping match
+	// rather than the last occurrence. The native walks the grapheme view from
+	// the end, so the first match it meets is the last occurrence.
 	describe("String.lastIndex(of:)", () => {
 		it("finds the last occurrence when occurrences overlap", async () => {
 			// NOTE: The positions JavaScript's own `lastIndexOf` answers, which
@@ -418,8 +418,8 @@ describe("Stdlib searching Methods", () => {
 		})
 
 		// NOTE: Positions are by GRAPHEME everywhere in the Namespace, and the
-		// reversal both sides go through is `characters()::reverse()`, which
-		// never splits one — so a String of emoji counts the same either way.
+		// searches read the same view `split` reads, which never splits one —
+		// so a String of emoji counts the same from either end.
 		it("counts the positions by grapheme", async () => {
 			expect(
 				await run(`implementation {
