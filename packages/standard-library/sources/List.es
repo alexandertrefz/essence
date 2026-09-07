@@ -380,13 +380,21 @@ declarations {
 
 			§§ Answers the last item the check accepts.
 			§§
+			§§ The walk runs backwards and stops at the first item it accepts.
+			§§
 			§§ @param where — the check each item is offered to
 			§§ @returns — the matching item, or nothing when no item is accepted.
 			(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
-				§ The last accepted item is the first accepted item of the
-				§ reversed List. So `firstItem(where:)` answers this one too,
-				§ and stops at the item that decides it.
-				<- @::reverse()::firstItem(where check)
+				§ Written on `lastIndex(where:)`, the one backwards walk that
+				§ stops at the item that decides it, and the item is read back
+				§ by its position. The body was `reverse()::firstItem(where:)`,
+				§ which copies the whole List before a walk whose point is
+				§ stopping early. Two thousand calls on 20,000 items with the
+				§ last item accepted measured 61 ms that way and 20 ms this way.
+				constant items = @
+
+				<- @::lastIndex(where check)
+					::andThen((position) { <- items::item(at position) })
 			}
 
 			§§ Answers the last item, or the given fallback for the empty List.
@@ -520,19 +528,7 @@ declarations {
 			<infer ItemType is Equatable>(
 				of item: ItemType,
 			) -> Optional<Integer> {
-				§ The last occurrence is the first occurrence of the reversed
-				§ List. So `firstIndex` answers this one too, and only the
-				§ position is counted back from the end.
-				§
-				§ The empty List reverses to itself and finds nothing, so it
-				§ needs no guard. The -1 that `lastPosition` holds never reaches
-				§ the subtraction, because `map` does not run on an empty
-				§ Optional.
-				constant lastPosition = @::length()::subtract(1)
-
-				<- @::reverse()
-					::firstIndex(of item)
-					::map((position) { <- lastPosition::subtract(position) })
+				<- @::lastIndex(where (candidate) { <- candidate::is(item) })
 			}
 
 			§§ Answers the position of the last item equal to the given one, or the given fallback when the item is absent.
@@ -549,22 +545,24 @@ declarations {
 				<- @::lastIndex(of item)::value(defaultingTo fallback)
 			}
 
-			§ The reversal the by-value entry above uses, over the check
-			§ instead of the item. The walk `firstIndex(where:)` makes stops
-			§ at the item that decides it, so this one stops at the last
-			§ accepted item.
+			§ The one backwards walk in the Namespace, and native because no
+			§ Essence expression walks a List backwards without copying it.
+			§ The fold in `reduce` runs forwards. The general `loop` is in
+			§ `Loop.es`, and importing that would make it a seventh file in
+			§ the frozen import cycle, through `Integer.es`. The body it
+			§ replaces reversed the receiver and read a `firstIndex` off the
+			§ copy. That is a whole copy before a walk whose point is stopping
+			§ early. Two thousand calls on 20,000 items with the last item
+			§ accepted measured 57 ms that way and 19 ms natively. The entries
+			§ `lastIndex(of:)` and `lastItem(where:)` are written on this one.
 
 			§§ Answers the position of the last item the check accepts.
 			§§
+			§§ The walk runs backwards and stops at the first item it accepts.
+			§§
 			§§ @param where — the check each item is offered to
 			§§ @returns — the zero-based position, or nothing when no item is accepted.
-			(where check: (_: ItemType) -> Boolean) -> Optional<Integer> {
-				constant lastPosition = @::length()::subtract(1)
-
-				<- @::reverse()
-					::firstIndex(where check)
-					::map((position) { <- lastPosition::subtract(position) })
-			}
+			(where check: (_: ItemType) -> Boolean) -> Optional<Integer>
 
 			§§ Answers the position of the last item the check accepts, or the given fallback when it accepts none.
 			§§

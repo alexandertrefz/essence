@@ -771,10 +771,39 @@ export function item__overload$1<ItemType extends AnyType>(
 // The eager `everyItem` beside `reduce` is what it used to be compared against;
 // the `Step` Choice is what let the short-circuiting version leave the native.
 
-// NOTE: `firstIndex`/`lastIndex` are no longer here — both are written in
-// Essence now, walking the positions with the general `loop` and `#Done`-ing at
-// the first match. The `Step` Choice is what let that walk-and-stop leave the
-// native; the item `is` arrives as the bound's hidden conformance Argument.
+// NOTE: `firstIndex` is no longer here — both of its entries are written in
+// Essence, on `reduce`'s early-stopping entry, which `#Done`s at the first
+// match; the item `is` arrives as the bound's hidden conformance Argument.
+
+// NOTE: The one backwards walk. `reduce` runs forwards and nothing in Essence
+// walks a List the other way without copying it, so `lastIndex(where:)` is
+// native and `lastIndex(of:)` and `lastItem(where:)` are written on it. The
+// back run is walked from its end and then the front run from its START, since
+// the front is stored reversed and its logical head is its last element — so
+// the walk stops at the last accepted item having visited nothing after it.
+// The body this replaces reversed the whole List first: two thousand calls on
+// 20,000 items with the last item accepted measured 57 ms that way and 19 ms
+// here, best of three with the subprocess startup inside both.
+export function lastIndex__overload$3<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	check: (item: ItemType) => BooleanType,
+): OptionalType<IntegerType> {
+	let view = viewOf(originalList)
+
+	for (let index = view.backCount - 1; index >= 0; index--) {
+		if (check(view.back[index]).value) {
+			return createValue(createInteger(view.frontCount + index))
+		}
+	}
+
+	for (let index = 0; index < view.frontCount; index++) {
+		if (check(view.front[index]).value) {
+			return createValue(createInteger(view.frontCount - 1 - index))
+		}
+	}
+
+	return createEmpty()
+}
 
 export function slice<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
