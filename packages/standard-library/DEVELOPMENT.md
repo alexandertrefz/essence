@@ -410,7 +410,7 @@ Printing is derived for a Choice whose Cases all carry no payload, and answers
 the Case's own name — `#Less` prints `Less`. So a Namespace over a Choice of
 unit Cases declares `is Equatable, is Printable` and has an empty body:
 `Ordering`, `Side`, `CaseSensitivity`, `NormalizationForm`, `NumberFormat`,
-`Rounding` and `SortOrder` are all that shape.
+`Rounding`, `SortOrder` and `Stream` are all that shape.
 
 Printing is DECLARED where equality is not — a Choice compares by its tags
 whatever anyone says, but how it READS is a decision, so a Choice whose

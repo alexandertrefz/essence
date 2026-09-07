@@ -2238,6 +2238,17 @@ third"::lines())
 		descending::toString(),
 	)
 
+	§ ——— Stream ———————————————————————————————————————————————————————————
+	constant toOutput: Stream = #Output
+	constant toError: Stream  = #Error
+
+	show("Choice_Equatable.is(_ Stream)", toOutput::is(#Output))
+	show("Choice_Equatable.is(_ Stream) [differing]", toOutput::is(#Error))
+	show("Choice_Equatable.isNot(_ Stream)", toOutput::isNot(#Error))
+	show("Choice_Equatable.isNot(_ Stream) [same]", toError::isNot(#Error))
+	show("Choice_Printable.toString() [Stream#Output]", toOutput::toString())
+	show("Choice_Printable.toString() [Stream#Error]", toError::toString())
+
 	§ ——— Record ———————————————————————————————————————————————————————————
 	§ LOAD-BEARING: `point` prints as `{ x = 1, y = 2 }`, well under sixty
 	§ characters. `getStringRepresentation` has a bug where a Record whose

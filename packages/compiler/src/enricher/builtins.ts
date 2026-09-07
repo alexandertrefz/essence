@@ -101,6 +101,10 @@ export const builtinMemberOrder: Array<string> = [
 	// three of its Methods are derived — so its position decides nothing but
 	// where a reader of this list meets it.
 	"SortOrder",
+	// NOTE: With the other mode Choices, and last among them because it is the
+	// newest and shares no Method name with anything here — all three of its
+	// Methods are derived.
+	"Stream",
 	"Record",
 	"List",
 	// NOTE: Directly after `List`, because both target a List and the position
@@ -266,9 +270,8 @@ export const builtinTypeOrder: Array<string> = [
 	// NOTE: Beside the mode Choice it is one of, and after `Rounding` for the
 	// reason it follows `Rounding` in the member order above.
 	"SortOrder",
-	// NOTE: With the other mode Choices, and last among them because it is the
-	// only one of them with no Namespace of its own — so it appears in this
-	// table and not in the member order above.
+	// NOTE: With the other mode Choices, and last among them for the reason it
+	// is last in the member order above.
 	"Stream",
 	// NOTE: After every Type a Program writes down, because it is the one Type
 	// a Program never writes down: a source arrives as a Parameter of

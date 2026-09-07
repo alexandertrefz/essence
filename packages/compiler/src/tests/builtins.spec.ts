@@ -41,6 +41,7 @@ import * as rounding from "@essence-lang/runtime/Rounding"
 import * as scalar from "@essence-lang/runtime/Scalar"
 import * as side from "@essence-lang/runtime/Side"
 import * as sortOrder from "@essence-lang/runtime/SortOrder"
+import * as stream from "@essence-lang/runtime/Stream"
 import * as string from "@essence-lang/runtime/String"
 import * as terminal from "@essence-lang/runtime/Terminal"
 import * as transcendental from "@essence-lang/runtime/Transcendental"
@@ -82,6 +83,9 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	NumberFormat: numberFormat,
 	Rounding: rounding,
 	SortOrder: sortOrder,
+	// NOTE: A Namespace with no native either, for the reason `Scalar` has
+	// none: all three of its Methods are derived from the Choice.
+	Stream: stream,
 	Record: record,
 	List: list,
 	NestedList: nestedList,
