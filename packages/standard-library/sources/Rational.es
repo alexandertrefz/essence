@@ -695,34 +695,31 @@ declarations {
 			<- @::denominator()::is(1)
 		}
 
-		§ The sign of a Rational is the sign of its numerator, because the
-		§ denominator is always positive in lowest terms. So the two below are
-		§ the Integer questions of the same names asked one level down, and
-		§ neither builds a `0/1` to compare against.
+		§ The three sign questions each ask `@` against a written `0/1`,
+		§ rather than reading the numerator and asking Integer's question of
+		§ it. A predicate written as one call on `@` is that call, and a chain
+		§ is a question of its own. So `if r::isGreaterThan(0/1)` proves a
+		§ `Rational where @::isPositive()`, and the `else` of an `if` asking
+		§ `isZero` proves `NonZeroRational`, exactly as Integer's three do.
+		§ The numerator route built no `0/1` and proved nothing. See
+		§ DEVELOPMENT.md, Why bodies look the way they do.
 
 		§§ Answers whether the Rational is above zero.
 		§§
 		§§ Zero is neither positive nor negative.
 		isPositive() -> Boolean {
-			<- @::numerator()::isPositive()
+			<- @::isGreaterThan(0/1)
 		}
 
 		§§ Answers whether the Rational is below zero.
 		§§
 		§§ Zero is neither positive nor negative.
 		isNegative() -> Boolean {
-			<- @::numerator()::isNegative()
+			<- @::isLessThan(0/1)
 		}
 
 		§§ Answers whether the Rational is exactly zero.
 		isZero() -> Boolean {
-			§ This one asks `@` rather than its numerator, and the bound is
-			§ the `0/1` `NonZeroRational` is written over. A predicate
-			§ written as one call on `@` is that call. So the `else` of an
-			§ `if` asking this proves that refinement, exactly as Integer's
-			§ `isZero` does. Reading the numerator would be a chain, and
-			§ would prove nothing. See DEVELOPMENT.md, Why bodies look the
-			§ way they do.
 			<- @::is(0/1)
 		}
 
