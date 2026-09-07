@@ -504,9 +504,18 @@ declarations {
 
 			constant needed = length::subtract(characterCount)
 
-			§ The padding has at least one character, so repeating it
-			§ `needed` times reaches at least `needed` characters.
-			constant filler = padding::repeat(times needed)
+			§ One copy more than the whole copies that fit reaches at least
+			§ `needed` characters, and overshoots by less than one copy. The
+			§ alternative, `needed` copies, overshoots by a factor of the
+			§ padding's length, and the slice then segments all of it. Measured
+			§ as a Program making 200 pads to 10,000 with a ten-character
+			§ non-ASCII padding: 937 ms on `needed` copies, 176 ms here. The
+			§ divisor is never zero past the guard above, and the fallback is
+			§ the `needed` copies, so the filler is long enough either way.
+			constant copies = needed
+				::quotient(dividingBy padding::length(), defaultingTo needed)
+				::add(1)
+			constant filler = padding::repeat(times copies)
 
 			§ `@` is rebound inside `match`; see DEVELOPMENT.md, Why bodies
 			§ look the way they do.
