@@ -2447,6 +2447,16 @@ third"::lines())
 		"Optional.toList<ItemType>() [empty]",
 		noNumbers::firstItem()::toList(),
 	)
+	§ The bridge to the carrier that carries a reason. The reason is read
+	§ whether or not the Optional needed one.
+	show(
+		"Optional.toResult<ItemType, FailureType>(failingWith: FailureType)",
+		numbers::firstItem()::toResult(failingWith "no items"),
+	)
+	show(
+		"Optional.toResult<ItemType, FailureType>(failingWith: FailureType) [empty]",
+		noNumbers::firstItem()::toResult(failingWith "no items"),
+	)
 
 	§ Equality is written, in two shapes: against a whole Optional — same
 	§ Case, then the payloads through their own `is` — and against a bare
@@ -2507,6 +2517,198 @@ third"::lines())
 	show(
 		"NestedOptional.flatten<ItemType>() [inner empty]",
 		nestedOptionals::firstItem()::flatten(),
+	)
+
+	§ ——— Result ———————————————————————————————————————————————————————————
+	§ The sister of the Optional block above: the same carrier, with a reason
+	§ where the Optional has nothing. Every receiver is declared, because a
+	§ Case written where it stands says nothing about the Type of the other
+	§ one.
+	constant fine: Result<Integer, String>    = #Value(3)
+	constant wrong: Result<Integer, String>   = #Failure("gone")
+	constant fineText: Result<String, String> = #Value("a")
+
+	show(
+		"Result.toString<ValueType is Printable, FailureType is Printable>()",
+		fine::toString(),
+	)
+	show(
+		"Result.toString<ValueType is Printable, FailureType is Printable>() [failed]",
+		wrong::toString(),
+	)
+	§ A String payload is QUOTED, for the reason an Optional's is: without the
+	§ quotes a rendering inside a structure can not be told from the text
+	§ around it.
+	show(
+		"Result.toString<ValueType is Printable, FailureType is Printable>() [String payload]",
+		fineText::toString(),
+	)
+	show("Result.hasValue<ValueType, FailureType>()", fine::hasValue())
+	show(
+		"Result.hasValue<ValueType, FailureType>() [failed]",
+		wrong::hasValue(),
+	)
+	§ The quantified entry, beside the bare one: a failed Result answers
+	§ `false` without the check running.
+	show(
+		"Result.hasValue<ValueType, FailureType>(where: (_ ValueType) -> Boolean)",
+		fine::hasValue(where (item) { <- item::isOdd() }),
+	)
+	show(
+		"Result.hasValue<ValueType, FailureType>(where: (_ ValueType) -> Boolean) [rejected]",
+		fine::hasValue(where (item) { <- item::isEven() }),
+	)
+	show(
+		"Result.hasValue<ValueType, FailureType>(where: (_ ValueType) -> Boolean) [failed]",
+		wrong::hasValue(where (item) { <- item::isOdd() }),
+	)
+	show("Result.hasFailed<ValueType, FailureType>()", wrong::hasFailed())
+	show(
+		"Result.hasFailed<ValueType, FailureType>() [present]",
+		fine::hasFailed(),
+	)
+	show("Result.value<ValueType, FailureType>()", fine::value())
+	show("Result.value<ValueType, FailureType>() [failed]", wrong::value())
+	show(
+		"Result.value<ValueType, FailureType>(defaultingTo: ValueType)",
+		fine::value(defaultingTo 0),
+	)
+	show(
+		"Result.value<ValueType, FailureType>(defaultingTo: ValueType) [failed]",
+		wrong::value(defaultingTo 42),
+	)
+	show("Result.reason<ValueType, FailureType>()", wrong::reason())
+	show("Result.reason<ValueType, FailureType>() [present]", fine::reason())
+	show(
+		"Result.map<ValueType, FailureType, Other>(_ (_ ValueType) -> Other)",
+		fine::map((item) { <- item::multiply(with 10) }),
+	)
+	show(
+		"Result.map<ValueType, FailureType, Other>(_ (_ ValueType) -> Other) [failed]",
+		wrong::map((item) { <- item::multiply(with 10) }),
+	)
+	show(
+		"Result.andThen<ValueType, FailureType, Other>(_ (_ ValueType) -> Result<Other, FailureType>)",
+		fine::andThen((item) -> Result<Integer, String> {
+			<- #Value(item::add(1))
+		}),
+	)
+	show(
+		"Result.andThen<ValueType, FailureType, Other>(_ (_ ValueType) -> Result<Other, FailureType>) [failed]",
+		wrong::andThen((item) -> Result<Integer, String> {
+			<- #Value(item::add(1))
+		}),
+	)
+	show(
+		"Result.mapFailure<ValueType, FailureType, Other>(_ (_ FailureType) -> Other)",
+		wrong::mapFailure((reason) { <- reason::length() }),
+	)
+	show(
+		"Result.mapFailure<ValueType, FailureType, Other>(_ (_ FailureType) -> Other) [present]",
+		fine::mapFailure((reason) { <- reason::length() }),
+	)
+	show(
+		"Result.recover<ValueType, FailureType>(with: (_ FailureType) -> ValueType)",
+		wrong::recover(with (reason) { <- reason::length() }),
+	)
+	show(
+		"Result.recover<ValueType, FailureType>(with: (_ FailureType) -> ValueType) [present]",
+		fine::recover(with (reason) { <- reason::length() }),
+	)
+	show(
+		"Result.keep<ValueType, FailureType>(where: (_ ValueType) -> Boolean, failingWith: FailureType)",
+		fine::keep(where (item) { <- item::isOdd() }, failingWith "even"),
+	)
+	show(
+		"Result.keep<ValueType, FailureType>(where: (_ ValueType) -> Boolean, failingWith: FailureType) [rejected]",
+		fine::keep(where (item) { <- item::isEven() }, failingWith "odd"),
+	)
+	show(
+		"Result.keep<ValueType, FailureType>(where: (_ ValueType) -> Boolean, failingWith: FailureType) [failed]",
+		wrong::keep(where (item) { <- item::isOdd() }, failingWith "even"),
+	)
+	show(
+		"Result.or<ValueType, FailureType>(_ Result<ValueType, FailureType>)",
+		fine::or(wrong),
+	)
+	show(
+		"Result.or<ValueType, FailureType>(_ Result<ValueType, FailureType>) [failed receiver]",
+		wrong::or(fine),
+	)
+	show(
+		"Result.or<ValueType, FailureType>(_ Result<ValueType, FailureType>) [both failed]",
+		wrong::or(wrong),
+	)
+	show("Result.toList<ValueType, FailureType>()", fine::toList())
+	show("Result.toList<ValueType, FailureType>() [failed]", wrong::toList())
+
+	§ Equality is written, in two shapes: against a whole Result — same Case,
+	§ then the payloads through their own `is` — and against a bare value,
+	§ which a failed Result never is.
+	show(
+		"Result.is<ValueType is Equatable, FailureType is Equatable>(_ Result<ValueType, FailureType>)",
+		fine::is(#Value(3)),
+	)
+	show(
+		"Result.is<ValueType is Equatable, FailureType is Equatable>(_ Result<ValueType, FailureType>) [different payload]",
+		fine::is(#Value(1)),
+	)
+	show(
+		"Result.is<ValueType is Equatable, FailureType is Equatable>(_ Result<ValueType, FailureType>) [both failed]",
+		wrong::is(#Failure("gone")),
+	)
+	show(
+		"Result.is<ValueType is Equatable, FailureType is Equatable>(_ Result<ValueType, FailureType>) [value against failure]",
+		fine::is(#Failure("gone")),
+	)
+	show(
+		"Result.isNot<ValueType is Equatable, FailureType is Equatable>(_ Result<ValueType, FailureType>)",
+		fine::isNot(#Failure("gone")),
+	)
+	show(
+		"Result.is<FailureType is Equatable, ValueType is Equatable>(_ ValueType)",
+		fine::is(3),
+	)
+	show(
+		"Result.is<FailureType is Equatable, ValueType is Equatable>(_ ValueType) [different value]",
+		fine::is(1),
+	)
+	show(
+		"Result.is<FailureType is Equatable, ValueType is Equatable>(_ ValueType) [failed]",
+		wrong::is(3),
+	)
+	show(
+		"Result.isNot<FailureType is Equatable, ValueType is Equatable>(_ ValueType)",
+		fine::isNot(2),
+	)
+	show(
+		"Result.isNot<FailureType is Equatable, ValueType is Equatable>(_ ValueType) [failed]",
+		wrong::isNot(3),
+	)
+
+	§ The two levels a Result of Results carries: the outer one says whether
+	§ the step ran, and the inner one what it answered.
+	constant nestedValue: Result<Result<Integer, String>, String>   = #Value(
+		#Value(7)
+	)
+	constant nestedFailure: Result<Result<Integer, String>, String> = #Value(
+		#Failure("inner")
+	)
+	constant outerFailure: Result<Result<Integer, String>, String>  = #Failure(
+		"outer"
+	)
+
+	show(
+		"NestedResult.flatten<ValueType, FailureType>()",
+		nestedValue::flatten(),
+	)
+	show(
+		"NestedResult.flatten<ValueType, FailureType>() [inner failed]",
+		nestedFailure::flatten(),
+	)
+	show(
+		"NestedResult.flatten<ValueType, FailureType>() [outer failed]",
+		outerFailure::flatten(),
 	)
 
 	§ ——— Ordering —————————————————————————————————————————————————————————
@@ -3651,6 +3853,63 @@ third"::lines())
 		allEmpty::firstValue(),
 	)
 	show("OptionalList.firstValue<ItemType>() [empty]", noMaybes::firstValue())
+
+	§ ——— ResultList ———————————————————————————————————————————————————————
+	§ The Namespace a List of Results reaches, beside the one a List of
+	§ Optionals reaches. Each receiver is declared, because the item Type is
+	§ what puts the Namespace in reach.
+	constant someChecks: List<Result<Integer, String>> = [
+		#Value(1),
+		#Failure("first"),
+		#Value(3),
+		#Failure("second"),
+	]
+	constant everyCheck: List<Result<Integer, String>> = [#Value(1), #Value(3)]
+	constant noChecks: List<Result<Integer, String>>   = []
+
+	show("ResultList.values<ValueType, FailureType>()", someChecks::values())
+	show(
+		"ResultList.values<ValueType, FailureType>() [none failed]",
+		everyCheck::values(),
+	)
+	show(
+		"ResultList.values<ValueType, FailureType>() [empty]",
+		noChecks::values(),
+	)
+	show(
+		"ResultList.failures<ValueType, FailureType>()",
+		someChecks::failures(),
+	)
+	show(
+		"ResultList.failures<ValueType, FailureType>() [none failed]",
+		everyCheck::failures(),
+	)
+	show(
+		"ResultList.failures<ValueType, FailureType>() [empty]",
+		noChecks::failures(),
+	)
+	show(
+		"ResultList.partition<ValueType, FailureType>()",
+		someChecks::partition(),
+	)
+	show(
+		"ResultList.partition<ValueType, FailureType>() [empty]",
+		noChecks::partition(),
+	)
+	§ Where `values` drops a failed Result, `allValues` keeps every reason it
+	§ found and answers no values at all.
+	show(
+		"ResultList.allValues<ValueType, FailureType>()",
+		everyCheck::allValues(),
+	)
+	show(
+		"ResultList.allValues<ValueType, FailureType>() [two failed]",
+		someChecks::allValues(),
+	)
+	show(
+		"ResultList.allValues<ValueType, FailureType>() [empty]",
+		noChecks::allValues(),
+	)
 
 	§ ——— NonEmptyList —————————————————————————————————————————————————————————
 	§ The Methods a List has to have been PROVEN to answer. A List written down

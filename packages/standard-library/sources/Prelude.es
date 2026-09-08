@@ -28,6 +28,7 @@ export {
 		NonEmptyList
 		NonEmptyNestedList
 		OptionalList
+		ResultList
 		SortOrder
 	}
 	from "./Loop.es" { loop }
@@ -68,6 +69,10 @@ export {
 		SignStyle
 	}
 	from "./Record.es" { Record }
+	from "./Result.es" {
+		NestedResult
+		Result
+	}
 	from "./Step.es" { Step }
 	from "./String.es" {
 		CaseSensitivity

@@ -288,7 +288,7 @@ tests {
 					{ sku = "NOPE", quantity = 1 },
 				],
 				zone = #Domestic,
-				coupon = #Value("FREE"),
+				coupon = Optional<String>#Value("FREE"),
 			})
 
 			expect problems::is([

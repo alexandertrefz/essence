@@ -63,6 +63,7 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	RandomnessType: "./Randomness",
 	RationalType: "./Rational",
 	RecordType: "./Record",
+	ResultType: "./Result",
 	StepType: "./Step",
 	ContinueType: "./Step",
 	DoneType: "./Step",
@@ -99,6 +100,7 @@ const UNION_NAME_ALIASES: Record<string, string> = {
 const GENERIC_UNION_ALIASES: Record<string, string> = {
 	Step: "StepType",
 	Optional: "OptionalType",
+	Result: "ResultType",
 }
 
 // NOTE: The Cases of a generic Choice — keyed `Choice#Case`, the sibling of

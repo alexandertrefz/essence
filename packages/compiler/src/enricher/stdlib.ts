@@ -37,27 +37,34 @@ function basenameOf(filePath: string): string {
 // and the reasoning behind it.
 const PRELUDE_FILE_NAME = "Prelude.es"
 
-// NOTE: The one group of files allowed to depend on each other in a circle, and
-// the whole of it. Every other file must stand alone in the graph.
+// NOTE: The two groups of files allowed to depend on each other in a circle, and
+// the whole of them. Every other file must stand alone in the graph.
 //
-// This group is not an oversight. Cross-kind arithmetic means each numeric kind
+// Neither is an oversight. Cross-kind arithmetic means each numeric kind
 // names the others — `Rational::add(_ other: Algebraic) -> Algebraic` — a
 // String's characters ARE a `List<String>`, a List is indexed by an Integer, and
-// both `parse`s consume a String. Breaking it would mean moving those Methods
-// off the Namespace they belong to, and a Type's Namespace being one findable
-// thing was judged worth more than a graph with no cycle in it.
+// both `parse`s consume a String. The second group is the pair of failure
+// carriers: `Optional::toResult(failingWith:)` supplies the reason an Optional
+// never had, and `Result::value()` and `reason()` answer the two Cases as
+// Optionals, so each file names the other in a signature. Breaking either would
+// mean moving those Methods off the Namespace they belong to, and a Type's
+// Namespace being one findable thing was judged worth more than a graph with no
+// cycle in it.
 //
-// What this refuses is a cycle NOBODY decided on. A new one anywhere, or a
-// seventh file joining this one, is a dependency someone added without noticing
-// what it closed — which is exactly the mistake the import blocks were written
-// to make visible.
-const EXPECTED_CYCLE = [
-	"Algebraic.es",
-	"Integer.es",
-	"List.es",
-	"Rational.es",
-	"String.es",
-	"Transcendental.es",
+// What this refuses is a cycle NOBODY decided on. A new one anywhere, or a file
+// joining one of these, is a dependency someone added without noticing what it
+// closed — which is exactly the mistake the import blocks were written to make
+// visible.
+const EXPECTED_CYCLES = [
+	[
+		"Algebraic.es",
+		"Integer.es",
+		"List.es",
+		"Rational.es",
+		"String.es",
+		"Transcendental.es",
+	],
+	["Optional.es", "Result.es"],
 ]
 
 function refuseUnexpectedCycles(graph: ModuleGraph): void {
@@ -79,18 +86,26 @@ function refuseUnexpectedCycles(graph: ModuleGraph): void {
 		return
 	}
 
-	let expected = [...EXPECTED_CYCLE].sort().join(", ")
-	let found = cycles.map((cycle) => cycle.join(", "))
+	// NOTE: Compared as SETS of cycles rather than as one string, because the
+	// order the groups come out in is the condensation's, which is a fact
+	// about the graph rather than a decision anybody wrote down.
+	let expected = EXPECTED_CYCLES.map((cycle) =>
+		[...cycle].sort().join(", "),
+	).sort()
+	let found = cycles.map((cycle) => cycle.join(", ")).sort()
 
-	if (found.length === 1 && found[0] === expected) {
+	if (
+		found.length === expected.length &&
+		found.every((cycle, index) => cycle === expected[index])
+	) {
 		return
 	}
 
 	throw new Error(
 		`The standard library's dependency graph changed shape.\n\n` +
-			`Expected exactly one cycle:\n  ${expected}\n\n` +
+			`Expected exactly ${expected.length} cycles:\n${expected.map((cycle) => `  ${cycle}`).join("\n")}\n\n` +
 			`Found ${found.length === 0 ? "none" : `${found.length}:`}\n${found.map((cycle) => `  ${cycle}`).join("\n")}\n\n` +
-			`An import closed a circle that was not there before. Either remove the dependency, or — if the cycle is genuinely wanted — say so in EXPECTED_CYCLE and write down why.`,
+			`An import closed a circle that was not there before. Either remove the dependency, or — if the cycle is genuinely wanted — say so in EXPECTED_CYCLES and write down why.`,
 	)
 }
 

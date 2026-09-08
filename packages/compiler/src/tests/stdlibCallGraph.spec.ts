@@ -612,6 +612,10 @@ describe("Stdlib Call Graph", () => {
 			// does, and it is a Node under that Namespace's name rather than
 			// under `Optional`.
 			"NestedOptional.flatten",
+			// NOTE: And the same one level along, for a Result whose value is
+			// a Result — a Namespace of its own for the reason
+			// `NestedOptional` is one.
+			"NestedResult.flatten",
 			"NonEmptyIntegerList.average",
 			"NonEmptyIntegerList.highestNumber",
 			"NonEmptyIntegerList.lowestNumber",
@@ -695,6 +699,7 @@ describe("Stdlib Call Graph", () => {
 			"Optional.or",
 			"Optional.pair",
 			"Optional.toList",
+			"Optional.toResult",
 			"Optional.value",
 			// NOTE: These three need a receiver not every List is, so they live
 			// in a Namespace of their own — receiver `List<Optional<ItemType>>`
@@ -757,6 +762,33 @@ describe("Stdlib Call Graph", () => {
 			"RationalList.lowestNumber__overload$2",
 			"RationalList.product",
 			"RationalList.sum",
+			// NOTE: Every Method of the carrier that says why, and every one
+			// of them is written in Essence — `toString` is the one native,
+			// for the reason `Optional.toString` is one.
+			"Result.andThen",
+			"Result.hasFailed",
+			"Result.hasValue__overload$1",
+			"Result.hasValue__overload$2",
+			"Result.isNot__overload$1",
+			"Result.isNot__overload$2",
+			"Result.is__overload$1",
+			"Result.is__overload$2",
+			"Result.keep",
+			"Result.map",
+			"Result.mapFailure",
+			"Result.or",
+			"Result.reason",
+			"Result.recover",
+			"Result.toList",
+			"Result.value__overload$1",
+			"Result.value__overload$2",
+			// NOTE: These four need a receiver not every List is, so they live
+			// in a Namespace of their own — receiver `List<Result<…>>` —
+			// exactly as `OptionalList`'s three do.
+			"ResultList.allValues",
+			"ResultList.failures",
+			"ResultList.partition",
+			"ResultList.values",
 			// NOTE: The Namespace of the Union `Integer | Rational`, whose two
 			// bodies are the one 2×2 dispatch of `Number.es` — emitted and
 			// reached exactly as the rest are, and named here for the same
