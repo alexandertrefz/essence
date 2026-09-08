@@ -19,6 +19,7 @@ import type { OptionalType, ValueType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
+import type { RoundingType } from "./Rounding"
 import type { StringType } from "./String"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
@@ -364,16 +365,58 @@ function formatAsDecimal(rational: RationalType): string {
 	return `${sign}${wholePart}.${digits.join("")}`
 }
 
+// NOTE: The one place a `Rounding` Case decides an answer here, shared by the
+// fixed-width formatter and the scientific mantissa. It is asked about the
+// MAGNITUDE — `digits` and `remainder` are both non-negative, and the sign is
+// prefixed afterwards — so the two directions that name a side of the number
+// line read the sign, and the two that name a distance do not. This mirrors the
+// Essence `Rational::round(toward:)`, which is written on the floor and takes
+// the same four decisions in the same four Cases.
+function roundsUpTheMagnitude(
+	digits: bigint,
+	remainder: bigint,
+	denominator: bigint,
+	isNegative: boolean,
+	direction: RoundingType,
+): boolean {
+	if (remainder === 0n) {
+		return false
+	}
+
+	let doubled = remainder * 2n
+
+	switch (direction[typeKeySymbol]) {
+		case "Rounding#Down":
+			return isNegative
+		case "Rounding#Up":
+			return !isNegative
+		case "Rounding#TowardZero":
+			return false
+		case "Rounding#NearestEven":
+			if (doubled === denominator) {
+				return digits % 2n !== 0n
+			}
+
+			return doubled > denominator
+		default:
+			return doubled >= denominator
+	}
+}
+
 // NOTE: The same long division as `formatAsDecimal`, over a fixed width: the
 // magnitude is scaled by a power of ten first, so the quotient IS the digit
-// string and the remainder decides the one rounding. Halves go away from zero,
-// which is what `round` does and what the cut digit above does. A width below
-// one rounds to a whole number, the same answer `round(toPlaces:)` gives, and
-// no dot is written for it.
+// string and the remainder decides the one rounding. The direction decides
+// which way that one rounding goes, and `#Nearest` is what a call that names
+// none is handed. A width below one rounds to a whole number, the same answer
+// `round(toPlaces:)` gives, and no dot is written for it.
 //
 // NOTE: The sign is prefixed only where something is left of it, so a value
 // that rounds to nothing prints `0.00` rather than `-0.00`.
-function formatAsFixedDecimal(rational: RationalType, places: number): string {
+function formatAsFixedDecimal(
+	rational: RationalType,
+	places: number,
+	direction: RoundingType,
+): string {
 	let parts = reducedParts(rational)
 	let isNegative = parts.numerator < 0n
 	let magnitude = isNegative ? -parts.numerator : parts.numerator
@@ -383,7 +426,15 @@ function formatAsFixedDecimal(rational: RationalType, places: number): string {
 	let digits = scaled / parts.denominator
 	let remainder = scaled % parts.denominator
 
-	if (remainder * 2n >= parts.denominator) {
+	if (
+		roundsUpTheMagnitude(
+			digits,
+			remainder,
+			parts.denominator,
+			isNegative,
+			direction,
+		)
+	) {
 		digits = digits + 1n
 	}
 
@@ -420,15 +471,17 @@ export function toString__overload$2(
 
 // NOTE: The width is meaningless to a fraction — `3/4` has no digits after a
 // point to count — so `#Fraction` answers what the entry above answers for it
-// and ignores the count, as the declaration says it does.
+// and ignores the count and the direction alike, as the declaration says it
+// does.
 export function toString__overload$3(
 	rational: RationalType,
 	format: NumberFormatType,
 	places: IntegerType,
+	direction: RoundingType,
 ): StringType {
 	if (format[typeKeySymbol] === "NumberFormat#Decimal") {
 		return createString(
-			formatAsFixedDecimal(rational, Number(places.value)),
+			formatAsFixedDecimal(rational, Number(places.value), direction),
 		)
 	} else {
 		return createString(formatAsFraction(rational))

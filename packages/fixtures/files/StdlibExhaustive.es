@@ -1216,28 +1216,48 @@ third"::lines())
 		4/2::toString(as NumberFormat#Fraction),
 	)
 	show(
-		"Rational.toString(as: NumberFormat, places: Integer)",
-		5/3::toString(as NumberFormat#Decimal, places 2),
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding)",
+		5/3::toString(as NumberFormat#Decimal, toPlaces 2),
 	)
 	show(
-		"Rational.toString(as: NumberFormat, places: Integer) [padded]",
-		1/2::toString(as NumberFormat#Decimal, places 2),
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [padded]",
+		1/2::toString(as NumberFormat#Decimal, toPlaces 2),
 	)
 	show(
-		"Rational.toString(as: NumberFormat, places: Integer) [negative]",
-		-5/3::toString(as NumberFormat#Decimal, places 2),
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [negative]",
+		-5/3::toString(as NumberFormat#Decimal, toPlaces 2),
 	)
 	show(
-		"Rational.toString(as: NumberFormat, places: Integer) [a half rounds away from zero]",
-		1/8::toString(as NumberFormat#Decimal, places 2),
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [a half rounds away from zero]",
+		1/8::toString(as NumberFormat#Decimal, toPlaces 2),
 	)
 	show(
-		"Rational.toString(as: NumberFormat, places: Integer) [no places]",
-		2/3::toString(as NumberFormat#Decimal, places 0),
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [no places]",
+		2/3::toString(as NumberFormat#Decimal, toPlaces 0),
 	)
 	show(
-		"Rational.toString(as: NumberFormat, places: Integer) [fraction ignores the count]",
-		3/4::toString(as NumberFormat#Fraction, places 2),
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [fraction ignores the count]",
+		3/4::toString(as NumberFormat#Fraction, toPlaces 2),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [down]",
+		5/3::toString(as NumberFormat#Decimal, toPlaces 2, toward #Down),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [negative down]",
+		-5/3::toString(as NumberFormat#Decimal, toPlaces 2, toward #Down),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [up]",
+		5/3::toString(as NumberFormat#Decimal, toPlaces 2, toward #Up),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [toward zero]",
+		-5/3::toString(as NumberFormat#Decimal, toPlaces 2, toward #TowardZero),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [a half to the even digit]",
+		1/8::toString(as NumberFormat#Decimal, toPlaces 2, toward #NearestEven),
 	)
 	show("Rational.compare(to: Rational)", 1/2::compare(to 2/3))
 	show("Rational.compare(to: Rational) [equal]", 1/2::compare(to 2/4))

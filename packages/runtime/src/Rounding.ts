@@ -4,9 +4,10 @@ import { typeKeySymbol } from "./type"
 // values carry Case tags (`"Rounding#Nearest"`) exactly as user-declared Cases
 // do. `is`, `isNot` and `toString` are all derived from the Choice
 // (`packages/standard-library/sources/Rational.es` declares the conformances beside the Method
-// that takes one), so nothing but the tags lives here. `Rational::round(toward:)` READS one, and it
-// is written in Essence too — this Choice reaches no native at all, unlike
-// `Side`, whose `String::trim(at:)` is one.
+// that takes one), so nothing but the tags lives here. The Essence body of
+// `Rational::round(toward:)` READS one, and the `toPlaces` entries of
+// `Rational::toString` are natives that take one — so this Choice does reach
+// `Rational.ts`, as `Side` reaches `String::trim(at:)`.
 export type NearestType = { [typeKeySymbol]: "Rounding#Nearest" }
 export type NearestEvenType = { [typeKeySymbol]: "Rounding#NearestEven" }
 export type DownType = { [typeKeySymbol]: "Rounding#Down" }

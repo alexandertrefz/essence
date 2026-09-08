@@ -44,6 +44,12 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	NumberFormatType: "./NumberFormat",
 	FractionType: "./NumberFormat",
 	DecimalType: "./NumberFormat",
+	RoundingType: "./Rounding",
+	NearestType: "./Rounding",
+	NearestEvenType: "./Rounding",
+	DownType: "./Rounding",
+	UpType: "./Rounding",
+	TowardZeroType: "./Rounding",
 	NormalizationFormType: "./NormalizationForm",
 	ComposedCanonicalType: "./NormalizationForm",
 	DecomposedCanonicalType: "./NormalizationForm",
@@ -76,6 +82,7 @@ const UNION_NAME_ALIASES: Record<string, string> = {
 	Side: "SideType",
 	SortOrder: "SortOrderType",
 	NumberFormat: "NumberFormatType",
+	Rounding: "RoundingType",
 	NormalizationForm: "NormalizationFormType",
 	Number: "NumberType",
 	Stream: "StreamType",
@@ -105,8 +112,8 @@ const GENERIC_CASE_TYPES: Record<string, string> = {
 }
 
 // NOTE: The runtime unit types of the builtin unit Choices — `Ordering`,
-// `Side`, `SortOrder`, `NumberFormat`, `NormalizationForm` and `Stream` — the only Cases
-// reachable in a signature, and then only inside their own Union, which is
+// `Side`, `SortOrder`, `NumberFormat`, `Rounding`, `NormalizationForm` and `Stream` — the only
+// Cases reachable in a signature, and then only inside their own Union, which is
 // mapped whole before its Cases are ever visited.
 const CASE_TYPES: Record<string, string> = {
 	"Ordering#Less": "LessType",
@@ -119,6 +126,11 @@ const CASE_TYPES: Record<string, string> = {
 	"SortOrder#Descending": "DescendingType",
 	"NumberFormat#Fraction": "FractionType",
 	"NumberFormat#Decimal": "DecimalType",
+	"Rounding#Nearest": "NearestType",
+	"Rounding#NearestEven": "NearestEvenType",
+	"Rounding#Down": "DownType",
+	"Rounding#Up": "UpType",
+	"Rounding#TowardZero": "TowardZeroType",
 	"NormalizationForm#ComposedCanonical": "ComposedCanonicalType",
 	"NormalizationForm#DecomposedCanonical": "DecomposedCanonicalType",
 	"NormalizationForm#ComposedCompatibility": "ComposedCompatibilityType",
