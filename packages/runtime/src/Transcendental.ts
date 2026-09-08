@@ -856,7 +856,9 @@ export const divide__overload$8 = divideByNonZero as (
 ) => TranscendentalType
 
 // NOTE: `round` answers an Integer as the first entry of its Overload; the
-// second is written in Essence on `approximate`.
+// second is written in Essence on `approximate`. `toString` is the first entry
+// of its own, and the two `as:` entries beside it are Essence.
 export const round__overload$1 = round
+export const toString__overload$1 = toString
 
 // #endregion

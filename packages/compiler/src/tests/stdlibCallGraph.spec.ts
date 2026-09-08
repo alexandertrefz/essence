@@ -482,6 +482,8 @@ describe("Stdlib Call Graph", () => {
 			"Algebraic.subtract__overload$2",
 			"Algebraic.subtract__overload$3",
 			"Algebraic.subtract__overload$4",
+			"Algebraic.toString__overload$2",
+			"Algebraic.toString__overload$3",
 			"Boolean.exclusiveOr",
 			"Boolean.toString",
 			"Comparable.isGreaterThan",
@@ -796,6 +798,8 @@ describe("Stdlib Call Graph", () => {
 			"Transcendental.subtract__overload$1",
 			"Transcendental.subtract__overload$2",
 			"Transcendental.subtract__overload$3",
+			"Transcendental.toString__overload$2",
+			"Transcendental.toString__overload$3",
 			// NOTE: The bodied free Functions, keyed by the bare name they are
 			// emitted under. `loop`'s other two entries are native — there is no
 			// body to walk, exactly as for a native Method. `$5` is the
