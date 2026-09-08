@@ -54,6 +54,10 @@ type AssertArities<Module, Arities extends Record<string, number>> =
 
 type ComparableConformance<Self extends AnyType> = {
 	compare: (self: Self, to: Self) => OrderingType
+	isLessThan: (self: Self, argument1: Self) => BooleanType
+	isLessThanOrEqualTo: (self: Self, argument1: Self) => BooleanType
+	isGreaterThan: (self: Self, argument1: Self) => BooleanType
+	isGreaterThanOrEqualTo: (self: Self, argument1: Self) => BooleanType
 }
 
 type EquatableConformance<Self extends AnyType> = {

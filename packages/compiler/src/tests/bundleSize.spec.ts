@@ -64,9 +64,14 @@ async function bundleSizeOfSource(source: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: 73,943 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 74,777 measured. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
+	//
+	// NOTE: 834 of those bytes are the four inequalities moving from
+	// `Orderable` to `Comparable`. A witness carries its Protocol's provided
+	// Methods, so every `<T is Comparable>` witness this file builds — `sort`
+	// asks for one — grew from one entry to five.
 	//
 	// NOTE: It has caught one design mistake worth keeping. Writing
 	// `Integer::isEven` as `remainder(dividingBy 2)::is(#Value(0))` reads far
@@ -88,10 +93,10 @@ describe("Bundle Size", () => {
 	// why moving a body into Essence can shrink a String-heavy Program while
 	// growing this one.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(74_900)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(75_800)
 	})
 
-	// NOTE: 38,690 measured; a reintroduced `Number` spread was 54,849. The same
+	// NOTE: 37,763 measured; a reintroduced `Number` spread was 54,849. The same
 	// claim as Everyday's, on a Program that takes square roots rather than
 	// doing arithmetic — so it reads the other side of several trades. A pass
 	// that pays text for work on Everyday takes bytes OFF here, because a file
@@ -99,10 +104,12 @@ describe("Bundle Size", () => {
 	//
 	// NOTE: It moves on Methods it never names. A conformance witness carries
 	// its Protocol's PROVIDED bodies whether the Program calls them or not, so
-	// a change to `Orderable` lands here identically to Everyday even though
-	// this file asks for none of it.
+	// a change to `Comparable` or `Orderable` lands here even though this file
+	// asks for none of it. That is where 927 of these bytes went: the four
+	// inequalities are `Comparable`'s now, so a witness for the smaller
+	// Protocol stops carrying `isBetween` and `clamp` with them.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(39_600)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(38_700)
 	})
 
 	// NOTE: 47,844 measured. The two tests above watch a Dictionary being shaken

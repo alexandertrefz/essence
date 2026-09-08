@@ -85,16 +85,20 @@ nobody decided on. `EXPECTED_CYCLE` in `packages/compiler/src/enricher/stdlib.ts
 is where it is stated.
 
 Two files sit on a line for the same reason `Comparable` does. `Orderable.es`
-extends `Comparable` and is written on `compare`, so it follows `Comparable.es`,
-which follows `Ordering.es`, which follows `Protocols.es`. And `Protocols.es`
+extends `Comparable` and is written on the four inequalities `Comparable`
+provides, so it follows `Comparable.es`, which follows `Ordering.es`, which
+follows `Protocols.es`. And `Protocols.es`
 imports NOTHING, which is what keeps the frozen shape at one cycle:
 `Boolean.es` conforms to `Equatable`, so a `Boolean` import here would close a
 second circle. That is why `Equatable.isNot`'s body is an `if` rather than
 `@::is(other)::negate()` — a body that reaches no Namespace needs no import. It
 is read as that call all the same, so the workaround costs the reader nothing;
 see *A predicate written as one call on `@` IS that call*.
-`Orderable.es` is under no such rule and imports `Boolean` and `Ordering` freely,
-because nothing imports it back.
+`Comparable.es` is under the same rule for the same reason, and writes its two
+`…OrEqualTo` bodies as an `if` too: `Boolean.es` conforms to `Comparable`, so a
+`Boolean` import there would close the circle the other way round.
+`Orderable.es` is under no such rule and imports `Boolean` freely, because
+nothing imports it back.
 
 ### The rest
 
@@ -379,7 +383,8 @@ DECLARED `NonEmptyList<NonEmptyList<Integer>>` reaches it outright, because the
 declaration is a position that asks the items and the receiver rail is not.
 
 **A written Method REPLACES a Protocol's provided one on that Namespace's own
-rung.** `Equatable` writes `isNot` and `Orderable` writes six Methods, and every
+rung.** `Equatable` writes `isNot`, `Comparable` writes four Methods and
+`Orderable` two, and every
 conformer answers them without declaring anything. A Namespace that declares a
 Method of the same name replaces the provided one entirely for its own target —
 no entry is merged in — and it has to hold an entry the provided signature

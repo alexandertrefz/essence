@@ -366,6 +366,19 @@ third"::lines())
 		"String.compare(to: String, comparing: CaseSensitivity) [insensitive, less]",
 		"abc"::compare(to "ABD", comparing CaseSensitivity#Insensitive),
 	)
+	§ The four inequalities are `Comparable`'s provided Methods, and a String
+	§ answers them on its own rung, off the `compare` above.
+	show("String.isLessThan(_ String)", "app"::isLessThan("apple"))
+	show("String.isLessThan(_ String) [greater]", "b"::isLessThan("a"))
+	show(
+		"String.isLessThanOrEqualTo(_ String) [equal]",
+		"abc"::isLessThanOrEqualTo("abc"),
+	)
+	show("String.isGreaterThan(_ String)", "b"::isGreaterThan("a"))
+	show(
+		"String.isGreaterThanOrEqualTo(_ String)",
+		"apple"::isGreaterThanOrEqualTo("app"),
+	)
 	show("String.toString()", greeting::toString())
 	show("String.toString() [empty]", emptyText::toString())
 
@@ -2826,6 +2839,19 @@ third"::lines())
 	show(
 		"List.compare<ItemType is Comparable>(to: List<ItemType>) [both empty]",
 		noNumbers::compare(to []),
+	)
+	§ And the four inequalities `Comparable` provides over that `compare`,
+	§ which a List answers through its conditional conformance.
+	show("List.isLessThan(_ List<ItemType>)", [1, 2]::isLessThan([1, 3]))
+	show("List.isLessThan(_ List<ItemType>) [prefix]", [1]::isLessThan([1, 2]))
+	show(
+		"List.isLessThanOrEqualTo(_ List<ItemType>) [equal]",
+		[1, 2]::isLessThanOrEqualTo([1, 2]),
+	)
+	show("List.isGreaterThan(_ List<ItemType>)", [1, 3]::isGreaterThan([1, 2]))
+	show(
+		"List.isGreaterThanOrEqualTo(_ List<ItemType>)",
+		[1, 2]::isGreaterThanOrEqualTo([1, 2]),
 	)
 	show(
 		"List.hasItems<ItemType>(where: (_ ItemType) -> Boolean)",

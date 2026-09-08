@@ -647,6 +647,17 @@ describe("Hover of declaration parts", () => {
 		expect(hover(source, { line: 2, column: 45 })).toBe("List<Item>")
 	})
 
+	// NOTE: The requirement and the four inequalities `Comparable` provides over
+	// it, which a Hover lists exactly as it lists a Namespace's members.
+	const COMPARABLE_HOVER = [
+		"protocol Comparable",
+		"compare(to: Self) -> Ordering",
+		"isLessThan(_ Self) -> Boolean",
+		"isLessThanOrEqualTo(_ Self) -> Boolean",
+		"isGreaterThan(_ Self) -> Boolean",
+		"isGreaterThanOrEqualTo(_ Self) -> Boolean",
+	].join("\n")
+
 	it("should describe a conformance clause as the Protocol it names", () => {
 		let source = [
 			"implementation {",
@@ -660,9 +671,7 @@ describe("Hover of declaration parts", () => {
 			"}",
 		].join("\n")
 
-		expect(hover(source, { line: 3, column: 10 })).toBe(
-			"protocol Comparable\ncompare(to: Self) -> Ordering",
-		)
+		expect(hover(source, { line: 3, column: 10 })).toBe(COMPARABLE_HOVER)
 	})
 
 	it("should describe what a Return Statement returns", () => {
@@ -691,9 +700,7 @@ describe("Hover of declaration parts", () => {
 		].join("\n")
 
 		expect(hover(source, { line: 3, column: 24 })).toBe("infer Item")
-		expect(hover(source, { line: 3, column: 33 })).toBe(
-			"protocol Comparable\ncompare(to: Self) -> Ordering",
-		)
+		expect(hover(source, { line: 3, column: 33 })).toBe(COMPARABLE_HOVER)
 	})
 })
 

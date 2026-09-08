@@ -1950,7 +1950,7 @@ describe("Standard Library Loader", () => {
 	// It is the proof that no Method has to be NAMED anywhere as the contrary of
 	// another. Every pair a hardcoded table once held is in the first list,
 	// read off a body: `Equatable::isNot` off the `if` it is written as, both
-	// `…OrEqualTo` off `Orderable`'s provided bodies and off the entries Integer
+	// `…OrEqualTo` off `Comparable`'s provided bodies and off the entries Integer
 	// and Rational write themselves — the mixed-kind ones among them, which
 	// write the ordering backwards and are read as its converse.
 	//
@@ -1963,7 +1963,7 @@ describe("Standard Library Loader", () => {
 	//
 	// A `protocol` row is asked under the Namespace of whichever conformance
 	// answered, never under the Protocol's name. So `protocol Equatable::is`
-	// and `protocol Orderable::isLessThan` are asked as the conformer's own
+	// and `protocol Comparable::isLessThan` are asked as the conformer's own
 	// rows, which this list names in their own right, and
 	// `protocol Orderable::isBetween`, which no Namespace declares, is what
 	// `Integer::isBetween`, `Rational::isBetween` and `Number::isBetween` in
@@ -2031,6 +2031,18 @@ describe("Standard Library Loader", () => {
 
 		for (let [name, protocol] of Object.entries(stdlib.protocols)) {
 			for (let [methodName, method] of Object.entries(protocol.methods)) {
+				// NOTE: A Protocol's table holds its ancestors' entries too, so
+				// `Orderable` carries the four bodies `Comparable` wrote. Each
+				// body is one row, under the Protocol that WROTE it — the same
+				// rule `protocolsProviding` reads a call by, and what keeps a
+				// list of bodies from growing a copy per extension.
+				if (
+					protocol.providedMethods?.[methodName] !== undefined &&
+					protocol.providedMethods[methodName] !== name
+				) {
+					continue
+				}
+
 				if (method.type === "SimpleMethod") {
 					readingOf(`protocol ${name}`, methodName, method)
 				}
@@ -2066,9 +2078,9 @@ describe("Standard Library Loader", () => {
 			"String::doesNotEnd -> not String::ends(#0)",
 			"String::doesNotStart -> not String::starts(#0)",
 			"String::hasCharacters -> not String::isEmpty()",
+			"protocol Comparable::isGreaterThanOrEqualTo -> not Self::isLessThan(#0)",
+			"protocol Comparable::isLessThanOrEqualTo -> not Self::isGreaterThan(#0)",
 			"protocol Equatable::isNot -> not Self::is(#0)",
-			"protocol Orderable::isGreaterThanOrEqualTo -> not Self::isLessThan(#0)",
-			"protocol Orderable::isLessThanOrEqualTo -> not Self::isGreaterThan(#0)",
 		])
 
 		expect([...new Set(primitives)].sort()).toEqual([
@@ -2113,10 +2125,10 @@ describe("Standard Library Loader", () => {
 			"String::isEmpty",
 			"String::starts",
 			"Transcendental::is",
+			"protocol Comparable::isGreaterThan",
+			"protocol Comparable::isLessThan",
 			"protocol Equatable::is",
 			"protocol Orderable::isBetween",
-			"protocol Orderable::isGreaterThan",
-			"protocol Orderable::isLessThan",
 		])
 	})
 

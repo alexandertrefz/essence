@@ -1444,7 +1444,7 @@ Boolean, the way an `if` condition does.
 The passed Arguments match none of the overloads of the called Method or
 Function. Each candidate signature is listed as a note. A candidate a Protocol
 PROVIDED is named by the Namespace whose conformance put it in reach, with the
-Protocol said beside it — `'Number::isLessThan' (provided by Orderable)`. Where a
+Protocol said beside it — `'Number::isLessThan' (provided by Comparable)`. Where a
 DERIVED Method was in reach and a Namespace declaring the name replaced it, a
 note says so, because nothing in the listed candidates would show it.
 
@@ -2280,8 +2280,8 @@ nothing else — whatever the Type Argument turns out to be at a call site, only
 the Protocol's surface is there to be relied on.
 
 This is what a provided Method's body meets when it reaches past its own
-Protocol: the body of `Orderable.isLessThan` may call `compare`, every other
-Method `Orderable` declares, and everything the Protocols it extends declare,
+Protocol: the body of `Comparable.isLessThan` may call `compare`, every other
+Method `Comparable` declares, and everything the Protocols it extends declare,
 and nothing else at all. Declare the Method on the Protocol, or bound the Type
 Parameter by a Protocol that has it.
 

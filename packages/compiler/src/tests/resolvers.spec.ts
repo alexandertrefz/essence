@@ -487,7 +487,7 @@ describe("Resolvers", () => {
 
 			expect(generated).toMatch(/Boxes\.rank\(a, b, \$pool_\d+\)/)
 			expect(generated).toMatch(
-				/const \$pool_\d+ = \{ compare: Integer\.compare \}/,
+				/const \$pool_\d+ = \{\n\tcompare: Integer\.compare,\n/,
 			)
 		})
 	})

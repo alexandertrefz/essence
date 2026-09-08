@@ -3538,7 +3538,7 @@ describe("Optimiser", () => {
 			let generated = generate(witnesses)
 
 			expect(generated).toMatch(
-				/const \$pool_\d+ = \{ compare: Integer\.compare \}/,
+				/const \$pool_\d+ = \{\n\tcompare: Integer\.compare,\n/,
 			)
 		})
 
@@ -6345,8 +6345,10 @@ describe("Optimiser", () => {
 		})
 
 		it("pools a conformance witness", () => {
+			// NOTE: `Comparable` provides the four inequalities, so a witness
+			// for it names Integer's own overrides beside its `compare`.
 			expect(generate(constants)).toMatch(
-				/const \$pool_\d+ = \{ compare: Integer\.compare \}/,
+				/const \$pool_\d+ = \{\n\tcompare: Integer\.compare,\n/,
 			)
 		})
 
@@ -6356,7 +6358,7 @@ describe("Optimiser", () => {
 			// and it was being made at every site and on every turn of the loop
 			// that reached one.
 			expect(generate(conditionalConformances)).toMatch(
-				/const \$pool_\d+ = \$type\.boundConformance\(\{ compare: List\.compare \}, \[\$pool_\d+\]\);/,
+				/const \$pool_\d+ = \$type\.providedConformance\(\$type\.boundConformance\(\{ compare: List\.compare \}, \[\$pool_\d+\]\), \{/,
 			)
 		})
 
@@ -6366,7 +6368,7 @@ describe("Optimiser", () => {
 			// onto it. Two constants, and the deeper one reads the shallower.
 			let declarations = [
 				...generate(conditionalConformances).matchAll(
-					/const (\$pool_\d+) = \$type\.boundConformance\(\{ compare: List\.compare \}, \[(\$pool_\d+)\]\);/g,
+					/const (\$pool_\d+) = \$type\.providedConformance\(\$type\.boundConformance\(\{ compare: List\.compare \}, \[(\$pool_\d+)\]\), \{/g,
 				),
 			]
 
@@ -6395,7 +6397,7 @@ describe("Optimiser", () => {
 			// instead — one witness for however many sites read it, where the
 			// witness used to be rebuilt at each of them.
 			expect(generate(constants)).toMatch(
-				/class Boxes \{[^]*?\n\}\nconst \$pool_\d+ = \{ compare: Boxes\.compare \};/,
+				/class Boxes \{[^]*?\n\}\nconst \$pool_\d+ = \$type\.providedConformance\(\{ compare: Boxes\.compare \}, \{/,
 			)
 		})
 
@@ -6510,7 +6512,7 @@ describe("Optimiser", () => {
 
 			expect(generated).not.toContain("$pool_")
 			expect(generated).toContain("Integer.createInteger(1)")
-			expect(generated).toContain("{ compare: Integer.compare }")
+			expect(generated).toContain("compare: Integer.compare,")
 		})
 
 		it("prints the same thing with the pass off", async () => {
