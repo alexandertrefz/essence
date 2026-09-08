@@ -45,8 +45,10 @@ live in `packages/compiler/src/enricher/primitives.ts`. `loop` — the one
 native Function family with no Namespace to live in — is declared here after
 all, in `Loop.es`, as ordinary free Functions. Printing is a Namespace:
 `Terminal.print` renders through `Printable` and ends the line,
-`Terminal.inspect` shows a value's structure and answers with it unchanged, and
-`Terminal.write` is the raw primitive both are built on (`Terminal.es`).
+`Terminal.inspect` shows a value's structure and answers with it unchanged,
+`Terminal.describe` hands that same structure back as a String instead of
+writing it, and `Terminal.write` is the raw primitive they are built on
+(`Terminal.es`).
 
 Three of every five declared Method entries are also IMPLEMENTED here, in
 Essence — 285 of 479 as this is written, counting one entry per Overload and

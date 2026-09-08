@@ -70,6 +70,8 @@ export type TerminalNatives = {
 	write: (argument0: StringType, to: StreamType) => RecordType
 	// static inspect<Value>(_: Value) -> Value
 	inspect: <Value extends AnyType>(argument0: Value) => Value
+	// static describe<Value>(_: Value) -> String
+	describe: <Value extends AnyType>(argument0: Value) => StringType
 }
 
 export type StringNatives = {
@@ -636,6 +638,7 @@ export const $TerminalAbsent: AssertNoEssenceExports<typeof import("./Terminal")
 export const $TerminalArity: AssertArities<typeof import("./Terminal"), {
 	write: 2
 	inspect: 1
+	describe: 1
 }> = true
 
 declare const StringModule: typeof import("./String")
