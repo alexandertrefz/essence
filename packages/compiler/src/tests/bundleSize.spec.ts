@@ -64,7 +64,7 @@ async function bundleSizeOfSource(source: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: 75,051 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 75,909 measured. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
 	//
@@ -72,6 +72,15 @@ describe("Bundle Size", () => {
 	// `Orderable` to `Comparable`. A witness carries its Protocol's provided
 	// Methods, so every `<T is Comparable>` witness this file builds — `sort`
 	// asks for one — grew from one entry to five.
+	//
+	// NOTE: 1,132 more are the rest of that same wave, and only 22 of them are
+	// this file's own text. 1,086 are `Rounding#NearestEven`: rounding to the
+	// even neighbour asks the floor for its parity, so `Rational::round`
+	// reaches `Integer.isEven` and the Euclidean `remainder` native behind it,
+	// and everything that rounds carries both. 24 came with `Optional`'s new
+	// combinators. The last 22 are `Integer::toString` becoming an Overload
+	// entry — `toString__overload$1` stands where `toString` did, at two sites
+	// here.
 	//
 	// NOTE: It has caught one design mistake worth keeping. Writing
 	// `Integer::isEven` as `remainder(dividingBy 2)::is(#Value(0))` reads far
@@ -93,10 +102,10 @@ describe("Bundle Size", () => {
 	// why moving a body into Essence can shrink a String-heavy Program while
 	// growing this one.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(76_100)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(76_900)
 	})
 
-	// NOTE: 37,763 measured; a reintroduced `Number` spread was 54,849. The same
+	// NOTE: 38,129 measured; a reintroduced `Number` spread was 54,849. The same
 	// claim as Everyday's, on a Program that takes square roots rather than
 	// doing arithmetic — so it reads the other side of several trades. A pass
 	// that pays text for work on Everyday takes bytes OFF here, because a file
@@ -108,11 +117,16 @@ describe("Bundle Size", () => {
 	// asks for none of it. That is where 927 of these bytes went: the four
 	// inequalities are `Comparable`'s now, so a witness for the smaller
 	// Protocol stops carrying `isBetween` and `clamp` with them.
+	//
+	// NOTE: 366 of them are the approximation wave, and this is the one file
+	// that pays for it in bodies it does name. 270 are `Algebraic::raise(to:)`,
+	// 64 the irrationals' `toString(as:)` entries, and 32 the `Integer` grid
+	// rungs the `round` here resolves to for a whole receiver.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(38_700)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(39_100)
 	})
 
-	// NOTE: 47,844 measured. The two tests above watch a Dictionary being shaken
+	// NOTE: 47,902 measured. The two tests above watch a Dictionary being shaken
 	// away whole; this one records what a Program that DOES hold one carries —
 	// the store, every native the file reaches, the written form, the kind
 	// registry and the registration that fills it. The composite key encoding
@@ -126,8 +140,13 @@ describe("Bundle Size", () => {
 	// not, and `Dictionary.ts` growing top-level side effects, which would pin
 	// the whole store into the two files above. The evidence that neither has
 	// happened is that those two do not move when this one does.
+	//
+	// NOTE: 58 of these bytes arrived without a Dictionary being touched at
+	// all: 34 with the `Integer` grid rungs, whose `toString` binding this file
+	// links under its Overload name now, and 24 with `Optional`'s new
+	// combinators.
 	it("charges a Dictionary Program for the container it uses", async () => {
-		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(48_700)
+		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(48_900)
 	})
 
 	// NOTE: 18,592 measured, where the same Program without the one call
