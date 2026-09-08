@@ -331,28 +331,18 @@ export function append(
 	originalString: StringType,
 	otherString: StringType,
 ): StringType {
-	let joined = createString(
-		originalString.value + otherString.value,
-	) as MeasuredString
+	let joined = originalString.value + otherString.value
 
-	// NOTE: The count is the joined text's own unit count, which for two such
-	// operands is exactly the two counts added — each of them counts by unit
-	// for the same reason. Written this way rather than as the sum so that
-	// joining does not reach the counting Method at all, and a Program that
-	// only joins Strings carries no segmenter.
-	//
-	// NOTE: The two keys are written here rather than through
-	// `createAsciiString`, which every other maker uses: a Program that only
-	// interpolates reaches `append`, `isAsciiIn` and `createString` out of
-	// this whole module, and `bundleSize.spec.ts` holds such a Program to the
-	// byte. Routing `append` through the helper pulls the helper in and
-	// measured 124 bytes more, where that ceiling has five bytes of room.
-	if (isAsciiIn(originalString) && isAsciiIn(otherString)) {
-		joined[isAsciiKey] = true
-		joined[graphemeCountKey] = joined.value.length
-	}
-
-	return joined
+	// NOTE: Through the same maker every other Method that answers an ASCII
+	// String uses, which gives the answer the joined text's own unit count —
+	// for two such operands exactly the two counts added, each of them counted
+	// by unit for the same reason. It was written out by hand here for 124
+	// bytes, back when the Module bundle ceiling had five bytes of room; the
+	// ceiling has the room its own rule asks for now, and a test threshold is
+	// no reason for one Method to spell what every other one calls.
+	return isAsciiIn(originalString) && isAsciiIn(otherString)
+		? createAsciiString(joined)
+		: createString(joined)
 }
 
 // NOTE: Whether a run of the separator's characters stands at a position of
