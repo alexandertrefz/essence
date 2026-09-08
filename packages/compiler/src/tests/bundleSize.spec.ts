@@ -64,7 +64,7 @@ async function bundleSizeOfSource(source: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: 75,909 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 75,765 measured. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
 	//
@@ -105,7 +105,7 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(76_900)
 	})
 
-	// NOTE: 38,129 measured; a reintroduced `Number` spread was 54,849. The same
+	// NOTE: 37,985 measured; a reintroduced `Number` spread was 54,849. The same
 	// claim as Everyday's, on a Program that takes square roots rather than
 	// doing arithmetic — so it reads the other side of several trades. A pass
 	// that pays text for work on Everyday takes bytes OFF here, because a file
@@ -126,7 +126,7 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(39_100)
 	})
 
-	// NOTE: 47,902 measured. The two tests above watch a Dictionary being shaken
+	// NOTE: 47,775 measured. The two tests above watch a Dictionary being shaken
 	// away whole; this one records what a Program that DOES hold one carries —
 	// the store, every native the file reaches, the written form, the kind
 	// registry and the registration that fills it. The composite key encoding
@@ -149,8 +149,8 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(48_900)
 	})
 
-	// NOTE: 18,592 measured, where the same Program without the one call
-	// measures 5,083 — so `removeDuplicates` costs 13,509 bytes, two and a
+	// NOTE: 18,607 measured, where the same Program without the one call
+	// measures 5,083 — so `removeDuplicates` costs 13,524 bytes, two and a
 	// half times the Program that calls it. It is written `@::tally()::keys()`
 	// on `GroupedList`, so a List Method reaches the whole second container:
 	// the store, the canonical key encoding, the kind registry, the
