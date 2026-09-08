@@ -2,9 +2,11 @@ import { describe, expect, test } from "bun:test"
 
 import { createInteger, type IntegerType } from "../Integer"
 import type { OptionalType } from "../Optional"
+import { equal } from "../Ordering"
 import { bothEnds, end, start } from "../Side"
 import {
 	character__overload$1 as character,
+	compare__overload$1 as compare,
 	count,
 	createString,
 	ends,
@@ -203,6 +205,9 @@ describe("the ASCII marker", () => {
 
 		expect(isMarkedAscii(uppercase(text))).toBeTrue()
 		expect(isMarkedAscii(lowercase(text))).toBeTrue()
+		// NOTE: `uppercase` above took the receiver's mark, and `trim` hands
+		// down what the receiver carries rather than taking it itself — the
+		// test below this one is about that, and asserts both halves.
 		expect(isMarkedAscii(trim(text, bothEnds))).toBeTrue()
 		expect(isMarkedAscii(trim(text, start))).toBeTrue()
 		expect(isMarkedAscii(trim(text, end))).toBeTrue()
@@ -221,6 +226,22 @@ describe("the ASCII marker", () => {
 		for (let word of words(text).value) {
 			expect(isMarkedAscii(word)).toBeTrue()
 		}
+	})
+
+	// NOTE: `trim` PROPAGATES the mark and never takes it. Taking it means
+	// scanning the whole String to answer a question about its two ends,
+	// which is what made trimming a fresh String cost its length; a receiver
+	// something has already measured hands the answer down for free. The
+	// order matters here, so the receiver is a fresh String per case.
+	test("is propagated by trim, never taken by it", () => {
+		expect(isUnmarked(trim(string("  Hello  "), bothEnds))).toBeTrue()
+
+		let measured = string("  Hello  ")
+
+		expect(length(measured).value).toBe(9)
+		expect(isMarkedAscii(trim(measured, bothEnds))).toBeTrue()
+		expect(isMarkedAscii(trim(measured, start))).toBeTrue()
+		expect(isMarkedAscii(trim(measured, end))).toBeTrue()
 	})
 
 	// NOTE: The marker is a claim, and a String the scan would refuse must
@@ -261,24 +282,39 @@ describe("the ASCII marker", () => {
 })
 
 describe("the NFC form", () => {
-	// NOTE: `words` and `trim` read the NFC form, as every other position
-	// Method does — so the words of a String and the pieces of its `split`
-	// are the same text in the same bytes, and a decomposed receiver answers
-	// composed text.
-	test("words and trim answer composed text", () => {
+	// NOTE: `words` reads the NFC form, as the position Methods do — they
+	// read the character view, and the view is segmented off the normal form
+	// — so the words of a String and the pieces of its `split` are the same
+	// text in the same bytes.
+	test("words and split answer composed text", () => {
 		expect(
 			words(string(`${decomposed} ${decomposed}`)).value.map(
 				(word) => word.value,
 			),
 		).toEqual([composed, composed])
-		expect(trim(string(` ${decomposed} `), bothEnds).value).toBe(composed)
-		expect(trim(string(` ${decomposed} `), start).value).toBe(
-			`${composed} `,
-		)
 		expect(
 			split(string(`${decomposed} ${decomposed}`), string(" ")).value.map(
 				(piece) => piece.value,
 			),
 		).toEqual([composed, composed])
+	})
+
+	// NOTE: `trim` is the exception, and deliberately: normalising is about
+	// the WHOLE String and trimming is about its two ends, so reading the
+	// normal form made an O(1) Method cost the receiver's length. It hands
+	// back the receiver's own bytes, which is the same String — no canonical
+	// composition or decomposition creates or destroys whitespace, so the
+	// trimmed decomposed text normalises to the trimmed composed text, and
+	// the two compare Equal, key one Dictionary slot and count the same
+	// characters.
+	test("is not forced by trim, whose answer is the same String", () => {
+		let trimmed = trim(string(` ${decomposed} `), bothEnds)
+
+		expect(trimmed.value).toBe(decomposed)
+		expect(compare(trimmed, string(composed))).toEqual(equal)
+		expect(length(trimmed).value).toBe(length(string(composed)).value)
+		expect(trim(string(` ${decomposed} `), start).value).toBe(
+			`${decomposed} `,
+		)
 	})
 })

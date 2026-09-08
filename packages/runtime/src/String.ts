@@ -810,13 +810,35 @@ export function words(originalString: StringType): ListType<StringType> {
 // here has to know that. Whitespace is whatever JavaScript calls whitespace,
 // which is the Unicode definition.
 //
-// NOTE: Read off the NFC form, for the reason `words` gives, and a trimmed
-// ASCII String is marked ASCII: taking units off either end of such a String
-// leaves such a String. A Program making 20,000 `trim()::length()` of a
-// 10,800-character String measured 174 ms without the marker and 25 ms with
-// it, 12 ms of each being its startup.
+// NOTE: Read off the RAW text, and neither of the two answers a String
+// remembers is FORCED to trim it — because both are answers about the WHOLE
+// String, and taking whitespace off the two ends should not cost a walk of
+// everything between them. Asking `normalisedFormOf` scanned for the ASCII
+// mark and, failing it, normalised and copied the whole String first: 200
+// trims of a FRESH 100,004-character ASCII String measured 68.9 µs per call
+// that way against 0.016 µs here, best of fifteen, and the cost grew by ten
+// for every ten times the length where this one does not move.
+//
+// NOTE: What makes the raw text the same answer is that trimming COMMUTES
+// with normalising. No canonical decomposition or composition creates or
+// destroys a whitespace character — the space that a `<compat>` or `<noBreak>`
+// mapping would produce is not one NFC performs, and a space composes with
+// nothing that follows it — so the whitespace at either end is the same
+// whitespace in both forms, and NFC of the trimmed text is the trim of the
+// NFC form. So the answer's own lazy normal form, and with it every
+// comparison, every position Method and every Dictionary key it becomes, is
+// what it was.
+//
+// NOTE: The ASCII mark is PROPAGATED where the receiver already carries one
+// and never taken by scanning for it: taking units off either end of such a
+// String leaves such a String, so a Program that trims what it built keeps the
+// mark all the way down — 20,000 `trim()::length()` of one 11,000-character
+// String built by `repeat` measured 0.4 ms in process, where the answer being
+// unmarked costs a scan of it per turn. A receiver nothing has measured
+// answers an unmarked String, which is the state it was in itself, and the
+// first Method that needs the mark takes it once.
 export function trim(originalString: StringType, side: SideType): StringType {
-	let text = normalisedFormOf(originalString)
+	let text = originalString.value
 	let trimmed: string
 
 	switch (side[typeKeySymbol]) {
@@ -830,7 +852,7 @@ export function trim(originalString: StringType, side: SideType): StringType {
 			trimmed = text.trim()
 	}
 
-	return isAsciiIn(originalString)
+	return (originalString as MeasuredString)[isAsciiKey] === true
 		? createAsciiString(trimmed)
 		: createString(trimmed)
 }
