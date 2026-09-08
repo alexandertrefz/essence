@@ -30,9 +30,10 @@ run Vite under Bun — `bun --bun vite`. A project installing the published
 - **A push that moves nothing is `undefined`.** `move` answers
   `Optional<Game>`; the page reads it as `Game | undefined` and simply does
   not place a tile. Not an exception, not a flag.
-- **The host rolls the dice.** Essence has no randomness and needs none:
-  `emptyCells` says where a tile may go, and `place` is told which square the
-  page chose. The rules stay pure and testable, the page stays five lines.
+- **The host rolls the dice.** The rules draw nothing: `emptyCells` says where a
+  tile may go, and `place` is told which square the page chose. The rules stay
+  pure and testable, the page stays five lines. A Program that wants to draw its
+  own square asks `Randomness.entropy()` for a source.
 - **The push is told as journeys.** `movements(game, direction)` answers
   where every tile that ended up somewhere came from — a merge from two
   places — so the page slides each tile in from where it was instead of
