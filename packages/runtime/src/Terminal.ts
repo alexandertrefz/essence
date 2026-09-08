@@ -1,5 +1,5 @@
 import { toString as algebraicToString } from "./Algebraic"
-import { toString as integerToString } from "./Integer"
+import { toString__overload$1 as integerToString } from "./Integer"
 import { materialise } from "./List"
 import { createEmpty, createValue, type OptionalType } from "./Optional"
 import { formatAsRational, type RationalType } from "./Rational"

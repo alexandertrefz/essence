@@ -908,20 +908,22 @@ describe("Rewriter", () => {
 
 			describe("toString", () => {
 				it("returns the correct strings", () => {
-					expect(integer.toString(integerOne())).toEqual(
+					expect(integer.toString__overload$1(integerOne())).toEqual(
 						string.createString("1"),
 					)
 
-					expect(integer.toString(integerTwo())).toEqual(
+					expect(integer.toString__overload$1(integerTwo())).toEqual(
 						string.createString("2"),
 					)
 
-					expect(integer.toString(integerHundred())).toEqual(
-						string.createString("100"),
-					)
+					expect(
+						integer.toString__overload$1(integerHundred()),
+					).toEqual(string.createString("100"))
 
 					expect(
-						integer.toString(integer.createInteger(1000n)),
+						integer.toString__overload$1(
+							integer.createInteger(1000n),
+						),
 					).toEqual(string.createString("1000"))
 				})
 			})
@@ -1175,7 +1177,7 @@ describe("Rewriter", () => {
 						list.map(
 							list.createList([integerOne(), integerTwo()]),
 							(item: integer.IntegerType) =>
-								integer.toString(item),
+								integer.toString__overload$1(item),
 						),
 					).toEqual(
 						list.createList([
@@ -1831,7 +1833,7 @@ describe("Rewriter", () => {
 					],
 					[
 						{ type: "Integer" },
-						integer.toString as (
+						integer.toString__overload$1 as (
 							...args: Array<unknown>
 						) => unknown,
 						[],
@@ -1934,7 +1936,7 @@ describe("Rewriter", () => {
 				let cases: Parameters<typeof dispatchMethod>[2] = [
 					[
 						{ type: "Integer" },
-						integer.toString as (
+						integer.toString__overload$1 as (
 							...args: Array<unknown>
 						) => unknown,
 						[],

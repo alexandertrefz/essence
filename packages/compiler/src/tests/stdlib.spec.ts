@@ -266,7 +266,7 @@ describe("Stdlib", () => {
 		it("joins any Printable items, not just Strings", () => {
 			expect(
 				list.join(ints(1n, 2n, 3n), str(", "), {
-					toString: integer.toString,
+					toString: integer.toString__overload$1,
 				}).value,
 			).toBe("1, 2, 3")
 		})

@@ -3121,7 +3121,7 @@ describe("Optimiser", () => {
 			let generated = generate(unionDispatch)
 
 			expect(generated).toContain(
-				'value[$type.typeKeySymbol] === "Integer" ? Integer.toString(value) : $es_Boolean_toString(value)',
+				'value[$type.typeKeySymbol] === "Integer" ? Integer.toString__overload$1(value) : $es_Boolean_toString(value)',
 			)
 			expect(generated).not.toContain("$type.dispatchMethod")
 		})
@@ -3151,7 +3151,7 @@ describe("Optimiser", () => {
 			}`)
 
 			expect(generated).toContain(
-				'value[$type.typeKeySymbol] === "Integer" ? Integer.toString(value) : $es_Boolean_toString(value)',
+				'value[$type.typeKeySymbol] === "Integer" ? Integer.toString__overload$1(value) : $es_Boolean_toString(value)',
 			)
 			expect(generated).not.toContain('=== "Boolean"')
 			expect(generated).not.toContain("noDispatchCaseMatched")
@@ -3325,7 +3325,7 @@ describe("Optimiser", () => {
 			// times over, and calling `identity` three times is not what the
 			// Program says.
 			expect(generate(unionDispatch)).toContain(
-				'($dispatch_0 => $dispatch_0[$type.typeKeySymbol] === "Integer" ? Integer.toString($dispatch_0) : $es_Boolean_toString($dispatch_0))(identity(',
+				'($dispatch_0 => $dispatch_0[$type.typeKeySymbol] === "Integer" ? Integer.toString__overload$1($dispatch_0) : $es_Boolean_toString($dispatch_0))(identity(',
 			)
 		})
 
@@ -3453,7 +3453,9 @@ describe("Optimiser", () => {
 		it("calls the Method the hole's witness names", () => {
 			let generated = generate(witnesses)
 
-			expect(generated).toContain("Integer.toString(count).value")
+			expect(generated).toContain(
+				"Integer.toString__overload$1(count).value",
+			)
 			expect(generated).not.toMatch(/\$pool_\d+\.toString\(count\)/)
 		})
 
@@ -3466,7 +3468,7 @@ describe("Optimiser", () => {
 
 					Terminal.inspect("{count}")
 				}`),
-			).not.toContain("toString: Integer.toString")
+			).not.toContain("toString: Integer.toString__overload$1")
 		})
 
 		it("reaches a Method a Namespace of the Program's own writes", () => {
@@ -3528,7 +3530,9 @@ describe("Optimiser", () => {
 			}`)
 
 			expect(generated).toContain("Item__conformance.toString(item)")
-			expect(generated).toContain("Integer.toString(count).value")
+			expect(generated).toContain(
+				"Integer.toString__overload$1(count).value",
+			)
 		})
 
 		it("leaves the witnesses that are passed to the pool", () => {
@@ -3560,7 +3564,7 @@ describe("Optimiser", () => {
 					enabled: true,
 					disabledPasses: new Set(["pool-constants"]),
 				}),
-			).toContain("Integer.toString(count).value")
+			).toContain("Integer.toString__overload$1(count).value")
 		})
 
 		it("prints the same thing with the pass off", async () => {

@@ -11,6 +11,7 @@ import {
 	}
 	from "./Rational.es" {
 		NonZeroRational
+		NumberFormat
 		Rational
 		Rounding
 	}
@@ -172,8 +173,47 @@ declarations {
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare(to other: Integer) -> Ordering
 
-		§§ Answers the Integer as a String, in decimal digits.
-		toString() -> String
+		§ The two `as:` entries are Integer's rung of a Method a `Scalar`
+		§ receiver dispatches over, and each hands the Integer to `Rational`
+		§ over one. A Program that never names a format never reaches them,
+		§ and pays none of the formatter they bring.
+
+		§§ Answers the Integer as a String.
+		§§
+		§§ The plain entry writes the decimal digits, and the `as:` entries write what `Rational` writes for the same value.
+		overload toString {
+			§§ Answers the Integer as a String, in decimal digits.
+			§§
+			§§ @returns — the String representation of the Integer.
+			() -> String
+
+			§§ Answers the Integer in the named format.
+			§§
+			§§ The `#Decimal` and `#Fraction` formats both write the digits alone, since an Integer is whole. The `#Percent` format writes one hundred times the value, with a `%` after it. The `#Scientific` format writes one digit before the point, and the power of ten after an `e`.
+			§§
+			§§ @param as — the form to represent the Integer in
+			§§ @returns — the String representation of the Integer.
+			(as format: NumberFormat) -> String {
+				<- Rational.of(@, over 1)::toString(as format)
+			}
+
+			§§ Answers the Integer in the named format, with exactly that many places.
+			§§
+			§§ The places are written as zeroes for the `#Decimal` format, so `5` over two places is `5.00`. The `#Fraction` format ignores both the count and the direction. The count and the direction reach the other two formats as they reach `Rational`.
+			§§
+			§§ @param as — the form to represent the Integer in
+			§§ @param toPlaces — how many digits to write after the point
+			§§ @param toward — the direction to round the last digit in, `#Nearest` when it is left out
+			§§ @returns — the String representation of the Integer.
+			(
+				as format: NumberFormat,
+				toPlaces count: Integer,
+				toward direction: Rounding = #Nearest,
+			) -> String {
+				<- Rational.of(@, over 1)
+					::toString(as format, toPlaces count, toward direction)
+			}
+		}
 
 		§ The mixed-kind entries of `add` and `multiply` are flipped calls.
 		§ The other operand's Namespace already declares the same sum or
@@ -681,12 +721,36 @@ declarations {
 
 		§§ Answers the Integer, rounded in the named direction.
 		§§
-		§§ An Integer is already whole, so every direction answers the receiver itself. The direction is `#Nearest` when a call names none.
-		§§
-		§§ @param toward — the direction to round in, `#Nearest` when it is left out
-		§§ @returns — the Integer itself.
-		round(toward direction: Rounding = #Nearest) -> Integer {
-			<- @
+		§§ An Integer is already whole and is on every decimal grid, so every entry here answers the receiver itself. The direction is `#Nearest` when a call names none.
+		overload round {
+			§§ Answers the Integer, rounded in the named direction.
+			§§
+			§§ @param toward — the direction to round in, `#Nearest` when it is left out
+			§§ @returns — the Integer itself.
+			(toward direction: Rounding = #Nearest) -> Integer {
+				<- @
+			}
+
+			§ The Rational rung of this answers a Rational, and this one
+			§ answers an Integer rather than `Rational.of(@, over 1)`. A
+			§ `Scalar` receiver then answers a Scalar, which is what it
+			§ already was. A Program that rounds an Integer to places and
+			§ prints it is 3,077 bytes smaller for it. It never builds the
+			§ Rational, and never links the formatter behind it. A Program
+			§ that inspects the value links that formatter anyway, and still
+			§ saves 491.
+
+			§§ Answers the Integer, rounded to a decimal grid of the given width.
+			§§
+			§§ @param toPlaces — how many decimal places to keep
+			§§ @param toward — the direction to round in, `#Nearest` when it is left out
+			§§ @returns — the Integer itself.
+			(
+				toPlaces places: Integer,
+				toward direction: Rounding = #Nearest,
+			) -> Integer {
+				<- @
+			}
 		}
 
 		§ `clamp` and `isBetween` are `Orderable`'s provided Methods now. Both

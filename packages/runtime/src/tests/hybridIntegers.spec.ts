@@ -14,7 +14,7 @@ import {
 	raise__overload$1 as raise,
 	remainder__overload$2 as remainder,
 	sum,
-	toString,
+	toString__overload$1,
 } from "../Integer"
 import { anyIs } from "../internalHelpers"
 import {
@@ -64,7 +64,7 @@ function heldBy(integer: IntegerType): "number" | "bigint" {
 }
 
 function decimalOf(integer: IntegerType): string {
-	return toString(integer).value
+	return toString__overload$1(integer).value
 }
 
 // NOTE: The three values either side of the boundary, which is where every

@@ -434,7 +434,7 @@ export function raise__overload$3(
 // which would spell an Integer in a way the language never writes — but a
 // number-held Integer is at most 2⁵³ − 1, five orders of magnitude below that,
 // so the decimal spelling is the only one either representation produces.
-export function toString(integer: IntegerType): StringType {
+export function toString__overload$1(integer: IntegerType): StringType {
 	return createString(integer.value.toString())
 }
 
