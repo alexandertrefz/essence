@@ -763,6 +763,7 @@ describe("Stdlib Call Graph", () => {
 			"String.replaceFirst",
 			"String.starts",
 			"String.toString",
+			"Terminal.ask",
 			"Terminal.print",
 			// NOTE: `Transcendental.is` and `absolute` are natives, and
 			// `List.toString` is one too — each was written on a Namespace

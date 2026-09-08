@@ -1,6 +1,7 @@
 import { toString as algebraicToString } from "./Algebraic"
 import { toString as integerToString } from "./Integer"
 import { materialise } from "./List"
+import { createEmpty, createValue, type OptionalType } from "./Optional"
 import { formatAsRational, type RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import { kindOf, singleLineMaxLength } from "./registry"
@@ -9,12 +10,13 @@ import { createString, quoted, type StringType } from "./String"
 import { toString as transcendentalToString } from "./Transcendental"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// NOTE: The native half of `packages/standard-library/sources/Terminal.es` — everything a
-// Program can put in front of a person. Only THREE of the Namespace's entries
-// are native: `write(_:to:)`, because a stream has to be reached somehow, and
-// `inspect` and `describe`, because the structural rendering below is what they
-// ARE. `print` and the stream-less `write` are written in Essence on top of
-// those.
+// NOTE: The native half of `packages/standard-library/sources/Terminal.es` —
+// everything a Program puts in front of a person, and everything a person hands
+// back. Five of the Namespace's entries are native: `write(_:to:)`, because a
+// stream has to be reached somehow, `inspect` and `describe`, because the
+// structural rendering below is what they ARE, and `readLine`/`readAll`,
+// because a descriptor has to be read somehow. `print` and `ask` are written in
+// Essence on top of those.
 //
 // NOTE: `getStringRepresentation` lives here rather than in `functions.ts`
 // because `inspect` is its only caller in the language — `functions.ts` keeps
@@ -383,4 +385,309 @@ export function inspect<Value extends AnyType>(value: Value): Value {
 // output off the console line the golden and sweep harnesses capture it from.
 export function describe<Value extends AnyType>(value: Value): StringType {
 	return createString(getStringRepresentation(value))
+}
+
+// NOTE: The reading half. A Program reads its input a LINE at a time, and a
+// descriptor answers bytes at whatever boundary the host happened to have them
+// — so what a read pulls and what a read hands out are two different amounts,
+// and the difference is held here. `pending` is text the host has already given
+// up and no call has taken yet, `ended` is the host saying there is no more,
+// and `scanned` is how much of `pending` a search for a break has already been
+// over. One buffer and no more: the input is one stream, and a second buffer
+// over the same descriptor would take bytes the first one is about to need.
+//
+// NOTE: The decoder is the state that makes the buffer necessary in the first
+// place. A character of three bytes can land across two reads, and a decoder
+// told `stream: true` holds the half it has until the rest arrives. Built on
+// the first read rather than at load, so that a Program which never reads
+// carries no construction — and so that a browser, where there is nothing to
+// read, never builds one at all.
+type InputState = {
+	pending: string
+	ended: boolean
+	scanned: number
+	decoder: TextDecoder | null
+}
+
+let input: InputState = {
+	pending: "",
+	ended: false,
+	scanned: 0,
+	decoder: null,
+}
+
+// NOTE: The reading half of `withOutputSink`, and the same shape: a dynamically
+// scoped binding installed for the length of ONE synchronous call and put back
+// by the `finally`. `text` is the whole of the input for that call, and `null`
+// is the host's own descriptor read from the start. Both replace the buffer
+// above, which is what makes a read that is staged repeatable — the state a
+// reading Program carries is the one thing a caller can not otherwise reach.
+export function withInputSource<Value>(
+	text: string | null,
+	run: () => Value,
+): Value {
+	let previous = input
+
+	input = {
+		pending: text ?? "",
+		ended: text !== null,
+		scanned: 0,
+		decoder: null,
+	}
+
+	try {
+		return run()
+	} finally {
+		input = previous
+	}
+}
+
+// NOTE: What a host can be asked for: some bytes, into a buffer, answering how
+// many arrived and zero at the end of the input. Every host below is reduced to
+// this one Function, so that the buffering above is written once.
+type ByteReader = (into: Uint8Array) => number
+
+// NOTE: Deno first, because it is the one host that answers with a Method of
+// its own — `Deno.stdin.readSync` — rather than through the Node file system.
+// It answers `null` at the end of the input where the others answer zero.
+type DenoHost = {
+	stdin?: { readSync?: (into: Uint8Array) => number | null }
+}
+
+// NOTE: Bun and Node reach `readSync` through `process.getBuiltinModule`, which
+// is the ONE door to a builtin that costs no import: a static `import "node:fs"`
+// here would be a specifier the bundler has to resolve, and every Program's
+// bundle is built for the browser, where it resolves to nothing at all. So the
+// module is asked for at the moment of the first read, off a global that a
+// browser does not have.
+type BuiltinModules = {
+	getBuiltinModule?: (identifier: string) => unknown
+}
+
+type FileSystem = {
+	readSync?: (
+		descriptor: number,
+		into: Uint8Array,
+		offset: number,
+		length: number,
+		position: null,
+	) => number
+}
+
+// NOTE: Looked up on every pull rather than once, for the reason `hostStream`
+// is: a lookup remembered at load would sit in every bundle whether or not the
+// Program reads, and the specs stage a host around a call.
+function hostReader(): ByteReader | undefined {
+	let deno = (globalThis as { Deno?: DenoHost }).Deno
+	let denoInput = deno?.stdin
+
+	if (denoInput !== undefined && typeof denoInput.readSync === "function") {
+		let readSync = denoInput.readSync
+
+		return (into) => readSync.call(denoInput, into) ?? 0
+	}
+
+	if (typeof process === "undefined") {
+		return undefined
+	}
+
+	let getBuiltinModule = (process as unknown as BuiltinModules)
+		.getBuiltinModule
+
+	if (typeof getBuiltinModule !== "function") {
+		return undefined
+	}
+
+	let fileSystem = getBuiltinModule.call(process, "node:fs") as
+		| FileSystem
+		| undefined
+	let readSync = fileSystem?.readSync
+
+	if (typeof readSync !== "function") {
+		return undefined
+	}
+
+	return (into) => readDescriptor(readSync, into)
+}
+
+// NOTE: Descriptor 0 is the Program's input on every host that has one, and it
+// is read rather than `process.stdin`, whose own reading is asynchronous —
+// there is nothing for a Method to answer while it waits. Two of the
+// descriptor's errors are answers rather than failures. EOF is how a console reports the end of its input on
+// Windows, where the others report zero bytes. EAGAIN is a descriptor somebody
+// put in non-blocking mode: the mode belongs to the OPEN FILE, so a parent
+// process that did it hands it to a child that never asked, and the read has to
+// be tried again rather than reported as the end of the input.
+function readDescriptor(
+	readSync: NonNullable<FileSystem["readSync"]>,
+	into: Uint8Array,
+): number {
+	while (true) {
+		try {
+			return readSync(0, into, 0, into.length, null)
+		} catch (error) {
+			let code = (error as { code?: string }).code
+
+			if (code === "EOF") {
+				return 0
+			}
+
+			if (code !== "EAGAIN") {
+				throw error
+			}
+
+			napBriefly()
+		}
+	}
+}
+
+// NOTE: Ten milliseconds of nothing, so that waiting for a person to type is
+// not a core at full tilt. `Atomics.wait` is the one synchronous wait a host
+// offers, and it is only reached from the EAGAIN arm above — a browser, where
+// the main thread is not allowed to wait, has no descriptor to read in the
+// first place. A host without `SharedArrayBuffer` retries at once, which is
+// slower to nobody but the machine.
+let napBuffer: Int32Array | null = null
+
+function napBriefly(): void {
+	if (typeof SharedArrayBuffer === "undefined") {
+		return
+	}
+
+	napBuffer ??= new Int32Array(new SharedArrayBuffer(4))
+
+	Atomics.wait(napBuffer, 0, 0, 10)
+}
+
+// NOTE: 64 KiB per crossing, allocated on the first read and kept: what a read
+// costs is the crossing into the host rather than the bytes, and a buffer built
+// per call would be 64 KiB of garbage per line. A read answers what the host
+// HAS rather than filling the buffer, so a large one does not make a Program
+// wait for more input than it asked for.
+const INPUT_BUFFER_LENGTH = 65536
+
+let inputBuffer: Uint8Array | null = null
+
+// NOTE: One crossing, and what it produced added to the buffer. A decode of a
+// chunk ending mid-character adds nothing at all, which is why every caller
+// asks again rather than assuming a pull made progress.
+function pull(): void {
+	let reader = hostReader()
+
+	if (reader === undefined) {
+		input.ended = true
+
+		return
+	}
+
+	inputBuffer ??= new Uint8Array(INPUT_BUFFER_LENGTH)
+	input.decoder ??= new TextDecoder()
+
+	let count = reader(inputBuffer)
+
+	if (count <= 0) {
+		// NOTE: A decode with nothing to decode is what flushes a character the
+		// input ended in the middle of, as the replacement character.
+		input.pending += input.decoder.decode()
+		input.ended = true
+
+		return
+	}
+
+	input.pending += input.decoder.decode(inputBuffer.subarray(0, count), {
+		stream: true,
+	})
+}
+
+// NOTE: The three breaks `String::lines` splits on, so that reading a text line
+// by line and splitting the same text into lines answer the same lines.
+//
+// NOTE: The search starts where the last one stopped rather than at the
+// beginning of the buffer. A line arrives in as many reads as it needs, and
+// searching all of what has arrived after each of them makes ONE long line
+// quadratic: a single twenty megabyte line measured 192 ms read with the
+// search starting at the beginning and 5.2 ms with it starting here.
+function firstBreakIn(text: string, from: number): number {
+	let feed = text.indexOf("\n", from)
+	let carriage = text.indexOf("\r", from)
+
+	if (feed < 0) {
+		return carriage
+	}
+
+	if (carriage < 0) {
+		return feed
+	}
+
+	return feed < carriage ? feed : carriage
+}
+
+// NOTE: `readLine()` — the next line, without the break that ends it, and
+// `#Empty` when there is no next line. The end of the input is not a failure
+// and not an empty line either, which is what the Optional is for.
+//
+// NOTE: A `\r` at the very end of what has been pulled is the one character
+// that can not be read yet: it is a break on its own AND the first half of
+// `\r\n`, and which one it is is the next byte's to say. So the loop pulls
+// again rather than deciding, and decides once the input has ended.
+export function readLine(): OptionalType<StringType> {
+	while (true) {
+		let breakAt = firstBreakIn(input.pending, input.scanned)
+
+		if (breakAt >= 0) {
+			let carriage = input.pending.charCodeAt(breakAt) === 13
+
+			if (
+				carriage &&
+				breakAt === input.pending.length - 1 &&
+				!input.ended
+			) {
+				pull()
+
+				continue
+			}
+
+			let paired =
+				carriage && input.pending.charCodeAt(breakAt + 1) === 10
+			let line = input.pending.slice(0, breakAt)
+
+			input.pending = input.pending.slice(breakAt + (paired ? 2 : 1))
+			input.scanned = 0
+
+			return createValue(createString(line))
+		}
+
+		if (input.ended) {
+			if (input.pending.length === 0) {
+				return createEmpty()
+			}
+
+			let line = input.pending
+
+			input.pending = ""
+			input.scanned = 0
+
+			return createValue(createString(line))
+		}
+
+		input.scanned = input.pending.length
+
+		pull()
+	}
+}
+
+// NOTE: `readAll()` — everything left, unchanged. The break a text ends with is
+// part of the answer, which is what makes this the reading side of `write`: a
+// Program that reads its input and writes it back writes what it was given.
+export function readAll(): StringType {
+	while (!input.ended) {
+		pull()
+	}
+
+	let text = input.pending
+
+	input.pending = ""
+	input.scanned = 0
+
+	return createString(text)
 }

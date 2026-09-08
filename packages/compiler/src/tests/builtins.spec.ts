@@ -401,24 +401,28 @@ describe("Builtins", () => {
 		})
 	})
 
-	// NOTE: The Namespace printing moved onto. It is checked here, beside the
-	// free Functions it replaced, because its writing natives are the only ones
-	// in the language whose whole purpose is an effect — nothing about the value
-	// they answer with says whether they ran, so the binding is all that stands
-	// between a `Terminal.print` and a Program that prints nothing.
+	// NOTE: The Namespace printing moved onto, and reading with it. It is
+	// checked here, beside the free Functions it replaced, because its natives
+	// are the only ones in the language whose whole purpose is an effect —
+	// nothing about the value they answer with says whether they ran, so the
+	// binding is all that stands between a `Terminal.print` and a Program that
+	// prints nothing, or a `Terminal.readLine` and one that reads nothing.
 	describe("Terminal", () => {
 		it("binds exactly the native entries to the runtime", () => {
 			let bindings = loadStdlib().nativeBindings["Terminal"]
 
-			// NOTE: `print` is Essence, `write`, `inspect` and `describe` are
-			// native — one Method each now that the Stream is a DEFAULT rather
-			// than an Overload entry, so each Array holds one flag and the
-			// runtime export wears the plain name.
+			// NOTE: `print` and `ask` are Essence, the other five are native —
+			// one Method each now that the Stream is a DEFAULT rather than an
+			// Overload entry, so each Array holds one flag and the runtime
+			// export wears the plain name.
 			expect(bindings?.methods).toEqual({
 				print: [false],
 				write: [true],
 				inspect: [true],
 				describe: [true],
+				readLine: [true],
+				readAll: [true],
+				ask: [false],
 			})
 
 			let runtime = terminal as Record<string, unknown>
@@ -426,7 +430,10 @@ describe("Builtins", () => {
 			expect(typeof runtime["write"]).toBe("function")
 			expect(typeof runtime["inspect"]).toBe("function")
 			expect(typeof runtime["describe"]).toBe("function")
+			expect(typeof runtime["readLine"]).toBe("function")
+			expect(typeof runtime["readAll"]).toBe("function")
 			expect(runtime["print"]).toBeUndefined()
+			expect(runtime["ask"]).toBeUndefined()
 			expect(runtime["write__overload$1"]).toBeUndefined()
 			expect(runtime["write__overload$2"]).toBeUndefined()
 		})

@@ -357,10 +357,14 @@ function isPureIntrinsic(
 // NOTE: And `Terminal` above all, whose absence is the one this table can least
 // afford to lose. It is named here rather than left to be inferred because the
 // table is an ALLOWLIST — a Namespace with no entry has every Method refused —
-// and the next reader adding one should not have to wonder whether the printing
-// Namespace was forgotten. `print`, `write` and `inspect` ARE the observable
-// effect the enumeration above is written to protect; every one of them has to
-// survive every pass.
+// and the next reader adding one should not have to wonder whether the
+// Namespace a Program talks through was forgotten. `print`, `write` and
+// `inspect` ARE the observable effect the enumeration above is written to
+// protect, and `readLine`, `readAll` and `ask` are that effect the other way
+// round — two reads of one Expression take two different lines. Every one of
+// them has to survive every pass. `describe` alone answers a String and does
+// nothing, and it is left out all the same: an entry would put `Terminal` in
+// this table, which is the one reading a later editor must not make.
 const pureMethods: Record<string, ReadonlySet<string>> = {
 	Integer: new Set([
 		"is",

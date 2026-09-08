@@ -72,6 +72,10 @@ export type TerminalNatives = {
 	inspect: <Value extends AnyType>(argument0: Value) => Value
 	// static describe<Value>(_: Value) -> String
 	describe: <Value extends AnyType>(argument0: Value) => StringType
+	// static readLine() -> Optional<String>
+	readLine: () => OptionalType<StringType>
+	// static readAll() -> String
+	readAll: () => StringType
 }
 
 export type StringNatives = {
@@ -634,11 +638,13 @@ export type FunctionsNatives = {
 
 declare const TerminalModule: typeof import("./Terminal")
 export const $Terminal: TerminalNatives = TerminalModule
-export const $TerminalAbsent: AssertNoEssenceExports<typeof import("./Terminal"), "print"> = true
+export const $TerminalAbsent: AssertNoEssenceExports<typeof import("./Terminal"), "print" | "ask"> = true
 export const $TerminalArity: AssertArities<typeof import("./Terminal"), {
 	write: 2
 	inspect: 1
 	describe: 1
+	readLine: 0
+	readAll: 0
 }> = true
 
 declare const StringModule: typeof import("./String")
