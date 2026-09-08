@@ -311,7 +311,7 @@ then handed the choice to the runtime:
 
 ```js
 $type.dispatchMethod(value, [], [
-	[{ type: "Integer" }, Integer.toString, []],
+	[{ type: "Integer" }, Integer.toString__overload$1, []],
 	[{ type: "Boolean" }, $es_Boolean_toString, []],
 ])
 ```
@@ -324,7 +324,7 @@ Compiler wrote itself. What the search decides is what is emitted:
 
 ```js
 value[$type.typeKeySymbol] === "Integer"
-	? Integer.toString(value)
+	? Integer.toString__overload$1(value)
 	: $es_Boolean_toString(value)
 ```
 
@@ -434,14 +434,14 @@ this pass off, and it is where the shared behaviour is written down.
 
 Calls the Method a witness names, rather than the witness.
 
-A conformance witness is a method map — `{ toString: Integer.toString }` —
-built so that a Function bounded by a Protocol can be handed one and read
-whichever Method it needs off it. At a site that reads exactly ONE of them, and
+A conformance witness is a method map —
+`{ toString: Integer.toString__overload$1 }` — built so that a Function bounded
+by a Protocol can be handed one and read whichever Method it needs off it. At a site that reads exactly ONE of them, and
 reads it right there, the map is a detour, because the Compiler already knows
 which Function it would find:
 
 ```js
-"You have " + Integer.toString(count).value + " left."
+"You have " + Integer.toString__overload$1(count).value + " left."
 ```
 
 That site is the hole of an interpolated String, and today it is the only one.
@@ -453,8 +453,9 @@ witnesses that are consumed on the spot, the pool takes what is left, and
 turning either off leaves the other answering exactly as it did.
 
 Safe because the map's members are references to Methods and nothing else. The
-call `witness.toString(x)` finds `Integer.toString` and calls it with `x`, and
-`Integer.toString(x)` calls the same Function with the same Argument.
+call `witness.toString(x)` finds `Integer.toString__overload$1` and calls it
+with `x`, and `Integer.toString__overload$1(x)` calls the same Function with
+the same Argument.
 
 A CONDITIONAL conformance is left alone, and the refusal is the whole of what
 makes the rest safe: such a witness is `boundConformance(<map>, [<witnesses>])`,
@@ -1364,8 +1365,8 @@ Builds each constant once, in a band of consts, instead of at every site.
 A constant written in a Program was built at every site it was written at, and
 built again on every turn of whatever loop reached it. `1` is
 `Integer.createInteger(1)` — an object and a call, per turn.
-`"{value}"` builds `{ toString: Integer.toString }` before it renders anything,
-once per hole. A Match's Record Matcher rebuilds `{ type: "Record", members: … }`
+`"{value}"` builds `{ toString: Integer.toString__overload$1 }` before it
+renders anything, once per hole. A Match's Record Matcher rebuilds `{ type: "Record", members: … }`
 to hand to the check, per test, per turn. None of them can differ from one
 evaluation to the next, so each is built once and read by name:
 

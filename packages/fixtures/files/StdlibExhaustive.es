@@ -607,6 +607,14 @@ third"::lines())
 	show("Integer.negate() [zero]", 0::negate())
 	show("Integer.round(toward?: Rounding) [no direction named]", 5::round())
 	show("Integer.round(toward?: Rounding)", -5::round(toward #Up))
+	show(
+		"Integer.round(toPlaces: Integer, toward?: Rounding)",
+		5::round(toPlaces 2),
+	)
+	show(
+		"Integer.round(toPlaces: Integer, toward?: Rounding) [negative, down]",
+		-5::round(toPlaces 2, toward #Down),
+	)
 	show("Integer.isEven()", 4::isEven())
 	show("Integer.isEven() [odd]", 3::isEven())
 	show("Integer.isOdd()", -3::isOdd())
@@ -767,6 +775,30 @@ third"::lines())
 	)
 	show("Integer.toString()", 42::toString())
 	show("Integer.toString() [negative]", -42::toString())
+	show(
+		"Integer.toString(as: NumberFormat)",
+		42::toString(as NumberFormat#Decimal),
+	)
+	show(
+		"Integer.toString(as: NumberFormat) [fraction]",
+		42::toString(as NumberFormat#Fraction),
+	)
+	show(
+		"Integer.toString(as: NumberFormat) [scientific]",
+		1234::toString(as NumberFormat#Scientific),
+	)
+	show(
+		"Integer.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding)",
+		42::toString(as NumberFormat#Decimal, toPlaces 2),
+	)
+	show(
+		"Integer.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [percent]",
+		42::toString(as NumberFormat#Percent, toPlaces 1),
+	)
+	show(
+		"Integer.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [scientific, negative]",
+		-1234::toString(as NumberFormat#Scientific, toPlaces 2),
+	)
 	show("Integer.compare(to: Integer)", 1::compare(to 2))
 	show("Integer.compare(to: Integer) [equal]", 2::compare(to 2))
 	show("Integer.compare(to: Integer) [greater]", 3::compare(to 2))

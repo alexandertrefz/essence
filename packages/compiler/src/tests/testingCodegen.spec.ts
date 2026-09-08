@@ -226,7 +226,7 @@ describe("Test codegen — the emitted shape", () => {
 		}`)
 
 		expect(javaScript).toContain(
-			'$testing.entry($context, 0, String.createString("" + Integer.toString(scored).value + " is a win"), () => {',
+			'$testing.entry($context, 0, String.createString("" + Integer.toString__overload$1(scored).value + " is a win"), () => {',
 		)
 	})
 

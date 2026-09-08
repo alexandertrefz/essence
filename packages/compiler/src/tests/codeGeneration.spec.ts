@@ -1485,7 +1485,7 @@ describe("Code Generation", () => {
 			`)
 
 			expect(generated).toContain("const n = $loop_0_items[")
-			expect(generated).toContain("Integer.toString(")
+			expect(generated).toContain("Integer.toString__overload$1(")
 		})
 
 		it("emits reduce with its starting value and callback", () => {
@@ -3974,7 +3974,7 @@ declarations {
 					// and no import for the Namespace is emitted at all, since
 					// nothing about it is native.
 					expect(code).toContain(
-						"Terminal.inspect(Integer.toString($es_Constants_DOUBLE));",
+						"Terminal.inspect(Integer.toString__overload$1($es_Constants_DOUBLE));",
 					)
 					expect(code).not.toContain("Constants.DOUBLE")
 					expect(code).not.toContain('import * as Constants from "')

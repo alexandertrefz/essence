@@ -64,7 +64,7 @@ async function bundleSizeOfSource(source: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: 75,029 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 75,051 measured. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
 	//
@@ -203,7 +203,7 @@ describe("Bundle Size", () => {
 
 		expect(inBundle.length).toBeGreaterThan(0)
 		expect(inBundle.length).toBeLessThanOrEqual(inPrelude.length)
-		// NOTE: 17,388 measured, and the ceiling keeps the ~500 bytes this
+		// NOTE: 17,470 measured, and the ceiling keeps the ~500 bytes this
 		// test's own rule asks for. It had five, which is not a guard but a
 		// tripwire: it fires on the next ordinary edit and says nothing
 		// about what moved. It even deformed the runtime — `String.append`
@@ -222,6 +222,14 @@ describe("Bundle Size", () => {
 		// pays 1,086 of the same. The alternative was a parity test spelled out
 		// of `quotient` and `multiply`, which reaches two natives instead of
 		// one and says the same thing worse.
-		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(17_900)
+		//
+		// NOTE: 82 more are the Integer `toString` binding under its Overload
+		// name: the plain entry is an Overload entry now, so
+		// `toString__overload$1` stands where `toString` did, at eight sites
+		// here and two in Everyday, which pays 22 of the same. Nothing is
+		// reached that was not reached before — the entries beside it are
+		// Essence bodies over `Rational`, and a Program that names no format
+		// links none of them.
+		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(18_000)
 	})
 })

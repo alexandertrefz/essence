@@ -578,6 +578,70 @@ describe("Rationals", () => {
 		})
 	})
 
+	// NOTE: The Integer rungs of the formatting family. What they are FOR is a
+	// receiver of `Integer | Rational` — the Type a mixed List sums to — which
+	// dispatches per member and needs both Namespaces to declare the name. So
+	// every test here runs the call twice: once on an Integer, and once on a
+	// Scalar the Compiler can not narrow.
+	describe("Integer's rung of the formatting family", () => {
+		it("writes an Integer in every format", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(42::toString(as #Decimal))
+					Terminal.inspect(42::toString(as #Fraction))
+					Terminal.inspect(42::toString(as #Percent))
+					Terminal.inspect(1234::toString(as #Scientific))
+					Terminal.inspect(42::toString(as #Decimal, toPlaces 2))
+					Terminal.inspect(
+						1234::toString(as #Scientific, toPlaces 2),
+					)
+				}`),
+			).toEqual([
+				'"42"',
+				'"42"',
+				'"4200%"',
+				'"1.234e3"',
+				'"42.00"',
+				'"1.23e3"',
+			])
+		})
+
+		it("answers the receiver for every width and direction", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(5::round(toPlaces 2))
+					Terminal.inspect(-5::round(toPlaces 2, toward #Down))
+					Terminal.inspect(5::round(toPlaces 0, toward #NearestEven))
+				}`),
+			).toEqual(["5", "-5", "5"])
+		})
+
+		// NOTE: The Type is written out rather than inferred, so the receiver
+		// is the Union both rungs answer for and neither the Integer nor the
+		// Rational entry can be reached on its own. Without Integer's rungs
+		// these three calls are `no-matching-overload`, which is the hole this
+		// package was written to close.
+		it("dispatches a Scalar receiver over both rungs", async () => {
+			expect(
+				await run(`implementation {
+					constant mixed: List<Integer | Rational> = [1, 3/2, 2]
+					constant total = mixed::sum()
+
+					Terminal.inspect(total::toString(as #Decimal, toPlaces 2))
+					Terminal.inspect(total::toString(as #Percent, toPlaces 1))
+					Terminal.inspect(total::round(toPlaces 1))
+
+					constant whole: List<Integer | Rational> = [1, 2]
+
+					Terminal.inspect(
+						whole::sum()::toString(as #Decimal, toPlaces 2),
+					)
+					Terminal.inspect(whole::sum()::round(toPlaces 1))
+				}`),
+			).toEqual(['"4.50"', '"450.0%"', "9/2", '"3.00"', "3"])
+		})
+	})
+
 	describe("Compiled Programs", () => {
 		it("divides by a negative Integer without corrupting the value", async () => {
 			expect(
