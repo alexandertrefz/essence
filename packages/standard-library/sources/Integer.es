@@ -254,6 +254,28 @@ declarations {
 					)
 			}
 
+			§ The rendering money always needs: minor units held as an
+			§ Integer, written as a major-unit decimal. It is an entry
+			§ because the divisor is a power of ten a caller would otherwise
+			§ build. The alternative leaves that power, and the sign in front
+			§ of it, at every render site that holds cents.
+
+			§§ Answers the Integer as a decimal scaled down by that many places.
+			§§
+			§§ The receiver is read as a count of the last place, so `1234` scaled by two places is `12.34`. A count of zero writes the digits alone. The sign is written in front, so `-1234` scaled by two places is `-12.34`.
+			§§
+			§§ @param scaledBy — how many decimal places to scale the Integer down by
+			§§ @returns — the String representation of the scaled Integer.
+			(scaledBy places: NonNegativeInteger) -> String {
+				§ A written `10` is a PositiveInteger and `raise` answers one
+				§ of those. That is the proof `Rational.of` needs to answer a
+				§ Rational rather than an Optional.
+				constant scale = 10::raise(to places)
+
+				<- Rational.of(@, over scale)
+					::toString(as #Decimal, toPlaces places)
+			}
+
 			§§ Answers the Integer with its sign written in the named style.
 			§§
 			§§ The `#Always` Case writes a `+` in front of a value that is not negative, so `3` is `+3` and zero is `+0`. The `#Negative` Case writes what the plain `toString()` writes.

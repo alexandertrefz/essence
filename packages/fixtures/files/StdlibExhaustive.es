@@ -826,6 +826,22 @@ third"::lines())
 			::toString(as NumberFormat#Decimal, toPlaces 2, groupingWith ","),
 	)
 	show(
+		"Integer.toString(scaledBy: NonNegativeInteger)",
+		1234::toString(scaledBy 2),
+	)
+	show(
+		"Integer.toString(scaledBy: NonNegativeInteger) [negative]",
+		-1234::toString(scaledBy 2),
+	)
+	show(
+		"Integer.toString(scaledBy: NonNegativeInteger) [below the scale]",
+		5::toString(scaledBy 2),
+	)
+	show(
+		"Integer.toString(scaledBy: NonNegativeInteger) [no places]",
+		1234::toString(scaledBy 0),
+	)
+	show(
 		"Integer.toString(showingSign: SignStyle)",
 		3::toString(showingSign SignStyle#Always),
 	)
