@@ -8,14 +8,23 @@ import { typeKeySymbol } from "./type"
 // is written in Essence too — this Choice reaches no native at all, unlike
 // `Side`, whose `String::trim(at:)` is one.
 export type NearestType = { [typeKeySymbol]: "Rounding#Nearest" }
+export type NearestEvenType = { [typeKeySymbol]: "Rounding#NearestEven" }
 export type DownType = { [typeKeySymbol]: "Rounding#Down" }
 export type UpType = { [typeKeySymbol]: "Rounding#Up" }
 export type TowardZeroType = { [typeKeySymbol]: "Rounding#TowardZero" }
-export type RoundingType = NearestType | DownType | UpType | TowardZeroType
+export type RoundingType =
+	| NearestType
+	| NearestEvenType
+	| DownType
+	| UpType
+	| TowardZeroType
 
 // NOTE: Shared unit instances, for the same reason `Ordering`'s are shared —
 // Case equality goes by tag, so these being singletons is an optimisation.
 export const nearest: NearestType = { [typeKeySymbol]: "Rounding#Nearest" }
+export const nearestEven: NearestEvenType = {
+	[typeKeySymbol]: "Rounding#NearestEven",
+}
 export const down: DownType = { [typeKeySymbol]: "Rounding#Down" }
 export const up: UpType = { [typeKeySymbol]: "Rounding#Up" }
 export const towardZero: TowardZeroType = {

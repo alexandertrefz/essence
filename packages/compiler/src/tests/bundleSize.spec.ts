@@ -64,7 +64,7 @@ async function bundleSizeOfSource(source: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: 74,777 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 75,029 measured. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
 	//
@@ -93,7 +93,7 @@ describe("Bundle Size", () => {
 	// why moving a body into Essence can shrink a String-heavy Program while
 	// growing this one.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(75_800)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(76_100)
 	})
 
 	// NOTE: 37,763 measured; a reintroduced `Number` spread was 54,849. The same
@@ -203,7 +203,7 @@ describe("Bundle Size", () => {
 
 		expect(inBundle.length).toBeGreaterThan(0)
 		expect(inBundle.length).toBeLessThanOrEqual(inPrelude.length)
-		// NOTE: 15,584 measured, and the ceiling keeps the ~500 bytes this
+		// NOTE: 17,388 measured, and the ceiling keeps the ~500 bytes this
 		// test's own rule asks for. It had five, which is not a guard but a
 		// tripwire: it fires on the next ordinary edit and says nothing
 		// about what moved. It even deformed the runtime — `String.append`
@@ -212,8 +212,16 @@ describe("Bundle Size", () => {
 		//
 		// NOTE: 89 of the bytes are that call coming back. The 603 over the
 		// 14,890 two Protocol commits measured byte-identically are older
-		// than this campaign: the same pipeline measures 15,495 at its base
-		// commit as it does after it, so nothing here spent them.
-		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(16_100)
+		// than that campaign: the same pipeline measures 15,495 at its base
+		// commit as it does after it, so nothing there spent them.
+		//
+		// NOTE: 1,804 of them are `Rounding#NearestEven`. Rounding to the even
+		// neighbour asks the floor for its parity, so `Rational::round` now
+		// reaches `Integer.isEven` and the Euclidean `remainder` native behind
+		// it, and every Program that rounds a Rational carries both. Everyday
+		// pays 1,086 of the same. The alternative was a parity test spelled out
+		// of `quotient` and `multiply`, which reaches two natives instead of
+		// one and says the same thing worse.
+		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(17_900)
 	})
 })

@@ -333,6 +333,89 @@ describe("Rationals", () => {
 		})
 	})
 
+	// NOTE: `#NearestEven` is the one Rounding Case whose answer depends on the
+	// step below rather than only on the distance to it, so every test here
+	// pairs a tie with the parity of its floor. `round` is written in Essence,
+	// so all of them go through a compiled Program: there is no native to
+	// drive.
+	describe("Banker's rounding", () => {
+		it("sends a tie to the even step on either side of zero", async () => {
+			expect(
+				await run(`implementation {
+					constant halves = [-5/2, -3/2, -1/2, 1/2, 3/2, 5/2, 7/2]
+
+					halves::map((half) {
+						<- Terminal.inspect(
+							half::round(toward #NearestEven)::toString(),
+						)
+					})
+				}`),
+			).toEqual(['"-2"', '"-2"', '"0"', '"0"', '"2"', '"2"', '"4"'])
+		})
+
+		it("answers what #Nearest answers where there is no tie", async () => {
+			expect(
+				await run(`implementation {
+					constant values = [-9/4, -1/4, 1/4, 9/4, 11/4]
+
+					values::map((value) {
+						<- Terminal.inspect(
+							value::round(toward #NearestEven)::toString(),
+						)
+					})
+				}`),
+			).toEqual(['"-2"', '"0"', '"0"', '"2"', '"3"'])
+		})
+
+		it("takes the even digit at a decimal grid", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(
+						1/8::round(toPlaces 2, toward #NearestEven)::toString(),
+					)
+					Terminal.inspect(
+						3/8::round(toPlaces 2, toward #NearestEven)::toString(),
+					)
+					Terminal.inspect(1/8::round(toPlaces 2)::toString())
+				}`),
+			).toEqual(['"3/25"', '"19/50"', '"13/100"'])
+		})
+
+		// NOTE: The bias the Case exists for, measured rather than argued. The
+		// hundred halves `1/2` through `199/2` sum to exactly 5000; rounding
+		// each away from zero first totals 5050, and rounding each to its even
+		// neighbour totals 5000. Exhaustive over the run rather than a `for
+		// any` draw, because the halves ARE the whole of what separates the two
+		// Cases and a draw would mostly miss them.
+		it("keeps a run of halves on its exact total", async () => {
+			expect(
+				await run(`implementation {
+					constant halves = List.of(integersFrom 1, through 100)
+						::map((step) {
+							<- Rational.of(
+								step::multiply(with 2)::subtract(1),
+								over 2,
+							)
+						})
+
+					Terminal.inspect(halves::sum()::toString())
+					Terminal.inspect(
+						halves::map((half) { <- half::round() })
+							::sum()
+							::toString(),
+					)
+					Terminal.inspect(
+						halves::map((half) {
+							<- half::round(toward #NearestEven)
+						})
+							::sum()
+							::toString(),
+					)
+				}`),
+			).toEqual(['"5000"', '"5050"', '"5000"'])
+		})
+	})
+
 	describe("Compiled Programs", () => {
 		it("divides by a negative Integer without corrupting the value", async () => {
 			expect(

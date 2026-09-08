@@ -42,11 +42,17 @@ declarations {
 	§ The Choice is declared beside the Namespace that rounds most, and
 	§ `Integer.es` imports it for its own `round`.
 
+	§ A long run of `#Nearest` roundings drifts upwards in magnitude. The
+	§ hundred halves `1/2` through `199/2` total 5050 under `#Nearest`, and
+	§ 5000 under `#NearestEven`, against an exact 5000. The alternative was to
+	§ leave out the rule every peer calls the default.
+
 	§§ Which step `round` reaches for a value that is not already on one.
 	§§
-	§§ `#Nearest` goes to the closest step, and away from zero for a value exactly halfway between two. The `#Down` Case answers the floor, `#Up` the ceiling, and `#TowardZero` the step towards zero. A call that names no rounding gets `#Nearest`.
+	§§ `#Nearest` goes to the closest step, and away from zero for a value exactly halfway between two. The `#NearestEven` Case goes to the closest step as well. A value exactly halfway between two steps reaches the even one of them. The `#Down` Case answers the floor, `#Up` the ceiling, and `#TowardZero` the step towards zero. A call that names no rounding gets `#Nearest`.
 	choice Rounding {
 		Nearest,
+		NearestEven,
 		Down,
 		Up,
 		TowardZero,
@@ -775,7 +781,7 @@ declarations {
 
 		§§ Answers the Rational rounded in the named direction.
 		§§
-		§§ The direction is `#Nearest` when a call names none. A value exactly halfway between two steps rounds away from zero, so `1/2` answers `1` and `-1/2` answers `-1`. The other directions answer the floor for `#Down`, the ceiling for `#Up`, and the value towards zero for `#TowardZero`. Naming a count of places rounds to a decimal grid of that width instead, and answers a Rational.
+		§§ The direction is `#Nearest` when a call names none. A value exactly halfway between two steps rounds away from zero, so `1/2` answers `1` and `-1/2` answers `-1`. Under `#NearestEven` a value exactly halfway between two steps reaches the even one, so `1/2` answers `0` and `3/2` answers `2`. The other directions answer the floor for `#Down`, the ceiling for `#Up`, and the value towards zero for `#TowardZero`. Naming a count of places rounds to a decimal grid of that width instead, and answers a Rational.
 		overload round {
 			§§ Answers the Rational as an Integer, rounded in the named direction.
 			§§
@@ -828,6 +834,23 @@ declarations {
 						} else if fractionalPart::isLessThan(1/2) {
 							<- floored
 						} else if value::isLessThan(0/1) {
+							<- floored
+						} else {
+							<- floored::add(1)
+						}
+					}
+
+					case #NearestEven {
+						§ The same two neighbours, and a different tie. One of
+						§ the floor and the step above it is even, and a tie
+						§ reaches that one whichever sign the value has.
+						constant fractionalPart = value::subtract(floored)
+
+						if fractionalPart::isGreaterThan(1/2) {
+							<- floored::add(1)
+						} else if fractionalPart::isLessThan(1/2) {
+							<- floored
+						} else if floored::isEven() {
 							<- floored
 						} else {
 							<- floored::add(1)
