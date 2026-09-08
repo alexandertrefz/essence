@@ -13,8 +13,8 @@ import { materialise } from "./List"
 import {
 	type RandomnessType,
 	below,
-	createEntropy,
 	createRandomness,
+	entropy,
 	fraction,
 	nextWord,
 	seedOf,
@@ -2276,7 +2276,7 @@ export type RunSummary = {
 // again exactly. It is an entropy word rather than `Math.random` so the runtime
 // reads the machine through one door.
 export function randomSeed(): string {
-	return nextWord(createEntropy()).toString(16).padStart(8, "0")
+	return nextWord(entropy()).toString(16).padStart(8, "0")
 }
 
 export function runTests(registry: Registry, options: RunOptions): RunSummary {

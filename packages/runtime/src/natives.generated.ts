@@ -593,16 +593,34 @@ export type GroupedNonEmptyListNatives = {
 }
 
 export type RandomnessNatives = {
-	// boolean() -> Boolean
-	boolean: (self: RandomnessType) => BooleanType
-	// integer(between: Integer, and: Integer) -> Integer
-	integer: (self: RandomnessType, between: IntegerType, and: IntegerType) => IntegerType
-	// rational(between: Rational, and: Rational) -> Rational
-	rational: (self: RandomnessType, between: RationalType, and: RationalType) => RationalType
-	// string(upTo: Integer) -> String
-	string: (self: RandomnessType, upTo: IntegerType) => StringType
+	// static entropy() -> Randomness
+	entropy: () => RandomnessType
+	// static seeded(_: String) -> Randomness
+	seeded: (argument0: StringType) => RandomnessType
+	// drawBoolean() -> Boolean
+	drawBoolean__overload$1: (self: RandomnessType) => BooleanType
+	// drawBoolean(withProbability: Rational) -> Boolean
+	drawBoolean__overload$2: (self: RandomnessType, withProbability: RationalType) => BooleanType
+	// drawInteger(between: Integer, and: Integer) -> Integer
+	drawInteger__overload$1: (self: RandomnessType, between: IntegerType, and: IntegerType) => IntegerType
+	// drawInteger(below: PositiveInteger) -> NonNegativeInteger
+	drawInteger__overload$2: (self: RandomnessType, below: IntegerType) => IntegerType
+	// drawRational(between: Rational, and: Rational) -> Rational
+	drawRational__overload$1: (self: RandomnessType, between: RationalType, and: RationalType) => RationalType
+	// drawRational(between: Rational, and: Rational, over: PositiveInteger) -> Rational
+	drawRational__overload$2: (self: RandomnessType, between: RationalType, and: RationalType, over: IntegerType) => RationalType
+	// drawString(upTo: Integer) -> String
+	drawString: (self: RandomnessType, upTo: IntegerType) => StringType
 	// pick<ItemType>(from: NonEmptyList) -> ItemType
-	pick: <ItemType extends AnyType>(self: RandomnessType, from: ListType<ItemType>) => ItemType
+	pick__overload$1: <ItemType extends AnyType>(self: RandomnessType, from: ListType<ItemType>) => ItemType
+	// pick<ItemType>(_: PositiveInteger, from: NonEmptyList) -> NonEmptyList
+	pick__overload$2: <ItemType extends AnyType>(self: RandomnessType, argument1: IntegerType, from: ListType<ItemType>) => ListType<ItemType>
+	// pick<ItemType>(from: NonEmptyList, weightedBy: (_: ItemType) -> Rational) -> ItemType
+	pick__overload$3: <ItemType extends AnyType>(self: RandomnessType, from: ListType<ItemType>, weightedBy: (argument0: ItemType) => RationalType) => ItemType
+	// shuffle<ItemType>(_: List<ItemType>) -> List<ItemType>
+	shuffle__overload$1: <ItemType extends AnyType>(self: RandomnessType, argument1: ListType<ItemType>) => ListType<ItemType>
+	// shuffle<ItemType>(_: NonEmptyList) -> NonEmptyList
+	shuffle__overload$2: <ItemType extends AnyType>(self: RandomnessType, argument1: ListType<ItemType>) => ListType<ItemType>
 }
 
 export type FunctionsNatives = {
@@ -1001,11 +1019,20 @@ export const $GroupedNonEmptyListArity: AssertArities<typeof import("./GroupedNo
 declare const RandomnessModule: typeof import("./Randomness")
 export const $Randomness: RandomnessNatives = RandomnessModule
 export const $RandomnessArity: AssertArities<typeof import("./Randomness"), {
-	boolean: 1
-	integer: 3
-	rational: 3
-	string: 2
-	pick: 2
+	entropy: 0
+	seeded: 1
+	drawBoolean__overload$1: 1
+	drawBoolean__overload$2: 2
+	drawInteger__overload$1: 3
+	drawInteger__overload$2: 2
+	drawRational__overload$1: 3
+	drawRational__overload$2: 4
+	drawString: 2
+	pick__overload$1: 2
+	pick__overload$2: 3
+	pick__overload$3: 3
+	shuffle__overload$1: 2
+	shuffle__overload$2: 2
 }> = true
 
 declare const functionsModule: typeof import("./functions")

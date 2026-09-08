@@ -1,40 +1,55 @@
 import { describe, expect, test } from "bun:test"
 
 import { createInteger } from "../Integer"
-import { createList } from "../List"
+import { createList, type ListType, materialise } from "../List"
 import {
 	below,
 	bigBetween,
-	boolean,
-	createEntropy,
 	createRandomness,
+	drawBoolean__overload$1,
+	drawBoolean__overload$2,
+	drawInteger__overload$1,
+	drawInteger__overload$2,
+	drawRational__overload$1,
+	drawRational__overload$2,
+	drawString,
+	entropy,
 	fraction,
-	integer,
 	nextWord,
-	pick,
+	pick__overload$1,
+	pick__overload$2,
+	pick__overload$3,
 	type RandomnessType,
-	rational,
+	seeded,
 	seedOf,
-	string,
+	shuffle__overload$1,
 } from "../Randomness"
-import { createRational } from "../Rational"
-import { createString } from "../String"
+import { createRational, type RationalType } from "../Rational"
+import { createString, type StringType } from "../String"
 import { typeKeySymbol } from "../type"
 
-// NOTE: The Namespace `stdlibGolden.spec.ts` can not reach — every entry takes a
-// source, and nothing written in Essence builds one. So the natives are driven
-// here, directly, over fixed seeds: what each answers is random, and what is
-// asserted about it is the range it lands in, the exactness it keeps, and that
+// NOTE: The Namespace `stdlibGolden.spec.ts` can not capture — what every entry
+// answers is random, so there is no value to check in against a record. The
+// natives are driven here instead, directly, over fixed seeds: what is asserted
+// about each answer is the range it lands in, the exactness it keeps, and that
 // one seed answers one sequence.
 
 function sourceOf(seed = "beef"): RandomnessType {
 	return createRandomness(seedOf(seed))
 }
 
+const TEAMS = ["Lions", "Tigers", "Bears", "Wolves"]
+
+// NOTE: A fresh List per call, because the natives that reorder one take the
+// Array they are handed over and a shared box would be read twice.
+function teamsOf(): ListType<StringType> {
+	return createList(TEAMS.map((team) => createString(team)))
+}
+
 describe("Randomness", () => {
 	// NOTE: A bound WIDER than a word has no whole multiple inside one, so the
 	// rejection loop would reject every draw. It is reachable from
-	// `string(upTo:)`, whose bound is whatever a caller wrote.
+	// `drawString(upTo:)`, whose bound is whatever a caller wrote.
 	test("answers a bound wider than a word rather than looping", () => {
 		let source = sourceOf()
 		let bound = 4294967296 * 4
@@ -73,11 +88,11 @@ describe("Randomness", () => {
 
 	test("advances the source with every answer", () => {
 		let source = sourceOf()
-		let first = boolean(source)
+		let first = drawBoolean__overload$1(source)
 		let drawn = [first]
 
 		for (let index = 0; index < 32; index++) {
-			drawn.push(boolean(source))
+			drawn.push(drawBoolean__overload$1(source))
 		}
 
 		// NOTE: Two reads of ONE source answer two values, which is the whole
@@ -87,6 +102,127 @@ describe("Randomness", () => {
 
 	test("carries the Randomness tag", () => {
 		expect(sourceOf()[typeKeySymbol]).toBe("Randomness")
+	})
+
+	describe("seeded", () => {
+		test("answers the same sequence for the same text", () => {
+			let one = seeded(createString("beef"))
+			let other = seeded(createString("beef"))
+
+			expect(Array.from({ length: 64 }, () => below(one, 1000))).toEqual(
+				Array.from({ length: 64 }, () => below(other, 1000)),
+			)
+		})
+
+		test("answers a different sequence for different text", () => {
+			let one = seeded(createString("beef"))
+			let other = seeded(createString("cafe"))
+
+			expect(
+				Array.from({ length: 32 }, () => below(one, 1_000_000)),
+			).not.toEqual(
+				Array.from({ length: 32 }, () => below(other, 1_000_000)),
+			)
+		})
+
+		// NOTE: The same door the test runtime builds a run's source through, so
+		// a Program replaying a seed and `--seed` replaying one draw alike.
+		test("answers what the seeded door answers", () => {
+			let named = seeded(createString("41c37ea3"))
+			let built = createRandomness(seedOf("41c37ea3"))
+
+			expect(
+				Array.from({ length: 32 }, () => below(named, 1000)),
+			).toEqual(Array.from({ length: 32 }, () => below(built, 1000)))
+		})
+
+		test("takes any text at all as a seed", () => {
+			expect(seeded(createString(""))[typeKeySymbol]).toBe("Randomness")
+			expect(seeded(createString("👋 a seed"))[typeKeySymbol]).toBe(
+				"Randomness",
+			)
+		})
+	})
+
+	describe("drawBoolean", () => {
+		test("answers each of the two about half the time", () => {
+			let source = sourceOf()
+			let trues = 0
+
+			for (let index = 0; index < 4000; index++) {
+				if (drawBoolean__overload$1(source).value) {
+					trues += 1
+				}
+			}
+
+			expect(trues).toBeGreaterThan(1800)
+			expect(trues).toBeLessThan(2200)
+		})
+
+		test("answers false for a chance of zero and true for a chance of one", () => {
+			let source = sourceOf()
+
+			for (let index = 0; index < 200; index++) {
+				expect(
+					drawBoolean__overload$2(source, createRational(0n, 1n))
+						.value,
+				).toBe(false)
+				expect(
+					drawBoolean__overload$2(source, createRational(1n, 1n))
+						.value,
+				).toBe(true)
+			}
+		})
+
+		// NOTE: A chance outside the unit range is clamped into it, which is
+		// what an entry with no Optional in its answer can do about one.
+		test("clamps a chance outside the unit range", () => {
+			let source = sourceOf()
+
+			expect(
+				drawBoolean__overload$2(source, createRational(-3n, 2n)).value,
+			).toBe(false)
+			expect(
+				drawBoolean__overload$2(source, createRational(5n, 2n)).value,
+			).toBe(true)
+		})
+
+		// NOTE: A third is a third of the DRAWS and not a third of a word
+		// rounded, which is what drawing over the chance's own denominator
+		// buys. 6000 draws land within 150 of 2000 with room to spare.
+		test("answers true as often as the chance says", () => {
+			let source = sourceOf()
+			let trues = 0
+
+			for (let index = 0; index < 6000; index++) {
+				if (
+					drawBoolean__overload$2(source, createRational(1n, 3n))
+						.value
+				) {
+					trues += 1
+				}
+			}
+
+			expect(trues).toBeGreaterThan(1850)
+			expect(trues).toBeLessThan(2150)
+		})
+
+		test("reads an unreduced chance as the point it names", () => {
+			let source = sourceOf()
+			let trues = 0
+
+			for (let index = 0; index < 2000; index++) {
+				if (
+					drawBoolean__overload$2(source, createRational(500n, 1000n))
+						.value
+				) {
+					trues += 1
+				}
+			}
+
+			expect(trues).toBeGreaterThan(900)
+			expect(trues).toBeLessThan(1100)
+		})
 	})
 
 	describe("below", () => {
@@ -170,14 +306,18 @@ describe("Randomness", () => {
 		})
 	})
 
-	describe("integer", () => {
+	describe("drawInteger", () => {
 		test("includes both bounds", () => {
 			let source = sourceOf()
 			let seen = new Set<number | bigint>()
 
 			for (let index = 0; index < 400; index++) {
 				seen.add(
-					integer(source, createInteger(1), createInteger(4)).value,
+					drawInteger__overload$1(
+						source,
+						createInteger(1),
+						createInteger(4),
+					).value,
 				)
 			}
 
@@ -190,7 +330,11 @@ describe("Randomness", () => {
 
 			for (let index = 0; index < 400; index++) {
 				seen.add(
-					integer(source, createInteger(4), createInteger(1)).value,
+					drawInteger__overload$1(
+						source,
+						createInteger(4),
+						createInteger(1),
+					).value,
 				)
 			}
 
@@ -200,7 +344,7 @@ describe("Randomness", () => {
 		test("draws past the safe range as a bigint", () => {
 			let source = sourceOf()
 			let low = 10n ** 30n
-			let drawn = integer(
+			let drawn = drawInteger__overload$1(
 				source,
 				createInteger(low),
 				createInteger(low + 10n ** 20n),
@@ -209,16 +353,68 @@ describe("Randomness", () => {
 			expect(typeof drawn.value).toBe("bigint")
 			expect(drawn.value >= low).toBe(true)
 		})
+
+		// NOTE: The half open entry, whose bound is outside the range. Every
+		// value below four is drawn in 400 turns with odds of four in 10^49
+		// against a miss.
+		test("counts from zero and stops below the bound", () => {
+			let source = sourceOf()
+			let seen = new Set<number | bigint>()
+
+			for (let index = 0; index < 400; index++) {
+				seen.add(
+					drawInteger__overload$2(source, createInteger(4)).value,
+				)
+			}
+
+			expect([...seen].sort()).toEqual([0, 1, 2, 3])
+		})
+
+		test("answers zero for a bound of one", () => {
+			let source = sourceOf()
+
+			expect(
+				drawInteger__overload$2(source, createInteger(1)).value,
+			).toBe(0)
+		})
+
+		// NOTE: The bound is proven above zero, and the proof erases before
+		// anything runs, so the guard is what a computed zero meets.
+		test("answers zero for a bound the proof would refuse", () => {
+			let source = sourceOf()
+
+			expect(
+				drawInteger__overload$2(source, createInteger(0)).value,
+			).toBe(0)
+			expect(
+				drawInteger__overload$2(source, createInteger(-7)).value,
+			).toBe(0)
+		})
+
+		test("draws a bound wider than the safe range", () => {
+			let source = sourceOf()
+			let bound = 10n ** 30n
+
+			for (let index = 0; index < 100; index++) {
+				let drawn = drawInteger__overload$2(
+					source,
+					createInteger(bound),
+				)
+				let value = BigInt(drawn.value)
+
+				expect(value >= 0n && value < bound).toBe(true)
+			}
+		})
 	})
 
-	describe("rational", () => {
+	describe("drawRational", () => {
 		test("stays inside the bounds", () => {
 			let source = sourceOf()
 			let low = createRational(-3n, 2n)
 			let high = createRational(7n, 2n)
 
 			for (let index = 0; index < 500; index++) {
-				let drawn = rational(source, low, high)
+				let drawn = drawRational__overload$1(source, low, high)
 				let scaled = drawn.numerator * 2n
 
 				expect(scaled >= -3n * drawn.denominator).toBe(true)
@@ -232,7 +428,7 @@ describe("Randomness", () => {
 
 			for (let index = 0; index < 500; index++) {
 				denominators.add(
-					rational(
+					drawRational__overload$1(
 						source,
 						createRational(0n, 1n),
 						createRational(1n, 1n),
@@ -253,7 +449,7 @@ describe("Randomness", () => {
 		})
 
 		test("answers the lower bound for a range too narrow to hold a multiple", () => {
-			let drawn = rational(
+			let drawn = drawRational__overload$1(
 				sourceOf(),
 				createRational(1n, 7n),
 				createRational(1n, 7n),
@@ -269,29 +465,97 @@ describe("Randomness", () => {
 			let high = createRational(7n, 2n)
 
 			for (let index = 0; index < 500; index++) {
-				let drawn = rational(source, high, low)
+				let drawn = drawRational__overload$1(source, high, low)
 				let scaled = drawn.numerator * 2n
 
 				expect(scaled >= -3n * drawn.denominator).toBe(true)
 				expect(scaled <= 7n * drawn.denominator).toBe(true)
 			}
 		})
+
+		// NOTE: The named lattice, which is the entry for every denominator the
+		// twelve above are wrong for. The range starts at one so that no draw
+		// is zero, which `createRational` writes over a denominator of one.
+		test("answers over the denominator it is given", () => {
+			let source = sourceOf()
+			let low = createRational(1n, 1n)
+			let high = createRational(2n, 1n)
+			let seen = new Set<bigint>()
+
+			for (let index = 0; index < 400; index++) {
+				let drawn = drawRational__overload$2(
+					source,
+					low,
+					high,
+					createInteger(7),
+				)
+
+				expect(drawn.denominator).toBe(7n)
+				expect(drawn.numerator >= 7n).toBe(true)
+				expect(drawn.numerator <= 14n).toBe(true)
+				seen.add(drawn.numerator)
+			}
+
+			expect(seen.size).toBe(8)
+		})
+
+		test("reads the bounds as the same range either way round", () => {
+			let source = sourceOf()
+
+			for (let index = 0; index < 200; index++) {
+				let drawn = drawRational__overload$2(
+					source,
+					createRational(2n, 1n),
+					createRational(1n, 1n),
+					createInteger(7),
+				)
+
+				expect(drawn.numerator >= 7n).toBe(true)
+				expect(drawn.numerator <= 14n).toBe(true)
+			}
+		})
+
+		test("answers the lower bound for a range too narrow to hold a multiple", () => {
+			let drawn = drawRational__overload$2(
+				sourceOf(),
+				createRational(1n, 7n),
+				createRational(1n, 7n),
+				createInteger(2),
+			)
+
+			expect(drawn.numerator).toBe(1n)
+			expect(drawn.denominator).toBe(7n)
+		})
+
+		// NOTE: The denominator is proven above zero, and the proof erases, so
+		// the guard is what a computed zero meets: one whole.
+		test("draws over one whole for a denominator the proof would refuse", () => {
+			let drawn = drawRational__overload$2(
+				sourceOf(),
+				createRational(3n, 1n),
+				createRational(3n, 1n),
+				createInteger(0),
+			)
+
+			expect(drawn.numerator).toBe(3n)
+			expect(drawn.denominator).toBe(1n)
+		})
 	})
 
-	describe("string", () => {
+	describe("drawString", () => {
 		test("answers no more characters than asked for", () => {
 			let source = sourceOf()
 
 			for (let index = 0; index < 400; index++) {
-				let drawn = string(source, createInteger(6))
+				let drawn = drawString(source, createInteger(6))
 
 				expect([...drawn.value].length).toBeLessThanOrEqual(8)
 			}
 		})
 
 		test("answers the empty String for a bound of zero or less", () => {
-			expect(string(sourceOf(), createInteger(0)).value).toBe("")
-			expect(string(sourceOf(), createInteger(-4)).value).toBe("")
+			expect(drawString(sourceOf(), createInteger(0)).value).toBe("")
+			expect(drawString(sourceOf(), createInteger(-4)).value).toBe("")
 		})
 
 		test("answers the empty String sometimes and a full one sometimes", () => {
@@ -299,7 +563,7 @@ describe("Randomness", () => {
 			let lengths = new Set<number>()
 
 			for (let index = 0; index < 400; index++) {
-				lengths.add(string(source, createInteger(3)).value.length)
+				lengths.add(drawString(source, createInteger(3)).value.length)
 			}
 
 			expect(lengths.has(0)).toBe(true)
@@ -318,7 +582,7 @@ describe("Randomness", () => {
 			let seen = new Set<string>()
 
 			for (let index = 0; index < 300; index++) {
-				seen.add(pick(source, items).value)
+				seen.add(pick__overload$1(source, items).value)
 			}
 
 			expect([...seen].sort()).toEqual(["Bears", "Lions", "Tigers"])
@@ -327,7 +591,219 @@ describe("Randomness", () => {
 		test("answers the one item of a List that holds one", () => {
 			let items = createList([createString("Wolves")])
 
-			expect(pick(sourceOf(), items).value).toBe("Wolves")
+			expect(pick__overload$1(sourceOf(), items).value).toBe("Wolves")
+		})
+
+		// NOTE: Without replacement, so a drawn item is never drawn again.
+		test("answers as many items as asked for, none of them twice", () => {
+			let source = sourceOf()
+
+			for (let index = 0; index < 200; index++) {
+				let drawn = materialise(
+					pick__overload$2(source, createInteger(3), teamsOf()),
+				).map((team) => team.value)
+
+				expect(drawn.length).toBe(3)
+				expect(new Set(drawn).size).toBe(3)
+				expect(
+					drawn.every((team) => TEAMS.includes(team as string)),
+				).toBe(true)
+			}
+		})
+
+		test("answers every item for a count above the length", () => {
+			let drawn = materialise(
+				pick__overload$2(sourceOf(), createInteger(40), teamsOf()),
+			).map((team) => team.value)
+
+			expect([...drawn].sort()).toEqual([...TEAMS].sort())
+		})
+
+		// NOTE: The count is proven above zero, and the proof erases before
+		// anything runs, so the guard is what a computed zero meets.
+		test("answers one item for a count the proof would refuse", () => {
+			let drawn = materialise(
+				pick__overload$2(sourceOf(), createInteger(0), teamsOf()),
+			)
+
+			expect(drawn.length).toBe(1)
+		})
+
+		test("leaves the List it was given as it was", () => {
+			let items = teamsOf()
+
+			pick__overload$2(sourceOf(), createInteger(3), items)
+
+			expect(materialise(items).map((team) => team.value)).toEqual([
+				...TEAMS,
+			])
+		})
+
+		test("answers the one item of every weighted draw over a List of one", () => {
+			let items = createList([createString("Wolves")])
+
+			expect(
+				pick__overload$3(sourceOf(), items, () =>
+					createRational(0n, 1n),
+				).value,
+			).toBe("Wolves")
+		})
+
+		test("answers only the item a weight is on", () => {
+			let source = sourceOf()
+			let items = createList([
+				createString("Lions"),
+				createString("Tigers"),
+				createString("Bears"),
+			])
+
+			for (let index = 0; index < 200; index++) {
+				expect(
+					pick__overload$3(source, items, (team) =>
+						team.value === "Tigers"
+							? createRational(1n, 1n)
+							: createRational(0n, 1n),
+					).value,
+				).toBe("Tigers")
+			}
+		})
+
+		// NOTE: The weights are exact, which is the whole reason they are
+		// Rationals. Halves and a third weigh 3, 3 and 2 parts of eight, so
+		// 8000 draws land near 3000, 3000 and 2000. Scaling each weight to the
+		// common denominator is what answers that: adding the parts up as they
+		// come and drawing over the sum's own denominator answers 4000, 2000
+		// and 2000 instead, which the bands below refuse.
+		test("weighs the items against each other exactly", () => {
+			let source = sourceOf()
+			let items = createList([
+				createString("Lions"),
+				createString("Tigers"),
+				createString("Bears"),
+			])
+			let weights: { [team: string]: RationalType } = {
+				Lions: createRational(1n, 2n),
+				Tigers: createRational(1n, 2n),
+				Bears: createRational(1n, 3n),
+			}
+			let counts: { [team: string]: number } = {
+				Lions: 0,
+				Tigers: 0,
+				Bears: 0,
+			}
+
+			for (let index = 0; index < 8000; index++) {
+				let drawn = pick__overload$3(
+					source,
+					items,
+					(team) => weights[team.value] ?? createRational(0n, 1n),
+				)
+
+				counts[drawn.value] = (counts[drawn.value] ?? 0) + 1
+			}
+
+			expect(counts.Lions).toBeGreaterThan(2800)
+			expect(counts.Lions).toBeLessThan(3200)
+			expect(counts.Tigers).toBeGreaterThan(2800)
+			expect(counts.Tigers).toBeLessThan(3200)
+			expect(counts.Bears).toBeGreaterThan(1800)
+			expect(counts.Bears).toBeLessThan(2200)
+		})
+
+		// NOTE: A weight of zero or less is drawn as zero, and weights that are
+		// all zero leave nothing to weigh with, so the draw is the even one.
+		test("draws a negative weight as zero", () => {
+			let source = sourceOf()
+			let items = createList([
+				createString("Lions"),
+				createString("Tigers"),
+			])
+
+			for (let index = 0; index < 200; index++) {
+				expect(
+					pick__overload$3(source, items, (team) =>
+						team.value === "Lions"
+							? createRational(-5n, 1n)
+							: createRational(1n, 4n),
+					).value,
+				).toBe("Tigers")
+			}
+		})
+
+		test("draws evenly where every weight is zero", () => {
+			let source = sourceOf()
+			let items = createList([
+				createString("Lions"),
+				createString("Tigers"),
+				createString("Bears"),
+			])
+			let seen = new Set<string>()
+
+			for (let index = 0; index < 300; index++) {
+				seen.add(
+					pick__overload$3(source, items, () =>
+						createRational(0n, 1n),
+					).value,
+				)
+			}
+
+			expect([...seen].sort()).toEqual(["Bears", "Lions", "Tigers"])
+		})
+	})
+
+	describe("shuffle", () => {
+		test("answers the same items in some order", () => {
+			let source = sourceOf()
+
+			for (let index = 0; index < 200; index++) {
+				let drawn = materialise(
+					shuffle__overload$1(source, teamsOf()),
+				).map((team) => team.value)
+
+				expect([...drawn].sort()).toEqual([...TEAMS].sort())
+			}
+		})
+
+		test("leaves the List it was given as it was", () => {
+			let items = teamsOf()
+
+			shuffle__overload$1(sourceOf(), items)
+
+			expect(materialise(items).map((team) => team.value)).toEqual([
+				...TEAMS,
+			])
+		})
+
+		// NOTE: Four items have 24 orders, so 200 draws answering one order
+		// throughout has odds of one in 24^199.
+		test("reaches more than one order", () => {
+			let source = sourceOf()
+			let seen = new Set<string>()
+
+			for (let index = 0; index < 200; index++) {
+				seen.add(
+					materialise(shuffle__overload$1(source, teamsOf()))
+						.map((team) => team.value)
+						.join(" "),
+				)
+			}
+
+			expect(seen.size).toBe(24)
+		})
+
+		test("answers the empty List and the List of one unchanged", () => {
+			let source = sourceOf()
+			let none = createList<StringType>([])
+			let one = createList([createString("Wolves")])
+
+			expect(materialise(shuffle__overload$1(source, none)).length).toBe(
+				0,
+			)
+			expect(
+				materialise(shuffle__overload$1(source, one)).map(
+					(team) => team.value,
+				),
+			).toEqual(["Wolves"])
 		})
 	})
 
@@ -348,16 +824,16 @@ describe("Randomness", () => {
 	// here is a broken source and never a rerun.
 	describe("entropy", () => {
 		test("carries the Randomness tag", () => {
-			expect(createEntropy()[typeKeySymbol]).toBe("Randomness")
+			expect(entropy()[typeKeySymbol]).toBe("Randomness")
 		})
 
 		test("answers THE one source from every call", () => {
-			expect(createEntropy()).toBe(createEntropy())
+			expect(entropy()).toBe(entropy())
 		})
 
 		// NOTE: Two runs of 64 words agree with odds of one in 2^2048.
 		test("never answers the same run of words twice", () => {
-			let source = createEntropy()
+			let source = entropy()
 			let first = Array.from({ length: 64 }, () => nextWord(source))
 			let second = Array.from({ length: 64 }, () => nextWord(source))
 
@@ -367,7 +843,7 @@ describe("Randomness", () => {
 		// NOTE: 2000 draws cross the 256 word buffer's edge a handful of times,
 		// so the refill is walked here rather than the first fill alone.
 		test("stays inside the bound", () => {
-			let source = createEntropy()
+			let source = entropy()
 
 			for (let index = 0; index < 2000; index++) {
 				let drawn = below(source, 7)
@@ -380,7 +856,7 @@ describe("Randomness", () => {
 		// NOTE: A value of six goes unseen in 400 draws with odds of six in
 		// 10^32.
 		test("reaches every value of a small bound", () => {
-			let source = createEntropy()
+			let source = entropy()
 			let seen = new Set<number>()
 
 			for (let index = 0; index < 400; index++) {
@@ -394,12 +870,16 @@ describe("Randomness", () => {
 		// one word door — so one of them driven over entropy stands for all.
 		// A bound of four goes unseen in 400 draws with odds of four in 10^49.
 		test("drives the natives as the seeded kind does", () => {
-			let source = createEntropy()
+			let source = entropy()
 			let seen = new Set<number | bigint>()
 
 			for (let index = 0; index < 400; index++) {
 				seen.add(
-					integer(source, createInteger(1), createInteger(4)).value,
+					drawInteger__overload$1(
+						source,
+						createInteger(1),
+						createInteger(4),
+					).value,
 				)
 			}
 
