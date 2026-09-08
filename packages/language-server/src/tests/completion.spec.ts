@@ -1968,25 +1968,32 @@ describe("Completion of a converted standard library Namespace", () => {
 
 		// NOTE: The canonical member order — `packages/standard-library/DEVELOPMENT.md`,
 		// Member order — puts the Protocol witnesses first and the Methods
-		// answering a Boolean after them, so this list is `is`, `toString` and
-		// then the four operations. `packages/compiler/src/tests/stdlibMemberOrder.spec.ts`
+		// answering a Boolean after them, so this list is `is`, `compare`,
+		// `toString` and then the four operations.
+		// `packages/compiler/src/tests/stdlibMemberOrder.spec.ts`
 		// is what holds the sources to it.
 		//
-		// NOTE: And `isNot` LAST, which is where a Protocol's provided Methods
-		// go. A Namespace declares the Methods it writes and says nothing about
+		// NOTE: And the PROVIDED Methods last, which is where they go. A
+		// Namespace declares the Methods it writes and says nothing about
 		// the ones a conformance hands it, so there is no position in the file to
 		// read one off — they are appended per Protocol, in
 		// `builtinProtocolOrder`, after everything written and everything
 		// derived. A reader then meets what the Namespace says about itself
-		// first, and what conforming added after it.
+		// first, and what conforming added after it. `Equatable` comes before
+		// `Comparable` in that table, so `isNot` leads the four inequalities.
 		expect(labelsOf(source, { line: 2, column: 8 })).toEqual([
 			"is",
+			"compare",
 			"toString",
 			"negate",
 			"and",
 			"or",
 			"exclusiveOr",
 			"isNot",
+			"isLessThan",
+			"isLessThanOrEqualTo",
+			"isGreaterThan",
+			"isGreaterThanOrEqualTo",
 		])
 	})
 

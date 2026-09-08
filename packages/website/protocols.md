@@ -277,8 +277,8 @@ and asks for nothing of its own.
 Which Types take which layer is a judgement about the Type, not about what is
 convenient. `Integer`, `Rational`, `Algebraic` and `Number` are `Orderable` —
 they sit on a number line, and `isBetween` and `clamp` mean what they say there.
-`String` and `List` stay `Comparable`: they are sortable, and that is a different
-claim.
+`String`, `List` and `Boolean` stay `Comparable`: they are sortable, and that is
+a different claim.
 
 Every one of the six takes `Self`, which is the target of the Namespace whose
 conformance offered it. `Integer` conforms and so does the covering `Number`, so

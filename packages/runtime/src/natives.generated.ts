@@ -143,6 +143,8 @@ export type NonEmptyStringNatives = {
 export type BooleanNatives = {
 	// is(_: Boolean) -> Boolean
 	is: (self: BooleanType, argument1: BooleanType) => BooleanType
+	// compare(to: Boolean) -> Ordering
+	compare: (self: BooleanType, to: BooleanType) => OrderingType
 	// negate() -> Boolean
 	negate: (self: BooleanType) => BooleanType
 	// and(_: Boolean) -> Boolean
@@ -693,6 +695,7 @@ export const $Boolean: BooleanNatives = BooleanModule
 export const $BooleanAbsent: AssertNoEssenceExports<typeof import("./Boolean"), "toString" | "exclusiveOr"> = true
 export const $BooleanArity: AssertArities<typeof import("./Boolean"), {
 	is: 2
+	compare: 2
 	negate: 1
 	and: 2
 	or: 2

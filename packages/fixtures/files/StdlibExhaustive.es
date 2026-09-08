@@ -429,6 +429,22 @@ third"::lines())
 	show("Boolean.is(_ Boolean) [differing]", true::is(false))
 	show("Boolean.isNot(_ Boolean)", true::isNot(false))
 	show("Boolean.isNot(_ Boolean) [equal]", false::isNot(false))
+	§ `false` before `true`, and the four inequalities `Comparable` provides
+	§ over the ordering.
+	show("Boolean.compare(to: Boolean)", false::compare(to true))
+	show("Boolean.compare(to: Boolean) [greater]", true::compare(to false))
+	show("Boolean.compare(to: Boolean) [equal]", true::compare(to true))
+	show("Boolean.isLessThan(_ Boolean)", false::isLessThan(true))
+	show("Boolean.isLessThan(_ Boolean) [greater]", true::isLessThan(false))
+	show(
+		"Boolean.isLessThanOrEqualTo(_ Boolean)",
+		true::isLessThanOrEqualTo(true),
+	)
+	show("Boolean.isGreaterThan(_ Boolean)", true::isGreaterThan(false))
+	show(
+		"Boolean.isGreaterThanOrEqualTo(_ Boolean)",
+		false::isGreaterThanOrEqualTo(true),
+	)
 	show("Boolean.and(_ Boolean)", true::and(true))
 	show("Boolean.and(_ Boolean) [false]", true::and(false))
 	show("Boolean.or(_ Boolean)", false::or(true))

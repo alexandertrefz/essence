@@ -2863,7 +2863,7 @@ describe("Enricher", () => {
 
 		it("should report a two-level because-chain for a nested failure", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				constant ordered = [[true], [false]]::sort()
+				constant ordered = [[{ x = 1 }], [{ x = 2 }]]::sort()
 			}`)
 
 			let failure = diagnostics.find(
@@ -2876,7 +2876,7 @@ describe("Enricher", () => {
 			expect(failure!.notes[0]).toContain("does not conform")
 			expect(
 				failure!.notes.some((note) =>
-					note.includes("Boolean does not conform"),
+					note.includes("{ x: Integer } does not conform"),
 				),
 			).toBe(true)
 		})
@@ -2896,12 +2896,13 @@ describe("Enricher", () => {
 		})
 
 		it("should reject a List of a non-Comparable Type", () => {
-			// NOTE: Boolean conforms only to Equatable and Printable — sorting a
-			// List of them has no item ordering to lean on. (Transcendental,
+			// NOTE: A Record conforms only to Equatable and Printable — sorting
+			// a List of them has no item ordering to lean on. (Transcendental,
 			// which the plan first named here, in fact conforms to Comparable
-			// through the covering `Number` Namespace, so it is not a negative.)
+			// through the covering `Number` Namespace, so it is not a negative,
+			// and neither is a Boolean any more.)
 			let diagnostics = diagnosticsFor(`implementation {
-				constant sorted = [true, false]::sort()
+				constant sorted = [{ x = 1 }, { x = 2 }]::sort()
 			}`)
 
 			expect(

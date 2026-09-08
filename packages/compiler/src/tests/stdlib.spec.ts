@@ -533,9 +533,11 @@ describe("Stdlib", () => {
 				}`),
 			).toEqual([])
 
+			// NOTE: A Record is `Equatable` and `Printable` and nothing else,
+			// so it is the negative here. A Boolean is `Comparable` now.
 			expect(
 				diagnosticsFor(`implementation {
-					constant ordered = [true, false]::sort()
+					constant ordered = [{ x = 1 }, { x = 2 }]::sort()
 				}`),
 			).not.toEqual([])
 		})

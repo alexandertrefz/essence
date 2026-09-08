@@ -1,3 +1,4 @@
+import { equal, greater, less, type OrderingType } from "./Ordering"
 import { typeKeySymbol } from "./type"
 
 export type BooleanType = { [typeKeySymbol]: "Boolean"; value: boolean }
@@ -37,6 +38,20 @@ export function is(
 	return createBoolean(originalBoolean.value === other.value)
 }
 
+// NOTE: `false` before `true` — the order Swift, Rust, Haskell and SQL all sort
+// a Boolean key in, and the one `false < true` reads as. The three `Ordering`
+// values are shared instances, so this allocates nothing.
+export function compare(
+	originalBoolean: BooleanType,
+	other: BooleanType,
+): OrderingType {
+	if (originalBoolean.value === other.value) {
+		return equal
+	}
+
+	return originalBoolean.value ? greater : less
+}
+
 export function and(
 	originalBoolean: BooleanType,
 	other: BooleanType,
@@ -52,6 +67,7 @@ export function or(
 }
 
 // NOTE: `isNot`, `exclusiveOr` and `toString` are implemented in Essence — see
-// `packages/standard-library/sources/Boolean.es`. `negate`, `is`, `and` and `or` stay native: they are
+// `packages/standard-library/sources/Boolean.es`. `negate`, `is`, `and`, `or`
+// and `compare` stay native: they are
 // the anchors the Essence half is built from, and `or` in particular would cost
 // four Method calls through De Morgan where this does one `||`.

@@ -281,3 +281,100 @@ describe("Ordering::then", () => {
 		).toEqual(["Ordering#Less", "Ordering#Greater"])
 	})
 })
+
+// NOTE: `false` before `true` is the order Swift, Rust, Haskell and SQL all
+// sort a Boolean key in, and a Boolean key is an ordinary one. `Boolean`
+// declares `Comparable` and writes `compare`; the four inequalities arrive with
+// the conformance.
+describe("Boolean's ordering", () => {
+	it("orders false before true", async () => {
+		expect(
+			await run(
+				[
+					"implementation {",
+					"\tTerminal.inspect(false::compare(to true))",
+					"\tTerminal.inspect(true::compare(to false))",
+					"\tTerminal.inspect(true::compare(to true))",
+					"\tTerminal.inspect(false::compare(to false))",
+					"}",
+				].join("\n"),
+			),
+		).toEqual([
+			"Ordering#Less",
+			"Ordering#Greater",
+			"Ordering#Equal",
+			"Ordering#Equal",
+		])
+	})
+
+	it("answers the four inequalities", async () => {
+		expect(
+			await run(
+				[
+					"implementation {",
+					"\tTerminal.inspect(false::isLessThan(true))",
+					"\tTerminal.inspect(true::isLessThan(false))",
+					"\tTerminal.inspect(true::isGreaterThan(false))",
+					"\tTerminal.inspect(true::isLessThanOrEqualTo(true))",
+					"\tTerminal.inspect(false::isGreaterThanOrEqualTo(true))",
+					"}",
+				].join("\n"),
+			),
+		).toEqual(["true", "false", "true", "true", "false"])
+	})
+
+	it("sorts a List of Booleans", async () => {
+		expect(
+			await run(
+				[
+					"implementation {",
+					"\tTerminal.inspect([true, false, true]::sort())",
+					"\tTerminal.inspect([true, false]::sort(in #Descending))",
+					"}",
+				].join("\n"),
+			),
+		).toEqual(["[ false, true, true ]", "[ true, false ]"])
+	})
+
+	// NOTE: The shape the conformance is FOR — a Boolean member read as a sort
+	// key, where `false` first puts the unfinished work at the top.
+	it("sorts on a Boolean key", async () => {
+		expect(
+			await run(
+				[
+					"implementation {",
+					"\ttype Invoice = { id: Integer, isPaid: Boolean }",
+					"",
+					"\tconstant invoices: List<Invoice> = [",
+					"\t\t{ id = 1, isPaid = true },",
+					"\t\t{ id = 2, isPaid = false },",
+					"\t\t{ id = 3, isPaid = true },",
+					"\t]",
+					"",
+					"\tTerminal.inspect(",
+					"\t\tinvoices::sort(on .isPaid)::map((invoice) { <- invoice.id }),",
+					"\t)",
+					"}",
+				].join("\n"),
+			),
+		).toEqual(["[ 2, 1, 3 ]"])
+	})
+
+	// NOTE: `Comparable` and nothing wider, for the reason a String stops
+	// there: nothing about two truth values makes a range.
+	it("reaches no isBetween", () => {
+		let parsed = parseWithDiagnostics(
+			[
+				"implementation {",
+				"\tTerminal.inspect(true::isBetween(false, and true))",
+				"}",
+			].join("\n"),
+		)
+
+		expect(
+			enrich(parsed.program).diagnostics.map(
+				(diagnostic) => diagnostic.code,
+			),
+		).toEqual(["unknown-method"])
+	})
+})

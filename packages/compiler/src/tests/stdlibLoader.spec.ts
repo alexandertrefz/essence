@@ -1554,10 +1554,12 @@ describe("Standard Library Loader", () => {
 		}
 
 		// NOTE: `Boolean.es` declares no Protocol and is hoisted before the
-		// file that does.
+		// files that do. `Comparable` arrives from the third of them, which
+		// `Boolean.es` names for its own ordering.
 		expect(namespaceNamed(stdlib, "Boolean").conformsTo).toEqual([
 			"Equatable",
 			"Printable",
+			"Comparable",
 		])
 		expect(namespaceNamed(stdlib, "Ordering").targetType).toBe(
 			stdlib.types["Ordering"]!,
