@@ -516,7 +516,7 @@ type PredicateEvaluator = (
 	args: Array<string | boolean>,
 ) => boolean | null
 
-// NOTE: The comparisons are declared once by `Orderable`, which provides them
+// NOTE: The comparisons are declared once by `Comparable`, which provides them
 // for every numeric kind, and AGAIN on Integer, where the same-kind entry is
 // written on the same-kind native — a performance stratification the standard
 // library explains at length. Either way the conjunct names the NAMESPACE whose

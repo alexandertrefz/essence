@@ -682,7 +682,7 @@ declarations {
 			}
 		}
 
-		§ These four override `Orderable`'s provided Methods of the same
+		§ These four override `Comparable`'s provided Methods of the same
 		§ names, for the reason Integer's do. The same-kind entry is written
 		§ on Rational's own `compare`, so comparing two Rationals does not
 		§ reach the cross-kind table in `Number`. A body pulls its transitive

@@ -618,7 +618,7 @@ declarations {
 			}
 		}
 
-		§ These four override `Orderable`'s provided Methods of the same
+		§ These four override `Comparable`'s provided Methods of the same
 		§ names, and are kept to answer an Integer question on this Namespace's
 		§ own rung. Integer's `compare` is a bigint comparison, while
 		§ `Number::compare` is the sixteen-cell cross-kind table, and a Program
@@ -632,7 +632,7 @@ declarations {
 		§
 		§ An override is in the conformance witness, so a bounded
 		§ `<Item is Orderable>` runs these entries where `1::isLessThan(2)`
-		§ runs them. Agreeing with `Orderable`'s bodies is a promise about
+		§ runs them. Agreeing with `Comparable`'s bodies is a promise about
 		§ speed rather than one the language leans on, and both read `compare`
 		§ either way.
 		§
@@ -860,9 +860,9 @@ declarations {
 		}
 
 		§ `clamp` and `isBetween` are `Orderable`'s provided Methods now. Both
-		§ are written on that Protocol's own inequalities, which read
-		§ `compare` through the conformance, so an Integer receiver reaches
-		§ Integer's `compare` and no other kind.
+		§ are written on the four inequalities `Comparable` provides. Those
+		§ read `compare` through the conformance, so an Integer receiver
+		§ reaches Integer's `compare` and no other kind.
 	}
 
 	§ A refinement adds Methods and takes none away, so a NonZeroInteger

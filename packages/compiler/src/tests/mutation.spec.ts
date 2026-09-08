@@ -476,7 +476,7 @@ describe("Mutation sites", () => {
 
 	// NOTE: A Method a PROTOCOL provided is answered by the Protocol, so the
 	// swap is sound exactly where that Protocol wrote a body for the target.
-	// `Orderable` writes all four comparisons, so a user Type conforming to it
+	// `Comparable` writes all four comparisons, so a user Type conforming to it
 	// offers the rotations a builtin does.
 	it("rotates a comparison a Protocol provided", () => {
 		let source = [

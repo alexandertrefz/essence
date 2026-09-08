@@ -53,7 +53,7 @@ implementation {
 
 	§ The whole tower is comparable through Number, across any two kinds.
 	§ An Integer against π, a Rational against π, two Transcendentals. The
-	§ four inequalities are `Orderable`'s, and Integer's own entries take an
+	§ four inequalities are `Comparable`'s, and Integer's own entries take an
 	§ Integer or a Rational and reject a Transcendental — so each question
 	§ across two kinds falls to the covering `Number`, which answers it.
 	Terminal.inspect(3::isLessThan(Number.Pi)) § true  (3 < π)
