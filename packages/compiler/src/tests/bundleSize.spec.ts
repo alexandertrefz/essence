@@ -20,8 +20,8 @@ import { validate } from "../validator/index"
 // fixtures that reach an Essence-implemented Method AND a large runtime module
 // — both use `Number`, whose module drags in the numeric tower — and each
 // carried ~13 kB it never used before the change. Dictionary.es holds the
-// other side of the claim, and the fourth test holds it across a bundle of
-// several Modules.
+// other side of the claim, the fourth prices one Method that reaches for it,
+// and the last holds the claim across a bundle of several Modules.
 //
 // NOTE: Every ceiling here is held about a kilobyte above the measurement and
 // moves in BOTH directions — a ceiling several kilobytes clear stops catching
@@ -121,6 +121,29 @@ describe("Bundle Size", () => {
 	// happened is that those two do not move when this one does.
 	it("charges a Dictionary Program for the container it uses", async () => {
 		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(48_700)
+	})
+
+	// NOTE: 18,592 measured, where the same Program without the one call
+	// measures 5,083 — so `removeDuplicates` costs 13,509 bytes, two and a
+	// half times the Program that calls it. It is written `@::tally()::keys()`
+	// on `GroupedList`, so a List Method reaches the whole second container:
+	// the store, the canonical key encoding, the kind registry, the
+	// registration and the written form all arrive with it.
+	//
+	// NOTE: That is the price of the body, and the body is what made the
+	// Method linear — 20,000 items with 2,000 distinct went from 66 ms to
+	// 2 ms, and 20,000 all distinct from 435 ms to 6 ms. The figure is here so
+	// the trade is a number rather than a surprise, and so that either half of
+	// it moving is caught: a Dictionary runtime that grows lands here first,
+	// and a body that stops reaching for one takes ten kilobytes off.
+	it("charges a removeDuplicates Program for the Dictionary behind it", async () => {
+		expect(
+			await bundleSizeOfSource(`implementation {
+	constant names = ["ada", "bob", "ada", "cy"]
+
+	Terminal.print(names::removeDuplicates()::join(with ", "))
+}`),
+		).toBeLessThan(19_600)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far
