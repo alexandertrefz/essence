@@ -3,6 +3,9 @@ import * as path from "node:path"
 
 import { readStdlibFiles } from "@essence-lang/standard-library"
 
+import { containsErrors } from "../diagnostics/index"
+import { parseWithDiagnostics } from "../parser/index"
+
 // NOTE: The writing rules the standard library's prose is held to, read off the
 // sources themselves. They are the ASD-STE100 *writing* rules — not its
 // dictionary, since the language's own terms are technical names — as agreed in
@@ -63,6 +66,7 @@ type Finding = {
 		| "may-should"
 		| "all-caps"
 		| "undocumented-declaration"
+		| "unparsable-span"
 	file: string
 	line: number
 	detail: string
@@ -350,6 +354,54 @@ export function undocumentedDeclarations(): Array<Finding> {
 		}))
 }
 
+// NOTE: A code span holding a `define` is written out for a reader to COPY —
+// it is the one construct the prose spells in full rather than naming — and
+// two of them told a reader to write `define { as v if c otherwise d }`, which
+// the parser refuses: the form is `as v if c as d otherwise`. Both stood in
+// Hover text on `Boolean::and` and `or`. So every such span is parsed here, in
+// the body a call site would put it in. Only `define` spans are: the rest of
+// the code spans in this library name Types, Methods and signature fragments,
+// none of which is an Expression.
+const definePattern = /`(define\s*\{[^`]*)`/g
+
+export function unparsableCodeSpans(): Array<Finding> {
+	let findings: Array<Finding> = []
+
+	for (let { filePath, sourceText } of readStdlibFiles()) {
+		for (let block of blocksOf(path.basename(filePath), sourceText)) {
+			// NOTE: The lines of one block are joined, because a span can
+			// break across two Comment lines and each half alone parses as
+			// nothing.
+			let text = block.lines.join(" ")
+
+			for (let [, span] of text.matchAll(definePattern)) {
+				let parsed = parseWithDiagnostics(
+					`implementation {
+	constant probe = ${span}
+}`,
+				)
+
+				if (!containsErrors(parsed.diagnostics)) {
+					continue
+				}
+
+				findings.push({
+					rule: "unparsable-span",
+					file: block.file,
+					line: block.line,
+					detail: `\`${span}\` does not parse: ${
+						parsed.diagnostics.find(
+							(diagnostic) => diagnostic.severity === "error",
+						)?.message ?? "unknown"
+					}`,
+				})
+			}
+		}
+	}
+
+	return findings
+}
+
 function findingsFor(rule: Finding["rule"]): Array<Finding> {
 	return proseFindings().filter((finding) => finding.rule === rule)
 }
@@ -453,6 +505,12 @@ describe("Standard Library Prose", () => {
 		console.log(
 			`\nundocumented-declaration: ${undocumented.length}\n${report(undocumented)}`,
 		)
+
+		let unparsable = unparsableCodeSpans()
+
+		console.log(
+			`\nunparsable-span: ${unparsable.length}\n${report(unparsable)}`,
+		)
 	})
 
 	it("should keep every sentence to 25 words", () => {
@@ -478,5 +536,21 @@ describe("Standard Library Prose", () => {
 	// library's Types are as much of its surface as its Methods are.
 	it("should give every Choice and Type Alias a '§§' block", () => {
 		expect(report(undocumentedDeclarations())).toBe("")
+	})
+
+	// NOTE: The count guards the scanner, as the two above guard theirs: a
+	// pattern that stopped matching would make this pass on nothing. There
+	// are two `define` spans as this is written, both on `Boolean`.
+	it("should write a 'define' span a reader can copy", () => {
+		expect(
+			readStdlibFiles().flatMap(({ filePath, sourceText }) =>
+				blocksOf(path.basename(filePath), sourceText).flatMap(
+					(block) => [
+						...block.lines.join(" ").matchAll(definePattern),
+					],
+				),
+			).length,
+		).toBeGreaterThanOrEqual(2)
+		expect(report(unparsableCodeSpans())).toBe("")
 	})
 })
