@@ -828,6 +828,44 @@ describe("Rationals", () => {
 		})
 	})
 
+	// NOTE: The scaled rendering money needs: minor units held as an Integer,
+	// written as a major-unit decimal. What it has to get right is a receiver
+	// SMALLER than the scale — five cents is `0.05`, not `5.00` — and the sign
+	// standing in front of every digit rather than in front of the last two.
+	describe("An Integer scaled by decimal places", () => {
+		it("reads the receiver as a count of the last place", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(1234::toString(scaledBy 2))
+					Terminal.inspect(-1234::toString(scaledBy 2))
+					Terminal.inspect(5::toString(scaledBy 2))
+					Terminal.inspect(-5::toString(scaledBy 2))
+					Terminal.inspect(0::toString(scaledBy 2))
+					Terminal.inspect(1234::toString(scaledBy 0))
+					Terminal.inspect(1234567::toString(scaledBy 4))
+				}`),
+			).toEqual([
+				'"12.34"',
+				'"-12.34"',
+				'"0.05"',
+				'"-0.05"',
+				'"0.00"',
+				'"1234"',
+				'"123.4567"',
+			])
+		})
+
+		it("takes a computed count of places", async () => {
+			expect(
+				await run(`implementation {
+					constant places = 1::add(1)
+
+					Terminal.inspect(1234::toString(scaledBy places))
+				}`),
+			).toEqual(['"12.34"'])
+		})
+	})
+
 	describe("Compiled Programs", () => {
 		it("divides by a negative Integer without corrupting the value", async () => {
 			expect(
