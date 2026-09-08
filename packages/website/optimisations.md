@@ -224,25 +224,27 @@ What is lowered, and nothing else:
   the path that is taken.
 - **NonZeroInteger**: `multiply`, and only where both operands are exactly
   `Integer`. This is where a receiver a branch narrowed takes its product — a
-  written receiver's goes to `PositiveInteger` below, which is narrower still. A
-  checked refinement is erased before the first pass runs, so such a call holds
-  two ordinary Integers, and the Method it would have reached is Integer's own
-  product re-exported under the refined Namespace's name. Same operator, same
-  operands, same answer: the evidence was spent while compiling and there is
-  nothing left of it to run. Every other entry the Namespace declares is left as
-  the call it is. Two of them scale an Algebraic or a Transcendental — the
-  overload index is not what tells those apart, since the operands are, and
-  `scalarOperands` answers null for anything but two Integers — `raise` is
-  refused by name as well as by `lowerInteger`, whose reason is that the
-  answer's size is the exponent's value rather than its length, and `divide`,
-  `absolute` and `negate` are not an operator over two Integers at all.
+  written POSITIVE receiver's goes to `PositiveInteger` below, which is narrower
+  still, and a written negative one stays here, since being non-zero is all its
+  sign proves. A checked refinement is erased before the first pass runs, so
+  such a call holds two ordinary Integers, and the Method it would have reached
+  is Integer's own product re-exported under the refined Namespace's name. Same
+  operator, same operands, same answer: the evidence was spent while compiling
+  and there is nothing left of it to run. Every other entry the Namespace
+  declares is left as the call it is. Two of them scale an Algebraic or a
+  Transcendental — the overload index is not what tells those apart, since the
+  operands are, and `scalarOperands` answers null for anything but two Integers
+  — `raise` is refused by name as well as by `lowerInteger`, whose reason is
+  that the answer's size is the exponent's value rather than its length, and
+  `divide`, `absolute` and `negate` are not an operator over two Integers at
+  all.
 - **NonNegativeInteger** and **PositiveInteger**: `add` and `multiply`, on that
-  same guard of two exact Integers. A written Integer proves both halves of its
-  sign, so `1::add(2)` and `2::multiply(with 3)` are `PositiveInteger`'s sum and
-  product now, and each of the two Namespaces re-exports Integer's own
-  arithmetic under its own name — so the lowering is the one above, reached by
-  another name. `raise` and `squareRoot` are left as the calls they are, for the
-  reasons Integer's own are.
+  same guard of two exact Integers. A written POSITIVE Integer proves both
+  halves of its sign, so `1::add(2)` and `2::multiply(with 3)` are
+  `PositiveInteger`'s sum and product now, and each of the two Namespaces
+  re-exports Integer's own arithmetic under its own name — so the lowering is
+  the one above, reached by another name. `raise` and `squareRoot` are left as
+  the calls they are, for the reasons Integer's own are.
 - **Boolean**: `negate`, `and`, `or`, which become `!`, `&&` and `||`.
 - **String**: `is` and the provided `isNot`, which become one call to the
   runtime's `stringEquals`. Two Strings are equal when their CHARACTERS are — the same

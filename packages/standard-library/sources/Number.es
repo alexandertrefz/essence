@@ -35,8 +35,8 @@ declarations {
 	§ The name is the author's pick over `Exact`, which this alias carried as a
 	§ helper of this file. Pi is exact as well, so `Exact` overclaimed the half
 	§ it names. That half is the rationals in either representation. The
-	§ sources spell `Integer | Rational` 54 times, and a Program that writes
-	§ `numbers::sum()` had no word for what it got back.
+	§ sources spelled `Integer | Rational` 54 times before this alias, and a
+	§ Program that writes `numbers::sum()` had no word for what it got back.
 
 	§§ An Integer or a Rational: the two numeric kinds a Program computes with exactly.
 	§§

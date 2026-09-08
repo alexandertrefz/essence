@@ -49,7 +49,7 @@ all, in `Loop.es`, as ordinary free Functions. Printing is a Namespace:
 `Terminal.write` is the raw primitive both are built on (`Terminal.es`).
 
 Three of every five declared Method entries are also IMPLEMENTED here, in
-Essence — 292 of 479 as this is written, counting one entry per Overload and
+Essence — 285 of 479 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
 Seven more are written on a PROTOCOL rather than on a Namespace, once for every
 conformer: `Equatable.isNot`, and `Orderable`'s four inequalities, `isBetween`
