@@ -217,7 +217,11 @@ function isSingleUnitAscii(value: string): boolean {
 // can. A remembered `true` is also what `append` PROPAGATES: joining two
 // carriage-return-free ASCII Strings can produce neither a non-ASCII unit nor a
 // carriage return, so the answer is known without scanning the join.
-function isAsciiIn(string: StringType): boolean {
+//
+// NOTE: Exported for `NonEmptyString.ts` beside `graphemesIn`, which reads the
+// two ends off the view — the fast path there is this question and the maker
+// below, exactly as `character(at:)` asks them here.
+export function isAsciiIn(string: StringType): boolean {
 	let measured = string as MeasuredString
 	let answer = measured[isAsciiKey]
 
@@ -237,7 +241,7 @@ function isAsciiIn(string: StringType): boolean {
 // what it built does not rescan it. `append` alone writes the two keys itself,
 // for the reason it gives. The caller is answerable for the claim, and the
 // note at each call says why it holds.
-function createAsciiString(value: string): StringType {
+export function createAsciiString(value: string): StringType {
 	let string = createString(value) as MeasuredString
 
 	string[isAsciiKey] = true
