@@ -235,13 +235,28 @@ export function startSession() {
 		testRuns: () => testRuns,
 		// NOTE: Waits for a NUMBER of finished runs rather than for a length of
 		// time: a compile takes as long as the machine takes.
-		waitForTestRuns: async (count: number, timeout = 30_000) => {
+		//
+		// NOTE: The deadline THROWS, and it is the whole budget every caller's
+		// own `it` was given rather than half of it. Handing back the runs that
+		// did arrive made a starved worker read as a false claim about the
+		// Server — the caller asserted on a short list and named the behaviour
+		// it was checking — and a deadline under the test's own only took the
+		// report away from bun's timeout, which says how long the test actually
+		// ran. Every caller here waits for a count it positively expects, so
+		// nothing uses the timeout to prove an absence.
+		waitForTestRuns: async (count: number, timeout = 60_000) => {
 			let deadline = Date.now() + timeout
 			let ended = () =>
 				testRuns.filter((run) => run.kind === "end").length
 
 			while (ended() < count && Date.now() < deadline) {
 				await new Promise((resolve) => setTimeout(resolve, 25))
+			}
+
+			if (ended() < count) {
+				throw new Error(
+					`only ${ended()} of ${count} test runs ended within ${timeout} ms`,
+				)
 			}
 
 			return testRuns.filter((run) => run.kind === "end")
@@ -261,10 +276,11 @@ export function startSession() {
 		// that is itself a macrotask wakes up once per callback and sees the
 		// Server one whole analysis at a time. A microtask would spin between two
 		// of them and see nothing move.
+		// The deadline throws, for the reason `waitForTestRuns` above gives.
 		waitForLinks: async (
 			before: CompilationTally,
 			count: number,
-			timeout = 30_000,
+			timeout = 60_000,
 		) => {
 			let deadline = Date.now() + timeout
 
@@ -277,7 +293,15 @@ export function startSession() {
 				})
 			}
 
-			return compilationCounts.links - before.links
+			let linked = compilationCounts.links - before.links
+
+			if (linked < count) {
+				throw new Error(
+					`only ${linked} of ${count} graphs were linked within ${timeout} ms`,
+				)
+			}
+
+			return linked
 		},
 		// NOTE: The most graphs the Server linked inside ONE turn of the event
 		// loop, watched from the moment this is called until it is stopped. What
