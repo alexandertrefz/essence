@@ -330,15 +330,26 @@ declarations {
 			§ division. An Essence body would have to pad and cut the text
 			§ that entry answers, which is reading a number back out of its
 			§ own rendering.
+			§
+			§ The count is unbounded where the entry above stops at 80 digits.
+			§ A count of 200 000 places renders in 15 ms, and an entry that
+			§ promises exactly that many digits can not stop short of them.
+			§ The cap above answers a question this entry does not ask: what
+			§ width to give an expansion that never ends.
 
 			§§ Answers the Rational as a decimal with exactly that many places.
 			§§
-			§§ The digits are padded with zeroes where the expansion is shorter, so `1/2` over two places is `0.50`. The last digit kept is rounded to the nearest, with halves away from zero, so `1/8` is `0.13`. A count below one rounds to a whole number, and no point is written. The `#Fraction` format ignores the count.
+			§§ The digits are padded with zeroes where the expansion is shorter, so `1/2` over two places is `0.50`. The last digit kept is rounded in the named direction, and `#Nearest` is what a call that names none is given, so `1/8` is `0.13`. A count below one rounds to a whole number, and no point is written. The count has no ceiling. The `#Fraction` format ignores both the count and the direction.
 			§§
 			§§ @param as — the form to represent the Rational in
-			§§ @param places — how many digits to write after the point
+			§§ @param toPlaces — how many digits to write after the point
+			§§ @param toward — the direction to round the last digit in, `#Nearest` when it is left out
 			§§ @returns — the String representation of the Rational.
-			(as format: NumberFormat, places count: Integer) -> String
+			(
+				as format: NumberFormat,
+				toPlaces count: Integer,
+				toward direction: Rounding = #Nearest,
+			) -> String
 		}
 
 		§ The Integer entries are written on the accessors and `Rational.of`, so
@@ -861,7 +872,7 @@ declarations {
 
 			§§ Answers the Rational rounded to a decimal grid of the given width.
 			§§
-			§§ Two places round to hundredths, so `5/3` answers `167/100`. The answer is exact, and it is a Rational rather than text: `toString(as #Decimal, places 2)` is what writes `1.67`. A count below one rounds to a whole number, answered as a Rational.
+			§§ Two places round to hundredths, so `5/3` answers `167/100`. The answer is exact, and it is a Rational rather than text: `toString(as #Decimal, toPlaces 2)` is what writes `1.67`. A count below one rounds to a whole number, answered as a Rational.
 			§§
 			§§ @param toPlaces — how many decimal places to keep
 			§§ @param toward — the direction to round in, `#Nearest` when it is left out

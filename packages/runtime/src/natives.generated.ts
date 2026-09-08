@@ -24,6 +24,7 @@ import type { OrderingType } from "./Ordering"
 import type { RandomnessType } from "./Randomness"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
+import type { RoundingType } from "./Rounding"
 import type { SideType } from "./Side"
 import type { SortOrderType } from "./SortOrder"
 import type { StepType } from "./Step"
@@ -232,8 +233,8 @@ export type RationalNatives = {
 	compare: (self: RationalType, to: RationalType) => OrderingType
 	// toString(as: NumberFormat) -> String
 	toString__overload$2: (self: RationalType, as: NumberFormatType) => StringType
-	// toString(as: NumberFormat, places: Integer) -> String
-	toString__overload$3: (self: RationalType, as: NumberFormatType, places: IntegerType) => StringType
+	// toString(as: NumberFormat, toPlaces: Integer, toward: Rounding) -> String
+	toString__overload$3: (self: RationalType, as: NumberFormatType, toPlaces: IntegerType, toward: RoundingType) => StringType
 	// add(_: Rational) -> Rational
 	add__overload$1: (self: RationalType, argument1: RationalType) => RationalType
 	// subtract(_: Rational) -> Rational
@@ -760,7 +761,7 @@ export const $RationalArity: AssertArities<typeof import("./Rational"), {
 	of__overload$2: 2
 	compare: 2
 	toString__overload$2: 2
-	toString__overload$3: 3
+	toString__overload$3: 4
 	add__overload$1: 2
 	subtract__overload$1: 2
 	multiply__overload$1: 2

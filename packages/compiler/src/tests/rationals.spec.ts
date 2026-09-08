@@ -10,6 +10,13 @@ import { decimal, fraction } from "@essence-lang/runtime/NumberFormat"
 import * as optional from "@essence-lang/runtime/Optional"
 import * as ordering from "@essence-lang/runtime/Ordering"
 import * as rational from "@essence-lang/runtime/Rational"
+import {
+	down,
+	nearest,
+	nearestEven,
+	towardZero,
+	up,
+} from "@essence-lang/runtime/Rounding"
 import { type AnyType, typeKeySymbol } from "@essence-lang/runtime/type"
 
 import { containsErrors } from "../diagnostics/index"
@@ -338,6 +345,77 @@ describe("Rationals", () => {
 	// pairs a tie with the parity of its floor. `round` is written in Essence,
 	// so all of them go through a compiled Program: there is no native to
 	// drive.
+	// NOTE: The fixed-width formatter rounds the one digit it cuts, and the
+	// direction is what decides which way. It works on the MAGNITUDE with the
+	// sign prefixed afterwards, so `#Down` and `#Up` have to read the sign back
+	// — a negative value rounded down is rounded AWAY from zero — and these
+	// tests are what hold that pairing.
+	describe("The rounded width", () => {
+		const fixed = (
+			numerator: bigint,
+			denominator: bigint,
+			places: number,
+			direction: Parameters<typeof rational.toString__overload$3>[3],
+		) =>
+			rational.toString__overload$3(
+				rational.createRational(numerator, denominator),
+				decimal,
+				integer.createInteger(BigInt(places)),
+				direction,
+			).value
+
+		it("rounds the cut digit in the named direction", () => {
+			expect(fixed(5n, 3n, 2, nearest)).toBe("1.67")
+			expect(fixed(5n, 3n, 2, down)).toBe("1.66")
+			expect(fixed(5n, 3n, 2, up)).toBe("1.67")
+			expect(fixed(5n, 3n, 2, towardZero)).toBe("1.66")
+			expect(fixed(5n, 3n, 2, nearestEven)).toBe("1.67")
+		})
+
+		it("reads the sign back for the two directions that name a side", () => {
+			expect(fixed(-5n, 3n, 2, nearest)).toBe("-1.67")
+			expect(fixed(-5n, 3n, 2, down)).toBe("-1.67")
+			expect(fixed(-5n, 3n, 2, up)).toBe("-1.66")
+			expect(fixed(-5n, 3n, 2, towardZero)).toBe("-1.66")
+		})
+
+		it("takes the even digit at a half, on either side of zero", () => {
+			expect(fixed(1n, 8n, 2, nearestEven)).toBe("0.12")
+			expect(fixed(3n, 8n, 2, nearestEven)).toBe("0.38")
+			expect(fixed(-1n, 8n, 2, nearestEven)).toBe("-0.12")
+			expect(fixed(1n, 8n, 2, nearest)).toBe("0.13")
+		})
+
+		it("leaves a value already on the grid alone in every direction", () => {
+			expect(fixed(1n, 2n, 2, down)).toBe("0.50")
+			expect(fixed(-1n, 2n, 2, down)).toBe("-0.50")
+			expect(fixed(-1n, 2n, 2, up)).toBe("-0.50")
+		})
+
+		// NOTE: The count has no ceiling, where the entry beside it stops at 80
+		// digits — measured at 15 ms for 200 000 places. This asks for more
+		// digits than that cap and checks the expansion is what long division
+		// gives, so a cap added later fails here rather than silently
+		// shortening an answer a caller asked the width of.
+		it("writes every place it is asked for, past the 80 the capped entry stops at", () => {
+			let text = fixed(2n, 3n, 200, nearest)
+
+			expect(text.length).toBe(202)
+			expect(text).toBe(`0.${"6".repeat(199)}7`)
+		})
+
+		it("names #Nearest for a call that leaves the direction out", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(1/8::toString(as #Decimal, toPlaces 2))
+					Terminal.inspect(
+						1/8::toString(as #Decimal, toPlaces 2, toward #Nearest),
+					)
+				}`),
+			).toEqual(['"0.13"', '"0.13"'])
+		})
+	})
+
 	describe("Banker's rounding", () => {
 		it("sends a tie to the even step on either side of zero", async () => {
 			expect(
