@@ -1,4 +1,5 @@
 import {
+	from "./Optional.es" { Optional }
 	from "./Protocols.es" {
 		Equatable
 		Printable
@@ -24,14 +25,16 @@ declarations {
 	§ DEVELOPMENT.md, Why bodies look the way they do.
 	namespace Stream for Stream is Equatable, is Printable {}
 
-	§ Four Methods, because the audiences are three. The `print` Method is for
-	§ the Program's reader, `inspect` and `describe` are for its author, and
-	§ `write` is the primitive they are built on. The natives are `write`,
-	§ `inspect` and `describe`, and `print` is written in Essence on `write`.
-	§ The Stream is a default on `print` and `write`, rather than an entry of
-	§ its own. A native carries a default exactly as a bodied Method does. The
-	§ `inspect` Method takes no Stream: what it writes is for whoever started
-	§ the Program.
+	§ Two directions, and three audiences. The `print` Method is for the
+	§ Program's reader. The `inspect` and `describe` Methods are for its author.
+	§ The `write` Method is the primitive the writing side is built on, and
+	§ `readLine` is the reading side's. The `readAll` Method takes what is left
+	§ of the input at once, and `ask` is a `write` and a `readLine`. The natives
+	§ are `write`, `inspect`, `describe`, `readLine` and `readAll`; `print` and
+	§ `ask` are written in Essence on them. The Stream is a default on `print`
+	§ and `write`, rather than an entry of its own. A native carries a default
+	§ exactly as a bodied Method does. The `inspect` Method takes no Stream:
+	§ what it writes is for whoever started the Program.
 	namespace Terminal {
 		§§ Prints a value and a newline, for the reader of the Program.
 		§§
@@ -83,6 +86,39 @@ declarations {
 		§§ @param _ — the value to describe
 		§§ @returns — the structural rendering.
 		static describe<infer Value>(_ value: Value) -> String
+
+		§ An Optional, because the end of the input is not a failure. It is not
+		§ an empty line either. A `String` answer would spell the end of the
+		§ input as the empty String, which is what an empty line already is. A
+		§ Program reading until the input stops would then never stop.
+
+		§§ Answers the next line of the Program's input, or nothing at the end of it.
+		§§
+		§§ The line break is not part of the line. A line ends at `\n`, at `\r`, or at the `\r\n` a Windows host writes. The last line of an input that ends without a break is a line. A host with no input answers nothing, as `write` falls back to the console on a host with no stream.
+		§§
+		§§ @returns — the next line, or nothing at the end of the input.
+		static readLine() -> Optional<String>
+
+		§§ Answers everything left in the Program's input, as one String.
+		§§
+		§§ The text is unchanged, so a break at the end of the input is part of the answer. A text that ends with a break has an empty last line when `lines()` splits it, which is what a trailing break means there. A host with no input answers the empty String.
+		§§
+		§§ @returns — the rest of the input, unchanged.
+		static readAll() -> String
+
+		§§ Writes a prompt with no newline, then answers the next line of the input.
+		§§
+		§§ The prompt goes to `#Output`. The answer is `readLine`'s, so it is nothing at the end of the input.
+		§§
+		§§ @param _ — the prompt to write before reading
+		§§ @returns — the line that follows the prompt, or nothing at the end of the input.
+		static ask(_ prompt: String) -> Optional<String> {
+			§ The prompt carries no newline of its own, so that the answer is
+			§ written on the line the question is on.
+			Terminal.write(prompt)
+
+			<- Terminal.readLine()
+		}
 	}
 }
 

@@ -386,5 +386,22 @@ describe("Terminal", () => {
 
 			expect(written.output).toBe("the Argument ran\nfalse\n")
 		})
+
+		// NOTE: A READ is the other kind of effect, and the one a pass is most
+		// likely to take for a pure Function: it takes no Argument, so two
+		// calls of it look alike to anything that compares Expressions. They
+		// are not alike — the first answers one line and the second the next —
+		// so both have to survive into the emitted Program.
+		it("emits both reads of an expression that reads twice", () => {
+			let javaScript = compile(`implementation {
+				constant joined = Terminal.readLine()::value(defaultingTo "")::append(
+					Terminal.readLine()::value(defaultingTo ""),
+				)
+
+				Terminal.write(joined)
+			}`)
+
+			expect(javaScript.split("Terminal.readLine(").length - 1).toBe(2)
+		})
 	})
 })
