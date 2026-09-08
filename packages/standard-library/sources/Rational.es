@@ -26,12 +26,20 @@ declarations {
 
 	§ The Choice is declared beside its only user.
 
-	§§ The forms `Rational::toString` writes: `#Fraction` is `"3/4"` and `#Decimal` is `"0.75"`.
+	§ The exponent of the scientific form is written `e` and a decimal number,
+	§ with a minus sign and never a plus, so `1.23e3` and `5e-4`. The
+	§ alternatives were `E3` and `e+3`. Neither reads back any better, since
+	§ `Rational.parse` reads no exponent at all, and nothing else here writes a
+	§ sign a value does not have.
+
+	§§ The forms `Rational::toString` writes: `#Fraction` is `"3/4"`, `#Decimal` is `"0.75"`, `#Percent` is `"75%"` and `#Scientific` is `"7.5e-1"`.
 	§§
-	§§ The plain `toString()` entry writes the fraction form, and the `as:` entries name one of the two.
+	§§ The plain `toString()` entry writes the fraction form, and the `as:` entries name one of the four. The scientific form writes one digit before the point, and the power of ten it took out as `e` and an exponent. Only the fraction form and the decimal form read back through `Rational.parse`.
 	choice NumberFormat {
 		Fraction,
 		Decimal,
+		Percent,
+		Scientific,
 	}
 
 	§ `Equatable` and `Printable` are both derived for a Choice of Cases that
@@ -291,7 +299,7 @@ declarations {
 
 		§§ Answers the Rational as a String, in lowest terms.
 		§§
-		§§ The form is `3/4` when no format is named, and the named format otherwise. A whole Rational prints its numerator alone, so `1/2::add(1/2)` prints `1` and `10::divide(by 2)` prints `5`. The `Rational.parse` Method reads every one of these forms. The fraction form reads back as the same Rational. A decimal form does too when its expansion ends within 80 digits, and reads back as the rounded value otherwise. A count of one or more places writes exactly that many digits after the point.
+		§§ The form is `3/4` when no format is named, and the named format otherwise. A whole Rational prints its numerator alone, so `1/2::add(1/2)` prints `1` and `10::divide(by 2)` prints `5`. The `Rational.parse` Method reads the fraction form and the decimal form. The fraction form reads back as the same Rational. A decimal form does too when its expansion ends within 80 digits, and reads back as the rounded value otherwise. A count of one or more places writes exactly that many digits after the point.
 		§§
 		§§ @returns — the String representation of the Rational.
 		overload toString {
@@ -318,9 +326,9 @@ declarations {
 				}
 			}
 
-			§§ Answers the Rational as a decimal, or as a fraction, in the named format.
+			§§ Answers the Rational in the named format.
 			§§
-			§§ The `#Decimal` format writes the expansion, to at most 80 digits, and the `#Fraction` format writes `3/4`. A whole Rational prints its numerator alone in either.
+			§§ The `#Decimal` format writes the expansion, to at most 80 digits, and the `#Fraction` format writes `3/4`. A whole Rational prints its numerator alone in either. The `#Percent` format writes that same expansion of one hundred times the value, with a `%` after it. The `#Scientific` format writes one digit before the point and the power of ten as an exponent, so `1234` is `1.234e3` and zero is `0e0`.
 			§§
 			§§ @param as — the form to represent the Rational in
 			§§ @returns — the String representation of the Rational.
@@ -337,9 +345,9 @@ declarations {
 			§ The cap above answers a question this entry does not ask: what
 			§ width to give an expansion that never ends.
 
-			§§ Answers the Rational as a decimal with exactly that many places.
+			§§ Answers the Rational in the named format, with exactly that many places.
 			§§
-			§§ The digits are padded with zeroes where the expansion is shorter, so `1/2` over two places is `0.50`. The last digit kept is rounded in the named direction, and `#Nearest` is what a call that names none is given, so `1/8` is `0.13`. A count below one rounds to a whole number, and no point is written. The count has no ceiling. The `#Fraction` format ignores both the count and the direction.
+			§§ The digits are padded with zeroes where the expansion is shorter, so `1/2` over two places is `0.50`. The last digit kept is rounded in the named direction, and `#Nearest` is what a call that names none is given, so `1/8` is `0.13`. A count below one rounds to a whole number, and no point is written. The count has no ceiling. The `#Percent` and `#Scientific` formats take the count the same way, so `1/8` over one place is `12.5%` and `1234` over two is `1.23e3`. The `#Fraction` format ignores both the count and the direction.
 			§§
 			§§ @param as — the form to represent the Rational in
 			§§ @param toPlaces — how many digits to write after the point
