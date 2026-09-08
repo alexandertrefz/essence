@@ -36,10 +36,16 @@ import { validate } from "../validator/index"
 // this is kept to the files that actually regressed. `write: false` keeps it
 // off the file system — nothing reaches disk.
 async function bundleSizeOf(fixtureName: string): Promise<number> {
-	let source = readFileSync(fixturePath(fixtureName), {
-		encoding: "utf-8",
-	})
+	return bundleSizeOfSource(
+		readFileSync(fixturePath(fixtureName), { encoding: "utf-8" }),
+	)
+}
 
+// NOTE: The same measurement over a Program written here rather than a
+// fixture, for a claim about ONE Method: the fixtures are exhaustive by
+// design, and what a single call drags in is only visible next to a Program
+// that does everything but make it.
+async function bundleSizeOfSource(source: string): Promise<number> {
 	let parsed = parseWithDiagnostics(source)
 	let enriched = enrich(parsed.program)
 
@@ -58,7 +64,7 @@ async function bundleSizeOf(fixtureName: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: 73,838 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 73,943 measured. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
 	//
@@ -99,7 +105,7 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(39_600)
 	})
 
-	// NOTE: 47,748 measured. The two tests above watch a Dictionary being shaken
+	// NOTE: 47,844 measured. The two tests above watch a Dictionary being shaken
 	// away whole; this one records what a Program that DOES hold one carries —
 	// the store, every native the file reaches, the written form, the kind
 	// registry and the registration that fills it. The composite key encoding
@@ -167,11 +173,17 @@ describe("Bundle Size", () => {
 
 		expect(inBundle.length).toBeGreaterThan(0)
 		expect(inBundle.length).toBeLessThanOrEqual(inPrelude.length)
-		// NOTE: 15,493 measured — SEVEN bytes under the ceiling, where the
-		// rest of this file keeps ~500. The figure last recorded here was
-		// 14,890, so 603 bytes arrived without a NOTE; the ceiling wants
-		// moving once what they are is known, and until then this test is
-		// one ordinary edit away from failing for no stated reason.
-		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(15_500)
+		// NOTE: 15,584 measured, and the ceiling keeps the ~500 bytes this
+		// test's own rule asks for. It had five, which is not a guard but a
+		// tripwire: it fires on the next ordinary edit and says nothing
+		// about what moved. It even deformed the runtime — `String.append`
+		// wrote its two marker keys by hand rather than calling the maker
+		// every other Method calls, to stay inside those five bytes.
+		//
+		// NOTE: 89 of the bytes are that call coming back. The 603 over the
+		// 14,890 two Protocol commits measured byte-identically are older
+		// than this campaign: the same pipeline measures 15,495 at its base
+		// commit as it does after it, so nothing here spent them.
+		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(16_100)
 	})
 })
