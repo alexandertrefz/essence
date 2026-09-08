@@ -2135,17 +2135,17 @@ describe("Choices", () => {
 			// Namespace named after the Compiler's own conformance Parameter.
 			it("says so once, and lets nothing carry the Parameter onward", () => {
 				let source = `implementation {
-					choice Result<Value is Equatable> { Ok { value: Value } }
+					choice Outcome<Value is Equatable> { Ok { value: Value } }
 
 					function unwrap<infer Value is Equatable>(
-						_ r: Result<Value>,
+						_ r: Outcome<Value>,
 					) -> Value {
 						<- match r -> Value {
 							case #Ok { <- @.value }
 						}
 					}
 
-					Terminal.inspect(unwrap(Result#Ok(1))::toString())
+					Terminal.inspect(unwrap(Outcome#Ok(1))::toString())
 				}`
 
 				expect(codesOf(source)).toEqual(["undecided-type-arguments"])
@@ -2178,13 +2178,13 @@ describe("Choices", () => {
 			// written first decides nothing at all.
 			it("waits for an Argument that decides the Parameter", async () => {
 				let orElse = `
-					choice Result<Value is Equatable> {
+					choice Outcome<Value is Equatable> {
 						Ok { value: Value },
 						Err,
 					}
 
 					function orElse<infer Value is Equatable>(
-						_ r: Result<Value>,
+						_ r: Outcome<Value>,
 						_ fallback: Value,
 					) -> Value {
 						<- match r -> Value {
@@ -2196,8 +2196,8 @@ describe("Choices", () => {
 
 				expect(
 					await run(`implementation { ${orElse}
-						Terminal.inspect(orElse(Result#Ok(1), 0)::toString())
-						Terminal.inspect(orElse(Result#Err, 7)::toString())
+						Terminal.inspect(orElse(Outcome#Ok(1), 0)::toString())
+						Terminal.inspect(orElse(Outcome#Err, 7)::toString())
 					}`),
 				).toEqual(['"1"', '"7"'])
 			})

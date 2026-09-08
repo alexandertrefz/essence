@@ -551,14 +551,14 @@ describe("Type matching", () => {
 
 	// NOTE: A Case is nominal by `(choice, name)`, and with Modules the Choice's
 	// written name is no longer unique in a Program: two files each declaring
-	// `choice Result` used to make interchangeable Types AND the same runtime
+	// `choice Outcome` used to make interchangeable Types AND the same runtime
 	// tag, so `is` and `match` confused them with no Diagnostic anywhere. The
 	// identity is the declaring Module's canonical path and the name, and a
 	// Program that is no Module keeps the bare name — which is why every Program
 	// in every other spec, `__golden__` file and snapshot is untouched.
 	describe("Module-qualified Choice identity", () => {
-		const RESULT = `implementation {
-			choice Result {
+		const OUTCOME = `implementation {
+			choice Outcome {
 				Ok { value: Integer },
 				Failed,
 			}
@@ -577,7 +577,7 @@ describe("Type matching", () => {
 		// file compile does.
 		function choiceDeclaredIn(
 			modulePath: string | null,
-			source: string = RESULT,
+			source: string = OUTCOME,
 		): common.typed.ChoiceDeclarationStatementNode {
 			let { program, diagnostics } = enrich(
 				parse(source),
@@ -617,8 +617,8 @@ describe("Type matching", () => {
 		}
 
 		it("should refuse a Case of another Module's Choice, both ways round", () => {
-			let left = choiceDeclaredIn("/modules/left/Result.es")
-			let right = choiceDeclaredIn("/modules/right/Result.es")
+			let left = choiceDeclaredIn("/modules/left/Outcome.es")
+			let right = choiceDeclaredIn("/modules/right/Outcome.es")
 
 			expect(matchesType(left.cases[0].type, right.cases[0].type)).toBe(
 				false,
@@ -645,8 +645,8 @@ describe("Type matching", () => {
 		})
 
 		it("should still match the Cases of one Module's Choice", () => {
-			let one = choiceDeclaredIn("/modules/left/Result.es")
-			let same = choiceDeclaredIn("/modules/left/Result.es")
+			let one = choiceDeclaredIn("/modules/left/Outcome.es")
+			let same = choiceDeclaredIn("/modules/left/Outcome.es")
 
 			expect(matchesType(one.cases[0].type, same.cases[0].type)).toBe(
 				true,
@@ -658,25 +658,25 @@ describe("Type matching", () => {
 		})
 
 		it("should identify a Program that is no Module by name alone", () => {
-			expect(choiceDeclaredIn(null).cases[0].type.choice).toBe("Result")
+			expect(choiceDeclaredIn(null).cases[0].type.choice).toBe("Outcome")
 		})
 
 		it("should identify a Module's Choice by its path and its name", () => {
 			expect(
-				choiceDeclaredIn("/modules/left/Result.es").cases[0].type
+				choiceDeclaredIn("/modules/left/Outcome.es").cases[0].type
 					.choice,
-			).toBe("/modules/left/Result.es#Result")
+			).toBe("/modules/left/Outcome.es#Outcome")
 		})
 
 		it("should print a Module's Choice under the name it was declared with", () => {
-			let declaration = choiceDeclaredIn("/modules/left/Result.es")
+			let declaration = choiceDeclaredIn("/modules/left/Outcome.es")
 
-			expect(describeType(declaration.cases[0].type)).toBe("Result#Ok")
-			expect(printType(declaration.cases[0].type)).toBe("Result#Ok")
+			expect(describeType(declaration.cases[0].type)).toBe("Outcome#Ok")
+			expect(printType(declaration.cases[0].type)).toBe("Outcome#Ok")
 			expect(printCaseWithPayload(declaration.cases[0].type)).toBe(
-				"Result#Ok { value: Integer }",
+				"Outcome#Ok { value: Integer }",
 			)
-			expect(printType(declaration.type)).toBe("Result")
+			expect(printType(declaration.type)).toBe("Outcome")
 		})
 
 		it("should name the Choices a Diagnostic asks a reader to pick between", () => {
@@ -710,15 +710,15 @@ describe("Type matching", () => {
 		it("should name a Module's Case as written where a Diagnostic is about it", () => {
 			let { program, diagnostics } = enrich(
 				parse(`implementation {
-					choice Result {
+					choice Outcome {
 						Ok { value: Integer },
 						Failed,
 					}
 
-					constant ok = Result#Ok({ value = 1 })
+					constant ok = Outcome#Ok({ value = 1 })
 					constant missing = ok.absent
 				}`),
-				{ modulePath: "/modules/Result.es" },
+				{ modulePath: "/modules/Outcome.es" },
 			)
 
 			let errors = [...diagnostics, ...validate(program)]
@@ -726,9 +726,9 @@ describe("Type matching", () => {
 			expect(errors).toHaveLength(1)
 			expect(errors[0].code).toBe("unknown-member")
 			expect(errors[0].message).toBe(
-				"Case 'Result#Ok' has no member 'absent'",
+				"Case 'Outcome#Ok' has no member 'absent'",
 			)
-			expect(errors[0].notes).toEqual(["Case 'Result#Ok' has 'value'."])
+			expect(errors[0].notes).toEqual(["Case 'Outcome#Ok' has 'value'."])
 		})
 	})
 

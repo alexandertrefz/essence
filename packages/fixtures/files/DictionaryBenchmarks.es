@@ -101,7 +101,7 @@ implementation {
 
 	§ One row of a season, for the Methods that turn a List into a
 	§ Dictionary.
-	type Result = { team: String, goals: Integer }
+	type Scoreline = { team: String, goals: Integer }
 
 	constant keys: List<String> = List.of(integersFrom 0, through 9999)
 		::map((number) { <- "key {number}" })
@@ -187,7 +187,7 @@ implementation {
 	§ Ten thousand results over a hundred teams, so grouping, tallying and
 	§ indexing have something to put together rather than one item under
 	§ every key.
-	constant results: List<Result> = List.of(integersFrom 0, through 9999)
+	constant results: List<Scoreline> = List.of(integersFrom 0, through 9999)
 		::map((number) {
 			<- {
 				team = "team {number::remainder(dividingBy 100)}",
