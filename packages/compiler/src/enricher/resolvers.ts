@@ -5585,8 +5585,8 @@ function refuseAmbiguousOverloadDefaults(
 	}>,
 ): void {
 	// NOTE: The hazard is a shape reachable ONLY by leaving something out, so an
-	// Overload block with no default anywhere has none — which is 43 of the
-	// standard library's 54 blocks and every block anybody wrote before this
+	// Overload block with no default anywhere has none — which is most of the
+	// standard library's blocks and every block anybody wrote before this
 	// existed. Asked first, because everything below enumerates subsets.
 	if (
 		entries.length < 2 ||

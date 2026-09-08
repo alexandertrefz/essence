@@ -51,6 +51,9 @@ instead of writing it, and `Terminal.write` is the raw primitive they are built
 on. The other direction is `Terminal.readLine`, which answers the next line of
 the Program's input or nothing at the end of it, with `Terminal.readAll` beside
 it and the `Terminal.ask` that is a prompt and a line (`Terminal.es`).
+`Randomness` is the source a Program draws from, built by
+`Randomness.entropy()` for the host's own randomness or by
+`Randomness.seeded(_)` for a run that replays (`Randomness.es`).
 
 Three of every five declared Method entries are also IMPLEMENTED here, in
 Essence — 317 of 534 as this is written, counting one entry per Overload and
@@ -112,8 +115,11 @@ and nothing is ever changed in place. `list::sort()` can only mean "give me the
 sorted List" — there is no mutating `sort` to confuse it with. Immutability is a
 global invariant, stated once here, not something each name re-encodes. `::`
 already lends the receiver-first feel; the imperative completes it and reads
-better (`1::add(2)`, not `1::added(2)`). The last two participles here were
-`groupedBy` and `tallied`, and they are `group(on:)` and `tally()` now.
+better (`1::add(2)`, not `1::added(2)`). The last two transforming participles
+here were `groupedBy` and `tallied`, and they are `group(on:)` and `tally()`
+now. `Randomness.seeded` is the one participle left, and it is not a
+transformation: a static creator names what the thing it builds IS, and a source
+built from a seed is a seeded one.
 
 **2. A preposition is a label, never fused into the verb.** When an Argument is
 reached through a preposition — *of* a thing, *on* a separator, *with* a prefix,

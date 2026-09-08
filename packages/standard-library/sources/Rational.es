@@ -984,7 +984,7 @@ declarations {
 		}
 
 		§ One name for reading a number off a grid, answered by every kind in
-		§ the tower. On the exact kinds it IS `round(toPlaces:toward:)`, and
+		§ the tower. On the exact kinds it is `round(toPlaces:toward:)`, and
 		§ on an irrational it is the only way to reach digits at all. The
 		§ alternative was `round` for the exact kinds and `approximate` for
 		§ the irrationals, which leaves a `Number` receiver with no entry
