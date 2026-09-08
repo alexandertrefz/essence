@@ -681,9 +681,11 @@ describe("Stdlib Call Graph", () => {
 			"Optional.pair",
 			"Optional.toList",
 			"Optional.value",
-			// NOTE: `values` needs a receiver not every List is, so it lives in
-			// a Namespace of its own — receiver `List<Optional<ItemType>>` —
-			// exactly as `NestedList::flatten` does.
+			// NOTE: These three need a receiver not every List is, so they live
+			// in a Namespace of their own — receiver `List<Optional<ItemType>>`
+			// — exactly as `NestedList::flatten` does.
+			"OptionalList.allValues",
+			"OptionalList.firstValue",
 			"OptionalList.values",
 			"Orderable.clamp",
 			"Orderable.isBetween",

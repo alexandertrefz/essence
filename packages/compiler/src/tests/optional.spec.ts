@@ -438,6 +438,118 @@ describe("Optional", () => {
 		})
 	})
 
+	// NOTE: The Namespace a List of Optionals reaches, which `values()` held
+	// alone. `allValues` is the traversal — every value, or nothing at all —
+	// and `firstValue` is the "try these in order" shape. Neither is an entry
+	// of `values`, because each answers a different Type.
+	describe("A List of Optionals", () => {
+		const lists = [
+			`constant rows: List<Optional<Integer>> = [#Value(1), #Empty, #Value(3)]`,
+			`constant complete: List<Optional<Integer>> = [#Value(1), #Value(3)]`,
+			`constant blanks: List<Optional<Integer>> = [#Empty, #Empty]`,
+			`constant none: List<Optional<Integer>> = []`,
+		].join("\n\t\t\t\t\t")
+
+		it("drops the empties with values, and refuses them with allValues", async () => {
+			expect(
+				await run(`implementation {
+					${lists}
+
+					Terminal.inspect(rows::values())
+					Terminal.inspect(rows::allValues())
+					Terminal.inspect(complete::allValues())
+					Terminal.inspect(blanks::allValues())
+				}`),
+			).toEqual([
+				"[ 1, 3 ]",
+				"Optional#Empty",
+				"Optional#Value([ 1, 3 ])",
+				"Optional#Empty",
+			])
+		})
+
+		// NOTE: The empty List has no empty Optional in it, so every value it
+		// holds is present and the answer is a value: the empty List, wrapped.
+		// A `#Empty` answer there would say a row failed where there is no row.
+		it("answers the empty List wrapped, for the empty List", async () => {
+			expect(
+				await run(`implementation {
+					${lists}
+
+					Terminal.inspect(none::allValues())
+					Terminal.inspect(none::firstValue())
+				}`),
+			).toEqual(["Optional#Value([])", "Optional#Empty"])
+		})
+
+		it("answers the first Optional holding a value", async () => {
+			expect(
+				await run(`implementation {
+					${lists}
+
+					constant late: List<Optional<Integer>> = [#Empty, #Value(7)]
+
+					Terminal.inspect(rows::firstValue())
+					Terminal.inspect(late::firstValue())
+					Terminal.inspect(blanks::firstValue())
+				}`),
+			).toEqual([
+				"Optional#Value(1)",
+				"Optional#Value(7)",
+				"Optional#Empty",
+			])
+		})
+
+		// NOTE: Both laws are checked over every arrangement of up to three
+		// items, which is where an empty Optional can stand first, last, alone
+		// or not at all. The characterisation is written on `values` and
+		// `length` rather than on the body's own question, so a body rewritten
+		// to answer it another way is still held to it.
+		const arrangements = `constant arrangements: List<List<Optional<Integer>>> = [
+						[],
+						[#Empty],
+						[#Value(1)],
+						[#Empty, #Empty],
+						[#Empty, #Value(1)],
+						[#Value(1), #Empty],
+						[#Value(1), #Value(2)],
+						[#Value(1), #Empty, #Value(2)],
+						[#Empty, #Value(1), #Value(2)],
+					]`
+
+		it("answers every value exactly when no Optional is empty", async () => {
+			expect(
+				await run(`implementation {
+					${arrangements}
+
+					constant noValues: List<Integer> = []
+
+					Terminal.inspect(arrangements::hasOnlyItems(where (items) {
+						constant kept = items::values()
+
+						if kept::length()::is(items::length()) {
+							<- items::allValues()::value(defaultingTo noValues)::is(kept)
+						} else {
+							<- items::allValues()::isEmpty()
+						}
+					}))
+				}`),
+			).toEqual(["true"])
+		})
+
+		it("answers the first value values() would have kept", async () => {
+			expect(
+				await run(`implementation {
+					${arrangements}
+
+					Terminal.inspect(arrangements::hasOnlyItems(where (items) {
+						<- items::firstValue()::is(items::values()::firstItem())
+					}))
+				}`),
+			).toEqual(["true"])
+		})
+	})
+
 	describe("Matching", () => {
 		it("binds the payload, and a Guard can name it", async () => {
 			// NOTE: The Guard resolves the binding into the `@.item` it stands

@@ -1231,15 +1231,17 @@ declarations {
 		flatten() -> List<ItemType>
 	}
 
-	§ A List of Optionals, and the one Method only such a List can answer. Its
-	§ `ItemType` binds to the payload Type, so `values()` answers a
+	§ A List of Optionals, and the three Methods only such a List can answer.
+	§ Its `ItemType` binds to the payload Type, so `values()` answers a
 	§ `List<Integer>` for a `List<Optional<Integer>>`. No Protocol bound can
-	§ name a Type that is not in the signature. That is why it is not a Method
-	§ of `List`, for the reason `flatten` is not.
+	§ name a Type that is not in the signature. That is why none of them is a
+	§ Method of `List`, for the reason `flatten` is not.
 	§
-	§ Written in Essence on `reduce` and `append`, which reaches only `List`'s
-	§ own primitives. A native would fill one Array of the answer's own size
-	§ instead of a box per kept item. Neither saves the other a walk.
+	§ The `values` body is written in Essence on `reduce` and `append`, which
+	§ reaches only `List`'s own primitives. A native would fill one Array of
+	§ the answer's own size instead of a box per kept item. Neither saves the
+	§ other a walk. The two Methods under it say at their own sites what they
+	§ are written on.
 	§
 	§ There is no proven twin. A List with something in it can hold nothing but
 	§ empty Optionals, so a proof about the receiver says nothing about the
@@ -1247,7 +1249,7 @@ declarations {
 	namespace OptionalList<infer ItemType> for List<Optional<ItemType>> {
 		§§ Answers the values the Optionals hold, in order.
 		§§
-		§§ The empty Optionals are left out, so the answer can be shorter than the receiver. A List of empty Optionals answers the empty List.
+		§§ The empty Optionals are left out, so the answer can be shorter than the receiver. A List of empty Optionals answers the empty List. Where one empty Optional has to answer nothing at all, the Method is `allValues()`.
 		§§
 		§§ @returns — the List of values.
 		values() -> List<ItemType> {
@@ -1257,6 +1259,53 @@ declarations {
 				<- match item -> List<ItemType> {
 					case #Value(value) { <- accumulated::append(value) }
 					case #Empty        { <- accumulated }
+				}
+			})
+		}
+
+		§ Written on the quantified `hasItems`, which leaves the walk at the
+		§ first empty Optional, and on `values()` for the answer. Two thousand
+		§ calls over a two thousand item List measured 40 ms where nothing is
+		§ empty and 16 ms where the first item is. Comparing
+		§ `values()::length()` against the receiver's measured 32 ms and 33 ms,
+		§ and a fold on `reduce`'s early-stopping entry 60 ms and 15 ms.
+
+		§§ Answers every value in order, and nothing where an Optional is empty.
+		§§
+		§§ The answer holds one value for every item of the receiver. The empty List answers the empty List, held in an Optional.
+		§§
+		§§ @example
+		§§   constant rows: List<Optional<Integer>> = [#Value(1), #Value(2)]
+		§§
+		§§   expect rows::allValues()::is(#Value([1, 2]))
+		§§
+		§§ @returns — the List of every value, or an empty Optional.
+		allValues() -> Optional<List<ItemType>> {
+			if @::hasItems(where (item) { <- item::isEmpty() }) {
+				<- #Empty
+			} else {
+				<- #Value(@::values())
+			}
+		}
+
+		§ Written on `reduce`'s early-stopping entry, which leaves the walk at
+		§ the first Optional holding a value. The alternative,
+		§ `firstItem(where …)::flatten()`, builds an Optional to take apart
+		§ again and measured 25 ms against 21 ms over the same two thousand
+		§ calls.
+
+		§§ Answers the value of the first Optional that holds one.
+		§§
+		§§ The walk stops at that Optional. A List holding nothing but empty Optionals answers empty, and so does the empty List.
+		§§
+		§§ @returns — the first value, or an empty Optional.
+		firstValue() -> Optional<ItemType> {
+			constant start: Optional<ItemType> = #Empty
+
+			<- @::reduce(startingWith start, step (found, item) {
+				<- match item -> Step<Optional<ItemType>, Optional<ItemType>> {
+					case #Value(value) { <- #Done(#Value(value)) }
+					case #Empty        { <- #Continue(found) }
 				}
 			})
 		}

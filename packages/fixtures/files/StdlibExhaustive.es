@@ -3236,9 +3236,24 @@ third"::lines())
 	constant allEmpty: List<Optional<Integer>>   = [#Empty, #Empty]
 	constant noMaybes: List<Optional<Integer>>   = []
 
+	constant everyMaybe: List<Optional<Integer>> = [#Value(1), #Value(3)]
+
 	show("OptionalList.values<ItemType>()", someMaybes::values())
 	show("OptionalList.values<ItemType>() [all empty]", allEmpty::values())
 	show("OptionalList.values<ItemType>() [empty]", noMaybes::values())
+	§ Where `values` drops an item, `allValues` answers nothing at all.
+	show("OptionalList.allValues<ItemType>()", everyMaybe::allValues())
+	show(
+		"OptionalList.allValues<ItemType>() [one empty]",
+		someMaybes::allValues(),
+	)
+	show("OptionalList.allValues<ItemType>() [empty]", noMaybes::allValues())
+	show("OptionalList.firstValue<ItemType>()", someMaybes::firstValue())
+	show(
+		"OptionalList.firstValue<ItemType>() [all empty]",
+		allEmpty::firstValue(),
+	)
+	show("OptionalList.firstValue<ItemType>() [empty]", noMaybes::firstValue())
 
 	§ ——— NonEmptyList —————————————————————————————————————————————————————————
 	§ The Methods a List has to have been PROVEN to answer. A List written down
