@@ -952,8 +952,8 @@ describe("Rationals", () => {
 
 		// NOTE: The List is bound to a `List` Type on purpose. A written List is
 		// its own proof of having an item, so a literal Argument would reach
-		// `Number.lowestNumber(_ NonEmptyList<Integer | Rational>)` and answer
-		// bare — and the fold under test here is the one answering an Optional.
+		// `Number.lowest(_ NonEmptyList<Integer | Rational>)` and answer bare —
+		// and the fold under test here is the one answering an Optional.
 		it("finds the lowest of a mixed List through the Essence fold", async () => {
 			expect(
 				await run(`implementation {
@@ -967,7 +967,7 @@ describe("Rationals", () => {
 						negativeOne,
 					]
 
-					Terminal.inspect(match Number.lowestNumber(mixed) -> String {
+					Terminal.inspect(match Number.lowest(mixed) -> String {
 						case #Value(lowest) {
 							<- match lowest -> String {
 								case Integer  { <- @::toString() }

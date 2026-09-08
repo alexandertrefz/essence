@@ -2226,160 +2226,100 @@ third"::lines())
 	show("Number.average(_ NonEmptyList<Integer>)", Number.average([1, 2]))
 	show("Number.average(_ NonEmptyList<Rational>)", Number.average([1/2, 1/3]))
 	show("Number.average(_ NonEmptyList<Scalar>)", Number.average([1, 1/2]))
-	show("Number.lowestNumber(_ Integer, _ Integer)", Number.lowestNumber(3, 2))
+	show("Number.lowest(_ Integer, _ Integer)", Number.lowest(3, 2))
+	show("Number.lowest(_ Rational, _ Rational)", Number.lowest(1/2, 1/3))
+	show("Number.lowest(_ Integer, _ Rational)", Number.lowest(1, 2/3))
+	show("Number.lowest(_ Rational, _ Integer)", Number.lowest(2/3, 1))
+	show("Number.lowest(_ List<Integer>)", Number.lowest(threeNumbers))
+	show("Number.lowest(_ List<Integer>) [empty]", Number.lowest(noNumbers))
+	show("Number.lowest(_ List<Rational>)", Number.lowest(twoRationals))
+	show("Number.lowest(_ List<Rational>) [empty]", Number.lowest(noRationals))
+	show("Number.lowest(_ List<Scalar>)", Number.lowest(twoMixedNumbers))
+	show("Number.lowest(_ List<Scalar>) [empty]", Number.lowest(noMixedNumbers))
 	show(
-		"Number.lowestNumber(_ Rational, _ Rational)",
-		Number.lowestNumber(1/2, 1/3),
+		"Number.lowest(_ List<Integer>, defaultingTo: Integer)",
+		Number.lowest(threeNumbers, defaultingTo 0),
 	)
 	show(
-		"Number.lowestNumber(_ Integer, _ Rational)",
-		Number.lowestNumber(1, 2/3),
+		"Number.lowest(_ List<Integer>, defaultingTo: Integer) [empty]",
+		Number.lowest(noNumbers, defaultingTo 0),
 	)
 	show(
-		"Number.lowestNumber(_ Rational, _ Integer)",
-		Number.lowestNumber(2/3, 1),
+		"Number.lowest(_ List<Rational>, defaultingTo: Rational)",
+		Number.lowest(twoRationals, defaultingTo 0/1),
 	)
 	show(
-		"Number.lowestNumber(_ List<Integer>)",
-		Number.lowestNumber(threeNumbers),
+		"Number.lowest(_ List<Rational>, defaultingTo: Rational) [empty]",
+		Number.lowest(noRationals, defaultingTo 0/1),
 	)
 	show(
-		"Number.lowestNumber(_ List<Integer>) [empty]",
-		Number.lowestNumber(noNumbers),
+		"Number.lowest(_ List<Scalar>, defaultingTo: Scalar)",
+		Number.lowest(twoMixedNumbers, defaultingTo 0),
 	)
 	show(
-		"Number.lowestNumber(_ List<Rational>)",
-		Number.lowestNumber(twoRationals),
+		"Number.lowest(_ List<Scalar>, defaultingTo: Scalar) [empty]",
+		Number.lowest(noMixedNumbers, defaultingTo 0),
 	)
-	show(
-		"Number.lowestNumber(_ List<Rational>) [empty]",
-		Number.lowestNumber(noRationals),
-	)
-	show(
-		"Number.lowestNumber(_ List<Scalar>)",
-		Number.lowestNumber(twoMixedNumbers),
-	)
-	show(
-		"Number.lowestNumber(_ List<Scalar>) [empty]",
-		Number.lowestNumber(noMixedNumbers),
-	)
-	show(
-		"Number.lowestNumber(_ List<Integer>, defaultingTo: Integer)",
-		Number.lowestNumber(threeNumbers, defaultingTo 0),
-	)
-	show(
-		"Number.lowestNumber(_ List<Integer>, defaultingTo: Integer) [empty]",
-		Number.lowestNumber(noNumbers, defaultingTo 0),
-	)
-	show(
-		"Number.lowestNumber(_ List<Rational>, defaultingTo: Rational)",
-		Number.lowestNumber(twoRationals, defaultingTo 0/1),
-	)
-	show(
-		"Number.lowestNumber(_ List<Rational>, defaultingTo: Rational) [empty]",
-		Number.lowestNumber(noRationals, defaultingTo 0/1),
-	)
-	show(
-		"Number.lowestNumber(_ List<Scalar>, defaultingTo: Scalar)",
-		Number.lowestNumber(twoMixedNumbers, defaultingTo 0),
-	)
-	show(
-		"Number.lowestNumber(_ List<Scalar>, defaultingTo: Scalar) [empty]",
-		Number.lowestNumber(noMixedNumbers, defaultingTo 0),
-	)
-	show(
-		"Number.lowestNumber(_ NonEmptyList<Integer>)",
-		Number.lowestNumber([3, 1, 2]),
-	)
+	show("Number.lowest(_ NonEmptyList<Integer>)", Number.lowest([3, 1, 2]))
 	§ One item, which is the seed the fold starts from and the answer it ends
 	§ with.
+	show("Number.lowest(_ NonEmptyList<Integer>) [single]", Number.lowest([7]))
+	show("Number.lowest(_ NonEmptyList<Rational>)", Number.lowest([1/2, 1/3]))
+	show("Number.lowest(_ NonEmptyList<Scalar>)", Number.lowest([1, 1/2]))
+	§ The widest entry, which is the only one an irrational reaches.
+	show("Number.lowest(_ Number, _ Number)", Number.lowest(3, Number.Pi))
 	show(
-		"Number.lowestNumber(_ NonEmptyList<Integer>) [single]",
-		Number.lowestNumber([7]),
+		"Number.lowest(_ Number, _ Number) [second is lower]",
+		Number.lowest(Number.Pi, 3),
+	)
+	show("Number.highest(_ Integer, _ Integer)", Number.highest(3, 2))
+	show("Number.highest(_ Rational, _ Rational)", Number.highest(1/2, 1/3))
+	show("Number.highest(_ Integer, _ Rational)", Number.highest(1, 2/3))
+	show("Number.highest(_ Rational, _ Integer)", Number.highest(2/3, 1))
+	show("Number.highest(_ List<Integer>)", Number.highest(threeNumbers))
+	show("Number.highest(_ List<Integer>) [empty]", Number.highest(noNumbers))
+	show("Number.highest(_ List<Rational>)", Number.highest(twoRationals))
+	show(
+		"Number.highest(_ List<Rational>) [empty]",
+		Number.highest(noRationals),
+	)
+	show("Number.highest(_ List<Scalar>)", Number.highest(twoMixedNumbers))
+	show(
+		"Number.highest(_ List<Scalar>) [empty]",
+		Number.highest(noMixedNumbers),
 	)
 	show(
-		"Number.lowestNumber(_ NonEmptyList<Rational>)",
-		Number.lowestNumber([1/2, 1/3]),
+		"Number.highest(_ List<Integer>, defaultingTo: Integer)",
+		Number.highest(threeNumbers, defaultingTo 0),
 	)
 	show(
-		"Number.lowestNumber(_ NonEmptyList<Scalar>)",
-		Number.lowestNumber([1, 1/2]),
+		"Number.highest(_ List<Integer>, defaultingTo: Integer) [empty]",
+		Number.highest(noNumbers, defaultingTo 0),
 	)
 	show(
-		"Number.highestNumber(_ Integer, _ Integer)",
-		Number.highestNumber(3, 2),
+		"Number.highest(_ List<Rational>, defaultingTo: Rational)",
+		Number.highest(twoRationals, defaultingTo 0/1),
 	)
 	show(
-		"Number.highestNumber(_ Rational, _ Rational)",
-		Number.highestNumber(1/2, 1/3),
+		"Number.highest(_ List<Rational>, defaultingTo: Rational) [empty]",
+		Number.highest(noRationals, defaultingTo 0/1),
 	)
 	show(
-		"Number.highestNumber(_ Integer, _ Rational)",
-		Number.highestNumber(1, 2/3),
+		"Number.highest(_ List<Scalar>, defaultingTo: Scalar)",
+		Number.highest(twoMixedNumbers, defaultingTo 0),
 	)
 	show(
-		"Number.highestNumber(_ Rational, _ Integer)",
-		Number.highestNumber(2/3, 1),
+		"Number.highest(_ List<Scalar>, defaultingTo: Scalar) [empty]",
+		Number.highest(noMixedNumbers, defaultingTo 0),
 	)
+	show("Number.highest(_ NonEmptyList<Integer>)", Number.highest([3, 1, 2]))
+	show("Number.highest(_ NonEmptyList<Rational>)", Number.highest([1/2, 1/3]))
+	show("Number.highest(_ NonEmptyList<Scalar>)", Number.highest([1, 1/2]))
+	§ The widest entry, which is the only one an irrational reaches.
+	show("Number.highest(_ Number, _ Number)", Number.highest(3, Number.Pi))
 	show(
-		"Number.highestNumber(_ List<Integer>)",
-		Number.highestNumber(threeNumbers),
-	)
-	show(
-		"Number.highestNumber(_ List<Integer>) [empty]",
-		Number.highestNumber(noNumbers),
-	)
-	show(
-		"Number.highestNumber(_ List<Rational>)",
-		Number.highestNumber(twoRationals),
-	)
-	show(
-		"Number.highestNumber(_ List<Rational>) [empty]",
-		Number.highestNumber(noRationals),
-	)
-	show(
-		"Number.highestNumber(_ List<Scalar>)",
-		Number.highestNumber(twoMixedNumbers),
-	)
-	show(
-		"Number.highestNumber(_ List<Scalar>) [empty]",
-		Number.highestNumber(noMixedNumbers),
-	)
-	show(
-		"Number.highestNumber(_ List<Integer>, defaultingTo: Integer)",
-		Number.highestNumber(threeNumbers, defaultingTo 0),
-	)
-	show(
-		"Number.highestNumber(_ List<Integer>, defaultingTo: Integer) [empty]",
-		Number.highestNumber(noNumbers, defaultingTo 0),
-	)
-	show(
-		"Number.highestNumber(_ List<Rational>, defaultingTo: Rational)",
-		Number.highestNumber(twoRationals, defaultingTo 0/1),
-	)
-	show(
-		"Number.highestNumber(_ List<Rational>, defaultingTo: Rational) [empty]",
-		Number.highestNumber(noRationals, defaultingTo 0/1),
-	)
-	show(
-		"Number.highestNumber(_ List<Scalar>, defaultingTo: Scalar)",
-		Number.highestNumber(twoMixedNumbers, defaultingTo 0),
-	)
-	show(
-		"Number.highestNumber(_ List<Scalar>, defaultingTo: Scalar) [empty]",
-		Number.highestNumber(noMixedNumbers, defaultingTo 0),
-	)
-	show(
-		"Number.highestNumber(_ NonEmptyList<Integer>)",
-		Number.highestNumber([3, 1, 2]),
-	)
-	show(
-		"Number.highestNumber(_ NonEmptyList<Rational>)",
-		Number.highestNumber([1/2, 1/3]),
-	)
-	show(
-		"Number.highestNumber(_ NonEmptyList<Scalar>)",
-		Number.highestNumber([1, 1/2]),
+		"Number.highest(_ Number, _ Number) [first is higher]",
+		Number.highest(Number.Pi, 3),
 	)
 
 	§ ——— Optional —————————————————————————————————————————————————————————

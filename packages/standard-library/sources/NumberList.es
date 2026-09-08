@@ -74,7 +74,7 @@ declarations {
 			§§
 			§§ @returns — the lowest item, or nothing for the empty List.
 			() -> Optional<Integer> {
-				<- Number.lowestNumber(@)
+				<- Number.lowest(@)
 			}
 
 			§§ The lowest item, or the given fallback for the empty List.
@@ -94,7 +94,7 @@ declarations {
 			§§
 			§§ @returns — the highest item, or nothing for the empty List.
 			() -> Optional<Integer> {
-				<- Number.highestNumber(@)
+				<- Number.highest(@)
 			}
 
 			§§ The highest item, or the given fallback for the empty List.
@@ -154,7 +154,7 @@ declarations {
 			§§
 			§§ @returns — the lowest item, or nothing for the empty List.
 			() -> Optional<Rational> {
-				<- Number.lowestNumber(@)
+				<- Number.lowest(@)
 			}
 
 			§§ The lowest item, or the given fallback for the empty List.
@@ -174,7 +174,7 @@ declarations {
 			§§
 			§§ @returns — the highest item, or nothing for the empty List.
 			() -> Optional<Rational> {
-				<- Number.highestNumber(@)
+				<- Number.highest(@)
 			}
 
 			§§ The highest item, or the given fallback for the empty List.
@@ -234,7 +234,7 @@ declarations {
 			§§
 			§§ @returns — the lowest item, or nothing for the empty List.
 			() -> Optional<Scalar> {
-				<- Number.lowestNumber(@)
+				<- Number.lowest(@)
 			}
 
 			§§ The lowest item, or the given fallback for the empty List.
@@ -254,7 +254,7 @@ declarations {
 			§§
 			§§ @returns — the highest item, or nothing for the empty List.
 			() -> Optional<Scalar> {
-				<- Number.highestNumber(@)
+				<- Number.highest(@)
 			}
 
 			§§ The highest item, or the given fallback for the empty List.
@@ -353,14 +353,14 @@ declarations {
 		§§
 		§§ @returns — the lowest item.
 		lowestNumber() -> Integer {
-			<- Number.lowestNumber(@)
+			<- Number.lowest(@)
 		}
 
 		§§ The highest item, which a non-empty List always has.
 		§§
 		§§ @returns — the highest item.
 		highestNumber() -> Integer {
-			<- Number.highestNumber(@)
+			<- Number.highest(@)
 		}
 
 		§§ The mean of the items: their total divided by their count.
@@ -376,14 +376,14 @@ declarations {
 		§§
 		§§ @returns — the lowest item.
 		lowestNumber() -> Rational {
-			<- Number.lowestNumber(@)
+			<- Number.lowest(@)
 		}
 
 		§§ The highest item, which a non-empty List always has.
 		§§
 		§§ @returns — the highest item.
 		highestNumber() -> Rational {
-			<- Number.highestNumber(@)
+			<- Number.highest(@)
 		}
 
 		§§ The mean of the items: their total divided by their count.
@@ -399,14 +399,14 @@ declarations {
 		§§
 		§§ @returns — the lowest item.
 		lowestNumber() -> Scalar {
-			<- Number.lowestNumber(@)
+			<- Number.lowest(@)
 		}
 
 		§§ The highest item, which a non-empty List always has.
 		§§
 		§§ @returns — the highest item.
 		highestNumber() -> Scalar {
-			<- Number.highestNumber(@)
+			<- Number.highest(@)
 		}
 
 		§§ The mean of the items: their total divided by their count.

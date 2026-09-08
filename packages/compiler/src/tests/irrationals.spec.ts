@@ -1401,6 +1401,28 @@ describe("Irrationals", () => {
 				`"3.142e0"`,
 			])
 		})
+
+		// NOTE: `Number.lowest`/`highest` gained a widest entry, kept behind
+		// the four kind-preserving ones so that two Integers still answer an
+		// Integer. It is the only entry an irrational reaches, because it is
+		// written on the covering `Number`'s ordering rather than on a kind's
+		// own. The bound Constants are what read the answered Type back.
+		it("answers the lower and higher of two Numbers of any kind", async () => {
+			expect(
+				await run(`implementation {
+					constant lower: Number = Number.lowest(3, Number.Pi)
+					constant higher: Number = Number.highest(3, Number.Pi)
+					§ The four kind-preserving entries still stand ahead of it.
+					constant integer: Integer = Number.lowest(3, 2)
+
+					Terminal.inspect(lower::toString())
+					Terminal.inspect(higher::toString())
+					Terminal.inspect(integer)
+					Terminal.inspect(Number.highest(Number.Pi, Number.E)::toString())
+					Terminal.inspect(Number.lowest(Number.Pi, Number.E)::toString())
+				}`),
+			).toEqual([`"3"`, `"π"`, "2", `"π"`, `"e"`])
+		})
 	})
 
 	describe("Structural equality", () => {

@@ -196,9 +196,11 @@ Rules 2 and 3 do NOT apply to the `is…`/`has…`/`doesNot…` prefixes — tho
 predicate naming, not prepositional Arguments, so `isGreaterThan`, `isBetween`
 and `doesNotContain` keep their fused word. Quantifiers and adjectives are not
 prepositions either: `removeEvery`, `everyItem`, `removeFirst`,
-`removeDuplicates`, `firstItem`/`lastItem` keep theirs. So do
-`lowestNumber`/`highestNumber`, which name the same question on `Number` and on
-a List of them.
+`removeDuplicates`, `firstItem`/`lastItem` keep theirs. So does the
+receiver-side `lowestNumber`/`highestNumber`, where the noun says what a List
+of anything is being asked for. The statics those delegate to are
+`Number.lowest` and `Number.highest`, because a Namespace already called
+`Number` needs no second `Number` in the name of its Method.
 
 A few more conventions worth stating because they are already consistent and
 easy to break:
