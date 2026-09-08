@@ -925,7 +925,7 @@ export const $NestedListArity: AssertArities<typeof import("./NestedList"), {
 
 declare const OptionalListModule: typeof import("./OptionalList")
 export const $OptionalList: OptionalListNatives = OptionalListModule
-export const $OptionalListAbsent: AssertNoEssenceExports<typeof import("./OptionalList"), "values"> = true
+export const $OptionalListAbsent: AssertNoEssenceExports<typeof import("./OptionalList"), "values" | "allValues" | "firstValue"> = true
 
 declare const NonEmptyListModule: typeof import("./NonEmptyList")
 export const $NonEmptyList: NonEmptyListNatives = NonEmptyListModule
