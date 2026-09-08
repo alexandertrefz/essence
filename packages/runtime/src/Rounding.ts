@@ -5,9 +5,11 @@ import { typeKeySymbol } from "./type"
 // do. `is`, `isNot` and `toString` are all derived from the Choice
 // (`packages/standard-library/sources/Rational.es` declares the conformances beside the Method
 // that takes one), so nothing but the tags lives here. The Essence body of
-// `Rational::round(toward:)` READS one, and the `toPlaces` entries of
-// `Rational::toString` are natives that take one — so this Choice does reach
-// `Rational.ts`, as `Side` reaches `String::trim(at:)`.
+// `Rational::round(toward:)` READS one; the `toPlaces` entries of
+// `Rational::toString` are natives that take one, and so are the irrationals'
+// `approximate(toPlaces:toward:)` and `round(toward:)`. So this Choice does
+// reach `Rational.ts`, `Algebraic.ts` and `Transcendental.ts`, the way `Side`
+// reaches `String::trim(at:)`.
 export type NearestType = { [typeKeySymbol]: "Rounding#Nearest" }
 export type NearestEvenType = { [typeKeySymbol]: "Rounding#NearestEven" }
 export type DownType = { [typeKeySymbol]: "Rounding#Down" }

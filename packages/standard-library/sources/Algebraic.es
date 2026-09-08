@@ -2,6 +2,7 @@ import {
 	from "./Boolean.es" { Boolean }
 	from "./Integer.es" {
 		Integer
+		NonNegativeInteger
 		NonZeroInteger
 	}
 	from "./Optional.es" { Optional }
@@ -14,6 +15,7 @@ import {
 	from "./Rational.es" {
 		NonZeroRational
 		Rational
+		Rounding
 	}
 }
 
@@ -317,6 +319,58 @@ declarations {
 		§§
 		§§ Negating an irrational leaves it irrational, so the answer is again an Algebraic.
 		negate() -> Algebraic
+
+		§ The two Methods that hand an Algebraic to a reader as digits. Both
+		§ rest on the certified enclosure the runtime already refines for the
+		§ ordering. The interval narrows until the rounding at the width asked
+		§ for is decided, and that step is the answer. Nothing here estimates.
+		§ The native is what reaches the enclosure, which no Essence body can.
+		§ It always ends: an Algebraic is irrational, so it never sits on the
+		§ point a rounding rule steps at.
+
+		§§ Answers the Algebraic as a Rational on a decimal grid of the given width.
+		§§
+		§§ Five places answer the value rounded to hundred-thousandths, so `2::squareRoot()` over five places answers `141421/100000`. This Method is where a Program asks for digits in place of the exact value. The answer is exact all the same: it is the step of that grid the value rounds to. A width of no places answers a whole number, as a Rational.
+		§§
+		§§ @param toPlaces — how many decimal places the grid keeps
+		§§ @param toward — the direction to round in, `#Nearest` when it is left out
+		§§ @returns — the value on the grid the width names.
+		approximate(
+			toPlaces places: NonNegativeInteger,
+			toward direction: Rounding = #Nearest,
+		) -> Rational
+
+		§§ Answers the Algebraic rounded in the named direction.
+		§§
+		§§ The direction is `#Nearest` when a call names none. An irrational is never exactly halfway between two steps, so `#Nearest` and `#NearestEven` answer alike here. The other directions answer the floor for `#Down`, the ceiling for `#Up`, and the step towards zero for `#TowardZero`. Naming a count of places rounds to a decimal grid of that width instead, and answers a Rational.
+		overload round {
+			§§ Answers the Algebraic as an Integer, rounded in the named direction.
+			§§
+			§§ @param toward — the direction to round in, `#Nearest` when it is left out
+			§§ @returns — the rounded Integer.
+			(toward direction: Rounding = #Nearest) -> Integer
+
+			§§ Answers the Algebraic rounded to a decimal grid of the given width.
+			§§
+			§§ Two places round to hundredths. The answer is what `approximate(toPlaces:toward:)` answers, and a count below one rounds to a whole number. The entry stands here so that a Number receiver reaches `round` at every width, whichever kind it holds.
+			§§
+			§§ @param toPlaces — how many decimal places to keep
+			§§ @param toward — the direction to round in, `#Nearest` when it is left out
+			§§ @returns — the rounded Rational.
+			(
+				toPlaces places: Integer,
+				toward direction: Rounding = #Nearest,
+			) -> Rational {
+				§ The `if` proves the width is not negative, which is what
+				§ `approximate` asks of it. See DEVELOPMENT.md, Why bodies look
+				§ the way they do.
+				if places::isPositive() {
+					<- @::approximate(toPlaces places, toward direction)
+				} else {
+					<- @::approximate(toPlaces 0, toward direction)
+				}
+			}
+		}
 	}
 }
 

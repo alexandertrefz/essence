@@ -1671,6 +1671,43 @@ third"::lines())
 		show("Algebraic.absolute() [negative]", rootTwo::negate()::absolute())
 		show("Algebraic.negate()", rootTwo::negate())
 		show("Algebraic.toString()", rootTwo::toString())
+		show(
+			"Algebraic.approximate(toPlaces: NonNegativeInteger, toward?: Rounding)",
+			rootTwo::approximate(toPlaces 6),
+		)
+		show(
+			"Algebraic.approximate(toPlaces: NonNegativeInteger, toward?: Rounding) [no places]",
+			rootTwo::approximate(toPlaces 0),
+		)
+		show(
+			"Algebraic.approximate(toPlaces: NonNegativeInteger, toward?: Rounding) [down]",
+			rootTwo::approximate(toPlaces 3, toward #Down),
+		)
+		show(
+			"Algebraic.approximate(toPlaces: NonNegativeInteger, toward?: Rounding) [negative, toward zero]",
+			rootTwo::negate()::approximate(toPlaces 3, toward #TowardZero),
+		)
+		show("Algebraic.round(toward?: Rounding)", rootTwo::round())
+		show(
+			"Algebraic.round(toward?: Rounding) [up]",
+			rootTwo::round(toward #Up),
+		)
+		show(
+			"Algebraic.round(toward?: Rounding) [negative down]",
+			rootTwo::negate()::round(toward #Down),
+		)
+		show(
+			"Algebraic.round(toward?: Rounding) [nearest even reads as nearest]",
+			rootTwo::round(toward #NearestEven),
+		)
+		show(
+			"Algebraic.round(toPlaces: Integer, toward?: Rounding)",
+			rootTwo::round(toPlaces 4),
+		)
+		show(
+			"Algebraic.round(toPlaces: Integer, toward?: Rounding) [a count below one]",
+			rootTwo::round(toPlaces -1),
+		)
 		<- {}
 	})
 
@@ -1804,6 +1841,44 @@ third"::lines())
 	)
 	show("Transcendental.negate()", Number.Pi::negate())
 	show("Transcendental.toString()", Number.Pi::toString())
+	show(
+		"Transcendental.approximate(toPlaces: NonNegativeInteger, toward?: Rounding)",
+		Number.Pi::approximate(toPlaces 5),
+	)
+	show(
+		"Transcendental.approximate(toPlaces: NonNegativeInteger, toward?: Rounding) [no places]",
+		Number.E::approximate(toPlaces 0),
+	)
+	show(
+		"Transcendental.approximate(toPlaces: NonNegativeInteger, toward?: Rounding) [up]",
+		Number.Pi::approximate(toPlaces 3, toward #Up),
+	)
+	§ A value over both bases is a Union, since the π and e parts can cancel.
+	§ The match is what hands the Transcendental arm to `approximate`.
+	show(
+		"Transcendental.approximate(toPlaces: NonNegativeInteger, toward?: Rounding) [both bases]",
+		match Number.Pi::add(Number.E) -> Rational {
+			case Rational       { <- @ }
+			case Transcendental { <- @::approximate(toPlaces 6) }
+		},
+	)
+	show("Transcendental.round(toward?: Rounding)", Number.Pi::round())
+	show(
+		"Transcendental.round(toward?: Rounding) [down]",
+		Number.E::round(toward #Down),
+	)
+	show(
+		"Transcendental.round(toward?: Rounding) [negative toward zero]",
+		Number.Pi::negate()::round(toward #TowardZero),
+	)
+	show(
+		"Transcendental.round(toPlaces: Integer, toward?: Rounding)",
+		Number.Pi::round(toPlaces 2),
+	)
+	show(
+		"Transcendental.round(toPlaces: Integer, toward?: Rounding) [a count below one]",
+		Number.Pi::round(toPlaces 0),
+	)
 
 	§ ——— Number ———————————————————————————————————————————————————————————
 	§ Reached through the Namespace spelling throughout, because the `::`
