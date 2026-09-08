@@ -354,6 +354,14 @@ declarations {
 			(by other: NonZeroRational) -> Transcendental
 		}
 
+		§ There is no `raise` and no `squareRoot` here. The span is linear in
+		§ its bases. Neither `π·π` nor `√π` is a Rational or a value of that
+		§ span, so no entry could answer one exactly. An entry answering an
+		§ Optional would be empty for every exponent but zero and one. An
+		§ entry answering digits would be an estimate this Namespace does not
+		§ make. The Method a Program that wants digits reaches for is
+		§ `approximate(toPlaces:)`.
+
 		§ A Transcendental is never zero. A value over one base equal to a
 		§ Rational would make that base rational. A value over several being
 		§ zero would settle an open problem. So `isPositive` and

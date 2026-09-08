@@ -189,6 +189,17 @@ function rebuildAlgebraic(
 	}
 }
 
+// NOTE: The two halves of `a + b·√d`, without the radicand — every helper below
+// that works on the parts of ONE radical takes and answers this.
+type AlgebraicParts = { rationalPart: BigRational; coefficient: BigRational }
+
+function partsOf(algebraic: AlgebraicType): AlgebraicParts {
+	return {
+		rationalPart: rationalPartOf(algebraic),
+		coefficient: radicalCoefficientOf(algebraic),
+	}
+}
+
 function rationalPartOf(algebraic: AlgebraicType): BigRational {
 	return {
 		numerator: algebraic.rationalPartNumerator,
@@ -200,6 +211,60 @@ function radicalCoefficientOf(algebraic: AlgebraicType): BigRational {
 	return {
 		numerator: algebraic.radicalCoefficientNumerator,
 		denominator: algebraic.radicalCoefficientDenominator,
+	}
+}
+
+// NOTE: (a + b·√d)(c + e·√d) = (a·c + b·e·d) + (a·e + b·c)·√d, over the parts
+// rather than over two values — the one product formula of the slice, read by
+// the Method and by `raise`, which multiplies without building a value it would
+// take apart again.
+function productParts(
+	first: AlgebraicParts,
+	second: AlgebraicParts,
+	radicand: bigint,
+): AlgebraicParts {
+	const scaledRadicand = { numerator: radicand, denominator: 1n }
+
+	return {
+		rationalPart: addRationals(
+			multiplyRationals(first.rationalPart, second.rationalPart),
+			multiplyRationals(
+				multiplyRationals(first.coefficient, second.coefficient),
+				scaledRadicand,
+			),
+		),
+		coefficient: addRationals(
+			multiplyRationals(first.rationalPart, second.coefficient),
+			multiplyRationals(second.rationalPart, first.coefficient),
+		),
+	}
+}
+
+// NOTE: 1/(a + b·√d) = (a − b·√d)/(a² − b²·d) — the conjugate trick, over the
+// parts for the same reason the product above is. The denominator can not be
+// zero (that would make √d rational), which is exactly the "dividing by an
+// Algebraic never fails" guarantee.
+function reciprocalParts(
+	parts: AlgebraicParts,
+	radicand: bigint,
+): AlgebraicParts {
+	const conjugateNorm = subtractRationals(
+		multiplyRationals(parts.rationalPart, parts.rationalPart),
+		multiplyRationals(
+			multiplyRationals(parts.coefficient, parts.coefficient),
+			{ numerator: radicand, denominator: 1n },
+		),
+	)
+
+	return {
+		rationalPart: divideRationals(parts.rationalPart, conjugateNorm),
+		coefficient: divideRationals(
+			{
+				numerator: -parts.coefficient.numerator,
+				denominator: parts.coefficient.denominator,
+			},
+			conjugateNorm,
+		),
 	}
 }
 
@@ -697,28 +762,16 @@ export function multiplyWithAlgebraic(
 
 	if (aligned !== null) {
 		const [first, second] = aligned
-		const firstRational = rationalPartOf(first)
-		const firstRadical = radicalCoefficientOf(first)
-		const secondRational = rationalPartOf(second)
-		const secondRadical = radicalCoefficientOf(second)
+		const product = productParts(
+			partsOf(first),
+			partsOf(second),
+			first.radicand,
+		)
 
-		// NOTE: (a + b·√d)(a' + b'·√d) = aa' + bb'·d + (ab' + a'b)·√d.
 		return createValue(
 			rebuildAlgebraic(
-				addRationals(
-					multiplyRationals(firstRational, secondRational),
-					multiplyRationals(
-						multiplyRationals(firstRadical, secondRadical),
-						{
-							numerator: first.radicand,
-							denominator: 1n,
-						},
-					),
-				),
-				addRationals(
-					multiplyRationals(firstRational, secondRadical),
-					multiplyRationals(secondRational, firstRadical),
-				),
+				product.rationalPart,
+				product.coefficient,
 				first.radicand,
 			),
 		)
@@ -778,31 +831,57 @@ export function dividedInto(
 	return reciprocal
 }
 
-// NOTE: 1/(a + b·√d) = (a − b·√d)/(a² − b²·d) — the conjugate trick. The
-// denominator can not be zero (that would make √d rational), which is exactly
-// the "dividing by an Algebraic never fails" guarantee.
+// NOTE: The quadratic slice is closed under Integer powers — a product over one
+// radicand stays over it, and the reciprocal of one value in the field is
+// another — so a negative exponent is as exact as a positive one and no entry
+// of this Method answers an Optional. The power can still collapse: `(√2)²` is
+// the Rational 2, which is why the answer is a Union.
+//
+// NOTE: Square-and-multiply, so an exponent of n costs a logarithm of n
+// products rather than n of them. The parts are reduced at every step by
+// `multiplyRationals`, so what grows is the value and not the spelling.
+export function raise(
+	algebraic: AlgebraicType,
+	exponent: IntegerType,
+): AlgebraicType | RationalType {
+	const power = BigInt(exponent.value)
+	let base =
+		power < 0n
+			? reciprocalParts(partsOf(algebraic), algebraic.radicand)
+			: partsOf(algebraic)
+	let answer: AlgebraicParts = {
+		rationalPart: { numerator: 1n, denominator: 1n },
+		coefficient: { numerator: 0n, denominator: 1n },
+	}
+	let remaining = power < 0n ? -power : power
+
+	while (remaining > 0n) {
+		if (remaining % 2n === 1n) {
+			answer = productParts(answer, base, algebraic.radicand)
+		}
+
+		remaining = remaining / 2n
+
+		if (remaining > 0n) {
+			base = productParts(base, base, algebraic.radicand)
+		}
+	}
+
+	return rebuildAlgebraic(
+		answer.rationalPart,
+		answer.coefficient,
+		algebraic.radicand,
+	)
+}
+
 export function reciprocalOf(
 	algebraic: AlgebraicType,
 ): AlgebraicType | RationalType {
-	const rationalPart = rationalPartOf(algebraic)
-	const radicalCoefficient = radicalCoefficientOf(algebraic)
-	const conjugateNorm = subtractRationals(
-		multiplyRationals(rationalPart, rationalPart),
-		multiplyRationals(
-			multiplyRationals(radicalCoefficient, radicalCoefficient),
-			{ numerator: algebraic.radicand, denominator: 1n },
-		),
-	)
+	const parts = reciprocalParts(partsOf(algebraic), algebraic.radicand)
 
 	return rebuildAlgebraic(
-		divideRationals(rationalPart, conjugateNorm),
-		divideRationals(
-			{
-				numerator: -radicalCoefficient.numerator,
-				denominator: radicalCoefficient.denominator,
-			},
-			conjugateNorm,
-		),
+		parts.rationalPart,
+		parts.coefficient,
 		algebraic.radicand,
 	)
 }

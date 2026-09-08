@@ -1660,6 +1660,19 @@ third"::lines())
 			"Algebraic.divide(by: Algebraic, defaultingTo: Rational | Algebraic) [differing radicals]",
 			rootTwo::divide(by rootThree, defaultingTo 0/1),
 		)
+		show("Algebraic.raise(to: Integer)", rootTwo::raise(to 3))
+		show(
+			"Algebraic.raise(to: Integer) [collapses to a Rational]",
+			rootTwo::raise(to computedTwo),
+		)
+		show(
+			"Algebraic.raise(to: Integer) [zero exponent]",
+			rootTwo::raise(to 0),
+		)
+		show(
+			"Algebraic.raise(to: Integer) [negative exponent]",
+			rootTwo::raise(to -2),
+		)
 		show("Algebraic.isPositive()", rootTwo::isPositive())
 		show(
 			"Algebraic.isPositive() [negative]",
