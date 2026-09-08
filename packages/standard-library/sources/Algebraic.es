@@ -392,8 +392,13 @@ declarations {
 		§ when it is negative, and above it exactly when it is positive. This
 		§ Namespace's own `compare` decides both. The covering `Number`'s
 		§ `isLessThan(0)` says the same and reaches the whole numeric tower;
-		§ see DEVELOPMENT.md, Why bodies look the way they do. No `isZero`
-		§ stands beside them: there is no Algebraic it answers `true` for.
+		§ see DEVELOPMENT.md, Why bodies look the way they do.
+		§
+		§ `isZero` and `isWholeNumber` answer `false` for every Algebraic.
+		§ They stand here for the reason `Integer::isWholeNumber` answers
+		§ `true` for every Integer. A Union receiver dispatches only where
+		§ every member Namespace declares the Method, so these two are what
+		§ let a `Number` ask either question at all.
 
 		§§ Answers whether the Algebraic is above zero.
 		§§
@@ -407,6 +412,20 @@ declarations {
 		§§ The sign of `a + b·√d` is exactly decidable. No approximation is consulted.
 		isNegative() -> Boolean {
 			<- @::compare(to @::negate())::is(#Less)
+		}
+
+		§§ Answers whether the Algebraic is exactly zero.
+		§§
+		§§ An Algebraic carries a radical with a coefficient that is not zero, so the answer is always `false`.
+		isZero() -> Boolean {
+			<- false
+		}
+
+		§§ Answers whether the Algebraic is a whole number.
+		§§
+		§§ An Algebraic is irrational, so it is never whole and the answer is always `false`.
+		isWholeNumber() -> Boolean {
+			<- false
 		}
 
 		§§ Answers the Algebraic without its sign, which is its distance from zero.

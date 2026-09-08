@@ -1110,6 +1110,50 @@ describe("Irrationals", () => {
 			})
 		})
 
+		// NOTE: The sign, which `absolute` already decided inside itself and
+		// which no Method of this Namespace could ask before. A value over one
+		// base is signed exactly; a value over several refines an interval,
+		// and 1000·e − 2718 is the case that needs more than the first
+		// enclosure to separate from zero.
+		it("answers its own sign", () => {
+			const thousandE = transcendental.multiply(
+				number.E,
+				integer.createInteger(1000n),
+			) as transcendental.TranscendentalType
+
+			expect(transcendental.isPositive(number.Pi).value).toBeTrue()
+			expect(
+				transcendental.isPositive(transcendental.negate(number.Pi))
+					.value,
+			).toBeFalse()
+			expect(
+				transcendental.isPositive(
+					transcendental.add(number.Pi, integer.createInteger(-3n)),
+				).value,
+			).toBeTrue()
+			expect(
+				transcendental.isPositive(
+					transcendental.add(number.Pi, integer.createInteger(-4n)),
+				).value,
+			).toBeFalse()
+			expect(
+				transcendental.isPositive(
+					transcendental.add(
+						thousandE,
+						integer.createInteger(-2718n),
+					),
+				).value,
+			).toBeTrue()
+			expect(
+				transcendental.isPositive(
+					transcendental.addTranscendental(
+						number.Pi,
+						transcendental.negate(number.E),
+					) as transcendental.TranscendentalType,
+				).value,
+			).toBeTrue()
+		})
+
 		// NOTE: The same refinement `compare` runs, read for digits rather
 		// than for a sign: the enclosure is narrowed until both of its ends
 		// round alike at the width asked for. π is 3.14159265358979…, e is
@@ -1484,6 +1528,28 @@ describe("Irrationals", () => {
 					Terminal.inspect(asNumber(7)::round(toward #Down))
 				}`),
 			).toEqual(["3", "2", "2", "7"])
+		})
+
+		// NOTE: The four questions a `Number` receiver could not ask before,
+		// each of which needed a rung on both irrationals. `isZero` and
+		// `isWholeNumber` answer `false` for every irrational, which is the
+		// mirror of `Integer::isWholeNumber` answering `true` for every
+		// Integer, and both are here so the Union can dispatch at all.
+		it("reaches the sign and wholeness questions on a Number receiver", async () => {
+			expect(
+				await run(`implementation {
+					function asNumber(_ value: Number) -> Number {
+						<- value
+					}
+
+					Terminal.inspect(asNumber(Number.Pi)::isPositive())
+					Terminal.inspect(asNumber(Number.GoldenRatio::negate())::isNegative())
+					Terminal.inspect(asNumber(Number.Pi)::isZero())
+					Terminal.inspect(asNumber(Number.GoldenRatio)::isWholeNumber())
+					Terminal.inspect(asNumber(0)::isZero())
+					Terminal.inspect(asNumber(7)::isWholeNumber())
+				}`),
+			).toEqual(["true", "true", "false", "false", "true", "true"])
 		})
 
 		// NOTE: The decimal rendering, which is `approximate` under a name a

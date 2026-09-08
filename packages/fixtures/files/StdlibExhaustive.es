@@ -1667,6 +1667,8 @@ third"::lines())
 		)
 		show("Algebraic.isNegative()", rootTwo::negate()::isNegative())
 		show("Algebraic.isNegative() [positive]", rootTwo::isNegative())
+		show("Algebraic.isZero()", rootTwo::isZero())
+		show("Algebraic.isWholeNumber()", rootTwo::isWholeNumber())
 		show("Algebraic.absolute()", rootTwo::absolute())
 		show("Algebraic.absolute() [negative]", rootTwo::negate()::absolute())
 		show("Algebraic.negate()", rootTwo::negate())
@@ -1878,6 +1880,19 @@ third"::lines())
 		"Transcendental.subtract(_ Transcendental) [e parts cancel]",
 		Number.Pi::add(Number.E)::subtract(Number.E),
 	)
+	show("Transcendental.isPositive()", Number.Pi::isPositive())
+	show(
+		"Transcendental.isPositive() [negative]",
+		Number.Pi::negate()::isPositive(),
+	)
+	show(
+		"Transcendental.isPositive() [both bases]",
+		Number.Pi::add(Number.E)::isPositive(),
+	)
+	show("Transcendental.isNegative()", Number.Pi::negate()::isNegative())
+	show("Transcendental.isNegative() [positive]", Number.Pi::isNegative())
+	show("Transcendental.isZero()", Number.Pi::isZero())
+	show("Transcendental.isWholeNumber()", Number.Pi::isWholeNumber())
 	show("Transcendental.absolute()", Number.Pi::absolute())
 	show(
 		"Transcendental.absolute() [negative]",

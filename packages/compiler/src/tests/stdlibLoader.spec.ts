@@ -2083,6 +2083,7 @@ describe("Standard Library Loader", () => {
 			"String::doesNotEnd -> not String::ends(#0)",
 			"String::doesNotStart -> not String::starts(#0)",
 			"String::hasCharacters -> not String::isEmpty()",
+			"Transcendental::isNegative -> not Transcendental::isPositive()",
 			"protocol Comparable::isGreaterThanOrEqualTo -> not Self::isLessThan(#0)",
 			"protocol Comparable::isLessThanOrEqualTo -> not Self::isGreaterThan(#0)",
 			"protocol Equatable::isNot -> not Self::is(#0)",
@@ -2092,6 +2093,12 @@ describe("Standard Library Loader", () => {
 			"Algebraic::is",
 			"Algebraic::isNegative",
 			"Algebraic::isPositive",
+			// NOTE: Both answer a literal rather than a call, so neither is a
+			// question of another. They stand for the reason
+			// `Integer::isWholeNumber` does: a Union receiver reaches a Method
+			// only where every member Namespace declares one.
+			"Algebraic::isWholeNumber",
+			"Algebraic::isZero",
 			"Boolean::and",
 			"Boolean::is",
 			"Boolean::negate",
@@ -2130,6 +2137,12 @@ describe("Standard Library Loader", () => {
 			"String::isEmpty",
 			"String::starts",
 			"Transcendental::is",
+			// NOTE: Native, so there is no body to read a question off — the
+			// sign of a form is a primitive of the runtime. `isNegative` is
+			// this one negated, and is in the alias list above.
+			"Transcendental::isPositive",
+			"Transcendental::isWholeNumber",
+			"Transcendental::isZero",
 			"protocol Comparable::isGreaterThan",
 			"protocol Comparable::isLessThan",
 			"protocol Equatable::is",
