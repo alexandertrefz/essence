@@ -53,11 +53,15 @@ declarations {
 		§ The decision each arm takes is the width to read the value at,
 		§ before it hands the Rational on to the formatter. A decimal is read
 		§ at the count it writes. A percentage shifts the point two places,
-		§ so it is read two digits deeper and the shift stays exact. A
-		§ scientific form's depth is decided by where its exponent falls,
-		§ which the reading would have to answer. So it is read at the
-		§ eightieth digit instead, the cap the entry without a count writes
-		§ at.
+		§ so it is read two digits deeper and the shift stays exact. It is
+		§ never read shallower than those two, which a count below zero would
+		§ otherwise ask for. A scientific form counts the digits of a mantissa
+		§ rather than of the value. So its depth is where the exponent falls:
+		§ `decimalExponent` answers that, and the reading is taken that many
+		§ digits off the count. Reading at a fixed eightieth digit is the
+		§ cheaper alternative. It is wrong for a mantissa. It writes zeroes it
+		§ never read past the eightieth place, and answers `0e0` for a value
+		§ `isPositive` answers `true` for.
 
 		§§ Answers the Algebraic as a String, in the exact symbolic form or in the named format.
 		§§
@@ -70,7 +74,7 @@ declarations {
 
 			§§ Answers the Algebraic as a decimal, or in the exact symbolic form, in the named format.
 			§§
-			§§ The `#Decimal` format rounds the expansion at the eightieth digit and writes it. An irrational expansion never ends, so the cap is always reached. Trailing zeros the rounding leaves are dropped, as they are for any Rational. The `#Percent` format writes one hundred times that same reading, taken two digits deeper so that eighty still stand after the point. The `#Scientific` format writes that reading with one digit before the point and the power of ten after an `e`. The `#Fraction` format writes the symbolic form, since no ratio of two Integers is this number.
+			§§ The `#Decimal` format rounds the expansion at the eightieth digit and writes it. An irrational expansion never ends, so the cap is always reached. Trailing zeros the rounding leaves are dropped, as they are for any Rational. The `#Percent` format writes one hundred times that same reading, taken two digits deeper so that eighty still stand after the point. The `#Scientific` format writes eighty digits after the point of the mantissa, and the power of ten after an `e`. The reading is taken at the eightieth digit of the mantissa, wherever the value falls. A value below one is read deeper than eighty places. The `#Fraction` format writes the symbolic form, since no ratio of two Integers is this number.
 			§§
 			§§ @param as — the form to represent the Algebraic in
 			§§ @returns — the String representation of the Algebraic.
@@ -95,8 +99,10 @@ declarations {
 					}
 
 					case #Scientific {
+						constant depth = 80::subtract(value::decimalExponent())
+
 						<- value
-							::approximate(toPlaces 80)
+							::round(toPlaces depth)
 							::toString(as #Scientific)
 					}
 				}
@@ -104,7 +110,7 @@ declarations {
 
 			§§ Answers the Algebraic as a decimal with exactly that many places.
 			§§
-			§§ The digits are padded with zeroes where the rounded value is shorter. The last digit kept is rounded in the named direction, and `#Nearest` is what a call that names none is given. A count below one rounds to a whole number, and no point is written. The `#Percent` format takes the count the same way, on one hundred times the value. The `#Scientific` format counts the digits of the mantissa after the point. The `#Fraction` format ignores both the count and the direction, and writes the symbolic form.
+			§§ The digits are padded with zeroes where the rounded value is shorter. The last digit kept is rounded in the named direction, and `#Nearest` is what a call that names none is given. A count below one rounds to a whole number, and no point is written. The `#Percent` format takes the count the same way, on one hundred times the value. The `#Scientific` format counts the digits of the mantissa after the point, at every magnitude. The value is read as many digits past the count as its own power of ten falls below zero. The `#Fraction` format ignores both the count and the direction, and writes the symbolic form.
 			§§
 			§§ @param as — the form to represent the Algebraic in
 			§§ @param toPlaces — how many digits to write after the point
@@ -131,8 +137,13 @@ declarations {
 					}
 
 					case #Percent {
+						constant depth = define {
+							as count::add(2) if count::isPositive()
+							as 2             otherwise
+						}
+
 						<- value
-							::round(toPlaces count::add(2), toward direction)
+							::round(toPlaces depth, toward direction)
 							::toString(
 								as #Percent,
 								toPlaces count,
@@ -141,8 +152,12 @@ declarations {
 					}
 
 					case #Scientific {
+						constant depth = count::subtract(
+							value::decimalExponent(),
+						)
+
 						<- value
-							::approximate(toPlaces 80, toward direction)
+							::round(toPlaces depth, toward direction)
 							::toString(
 								as #Scientific,
 								toPlaces count,
@@ -510,6 +525,18 @@ declarations {
 				}
 			}
 		}
+
+		§ The width every reading of a mantissa is decided by, and the third
+		§ Method written on the same enclosure. It stands here because the
+		§ `#Scientific` arm above can not compute it. An Essence body reaches
+		§ no enclosure, and the exponent is what says how deep that arm reads.
+
+		§§ Answers the power of ten at or below the Algebraic's distance from zero.
+		§§
+		§§ This is the exponent the `#Scientific` format writes after the `e`. A value between one and ten answers zero, and a value between a tenth and one answers minus one. The enclosure widens until it falls inside one such power of ten. That always happens: an Algebraic is irrational, so it is never a power of ten itself.
+		§§
+		§§ @returns — the exponent of the power of ten the value falls on.
+		decimalExponent() -> Integer
 	}
 }
 

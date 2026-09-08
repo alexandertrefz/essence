@@ -1,5 +1,9 @@
 import type { AlgebraicType } from "./Algebraic"
-import { roundedOnDecimalGrid, scaledIntervalOf } from "./Algebraic"
+import {
+	decimalExponentOnEnclosure,
+	roundedOnDecimalGrid,
+	scaledIntervalOf,
+} from "./Algebraic"
 import type { BigRational } from "./bigRational"
 import {
 	addRationals,
@@ -753,14 +757,15 @@ export function isPositive(transcendental: TranscendentalType): BooleanType {
 	)
 }
 
-// NOTE: The two Methods that hand a Transcendental to a reader as digits, and
+// NOTE: The three Methods that hand a Transcendental to a reader as digits, and
 // the seam the linear span pays its one conjectural price at. The enclosure of
-// the value is refined until the rounding at the width asked for is decided. A
+// the value is refined until the question at the width asked for is decided. A
 // value over a SINGLE base is irrational outright, so it never sits on the
-// point a rounding rule steps at and the refinement always ends. A value over
-// several bases sitting on such a point would make `b·π + c·e` rational, which
-// is an open problem, so that one refines to the same cutoff every other
-// several-base decision runs to and reports the impasse there.
+// point a rounding rule steps at, is never a power of ten, and the refinement
+// always ends. A value over several bases sitting on either point would make
+// `b·π + c·e` rational, which is an open problem, so that one refines to the
+// same cutoff every other several-base decision runs to and reports the impasse
+// there.
 function roundedTranscendental(
 	transcendental: TranscendentalType,
 	places: bigint,
@@ -800,6 +805,21 @@ export function approximate(
 		roundedTranscendental(transcendental, width, direction),
 		10n ** width,
 	)
+}
+
+export function decimalExponent(
+	transcendental: TranscendentalType,
+): IntegerType {
+	const exponent = decimalExponentOnEnclosure(
+		(digits) => scaledTranscendentalInterval(transcendental, digits),
+		transcendental.terms.length > 1 ? precisionCutoffDigits : null,
+	)
+
+	if (exponent === null) {
+		throwPrecisionCutoffForReading("Reading this number's power of ten")
+	}
+
+	return createInteger(exponent)
 }
 
 // #endregion

@@ -317,6 +317,8 @@ export type AlgebraicNatives = {
 	approximate: (self: AlgebraicType, toPlaces: IntegerType, toward: RoundingType) => RationalType
 	// round(toward: Rounding) -> Integer
 	round__overload$1: (self: AlgebraicType, toward: RoundingType) => IntegerType
+	// decimalExponent() -> Integer
+	decimalExponent: (self: AlgebraicType) => IntegerType
 }
 
 export type TranscendentalNatives = {
@@ -360,6 +362,8 @@ export type TranscendentalNatives = {
 	approximate: (self: TranscendentalType, toPlaces: IntegerType, toward: RoundingType) => RationalType
 	// round(toward: Rounding) -> Integer
 	round__overload$1: (self: TranscendentalType, toward: RoundingType) => IntegerType
+	// decimalExponent() -> Integer
+	decimalExponent: (self: TranscendentalType) => IntegerType
 }
 
 export type NumberNatives = {
@@ -834,6 +838,7 @@ export const $AlgebraicArity: AssertArities<typeof import("./Algebraic"), {
 	negate: 1
 	approximate: 3
 	round__overload$1: 2
+	decimalExponent: 1
 }> = true
 
 declare const TranscendentalModule: typeof import("./Transcendental")
@@ -860,6 +865,7 @@ export const $TranscendentalArity: AssertArities<typeof import("./Transcendental
 	negate: 1
 	approximate: 3
 	round__overload$1: 2
+	decimalExponent: 1
 }> = true
 
 declare const NumberModule: typeof import("./Number")

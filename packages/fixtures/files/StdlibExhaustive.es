@@ -1727,6 +1727,12 @@ third"::lines())
 			rootTwo::toString(as #Scientific, toPlaces 4),
 		)
 		show(
+			"Algebraic.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [scientific, below the eightieth place]",
+			rootTwo
+				::divide(by 10::raise(to 90))
+				::toString(as #Scientific, toPlaces 4),
+		)
+		show(
 			"Algebraic.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [up]",
 			rootTwo::toString(as #Decimal, toPlaces 4, toward #Up),
 		)
@@ -1766,6 +1772,11 @@ third"::lines())
 		show(
 			"Algebraic.round(toPlaces: Integer, toward?: Rounding) [a count below one]",
 			rootTwo::round(toPlaces -1),
+		)
+		show("Algebraic.decimalExponent()", rootTwo::decimalExponent())
+		show(
+			"Algebraic.decimalExponent() [below one]",
+			rootTwo::divide(by 1000)::decimalExponent(),
 		)
 		<- {}
 	})
@@ -1954,6 +1965,12 @@ third"::lines())
 		Number.Pi::toString(as #Scientific, toPlaces 4),
 	)
 	show(
+		"Transcendental.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [scientific, below the eightieth place]",
+		Number.Pi
+			::divide(by 10::raise(to 90))
+			::toString(as #Scientific, toPlaces 4),
+	)
+	show(
 		"Transcendental.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [down]",
 		Number.Pi::toString(as #Decimal, toPlaces 4, toward #Down),
 	)
@@ -1994,6 +2011,11 @@ third"::lines())
 	show(
 		"Transcendental.round(toPlaces: Integer, toward?: Rounding) [a count below one]",
 		Number.Pi::round(toPlaces 0),
+	)
+	show("Transcendental.decimalExponent()", Number.Pi::decimalExponent())
+	show(
+		"Transcendental.decimalExponent() [below one]",
+		Number.Pi::divide(by 1000)::decimalExponent(),
 	)
 
 	§ ——— Number ———————————————————————————————————————————————————————————

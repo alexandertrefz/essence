@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
-import { roundedOnDecimalGrid } from "../Algebraic"
+import {
+	decimalExponentOnEnclosure,
+	roundedOnDecimalGrid,
+} from "../Algebraic"
 import { createCase } from "../type"
 
 // NOTE: The refinement both irrationals hand a reader digits through, driven
@@ -76,5 +79,67 @@ describe("rounding on a decimal grid", () => {
 
 		expect(roundedOnDecimalGrid(half.at, 0n, nearest, 16n)).toBeNull()
 		expect(half.taken()).toBe(2)
+	})
+})
+
+describe("reading a decimal exponent", () => {
+	test("a value between one and ten falls on the zeroth power", () => {
+		let value = enclosureOf(7n, 5n)
+
+		expect(decimalExponentOnEnclosure(value.at, null)).toBe(0n)
+		expect(value.taken()).toBe(1)
+	})
+
+	test("a value below one falls on a negative power", () => {
+		expect(decimalExponentOnEnclosure(enclosureOf(1n, 3n).at, null)).toBe(
+			-1n,
+		)
+		expect(decimalExponentOnEnclosure(enclosureOf(1n, 300n).at, null)).toBe(
+			-3n,
+		)
+	})
+
+	test("a value above ten falls on a positive power", () => {
+		expect(decimalExponentOnEnclosure(enclosureOf(400n, 3n).at, null)).toBe(
+			2n,
+		)
+	})
+
+	// NOTE: The sign is read off the far end of the interval, so a negative
+	// value answers the power its distance from zero falls on, exactly as the
+	// positive one does.
+	test("a negative value answers the power its magnitude falls on", () => {
+		expect(decimalExponentOnEnclosure(enclosureOf(-7n, 5n).at, null)).toBe(
+			0n,
+		)
+		expect(decimalExponentOnEnclosure(enclosureOf(-1n, 300n).at, null)).toBe(
+			-3n,
+		)
+	})
+
+	// NOTE: A value far below the first enclosure's width encloses zero at
+	// eight digits, and one just under a power of ten straddles the band, so
+	// both ask for more digits before they decide. Neither can loop forever on
+	// a real receiver: an irrational is neither zero nor a power of ten.
+	test("a value the first enclosure can not place asks for more digits", () => {
+		let tiny = enclosureOf(3n, 10n ** 20n)
+
+		expect(decimalExponentOnEnclosure(tiny.at, null)).toBe(-20n)
+		expect(tiny.taken()).toBe(3)
+
+		let underOne = enclosureOf(10n ** 12n - 1n, 10n ** 12n)
+
+		expect(decimalExponentOnEnclosure(underOne.at, null)).toBe(-1n)
+		expect(underOne.taken()).toBe(2)
+	})
+
+	// NOTE: The same absolute cutoff the grid reading takes, for the same
+	// caller — a Transcendental over several bases sitting exactly on a power
+	// of ten would settle the same open problem.
+	test("a value on a power of ten is refused at the limit", () => {
+		let ten = enclosureOf(10n, 1n)
+
+		expect(decimalExponentOnEnclosure(ten.at, 16n)).toBeNull()
+		expect(ten.taken()).toBe(2)
 	})
 })

@@ -664,6 +664,46 @@ export function roundedOnDecimalGrid(
 	}
 }
 
+// NOTE: The power of ten at or below the value's distance from zero, read off
+// the same certified enclosure the grid rounding reads. An enclosure taken at
+// `digits` brackets the value scaled by 10^digits, so a digit count both of its
+// ends share names one power-of-ten band and settles the exponent; ends of
+// different lengths, or an interval still holding zero, ask for twice the
+// digits. It terminates for the reason `roundedOnDecimalGrid` does: an
+// irrational is neither zero nor a power of ten, so the interval eventually
+// falls strictly inside one band. `limitDigits` is the same absolute cutoff,
+// for the same caller.
+export function decimalExponentOnEnclosure(
+	enclosureAt: (digits: bigint) => { low: bigint; high: bigint },
+	limitDigits: null,
+): bigint
+export function decimalExponentOnEnclosure(
+	enclosureAt: (digits: bigint) => { low: bigint; high: bigint },
+	limitDigits: bigint | null,
+): bigint | null
+export function decimalExponentOnEnclosure(
+	enclosureAt: (digits: bigint) => { low: bigint; high: bigint },
+	limitDigits: bigint | null,
+): bigint | null {
+	for (let digits = 8n; ; digits *= 2n) {
+		if (limitDigits !== null && digits > limitDigits) {
+			return null
+		}
+
+		const enclosure = enclosureAt(digits)
+		const nearer = enclosure.low > 0n ? enclosure.low : -enclosure.high
+		const further = enclosure.low > 0n ? enclosure.high : -enclosure.low
+
+		if (nearer > 0n) {
+			const length = nearer.toString().length
+
+			if (length === further.toString().length) {
+				return BigInt(length) - 1n - digits
+			}
+		}
+	}
+}
+
 // #endregion
 
 // #region Methods
@@ -905,11 +945,12 @@ export function negate(algebraic: AlgebraicType): AlgebraicType {
 	}
 }
 
-// NOTE: The two Methods that hand an Algebraic to a reader as digits. Both are
-// written on `scaledIntervalOf` above: the enclosure is refined until the
-// rounding at the width asked for is decided, and the decided step is the
-// answer. Neither ever gives up — an Algebraic is irrational by construction,
-// so it never sits on the point a rounding rule steps at.
+// NOTE: The three Methods that hand an Algebraic to a reader as digits. All
+// are written on `scaledIntervalOf` above: the enclosure is refined until the
+// question at the width asked for is decided, and the decided answer is the
+// answer. None ever gives up — an Algebraic is irrational by construction, so
+// it never sits on the point a rounding rule steps at, and it is never a power
+// of ten either.
 export function round(
 	algebraic: AlgebraicType,
 	direction: RoundingType,
@@ -939,6 +980,15 @@ export function approximate(
 			null,
 		),
 		10n ** width,
+	)
+}
+
+export function decimalExponent(algebraic: AlgebraicType): IntegerType {
+	return createInteger(
+		decimalExponentOnEnclosure(
+			(digits) => scaledIntervalOf(algebraic, digits),
+			null,
+		),
 	)
 }
 
