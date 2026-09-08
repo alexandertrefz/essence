@@ -15,6 +15,7 @@ import {
 import * as optional from "@essence-lang/runtime/Optional"
 import * as ordering from "@essence-lang/runtime/Ordering"
 import * as rational from "@essence-lang/runtime/Rational"
+import { createString } from "@essence-lang/runtime/String"
 import {
 	down,
 	nearest,
@@ -763,6 +764,48 @@ describe("Rationals", () => {
 					)
 				}`),
 			).toEqual(['"6,172,839/5,000"', '"1.235e6"', '"123 456 700%"'])
+		})
+
+		// NOTE: The one claim here a stopwatch has to make. Writing a
+		// separator between the groups is a walk over the groups, so it has to
+		// cost what the formatting it is written on top of costs, give or take
+		// — an Array each group is unshifted onto instead moves every group
+		// already in it, and 100,000 whole digits measured 92 ms that way
+		// against 6.2 ms this way, best of three, where the same value
+		// formatted without a separator is 5.1 ms. The ceiling is a RATIO
+		// against that same unseparated formatting rather than a time, so a
+		// slow machine moves both figures together: it was 17× before this and
+		// is 1.2× now.
+		it("writes the separator in one pass over the groups", () => {
+			let value = rational.createRational(BigInt("9".repeat(100_000)), 1n)
+			let comma = createString(",")
+			let best = (run: () => string): number => {
+				let fastest = Number.POSITIVE_INFINITY
+
+				for (let attempt = 0; attempt < 3; attempt++) {
+					let start = performance.now()
+					let answer = run()
+
+					fastest = Math.min(fastest, performance.now() - start)
+
+					// NOTE: Read here so that no engine can drop the call as a
+					// value nothing looks at, and so a formatter that answered
+					// nothing is not the fastest run of all.
+					expect(answer.length).toBeGreaterThanOrEqual(100_000)
+				}
+
+				return fastest
+			}
+
+			let grouped = best(
+				() =>
+					rational.toString__overload$4(value, decimal, comma).value,
+			)
+			let plain = best(
+				() => rational.toString__overload$2(value, decimal).value,
+			)
+
+			expect(grouped).toBeLessThan(plain * 3)
 		})
 
 		it("reaches a Scalar receiver through both rungs", async () => {
