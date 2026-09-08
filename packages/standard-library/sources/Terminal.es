@@ -24,13 +24,14 @@ declarations {
 	§ DEVELOPMENT.md, Why bodies look the way they do.
 	namespace Stream for Stream is Equatable, is Printable {}
 
-	§ Three Methods, because the audiences are three. The `print` Method is for
-	§ the Program's reader, `inspect` is for its author, and `write` is the
-	§ primitive both are built on. The natives are `write` and `inspect`, and
-	§ `print` is written in Essence on `write`. The Stream is a default on
-	§ `print` and `write`, rather than an entry of its own. A native carries a
-	§ default exactly as a bodied Method does. The `inspect` Method takes no
-	§ Stream: what it writes is for whoever started the Program.
+	§ Four Methods, because the audiences are three. The `print` Method is for
+	§ the Program's reader, `inspect` and `describe` are for its author, and
+	§ `write` is the primitive they are built on. The natives are `write`,
+	§ `inspect` and `describe`, and `print` is written in Essence on `write`.
+	§ The Stream is a default on `print` and `write`, rather than an entry of
+	§ its own. A native carries a default exactly as a bodied Method does. The
+	§ `inspect` Method takes no Stream: what it writes is for whoever started
+	§ the Program.
 	namespace Terminal {
 		§§ Prints a value and a newline, for the reader of the Program.
 		§§
@@ -66,6 +67,22 @@ declarations {
 		§§ @param _ — the value to inspect
 		§§ @returns — the value it was given, unchanged.
 		static inspect<infer Value>(_ value: Value) -> Value
+
+		§ The rendering `inspect` writes, handed back instead of written. A
+		§ message can then carry a value's structure. It is native for the
+		§ reason `inspect` is: the walk that lays a value out is what the Method
+		§ is. And `inspect` keeps a native of its own rather than becoming this
+		§ call and a `write`. It writes its line through the console, which is
+		§ where a Program under test is read from. The 1,195 lines of
+		§ `StdlibExhaustive.es` output are captured off `console.log` alone.
+
+		§§ Answers the structure of a value as a String, for the author of the Program.
+		§§
+		§§ This is the rendering `inspect` writes. Strings are quoted, Cases print as their tags, and Records and Lists are laid out. The value needs no conformance.
+		§§
+		§§ @param _ — the value to describe
+		§§ @returns — the structural rendering.
+		static describe<infer Value>(_ value: Value) -> String
 	}
 }
 

@@ -5,15 +5,16 @@ import { formatAsRational, type RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import { kindOf, singleLineMaxLength } from "./registry"
 import type { StreamType } from "./Stream"
-import { quoted, type StringType } from "./String"
+import { createString, quoted, type StringType } from "./String"
 import { toString as transcendentalToString } from "./Transcendental"
 import { type AnyType, typeKeySymbol } from "./type"
 
 // NOTE: The native half of `packages/standard-library/sources/Terminal.es` — everything a
-// Program can put in front of a person. Only TWO of the Namespace's entries are
-// native: `write(_:to:)`, because a stream has to be reached somehow, and
-// `inspect`, because the structural rendering below is what it IS. `print` and
-// the stream-less `write` are written in Essence on top of those two.
+// Program can put in front of a person. Only THREE of the Namespace's entries
+// are native: `write(_:to:)`, because a stream has to be reached somehow, and
+// `inspect` and `describe`, because the structural rendering below is what they
+// ARE. `print` and the stream-less `write` are written in Essence on top of
+// those.
 //
 // NOTE: `getStringRepresentation` lives here rather than in `functions.ts`
 // because `inspect` is its only caller in the language — `functions.ts` keeps
@@ -372,4 +373,14 @@ export function inspect<Value extends AnyType>(value: Value): Value {
 	}
 
 	return value
+}
+
+// NOTE: `describe` — the walk above, handed back rather than written, so that a
+// message can carry a value's structure. It is the whole of what `inspect`
+// renders and nothing of what `inspect` does, which is why the two are separate
+// exports over one Function rather than one export the other is written on: an
+// `inspect` written as this and a `write` would move a Program's structural
+// output off the console line the golden and sweep harnesses capture it from.
+export function describe<Value extends AnyType>(value: Value): StringType {
+	return createString(getStringRepresentation(value))
 }

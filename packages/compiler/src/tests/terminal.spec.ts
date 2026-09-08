@@ -273,6 +273,92 @@ describe("Terminal", () => {
 		})
 	})
 
+	describe("describe", () => {
+		// NOTE: The same rendering `inspect` writes, handed back as a String —
+		// so a Program can put a value's structure in a message rather than on
+		// a line of its own. A String comes back with the quotes a Literal
+		// carries, which `print` then writes as text.
+		it("answers a String's structural form, quotes included", async () => {
+			let written = await write(`implementation {
+				Terminal.print(Terminal.describe("hello"))
+			}`)
+
+			expect(written.output).toBe('"hello"\n')
+		})
+
+		// NOTE: THE reason the Method exists. `inspect` can only write, so a
+		// failure message, a log line or an error payload could not carry a
+		// value's structure at all.
+		it("puts a value's structure inside a message", async () => {
+			let written = await write(`implementation {
+				constant total = { won = 2, lost = 1 }
+
+				Terminal.print("unexpected: {Terminal.describe(total)}")
+			}`)
+
+			expect(written.output).toBe("unexpected: { won = 2, lost = 1 }\n")
+		})
+
+		// NOTE: Every container the structural walk knows, in one call: a
+		// Record holding a List, a Dictionary, and a Case. The Strings inside
+		// each are quoted, which is the rule a structure is rendered under and
+		// the one thing `print` of the same value would not do.
+		it("lays out a Record, a List, a Dictionary and a Case", async () => {
+			let written = await write(`implementation {
+				Terminal.print(Terminal.describe({ name = "x", tags = ["a", ""] }))
+				Terminal.print(Terminal.describe(["a" = 1, "b" = 2]))
+				Terminal.print(Terminal.describe(1::compare(to 2)))
+				Terminal.print(Terminal.describe("a"::firstIndex(of "b")))
+			}`)
+
+			expect(written.output).toBe(
+				[
+					'{ name = "x", tags = [ "a", "" ] }',
+					'[ "a" = 1, "b" = 2 ]',
+					"Ordering#Less",
+					"Optional#Empty",
+					"",
+				].join("\n"),
+			)
+		})
+
+		// NOTE: Any value at all, conformance or none — the half of `inspect`
+		// that makes it the Method for a Program's author rather than for its
+		// reader.
+		it("takes a value that conforms to no Printable", async () => {
+			let written = await write(`implementation {
+				choice Colour {
+					Red,
+					Blue,
+				}
+
+				constant chosen: Colour = Colour#Red
+
+				Terminal.print(Terminal.describe(chosen))
+			}`)
+
+			expect(written.output).toBe("Colour#Red\n")
+		})
+
+		// NOTE: One walk, two doors. `inspect` writes exactly the String this
+		// answers, which is what lets a Program that was printing its structure
+		// keep printing the same thing while a message carries it too.
+		it("answers exactly what inspect writes", async () => {
+			let written = await write(`implementation {
+				constant value = { name = "x", scores = [1, 2] }
+
+				Terminal.inspect(value)
+				Terminal.write(Terminal.describe(value))
+				Terminal.write("\n")
+			}`)
+
+			let lines = written.output.split("\n")
+
+			expect(lines[0]).toBe('{ name = "x", scores = [ 1, 2 ] }')
+			expect(lines[1]).toBe(lines[0])
+		})
+	})
+
 	// NOTE: The Optimiser may never take one of these away. `isPureExpression`
 	// answers "can this be left unevaluated" and its enumeration of pure Method
 	// calls names no `Terminal` entry — but the enumeration is an allowlist, and
