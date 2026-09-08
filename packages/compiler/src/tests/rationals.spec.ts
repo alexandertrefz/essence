@@ -689,6 +689,102 @@ describe("Rationals", () => {
 		})
 	})
 
+	// NOTE: Grouping is written into the digits of an answer the formatter has
+	// already produced, so what it has to get right is WHICH digits: a run
+	// before a point, and one on each side of a fraction's slash. The two
+	// entries are on `Rational` and on `Integer` alike, so a `Scalar` receiver
+	// reaches them, and the last test here is what says so.
+	describe("Grouped digits", () => {
+		it("writes the separator between every three digits from the right", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(
+						1234567::toString(as #Decimal, groupingWith ","),
+					)
+					Terminal.inspect(
+						123::toString(as #Decimal, groupingWith ","),
+					)
+					Terminal.inspect(
+						12::toString(as #Decimal, groupingWith ","),
+					)
+					Terminal.inspect(
+						-1234567::toString(as #Decimal, groupingWith " "),
+					)
+				}`),
+			).toEqual(['"1,234,567"', '"123"', '"12"', '"-1 234 567"'])
+		})
+
+		it("groups the digits before the point and none after it", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(
+						12345678/10000::toString(
+							as #Decimal,
+							groupingWith ",",
+						),
+					)
+					Terminal.inspect(
+						1234567::toString(
+							as #Decimal,
+							toPlaces 2,
+							groupingWith ",",
+						),
+					)
+					Terminal.inspect(
+						12345678/10000::toString(
+							as #Decimal,
+							toPlaces 2,
+							groupingWith ",",
+							toward #Down,
+						),
+					)
+				}`),
+			).toEqual(['"1,234.5678"', '"1,234,567.00"', '"1,234.56"'])
+		})
+
+		it("groups both parts of a fraction and neither part of an exponent", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(
+						12345678/10000::toString(
+							as #Fraction,
+							groupingWith ",",
+						),
+					)
+					Terminal.inspect(
+						1234567::toString(
+							as #Scientific,
+							toPlaces 3,
+							groupingWith ",",
+						),
+					)
+					Terminal.inspect(
+						1234567::toString(as #Percent, groupingWith " "),
+					)
+				}`),
+			).toEqual(['"6,172,839/5,000"', '"1.235e6"', '"123 456 700%"'])
+		})
+
+		it("reaches a Scalar receiver through both rungs", async () => {
+			expect(
+				await run(`implementation {
+					constant mixed: List<Integer | Rational> = [1234567, 1/2]
+
+					Terminal.inspect(
+						mixed::sum()::toString(
+							as #Decimal,
+							toPlaces 2,
+							groupingWith ",",
+						),
+					)
+					Terminal.inspect(
+						mixed::sum()::toString(as #Decimal, groupingWith ","),
+					)
+				}`),
+			).toEqual(['"1,234,567.50"', '"1,234,567.5"'])
+		})
+	})
+
 	describe("Compiled Programs", () => {
 		it("divides by a negative Integer without corrupting the value", async () => {
 			expect(

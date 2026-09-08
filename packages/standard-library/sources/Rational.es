@@ -358,6 +358,39 @@ declarations {
 				toPlaces count: Integer,
 				toward direction: Rounding = #Nearest,
 			) -> String
+
+			§ The label mirrors `defaultingTo:`: it names what the entry does
+			§ with the Argument rather than what the Argument is. Both
+			§ grouped entries stand on this Namespace and on `Integer` alike,
+			§ so a `Scalar` receiver reaches them. That is why the entry
+			§ without a count is here rather than on `Integer` alone. Locale
+			§ is not a Parameter and never will be: the separator is written
+			§ where the entry says it is written.
+
+			§§ Answers the Rational in the named format, with a separator between the digit groups.
+			§§
+			§§ The separator goes between every three digits before the point, counted from the right, so `1234567` is `1,234,567` under a comma. The scientific form writes one digit before the point and takes no separator. The fraction form groups the numerator and the denominator alike.
+			§§
+			§§ @param as — the form to represent the Rational in
+			§§ @param groupingWith — the text to write between the digit groups
+			§§ @returns — the String representation of the Rational.
+			(as format: NumberFormat, groupingWith separator: String) -> String
+
+			§§ Answers the Rational in the named format, with that many places and a separator between the digit groups.
+			§§
+			§§ The count and the direction reach the format exactly as they do without a separator, so `1234567/1` over two places is `1,234,567.00` under a comma. Only the digits before the point are grouped.
+			§§
+			§§ @param as — the form to represent the Rational in
+			§§ @param toPlaces — how many digits to write after the point
+			§§ @param groupingWith — the text to write between the digit groups
+			§§ @param toward — the direction to round the last digit in, `#Nearest` when it is left out
+			§§ @returns — the String representation of the Rational.
+			(
+				as format: NumberFormat,
+				toPlaces count: Integer,
+				groupingWith separator: String,
+				toward direction: Rounding = #Nearest,
+			) -> String
 		}
 
 		§ The Integer entries are written on the accessors and `Rational.of`, so

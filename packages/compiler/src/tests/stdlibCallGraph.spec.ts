@@ -543,6 +543,8 @@ describe("Stdlib Call Graph", () => {
 			"Integer.subtract__overload$4",
 			"Integer.toString__overload$2",
 			"Integer.toString__overload$3",
+			"Integer.toString__overload$4",
+			"Integer.toString__overload$5",
 			"IntegerList.average__overload$1",
 			"IntegerList.average__overload$2",
 			"IntegerList.highestNumber__overload$1",

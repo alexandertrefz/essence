@@ -807,6 +807,24 @@ third"::lines())
 		"Integer.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [scientific, negative]",
 		-1234::toString(as NumberFormat#Scientific, toPlaces 2),
 	)
+	show(
+		"Integer.toString(as: NumberFormat, groupingWith: String)",
+		1234567::toString(as NumberFormat#Decimal, groupingWith ","),
+	)
+	show(
+		"Integer.toString(as: NumberFormat, groupingWith: String) [under three digits]",
+		12::toString(as NumberFormat#Decimal, groupingWith ","),
+	)
+	show(
+		"Integer.toString(as: NumberFormat, toPlaces: Integer, groupingWith: String, toward?: Rounding)",
+		1234567
+			::toString(as NumberFormat#Decimal, toPlaces 2, groupingWith ","),
+	)
+	show(
+		"Integer.toString(as: NumberFormat, toPlaces: Integer, groupingWith: String, toward?: Rounding) [negative]",
+		-1234567
+			::toString(as NumberFormat#Decimal, toPlaces 2, groupingWith ","),
+	)
 	show("Integer.compare(to: Integer)", 1::compare(to 2))
 	show("Integer.compare(to: Integer) [equal]", 2::compare(to 2))
 	show("Integer.compare(to: Integer) [greater]", 3::compare(to 2))
@@ -1334,6 +1352,29 @@ third"::lines())
 	show(
 		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [scientific carries into the exponent]",
 		999/100::toString(as NumberFormat#Scientific, toPlaces 1),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, groupingWith: String)",
+		12345678/10000::toString(as NumberFormat#Decimal, groupingWith ","),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, groupingWith: String) [fraction groups both parts]",
+		12345678/10000::toString(as NumberFormat#Fraction, groupingWith ","),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, groupingWith: String, toward?: Rounding)",
+		12345678/10000
+			::toString(as NumberFormat#Decimal, toPlaces 2, groupingWith ","),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, groupingWith: String, toward?: Rounding) [down]",
+		12345678/10000
+			::toString(
+				as NumberFormat#Decimal,
+				toPlaces 2,
+				groupingWith ",",
+				toward #Down,
+			),
 	)
 	show("Rational.compare(to: Rational)", 1/2::compare(to 2/3))
 	show("Rational.compare(to: Rational) [equal]", 1/2::compare(to 2/4))
