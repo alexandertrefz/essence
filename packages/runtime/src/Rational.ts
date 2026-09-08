@@ -552,6 +552,45 @@ function formatAsScientific(
 	return `${text}e${exponent}`
 }
 
+// NOTE: The separator goes between every three digits of a run that stands
+// before a point, counted from the right. Which runs those are is decided per
+// format by where the run ENDS: the decimal and percent forms end theirs at the
+// point or at the `%`, the scientific form's mantissa is one digit and takes
+// none, and the fraction form has a run on each side of the `/`, so both are
+// grouped. Locale is deliberately absent — the separator is written between the
+// groups exactly as it is given, and nothing here decides what it should be.
+function groupedWholePart(part: string, separator: string): string {
+	let sign = part.startsWith("-") ? "-" : ""
+	let rest = sign === "" ? part : part.slice(1)
+	let boundary = rest.length
+
+	for (let index = 0; index < rest.length; index++) {
+		let character = rest[index]!
+
+		if (character < "0" || character > "9") {
+			boundary = index
+			break
+		}
+	}
+
+	let digits = rest.slice(0, boundary)
+	let tail = rest.slice(boundary)
+	let groups: Array<string> = []
+
+	for (let index = digits.length; index > 0; index -= 3) {
+		groups.unshift(digits.slice(index - 3 < 0 ? 0 : index - 3, index))
+	}
+
+	return `${sign}${groups.join(separator)}${tail}`
+}
+
+function withGrouping(text: string, separator: string): string {
+	return text
+		.split("/")
+		.map((part) => groupedWholePart(part, separator))
+		.join("/")
+}
+
 // #region toString
 
 // NOTE: The format arrives as a `NumberFormat` Case rather than a String, so
@@ -597,6 +636,39 @@ export function toString__overload$3(
 	} else {
 		return createString(formatAsFraction(rational))
 	}
+}
+
+// NOTE: The two grouped entries are the two above with a separator written into
+// the digits of the answer. They are natives beside them rather than Essence
+// bodies over them, because an Essence body would have to take the text apart
+// with `split` and `characters` and put it back together, which reaches the
+// whole of `List` for a walk the formatter is already standing in front of.
+export function toString__overload$4(
+	rational: RationalType,
+	format: NumberFormatType,
+	separator: StringType,
+): StringType {
+	return createString(
+		withGrouping(
+			toString__overload$2(rational, format).value,
+			separator.value,
+		),
+	)
+}
+
+export function toString__overload$5(
+	rational: RationalType,
+	format: NumberFormatType,
+	places: IntegerType,
+	separator: StringType,
+	direction: RoundingType,
+): StringType {
+	return createString(
+		withGrouping(
+			toString__overload$3(rational, format, places, direction).value,
+			separator.value,
+		),
+	)
 }
 
 // #endregion

@@ -213,6 +213,45 @@ declarations {
 				<- Rational.of(@, over 1)
 					::toString(as format, toPlaces count, toward direction)
 			}
+
+			§§ Answers the Integer in the named format, with a separator between the digit groups.
+			§§
+			§§ The separator goes between every three digits, counted from the right, so `1234567` is `1,234,567` under a comma.
+			§§
+			§§ @param as — the form to represent the Integer in
+			§§ @param groupingWith — the text to write between the digit groups
+			§§ @returns — the String representation of the Integer.
+			(
+				as format: NumberFormat,
+				groupingWith separator: String,
+			) -> String {
+				<- Rational.of(@, over 1)
+					::toString(as format, groupingWith separator)
+			}
+
+			§§ Answers the Integer in the named format, with that many places and a separator between the digit groups.
+			§§
+			§§ Only the digits before the point are grouped, so `1234567` over two places is `1,234,567.00` under a comma.
+			§§
+			§§ @param as — the form to represent the Integer in
+			§§ @param toPlaces — how many digits to write after the point
+			§§ @param groupingWith — the text to write between the digit groups
+			§§ @param toward — the direction to round the last digit in, `#Nearest` when it is left out
+			§§ @returns — the String representation of the Integer.
+			(
+				as format: NumberFormat,
+				toPlaces count: Integer,
+				groupingWith separator: String,
+				toward direction: Rounding = #Nearest,
+			) -> String {
+				<- Rational.of(@, over 1)
+					::toString(
+						as format,
+						toPlaces count,
+						groupingWith separator,
+						toward direction,
+					)
+			}
 		}
 
 		§ The mixed-kind entries of `add` and `multiply` are flipped calls.
