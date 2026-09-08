@@ -468,6 +468,14 @@ declarations {
 	§ decides: a witness a Namespace wrote takes the scan path through the
 	§ store, as `contains` would.
 	§
+	§ What it costs is the container. A Program whose only call is this one
+	§ carries the store, the key encoding, the kind registry and the written
+	§ form. It measures 18,592 bytes against 5,083 without the call, and
+	§ `bundleSize.spec.ts` holds that figure. The open alternative is a List
+	§ native over a plain Map, which would buy most of it back. It needs the
+	§ encoding and the branded-witness rule this file owns, in a module of
+	§ their own.
+	§
 	§ `group(on:)` replaced a `List::group(on:)` that folded a List of group
 	§ Records, scanning the groups opened so far for each item. Over the same
 	§ 20,000 items it took 195 ms, where this native takes 0.8 ms. The List
