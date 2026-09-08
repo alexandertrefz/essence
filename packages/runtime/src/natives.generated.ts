@@ -348,6 +348,8 @@ export type TranscendentalNatives = {
 	divide__overload$7: (self: TranscendentalType, by: IntegerType) => TranscendentalType
 	// divide(by: NonZeroRational) -> Transcendental
 	divide__overload$8: (self: TranscendentalType, by: RationalType) => TranscendentalType
+	// isPositive() -> Boolean
+	isPositive: (self: TranscendentalType) => BooleanType
 	// absolute() -> Transcendental
 	absolute: (self: TranscendentalType) => TranscendentalType
 	// negate() -> Transcendental
@@ -809,7 +811,7 @@ export const $ScalarAbsent: AssertNoEssenceExports<typeof import("./Scalar"), "a
 
 declare const AlgebraicModule: typeof import("./Algebraic")
 export const $Algebraic: AlgebraicNatives = AlgebraicModule
-export const $AlgebraicAbsent: AssertNoEssenceExports<typeof import("./Algebraic"), "is" | "toString__overload$2" | "toString__overload$3" | "add__overload$4" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "multiply__overload$4" | "divide__overload$4" | "divide__overload$5" | "divide__overload$6" | "isPositive" | "isNegative" | "absolute" | "round__overload$2"> = true
+export const $AlgebraicAbsent: AssertNoEssenceExports<typeof import("./Algebraic"), "is" | "toString__overload$2" | "toString__overload$3" | "add__overload$4" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "multiply__overload$4" | "divide__overload$4" | "divide__overload$5" | "divide__overload$6" | "isPositive" | "isNegative" | "isZero" | "isWholeNumber" | "absolute" | "round__overload$2"> = true
 export const $AlgebraicArity: AssertArities<typeof import("./Algebraic"), {
 	compare: 2
 	toString__overload$1: 1
@@ -833,7 +835,7 @@ export const $AlgebraicArity: AssertArities<typeof import("./Algebraic"), {
 
 declare const TranscendentalModule: typeof import("./Transcendental")
 export const $Transcendental: TranscendentalNatives = TranscendentalModule
-export const $TranscendentalAbsent: AssertNoEssenceExports<typeof import("./Transcendental"), "toString__overload$2" | "toString__overload$3" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "divide__overload$4" | "divide__overload$5" | "divide__overload$6" | "round__overload$2"> = true
+export const $TranscendentalAbsent: AssertNoEssenceExports<typeof import("./Transcendental"), "toString__overload$2" | "toString__overload$3" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "divide__overload$4" | "divide__overload$5" | "divide__overload$6" | "isNegative" | "isZero" | "isWholeNumber" | "round__overload$2"> = true
 export const $TranscendentalArity: AssertArities<typeof import("./Transcendental"), {
 	is: 2
 	compare: 3
@@ -850,6 +852,7 @@ export const $TranscendentalArity: AssertArities<typeof import("./Transcendental
 	divide__overload$3: 2
 	divide__overload$7: 2
 	divide__overload$8: 2
+	isPositive: 1
 	absolute: 1
 	negate: 1
 	approximate: 3

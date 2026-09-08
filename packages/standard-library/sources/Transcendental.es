@@ -354,6 +354,46 @@ declarations {
 			(by other: NonZeroRational) -> Transcendental
 		}
 
+		§ A Transcendental is never zero. A value over one base equal to a
+		§ Rational would make that base rational. A value over several being
+		§ zero would settle an open problem. So `isPositive` and
+		§ `isNegative` are contraries, and one is the other negated. The
+		§ positive half is native, because this Namespace declares no ordering
+		§ to write a sign on. The covering `Number`'s reaches the whole numeric
+		§ tower; see DEVELOPMENT.md, Why bodies look the way they do.
+		§
+		§ `isZero` and `isWholeNumber` answer `false` for every value. They
+		§ stand here for the reason `Integer::isWholeNumber` answers `true` for
+		§ every Integer. A Union receiver dispatches only where every member
+		§ Namespace declares the Method, so these two are what let a `Number`
+		§ ask either question at all.
+
+		§§ Answers whether the Transcendental is above zero.
+		§§
+		§§ A value over a single base has an exact sign. A value that mixes π and e decides its sign by refining an interval, down to the precision limit `absolute` names.
+		isPositive() -> Boolean
+
+		§§ Answers whether the Transcendental is below zero.
+		§§
+		§§ A Transcendental is never zero, so it is below zero exactly when it is not above it. The sign is decided the way `isPositive` decides it.
+		isNegative() -> Boolean {
+			<- @::isPositive()::negate()
+		}
+
+		§§ Answers whether the Transcendental is exactly zero.
+		§§
+		§§ At least one base term keeps a coefficient that is not zero, so the answer is always `false`.
+		isZero() -> Boolean {
+			<- false
+		}
+
+		§§ Answers whether the Transcendental is a whole number.
+		§§
+		§§ A Transcendental is irrational, so it is never whole and the answer is always `false`.
+		isWholeNumber() -> Boolean {
+			<- false
+		}
+
 		§§ Answers the Transcendental without its sign, which is its distance from zero.
 		§§
 		§§ A value on a single base can never equal a Rational, so its sign is exact. A value that mixes π and e decides its sign by refining an interval, down to a documented precision limit.

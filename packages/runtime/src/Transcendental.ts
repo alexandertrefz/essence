@@ -726,6 +726,18 @@ export function negate(transcendental: TranscendentalType): TranscendentalType {
 	}
 }
 
+// NOTE: The sign of the value, which `signOfForm` decides — exactly for a value
+// over one base, and through the cutoff refinement for one over several. Native
+// for the reason `absolute` above is: this Namespace declares no ordering to
+// write a sign on, and reading the covering `Number`'s puts the whole numeric
+// tower behind a sign test. `isNegative` is not here — a Transcendental is
+// never zero, so it is this question negated, and it is written in Essence.
+export function isPositive(transcendental: TranscendentalType): BooleanType {
+	return createBoolean(
+		signOfForm(rationalPartOf(transcendental), transcendental.terms) > 0n,
+	)
+}
+
 // NOTE: The two Methods that hand a Transcendental to a reader as digits, and
 // the seam the linear span pays its one conjectural price at. The enclosure of
 // the value is refined until the rounding at the width asked for is decided. A
