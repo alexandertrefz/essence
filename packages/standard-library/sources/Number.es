@@ -396,8 +396,8 @@ declarations {
 
 		§§ The lower of two Numbers, or the lowest in a List of them.
 		§§
-		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its lowest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing. A List proven to have an item answers the item itself.
-		overload static lowestNumber {
+		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its lowest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing. A List proven to have an item answers the item itself. A pair the four kind-preserving entries do not fit falls to the widest entry, which answers a Number.
+		overload static lowest {
 			§§ The lower of two Integers.
 			§§
 			§§ The answer is an Integer. Two equal Integers answer the first of them.
@@ -476,7 +476,7 @@ declarations {
 						case #Empty { <- #Value(integer) }
 
 						case #Value(running) {
-							<- #Value(Number.lowestNumber(running, integer))
+							<- #Value(Number.lowest(running, integer))
 						}
 					}
 				})
@@ -496,7 +496,7 @@ declarations {
 						case #Empty { <- #Value(rational) }
 
 						case #Value(running) {
-							<- #Value(Number.lowestNumber(running, rational))
+							<- #Value(Number.lowest(running, rational))
 						}
 					}
 				})
@@ -538,7 +538,7 @@ declarations {
 				_ integers: List<Integer>,
 				defaultingTo fallback: Integer,
 			) -> Integer {
-				<- Number.lowestNumber(integers)::value(defaultingTo fallback)
+				<- Number.lowest(integers)::value(defaultingTo fallback)
 			}
 
 			§§ The lowest of the Rationals, with a value to answer for the empty List.
@@ -550,7 +550,7 @@ declarations {
 				_ rationals: List<Rational>,
 				defaultingTo fallback: Rational,
 			) -> Rational {
-				<- Number.lowestNumber(rationals)::value(defaultingTo fallback)
+				<- Number.lowest(rationals)::value(defaultingTo fallback)
 			}
 
 			§§ The lowest of the Numbers, with a value to answer for the empty List.
@@ -559,7 +559,7 @@ declarations {
 			§§ @param defaultingTo — the value to answer with when there is no lowest
 			§§ @returns — the lowest Number, or the given value in its place.
 			(_ numbers: List<Scalar>, defaultingTo fallback: Scalar) -> Scalar {
-				<- Number.lowestNumber(numbers)::value(defaultingTo fallback)
+				<- Number.lowest(numbers)::value(defaultingTo fallback)
 			}
 
 			§ The proven entries fold the same pairwise ones from `firstItem()`,
@@ -575,9 +575,7 @@ declarations {
 			(_ integers: NonEmptyList<Integer>) -> Integer {
 				<- integers::reduce(
 					startingWith integers::firstItem(),
-					(lowest, integer) {
-						<- Number.lowestNumber(lowest, integer)
-					},
+					(lowest, integer) { <- Number.lowest(lowest, integer) },
 				)
 			}
 
@@ -590,9 +588,7 @@ declarations {
 			(_ rationals: NonEmptyList<Rational>) -> Rational {
 				<- rationals::reduce(
 					startingWith rationals::firstItem(),
-					(lowest, rational) {
-						<- Number.lowestNumber(lowest, rational)
-					},
+					(lowest, rational) { <- Number.lowest(lowest, rational) },
 				)
 			}
 
@@ -614,12 +610,33 @@ declarations {
 					},
 				)
 			}
+
+			§ The entry that reaches the whole tower, kept behind the four
+			§ kind-preserving ones above so that two Integers still answer an
+			§ Integer. It is written on the covering `Number`'s ordering. That
+			§ is the sixteen-cell `compare` this file declares, the same rung
+			§ `clamp` and `isBetween` already answered an irrational through.
+
+			§§ The lower of two Numbers, of any kind the tower holds.
+			§§
+			§§ The answer is a Number, since the two can be of different kinds. Two equal Numbers answer the first of them.
+			§§
+			§§ @param _ — the first Number to compare
+			§§ @param _ — the second Number to compare
+			§§ @returns — the lower Number.
+			(_ firstNumber: Number, _ secondNumber: Number) -> Number {
+				if firstNumber::isLessThanOrEqualTo(secondNumber) {
+					<- firstNumber
+				} else {
+					<- secondNumber
+				}
+			}
 		}
 
 		§§ The higher of two Numbers, or the highest in a List of them.
 		§§
-		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its highest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing. A List proven to have an item answers the item itself.
-		overload static highestNumber {
+		§§ The answer for two equal Numbers is the first of them. A List answers the earliest of its highest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing. A List proven to have an item answers the item itself. A pair the four kind-preserving entries do not fit falls to the widest entry, which answers a Number.
+		overload static highest {
 			§§ The higher of two Integers.
 			§§
 			§§ The answer is an Integer. Two equal Integers answer the first of them.
@@ -694,7 +711,7 @@ declarations {
 						case #Empty { <- #Value(integer) }
 
 						case #Value(running) {
-							<- #Value(Number.highestNumber(running, integer))
+							<- #Value(Number.highest(running, integer))
 						}
 					}
 				})
@@ -714,7 +731,7 @@ declarations {
 						case #Empty { <- #Value(rational) }
 
 						case #Value(running) {
-							<- #Value(Number.highestNumber(running, rational))
+							<- #Value(Number.highest(running, rational))
 						}
 					}
 				})
@@ -753,7 +770,7 @@ declarations {
 				_ integers: List<Integer>,
 				defaultingTo fallback: Integer,
 			) -> Integer {
-				<- Number.highestNumber(integers)::value(defaultingTo fallback)
+				<- Number.highest(integers)::value(defaultingTo fallback)
 			}
 
 			§§ The highest of the Rationals, with a value to answer for the empty List.
@@ -765,7 +782,7 @@ declarations {
 				_ rationals: List<Rational>,
 				defaultingTo fallback: Rational,
 			) -> Rational {
-				<- Number.highestNumber(rationals)::value(defaultingTo fallback)
+				<- Number.highest(rationals)::value(defaultingTo fallback)
 			}
 
 			§§ The highest of the Numbers, with a value to answer for the empty List.
@@ -774,7 +791,7 @@ declarations {
 			§§ @param defaultingTo — the value to answer with when there is no highest
 			§§ @returns — the highest Number, or the given value in its place.
 			(_ numbers: List<Scalar>, defaultingTo fallback: Scalar) -> Scalar {
-				<- Number.highestNumber(numbers)::value(defaultingTo fallback)
+				<- Number.highest(numbers)::value(defaultingTo fallback)
 			}
 
 			§§ The highest of the Integers in a List proven to have an item.
@@ -786,9 +803,7 @@ declarations {
 			(_ integers: NonEmptyList<Integer>) -> Integer {
 				<- integers::reduce(
 					startingWith integers::firstItem(),
-					(highest, integer) {
-						<- Number.highestNumber(highest, integer)
-					},
+					(highest, integer) { <- Number.highest(highest, integer) },
 				)
 			}
 
@@ -802,7 +817,7 @@ declarations {
 				<- rationals::reduce(
 					startingWith rationals::firstItem(),
 					(highest, rational) {
-						<- Number.highestNumber(highest, rational)
+						<- Number.highest(highest, rational)
 					},
 				)
 			}
@@ -824,6 +839,27 @@ declarations {
 						}
 					},
 				)
+			}
+
+			§ The entry that reaches the whole tower, kept behind the four
+			§ kind-preserving ones above so that two Integers still answer an
+			§ Integer. It is written on the covering `Number`'s ordering. That
+			§ is the sixteen-cell `compare` this file declares, the same rung
+			§ `clamp` and `isBetween` already answered an irrational through.
+
+			§§ The higher of two Numbers, of any kind the tower holds.
+			§§
+			§§ The answer is a Number, since the two can be of different kinds. Two equal Numbers answer the first of them.
+			§§
+			§§ @param _ — the first Number to compare
+			§§ @param _ — the second Number to compare
+			§§ @returns — the higher Number.
+			(_ firstNumber: Number, _ secondNumber: Number) -> Number {
+				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
+					<- firstNumber
+				} else {
+					<- secondNumber
+				}
 			}
 		}
 

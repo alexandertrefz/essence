@@ -226,7 +226,7 @@ hands over both values — the receiver's first, then the Argument's:
 
 ```essence
 constant highest = ages::merge(with theirs, choosing (mine, yours) {
-	<- Number.highestNumber(mine, yours)
+	<- Number.highest(mine, yours)
 })
 ```
 

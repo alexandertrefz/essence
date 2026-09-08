@@ -31,11 +31,12 @@ export const GoldenRatio = createAlgebraic(
 
 // #endregion
 
-// NOTE: `lowestNumber`, `highestNumber`, `sum`, `product` and `average` are
+// NOTE: `lowest`, `highest`, `sum`, `product` and `average` are
 // written in Essence now — `packages/standard-library/sources/Number.es`. The pairwise
-// `lowestNumber`/`highestNumber` entries were already there; the List entries
+// `lowest`/`highest` entries were already there; the List entries
 // fold them over the items, and the aggregates fold the members' own
-// arithmetic, collapsing a whole mixed total back to an Integer.
+// arithmetic, collapsing a whole mixed total back to an Integer. The widest
+// pairwise entry folds none of this: it reads the `compare` below.
 
 // #region Union-level Methods
 
