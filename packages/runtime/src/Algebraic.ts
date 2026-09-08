@@ -617,7 +617,12 @@ export function roundScaled(
 // Transcendental over several bases, whose value being rational would settle an
 // open problem. That caller reads a `null` answer as the impasse it is instead
 // of looping forever; every other caller passes `null` for no limit and is
-// answered a step.
+// answered a step. The limit is ABSOLUTE, on the width of the enclosure rather
+// than on how far past `places` the refinement was pushed, because that width
+// is what `Number.es` documents the cutoff as. So a caller asking for a grid
+// already at the limit is answered `null` before a single enclosure is taken,
+// and what it reports is the width it asked for rather than an impasse it
+// reached.
 //
 // NOTE: The guard starts at 8 digits and doubles. Eight is what makes the
 // FIRST enclosure decide for every ordinary value, so the common call costs one

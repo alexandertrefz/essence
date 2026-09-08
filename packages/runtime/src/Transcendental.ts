@@ -261,6 +261,21 @@ function throwPrecisionCutoff(): never {
 	)
 }
 
+// NOTE: The same cutoff met by a reader of digits rather than by a comparison.
+// Nothing on those paths has two numbers in hand, and the enclosure the reading
+// needs may never have been taken at all — a grid at or past the cutoff is
+// refused before the first one — so the caller passes what it was reading and
+// the message claims no depth that two values agreed to.
+function throwPrecisionCutoffForReading(reading: string): never {
+	throw new Error(
+		`${reading} exceeded the precision cutoff of ` +
+			`${precisionCutoffDigits} digits. This number combines several ` +
+			"transcendental constants, so the reading is decided by refining " +
+			"an enclosure, and whether such a value falls exactly on the " +
+			"point that would decide it is an open problem in mathematics.",
+	)
+}
+
 // NOTE: A certified enclosure of `rationalPart + Σ coefficient·base`, scaled
 // by 10^digits. Each base's enclosure is computed only when a term carries it.
 function scaledFormInterval(
@@ -759,7 +774,9 @@ function roundedTranscendental(
 	)
 
 	if (step === null) {
-		throwPrecisionCutoff()
+		throwPrecisionCutoffForReading(
+			`Reading this number at ${places} decimal places`,
+		)
 	}
 
 	return step

@@ -425,7 +425,7 @@ declarations {
 		§§
 		§§ Five places answer the value rounded to hundred-thousandths, so `Number.Pi` over five places answers `314159/100000`. This Method is where a Program asks for digits in place of the exact value. The answer is exact all the same: it is the step of that grid the value rounds to. A width of no places answers a whole number, as a Rational.
 		§§
-		§§ A value over a single base is always answered for. A value carrying both π and e can not be shown to miss every step of the grid. Deciding that would settle an open problem. A call on such a value refines to the cutoff `Number::compare` names, and stops the Program there.
+		§§ A value over a single base is always answered for. A value carrying both π and e can not be shown to miss every step of the grid. Deciding that would settle an open problem. A call on such a value is answered while the enclosure the width needs stays inside the cutoff `Number::compare` names. A width past that cutoff stops the Program.
 		§§
 		§§ @param toPlaces — how many decimal places the grid keeps
 		§§ @param toward — the direction to round in, `#Nearest` when it is left out
