@@ -1,5 +1,5 @@
 import type { AlgebraicType } from "./Algebraic"
-import { scaledIntervalOf } from "./Algebraic"
+import { roundedOnDecimalGrid, scaledIntervalOf } from "./Algebraic"
 import type { BigRational } from "./bigRational"
 import {
 	addRationals,
@@ -12,12 +12,14 @@ import {
 import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
+import { createInteger } from "./Integer"
 import type { OptionalType, ValueType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
 import type { RationalType } from "./Rational"
 import { createRational } from "./Rational"
+import type { RoundingType } from "./Rounding"
 import type { StringType } from "./String"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
@@ -724,6 +726,53 @@ export function negate(transcendental: TranscendentalType): TranscendentalType {
 	}
 }
 
+// NOTE: The two Methods that hand a Transcendental to a reader as digits, and
+// the seam the linear span pays its one conjectural price at. The enclosure of
+// the value is refined until the rounding at the width asked for is decided. A
+// value over a SINGLE base is irrational outright, so it never sits on the
+// point a rounding rule steps at and the refinement always ends. A value over
+// several bases sitting on such a point would make `b·π + c·e` rational, which
+// is an open problem, so that one refines to the same cutoff every other
+// several-base decision runs to and reports the impasse there.
+function roundedTranscendental(
+	transcendental: TranscendentalType,
+	places: bigint,
+	direction: RoundingType,
+): bigint {
+	const step = roundedOnDecimalGrid(
+		(digits) => scaledTranscendentalInterval(transcendental, digits),
+		places,
+		direction,
+		transcendental.terms.length > 1 ? precisionCutoffDigits : null,
+	)
+
+	if (step === null) {
+		throwPrecisionCutoff()
+	}
+
+	return step
+}
+
+export function round(
+	transcendental: TranscendentalType,
+	direction: RoundingType,
+): IntegerType {
+	return createInteger(roundedTranscendental(transcendental, 0n, direction))
+}
+
+export function approximate(
+	transcendental: TranscendentalType,
+	places: IntegerType,
+	direction: RoundingType,
+): RationalType {
+	const width = BigInt(places.value)
+
+	return createRational(
+		roundedTranscendental(transcendental, width, direction),
+		10n ** width,
+	)
+}
+
 // #endregion
 
 // #region Printing
@@ -805,5 +854,9 @@ export const divide__overload$8 = divideByNonZero as (
 	transcendental: TranscendentalType,
 	other: RationalType,
 ) => TranscendentalType
+
+// NOTE: `round` answers an Integer as the first entry of its Overload; the
+// second is written in Essence on `approximate`.
+export const round__overload$1 = round
 
 // #endregion

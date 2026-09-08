@@ -13,6 +13,7 @@ import * as number from "@essence-lang/runtime/Number"
 import type { OptionalType, ValueType } from "@essence-lang/runtime/Optional"
 import * as ordering from "@essence-lang/runtime/Ordering"
 import * as rational from "@essence-lang/runtime/Rational"
+import * as rounding from "@essence-lang/runtime/Rounding"
 import * as transcendental from "@essence-lang/runtime/Transcendental"
 import { type AnyType, typeKeySymbol } from "@essence-lang/runtime/type"
 
@@ -127,6 +128,37 @@ function* deterministicNumbers(seed: number): Generator<number> {
 		state = (state * 1103515245 + 12345) % 2147483648
 
 		yield state
+	}
+}
+
+// NOTE: The five rounding rules under the names the tests read them by, so a
+// table-driven case names its rule rather than reaching into the module.
+const roundings = {
+	nearest: rounding.nearest,
+	nearestEven: rounding.nearestEven,
+	down: rounding.down,
+	up: rounding.up,
+	towardZero: rounding.towardZero,
+}
+
+// NOTE: `p/q` as the pair the test compares against — `approximate` builds its
+// answer through `createRational`, which normalises a zero numerator's
+// denominator to 1, so the width can not be read back off the answer.
+function boundsOf(
+	value: rational.RationalType,
+	places: bigint,
+): { low: rational.RationalType; high: rational.RationalType } {
+	const scale = 10n ** places
+
+	return {
+		low: rational.createRational(
+			value.numerator * scale - value.denominator,
+			value.denominator * scale,
+		),
+		high: rational.createRational(
+			value.numerator * scale + value.denominator,
+			value.denominator * scale,
+		),
 	}
 }
 
@@ -608,6 +640,132 @@ describe("Irrationals", () => {
 
 			expect(best).toBeLessThan(50)
 		})
+
+		// NOTE: The enclosure `scaledIntervalOf` answers is refined until both
+		// of its ends round alike at the width asked for, so what is checked
+		// here is that the answer IS the step the exact value rounds to — not
+		// that it is close to one. √2 is 1.41421356…, so the digits below are
+		// readable, and the rounding rules separate on the third place of
+		// 1.4142|1356 only where a rule looks at the remainder rather than at a
+		// tie: an irrational never sits on a tie, which is why `#Nearest` and
+		// `#NearestEven` agree everywhere here.
+		describe("approximate(toPlaces:toward:)", () => {
+			const at = (
+				value: algebraic.AlgebraicType,
+				places: bigint,
+				direction: rounding.RoundingType = roundings.nearest,
+			) =>
+				algebraic.approximate(
+					value,
+					integer.createInteger(places),
+					direction,
+				)
+
+			const digitsOf = (value: rational.RationalType) =>
+				`${value.numerator}/${value.denominator}`
+
+			it("answers the step of the grid the value rounds to", () => {
+				expect(digitsOf(at(radical(2n), 0n))).toBe("1/1")
+				expect(digitsOf(at(radical(2n), 3n))).toBe("1414/1000")
+				expect(digitsOf(at(radical(2n), 6n))).toBe("1414214/1000000")
+				expect(digitsOf(at(number.GoldenRatio, 10n))).toBe(
+					"16180339887/10000000000",
+				)
+			})
+
+			it("answers every rounding rule at the width asked for", () => {
+				expect(digitsOf(at(radical(2n), 3n, roundings.down))).toBe(
+					"1414/1000",
+				)
+				expect(digitsOf(at(radical(2n), 3n, roundings.up))).toBe(
+					"1415/1000",
+				)
+				expect(
+					digitsOf(at(radical(2n), 3n, roundings.towardZero)),
+				).toBe("1414/1000")
+				expect(
+					digitsOf(at(radical(2n), 3n, roundings.nearestEven)),
+				).toBe("1414/1000")
+			})
+
+			it("rounds a negative value the way its rule names", () => {
+				const negated = algebraic.negate(radical(2n))
+
+				expect(digitsOf(at(negated, 3n))).toBe("-1414/1000")
+				expect(digitsOf(at(negated, 3n, roundings.down))).toBe(
+					"-1415/1000",
+				)
+				expect(digitsOf(at(negated, 3n, roundings.up))).toBe(
+					"-1414/1000",
+				)
+				expect(digitsOf(at(negated, 3n, roundings.towardZero))).toBe(
+					"-1414/1000",
+				)
+			})
+
+			it("answers a whole number as a Rational over one", () => {
+				expect(digitsOf(at(radical(2n), 0n, roundings.up))).toBe("2/1")
+				expect(digitsOf(at(algebraic.negate(radical(2n)), 0n))).toBe(
+					"-1/1",
+				)
+			})
+
+			// NOTE: `round` is the same decision at no places, answering an
+			// Integer rather than a Rational — the rung a `Number` receiver
+			// reaches.
+			it("answers the same step through round", () => {
+				expect(
+					algebraic.round(radical(2n), roundings.nearest).value,
+				).toBe(1)
+				expect(algebraic.round(radical(2n), roundings.up).value).toBe(2)
+				expect(
+					algebraic.round(
+						algebraic.negate(radical(2n)),
+						roundings.down,
+					).value,
+				).toBe(-2)
+			})
+
+			// NOTE: The property the §§ block promises: the answer is within
+			// one unit of the last place of the value itself. It is asserted
+			// through `compare`, which is exact, so nothing here rests on a
+			// second approximation.
+			it("lands within a unit of the last place, for any value", () => {
+				const numbers = deterministicNumbers(20260907)
+
+				for (let attempt = 0; attempt < 200; attempt++) {
+					const rationalPart = bigRational(
+						BigInt((numbers.next().value % 200) - 100),
+						BigInt((numbers.next().value % 9) + 1),
+					)
+					const coefficient = bigRational(
+						BigInt((numbers.next().value % 200) - 100),
+						BigInt((numbers.next().value % 9) + 1),
+					)
+					const radicand = BigInt((numbers.next().value % 500) + 2)
+					const places = BigInt(numbers.next().value % 12)
+					const value = algebraic.createAlgebraic(
+						rationalPart,
+						coefficient,
+						radicand,
+					)
+
+					if (value[typeKeySymbol] !== "Algebraic") {
+						continue
+					}
+
+					const answer = at(value, places)
+					const bounds = boundsOf(answer, places)
+
+					expect(algebraic.compare(value, bounds.low)).toEqual(
+						ordering.greater,
+					)
+					expect(algebraic.compare(value, bounds.high)).toEqual(
+						ordering.less,
+					)
+				}
+			})
+		})
 	})
 
 	describe("Transcendental Runtime", () => {
@@ -951,6 +1109,139 @@ describe("Irrationals", () => {
 				)
 			})
 		})
+
+		// NOTE: The same refinement `compare` runs, read for digits rather
+		// than for a sign: the enclosure is narrowed until both of its ends
+		// round alike at the width asked for. π is 3.14159265358979…, e is
+		// 2.718281828459…, and their sum is 5.859874482048…, so the answers
+		// below are readable digit by digit.
+		describe("approximate(toPlaces:toward:)", () => {
+			const at = (
+				value: transcendental.TranscendentalType,
+				places: bigint,
+				direction: rounding.RoundingType = roundings.nearest,
+			) =>
+				transcendental.approximate(
+					value,
+					integer.createInteger(places),
+					direction,
+				)
+
+			const digitsOf = (value: rational.RationalType) =>
+				`${value.numerator}/${value.denominator}`
+
+			it("answers the step of the grid the value rounds to", () => {
+				expect(digitsOf(at(number.Pi, 0n))).toBe("3/1")
+				expect(digitsOf(at(number.Pi, 5n))).toBe("314159/100000")
+				expect(digitsOf(at(number.E, 8n))).toBe("271828183/100000000")
+				expect(digitsOf(at(number.Tau, 4n))).toBe("62832/10000")
+			})
+
+			it("answers every rounding rule at the width asked for", () => {
+				expect(digitsOf(at(number.Pi, 3n, roundings.down))).toBe(
+					"3141/1000",
+				)
+				expect(digitsOf(at(number.Pi, 3n, roundings.up))).toBe(
+					"3142/1000",
+				)
+				expect(digitsOf(at(number.Pi, 3n, roundings.towardZero))).toBe(
+					"3141/1000",
+				)
+				expect(digitsOf(at(number.Pi, 3n, roundings.nearestEven))).toBe(
+					"3142/1000",
+				)
+			})
+
+			it("rounds a value over both bases", () => {
+				const sum = transcendental.addTranscendental(
+					number.Pi,
+					number.E,
+				) as transcendental.TranscendentalType
+
+				expect(digitsOf(at(sum, 6n))).toBe("5859874/1000000")
+				expect(transcendental.round(sum, roundings.nearest).value).toBe(
+					6,
+				)
+			})
+
+			// NOTE: The claim the refinement loop exists for. A value a
+			// thirty-first of a decimal place above a half can not be decided
+			// by the first enclosure, which is eight digits wide, so the guard
+			// doubles until it is. Built as π plus the rational that carries π
+			// to a half, over a floor of π rather than a rounding of it, so the
+			// value is above the half and never on it.
+			it("refines an enclosure that does not decide at once", () => {
+				const floored = at(number.Pi, 30n, roundings.down)
+				const justAboveHalf = transcendental.add(
+					number.Pi,
+					rational.createRational(
+						floored.denominator - 2n * floored.numerator,
+						2n * floored.denominator,
+					),
+				)
+
+				expect(
+					transcendental.signRelativeTo(
+						justAboveHalf,
+						rational.createRational(1n, 2n),
+					),
+				).toBe(1n)
+				expect(digitsOf(at(justAboveHalf, 0n))).toBe("1/1")
+				expect(
+					digitsOf(at(justAboveHalf, 0n, roundings.nearestEven)),
+				).toBe("1/1")
+				expect(digitsOf(at(justAboveHalf, 0n, roundings.down))).toBe(
+					"0/1",
+				)
+				expect(
+					digitsOf(at(justAboveHalf, 0n, roundings.towardZero)),
+				).toBe("0/1")
+			})
+
+			// NOTE: The property the §§ block promises, asserted through
+			// `signRelativeTo`, which is the exact ordering against a Rational.
+			it("lands within a unit of the last place, for any value", () => {
+				const numbers = deterministicNumbers(20260908)
+
+				for (let attempt = 0; attempt < 200; attempt++) {
+					const coefficients = [
+						bigRational(
+							BigInt((numbers.next().value % 40) - 20),
+							BigInt((numbers.next().value % 9) + 1),
+						),
+						bigRational(
+							BigInt((numbers.next().value % 40) - 20),
+							BigInt((numbers.next().value % 9) + 1),
+						),
+					]
+					const places = BigInt(numbers.next().value % 10)
+					const value = transcendental.createTranscendental(
+						bigRational(
+							BigInt((numbers.next().value % 40) - 20),
+							BigInt((numbers.next().value % 9) + 1),
+						),
+						[
+							{ base: "π", coefficient: coefficients[0]! },
+							{ base: "e", coefficient: coefficients[1]! },
+						],
+					)
+
+					if (value[typeKeySymbol] !== "Transcendental") {
+						continue
+					}
+
+					const answer = at(value, places)
+					const bounds = boundsOf(answer, places)
+
+					expect(
+						transcendental.signRelativeTo(value, bounds.low),
+					).toBe(1n)
+					expect(
+						transcendental.signRelativeTo(value, bounds.high),
+					).toBe(-1n)
+				}
+			})
+		})
 	})
 
 	describe("Number cross-kind semantics", () => {
@@ -1128,6 +1419,48 @@ describe("Irrationals", () => {
 					})
 				}`),
 			).toEqual([])
+		})
+
+		// NOTE: A Union receiver dispatches only where EVERY member Namespace
+		// declares the Method, so this is the check that `round(toward:)` now
+		// has all four rungs — Integer's and Rational's were already written,
+		// and the two irrationals gained one each. It is written through a
+		// Function so the receiver is a `Number` the Program was handed rather
+		// than a value that proves its own kind.
+		it("reaches round on a Number receiver, across every kind", async () => {
+			expect(
+				await run(`implementation {
+					function asNumber(_ value: Number) -> Number {
+						<- value
+					}
+
+					Terminal.inspect(asNumber(Number.Pi)::round())
+					Terminal.inspect(asNumber(Number.GoldenRatio)::round(toward #Up))
+					Terminal.inspect(asNumber(3/2)::round())
+					Terminal.inspect(asNumber(7)::round(toward #Down))
+				}`),
+			).toEqual(["3", "2", "2", "7"])
+		})
+
+		// NOTE: The whole point of the approximation API, written the way a
+		// Program writes it: an exact area, then digits asked for once at the
+		// end.
+		//
+		// NOTE: `inspect` shows a Rational in lowest terms, so `4·π` over four
+		// places reads `7854/625` rather than the `125664/10000` the grid is
+		// built on. The two are one number; the direct tests above read the
+		// unreduced pair off the answer, which is what makes the digits
+		// legible there.
+		it("answers digits for an exact irrational area", async () => {
+			expect(
+				await run(`implementation {
+					constant area = Number.Pi::multiply(with 2::raise(to 2))
+
+					Terminal.inspect(area::toString())
+					Terminal.inspect(area::approximate(toPlaces 4))
+					Terminal.inspect(area::round(toPlaces 2))
+				}`),
+			).toEqual([`"4·π"`, "7854/625", "1257/100"])
 		})
 	})
 })

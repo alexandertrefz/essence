@@ -311,6 +311,10 @@ export type AlgebraicNatives = {
 	divide__overload$8: (self: AlgebraicType, by: RationalType) => AlgebraicType
 	// negate() -> Algebraic
 	negate: (self: AlgebraicType) => AlgebraicType
+	// approximate(toPlaces: NonNegativeInteger, toward: Rounding) -> Rational
+	approximate: (self: AlgebraicType, toPlaces: IntegerType, toward: RoundingType) => RationalType
+	// round(toward: Rounding) -> Integer
+	round__overload$1: (self: AlgebraicType, toward: RoundingType) => IntegerType
 }
 
 export type TranscendentalNatives = {
@@ -348,6 +352,10 @@ export type TranscendentalNatives = {
 	absolute: (self: TranscendentalType) => TranscendentalType
 	// negate() -> Transcendental
 	negate: (self: TranscendentalType) => TranscendentalType
+	// approximate(toPlaces: NonNegativeInteger, toward: Rounding) -> Rational
+	approximate: (self: TranscendentalType, toPlaces: IntegerType, toward: RoundingType) => RationalType
+	// round(toward: Rounding) -> Integer
+	round__overload$1: (self: TranscendentalType, toward: RoundingType) => IntegerType
 }
 
 export type NumberNatives = {
@@ -801,7 +809,7 @@ export const $ScalarAbsent: AssertNoEssenceExports<typeof import("./Scalar"), "a
 
 declare const AlgebraicModule: typeof import("./Algebraic")
 export const $Algebraic: AlgebraicNatives = AlgebraicModule
-export const $AlgebraicAbsent: AssertNoEssenceExports<typeof import("./Algebraic"), "is" | "add__overload$4" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "multiply__overload$4" | "divide__overload$4" | "divide__overload$5" | "divide__overload$6" | "isPositive" | "isNegative" | "absolute"> = true
+export const $AlgebraicAbsent: AssertNoEssenceExports<typeof import("./Algebraic"), "is" | "add__overload$4" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "multiply__overload$4" | "divide__overload$4" | "divide__overload$5" | "divide__overload$6" | "isPositive" | "isNegative" | "absolute" | "round__overload$2"> = true
 export const $AlgebraicArity: AssertArities<typeof import("./Algebraic"), {
 	compare: 2
 	toString: 1
@@ -819,11 +827,13 @@ export const $AlgebraicArity: AssertArities<typeof import("./Algebraic"), {
 	divide__overload$7: 2
 	divide__overload$8: 2
 	negate: 1
+	approximate: 3
+	round__overload$1: 2
 }> = true
 
 declare const TranscendentalModule: typeof import("./Transcendental")
 export const $Transcendental: TranscendentalNatives = TranscendentalModule
-export const $TranscendentalAbsent: AssertNoEssenceExports<typeof import("./Transcendental"), "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "divide__overload$4" | "divide__overload$5" | "divide__overload$6"> = true
+export const $TranscendentalAbsent: AssertNoEssenceExports<typeof import("./Transcendental"), "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "divide__overload$4" | "divide__overload$5" | "divide__overload$6" | "round__overload$2"> = true
 export const $TranscendentalArity: AssertArities<typeof import("./Transcendental"), {
 	is: 2
 	compare: 3
@@ -842,6 +852,8 @@ export const $TranscendentalArity: AssertArities<typeof import("./Transcendental
 	divide__overload$8: 2
 	absolute: 1
 	negate: 1
+	approximate: 3
+	round__overload$1: 2
 }> = true
 
 declare const NumberModule: typeof import("./Number")
