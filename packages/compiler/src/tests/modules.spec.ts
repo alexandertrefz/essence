@@ -1932,7 +1932,7 @@ export {
 
 	// NOTE: What the Module's canonical path is FOR: a Choice takes its nominal
 	// identity from the Module that declares it, so two files each declaring
-	// `choice Result` declare two Types — and linking is where that path is
+	// `choice Outcome` declare two Types — and linking is where that path is
 	// supplied. Without it the two would be interchangeable at compile time and
 	// carry the same runtime tag, and `is` would confuse them with no Diagnostic
 	// anywhere.
@@ -1940,11 +1940,11 @@ export {
 		withProject(
 			{
 				"Main.es": `import {
-	from "./Other.es" { Result as Theirs }
+	from "./Other.es" { Outcome as Theirs }
 }
 
 implementation {
-	choice Result {
+	choice Outcome {
 		Ok
 	}
 
@@ -1952,19 +1952,19 @@ implementation {
 		<- true
 	}
 
-	constant mine: Result = #Ok
+	constant mine: Outcome = #Ok
 
 	Terminal.inspect(take(mine)::toString())
 }
 `,
 				"Other.es": `implementation {
-	choice Result {
+	choice Outcome {
 		Ok
 	}
 }
 
 export {
-	Result
+	Outcome
 }
 `,
 			},
