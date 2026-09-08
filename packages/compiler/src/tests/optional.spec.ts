@@ -256,6 +256,186 @@ describe("Optional", () => {
 				}`),
 			).toEqual(["true", "false", "false", "true"])
 		})
+
+		// NOTE: The quantified entry of `hasValue`, which stands beside the
+		// bare one as `List::hasItems(where:)` stands beside `hasItems()`. An
+		// empty Optional answers `false` without running the check, which is
+		// what makes the name read true on a container holding nothing.
+		it("asks a question of the value, and answers false without one", async () => {
+			expect(
+				await run(`implementation {
+					constant numbers = [3]
+					constant none: List<Integer> = []
+
+					Terminal.inspect(numbers::firstItem()::hasValue(where (item) { <- item::isOdd() }))
+					Terminal.inspect(numbers::firstItem()::hasValue(where (item) { <- item::isEven() }))
+					Terminal.inspect(none::firstItem()::hasValue(where (item) { <- item::isOdd() }))
+				}`),
+			).toEqual(["true", "false", "false"])
+		})
+
+		// NOTE: `or` takes an Optional and answers one; `value(defaultingTo:)`
+		// takes a bare value and answers one. Two names rather than two
+		// entries, because on a nested Optional an `#Empty` Argument would fit
+		// both readings.
+		it("falls back to another Optional with or", async () => {
+			expect(
+				await run(`implementation {
+					constant numbers = [3]
+					constant none: List<Integer> = []
+
+					Terminal.inspect(numbers::firstItem()::or(#Value(9)))
+					Terminal.inspect(none::firstItem()::or(#Value(9)))
+					Terminal.inspect(none::firstItem()::or(none::firstItem()))
+					Terminal.inspect(none::firstItem()::or(#Value(1))::or(#Value(2)))
+				}`),
+			).toEqual([
+				"Optional#Value(3)",
+				"Optional#Value(9)",
+				"Optional#Empty",
+				"Optional#Value(1)",
+			])
+		})
+
+		// NOTE: The at-most-one case of `List::pair(with:)`, and the shape two
+		// Optionals are combined in without a nested Match at the use site.
+		// Essence has no tuple, so the answer is a Record of `first` and
+		// `second`.
+		it("pairs two Optionals, and answers empty when either is", async () => {
+			expect(
+				await run(`implementation {
+					constant numbers = [3]
+					constant words = ["a"]
+					constant none: List<Integer> = []
+
+					Terminal.inspect(numbers::firstItem()::pair(with words::firstItem()))
+					Terminal.inspect(none::firstItem()::pair(with words::firstItem()))
+					Terminal.inspect(numbers::firstItem()::pair(with none::firstItem()))
+				}`),
+			).toEqual([
+				`Optional#Value({ first = 3, second = "a" })`,
+				"Optional#Empty",
+				"Optional#Empty",
+			])
+		})
+
+		// NOTE: The bridge to every Method a List answers, and the one body
+		// here that builds a value of another Type. A List literal is a
+		// language primitive, so it names no Namespace: importing `List` into
+		// `Optional.es` would close a second cycle in the library.
+		it("crosses to a List of at most one item", async () => {
+			expect(
+				await run(`implementation {
+					constant numbers = [3]
+					constant none: List<Integer> = []
+
+					Terminal.inspect(numbers::firstItem()::toList())
+					Terminal.inspect(none::firstItem()::toList())
+					Terminal.inspect(numbers::firstItem()::toList()::length())
+				}`),
+			).toEqual(["[ 3 ]", "[]", "1"])
+		})
+	})
+
+	// NOTE: The laws the combinators are expected to keep, checked over every
+	// combination of a three value domain rather than over sampled ones —
+	// `#Empty` and two distinct values is the whole of what an
+	// `Optional<Integer>` can be up to the payload, so an exhaustive answer is
+	// available and is stronger than a sampled one.
+	describe("Laws", () => {
+		const domain = `constant candidates: List<Optional<Integer>> = [#Empty, #Value(1), #Value(2)]`
+
+		it("makes or associative", async () => {
+			expect(
+				await run(`implementation {
+					${domain}
+
+					Terminal.inspect(candidates::hasOnlyItems(where (first) {
+						<- candidates::hasOnlyItems(where (second) {
+							<- candidates::hasOnlyItems(where (third) {
+								<- first::or(second)::or(third)::is(first::or(second::or(third)))
+							})
+						})
+					}))
+				}`),
+			).toEqual(["true"])
+		})
+
+		it("makes an empty Optional or's identity on both sides", async () => {
+			expect(
+				await run(`implementation {
+					${domain}
+
+					constant nothing: Optional<Integer> = #Empty
+
+					Terminal.inspect(candidates::hasOnlyItems(where (candidate) {
+						<- candidate::or(nothing)::is(candidate)::and(nothing::or(candidate)::is(candidate))
+					}))
+				}`),
+			).toEqual(["true"])
+		})
+
+		// NOTE: `or` answers the FIRST value in the chain, so it is idempotent
+		// and not commutative. Both are stated, because a reader who has the
+		// associativity above will ask.
+		it("makes or idempotent, and not commutative", async () => {
+			expect(
+				await run(`implementation {
+					${domain}
+
+					Terminal.inspect(candidates::hasOnlyItems(where (candidate) {
+						<- candidate::or(candidate)::is(candidate)
+					}))
+					Terminal.inspect(candidates::hasOnlyItems(where (first) {
+						<- candidates::hasOnlyItems(where (second) {
+							<- first::or(second)::is(second::or(first))
+						})
+					}))
+				}`),
+			).toEqual(["true", "false"])
+		})
+
+		it("pairs exactly when both Optionals hold a value", async () => {
+			expect(
+				await run(`implementation {
+					${domain}
+
+					Terminal.inspect(candidates::hasOnlyItems(where (first) {
+						<- candidates::hasOnlyItems(where (second) {
+							<- first::pair(with second)::hasValue()::is(first::hasValue()::and(second::hasValue()))
+						})
+					}))
+				}`),
+			).toEqual(["true"])
+		})
+
+		// NOTE: The round trip. `toList` and the List's own `firstItem` are
+		// each other's inverse on an Optional, which is what makes `toList` a
+		// bridge rather than a lossy rendering.
+		it("crosses to a List and back with toList", async () => {
+			expect(
+				await run(`implementation {
+					${domain}
+
+					Terminal.inspect(candidates::hasOnlyItems(where (candidate) {
+						<- candidate::toList()::firstItem()::is(candidate)
+					}))
+				}`),
+			).toEqual(["true"])
+		})
+
+		it("asks hasValue(where:) what keep(where:) answers", async () => {
+			expect(
+				await run(`implementation {
+					${domain}
+
+					Terminal.inspect(candidates::hasOnlyItems(where (candidate) {
+						<- candidate::hasValue(where (item) { <- item::isOdd() })
+							::is(candidate::keep(where (item) { <- item::isOdd() })::hasValue())
+					}))
+				}`),
+			).toEqual(["true"])
+		})
 	})
 
 	describe("Matching", () => {

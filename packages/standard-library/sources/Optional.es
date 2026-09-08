@@ -120,14 +120,38 @@ declarations {
 		§ alternative is to match the Optional apart at the use site, or to
 		§ pick a fallback that can not occur and compare against it. That
 		§ fallback is wrong whenever the payload can equal it.
+		§
+		§ The quantified entry stands beside the bare one as
+		§ `List::hasItems(where:)` stands beside `hasItems()`, and the
+		§ predicate Parameter carries the same `where` label. The alternative
+		§ was `keep(where check)::hasValue()`, which builds an Optional per
+		§ call to ask a question about it.
 
-		§§ Answers whether the Optional holds a value.
+		§§ Answers whether the Optional holds a value, or holds a value the check accepts.
 		§§
-		§§ @returns — `true` when there is a value.
-		hasValue() -> Boolean {
-			<- match @ -> Boolean {
-				case #Value { <- true }
-				case #Empty { <- false }
+		§§ @returns — `true` when there is a value, or when the check accepts the value.
+		overload hasValue {
+			§§ Answers whether the Optional holds a value.
+			§§
+			§§ @returns — `true` when there is a value.
+			() -> Boolean {
+				<- match @ -> Boolean {
+					case #Value { <- true }
+					case #Empty { <- false }
+				}
+			}
+
+			§§ Answers whether the Optional holds a value the check accepts.
+			§§
+			§§ An empty Optional answers `false`, and the check does not run.
+			§§
+			§§ @param where — the question asked of the value
+			§§ @returns — `true` when there is a value and the check accepts it.
+			(where check: (_: ItemType) -> Boolean) -> Boolean {
+				<- match @ -> Boolean {
+					case #Value(item) { <- check(item) }
+					case #Empty       { <- false }
+				}
 			}
 		}
 
@@ -199,6 +223,76 @@ declarations {
 				case #Empty { <- #Empty }
 			}
 		}
+
+		§ Falling back has two spellings, one per shape. The Method `or` takes
+		§ an Optional and answers one. The Method `value(defaultingTo:)` takes
+		§ a bare value and answers one. Neither is an entry of the other: on a
+		§ nested Optional an Argument of `#Empty` fits both readings. That
+		§ ambiguity kept an `orElse` out of this Namespace.
+
+		§§ Answers the Optional when it holds a value, and the given Optional otherwise.
+		§§
+		§§ A chain of calls reads as a list of fallbacks, and the first value in it decides the answer. Two empty Optionals answer empty.
+		§§
+		§§ @example
+		§§   constant missing: Optional<Integer> = #Empty
+		§§
+		§§   expect missing::or(#Value(2))::is(2)
+		§§
+		§§ @param _ — the Optional to fall back on
+		§§ @returns — the receiver when it holds a value, and the Argument in its place otherwise.
+		or(_ other: Optional<ItemType>) -> Optional<ItemType> {
+			<- match @ -> Optional<ItemType> {
+				case #Value(item) { <- #Value(item) }
+				case #Empty       { <- other }
+			}
+		}
+
+		§ The Record of `first` and `second` is the shape `List::pair(with:)`
+		§ answers, because Essence has no tuple. Two Optionals are combined
+		§ here rather than at the use site, where the alternative is a nested
+		§ `match` per pair of values a Program reads.
+
+		§§ Answers the two values in one Record, and empty when either Optional is empty.
+		§§
+		§§ This is `List::pair(with:)` for the at-most-one case. Both values are needed, so one empty Optional answers empty.
+		§§
+		§§ @param with — the Optional to pair the value with
+		§§ @returns — a Record holding this value under `first` and the other under `second`, or an empty Optional.
+		pair<infer Other>(
+			with other: Optional<Other>,
+		) -> Optional<{ first: ItemType, second: Other }> {
+			<- match @ -> Optional<{ first: ItemType, second: Other }> {
+				case #Value(item) {
+					<- match other
+						-> Optional<{ first: ItemType, second: Other }>
+					{
+						case #Value(otherItem) {
+							<- #Value({ first = item, second = otherItem })
+						}
+						case #Empty { <- #Empty }
+					}
+				}
+				case #Empty { <- #Empty }
+			}
+		}
+
+		§ A List literal is a language primitive, so the body names no
+		§ Namespace. Naming `List` would close a second cycle in the import
+		§ graph, since `List.es` imports this file. See DEVELOPMENT.md, The
+		§ shape of the graph is frozen.
+
+		§§ Answers a List holding the value, and the empty List when there is none.
+		§§
+		§§ The answer holds one item at most. It is the bridge to the Methods a List answers, and `OptionalList::values()` is the bridge back.
+		§§
+		§§ @returns — the List of the value, or the empty List.
+		toList() -> List<ItemType> {
+			<- match @ -> List<ItemType> {
+				case #Value(item) { <- [item] }
+				case #Empty       { <- [] }
+			}
+		}
 	}
 
 	§ `flatten` needs a receiver that not every Optional is, so it lives in a
@@ -206,9 +300,8 @@ declarations {
 	§ binds to the inner payload, which makes the answer an `Optional<Integer>`
 	§ rather than the `Optional<Optional<Integer>>` it started as. The
 	§ `andThen` Method needs no such Namespace: a step that answers an Optional
-	§ never builds a nested one. There is no `orElse`, because an Optional
-	§ whose payload is an Optional makes "or else what" ambiguous, and
-	§ `value(defaultingTo:)` answers the unambiguous half.
+	§ never builds a nested one. Neither does `or`, which takes what it
+	§ answers.
 	namespace NestedOptional<infer ItemType> for Optional<Optional<ItemType>> {
 		§§ Answers the inner Optional, one level down.
 		§§

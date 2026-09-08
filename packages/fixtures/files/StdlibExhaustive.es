@@ -2016,6 +2016,20 @@ third"::lines())
 		"Optional.hasValue<ItemType>() [empty]",
 		noNumbers::firstItem()::hasValue(),
 	)
+	§ The quantified entry, beside the bare one: an empty Optional answers
+	§ `false` without the check running.
+	show(
+		"Optional.hasValue<ItemType>(where: (_ ItemType) -> Boolean)",
+		numbers::firstItem()::hasValue(where (item) { <- item::isOdd() }),
+	)
+	show(
+		"Optional.hasValue<ItemType>(where: (_ ItemType) -> Boolean) [rejected]",
+		numbers::firstItem()::hasValue(where (item) { <- item::isEven() }),
+	)
+	show(
+		"Optional.hasValue<ItemType>(where: (_ ItemType) -> Boolean) [empty]",
+		noNumbers::firstItem()::hasValue(where (item) { <- item::isOdd() }),
+	)
 	show("Optional.isEmpty<ItemType>()", noNumbers::firstItem()::isEmpty())
 	show(
 		"Optional.isEmpty<ItemType>() [present]",
@@ -2044,6 +2058,35 @@ third"::lines())
 	show(
 		"Optional.keep<ItemType>(where: (_ ItemType) -> Boolean) [rejected]",
 		numbers::firstItem()::keep(where (item) { <- item::isNegative() }),
+	)
+	show(
+		"Optional.or<ItemType>(_ Optional<ItemType>)",
+		numbers::firstItem()::or(noNumbers::firstItem()),
+	)
+	show(
+		"Optional.or<ItemType>(_ Optional<ItemType>) [empty receiver]",
+		noNumbers::firstItem()::or(numbers::firstItem()),
+	)
+	show(
+		"Optional.or<ItemType>(_ Optional<ItemType>) [both empty]",
+		noNumbers::firstItem()::or(noNumbers::firstItem()),
+	)
+	show(
+		"Optional.pair<ItemType, Other>(with: Optional<Other>)",
+		numbers::firstItem()::pair(with greeting::characters()::firstItem()),
+	)
+	show(
+		"Optional.pair<ItemType, Other>(with: Optional<Other>) [empty receiver]",
+		noNumbers::firstItem()::pair(with numbers::firstItem()),
+	)
+	show(
+		"Optional.pair<ItemType, Other>(with: Optional<Other>) [empty argument]",
+		numbers::firstItem()::pair(with noNumbers::firstItem()),
+	)
+	show("Optional.toList<ItemType>()", numbers::firstItem()::toList())
+	show(
+		"Optional.toList<ItemType>() [empty]",
+		noNumbers::firstItem()::toList(),
 	)
 
 	§ Equality is written, in two shapes: against a whole Optional — same

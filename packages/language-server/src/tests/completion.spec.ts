@@ -2010,8 +2010,9 @@ describe("Completion of a converted standard library Namespace", () => {
 		// Optional has, offered as an extra. `is` and `isNot` sit among the
 		// declared Methods, in declaration order, because `Optional` writes
 		// them: the derived Namespace a Choice would otherwise offer is only
-		// reached once no declared Namespace answers the name. Each is an
-		// Overload of two entries, and an Overload completes once per entry.
+		// reached once no declared Namespace answers the name. `is`, `isNot`
+		// and `hasValue` are each an Overload of two entries, and an Overload
+		// completes once per entry.
 		expect(labelsOf(source, { line: 3, column: 9 })).toEqual([
 			"is",
 			"is",
@@ -2019,11 +2020,15 @@ describe("Completion of a converted standard library Namespace", () => {
 			"isNot",
 			"toString",
 			"hasValue",
+			"hasValue",
 			"isEmpty",
 			"value",
 			"map",
 			"andThen",
 			"keep",
+			"or",
+			"pair",
+			"toList",
 			"flatten",
 		])
 	})

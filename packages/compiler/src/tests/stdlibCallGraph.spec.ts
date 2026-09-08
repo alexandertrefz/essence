@@ -668,7 +668,8 @@ describe("Stdlib Call Graph", () => {
 			"NumberList.product",
 			"NumberList.sum",
 			"Optional.andThen",
-			"Optional.hasValue",
+			"Optional.hasValue__overload$1",
+			"Optional.hasValue__overload$2",
 			"Optional.isEmpty",
 			"Optional.isNot__overload$1",
 			"Optional.isNot__overload$2",
@@ -676,6 +677,9 @@ describe("Stdlib Call Graph", () => {
 			"Optional.is__overload$2",
 			"Optional.keep",
 			"Optional.map",
+			"Optional.or",
+			"Optional.pair",
+			"Optional.toList",
 			"Optional.value",
 			// NOTE: `values` needs a receiver not every List is, so it lives in
 			// a Namespace of its own — receiver `List<Optional<ItemType>>` —
