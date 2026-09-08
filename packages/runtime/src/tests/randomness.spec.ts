@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test"
 
-import { createInteger } from "../Integer"
-import { createList, type ListType, materialise } from "../List"
+import { createInteger, type IntegerType } from "../Integer"
+import {
+	createList,
+	type ListType,
+	materialise,
+	prepend__overload$1 as prepend,
+} from "../List"
 import {
 	below,
 	bigBetween,
@@ -627,6 +632,89 @@ describe("Randomness", () => {
 			)
 
 			expect(drawn.length).toBe(1)
+		})
+
+		// NOTE: A count small against the length is drawn through a Map of the
+		// positions the swaps displaced rather than through a copy of the whole
+		// receiver, and the line between the two is a twenty-fifth of the
+		// length. Both spellings issue the same draws in the same order, so
+		// the two sides of that line agree item for item as far as the smaller
+		// one goes: 200 of 5,000 is the last count drawn sparsely and 201 is
+		// the first drawn through the copy.
+		test("draws the same items on either side of the sparse line", () => {
+			let items = createList(
+				Array.from({ length: 5_000 }, (_, index) =>
+					createInteger(index),
+				),
+			)
+			let drawnAt = (count: number): Array<number> =>
+				materialise(
+					pick__overload$2(
+						sourceOf("either side"),
+						createInteger(count),
+						items,
+					),
+				).map((item) => Number(item.value))
+			let sparse = drawnAt(200)
+			let copied = drawnAt(201)
+
+			expect(sparse.length).toBe(200)
+			expect(copied.length).toBe(201)
+			expect(new Set(sparse).size).toBe(200)
+			expect(copied.slice(0, 200)).toEqual(sparse)
+		})
+
+		// NOTE: A List built from the front holds its items in a REVERSED run,
+		// so the sparse draw has to index that run backwards. Drawing the same
+		// items out of a flat List under the same seed is what says it does.
+		test("draws the same items out of a front-built List", () => {
+			let flat = createList(
+				Array.from({ length: 400 }, (_, index) =>
+					createInteger(index),
+				),
+			)
+			let front = createList<IntegerType>([])
+
+			for (let index = 399; index >= 0; index--) {
+				front = prepend(front, createInteger(index))
+			}
+
+			let drawnFrom = (items: ListType<IntegerType>): Array<number> =>
+				materialise(
+					pick__overload$2(
+						sourceOf("front run"),
+						createInteger(4),
+						items,
+					),
+				).map((item) => Number(item.value))
+
+			expect(drawnFrom(front)).toEqual(drawnFrom(flat))
+		})
+
+		// NOTE: The one claim here a stopwatch has to make. A draw costs the
+		// COUNT rather than the length, so 200 draws of ten items out of two
+		// hundred thousand is work on two thousand items — it measured 0.5 ms,
+		// against 220 ms when every draw copied the whole receiver first. The
+		// ceiling is a hundred times the first figure and a quarter of the
+		// second.
+		test("draws a few items without reading the whole List", () => {
+			let items = createList(
+				Array.from({ length: 200_000 }, (_, index) =>
+					createInteger(index),
+				),
+			)
+			let source = sourceOf("a few")
+			let start = performance.now()
+			let drawn = 0
+
+			for (let turn = 0; turn < 200; turn++) {
+				drawn += materialise(
+					pick__overload$2(source, createInteger(10), items),
+				).length
+			}
+
+			expect(drawn).toBe(2_000)
+			expect(performance.now() - start).toBeLessThan(50)
 		})
 
 		test("leaves the List it was given as it was", () => {
