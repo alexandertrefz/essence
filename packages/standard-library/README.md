@@ -4,11 +4,14 @@ Essence's standard library, written in Essence.
 
 Everything a Program can reach before its first line is declared here: the core
 Protocols (`Equatable`, `Printable`, `Comparable`, `Orderable`), `Boolean`,
-`Optional`, `Ordering`, `Record`, `String`, the whole numeric tower (`Integer`,
-`Rational`, `Algebraic`, `Transcendental` and the covering `Number`, which
-brings the `Number`, `Irrational` and `Scalar` Union Types with it), and `List`
-together with `NestedList`, `OptionalList`, `NonEmptyList` and the
-`NonEmptyNestedList` that only both of those proofs together reach. A checked
+`Optional`, `Result`, `Ordering`, `Record`, `String`, the whole numeric tower
+(`Integer`, `Rational`, `Algebraic`, `Transcendental` and the covering `Number`,
+which brings the `Number`, `Irrational` and `Scalar` Union Types with it), and
+`List` together with `NestedList`, `OptionalList`, `ResultList`, `NonEmptyList`
+and the `NonEmptyNestedList` that only both of those proofs together reach. The
+two failure carriers each have a nested Namespace beside them, `NestedOptional`
+and `NestedResult`, holding the `flatten` that only a carrier of a carrier
+answers. A checked
 refinement is exported beside the base it narrows: `NonZeroInteger`,
 `NonNegativeInteger` and `PositiveInteger` beside `Integer`, `NonZeroRational`
 beside `Rational`, `NonEmptyString` beside `String`, `NonEmptyList` beside
@@ -56,7 +59,7 @@ it and the `Terminal.ask` that is a prompt and a line (`Terminal.es`).
 `Randomness.seeded(_)` for a run that replays (`Randomness.es`).
 
 Three of every five declared Method entries are also IMPLEMENTED here, in
-Essence — 317 of 534 as this is written, counting one entry per Overload and
+Essence — 340 of 558 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
 Seven more are written on a PROTOCOL rather than on a Namespace, once for every
 conformer: `Equatable.isNot`, `Comparable`'s four inequalities, and
@@ -86,11 +89,12 @@ holds. Each says at its own declaration what it measured. The short-circuiting
 `reduce`'s early-stopping entry, and leaves the walk at the item that decides
 the answer.
 
-Two Methods are native for a reason worth reading before assuming otherwise:
+Three Methods are native for a reason worth reading before assuming otherwise:
 `List.is`, because the pairwise form trips an infinite recursion in generic
-inference (the repro is at the declaration), and `Optional.toString`, because
-an Essence body renders the payload through a hole and a hole renders a String
-BARE — which is exactly the quoting rule the entry exists to keep.
+inference (the repro is at the declaration), and `Optional.toString` and
+`Result.toString`, because an Essence body renders the payload through a hole
+and a hole renders a String BARE — which is exactly the quoting rule the two
+entries exist to keep.
 `String.replaceEvery` used to be too — its empty part inserted at UTF-16
 code-unit boundaries — but the empty part is now a no-op, so it is
 `split(on part)::join(with replacement)` in Essence.
@@ -158,6 +162,25 @@ A quantifier or a position spelled into the name is NOT one: `removeFirst`
 as a different question rather than as the same question answered differently.
 Those keep their own names.
 
+**`Result` is `Optional` with a reason, and is named that way.** The two
+carriers are one shape — `#Value { item }` beside `#Failure { reason }`, against
+`#Value { item }` beside `#Empty` — so every Method one offers over its payload
+the other offers over its value, under the SAME name and the same Argument
+labels: `is` at either level, `isNot`, `toString`, `hasValue`,
+`hasValue(where:)`, `value(defaultingTo:)`, `map`, `andThen`, `keep`, `or`,
+`toList`, and `flatten` on the nested Namespace beside each. A reader who has
+found their way around one has found their way around the other, which is rule 4
+read across two Types rather than across two entries. What a Result adds is what
+a reason makes possible and nothing else: `hasFailed()` and `reason()` for the
+second Case, `mapFailure` for `map` over it, `recover(with:)` for the collapse
+that reads it, and the `failingWith:` Argument on `keep`. What it does not add is
+a second name for one idea — there is no `unwrap`, no `mapError` and no
+`Either`. The bridges are `Optional::toResult(failingWith:)` and
+`Result::value()`, which are why those two files are the one pair here that name
+each other. On the List side `ResultList::allValues()` keeps EVERY reason, in a
+`NonEmptyList`, where `OptionalList::allValues()` has none to keep: checking a
+file of rows is meant to report everything wrong with it, not the first thing.
+
 **The one thing rule 4 does NOT license.** `Integer` and `Rational` each declare
 the four inequalities that `Comparable` already provides, and that is not
 duplication to collapse — it is a performance stratification, and a widening
@@ -221,7 +244,9 @@ easy to break:
   deliberate exception, and the reason is that an Optional holds at most one
   value: `everyValue(where:)` would put a quantifier on a container that has no
   room for one, and the name says instead what the call does with the value it
-  has.
+  has. `Result::keep(where:failingWith:)` carries the same name for the same
+  reason, with the second Argument a Result needs: refusing a value there has to
+  say why.
 - **A key-reading Function is always labelled `on`** — `sort(on:)`,
   `group(on:)`, `lowestItem(on:)`, `highestItem(on:)`, `sum(on:)`,
   `average(on:)`. Each takes a Function of one Parameter answering the value the

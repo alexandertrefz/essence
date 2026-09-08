@@ -60,6 +60,7 @@ math.exports.square(12n) // 144n
 | `List<T>`         | `Array`                               |
 | `{ a: T }`        | a plain object, closed — an undeclared key is refused |
 | `Optional<T>`     | `T` or `undefined`                    |
+| `Result<T, F>`    | `{ $case: "Result#Value", item: T }` or `{ $case: "Result#Failure", reason: F }` |
 | a Case of a Choice | `{ $case: "Choice#Case", ...payload }` |
 | a Case of a Choice with no payloads at all | the bare Case name, `"Up"` |
 
@@ -76,10 +77,15 @@ lossless spelling at all the value is refused rather than approximated: an
 `#Value(#Empty)` is not `#Empty`.
 
 `Optional` is the one Choice spelled by ABSENCE rather than by a `$case`, and
-that holds however its Type was written down. An unannotated
-`constant present = #Value(3)` has one of `Optional`'s Cases alone for a Type
-rather than the Union an annotation would have named, and still crosses as
-`3n` — the last two rows of the table are every other Choice.
+that holds however its Type was written down. A
+`constant present = Optional<Integer>#Value(3)` has one of `Optional`'s Cases
+alone for a Type rather than the Union an annotation would have named, and still
+crosses as `3n` — the last three rows of the table are every other Choice.
+`Result<T, F>` is listed among them rather than beside `Optional`: the two are
+one shape in Essence, and only `Optional` is spelled by absence, because
+`undefined` says "no value" and has no room for a reason. A `Result` is an
+ordinary Choice on this side, and its row above is what the two `$case` rows
+already say, written out.
 
 A constant is marshalled when it is read, not when the Module is loaded, so an
 export the boundary has no mapping for — the numeric tower above `Rational`,
