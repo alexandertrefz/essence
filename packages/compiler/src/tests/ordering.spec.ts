@@ -151,3 +151,133 @@ describe("Comparable's provided inequalities", () => {
 		).toEqual(["true", "false"])
 	})
 })
+
+// NOTE: The only spelling a two-key sort has. `Ordering::then` answers the
+// first ordering wherever it decides anything, and the second where the first
+// is `#Equal` — with a `computedBy` twin whose Function runs only there.
+describe("Ordering::then", () => {
+	it("answers the first ordering where it decides", async () => {
+		expect(
+			await run(
+				[
+					"implementation {",
+					"\tTerminal.inspect(Ordering#Less::then(#Greater))",
+					"\tTerminal.inspect(Ordering#Greater::then(#Less))",
+					"\tTerminal.inspect(Ordering#Equal::then(#Greater))",
+					"\tTerminal.inspect(Ordering#Equal::then(#Equal))",
+					"}",
+				].join("\n"),
+			),
+		).toEqual([
+			"Ordering#Less",
+			"Ordering#Greater",
+			"Ordering#Greater",
+			"Ordering#Equal",
+		])
+	})
+
+	it("answers the same way through the lazy entry", async () => {
+		expect(
+			await run(
+				[
+					"implementation {",
+					"\tTerminal.inspect(",
+					"\t\tOrdering#Less::then(computedBy () -> Ordering { <- #Greater }),",
+					"\t)",
+					"\tTerminal.inspect(",
+					"\t\tOrdering#Equal::then(computedBy () -> Ordering { <- #Greater }),",
+					"\t)",
+					"}",
+				].join("\n"),
+			),
+		).toEqual(["Ordering#Less", "Ordering#Greater"])
+	})
+
+	// NOTE: What the `computedBy` entry is FOR, and the one claim about it a
+	// value can not carry: the Function is written to PRINT, so a run that
+	// never reaches it leaves nothing on the stream.
+	it("leaves the lazy tie-breaker unrun where the first decides", async () => {
+		expect(
+			await run(
+				[
+					"implementation {",
+					"\tTerminal.inspect(",
+					"\t\tOrdering#Less::then(computedBy () -> Ordering {",
+					'\t\t\tTerminal.inspect("computed")',
+					"",
+					"\t\t\t<- #Greater",
+					"\t\t}),",
+					"\t)",
+					"}",
+				].join("\n"),
+			),
+		).toEqual(["Ordering#Less"])
+	})
+
+	it("runs the lazy tie-breaker where the first is equal", async () => {
+		expect(
+			await run(
+				[
+					"implementation {",
+					"\tTerminal.inspect(",
+					"\t\tOrdering#Equal::then(computedBy () -> Ordering {",
+					'\t\t\tTerminal.inspect("computed")',
+					"",
+					"\t\t\t<- #Greater",
+					"\t\t}),",
+					"\t)",
+					"}",
+				].join("\n"),
+			),
+		).toEqual(['"computed"', "Ordering#Greater"])
+	})
+
+	// NOTE: The shape the whole Method exists for — the league example's
+	// ranking rule, which was a List of orderings searched for the first
+	// decisive one.
+	it("orders a sort on a second key", async () => {
+		expect(
+			await run(
+				[
+					"implementation {",
+					"\ttype Person = { surname: String, name: String }",
+					"",
+					"\tconstant people: List<Person> = [",
+					'\t\t{ surname = "Ott", name = "Zoe" },',
+					'\t\t{ surname = "Ali", name = "Bo" },',
+					'\t\t{ surname = "Ott", name = "Al" },',
+					"\t]",
+					"",
+					"\tconstant ranked = people::sort(by (a, b) {",
+					"\t\t<- a.surname::compare(to b.surname)",
+					"\t\t\t::then(a.name::compare(to b.name))",
+					"\t})",
+					"",
+					"\tTerminal.inspect(",
+					'\t\tranked::map((p) { <- "{p.surname} {p.name}" })::join(with ", "),',
+					"\t)",
+					"}",
+				].join("\n"),
+			),
+		).toEqual(['"Ali Bo, Ott Al, Ott Zoe"'])
+	})
+
+	// NOTE: Three keys chain, and the third is reached only where the first
+	// two both left the pair equal.
+	it("chains a third ordering", async () => {
+		expect(
+			await run(
+				[
+					"implementation {",
+					"\tTerminal.inspect(",
+					"\t\tOrdering#Equal::then(#Equal)::then(#Less),",
+					"\t)",
+					"\tTerminal.inspect(",
+					"\t\tOrdering#Equal::then(#Greater)::then(#Less),",
+					"\t)",
+					"}",
+				].join("\n"),
+			),
+		).toEqual(["Ordering#Less", "Ordering#Greater"])
+	})
+})

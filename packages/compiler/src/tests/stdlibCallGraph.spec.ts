@@ -683,6 +683,8 @@ describe("Stdlib Call Graph", () => {
 			"OptionalList.values",
 			"Orderable.clamp",
 			"Orderable.isBetween",
+			"Ordering.then__overload$1",
+			"Ordering.then__overload$2",
 			"Rational.absolute",
 			"Rational.add__overload$2",
 			"Rational.add__overload$3",
