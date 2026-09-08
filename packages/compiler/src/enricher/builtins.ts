@@ -95,6 +95,11 @@ export const builtinMemberOrder: Array<string> = [
 	"NormalizationForm",
 	"NumberFormat",
 	"Rounding",
+	// NOTE: Directly after `Rounding`, because `Rational.es` declares the two
+	// together and a reader meets them where they are declared. All three of
+	// its Methods are derived, so it shares no Method name with anything here
+	// and its position decides nothing else.
+	"SignStyle",
 	// NOTE: With the other mode Choices, and after them because it is the
 	// newest. `SortOrder` is declared beside `sort` in `List.es` rather than
 	// with these, and it shares no Method name with any Namespace here — all
@@ -267,6 +272,9 @@ export const builtinTypeOrder: Array<string> = [
 	"NormalizationForm",
 	"NumberFormat",
 	"Rounding",
+	// NOTE: Beside the mode Choice it is declared with, for the reason it
+	// follows `Rounding` in the member order above.
+	"SignStyle",
 	// NOTE: Beside the mode Choice it is one of, and after `Rounding` for the
 	// reason it follows `Rounding` in the member order above.
 	"SortOrder",

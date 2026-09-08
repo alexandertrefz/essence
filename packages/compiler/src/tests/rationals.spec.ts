@@ -785,6 +785,49 @@ describe("Rationals", () => {
 		})
 	})
 
+	// NOTE: The sign style is over the plain form, and its whole content is
+	// what a value that is NOT negative is written as. So every test pairs the
+	// two Cases over the same value, and zero is the one that has to be said
+	// outright: it is written `+0`, because the rule is the sign a value that
+	// is not negative gets rather than a claim about its sign.
+	describe("The written sign", () => {
+		it("writes a plus in front of what is not negative", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(3::toString(showingSign #Always))
+					Terminal.inspect(-3::toString(showingSign #Always))
+					Terminal.inspect(0::toString(showingSign #Always))
+					Terminal.inspect(3::toString(showingSign #Negative))
+					Terminal.inspect(-3::toString(showingSign #Negative))
+				}`),
+			).toEqual(['"+3"', '"-3"', '"+0"', '"3"', '"-3"'])
+		})
+
+		it("writes a Rational's fraction form under either style", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(3/4::toString(showingSign #Always))
+					Terminal.inspect(-3/4::toString(showingSign #Always))
+					Terminal.inspect(4/2::toString(showingSign #Always))
+					Terminal.inspect(0/1::toString(showingSign #Always))
+					Terminal.inspect(3/4::toString(showingSign #Negative))
+				}`),
+			).toEqual(['"+3/4"', '"-3/4"', '"+2"', '"+0"', '"3/4"'])
+		})
+
+		it("reaches a Scalar receiver through both rungs", async () => {
+			expect(
+				await run(`implementation {
+					constant mixed: List<Integer | Rational> = [1, 3/2]
+
+					Terminal.inspect(
+						mixed::sum()::toString(showingSign #Always),
+					)
+				}`),
+			).toEqual(['"+5/2"'])
+		})
+	})
+
 	describe("Compiled Programs", () => {
 		it("divides by a negative Integer without corrupting the value", async () => {
 			expect(

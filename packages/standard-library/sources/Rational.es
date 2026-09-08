@@ -68,6 +68,19 @@ declarations {
 
 	namespace Rounding for Rounding is Equatable, is Printable {}
 
+	§ The Choice is declared beside `Rounding`, and `Integer.es` imports it for
+	§ its own `toString`.
+
+	§§ Whether `toString(showingSign:)` writes a sign in front of a value that is not negative.
+	§§
+	§§ A negative value is written with its minus sign under both Cases. Under `#Always` a value that is not negative is written with a `+` in front, and zero is `+0`. A call that names `#Negative` gets what the plain `toString()` writes.
+	choice SignStyle {
+		Negative,
+		Always,
+	}
+
+	namespace SignStyle for SignStyle is Equatable, is Printable {}
+
 	§ The bound is written `0/1`, which is the house spelling for a Rational
 	§ zero. A bare `0` asks the same question: the Compiler reads every Integer
 	§ bound on a Rational as `n/1`, so both spellings reach this Type.
@@ -391,6 +404,36 @@ declarations {
 				groupingWith separator: String,
 				toward direction: Rounding = #Nearest,
 			) -> String
+
+			§ The sign entry is over the plain form alone. Crossing it with
+			§ the formats would be four more entries. What they would buy is
+			§ one `append` at the call site, since the `#Always` Case writes
+			§ a `+` in front and nothing else.
+
+			§§ Answers the Rational as a fraction, with its sign written in the named style.
+			§§
+			§§ The `#Always` Case writes a `+` in front of a value that is not negative, so `3/4` is `+3/4` and zero is `+0`. The `#Negative` Case writes what the plain `toString()` writes.
+			§§
+			§§ @param showingSign — whether to write a sign in front of a value that is not negative
+			§§ @returns — the String representation of the Rational.
+			(showingSign style: SignStyle) -> String {
+				§ `@` is rebound inside `match`; see DEVELOPMENT.md, Why
+				§ bodies look the way they do.
+				constant text       = @::toString()
+				constant isNegative = @::isNegative()
+
+				<- match style -> String {
+					case #Negative { <- text }
+
+					case #Always {
+						if isNegative {
+							<- text
+						} else {
+							<- "+"::append(text)
+						}
+					}
+				}
+			}
 		}
 
 		§ The Integer entries are written on the accessors and `Rational.of`, so
@@ -1028,4 +1071,5 @@ export {
 	NumberFormat
 	Rational
 	Rounding
+	SignStyle
 }
