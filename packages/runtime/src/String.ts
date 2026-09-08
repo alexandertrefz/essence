@@ -173,6 +173,22 @@ export function graphemesIn(string: StringType): Array<string> {
 	return segments
 }
 
+// NOTE: Whether this String has had its character view BUILT — the one
+// question that tells the two paths of a position Method apart from outside.
+// An ASCII receiver is searched, split and cut by the JavaScript intrinsics
+// and leaves no view behind; every other receiver is segmented and remembers
+// the segments. `stringPerformance.spec.ts` asks it, because a claim about
+// WORK holds whatever else the machine is doing, where the wall-clock ceiling
+// it replaced had to sit several times above the fast figure and below the
+// slow one — and for `split` those two are only ten apart.
+//
+// NOTE: Nothing in the standard library calls it, so no Program's bundle
+// carries it: an export nothing reaches is shaken out exactly as an unreached
+// native is.
+export function hasCharacterView(string: StringType): boolean {
+	return (string as MeasuredString)[graphemesKey] !== undefined
+}
+
 // NOTE: A String assembled FROM a known character view keeps that view — the
 // clusters are remembered under the Symbol keys right away, so every Method
 // reading `graphemesIn` sees exactly the characters the assembly meant.
