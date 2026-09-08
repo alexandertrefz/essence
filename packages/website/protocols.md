@@ -203,7 +203,7 @@ provided Method is not that: it is declared in the Protocol.
 
 The standard library still writes its overrides to say the same thing faster.
 `Integer`'s four inequalities read its own `compare` rather than the cross-kind
-table, and answer what `Orderable`'s provided bodies answer — which is now a
+table, and answer what `Comparable`'s provided bodies answer — which is now a
 promise about performance alone, not one the language leans on.
 
 ## Extension
@@ -213,12 +213,13 @@ conformance uses:
 
 ```essence
 protocol Orderable is Comparable {
-	§§ Answers whether this value sorts before another.
+	§§ Answers whether the value lies between the two given ones, both included.
 	§§
-	§§ @param _ — the value to compare with
-	§§ @returns — `true` when this value sorts first.
-	isLessThan(_ other: Self) -> Boolean {
-		<- @::compare(to other)::is(Ordering#Less)
+	§§ @param _ — one bound of the range, included
+	§§ @param and — the other bound of the range, included
+	§§ @returns — `true` when the value is within the bounds.
+	isBetween(_ lower: Self, and upper: Self) -> Boolean {
+		<- @::isGreaterThanOrEqualTo(lower)::and(@::isLessThanOrEqualTo(upper))
 	}
 }
 ```
@@ -265,13 +266,13 @@ the layer below can not decide for itself:
 | Protocol | Requires | Provides |
 |---|---|---|
 | `Equatable` | `is(_:)` | `isNot(_:)` |
-| `Comparable` | `compare(to:)` | — |
-| `Orderable is Comparable` | — | `isLessThan(_:)`, `isLessThanOrEqualTo(_:)`, `isGreaterThan(_:)`, `isGreaterThanOrEqualTo(_:)`, `isBetween(_:and:)`, `clamp(between:and:)` |
+| `Comparable` | `compare(to:)` | `isLessThan(_:)`, `isLessThanOrEqualTo(_:)`, `isGreaterThan(_:)`, `isGreaterThanOrEqualTo(_:)` |
+| `Orderable is Comparable` | — | `isBetween(_:and:)`, `clamp(between:and:)` |
 
-`Comparable` asks for one Method and stays there, because one total order is all
-`sort`, `lowest` and `highest` need. `Orderable` is the layer that turns that
-order into the questions a reader actually writes, and it asks for nothing of its
-own: a Type that can `compare` can answer all six.
+`Comparable` asks for one Method and turns it into the four inequalities anyone
+who can order two values writes: ordering two names is as ordinary a question as
+ordering two numbers. `Orderable` adds the two a number LINE makes meaningful,
+and asks for nothing of its own.
 
 Which Types take which layer is a judgement about the Type, not about what is
 convenient. `Integer`, `Rational`, `Algebraic` and `Number` are `Orderable` —

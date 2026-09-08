@@ -1,6 +1,7 @@
 import {
 	from "./Algebraic.es" { Algebraic }
 	from "./Boolean.es" { Boolean }
+	from "./Comparable.es" { Comparable }
 	from "./Integer.es" { Integer }
 	from "./List.es" {
 		List

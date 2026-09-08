@@ -1,71 +1,32 @@
 import {
 	from "./Boolean.es" { Boolean }
 	from "./Comparable.es" { Comparable }
-	from "./Ordering.es" { Ordering }
 }
 
 declarations {
 
-	§ `Orderable` extends `Comparable` and adds no requirement: the six
-	§ Methods below are all written on `compare`. It sits after
-	§ `Comparable.es` in the file chain for that reason, and imports
-	§ `Boolean` and `Ordering` because its bodies name both. The two Cases
-	§ are written out rather than left bare. A bare `#Less` needs the Choice
-	§ in Scope to resolve, and the loader then reports the import that put it
-	§ there as unread.
+	§ `Orderable` extends `Comparable` and adds no requirement: both Methods
+	§ below are written on the four inequalities `Comparable` provides. It
+	§ sits after `Comparable.es` in the file chain for that reason, and
+	§ imports `Boolean` because `isBetween`'s body names it.
 	§
-	§ The split is what `sort` needs against what a number line offers. A
-	§ String or a List keeps the smaller promise, `Comparable`. Only
-	§ `Orderable` makes `isBetween` and `clamp` mean something, so the
-	§ numeric kinds declare it and nothing else does.
+	§ The split is what a range needs against what an ordering offers. A
+	§ String, a List and a Boolean can each be ordered and keep the smaller
+	§ promise, `Comparable`. Only a number line makes `isBetween` and `clamp`
+	§ mean something, so the numeric kinds declare this Protocol and nothing
+	§ else does.
 	§
 	§ A provided Method takes `Self`, which is the target of the Namespace
 	§ whose conformance offered it. Both `Integer` and the covering `Number`
-	§ conform, so each of the six has two rungs on a numeric receiver. A
+	§ conform, so each of the two has two rungs on a numeric receiver. A
 	§ same-kind question is answered within the kind, and one across two
 	§ kinds falls to `Number`'s rung, with nothing widened at the call.
 	§
-	§ The two `…OrEqualTo` bodies are read as well as run. Each is one call
-	§ on `@` negated, over the bound it was handed. So a refinement written
-	§ on either name is the one written on the comparison it negates. The
-	§ conformer that answered gives the leaf its Namespace. `isLessThan`,
-	§ `isGreaterThan` and `isBetween` read a chain and stay questions of
-	§ their own. See DEVELOPMENT.md, Why bodies look the way they do.
+	§ `isBetween` reads a chain and stays a question of its own. See
+	§ DEVELOPMENT.md, Why bodies look the way they do.
 
-	§§ Anything on a line, where a value can be below another, between two others or pulled into a range.
+	§§ Anything on a line, where a value can be between two others or pulled into a range.
 	protocol Orderable is Comparable {
-		§§ Answers whether the value is strictly below another.
-		§§
-		§§ @param _ — the value to compare with
-		§§ @returns — `true` when the value is below the given one.
-		isLessThan(_ other: Self) -> Boolean {
-			<- @::compare(to other)::is(Ordering#Less)
-		}
-
-		§§ Answers whether the value is below another, or equal to it.
-		§§
-		§§ @param _ — the value to compare with
-		§§ @returns — `true` when the value is below the given one or equal to it.
-		isLessThanOrEqualTo(_ other: Self) -> Boolean {
-			<- @::isGreaterThan(other)::negate()
-		}
-
-		§§ Answers whether the value is strictly above another.
-		§§
-		§§ @param _ — the value to compare with
-		§§ @returns — `true` when the value is above the given one.
-		isGreaterThan(_ other: Self) -> Boolean {
-			<- @::compare(to other)::is(Ordering#Greater)
-		}
-
-		§§ Answers whether the value is above another, or equal to it.
-		§§
-		§§ @param _ — the value to compare with
-		§§ @returns — `true` when the value is above the given one or equal to it.
-		isGreaterThanOrEqualTo(_ other: Self) -> Boolean {
-			<- @::isLessThan(other)::negate()
-		}
-
 		§§ Answers whether the value lies between the two given ones, both included.
 		§§
 		§§ The two bounds name the same range in either order: `7::isBetween(10, and 1)` is `true`, and `15::isBetween(10, and 1)` is `false`.

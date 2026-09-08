@@ -56,8 +56,9 @@ Three of every five declared Method entries are also IMPLEMENTED here, in
 Essence — 285 of 479 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
 Seven more are written on a PROTOCOL rather than on a Namespace, once for every
-conformer: `Equatable.isNot`, and `Orderable`'s four inequalities, `isBetween`
-and `clamp`. A conformer answers each without writing anything, and a Namespace
+conformer: `Equatable.isNot`, `Comparable`'s four inequalities, and
+`Orderable`'s `isBetween` and `clamp`. A conformer answers each without writing
+anything, and a Namespace
 that writes a Method of the name replaces the provided one on its own rung —
 which is what `Optional::isNot`, `Integer::isNot` and `Integer::isLessThan` do,
 each for a reason its own declaration gives. What stays native is a
@@ -153,7 +154,7 @@ as a different question rather than as the same question answered differently.
 Those keep their own names.
 
 **The one thing rule 4 does NOT license.** `Integer` and `Rational` each declare
-the four inequalities that `Orderable` already provides, and that is not
+the four inequalities that `Comparable` already provides, and that is not
 duplication to collapse — it is a performance stratification, and a widening
 besides. The written entry is on the member's own `compare`, a bigint or a
 cross-multiplication; the provided one reads whatever `compare` the conformance
@@ -167,7 +168,7 @@ offer. The reasoning is written above `Integer::isLessThan`, and
 Before collapsing anything that looks repeated here, check whether the repeat
 is what keeps a body reaching only its own Namespace's primitives.
 
-**Ordering across two kinds falls to `Number`.** `Orderable`'s Methods take
+**Ordering across two kinds falls to `Number`.** The ordering Methods take
 `Self`, which is the target of the Namespace whose conformance offers them —
 and both `Integer` and the covering `Number` conform, so each of the six has two
 rungs on a numeric receiver. A same-kind question is answered within the kind,

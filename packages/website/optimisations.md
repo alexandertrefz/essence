@@ -292,7 +292,7 @@ This one runs inside the standard library as well, and that is where most of it
 lands: the bodies of `isLessThanOrEqualTo` and `subtract` are written in Essence
 on the ones below them, and the receiver there is typed exactly `Integer` — so
 they lower like any other site, and a Program that reaches the comparison family
-stops carrying those bodies at all. `Orderable`'s provided bodies are the
+stops carrying those bodies at all. The Protocols' provided bodies are the
 exception, and have to be: their receiver is `Self`, which is no kind in
 particular until a conformance says so, so they stay calls and lower nothing.
 

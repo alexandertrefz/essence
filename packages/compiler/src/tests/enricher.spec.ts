@@ -1606,16 +1606,16 @@ describe("Enricher", () => {
 			})
 
 			it("types the body with the inferred Parameter", () => {
-				// NOTE: `isGreaterThan` only resolves if `item` is an Integer,
-				// so this fails outright rather than subtly if the inferred
-				// Type never reaches the body's Scope.
+				// NOTE: `isBetween` is `Orderable`'s and a String is only
+				// `Comparable`, so this fails outright rather than subtly if
+				// the inferred Type never reaches the body's Scope.
 				expect(
 					diagnosticsFor(`implementation {
 						constant kept = ["a"]::removeEvery(
-							where (item) { <- item::isGreaterThan(2) },
+							where (item) { <- item::isBetween(1, and 2) },
 						)
 					}`).map((diagnostic) => diagnostic.message),
-				).toContain("No Method named 'isGreaterThan' for this value")
+				).toContain("No Method named 'isBetween' for this value")
 			})
 
 			it("reports a literal with nothing to infer from", () => {
@@ -1849,7 +1849,7 @@ describe("Enricher", () => {
 			})
 
 			it("types the body with a non-Generic free Function's Parameter", () => {
-				// NOTE: `isGreaterThan` only resolves for an Integer, so a
+				// NOTE: `isBetween` only resolves for a Type on a line, so a
 				// Parameter Type that never reaches the body fails outright
 				// here rather than subtly.
 				expect(
@@ -1858,9 +1858,9 @@ describe("Enricher", () => {
 							<- transform("a")
 						}
 
-						constant described = describe((item) { <- item::isGreaterThan(2) })
+						constant described = describe((item) { <- item::isBetween(1, and 2) })
 					}`).map((diagnostic) => diagnostic.message),
-				).toContain("No Method named 'isGreaterThan' for this value")
+				).toContain("No Method named 'isBetween' for this value")
 			})
 
 			it("threads the expected Types past a labelled Parameter", () => {
@@ -8281,22 +8281,15 @@ describe("Enricher", () => {
 				expect(narrowedThrough("@::isAtMost(3)", true)).toBe("Above")
 			})
 
-			// NOTE: And `Orderable`'s own provided bodies reach a witness the
-			// same way. `String` conforms to `Comparable` alone, so a Program
-			// declaring the wider conformance is where those bodies answer a
-			// String — and `isLessThanOrEqualTo` is `isGreaterThan` negated
-			// through that very Namespace.
+			// NOTE: And `Comparable`'s own provided bodies reach a witness the
+			// same way. A String writes none of the four itself, so every one
+			// of them is the Protocol's body over `String::compare` — and
+			// `isLessThanOrEqualTo` is `isGreaterThan` negated through it.
 			it("should narrow through a provided body the standard library writes", () => {
 				expect(
 					narrowedTypeOf(
 						`implementation {
-							namespace Word for String is Orderable {
-								compare(to other: String) -> Ordering {
-									<- @::<String>compare(to other)
-								}
-							}
-
-							type Long = String where @::<Word>isGreaterThan("mm")
+							type Long = String where @::isGreaterThan("mm")
 
 							constant w = "zebra"
 

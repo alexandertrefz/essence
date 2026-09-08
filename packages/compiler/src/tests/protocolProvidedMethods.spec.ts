@@ -1377,7 +1377,7 @@ describe("Protocol-provided Methods", () => {
 			].join("\n")
 
 			expect(await run(source)).toEqual(["false"])
-			expect(generate(source)).not.toContain("$es_Orderable__isLessThan")
+			expect(generate(source)).not.toContain("$es_Comparable__isLessThan")
 		})
 
 		// NOTE: `Integer` writes `isBetween` nowhere, so both rungs are provided
@@ -1421,7 +1421,7 @@ describe("Protocol-provided Methods", () => {
 					[
 						"implementation {",
 						"\tTerminal.inspect(5::<Orderable>isBetween(1, and 3/2))",
-						"\tTerminal.inspect(3::<Orderable>isLessThan(Number.Pi))",
+						"\tTerminal.inspect(3::<Comparable>isLessThan(Number.Pi))",
 						"}",
 					].join("\n"),
 				),
