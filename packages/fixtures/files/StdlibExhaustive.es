@@ -1672,6 +1672,50 @@ third"::lines())
 		show("Algebraic.negate()", rootTwo::negate())
 		show("Algebraic.toString()", rootTwo::toString())
 		show(
+			"Algebraic.toString(as: NumberFormat)",
+			rootTwo::toString(as #Decimal),
+		)
+		show(
+			"Algebraic.toString(as: NumberFormat) [fraction is the symbolic form]",
+			rootTwo::toString(as #Fraction),
+		)
+		show(
+			"Algebraic.toString(as: NumberFormat) [percent]",
+			rootTwo::toString(as #Percent),
+		)
+		show(
+			"Algebraic.toString(as: NumberFormat) [scientific]",
+			rootTwo::toString(as #Scientific),
+		)
+		show(
+			"Algebraic.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding)",
+			rootTwo::toString(as #Decimal, toPlaces 4),
+		)
+		show(
+			"Algebraic.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [padded with zeroes]",
+			rootTwo::subtract(14142/10000)::toString(as #Decimal, toPlaces 3),
+		)
+		show(
+			"Algebraic.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [a count below one]",
+			rootTwo::toString(as #Decimal, toPlaces 0),
+		)
+		show(
+			"Algebraic.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [fraction ignores the count]",
+			rootTwo::toString(as #Fraction, toPlaces 4),
+		)
+		show(
+			"Algebraic.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [percent]",
+			rootTwo::toString(as #Percent, toPlaces 2),
+		)
+		show(
+			"Algebraic.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [scientific]",
+			rootTwo::toString(as #Scientific, toPlaces 4),
+		)
+		show(
+			"Algebraic.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [up]",
+			rootTwo::toString(as #Decimal, toPlaces 4, toward #Up),
+		)
+		show(
 			"Algebraic.approximate(toPlaces: NonNegativeInteger, toward?: Rounding)",
 			rootTwo::approximate(toPlaces 6),
 		)
@@ -1841,6 +1885,50 @@ third"::lines())
 	)
 	show("Transcendental.negate()", Number.Pi::negate())
 	show("Transcendental.toString()", Number.Pi::toString())
+	show(
+		"Transcendental.toString(as: NumberFormat)",
+		Number.Pi::toString(as #Decimal),
+	)
+	show(
+		"Transcendental.toString(as: NumberFormat) [fraction is the symbolic form]",
+		Number.Pi::toString(as #Fraction),
+	)
+	show(
+		"Transcendental.toString(as: NumberFormat) [percent]",
+		Number.Pi::toString(as #Percent),
+	)
+	show(
+		"Transcendental.toString(as: NumberFormat) [scientific]",
+		Number.Pi::toString(as #Scientific),
+	)
+	show(
+		"Transcendental.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding)",
+		Number.Pi::toString(as #Decimal, toPlaces 4),
+	)
+	show(
+		"Transcendental.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [negative]",
+		Number.Pi::negate()::toString(as #Decimal, toPlaces 2),
+	)
+	show(
+		"Transcendental.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [a count below one]",
+		Number.E::toString(as #Decimal, toPlaces 0),
+	)
+	show(
+		"Transcendental.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [fraction ignores the count]",
+		Number.Pi::toString(as #Fraction, toPlaces 4),
+	)
+	show(
+		"Transcendental.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [percent]",
+		Number.Pi::toString(as #Percent, toPlaces 2),
+	)
+	show(
+		"Transcendental.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [scientific]",
+		Number.Pi::toString(as #Scientific, toPlaces 4),
+	)
+	show(
+		"Transcendental.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [down]",
+		Number.Pi::toString(as #Decimal, toPlaces 4, toward #Down),
+	)
 	show(
 		"Transcendental.approximate(toPlaces: NonNegativeInteger, toward?: Rounding)",
 		Number.Pi::approximate(toPlaces 5),

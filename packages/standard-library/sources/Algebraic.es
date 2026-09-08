@@ -14,6 +14,7 @@ import {
 	}
 	from "./Rational.es" {
 		NonZeroRational
+		NumberFormat
 		Rational
 		Rounding
 	}
@@ -43,10 +44,114 @@ declarations {
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare(to other: Algebraic) -> Ordering
 
-		§§ Answers the Algebraic as a String, in the exact symbolic form: `√2`, `3·√2` or `1 + √2`.
+		§ The `as:` entries match on the format rather than handing it on.
+		§ A `#Fraction` of an irrational is the symbolic form, which no
+		§ Rational carries. A Case added to `NumberFormat` stops the match
+		§ here, which is the point. What a percentage or an exponent of an
+		§ irrational writes is a decision, not a pass-through.
+		§
+		§ The decision each arm takes is the width to read the value at,
+		§ before it hands the Rational on to the formatter. A decimal is read
+		§ at the count it writes. A percentage shifts the point two places,
+		§ so it is read two digits deeper and the shift stays exact. A
+		§ scientific form's depth is decided by where its exponent falls,
+		§ which the reading would have to answer. So it is read at the
+		§ eightieth digit instead, the cap the entry without a count writes
+		§ at.
+
+		§§ Answers the Algebraic as a String, in the exact symbolic form or in the named format.
 		§§
-		§§ One radical has one printed form, with one exception. Normalisation divides out square factors up to 65536, so a radicand `p²·q` with both primes above that is printed as written. The equal `p·√q` prints in the normalised form.
-		toString() -> String
+		§§ The form is `√2`, `3·√2` or `1 + √2` when no format is named, and `#Fraction` names that same form. The `#Decimal` format writes the expansion, to at most 80 digits, which is the cap a Rational writes a non-terminating expansion at. A count of places writes exactly that many digits after the point.
+		overload toString {
+			§§ Answers the Algebraic as a String, in the exact symbolic form: `√2`, `3·√2` or `1 + √2`.
+			§§
+			§§ One radical has one printed form, with one exception. Normalisation divides out square factors up to 65536, so a radicand `p²·q` with both primes above that is printed as written. The equal `p·√q` prints in the normalised form.
+			() -> String
+
+			§§ Answers the Algebraic as a decimal, or in the exact symbolic form, in the named format.
+			§§
+			§§ The `#Decimal` format rounds the expansion at the eightieth digit and writes it. An irrational expansion never ends, so the cap is always reached. Trailing zeros the rounding leaves are dropped, as they are for any Rational. The `#Percent` format writes one hundred times that same reading, taken two digits deeper so that eighty still stand after the point. The `#Scientific` format writes that reading with one digit before the point and the power of ten after an `e`. The `#Fraction` format writes the symbolic form, since no ratio of two Integers is this number.
+			§§
+			§§ @param as — the form to represent the Algebraic in
+			§§ @returns — the String representation of the Algebraic.
+			(as format: NumberFormat) -> String {
+				§ `@` is the scrutinee inside a `match`; see DEVELOPMENT.md,
+				§ Why bodies look the way they do.
+				constant value = @
+
+				<- match format -> String {
+					case #Fraction { <- value::toString() }
+
+					case #Decimal {
+						<- value
+							::approximate(toPlaces 80)
+							::toString(as #Decimal)
+					}
+
+					case #Percent {
+						<- value
+							::approximate(toPlaces 82)
+							::toString(as #Percent)
+					}
+
+					case #Scientific {
+						<- value
+							::approximate(toPlaces 80)
+							::toString(as #Scientific)
+					}
+				}
+			}
+
+			§§ Answers the Algebraic as a decimal with exactly that many places.
+			§§
+			§§ The digits are padded with zeroes where the rounded value is shorter. The last digit kept is rounded in the named direction, and `#Nearest` is what a call that names none is given. A count below one rounds to a whole number, and no point is written. The `#Percent` format takes the count the same way, on one hundred times the value. The `#Scientific` format counts the digits of the mantissa after the point. The `#Fraction` format ignores both the count and the direction, and writes the symbolic form.
+			§§
+			§§ @param as — the form to represent the Algebraic in
+			§§ @param toPlaces — how many digits to write after the point
+			§§ @param toward — the direction to round the last digit in, `#Nearest` when it is left out
+			§§ @returns — the String representation of the Algebraic.
+			(
+				as format: NumberFormat,
+				toPlaces count: Integer,
+				toward direction: Rounding = #Nearest,
+			) -> String {
+				constant value = @
+
+				<- match format -> String {
+					case #Fraction { <- value::toString() }
+
+					case #Decimal {
+						<- value
+							::round(toPlaces count, toward direction)
+							::toString(
+								as #Decimal,
+								toPlaces count,
+								toward direction,
+							)
+					}
+
+					case #Percent {
+						<- value
+							::round(toPlaces count::add(2), toward direction)
+							::toString(
+								as #Percent,
+								toPlaces count,
+								toward direction,
+							)
+					}
+
+					case #Scientific {
+						<- value
+							::approximate(toPlaces 80, toward direction)
+							::toString(
+								as #Scientific,
+								toPlaces count,
+								toward direction,
+							)
+					}
+				}
+			}
+		}
 
 		§§ Answers the exact sum of the Algebraic and a number.
 		§§

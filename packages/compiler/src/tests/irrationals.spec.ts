@@ -1253,6 +1253,50 @@ describe("Irrationals", () => {
 		// including the empty Lists.
 		// NOTE: the `isLessThan` family is Essence now (`packages/standard-library/sources/Number.es`) — its agreement with `compare` is covered by the golden harness.
 		// NOTE: the `isLessThan` family is Essence now (`packages/standard-library/sources/Number.es`); its symmetry with itself is covered by the golden harness.
+
+		// NOTE: The reason the grid family is spelled the same way on all four
+		// kinds. A `Number` reaches a Method only where every member Namespace
+		// declares one of the signature, so this is what the `approximate`
+		// rungs on `Integer` and `Rational` and the `toward:` on the
+		// irrationals' `toString(as:toPlaces:)` were for: one call, whichever
+		// kind the value turns out to hold.
+		it("reads digits off a Number receiver of any kind", async () => {
+			expect(
+				await run(`implementation {
+					function asNumber(_ value: Number) -> Number {
+						<- value
+					}
+
+					constant pi    = asNumber(Number.Pi)
+					constant whole = asNumber(7)
+					constant ratio = asNumber(5/3)
+
+					Terminal.inspect(pi::round(toPlaces 2))
+					Terminal.inspect(whole::round(toPlaces 2))
+					Terminal.inspect(ratio::round(toPlaces 2))
+					Terminal.inspect(pi::approximate(toPlaces 5))
+					Terminal.inspect(whole::approximate(toPlaces 5))
+					Terminal.inspect(ratio::approximate(toPlaces 2, toward #Down))
+					Terminal.inspect(pi::toString(as #Fraction))
+					Terminal.inspect(pi::toString(as #Decimal, toPlaces 4))
+					Terminal.inspect(whole::toString(as #Decimal, toPlaces 2))
+					Terminal.inspect(ratio::toString(as #Percent, toPlaces 1))
+					Terminal.inspect(pi::toString(as #Scientific, toPlaces 3))
+				}`),
+			).toEqual([
+				"157/50",
+				"7",
+				"167/100",
+				"314159/100000",
+				"7/1",
+				"83/50",
+				`"π"`,
+				`"3.1416"`,
+				`"7.00"`,
+				`"166.7%"`,
+				`"3.142e0"`,
+			])
+		})
 	})
 
 	describe("Structural equality", () => {
@@ -1440,6 +1484,63 @@ describe("Irrationals", () => {
 					Terminal.inspect(asNumber(7)::round(toward #Down))
 				}`),
 			).toEqual(["3", "2", "2", "7"])
+		})
+
+		// NOTE: The decimal rendering, which is `approximate` under a name a
+		// reader reaches for. The entry with no count is capped where a
+		// Rational's non-terminating expansion is capped, at eighty digits.
+		// Rounding at the eightieth left π with two trailing zeroes, and a
+		// Rational drops those, so the text is eighty characters: one digit,
+		// the point, and seventy-eight after it.
+		it("writes an irrational as a decimal", async () => {
+			expect(
+				await run(`implementation {
+					constant root: Algebraic = match 2::squareRoot() -> Algebraic {
+						case Algebraic { <- @ }
+						case Integer { <- Number.GoldenRatio }
+					}
+
+					Terminal.inspect(Number.Pi::toString(as #Decimal, toPlaces 4))
+					Terminal.inspect(Number.Pi::toString(as #Fraction))
+					Terminal.inspect(Number.Pi::negate()::toString(as #Decimal, toPlaces 2))
+					Terminal.inspect(root::toString(as #Decimal, toPlaces 6))
+					Terminal.inspect(Number.Pi::toString(as #Decimal)::length())
+				}`),
+			).toEqual([`"3.1416"`, `"π"`, `"-3.14"`, `"1.414214"`, "80"])
+		})
+
+		// NOTE: The other two formats, and the direction the count entry takes.
+		// Each arm reads the value at the width its own writing needs: a
+		// decimal at the count, a percentage two digits deeper so the shift by
+		// a hundred stays exact, and a scientific form at the eightieth digit,
+		// since where its exponent falls is what would decide the depth. The
+		// last two lines pin what that leaves the entries with no count. A
+		// percentage is read two digits deeper, so eighty digits stand after
+		// its point: three before it, the point, eighty after and the `%` is
+		// 85 characters. A scientific form is the same eighty-digit reading a
+		// decimal gets, and π's loses two trailing zeroes to the trimming
+		// every Rational gets — the decimal is 80 characters, and the `e0`
+		// after it makes 82.
+		it("writes an irrational as a percentage and in scientific notation", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(Number.Pi::toString(as #Percent, toPlaces 2))
+					Terminal.inspect(Number.Pi::toString(as #Scientific, toPlaces 4))
+					Terminal.inspect(Number.Pi::toString(as #Decimal, toPlaces 4, toward #Down))
+					Terminal.inspect(Number.Pi::toString(as #Percent, toPlaces 2, toward #Down))
+					Terminal.inspect(Number.Pi::multiply(with 1/1000)::toString(as #Scientific, toPlaces 3))
+					Terminal.inspect(Number.Pi::toString(as #Percent)::length())
+					Terminal.inspect(Number.Pi::toString(as #Scientific)::length())
+				}`),
+			).toEqual([
+				`"314.16%"`,
+				`"3.1416e0"`,
+				`"3.1415"`,
+				`"314.15%"`,
+				`"3.142e-3"`,
+				"85",
+				"82",
+			])
 		})
 
 		// NOTE: The whole point of the approximation API, written the way a
