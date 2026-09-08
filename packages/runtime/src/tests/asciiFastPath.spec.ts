@@ -219,12 +219,22 @@ describe("the ASCII marker", () => {
 			expect(isMarkedAscii(piece)).toBeTrue()
 		}
 
-		for (let piece of split(text, string("")).value) {
-			expect(isMarkedAscii(piece)).toBeTrue()
-		}
-
 		for (let word of words(text).value) {
 			expect(isMarkedAscii(word)).toBeTrue()
+		}
+	})
+
+	// NOTE: The one split that does not mark its pieces, and why: the empty
+	// separator answers the characters, and a piece there is ONE unit — the
+	// scan that would answer the mark reads it, so the mark saves nothing and
+	// writing two Symbol keys per character of the receiver measured most of
+	// the Method. It is still an ASCII String and still counts as one.
+	test("leaves the characters of a split unmarked", () => {
+		let text = string("  Hello, World  ")
+
+		for (let piece of split(text, string("")).value) {
+			expect(isUnmarked(piece)).toBeTrue()
+			expect(length(piece).value).toBe(1)
 		}
 	})
 
