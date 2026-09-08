@@ -30,10 +30,10 @@ one entry reaches, and a List crosses to them through two Namespaces of its own
 — `GroupedList` and the `GroupedNonEmptyList` that same proof reaches — which
 `Dictionary.es` declares beside the container they answer.
 The modes a Method takes are Choices declared beside it: `Side`, `Rounding`,
-`NumberFormat`, `CaseSensitivity`, `NormalizationForm`, `SortOrder`, `Stream`
-and `Step`.
+`SignStyle`, `NumberFormat`, `CaseSensitivity`, `NormalizationForm`,
+`SortOrder`, `Stream` and `Step`.
 A Choice whose Cases all carry no payload derives both its `Equatable` and its
-`Printable` conformance, so seven of those eight have a Namespace that declares
+`Printable` conformance, so eight of those nine have a Namespace that declares
 the two and holds no body at all: `#Less` prints `Less` without anybody writing
 that down. `Step` has none, because both of its Cases carry a payload and only a
 Choice of Cases that carry none derives a `toString`.
@@ -53,7 +53,7 @@ the Program's input or nothing at the end of it, with `Terminal.readAll` beside
 it and the `Terminal.ask` that is a prompt and a line (`Terminal.es`).
 
 Three of every five declared Method entries are also IMPLEMENTED here, in
-Essence — 287 of 482 as this is written, counting one entry per Overload and
+Essence — 295 of 491 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
 Seven more are written on a PROTOCOL rather than on a Namespace, once for every
 conformer: `Equatable.isNot`, `Comparable`'s four inequalities, and

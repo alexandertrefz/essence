@@ -956,7 +956,7 @@ declarations {
 
 			§§ Answers the Rational rounded to a decimal grid of the given width.
 			§§
-			§§ Two places round to hundredths, so `5/3` answers `167/100`. The answer is exact, and it is a Rational rather than text: `toString(as #Decimal, toPlaces 2)` is what writes `1.67`. A count below one rounds to a whole number, answered as a Rational.
+			§§ Two places round to hundredths, so `5/3` answers `167/100`. The answer is exact, and it is a Rational rather than text: `toString(as #Decimal, toPlaces 2)` is what writes `1.67`. A count below one rounds to a whole number, answered as a Rational. The count has no ceiling, as it has none on `toString`.
 			§§
 			§§ @param toPlaces — how many decimal places to keep
 			§§ @param toward — the direction to round in, `#Nearest` when it is left out

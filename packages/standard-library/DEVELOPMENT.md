@@ -422,9 +422,9 @@ Printing is derived for a Choice whose Cases all carry no payload, and answers
 the Case's own name — `#Less` prints `Less`. So a Namespace over a Choice of
 unit Cases declares `is Equatable, is Printable` and writes neither Method:
 `Ordering`, `Side`, `CaseSensitivity`, `NormalizationForm`, `NumberFormat`,
-`Rounding`, `SortOrder` and `Stream` are all that shape, and seven of the eight
-have an empty body besides. `Ordering` is the one that does not: `then` is a
-Method of its own, and no conformance offers it.
+`Rounding`, `SignStyle`, `SortOrder` and `Stream` are all that shape, and eight
+of the nine have an empty body besides. `Ordering` is the one that does not:
+`then` is a Method of its own, and no conformance offers it.
 
 Printing is DECLARED where equality is not — a Choice compares by its tags
 whatever anyone says, but how it READS is a decision, so a Choice whose
