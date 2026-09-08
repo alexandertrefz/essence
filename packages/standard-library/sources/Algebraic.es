@@ -388,6 +388,21 @@ declarations {
 			(by other: NonZeroRational) -> Algebraic
 		}
 
+		§ There is no `squareRoot` beside this. A root of `a + b·√d` is a root
+		§ of a quartic, and lies in this slice only where `a² − b²·d` is a
+		§ square. So `√(3 + 2·√2)` is `1 + √2`, and `√(1 + √2)` is no
+		§ Algebraic at all. An entry answering an Optional would be empty for
+		§ almost every receiver, so the root waits for the representation that
+		§ can hold it.
+
+		§§ Answers the Algebraic raised to the given power, exactly.
+		§§
+		§§ The slice is closed under Integer powers, so every power is exact. A power can cancel the radical, so `2::squareRoot()` squared is the Rational `2`. A negative exponent answers the power of the reciprocal, which always exists, since an Algebraic is never zero. A zero exponent answers `1`.
+		§§
+		§§ @param to — the exponent
+		§§ @returns — the exact power, an Algebraic or a Rational.
+		raise(to exponent: Integer) -> Rational | Algebraic
+
 		§ An Algebraic is never zero, so it is below its own negation exactly
 		§ when it is negative, and above it exactly when it is positive. This
 		§ Namespace's own `compare` decides both. The covering `Number`'s

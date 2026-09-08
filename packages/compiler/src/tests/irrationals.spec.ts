@@ -641,6 +641,66 @@ describe("Irrationals", () => {
 			expect(best).toBeLessThan(50)
 		})
 
+		// NOTE: The quadratic slice is a FIELD, so it is closed under Integer
+		// powers in both directions. The golden ratio is the case that shows
+		// it: φⁿ is `(Lₙ + Fₙ·√5) / 2` over the Lucas and Fibonacci numbers,
+		// so φ¹⁰ is `(123 + 55·√5) / 2` and a wrong power would be visible at
+		// a glance.
+		it("raises to an Integer power, exactly and in both directions", () => {
+			const power = (value: algebraic.AlgebraicType, exponent: bigint) =>
+				algebraic.raise(value, integer.createInteger(exponent))
+
+			expect(power(radical(2n), 2n)).toEqual(
+				rational.createRational(2n, 1n),
+			)
+			expect(power(radical(2n), 3n)).toEqual(radical(8n))
+			expect(power(radical(2n), 0n)).toEqual(
+				rational.createRational(1n, 1n),
+			)
+			expect(power(radical(2n), -2n)).toEqual(
+				rational.createRational(1n, 2n),
+			)
+			expect(power(number.GoldenRatio, 1n)).toEqual(number.GoldenRatio)
+			expect(power(number.GoldenRatio, 10n)).toEqual(
+				algebraic.createAlgebraic(
+					bigRational(123n, 2n),
+					bigRational(55n, 2n),
+					5n,
+				),
+			)
+			// NOTE: φ⁻¹ is φ − 1, which is the identity the golden ratio is
+			// named for, and the one case where the reciprocal branch is
+			// checked against something a reader knows.
+			expect(power(number.GoldenRatio, -1n)).toEqual(
+				algebraic.createAlgebraic(
+					bigRational(-1n, 2n),
+					bigRational(1n, 2n),
+					5n,
+				),
+			)
+		})
+
+		// NOTE: Square-and-multiply, so the claim is that a large exponent
+		// costs a logarithm of it. φ to the ten-thousandth is a 2090-digit
+		// pair; the same walk one product at a time is ten thousand products
+		// on numbers that long.
+		it("raises to a large exponent in milliseconds", () => {
+			let best = Number.POSITIVE_INFINITY
+
+			for (let attempt = 0; attempt < 3; attempt++) {
+				const started = performance.now()
+
+				algebraic.raise(
+					number.GoldenRatio,
+					integer.createInteger(10000n),
+				)
+
+				best = Math.min(best, performance.now() - started)
+			}
+
+			expect(best).toBeLessThan(50)
+		})
+
 		// NOTE: The enclosure `scaledIntervalOf` answers is refined until both
 		// of its ends round alike at the width asked for, so what is checked
 		// here is that the answer IS the step the exact value rounds to — not

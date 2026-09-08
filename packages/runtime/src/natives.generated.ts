@@ -309,6 +309,8 @@ export type AlgebraicNatives = {
 	divide__overload$7: (self: AlgebraicType, by: IntegerType) => AlgebraicType
 	// divide(by: NonZeroRational) -> Algebraic
 	divide__overload$8: (self: AlgebraicType, by: RationalType) => AlgebraicType
+	// raise(to: Integer) -> Rational | Algebraic
+	raise: (self: AlgebraicType, to: IntegerType) => RationalType | AlgebraicType
 	// negate() -> Algebraic
 	negate: (self: AlgebraicType) => AlgebraicType
 	// approximate(toPlaces: NonNegativeInteger, toward: Rounding) -> Rational
@@ -828,6 +830,7 @@ export const $AlgebraicArity: AssertArities<typeof import("./Algebraic"), {
 	divide__overload$3: 2
 	divide__overload$7: 2
 	divide__overload$8: 2
+	raise: 2
 	negate: 1
 	approximate: 3
 	round__overload$1: 2
