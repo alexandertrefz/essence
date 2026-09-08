@@ -602,7 +602,7 @@ function memberSwaps(
 // Protocol wrote a body for the target — that body is the Function the emitted
 // call names, and a target the Protocol merely REQUIRES has no body anywhere to
 // name. `Equatable` requires `is` and provides `isNot`, so a provided `isNot`
-// has nowhere to rotate to; `Orderable` provides all four comparisons, so a
+// has nowhere to rotate to; `Comparable` provides all four comparisons, so a
 // user Type that conforms to it offers the same rotations a builtin does.
 //
 // NOTE: Asked of the standard library's Protocol table, which is the only one

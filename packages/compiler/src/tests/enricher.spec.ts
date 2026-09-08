@@ -4223,7 +4223,7 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The ordering family is `Orderable`'s, provided over `Self` —
+		// NOTE: The ordering family is `Comparable`'s, provided over `Self` —
 		// the target of the Namespace whose conformance offered it, which is
 		// the covering `Number` as much as it is `Integer`. So a comparison
 		// across two kinds falls to `Number`'s rung and is answered there,
@@ -4274,7 +4274,7 @@ describe("Enricher", () => {
 		// and each holds one entry for the other kind, but neither was widened
 		// to the irrationals — deciding a Transcendental ordering in general
 		// is undecidable, so the claim is made once by `Number.compare`, which
-		// `Orderable` provides the whole family on top of. This guards against
+		// `Comparable` provides the whole family on top of. This guards against
 		// a well-meaning re-addition to a member.
 		it("keeps cross-kind comparison off the member Namespaces", () => {
 			// NOTE: The argument Types Integer::isLessThan accepts — no
@@ -4295,8 +4295,8 @@ describe("Enricher", () => {
 				builtinNamespace("Transcendental").methods.isLessThan,
 			).toBeUndefined()
 			// NOTE: And `Number` writes none either. The covering Namespace
-			// declares `is Orderable`, whose provided `isLessThan` reads its
-			// cross-kind `compare` — so a receiver of the covering Type
+			// declares `is Orderable`, which extends `Comparable`, and that
+			// Protocol's provided `isLessThan` reads its cross-kind `compare` — so a receiver of the covering Type
 			// compares against any member of the tower without a body here.
 			expect(
 				builtinNamespace("Number").methods.isLessThan,

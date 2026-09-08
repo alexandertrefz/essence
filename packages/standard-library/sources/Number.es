@@ -893,10 +893,11 @@ declarations {
 			}
 		}
 
-		§ The four inequalities, `isBetween` and `clamp` are `Orderable`'s
-		§ provided Methods, written once on `compare`. The conformance above
-		§ is what a Number receiver reaches them through, and this Namespace
-		§ declares none of the six itself. Reaching one through it is spelled
+		§ The four inequalities are `Comparable`'s provided Methods, and
+		§ `isBetween` and `clamp` are `Orderable`'s. Each is written a single
+		§ time, on `compare` or on the inequalities that read it. The
+		§ conformance above is what a Number receiver reaches all six through,
+		§ and this Namespace declares none of them itself. Reaching one through it is spelled
 		§ both ways a written Method is, so `Number.isLessThan(a, b)` stands
 		§ beside `Number.compare(a, to b)`. See README.md, Ordering across
 		§ two kinds falls to Number.

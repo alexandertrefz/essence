@@ -2062,8 +2062,9 @@ third"::lines())
 			"Number.compare(to: Number) [Transcendental]",
 			Number.compare(Number.Pi, to Number.Tau),
 		)
-		§ The four inequalities, `isBetween` and `clamp` are `Orderable`'s
-		§ provided Methods, and every conformer has a rung of its own. These
+		§ The four inequalities are `Comparable`'s provided Methods, and
+		§ `isBetween` and `clamp` are `Orderable`'s. Every conformer has a rung
+		§ of its own. These
 		§ lines exercise the covering `Number`'s rung. That is what `asNumber`
 		§ reaches: a bare receiver would be asked of its own kind's rung first.
 		show(

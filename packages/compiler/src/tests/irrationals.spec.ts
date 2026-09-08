@@ -500,7 +500,7 @@ describe("Irrationals", () => {
 			})
 
 			// NOTE: The same pair the way a Program meets it. `Algebraic::is` is
-			// written on `compare`, the inequalities are `Orderable`'s provided
+			// written on `compare`, the inequalities are `Comparable`'s provided
 			// bodies over it, and a Union receiver reaches `Number::is` and the
 			// sixteen-cell `Number.compare` — every one of those has to read
 			// √(65537²·65539) and 65537·√65539 as one number, and the same-radical

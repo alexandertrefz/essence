@@ -1131,8 +1131,8 @@ export function negatedPredicateConjunct(
 // set carries on its own, which can not grow with the Program.
 //
 // NOTE: The Methods are named, but only where the base itself answers them.
-// `is`, `isLessThan`, `isGreaterThan` and `isBetween` are `Equatable`'s and
-// `Orderable`'s vocabulary, and the ordering's law is a promise the BASE makes —
+// `is`, `isLessThan` and `isGreaterThan` are `Equatable`'s and `Comparable`'s
+// vocabulary, and `isBetween` is `Orderable`'s, and the ordering's law is a promise the BASE makes —
 // so a leaf is read for it only when the Namespace that answered is the base's
 // own, or the covering `Number` an Integer bound on a Rational falls to. A
 // Program may declare `namespace Tally for String { isLessThan(_ n: Integer) … }`

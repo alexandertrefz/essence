@@ -15191,10 +15191,9 @@ export function derivePredicateAliases(
 }
 
 // NOTE: The same reading of a PROTOCOL's provided bodies, run as the Protocol
-// reaches Scope. `Orderable` writes `isGreaterThanOrEqualTo` as
-// `@::isLessThan(other)::negate()` and `Equatable` writes `isNot` as the `if`
-// that says the same thing, and every conformer answers both through those very
-// bodies — so the leaf a conformer's receiver proves is read here, once, rather
+// reaches Scope. The three `if` bodies that are one call on `@` —
+// `Comparable`'s two `…OrEqualTo` entries and `Equatable`'s `isNot` — are read
+// this way, and every conformer answers them through those very bodies — so the leaf a conformer's receiver proves is read here, once, rather
 // than being named in a table of Methods declared to be each other's
 // contraries.
 //

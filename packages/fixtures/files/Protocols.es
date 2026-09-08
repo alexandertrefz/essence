@@ -87,10 +87,11 @@ implementation {
 
 	§ The builtin Types conform to the core Protocols — Equatable and
 	§ Printable for all of them, and Comparable for the ordered ones:
-	§ Integer, Rational, Algebraic and String. (Transcendentals order only
-	§ through Number, so they carry no Comparable conformance of their own.)
-	§ The numeric ones say `is Orderable`, which extends Comparable and
-	§ provides the four inequalities, `isBetween` and `clamp` on top of it —
+	§ Integer, Rational, Algebraic, String, Boolean and a List of items that
+	§ are themselves Comparable. (Transcendentals order only through Number,
+	§ so they carry no Comparable conformance of their own.) Comparable
+	§ provides the four inequalities, and the numeric ones say
+	§ `is Orderable`, which extends it and adds `isBetween` and `clamp` —
 	§ so the bound below is satisfied by a conformance that never names it.
 
 	function smallerOf<infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
