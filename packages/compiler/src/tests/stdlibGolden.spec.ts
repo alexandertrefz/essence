@@ -116,15 +116,15 @@ function labelOf(line: string): string {
 // line. The Namespace that PRINTS can not be held to account by a record made of
 // printing; its behaviour is covered by `terminal.spec.ts`, which compiles small
 // Programs and reads back what each stream actually received.
-// NOTE: And the one Namespace this harness can not REACH. Every entry of
-// `Randomness` takes a source, and nothing written in Essence builds one — a
-// property test's runner builds one from its seed and hands it to
-// `Generatable::generate`, which is the only place a source is ever met. So
-// there is no line `StdlibExhaustive.es` could write, and no capture to diff:
-// what the entries answer is random by definition. They are covered by
+// NOTE: And the one Namespace this harness can not CAPTURE. `Randomness.seeded`
+// builds a source a line here could draw from, and what the draw answers is one
+// of the generator's own words — so a capture of it would pin sfc32 rather than
+// the Namespace, and every change to the words would read as a broken body. So
+// there is no line `StdlibExhaustive.es` writes. The entries are covered by
 // `packages/runtime/src/tests/randomness.spec.ts`, which drives the natives
 // directly over a fixed seed and asserts the ranges, the exactness and the
-// replay.
+// replay, and by `packages/compiler/src/tests/randomness.spec.ts`, which runs
+// Programs that build a source and draw from it.
 const COVERED_ELSEWHERE = new Set(["Terminal", "Randomness"])
 
 // NOTE: Every Method a Program can call, spelled the way `StdlibExhaustive.es`

@@ -2101,7 +2101,7 @@ describe("Standard Library Loader", () => {
 			"Number::is",
 			"Optional::hasValue",
 			"Optional::is",
-			"Randomness::boolean",
+			"Randomness::drawBoolean",
 			"Rational::is",
 			"Rational::isGreaterThan",
 			"Rational::isLessThan",

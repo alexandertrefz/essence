@@ -1,9 +1,10 @@
+import { type BigRational, reduced } from "./bigRational"
 import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
 import type { ListType } from "./List"
-import { viewOf } from "./List"
+import { createList, ownItemsOf, viewOf } from "./List"
 import type { RationalType } from "./Rational"
 import { createRational } from "./Rational"
 import type { StringType } from "./String"
@@ -100,9 +101,9 @@ export function seedOf(text: string): number {
 	return hash >>> 0
 }
 
-// NOTE: The door every SEEDED source is built through. `createRandomness` is
-// not a native — nothing written in Essence builds a source — so this is
-// reached from the test runtime alone.
+// NOTE: The door every SEEDED source is built through: `seeded` below, which a
+// Program calls, and the test runtime, which builds a property run's source
+// from the seed it prints.
 export function createRandomness(seed: number): RandomnessType {
 	let state = seed | 0
 	let first = scramble(state)
@@ -149,17 +150,13 @@ function entropyWord(): number {
 	return word
 }
 
-// NOTE: The door to the machine's own randomness. Every call answers THE one
-// value, because two entropy sources could not be told apart — the machine is
-// one, and the words above are drawn from it rather than held. It is a seeded
-// source that is worth building twice, since its state is its own.
+// NOTE: The machine's own randomness, as ONE value. Two entropy sources could
+// not be told apart — the machine is one, and the words above are drawn from it
+// rather than held — so `entropy` below answers this from every call, and only
+// the seeded kind is worth building twice.
 const ENTROPY: EntropyRandomnessType = {
 	[typeKeySymbol]: "Randomness",
 	seeded: false,
-}
-
-export function createEntropy(): RandomnessType {
-	return ENTROPY
 }
 
 // NOTE: A whole number in `[0, bound)`, taken from the low bits with the
@@ -241,17 +238,53 @@ export function fraction(source: RandomnessType): number {
 
 // #region Natives
 
+// NOTE: The two doors a Program builds a source through, and they are the two
+// kinds under the one tag. `entropy` hands over the singleton above, so a
+// Program that holds the answer in a Constant still reads the machine at every
+// draw and nothing it does is replayable. `seeded` folds the text into a word
+// and scrambles four out of it, which is the source `--seed` replays.
+export function entropy(): RandomnessType {
+	return ENTROPY
+}
+
+export function seeded(seed: StringType): RandomnessType {
+	return createRandomness(seedOf(seed.value))
+}
+
 // NOTE: `true` or `false`, each half the time. It reads the top bit rather than
 // the bottom one, which is the better bit of an sfc32 word.
-export function boolean(source: RandomnessType): BooleanType {
+export function drawBoolean__overload$1(source: RandomnessType): BooleanType {
 	return createBoolean(nextWord(source) >= 2147483648)
+}
+
+// NOTE: `true` exactly as often as the chance says, which is why the draw is
+// over the chance's OWN denominator rather than over `fraction`: a chance of
+// `1/3` is a third of the time and not a third of 2^32 rounded to a word. The
+// parts are read unreduced, since `n/d` and `2n/2d` name one point either way.
+// A chance outside `[0, 1]` is clamped rather than refused — every entry here
+// answers, and there is no Optional in the signature to answer with.
+export function drawBoolean__overload$2(
+	source: RandomnessType,
+	chance: RationalType,
+): BooleanType {
+	if (chance.numerator <= 0n) {
+		return createBoolean(false)
+	}
+
+	if (chance.numerator >= chance.denominator) {
+		return createBoolean(true)
+	}
+
+	return createBoolean(
+		bigBetween(source, 0n, chance.denominator - 1n) < chance.numerator,
+	)
 }
 
 // NOTE: Both bounds included, and the two naming the same range in either
 // order — the reading `Orderable::clamp` and `Orderable::isBetween` both give a
 // pair, so a draw between them reads it the same way. The bounds are exchanged
 // rather than the lower one answered, which is what made this the odd one out.
-export function integer(
+export function drawInteger__overload$1(
 	source: RandomnessType,
 	low: IntegerType,
 	high: IntegerType,
@@ -264,6 +297,24 @@ export function integer(
 	return createInteger(bigBetween(source, lowest, highest))
 }
 
+// NOTE: The half open form an index draw wants, where the entry above is the
+// closed one a range wants. The bound is proven above zero and the answer is
+// proven not to be negative, so neither end needs an Optional; the proof erases
+// before anything runs, which is why a bound of one or less is guarded here and
+// answers zero.
+export function drawInteger__overload$2(
+	source: RandomnessType,
+	bound: IntegerType,
+): IntegerType {
+	let limit = BigInt(bound.value)
+
+	if (limit <= 1n) {
+		return createInteger(0n)
+	}
+
+	return createInteger(bigBetween(source, 0n, limit - 1n))
+}
+
 // NOTE: A Rational is drawn as a denominator and then a numerator, rather than
 // as a scaled double, so that what comes out is exact and has a denominator a
 // reader recognises. The denominators are the small ones a test wants to meet —
@@ -273,16 +324,45 @@ const DENOMINATORS = [1n, 2n, 3n, 4n, 5n, 6n, 8n, 10n, 12n, 16n, 100n, 1000n]
 // NOTE: The two bounds name the same range in either order, exactly as they do
 // for the Integer above. A denominator is positive after `createRational`, so
 // the cross-multiplication below orders the pair.
-export function rational(
+export function drawRational__overload$1(
 	source: RandomnessType,
 	low: RationalType,
 	high: RationalType,
+): RationalType {
+	return overDenominator(
+		source,
+		low,
+		high,
+		DENOMINATORS[below(source, DENOMINATORS.length)] ?? 1n,
+	)
+}
+
+// NOTE: The same draw with the lattice named rather than drawn. It is the entry
+// for everything the twelve denominators above are wrong for: a draw off a
+// hundredth is a draw off a hundredth however often it is asked for. The
+// denominator is proven above zero, and the proof erases, so a denominator of
+// zero or less is guarded into one whole.
+export function drawRational__overload$2(
+	source: RandomnessType,
+	low: RationalType,
+	high: RationalType,
+	denominator: IntegerType,
+): RationalType {
+	let scale = BigInt(denominator.value)
+
+	return overDenominator(source, low, high, scale > 0n ? scale : 1n)
+}
+
+function overDenominator(
+	source: RandomnessType,
+	low: RationalType,
+	high: RationalType,
+	denominator: bigint,
 ): RationalType {
 	let exchanged =
 		low.numerator * high.denominator > high.numerator * low.denominator
 	let lowerBound = exchanged ? high : low
 	let upperBound = exchanged ? low : high
-	let denominator = DENOMINATORS[below(source, DENOMINATORS.length)] ?? 1n
 	// NOTE: The bounds scaled to that denominator, rounded INWARDS on both
 	// sides, so every answer is inside the range the caller wrote. A range too
 	// narrow to hold one multiple of the denominator answers the lower bound,
@@ -324,7 +404,10 @@ export function character(source: RandomnessType): string {
 // NOTE: A String of at most `upTo` characters, and possibly of none. A negative
 // bound answers the empty String, which is the only String shorter than nothing
 // asked for.
-export function string(source: RandomnessType, upTo: IntegerType): StringType {
+export function drawString(
+	source: RandomnessType,
+	upTo: IntegerType,
+): StringType {
 	let bound = Number(upTo.value)
 
 	if (!Number.isFinite(bound) || bound <= 0) {
@@ -345,7 +428,7 @@ export function string(source: RandomnessType, upTo: IntegerType): StringType {
 // `NonEmptyList`, so the refinement is what promises there is one to answer
 // with; the fallback below is unreachable and is what TypeScript is told
 // instead, since a refinement erases before anything runs.
-export function pick<ItemType extends AnyType>(
+export function pick__overload$1<ItemType extends AnyType>(
 	source: RandomnessType,
 	items: ListType<ItemType>,
 ): ItemType {
@@ -358,6 +441,134 @@ export function pick<ItemType extends AnyType>(
 
 	return view.back[index - view.frontCount] as ItemType
 }
+
+// NOTE: Without replacement, as a PARTIAL shuffle: `count` swaps put the drawn
+// items at the front of a copy, each drawn from what is left. The copy is the
+// answer's own Array, so the answer is the first `count` of it. Drawing again
+// whenever the draw meets an item it already has is the other way to spell it,
+// and how long that runs is unbounded as `count` approaches the length.
+//
+// NOTE: A count above the length is the whole List reordered, because there is
+// no item left to draw a further one from. It is clamped rather than refused
+// for the reason the chance above is: the signature has no Optional in it.
+export function pick__overload$2<ItemType extends AnyType>(
+	source: RandomnessType,
+	count: IntegerType,
+	items: ListType<ItemType>,
+): ListType<ItemType> {
+	let drawn = ownItemsOf(items)
+	let total = drawn.length
+	let wanted = Number(count.value)
+	let taken = wanted < 1 ? 1 : wanted
+
+	if (taken > total) {
+		taken = total
+	}
+
+	for (let index = 0; index < taken; index++) {
+		let choice = index + below(source, total - index)
+		let held = drawn[index] as ItemType
+
+		drawn[index] = drawn[choice] as ItemType
+		drawn[choice] = held
+	}
+
+	drawn.length = taken
+
+	return createList(drawn)
+}
+
+// NOTE: The weights are Rationals and the draw is exact, so the arithmetic is
+// over one common denominator rather than over a sum of doubles. It is the
+// least common multiple of the reduced denominators, built with `reduced` — the
+// gcd of the pair is what it divides out — and every weight scaled to it is a
+// whole number. So the draw is one Integer in `[0, total)`, and the walk that
+// spends it compares whole numbers. Adding the weights up as they come and
+// drawing over the sum's own denominator is the cheaper arithmetic and the
+// WRONG one: weights of a half, a half and a third answer 1/2, 1/4 and 1/4
+// that way rather than 3/8, 3/8 and 1/4. One pick over a thousand items whose
+// denominators run to eight measures 0.20 ms, nearly all of it this scaling.
+//
+// NOTE: A weight of zero or less is drawn as zero: a negative likelihood is not
+// a likelihood, and refusing here would need an Optional the signature has no
+// room for. Weights that are all zero leave nothing to weigh the items by, so
+// the draw falls back to the even one the entry above makes.
+const NO_WEIGHT: BigRational = { numerator: 0n, denominator: 1n }
+
+export function pick__overload$3<ItemType extends AnyType>(
+	source: RandomnessType,
+	items: ListType<ItemType>,
+	weight: (item: ItemType) => RationalType,
+): ItemType {
+	let chosen = ownItemsOf(items)
+	let parts: Array<BigRational> = []
+	let common = 1n
+
+	for (let item of chosen) {
+		let drawn = weight(item)
+		let part = reduced(drawn.numerator, drawn.denominator)
+
+		if (part.numerator <= 0n) {
+			part = NO_WEIGHT
+		}
+
+		parts.push(part)
+		common = reduced(common, part.denominator).numerator * part.denominator
+	}
+
+	let scaled: Array<bigint> = []
+	let total = 0n
+
+	for (let part of parts) {
+		let value = part.numerator * (common / part.denominator)
+
+		scaled.push(value)
+		total += value
+	}
+
+	if (total <= 0n) {
+		return chosen[below(source, chosen.length)] as ItemType
+	}
+
+	let drawn = bigBetween(source, 0n, total - 1n)
+	let running = 0n
+
+	for (let index = 0; index < scaled.length; index++) {
+		running += scaled[index] ?? 0n
+
+		if (drawn < running) {
+			return chosen[index] as ItemType
+		}
+	}
+
+	return chosen[chosen.length - 1] as ItemType
+}
+
+// NOTE: Fisher and Yates, walked from the back so that each turn draws from the
+// items it has not placed yet — which is what makes every one of the `n!`
+// orders equally likely. It reorders an Array of its own rather than the
+// receiver's, so the List it was handed is left as it was.
+export function shuffle__overload$1<ItemType extends AnyType>(
+	source: RandomnessType,
+	items: ListType<ItemType>,
+): ListType<ItemType> {
+	let drawn = ownItemsOf(items)
+
+	for (let index = drawn.length - 1; index > 0; index--) {
+		let choice = below(source, index + 1)
+		let held = drawn[index] as ItemType
+
+		drawn[index] = drawn[choice] as ItemType
+		drawn[choice] = held
+	}
+
+	return createList(drawn)
+}
+
+// NOTE: The same Function under the proof, for the reason `String.split`'s
+// second entry is one: a refinement erases before anything runs, and a
+// reordering of a List with something in it has something in it.
+export const shuffle__overload$2 = shuffle__overload$1
 
 // #endregion
 
