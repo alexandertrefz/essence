@@ -65,6 +65,7 @@ export {
 		NumberFormat
 		Rational
 		Rounding
+		SignStyle
 	}
 	from "./Record.es" { Record }
 	from "./Step.es" { Step }

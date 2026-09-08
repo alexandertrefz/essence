@@ -14,6 +14,7 @@ import {
 		NumberFormat
 		Rational
 		Rounding
+		SignStyle
 	}
 	from "./Step.es" { Step }
 	from "./String.es" { String }
@@ -251,6 +252,31 @@ declarations {
 						groupingWith separator,
 						toward direction,
 					)
+			}
+
+			§§ Answers the Integer with its sign written in the named style.
+			§§
+			§§ The `#Always` Case writes a `+` in front of a value that is not negative, so `3` is `+3` and zero is `+0`. The `#Negative` Case writes what the plain `toString()` writes.
+			§§
+			§§ @param showingSign — whether to write a sign in front of a value that is not negative
+			§§ @returns — the String representation of the Integer.
+			(showingSign style: SignStyle) -> String {
+				§ `@` is rebound inside `match`; see DEVELOPMENT.md, Why
+				§ bodies look the way they do.
+				constant text       = @::toString()
+				constant isNegative = @::isNegative()
+
+				<- match style -> String {
+					case #Negative { <- text }
+
+					case #Always {
+						if isNegative {
+							<- text
+						} else {
+							<- "+"::append(text)
+						}
+					}
+				}
 			}
 		}
 

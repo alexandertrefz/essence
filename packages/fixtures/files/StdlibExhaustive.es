@@ -825,6 +825,22 @@ third"::lines())
 		-1234567
 			::toString(as NumberFormat#Decimal, toPlaces 2, groupingWith ","),
 	)
+	show(
+		"Integer.toString(showingSign: SignStyle)",
+		3::toString(showingSign SignStyle#Always),
+	)
+	show(
+		"Integer.toString(showingSign: SignStyle) [negative]",
+		-3::toString(showingSign SignStyle#Always),
+	)
+	show(
+		"Integer.toString(showingSign: SignStyle) [zero]",
+		0::toString(showingSign SignStyle#Always),
+	)
+	show(
+		"Integer.toString(showingSign: SignStyle) [only negative]",
+		3::toString(showingSign SignStyle#Negative),
+	)
 	show("Integer.compare(to: Integer)", 1::compare(to 2))
 	show("Integer.compare(to: Integer) [equal]", 2::compare(to 2))
 	show("Integer.compare(to: Integer) [greater]", 3::compare(to 2))
@@ -1375,6 +1391,22 @@ third"::lines())
 				groupingWith ",",
 				toward #Down,
 			),
+	)
+	show(
+		"Rational.toString(showingSign: SignStyle)",
+		3/4::toString(showingSign SignStyle#Always),
+	)
+	show(
+		"Rational.toString(showingSign: SignStyle) [negative]",
+		-3/4::toString(showingSign SignStyle#Always),
+	)
+	show(
+		"Rational.toString(showingSign: SignStyle) [whole]",
+		4/2::toString(showingSign SignStyle#Always),
+	)
+	show(
+		"Rational.toString(showingSign: SignStyle) [only negative]",
+		3/4::toString(showingSign SignStyle#Negative),
 	)
 	show("Rational.compare(to: Rational)", 1/2::compare(to 2/3))
 	show("Rational.compare(to: Rational) [equal]", 1/2::compare(to 2/4))
@@ -2411,8 +2443,10 @@ third"::lines())
 	)
 
 	§ ——— NumberFormat ———————————————————————————————————————————————————————
-	constant asFraction: NumberFormat = #Fraction
-	constant asDecimal: NumberFormat  = #Decimal
+	constant asFraction: NumberFormat   = #Fraction
+	constant asDecimal: NumberFormat    = #Decimal
+	constant asPercent: NumberFormat    = #Percent
+	constant asScientific: NumberFormat = #Scientific
 
 	show("Choice_Equatable.is(_ NumberFormat)", asFraction::is(#Fraction))
 	show(
@@ -2432,12 +2466,21 @@ third"::lines())
 		"Choice_Printable.toString() [NumberFormat#Decimal]",
 		asDecimal::toString(),
 	)
+	show(
+		"Choice_Printable.toString() [NumberFormat#Percent]",
+		asPercent::toString(),
+	)
+	show(
+		"Choice_Printable.toString() [NumberFormat#Scientific]",
+		asScientific::toString(),
+	)
 
 	§ ——— Rounding —————————————————————————————————————————————————————————
-	constant toNearest: Rounding    = #Nearest
-	constant toDown: Rounding       = #Down
-	constant toUp: Rounding         = #Up
-	constant toTowardZero: Rounding = #TowardZero
+	constant toNearest: Rounding     = #Nearest
+	constant toNearestEven: Rounding = #NearestEven
+	constant toDown: Rounding        = #Down
+	constant toUp: Rounding          = #Up
+	constant toTowardZero: Rounding  = #TowardZero
 
 	show("Choice_Equatable.is(_ Rounding)", toNearest::is(#Nearest))
 	show("Choice_Equatable.is(_ Rounding) [differing]", toNearest::is(#Down))
@@ -2452,6 +2495,33 @@ third"::lines())
 	show(
 		"Choice_Printable.toString() [Rounding#TowardZero]",
 		toTowardZero::toString(),
+	)
+	show(
+		"Choice_Printable.toString() [Rounding#NearestEven]",
+		toNearestEven::toString(),
+	)
+
+	§ ——— SignStyle ————————————————————————————————————————————————————————
+	constant onlyNegative: SignStyle = #Negative
+	constant alwaysSigned: SignStyle = #Always
+
+	show("Choice_Equatable.is(_ SignStyle)", onlyNegative::is(#Negative))
+	show(
+		"Choice_Equatable.is(_ SignStyle) [differing]",
+		onlyNegative::is(#Always),
+	)
+	show("Choice_Equatable.isNot(_ SignStyle)", onlyNegative::isNot(#Always))
+	show(
+		"Choice_Equatable.isNot(_ SignStyle) [same]",
+		alwaysSigned::isNot(#Always),
+	)
+	show(
+		"Choice_Printable.toString() [SignStyle#Negative]",
+		onlyNegative::toString(),
+	)
+	show(
+		"Choice_Printable.toString() [SignStyle#Always]",
+		alwaysSigned::toString(),
 	)
 
 	§ ——— SortOrder ————————————————————————————————————————————————————————
