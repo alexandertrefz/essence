@@ -2106,6 +2106,16 @@ third"::lines())
 	show("Choice_Printable.toString() [Ordering#Less]", less::toString())
 	show("Choice_Printable.toString() [Ordering#Equal]", equal::toString())
 	show("Choice_Printable.toString() [Ordering#Greater]", greater::toString())
+	show("Ordering.then(_ Ordering)", equal::then(#Greater))
+	show("Ordering.then(_ Ordering) [decided]", less::then(#Greater))
+	show(
+		"Ordering.then(computedBy: () -> Ordering)",
+		equal::then(computedBy () -> Ordering { <- #Greater }),
+	)
+	show(
+		"Ordering.then(computedBy: () -> Ordering) [decided]",
+		greater::then(computedBy () -> Ordering { <- #Less }),
+	)
 
 	§ ——— Side —————————————————————————————————————————————————————————————
 	constant atStart: Side    = #Start

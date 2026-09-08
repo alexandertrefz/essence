@@ -850,6 +850,7 @@ export const $NestedOptionalAbsent: AssertNoEssenceExports<typeof import("./Nest
 
 declare const OrderingModule: typeof import("./Ordering")
 export const $Ordering: OrderingNatives = OrderingModule
+export const $OrderingAbsent: AssertNoEssenceExports<typeof import("./Ordering"), "then__overload$1" | "then__overload$2"> = true
 
 declare const SideModule: typeof import("./Side")
 export const $Side: SideNatives = SideModule
