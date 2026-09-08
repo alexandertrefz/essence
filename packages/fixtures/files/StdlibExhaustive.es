@@ -1102,6 +1102,22 @@ third"::lines())
 		1/4::round(toward #Nearest),
 	)
 	show(
+		"Rational.round(toward?: Rounding) [a half to the even step]",
+		1/2::round(toward #NearestEven),
+	)
+	show(
+		"Rational.round(toward?: Rounding) [a half up to the even step]",
+		3/2::round(toward #NearestEven),
+	)
+	show(
+		"Rational.round(toward?: Rounding) [a negative half to the even step]",
+		-7/2::round(toward #NearestEven),
+	)
+	show(
+		"Rational.round(toward?: Rounding) [above a half, to the even step]",
+		9/4::round(toward #NearestEven),
+	)
+	show(
 		"Rational.round(toPlaces: Integer, toward?: Rounding)",
 		5/3::round(toPlaces 2),
 	)
@@ -1124,6 +1140,10 @@ third"::lines())
 	show(
 		"Rational.round(toPlaces: Integer, toward?: Rounding) [a count below one]",
 		2/3::round(toPlaces -1),
+	)
+	show(
+		"Rational.round(toPlaces: Integer, toward?: Rounding) [a half to the even place]",
+		1/8::round(toPlaces 2, toward #NearestEven),
 	)
 	§ The same split `Integer::raise` makes, and the same computed exponents
 	§ keep these calls on the entry answering an Optional.
