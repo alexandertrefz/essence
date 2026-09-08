@@ -1404,17 +1404,15 @@ function renderDictionary(
 		return "[=]"
 	}
 
-	// NOTE: One rendering of an entry, closed over the indent the layout needs,
-	// rather than the two the Record and List arms spell out. An entry is two
-	// nested calls rather than one, so writing the pair twice measured 295
-	// bytes of every bundle that prints anything, for nothing a reader gains.
-	let pairsAt =
-		(indent: number) =>
-		([key, held]: [AnyType, AnyType]): string =>
-			`${renderPart(key, indent, rationalForm, listPadding)} = ${renderPart(held, indent, rationalForm, listPadding)}`
-	let singleLine = `[${listPadding}${pairs
-		.map(pairsAt(0))
-		.join(", ")}${listPadding}]`
+	// NOTE: Each entry is rendered ONCE, at indent zero, and the nested layout
+	// re-indents what the single-line one already produced — the same walk the
+	// Record and List arms take, and for the same reason: a second rendering
+	// per layout doubles the work at every level of nesting.
+	let entries = pairs.map(
+		([key, held]) =>
+			`${renderPart(key, 0, rationalForm, listPadding)} = ${renderPart(held, 0, rationalForm, listPadding)}`,
+	)
+	let singleLine = `[${listPadding}${entries.join(", ")}${listPadding}]`
 
 	if (singleLine.length < singleLineMaxLength) {
 		return singleLine
@@ -1422,8 +1420,8 @@ function renderDictionary(
 
 	let contentIndent = " ".repeat(4 * (indentLevel + 1))
 
-	return `[\n${contentIndent}${pairs
-		.map(pairsAt(indentLevel + 1))
+	return `[\n${contentIndent}${entries
+		.map((entry) => entry.replaceAll("\n", `\n${contentIndent}`))
 		.join(`,\n${contentIndent}`)}\n${" ".repeat(4 * indentLevel)}]`
 }
 

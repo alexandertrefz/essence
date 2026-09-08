@@ -129,3 +129,46 @@ describe("rendering a Dictionary", () => {
 		)
 	})
 })
+
+// NOTE: The walk renders every child ONCE, at indent zero, and re-indents that
+// rendering for the nested layout — so what it costs is the size of the value
+// and not two renderings per level of nesting. The two tests below are the two
+// halves of that: the layout it produces at a deeper indent is the one it
+// produces at zero with the indent written after each newline, and a value
+// nested deeply enough that every level wraps still renders in no time at all.
+describe("rendering a deeply nested value", () => {
+	// NOTE: One member per level and a leaf long enough that every level
+	// overflows the single-line budget, which is the shape that made the walk
+	// double per level. Depth 22 measured 1,153 ms before and 0.03 ms now.
+	function chain(depth: number): AnyType {
+		let value: AnyType = createString(
+			"a leaf String long enough that every level of this chain wraps",
+		)
+
+		for (let level = 0; level < depth; level++) {
+			value = createRecord({ member: value })
+		}
+
+		return value
+	}
+
+	test("a deeper indent is the indent written into the shallower one", () => {
+		let value = chain(4)
+		let shallow = getStringRepresentation(value)
+
+		for (let level of [1, 2, 5]) {
+			expect(getStringRepresentation(value, level)).toBe(
+				shallow.replaceAll("\n", `\n${" ".repeat(4 * level)}`),
+			)
+		}
+	})
+
+	test("a chain twenty-two deep renders at once", () => {
+		let value = chain(22)
+		let start = performance.now()
+		let rendered = getStringRepresentation(value)
+
+		expect(performance.now() - start).toBeLessThan(50)
+		expect(rendered.split("\n").length).toBe(45)
+	})
+})
