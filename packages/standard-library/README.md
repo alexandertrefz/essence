@@ -53,7 +53,7 @@ the Program's input or nothing at the end of it, with `Terminal.readAll` beside
 it and the `Terminal.ask` that is a prompt and a line (`Terminal.es`).
 
 Three of every five declared Method entries are also IMPLEMENTED here, in
-Essence — 285 of 479 as this is written, counting one entry per Overload and
+Essence — 287 of 482 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
 Seven more are written on a PROTOCOL rather than on a Namespace, once for every
 conformer: `Equatable.isNot`, `Comparable`'s four inequalities, and
@@ -63,8 +63,8 @@ that writes a Method of the name replaces the provided one on its own rung —
 which is what `Optional::isNot`, `Integer::isNot` and `Integer::isLessThan` do,
 each for a reason its own declaration gives. What stays native is a
 deliberate line, not a backlog: the primitives everything else is composed from
-(`Boolean.negate`/`is`/`and`/`or`, integer and rational arithmetic, same-kind
-`compare`), the JavaScript intrinsics Essence has no expression for
+(`Boolean.negate`/`is`/`and`/`or`/`compare`, integer and rational arithmetic,
+same-kind `compare`), the JavaScript intrinsics Essence has no expression for
 (`String.uppercase`, `String.trim(at:)`, `String.normalize(as:)`,
 `String.lines`/`words`, `Record`'s reflective Methods, `String.compare` —
 there is no way to name a character's code point), and the iteration primitives
