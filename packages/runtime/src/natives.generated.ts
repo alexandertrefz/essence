@@ -842,7 +842,7 @@ export const $NumberArity: AssertArities<typeof import("./Number"), {
 
 declare const OptionalModule: typeof import("./Optional")
 export const $Optional: OptionalNatives = OptionalModule
-export const $OptionalAbsent: AssertNoEssenceExports<typeof import("./Optional"), "is__overload$1" | "is__overload$2" | "isNot__overload$1" | "isNot__overload$2" | "hasValue" | "isEmpty" | "value" | "map" | "andThen" | "keep"> = true
+export const $OptionalAbsent: AssertNoEssenceExports<typeof import("./Optional"), "is__overload$1" | "is__overload$2" | "isNot__overload$1" | "isNot__overload$2" | "hasValue__overload$1" | "hasValue__overload$2" | "isEmpty" | "value" | "map" | "andThen" | "keep" | "or" | "pair" | "toList"> = true
 export const $OptionalArity: AssertArities<typeof import("./Optional"), {
 	toString: 2
 }> = true
