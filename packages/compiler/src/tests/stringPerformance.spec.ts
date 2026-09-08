@@ -4,6 +4,18 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { createInteger } from "@essence-lang/runtime/Integer"
+import {
+	count as occurrencesOf,
+	createString,
+	firstIndex__overload$1 as firstIndex,
+	hasCharacterView,
+	lastIndex__overload$1 as lastIndex,
+	slice,
+	split__overload$1 as split,
+} from "@essence-lang/runtime/String"
+import { typeKeySymbol } from "@essence-lang/runtime/type"
+
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
 import { optimise } from "../optimiser/index"
@@ -12,18 +24,18 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The claims about a String that are claims about TIME, on the shape of
-// `listPerformance.spec.ts`: each Program is compiled, run as a subprocess and
-// timed by the wall, startup included, against a ceiling several times what
-// the fast path costs and well under what the slow one cost. Every figure
-// below is this harness's own, best of three, taken with the runtime before
-// this package and after it.
-//
-// NOTE: The receiver is a 10,800-character ASCII String, because ASCII is
-// what a fast path is FOR: a String the ASCII scan accepts is searched, split
-// and cut by the JavaScript intrinsics, where every other String goes through
-// the grapheme view. A guard on the view's own walk would be a guard on the
+// NOTE: The claims about a String that are claims about WORK, and the two that
+// are claims about TIME. A String the ASCII scan accepts is searched, split and
+// cut by the JavaScript intrinsics, where every other String goes through the
+// grapheme view — so the first block asks the receiver afterwards whether a
+// view was built, which is what the two paths differ in and is decided by no
+// clock at all. A guard on the view's own walk would be a guard on the
 // Segmenter, which is not this package's claim.
+//
+// NOTE: The second block is for what only a stopwatch can say: that the whole
+// Program, compiled and run, stays far under what it cost before. Each is
+// compiled once, run as a subprocess three times and taken at its best, so a
+// scheduler that stalls one run does not decide the test.
 const CHARACTERS = 10_800
 
 // NOTE: `contains` is written on `firstIndex(of:)`, which used to be written
@@ -33,24 +45,28 @@ const CHARACTERS = 10_800
 // both figures: 26 ms for twenty thousand searches against 2,150 ms before.
 const SEARCH_TURNS = 20_000
 
-// NOTE: A split of two ASCII Strings is the intrinsic's split, and the walk
-// over the grapheme view it replaced compared the separator at every one of
-// the receiver's positions. Measured the same way: 57 ms for five thousand
-// splits of three hundred lines against 647 ms before.
-const SPLIT_TURNS = 5_000
-
 // NOTE: `replaceFirst` is written on `firstIndex(of:)` and two `slice`s, and
 // `slice` cuts an ASCII String by the intrinsic rather than through the
 // view. Measured the same way: 20 ms for five thousand replacements against
 // 728 ms before, when it split the String and joined the pieces back.
 const REPLACE_TURNS = 5_000
 
-// NOTE: One ceiling for all three: five times the slowest of the three fast
-// figures, 57 ms, and half the fastest of the three slow ones, 647 ms. A
-// machine several times slower than this one still passes, and each of the
-// three measured over the ceiling before this package — the search well over
-// an order of magnitude over it.
+// NOTE: One ceiling for both: eleven times the slower of the two fast figures,
+// 26 ms, and a third of the faster of the two slow ones, 728 ms. A machine
+// several times slower than this one still passes, and each of the two
+// measured well over the ceiling before this package.
+//
+// NOTE: `split` is NOT timed here, and that is deliberate. Its two figures are
+// 57 ms and 647 ms — a factor of eleven, where the search's are a factor of
+// eighty — so no ceiling can be both several times over the fast one and under
+// the slow one, and the one it had sat 4.4× over its figure and failed on a
+// loaded machine at 468 to 558 ms. The claim it was making is the first block's
+// first case, asserted rather than timed.
 const CEILING_MILLISECONDS = 300
+
+// NOTE: Three hundred lines of thirty-six characters and a line break, which is
+// the shape a Program reading text takes.
+const LINES = "abcdefghijklmnopqrstuvwxyz0123456789\n".repeat(300)
 
 function millisecondsToRun(source: string, printed: string): number {
 	let parsed = parseWithDiagnostics(source)
@@ -69,19 +85,25 @@ function millisecondsToRun(source: string, printed: string): number {
 	writeFileSync(file, javaScript)
 
 	try {
-		let start = performance.now()
-		let result = spawnSync(process.execPath, [file], {
-			encoding: "utf-8",
-		})
-		let elapsed = performance.now() - start
+		let best = Number.POSITIVE_INFINITY
 
-		// NOTE: Each Program prints a count that only the right answers add
-		// up to, and it is checked here — a search that threw, or answered
-		// the wrong position, would otherwise be the fastest run of all.
-		expect(result.stderr).toBe("")
-		expect(result.stdout.trim()).toBe(printed)
+		for (let attempt = 0; attempt < 3; attempt++) {
+			let start = performance.now()
+			let result = spawnSync(process.execPath, [file], {
+				encoding: "utf-8",
+			})
 
-		return elapsed
+			best = Math.min(best, performance.now() - start)
+
+			// NOTE: Each Program prints a count that only the right answers
+			// add up to, and it is checked here — a search that threw, or
+			// answered the wrong position, would otherwise be the fastest run
+			// of all.
+			expect(result.stderr).toBe("")
+			expect(result.stdout.trim()).toBe(printed)
+		}
+
+		return best
 	} finally {
 		rmSync(directory, { recursive: true, force: true })
 	}
@@ -102,21 +124,6 @@ function searchingSource(): string {
 }`
 }
 
-// NOTE: Three hundred lines of thirty-six characters and a line break, split
-// at the break — the shape a Program reading text takes — and the pieces
-// counted: a trailing break leaves a final empty piece, so 301 per turn.
-function splittingSource(): string {
-	return `implementation {
-	constant text = "abcdefghijklmnopqrstuvwxyz0123456789\\n"::repeat(times 300)
-	constant pieces = loop(from 1, through ${SPLIT_TURNS}, startingWith 0, step (
-		_,
-		count,
-	) { <- count::add(text::split(on "\\n")::length()) })
-
-	Terminal.print(pieces)
-}`
-}
-
 // NOTE: The part occurs early, so the search is short and the two cuts are
 // what the turn costs; replacing three characters by one leaves a String two
 // characters shorter, which is what the printed sum checks.
@@ -132,17 +139,66 @@ function replacingSource(): string {
 }`
 }
 
+function position(answer: ReturnType<typeof firstIndex>): number {
+	return answer[typeKeySymbol] === "Optional#Empty"
+		? -1
+		: Number(answer.item.value)
+}
+
+describe("String work", () => {
+	// NOTE: The receiver is asked afterwards whether it has a character view,
+	// which only the walk builds — so this is the whole of "the ASCII path was
+	// taken", and it is a fact about the run rather than a reading off a
+	// clock. The answers are asserted beside it, because a fast path that
+	// answered the wrong thing would build no view either.
+	it("splits an ASCII String without building its character view", () => {
+		let text = createString(LINES)
+		let pieces = split(text, createString("\n"))
+
+		expect(pieces.value).toHaveLength(301)
+		expect(pieces.value[0]!.value).toBe(
+			"abcdefghijklmnopqrstuvwxyz0123456789",
+		)
+		expect(pieces.value[300]!.value).toBe("")
+		expect(hasCharacterView(text)).toBeFalse()
+	})
+
+	it("searches an ASCII String without building its character view", () => {
+		let text = createString(LINES)
+
+		expect(position(firstIndex(text, createString("z0")))).toBe(25)
+		expect(position(firstIndex(text, createString("zzz")))).toBe(-1)
+		expect(position(lastIndex(text, createString("z0")))).toBe(11_088)
+		expect(Number(occurrencesOf(text, createString("z0")).value)).toBe(300)
+		expect(hasCharacterView(text)).toBeFalse()
+	})
+
+	it("cuts an ASCII String without building its character view", () => {
+		let text = createString(LINES)
+
+		expect(slice(text, createInteger(0), createInteger(10)).value).toBe(
+			"abcdefghij",
+		)
+		expect(hasCharacterView(text)).toBeFalse()
+	})
+
+	// NOTE: The other side of the claim — a receiver the scan refuses goes
+	// through the view, and the view is remembered on it. Without this the
+	// three cases above would pass just as well if nothing built a view ever.
+	it("builds the view for a receiver the ASCII scan refuses", () => {
+		let text = createString(`café${LINES}`)
+
+		split(text, createString("\n"))
+
+		expect(hasCharacterView(text)).toBeTrue()
+	})
+})
+
 describe("String performance", () => {
 	it("searches a ten kilobyte String twenty thousand times without building its pieces", () => {
 		expect(millisecondsToRun(searchingSource(), "0")).toBeLessThan(
 			CEILING_MILLISECONDS,
 		)
-	})
-
-	it("splits three hundred lines five thousand times through the intrinsic", () => {
-		expect(
-			millisecondsToRun(splittingSource(), `${SPLIT_TURNS * 301}`),
-		).toBeLessThan(CEILING_MILLISECONDS)
 	})
 
 	it("replaces the first occurrence five thousand times with two cuts", () => {
