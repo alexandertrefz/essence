@@ -906,6 +906,27 @@ declarations {
 				}
 			}
 		}
+
+		§ One name for reading a number off a grid, answered by every kind in
+		§ the tower. On the exact kinds it IS `round(toPlaces:toward:)`, and
+		§ on an irrational it is the only way to reach digits at all. The
+		§ alternative was `round` for the exact kinds and `approximate` for
+		§ the irrationals, which leaves a `Number` receiver with no entry
+		§ either name reaches.
+
+		§§ Answers the Rational read off a decimal grid of the given width.
+		§§
+		§§ A Rational is exact, so the answer is the same one `round(toPlaces:toward:)` gives: two places answer hundredths, and `5/3` answers `167/100`. The entries of this name on `Algebraic` and on `Transcendental` are what make an irrational readable as a number. This one is what lets a `Number` receiver reach the family.
+		§§
+		§§ @param toPlaces — how many decimal places to keep
+		§§ @param toward — the direction to round in, `#Nearest` when it is left out
+		§§ @returns — the Rational on that grid.
+		approximate(
+			toPlaces places: NonNegativeInteger,
+			toward direction: Rounding = #Nearest,
+		) -> Rational {
+			<- @::round(toPlaces places, toward direction)
+		}
 	}
 
 	§ What a Rational proven not to be zero answers that a bare one can not,

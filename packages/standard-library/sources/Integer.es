@@ -753,6 +753,25 @@ declarations {
 			}
 		}
 
+		§ The Integer rung of the approximation family. Its answer is a
+		§ Rational rather than an Integer, so that every kind in the tower
+		§ answers one Type for the name. An irrational rung can answer
+		§ nothing else.
+
+		§§ Answers the Integer read off a decimal grid of the given width.
+		§§
+		§§ An Integer is on every decimal grid, so the answer is the receiver itself as a Rational. The entries of this name on `Algebraic` and on `Transcendental` are what make an irrational readable as a number. This one is what lets a `Number` receiver reach the family.
+		§§
+		§§ @param toPlaces — how many decimal places to keep
+		§§ @param toward — the direction to round in, `#Nearest` when it is left out
+		§§ @returns — the Integer itself, as a Rational.
+		approximate(
+			toPlaces places: NonNegativeInteger,
+			toward direction: Rounding = #Nearest,
+		) -> Rational {
+			<- Rational.of(@, over 1)
+		}
+
 		§ `clamp` and `isBetween` are `Orderable`'s provided Methods now. Both
 		§ are written on that Protocol's own inequalities, which read
 		§ `compare` through the conformance, so an Integer receiver reaches

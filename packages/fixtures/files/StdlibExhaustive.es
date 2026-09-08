@@ -615,6 +615,14 @@ third"::lines())
 		"Integer.round(toPlaces: Integer, toward?: Rounding) [negative, down]",
 		-5::round(toPlaces 2, toward #Down),
 	)
+	show(
+		"Integer.approximate(toPlaces: NonNegativeInteger, toward?: Rounding)",
+		5::approximate(toPlaces 2),
+	)
+	show(
+		"Integer.approximate(toPlaces: NonNegativeInteger, toward?: Rounding) [negative]",
+		-5::approximate(toPlaces 0, toward #Up),
+	)
 	show("Integer.isEven()", 4::isEven())
 	show("Integer.isEven() [odd]", 3::isEven())
 	show("Integer.isOdd()", -3::isOdd())
@@ -1176,6 +1184,18 @@ third"::lines())
 	show(
 		"Rational.round(toPlaces: Integer, toward?: Rounding) [a half to the even place]",
 		1/8::round(toPlaces 2, toward #NearestEven),
+	)
+	show(
+		"Rational.approximate(toPlaces: NonNegativeInteger, toward?: Rounding)",
+		5/3::approximate(toPlaces 2),
+	)
+	show(
+		"Rational.approximate(toPlaces: NonNegativeInteger, toward?: Rounding) [down]",
+		5/3::approximate(toPlaces 2, toward #Down),
+	)
+	show(
+		"Rational.approximate(toPlaces: NonNegativeInteger, toward?: Rounding) [no places]",
+		5/3::approximate(toPlaces 0),
 	)
 	§ The same split `Integer::raise` makes, and the same computed exponents
 	§ keep these calls on the entry answering an Optional.
