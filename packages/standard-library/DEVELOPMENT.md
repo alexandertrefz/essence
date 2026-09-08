@@ -447,12 +447,13 @@ knowing: `Optional::is` declares the whole Optional entry FIRST, so
 its refined entry after the general one, so it is numbered second of the three
 and still read first. Appending is the rule, because it leaves every earlier
 number alone — so the `defaultingTo:` entry is last only where nothing has been
-written since. Seventeen Overloads carry a refined entry written after one, and
-each of those is read first all the same: `String::split`, `Integer::divide`,
-`remainder`, `quotient` and `raise`, `NonZeroInteger::raise`, `Rational::of`,
-`divide` and `raise`, `Algebraic::multiply` and `divide`,
-`Transcendental::multiply` and `divide`, `List.repeat`, `Number.average` and the
-two `Number` extrema.
+written since. Twenty-one Overloads carry a refined entry written after one,
+and each of those is read first all the same: `String::split`, `Integer::divide`,
+`remainder`, `quotient`, `raise` and `toString`, `NonZeroInteger::raise`,
+`Rational::of`, `divide` and `raise`, `Algebraic::multiply` and `divide`,
+`Transcendental::multiply` and `divide`, `List.repeat`, `Number.average`, the
+two `Number` extrema, and `Randomness::drawInteger`, `drawRational` and
+`shuffle`.
 
 **A predicate written as one call on `@` IS that call.** A Method answering a
 Boolean whose whole body is one call on `@` — optionally negated — is read off

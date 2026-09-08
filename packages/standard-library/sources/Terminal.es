@@ -76,8 +76,8 @@ declarations {
 		§ reason `inspect` is: the walk that lays a value out is what the Method
 		§ is. And `inspect` keeps a native of its own rather than becoming this
 		§ call and a `write`. It writes its line through the console, which is
-		§ where a Program under test is read from. The 1,195 lines of
-		§ `StdlibExhaustive.es` output are captured off `console.log` alone.
+		§ where a Program under test is read from. Every line of
+		§ `StdlibExhaustive.es` output is captured off `console.log` alone.
 
 		§§ Answers the structure of a value as a String, for the author of the Program.
 		§§
