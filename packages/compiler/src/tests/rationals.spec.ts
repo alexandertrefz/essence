@@ -642,6 +642,53 @@ describe("Rationals", () => {
 		})
 	})
 
+	// NOTE: `approximate` is one name across the whole tower, and its two exact
+	// rungs are what let a `Number` receiver reach it at all. `Terminal.inspect`
+	// shows the STRUCTURAL form of a Rational — `5/1` rather than `5` — which is
+	// what makes the answer's Type visible here: Integer's rung answers a
+	// Rational, not the receiver.
+	describe("The exact rungs of approximate", () => {
+		it("answers an Integer receiver as a Rational", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(5::approximate(toPlaces 2))
+					Terminal.inspect(-5::approximate(toPlaces 0, toward #Up))
+				}`),
+			).toEqual(["5/1", "-5/1"])
+		})
+
+		it("answers a Rational receiver on the grid it is asked for", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(5/3::approximate(toPlaces 2))
+					Terminal.inspect(5/3::approximate(toPlaces 2, toward #Down))
+					Terminal.inspect(5/3::approximate(toPlaces 0))
+					Terminal.inspect(
+						1/8::approximate(toPlaces 2, toward #NearestEven),
+					)
+				}`),
+			).toEqual(["167/100", "83/50", "2/1", "3/25"])
+		})
+
+		// NOTE: The grid is what it promises: the answer is within a step of
+		// the receiver, and the step is a tenth to the power of the width.
+		it("stays within one step of the receiver", async () => {
+			expect(
+				await run(`implementation {
+					constant value = 22/7
+					constant step  = 1/1000
+					constant near  = value::approximate(toPlaces 3)
+
+					Terminal.inspect(
+						near::subtract(value)::absolute()
+							::isLessThanOrEqualTo(step),
+					)
+					Terminal.inspect(near::toString(as #Decimal))
+				}`),
+			).toEqual(["true", '"3.143"'])
+		})
+	})
+
 	describe("Compiled Programs", () => {
 		it("divides by a negative Integer without corrupting the value", async () => {
 			expect(
