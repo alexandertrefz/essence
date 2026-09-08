@@ -14,6 +14,7 @@ import * as keyedNumberList from "@essence-lang/runtime/KeyedNumberList"
 import * as list from "@essence-lang/runtime/List"
 import * as nestedList from "@essence-lang/runtime/NestedList"
 import * as nestedOptional from "@essence-lang/runtime/NestedOptional"
+import * as nestedResult from "@essence-lang/runtime/NestedResult"
 import * as nonEmptyDictionary from "@essence-lang/runtime/NonEmptyDictionary"
 import * as nonEmptyIntegerList from "@essence-lang/runtime/NonEmptyIntegerList"
 import * as nonEmptyKeyedNumberList from "@essence-lang/runtime/NonEmptyKeyedNumberList"
@@ -37,6 +38,8 @@ import * as randomness from "@essence-lang/runtime/Randomness"
 import * as rational from "@essence-lang/runtime/Rational"
 import * as rationalList from "@essence-lang/runtime/RationalList"
 import * as record from "@essence-lang/runtime/Record"
+import * as result from "@essence-lang/runtime/Result"
+import * as resultList from "@essence-lang/runtime/ResultList"
 import * as rounding from "@essence-lang/runtime/Rounding"
 import * as scalar from "@essence-lang/runtime/Scalar"
 import * as side from "@essence-lang/runtime/Side"
@@ -77,6 +80,11 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	Number: number,
 	Optional: optional,
 	NestedOptional: nestedOptional,
+	Result: result,
+	// NOTE: A Namespace with no native at all, so its module holds only the
+	// re-export comment — `flatten` is written in Essence, exactly as
+	// `NestedOptional`'s is.
+	NestedResult: nestedResult,
 	Ordering: ordering,
 	Side: side,
 	CaseSensitivity: caseSensitivity,
@@ -92,6 +100,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	List: list,
 	NestedList: nestedList,
 	OptionalList: optionalList,
+	ResultList: resultList,
 	NonEmptyList: nonEmpty,
 	NonEmptyNestedList: nonEmptyNestedList,
 	IntegerList: integerList,

@@ -12,6 +12,7 @@ import {
 		Equatable
 		Printable
 	}
+	from "./Result.es" { Result }
 	from "./Step.es" { Step }
 }
 
@@ -1311,6 +1312,97 @@ declarations {
 		}
 	}
 
+	§ The Namespace a List of Results reaches, beside the one a List of
+	§ Optionals reaches. What puts it in reach is what the items are, which
+	§ makes it a narrowing of `List` rather than a Namespace of `Result.es`.
+	§ Declaring it there would close a second cycle around this file, which
+	§ imports that one.
+	namespace ResultList<infer ValueType, infer FailureType>
+		for List<Result<ValueType, FailureType>>
+	{
+		§§ Answers the values the Results hold, in order.
+		§§
+		§§ The failed Results are left out, so the answer can be shorter than the receiver. A List of failures answers the empty List. Where one failure has to answer nothing at all, the Method is `allValues()`.
+		§§
+		§§ @returns — the List of values.
+		values() -> List<ValueType> {
+			constant kept: List<ValueType> = []
+
+			<- @::reduce(startingWith kept, (accumulated, item) {
+				<- match item -> List<ValueType> {
+					case #Value(value) { <- accumulated::append(value) }
+					case #Failure      { <- accumulated }
+				}
+			})
+		}
+
+		§§ Answers the reasons the failed Results hold, in order.
+		§§
+		§§ The Results holding a value are left out. A List of values answers the empty List.
+		§§
+		§§ @returns — the List of reasons.
+		failures() -> List<FailureType> {
+			constant kept: List<FailureType> = []
+
+			<- @::reduce(startingWith kept, (accumulated, item) {
+				<- match item -> List<FailureType> {
+					case #Value           { <- accumulated }
+					case #Failure(reason) { <- accumulated::append(reason) }
+				}
+			})
+		}
+
+		§ The members are named for the two Cases, where `List::partition`
+		§ names its halves for what a check did to an item. There is no check
+		§ here, and `accepted` would say that something passed one.
+		§
+		§ The body is written on `values` and `failures` rather than on a fold
+		§ carrying a Record, because a fold pays a Record spread per item. Two
+		§ thousand partitions of a two thousand item List measured 45 ms on
+		§ the two walks and 174 ms on the fold. Subprocess startup is inside
+		§ both figures.
+
+		§§ Answers the Results split in two: the values they hold, and the reasons they failed with.
+		§§
+		§§ Both halves keep the original order. Every item of the receiver is in exactly one of them.
+		§§
+		§§ @returns — a Record holding the values under `values` and the reasons under `failures`.
+		partition()
+			-> { values: List<ValueType>, failures: List<FailureType> }
+		{
+			<- { values = @::values(), failures = @::failures() }
+		}
+
+		§ Accumulating rather than stopping at the first failure, because that
+		§ is what the callers of this shape want. A form or a file of rows is
+		§ checked to be told everything that is wrong with it. The failures are
+		§ read once, and the `if` asking `hasItems` is what mints the proof the
+		§ answer needs. An early-stopping `hasItems(where …)` in front of that
+		§ buys nothing: the walk it cut short proves nothing, so the same `if`
+		§ still has to follow. Two thousand gatherings of a two thousand item
+		§ List measured 59 ms either way.
+
+		§§ Answers every value in order, and every reason where anything failed.
+		§§
+		§§ The answer holds one value for every item of the receiver. A single failure decides the answer, and the reasons are kept in the order they stand in. The empty List answers the empty List, held in a value. Where only the first reason is wanted, `reason()::map((reasons) { <- reasons::firstItem() })` reads it.
+		§§
+		§§ @example
+		§§   constant rows: List<Result<Integer, String>> = [#Value(1), #Value(2)]
+		§§
+		§§   expect rows::allValues()::is(#Value([1, 2]))
+		§§
+		§§ @returns — every value in a Result, or every reason in one.
+		allValues() -> Result<List<ValueType>, NonEmptyList<FailureType>> {
+			constant problems = @::failures()
+
+			if problems::hasItems() {
+				<- #Failure(problems)
+			} else {
+				<- #Value(@::values())
+			}
+		}
+	}
+
 	§ The Methods the proof changes. A NonEmptyList already answers every
 	§ Method of `List`. A Namespace of its own is for the Methods that answer
 	§ better for having the proof.
@@ -1588,5 +1680,6 @@ export {
 	NonEmptyList
 	NonEmptyNestedList
 	OptionalList
+	ResultList
 	SortOrder
 }

@@ -1081,6 +1081,9 @@ describe("Standard Library Loader", () => {
 			"OptionalList",
 			"Optional",
 			"NestedOptional",
+			"Result",
+			"NestedResult",
+			"ResultList",
 			"Ordering",
 			"Number",
 			"Irrational",
@@ -1376,6 +1379,11 @@ describe("Standard Library Loader", () => {
 			// that `NestedOptional::flatten` reads as the extra a nested
 			// Optional has.
 			"NestedOptional",
+			// NOTE: The carrier that says WHY, and the Namespace beside it,
+			// after the plainer pair for the reason `NonZeroInteger` follows
+			// `Integer` — see `builtinMemberOrder`.
+			"Result",
+			"NestedResult",
 			"Ordering",
 			"Side",
 			"CaseSensitivity",
@@ -1395,6 +1403,9 @@ describe("Standard Library Loader", () => {
 			// NOTE: And the Namespace a List of Optionals reaches, beside it
 			// and for the same reason — see `builtinMemberOrder`.
 			"OptionalList",
+			// NOTE: And the Namespace a List of Results reaches, beside it and
+			// for the same reason — see `builtinMemberOrder`.
+			"ResultList",
 			"NonEmptyList",
 			// NOTE: And the Namespace a List reaches only with both proofs in
 			// hand, after both of the Namespaces it narrows — see
@@ -1494,6 +1505,7 @@ describe("Standard Library Loader", () => {
 		for (let name of [
 			"Ordering",
 			"Optional",
+			"Result",
 			"Side",
 			"CaseSensitivity",
 			"Step",
@@ -2079,6 +2091,8 @@ describe("Standard Library Loader", () => {
 			"Rational::isNot -> not Rational::is(#0)",
 			"Rational::isPositive -> Rational::isGreaterThan(0/1)",
 			"Rational::isZero -> Rational::is(0/1)",
+			"Result::hasFailed -> not Result::hasValue()",
+			"Result::isNot -> not Result::is(#0)",
 			"String::doesNotContain -> not String::contains(#0)",
 			"String::doesNotEnd -> not String::ends(#0)",
 			"String::doesNotStart -> not String::starts(#0)",
@@ -2131,6 +2145,8 @@ describe("Standard Library Loader", () => {
 			"Rational::isLessThan",
 			"Rational::isWholeNumber",
 			"Record::is",
+			"Result::hasValue",
+			"Result::is",
 			"String::contains",
 			"String::ends",
 			"String::is",

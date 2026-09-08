@@ -76,13 +76,24 @@ it under its own name cost it all six of the registration sites below.
 
 ### The shape of the graph is frozen
 
-One cycle is allowed — `Algebraic`, `Integer`, `List`, `Rational`, `String`,
-`Transcendental` — and the loader refuses any other. That group is intrinsic:
+Two cycles are allowed — `Algebraic`, `Integer`, `List`, `Rational`, `String`,
+`Transcendental`, and the pair `Optional`, `Result` — and the loader refuses any
+other. The first group is intrinsic:
 cross-kind arithmetic means each numeric kind names the others, a String's
-characters ARE a `List<String>`, and both `parse`s consume a String. A new cycle
-anywhere, or a seventh file joining that one, means an import closed a circle
-nobody decided on. `EXPECTED_CYCLE` in `packages/compiler/src/enricher/stdlib.ts`
-is where it is stated.
+characters ARE a `List<String>`, and both `parse`s consume a String. The second
+is the pair of failure carriers, and it is intrinsic for the same kind of
+reason: `Optional::toResult(failingWith:)` supplies the reason an Optional never
+had, and `Result::value()` and `reason()` answer the two Cases as Optionals, so
+each file names the other in a signature. The alternative was a static
+`Result.of(_ optional, failingWith:)` on the Result side alone, which keeps the
+graph a tree and reads backwards in a chain. A new cycle
+anywhere, or a file joining one of these, means an import closed a circle
+nobody decided on. `EXPECTED_CYCLES` in `packages/compiler/src/enricher/stdlib.ts`
+is where they are stated.
+
+`ResultList` is in `List.es` beside `OptionalList` for the same graph: it
+narrows a List by what its items are, and declaring it in `Result.es` would
+make that file name `List.es`, which names `Optional.es`, which names it back.
 
 Two files sit on a line for the same reason `Comparable` does. `Orderable.es`
 extends `Comparable` and is written on the four inequalities `Comparable`
@@ -302,7 +313,8 @@ groups, in this order:
    `length`, `numerator`, `denominator`, `absolute`, `item(at:)`, `firstItem`,
    `lastItem`, `firstIndex`, `lastIndex`, `indices`, `keys`, `values`,
    `entries`, `characters`, `words`, `lines`, `character(at:)`,
-   `firstCharacter`, `lastCharacter`, `value(defaultingTo:)`.
+   `firstCharacter`, `lastCharacter`, `value(defaultingTo:)`, `reason`,
+   `failures`.
 6. **Transforms, and everything else** — `negate`, `round`, `clamp`,
    `reciprocal`, `map`, `reduce`, `everyItem`, `sort`, `slice`, `append`,
    `join`, `split`, `trim`, `pad`, `flatten`, `andThen`.

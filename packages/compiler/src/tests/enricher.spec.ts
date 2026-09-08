@@ -9405,25 +9405,27 @@ describe("Enricher", () => {
 					constant total = count(${ARMS})
 				}`)
 
-				// NOTE: Both, and in that order. The Case's own Diagnostic names
-				// the Type Parameters left over and offers to annotate the
-				// Declaration — which is a help there IS no Declaration for
-				// here, and the `define`'s own is what supplies the one that
-				// works.
+				// NOTE: All three, and in that order. The Case's own two
+				// Diagnostics name the Type Parameters left over and the two
+				// Choices declaring `#Value` — `Optional` and `Result` — and
+				// each offers to annotate the Declaration, which is a help
+				// there IS no Declaration for here. The `define`'s own is what
+				// supplies the one that works.
 				expect(
 					diagnostics.map((diagnostic) => diagnostic.code),
 				).toEqual([
 					"undecided-type-arguments",
+					"ambiguous-case",
 					"define-without-answer-type",
 				])
-				expect(diagnostics[1].severity).toBe("error")
-				expect(diagnostics[1].labels[0]?.message).toBe(
+				expect(diagnostics[2].severity).toBe("error")
+				expect(diagnostics[2].labels[0]?.message).toBe(
 					"this 'define' has no answer Type",
 				)
-				expect(diagnostics[1].labels[1]?.message).toBe(
+				expect(diagnostics[2].labels[1]?.message).toBe(
 					"this arm has none of its own to lend it",
 				)
-				expect(diagnostics[1].helps).toEqual([
+				expect(diagnostics[2].helps).toEqual([
 					"Write the answer Type on the 'define' itself: 'define -> Type { … }' — it is pushed into every arm.",
 					"Or annotate the Declaration it stands in, where it stands in one. An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.",
 				])
@@ -9446,16 +9448,17 @@ describe("Enricher", () => {
 					diagnostics.map((diagnostic) => diagnostic.code),
 				).toEqual([
 					"undecided-type-arguments",
+					"ambiguous-case",
 					"define-without-answer-type",
 				])
-				expect(diagnostics[1].notes).toHaveLength(1)
+				expect(diagnostics[2].notes).toHaveLength(1)
 				expect(
-					diagnostics[1].notes.some((note) =>
+					diagnostics[2].notes.some((note) =>
 						note.includes("An Argument position"),
 					),
 				).toBe(false)
 				expect(
-					diagnostics[1].helps.some((help) =>
+					diagnostics[2].helps.some((help) =>
 						help.includes("annotate the Declaration"),
 					),
 				).toBe(true)

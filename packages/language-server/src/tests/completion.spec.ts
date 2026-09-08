@@ -2029,6 +2029,7 @@ describe("Completion of a converted standard library Namespace", () => {
 			"or",
 			"pair",
 			"toList",
+			"toResult",
 			"flatten",
 		])
 	})

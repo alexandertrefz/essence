@@ -2442,9 +2442,9 @@ Error: A Define Condition has to be a Boolean
 exports[`Diagnostic Showcase DefineAnswers.es should render the same report every time 1`] = `
 "[undecided-type-arguments]
 Error: Nothing decides the Type Arguments of '#Empty'
-    ╭─┤ DefineAnswers.es:22:6 │
+    ╭─┤ DefineAnswers.es:26:6 │
     │
- 22 │        as #Empty if skipped
+ 26 │        as #Empty if skipped
     │           ───┬──  
     │              ╰──── no Type Arguments here, and nothing around it decides them
     │ 
@@ -2455,16 +2455,31 @@ Error: Nothing decides the Type Arguments of '#Empty'
     │ Note 2: A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.
 ────╯
 
+[ambiguous-case]
+Error: Case '#Value' is declared by more than one Choice
+    ╭─┤ DefineAnswers.es:27:7 │
+    │
+ 27 │        as #Value(1) otherwise
+    │            ──┬──  
+    │              ╰──── 2 Choices in scope declare it
+    │ 
+    │ Help 1: Write 'Optional#Value' to pick 'Optional'.
+    │ Help 2: Write 'Result#Value' to pick 'Result'.
+    │ 
+    │ Note 1: 'Optional' declares '#Value'.
+    │ Note 2: 'Result' declares '#Value'.
+────╯
+
 [define-without-answer-type]
 Error: Nothing decides what this 'define' answers
-    ╭─┤ DefineAnswers.es:21:21 │
+    ╭─┤ DefineAnswers.es:25:21 │
     │
- 21 │ ╭─▶     constant fetched = define {
- 22 │ │          as #Empty if skipped
+ 25 │ ╭─▶     constant fetched = define {
+ 26 │ │          as #Empty if skipped
     │ │             ───┬──  
     │ │                ╰──── this arm has none of its own to lend it
     ┆ ┆   
- 24 │ ├─▶     }
+ 28 │ ├─▶     }
     │ │           
     │ ╰─────────── this 'define' has no answer Type
     │ 
@@ -2476,9 +2491,9 @@ Error: Nothing decides what this 'define' answers
 
 [undecided-type-arguments]
 Error: Nothing decides the Type Arguments of '#Empty'
-    ╭─┤ DefineAnswers.es:30:6 │
+    ╭─┤ DefineAnswers.es:34:6 │
     │
- 30 │        as #Empty if skipped
+ 34 │        as #Empty if skipped
     │           ───┬──  
     │              ╰──── no Type Arguments here, and nothing around it decides them
     │ 
@@ -2489,16 +2504,31 @@ Error: Nothing decides the Type Arguments of '#Empty'
     │ Note 2: A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.
 ────╯
 
+[ambiguous-case]
+Error: Case '#Value' is declared by more than one Choice
+    ╭─┤ DefineAnswers.es:35:7 │
+    │
+ 35 │        as #Value(2) otherwise
+    │            ──┬──  
+    │              ╰──── 2 Choices in scope declare it
+    │ 
+    │ Help 1: Write 'Optional#Value' to pick 'Optional'.
+    │ Help 2: Write 'Result#Value' to pick 'Result'.
+    │ 
+    │ Note 1: 'Optional' declares '#Value'.
+    │ Note 2: 'Result' declares '#Value'.
+────╯
+
 [define-without-answer-type]
 Error: Nothing decides what this 'define' answers
-    ╭─┤ DefineAnswers.es:29:25 │
+    ╭─┤ DefineAnswers.es:33:25 │
     │
- 29 │ ╭─▶     constant total = count(define {
- 30 │ │          as #Empty if skipped
+ 33 │ ╭─▶     constant total = count(define {
+ 34 │ │          as #Empty if skipped
     │ │             ───┬──  
     │ │                ╰──── this arm has none of its own to lend it
     ┆ ┆   
- 32 │ ├─▶     })
+ 36 │ ├─▶     })
     │ │            
     │ ╰──────────── this 'define' has no answer Type
     │ 
@@ -2508,7 +2538,7 @@ Error: Nothing decides what this 'define' answers
     │ Note: A 'define' takes its answer Type from its arrow, from the position it stands in, or from what its arms answer with — and an arm that decides no Type Arguments of its own leaves nothing to take.
 ────╯
 
-─── 4 errors
+─── 6 errors
 "
 `;
 

@@ -86,6 +86,12 @@ const ACCESSORS = new Set([
 	"firstCharacter",
 	"lastCharacter",
 	"value",
+	// NOTE: A Result's two Cases read apart, and the List-side reading of the
+	// second. `reason` stands beside `value` and `failures` beside `values`,
+	// each answering a part of the receiver under the name its own Case gives
+	// it.
+	"reason",
+	"failures",
 ])
 
 type Member = {

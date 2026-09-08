@@ -89,6 +89,18 @@ export const builtinMemberOrder: Array<string> = [
 	// belong together, and the general one has to be met FIRST so that
 	// `NestedOptional::flatten` reads as the extra a nested Optional has.
 	"NestedOptional",
+	// NOTE: After `Optional` and the Namespace beside it, because a Result is
+	// the same carrier with a reason attached and a reader meets the plainer
+	// one first. It shares ten Method names with `Optional`, and shares them
+	// harmlessly, because no value reaches both: this target is a Result and
+	// that one is an Optional. So the position decides nothing but where a
+	// reader meets it.
+	"Result",
+	// NOTE: Directly after `Result`, for the reason `NestedOptional` sits
+	// directly after `Optional` — the two Namespaces one Result value can
+	// reach belong together, and the general one has to be met FIRST so that
+	// `NestedResult::flatten` reads as the extra a nested Result has.
+	"NestedResult",
 	"Ordering",
 	"Side",
 	"CaseSensitivity",
@@ -132,7 +144,15 @@ export const builtinMemberOrder: Array<string> = [
 	// Method name with any Namespace above or below it, so its position decides
 	// only where `values` is offered.
 	"OptionalList",
-	// NOTE: And after those, for the third time and the same reason. `NonEmptyList`
+	// NOTE: And beside it, for the same reason once more — `ResultList` narrows
+	// a List by what its items ARE, exactly as `OptionalList` does, so `List`
+	// has to be met first here too. It shares `values` with `OptionalList` and
+	// `partition` with `List`, and a List of Results reaches all three: `List`
+	// first means `partition(where:)` is offered from the Namespace whose entry
+	// takes a check, and `OptionalList` before this one means neither `values`
+	// hides the other on a receiver that can only reach one of them.
+	"ResultList",
+	// NOTE: And after those, for the fourth time and the same reason. `NonEmptyList`
 	// targets a refinement of `List`, and its `firstItem`/`lastItem` are named by
 	// `List` as well — so `List` has to be met FIRST, or Completion on any List
 	// would offer the total pair that only a proven List can answer. Which
@@ -265,6 +285,12 @@ export const builtinTypeOrder: Array<string> = [
 	"Irrational",
 	"Number",
 	"Optional",
+	// NOTE: Directly after the Type it is the sibling of, for the reason
+	// `NonZeroInteger` sits directly after `Integer` — a reader of this table
+	// meets the carrier that says there is nothing and then the one that says
+	// why. `closestMatch` breaks a tie on the FIRST candidate, and the two are
+	// no edit apart, so this decides nothing else.
+	"Result",
 	"Ordering",
 	"Side",
 	"CaseSensitivity",

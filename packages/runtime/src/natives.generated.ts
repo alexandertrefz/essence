@@ -24,6 +24,7 @@ import type { OrderingType } from "./Ordering"
 import type { RandomnessType } from "./Randomness"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
+import type { ResultType } from "./Result"
 import type { RoundingType } from "./Rounding"
 import type { SideType } from "./Side"
 import type { SortOrderType } from "./SortOrder"
@@ -388,6 +389,15 @@ export type NestedOptionalNatives = {
 
 }
 
+export type ResultNatives = {
+	// toString<ValueType is Printable, FailureType is Printable>() -> String
+	toString: <ValueType extends AnyType, FailureType extends AnyType>(self: ResultType<ValueType, FailureType>, ValueType__conformance: PrintableConformance<ValueType>, FailureType__conformance: PrintableConformance<FailureType>) => StringType
+}
+
+export type NestedResultNatives = {
+
+}
+
 export type OrderingNatives = {
 
 }
@@ -496,6 +506,10 @@ export type NestedListNatives = {
 }
 
 export type OptionalListNatives = {
+
+}
+
+export type ResultListNatives = {
 
 }
 
@@ -877,7 +891,7 @@ export const $NumberArity: AssertArities<typeof import("./Number"), {
 
 declare const OptionalModule: typeof import("./Optional")
 export const $Optional: OptionalNatives = OptionalModule
-export const $OptionalAbsent: AssertNoEssenceExports<typeof import("./Optional"), "is__overload$1" | "is__overload$2" | "isNot__overload$1" | "isNot__overload$2" | "hasValue__overload$1" | "hasValue__overload$2" | "isEmpty" | "value" | "map" | "andThen" | "keep" | "or" | "pair" | "toList"> = true
+export const $OptionalAbsent: AssertNoEssenceExports<typeof import("./Optional"), "is__overload$1" | "is__overload$2" | "isNot__overload$1" | "isNot__overload$2" | "hasValue__overload$1" | "hasValue__overload$2" | "isEmpty" | "value" | "map" | "andThen" | "keep" | "or" | "pair" | "toList" | "toResult"> = true
 export const $OptionalArity: AssertArities<typeof import("./Optional"), {
 	toString: 2
 }> = true
@@ -885,6 +899,17 @@ export const $OptionalArity: AssertArities<typeof import("./Optional"), {
 declare const NestedOptionalModule: typeof import("./NestedOptional")
 export const $NestedOptional: NestedOptionalNatives = NestedOptionalModule
 export const $NestedOptionalAbsent: AssertNoEssenceExports<typeof import("./NestedOptional"), "flatten"> = true
+
+declare const ResultModule: typeof import("./Result")
+export const $Result: ResultNatives = ResultModule
+export const $ResultAbsent: AssertNoEssenceExports<typeof import("./Result"), "is__overload$1" | "is__overload$2" | "isNot__overload$1" | "isNot__overload$2" | "hasValue__overload$1" | "hasValue__overload$2" | "hasFailed" | "value__overload$1" | "value__overload$2" | "reason" | "map" | "andThen" | "mapFailure" | "recover" | "keep" | "or" | "toList"> = true
+export const $ResultArity: AssertArities<typeof import("./Result"), {
+	toString: 3
+}> = true
+
+declare const NestedResultModule: typeof import("./NestedResult")
+export const $NestedResult: NestedResultNatives = NestedResultModule
+export const $NestedResultAbsent: AssertNoEssenceExports<typeof import("./NestedResult"), "flatten"> = true
 
 declare const OrderingModule: typeof import("./Ordering")
 export const $Ordering: OrderingNatives = OrderingModule
@@ -964,6 +989,10 @@ export const $NestedListArity: AssertArities<typeof import("./NestedList"), {
 declare const OptionalListModule: typeof import("./OptionalList")
 export const $OptionalList: OptionalListNatives = OptionalListModule
 export const $OptionalListAbsent: AssertNoEssenceExports<typeof import("./OptionalList"), "values" | "allValues" | "firstValue"> = true
+
+declare const ResultListModule: typeof import("./ResultList")
+export const $ResultList: ResultListNatives = ResultListModule
+export const $ResultListAbsent: AssertNoEssenceExports<typeof import("./ResultList"), "values" | "failures" | "partition" | "allValues"> = true
 
 declare const NonEmptyListModule: typeof import("./NonEmptyList")
 export const $NonEmptyList: NonEmptyListNatives = NonEmptyListModule

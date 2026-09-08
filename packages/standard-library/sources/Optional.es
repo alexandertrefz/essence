@@ -4,6 +4,7 @@ import {
 		Equatable
 		Printable
 	}
+	from "./Result.es" { Result }
 }
 
 declarations {
@@ -291,6 +292,35 @@ declarations {
 			<- match @ -> List<ItemType> {
 				case #Value(item) { <- [item] }
 				case #Empty       { <- [] }
+			}
+		}
+
+		§ The bridge to the carrier that carries a reason. It is why
+		§ `Result.es` and this file are the one pair of standard library files
+		§ that name each other. An Optional says there is nothing, and a Result
+		§ says what went wrong, so crossing from here supplies the reason the
+		§ Optional never had. The alternative was a static
+		§ `Result.of(_ optional, failingWith:)`, which keeps the graph a tree
+		§ and reads backwards in the chains this language is written in. See
+		§ DEVELOPMENT.md, The shape of the graph is frozen.
+
+		§§ Answers the value as a Result, failing with the given reason where there is none.
+		§§
+		§§ An Optional says that there is no value, and a Result says why. The reason is read whether or not it is used.
+		§§
+		§§ @example
+		§§   constant missing: Optional<Integer> = #Empty
+		§§
+		§§   expect missing::toResult(failingWith "gone")::is(#Failure("gone"))
+		§§
+		§§ @param failingWith — the reason to fail with where there is no value
+		§§ @returns — the value in a Result, or the reason as a failure.
+		toResult<infer FailureType>(
+			failingWith reason: FailureType,
+		) -> Result<ItemType, FailureType> {
+			<- match @ -> Result<ItemType, FailureType> {
+				case #Value(item) { <- #Value(item) }
+				case #Empty       { <- #Failure(reason) }
 			}
 		}
 	}
