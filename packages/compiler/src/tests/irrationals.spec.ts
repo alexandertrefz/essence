@@ -1371,14 +1371,17 @@ describe("Irrationals", () => {
 						<- value
 					}
 
-					constant pi    = asNumber(Number.Pi)
-					constant whole = asNumber(7)
-					constant ratio = asNumber(5/3)
+					constant pi     = asNumber(Number.Pi)
+					constant golden = asNumber(Number.GoldenRatio)
+					constant whole  = asNumber(7)
+					constant ratio  = asNumber(5/3)
 
 					Terminal.inspect(pi::round(toPlaces 2))
+					Terminal.inspect(golden::round(toPlaces 2))
 					Terminal.inspect(whole::round(toPlaces 2))
 					Terminal.inspect(ratio::round(toPlaces 2))
 					Terminal.inspect(pi::approximate(toPlaces 5))
+					Terminal.inspect(golden::approximate(toPlaces 5))
 					Terminal.inspect(whole::approximate(toPlaces 5))
 					Terminal.inspect(ratio::approximate(toPlaces 2, toward #Down))
 					Terminal.inspect(pi::toString(as #Fraction))
@@ -1386,12 +1389,15 @@ describe("Irrationals", () => {
 					Terminal.inspect(whole::toString(as #Decimal, toPlaces 2))
 					Terminal.inspect(ratio::toString(as #Percent, toPlaces 1))
 					Terminal.inspect(pi::toString(as #Scientific, toPlaces 3))
+					Terminal.inspect(golden::toString(as #Scientific, toPlaces 3))
 				}`),
 			).toEqual([
 				"157/50",
+				"81/50",
 				"7",
 				"167/100",
 				"314159/100000",
+				"161803/100000",
 				"7/1",
 				"83/50",
 				`"π"`,
@@ -1399,6 +1405,7 @@ describe("Irrationals", () => {
 				`"7.00"`,
 				`"166.7%"`,
 				`"3.142e0"`,
+				`"1.618e0"`,
 			])
 		})
 
@@ -1660,15 +1667,16 @@ describe("Irrationals", () => {
 		// NOTE: The other two formats, and the direction the count entry takes.
 		// Each arm reads the value at the width its own writing needs: a
 		// decimal at the count, a percentage two digits deeper so the shift by
-		// a hundred stays exact, and a scientific form at the eightieth digit,
-		// since where its exponent falls is what would decide the depth. The
-		// last two lines pin what that leaves the entries with no count. A
-		// percentage is read two digits deeper, so eighty digits stand after
-		// its point: three before it, the point, eighty after and the `%` is
-		// 85 characters. A scientific form is the same eighty-digit reading a
-		// decimal gets, and π's loses two trailing zeroes to the trimming
-		// every Rational gets — the decimal is 80 characters, and the `e0`
-		// after it makes 82.
+		// a hundred stays exact, and a scientific form as many digits past the
+		// count as the value's own power of ten falls below zero, which
+		// `decimalExponent` answers. The last two lines pin what that leaves
+		// the entries with no count. A percentage is read two digits deeper,
+		// so eighty digits stand after its point: three before it, the point,
+		// eighty after and the `%` is 85 characters. A scientific form writes
+		// eighty digits after the point of its mantissa at every magnitude,
+		// and π's loses two trailing zeroes to the trimming every Rational
+		// gets — the mantissa is 80 characters, and the `e0` after it makes
+		// 82.
 		it("writes an irrational as a percentage and in scientific notation", async () => {
 			expect(
 				await run(`implementation {
@@ -1688,6 +1696,106 @@ describe("Irrationals", () => {
 				`"3.142e-3"`,
 				"85",
 				"82",
+			])
+		})
+
+		// NOTE: The region the eightieth-digit reading used to fabricate. A
+		// `#Scientific` count is a count of MANTISSA digits, so the value has
+		// to be read as many places past it as its own power of ten falls
+		// below zero — `decimalExponent` is what answers that, and the last
+		// three lines are why it has to. A fixed eightieth-place reading wrote
+		// zeroes it never read from the eighty-first digit of a mantissa, and
+		// answered `0e0` for a value `isPositive` answers `true` for. The
+		// entries with no count write eighty mantissa digits at every
+		// magnitude, so π's 85 characters are its 80-character mantissa and
+		// `e-100`, and √2, which loses no trailing zero, is two longer.
+		it("writes a scientific form at the magnitude the value has", async () => {
+			expect(
+				await run(`implementation {
+					constant root: Algebraic = match 2::squareRoot() -> Algebraic {
+						case Algebraic { <- @ }
+						case Integer { <- Number.GoldenRatio }
+					}
+
+					constant tinyRoot = root::divide(by 10::raise(to 100))
+					constant tinyPi   = Number.Pi::divide(by 10::raise(to 100))
+
+					Terminal.inspect(root::divide(by 10::raise(to 77))::toString(as #Scientific, toPlaces 4))
+					Terminal.inspect(root::divide(by 10::raise(to 80))::toString(as #Scientific, toPlaces 4))
+					Terminal.inspect(tinyRoot::toString(as #Scientific, toPlaces 3))
+					Terminal.inspect(Number.Pi::divide(by 10::raise(to 77))::toString(as #Scientific, toPlaces 4))
+					Terminal.inspect(Number.Pi::divide(by 10::raise(to 80))::toString(as #Scientific, toPlaces 4))
+					Terminal.inspect(tinyPi::toString(as #Scientific, toPlaces 3))
+					Terminal.inspect(tinyRoot::isPositive())
+					Terminal.inspect(tinyRoot::toString(as #Scientific)::length())
+					Terminal.inspect(tinyPi::toString(as #Scientific)::length())
+					Terminal.inspect(root::decimalExponent())
+					Terminal.inspect(tinyPi::decimalExponent())
+				}`),
+			).toEqual([
+				`"1.4142e-77"`,
+				`"1.4142e-80"`,
+				`"1.414e-100"`,
+				`"3.1416e-77"`,
+				`"3.1416e-80"`,
+				`"3.142e-100"`,
+				"true",
+				"87",
+				"85",
+				"0",
+				"-100",
+			])
+		})
+
+		// NOTE: The count a `#Scientific` mantissa is written at is not the
+		// depth the value is read at, so a count past the eightieth digit is
+		// answered from a reading that deep. The digits from the eighty-first
+		// are the true expansion of √2, which is what a fixed eightieth-place
+		// reading could not answer.
+		it("writes a mantissa past the eightieth digit", async () => {
+			expect(
+				await run(`implementation {
+					constant root: Algebraic = match 2::squareRoot() -> Algebraic {
+						case Algebraic { <- @ }
+						case Integer { <- Number.GoldenRatio }
+					}
+
+					Terminal.inspect(root::toString(as #Scientific, toPlaces 85))
+				}`),
+			).toEqual([
+				`"1.4142135623730950488016887242096980785696718753769480731766797379907324784621070388504e0"`,
+			])
+		})
+
+		// NOTE: A `#Percent` count below one rounds to a whole percentage, and
+		// the shift by a hundred spends two decimal places whatever the count
+		// is. So the reading is never shallower than those two — reading at
+		// the bare `count + 2` answers 140% for √2 at one place below zero,
+		// off a grid coarser than the whole percentage it then writes.
+		it("rounds a percentage below one place to a whole percentage", async () => {
+			expect(
+				await run(`implementation {
+					constant root: Algebraic = match 2::squareRoot() -> Algebraic {
+						case Algebraic { <- @ }
+						case Integer { <- Number.GoldenRatio }
+					}
+
+					Terminal.inspect(root::toString(as #Percent, toPlaces 0))
+					Terminal.inspect(root::toString(as #Percent, toPlaces -1))
+					Terminal.inspect(root::toString(as #Percent, toPlaces -2))
+					Terminal.inspect(root::toString(as #Percent, toPlaces -1, toward #Up))
+					Terminal.inspect(Number.Pi::toString(as #Percent, toPlaces 0))
+					Terminal.inspect(Number.Pi::toString(as #Percent, toPlaces -1))
+					Terminal.inspect(Number.Pi::toString(as #Percent, toPlaces -2))
+				}`),
+			).toEqual([
+				`"141%"`,
+				`"141%"`,
+				`"141%"`,
+				`"142%"`,
+				`"314%"`,
+				`"314%"`,
+				`"314%"`,
 			])
 		})
 
