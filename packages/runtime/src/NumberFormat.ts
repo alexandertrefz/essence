@@ -8,7 +8,13 @@ import { typeKeySymbol } from "./type"
 // Method of `Rational`, so its native is in `Rational.ts`.
 export type FractionType = { [typeKeySymbol]: "NumberFormat#Fraction" }
 export type DecimalType = { [typeKeySymbol]: "NumberFormat#Decimal" }
-export type NumberFormatType = FractionType | DecimalType
+export type PercentType = { [typeKeySymbol]: "NumberFormat#Percent" }
+export type ScientificType = { [typeKeySymbol]: "NumberFormat#Scientific" }
+export type NumberFormatType =
+	| FractionType
+	| DecimalType
+	| PercentType
+	| ScientificType
 
 // NOTE: Shared unit instances, for the same reason `Ordering`'s are shared —
 // Case equality goes by tag, so these being singletons is an optimisation.
@@ -16,3 +22,7 @@ export const fraction: FractionType = {
 	[typeKeySymbol]: "NumberFormat#Fraction",
 }
 export const decimal: DecimalType = { [typeKeySymbol]: "NumberFormat#Decimal" }
+export const percent: PercentType = { [typeKeySymbol]: "NumberFormat#Percent" }
+export const scientific: ScientificType = {
+	[typeKeySymbol]: "NumberFormat#Scientific",
+}

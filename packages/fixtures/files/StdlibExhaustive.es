@@ -1216,6 +1216,18 @@ third"::lines())
 		4/2::toString(as NumberFormat#Fraction),
 	)
 	show(
+		"Rational.toString(as: NumberFormat) [percent]",
+		3/4::toString(as NumberFormat#Percent),
+	)
+	show(
+		"Rational.toString(as: NumberFormat) [scientific]",
+		3/4::toString(as NumberFormat#Scientific),
+	)
+	show(
+		"Rational.toString(as: NumberFormat) [scientific, zero]",
+		0/1::toString(as NumberFormat#Scientific),
+	)
+	show(
 		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding)",
 		5/3::toString(as NumberFormat#Decimal, toPlaces 2),
 	)
@@ -1258,6 +1270,18 @@ third"::lines())
 	show(
 		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [a half to the even digit]",
 		1/8::toString(as NumberFormat#Decimal, toPlaces 2, toward #NearestEven),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [percent]",
+		1/8::toString(as NumberFormat#Percent, toPlaces 1),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [scientific]",
+		1/3::toString(as NumberFormat#Scientific, toPlaces 4),
+	)
+	show(
+		"Rational.toString(as: NumberFormat, toPlaces: Integer, toward?: Rounding) [scientific carries into the exponent]",
+		999/100::toString(as NumberFormat#Scientific, toPlaces 1),
 	)
 	show("Rational.compare(to: Rational)", 1/2::compare(to 2/3))
 	show("Rational.compare(to: Rational) [equal]", 1/2::compare(to 2/4))

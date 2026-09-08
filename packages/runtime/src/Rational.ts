@@ -453,17 +453,122 @@ function formatAsFixedDecimal(
 	)}`
 }
 
+// NOTE: A percentage is the same decimal one hundred times over, with a `%`
+// after it. The factor goes on the numerator rather than through
+// `multiplyRationals`, because a whole number times a fraction needs no
+// cross-multiplication and no reduction: `reducedParts` reduces on read.
+function scaledByAHundred(rational: RationalType): RationalType {
+	let parts = reducedParts(rational)
+
+	return createRational(parts.numerator * 100n, parts.denominator)
+}
+
+// NOTE: Whether the magnitude is at or above a power of ten, asked without
+// building a decimal expansion: `n / d >= 10^exponent` is a comparison of two
+// products, and a negative exponent scales the other side instead of dividing.
+function isAtLeastPowerOfTen(
+	numerator: bigint,
+	denominator: bigint,
+	exponent: bigint,
+): boolean {
+	if (exponent >= 0n) {
+		return numerator >= 10n ** exponent * denominator
+	}
+
+	return numerator * 10n ** -exponent >= denominator
+}
+
+// NOTE: The exponent of the scientific form: the largest power of ten at or
+// below the magnitude. The digit counts bracket it within one — a numerator of
+// `a` digits over a denominator of `b` is between `10^(a-b-1)` and
+// `10^(a-b+1)` — so one comparison settles which of the two it is, whatever the
+// size of the parts. Zero has no such power and is written `0e0`, which is what
+// the caller of this reads the zero magnitude as.
+function decimalExponentOf(numerator: bigint, denominator: bigint): bigint {
+	let guess =
+		BigInt(numerator.toString().length) -
+		BigInt(denominator.toString().length)
+
+	if (isAtLeastPowerOfTen(numerator, denominator, guess)) {
+		return guess
+	}
+
+	return guess - 1n
+}
+
+// NOTE: The receiver divided by a power of ten, which is the mantissa of the
+// scientific form.
+function shiftedByPowerOfTen(
+	rational: RationalType,
+	exponent: bigint,
+): RationalType {
+	let parts = reducedParts(rational)
+
+	if (exponent >= 0n) {
+		return createRational(
+			parts.numerator,
+			parts.denominator * 10n ** exponent,
+		)
+	}
+
+	return createRational(parts.numerator * 10n ** -exponent, parts.denominator)
+}
+
+// NOTE: How many digits stand before the point, sign apart. A mantissa written
+// at a fixed width can round UP into the next power of ten — `9.99` at one
+// place is `10.0` — and this is what says so, off the text rather than off a
+// second exact comparison, because the rounding happened inside the formatter.
+function wholeDigitCount(text: string): number {
+	let magnitude = text.startsWith("-") ? text.slice(1) : text
+	let point = magnitude.indexOf(".")
+
+	return point === -1 ? magnitude.length : point
+}
+
+// NOTE: One digit before the point, the rest after it, and the power of ten
+// that was taken out written as `e` and a decimal exponent. The exponent takes
+// a minus sign and never a plus, so `1.23e3` and `5e-4` are the two shapes, and
+// zero is `0e0`. Rounding the mantissa can carry it to ten, and one step of
+// renormalisation is enough: ten is the only value a carry can reach.
+function formatAsScientific(
+	rational: RationalType,
+	width: (mantissa: RationalType) => string,
+): string {
+	let parts = reducedParts(rational)
+
+	if (parts.numerator === 0n) {
+		return `${width(rational)}e0`
+	}
+
+	let magnitude = parts.numerator < 0n ? -parts.numerator : parts.numerator
+	let exponent = decimalExponentOf(magnitude, parts.denominator)
+	let text = width(shiftedByPowerOfTen(rational, exponent))
+
+	if (wholeDigitCount(text) > 1) {
+		exponent = exponent + 1n
+		text = width(shiftedByPowerOfTen(rational, exponent))
+	}
+
+	return `${text}e${exponent}`
+}
+
 // #region toString
 
 // NOTE: The format arrives as a `NumberFormat` Case rather than a String, so
-// there is no unrecognised spelling to fall back from — the two Cases are the
-// only two a caller can write.
+// there is no unrecognised spelling to fall back from — the four Cases are the
+// only four a caller can write.
 export function toString__overload$2(
 	rational: RationalType,
 	format: NumberFormatType,
 ): StringType {
-	if (format[typeKeySymbol] === "NumberFormat#Decimal") {
+	let tag = format[typeKeySymbol]
+
+	if (tag === "NumberFormat#Decimal") {
 		return createString(formatAsDecimal(rational))
+	} else if (tag === "NumberFormat#Percent") {
+		return createString(`${formatAsDecimal(scaledByAHundred(rational))}%`)
+	} else if (tag === "NumberFormat#Scientific") {
+		return createString(formatAsScientific(rational, formatAsDecimal))
 	} else {
 		return createString(formatAsFraction(rational))
 	}
@@ -479,10 +584,16 @@ export function toString__overload$3(
 	places: IntegerType,
 	direction: RoundingType,
 ): StringType {
-	if (format[typeKeySymbol] === "NumberFormat#Decimal") {
-		return createString(
-			formatAsFixedDecimal(rational, Number(places.value), direction),
-		)
+	let tag = format[typeKeySymbol]
+	let width = (value: RationalType) =>
+		formatAsFixedDecimal(value, Number(places.value), direction)
+
+	if (tag === "NumberFormat#Decimal") {
+		return createString(width(rational))
+	} else if (tag === "NumberFormat#Percent") {
+		return createString(`${width(scaledByAHundred(rational))}%`)
+	} else if (tag === "NumberFormat#Scientific") {
+		return createString(formatAsScientific(rational, width))
 	} else {
 		return createString(formatAsFraction(rational))
 	}

@@ -6,7 +6,12 @@ import { join } from "node:path"
 import * as algebraic from "@essence-lang/runtime/Algebraic"
 import * as integer from "@essence-lang/runtime/Integer"
 import * as number from "@essence-lang/runtime/Number"
-import { decimal, fraction } from "@essence-lang/runtime/NumberFormat"
+import {
+	decimal,
+	fraction,
+	percent,
+	scientific,
+} from "@essence-lang/runtime/NumberFormat"
 import * as optional from "@essence-lang/runtime/Optional"
 import * as ordering from "@essence-lang/runtime/Ordering"
 import * as rational from "@essence-lang/runtime/Rational"
@@ -337,6 +342,85 @@ describe("Rationals", () => {
 					integer.createInteger(0n),
 				),
 			).toEqual(ordering.equal)
+		})
+	})
+
+	// NOTE: The two formats that rewrite the value before they render it. A
+	// percentage is one hundred times the receiver, and the scientific form is
+	// the receiver over the largest power of ten at or below it — so both are
+	// held to the same 80-digit cap and the same fixed widths the decimal form
+	// is, and both are checked here against a value whose expansion never ends.
+	describe("The percent and scientific forms", () => {
+		const plain = (
+			numerator: bigint,
+			denominator: bigint,
+			format: Parameters<typeof rational.toString__overload$2>[1],
+		) =>
+			rational.toString__overload$2(
+				rational.createRational(numerator, denominator),
+				format,
+			).value
+
+		const fixed = (
+			numerator: bigint,
+			denominator: bigint,
+			format: Parameters<typeof rational.toString__overload$3>[1],
+			places: number,
+		) =>
+			rational.toString__overload$3(
+				rational.createRational(numerator, denominator),
+				format,
+				integer.createInteger(BigInt(places)),
+				nearest,
+			).value
+
+		it("writes a percentage as one hundred times the decimal", () => {
+			expect(plain(3n, 4n, percent)).toBe("75%")
+			expect(plain(1n, 8n, percent)).toBe("12.5%")
+			expect(fixed(1n, 8n, percent, 1)).toBe("12.5%")
+			expect(fixed(-1n, 4n, percent, 0)).toBe("-25%")
+			expect(fixed(0n, 1n, percent, 2)).toBe("0.00%")
+		})
+
+		it("caps a percentage's expansion where the decimal form caps", () => {
+			expect(plain(1n, 3n, percent)).toBe(`33.${"3".repeat(80)}%`)
+		})
+
+		it("writes one digit before the point and the power of ten after an e", () => {
+			expect(plain(1234n, 1n, scientific)).toBe("1.234e3")
+			expect(fixed(1234n, 1n, scientific, 2)).toBe("1.23e3")
+			expect(plain(1n, 2000n, scientific)).toBe("5e-4")
+			expect(plain(-5n, 1n, scientific)).toBe("-5e0")
+			expect(plain(1n, 1n, scientific)).toBe("1e0")
+		})
+
+		it("writes zero as 0e0, at every width", () => {
+			expect(plain(0n, 1n, scientific)).toBe("0e0")
+			expect(fixed(0n, 1n, scientific, 2)).toBe("0.00e0")
+		})
+
+		// NOTE: A mantissa is below ten before it is rounded and can reach ten
+		// after — `9.99` at one place is `10.0` — so the exponent has to take
+		// the carry. Ten is the only value a carry can reach, so one step of
+		// renormalisation is the whole of it.
+		it("carries a rounded mantissa into the exponent", () => {
+			expect(fixed(999n, 100n, scientific, 1)).toBe("1.0e1")
+			expect(fixed(9999n, 1000n, scientific, 2)).toBe("1.00e1")
+			expect(fixed(-999n, 100n, scientific, 1)).toBe("-1.0e1")
+		})
+
+		it("ignores the two new formats where the fraction form is asked for", () => {
+			expect(fixed(3n, 4n, fraction, 2)).toBe("3/4")
+		})
+
+		it("reaches both formats from a Program", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(1/8::toString(as #Percent, toPlaces 1))
+					Terminal.inspect(1234::divide(by 1, defaultingTo 0/1)
+						::toString(as #Scientific, toPlaces 2))
+				}`),
+			).toEqual(['"12.5%"', '"1.23e3"'])
 		})
 	})
 
