@@ -1068,6 +1068,44 @@ describe("Property tests", () => {
 			expect(counterexampleOf(events).shade).toBe("Shade#Dark(0)")
 		})
 
+		// NOTE: `Result` is an ordinary generic Choice to the derivation — two
+		// Cases, a payload each — so a property over one draws BOTH, and a
+		// property that holds on only one of them fails with the other. Two
+		// tests rather than one, because each direction is a claim of its own:
+		// a generator that answered only `#Value` would pass the second and
+		// fail the first, and one that answered only `#Failure` the reverse.
+		it("draws the failed Case of a Result", async () => {
+			let { events } = await run(`tests {
+				test "every Result holds a value" for any (answered: Result<Integer, String>) {
+					expect answered::hasValue()
+				}
+			}`)
+
+			expect(counterexampleOf(events).answered).toBe('Result#Failure("")')
+		})
+
+		it("draws the value Case of a Result too", async () => {
+			let { events } = await run(`tests {
+				test "every Result failed" for any (answered: Result<Integer, String>) {
+					expect answered::hasFailed()
+				}
+			}`)
+
+			expect(counterexampleOf(events).answered).toBe("Result#Value(0)")
+		})
+
+		// NOTE: And it shrinks the payload the way any Case's is shrunk — the
+		// smallest Integer that still fails, inside the Case that carries it.
+		it("shrinks a Result's payload to the smallest one that still fails", async () => {
+			let { events } = await run(`tests {
+				test "small answers" for any (answered: Result<Integer, String>) {
+					expect answered::value(defaultingTo 0)::isLessThan(4)
+				}
+			}`)
+
+			expect(counterexampleOf(events).answered).toBe("Result#Value(4)")
+		})
+
 		// NOTE: A refinement nothing satisfies is a failure of the RUN rather
 		// than of the property — the test asserted nothing, and a report saying
 		// it passed would be claiming otherwise.

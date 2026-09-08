@@ -14,6 +14,7 @@ import { pathToFileURL } from "node:url"
 import { fixturePath } from "@essence-lang/fixtures"
 import { RUNTIME_DIRECTORY } from "@essence-lang/runtime"
 
+import { type Descriptor, describeModule } from "../embed/describe"
 import { hashGraph } from "../embed/hash"
 import {
 	compileToMemory,
@@ -230,6 +231,86 @@ export {
 			expect(module.bridged).toBe(42)
 			expect(typeof module.describe).toBe("function")
 		})
+	})
+
+	// NOTE: `Result` is a builtin generic Choice and crosses as an ORDINARY
+	// one — a Union of two `case` descriptors, each with its emitted tag and
+	// its payload. `Optional` is the single Choice this seam spells by absence,
+	// and it is spelled that way by whole identity rather than by shape, so a
+	// second two-Case Choice of the standard library gets none of it: nothing
+	// here is `kind: "optional"`, and neither Case is flagged `optional`.
+	it("crosses a Result as an ordinary generic Choice", async () => {
+		await withProject(
+			{
+				"Checked.es": `implementation {
+	constant answered: Result<Integer, String> = #Value(3)
+
+	constant refused: Result<Integer, String> = #Failure("gone")
+
+	constant missing: Optional<Integer> = #Empty
+}
+
+export {
+	answered
+	missing
+	refused
+}
+`,
+			},
+			async (directory) => {
+				let entry = path.join(directory, "Checked.es")
+				let result = await compileToMemory(entry)
+
+				expect(result.diagnostics).toEqual([])
+
+				let described = describeModule(result.surface, entry)
+				let carriedBy = (name: string): Descriptor | null => {
+					let entry = described.exports[name]
+
+					return entry?.kind === "constant" ? entry.of : null
+				}
+
+				let answered = carriedBy("answered")
+
+				expect(answered?.kind).toBe("union")
+
+				let arms = answered?.kind === "union" ? answered.arms : []
+
+				expect(
+					arms.map((arm) =>
+						arm.kind === "case"
+							? {
+									kind: arm.kind,
+									tag: arm.tag,
+									name: arm.name,
+									optional: arm.optional,
+									unitChoice: arm.unitChoice,
+								}
+							: { kind: arm.kind },
+					),
+				).toEqual([
+					{
+						kind: "case",
+						tag: "Result#Value",
+						name: "Value",
+						optional: false,
+						unitChoice: false,
+					},
+					{
+						kind: "case",
+						tag: "Result#Failure",
+						name: "Failure",
+						optional: false,
+						unitChoice: false,
+					},
+				])
+
+				// NOTE: The other half of the claim: the Choice that IS spelled
+				// by absence still is, so this is a difference between the two
+				// Types rather than a rule that stopped applying.
+				expect(carriedBy("missing")?.kind).toBe("optional")
+			},
+		)
 	})
 
 	it("answers a type error with Diagnostics and no code", async () => {

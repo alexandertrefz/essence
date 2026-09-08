@@ -474,3 +474,22 @@ none at all
 ["a", "b", "c"]
 ["a-b-c"]"
 `;
+
+exports[`Fixture Sweep Result.es should print what it printed before 1`] = `
+"[ 12, 7 ]
+[ Problem#NotPositive, Problem#NotANumber ]
+{
+    values = [ 12, 7 ],
+    failures = [ Problem#NotPositive, Problem#NotANumber ]
+}
+Result#Failure([ Problem#NotPositive, Problem#NotANumber ])
+Result#Value([ 12, 7 ])
+Result#Value(700)
+Optional#Value(7)
+Optional#Value(Problem#NotANumber)
+0
+Result#Value(7)
+0
+Result#Failure("NotANumber")
+Result#Value(8)"
+`;
