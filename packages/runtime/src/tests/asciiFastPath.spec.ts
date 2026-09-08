@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { createInteger, type IntegerType } from "../Integer"
+import { firstCharacter, lastCharacter } from "../NonEmptyString"
 import type { OptionalType } from "../Optional"
 import { equal } from "../Ordering"
 import { bothEnds, end, start } from "../Side"
@@ -252,6 +253,36 @@ describe("the ASCII marker", () => {
 		expect(isMarkedAscii(trim(measured, bothEnds))).toBeTrue()
 		expect(isMarkedAscii(trim(measured, start))).toBeTrue()
 		expect(isMarkedAscii(trim(measured, end))).toBeTrue()
+	})
+
+	// NOTE: The two ends a PROVEN String answers, whose fast path is the mark
+	// itself: an ASCII receiver is read by unit and the answer is marked, and
+	// every other receiver comes through the view and is not. So the mark on
+	// the answer is what says which branch ran, and it is asserted rather than
+	// timed. Reading the ends off the view built a String per character of the
+	// receiver, which made the proven Method slower than the unproven
+	// `character(at:)` it spares a Program the Optional of.
+	test("is written by the ends a proven String answers", () => {
+		let text = string("Hello")
+
+		expect(firstCharacter(text).value).toBe("H")
+		expect(lastCharacter(text).value).toBe("o")
+		expect(isMarkedAscii(firstCharacter(text))).toBeTrue()
+		expect(isMarkedAscii(lastCharacter(text))).toBeTrue()
+		expect(length(firstCharacter(text)).value).toBe(1)
+
+		let wide = string("a😀b")
+
+		expect(firstCharacter(wide).value).toBe("a")
+		expect(lastCharacter(wide).value).toBe("b")
+		expect(isUnmarked(firstCharacter(wide))).toBeTrue()
+
+		// NOTE: The end of a String whose last character is several code
+		// units, which is the whole reason the other branch reads the view.
+		let emoji = string("ab😀")
+
+		expect(lastCharacter(emoji).value).toBe("😀")
+		expect(length(lastCharacter(emoji)).value).toBe(1)
 	})
 
 	// NOTE: The marker is a claim, and a String the scan would refuse must
