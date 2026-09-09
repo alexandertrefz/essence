@@ -182,10 +182,10 @@ declarations {
 		§§
 		§§ @param _ — the transform to run on the value
 		§§ @returns — the transformed value in an Optional, or an empty Optional.
-		map<infer ResultType>(
-			_ transform: (_: ItemType) -> ResultType,
-		) -> Optional<ResultType> {
-			<- match @ -> Optional<ResultType> {
+		map<infer Other>(
+			_ transform: (_: ItemType) -> Other,
+		) -> Optional<Other> {
+			<- match @ -> Optional<Other> {
 				case #Value(item) { <- #Value(transform(item)) }
 				case #Empty       { <- #Empty }
 			}
@@ -197,10 +197,10 @@ declarations {
 		§§
 		§§ @param _ — the step to run on the value
 		§§ @returns — the Optional the step answers, or an empty Optional.
-		andThen<infer ResultType>(
-			_ step: (_: ItemType) -> Optional<ResultType>,
-		) -> Optional<ResultType> {
-			<- match @ -> Optional<ResultType> {
+		andThen<infer Other>(
+			_ step: (_: ItemType) -> Optional<Other>,
+		) -> Optional<Other> {
+			<- match @ -> Optional<Other> {
 				case #Value(item) { <- step(item) }
 				case #Empty       { <- #Empty }
 			}

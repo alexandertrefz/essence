@@ -14,17 +14,17 @@ declarations {
 	§ Two of the five are native, because only a native can loop where the one
 	§ recursion is not stack-safe. They are `while` and the general
 	§ `step -> Step` loop. The general loop can not be written on `while`, which
-	§ only ever answers with its State: no Expression names the Result where
+	§ only ever answers with its State: no Expression names the answer where
 	§ the loop stops. The other three entries are written in Essence and need
 	§ no `Step`, because the predicate is the whole of their stopping. Two of
 	§ them are written on `while`, and the exclusive count on the inclusive
 	§ one.
 
-	§§ Answers the State the loop settles on, or the Result a step stops with.
+	§§ Answers the State the loop settles on, or the answer a step stops with.
 	§§
-	§§ A `startingWith` value seeds the State and a `step` callback advances it. The entries differ in what ends the loop. The `while` and `until` entries check a predicate before each step. One counted entry runs once per Integer from `from` through `through`, and the other stops before `upTo`. The general entry lets a `step` answer with a `Step`, and finishes with a Result of its own Type. Pick the entry by the labels it reads, as with an overloaded Method.
+	§§ A `startingWith` value seeds the State and a `step` callback advances it. The entries differ in what ends the loop. The `while` and `until` entries check a predicate before each step. One counted entry runs once per Integer from `from` through `through`, and the other stops before `upTo`. The general entry lets a `step` answer with a `Step`, and finishes with an answer of its own Type. Pick the entry by the labels it reads, as with an overloaded Method.
 	§§
-	§§ @returns — the State the loop settles on, or the Result a `#Done` carries.
+	§§ @returns — the State the loop settles on, or the value a `#Done` carries.
 	overload function loop {
 		§§ Answers the first State the condition rejects.
 		§§
@@ -112,17 +112,17 @@ declarations {
 			}
 		}
 
-		§§ Answers the Result the first `#Done` carries.
+		§§ Answers the value the first `#Done` carries.
 		§§
-		§§ Each step answers with a `Step`. A `#Continue` carries the next State, and the loop goes again. A `#Done` carries the Result, and the loop finishes with it. This entry ends on a decision the State makes, rather than on a count or a fixed predicate. It is the family's other native.
+		§§ Each step answers with a `Step`. A `#Continue` carries the next State, and the loop goes again. A `#Done` carries the answer, and the loop finishes with it. This entry ends on a decision the State makes, rather than on a count or a fixed predicate. It is the family's other native.
 		§§
 		§§ @param startingWith — the State the loop begins from.
 		§§ @param step — the body, handed the running State and answering with a `Step`: `#Continue` to go again, `#Done` to stop.
-		§§ @returns — the Result the first `#Done` carries.
-		<infer State, infer Result>(
+		§§ @returns — the value the first `#Done` carries.
+		<infer State, infer Answer>(
 			startingWith state: State,
-			step advance: (_: State) -> Step<State, Result>,
-		) -> Result
+			step advance: (_: State) -> Step<State, Answer>,
+		) -> Answer
 
 		§§ Runs the body once for each Integer from `from` up to, but not including, `upTo`, and answers the State after the last step.
 		§§

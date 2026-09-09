@@ -470,12 +470,12 @@ export type ListNatives = {
 	append__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType) => ListType<ItemType>
 	// append<ItemType>(contentsOf: List<ItemType>) -> List<ItemType>
 	append__overload$2: <ItemType extends AnyType>(self: ListType<ItemType>, contentsOf: ListType<ItemType>) => ListType<ItemType>
-	// map<ItemType, Result>(_: (_: ItemType) -> Result) -> List<Result>
-	map: <ItemType extends AnyType, Result extends AnyType>(self: ListType<ItemType>, argument1: (argument0: ItemType) => Result) => ListType<Result>
-	// reduce<ItemType, Result>(startingWith: Result, _: (_: Result, _: ItemType) -> Result) -> Result
-	reduce__overload$1: <ItemType extends AnyType, Result extends AnyType>(self: ListType<ItemType>, startingWith: Result, argument2: (argument0: Result, argument1: ItemType) => Result) => Result
-	// reduce<ItemType, Result>(startingWith: Result, step: (_: Result, _: ItemType) -> Step<Result, Result>) -> Result
-	reduce__overload$2: <ItemType extends AnyType, Result extends AnyType>(self: ListType<ItemType>, startingWith: Result, step: (argument0: Result, argument1: ItemType) => StepType<Result, Result>) => Result
+	// map<ItemType, Other>(_: (_: ItemType) -> Other) -> List<Other>
+	map: <ItemType extends AnyType, Other extends AnyType>(self: ListType<ItemType>, argument1: (argument0: ItemType) => Other) => ListType<Other>
+	// reduce<ItemType, Answer>(startingWith: Answer, _: (_: Answer, _: ItemType) -> Answer) -> Answer
+	reduce__overload$1: <ItemType extends AnyType, Answer extends AnyType>(self: ListType<ItemType>, startingWith: Answer, argument2: (argument0: Answer, argument1: ItemType) => Answer) => Answer
+	// reduce<ItemType, Answer>(startingWith: Answer, step: (_: Answer, _: ItemType) -> Step<Answer, Answer>) -> Answer
+	reduce__overload$2: <ItemType extends AnyType, Answer extends AnyType>(self: ListType<ItemType>, startingWith: Answer, step: (argument0: Answer, argument1: ItemType) => StepType<Answer, Answer>) => Answer
 	// everyItem<ItemType>(where: (_: ItemType) -> Boolean) -> List<ItemType>
 	everyItem: <ItemType extends AnyType>(self: ListType<ItemType>, where: (argument0: ItemType) => BooleanType) => ListType<ItemType>
 	// slice<ItemType>(from: Integer, to: Integer) -> List<ItemType>
@@ -526,8 +526,8 @@ export type NonEmptyListNatives = {
 	prepend: <ItemType extends AnyType>(self: ListType<ItemType>, contentsOf: ListType<ItemType>) => ListType<ItemType>
 	// append<ItemType>(contentsOf: List<ItemType>) -> NonEmptyList
 	append: <ItemType extends AnyType>(self: ListType<ItemType>, contentsOf: ListType<ItemType>) => ListType<ItemType>
-	// map<ItemType, Result>(_: (_: ItemType) -> Result) -> NonEmptyList
-	map: <ItemType extends AnyType, Result extends AnyType>(self: ListType<ItemType>, argument1: (argument0: ItemType) => Result) => ListType<Result>
+	// map<ItemType, Other>(_: (_: ItemType) -> Other) -> NonEmptyList
+	map: <ItemType extends AnyType, Other extends AnyType>(self: ListType<ItemType>, argument1: (argument0: ItemType) => Other) => ListType<Other>
 	// reverse<ItemType>() -> NonEmptyList
 	reverse: <ItemType extends AnyType>(self: ListType<ItemType>) => ListType<ItemType>
 	// sort<ItemType is Comparable>(in: SortOrder) -> NonEmptyList
@@ -608,8 +608,8 @@ export type DictionaryNatives = {
 	removeEvery: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, where: (argument0: RecordType & { key: KeyType; value: ValueType }) => BooleanType) => DictionaryType<KeyType, ValueType>
 	// everyEntry<KeyType, ValueType>(where: (_: { key: KeyType, value: ValueType }) -> Boolean) -> Dictionary<KeyType, ValueType>
 	everyEntry: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, where: (argument0: RecordType & { key: KeyType; value: ValueType }) => BooleanType) => DictionaryType<KeyType, ValueType>
-	// map<KeyType, ValueType, Result>(_: (_: { key: KeyType, value: ValueType }) -> Result) -> Dictionary<KeyType, Result>
-	map: <KeyType extends AnyType, ValueType extends AnyType, Result extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: (argument0: RecordType & { key: KeyType; value: ValueType }) => Result) => DictionaryType<KeyType, Result>
+	// map<KeyType, ValueType, Other>(_: (_: { key: KeyType, value: ValueType }) -> Other) -> Dictionary<KeyType, Other>
+	map: <KeyType extends AnyType, ValueType extends AnyType, Other extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: (argument0: RecordType & { key: KeyType; value: ValueType }) => Other) => DictionaryType<KeyType, Other>
 }
 
 export type NonEmptyDictionaryNatives = {
@@ -621,8 +621,8 @@ export type NonEmptyDictionaryNatives = {
 	values: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<ValueType>
 	// entries<KeyType, ValueType>() -> NonEmptyList
 	entries: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<RecordType & { key: KeyType; value: ValueType }>
-	// map<KeyType, ValueType, Result>(_: (_: { key: KeyType, value: ValueType }) -> Result) -> NonEmptyDictionary
-	map: <KeyType extends AnyType, ValueType extends AnyType, Result extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: (argument0: RecordType & { key: KeyType; value: ValueType }) => Result) => DictionaryType<KeyType, Result>
+	// map<KeyType, ValueType, Other>(_: (_: { key: KeyType, value: ValueType }) -> Other) -> NonEmptyDictionary
+	map: <KeyType extends AnyType, ValueType extends AnyType, Other extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: (argument0: RecordType & { key: KeyType; value: ValueType }) => Other) => DictionaryType<KeyType, Other>
 }
 
 export type GroupedListNatives = {
@@ -677,8 +677,8 @@ export type RandomnessNatives = {
 export type FunctionsNatives = {
 	// static loop<State>(startingWith: State, while: (_: State) -> Boolean, step: (_: State) -> State) -> State
 	loop__overload$1: <State extends AnyType>(startingWith: State, argument1: (argument0: State) => BooleanType, step: (argument0: State) => State) => State
-	// static loop<State, Result>(startingWith: State, step: (_: State) -> Step<State, Result>) -> Result
-	loop__overload$4: <State extends AnyType, Result extends AnyType>(startingWith: State, step: (argument0: State) => StepType<State, Result>) => Result
+	// static loop<State, Answer>(startingWith: State, step: (_: State) -> Step<State, Answer>) -> Answer
+	loop__overload$4: <State extends AnyType, Answer extends AnyType>(startingWith: State, step: (argument0: State) => StepType<State, Answer>) => Answer
 }
 
 declare const TerminalModule: typeof import("./Terminal")

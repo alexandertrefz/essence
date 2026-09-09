@@ -861,7 +861,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			}
 
 			// NOTE: A generic Choice reads back with its Type Parameters —
-			// `choice Step<State, Result>` — the same way a Namespace's
+			// `choice Step<State, Answer>` — the same way a Namespace's
 			// declaration head spells its own. Its Cases then show their payloads
 			// in terms of those Parameters (`state: State`), the abstract shape a
 			// use site instantiates. A non-generic Choice's Union carries no

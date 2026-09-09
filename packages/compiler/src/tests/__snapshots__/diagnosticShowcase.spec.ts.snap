@@ -536,7 +536,7 @@ Error: A generic Choice can not name itself in a payload
 ────╯
 
 [uninferable-type-parameter]
-Error: Type Parameter 'Result' could not be inferred
+Error: Type Parameter 'Answer' could not be inferred
     ╭─┤ GenericChoice.es:30:19 │
     │
  30 │ ╭─▶     constant never = loop(startingWith 0,

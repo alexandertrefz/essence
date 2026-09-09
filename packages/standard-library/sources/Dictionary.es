@@ -307,9 +307,9 @@ declarations {
 		§§
 		§§ @param _ — the transform each entry is handed to
 		§§ @returns — the Dictionary of transformed values.
-		map<infer Result>(
-			_ transform: (_: { key: KeyType, value: ValueType }) -> Result,
-		) -> Dictionary<KeyType, Result>
+		map<infer Other>(
+			_ transform: (_: { key: KeyType, value: ValueType }) -> Other,
+		) -> Dictionary<KeyType, Other>
 
 		§§ Answers a new Dictionary holding the entries of both.
 		§§
@@ -444,9 +444,9 @@ declarations {
 		§§
 		§§ @param _ — the transform each entry is handed to
 		§§ @returns — the Dictionary of transformed values, which certainly has an entry.
-		map<infer Result>(
-			_ transform: (_: { key: KeyType, value: ValueType }) -> Result,
-		) -> NonEmptyDictionary<KeyType, Result>
+		map<infer Other>(
+			_ transform: (_: { key: KeyType, value: ValueType }) -> Other,
+		) -> NonEmptyDictionary<KeyType, Other>
 	}
 
 	§ The bridge from the first container to the second, and the Methods a List
