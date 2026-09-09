@@ -237,6 +237,16 @@ function foldInvocation(
 				member === "absolute"
 				? foldRational(node, member, shadowed)
 				: node
+		// NOTE: The two sign refinements of Rational, for the reason the Integer
+		// pair above is here: each closes over a sum or a product by
+		// re-exporting Rational's own, so a written `1/2::add(1/4)` is
+		// `PositiveRational`'s sum now and folds to the same `3/4`. `squareRoot`
+		// is left alone, as `Rational`'s own is.
+		case "NonNegativeRational":
+		case "PositiveRational":
+			return member === "add" || member === "multiply"
+				? foldRational(node, member, shadowed)
+				: node
 		case "String":
 			return foldString(node, member, shadowed)
 		default:

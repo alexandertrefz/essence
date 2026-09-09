@@ -328,6 +328,26 @@ export type NonZeroRationalNatives = {
 	negate: (self: RationalType) => RationalType
 }
 
+export type NonNegativeRationalNatives = {
+	// add(_: PositiveRational) -> PositiveRational
+	add__overload$1: (self: RationalType, argument1: RationalType) => RationalType
+	// add(_: NonNegativeRational) -> NonNegativeRational
+	add__overload$2: (self: RationalType, argument1: RationalType) => RationalType
+	// multiply(with: NonNegativeRational) -> NonNegativeRational
+	multiply: (self: RationalType, argument1: RationalType) => RationalType
+	// squareRoot() -> Rational | Algebraic
+	squareRoot: (self: RationalType) => RationalType | AlgebraicType
+}
+
+export type PositiveRationalNatives = {
+	// add(_: NonNegativeRational) -> PositiveRational
+	add: (self: RationalType, argument1: RationalType) => RationalType
+	// multiply(with: PositiveRational) -> PositiveRational
+	multiply: (self: RationalType, argument1: RationalType) => RationalType
+	// squareRoot() -> PositiveRational | Algebraic
+	squareRoot: (self: RationalType) => RationalType | AlgebraicType
+}
+
 export type ScalarNatives = {
 
 }
@@ -954,6 +974,23 @@ export const $NonZeroRationalArity: AssertArities<typeof import("./NonZeroRation
 	numerator: 1
 	reciprocal: 1
 	negate: 1
+}> = true
+
+declare const NonNegativeRationalModule: typeof import("./NonNegativeRational")
+export const $NonNegativeRational: NonNegativeRationalNatives = NonNegativeRationalModule
+export const $NonNegativeRationalArity: AssertArities<typeof import("./NonNegativeRational"), {
+	add__overload$1: 2
+	add__overload$2: 2
+	multiply: 2
+	squareRoot: 1
+}> = true
+
+declare const PositiveRationalModule: typeof import("./PositiveRational")
+export const $PositiveRational: PositiveRationalNatives = PositiveRationalModule
+export const $PositiveRationalArity: AssertArities<typeof import("./PositiveRational"), {
+	add: 2
+	multiply: 2
+	squareRoot: 1
 }> = true
 
 declare const ScalarModule: typeof import("./Scalar")

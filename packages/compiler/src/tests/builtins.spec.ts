@@ -25,6 +25,7 @@ import * as nonEmptyNumberList from "@essence-lang/runtime/NonEmptyNumberList"
 import * as nonEmptyRationalList from "@essence-lang/runtime/NonEmptyRationalList"
 import * as nonEmptyString from "@essence-lang/runtime/NonEmptyString"
 import * as nonNegativeInteger from "@essence-lang/runtime/NonNegativeInteger"
+import * as nonNegativeRational from "@essence-lang/runtime/NonNegativeRational"
 import * as nonZeroInteger from "@essence-lang/runtime/NonZeroInteger"
 import * as nonZeroRational from "@essence-lang/runtime/NonZeroRational"
 import * as normalizationForm from "@essence-lang/runtime/NormalizationForm"
@@ -35,6 +36,7 @@ import * as optional from "@essence-lang/runtime/Optional"
 import * as optionalList from "@essence-lang/runtime/OptionalList"
 import * as ordering from "@essence-lang/runtime/Ordering"
 import * as positiveInteger from "@essence-lang/runtime/PositiveInteger"
+import * as positiveRational from "@essence-lang/runtime/PositiveRational"
 import * as randomness from "@essence-lang/runtime/Randomness"
 import * as rational from "@essence-lang/runtime/Rational"
 import * as rationalList from "@essence-lang/runtime/RationalList"
@@ -72,6 +74,8 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	PositiveInteger: positiveInteger,
 	Rational: rational,
 	NonZeroRational: nonZeroRational,
+	NonNegativeRational: nonNegativeRational,
+	PositiveRational: positiveRational,
 	// NOTE: A Namespace with no native at all, so its module holds only the
 	// type a native taking a Scalar would spell — the row is here because the
 	// cross-check below is over the Rewriter's whole import list.

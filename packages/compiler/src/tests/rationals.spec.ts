@@ -1056,7 +1056,15 @@ describe("Rationals", () => {
 						case Algebraic { <- @::toString() }
 					})
 
+					§ A written 0/5 proves it is not negative, so this call
+					§ is NonNegativeRational's total entry. The computed
+					§ receiver below stays on Rational's own.
 					Terminal.inspect(match 0/5::squareRoot() -> String {
+						case Rational  { <- @::toString() }
+						case Algebraic { <- @::toString() }
+					})
+
+					Terminal.inspect(match 1/5::subtract(1/5)::squareRoot() -> String {
 						case #Value(root) {
 							<- match root -> String {
 								case Rational  { <- @::toString() }
@@ -1066,7 +1074,7 @@ describe("Rationals", () => {
 						case #Empty { <- "Empty" }
 					})
 				}`),
-			).toEqual(['"0"', '"0"'])
+			).toEqual(['"0"', '"0"', '"0"'])
 		})
 
 		// NOTE: `Rational::isPositive` is `@::isGreaterThan(0/1)` and
@@ -1078,10 +1086,11 @@ describe("Rationals", () => {
 		// nothing a `PositiveRational` asks for, and a written `3/4` proved it
 		// neither. The `else` of `isPositive` narrows too, to the negation the
 		// alias records, which is what `isLessThanOrEqualTo(0/1)` reads.
+		// `PositiveRational` is the Prelude's own Type now, so the Program
+		// declares only the half the library has no name for.
 		it("narrows a Rational by its sign through the comparison it is written on", async () => {
 			expect(
 				await run(`implementation {
-					type PositiveRational = Rational where @::isPositive()
 					type NegativeRational = Rational where @::isNegative()
 
 					function keepPositive(_ r: PositiveRational) -> Rational { <- r }

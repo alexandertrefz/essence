@@ -7190,12 +7190,16 @@ describe("Enricher", () => {
 		})
 
 		// NOTE: A Rational narrows on the same rail, with the bound written as
-		// the fraction `Rational::isNot` takes.
+		// the fraction `Rational::isNot` takes. The receiver is a DIFFERENCE
+		// in all four of these, which is the one operation no refinement of
+		// Rational closes over — a sum of two written positives is a
+		// `PositiveRational` before the `if` is reached, and would prove the
+		// narrowing nothing.
 		it("should narrow a Rational the condition proved the predicate of", () => {
 			expect(
 				narrowedTypeOf(
 					`implementation {
-						constant r = 1/2::add(1/3)
+						constant r = 5/6::subtract(1/3)
 
 						if r::isNot(0/1) {
 							Terminal.inspect(r)
@@ -7215,7 +7219,7 @@ describe("Enricher", () => {
 			expect(
 				narrowedTypeOf(
 					`implementation {
-						constant r = 1/2::add(1/3)
+						constant r = 5/6::subtract(1/3)
 
 						if r::isNot(0) {
 							Terminal.inspect(r)
@@ -7236,7 +7240,7 @@ describe("Enricher", () => {
 			expect(
 				narrowedTypeOf(
 					`implementation {
-						constant r = 1/2::add(1/3)
+						constant r = 5/6::subtract(1/3)
 
 						if r::is(0/1) {
 							Terminal.inspect(0)
@@ -7250,16 +7254,17 @@ describe("Enricher", () => {
 		})
 
 		// NOTE: A Rational bound is read by the same ordering law an Integer
-		// bound is: a value proven above zero has been proven not to BE zero, so
-		// a condition nobody wrote an Alias for still reaches the Alias its
-		// answer proves. The `reciprocal` inside is what the narrowing is worth
-		// — the entry answering a bare Rational is the one a proven receiver
-		// reaches, and the annotation refuses the Optional the base answers.
+		// bound is. `isGreaterThan(0/1)` is what `PositiveRational` is written
+		// on, so the condition reaches that Alias exactly; a value above zero
+		// has also been proven not to BE zero, which is what the `reciprocal`
+		// inside spends. That call is what the narrowing is worth — the entry
+		// answering a bare Rational is the one a proven receiver reaches, and
+		// the annotation refuses the Optional the base answers.
 		it("should reach a Rational refinement an ordering proves", () => {
 			expect(
 				narrowedTypeOf(
 					`implementation {
-						constant r = 1/2::add(1/3)
+						constant r = 5/6::subtract(1/3)
 
 						if r::isGreaterThan(0/1) {
 							constant flipped: Rational = r::reciprocal()
@@ -7270,7 +7275,7 @@ describe("Enricher", () => {
 					}`,
 					"r",
 				),
-			).toBe("NonZeroRational")
+			).toBe("PositiveRational")
 		})
 
 		// NOTE: The narrowing is worth exactly what it lets a Program write, which
@@ -10247,15 +10252,15 @@ describe("Enricher", () => {
 
 		// NOTE: A written Rational answers for itself the way a written Integer
 		// does, and prints under the Alias whose conjuncts are exactly what it
-		// proved. A zero proves nothing, so it stays the Rational it is written
-		// as.
+		// proved. A zero is not above zero and is not below it either, so it
+		// proves the weaker of the two sign Aliases.
 		it("should carry a written Rational's proof", () => {
 			expect(receiverTypeOf("constant text = 1/2::toString()")).toBe(
-				"NonZeroRational",
+				"PositiveRational",
 			)
 
 			expect(receiverTypeOf("constant text = 0/1::toString()")).toBe(
-				"Rational",
+				"NonNegativeRational",
 			)
 		})
 

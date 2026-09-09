@@ -523,3 +523,78 @@ describe("Crossing between the two exact kinds", () => {
 		])
 	})
 })
+
+describe("The sign refinements on Rational", () => {
+	// NOTE: A written Rational proves its own sign, so each of these reaches
+	// the narrowest Namespace that declares the name. The answers are the
+	// same arithmetic either way; what the proof buys is the ANSWER's Type,
+	// which the compiled cases below read back through a declaration.
+	it("answers the root itself for a receiver proven not to be negative", async () => {
+		expect(
+			await run(
+				program(
+					"constant nonNegative: NonNegativeRational = 3/4",
+					"constant zero: NonNegativeRational = 0/1",
+					show("nonNegative::squareRoot()"),
+					show("zero::squareRoot()"),
+					show("1/4::squareRoot()"),
+					show("1/2::squareRoot()"),
+				),
+			),
+		).toEqual(["1/2·√3", "0/1", "1/2", "1/2·√2"])
+	})
+
+	it("keeps a sum and a product within the proof", async () => {
+		expect(
+			await run(
+				program(
+					"constant nonNegative: NonNegativeRational = 3/4",
+					"constant zero: NonNegativeRational = 0/1",
+					"constant positive: PositiveRational = 1/2",
+					show("nonNegative::add(positive)"),
+					show("zero::add(zero)"),
+					show("nonNegative::multiply(with zero)"),
+					show("positive::multiply(with 2/3)"),
+					show("1/2::add(3/4)"),
+					show("1/2::multiply(with 3/4)"),
+				),
+			),
+		).toEqual(["5/4", "0/1", "0/1", "1/3", "5/4", "3/8"])
+	})
+
+	// NOTE: The Types the proofs answer, read back off a declaration — an
+	// answer too wide would be a `constant-type-mismatch` here.
+	it("answers the proven Types the declarations promise", () => {
+		expect(() =>
+			generate(
+				program(
+					"constant nonNegative: NonNegativeRational = 3/4",
+					"constant zero: NonNegativeRational = 0/1",
+					"constant positive: PositiveRational = 1/2",
+					"constant sum: PositiveRational = nonNegative::add(positive)",
+					"constant kept: NonNegativeRational = zero::add(zero)",
+					"constant product: NonNegativeRational = nonNegative::multiply(with zero)",
+					"constant scaled: PositiveRational = positive::multiply(with 2/3)",
+					"constant root: PositiveRational | Algebraic = 1/4::squareRoot()",
+					"constant written: PositiveRational = 1/2::add(3/4)",
+				),
+			),
+		).not.toThrow()
+	})
+
+	// NOTE: A value above zero is a NonZeroRational and a NonNegativeRational
+	// at once, so both of those Namespaces are in reach — and `multiply` on
+	// the narrowest target is what keeps the call from being ambiguous.
+	it("passes a positive Rational wherever either weaker proof is wanted", () => {
+		expect(() =>
+			generate(
+				program(
+					"constant positive: PositiveRational = 1/2",
+					"constant reciprocal: NonZeroRational = positive::reciprocal()",
+					"constant halved: NonNegativeRational = positive",
+					"constant nonZero: NonZeroRational = positive",
+				),
+			),
+		).not.toThrow()
+	})
+})

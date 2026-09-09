@@ -90,6 +90,22 @@ declarations {
 	§§ The proof is what lets `reciprocal` answer a Rational rather than an Optional. The `numerator` is a NonZeroInteger, and `absolute`, `negate` and multiplication answer one of these again.
 	type NonZeroRational = Rational where @::isNot(0/1)
 
+	§ The two sign refinements, the sisters of `NonNegativeInteger` and
+	§ `PositiveInteger`. Both rest on `isPositive` being one call on `@`,
+	§ which wave 1 made it. A chain would leave the two Types unrelated, and
+	§ `PositiveRational` provable nowhere. See DEVELOPMENT.md, Why bodies look
+	§ the way they do.
+
+	§§ The Rationals from zero upward, as a checked refinement of `Rational`.
+	§§
+	§§ A receiver proven to be one of these has a real square root, which the bare `squareRoot` answers an Optional for. Addition and multiplication stay within the proof.
+	type NonNegativeRational = Rational where @::isGreaterThanOrEqualTo(0/1)
+
+	§§ The Rationals above zero, as a checked refinement of `Rational`.
+	§§
+	§§ A value above zero is neither zero nor below it, so one of these is accepted wherever a NonZeroRational or a NonNegativeRational is wanted. Addition with a value that is not negative, and multiplication with another of these, answer one of these again.
+	type PositiveRational = Rational where @::isPositive()
+
 	§ Exact ratios of Integers, kept in lowest terms with the sign on the
 	§ numerator. The literal form is `3/4`, and `Rational.of` builds one from
 	§ two computed Integers. Arithmetic never rounds: an operation that leaves
@@ -1203,11 +1219,104 @@ declarations {
 		§§ @returns — the negation, which is not zero.
 		negate() -> NonZeroRational
 	}
+
+	§ The other half of the sign, the sister of `namespace NonNegativeInteger`.
+	§ A negative Rational is the only one with no real square root, so a
+	§ receiver proven not to be negative answers the root itself. Two
+	§ operations close over the proof, as they do for the Integers. A sum and
+	§ a product of two non-negative Rationals are non-negative, and a sum with
+	§ a positive one is positive. A difference is not, as `1/2` and `3/4` show.
+	§
+	§ Every entry is native, and is `Rational`'s own operation under this
+	§ Namespace's name. A refinement erases before anything runs, so both
+	§ operands are ordinary Rationals by the time one of these runs. The
+	§ evidence was spent while compiling. The root is read off the Optional
+	§ entry beside it, which is the shape `NonNegativeInteger::squareRoot`
+	§ copies.
+	§
+	§ The `add` entry taking a PositiveRational stands first, for the reason
+	§ `NonNegativeInteger`'s does. Both entries ask for a proof, so they are
+	§ probed in the order they are written. A positive Argument fits the wider
+	§ entry as well.
+	namespace NonNegativeRational for NonNegativeRational {
+		§§ Adds a Rational proven not to be negative to this NonNegativeRational.
+		§§
+		§§ A sum of two non-negative Rationals is never negative, and a positive summand makes it positive.
+		overload add {
+			§§ Adds a Rational proven to be positive.
+			§§
+			§§ The receiver is not negative and the other summand is above zero, so the sum is above zero.
+			§§
+			§§ @param _ — the PositiveRational to add
+			§§ @returns — the sum, which is above zero.
+			(_ other: PositiveRational) -> PositiveRational
+
+			§§ Adds a Rational proven not to be negative.
+			§§
+			§§ Neither summand is negative, so the sum is not negative either.
+			§§
+			§§ @param _ — the NonNegativeRational to add
+			§§ @returns — the sum, which is never negative.
+			(_ other: NonNegativeRational) -> NonNegativeRational
+		}
+
+		§§ Multiplies this NonNegativeRational with a Rational proven not to be negative.
+		§§
+		§§ Neither factor is negative, so the product is not negative either.
+		§§
+		§§ @param with — the NonNegativeRational to multiply with
+		§§ @returns — the product, which is never negative.
+		multiply(with other: NonNegativeRational) -> NonNegativeRational
+
+		§§ Answers the exact square root of this NonNegativeRational.
+		§§
+		§§ A negative Rational is the one with no real root, and the receiver is proven not to be one. So the answer is the root itself rather than an Optional. A ratio of two perfect squares answers a Rational, and every other value answers an exact Algebraic.
+		§§
+		§§ @returns — the root.
+		squareRoot() -> Rational | Algebraic
+	}
+
+	§ Both halves of the sign at once, the sister of `namespace
+	§ PositiveInteger`. A PositiveRational reaches every entry of the three
+	§ Namespaces above, and this one holds the entries where holding two
+	§ proofs tightens the answer further.
+	§
+	§ `multiply` has to be written here as much as `add`. A written `1/2` is a
+	§ PositiveRational, and `1/2::multiply(with 3/4)` fits the
+	§ `NonZeroRational` entry and the `NonNegativeRational` entry alike.
+	§ Neither of those targets is narrower than the other, so without an entry
+	§ on the narrowest target the call would be `ambiguous-namespace`.
+	namespace PositiveRational for PositiveRational {
+		§§ Adds a Rational proven not to be negative to this PositiveRational.
+		§§
+		§§ The receiver is above zero and the other summand is not below it, so the sum is above zero.
+		§§
+		§§ @param _ — the NonNegativeRational to add
+		§§ @returns — the sum, which is above zero.
+		add(_ other: NonNegativeRational) -> PositiveRational
+
+		§§ Multiplies this PositiveRational with another.
+		§§
+		§§ Both factors are above zero, so the product is above zero.
+		§§
+		§§ @param with — the PositiveRational to multiply with
+		§§ @returns — the product, which is above zero.
+		multiply(with other: PositiveRational) -> PositiveRational
+
+		§§ Answers the exact square root of this PositiveRational.
+		§§
+		§§ A ratio of two perfect squares above zero has a root above zero, and every other value answers an exact Algebraic.
+		§§
+		§§ @returns — the root.
+		squareRoot() -> PositiveRational | Algebraic
+	}
 }
 
 export {
+	NonNegativeRational
 	NonZeroRational
 	NumberFormat
+	PositiveRational
 	Rational
 	Rounding
 	SignStyle
