@@ -800,6 +800,38 @@ The runner tries the candidates in the order the List holds them, keeps the
 first one that fails as well, and asks that value for its own — so a body whose
 smallest candidate comes first is walked down in one pass.
 
+### `unreachable-conformance`
+
+A `Generatable` conformance declared on a GENERIC Namespace, for a Type a
+property test generates. The conformance is checked and would then have to be
+discarded, so it is refused instead.
+
+`generate` is a static taking a `Randomness` and nothing else, so a call has no
+Argument for the Namespace's own Type Parameters to be worked out from — and
+Essence has no spelling for a Type Argument at a call, which is why the call an
+author would write by hand reports `uninferable-type-parameter`:
+
+```essence
+type Pair<Item> = { held: Item, mark: Integer }
+
+namespace Pair<infer Item> for Pair<Item>
+	is Generatable where Item is Generatable
+{
+	static generate(from source: Randomness) -> Pair<Item> {
+		<- { held = Item.generate(from source), mark = 42 }
+	}
+}
+```
+
+Declare the conformance on a Namespace whose target Type is already applied —
+`namespace TwinPair for Pair<Twin> is Generatable` — and it is reached like any
+other. One standing beside the generic Namespace answers on its own, and nothing
+is refused.
+
+Passing the conformance over would have run the structural draw AND the
+structural shrink, which is exactly what declaring one is for: a report about
+values the author never agreed to.
+
 ### `ungeneratable-contract`
 
 A remark rather than a mistake. `essence test --contracts` reads every Method a

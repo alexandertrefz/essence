@@ -663,6 +663,93 @@ describe("Property tests", () => {
 				/^\{ count = (5|6|7|8|9|10)[0-9] \}$/,
 			)
 		})
+
+		// NOTE: A GENERIC Namespace's conformance can not be reached: `generate`
+		// is a static taking a `Randomness` and nothing else, so nothing at the
+		// call binds the Namespace's own Type Parameters, and the language has
+		// no spelling for a Type Argument at a call — the very call an author
+		// would write by hand reports `uninferable-type-parameter`. It is
+		// refused rather than passed over, because passing it over runs the
+		// structural draw AND the structural shrink the conformance was written
+		// to replace.
+		const pair = `type Twin = { first: Integer, second: Integer }
+
+			type Pair<Item> = { held: Item, mark: Integer }
+
+			namespace Twin for Twin is Generatable {
+				static generate(from source: Randomness) -> Twin {
+					<- { first = 7, second = 7 }
+				}
+
+				shrink() -> List<Twin> {
+					<- []
+				}
+			}
+
+			namespace Pair<infer Item> for Pair<Item>
+				is Generatable where Item is Generatable
+			{
+				static generate(from source: Randomness) -> Pair<Item> {
+					<- { held = Item.generate(from source), mark = 42 }
+				}
+
+				shrink() -> List<Pair<Item>> {
+					<- []
+				}
+			}`
+
+		it("refuses a generic Namespace's conformance rather than passing it over", () => {
+			let source = `implementation {
+				${pair}
+			}
+
+			tests {
+				test "a pair is marked" for any (pair: Pair<Twin>) {
+					expect pair.mark::is(0)
+				}
+			}`
+
+			expect(codesOf(source)).toEqual(["unreachable-conformance"])
+			expect(
+				analyse(source).diagnostics.flatMap(
+					(diagnostic) => diagnostic.helps,
+				),
+			).toEqual([
+				"Declare 'Generatable' on a Namespace whose target Type is already applied, rather than on a generic one.",
+			])
+		})
+
+		// NOTE: And a Namespace over the APPLIED Type is what the Help asks
+		// for, so one standing beside the generic Namespace answers and nothing
+		// is refused — the draw is the written one and the value stands as it
+		// was drawn, both of which the generic conformance failed to do.
+		it("takes a Namespace over the applied Type beside a generic one", async () => {
+			let { events } = await run(`implementation {
+				${pair}
+
+				namespace TwinPair for Pair<Twin> is Generatable {
+					static generate(from source: Randomness) -> Pair<Twin> {
+						<- { held = { first = 3, second = 3 }, mark = 99 }
+					}
+
+					shrink() -> List<Pair<Twin>> {
+						<- []
+					}
+				}
+			}
+
+			tests {
+				test "a pair is marked" for any (pair: Pair<Twin>) {
+					expect pair.mark::is(0)
+				}
+			}`)
+			let [property] = propertyEvents(events)
+
+			expect(property?.shrinks).toBe(0)
+			expect(counterexampleOf(events).pair).toBe(
+				"{ held = { first = 3, second = 3 }, mark = 99 }",
+			)
+		})
 	})
 
 	// NOTE: A drawn value is a value like any other, so a `require` takes it
