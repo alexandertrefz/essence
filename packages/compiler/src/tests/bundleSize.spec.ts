@@ -64,7 +64,22 @@ async function bundleSizeOfSource(source: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: 78,053 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 5,740 measured, and it is the floor every Program pays: the runtime
+	// a bundle links whatever it calls. HelloWorld.es names no number, no
+	// container and no constant — what it measures is what a `Terminal.print`
+	// and a String interpolation drag in, and what NOTHING else does.
+	//
+	// NOTE: It was 6,930 until the transcendental basis registry stopped
+	// deriving its canonical order in a top-level call, which no bundler can
+	// prove pure: the module, both series behind it and the tower they reach
+	// were 1,190 bytes of this figure, in a Program that names no constant at
+	// all. A ceiling here is what says the next such top-level effect is
+	// noticed by a test rather than by a reader of a bundle.
+	it("keeps the floor every Program pays", async () => {
+		expect(await bundleSizeOf("HelloWorld.es")).toBeLessThan(6_740)
+	})
+
+	// NOTE: 78,120 measured. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
 	//
@@ -88,6 +103,16 @@ describe("Bundle Size", () => {
 	// behind it takes a signed step and the `downTo:` promise as parameters, so
 	// the one Program here that writes a range carries the shape all four
 	// entries share rather than the two loops that entry alone needed.
+	//
+	// NOTE: 48 of those bytes are `List` Methods becoming Overload entries, at
+	// the call sites here: each name binds its `__overload$1` suffix now.
+	//
+	// NOTE: 67 of those bytes are the transcendental basis registry carrying
+	// its own canonical term order. The Map that derived that order was a
+	// top-level call no bundler can prove pure, so every Program linked the
+	// module and the two series behind it whether it named a constant or not —
+	// which is what the floor below measures. A file that genuinely uses the
+	// tower pays these 67 for the shape that shakes.
 	//
 	// NOTE: 834 of those bytes are the four inequalities moving from
 	// `Orderable` to `Comparable`. A witness carries its Protocol's provided
@@ -126,7 +151,7 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(79_100)
 	})
 
-	// NOTE: 37,993 measured; a reintroduced `Number` spread was 54,849. The same
+	// NOTE: 38,056 measured; a reintroduced `Number` spread was 54,849. The same
 	// claim as Everyday's, on a Program that takes square roots rather than
 	// doing arithmetic — so it reads the other side of several trades. A pass
 	// that pays text for work on Everyday takes bytes OFF here, because a file
@@ -147,6 +172,9 @@ describe("Bundle Size", () => {
 	// NOTE: 8 are an identifier growing. `String.ts`'s internal `quoted` is
 	// `quotedText` now, so that the Method of that name can be the native it
 	// is, and the printer every Program links calls it under the longer name.
+	//
+	// NOTE: 63 are the transcendental registry change Everyday's note above
+	// explains, which every file that reaches the tower pays alike.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(39_100)
 	})
@@ -177,7 +205,7 @@ describe("Bundle Size", () => {
 	// functions arrive here in the same order, under one more of esbuild's
 	// per-module banner comments — which is the whole of the difference.
 	//
-	// NOTE: 59,505 measured now, and the 11,655 bytes between the two figures
+	// NOTE: 59,505 measured then, and the 11,655 bytes between the two figures
 	// are what the fixture ITSELF grew by: it exercises the Methods the
 	// completeness wave added, and each drags its own reach in. Measured one
 	// call at a time against a fixture without the new section, which is
@@ -192,20 +220,27 @@ describe("Bundle Size", () => {
 	// `remove` and `of` are Overloads now, so the emitted name of each native
 	// carries its `__overload$1` suffix at every call site.
 	//
+	// NOTE: 58,328 measured now. Every figure above it was taken before the
+	// transcendental registry stopped deriving its base order at load, which
+	// gave 1,177 bytes back here and 1,190 to every Program that names no
+	// constant at all.
+	//
 	// NOTE: What says this is the fixture and not the runtime is the three
 	// figures that did NOT move with it: `Everyday.es`, the removeDuplicates
-	// Program below at 12,753, and `HelloWorld.es` at 6,930. `Everyday.es`
-	// reads 78,053 now, and nothing it has taken since is anything a Dictionary
-	// reaches: 48 bytes of `List` Methods becoming Overloads, and the 1,832 of
-	// the String vocabulary wave its own note above accounts for. A Dictionary
-	// runtime that grew would move the second of those, which reaches the whole
-	// store through one call and none of the new Methods.
+	// Program below at 11,563, and `HelloWorld.es` at 5,740. `Everyday.es`
+	// reads 78,120 now, and nothing it has taken since is anything a Dictionary
+	// reaches: 48 bytes of `List` Methods becoming Overloads, 381 of the range
+	// natives folding into one walk, 27 of `List.split` becoming an Overload
+	// entry, 67 of the transcendental registry, and the 1,832 of the String
+	// vocabulary wave its own note above accounts for. A Dictionary runtime
+	// that grew would move the second of those, which reaches the whole store
+	// through one call and none of the new Methods.
 	it("charges a Dictionary Program for the container it uses", async () => {
-		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(60_500)
+		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(59_300)
 	})
 
-	// NOTE: 12,753 measured, where the same Program without the one call
-	// measures 5,083 — so `removeDuplicates` costs 7,670 bytes, half again as
+	// NOTE: 11,563 measured, where the same Program without the one call
+	// measures 3,893 — so `removeDuplicates` costs 7,670 bytes, twice as
 	// much as the Program that calls it. It was 18,607 while the body was
 	// `@::tally()::keys()` on `GroupedList`: a List Method reached the whole
 	// second container, and the store, the kind registry, the registration and
@@ -230,7 +265,7 @@ describe("Bundle Size", () => {
 
 	Terminal.print(names::removeDuplicates()::join(with ", "))
 }`),
-		).toBeLessThan(13_700)
+		).toBeLessThan(12_550)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far
@@ -283,7 +318,7 @@ describe("Bundle Size", () => {
 
 		expect(inBundle.length).toBeGreaterThan(0)
 		expect(inBundle.length).toBeLessThanOrEqual(inPrelude.length)
-		// NOTE: 17,470 measured, and the ceiling keeps the ~500 bytes this
+		// NOTE: 16,273 measured, and the ceiling keeps the ~500 bytes this
 		// test's own rule asks for. It had five, which is not a guard but a
 		// tripwire: it fires on the next ordinary edit and says nothing
 		// about what moved. It even deformed the runtime — `String.append`
@@ -303,6 +338,9 @@ describe("Bundle Size", () => {
 		// of `quotient` and `multiply`, which reaches two natives instead of
 		// one and says the same thing worse.
 		//
+		// NOTE: 1,197 came off again with the transcendental registry, which no
+		// Module here names: the floor test above says what that change was.
+		//
 		// NOTE: 82 more are the Integer `toString` binding under its Overload
 		// name: the plain entry is an Overload entry now, so
 		// `toString__overload$1` stands where `toString` did, at eight sites
@@ -310,6 +348,6 @@ describe("Bundle Size", () => {
 		// reached that was not reached before — the entries beside it are
 		// Essence bodies over `Rational`, and a Program that names no format
 		// links none of them.
-		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(18_000)
+		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(16_800)
 	})
 })
