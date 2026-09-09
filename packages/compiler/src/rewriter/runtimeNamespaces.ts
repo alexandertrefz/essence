@@ -40,6 +40,7 @@ export const runtimeNamespaceNames = [
 	"NumberFormat",
 	"Rounding",
 	"SignStyle",
+	"Division",
 	"SortOrder",
 	"Stream",
 	"Record",

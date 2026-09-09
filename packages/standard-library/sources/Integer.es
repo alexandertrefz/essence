@@ -40,6 +40,28 @@ declarations {
 	§§ A value above zero is neither zero nor below it, so one of these is accepted wherever a NonZeroInteger or a NonNegativeInteger is wanted. Addition, multiplication and `raise` answer one of these again.
 	type PositiveInteger = Integer where @::isPositive()
 
+	§ The Choice is declared beside its only user, as `Rounding` is beside
+	§ `Rational::round`.
+	§
+	§ Two Cases rather than the four a survey of languages turns up. Flooring
+	§ and ceiling divisions are `quotient(dividingBy:toward:)` beside this,
+	§ where they are one Case each of a Choice the tower already had. What is
+	§ left is the pairing a remainder is read under, and there are two of
+	§ those.
+
+	§§ How a division pairs its quotient with its remainder.
+	§§
+	§§ Under `#Euclidean` the remainder is never negative, so it is always below the divisor's magnitude. Under `#Truncating` the remainder takes the sign of the dividend, which is what an algorithm ported from another language expects.
+	choice Division {
+		Euclidean,
+		Truncating,
+	}
+
+	§ `Equatable` and `Printable` are both derived for a Choice of Cases that
+	§ carry no payload. This Namespace declares the two and writes neither; see
+	§ DEVELOPMENT.md, Why bodies look the way they do.
+	namespace Division for Division is Equatable, is Printable {}
+
 	§ Whole numbers of arbitrary size, and the exact arithmetic over them.
 	§ Nothing here rounds. An operation that leaves the Integers widens into
 	§ a Rational, an Algebraic or a Transcendental instead.
@@ -610,6 +632,36 @@ declarations {
 				<- @::remainder(dividingBy divisor)
 					::value(defaultingTo fallback)
 			}
+
+			§§ Answers what is left over, paired with the quotient in the named way.
+			§§
+			§§ The entries above answer the `#Euclidean` pairing, which is why this one names no default. The `#Truncating` Case answers a remainder carrying the sign of the dividend, so `-7::remainder(dividingBy 3, as #Truncating)` is `-1` rather than `2`. The two agree wherever the dividend is not negative.
+			§§
+			§§ @param dividingBy — the divisor, proven not to be zero
+			§§ @param as — the pairing to read the remainder under
+			§§ @returns — the remainder.
+			(dividingBy divisor: NonZeroInteger, as kind: Division) -> Integer {
+				§ `@` is rebound inside `match`; see DEVELOPMENT.md, Why
+				§ bodies look the way they do.
+				constant dividend  = @
+				constant euclidean = @::remainder(dividingBy divisor)
+
+				<- match kind -> Integer {
+					case #Euclidean { <- euclidean }
+
+					case #Truncating {
+						§ The Euclidean remainder is the truncating one for a
+						§ dividend that is not negative, and one whole divisor
+						§ above it otherwise. A remainder of zero is its own
+						§ truncating form under either sign.
+						if dividend::isNegative()::and(euclidean::isNot(0)) {
+							<- euclidean::subtract(divisor::absolute())
+						} else {
+							<- euclidean
+						}
+					}
+				}
+			}
 		}
 
 		§§ Answers how many whole divisors fit.
@@ -640,6 +692,31 @@ declarations {
 				defaultingTo fallback: Integer,
 			) -> Integer {
 				<- @::quotient(dividingBy divisor)::value(defaultingTo fallback)
+			}
+
+			§ The direction is labelled `toward:`, the label `round` already
+			§ carries a `Rounding` under. The other spelling was `rounding:`.
+			§ One concept under two labels is what the `places` to `toPlaces`
+			§ rename took out of this file.
+			§
+			§ The body is the exact division and the rounding the library
+			§ already has, rather than five directions written again over
+			§ bigints. It builds a Rational the entries above never build,
+			§ which a Program dividing two Integers already links: `divide`
+			§ answers one.
+
+			§§ Answers how many whole divisors fit, rounded in the named direction.
+			§§
+			§§ The answer is the exact quotient rounded in that direction, so `7::quotient(dividingBy 2, toward #Up)` is `4`. The entries above pair their quotient with a remainder that is never negative. That pairing is the floor for a positive divisor and the ceiling for a negative one. So `#Down` answers what they answer for every divisor above zero.
+			§§
+			§§ @param dividingBy — the divisor, proven not to be zero
+			§§ @param toward — the direction to round the quotient in
+			§§ @returns — the quotient.
+			(
+				dividingBy divisor: NonZeroInteger,
+				toward direction: Rounding,
+			) -> Integer {
+				<- @::divide(by divisor)::round(toward direction)
 			}
 		}
 
@@ -1204,6 +1281,7 @@ declarations {
 }
 
 export {
+	Division
 	Integer
 	NonNegativeInteger
 	NonZeroInteger

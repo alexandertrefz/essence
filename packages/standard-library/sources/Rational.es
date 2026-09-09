@@ -658,6 +658,107 @@ declarations {
 			(by other: NonZeroRational) -> Rational
 		}
 
+		§ The Euclidean division of two Rationals, which the Integer pair of
+		§ the same names already answers for whole values. The quotient counts
+		§ whole divisors, so it is an Integer, and the remainder is what is
+		§ left of a Rational, so it is one. Rounding the exact ratio is what
+		§ decides both. The floor for a positive divisor, and the ceiling for
+		§ a negative one, leaves the remainder above zero.
+		§
+		§ Neither takes a `Division` the way `Integer::remainder` does. The
+		§ pairing a caller ports an algorithm under is an Integer question,
+		§ and nothing here asked for the truncating one yet.
+
+		§§ Answers what is left over after taking out every whole divisor that fits.
+		§§
+		§§ The division is Euclidean, so the remainder is never negative and always below the divisor's magnitude. For example, `7/2::remainder(dividingBy 1/3)` is `1/6`. A zero divisor answers empty, and the `defaultingTo:` entry answers the given Rational instead.
+		overload remainder {
+			§§ Answers the remainder over a divisor nothing is known about.
+			§§
+			§§ @param dividingBy — the divisor
+			§§ @returns — the remainder, or nothing when dividing by zero.
+			(dividingBy divisor: Rational) -> Optional<Rational> {
+				§ The `else` of an `if` asking `isZero` proves
+				§ `NonZeroRational`, which the entry below asks for. See
+				§ DEVELOPMENT.md, Why bodies look the way they do.
+				if divisor::isZero() {
+					<- #Empty
+				} else {
+					<- #Value(@::remainder(dividingBy divisor))
+				}
+			}
+
+			§§ Answers the remainder over a divisor proven not to be zero.
+			§§
+			§§ The division can not fail, so the answer is the remainder itself rather than an Optional.
+			§§
+			§§ @param dividingBy — the divisor, proven not to be zero
+			§§ @returns — the remainder.
+			(dividingBy divisor: NonZeroRational) -> Rational {
+				constant whole = @::quotient(dividingBy divisor)
+
+				<- @::subtract(divisor::multiply(with whole))
+			}
+
+			§§ Answers the remainder, with a value to answer when the divisor is zero.
+			§§
+			§§ @param dividingBy — the divisor
+			§§ @param defaultingTo — the value to answer with when there is no remainder
+			§§ @returns — the remainder, or the given value in its place.
+			(
+				dividingBy divisor: Rational,
+				defaultingTo fallback: Rational,
+			) -> Rational {
+				<- @::remainder(dividingBy divisor)
+					::value(defaultingTo fallback)
+			}
+		}
+
+		§§ Answers how many whole divisors fit.
+		§§
+		§§ This is the other half of the same Euclidean division as `remainder`, and the two agree: `quotient · divisor + remainder` is the original Rational. For example, `7/2::quotient(dividingBy 1/3)` is `10`. A zero divisor answers empty, and the `defaultingTo:` entry answers the given Integer instead.
+		overload quotient {
+			§§ Answers the quotient over a divisor nothing is known about.
+			§§
+			§§ @param dividingBy — the divisor
+			§§ @returns — the quotient, or nothing when dividing by zero.
+			(dividingBy divisor: Rational) -> Optional<Integer> {
+				if divisor::isZero() {
+					<- #Empty
+				} else {
+					<- #Value(@::quotient(dividingBy divisor))
+				}
+			}
+
+			§§ Answers the quotient over a divisor proven not to be zero.
+			§§
+			§§ The division can not fail, so the answer is the quotient itself rather than an Optional.
+			§§
+			§§ @param dividingBy — the divisor, proven not to be zero
+			§§ @returns — the quotient.
+			(dividingBy divisor: NonZeroRational) -> Integer {
+				constant ratio = @::divide(by divisor)
+
+				if divisor::isNegative() {
+					<- ratio::round(toward #Up)
+				} else {
+					<- ratio::round(toward #Down)
+				}
+			}
+
+			§§ Answers the quotient, with a value to answer when the divisor is zero.
+			§§
+			§§ @param dividingBy — the divisor
+			§§ @param defaultingTo — the value to answer with when there is no quotient
+			§§ @returns — the quotient, or the given value in its place.
+			(
+				dividingBy divisor: Rational,
+				defaultingTo fallback: Integer,
+			) -> Integer {
+				<- @::quotient(dividingBy divisor)::value(defaultingTo fallback)
+			}
+		}
+
 		§§ Raises the Rational to the given power.
 		§§
 		§§ A negative exponent answers the exact reciprocal power. Zero raised to the power of zero is one. Raising this Rational to an exponent proven not to be negative can not fail. Zero raised to a negative power answers empty, and the `defaultingTo:` entry answers the given Rational instead.

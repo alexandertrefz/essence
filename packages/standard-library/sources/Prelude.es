@@ -17,6 +17,7 @@ export {
 		NonEmptyDictionary
 	}
 	from "./Integer.es" {
+		Division
 		Integer
 		NonNegativeInteger
 		NonZeroInteger

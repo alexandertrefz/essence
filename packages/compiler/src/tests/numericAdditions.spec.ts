@@ -361,3 +361,116 @@ describe("Reading and writing an Integer in another base", () => {
 		}
 	})
 })
+
+describe("Division modes", () => {
+	it("rounds the whole quotient in the named direction", async () => {
+		expect(
+			await run(
+				program(
+					show("7::quotient(dividingBy 2, toward #Up)"),
+					show("7::quotient(dividingBy 2, toward #Down)"),
+					show("7::quotient(dividingBy 2, toward #TowardZero)"),
+					show("-7::quotient(dividingBy 2, toward #TowardZero)"),
+					show("-7::quotient(dividingBy 2, toward #Up)"),
+					show("-7::quotient(dividingBy 2, toward #Down)"),
+					show("7::quotient(dividingBy 2, toward #Nearest)"),
+					show("6::quotient(dividingBy 2, toward #Up)"),
+				),
+			),
+		).toEqual(["4", "3", "3", "-3", "-3", "-4", "4", "3"])
+	})
+
+	// NOTE: The one place the direction and the Euclidean pairing part
+	// company, which the §§ block of the entry names.
+	it("answers the Euclidean quotient for a positive divisor alone", async () => {
+		expect(
+			await run(
+				program(
+					show("7::quotient(dividingBy 3)"),
+					show("7::quotient(dividingBy 3, toward #Down)"),
+					show("-7::quotient(dividingBy 3)"),
+					show("-7::quotient(dividingBy 3, toward #Down)"),
+					show("7::quotient(dividingBy -3)"),
+					show("7::quotient(dividingBy -3, toward #Down)"),
+				),
+			),
+		).toEqual(["2", "2", "-3", "-3", "-2", "-3"])
+	})
+
+	it("pairs the remainder the way the Division names", async () => {
+		expect(
+			await run(
+				program(
+					show("-7::remainder(dividingBy 3, as #Euclidean)"),
+					show("-7::remainder(dividingBy 3, as #Truncating)"),
+					show("7::remainder(dividingBy 3, as #Truncating)"),
+					show("-7::remainder(dividingBy -3, as #Truncating)"),
+					show("7::remainder(dividingBy -3, as #Truncating)"),
+					show("-6::remainder(dividingBy 3, as #Truncating)"),
+					show("6::remainder(dividingBy 3, as #Truncating)"),
+				),
+			),
+		).toEqual(["2", "-1", "1", "-1", "1", "0", "0"])
+	})
+
+	// NOTE: The two laws the §§ blocks promise. The Euclidean remainder is
+	// never negative and always below the divisor's magnitude; the truncating
+	// one takes the dividend's sign; and either pairing rebuilds the dividend.
+	it("keeps the laws of both pairings, for any pair", () => {
+		let numbers = deterministicNumbers(20260911)
+
+		for (let attempt = 0; attempt < 200; attempt++) {
+			let dividend = (numbers.next().value % 2001) - 1000
+			let divisor = (numbers.next().value % 40) - 20 || 7
+			let euclidean = ((dividend % divisor) + Math.abs(divisor)) % divisor
+			let truncating = dividend % divisor
+
+			expect(euclidean >= 0).toBe(true)
+			expect(euclidean < Math.abs(divisor)).toBe(true)
+			expect(
+				(dividend - euclidean) % divisor === 0 &&
+					(dividend - truncating) % divisor === 0,
+			).toBe(true)
+			expect(truncating === 0 || truncating < 0 === dividend < 0).toBe(
+				true,
+			)
+		}
+	})
+
+	it("divides two Rationals into a whole quotient and a Rational remainder", async () => {
+		expect(
+			await run(
+				program(
+					"constant computedZero = 1/2::subtract(1/2)",
+					show("7/2::quotient(dividingBy 1/3)"),
+					show("7/2::remainder(dividingBy 1/3)"),
+					show("7/2::quotient(dividingBy -1/3)"),
+					show("7/2::remainder(dividingBy -1/3)"),
+					show("-7/2::quotient(dividingBy 1/3)"),
+					show("-7/2::remainder(dividingBy 1/3)"),
+					show("7/2::quotient(dividingBy computedZero)"),
+					show("7/2::remainder(dividingBy computedZero)"),
+					show(
+						"7/2::quotient(dividingBy computedZero, defaultingTo 0)",
+					),
+					show(
+						"7/2::remainder(dividingBy computedZero, defaultingTo 0/1)",
+					),
+					show("1/3::remainder(dividingBy 7/2)"),
+				),
+			),
+		).toEqual([
+			"10",
+			"1/6",
+			"-10",
+			"1/6",
+			"-11",
+			"1/6",
+			"Optional#Empty",
+			"Optional#Empty",
+			"0",
+			"0/1",
+			"1/3",
+		])
+	})
+})

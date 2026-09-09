@@ -5,6 +5,7 @@ import * as algebraic from "@essence-lang/runtime/Algebraic"
 import * as boolean from "@essence-lang/runtime/Boolean"
 import * as caseSensitivity from "@essence-lang/runtime/CaseSensitivity"
 import * as dictionary from "@essence-lang/runtime/Dictionary"
+import * as division from "@essence-lang/runtime/Division"
 import * as functions from "@essence-lang/runtime/functions"
 import * as groupedList from "@essence-lang/runtime/GroupedList"
 import * as groupedNonEmptyList from "@essence-lang/runtime/GroupedNonEmptyList"
@@ -92,6 +93,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	NumberFormat: numberFormat,
 	Rounding: rounding,
 	SignStyle: signStyle,
+	Division: division,
 	SortOrder: sortOrder,
 	// NOTE: A Namespace with no native either, for the reason `Scalar` has
 	// none: all three of its Methods are derived from the Choice.

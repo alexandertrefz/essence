@@ -112,6 +112,12 @@ export const builtinMemberOrder: Array<string> = [
 	// its Methods are derived, so it shares no Method name with anything here
 	// and its position decides nothing else.
 	"SignStyle",
+	// NOTE: With the two mode Choices the numeric tower already had, and after
+	// them because a reader meets `Rounding` first — `Integer.es` declares this
+	// one, and `Integer::quotient` takes a `Rounding` beside the `Division` its
+	// `remainder` takes. All three of its Methods are derived, so it shares no
+	// Method name with anything here and its position decides nothing else.
+	"Division",
 	// NOTE: With the other mode Choices, and after them because it is the
 	// newest. `SortOrder` is declared beside `sort` in `List.es` rather than
 	// with these, and it shares no Method name with any Namespace here — all
@@ -306,6 +312,9 @@ export const builtinTypeOrder: Array<string> = [
 	// NOTE: Beside the mode Choice it is declared with, for the reason it
 	// follows `Rounding` in the member order above.
 	"SignStyle",
+	// NOTE: Beside the two mode Choices a division reads, for the reason it
+	// follows `SignStyle` in the member order above.
+	"Division",
 	// NOTE: Beside the mode Choice it is one of, and after `Rounding` for the
 	// reason it follows `Rounding` in the member order above.
 	"SortOrder",
