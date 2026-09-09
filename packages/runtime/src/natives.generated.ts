@@ -632,6 +632,8 @@ export type DictionaryNatives = {
 	values: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<ValueType>
 	// entries<KeyType, ValueType>() -> List<{ key: KeyType, value: ValueType }>
 	entries: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<RecordType & { key: KeyType; value: ValueType }>
+	// firstEntry<KeyType, ValueType>() -> Optional<{ key: KeyType, value: ValueType }>
+	firstEntry__overload$1: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => OptionalType<RecordType & { key: KeyType; value: ValueType }>
 	// set<ValueType, KeyType is Equatable>(_: KeyType, to: ValueType) -> NonEmptyDictionary
 	set: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: KeyType, to: ValueType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
 	// remove<ValueType, KeyType is Equatable>(at: KeyType) -> Dictionary<KeyType, ValueType>
@@ -657,6 +659,8 @@ export type NonEmptyDictionaryNatives = {
 	values: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<ValueType>
 	// entries<KeyType, ValueType>() -> NonEmptyList
 	entries: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<RecordType & { key: KeyType; value: ValueType }>
+	// firstEntry<KeyType, ValueType>() -> { key: KeyType, value: ValueType }
+	firstEntry: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => RecordType & { key: KeyType; value: ValueType }
 	// map<KeyType, ValueType, Other>(_: (_: { key: KeyType, value: ValueType }) -> Other) -> NonEmptyDictionary
 	map: <KeyType extends AnyType, ValueType extends AnyType, Other extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: (argument0: RecordType & { key: KeyType; value: ValueType }) => Other) => DictionaryType<KeyType, Other>
 	// sort<ValueType, KeyType is Comparable>(in: SortOrder) -> NonEmptyDictionary
@@ -1110,7 +1114,7 @@ export const $NonEmptyKeyedNumberListAbsent: AssertNoEssenceExports<typeof impor
 
 declare const DictionaryModule: typeof import("./Dictionary")
 export const $Dictionary: DictionaryNatives = DictionaryModule
-export const $DictionaryAbsent: AssertNoEssenceExports<typeof import("./Dictionary"), "of__overload$2" | "hasEntries__overload$1" | "hasEntries__overload$2" | "hasKey" | "hasValue" | "hasOnlyEntries" | "hasNoEntries" | "value__overload$2" | "update__overload$1" | "update__overload$2" | "remove__overload$2" | "merge__overload$1" | "merge__overload$2" | "count"> = true
+export const $DictionaryAbsent: AssertNoEssenceExports<typeof import("./Dictionary"), "of__overload$2" | "hasEntries__overload$1" | "hasEntries__overload$2" | "hasKey" | "hasValue" | "hasOnlyEntries" | "hasNoEntries" | "value__overload$2" | "firstEntry__overload$2" | "update__overload$1" | "update__overload$2" | "remove__overload$2" | "merge__overload$1" | "merge__overload$2" | "count"> = true
 export const $DictionaryArity: AssertArities<typeof import("./Dictionary"), {
 	of__overload$1: 2
 	is: 4
@@ -1121,6 +1125,7 @@ export const $DictionaryArity: AssertArities<typeof import("./Dictionary"), {
 	keys: 1
 	values: 1
 	entries: 1
+	firstEntry__overload$1: 1
 	set: 4
 	remove__overload$1: 3
 	removeEvery: 2
@@ -1137,6 +1142,7 @@ export const $NonEmptyDictionaryArity: AssertArities<typeof import("./NonEmptyDi
 	keys: 1
 	values: 1
 	entries: 1
+	firstEntry: 1
 	map: 2
 	sort__overload$1: 3
 	sort__overload$2: 4

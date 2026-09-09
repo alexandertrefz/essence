@@ -4889,6 +4889,27 @@ third"::lines())
 	show("Dictionary.keys<KeyType, ValueType>() [empty]", noAges::keys())
 	show("Dictionary.values<KeyType, ValueType>()", ages::values())
 	show("Dictionary.entries<KeyType, ValueType>()", ages::entries())
+	§ The one reading that answers a position. The empty Dictionary has no
+	§ first entry, and the `defaultingTo:` entry answers the caller's instead.
+	show("Dictionary.firstEntry<KeyType, ValueType>()", ages::firstEntry())
+	show(
+		"Dictionary.firstEntry<KeyType, ValueType>() [empty]",
+		noAges::firstEntry(),
+	)
+	§ A removed key leaves a tombstoned slot standing where it was, and the
+	§ first entry is the first LIVE one rather than the first slot.
+	show(
+		"Dictionary.firstEntry<KeyType, ValueType>() [after a removal]",
+		ages::remove(at "alex")::firstEntry(),
+	)
+	show(
+		"Dictionary.firstEntry<KeyType, ValueType>(defaultingTo: \{ key: KeyType, value: ValueType \})",
+		ages::firstEntry(defaultingTo { key = "nobody", value = 0 }),
+	)
+	show(
+		"Dictionary.firstEntry<KeyType, ValueType>(defaultingTo: \{ key: KeyType, value: ValueType \}) [empty]",
+		noAges::firstEntry(defaultingTo { key = "nobody", value = 0 }),
+	)
 	show(
 		"Dictionary.set<ValueType, KeyType is Equatable>(_ KeyType, to: ValueType)",
 		ages::set("kim", to 7),
@@ -5115,6 +5136,16 @@ third"::lines())
 	show(
 		"NonEmptyDictionary.entries<KeyType, ValueType>()",
 		provenAges::entries(),
+	)
+	§ The proof spends the Optional `Dictionary`'s own entry answers, so the
+	§ entry itself is what a proven receiver reads.
+	show(
+		"NonEmptyDictionary.firstEntry<KeyType, ValueType>()",
+		provenAges::firstEntry(),
+	)
+	show(
+		"NonEmptyDictionary.firstEntry<KeyType, ValueType>() [proof spent]",
+		provenAges::firstEntry().value,
 	)
 	§ Each of the three halves carries its own proof into the answer, which is
 	§ what a total `firstItem` reads off it.

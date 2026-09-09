@@ -183,16 +183,16 @@ a `List`, and an expression that is not empty is not one the language can be
 told is not empty; `NonZeroRational::reciprocal` and `negate` are the fourth and
 fifth, for the same reason one level along; and `NonEmptyString::characters` is
 the sixth, spelled out of the `split(on "")` its own Essence twin is.
-`NonEmptyList::firstItem` and `NonEmptyString::firstCharacter` are on no such
-list, though each stands beside an Essence body: an entry that unwraps an
-Optional performs a different operation from the one that answers it. Every
-other refined entry READS off the native beside it instead —
-`NonNegativeInteger::squareRoot` is the shape to copy — and these six can not,
-because the entry each stands beside is an Essence body and so exports no
-runtime Function to import. That is the exception the rule above allows, and it
-is only safe because `StdlibExhaustive.es` calls both entries over the same
-inputs, wherever they stand: the golden capture is what stops the two from
-drifting. Writing another one means adding those lines too.
+`NonEmptyList::firstItem`, `NonEmptyString::firstCharacter` and
+`NonEmptyDictionary::firstEntry` are on no such list, though each stands beside
+a body of the same name: an entry that unwraps an Optional performs a different
+operation from the one that answers it. Every other refined entry READS off the
+native beside it instead — `NonNegativeInteger::squareRoot` is the shape to
+copy — and these six can not, because the entry each stands beside is an Essence
+body and so exports no runtime Function to import. That is the exception the
+rule above allows, and it is only safe because `StdlibExhaustive.es` calls both
+entries over the same inputs, wherever they stand: the golden capture is what
+stops the two from drifting. Writing another one means adding those lines too.
 
 Most of `NonEmptyList` is native, but not all of it. `indices()` is written on
 `List.of(integersFrom:downTo:)`, which promises a non-empty answer already, and
@@ -313,7 +313,7 @@ groups, in this order:
 5. **Accessors** — the Methods that answer a named part of the receiver:
    `length`, `numerator`, `denominator`, `absolute`, `item(at:)`, `firstItem`,
    `lastItem`, `firstIndex`, `lastIndex`, `indices`, `keys`, `values`,
-   `entries`, `characters`, `words`, `lines`, `character(at:)`,
+   `entries`, `firstEntry`, `characters`, `words`, `lines`, `character(at:)`,
    `firstCharacter`, `lastCharacter`, `value(defaultingTo:)`, `reason`,
    `reasons`.
 6. **Transforms, and everything else** — `negate`, `round`, `clamp`,

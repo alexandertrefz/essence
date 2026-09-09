@@ -493,6 +493,7 @@ describe("Stdlib Call Graph", () => {
 			"Comparable.isLessThan",
 			"Comparable.isLessThanOrEqualTo",
 			"Dictionary.count",
+			"Dictionary.firstEntry__overload$2",
 			"Dictionary.hasEntries__overload$1",
 			"Dictionary.hasEntries__overload$2",
 			"Dictionary.hasKey",

@@ -77,6 +77,10 @@ const ACCESSORS = new Set([
 	// `entries` from `enumerate`.
 	"values",
 	"entries",
+	// NOTE: The first of them, read under the name a Dictionary gives the pair
+	// it is made of — what `firstItem` is to a List and `firstCharacter` to a
+	// String.
+	"firstEntry",
 	"characters",
 	"words",
 	"lines",

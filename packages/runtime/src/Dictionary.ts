@@ -789,6 +789,46 @@ export function entries<Key extends AnyType, Value extends AnyType>(
 	return createList(answer)
 }
 
+// NOTE: The first entry a box holds, or `null` for a box holding none — the
+// same walk every reader here is, stopped at the first slot that answers.
+// `NonEmptyDictionary.firstEntry` reads it too, which is why it is exported:
+// its receiver's proof says the answer is never `null`, and the entry it spends
+// that proof on is a different operation from the one that answers an Optional.
+export function firstLiveEntry<Key extends AnyType, Value extends AnyType>(
+	dictionary: DictionaryType<Key, Value>,
+): EntryRecord<Key, Value> | null {
+	let generation = dictionary.generation
+	let slots = dictionary.store.slots
+	let count = slots.length
+
+	for (let index = 0; index < count; index++) {
+		let slot = slots[index]
+		let value = liveValueOf(slot, generation)
+
+		if (value !== undefined) {
+			return { [typeKeySymbol]: "Record", key: slot.key, value }
+		}
+	}
+
+	return null
+}
+
+// NOTE: Native for what the position costs. The Essence body is
+// `@::entries()::firstItem()`, which builds an entry Record for every entry the
+// Dictionary holds and drops all but the first; this builds one. Ten thousand
+// readings of a thousand-entry Dictionary measured 10 ms here and 105 ms that
+// way, best of three with the subprocess startup inside both.
+export function firstEntry__overload$1<
+	Key extends AnyType,
+	Value extends AnyType,
+>(
+	dictionary: DictionaryType<Key, Value>,
+): OptionalType<EntryRecord<Key, Value>> {
+	let entry = firstLiveEntry(dictionary)
+
+	return entry === null ? createEmpty() : createValue(entry)
+}
+
 // NOTE: Setting a key is four decisions and then one push.
 //
 // The key is found first, on the receiver, because whether it is there and
