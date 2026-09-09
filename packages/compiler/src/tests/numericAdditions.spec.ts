@@ -16,7 +16,7 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The entries wave 4 added to the numeric tower — the number theory on
+// NOTE: The numeric tower beyond its arithmetic — the number theory on
 // `Integer`, the radix pair, the division modes, the kind conversions, the
 // sign refinements on `Rational` and the statistics a List of Numbers answers.
 // Each is exercised through a compiled Program, because what is being checked

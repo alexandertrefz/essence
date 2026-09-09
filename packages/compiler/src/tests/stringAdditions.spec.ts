@@ -14,9 +14,10 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The String entries wave 4 added — the code points, the four character
-// classes, the folding searches, the cuts and the rest of the vocabulary —
-// beside the two parses that read the notation the language writes.
+// NOTE: The String vocabulary beyond the searches and the cases — the code
+// points, the four character classes, the folding searches, the cuts and the
+// rest of it — beside the two parses that read the notation the language
+// writes.
 // `stdlibStrings.spec.ts` holds the entries that were there before, and the
 // same rule decides what belongs here: an ASCII String and a String the scan
 // refuses take two different routes through the runtime, so every answer below

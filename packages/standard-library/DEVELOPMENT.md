@@ -188,14 +188,19 @@ not stay in Essence either — and the refined entry re-exports that one runtime
 Function now.
 `NonEmptyList::firstItem`, `NonEmptyString::firstCharacter` and
 `NonEmptyDictionary::firstEntry` are on no such list, though each stands beside
-a body of the same name: an entry that unwraps an Optional performs a different
-operation from the one that answers it. Every other refined entry READS off the
-native beside it instead — `NonNegativeInteger::squareRoot` is the shape to
-copy — and these five can not, because the entry each stands beside is an Essence
-body and so exports no runtime Function to import. That is the exception the
-rule above allows, and it is only safe because `StdlibExhaustive.es` calls both
-entries over the same inputs, wherever they stand: the golden capture is what
-stops the two from drifting. Writing another one means adding those lines too.
+an entry of the same name: an entry that unwraps an Optional performs a
+different operation from the one that answers it. Two of those three write the
+operation out, because `List::firstItem` and `String::firstCharacter` are
+Essence bodies with no runtime Function to read. The third does not:
+`Dictionary::firstEntry` is native, and `NonEmptyDictionary` reads the
+`firstLiveEntry` it exports for exactly that. Every other refined entry READS
+off the native beside it — `NonNegativeInteger::squareRoot` is the shape to
+copy — and the five above can not, because the entry each stands beside is an
+Essence body and so exports no runtime Function to import. That is the
+exception the rule above allows, and it is only safe because
+`StdlibExhaustive.es` calls both entries over the same inputs, wherever they
+stand: the golden capture is what stops the two from drifting. Writing another
+one means adding those lines too.
 
 Most of `NonEmptyList` is native, but not all of it. `replace(at:_:)` hands the
 transformed item to the native `replace(_:at:)`, and `lowestItem(on:)` and
@@ -331,7 +336,7 @@ groups, in this order:
    `doesNotContain`.
 5. **Accessors** — the Methods that answer a named part of the receiver:
    `length`, `numerator`, `denominator`, `absolute`, `item(at:)`, `firstItem`,
-   `lastItem`, `onlyItem`, `firstIndex`, `lastIndex`, `indices`, `everyIndex`,
+   `lastItem`, `firstIndex`, `lastIndex`, `indices`, `onlyItem`, `everyIndex`,
    `keys`, `values`, `entries`, `firstEntry`, `characters`, `codePoints`,
    `words`, `lines`, `character(at:)`, `firstCharacter`, `lastCharacter`,
    `value(defaultingTo:)`, `reason`, `reasons`.

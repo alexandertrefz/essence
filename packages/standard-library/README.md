@@ -33,10 +33,10 @@ one entry reaches, and a List crosses to them through two Namespaces of its own
 — `GroupedList` and the `GroupedNonEmptyList` that same proof reaches — which
 `Dictionary.es` declares beside the container they answer.
 The modes a Method takes are Choices declared beside it: `Side`, `Rounding`,
-`SignStyle`, `NumberFormat`, `CaseSensitivity`, `NormalizationForm`,
-`SortOrder`, `Stream` and `Step`.
+`SignStyle`, `Division`, `NumberFormat`, `CaseSensitivity`,
+`NormalizationForm`, `SortOrder`, `Stream` and `Step`.
 A Choice whose Cases all carry no payload derives both its `Equatable` and its
-`Printable` conformance, so eight of those nine have a Namespace that declares
+`Printable` conformance, so nine of those ten have a Namespace that declares
 the two and holds no body at all: `#Less` prints `Less` without anybody writing
 that down. `Step` has none, because both of its Cases carry a payload and only a
 Choice of Cases that carry none derives a `toString`.
@@ -63,7 +63,7 @@ it and the `Terminal.ask` that is a prompt and a line (`Terminal.es`).
 `Randomness.seeded(_)` for a run that replays (`Randomness.es`).
 
 Three of every five declared Method entries are also IMPLEMENTED here, in
-Essence — 448 of 725 as this is written, counting one entry per Overload and
+Essence — 443 of 725 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
 Seven more are written on a PROTOCOL rather than on a Namespace, once for every
 conformer: `Equatable.isNot`, `Comparable`'s four inequalities, and
@@ -344,16 +344,19 @@ ordering.
 `sort(on:)`, `lowestItem(on:)` and `highestItem(on:)` bound the KEY rather
 than the item — `<infer Key is Comparable>` — so a List of anything can be
 ordered by anything comparable read off it. The key is what has to be ordered,
-and the item never is.
+and the item never is. Where there is no key to read the item is what has to be
+ordered instead: the keyless `lowestItem()`, `highestItem()` and `isSorted(in:)`
+bound `<infer ItemType is Comparable>`.
 
 `is`, `contains`, `doesNotContain`, `firstIndex(of:)`, `lastIndex(of:)`,
-`count(of:)`, `removeEvery(_ item:)`, `split(on:)` and the five set-shaped
-Methods — `removeDuplicates`, `hasDuplicates`, `contains(everyItemOf:)`,
-`everyItem(alsoIn:)` and `removeEvery(contentsOf:)` — are bounded
-`is Equatable`, so equality between items means the item Type's OWN `is` rather
-than a structural comparison the language can not express. That is a narrowing:
-a Method holding an UNBOUNDED `List<ItemType>` can no longer call them, and the
-Diagnostic says which bound to add. `List` conforms
+`everyIndex(of:)`, `count(of:)`, `removeEvery(_ item:)`, `split(on:)`,
+`starts(with:)`, `doesNotStart(with:)`, `ends(with:)`, `doesNotEnd(with:)` and
+the five set-shaped Methods — `removeDuplicates`, `hasDuplicates`,
+`contains(everyItemOf:)`, `everyItem(alsoIn:)` and `removeEvery(contentsOf:)` —
+are bounded `is Equatable`, so equality between items means the item Type's OWN
+`is` rather than a structural comparison the language can not express. That is a
+narrowing: a Method holding an UNBOUNDED `List<ItemType>` can no longer call
+them, and the Diagnostic says which bound to add. `List` conforms
 `is Equatable where ItemType is Equatable`, so nested Lists still have a witness
 — and that conditional conformance is also what `[1, 2]::isNot([1, 3])` runs on:
 `isNot` is `Equatable`'s provided Method, and the item witness flows into it.
