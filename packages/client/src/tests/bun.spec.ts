@@ -239,6 +239,37 @@ export const pi = PI.toString()
 		expect(text).not.toContain("?source")
 	})
 
+	// NOTE: The plugin door builds its bridge out of IMPORTS rather than out of
+	// an injected Module, so this is where the two names a Dictionary crosses
+	// through are proven end to end: a `Map` built in the host's own realm goes
+	// in, the Module writes to what it was handed, and what comes back holds
+	// the entries in the order the box holds them.
+	it("carries a Dictionary across the marshalled door", async () => {
+		let directory = project({
+			"Ledger.es": `implementation {
+
+	function ages(_ value: Dictionary<String, Integer>) -> Dictionary<String, Integer> {
+		<- value::set("added", to 9)
+	}
+}
+
+export {
+	ages
+}
+`,
+			"entry.js": `import { ages } from "./Ledger.es"
+
+export const entries = [...ages(new Map([["alex", 39n]]))]
+`,
+		})
+		let { module } = await built(directory, "entry.js")
+
+		expect(module.entries).toEqual([
+			["alex", 39n],
+			["added", 9n],
+		])
+	})
+
 	// NOTE: The raw door and the wrapper, in one build, holding one Module: a
 	// value built through the runtime the build resolved is a value the
 	// marshalled door's Functions were compiled against.

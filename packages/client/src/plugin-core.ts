@@ -7,8 +7,9 @@ import {
 } from "@essence-lang/compiler/bundler"
 import { containsErrors } from "@essence-lang/compiler/diagnostics"
 import {
+	carriesDictionary,
 	emitToMemory,
-	RUNTIME_BRIDGE_MODULES,
+	runtimeBridgeModules,
 } from "@essence-lang/compiler/embed"
 import { canonicalPath, type ModuleHost } from "@essence-lang/compiler/modules"
 import type { OptimiserOptions } from "@essence-lang/compiler/optimiser"
@@ -483,13 +484,20 @@ export function wrapperFor(
 		options.diagnostics === "minimal"
 			? withoutShown(descriptor)
 			: descriptor
-	let runtimeImports = RUNTIME_BRIDGE_MODULES.map(
+	// NOTE: The same table the injected bridge is written out of, asked the
+	// same question: a Module whose boundary names no Dictionary imports
+	// neither of the two Functions one crosses through, and so carries none of
+	// the store behind them into the host's build.
+	let modules = runtimeBridgeModules({
+		dictionary: carriesDictionary(descriptor),
+	})
+	let runtimeImports = modules.map(
 		([fileName]) =>
 			`import * as ${runtimeAlias(fileName)} from ${JSON.stringify(
 				`${RUNTIME_PACKAGE}/${fileName}`,
 			)}`,
 	)
-	let bridge = RUNTIME_BRIDGE_MODULES.flatMap(([fileName, members]) =>
+	let bridge = modules.flatMap(([fileName, members]) =>
 		members.map(
 			([member, name]) =>
 				`\t\t${member}: ${runtimeAlias(fileName)}.${name},`,
@@ -627,6 +635,13 @@ function nodeWithoutShown(node: Descriptor): Descriptor {
 			return { ...node, of: nodeWithoutShown(node.of), shown: "" }
 		case "optional":
 			return { ...node, of: nodeWithoutShown(node.of), shown: "" }
+		case "dictionary":
+			return {
+				...node,
+				key: nodeWithoutShown(node.key),
+				value: nodeWithoutShown(node.value),
+				shown: "",
+			}
 		case "record":
 			return {
 				...node,

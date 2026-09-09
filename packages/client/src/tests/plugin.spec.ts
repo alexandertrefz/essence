@@ -664,6 +664,48 @@ describe("The wrapper a build imports", () => {
 		expect(code).toContain("export { $export_square as square }")
 	})
 
+	// NOTE: The Dictionary door is carried only where the boundary names one,
+	// and this is the whole of what that looks like in a build: the two
+	// Functions a Dictionary crosses through, and behind them the store and the
+	// key encoding — 15 kB of runtime a page that holds no Dictionary would
+	// otherwise import and never call.
+	it("imports the Dictionary door only where the boundary names one", async () => {
+		let plain = await wrapper()
+
+		expect(plain).not.toContain("@essence-lang/runtime/Dictionary")
+		expect(plain).not.toContain("dictionary:")
+
+		let directory = project({
+			"Ledger.es": `implementation {
+
+	function ages(_ value: Dictionary<String, Integer>) -> Dictionary<String, Integer> {
+		<- value
+	}
+}
+
+export {
+	ages
+}
+`,
+		})
+		let plugin = essence({ declarations: false })
+		let code =
+			(await plugin.load.call(
+				context(),
+				path.join(directory, "Ledger.es"),
+			)) ?? ""
+
+		expect(code).toContain(
+			'import * as $runtime_Dictionary from "@essence-lang/runtime/Dictionary"',
+		)
+		expect(code).toContain(
+			"dictionary: $runtime_Dictionary.createDictionaryFrom,",
+		)
+		expect(code).toContain(
+			"dictionaryEntries: $runtime_type.liveEntriesOf,",
+		)
+	})
+
 	// NOTE: What a Descriptor carries beyond the decisions themselves: the Type
 	// as the Compiler printed it, which is what a refusal at run time NAMES. It
 	// is most of the bytes and none of the behaviour, so a build that ships to a

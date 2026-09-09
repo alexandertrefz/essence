@@ -52,6 +52,10 @@ implementation {
 	§ Descriptor is walked to rather than met at.
 	type Marker = { direction: Direction }
 
+	§ A Dictionary a Record carries, which is the same position for the same
+	§ reason.
+	type Ledger = { entries: Dictionary<String, Integer> }
+
 	function integer(_ value: Integer) -> Integer {
 		<- value
 	}
@@ -86,6 +90,100 @@ implementation {
 
 	function shape(_ value: Shape) -> Shape {
 		<- value
+	}
+
+	§ A Dictionary, which crosses as a JavaScript `Map` at every key Type — one
+	§ shape for every kind of key, holding its entries in the order they were
+	§ put in, which is the order a Dictionary holds its own.
+	function ages(
+		_ value: Dictionary<String, Integer>,
+	) -> Dictionary<String, Integer> {
+		<- value
+	}
+
+	§ And keyed by each of the other kinds a key is written as on the JavaScript
+	§ side: a bigint, an `EssenceRational`, a boolean, the bare name of a unit
+	§ Choice's Case, a `$case` object and a plain one. The last three are looked
+	§ up by IDENTITY in a `Map`, which is what makes such a key one to iterate
+	§ rather than one to read back.
+	function counts(
+		_ value: Dictionary<Integer, String>,
+	) -> Dictionary<Integer, String> {
+		<- value
+	}
+
+	function shares(
+		_ value: Dictionary<Rational, String>,
+	) -> Dictionary<Rational, String> {
+		<- value
+	}
+
+	function flags(
+		_ value: Dictionary<Boolean, String>,
+	) -> Dictionary<Boolean, String> {
+		<- value
+	}
+
+	function headings(
+		_ value: Dictionary<Direction, Integer>,
+	) -> Dictionary<Direction, Integer> {
+		<- value
+	}
+
+	function outlines(
+		_ value: Dictionary<Shape, Integer>,
+	) -> Dictionary<Shape, Integer> {
+		<- value
+	}
+
+	function plots(
+		_ value: Dictionary<Box, Integer>,
+	) -> Dictionary<Box, Integer> {
+		<- value
+	}
+
+	§ A refinement crosses UNWRAPPED to its base and UNPROVEN, which is the
+	§ boundary's rule for every one of them rather than anything about this
+	§ Type: the predicate belongs at the crossing and does not run there yet.
+	function filled(
+		_ value: NonEmptyDictionary<String, Integer>,
+	) -> NonEmptyDictionary<String, Integer> {
+		<- value
+	}
+
+	§ The three positions a Dictionary is reached AT rather than met at — a
+	§ value of one, an item of one and a member of one.
+	function nesting(
+		_ value: Dictionary<String, Dictionary<String, Integer>>,
+	) -> Dictionary<String, Dictionary<String, Integer>> {
+		<- value
+	}
+
+	function ledgers(
+		_ value: List<Dictionary<String, Integer>>,
+	) -> List<Dictionary<String, Integer>> {
+		<- value
+	}
+
+	function ledger(_ value: Ledger) -> Ledger {
+		<- value
+	}
+
+	function maybeAges(
+		_ value: Optional<Dictionary<String, Integer>>,
+	) -> Optional<Dictionary<String, Integer>> {
+		<- value
+	}
+
+	§ Not an identity, and deliberately so. A Dictionary is a SHARED store with
+	§ a generation stamp: a written key is a version pushed onto it and a removed
+	§ one leaves a tombstoned slot standing where it was, so what a box holds is
+	§ never simply what its store holds. This is the value a round trip of a
+	§ freshly built Dictionary can not ask about.
+	function edited(
+		_ value: Dictionary<String, Integer>,
+	) -> Dictionary<String, Integer> {
+		<- value::set("added", to 9)::remove(at "dropped")
 	}
 
 	§ A `Result` is an ordinary generic Choice on the JavaScript side — the
@@ -186,6 +284,9 @@ implementation {
 		}
 	}
 
+	constant sizes: Dictionary<String, Integer> = ["small" = 1, "large" = 2]
+	constant nothing: Dictionary<String, Integer> = [=]
+
 	constant answer        = 42
 	constant third         = 1/3
 	constant greeting      = "hé"
@@ -215,12 +316,14 @@ export {
 	Config
 	Direction
 	Label
+	Ledger
 	Marker
 	Shape
 	Sign
 	Styled
 	Vertical
 	absent
+	ages
 	answer
 	answered
 	areaOf
@@ -231,24 +334,36 @@ export {
 	card
 	circle
 	config
+	counts
 	direction
 	directionOrShape
 	directionOrSign
 	directionOrText
 	directionOrVertical
 	directions
+	edited
+	filled
 	flag
+	flags
 	greeting
 	grown
 	heading
+	headings
 	integer
 	labelled
+	ledger
+	ledgers
 	marker
 	maybe
+	maybeAges
 	maybeDirection
 	maybes
 	names
+	nesting
+	nothing
 	ordering
+	outlines
+	plots
 	plus
 	point
 	present
@@ -256,6 +371,8 @@ export {
 	refused
 	result
 	shape
+	shares
+	sizes
 	styled
 	text
 	third
