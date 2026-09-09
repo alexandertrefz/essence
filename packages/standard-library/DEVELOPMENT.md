@@ -77,19 +77,19 @@ it under its own name cost it all six of the registration sites below.
 ### The shape of the graph is frozen
 
 Two cycles are allowed — `Algebraic`, `Integer`, `List`, `Rational`, `String`,
-`Transcendental`, and the pair `Optional`, `Result` — and the loader refuses any
-other. The first group is intrinsic:
-cross-kind arithmetic means each numeric kind names the others, a String's
-characters ARE a `List<String>`, and both `parse`s consume a String. The second
-is the pair of failure carriers, and it is intrinsic for the same kind of
-reason: `Optional::toResult(failingWith:)` supplies the reason an Optional never
-had, and `Result::value()` and `reason()` answer the two Cases as Optionals, so
-each file names the other in a signature. The alternative was a static
-`Result.of(_ optional, failingWith:)` on the Result side alone, which keeps the
-graph a tree and reads backwards in a chain. A new cycle
-anywhere, or a file joining one of these, means an import closed a circle
-nobody decided on. `EXPECTED_CYCLES` in `packages/compiler/src/enricher/stdlib.ts`
-is where they are stated.
+`Transcendental`, and the pair `Optional`, `Result` — and the loader refuses
+any other. The first group is intrinsic: cross-kind arithmetic means each
+numeric kind names the others, a String's characters ARE a `List<String>`, and
+both `parse`s consume a String. The second is elective, and only half of it is
+forced: `Result::value()` and `reason()` answer the two Cases as Optionals, so
+`Result.es` has to name `Optional.es`, but the way back is one Method.
+`Optional::toResult(failingWith:)` was taken over a static
+`Result.of(_ optional, failingWith:)`, which keeps the graph a tree and reads
+backwards in a chain — a Method belongs on its receiver's Namespace, and that
+was judged worth more than a graph with no cycle in it. A new cycle anywhere,
+or a file joining one of these, means an import closed a circle nobody decided
+on. `EXPECTED_CYCLES` in `packages/compiler/src/enricher/stdlib.ts` is where
+they are stated.
 
 `ResultList` is in `List.es` beside `OptionalList` for the same graph: it
 narrows a List by what its items are, and declaring it in `Result.es` would
@@ -99,9 +99,9 @@ Two files sit on a line for the same reason `Comparable` does. `Orderable.es`
 extends `Comparable` and is written on the four inequalities `Comparable`
 provides, so it follows `Comparable.es`, which follows `Ordering.es`, which
 follows `Protocols.es`. And `Protocols.es`
-imports NOTHING, which is what keeps the frozen shape at one cycle:
+imports NOTHING, which is what keeps the frozen shape at two cycles:
 `Boolean.es` conforms to `Equatable`, so a `Boolean` import here would close a
-second circle. That is why `Equatable.isNot`'s body is an `if` rather than
+third circle. That is why `Equatable.isNot`'s body is an `if` rather than
 `@::is(other)::negate()` — a body that reaches no Namespace needs no import. It
 is read as that call all the same, so the workaround costs the reader nothing;
 see *A predicate written as one call on `@` IS that call*.
@@ -768,6 +768,14 @@ in `CASE_TYPES`, and each of those names in `RUNTIME_TYPE_MODULES` — otherwise
 `generate:natives` throws `no runtime type known for Case '<Choice>#<Case>'`
 rather than rendering the contract. `Side` needed all three, because
 `String::trim(at:)` takes one.
+
+A GENERIC `choice` uses the other pair of maps. `UNION_NAME_ALIASES` is keyed on
+`UnionType.name`, which an applied generic does not carry — it stamps
+`alias.name` instead — so the entry goes in `GENERIC_UNION_ALIASES`, and a bare
+Case of it reaching a signature goes in `GENERIC_CASE_TYPES` rather than in
+`CASE_TYPES`. `Optional` needs both, because `Optional#Value` appears in one;
+`Result` needs only the first, because no native signature takes a bare Result
+Case. `RUNTIME_TYPE_MODULES` is the same for either kind.
 
 ## The native contract
 

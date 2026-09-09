@@ -460,8 +460,8 @@ declarations {
 	§ keys: the distinct items in the order they were first met. The store
 	§ finds them, where a fold would scan the items kept so far. It is here
 	§ rather than in `List.es` because `List.es` can not import this file.
-	§ That import would close a second cycle in the library's graph, and the
-	§ loader refuses any cycle but the one it names. The numbers are over
+	§ That import would close a third cycle in the library's graph, and the
+	§ loader refuses any cycle but the two it names. The numbers are over
 	§ 20,000 items with 2,000 distinct. The fold on `contains` it replaced
 	§ took 113 ms, and the native it replaced on `NonEmptyList` took 110 ms.
 	§ This body takes 0.5 ms on either receiver. The item's own `is` still

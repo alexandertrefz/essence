@@ -5,21 +5,20 @@ Essence's standard library, written in Essence.
 Everything a Program can reach before its first line is declared here: the core
 Protocols (`Equatable`, `Printable`, `Comparable`, `Orderable`), `Boolean`,
 `Optional`, `Result`, `Ordering`, `Record`, `String`, the whole numeric tower
-(`Integer`, `Rational`, `Algebraic`, `Transcendental` and the covering `Number`,
-which brings the `Number`, `Irrational` and `Scalar` Union Types with it), and
-`List` together with `NestedList`, `OptionalList`, `ResultList`, `NonEmptyList`
-and the `NonEmptyNestedList` that only both of those proofs together reach. The
-two failure carriers each have a nested Namespace beside them, `NestedOptional`
-and `NestedResult`, holding the `flatten` that only a carrier of a carrier
-answers. A checked
-refinement is exported beside the base it narrows: `NonZeroInteger`,
-`NonNegativeInteger` and `PositiveInteger` beside `Integer`, `NonZeroRational`
-beside `Rational`, `NonEmptyString` beside `String`, `NonEmptyList` beside
-`List`. Each reaches everything its base reaches, and the tighter answers a
-proof affords on top — `DEVELOPMENT.md` has the rule a narrowed receiver is read
-by. A value written down is its own proof and reaches them without being
-narrowed at all: `4::squareRoot()` answers a number and `[1, 2]::firstItem()`
-answers an item.
+(`Integer`, `Rational`, `Algebraic`, `Transcendental` and the covering
+`Number`, which brings the `Number`, `Irrational` and `Scalar` Union Types with
+it), and `List` together with `NestedList`, `OptionalList`, `ResultList`,
+`NonEmptyList` and the `NonEmptyNestedList` that only both of those proofs
+together reach. The two failure carriers each have a nested Namespace beside
+them, `NestedOptional` and `NestedResult`, holding the `flatten` that only a
+carrier of a carrier answers. A checked refinement is exported beside the base
+it narrows: `NonZeroInteger`, `NonNegativeInteger` and `PositiveInteger` beside
+`Integer`, `NonZeroRational` beside `Rational`, `NonEmptyString` beside
+`String`, `NonEmptyList` beside `List`. Each reaches everything its base
+reaches, and the tighter answers a proof affords on top — `DEVELOPMENT.md` has
+the rule a narrowed receiver is read by. A value written down is its own proof
+and reaches them without being narrowed at all: `4::squareRoot()` answers a
+number and `[1, 2]::firstItem()` answers an item.
 The aggregates a List of numbers answers are reachable from the List itself,
 through six Namespaces of their own in `NumberList.es` — `IntegerList`,
 `RationalList` and `NumberList`, and the `NonEmptyIntegerList`,
@@ -163,23 +162,29 @@ as a different question rather than as the same question answered differently.
 Those keep their own names.
 
 **`Result` is `Optional` with a reason, and is named that way.** The two
-carriers are one shape — `#Value { item }` beside `#Failure { reason }`, against
-`#Value { item }` beside `#Empty` — so every Method one offers over its payload
-the other offers over its value, under the SAME name and the same Argument
-labels: `is` at either level, `isNot`, `toString`, `hasValue`,
-`hasValue(where:)`, `value(defaultingTo:)`, `map`, `andThen`, `keep`, `or`,
-`toList`, and `flatten` on the nested Namespace beside each. A reader who has
-found their way around one has found their way around the other, which is rule 4
-read across two Types rather than across two entries. What a Result adds is what
-a reason makes possible and nothing else: `hasFailed()` and `reason()` for the
-second Case, `mapFailure` for `map` over it, `recover(with:)` for the collapse
-that reads it, and the `failingWith:` Argument on `keep`. What it does not add is
-a second name for one idea — there is no `unwrap`, no `mapError` and no
-`Either`. The bridges are `Optional::toResult(failingWith:)` and
-`Result::value()`, which are why those two files are the one pair here that name
-each other. On the List side `ResultList::allValues()` keeps EVERY reason, in a
-`NonEmptyList`, where `OptionalList::allValues()` has none to keep: checking a
-file of rows is meant to report everything wrong with it, not the first thing.
+carriers are one shape — `#Value { item }` beside `#Failure { reason }`,
+against `#Value { item }` beside `#Empty` — and eleven entries carry over from
+one to the other under the same name and the same Argument labels. That list is
+exact: `is` at either level, `isNot`, `toString`, `hasValue`,
+`hasValue(where:)`, `value(defaultingTo:)`, `map`, `andThen`, `or`, `toList`,
+and `flatten` on the nested Namespace beside each. A reader who has found their
+way around one has found their way around the other, which is rule 4 read
+across two Types rather than across two entries. Four places diverge, and each
+is worth reading before guessing: the "no value" question is spelled
+`hasFailed()` rather than `Optional::isEmpty()`, because the second Case has a
+name of its own; `keep` keeps its name and its `where:` label and takes a
+second Argument besides, `failingWith:`, since refusing a value has to say why;
+a bare `value()` is an addition, the reading an Optional has nothing to answer
+with; and `pair(with:)` is not offered on a Result yet, because which reason
+survives when both failed is undecided. What a reason then makes possible is
+`reason()` for the second Case, `mapFailure` for `map` over it, and
+`recover(with:)` for the collapse that reads it. What it does not add is a
+second name for one idea — there is no `unwrap`, no `mapError` and no `Either`.
+The bridges are `Optional::toResult(failingWith:)` and `Result::value()`, which
+are why those two files are the one pair here that name each other. On the List
+side `ResultList::allValues()` keeps EVERY reason, in a `NonEmptyList`, where
+`OptionalList::allValues()` has none to keep: checking a file of rows is meant
+to report everything wrong with it, not the first thing.
 
 **The one thing rule 4 does NOT license.** `Integer` and `Rational` each declare
 the four inequalities that `Comparable` already provides, and that is not

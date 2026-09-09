@@ -286,9 +286,9 @@ declarations {
 		}
 
 		§ A List literal is a language primitive, so the body names no
-		§ Namespace. Naming `List` would close a second cycle in the import
-		§ graph, since `List.es` imports this file. See DEVELOPMENT.md, The
-		§ shape of the graph is frozen.
+		§ Namespace. Naming `List` would close a cycle in the import graph,
+		§ since `List.es` imports this file. See DEVELOPMENT.md, The shape of
+		§ the graph is frozen.
 
 		§§ Answers a List holding the value, and the empty List when there is none.
 		§§

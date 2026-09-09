@@ -14,8 +14,8 @@ declarations {
 		§ Provided, so a conformer writes `is` alone and answers both. The
 		§ body is an `if` rather than `@::is(other)::negate()`. Reaching
 		§ `Boolean::negate` would need `Boolean` imported here, and
-		§ `Boolean.es` imports this file. That is a second cycle in a graph
-		§ that has one; see DEVELOPMENT.md, The shape of the graph is frozen.
+		§ `Boolean.es` imports this file. That is a third cycle in a graph
+		§ that has two; see DEVELOPMENT.md, The shape of the graph is frozen.
 		§
 		§ This body is read as well as run. An `if` that answers one Boolean
 		§ in each branch spells out the call it asks. So `isNot` is `is`

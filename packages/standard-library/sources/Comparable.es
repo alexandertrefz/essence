@@ -23,7 +23,7 @@ declarations {
 	§ The two `…OrEqualTo` bodies are an `if` rather than
 	§ `@::isGreaterThan(other)::negate()`. Reaching `Boolean::negate` would
 	§ need `Boolean` imported here, and `Boolean.es` imports this file for its
-	§ own conformance. That is a second cycle in a graph that has one; see
+	§ own conformance. That is a third cycle in a graph that has two; see
 	§ DEVELOPMENT.md, The shape of the graph is frozen. The same reason makes
 	§ `Equatable::isNot` an `if`.
 	§
