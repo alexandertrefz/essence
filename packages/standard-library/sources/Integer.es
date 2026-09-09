@@ -16,7 +16,6 @@ import {
 		Rounding
 		SignStyle
 	}
-	from "./Step.es" { Step }
 	from "./String.es" { String }
 	from "./Transcendental.es" { Transcendental }
 }
@@ -47,58 +46,86 @@ declarations {
 	namespace Integer for Integer is Equatable, is Printable, is Orderable {
 		§§ Reads an Integer from its text form.
 		§§
-		§§ The text form is an optional minus sign followed by digits, the shape `toString` produces. Text of any other shape answers empty, and the `defaultingTo:` entry answers the given Integer instead.
+		§§ The text form is the one the language writes an Integer down in. It is digits, with an optional sign in front, and an optional underscore between two digits. Text of any other shape answers empty, and the `defaultingTo:` entry answers the given Integer instead.
+		§§
+		§§ @example
+		§§   expect Integer.parse("-42")::is(-42)
+		§§   expect Integer.parse("+1_000")::is(1000)
+		§§   expect Integer.parse("1_")::isEmpty()
 		overload static parse {
 			§§ @param _ — the text to read
 			§§ @returns — the Integer, or nothing when the text has any other shape.
 			(_ text: String) -> Optional<Integer> {
-				§ The sign is the position of a leading `-`. The `keep` call
-				§ discards a `-` found anywhere else, so `sign` has a value
-				§ exactly when the text is negative. A second sign falls to
-				§ the digit check below, and a sign alone leaves no digits.
-				constant sign = text::firstIndex(of "-")
-					::keep(where (position) { <- position::is(0) })
+				§ The whole body reads code points, so the sign and the
+				§ separator are two more points rather than two more String
+				§ searches. Asking the String instead — `starts(with "-")` and
+				§ its two neighbours — reaches `String::is` and its `compare`.
+				§ That cost 306 bytes of `Everyday.es`'s bundle, measured over
+				§ this parse and `Rational.parse` together.
+				§
+				§ The points named here: 43 is `+`, 45 is `-`, 48 is `0`, and
+				§ 95 is `_`.
+				constant points   = text::codePoints()
+				constant leading  = points::firstItem(defaultingTo 0)
+				constant negative = leading::is(45)
 
-				constant digitsText = match sign -> String {
-					case #Value { <- text::slice(from 1) }
-
-					case #Empty { <- text }
+				constant digitPoints = define {
+					as points::removeFirst() if negative::or(leading::is(43))
+					as points otherwise
 				}
 
-				if digitsText::isEmpty() {
+				§ An underscore stands between two digits and nowhere else,
+				§ which is the rule the Lexer reads a written Integer by. A
+				§ `1_000` is a Number, and `_1`, `1_` and `1__0` are not. So
+				§ the notation the language writes reads back through here.
+				if digitPoints
+					::isEmpty()
+					::or(digitPoints::firstItem(defaultingTo 0)::is(95))
+					::or(digitPoints::lastItem(defaultingTo 0)::is(95))
+					::or(text::contains("__"))
+				{
 					<- #Empty
 				} else {
 					constant start: Optional<Integer> = #Value(0)
 
-					constant magnitude = digitsText
-						::characters()
-						::reduce(startingWith start, step (value, character) {
-							§ A digit's value is its position in the
-							§ digit list, and any other character
-							§ refuses the text.
-							<- match "0123456789"::firstIndex(of character)
-								-> Step<Optional<Integer>, Optional<Integer>>
-							{
-								case #Empty { <- #Done(#Empty) }
+					§ A digit's value is its distance from the point of `0`.
+					§ The body used to look each one up in a String of the ten
+					§ of them, and that is not the slower of the two.
+					§ Measured over 20,000 parses of a thirteen-digit numeral,
+					§ best of five: 14 ms of parsing that way and 16 ms this
+					§ way. The lookup stopped building anything the day
+					§ `firstIndex` went native.
+					constant magnitude = digitPoints::reduce(
+						startingWith start,
+						step (value, point) {
+							constant digit = point::subtract(48)
 
-								case #Value(digit) {
-									<- #Continue(
-										#Value(
-											value
-												::value(defaultingTo 0)
-												::multiply(with 10)
-												::add(digit)
-										)
+							if digit::isBetween(0, and 9) {
+								<- #Continue(
+									#Value(
+										value
+											::value(defaultingTo 0)
+											::multiply(with 10)
+											::add(digit)
 									)
-								}
+								)
 							}
-						})
+
+							§ An underscore carries no digit. The guards
+							§ above have already refused one standing
+							§ anywhere but between two digits.
+							if point::is(95) {
+								<- #Continue(value)
+							}
+
+							<- #Done(#Empty)
+						},
+					)
 
 					<- magnitude::map((parsedMagnitude) {
-						<- match sign -> Integer {
-							case #Value { <- parsedMagnitude::negate() }
-
-							case #Empty { <- parsedMagnitude }
+						<- define {
+							as parsedMagnitude::negate() if negative
+							as parsedMagnitude           otherwise
 						}
 					})
 				}

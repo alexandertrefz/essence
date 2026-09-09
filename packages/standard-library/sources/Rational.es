@@ -140,34 +140,40 @@ declarations {
 
 		§§ Reads a Rational from its text form.
 		§§
-		§§ The text is a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`. Each form takes an optional minus sign in front. Text of another shape, or a fraction over zero, answers empty, and the `defaultingTo:` entry answers the given Rational instead.
+		§§ The text is a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`. Each form takes an optional sign in front, and an underscore between two digits, which is the notation the language writes. Text of another shape, or a fraction over zero, answers empty, and the `defaultingTo:` entry answers the given Rational instead.
+		§§
+		§§ @example
+		§§   expect Rational.parse("+1_000.5")::is(2001/2)
+		§§   expect Rational.parse(".5")::isEmpty()
 		overload static parse {
 			§§ @param _ — the text to read
 			§§ @returns — the Rational, or nothing when the text has any other shape or divides by zero.
 			(_ text: String) -> Optional<Rational> {
-				§ The sign is the position of a leading `-`. The `keep` step
-				§ drops a `-` standing anywhere else, so what is left has a
-				§ value only for a negative text.
-				constant sign = text::firstIndex(of "-")
-					::keep(where (position) { <- position::is(0) })
+				§ A sign is a leading `-` or a leading `+`, the two
+				§ `Integer.parse` reads. It is read as a code point there and
+				§ here: the point of `+` is 43, and the point of `-` is 45.
+				constant leading  = text::codePoints()
+					::firstItem(defaultingTo 0)
+				constant negative = leading::is(45)
 
-				constant unsignedText = match sign -> String {
-					case #Value { <- text::slice(from 1) }
-
-					case #Empty { <- text }
+				constant unsignedText = define {
+					as text::slice(from 1) if negative::or(leading::is(43))
+					as text otherwise
 				}
 
-				§ A `-` stands only at the front. The pieces below are plain
+				§ A sign stands only at the front. The pieces below are
 				§ digit runs, so `1/-2` and `--1/2` are refused here.
-				if unsignedText::contains("-") {
+				if unsignedText
+					::contains("-")
+					::or(unsignedText::contains("+"))
+				{
 					<- #Empty
 				} else {
 					§ The pieces below are unsigned, so the sign returns as
 					§ a factor on the numerator.
-					constant signFactor = match sign -> Integer {
-						case #Value { <- -1 }
-
-						case #Empty { <- 1 }
+					constant signFactor = define {
+						as -1 if negative
+						as 1  otherwise
 					}
 
 					constant fractionPieces = unsignedText::split(on "/")
@@ -204,24 +210,41 @@ declarations {
 							{
 								<- #Empty
 							} else {
+								§ The two halves are read apart rather than
+								§ joined and read once. A separator is legal
+								§ between two digits and nowhere else, and
+								§ joining the halves stands the end of one
+								§ beside the start of the other. Read that
+								§ way, `1_.5` is the `1_5` the language does
+								§ not write.
+								§
 								§ The scale is ten to the count of digits
-								§ after the dot. Asking `length()` for that
-								§ count proves it is not negative, and a
-								§ written `10` proves the base is above zero.
-								§ So the power is above zero too. That is
-								§ what lets `Rational.of` reach the entry
-								§ over a denominator proven not to be zero,
-								§ and `map` stand where `andThen` had to.
-								<- Integer.parse(
-									wholeText::append(fractionalText),
-								)::map((digitsValue) {
-									constant scale = 10
-										::raise(to fractionalText::length())
-
-									<- Rational.of(
-										digitsValue::multiply(with signFactor),
-										over scale,
+								§ after the dot, and a separator is no digit.
+								§ Asking `length()` for that count proves it
+								§ is not negative, and a written `10` proves
+								§ the base is above zero. So the power is
+								§ above zero too. That is what lets
+								§ `Rational.of` reach the entry over a
+								§ denominator proven not to be zero, and `map`
+								§ stand where `andThen` had to.
+								constant scale = 10
+									::raise(
+										to fractionalText
+											::replaceEvery("_", with "")
+											::length(),
 									)
+
+								<- Integer.parse(wholeText)::andThen((whole) {
+									<- Integer.parse(fractionalText)
+										::map((fraction) {
+											<- Rational.of(
+												whole
+													::multiply(with scale)
+													::add(fraction)
+													::multiply(with signFactor),
+												over scale,
+											)
+										})
 								})
 							}
 						} else if decimalPieces::length()::isNot(1) {
