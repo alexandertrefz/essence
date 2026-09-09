@@ -239,15 +239,31 @@ tests {
 	}
 
 	§ A draw answers a different tile on a different square every time, so
-	§ what is tested is everything about it that does NOT depend on the draw:
+	§ most of what is tested is what does NOT depend on which draw came out:
 	§ that one square was filled, that the tile is one of the two the game
 	§ deals, and that a full board is handed back untouched.
+	§
+	§ That the square is drawn at all is testable too, over enough deals:
+	§ thirty deals landing on one square of sixteen is one chance in sixteen
+	§ to the twenty-ninth. The tile is not — one in ten over thirty deals is
+	§ an ordinary run, so a test of it would fail on ordinary luck.
 	suite "a new tile" {
 		test "fills one square, with a 2 or a 4" {
 			constant dealt = withNewTile(empty)
 
 			expect emptyCells(dealt)::length()::is(15)
 			expect [2, 4]::contains(highest(dealt))
+		}
+
+		§ The squares LEFT stand for the square filled, and say nothing about
+		§ which tile was dealt onto it — so this reads the draw of the square
+		§ alone.
+		test "deals to more than one square over thirty games" {
+			constant remaining = List.of(integersFrom 1, through 30)::map((_) {
+				<- emptyCells(withNewTile(empty))
+			})
+
+			expect remaining::removeDuplicates()::length()::isGreaterThan(1)
 		}
 
 		test "has nowhere to put one on a full board" {
