@@ -7,17 +7,26 @@ implementation {
 	namespace Money for Integer {
 		§§ The amount as text — `1234` is `€12.34`.
 		formatted() -> String {
-			constant size  = @::absolute()
-			constant euros = size::quotient(dividingBy 100)
-			constant cents = size::remainder(dividingBy 100)
-				::toString()
-				::pad(to 2, with "0")
+			§ Cents are the last two places of the number, which is what
+			§ `scaledBy:` writes: the point two places in from the right, and
+			§ a shorter number padded out to reach it. Nothing here divides,
+			§ and nothing pads a String by hand.
+			§
+			§ Only the sign is left, and it goes in front of the SYMBOL rather
+			§ than in front of the digits — the one thing no numeric format
+			§ has a word for. A shop dealing in thousands would want the digit
+			§ groups separated as well, which is the `groupingWith:` entry of
+			§ the same Method:
+			§ `Rational.of(@, over 100)::toString(as #Decimal, toPlaces 2, groupingWith ",")`.
+			§ It is the one rendering that has to build the Rational, and this
+			§ shop's amounts never reach it.
+			constant amount = @::absolute()::toString(scaledBy 2)
 
 			if @::isNegative() {
-				<- "-€{euros}.{cents}"
+				<- "-€{amount}"
 			}
 
-			<- "€{euros}.{cents}"
+			<- "€{amount}"
 		}
 
 		§§ This amount taken at a rate — `19/100` of `1000` cents is `190` —

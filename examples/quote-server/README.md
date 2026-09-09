@@ -95,12 +95,17 @@ curl -s localhost:3000/quote -d '{ "lines": [{ "sku": "BEAN-250", "quantity": "t
 - **Exact money.** Prices are cents (`Integer`), rates are `Rational` — a 5 %
   volume tier and a 15 % coupon add to exactly `1/5` — and
   [`Money.percent`](rules/Money.es) is the one place a rate meets cents and
-  rounds. Integers come out of the boundary as `bigint`; `server.ts` turns them
-  into JSON numbers, and says why that is safe here.
-- **A checked line is a Choice.** [`Pricing.es`](rules/Pricing.es) checks each
-  line once into `Fine { … } | Wrong { problem }`, then folds the problems out
-  of one Case and the prices out of the other; neither fold meets a value the
-  other Case describes.
+  rounds. `1234::toString(scaledBy 2)` is what writes them back out as
+  `12.34`, so nothing divides by a hundred to render a price. Integers come
+  out of the boundary as `bigint`; `server.ts` turns them into JSON numbers,
+  and says why that is safe here.
+- **A checked line is a `Result`.** [`Pricing.es`](rules/Pricing.es) checks
+  each line once into `Result<FineLine, Problem>` — an `Optional` says there
+  is no price, a Result says why — and `allValues()` asks the whole order at
+  once: every line's value, or every reason where anything failed. It
+  *accumulates*, so a client is told everything wrong with its order in one
+  answer instead of the first thing; there is no fold written here for either
+  half.
 - **Typed on both sides.** The plugin writes `rules/Pricing.d.es.ts` beside
   the source, and `tsc` reads the import from it:
 

@@ -64,10 +64,17 @@ implementation {
 		},
 	]
 
+	§ The catalog keyed by the SKU, worked out once. `index(on:)` is the
+	§ one-to-one crossing from a List to a Dictionary — `group(on:)` is the
+	§ one that keeps every item under its key, and a SKU names one product.
+	constant bySku = catalog::index(on .sku)
+
 	namespace Catalog {
 		§§ The product under a SKU, if the shop sells one.
 		static find(_ sku: String) -> Optional<Product> {
-			<- catalog::firstItem(where (product) { <- product.sku::is(sku) })
+			§ One question of the Dictionary, where a walk of the whole List
+			§ asked every product whether it was the one.
+			<- bySku::value(at sku)
 		}
 	}
 }
@@ -92,12 +99,10 @@ tests {
 			expect Catalog.find("NOPE")::is(#Empty)
 		}
 
+		§ One walk, holding the SKUs it has met — where counting the catalog's
+		§ own SKU for every product in it asked the whole List once per row.
 		test "sells every product under a SKU of its own" {
-			expect catalog::hasOnlyItems(where (product) {
-				<- catalog
-					::count(where (other) { <- other.sku::is(product.sku) })
-					::is(1)
-			})
+			expect catalog::hasDuplicates(on .sku)::negate()
 		}
 	}
 }
