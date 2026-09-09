@@ -15394,7 +15394,7 @@ function aliasCallOf(expression: parser.ExpressionNode): AliasBody | null {
 // NOTE: `if @::is(other) { <- false } else { <- true }` — a call spelled out as
 // the two answers it gives. `Equatable::isNot` is written this way and has to
 // be: reaching `Boolean::negate` would need `Boolean` imported into the file
-// `Boolean.es` itself imports, which is a second cycle in a graph that has one.
+// `Boolean.es` itself imports, which is a third cycle in a graph that has two.
 // See the standard library's DEVELOPMENT.md, The shape of the graph is frozen.
 //
 // Exactly that shape and no other: the `if` is the whole body, each branch

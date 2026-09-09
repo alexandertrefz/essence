@@ -322,7 +322,7 @@ describe("Optional", () => {
 		// NOTE: The bridge to every Method a List answers, and the one body
 		// here that builds a value of another Type. A List literal is a
 		// language primitive, so it names no Namespace: importing `List` into
-		// `Optional.es` would close a second cycle in the library.
+		// `Optional.es` would close a third cycle in the library.
 		it("crosses to a List of at most one item", async () => {
 			expect(
 				await run(`implementation {
