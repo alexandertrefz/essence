@@ -195,10 +195,14 @@ export type BooleanNatives = {
 }
 
 export type IntegerNatives = {
+	// static parse(_: String, inBase: Integer) -> Optional<Integer>
+	parse__overload$3: (argument0: StringType, inBase: IntegerType) => OptionalType<IntegerType>
 	// compare(to: Integer) -> Ordering
 	compare: (self: IntegerType, to: IntegerType) => OrderingType
 	// toString() -> String
 	toString__overload$1: (self: IntegerType) => StringType
+	// toString(inBase: Integer) -> String
+	toString__overload$8: (self: IntegerType, inBase: IntegerType) => StringType
 	// add(_: Integer) -> Integer
 	add__overload$1: (self: IntegerType, argument1: IntegerType) => IntegerType
 	// multiply(with: Integer) -> Integer
@@ -858,10 +862,12 @@ export const $BooleanArity: AssertArities<typeof import("./Boolean"), {
 
 declare const IntegerModule: typeof import("./Integer")
 export const $Integer: IntegerNatives = IntegerModule
-export const $IntegerAbsent: AssertNoEssenceExports<typeof import("./Integer"), "parse__overload$1" | "parse__overload$2" | "is__overload$1" | "is__overload$2" | "isNot__overload$1" | "isNot__overload$2" | "toString__overload$2" | "toString__overload$3" | "toString__overload$4" | "toString__overload$5" | "toString__overload$6" | "toString__overload$7" | "add__overload$2" | "add__overload$3" | "add__overload$4" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "multiply__overload$2" | "multiply__overload$3" | "multiply__overload$4" | "divide__overload$1" | "divide__overload$2" | "divide__overload$5" | "divide__overload$6" | "divide__overload$7" | "remainder__overload$3" | "quotient__overload$3" | "raise__overload$2" | "squareRoot__overload$2" | "isLessThan__overload$1" | "isLessThan__overload$2" | "isLessThanOrEqualTo__overload$1" | "isLessThanOrEqualTo__overload$2" | "isGreaterThan__overload$1" | "isGreaterThan__overload$2" | "isGreaterThanOrEqualTo__overload$1" | "isGreaterThanOrEqualTo__overload$2" | "isEven" | "isOdd" | "isPositive" | "isNegative" | "isZero" | "isWholeNumber" | "isMultiple" | "round__overload$1" | "round__overload$2" | "approximate" | "factorial__overload$2"> = true
+export const $IntegerAbsent: AssertNoEssenceExports<typeof import("./Integer"), "parse__overload$1" | "parse__overload$2" | "parse__overload$4" | "is__overload$1" | "is__overload$2" | "isNot__overload$1" | "isNot__overload$2" | "toString__overload$2" | "toString__overload$3" | "toString__overload$4" | "toString__overload$5" | "toString__overload$6" | "toString__overload$7" | "add__overload$2" | "add__overload$3" | "add__overload$4" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "multiply__overload$2" | "multiply__overload$3" | "multiply__overload$4" | "divide__overload$1" | "divide__overload$2" | "divide__overload$5" | "divide__overload$6" | "divide__overload$7" | "remainder__overload$3" | "quotient__overload$3" | "raise__overload$2" | "squareRoot__overload$2" | "isLessThan__overload$1" | "isLessThan__overload$2" | "isLessThanOrEqualTo__overload$1" | "isLessThanOrEqualTo__overload$2" | "isGreaterThan__overload$1" | "isGreaterThan__overload$2" | "isGreaterThanOrEqualTo__overload$1" | "isGreaterThanOrEqualTo__overload$2" | "isEven" | "isOdd" | "isPositive" | "isNegative" | "isZero" | "isWholeNumber" | "isMultiple" | "round__overload$1" | "round__overload$2" | "approximate" | "factorial__overload$2"> = true
 export const $IntegerArity: AssertArities<typeof import("./Integer"), {
+	parse__overload$3: 2
 	compare: 2
 	toString__overload$1: 1
+	toString__overload$8: 2
 	add__overload$1: 2
 	multiply__overload$1: 2
 	divide__overload$3: 2

@@ -441,6 +441,85 @@ export function toString__overload$1(integer: IntegerType): StringType {
 	return createString(integer.value.toString())
 }
 
+// #region Radix
+
+// NOTE: The digits every base writes, in value order: `0` through `9` and then
+// `a` through `z`, which is the alphabet `Number.prototype.toString` and every
+// peer's radix printer already agree on. Thirty-six of them is what fixes the
+// highest base.
+const RADIX_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+const LOWEST_RADIX = 2
+const HIGHEST_RADIX = 36
+
+// NOTE: The base is read as a count rather than as a mode, so a value outside
+// what any positional notation can write is brought to the nearest edge rather
+// than refused. Both entries clamp through here, which is what keeps the pair
+// a round trip at every base a Program can write down.
+function radixOf(base: IntegerType): number {
+	const value = Number(base.value)
+
+	if (value < LOWEST_RADIX) {
+		return LOWEST_RADIX
+	}
+
+	return value > HIGHEST_RADIX ? HIGHEST_RADIX : value
+}
+
+// NOTE: `value.toString(radix)` is exact for both representations: a bigint
+// converts digit by digit, and a number-held Integer is a safe integer, which
+// has no fractional part for the conversion to approximate.
+export function toString__overload$8(
+	integer: IntegerType,
+	base: IntegerType,
+): StringType {
+	return createString(integer.value.toString(radixOf(base)))
+}
+
+// NOTE: Native, because the digits have to be read at the base the call names
+// and accumulated in bigint. `parseInt` reads a radix and answers a double, so
+// it loses every Integer past 2⁵³ — which is exactly the range this Type is
+// unbounded for.
+//
+// NOTE: A capital digit reads as its lowercase, since the printer writes
+// lowercase and a Program pasting a hexadecimal constant from anywhere else has
+// capitals in it. Nothing else about the shape is lenient: a sign anywhere but
+// the front, a digit the base has no room for, and the empty text each answer
+// nothing.
+export function parse__overload$3(
+	text: StringType,
+	base: IntegerType,
+): OptionalType<IntegerType> {
+	const radix = BigInt(radixOf(base))
+	let digits = text.value
+
+	if (digits.startsWith("-")) {
+		digits = digits.slice(1)
+	}
+
+	if (digits.length === 0) {
+		return createEmpty()
+	}
+
+	let magnitude = 0n
+
+	for (const character of digits) {
+		const digit = RADIX_DIGITS.indexOf(character.toLowerCase())
+
+		if (digit < 0 || BigInt(digit) >= radix) {
+			return createEmpty()
+		}
+
+		magnitude = magnitude * radix + BigInt(digit)
+	}
+
+	return createValue(
+		createInteger(text.value.startsWith("-") ? -magnitude : magnitude),
+	)
+}
+
+// #endregion
+
 // #region Number theory
 
 // NOTE: Euclid's algorithm, imported from `bigRational.ts` rather than written

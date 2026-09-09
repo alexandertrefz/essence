@@ -1057,7 +1057,40 @@ c"::quoted())
 		"Integer.parse(_ String, defaultingTo: Integer) [not a number]",
 		Integer.parse("nope", defaultingTo 0),
 	)
+	show(
+		"Integer.parse(_ String, inBase: Integer)",
+		Integer.parse("ff", inBase 16),
+	)
+	show(
+		"Integer.parse(_ String, inBase: Integer) [capital digits]",
+		Integer.parse("-FF", inBase 16),
+	)
+	show(
+		"Integer.parse(_ String, inBase: Integer) [digit the base has no room for]",
+		Integer.parse("2", inBase 2),
+	)
+	show(
+		"Integer.parse(_ String, inBase: Integer) [base below two]",
+		Integer.parse("101", inBase 1),
+	)
+	show(
+		"Integer.parse(_ String, inBase: Integer, defaultingTo: Integer)",
+		Integer.parse("zz", inBase 36, defaultingTo 0),
+	)
+	show(
+		"Integer.parse(_ String, inBase: Integer, defaultingTo: Integer) [not a number]",
+		Integer.parse("nope", inBase 16, defaultingTo 0),
+	)
 	show("Integer.toString()", 42::toString())
+	show("Integer.toString(inBase: Integer)", 255::toString(inBase 16))
+	show(
+		"Integer.toString(inBase: Integer) [negative, base two]",
+		-5::toString(inBase 2),
+	)
+	show(
+		"Integer.toString(inBase: Integer) [base above thirty-six]",
+		255::toString(inBase 99),
+	)
 	show("Integer.toString() [negative]", -42::toString())
 	show(
 		"Integer.toString(as: NumberFormat)",
