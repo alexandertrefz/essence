@@ -138,6 +138,19 @@ export function describeType(type: common.Type): string {
 		case "GenericUse":
 		case "GenericAlias":
 			return displayGenericName(type.name)
+		// NOTE: The poison Type is not a Type a Program can hold, write or be
+		// told about — it is the Compiler's marker for a position it has
+		// nothing to say about, either because the mistake there was already
+		// reported or because nothing bound the Type Parameter that stood
+		// here. Printing its internal tag put the word `Error` into a message
+		// about a Program that declares no such Type: `Result<Integer, String>
+		// | Result<Error, Integer>` is what a mismatched nested `flatten`
+		// rendered as. The ellipsis says what the slot really holds, which is
+		// nothing this Diagnostic knows. `printType`, the Hover's sibling,
+		// keeps the tag: it is read by the Compiler's own tests as the evidence
+		// that a value WAS poisoned.
+		case "Error":
+			return "…"
 		default:
 			return type.type
 	}

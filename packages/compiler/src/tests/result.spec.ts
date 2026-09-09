@@ -357,6 +357,32 @@ describe("Result", () => {
 				`Result#Failure("outer")`,
 			])
 		})
+
+		// NOTE: `NestedResult` targets one failure Type at both levels, and a
+		// receiver that fails with two different ones still reaches it: the
+		// dispatch matches each Case of the receiver on its own, so `#Value`
+		// binds the inner pair and `#Failure` binds the outer reason. The
+		// answer is the two joined, which is sound — the reason a `flatten`
+		// answers really is a `String` or an `Integer` there.
+		//
+		// The `#Failure` branch binds nothing for the value Type, so its half
+		// of that answer carries the Compiler's poison Type. What is pinned
+		// here is that the poison is not PRINTED: `Error` is not a Type this
+		// Program declares, and a Diagnostic naming one would send a reader
+		// looking for it.
+		it("joins two failure Types, and names neither of them Error", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				constant mismatched: Result<Result<Integer, String>, Integer> = #Value(#Value(1))
+				constant flat: String = mismatched::flatten()
+			}`)
+
+			expect(diagnostics.map(({ code }) => code)).toEqual([
+				"assignment-type-mismatch",
+			])
+			expect(diagnostics[0].labels?.[0]?.message).toBe(
+				"this is a Result<Integer, String> | Result<…, Integer>",
+			)
+		})
 	})
 
 	// NOTE: The bridge each way. `Optional::toResult` supplies the reason an
