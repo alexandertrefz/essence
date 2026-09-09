@@ -9,7 +9,8 @@
 // `DictionaryType` and the evidence the Type carried was spent while compiling,
 // so there is nothing left for a body here to do differently. What the proof
 // buys is said in the Types alone — a count that is never zero, and three
-// halves that are never the empty List.
+// halves that are never the empty List, and a sort and a map that answer
+// something with an entry in it.
 //
 // NOTE: The module exists at all because an Essence body could not write these.
 // `<- @::length()` on a proven receiver is this very Method rather than
@@ -20,4 +21,12 @@
 // itself, whatever it was handed, exactly as `List::append(_:)` answers a
 // `NonEmptyList` — so a proven receiver reaches that entry and there is nothing
 // for this Namespace to declare.
-export { entries, keys, length, map, values } from "./Dictionary"
+export {
+	entries,
+	keys,
+	length,
+	map,
+	sort__overload$1,
+	sort__overload$2,
+	values,
+} from "./Dictionary"

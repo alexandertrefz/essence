@@ -237,4 +237,160 @@ describe("Dictionary additions", () => {
 			).toEqual(["0"])
 		})
 	})
+
+	describe("Ordering", () => {
+		// NOTE: The receiver is written out of order, so an answer in order is
+		// something the sort did rather than something the literal already was.
+		it("orders by the keys, in either direction", async () => {
+			expect(
+				await run(`implementation {
+					${ages}
+					${noAges}
+
+					Terminal.inspect(ages::sort()::toString())
+					Terminal.inspect(ages::sort(in #Ascending)::toString())
+					Terminal.inspect(ages::sort(in #Descending)::toString())
+					Terminal.inspect(noAges::sort()::toString())
+				}`),
+			).toEqual([
+				'"[\\"alex\\" = 39, \\"kim\\" = 25, \\"sam\\" = 25]"',
+				'"[\\"alex\\" = 39, \\"kim\\" = 25, \\"sam\\" = 25]"',
+				'"[\\"sam\\" = 25, \\"kim\\" = 25, \\"alex\\" = 39]"',
+				'"[=]"',
+			])
+		})
+
+		// NOTE: `sam` and `kim` hold the same value and `sam` stands first in
+		// the receiver, so a stable sort leaves `sam` first in BOTH
+		// directions. Descending turns the comparison around rather than
+		// reversing the answer, which is the whole of what that costs.
+		it("is stable in either direction", async () => {
+			expect(
+				await run(`implementation {
+					${ages}
+
+					Terminal.inspect(ages::sort(on .value)::keys()::toString())
+					Terminal.inspect(
+						ages::sort(on .value, in #Descending)::keys()::toString(),
+					)
+				}`),
+			).toEqual([
+				'"[\\"sam\\", \\"kim\\", \\"alex\\"]"',
+				'"[\\"alex\\", \\"sam\\", \\"kim\\"]"',
+			])
+		})
+
+		// NOTE: A reordering answers the entries it was handed, and equality
+		// ignores order — so a sorted Dictionary is equal to the one it was
+		// read off, whatever it did to the order.
+		it("keeps every entry it was handed", async () => {
+			expect(
+				await run(`implementation {
+					${ages}
+
+					Terminal.inspect(ages::sort()::is(ages))
+					Terminal.inspect(ages::sort(in #Descending)::is(ages))
+					Terminal.inspect(ages::sort(on .value)::length())
+				}`),
+			).toEqual(["true", "true", "3"])
+		})
+
+		// NOTE: The answer carries each slot's ENCODING over rather than
+		// spelling it again, and a Record key is where a mistake there would
+		// show: a key found in one step before the sort has to be found in one
+		// step after it.
+		it("finds a Record key in the Dictionary it answered", async () => {
+			expect(
+				await run(`implementation {
+					constant seats = [
+						{ row = 4, seat = 1 } = "sam",
+						{ row = 1, seat = 2 } = "alex",
+					]
+					constant ordered = seats::sort(on .value)
+
+					Terminal.inspect(ordered::keys()::firstItem())
+					Terminal.inspect(ordered::value(at { row = 4, seat = 1 }))
+					Terminal.inspect(ordered::value(at { row = 9, seat = 9 }))
+					Terminal.inspect(
+						ordered::set({ row = 4, seat = 1 }, to "kim")::length(),
+					)
+				}`),
+			).toEqual([
+				"Optional#Value({ row = 1, seat = 2 })",
+				'Optional#Value("sam")',
+				"Optional#Empty",
+				"2",
+			])
+		})
+
+		// NOTE: A key of a kind with no canonical encoding takes the SCAN
+		// path, and the count of such slots is what a lookup falls through to
+		// it on. A sorted answer has to carry that count over with the slots,
+		// or a lookup would answer nothing for a key standing right there.
+		it("carries an unencodable key over", async () => {
+			expect(
+				await run(`implementation {
+					constant runs = [[2, 1] = "second", [1, 3] = "first"]
+					constant ordered = runs::sort()
+
+					Terminal.inspect(ordered::values()::toString())
+					Terminal.inspect(ordered::value(at [2, 1]))
+					Terminal.inspect(ordered::hasKey([9]))
+				}`),
+			).toEqual([
+				'"[\\"first\\", \\"second\\"]"',
+				'Optional#Value("second")',
+				"false",
+			])
+		})
+
+		// NOTE: A reordering answers the entries it was handed, so a proven
+		// receiver comes out proven and the total answers are in reach with no
+		// `if` in front of them.
+		it("carries the proof of a non-empty receiver", async () => {
+			expect(
+				await run(`implementation {
+					constant proven: NonEmptyDictionary<String, Integer> = [
+						"sam" = 25,
+						"alex" = 39,
+					]
+
+					Terminal.inspect(proven::sort()::keys()::firstItem())
+					Terminal.inspect(proven::sort()::length())
+					Terminal.inspect(
+						proven::sort(on .value, in #Descending)::values()::firstItem(),
+					)
+				}`),
+			).toEqual(['"alex"', "2", "39"])
+		})
+
+		// NOTE: The two claims a sort makes, over a receiver built out of
+		// order: the keys come out in order, and no entry is lost or gained.
+		it("leaves the keys in order over a generated receiver", async () => {
+			expect(
+				await run(`implementation {
+					constant pairs = List.of(integersFrom 1, through 120)
+						::map((n) {
+							<- {
+								key = n::multiply(with 37)::remainder(dividingBy 101),
+								value = n,
+							}
+						})
+					constant sample = Dictionary.of(pairs)
+					constant ordered = sample::sort()
+					constant keys = ordered::keys()
+
+					constant outOfOrder = keys
+						::pair(with keys::removeFirst())
+						::count(where ({ first, second }) {
+							<- first::isGreaterThan(second)
+						})
+
+					Terminal.inspect(outOfOrder)
+					Terminal.inspect(ordered::is(sample))
+					Terminal.inspect(ordered::length()::is(sample::length()))
+				}`),
+			).toEqual(["0", "true", "true"])
+		})
+	})
 })

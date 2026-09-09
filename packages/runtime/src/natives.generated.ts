@@ -642,6 +642,10 @@ export type DictionaryNatives = {
 	everyEntry: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, where: (argument0: RecordType & { key: KeyType; value: ValueType }) => BooleanType) => DictionaryType<KeyType, ValueType>
 	// map<KeyType, ValueType, Other>(_: (_: { key: KeyType, value: ValueType }) -> Other) -> Dictionary<KeyType, Other>
 	map: <KeyType extends AnyType, ValueType extends AnyType, Other extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: (argument0: RecordType & { key: KeyType; value: ValueType }) => Other) => DictionaryType<KeyType, Other>
+	// sort<ValueType, KeyType is Comparable>(in: SortOrder) -> Dictionary<KeyType, ValueType>
+	sort__overload$1: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: SortOrderType, KeyType__conformance: ComparableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
+	// sort<KeyType, ValueType, Key is Comparable>(on: (_: { key: KeyType, value: ValueType }) -> Key, in: SortOrder) -> Dictionary<KeyType, ValueType>
+	sort__overload$2: <KeyType extends AnyType, ValueType extends AnyType, Key extends AnyType>(self: DictionaryType<KeyType, ValueType>, on: (argument0: RecordType & { key: KeyType; value: ValueType }) => Key, argument2: SortOrderType, Key__conformance: ComparableConformance<Key>) => DictionaryType<KeyType, ValueType>
 }
 
 export type NonEmptyDictionaryNatives = {
@@ -655,6 +659,10 @@ export type NonEmptyDictionaryNatives = {
 	entries: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<RecordType & { key: KeyType; value: ValueType }>
 	// map<KeyType, ValueType, Other>(_: (_: { key: KeyType, value: ValueType }) -> Other) -> NonEmptyDictionary
 	map: <KeyType extends AnyType, ValueType extends AnyType, Other extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: (argument0: RecordType & { key: KeyType; value: ValueType }) => Other) => DictionaryType<KeyType, Other>
+	// sort<ValueType, KeyType is Comparable>(in: SortOrder) -> NonEmptyDictionary
+	sort__overload$1: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: SortOrderType, KeyType__conformance: ComparableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
+	// sort<KeyType, ValueType, Key is Comparable>(on: (_: { key: KeyType, value: ValueType }) -> Key, in: SortOrder) -> NonEmptyDictionary
+	sort__overload$2: <KeyType extends AnyType, ValueType extends AnyType, Key extends AnyType>(self: DictionaryType<KeyType, ValueType>, on: (argument0: RecordType & { key: KeyType; value: ValueType }) => Key, argument2: SortOrderType, Key__conformance: ComparableConformance<Key>) => DictionaryType<KeyType, ValueType>
 }
 
 export type GroupedListNatives = {
@@ -1102,7 +1110,7 @@ export const $NonEmptyKeyedNumberListAbsent: AssertNoEssenceExports<typeof impor
 
 declare const DictionaryModule: typeof import("./Dictionary")
 export const $Dictionary: DictionaryNatives = DictionaryModule
-export const $DictionaryAbsent: AssertNoEssenceExports<typeof import("./Dictionary"), "hasEntries__overload$1" | "hasEntries__overload$2" | "hasKey" | "value__overload$2" | "update__overload$1" | "update__overload$2" | "merge__overload$1" | "merge__overload$2"> = true
+export const $DictionaryAbsent: AssertNoEssenceExports<typeof import("./Dictionary"), "hasEntries__overload$1" | "hasEntries__overload$2" | "hasKey" | "hasValue" | "hasOnlyEntries" | "hasNoEntries" | "value__overload$2" | "update__overload$1" | "update__overload$2" | "merge__overload$1" | "merge__overload$2" | "count"> = true
 export const $DictionaryArity: AssertArities<typeof import("./Dictionary"), {
 	of: 2
 	is: 4
@@ -1118,6 +1126,8 @@ export const $DictionaryArity: AssertArities<typeof import("./Dictionary"), {
 	removeEvery: 2
 	everyEntry: 2
 	map: 2
+	sort__overload$1: 3
+	sort__overload$2: 4
 }> = true
 
 declare const NonEmptyDictionaryModule: typeof import("./NonEmptyDictionary")
@@ -1128,6 +1138,8 @@ export const $NonEmptyDictionaryArity: AssertArities<typeof import("./NonEmptyDi
 	values: 1
 	entries: 1
 	map: 2
+	sort__overload$1: 3
+	sort__overload$2: 4
 }> = true
 
 declare const GroupedListModule: typeof import("./GroupedList")

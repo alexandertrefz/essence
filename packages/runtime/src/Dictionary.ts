@@ -8,9 +8,11 @@ import type { ListType } from "./List"
 import { createList, runsOf } from "./List"
 import type { OptionalType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
+import type { OrderingType } from "./Ordering"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import { registerKind, type RenderPart, singleLineMaxLength } from "./registry"
+import type { SortOrderType } from "./SortOrder"
 import type { StringType } from "./String"
 import { createString, itemText } from "./String"
 import { type AnyType, typeKeySymbol } from "./type"
@@ -1073,6 +1075,131 @@ function kept<Key extends AnyType, Value extends AnyType>(
 	}
 
 	return boxAt(store, 0, slots.length)
+}
+
+// NOTE: The REORDERING the two filters above are the filtering of, and native
+// for the same reason: the answer holds the receiver's own slots under another
+// order, so every key's encoding is carried over rather than spelled a second
+// time. The Essence body it replaces was
+// `Dictionary.of(@::entries()::sort(on .key, in order))`, which encodes every
+// key of the answer afresh.
+//
+// NOTE: The key is read ONCE per entry and the POSITIONS are sorted on those
+// keys, which is the shape `List.sort__overload$3` takes and for the same
+// reason: a comparison calling the key on both sides reads it 2·n·log₂n times
+// against n. Sorting positions rather than Records is also what keeps a cheap
+// key cheap — one object per entry is a heavier debit than the reads it saves.
+//
+// NOTE: Stable in either direction. A descending sort hands the same
+// comparison its pair the other way round rather than reversing the answer,
+// `Array.sort` is stable, and the positions it sorts start out in the
+// receiver's order — so two entries whose keys compare `#Equal` keep the order
+// they had whichever way the sort runs.
+//
+// NOTE: The slot count is fixed before the walk, for the reason `map` fixes
+// its own: the key Function may write to the very Dictionary being read.
+function reordered<
+	Key extends AnyType,
+	Value extends AnyType,
+	Read extends AnyType,
+>(
+	dictionary: DictionaryType<Key, Value>,
+	readKey: (slot: Slot<Key, Value>, value: Value) => Read,
+	order: SortOrderType,
+	conformance: { compare: (self: Read, other: Read) => OrderingType },
+): DictionaryType<Key, Value> {
+	let generation = dictionary.generation
+	let source = dictionary.store.slots
+	let count = source.length
+	let live: Array<Slot<Key, Value>> = []
+	let held: Array<Value> = []
+	let keys: Array<Read> = []
+	let positions: Array<number> = []
+
+	registerDictionaryKind()
+
+	for (let position = 0; position < count; position++) {
+		let slot = source[position]
+		let value = liveValueOf(slot, generation)
+
+		if (value === undefined) {
+			continue
+		}
+
+		positions.push(live.length)
+		live.push(slot)
+		held.push(value)
+		keys.push(readKey(slot, value))
+	}
+
+	if (order[typeKeySymbol] === "SortOrder#Descending") {
+		positions.sort((first, second) =>
+			orderingSign(conformance.compare(keys[second], keys[first])),
+		)
+	} else {
+		positions.sort((first, second) =>
+			orderingSign(conformance.compare(keys[first], keys[second])),
+		)
+	}
+
+	let store = emptyStore<Key, Value>()
+	let slots = store.slots
+
+	for (let index = 0; index < positions.length; index++) {
+		let position = positions[index]
+		let slot = live[position]
+		let fresh: Slot<Key, Value> = {
+			key: slot.key,
+			encoded: slot.encoded,
+			versions: [{ value: held[position], generation: 0 }],
+		}
+
+		slots.push(fresh)
+		fileSlot(store, fresh)
+	}
+
+	return boxAt(store, 0, slots.length)
+}
+
+// NOTE: The Ordering Case read by tag, mapped to the sign `Array.sort` expects
+// — the same three lines `List.ts` reads its own comparisons by. It is spelled
+// again here rather than imported, because a Program holding a Dictionary need
+// not hold a List.
+function orderingSign(ordering: OrderingType): number {
+	if (ordering[typeKeySymbol] === "Ordering#Less") {
+		return -1
+	} else if (ordering[typeKeySymbol] === "Ordering#Greater") {
+		return 1
+	} else {
+		return 0
+	}
+}
+
+export function sort__overload$1<Key extends AnyType, Value extends AnyType>(
+	dictionary: DictionaryType<Key, Value>,
+	order: SortOrderType,
+	conformance: { compare: (self: Key, other: Key) => OrderingType },
+): DictionaryType<Key, Value> {
+	return reordered(dictionary, (slot) => slot.key, order, conformance)
+}
+
+export function sort__overload$2<
+	Key extends AnyType,
+	Value extends AnyType,
+	Read extends AnyType,
+>(
+	dictionary: DictionaryType<Key, Value>,
+	key: (entry: EntryRecord<Key, Value>) => Read,
+	order: SortOrderType,
+	conformance: { compare: (self: Read, other: Read) => OrderingType },
+): DictionaryType<Key, Value> {
+	return reordered(
+		dictionary,
+		(slot, value) =>
+			key({ [typeKeySymbol]: "Record", key: slot.key, value }),
+		order,
+		conformance,
+	)
 }
 
 // NOTE: The live view as pairs, for the two answers below that have to hold one

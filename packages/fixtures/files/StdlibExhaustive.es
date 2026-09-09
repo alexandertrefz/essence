@@ -4965,6 +4965,39 @@ third"::lines())
 		"Dictionary.merge<ValueType, KeyType is Equatable>(with: Dictionary<KeyType, ValueType>) [empty receiver]",
 		noAges::merge(with ages),
 	)
+	§ A Dictionary is ordered, so ordering it is a question it can answer. The
+	§ receiver is written out of order here, and `scrambled` holds two entries
+	§ under one value so the stability of both directions is visible.
+	constant scrambled = Dictionary.of([
+		{ key = "sam", value = 25 },
+		{ key = "alex", value = 39 },
+		{ key = "kim", value = 25 },
+	])
+
+	show(
+		"Dictionary.sort<ValueType, KeyType is Comparable>(in?: SortOrder)",
+		scrambled::sort(),
+	)
+	show(
+		"Dictionary.sort<ValueType, KeyType is Comparable>(in?: SortOrder) [descending]",
+		scrambled::sort(in #Descending),
+	)
+	show(
+		"Dictionary.sort<ValueType, KeyType is Comparable>(in?: SortOrder) [empty]",
+		noAges::sort(),
+	)
+	§ Two entries whose keys compare equal keep the order they had, whichever
+	§ way the sort runs — `sam` stands before `kim` in the receiver and in both
+	§ answers.
+	show(
+		"Dictionary.sort<KeyType, ValueType, Key is Comparable>(on: (_ \{ key: KeyType, value: ValueType \}) -> Key, in?: SortOrder)",
+		scrambled::sort(on .value),
+	)
+	show(
+		"Dictionary.sort<KeyType, ValueType, Key is Comparable>(on: (_ \{ key: KeyType, value: ValueType \}) -> Key, in?: SortOrder) [descending]",
+		scrambled::sort(on .value, in #Descending),
+	)
+
 	§ Counting sees every entry whatever it answers, so the empty Dictionary
 	§ and a check nothing passes both answer none.
 	show(
@@ -5068,6 +5101,24 @@ third"::lines())
 	show(
 		"NonEmptyDictionary.map<KeyType, ValueType, Other>(_ (_ \{ key: KeyType, value: ValueType \}) -> Other) [proof carried]",
 		provenAges::map(({ key, value }) { <- value::add(1) })::length(),
+	)
+	§ A reordering answers the entries it was handed, so a proven receiver
+	§ comes out proven and its `length` is above zero without an `if`.
+	show(
+		"NonEmptyDictionary.sort<ValueType, KeyType is Comparable>(in?: SortOrder)",
+		provenAges::sort(in #Descending),
+	)
+	show(
+		"NonEmptyDictionary.sort<ValueType, KeyType is Comparable>(in?: SortOrder) [proof carried]",
+		provenAges::sort()::length(),
+	)
+	show(
+		"NonEmptyDictionary.sort<KeyType, ValueType, Key is Comparable>(on: (_ \{ key: KeyType, value: ValueType \}) -> Key, in?: SortOrder)",
+		provenAges::sort(on .value),
+	)
+	show(
+		"NonEmptyDictionary.sort<KeyType, ValueType, Key is Comparable>(on: (_ \{ key: KeyType, value: ValueType \}) -> Key, in?: SortOrder) [proof carried]",
+		provenAges::sort(on .value)::keys()::firstItem(),
 	)
 	§ Setting a key answers this Type on `Dictionary` itself, whatever it was
 	§ handed, so even the empty Dictionary answers a proven one.
