@@ -395,6 +395,39 @@ tests {
 
 			expect leader::compare(to follower)::is(#Less)
 		}
+
+		§ One test per rung below the points, each over a pair the rungs above
+		§ it leave equal. The season fixture never ties on points, so nothing
+		§ else in this file reaches them.
+		test "ranks a better goal difference ahead, on equal points" {
+			constant wider  = blank::record(scored 3, conceded 0)
+			constant narrow = Standings.blank(of { team = tigers })
+				::record(scored 1, conceded 0)
+
+			expect wider::compare(to narrow)::is(#Less)
+			expect narrow::compare(to wider)::is(#Greater)
+		}
+
+		§ The pair is deliberately the way round the name rung disagrees with:
+		§ Tigers holds the goals and would lose the name. So a rung read out of
+		§ order shows up here rather than agreeing by accident.
+		test "ranks more goals scored ahead, on equal difference" {
+			constant fewer = blank::record(scored 1, conceded 0)
+			constant more  = Standings.blank(of { team = tigers })
+				::record(scored 2, conceded 1)
+
+			expect more::compare(to fewer)::is(#Less)
+			expect fewer::compare(to more)::is(#Greater)
+		}
+
+		test "ranks by name where nothing else separates two rows" {
+			constant first  = blank::record(scored 2, conceded 1)
+			constant second = Standings.blank(of { team = tigers })
+				::record(scored 2, conceded 1)
+
+			expect first::compare(to second)::is(#Less)
+			expect second::compare(to first)::is(#Greater)
+		}
 	}
 
 	suite "outcomeOf" {
