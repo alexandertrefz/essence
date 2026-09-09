@@ -86,8 +86,8 @@ export type CaseDescriptor = {
 	name: string
 	// NOTE: Whether this is the builtin `Optional`'s own Case — the Choice
 	// spelled by ABSENCE rather than by a `$case`. Met on its own where a
-	// `constant thing = #Value(3)` is inferred as the Case rather than as the
-	// Union an annotation would have named.
+	// `constant thing = Optional<Integer>#Value(3)` is inferred as the Case
+	// rather than as the Union an annotation would have named.
 	optional: boolean
 	// NOTE: Whether EVERY Case of this Case's Choice has an empty payload — a
 	// unit Choice, spelled on the JavaScript side by its bare Case name rather

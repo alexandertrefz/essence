@@ -1066,10 +1066,10 @@ export function createInterpreter(
 		let tag = expected.tag
 
 		// NOTE: One of `Optional`'s own Cases, met without the other — which is
-		// what `constant thing = #Value(3)` infers, a Case rather than the Union
-		// an annotation would have named. The pair is collapsed into an `optional`
-		// before it ever reaches here, so this is the lone arm, read by the rule
-		// the pair is read by.
+		// what `constant thing = Optional<Integer>#Value(3)` infers, a Case
+		// rather than the Union an annotation would have named. The pair is
+		// collapsed into an `optional` before it ever reaches here, so this is
+		// the lone arm, read by the rule the pair is read by.
 		if (expected.optional) {
 			if (expected.name === "Empty") {
 				return (value, at, step) => {
@@ -1455,8 +1455,9 @@ export function createInterpreter(
 			}
 			case "case": {
 				// NOTE: One of `Optional`'s own two Cases, met WITHOUT the other
-				// — which is what `constant thing = #Value(3)` infers, a Case
-				// rather than the Union an annotation would have named. It is
+				// — which is what `constant thing = Optional<Integer>#Value(3)`
+				// infers, a Case rather than the Union an annotation would have
+				// named. It is
 				// spelled by ABSENCE on this side, so it is read by the walk
 				// that owns that rule: reading it as a Case here would hand back
 				// `{ $case: 'Optional#Value' }` where the boundary, the way in

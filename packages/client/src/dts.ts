@@ -412,8 +412,8 @@ function widensOnInput(node: Descriptor): boolean {
 
 // NOTE: What an `Optional` holds, or `null` where this is not one. The pair
 // collapses to a node of its own; a lone `#Value` is met where a `constant thing
-// = #Value(3)` was inferred as the Case rather than as the Union an annotation
-// would have named.
+// = Optional<Integer>#Value(3)` was inferred as the Case rather than as the
+// Union an annotation would have named.
 function optionalItem(node: Descriptor): Descriptor | null {
 	switch (node.kind) {
 		case "optional":

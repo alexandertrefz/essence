@@ -65,9 +65,9 @@ describe("A Module described", () => {
 	})
 
 	// NOTE: One of `Optional`'s two Cases can reach a Surface WITHOUT the other
-	// — `constant thing = #Value(3)` is inferred as the Case alone — so the lone
-	// arm keeps a Case of its own, marked as the one Choice that is spelled by
-	// absence rather than by a `$case`.
+	// — `constant thing = Optional<Integer>#Value(3)` is inferred as the Case
+	// alone — so the lone arm keeps a Case of its own, marked as the one Choice
+	// that is spelled by absence rather than by a `$case`.
 	it("marks one of Optional's own Cases met without the other", () => {
 		expect(
 			describeType(
