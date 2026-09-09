@@ -1280,7 +1280,16 @@ export let wrong: Direction = turn("Left")
 		plugin.configResolved({ command: "build" })
 		await plugin.load.call(context(), path.join(directory, "Math.es"))
 
-		expect(await readdir(directory)).toEqual(["Math.es", "node_modules"])
+		// NOTE: Sorted, because a directory listing is not an ordering. What
+		// `readdir` hands back is the order the filesystem holds the names in,
+		// and ext4 — which is what CI reads this directory off — holds them
+		// against a hash seed of its own, so the two names arrive either way
+		// round on a runner and always the same way round on a developer's Mac.
+		// What this asserts is WHICH files the build left behind.
+		expect((await readdir(directory)).sort()).toEqual([
+			"Math.es",
+			"node_modules",
+		])
 	})
 
 	// NOTE: A dev server compiles on every request, and a file rewritten with its
