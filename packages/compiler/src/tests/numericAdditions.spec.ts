@@ -3,7 +3,10 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import type { IntegerType } from "@essence-lang/runtime/Integer"
 import * as integer from "@essence-lang/runtime/Integer"
+import type { ValueType } from "@essence-lang/runtime/Optional"
+import { typeKeySymbol } from "@essence-lang/runtime/type"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
@@ -263,5 +266,98 @@ describe("Number theory on Integer", () => {
 		expect(
 			integer.isPrime(integer.createInteger(2n ** 61n - 3n)).value,
 		).toBe(false)
+	})
+})
+
+describe("Reading and writing an Integer in another base", () => {
+	it("writes the digits of the base, and reads them back", async () => {
+		expect(
+			await run(
+				program(
+					show("255::toString(inBase 16)"),
+					show("-255::toString(inBase 16)"),
+					show("255::toString(inBase 2)"),
+					show("255::toString(inBase 36)"),
+					show("0::toString(inBase 16)"),
+					show('Integer.parse("ff", inBase 16)'),
+					show('Integer.parse("FF", inBase 16)'),
+					show('Integer.parse("-ff", inBase 16)'),
+					show('Integer.parse("fg", inBase 16)'),
+					show('Integer.parse("2", inBase 2)'),
+					show('Integer.parse("", inBase 16)'),
+					show('Integer.parse("-", inBase 16)'),
+					show('Integer.parse("1-1", inBase 16)'),
+					show('Integer.parse("zz", inBase 36, defaultingTo 0)'),
+					show('Integer.parse("nope", inBase 16, defaultingTo 0)'),
+				),
+			),
+		).toEqual([
+			'"ff"',
+			'"-ff"',
+			'"11111111"',
+			'"73"',
+			'"0"',
+			"Optional#Value(255)",
+			"Optional#Value(255)",
+			"Optional#Value(-255)",
+			"Optional#Empty",
+			"Optional#Empty",
+			"Optional#Empty",
+			"Optional#Empty",
+			"Optional#Empty",
+			"1295",
+			"0",
+		])
+	})
+
+	// NOTE: The clamp both entries read a base through, which is what keeps
+	// them a round trip at a base no positional notation has.
+	it("reads a base outside two through thirty-six as the nearest of the two", async () => {
+		expect(
+			await run(
+				program(
+					show("255::toString(inBase 1)"),
+					show("255::toString(inBase 0)"),
+					show("255::toString(inBase -8)"),
+					show("255::toString(inBase 99)"),
+					show('Integer.parse("11111111", inBase 1)'),
+					show('Integer.parse("73", inBase 99)'),
+				),
+			),
+		).toEqual([
+			'"11111111"',
+			'"11111111"',
+			'"11111111"',
+			'"73"',
+			"Optional#Value(255)",
+			"Optional#Value(255)",
+		])
+	})
+
+	// NOTE: The round trip the §§ blocks promise, over every base and both
+	// representations of an Integer.
+	it("reads back what it wrote, at every base and either sign", () => {
+		let numbers = deterministicNumbers(20260910)
+
+		for (let base = 2; base <= 36; base++) {
+			for (let attempt = 0; attempt < 20; attempt++) {
+				let value =
+					BigInt(numbers.next().value) *
+					BigInt(numbers.next().value % 7 === 0 ? -1 : 1)
+				let written = integer.toString__overload$8(
+					integer.createInteger(value),
+					integer.createInteger(base),
+				)
+				let read = integer.parse__overload$3(
+					written,
+					integer.createInteger(base),
+				)
+
+				expect(read[typeKeySymbol]).toBe("Optional#Value")
+				expect(
+					integerValue((read as ValueType<IntegerType>).item.value),
+				).toBe(value)
+			}
+		}
 	})
 })

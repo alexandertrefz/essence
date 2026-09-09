@@ -542,6 +542,7 @@ describe("Stdlib Call Graph", () => {
 			"Integer.multiply__overload$4",
 			"Integer.parse__overload$1",
 			"Integer.parse__overload$2",
+			"Integer.parse__overload$4",
 			"Integer.quotient__overload$3",
 			"Integer.raise__overload$2",
 			"Integer.remainder__overload$3",

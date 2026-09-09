@@ -139,6 +139,43 @@ declarations {
 			(_ text: String, defaultingTo fallback: Integer) -> Integer {
 				<- Integer.parse(text)::value(defaultingTo fallback)
 			}
+
+			§ The base is an Integer rather than a Choice of named bases. A
+			§ base is a count of digits rather than a mode a caller picks.
+			§ The Cases `Binary`, `Octal`, `Decimal` and `Hexadecimal` name
+			§ four of the thirty-five a positional notation has. They leave a
+			§ caller writing base 32 with nothing to say.
+			§
+			§ Both entries read a base outside two through thirty-six as the
+			§ nearer of the two. That is the reading `round(toPlaces:)` gives
+			§ a count below one. The alternative was an Optional answer on the
+			§ printer as well, which leaves `255::toString(inBase 16)` a value
+			§ to unwrap at every call. Clamping keeps the pair a round trip at
+			§ every base a Program can write down.
+
+			§§ Reads an Integer from its text form in the given base.
+			§§
+			§§ The text form is an optional minus sign followed by digits of that base. A digit above nine is a letter, and a capital letter reads as its lowercase. Text of any other shape answers empty. A base below two is read as two, and a base above thirty-six as thirty-six.
+			§§
+			§§ @param _ — the text to read
+			§§ @param inBase — the base the digits are written in
+			§§ @returns — the Integer, or nothing when the text has any other shape.
+			(_ text: String, inBase base: Integer) -> Optional<Integer>
+
+			§§ Reads an Integer from its text form in the given base, with a value to answer when the text has another shape.
+			§§
+			§§ @param _ — the text to read
+			§§ @param inBase — the base the digits are written in
+			§§ @param defaultingTo — the value to answer with when the text is no Integer
+			§§ @returns — the Integer, or the given value in its place.
+			(
+				_ text: String,
+				inBase base: Integer,
+				defaultingTo fallback: Integer,
+			) -> Integer {
+				<- Integer.parse(text, inBase base)
+					::value(defaultingTo fallback)
+			}
 		}
 
 		§ The Rational entry is the flipped call the mixed-kind inequalities
@@ -327,6 +364,14 @@ declarations {
 					}
 				}
 			}
+
+			§§ Answers the Integer in the given base.
+			§§
+			§§ A digit above nine is written as a lowercase letter, so `255` in base sixteen is `ff`. The sign is written in front. A base below two is read as two, and a base above thirty-six as thirty-six. `Integer.parse(_ , inBase:)` reads back what this writes.
+			§§
+			§§ @param inBase — the base to write the digits in
+			§§ @returns — the String representation of the Integer.
+			(inBase base: Integer) -> String
 		}
 
 		§ The mixed-kind entries of `add` and `multiply` are flipped calls.
