@@ -1515,6 +1515,40 @@ describe("Standard Library Loader", () => {
 		])
 	})
 
+	// NOTE: The size of the declared surface, which is what the library costs
+	// to LOAD. Every Program pays that cost before its own first line: these
+	// sources measure about 200 ms to enrich cold and 21 ms warm, and the
+	// figure follows the number of entries rather than anything a Program
+	// does. A clock is no guard for it — five idle runs of the same check
+	// spread 66% on one machine, which is a flake rather than a ceiling — so
+	// the count stands in, and a wave that adds entries moves it deliberately,
+	// the way the golden capture is recaptured. `DEVELOPMENT.md` holds the
+	// timings and the rule beside the member order.
+	//
+	// NOTE: One entry per Overload, plus the free Functions, which is the
+	// count `README.md` states in its own prose.
+	it("counts the declared entries a load pays for", () => {
+		let stdlib = loadStdlib()
+		let entries = 0
+
+		for (let namespace of stdlib.namespaces) {
+			for (let method of Object.values(namespace.methods)) {
+				entries +=
+					method.type === "OverloadedMethod" ||
+					method.type === "OverloadedStaticMethod"
+						? method.overloads.length
+						: 1
+			}
+		}
+
+		for (let flags of Object.values(stdlib.functionBindings)) {
+			entries += flags.length
+		}
+
+		expect(stdlib.namespaces).toHaveLength(50)
+		expect(entries).toBe(725)
+	})
+
 	// NOTE: The other half of the ordering rule. `builtinMemberOrder` is the
 	// SOLE source of order — there is no second table whose key order could
 	// stand in for it. A name listed that no longer exists is dead weight that
