@@ -583,6 +583,103 @@ describe("Code Actions", () => {
 		})
 	})
 
+	// NOTE: The Warning offers two spellings and the fix applies one of them, so
+	// it is a rewrite rather than a quickfix and is picked out by the code it
+	// answers. Applying it leaves a Program that says which question it asks, so
+	// the Warning is gone from the buffer the fix produced.
+	describe("ambiguous-nesting-level", () => {
+		function rewrites(lines: Array<string>): Array<CodeActionEntry> {
+			return actionsOf(lines).filter(
+				(entry) => entry.diagnosticCode === "ambiguous-nesting-level",
+			)
+		}
+
+		it("should wrap the Argument in the Case that holds it", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant nested: Optional<Optional<Integer>> = #Value(#Empty)",
+				"\tconstant answer = nested::is(#Empty)",
+				"}",
+			]
+
+			let [fix] = rewrites(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Wrap the Argument in '#Value(…)'")
+			expect(fix.kind).toBe("refactor.rewrite")
+			expect(fix.isPreferred).toBe(false)
+			expect(result[2]).toBe(
+				"\tconstant answer = nested::is(#Value(#Empty))",
+			)
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: An Argument carrying a payload is wrapped whole, and its own text
+		// is never retyped — the fix is two insertions at the ends of the span.
+		it("should wrap a Case carrying a payload", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant failed: Result<Result<Integer, String>, String> = #Value(#Failure("gone"))',
+				'\tconstant answer = failed::is(#Failure("gone"))',
+				"}",
+			]
+
+			let [fix] = rewrites(lines)
+
+			expect(applied(lines, fix)[2]).toBe(
+				'\tconstant answer = failed::is(#Value(#Failure("gone")))',
+			)
+		})
+
+		// NOTE: The Case the fix wraps in is the receiver's, not the standard
+		// library's — a Program's own carrier gets its own Case name.
+		it("should name the receiver's own holding Case", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Box<ItemType> {",
+				"\t\tFull { item: ItemType },",
+				"\t\tBlank,",
+				"\t}",
+				"",
+				"\tnamespace Boxes<infer ItemType> for Box<ItemType> {",
+				"\t\toverload holds {",
+				"\t\t\t(_ other: Box<ItemType>) -> Boolean {",
+				"\t\t\t\t<- true",
+				"\t\t\t}",
+				"",
+				"\t\t\t(_ other: ItemType) -> Boolean {",
+				"\t\t\t\t<- false",
+				"\t\t\t}",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant nested: Box<Box<Integer>> = #Full(#Blank)",
+				"",
+				"\tconstant answer = nested::holds(#Blank)",
+				"}",
+			]
+
+			let [fix] = rewrites(lines)
+
+			expect(fix.title).toBe("Wrap the Argument in '#Full(…)'")
+			expect(applied(lines, fix)[20]).toBe(
+				"\tconstant answer = nested::holds(#Full(#Blank))",
+			)
+		})
+
+		it("should offer nothing where nothing warns", () => {
+			expect(
+				rewrites([
+					"implementation {",
+					"\tconstant plain: Optional<Integer> = #Value(1)",
+					"\tconstant answer = plain::is(#Empty)",
+					"}",
+				]),
+			).toEqual([])
+		})
+	})
+
 	describe("fallback-never-used", () => {
 		// NOTE: The Argument the Warning names goes, and the comma in front of it
 		// goes with it — a call left holding `(by 2, )` is not what the Help asks
