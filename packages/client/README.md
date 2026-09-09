@@ -154,6 +154,25 @@ of its own is handed a Map holding both, and holds them as two entries where
 that Module says there is one. It is the same unproven crossing a refinement
 makes; the refusal above catches the other direction of the same disagreement.
 
+One caveat, and it is about the bundle rather than the value. The two Functions
+a Dictionary crosses through carry about 15 kB of store and key encoding behind
+them, so a bundle imports them only where the Module's boundary — its exported
+values and its exported Types together — names a Dictionary somewhere. A
+Dictionary that reaches a position the boundary does not DECLARE therefore has
+no door to cross through and is refused, saying so. A Record is the way to
+arrive there: it is structurally open, so a value may carry a member its
+declared Type does not name, and every other Type crosses from such a member
+where a Dictionary does not.
+
+```
+return value → .extra: this bundle carries no Dictionary door — it was built
+for a boundary that declares none, so a Dictionary can only have reached this
+position through something the boundary does not name.
+```
+
+Declare the member — `-> { width: Integer, extra: Dictionary<String, Integer> }`
+— and the door goes in with it.
+
 ## Calls
 
 A call is marshalled on both sides: the Arguments against the Parameter Types

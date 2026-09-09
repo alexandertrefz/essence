@@ -2278,12 +2278,18 @@ export function createInterpreter(
 		)
 	}
 
-	// NOTE: A Descriptor naming a Dictionary read against a bundle built for a
-	// boundary that names none. It can not happen where the two come from one
-	// compile — the same Descriptor decides both — so it is a mismatched pair
-	// rather than a value's mistake, and it is said out loud for the reason
-	// `runtimeBridgeOf` says its own: a `TypeError` about `undefined` from
-	// inside a walk names nothing a reader can act on.
+	// NOTE: A Dictionary met where the bundle carries no door for one. The door
+	// is conditional — 15 kB of store and key encoding a boundary that names no
+	// Dictionary does not pay for — and it is decided from the boundary the
+	// Module DECLARES: its exported values and its exported Types. So this is
+	// reachable from one compile after all, and the reason it names is the
+	// truthful one rather than a stale pair. A Record is structurally open and
+	// the outbound walk reads the VALUE's members, so a member the boundary
+	// never declared can carry a Dictionary the door question could not see.
+	//
+	// NOTE: Said out loud for the reason `runtimeBridgeOf` says its own: a
+	// `TypeError` about `undefined` from inside a walk names nothing a reader
+	// can act on.
 	function noDictionaryDoor(
 		at: Path | null,
 		step: Step,
@@ -2291,7 +2297,7 @@ export function createInterpreter(
 		let where = spell(at, step)
 
 		return new EssenceMarshalError(
-			`${where}: this bundle can not marshal a Dictionary — it was built for a boundary that names none, and this Descriptor names one, so the two came from different compiles.`,
+			`${where}: this bundle carries no Dictionary door — it was built for a boundary that declares none, so a Dictionary can only have reached this position through something the boundary does not name. Declare it: give the member a Type, or export a Dictionary somewhere on the boundary.`,
 			where,
 		)
 	}

@@ -515,3 +515,12 @@ on the way out rather than handed back an entry short. The one disagreement it
 can not see is an `is` a Namespace wrote for the key Type: the boundary builds
 with the standard library's own equality, so a Dictionary a host builds is
 organised by that rather than by a rule the Program wrote for itself.
+
+A Dictionary crosses where the boundary **declares** one. The two Functions one
+crosses through carry about 15 kB of store and key encoding with them, so a
+bundle imports them only where the Module's boundary — its exported values and
+its exported Types together — names a Dictionary somewhere. A Record is
+structurally open, so a value may carry a member its declared Type does not
+name; every other Type crosses from such a member, and a Dictionary is refused
+there, saying that the bundle carries no door because the boundary declares
+none. Naming the member in the Type is what puts the door in.
