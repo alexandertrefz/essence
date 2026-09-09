@@ -481,29 +481,38 @@ export function toString__overload$8(
 // it loses every Integer past 2⁵³ — which is exactly the range this Type is
 // unbounded for.
 //
-// NOTE: A capital digit reads as its lowercase, since the printer writes
-// lowercase and a Program pasting a hexadecimal constant from anywhere else has
-// capitals in it. Nothing else about the shape is lenient: a sign anywhere but
-// the front, a digit the base has no room for, and the empty text each answer
-// nothing.
+// NOTE: The same shape the base-less entry reads, at every base: a sign in
+// front, and an underscore between two digits and nowhere else. A capital digit
+// reads as its lowercase besides, since the printer writes lowercase and a
+// Program pasting a hexadecimal constant from anywhere else has capitals in it.
+// The two entries of one Overload reading one text two ways is what this
+// avoids. Nothing else is lenient: a sign anywhere but the front, a digit the
+// base has no room for, and the empty text each answer nothing.
 export function parse__overload$3(
 	text: StringType,
 	base: IntegerType,
 ): OptionalType<IntegerType> {
 	const radix = BigInt(radixOf(base))
-	let digits = text.value
+	const signed = text.value
+	const negative = signed.startsWith("-")
+	const digits = negative || signed.startsWith("+") ? signed.slice(1) : signed
 
-	if (digits.startsWith("-")) {
-		digits = digits.slice(1)
-	}
-
-	if (digits.length === 0) {
+	if (
+		digits.length === 0 ||
+		digits.startsWith("_") ||
+		digits.endsWith("_") ||
+		digits.includes("__")
+	) {
 		return createEmpty()
 	}
 
 	let magnitude = 0n
 
 	for (const character of digits) {
+		if (character === "_") {
+			continue
+		}
+
 		const digit = RADIX_DIGITS.indexOf(character.toLowerCase())
 
 		if (digit < 0 || BigInt(digit) >= radix) {
@@ -513,9 +522,7 @@ export function parse__overload$3(
 		magnitude = magnitude * radix + BigInt(digit)
 	}
 
-	return createValue(
-		createInteger(text.value.startsWith("-") ? -magnitude : magnitude),
-	)
+	return createValue(createInteger(negative ? -magnitude : magnitude))
 }
 
 // #endregion
