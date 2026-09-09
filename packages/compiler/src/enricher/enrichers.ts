@@ -5045,7 +5045,15 @@ function refuseUngeneratableType(
 			code: "ungeneratable-type",
 			labels: [primary(position, label)],
 			notes: [note],
-			helps: [help],
+			// NOTE: The second help is the half of a conformance nobody thinks
+			// to write. `Generatable` provides a `shrink` answering no
+			// candidates, so a conformance declared for the first help alone
+			// reports whatever the source drew — which is what the reader of
+			// this Diagnostic is about to declare.
+			helps: [
+				help,
+				"Write 'shrink' in the conformance as well: 'Generatable' provides one that answers no candidates, and a counterexample is otherwise reported as it was drawn.",
+			],
 		},
 	)
 
