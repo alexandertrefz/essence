@@ -896,7 +896,7 @@ export function set<Key extends AnyType, Value extends AnyType>(
 //
 // NOTE: `dead` grows by two: the value that was there is superseded, and the
 // tombstone that supersedes it is itself no live key's newest.
-export function remove<Key extends AnyType, Value extends AnyType>(
+export function remove__overload$1<Key extends AnyType, Value extends AnyType>(
 	dictionary: DictionaryType<Key, Value>,
 	key: Key,
 	conformance: EquatableWitness<Key>,

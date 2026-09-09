@@ -8,7 +8,7 @@ import {
 	keys as keysOf,
 	length as lengthOf,
 	map as mapEntries,
-	remove as removeAt,
+	remove__overload$1 as removeAt,
 	set as setAt,
 	TOMBSTONE,
 	toString as dictionaryToString,
