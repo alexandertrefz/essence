@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "bun:test"
+import { afterAll, afterEach, describe, expect, it } from "bun:test"
 import { spawnSync } from "node:child_process"
 import {
 	existsSync,
@@ -89,6 +89,25 @@ process.env.ESSENCE_RESULTS_CACHE = resultCache
 afterAll(() => {
 	rmSync(bundleCache, { recursive: true, force: true })
 	rmSync(resultCache, { recursive: true, force: true })
+})
+
+// NOTE: The three globals the helpers below hijack to read what a Program
+// wrote — `capture` holds both streams, `runBundle` holds `console.log` beside
+// stdout. Each puts back what it took in a `finally`, and a `finally` behind an
+// `await` never runs when the runtime abandons the promise: a test that hits
+// its timeout mid-compile leaves the hijack standing, and every later test in
+// the file then writes into a buffer nothing reads. These are the originals,
+// and the `afterEach` is what makes an abandoned hijack cost one test rather
+// than the file. It is registered here rather than inside a `describe` because
+// the four callers stand in three of them.
+const originalLog = console.log
+const originalStandardOut = process.stdout.write
+const originalStandardError = process.stderr.write
+
+afterEach(() => {
+	console.log = originalLog
+	process.stdout.write = originalStandardOut
+	process.stderr.write = originalStandardError
 })
 
 type Command = NonNullable<ReturnType<typeof findCommand>>
@@ -1315,6 +1334,28 @@ describe("essence dap", () => {
 		expect(out).toContain("essence dap")
 		expect(out).toContain("Debug Adapter Protocol")
 		expect(out).not.toContain("GLOBAL OPTIONS")
+	})
+})
+
+// NOTE: What an abandoned hijack leaves behind, without abandoning one: a test
+// that times out inside `capture` or `runBundle` never reaches the `finally`
+// that puts the globals back, and a spec that timed one out on purpose would
+// itself be a failing test. This installs the same state directly, and the test
+// after it is the assertion — the `afterEach` at the top of the file is what
+// stands between the two.
+describe("an abandoned output hijack", () => {
+	it("leaves the globals held, as a timed-out test would", () => {
+		console.log = (() => {}) as typeof console.log
+		process.stdout.write = (() => true) as typeof process.stdout.write
+		process.stderr.write = (() => true) as typeof process.stderr.write
+
+		expect(console.log).not.toBe(originalLog)
+	})
+
+	it("hands the next test the real ones back", () => {
+		expect(console.log).toBe(originalLog)
+		expect(process.stdout.write).toBe(originalStandardOut)
+		expect(process.stderr.write).toBe(originalStandardError)
 	})
 })
 
