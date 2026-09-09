@@ -73,31 +73,57 @@ describe("loop", () => {
 		expect(
 			await run(`implementation {
 				constant sum = loop(from 1, through 10, startingWith 0,
-					step (index, total) { <- total::add(index) })
+					(index, total) { <- total::add(index) })
 
 				Terminal.inspect(sum::toString())
 			}`),
 		).toEqual(['"55"'])
 	})
 
-	it("counts down when the counted loop's start is the greater", async () => {
-		// NOTE: 3, then 2, then 1 — the same direction `List.of` counts, so the
-		// appended digits read "321".
+	it("answers the seed when the counted loop's end is below its start", async () => {
+		// NOTE: The count only runs up, so this body never runs. The direction
+		// is what the label says, exactly as `List.of` reads it.
 		expect(
 			await run(`implementation {
-				constant digits = loop(from 3, through 1, startingWith "",
-					step (index, acc) { <- acc::append(index::toString()) })
+				constant untouched = loop(from 10, through 1, startingWith 42,
+					(index, total) { <- total::add(index) })
+
+				Terminal.inspect(untouched::toString())
+			}`),
+		).toEqual(['"42"'])
+	})
+
+	it("counts down through the end the downTo entry names", async () => {
+		// NOTE: 3, then 2, then 1 — the same direction `List.of(downTo:)`
+		// counts, so the appended digits read "321".
+		expect(
+			await run(`implementation {
+				constant digits = loop(from 3, downTo 1, startingWith "",
+					(index, acc) { <- acc::append(index::toString()) })
 
 				Terminal.inspect(digits)
 			}`),
 		).toEqual(['"321"'])
 	})
 
+	it("always takes the first turn of a down count", async () => {
+		// NOTE: The first Integer is always seen, which is the promise
+		// `List.of(integersFrom:downTo:)` carries into its Type.
+		expect(
+			await run(`implementation {
+				constant digits = loop(from 3, downTo 9, startingWith "",
+					(index, acc) { <- acc::append(index::toString()) })
+
+				Terminal.inspect(digits)
+			}`),
+		).toEqual(['"3"'])
+	})
+
 	it("visits a single value when the counted loop's ends coincide", async () => {
 		expect(
 			await run(`implementation {
 				constant once = loop(from 7, through 7, startingWith 0,
-					step (index, total) { <- total::add(index) })
+					(index, total) { <- total::add(index) })
 
 				Terminal.inspect(once::toString())
 			}`),
@@ -110,7 +136,7 @@ describe("loop", () => {
 			await run(`implementation {
 				constant doubled = loop(startingWith 1,
 					while (n) { <- n::isLessThan(100) },
-					step (n) { <- n::multiply(with 2) })
+					(n) { <- n::multiply(with 2) })
 
 				Terminal.inspect(doubled::toString())
 			}`),
@@ -122,7 +148,7 @@ describe("loop", () => {
 			await run(`implementation {
 				constant untouched = loop(startingWith 500,
 					while (n) { <- n::isLessThan(100) },
-					step (n) { <- n::multiply(with 2) })
+					(n) { <- n::multiply(with 2) })
 
 				Terminal.inspect(untouched::toString())
 			}`),
@@ -134,7 +160,7 @@ describe("loop", () => {
 			await run(`implementation {
 				constant doubled = loop(startingWith 1,
 					until (n) { <- n::isGreaterThanOrEqualTo(100) },
-					step (n) { <- n::multiply(with 2) })
+					(n) { <- n::multiply(with 2) })
 
 				Terminal.inspect(doubled::toString())
 			}`),
@@ -146,7 +172,7 @@ describe("loop", () => {
 			await run(`implementation {
 				constant untouched = loop(startingWith 500,
 					until (n) { <- n::isGreaterThanOrEqualTo(100) },
-					step (n) { <- n::multiply(with 2) })
+					(n) { <- n::multiply(with 2) })
 
 				Terminal.inspect(untouched::toString())
 			}`),
@@ -267,6 +293,189 @@ describe("loop", () => {
 				walk(" -> Step<Integer, String>", "Step<Integer, String>"),
 			),
 		).toEqual(['"done"'])
+	})
+})
+
+// NOTE: The three counted entries whose body answers a `Step`. They share every
+// label with the run-to-the-end entries beside them and are told apart by the
+// last one — `step` against a positional body — which is the whole reason the
+// family was relabelled: a callback's answer Type is not what an Overload is
+// chosen by, so the counted early exit had no spelling before.
+describe("a counted loop whose body answers a Step", () => {
+	it("leaves the count on the first #Done", async () => {
+		// NOTE: 1 + 2 + 3 + 4 = 10, and 10 + 5 = 15 is the first total above
+		// ten — so the answer is 15 rather than the 5050 the whole count
+		// reaches. That is proof no Integer past the #Done was visited.
+		expect(
+			await run(`implementation {
+				constant total = loop(from 1, through 100, startingWith 0,
+					step (index, running) {
+						constant next = running::add(index)
+
+						if next::isGreaterThan(10) { <- #Done(next) }
+
+						<- #Continue(next)
+					})
+
+				Terminal.inspect(total::toString())
+			}`),
+		).toEqual(['"15"'])
+	})
+
+	it("answers the State the last step carried when the count runs out", async () => {
+		expect(
+			await run(`implementation {
+				constant total = loop(from 1, through 4, startingWith 0,
+					step (index, running) { <- #Continue(running::add(index)) })
+
+				Terminal.inspect(total::toString())
+			}`),
+		).toEqual(['"10"'])
+	})
+
+	it("answers the seed for a range that runs no turns", async () => {
+		expect(
+			await run(`implementation {
+				constant untouched = loop(from 5, through 1, startingWith 42,
+					step (index, running) { <- #Continue(running::add(index)) })
+
+				constant excluded = loop(from 0, upTo 0, startingWith 7,
+					step (index, running) { <- #Continue(running::add(index)) })
+
+				Terminal.inspect(untouched::toString())
+				Terminal.inspect(excluded::toString())
+			}`),
+		).toEqual(['"42"', '"7"'])
+	})
+
+	it("stops before an excluded end", async () => {
+		expect(
+			await run(`implementation {
+				constant total = loop(from 0, upTo 5, startingWith 0,
+					step (index, running) { <- #Continue(running::add(index)) })
+
+				Terminal.inspect(total::toString())
+			}`),
+		).toEqual(['"10"'])
+	})
+
+	it("counts down, and takes its first turn whatever the end is", async () => {
+		expect(
+			await run(`implementation {
+				constant digits = loop(from 5, downTo 1, startingWith "",
+					step (index, gathered) {
+						constant next = gathered::append(index::toString())
+
+						if next::length()::is(3) { <- #Done(next) }
+
+						<- #Continue(next)
+					})
+
+				constant whole = loop(from 3, downTo 1, startingWith "",
+					step (index, gathered) {
+						<- #Continue(gathered::append(index::toString()))
+					})
+
+				constant inverted = loop(from 3, downTo 9, startingWith "",
+					step (index, gathered) {
+						<- #Continue(gathered::append(index::toString()))
+					})
+
+				Terminal.inspect(digits)
+				Terminal.inspect(whole)
+				Terminal.inspect(inverted)
+			}`),
+		).toEqual(['"543"', '"321"', '"3"'])
+	})
+
+	// NOTE: The label is the whole of the difference, so the pair has to be
+	// checked side by side: the same Arguments under the same labels reach two
+	// different entries and answer two different things.
+	it("is a different entry from the positional body under the same labels", async () => {
+		expect(
+			await run(`implementation {
+				constant counted = loop(from 1, through 3, startingWith 0,
+					(index, running) { <- running::add(index) })
+
+				constant stepped = loop(from 1, through 3, startingWith 0,
+					step (index, running) {
+						if index::is(2) { <- #Done(running) }
+
+						<- #Continue(running::add(index))
+					})
+
+				Terminal.inspect(counted::toString())
+				Terminal.inspect(stepped::toString())
+			}`),
+		).toEqual(['"6"', '"1"'])
+	})
+})
+
+// NOTE: Every counted entry has two implementations that have to agree: the
+// Essence body in `Loop.es`, and the `for` the Optimiser writes where the call
+// stands. `inline-loops` only writes the walk out where every callback is
+// written AT the call, so binding the body to a name is what reaches the Essence
+// body — and these run the same walks both ways.
+describe("the counted entries answer alike inlined and not", () => {
+	it("agrees on the up count, the down count and the empty range", async () => {
+		expect(
+			await run(`implementation {
+				constant add = (_ index: Integer, _ total: Integer) -> Integer {
+					<- total::add(index)
+				}
+
+				Terminal.inspect(loop(from 1, through 4, startingWith 0, add)::toString())
+				Terminal.inspect(loop(from 4, through 1, startingWith 0, add)::toString())
+				Terminal.inspect(loop(from 4, downTo 1, startingWith 0, add)::toString())
+				Terminal.inspect(loop(from 1, downTo 4, startingWith 0, add)::toString())
+				Terminal.inspect(loop(from 0, upTo 4, startingWith 0, add)::toString())
+
+				Terminal.inspect(loop(from 1, through 4, startingWith 0,
+					(index, total) { <- total::add(index) })::toString())
+				Terminal.inspect(loop(from 4, through 1, startingWith 0,
+					(index, total) { <- total::add(index) })::toString())
+				Terminal.inspect(loop(from 4, downTo 1, startingWith 0,
+					(index, total) { <- total::add(index) })::toString())
+				Terminal.inspect(loop(from 1, downTo 4, startingWith 0,
+					(index, total) { <- total::add(index) })::toString())
+				Terminal.inspect(loop(from 0, upTo 4, startingWith 0,
+					(index, total) { <- total::add(index) })::toString())
+			}`),
+		).toEqual([
+			'"10"',
+			'"0"',
+			'"10"',
+			'"1"',
+			'"6"',
+			'"10"',
+			'"0"',
+			'"10"',
+			'"1"',
+			'"6"',
+		])
+	})
+
+	// NOTE: The Step-answering counted entries have one implementation rather
+	// than two — they are written on the general driver, which is inlined inside
+	// their own prelude bodies rather than at the call — so this reads the same
+	// walk through a named body to be sure the Essence is what runs.
+	it("answers alike where a Step body is bound to a name", async () => {
+		expect(
+			await run(`implementation {
+				constant stop = (_ index: Integer, _ total: Integer)
+					-> Step<Integer, Integer> {
+					constant next = total::add(index)
+
+					if next::isGreaterThan(10) { <- #Done(next) }
+
+					<- #Continue(next)
+				}
+
+				Terminal.inspect(loop(from 1, through 100, startingWith 0, step stop)::toString())
+				Terminal.inspect(loop(from 1, upTo 100, startingWith 0, step stop)::toString())
+				Terminal.inspect(loop(from 100, downTo 1, startingWith 0, step stop)::toString())
+			}`),
+		).toEqual(['"15"', '"15"', '"100"'])
 	})
 })
 
@@ -391,6 +600,14 @@ describe("Loops.es", () => {
 			encoding: "utf-8",
 		})
 
-		expect(await run(source)).toEqual(["55", "15", "128", "128", "2"])
+		expect(await run(source)).toEqual([
+			"55",
+			"321",
+			"15",
+			"128",
+			"128",
+			"15",
+			"2",
+		])
 	})
 })

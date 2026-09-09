@@ -94,7 +94,7 @@ function millisecondsToRun(source: string, printed: string): number {
 // number of turns because of it.
 function buildingSource(method: string): string {
 	return `implementation {
-	constant built = loop(from 1, through ${TURNS}, startingWith [0], step (
+	constant built = loop(from 1, through ${TURNS}, startingWith [0], (
 		index,
 		list,
 	) { <- list::${method}(index) })
@@ -115,12 +115,12 @@ function drainingSource(
 	step: string,
 ): string {
 	return `implementation {
-	constant built = loop(from 1, through ${turns}, startingWith [0], step (
+	constant built = loop(from 1, through ${turns}, startingWith [0], (
 		index,
 		list,
 	) { <- list::${built}(index) })
 
-	constant drained = loop(from 1, through ${turns}, startingWith built, step (
+	constant drained = loop(from 1, through ${turns}, startingWith built, (
 		_,
 		list,
 	) { <- list::${step} })

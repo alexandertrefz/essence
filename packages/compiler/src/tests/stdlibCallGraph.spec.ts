@@ -843,10 +843,16 @@ describe("Stdlib Call Graph", () => {
 			// NOTE: The bodied free Functions, keyed by the bare name they are
 			// emitted under. `loop`'s other two entries are native — there is no
 			// body to walk, exactly as for a native Method. `$5` is the
-			// exclusive count, written on `$3`, the inclusive one.
+			// exclusive count, written on `$3`, the inclusive one, and `$8` is
+			// the same pair one row down among the entries whose body answers a
+			// `Step`.
 			"loop__overload$2",
 			"loop__overload$3",
 			"loop__overload$5",
+			"loop__overload$6",
+			"loop__overload$7",
+			"loop__overload$8",
+			"loop__overload$9",
 		])
 	})
 

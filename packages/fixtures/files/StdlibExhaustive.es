@@ -4910,57 +4910,71 @@ third"::lines())
 	§ ——— loop ————————————————————————————————————————————————————————————
 	§ The free-Function loop family. `loop` belongs to no Namespace, so its
 	§ labels carry no prefix — the coverage net learns them from the member
-	§ table just as it learns a Namespace's Methods.
+	§ table just as it learns a Namespace's Methods. The body is positional
+	§ where it runs the walk to its end, and labelled `step` where it answers
+	§ with a `Step` and can leave early.
 	show(
-		"loop<State>(from: Integer, through: Integer, startingWith: State, step: (_ Integer, _ State) -> State)",
-		loop(from 1, through 5, startingWith 0, step (index, total) {
+		"loop<State>(from: Integer, through: Integer, startingWith: State, _ (_ Integer, _ State) -> State)",
+		loop(from 1, through 5, startingWith 0, (index, total) {
 			<- total::add(index)
 		}),
 	)
 	show(
-		"loop<State>(from: Integer, through: Integer, startingWith: State, step: (_ Integer, _ State) -> State) [down]",
-		loop(from 3, through 1, startingWith "", step (index, acc) {
+		"loop<State>(from: Integer, through: Integer, startingWith: State, _ (_ Integer, _ State) -> State) [end below the start]",
+		loop(from 3, through 1, startingWith 99, (index, total) {
+			<- total::add(index)
+		}),
+	)
+	show(
+		"loop<State>(from: Integer, upTo: Integer, startingWith: State, _ (_ Integer, _ State) -> State)",
+		loop(from 0, upTo 5, startingWith 0, (index, total) {
+			<- total::add(index)
+		}),
+	)
+	show(
+		"loop<State>(from: Integer, upTo: Integer, startingWith: State, _ (_ Integer, _ State) -> State) [zero turns]",
+		loop(from 0, upTo 0, startingWith 99, (index, total) {
+			<- total::add(index)
+		}),
+	)
+	show(
+		"loop<State>(from: Integer, downTo: Integer, startingWith: State, _ (_ Integer, _ State) -> State)",
+		loop(from 3, downTo 1, startingWith "", (index, acc) {
 			<- acc::append(index::toString())
 		}),
 	)
 	show(
-		"loop<State>(from: Integer, upTo: Integer, startingWith: State, step: (_ Integer, _ State) -> State)",
-		loop(from 0, upTo 5, startingWith 0, step (index, total) {
-			<- total::add(index)
+		"loop<State>(from: Integer, downTo: Integer, startingWith: State, _ (_ Integer, _ State) -> State) [end above the start]",
+		loop(from 3, downTo 9, startingWith "", (index, acc) {
+			<- acc::append(index::toString())
 		}),
 	)
 	show(
-		"loop<State>(from: Integer, upTo: Integer, startingWith: State, step: (_ Integer, _ State) -> State) [zero turns]",
-		loop(from 0, upTo 0, startingWith 99, step (index, total) {
-			<- total::add(index)
-		}),
-	)
-	show(
-		"loop<State>(startingWith: State, while: (_ State) -> Boolean, step: (_ State) -> State)",
-		loop(startingWith 1, while (n) { <- n::isLessThan(100) }, step (n) {
+		"loop<State>(startingWith: State, while: (_ State) -> Boolean, _ (_ State) -> State)",
+		loop(startingWith 1, while (n) { <- n::isLessThan(100) }, (n) {
 			<- n::multiply(with 2)
 		}),
 	)
 	show(
-		"loop<State>(startingWith: State, while: (_ State) -> Boolean, step: (_ State) -> State) [zero turns]",
-		loop(startingWith 500, while (n) { <- n::isLessThan(100) }, step (n) {
+		"loop<State>(startingWith: State, while: (_ State) -> Boolean, _ (_ State) -> State) [zero turns]",
+		loop(startingWith 500, while (n) { <- n::isLessThan(100) }, (n) {
 			<- n::multiply(with 2)
 		}),
 	)
 	show(
-		"loop<State>(startingWith: State, until: (_ State) -> Boolean, step: (_ State) -> State)",
+		"loop<State>(startingWith: State, until: (_ State) -> Boolean, _ (_ State) -> State)",
 		loop(
 			startingWith 1,
 			until (n) { <- n::isGreaterThanOrEqualTo(100) },
-			step (n) { <- n::multiply(with 2) },
+			(n) { <- n::multiply(with 2) },
 		),
 	)
 	show(
-		"loop<State>(startingWith: State, until: (_ State) -> Boolean, step: (_ State) -> State) [zero turns]",
+		"loop<State>(startingWith: State, until: (_ State) -> Boolean, _ (_ State) -> State) [zero turns]",
 		loop(
 			startingWith 500,
 			until (n) { <- n::isGreaterThanOrEqualTo(100) },
-			step (n) { <- n::multiply(with 2) },
+			(n) { <- n::multiply(with 2) },
 		),
 	)
 	show(
@@ -4979,5 +4993,69 @@ third"::lines())
 				})
 			},
 		),
+	)
+
+	§ The counted entries whose body answers a `Step`. Each is shown twice:
+	§ once where the body leaves early, and once where the count runs out and
+	§ the State it carried is the answer.
+	show(
+		"loop<State>(from: Integer, through: Integer, startingWith: State, step: (_ Integer, _ State) -> Step<State, State>)",
+		loop(from 1, through 100, startingWith 0, step (index, total) {
+			constant next = total::add(index)
+
+			if next::isGreaterThan(10) {
+				<- #Done(next)
+			}
+
+			<- #Continue(next)
+		}),
+	)
+	show(
+		"loop<State>(from: Integer, through: Integer, startingWith: State, step: (_ Integer, _ State) -> Step<State, State>) [count runs out]",
+		loop(from 1, through 4, startingWith 0, step (index, total) {
+			<- #Continue(total::add(index))
+		}),
+	)
+	show(
+		"loop<State>(from: Integer, through: Integer, startingWith: State, step: (_ Integer, _ State) -> Step<State, State>) [end below the start]",
+		loop(from 5, through 1, startingWith 42, step (index, total) {
+			<- #Continue(total::add(index))
+		}),
+	)
+	show(
+		"loop<State>(from: Integer, upTo: Integer, startingWith: State, step: (_ Integer, _ State) -> Step<State, State>)",
+		loop(from 0, upTo 5, startingWith 0, step (index, total) {
+			<- #Continue(total::add(index))
+		}),
+	)
+	show(
+		"loop<State>(from: Integer, upTo: Integer, startingWith: State, step: (_ Integer, _ State) -> Step<State, State>) [zero turns]",
+		loop(from 0, upTo 0, startingWith 7, step (index, total) {
+			<- #Continue(total::add(index))
+		}),
+	)
+	show(
+		"loop<State>(from: Integer, downTo: Integer, startingWith: State, step: (_ Integer, _ State) -> Step<State, State>)",
+		loop(from 5, downTo 1, startingWith "", step (index, acc) {
+			constant next = acc::append(index::toString())
+
+			if next::length()::is(3) {
+				<- #Done(next)
+			}
+
+			<- #Continue(next)
+		}),
+	)
+	show(
+		"loop<State>(from: Integer, downTo: Integer, startingWith: State, step: (_ Integer, _ State) -> Step<State, State>) [count runs out]",
+		loop(from 3, downTo 1, startingWith "", step (index, acc) {
+			<- #Continue(acc::append(index::toString()))
+		}),
+	)
+	show(
+		"loop<State>(from: Integer, downTo: Integer, startingWith: State, step: (_ Integer, _ State) -> Step<State, State>) [end above the start]",
+		loop(from 3, downTo 9, startingWith "", step (index, acc) {
+			<- #Continue(acc::append(index::toString()))
+		}),
 	)
 }

@@ -601,7 +601,7 @@ Writes a loop out where it is written, instead of calling a driver that calls
 callbacks.
 
 Essence has no loop Statement. A walk is a driver Function handed callbacks —
-`loop(startingWith 0, while (n) { … }, step (n) { … })` — and the driver calls
+`loop(startingWith 0, while (n) { … }, (n) { … })` — and the driver calls
 them, threading whatever they answer with from one turn to the next. That is the
 language's whole answer to iteration, and it is a good one: the control flow is a
 value, so a Match can read it, an early exit is an ordinary `#Done`, and `<-`
@@ -662,16 +662,19 @@ loop inlined inside another loop's body can not take a name that one is using.
 evaluated before the walk in the order the call passed them, which is the order
 the driver's Arguments were evaluated in. Each driver's own order is mirrored
 exactly: `while` and `until` check the predicate BEFORE each step, so a predicate
-decided on the seed answers the seed and the body never runs; the counted entry
-fixes its direction once, before the first turn.
+decided on the seed answers the seed and the body never runs; a counted entry
+counts the direction its own label names.
 
-**The counted loop does not go through its driver at all.**
-`loop(from:through:startingWith:step:)` is written in Essence on the `while`
-driver and threads a `{ index, carried }` Record through it — a Record and an
-Integer built per turn, a closure asking whether the index has passed the end,
-another advancing it. Inlined it is a `for` over what the two bounds hold,
-counting up when `from` is the lesser and down when it is the greater exactly as
-that body decides it.
+**The counted loops do not go through their driver at all.**
+`loop(from:through:startingWith:_)` and `loop(from:downTo:startingWith:_)` are
+each written in Essence on the `while` driver and thread a `{ index, carried }`
+Record through it — a Record and an Integer built per turn, a closure asking
+whether the index has passed the end, another advancing it. Inlined each is a
+`for` over what the two bounds hold. Which way it counts is which entry was
+called, so it is settled while compiling: the `through:` walk runs while the
+index has not passed the end from below, and the `downTo:` walk runs down to
+whichever of the end and the start is lower, which is what always takes its
+first turn.
 
 The counter counts in NUMBERS wherever both bounds are held as ones, which is
 every loop written over ordinary quantities; a bound past 2⁵³ — a walk of more
@@ -1531,7 +1534,7 @@ is read through as it stands.
    keeps its box, as does one that hands the State to a Function, asks it for its
    decimal spelling, puts it in a List, compares it through an `Ordering` or
    shadows the name. The test does not try to tell those apart.
-3. A driver that hands ONE State to two bodies — `loop(startingWith:while:step:)`
+3. A driver that hands ONE State to two bodies — `loop(startingWith:while:_)`
    and its `until` sibling — takes the swap for both or for neither.
 4. The Parameter's `const` is still bound each turn, now to the raw value. The
    slot is one binding for the whole walk, so a closure reading it would answer

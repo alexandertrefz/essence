@@ -45,7 +45,11 @@ the bare Type tags — `Boolean`, `String`, `Integer`, `Rational`, `Algebraic`,
 `Transcendental`, the open Record and the unapplied `List` — which
 live in `packages/compiler/src/enricher/primitives.ts`. `loop` — the one
 native Function family with no Namespace to live in — is declared here after
-all, in `Loop.es`, as ordinary free Functions. Printing is a Namespace, and
+all, in `Loop.es`, as ordinary free Functions. Its nine entries are told apart
+by their labels, and the last label is what separates the two halves of the
+family: a POSITIONAL body runs the walk to its end, and a `step:` body answers
+a `Step` and can leave it early. `List::reduce` reads the same pair the same
+way. Printing is a Namespace, and
 reading is the same one: `Terminal.print` renders through `Printable` and ends
 the line, `Terminal.inspect` shows a value's structure and answers with it
 unchanged, `Terminal.describe` hands that same structure back as a String
@@ -58,7 +62,7 @@ it and the `Terminal.ask` that is a prompt and a line (`Terminal.es`).
 `Randomness.seeded(_)` for a run that replays (`Randomness.es`).
 
 Three of every five declared Method entries are also IMPLEMENTED here, in
-Essence — 341 of 562 as this is written, counting one entry per Overload and
+Essence — 345 of 566 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
 Seven more are written on a PROTOCOL rather than on a Namespace, once for every
 conformer: `Equatable.isNot`, `Comparable`'s four inequalities, and

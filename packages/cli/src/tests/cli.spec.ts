@@ -1876,9 +1876,11 @@ describe("the Debug Adapter's compile", () => {
 			// the same file prints.
 			expect(await runBundle(outputFileName)).toEqual([
 				"55",
+				"321",
 				"15",
 				"128",
 				"128",
+				"15",
 				"2",
 			])
 		} finally {

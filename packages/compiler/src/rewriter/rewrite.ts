@@ -6014,7 +6014,7 @@ function inlinedLoop(loop: common.typedSimple.InlineLoop): InlinedWalk {
 	}
 }
 
-// NOTE: `loop(startingWith:while:step:)` — the predicate checked BEFORE each
+// NOTE: `loop(startingWith:while:_)` — the predicate checked BEFORE each
 // step, exactly as the driver checks it, so a predicate false on the seed
 // answers the seed and the body never runs. `until` is the same walk with the
 // answer read the other way round, which is what its own Essence body does by
@@ -6094,12 +6094,22 @@ function conditionWalk(
 	}
 }
 
-// NOTE: `loop(from:through:startingWith:step:)`, and the one entry that does not
-// go through its driver at all. Its Essence body threads `{ index, carried }`
-// through the `while` driver — a Record and an Integer built per turn, a closure
-// asking whether the index has passed the end and another advancing it. All of
-// it is decided here: the direction once, before the first turn, exactly as that
-// body decides it, and then a `for` over what the two bounds hold.
+// NOTE: `loop(from:through:startingWith:_)` and `loop(from:downTo:startingWith:_)`,
+// the two entries that do not go through their driver at all. Each Essence body
+// threads `{ index, carried }` through the `while` driver — a Record and an
+// Integer built per turn, a closure asking whether the index has passed the end
+// and another advancing it. All of it is decided here: the direction is which
+// entry was called and is settled while compiling, and what is left is a `for`
+// over what the two bounds hold. The direction used to be read from the bounds
+// at run time, which cost a `const`, a conditional step and a conditional test
+// per walk: a Program of one ten-turn count measures 5,020 bytes against the
+// 5,130 it measured then.
+//
+// NOTE: The down-counting entry always takes its first turn, which is the promise
+// `List.of(integersFrom:downTo:)` carries into its Type and which its Essence
+// body keeps by advancing once before the count is asked anything. Here the same
+// thing is one clamp: the walk runs down to whichever of the end and the start is
+// lower, so an end above the start stops after the first turn.
 //
 // NOTE: The counter counts in NUMBERS wherever both bounds are held as ones,
 // which is every loop written over ordinary quantities: a counter between two
@@ -6120,7 +6130,7 @@ function countedWalk(
 	let prefix = loop.name
 	let from = `${prefix}_from`
 	let to = `${prefix}_to`
-	let ascending = `${prefix}_up`
+	let bound = `${prefix}_bound`
 	let escaped = `${prefix}_big`
 	let delta = `${prefix}_delta`
 	let index = `${prefix}_index`
@@ -6181,12 +6191,25 @@ function countedWalk(
 
 	let statements: Array<estree.Statement> = [
 		...bounds,
-		loopDeclaration("const", ascending, {
-			type: "BinaryExpression",
-			operator: "<=",
-			left: loopIdentifier(from),
-			right: loopIdentifier(to),
-		}),
+		// NOTE: Only the down-counting entry declares anything here, and what
+		// it declares is the clamp its first turn rests on. The up-counting
+		// entry tests against its end directly, because an end behind the start
+		// is a walk of no turns there.
+		...(driver.descending
+			? [
+					loopDeclaration("const", bound, {
+						type: "ConditionalExpression",
+						test: {
+							type: "BinaryExpression",
+							operator: "<=",
+							left: loopIdentifier(to),
+							right: loopIdentifier(from),
+						},
+						consequent: loopIdentifier(to),
+						alternate: loopIdentifier(from),
+					}),
+				]
+			: []),
 		// NOTE: Either bound being a bigint is what sends the counter to
 		// bigint, and by the canonical invariant that is the same question
 		// as either bound being outside safe range.
@@ -6207,15 +6230,10 @@ function countedWalk(
 				? {
 						type: "ConditionalExpression",
 						test: loopIdentifier(escaped),
-						consequent: {
-							type: "ConditionalExpression",
-							test: loopIdentifier(ascending),
-							consequent: countLiteral(1n),
-							alternate: countLiteral(-1n),
-						},
-						alternate: steppedBy(ascending),
+						consequent: countLiteral(driver.descending ? -1n : 1n),
+						alternate: steppedBy(driver.descending),
 					}
-				: steppedBy(ascending),
+				: steppedBy(driver.descending),
 		),
 		{
 			type: "ForStatement",
@@ -6240,26 +6258,24 @@ function countedWalk(
 					: loopIdentifier(from),
 			),
 			// NOTE: Counting up runs while the index has not passed the end
-			// from below and counting down while it has not passed it from
-			// above — the two predicates the Essence body writes, asked of
-			// the counter rather than through a closure and an Ordering.
-			// The comparison is exact whichever kind each side is holding.
-			test: {
-				type: "ConditionalExpression",
-				test: loopIdentifier(ascending),
-				consequent: {
-					type: "BinaryExpression",
-					operator: "<=",
-					left: loopIdentifier(index),
-					right: loopIdentifier(to),
-				},
-				alternate: {
-					type: "BinaryExpression",
-					operator: ">=",
-					left: loopIdentifier(index),
-					right: loopIdentifier(to),
-				},
-			},
+			// from below, and counting down while it has not passed the
+			// clamp from above — the predicate each Essence body writes,
+			// asked of the counter rather than through a closure and an
+			// Ordering. The comparison is exact whichever kind each side is
+			// holding.
+			test: driver.descending
+				? {
+						type: "BinaryExpression",
+						operator: ">=",
+						left: loopIdentifier(index),
+						right: loopIdentifier(bound),
+					}
+				: {
+						type: "BinaryExpression",
+						operator: "<=",
+						left: loopIdentifier(index),
+						right: loopIdentifier(to),
+					},
 			update: {
 				type: "AssignmentExpression",
 				operator: "+=",
@@ -7628,14 +7644,10 @@ function safeBound(node: common.typedSimple.ExpressionNode): boolean {
 }
 
 // NOTE: One step of the counter, in numbers: up or down by one, which is the
-// step of every walk whose bounds a double holds.
-function steppedBy(ascending: string): estree.Expression {
-	return {
-		type: "ConditionalExpression",
-		test: loopIdentifier(ascending),
-		consequent: numberLiteral(1),
-		alternate: numberLiteral(-1),
-	}
+// step of every walk whose bounds a double holds. Which way is the entry that
+// was called, so the step is a literal rather than a read.
+function steppedBy(descending: boolean): estree.Expression {
+	return numberLiteral(descending ? -1 : 1)
 }
 
 // NOTE: One step of a counter that had to escape to bigint, as the literal an

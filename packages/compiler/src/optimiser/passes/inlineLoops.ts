@@ -4,7 +4,7 @@ import type { OptimiserPass } from "../index"
 import { rewriteNodes } from "../walk"
 
 // NOTE: Essence has no loop Statement. A walk is a driver Function handed
-// callbacks — `loop(startingWith 0, while (n) { … }, step (n) { … })` — and the
+// callbacks — `loop(startingWith 0, while (n) { … }, (n) { … })` — and the
 // driver calls them, one closure call per callback per turn, threading whatever
 // they answer with between them. That is the language's whole answer to
 // iteration, and it is a good one: the control flow is a value, so a Match can
@@ -24,12 +24,15 @@ import { rewriteNodes } from "../walk"
 //     { const n = $loop_0_state; $loop_0_state = …; }
 //   }
 //
-// NOTE: The counted entry does not go through its driver at all. `loop(from:
-// through:startingWith:step:)` is written in Essence on the `while` driver and
-// threads `{ index, carried }` — a Record built per turn, around an Integer
-// built per turn, checked by a closure and advanced by another. Inlined it is a
-// `for` over the bigint the Integers hold, and the only allocation left is the
-// Integer the body is handed.
+// NOTE: The two counted entries whose body runs the walk to its end do not go
+// through their driver at all. `loop(from:through:startingWith:_)` and
+// `loop(from:downTo:startingWith:_)` are written in Essence on the `while`
+// driver and thread `{ index, carried }` — a Record built per turn, around an
+// Integer built per turn, checked by a closure and advanced by another. Inlined
+// each is a `for` over the bigint the Integers hold, and the only allocation
+// left is the Integer the body is handed. The three counted entries whose body
+// answers a `Step` are written on the general driver instead, so what is
+// inlined for them is that driver, once, inside their prelude bodies.
 //
 // NOTE: A `Step` a callback answers with is read where it is BUILT. The general
 // loop and `reduce`'s early-stopping entry both decide by a tag the body has
@@ -217,9 +220,15 @@ class Inlining {
 			case "loop__overload$2":
 				return this.conditionLoop(node, "until", true)
 			case "loop__overload$3":
-				return this.countedLoop(node)
+				return this.countedLoop(node, "through", false)
 			case "loop__overload$4":
 				return this.generalLoop(node)
+			// NOTE: The down-counting counted entry, whose body is positional
+			// like its up-counting neighbour's. The three counted entries whose
+			// body answers a `Step` are not here: each is written on the general
+			// loop, whose driver is inlined inside their prelude bodies.
+			case "loop__overload$6":
+				return this.countedLoop(node, "downTo", true)
 			default:
 				return null
 		}
@@ -230,11 +239,7 @@ class Inlining {
 		label: string,
 		until: boolean,
 	): common.typedSimple.InlineLoopDriver | null {
-		let args = argumentsNamed(node.arguments, [
-			"startingWith",
-			label,
-			"step",
-		])
+		let args = argumentsNamed(node.arguments, ["startingWith", label, null])
 
 		if (args === null) {
 			return null
@@ -253,12 +258,14 @@ class Inlining {
 
 	private countedLoop(
 		node: common.typedSimple.FunctionInvocationNode,
+		label: string,
+		descending: boolean,
 	): common.typedSimple.InlineLoopDriver | null {
 		let args = argumentsNamed(node.arguments, [
 			"from",
-			"through",
+			label,
 			"startingWith",
-			"step",
+			null,
 		])
 
 		if (args === null) {
@@ -283,6 +290,7 @@ class Inlining {
 
 		return {
 			kind: "counted",
+			descending,
 			from: from!,
 			through: through!,
 			seed: seed!,

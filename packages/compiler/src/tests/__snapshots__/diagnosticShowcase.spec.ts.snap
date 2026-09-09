@@ -606,7 +606,7 @@ Error: An overloaded Function can not be used as a value
     │
  44 │     constant everyLoop = loop
     │                          ──┬─  
-    │                            ╰─── this names all 5 overloads at once
+    │                            ╰─── this names all 9 overloads at once
     │ 
     │ Help: Invoke it, or wrap the overload you mean in a Function literal.
 ────╯

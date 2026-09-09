@@ -1112,17 +1112,17 @@ const conditions = `implementation {
 // replaces. The counted one first: up, down, and the Statement position that
 // takes it without a closure.
 const countedLoop = `implementation {
-	constant sum = loop(from 1, through 10, startingWith 0, step (
+	constant sum = loop(from 1, through 10, startingWith 0, (
 		index,
 		total,
 	) { <- total::add(index) })
 
-	constant down = loop(from 3, through 1, startingWith 0, step (
+	constant down = loop(from 3, downTo 1, startingWith 0, (
 		index,
 		total,
 	) { <- total::add(index) })
 
-	constant once = loop(from 2, through 2, startingWith 0, step (
+	constant once = loop(from 2, through 2, startingWith 0, (
 		index,
 		total,
 	) { <- total::add(index) })
@@ -1136,11 +1136,11 @@ const countedLoop = `implementation {
 const conditionLoops = `implementation {
 	constant doubled = loop(startingWith 1, while (n) {
 		<- n::isLessThan(100)
-	}, step (n) { <- n::multiply(with 2) })
+	}, (n) { <- n::multiply(with 2) })
 
 	constant same = loop(startingWith 1, until (n) {
 		<- n::isGreaterThanOrEqualTo(100)
-	}, step (n) { <- n::multiply(with 2) })
+	}, (n) { <- n::multiply(with 2) })
 
 	Terminal.inspect(doubled)
 	Terminal.inspect(same)
@@ -1311,13 +1311,13 @@ const shadowedList = `implementation {
 const argumentLoop = `implementation {
 	Terminal.inspect(loop(startingWith 1, while (n) {
 		<- n::isLessThan(10)
-	}, step (n) { <- n::multiply(with 2) }))
+	}, (n) { <- n::multiply(with 2) }))
 }`
 
 // NOTE: A walk inside a walk's body, which is what numbers the names apart.
 const nestedLoops = `implementation {
-	Terminal.inspect(loop(from 1, through 3, startingWith 0, step (index, total) {
-		<- total::add(loop(from 1, through index, startingWith 0, step (
+	Terminal.inspect(loop(from 1, through 3, startingWith 0, (index, total) {
+		<- total::add(loop(from 1, through index, startingWith 0, (
 			inner,
 			carried,
 		) { <- carried::add(inner) }))
@@ -1333,7 +1333,7 @@ const shadowedParameter = `implementation {
 
 	constant answer = loop(startingWith 1, while (total) {
 		<- total::isLessThan(10)
-	}, step (n) { <- n::add(total) })
+	}, (n) { <- n::add(total) })
 
 	Terminal.inspect(answer)
 
@@ -1349,7 +1349,7 @@ const shadowedParameter = `implementation {
 // because printing is the only way a Program can tell.
 const orderedLoops = `implementation {
 	Terminal.inspect(loop(from Terminal.inspect(1), through Terminal.inspect(3), startingWith Terminal.inspect(0),
-	step (index, total) { <- total::add(index) }))
+	(index, total) { <- total::add(index) }))
 
 	Terminal.inspect(Terminal.inspect([1, 2])::reduce(startingWith Terminal.inspect(0), (total, item) {
 		<- total::add(item)
@@ -1472,18 +1472,18 @@ const bothEndsEdited = `implementation {
 // second link of a chain resolves on `NonEmptyList` rather than on `List` — the
 // first `append` proved the receiver is not empty.
 const builtList = `implementation {
-	constant built = loop(from 1, through 4, startingWith [0], step (index, list) {
+	constant built = loop(from 1, through 4, startingWith [0], (index, list) {
 		<- list::append(index)
 	})
 
-	constant batched = loop(from 1, through 3, startingWith [0], step (index, list) {
+	constant batched = loop(from 1, through 3, startingWith [0], (index, list) {
 		<- list::append(index)::append(contentsOf [index, index])
 	})
 
 	§ The other half of the addition: a List under a name, which nothing may
 	§ take the Array of, so its items are walked out of the box it is held in.
 	constant tail = [7, 8]
-	constant joined = loop(from 1, through 2, startingWith [0], step (index, list) {
+	constant joined = loop(from 1, through 2, startingWith [0], (index, list) {
 		<- list::append(contentsOf tail)
 	})
 
@@ -1534,7 +1534,7 @@ const builtStates = `implementation {
 // else entirely leaves with that value while the Array the walk built goes
 // nowhere.
 const builtBranches = `implementation {
-	constant sparse = loop(from 1, through 6, startingWith [0], step (index, list) {
+	constant sparse = loop(from 1, through 6, startingWith [0], (index, list) {
 		if index::isGreaterThan(3) {
 			<- list
 		} else {
@@ -1567,13 +1567,13 @@ const builtBesideElisions = `implementation {
 	variable turns = 0
 	constant paced = loop(startingWith [0], while (list) {
 		<- turns::isLessThan(3)
-	}, step (list) {
+	}, (list) {
 		turns = turns::add(1)
 
 		<- list::append(turns)
 	})
 
-	constant doubled = loop(from 1, through 4, startingWith [0], step (
+	constant doubled = loop(from 1, through 4, startingWith [0], (
 		index,
 		list,
 	) {
@@ -1594,7 +1594,7 @@ const retainedAccumulator = `implementation {
 	constant walked = loop(from 1, through 3, startingWith {
 		current = [0],
 		snapshots = history,
-	}, step (index, state) {
+	}, (index, state) {
 		<- {
 			current = state.current::append(index),
 			snapshots = state.snapshots::append(state.current),
@@ -1611,11 +1611,11 @@ const retainedAccumulator = `implementation {
 // grows the end a build does not push onto. Every one of them keeps the walk it
 // was written in, and the answers are what the copying emission answers.
 const declinedAccumulators = `implementation {
-	constant read = loop(from 1, through 3, startingWith [0], step (index, list) {
+	constant read = loop(from 1, through 3, startingWith [0], (index, list) {
 		<- list::append(list::length())
 	})
 
-	constant captured = loop(from 1, through 3, startingWith [0], step (
+	constant captured = loop(from 1, through 3, startingWith [0], (
 		index,
 		list,
 	) {
@@ -1624,7 +1624,7 @@ const declinedAccumulators = `implementation {
 		<- list::append(seen::length())
 	})
 
-	constant walked = loop(from 1, through 3, startingWith [0], step (
+	constant walked = loop(from 1, through 3, startingWith [0], (
 		index,
 		list,
 	) {
@@ -1633,14 +1633,14 @@ const declinedAccumulators = `implementation {
 		}))
 	})
 
-	constant doubled = loop(from 1, through 3, startingWith [0], step (
+	constant doubled = loop(from 1, through 3, startingWith [0], (
 		index,
 		list,
 	) {
 		<- list::append(contentsOf list)
 	})
 
-	constant fronted = loop(from 1, through 3, startingWith [0], step (
+	constant fronted = loop(from 1, through 3, startingWith [0], (
 		index,
 		list,
 	) {
@@ -1662,7 +1662,7 @@ const declinedAccumulators = `implementation {
 // runs at least one, in whichever direction its bounds point.
 const seededBuilds = `implementation {
 	constant seed = [1, 2]
-	constant grown = loop(from 3, through 5, startingWith seed, step (
+	constant grown = loop(from 3, through 5, startingWith seed, (
 		index,
 		list,
 	) {
@@ -2974,8 +2974,8 @@ describe("Optimiser", () => {
 
 		// NOTE: The standard library is optimised with the Program that reaches
 		// it, and its own bodies are written on the Methods this pass lowers:
-		// the counted loop driver asks `start::isLessThanOrEqualTo(end)` to
-		// decide which way it counts, and `isEven` asks `rest::is(0)`.
+		// the counted loop driver asks `index::isLessThanOrEqualTo(end)` each
+		// turn, and `isEven` asks `rest::is(0)`.
 		//
 		// NOTE: The step callback is a VALUE rather than a literal, which is
 		// what keeps the driver in the emission at all — `inline-loops` writes
@@ -2987,11 +2987,10 @@ describe("Optimiser", () => {
 				constant advance = (_ index: Integer, _ total: Integer)
 					-> Integer { <- total::add(index) }
 
-				Terminal.inspect(loop(from 1, through 3, startingWith 0, step advance))
+				Terminal.inspect(loop(from 1, through 3, startingWith 0, advance))
 				Terminal.inspect(4::isEven())
 			}`)
 
-			expect(generated).toContain("start.value <= end.value")
 			// NOTE: `index` rather than `current.index` because the driver's
 			// `while` predicate takes its State apart with a Pattern — the
 			// binding is what the lowered comparison reads.
@@ -4297,9 +4296,14 @@ describe("Optimiser", () => {
 	describe("inline-loops", () => {
 		it("writes the counted loop as a for over what the bounds hold", () => {
 			// NOTE: The whole of what the counted entry costs, gone: the
-			// direction is decided once, the counter IS what its bounds hold,
-			// and the `{ index, carried }` Record its Essence body threads
-			// through the `while` driver is never built.
+			// counter IS what its bounds hold, and the `{ index, carried }`
+			// Record its Essence body threads through the `while` driver is
+			// never built.
+			//
+			// NOTE: The direction is which ENTRY was called, so nothing asks at
+			// run time and neither walk carries the other's test. Only the
+			// down-counting one declares anything besides its bounds, and what
+			// it declares is the clamp that makes its first turn certain.
 			//
 			// NOTE: And the KIND of counter is decided while COMPILING, because
 			// both bounds are written as Integers a double holds exactly. None
@@ -4307,17 +4311,21 @@ describe("Optimiser", () => {
 			let generated = generate(countedLoop)
 
 			expect(generated).toContain("const $loop_0_from = $pool_0.value;")
-			expect(generated).toContain(
-				"const $loop_0_up = $loop_0_from <= $loop_0_to;",
-			)
+			expect(generated).not.toContain("$loop_0_up")
 			expect(generated).not.toContain("$loop_0_big")
+			expect(generated).toContain("const $loop_0_delta = 1;")
 			expect(generated).toContain(
-				"const $loop_0_delta = $loop_0_up ? 1 : -1;",
+				"for (let $loop_0_index = $loop_0_from; $loop_0_index <= $loop_0_to; $loop_0_index += $loop_0_delta)",
 			)
 			expect(generated).toContain(
-				"for (let $loop_0_index = $loop_0_from; $loop_0_up ? $loop_0_index <= $loop_0_to : $loop_0_index >= $loop_0_to; $loop_0_index += $loop_0_delta)",
+				"const $loop_1_bound = $loop_1_to <= $loop_1_from ? $loop_1_to : $loop_1_from;",
+			)
+			expect(generated).toContain("const $loop_1_delta = -1;")
+			expect(generated).toContain(
+				"for (let $loop_1_index = $loop_1_from; $loop_1_index >= $loop_1_bound; $loop_1_index += $loop_1_delta)",
 			)
 			expect(generated).not.toContain("loop__overload$3")
+			expect(generated).not.toContain("loop__overload$6")
 			expect(generated).not.toContain("function (")
 		})
 
@@ -4328,7 +4336,7 @@ describe("Optimiser", () => {
 			// is decided from the bounds and canonicality belongs to the value.
 			let generated = generate(`implementation {
 	function upTo(_ limit: Integer) -> Integer {
-		<- loop(from 1, through limit, startingWith 0, step (
+		<- loop(from 1, through limit, startingWith 0, (
 			index,
 			total,
 		) { <- total::add(index) })
@@ -4341,7 +4349,7 @@ describe("Optimiser", () => {
 				'const $loop_0_big = typeof $loop_0_from !== "number" || typeof $loop_0_to !== "number";',
 			)
 			expect(generated).toContain(
-				"const $loop_0_delta = $loop_0_big ? $loop_0_up ? 1n : -1n : $loop_0_up ? 1 : -1;",
+				"const $loop_0_delta = $loop_0_big ? 1n : 1;",
 			)
 			expect(generated).toContain(
 				"for (let $loop_0_index = $loop_0_big ? BigInt($loop_0_from) : $loop_0_from;",
@@ -4381,7 +4389,7 @@ describe("Optimiser", () => {
 			// Integer is BUILT — `$loop_0_index` alone would be the swap taken
 			// where it must not be.
 			let generated = generate(`implementation {
-	constant seen = loop(from 1, through 3, startingWith [], step (
+	constant seen = loop(from 1, through 3, startingWith [], (
 		index,
 		gathered,
 	) { <- gathered::append(index) })
@@ -4438,12 +4446,12 @@ describe("Optimiser", () => {
 		<- value::add(value)
 	}
 
-	constant handed = loop(from 1, through 3, startingWith 1, step (
+	constant handed = loop(from 1, through 3, startingWith 1, (
 		_index,
 		carried,
 	) { <- twice(carried) })
 
-	constant built = loop(from 1, through 3, startingWith { total = 0 }, step (
+	constant built = loop(from 1, through 3, startingWith { total = 0 }, (
 		index,
 		state,
 	) { <- { state with total = state.total::add(index) } })
@@ -4466,7 +4474,7 @@ describe("Optimiser", () => {
 			// call — with either off there is nothing to carry, and the walk
 			// answers what it always did.
 			let source = `implementation {
-	constant crossed = loop(from 1, through 3, startingWith 9007199254740990, step (
+	constant crossed = loop(from 1, through 3, startingWith 9007199254740990, (
 		index,
 		carried,
 	) { <- carried::add(index) })
@@ -4779,7 +4787,7 @@ describe("Optimiser", () => {
 					"inline-loops",
 					readFileSync(fixturePath("Loops.es"), "utf8"),
 				),
-			).toEqual(["55", "15", "128", "128", "2"])
+			).toEqual(["55", "321", "15", "128", "128", "15", "2"])
 		})
 
 		it("prints the same thing with the pass off over a List Program", async () => {
@@ -4970,7 +4978,7 @@ describe("Optimiser", () => {
 			let generated = generate(`implementation {
 				constant built = loop(startingWith [0], while (list) {
 					<- list::length()::isLessThan(4)
-				}, step (list) { <- list::append(1) })
+				}, (list) { <- list::append(1) })
 
 				Terminal.inspect(built)
 			}`)

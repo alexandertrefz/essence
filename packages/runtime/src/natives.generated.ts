@@ -681,8 +681,8 @@ export type RandomnessNatives = {
 }
 
 export type FunctionsNatives = {
-	// static loop<State>(startingWith: State, while: (_: State) -> Boolean, step: (_: State) -> State) -> State
-	loop__overload$1: <State extends AnyType>(startingWith: State, argument1: (argument0: State) => BooleanType, step: (argument0: State) => State) => State
+	// static loop<State>(startingWith: State, while: (_: State) -> Boolean, _: (_: State) -> State) -> State
+	loop__overload$1: <State extends AnyType>(startingWith: State, argument1: (argument0: State) => BooleanType, argument2: (argument0: State) => State) => State
 	// static loop<State, Answer>(startingWith: State, step: (_: State) -> Step<State, Answer>) -> Answer
 	loop__overload$4: <State extends AnyType, Answer extends AnyType>(startingWith: State, step: (argument0: State) => StepType<State, Answer>) => Answer
 }
@@ -1130,7 +1130,7 @@ export const $RandomnessArity: AssertArities<typeof import("./Randomness"), {
 
 declare const functionsModule: typeof import("./functions")
 export const $functions: FunctionsNatives = functionsModule
-export const $functionsAbsent: AssertNoEssenceExports<typeof import("./functions"), "loop__overload$2" | "loop__overload$3" | "loop__overload$5"> = true
+export const $functionsAbsent: AssertNoEssenceExports<typeof import("./functions"), "loop__overload$2" | "loop__overload$3" | "loop__overload$5" | "loop__overload$6" | "loop__overload$7" | "loop__overload$8" | "loop__overload$9"> = true
 export const $functionsArity: AssertArities<typeof import("./functions"), {
 	loop__overload$1: 3
 	loop__overload$4: 2

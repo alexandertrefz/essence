@@ -1273,7 +1273,7 @@ export type InlineLoopCallback = {
 // greater because `loop__overload$3` does — and each is emitted in the order the
 // call evaluated its Arguments.
 export type InlineLoopDriver =
-	// NOTE: `loop(startingWith:while:step:)` and its `until` sibling, which is
+	// NOTE: `loop(startingWith:while:_)` and its `until` sibling, which is
 	// the same driver with the predicate read the other way round.
 	| {
 			kind: "condition"
@@ -1282,12 +1282,17 @@ export type InlineLoopDriver =
 			predicate: InlineLoopCallback
 			step: InlineLoopCallback
 	  }
-	// NOTE: `loop(from:through:startingWith:step:)`, which is written in Essence
-	// on the `while` driver and threads a `{ index, carried }` Record through it.
-	// Inlined it is a `for` over the bigint the Integers hold, and neither the
-	// Record nor the Essence driver is reached at all.
+	// NOTE: `loop(from:through:startingWith:_)` and `loop(from:downTo:startingWith:_)`,
+	// each written in Essence on the `while` driver and threading a
+	// `{ index, carried }` Record through it. Inlined it is a `for` over the
+	// bigint the Integers hold, and neither the Record nor the Essence driver is
+	// reached at all. `descending` is which entry it is, and it decides the step
+	// and the test while compiling rather than from the bounds at run time: the
+	// up-counting entry answers the seed where the end is behind the start, and
+	// the down-counting one always takes its first turn.
 	| {
 			kind: "counted"
+			descending: boolean
 			from: ExpressionNode
 			through: ExpressionNode
 			seed: ExpressionNode
