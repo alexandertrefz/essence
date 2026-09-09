@@ -30,7 +30,7 @@ import {
 	materialise,
 	ownItemsOf,
 	pair,
-	partition,
+	partition__overload$1 as partition,
 	prepend__overload$1 as prepend,
 	reduce__overload$1 as reduce,
 	reduce__overload$2 as reduceWithStep,

@@ -2155,6 +2155,8 @@ describe("Standard Library Loader", () => {
 			"Integer::isPositive -> Integer::isGreaterThan(0)",
 			"Integer::isZero -> Integer::is(0)",
 			"List::doesNotContain -> not List::contains(#0)",
+			"List::doesNotEnd -> not List::ends(#0)",
+			"List::doesNotStart -> not List::starts(#0)",
 			"List::hasItems -> not List::isEmpty()",
 			"List::hasNoItems -> not List::hasItems(#0)",
 			"Optional::isEmpty -> not Optional::hasValue()",
@@ -2212,6 +2214,7 @@ describe("Standard Library Loader", () => {
 			"Integer::isMultiple",
 			"Integer::isWholeNumber",
 			"List::contains",
+			"List::ends",
 			// NOTE: Both entries are native, so there is no body to read a
 			// question off. Neither is `removeDuplicates()::length()`
 			// compared against the receiver's, which is what would have made
@@ -2221,6 +2224,12 @@ describe("Standard Library Loader", () => {
 			"List::hasOnlyItems",
 			"List::is",
 			"List::isEmpty",
+			// NOTE: `isSorted` is native, so there is no body to read a
+			// question off. The two ends of a List are chains instead: each
+			// cuts an end off the receiver and compares it against the List
+			// the call wrote, as `String`'s own pair below does.
+			"List::isSorted",
+			"List::starts",
 			"Number::is",
 			"Optional::hasValue",
 			"Optional::is",

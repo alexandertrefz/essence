@@ -447,6 +447,101 @@ declarations {
 			<infer Key is Equatable>(on key: (_: ItemType) -> Key) -> Boolean
 		}
 
+		§ The four questions `String` asks of its text, asked of a List. A
+		§ String's characters are a `List<String>`, so the same question was
+		§ askable of the text and not of its characters. Each is written on
+		§ the counted `firstItems` or `lastItems` beside it, which answer
+		§ every item for a count past the length. So a prefix longer than the
+		§ receiver is compared against fewer items than it has, and no guard
+		§ is needed.
+		§
+		§ The two `doesNot` bodies are read as well as run, as `String`'s two
+		§ are. Each asks its contrary's question over whatever List the call
+		§ writes. See DEVELOPMENT.md, Why bodies look the way they do.
+
+		§§ Answers whether the List begins with the items of the given one.
+		§§
+		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`. Every List begins with the empty List.
+		§§
+		§§ @example
+		§§   expect [1, 2, 3]::starts(with [1, 2])
+		§§   expect [1, 2, 3]::doesNotStart(with [2])
+		§§
+		§§ @param with — the leading items to look for
+		§§ @returns — `true` when the List begins with those items.
+		starts<infer ItemType is Equatable>(
+			with prefix: List<ItemType>,
+		) -> Boolean {
+			<- @::firstItems(prefix::length())::is(prefix)
+		}
+
+		§§ Answers whether the List does not begin with the items of the given one.
+		§§
+		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
+		§§
+		§§ @param with — the leading items to look for
+		§§ @returns — `true` when the List begins with other items.
+		doesNotStart<infer ItemType is Equatable>(
+			with prefix: List<ItemType>,
+		) -> Boolean {
+			<- @::starts(with prefix)::negate()
+		}
+
+		§§ Answers whether the List ends with the items of the given one.
+		§§
+		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`. Every List ends with the empty List.
+		§§
+		§§ @param with — the trailing items to look for
+		§§ @returns — `true` when the List ends with those items.
+		ends<infer ItemType is Equatable>(
+			with suffix: List<ItemType>,
+		) -> Boolean {
+			<- @::lastItems(suffix::length())::is(suffix)
+		}
+
+		§§ Answers whether the List does not end with the items of the given one.
+		§§
+		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
+		§§
+		§§ @param with — the trailing items to look for
+		§§ @returns — `true` when the List ends with other items.
+		doesNotEnd<infer ItemType is Equatable>(
+			with suffix: List<ItemType>,
+		) -> Boolean {
+			<- @::ends(with suffix)::negate()
+		}
+
+		§ Native, and the shape the README's fourth group names: an ordering
+		§ whose Essence body builds a whole List to answer one question. Two
+		§ bodies were weighed. One is the adjacent pairs
+		§ `@::pair(with @::removeFirst())` makes, quantified by
+		§ `hasNoItems`. The other is a fold carrying the item before in a
+		§ Record. The pairs build one Record per item, and the fold pays a
+		§ Record spread per item. Two thousand checks of a two thousand item
+		§ sorted List measured 64 ms and 127 ms against 21 ms here. The walk
+		§ here holds the item before in a local. A List already in order is
+		§ the case that pays. The pairs build their whole List whatever the
+		§ answer is, and measured 57 ms where the third item decides it.
+		§
+		§ A direction is a Parameter rather than a Method of its own, the way
+		§ `sort` reads one. Descending turns the comparison around instead of
+		§ asking a second question. So the two directions agree about a List
+		§ whose items the order does not tell apart.
+
+		§§ Answers whether the items are in order.
+		§§
+		§§ Items the order does not tell apart are in order either way. The empty List and a List of one item are both in order. The Method is available whenever the items conform to `Comparable`.
+		§§
+		§§ @example
+		§§   expect [1, 2, 2, 3]::isSorted()
+		§§   expect [3, 2, 1]::isSorted(in #Descending)
+		§§
+		§§ @param in — the direction to check for, `#Ascending` when it is left out
+		§§ @returns — `true` when no item stands out of that order.
+		isSorted<infer ItemType is Comparable>(
+			in order: SortOrder = #Ascending,
+		) -> Boolean
+
 		§§ Answers how many items the List has.
 		§§
 		§§ @returns — the number of items, which is never negative.
@@ -736,13 +831,108 @@ declarations {
 		§ `@::indices()::map(…)`, which reads every item back through
 		§ `item(at:)` and builds an Optional per item to take apart again.
 
-		§§ Answers the positions the List has, in order.
+		§§ Answers the positions the List has, or the positions of the items a check accepts.
 		§§
-		§§ The positions count from zero and stop before the length. The empty List answers no positions. The answer is a whole List of positions: to walk the items beside their positions in one pass, use `enumerate()`.
+		§§ The positions count from zero and stop before the length. The empty List answers no positions.
 		§§
 		§§ @returns — the List of positions.
-		indices() -> List<Integer> {
-			<- List.of(integersFrom 0, upTo @::length())
+		overload indices {
+			§§ Answers the positions the List has, in order.
+			§§
+			§§ The positions count from zero and stop before the length. The empty List answers no positions. The answer is a whole List of positions: to walk the items beside their positions in one pass, use `enumerate()`.
+			§§
+			§§ @returns — the List of positions.
+			() -> List<Integer> {
+				<- List.of(integersFrom 0, upTo @::length())
+			}
+
+			§ Written on `enumerate`, which is the one walk that hands a body
+			§ an item and the position it stands at. The fold is what keeps
+			§ the positions. A filter over the same entries followed by a
+			§ `map` reading `.index` builds two Lists where this builds one.
+			§ Two hundred walks of 20,000 items measured 104 ms that way and
+			§ 74 ms here.
+			§
+			§ For the positions an item stands at, `everyIndex(of:)` asks the
+			§ same question by value.
+
+			§§ Answers the positions of the items the check accepts, in order.
+			§§
+			§§ The positions count from zero. A check that accepts no item answers no positions.
+			§§
+			§§ @example
+			§§   expect [3, 4, 5, 6]::indices(where (n) { <- n::isEven() })::is([1, 3])
+			§§
+			§§ @param where — the check each item is offered to
+			§§ @returns — the List of positions the check accepted.
+			(where check: (_: ItemType) -> Boolean) -> List<Integer> {
+				constant kept: List<Integer> = []
+
+				<- @::enumerate()
+					::reduce(startingWith kept, (positions, entry) {
+						if check(entry.item) {
+							<- positions::append(entry.index)
+						} else {
+							<- positions
+						}
+					})
+			}
+		}
+
+		§ The two ends have a middle. A search that expects to match one item
+		§ answers a List of one, and reading that through `firstItem` says
+		§ nothing about the items after it. The length is read once and
+		§ `firstItem` answers the Optional outright, so nothing is unwrapped
+		§ to be wrapped again.
+
+		§§ Answers the only item of the List.
+		§§
+		§§ A List of any other length has no only item, and the `defaultingTo:` entry answers the given item in place of nothing.
+		overload onlyItem {
+			§§ Answers the only item of the List.
+			§§
+			§§ @example
+			§§   expect [7]::onlyItem()::is(7)
+			§§   expect [7, 8]::onlyItem()::isEmpty()
+			§§
+			§§ @returns — the item, or nothing when the List does not hold exactly one.
+			() -> Optional<ItemType> {
+				if @::length()::is(1) {
+					<- @::firstItem()
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ Answers the only item of the List, or the given fallback for a List of any other length.
+			§§
+			§§ @param defaultingTo — the item to answer with when there is no only item
+			§§ @returns — the item, or the fallback in its place.
+			(defaultingTo fallback: ItemType) -> ItemType {
+				<- @::onlyItem()::value(defaultingTo fallback)
+			}
+		}
+
+		§ The plural of `firstIndex(of:)` and `lastIndex(of:)`, which name
+		§ one position each. It is a Method of its own rather than an entry
+		§ on `indices`. That Method answers the positions the List holds, and
+		§ this one answers the positions an item stands at. The check form of
+		§ the same question is `indices(where:)`, and this is that entry with
+		§ the items' own `is` as the check.
+
+		§§ Answers the positions of every item equal to the given one, in order.
+		§§
+		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`. A List without the item answers no positions.
+		§§
+		§§ @example
+		§§   expect [1, 2, 1]::everyIndex(of 1)::is([0, 2])
+		§§
+		§§ @param of — the item to look for
+		§§ @returns — the List of positions the item stands at.
+		everyIndex<infer ItemType is Equatable>(
+			of item: ItemType,
+		) -> List<Integer> {
+			<- @::indices(where (candidate) { <- candidate::is(item) })
 		}
 
 		§§ Answers every item beside the position it stands at.
@@ -752,24 +942,68 @@ declarations {
 		§§ @returns — the List of Records, each holding a position under `index` and the item at it under `item`.
 		enumerate() -> List<{ index: Integer, item: ItemType }>
 
-		§§ Answers a new List without the first item, or without the given number of leading items.
+		§ The counted entry and the checked one. A count says how many
+		§ leading items go. A `while:` check says where the leading run ends.
+		§ The walk stops at the first item the check refuses, and every item
+		§ from there on is kept.
+		§
+		§ The checked entry reads that boundary off `firstIndex(where:)`,
+		§ which leaves at the first refusal, and slices from it. The
+		§ alternative was a fold carrying a Record of the answer and whether
+		§ it is still dropping. That fold walks every item and pays a Record
+		§ spread for each item it keeps. Two thousand calls over a two
+		§ thousand item List measured 34 ms on the boundary and 133 ms on the
+		§ fold. A quarter of the items were dropped there. Dropping all but a
+		§ twentieth they measured 23 ms and 33 ms.
+		§
+		§ The entries `removeLast(while:)` and `lastItems(while:)` read their
+		§ boundary off `lastIndex(where:)`, which walks backwards. The entry
+		§ `firstItems(while:)` does not, and says why at its own site.
+
+		§§ Answers a new List without the first item, without the given number of leading items, or without the leading items a check accepts.
 		§§
-		§§ The answer is empty when more items are removed than the List has. A count below one removes nothing.
+		§§ The answer is empty when every item is removed. A count below one removes nothing.
 		§§
-		§§ @param _ — how many leading items to remove, which is one when it is left out
 		§§ @returns — the shortened List.
-		removeFirst(_ count: Integer = 1) -> List<ItemType> {
-			§ The Parameter is a count, not a position. A negative count would
-			§ reach `slice` as a position counting back from the end, so the
-			§ guard answers the receiver instead. A count past the length
-			§ reaches `slice`'s own clamping and leaves nothing.
-			§
-			§ On the empty List the default slices `[1, 0)`, an inverted range,
-			§ which `slice` answers empty.
-			if count::isLessThan(0) {
-				<- @
-			} else {
-				<- @::slice(from count)
+		overload removeFirst {
+			§§ Answers a new List without the first item, or without the given number of leading items.
+			§§
+			§§ The answer is empty when more items are removed than the List has. A count below one removes nothing.
+			§§
+			§§ @param _ — how many leading items to remove, which is one when it is left out
+			§§ @returns — the shortened List.
+			(_ count: Integer = 1) -> List<ItemType> {
+				§ The Parameter is a count, not a position. A negative count
+				§ would reach `slice` as a position counting back from the
+				§ end, so the guard answers the receiver instead. A count past
+				§ the length reaches `slice`'s own clamping and leaves
+				§ nothing.
+				§
+				§ On the empty List the default slices `[1, 0)`, an inverted
+				§ range, which `slice` answers empty.
+				if count::isLessThan(0) {
+					<- @
+				} else {
+					<- @::slice(from count)
+				}
+			}
+
+			§§ Answers a new List without the leading items the check accepts.
+			§§
+			§§ The walk stops at the first item the check refuses, and that item and every item after it are kept. A check that accepts every item answers the empty List.
+			§§
+			§§ @example
+			§§   expect [1, 2, 3, 1]::removeFirst(while (n) { <- n::isLessThan(3) })::is([3, 1])
+			§§
+			§§ @param while — the check the leading items are offered to
+			§§ @returns — the List from the first refused item on.
+			(while check: (_: ItemType) -> Boolean) -> List<ItemType> {
+				<- @::slice(
+					from @::firstIndex(
+						where (item) { <- check(item)::negate() },
+						defaultingTo @::length(),
+					),
+				)
 			}
 		}
 
@@ -831,21 +1065,54 @@ declarations {
 			) -> List<ItemType>
 		}
 
-		§§ Answers a new List without the last item, or without the given number of trailing items.
+		§§ Answers a new List without the last item, without the given number of trailing items, or without the trailing items a check accepts.
 		§§
-		§§ The answer is empty when more items are removed than the List has. A count below one removes nothing.
+		§§ The answer is empty when every item is removed. A count below one removes nothing.
 		§§
-		§§ @param _ — how many trailing items to remove, which is one when it is left out
 		§§ @returns — the shortened List.
-		removeLast(_ count: Integer = 1) -> List<ItemType> {
-			§ The Parameter is a count, not a position. A count at or past the
-			§ length makes the subtraction go negative, and `slice` would read
-			§ that as a position counting back from the end. Both ends are
-			§ answered here instead.
-			<- define {
-				as @  if count::isLessThan(1)
-				as [] if count::isGreaterThanOrEqualTo(@::length())
-				as @::slice(to @::length()::subtract(count)) otherwise
+		overload removeLast {
+			§§ Answers a new List without the last item, or without the given number of trailing items.
+			§§
+			§§ The answer is empty when more items are removed than the List has. A count below one removes nothing.
+			§§
+			§§ @param _ — how many trailing items to remove, which is one when it is left out
+			§§ @returns — the shortened List.
+			(_ count: Integer = 1) -> List<ItemType> {
+				§ The Parameter is a count, not a position. A count at or past
+				§ the length makes the subtraction go negative, and `slice`
+				§ would read that as a position counting back from the end.
+				§ Both ends are answered here instead.
+				<- define {
+					as @  if count::isLessThan(1)
+					as [] if count::isGreaterThanOrEqualTo(@::length())
+					as @::slice(to @::length()::subtract(count)) otherwise
+				}
+			}
+
+			§ The boundary is `lastIndex(where:)`, which walks backwards
+			§ natively and leaves at the last item the check refuses. Every
+			§ position after it is the trailing run. A List the check accepts
+			§ every item of answers no such position, and the fallback of -1
+			§ makes the slice stop before position zero. See the note on
+			§ `removeFirst`.
+
+			§§ Answers a new List without the trailing items the check accepts.
+			§§
+			§§ The walk runs backwards and stops at the last item the check refuses. That item and every item before it are kept. A check that accepts every item answers the empty List.
+			§§
+			§§ @example
+			§§   expect [1, 3, 2, 1]::removeLast(while (n) { <- n::isLessThan(3) })::is([1, 3])
+			§§
+			§§ @param while — the check the trailing items are offered to
+			§§ @returns — the List up to the last refused item.
+			(while check: (_: ItemType) -> Boolean) -> List<ItemType> {
+				<- @::slice(
+					to @::lastIndex(
+						where (item) { <- check(item)::negate() },
+						defaultingTo -1,
+					)
+						::add(1),
+				)
 			}
 		}
 
@@ -1246,15 +1513,77 @@ declarations {
 		§ `§§` block in the file says a check accepts or refuses an item, so
 		§ the halves are `accepted` and `refused`.
 
-		§§ Answers the List split in two by the check: the items it accepts, and the items it refuses.
+		§ The two entries below the first cut the List at one position
+		§ instead of sorting the items into two heaps. So their halves are
+		§ named for where they stand rather than for what a check did to
+		§ them: `leading` and `trailing`. Every item of the receiver is in
+		§ one of them, and joining the two answers the receiver back.
+
+		§§ Answers the List split in two: by a check, at the end of the leading run a check accepts, or at a position.
 		§§
-		§§ Both halves keep the original order. Each item is offered to the check once.
+		§§ Both halves keep the original order, and every item of the receiver is in exactly one of them.
 		§§
-		§§ @param where — the check each item is offered to
-		§§ @returns — a Record holding the accepted items under `accepted` and the others under `refused`.
-		partition(
-			where check: (_: ItemType) -> Boolean,
-		) -> { accepted: List<ItemType>, refused: List<ItemType> }
+		§§ @returns — a Record holding the two halves.
+		overload partition {
+			§§ Answers the List split in two by the check: the items it accepts, and the items it refuses.
+			§§
+			§§ Both halves keep the original order. Each item is offered to the check once.
+			§§
+			§§ @param where — the check each item is offered to
+			§§ @returns — a Record holding the accepted items under `accepted` and the others under `refused`.
+			(
+				where check: (_: ItemType) -> Boolean,
+			) -> { accepted: List<ItemType>, refused: List<ItemType> }
+
+			§ Both halves off one boundary, which is the whole of what this
+			§ entry buys over calling `firstItems(while:)` beside
+			§ `removeFirst(while:)`: the leading run is walked once. The
+			§ boundary is `removeFirst`'s own, and that note explains it.
+
+			§§ Answers the List split at the end of the leading run the check accepts.
+			§§
+			§§ The walk stops at the first item the check refuses. That item opens the trailing half. A check that accepts every item answers the whole List under `leading`.
+			§§
+			§§ @example
+			§§   constant halves = [1, 2, 3, 1]::partition(while (n) { <- n::isLessThan(3) })
+			§§
+			§§   expect halves.leading::is([1, 2])
+			§§   expect halves.trailing::is([3, 1])
+			§§
+			§§ @param while — the check the leading items are offered to
+			§§ @returns — a Record holding the leading run under `leading` and the rest under `trailing`.
+			(
+				while check: (_: ItemType) -> Boolean,
+			) -> { leading: List<ItemType>, trailing: List<ItemType> } {
+				<- @::partition(
+					at @::firstIndex(
+						where (item) { <- check(item)::negate() },
+						defaultingTo @::length(),
+					),
+				)
+			}
+
+			§§ Answers the List split in two at the given position.
+			§§
+			§§ The item at that position opens the trailing half. A negative position counts back from the end: -1 cuts before the last item. A position outside the List leaves one half empty.
+			§§
+			§§ @example
+			§§   constant halves = [1, 2, 3]::partition(at 1)
+			§§
+			§§   expect halves.leading::is([1])
+			§§   expect halves.trailing::is([2, 3])
+			§§
+			§§ @param at — the position to cut before
+			§§ @returns — a Record holding the items before that position under `leading` and the rest under `trailing`.
+			(
+				at index: Integer,
+			) -> { leading: List<ItemType>, trailing: List<ItemType> } {
+				<- {
+					leading = @::slice(to index),
+					trailing = @::slice(from index),
+				}
+			}
+		}
 
 		§§ Answers the items of the two Lists paired position by position.
 		§§
@@ -1335,9 +1664,9 @@ declarations {
 		§ `sort(on key)::firstItem()`, which answers the same item for n log n
 		§ comparisons instead of n.
 
-		§§ Answers the item whose key is lowest.
+		§§ Answers the lowest item, or the item whose key is lowest.
 		§§
-		§§ Ties keep the earlier item. The empty List has no such item, and the `defaultingTo:` entry answers the given item in place of nothing.
+		§§ Ties keep the earlier item. The empty List has no such item, and the `defaultingTo:` entries answer the given item in place of nothing.
 		overload lowestItem {
 			§§ Answers the item whose key is lowest.
 			§§
@@ -1377,11 +1706,51 @@ declarations {
 			) -> ItemType {
 				<- @::lowestItem(on key)::value(defaultingTo fallback)
 			}
+
+			§ The keyless pair, for a List whose items order themselves.
+			§ Without them `["pear", "apple"]::lowestItem()` had to be written
+			§ as a sort and a read, or as an identity key at the call site.
+			§ Each is the keyed entry above with the item as its own key. So
+			§ the comparison stays written once, and one call per item is
+			§ what that costs. Two thousand calls over a two thousand item
+			§ List measured 15 ms here and 10 ms with the fold written out a
+			§ second time. The second copy was declined at that price: it is
+			§ the same walk and the same comparison under a second name.
+			§
+			§ They are appended rather than written beside the keyed pair,
+			§ because an Overload's position binds its emitted name. See
+			§ DEVELOPMENT.md, Editing hazards.
+
+			§§ Answers the lowest item.
+			§§
+			§§ Ties keep the earlier item. The entry is available whenever the items conform to `Comparable`.
+			§§
+			§§ @example
+			§§   constant fruit: List<String> = ["pear", "apple"]
+			§§
+			§§   expect fruit::lowestItem()::is("apple")
+			§§
+			§§ @returns — the item, or nothing for the empty List.
+			<infer ItemType is Comparable>() -> Optional<ItemType> {
+				<- @::lowestItem(on (item) { <- item })
+			}
+
+			§§ Answers the lowest item, or the given fallback for the empty List.
+			§§
+			§§ The entry is available whenever the items conform to `Comparable`.
+			§§
+			§§ @param defaultingTo — the item to answer with when there is none
+			§§ @returns — the item, or the fallback in its place.
+			<infer ItemType is Comparable>(
+				defaultingTo fallback: ItemType,
+			) -> ItemType {
+				<- @::lowestItem()::value(defaultingTo fallback)
+			}
 		}
 
-		§§ Answers the item whose key is highest.
+		§§ Answers the highest item, or the item whose key is highest.
 		§§
-		§§ Ties keep the earlier item. The empty List has no such item, and the `defaultingTo:` entry answers the given item in place of nothing.
+		§§ Ties keep the earlier item. The empty List has no such item, and the `defaultingTo:` entries answer the given item in place of nothing.
 		overload highestItem {
 			§§ Answers the item whose key is highest.
 			§§
@@ -1421,6 +1790,46 @@ declarations {
 			) -> ItemType {
 				<- @::highestItem(on key)::value(defaultingTo fallback)
 			}
+
+			§ The keyless pair, for a List whose items order themselves.
+			§ Without them `["pear", "apple"]::highestItem()` had to be written
+			§ as a sort and a read, or as an identity key at the call site.
+			§ Each is the keyed entry above with the item as its own key. So
+			§ the comparison stays written once, and one call per item is
+			§ what that costs. Two thousand calls over a two thousand item
+			§ List measured 15 ms here and 10 ms with the fold written out a
+			§ second time. The second copy was declined at that price: it is
+			§ the same walk and the same comparison under a second name.
+			§
+			§ They are appended rather than written beside the keyed pair,
+			§ because an Overload's position binds its emitted name. See
+			§ DEVELOPMENT.md, Editing hazards.
+
+			§§ Answers the highest item.
+			§§
+			§§ Ties keep the earlier item. The entry is available whenever the items conform to `Comparable`.
+			§§
+			§§ @example
+			§§   constant fruit: List<String> = ["pear", "apple"]
+			§§
+			§§   expect fruit::highestItem()::is("pear")
+			§§
+			§§ @returns — the item, or nothing for the empty List.
+			<infer ItemType is Comparable>() -> Optional<ItemType> {
+				<- @::highestItem(on (item) { <- item })
+			}
+
+			§§ Answers the highest item, or the given fallback for the empty List.
+			§§
+			§§ The entry is available whenever the items conform to `Comparable`.
+			§§
+			§§ @param defaultingTo — the item to answer with when there is none
+			§§ @returns — the item, or the fallback in its place.
+			<infer ItemType is Comparable>(
+				defaultingTo fallback: ItemType,
+			) -> ItemType {
+				<- @::highestItem()::value(defaultingTo fallback)
+			}
 		}
 
 		§ Keeping from an end, which is what `removeFirst` and `removeLast`
@@ -1434,32 +1843,164 @@ declarations {
 		§ `slice(from 0)` is the whole List, so a count of zero would keep
 		§ everything without the guard.
 
-		§§ Answers a new List of the leading items, up to the given count.
+		§§ Answers a new List of the leading items, up to the given count, or of the leading items a check accepts.
 		§§
 		§§ A count below one answers the empty List. A count past the length answers every item.
 		§§
-		§§ @param _ — how many leading items to keep
 		§§ @returns — the List of leading items, in the order they were in.
-		firstItems(_ count: Integer) -> List<ItemType> {
-			if count::isLessThan(1) {
-				<- []
-			} else {
-				<- @::slice(to count)
+		overload firstItems {
+			§§ Answers a new List of the leading items, up to the given count.
+			§§
+			§§ A count below one answers the empty List. A count past the length answers every item.
+			§§
+			§§ @param _ — how many leading items to keep
+			§§ @returns — the List of leading items, in the order they were in.
+			(_ count: Integer) -> List<ItemType> {
+				if count::isLessThan(1) {
+					<- []
+				} else {
+					<- @::slice(to count)
+				}
+			}
+
+			§ The complement of `removeFirst(while:)`: the two joined answer
+			§ the receiver back. This one is the fold rather than the
+			§ boundary, because what it keeps is exactly what it walked. The
+			§ boundary reads the leading run and then copies it. Two thousand
+			§ calls over a two thousand item List measured 10 ms that way and
+			§ 7 ms here. A quarter of the items were kept there. Keeping all
+			§ but a twentieth the two measured 22 ms and 25 ms, and the fold
+			§ is behind. The entry `removeFirst(while:)` keeps what it never
+			§ walked, which is why it slices instead.
+
+			§§ Answers a new List of the leading items the check accepts.
+			§§
+			§§ The walk stops at the first item the check refuses, and that item is left out. A check that accepts every item answers every item.
+			§§
+			§§ @example
+			§§   expect [1, 2, 3, 1]::firstItems(while (n) { <- n::isLessThan(3) })::is([1, 2])
+			§§
+			§§ @param while — the check the leading items are offered to
+			§§ @returns — the List up to the first refused item.
+			(while check: (_: ItemType) -> Boolean) -> List<ItemType> {
+				constant leading: List<ItemType> = []
+
+				<- @::reduce(startingWith leading, step (kept, item) {
+					if check(item) {
+						<- #Continue(kept::append(item))
+					} else {
+						<- #Done(kept)
+					}
+				})
 			}
 		}
 
-		§§ Answers a new List of the trailing items, up to the given count.
+		§§ Answers a new List of the trailing items, up to the given count, or of the trailing items a check accepts.
 		§§
-		§§ A count below one answers the empty List. A count past the length reaches back past the start, where `slice` settles on zero, so it answers every item.
+		§§ A count below one answers the empty List. A count past the length answers every item.
 		§§
-		§§ @param _ — how many trailing items to keep
 		§§ @returns — the List of trailing items, in the order they were in.
-		lastItems(_ count: Integer) -> List<ItemType> {
-			if count::isLessThan(1) {
-				<- []
-			} else {
-				<- @::slice(from count::negate())
+		overload lastItems {
+			§§ Answers a new List of the trailing items, up to the given count.
+			§§
+			§§ A count below one answers the empty List. A count past the length reaches back past the start, where `slice` settles on zero, so it answers every item.
+			§§
+			§§ @param _ — how many trailing items to keep
+			§§ @returns — the List of trailing items, in the order they were in.
+			(_ count: Integer) -> List<ItemType> {
+				if count::isLessThan(1) {
+					<- []
+				} else {
+					<- @::slice(from count::negate())
+				}
 			}
+
+			§ The complement of `removeLast(while:)`, over the same backwards
+			§ boundary. See the note on `removeFirst`.
+
+			§§ Answers a new List of the trailing items the check accepts.
+			§§
+			§§ The walk runs backwards and stops at the last item the check refuses, which is left out. A check that accepts every item answers every item.
+			§§
+			§§ @example
+			§§   expect [1, 3, 2, 1]::lastItems(while (n) { <- n::isLessThan(3) })::is([2, 1])
+			§§
+			§§ @param while — the check the trailing items are offered to
+			§§ @returns — the List from after the last refused item.
+			(while check: (_: ItemType) -> Boolean) -> List<ItemType> {
+				<- @::slice(
+					from @::lastIndex(
+						where (item) { <- check(item)::negate() },
+						defaultingTo -1,
+					)
+						::add(1),
+				)
+			}
+		}
+
+		§ The running fold. Where `reduce` keeps the last value the combiner
+		§ built, this keeps every one of them. The name is neither `reduce`
+		§ nor `scan`. Peers spell it five ways, and `accumulate` is the one
+		§ that reads as a command and does not collide with the fold beside
+		§ it.
+		§
+		§ Native, because the answer holds the starting value before any item
+		§ is seen. So it is never empty, which is the promise an Essence body
+		§ can not make. A body would be a `reduce` carrying the List it is
+		§ building, whose answer is a `List`.
+
+		§§ Answers every value the combiner builds, starting from the given one.
+		§§
+		§§ The answer opens with the starting value and holds one value for every item after it. So it is one longer than the List, and it is never empty. The empty List answers the starting value alone.
+		§§
+		§§ @example
+		§§   constant totals = [1, 2, 3]::accumulate(startingWith 0, (total, item) {
+		§§     <- total::add(item)
+		§§   })
+		§§
+		§§   expect totals::is([0, 1, 3, 6])
+		§§
+		§§ @param startingWith — the value the first combination builds on
+		§§ @param _ — the combiner, handed the value so far and each item
+		§§ @returns — the List of values, which is never empty.
+		accumulate<infer Answer>(
+			startingWith initial: Answer,
+			_ combine: (_: Answer, _: ItemType) -> Answer,
+		) -> NonEmptyList<Answer>
+
+		§ The filter and the transform in one walk, written on `reduce`
+		§ rather than as `map(transform)::values()`. What it saves is the
+		§ whole List of Optionals that composition builds to take apart
+		§ again. It saves little time. Two thousand walks of a two thousand
+		§ item List measured 1013 ms on the composition and 948 ms here, with
+		§ `Integer.parse` as the transform. Halving an Integer instead
+		§ measured 511 ms and 474 ms. The composition is still what the
+		§ Method means, which is what its block says.
+
+		§§ Answers every value the transform answers for an item.
+		§§
+		§§ The items the transform answers nothing for are left out, so the answer can be shorter than the receiver. It is `map(transform)::values()` in one walk.
+		§§
+		§§ @example
+		§§   constant parsed = ["1", "x", "22"]::everyValue(from (text) {
+		§§     <- Integer.parse(text)
+		§§   })
+		§§
+		§§   expect parsed::is([1, 22])
+		§§
+		§§ @param from — the transform each item is handed to
+		§§ @returns — the List of values.
+		everyValue<infer Other>(
+			from transform: (_: ItemType) -> Optional<Other>,
+		) -> List<Other> {
+			constant kept: List<Other> = []
+
+			<- @::reduce(startingWith kept, (accumulated, item) {
+				<- match transform(item) -> List<Other> {
+					case #Value(value) { <- accumulated::append(value) }
+					case #Empty        { <- accumulated }
+				}
+			})
 		}
 
 		§ The set-shaped Methods, and the one structure all four rest on. Each
@@ -1917,6 +2458,32 @@ declarations {
 			_ transform: (_: ItemType) -> Other,
 		) -> NonEmptyList<Other>
 
+		§ The fold with no starting value, which is the proof spent on a
+		§ question `List` can not be asked. A seedless fold over the empty
+		§ List has nothing to answer with. So peers ship two names for it,
+		§ and one of them answers an Optional. Here the receiver carries the
+		§ evidence, and one name answers the item outright.
+		§
+		§ The first item is the starting value, and the rest of the List is
+		§ folded into it. The two seeded entries stay on `List`. A call that
+		§ writes `startingWith:` finds no entry here and falls to that rung,
+		§ as a `defaultingTo:` call on `lowestItem` does.
+
+		§§ Answers the items combined into a single value, with no starting value to give.
+		§§
+		§§ The first item opens the fold and each item after it is combined into what came before. A List of one item answers that item, and the combiner is not run.
+		§§
+		§§ @example
+		§§   constant total = [1, 2, 3]::reduce((running, item) { <- running::add(item) })
+		§§
+		§§   expect total::is(6)
+		§§
+		§§ @param _ — the combiner, handed the value so far and each item
+		§§ @returns — the combined value.
+		reduce(_ combine: (_: ItemType, _: ItemType) -> ItemType) -> ItemType {
+			<- @::removeFirst()::reduce(startingWith @::firstItem(), combine)
+		}
+
 		§ Neither `reverse` nor `sort` adds an item or drops one, so the answer
 		§ is the receiver's own items in another order. All four are `List`'s
 		§ own natives under this Namespace's names.
@@ -2056,28 +2623,62 @@ declarations {
 		§ first. Nothing can tell this fallback is dead, since
 		§ `Optional::value(defaultingTo:)` declares no bare `value()`.
 
-		§§ Answers the item whose key is lowest, which a non-empty List always has.
+		§§ Answers the lowest item, or the item whose key is lowest, which a non-empty List always has.
 		§§
 		§§ Ties keep the earlier item.
 		§§
-		§§ @param on — the key the items are ordered by
 		§§ @returns — the item.
-		lowestItem<infer Key is Comparable>(
-			on key: (_: ItemType) -> Key,
-		) -> ItemType {
-			<- @::<List>lowestItem(on key)::value(defaultingTo @::firstItem())
+		overload lowestItem {
+			§§ Answers the item whose key is lowest, which a non-empty List always has.
+			§§
+			§§ Ties keep the earlier item.
+			§§
+			§§ @param on — the key the items are ordered by
+			§§ @returns — the item.
+			<infer Key is Comparable>(
+				on key: (_: ItemType) -> Key,
+			) -> ItemType {
+				<- @::<List>lowestItem(on key)
+					::value(defaultingTo @::firstItem())
+			}
+
+			§§ Answers the lowest item, which a non-empty List always has.
+			§§
+			§§ Ties keep the earlier item. The entry is available whenever the items conform to `Comparable`.
+			§§
+			§§ @returns — the item.
+			<infer ItemType is Comparable>() -> ItemType {
+				<- @::<List>lowestItem()::value(defaultingTo @::firstItem())
+			}
 		}
 
-		§§ Answers the item whose key is highest, which a non-empty List always has.
+		§§ Answers the highest item, or the item whose key is highest, which a non-empty List always has.
 		§§
 		§§ Ties keep the earlier item.
 		§§
-		§§ @param on — the key the items are ordered by
 		§§ @returns — the item.
-		highestItem<infer Key is Comparable>(
-			on key: (_: ItemType) -> Key,
-		) -> ItemType {
-			<- @::<List>highestItem(on key)::value(defaultingTo @::firstItem())
+		overload highestItem {
+			§§ Answers the item whose key is highest, which a non-empty List always has.
+			§§
+			§§ Ties keep the earlier item.
+			§§
+			§§ @param on — the key the items are ordered by
+			§§ @returns — the item.
+			<infer Key is Comparable>(
+				on key: (_: ItemType) -> Key,
+			) -> ItemType {
+				<- @::<List>highestItem(on key)
+					::value(defaultingTo @::firstItem())
+			}
+
+			§§ Answers the highest item, which a non-empty List always has.
+			§§
+			§§ Ties keep the earlier item. The entry is available whenever the items conform to `Comparable`.
+			§§
+			§§ @returns — the item.
+			<infer ItemType is Comparable>() -> ItemType {
+				<- @::<List>highestItem()::value(defaultingTo @::firstItem())
+			}
 		}
 
 		§ Both entries carry the proof. The first item is always kept, so a
