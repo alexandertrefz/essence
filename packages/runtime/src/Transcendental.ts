@@ -106,26 +106,42 @@ function scaledE(digits: bigint): { low: bigint; high: bigint } {
 }
 
 // NOTE: Everything the rest of this module knows about a base: the symbol a
-// term prints under — also its identity in the representation — and a
-// certified enclosure of its value. Registration order is canonical term
-// order, which is what keeps structural equality a plain walk. Every entry
-// must be a PROVABLY transcendental constant: single-term totality rests on
-// it, and `createTranscendental` is gated on membership here.
-const bases = new Map<string, ScaledEnclosure>([
-	["π", scaledPi],
-	["e", scaledE],
+// term prints under — also its identity in the representation — the place it
+// takes in canonical term order, which is what keeps structural equality a
+// plain walk, and a certified enclosure of its value. Every entry must be a
+// PROVABLY transcendental constant: single-term totality rests on it, and
+// `createTranscendental` is gated on membership here.
+//
+// NOTE: The order rides in the registry so that a third base can not be
+// registered without one — a second Map deriving it, `new Map([...bases.keys()]
+// .map(…))`, is a top-level call no bundler can prove pure, and it pinned this
+// module and the two series behind it into every Program: 1,190 bytes of a
+// HelloWorld that names no constant at all. Deriving the order lazily inside
+// `orderOf` shakes the same way and costs 83 bytes more wherever the tower is
+// genuinely used.
+type Base = { order: number; enclosure: ScaledEnclosure }
+
+const bases = new Map<string, Base>([
+	["π", { order: 0, enclosure: scaledPi }],
+	["e", { order: 1, enclosure: scaledE }],
 ])
 
-const baseOrder = new Map([...bases.keys()].map((key, index) => [key, index]))
+function baseOf(base: string): Base {
+	const entry = bases.get(base)
 
-function enclosureOf(base: string): ScaledEnclosure {
-	const enclosure = bases.get(base)
-
-	if (enclosure === undefined) {
+	if (entry === undefined) {
 		throw new Error(`'${base}' is not a registered transcendental base.`)
 	}
 
-	return enclosure
+	return entry
+}
+
+function enclosureOf(base: string): ScaledEnclosure {
+	return baseOf(base).enclosure
+}
+
+function orderOf(base: string): number {
+	return baseOf(base).order
 }
 
 // #endregion
@@ -178,7 +194,7 @@ function canonicalTerms(
 			),
 		}))
 		.filter(({ coefficient }) => coefficient.numerator !== 0n)
-		.sort((a, b) => baseOrder.get(a.base)! - baseOrder.get(b.base)!)
+		.sort((a, b) => orderOf(a.base) - orderOf(b.base))
 		.map(({ base, coefficient }) => ({
 			base,
 			coefficientNumerator: coefficient.numerator,
