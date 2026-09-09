@@ -5216,7 +5216,11 @@ describe("Optimiser", () => {
 			})
 
 			expect(generated).toContain("Integer.createInteger(60)")
-			expect(generated).toContain("Rational.add__overload$1(")
+			// NOTE: `PositiveRational`'s rather than `Rational`'s: both
+			// operands are written above zero, and the refined Namespace beats
+			// the base one for a name both declare. It is the same sum either
+			// way — that entry re-exports this one.
+			expect(generated).toContain("PositiveRational.add(")
 			expect(generated).toContain("String.append(")
 			expect(generated).not.toContain("Integer.createInteger(86400)")
 		})

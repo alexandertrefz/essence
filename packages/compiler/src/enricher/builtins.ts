@@ -70,6 +70,14 @@ export const builtinMemberOrder: Array<string> = [
 	// reach belong together, and the general one has to be met FIRST so that
 	// `NonZeroRational::reciprocal` reads as the extra a proven Rational has.
 	"NonZeroRational",
+	// NOTE: The other two refinements of `Rational`, with the first and in the
+	// order the Integer three are listed in — the general Namespace has to be
+	// met FIRST, and `PositiveRational` is a `NonZeroRational` and a
+	// `NonNegativeRational` at once, so it comes after both. The three share
+	// `multiply`, and a receiver proving all three resolves it on the
+	// narrowest target rather than on this order.
+	"NonNegativeRational",
+	"PositiveRational",
 	// NOTE: After both of the Types it covers, for the reason `NonEmptyList`
 	// sits after `List` — an Integer and a Rational each reach this Namespace
 	// as well as their own, and Completion dedupes members
@@ -268,6 +276,11 @@ export const builtinTypeOrder: Array<string> = [
 	// NOTE: Directly after the Type it refines, for the reason `NonZeroInteger`
 	// sits directly after `Integer`.
 	"NonZeroRational",
+	// NOTE: The other two refinements of `Rational`, with the first and in the
+	// order the Integer three are listed in — `PositiveRational` is spelled as
+	// the conjunction of the two above it, so a value of it is both.
+	"NonNegativeRational",
+	"PositiveRational",
 	"Algebraic",
 	"Transcendental",
 	"Record",

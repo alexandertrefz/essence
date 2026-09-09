@@ -13,13 +13,13 @@ together reach. The two failure carriers each have a nested Namespace beside
 them, `NestedOptional` and `NestedResult`, holding the `flatten` that only a
 carrier of a carrier answers. A checked refinement is exported beside the base
 it narrows: `NonZeroInteger`, `NonNegativeInteger` and `PositiveInteger` beside
-`Integer`, `NonZeroRational` beside `Rational`, `NonEmptyString` and
-`Character` beside `String`, `NonEmptyList` beside `List`. Each reaches
-everything its base reaches, and the tighter answers a proof affords on top —
-`DEVELOPMENT.md` has
-the rule a narrowed receiver is read by. A value written down is its own proof
-and reaches them without being narrowed at all: `4::squareRoot()` answers a
-number and `[1, 2]::firstItem()` answers an item.
+`Integer`, `NonZeroRational`, `NonNegativeRational` and `PositiveRational`
+beside `Rational`, `NonEmptyString` and `Character` beside `String`,
+`NonEmptyList` beside `List`. Each reaches everything its base reaches, and the
+tighter answers a proof affords on top — `DEVELOPMENT.md` has the rule a
+narrowed receiver is read by. A value written down is its own proof and reaches
+them without being narrowed at all: `4::squareRoot()` answers a number and
+`[1, 2]::firstItem()` answers an item.
 The aggregates a List of numbers answers are reachable from the List itself,
 through six Namespaces of their own in `NumberList.es` — `IntegerList`,
 `RationalList` and `NumberList`, and the `NonEmptyIntegerList`,

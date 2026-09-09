@@ -713,14 +713,16 @@ c"::quoted())
 	constant computedNegativeThree = 0::subtract(3)
 	constant computedNegativeFive  = 0::subtract(5)
 
-	§ A written Rational proves it is not zero exactly as a written Integer
-	§ does, so these keep the calls below on the entries taking a Rational that
-	§ might be. Each is the sum of two halves of itself, which the exact
-	§ arithmetic answers in lowest terms — so each holds the parts the written
-	§ form holds. The negative one is a difference, for the same reason.
-	constant computedHalf          = 1/4::add(1/4)
-	constant computedSixth         = 1/12::add(1/12)
-	constant computedThreeQuarters = 1/2::add(1/4)
+	§ A written Rational proves its sign and that it is not zero, exactly as a
+	§ written Integer does, so these keep the calls below on the entries taking
+	§ a Rational nothing is known about. Each is a DIFFERENCE, which is the one
+	§ operation no refinement of Rational closes over: a sum and a product of
+	§ two written Rationals carry a proof of their own. The exact arithmetic
+	§ answers in lowest terms, so each still holds the parts the written form
+	§ holds.
+	constant computedHalf          = 3/4::subtract(1/4)
+	constant computedSixth         = 1/4::subtract(1/12)
+	constant computedThreeQuarters = 1/1::subtract(1/4)
 	constant computedNegativeThreeQuarters = 0/1::subtract(3/4)
 
 	§ One over the range a JavaScript number holds exactly, computed so that
@@ -1362,8 +1364,11 @@ c"::quoted())
 	show("Rational.is(_ Integer) [fractional]", 1/2::is(2))
 	show("Rational.isNot(_ Integer)", 1/2::isNot(2))
 	show("Rational.isNot(_ Integer) [equal]", 4/2::isNot(2))
-	show("Rational.add(_ Rational)", 1/2::add(1/3))
-	show("Rational.add(_ Rational) [collapses to a whole]", 1/2::add(1/2))
+	show("Rational.add(_ Rational)", computedHalf::add(1/3))
+	show(
+		"Rational.add(_ Rational) [collapses to a whole]",
+		computedHalf::add(1/2),
+	)
 	show("Rational.add(_ Integer)", 1/2::add(1))
 	show("Rational.add(_ Transcendental)", 1/2::add(Number.Pi))
 	show("Rational.subtract(_ Rational)", 1/2::subtract(1/3))
@@ -1466,16 +1471,27 @@ c"::quoted())
 		"Rational.clamp(between: Rational, and: Rational) [inverted bounds]",
 		1/2::clamp(between 2/3, and 1/3),
 	)
-	show("Rational.squareRoot() [perfect square]", 1/4::squareRoot())
-	show("Rational.squareRoot() [irrational]", 1/2::squareRoot())
-	show("Rational.squareRoot() [negative]", -1/2::squareRoot())
+	§ The receivers are computed, so that the calls stay on `Rational`'s own
+	§ entry: a written Rational above zero proves its sign and comes to
+	§ `PositiveRational` instead.
+	constant computedQuarter = 1/2::subtract(1/4)
+
+	show(
+		"Rational.squareRoot() [perfect square]",
+		computedQuarter::squareRoot(),
+	)
+	show("Rational.squareRoot() [irrational]", computedHalf::squareRoot())
+	show(
+		"Rational.squareRoot() [negative]",
+		computedNegativeThreeQuarters::squareRoot(),
+	)
 	show(
 		"Rational.squareRoot(defaultingTo: Rational | Algebraic)",
-		1/4::squareRoot(defaultingTo 0/1),
+		computedQuarter::squareRoot(defaultingTo 0/1),
 	)
 	show(
 		"Rational.squareRoot(defaultingTo: Rational | Algebraic) [negative]",
-		-1/2::squareRoot(defaultingTo 0/1),
+		computedNegativeThreeQuarters::squareRoot(defaultingTo 0/1),
 	)
 	show("Rational.numerator()", computedThreeQuarters::numerator())
 	show("Rational.denominator()", 3/4::denominator())
@@ -1858,10 +1874,12 @@ c"::quoted())
 	§ The Methods a proven Rational has that a bare one does not, and the
 	§ sister of the NonZeroInteger block above. `multiply` needs both operands
 	§ proven, and a value written down is its own proof — as a receiver as much
-	§ as as an Argument. So every call here is written where it stands.
+	§ as as an Argument. So every call here is written where it stands. Its
+	§ receiver is NEGATIVE: a written Rational above zero proves its sign too,
+	§ and `PositiveRational` declares `multiply` on a narrower target.
 	show(
 		"NonZeroRational.multiply(with: NonZeroRational)",
-		1/2::multiply(with 2/3),
+		-1/2::multiply(with 2/3),
 	)
 	show("NonZeroRational.reciprocal()", 3/4::reciprocal())
 	show("NonZeroRational.numerator()", 3/4::numerator())
@@ -1871,6 +1889,61 @@ c"::quoted())
 	show("NonZeroRational.negate()", 3/4::negate())
 	show("NonZeroRational.negate() [negative]", -3/4::negate())
 	show("NonZeroRational.negate() [not reduced]", 2/4::negate())
+
+	§ ——— NonNegativeRational ———————————————————————————————————————————————
+	§ The Methods a sign proves, and the sister of the NonNegativeInteger block
+	§ above. The receivers are declared rather than written, so that the calls
+	§ above keep reaching Rational's own entry: a written `3/4` proves its sign
+	§ for itself and comes here instead. The `add` entries are told apart by
+	§ what is known about the SUMMAND, and a declared zero proves only that it
+	§ is not negative.
+	constant provenThreeQuarters: NonNegativeRational = 3/4
+	constant provenTwoThirds: NonNegativeRational     = 2/3
+	constant provenZeroRational: NonNegativeRational  = 0/1
+
+	show(
+		"NonNegativeRational.add(_ PositiveRational)",
+		provenThreeQuarters::add(1/2),
+	)
+	show(
+		"NonNegativeRational.add(_ PositiveRational) [zero receiver]",
+		provenZeroRational::add(1/2),
+	)
+	show(
+		"NonNegativeRational.add(_ NonNegativeRational)",
+		provenThreeQuarters::add(provenZeroRational),
+	)
+	show(
+		"NonNegativeRational.multiply(with: NonNegativeRational)",
+		provenThreeQuarters::multiply(with provenTwoThirds),
+	)
+	show(
+		"NonNegativeRational.multiply(with: NonNegativeRational) [zero]",
+		provenThreeQuarters::multiply(with provenZeroRational),
+	)
+	show("NonNegativeRational.squareRoot()", provenThreeQuarters::squareRoot())
+	show(
+		"NonNegativeRational.squareRoot() [zero]",
+		provenZeroRational::squareRoot(),
+	)
+
+	§ ——— PositiveRational ——————————————————————————————————————————————————
+	§ Both proofs at once, and a written Rational above zero is one of these
+	§ for itself: `1/4::squareRoot()` comes here rather than to the Namespace
+	§ above. The receivers are declared all the same, for the reason the two
+	§ blocks above declare theirs.
+	constant provenPositiveHalf: PositiveRational = 1/2
+
+	show(
+		"PositiveRational.add(_ NonNegativeRational)",
+		provenPositiveHalf::add(provenZeroRational),
+	)
+	show(
+		"PositiveRational.multiply(with: PositiveRational)",
+		provenPositiveHalf::multiply(with 2/3),
+	)
+	show("PositiveRational.squareRoot()", 1/4::squareRoot())
+	show("PositiveRational.squareRoot() [irrational]", 1/2::squareRoot())
 
 	§ ——— Scalar ———————————————————————————————————————————————————————————
 	§ The two Methods of the Union `Integer | Rational`, which take an

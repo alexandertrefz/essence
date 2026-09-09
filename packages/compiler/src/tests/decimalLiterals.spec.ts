@@ -118,16 +118,21 @@ describe("Decimal Literals", () => {
 		).toEqual(['"2"', '"2"'])
 	})
 
+	// NOTE: A written decimal above zero proves its sign for itself, so the
+	// root reaches `PositiveRational`'s total entry and there is no Optional
+	// to take apart. A computed receiver goes to `Rational`'s own entry, which
+	// still answers one.
 	it("reaches the numeric tower through a decimal receiver", async () => {
 		expect(
 			await run(`implementation {
-				Terminal.inspect(match 2.25::squareRoot() -> String {
+				Terminal.inspect(2.25::squareRoot()::toString())
+				Terminal.inspect(match 2.5::subtract(0.25)::squareRoot() -> String {
 					case #Value(root) { <- root::toString() }
 					case #Empty       { <- "Empty" }
 				})
 				Terminal.inspect(-0.5::absolute()::toString())
 			}`),
-		).toEqual(['"3/2"', '"1/2"'])
+		).toEqual(['"3/2"', '"3/2"', '"1/2"'])
 	})
 
 	// NOTE: A whole mixed sum answers an Integer rather than a Rational over

@@ -63,8 +63,10 @@ export {
 		Randomness
 	}
 	from "./Rational.es" {
+		NonNegativeRational
 		NonZeroRational
 		NumberFormat
+		PositiveRational
 		Rational
 		Rounding
 		SignStyle
