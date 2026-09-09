@@ -64,9 +64,20 @@ async function bundleSizeOfSource(source: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: 76,221 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 78,053 measured. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
+	//
+	// NOTE: 1,832 of those bytes are the String vocabulary wave, and this file
+	// calls three of its entries: `Integer.parse`, `Integer.parse(defaultingTo:)`
+	// and `Rational.parse`. 590 are the entries themselves — `characters` going
+	// native, and the searches gaining a folding entry, which puts the shared
+	// walk behind a handful of small wrappers. The other 1,242 are what the two
+	// parses now READ: `codePoints`, the two ends of the List of points, and
+	// `replaceEvery` for the digit count behind a decimal point, which is 351 of
+	// them by itself. Reading the sign off the String instead — `starts(with:)`
+	// and its neighbours — reaches `String::is` and its `compare`, and measured
+	// 306 bytes more than the points do.
 	//
 	// NOTE: 27 of those bytes are `List.split` becoming an Overload entry.
 	// `split__overload$1` stands where `split` did, and esbuild then renames
@@ -112,7 +123,7 @@ describe("Bundle Size", () => {
 	// why moving a body into Essence can shrink a String-heavy Program while
 	// growing this one.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(77_200)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(79_100)
 	})
 
 	// NOTE: 37,993 measured; a reintroduced `Number` spread was 54,849. The same
@@ -184,8 +195,9 @@ describe("Bundle Size", () => {
 	// NOTE: What says this is the fixture and not the runtime is the three
 	// figures that did NOT move with it: `Everyday.es`, the removeDuplicates
 	// Program below at 12,753, and `HelloWorld.es` at 6,930. `Everyday.es`
-	// reads 76,221 now, and all 48 of the bytes it took later are `List`
-	// Methods becoming Overloads rather than anything a Dictionary reaches. A
+	// reads 78,053 now, and nothing it has taken since is anything a Dictionary
+	// reaches: 48 bytes of `List` Methods becoming Overloads, and the 1,832 of
+	// the String vocabulary wave its own note above accounts for. A Dictionary
 	// runtime that grew would move the second of those, which reaches the whole
 	// store through one call and none of the new Methods.
 	it("charges a Dictionary Program for the container it uses", async () => {
