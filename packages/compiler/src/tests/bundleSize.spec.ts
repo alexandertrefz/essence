@@ -160,8 +160,29 @@ describe("Bundle Size", () => {
 	// the set-shaped List natives can rest on it without the store. The same
 	// functions arrive here in the same order, under one more of esbuild's
 	// per-module banner comments — which is the whole of the difference.
+	//
+	// NOTE: 59,497 measured now, and the 11,655 bytes between the two figures
+	// are what the fixture ITSELF grew by: it exercises the Methods the
+	// completeness wave added, and each drags its own reach in. Measured one
+	// call at a time against a fixture without the new section, which is
+	// 47,842: `sort()` is 3,412 of them and `sort(on:)` 3,139 — the two share
+	// most of that, since both reach the same native and the `Comparable`
+	// witness of what they order — `Dictionary.of(_, valuedBy:)` 2,137 for the
+	// `List::map` it is written on, `count(where:)` 1,384 for `List::count`,
+	// `hasValue` 1,157 for `List::contains`, and the five remaining calls 684
+	// or less each.
+	//
+	// NOTE: 48 bytes of that base moved without a Method being added to it:
+	// `remove` and `of` are Overloads now, so the emitted name of each native
+	// carries its `__overload$1` suffix at every call site.
+	//
+	// NOTE: What says this is the fixture and not the runtime is the three
+	// figures that did NOT move: `Everyday.es` at 76,173, the removeDuplicates
+	// Program below at 12,753, and `HelloWorld.es` at 6,930. A Dictionary
+	// runtime that grew would move the second of those, which reaches the
+	// whole store through one call and none of the new Methods.
 	it("charges a Dictionary Program for the container it uses", async () => {
-		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(48_900)
+		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(60_500)
 	})
 
 	// NOTE: 12,753 measured, where the same Program without the one call
