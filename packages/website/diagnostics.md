@@ -2286,6 +2286,29 @@ Neither derive is offered where the Namespace writes the Method itself. A Case
 that carries a payload has no name to print on its own, so `is Printable` there
 still needs a written `toString` and reports this without one.
 
+### `undeclared-conformance`
+
+A Namespace over a Choice writes a REQUIREMENT of a Protocol that Choice derives
+without being asked — `is` for `Equatable`, `cases` for `Enumerable` — and does
+not declare that conformance.
+
+Both derives are built from the Choice itself and consult no Namespace, so a
+call that names the Namespace would read the written Method while a call through
+an `is Equatable` or `is Enumerable` bound would read the derived one. Which of
+the two a Program got even turned on the Namespace's NAME: one spelled like the
+Choice shadows the Choice's own `Colour.cases()` rail, one of any other name
+does not.
+
+Declare the conformance, which is what the Help says.
+
+Two things are deliberately not in this refusal. `is Printable`, because
+printing derives only where a Namespace declares it — a written `toString`
+replaces nothing and can disagree with nothing. And a Method the Protocol
+PROVIDES rather than requires: `Equatable::isNot` is answered by the Protocol's
+own const, which stands on the ladder beside a Namespace writing that name
+rather than being replaced by it, so `namespace Extras for Colour { isNot(_ tag:
+String) -> String }` is a second Method rather than a second answer.
+
 ### `conformance-needs-target-type`
 
 Only a Namespace with a target Type (`for …`) can conform to a Protocol.

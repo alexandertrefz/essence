@@ -362,10 +362,30 @@ function count<infer Mode is Enumerable>(_ example: Mode) -> Integer {
 }
 ```
 
+A bare Case does not satisfy the bound: `count(Colour#Red)` binds `Mode` to
+`Colour#Red`, and one Case is no Choice — its listing would have to promise a
+List of that Case alone. What a bounded call takes is a value annotated at the
+Choice:
+
+```essence
+constant red: Colour = #Red
+
+Terminal.print(count(red)::toString()) § 3
+```
+
 A Choice that carries a payload anywhere derives nothing here: there is no value
 of such a Case to list without inventing one. It conforms by writing the Method,
 which is also how any Namespace replaces a derive — a written `cases` is the
-answer wherever one is written, exactly as a written `is` or `toString` is.
+answer wherever one is written, exactly as a written `is` is.
+
+The Namespace has to **declare** the conformance for that to hold. Equality and
+the Case listing are derived without being declared, and the derive is built
+from the Choice: it never consults a Namespace that only writes the Method. So
+a Namespace writing `cases` or `is` without saying `is Enumerable` or
+`is Equatable` would answer one thing where it is named and another through a
+bound, and the Compiler refuses it with `undeclared-conformance`. Printing is
+not in that refusal: it derives only where a Namespace declares it, so a written
+`toString` replaces nothing and can not disagree with anything.
 
 ## How it is compiled
 

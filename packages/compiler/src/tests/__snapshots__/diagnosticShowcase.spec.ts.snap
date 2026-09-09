@@ -344,6 +344,50 @@ Error: Case '#Up' carries no payload to default
 "
 `;
 
+exports[`Diagnostic Showcase DerivedConformance.es should render the same report every time 1`] = `
+"[undeclared-conformance]
+Error: Namespace 'Offered' writes 'cases' without declaring 'is Enumerable'
+    ╭─┤ DerivedConformance.es:24:10 │
+    │
+ 24 │        static cases() -> NonEmptyList<Colour> {
+    │               ──┬──  
+    │                 ╰──── Colour derives 'Enumerable' unless this Namespace declares it
+    │ 
+    │ Help: Declare the conformance: 'is Enumerable' on this Namespace.
+    │ 
+    │ Note: A call naming this Namespace answers what is written here; a call through an 'Enumerable' bound answers the derived one.
+────╯
+
+[undeclared-conformance]
+Error: Namespace 'Counted' writes 'cases' without declaring 'is Enumerable'
+    ╭─┤ DerivedConformance.es:33:3 │
+    │
+ 33 │        cases() -> Integer {
+    │        ──┬──  
+    │          ╰──── Colour derives 'Enumerable' unless this Namespace declares it
+    │ 
+    │ Help: Declare the conformance: 'is Enumerable' on this Namespace.
+    │ 
+    │ Note: A call naming this Namespace answers what is written here; a call through an 'Enumerable' bound answers the derived one.
+────╯
+
+[undeclared-conformance]
+Error: Namespace 'Compared' writes 'is' without declaring 'is Equatable'
+    ╭─┤ DerivedConformance.es:42:3 │
+    │
+ 42 │        is(_ other: Colour) -> Boolean {
+    │        ─┐  
+    │         ╰── Colour derives 'Equatable' unless this Namespace declares it
+    │ 
+    │ Help: Declare the conformance: 'is Equatable' on this Namespace.
+    │ 
+    │ Note: A call naming this Namespace answers what is written here; a call through an 'Equatable' bound answers the derived one.
+────╯
+
+─── 3 errors
+"
+`;
+
 exports[`Diagnostic Showcase Dispatch.es should render the same report every time 1`] = `
 "[unknown-method]
 Error: No Method named 'lenght' for this value

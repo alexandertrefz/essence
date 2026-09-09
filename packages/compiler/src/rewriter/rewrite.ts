@@ -4593,6 +4593,13 @@ function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
 		)
 	}
 
+	// NOTE: And a member the base does not spell either: a `cases` written in a
+	// Namespace of another name, reached through the Choice's own. The base
+	// names the Type, as the author wrote it, so the Namespace comes from here.
+	if (node.namespaceName !== undefined) {
+		return namespaceMember(node.namespaceName, node.member.name)
+	}
+
 	if (
 		node.base.nodeType === "Identifier" &&
 		node.base.type.type === "Namespace"

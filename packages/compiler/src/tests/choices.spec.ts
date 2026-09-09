@@ -3103,12 +3103,15 @@ describe("Choices", () => {
 			).toEqual(["unknown-member"])
 		})
 
-		// NOTE: The derive is a fallback, never an override — the same rule
-		// equality and printing follow.
+		// NOTE: A written `cases` replaces the derive where the Namespace
+		// DECLARES the conformance, and both rails answer it — the direct one
+		// through the Choice's own name, the bounded one through the witness.
+		// Without the declaration the two used to disagree in silence, which is
+		// what `undeclared-conformance` now refuses.
 		it("keeps a written 'cases' in place of the derived one", async () => {
 			expect(
 				await run(`implementation { ${colourChoice}
-					namespace Colour for Colour {
+					namespace Colour for Colour is Enumerable {
 						§§ The Colours worth offering.
 						§§
 						§§ @returns — one Colour.
@@ -3120,6 +3123,192 @@ describe("Choices", () => {
 					Terminal.inspect(Colour.cases()::length())
 				}`),
 			).toEqual(["1"])
+		})
+
+		// NOTE: The three spellings a written `cases` can be reached through,
+		// each asked on BOTH rails. The Namespace's NAME used to decide which
+		// answer a Program got: one spelled like the Choice is a value in Scope
+		// and shadows the Type-named rail away, one of any other name did not,
+		// so `Colour.cases()` derived while a bounded call read the written
+		// Method.
+		const bothRails = (
+			namespaceName: string,
+		) => `implementation { ${colourChoice}
+			namespace ${namespaceName} for Colour is Enumerable {
+				§§ The Colours worth offering.
+				§§
+				§§ @returns — one Colour.
+				static cases() -> NonEmptyList<Colour> {
+					<- [#Red]
+				}
+			}
+
+			function countOf <infer Mode is Enumerable>(_ example: Mode) -> Integer {
+				<- Mode.cases()::length()
+			}
+
+			constant red: Colour = #Red
+
+			Terminal.inspect(Colour.cases()::length())
+			Terminal.inspect(${namespaceName}.cases()::length())
+			Terminal.inspect(countOf(red))
+		}`
+
+		it("answers a written 'cases' the same way on every rail", async () => {
+			expect(await run(bothRails("Colour"))).toEqual(["1", "1", "1"])
+			expect(await run(bothRails("Colours"))).toEqual(["1", "1", "1"])
+		})
+
+		it("emits the Namespace a 'cases' reached through the Choice is written in", () => {
+			expect(
+				generate(`implementation { ${colourChoice}
+					namespace Colours for Colour is Enumerable {
+						§§ The Colours worth offering.
+						§§
+						§§ @returns — one Colour.
+						static cases() -> NonEmptyList<Colour> {
+							<- [#Red]
+						}
+					}
+
+					Terminal.inspect(Colour.cases()::length())
+				}`),
+			).toContain("Colours.cases()")
+		})
+
+		// NOTE: The derive is built from the CHOICE and never consults a
+		// Namespace nobody declared the clause on, so a written Method that
+		// does not declare it answers the direct rail while the derive answers
+		// every bounded call. Refused at the Namespace rather than left to
+		// diverge — the Help is the one line that makes the two agree.
+		it("refuses a written 'cases' the Namespace does not declare", () => {
+			let source = `implementation { ${colourChoice}
+				namespace Colours for Colour {
+					§§ The Colours worth offering.
+					§§
+					§§ @returns — one Colour.
+					static cases() -> NonEmptyList<Colour> {
+						<- [#Red]
+					}
+				}
+
+				Terminal.print("x")
+			}`
+
+			expect(codesOf(source)).toEqual(["undeclared-conformance"])
+			expect(helpsOf(source)).toEqual([
+				"Declare the conformance: 'is Enumerable' on this Namespace.",
+			])
+		})
+
+		// NOTE: The guard is by NAME, exactly as the derive's own replacement
+		// rule is — so a `cases` of the wrong shape suppresses the listing as
+		// surely as a right one would, and is told so here rather than leaving
+		// `Colour.cases()` typed as whatever it happens to answer.
+		it("refuses a written 'cases' of the wrong shape", () => {
+			expect(
+				codesOf(`implementation { ${colourChoice}
+					namespace Colours for Colour {
+						§§ How many Colours there are.
+						§§
+						§§ @returns — a count.
+						cases() -> Integer {
+							<- 3
+						}
+					}
+
+					Terminal.print("x")
+				}`),
+			).toEqual(["undeclared-conformance"])
+		})
+
+		// NOTE: Equality splits the same way and always did — the derive is
+		// unconditional for a Choice, so a Namespace writing `is` without the
+		// clause answered one thing directly and another through a bound. Only
+		// the REQUIREMENT is refused: `isNot` is provided, and a Namespace
+		// writing that name stands beside the Protocol's own const on the
+		// ladder rather than instead of it.
+		it("refuses a written 'is' the Namespace does not declare", () => {
+			let source = `implementation { ${colourChoice}
+				namespace Colours for Colour {
+					§§ Compares two Colours.
+					§§
+					§§ @param _ — the Colour to compare with
+					§§ @returns — always true.
+					is(_ other: Colour) -> Boolean {
+						<- true
+					}
+				}
+
+				Terminal.print("x")
+			}`
+
+			expect(codesOf(source)).toEqual(["undeclared-conformance"])
+			expect(helpsOf(source)).toEqual([
+				"Declare the conformance: 'is Equatable' on this Namespace.",
+			])
+		})
+
+		it("accepts a written 'isNot' the Namespace does not declare", () => {
+			expect(
+				codesOf(`implementation { ${colourChoice}
+					namespace Colours for Colour {
+						§§ Spells the difference.
+						§§
+						§§ @param _ — the tag
+						§§ @returns — the tag.
+						isNot(_ tag: String) -> String {
+							<- tag
+						}
+					}
+
+					Terminal.print("x")
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: Printing derives ONLY where a Namespace declares it, so a
+		// written `toString` without the clause replaces nothing and splits
+		// nothing — which is why the refusal above names two Protocols and not
+		// three.
+		it("accepts a written 'toString' the Namespace does not declare", () => {
+			expect(
+				codesOf(`implementation { ${colourChoice}
+					namespace Colours for Colour {
+						§§ The Colour as a String.
+						§§
+						§§ @returns — a name.
+						toString() -> String {
+							<- "colour"
+						}
+					}
+
+					Terminal.print("x")
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: And a Choice carrying a payload derives no listing at all, so
+		// writing `cases` for it replaces nothing either.
+		it("accepts a written 'cases' for a Choice that derives none", () => {
+			expect(
+				codesOf(`implementation {
+					choice Shape {
+						Circle { radius: Integer },
+					}
+
+					namespace Shapes for Shape {
+						§§ The Shapes worth drawing.
+						§§
+						§§ @returns — one Shape.
+						static cases() -> NonEmptyList<Shape> {
+							<- [#Circle(1)]
+						}
+					}
+
+					Terminal.print("x")
+				}`),
+			).toEqual([])
 		})
 
 		// NOTE: A Namespace may say so, and saying so is neither needed nor

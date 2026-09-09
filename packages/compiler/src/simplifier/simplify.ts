@@ -698,15 +698,19 @@ function simplifyLookup(
 		...(node.providedBy === undefined
 			? {}
 			: { providedBy: node.providedBy }),
-		// NOTE: And the two answers a member no Namespace holds needs: the tags
-		// a derived `cases` is built from, and the hidden Parameter a bounded
-		// Type Parameter's member is read off.
+		// NOTE: And the three answers a member the base does not spell needs: the
+		// tags a derived `cases` is built from, the hidden Parameter a bounded
+		// Type Parameter's member is read off, and the Namespace a `cases`
+		// written beside the Choice is read off.
 		...(node.derivedCases === undefined
 			? {}
 			: { derivedCases: node.derivedCases }),
 		...(node.conformanceName === undefined
 			? {}
 			: { conformanceName: node.conformanceName }),
+		...(node.namespaceName === undefined
+			? {}
+			: { namespaceName: node.namespaceName }),
 	}
 }
 

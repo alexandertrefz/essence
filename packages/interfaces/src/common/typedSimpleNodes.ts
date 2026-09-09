@@ -688,6 +688,9 @@ export interface LookupNode {
 	// NOTE: As on the typed Node — the conformance Parameter a bounded Type
 	// Parameter's member is read off.
 	conformanceName?: string
+	// NOTE: As on the typed Node — the Namespace a member read off a Choice's
+	// own name is written in.
+	namespaceName?: string
 }
 
 export interface IdentifierNode {

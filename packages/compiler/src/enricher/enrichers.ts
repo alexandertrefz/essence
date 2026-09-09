@@ -2871,6 +2871,9 @@ function enrichLookup(
 		...(fabricated?.conformanceName === undefined
 			? {}
 			: { conformanceName: fabricated.conformanceName }),
+		...(fabricated?.namespaceName === undefined
+			? {}
+			: { namespaceName: fabricated.namespaceName }),
 	}
 }
 
@@ -2890,6 +2893,7 @@ function fabricatedMember(
 	type: common.MethodType
 	derivedCases?: Array<string>
 	conformanceName?: string
+	namespaceName?: string
 } | null {
 	let namespace =
 		named ??
@@ -2914,6 +2918,14 @@ function fabricatedMember(
 			: {}),
 		...(namespace.targetType.type === "GenericUse"
 			? { conformanceName: namespace.name }
+			: {}),
+		// NOTE: And the third answer this rail has: a Namespace WRITING the
+		// Method the derive would have answered. Nothing about it is fabricated
+		// but the reach — the base spells the Choice, so the emission has to be
+		// told the name the Method is actually written in.
+		...(namespace.name !== derivedEnumerableNamespaceName &&
+		namespace.targetType.type !== "GenericUse"
+			? { namespaceName: namespace.name }
 			: {}),
 	}
 }
