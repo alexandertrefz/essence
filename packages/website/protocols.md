@@ -71,6 +71,19 @@ conformance puts the Method in reach and passes the receiver, exactly as
 `Equatable.isNot(a, b)` is `protocol-as-value`, since a Protocol is a bound and
 never a value.
 
+Inside a bounded body the Type Parameter answers that second spelling, because
+the conformance it was handed is what holds the Methods:
+
+```essence
+function differ<infer Item is Equatable>(_ a: Item, _ b: Item) -> Boolean {
+	<- Item.isNot(a, b)
+}
+```
+
+`a::isNot(b)` says the same thing there. The spelling earns its keep on a
+requirement with no receiver to write it on — a `static`, which is what
+`Enumerable` asks for below.
+
 ### What a provided body may say
 
 A provided Method's body is written on `@`, the conforming value. `@` is known

@@ -2896,23 +2896,23 @@ function fabricatedMember(
 		(baseType.type === "Namespace" && memberName === enumerableMethodName
 			? derivedEnumerableNamespaceFor(baseType, scope)
 			: null)
-	let method = namespace?.methods[memberName]
 
-	if (namespace === null || namespace === undefined || method === undefined) {
+	if (namespace === null || namespace.targetType === null) {
+		return null
+	}
+
+	let method = namespace.methods[memberName]
+
+	if (method === undefined) {
 		return null
 	}
 
 	return {
 		type: method,
 		...(namespace.name === derivedEnumerableNamespaceName
-			? {
-					derivedCases:
-						derivedCaseTags(
-							namespace.targetType ?? { type: "Error" },
-						) ?? [],
-				}
+			? { derivedCases: derivedCaseTags(namespace.targetType) ?? [] }
 			: {}),
-		...(namespace.targetType?.type === "GenericUse"
+		...(namespace.targetType.type === "GenericUse"
 			? { conformanceName: namespace.name }
 			: {}),
 	}

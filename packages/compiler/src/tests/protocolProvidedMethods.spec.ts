@@ -1185,6 +1185,48 @@ describe("Protocol-provided Methods", () => {
 			).toContain("$es_Orderable__isBetween(")
 		})
 
+		// NOTE: The same spelling on a Protocol-bounded Type Parameter, which
+		// is what the Parameter's conformance is FOR: `Item` is no Namespace,
+		// and the witness the call was handed is what answers. It is the only
+		// spelling a static requirement has, and it reaches the instance
+		// Methods for the same reason — the witness holds every Method the
+		// Protocol declares.
+		it("should answer a bounded Type Parameter's own conformance", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tfunction differ <infer Item is Equatable>(_ a: Item, _ b: Item) -> Boolean {",
+						"\t\t<- Item.isNot(a, b)",
+						"\t}",
+						"",
+						"\tfunction held <infer Item is Orderable>(_ a: Item, _ b: Item) -> Item {",
+						"\t\t<- Item.clamp(a, between b, and b)",
+						"\t}",
+						"",
+						"\tTerminal.inspect(differ(1, 2))",
+						'\tTerminal.inspect(differ("a", "a"))',
+						"\tTerminal.inspect(held(5, 9))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["true", "false", "9"])
+		})
+
+		it("should refuse a name the bound's Protocol does not declare", () => {
+			let source = [
+				"implementation {",
+				"\tfunction differ <infer Item is Equatable>(_ a: Item) -> Boolean {",
+				"\t\t<- Item.isBigger(a, a)",
+				"\t}",
+				"",
+				"\tTerminal.inspect(differ(1))",
+				"}",
+			].join("\n")
+
+			expect(codesOf(source)).toEqual(["unknown-name"])
+		})
+
 		it("should still refuse a name no conformance provides", () => {
 			let source = [
 				"implementation {",
