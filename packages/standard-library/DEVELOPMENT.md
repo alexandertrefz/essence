@@ -459,9 +459,9 @@ Printing is derived for a Choice whose Cases all carry no payload, and answers
 the Case's own name — `#Less` prints `Less`. So a Namespace over a Choice of
 unit Cases declares `is Equatable, is Printable` and writes neither Method:
 `Ordering`, `Side`, `CaseSensitivity`, `NormalizationForm`, `NumberFormat`,
-`Rounding`, `SignStyle`, `SortOrder` and `Stream` are all that shape, and eight
-of the nine have an empty body besides. `Ordering` is the one that does not:
-`then` is a Method of its own, and no conformance offers it.
+`Rounding`, `SignStyle`, `Division`, `SortOrder` and `Stream` are all that
+shape, and nine of the ten have an empty body besides. `Ordering` is the one
+that does not: `then` is a Method of its own, and no conformance offers it.
 
 `Enumerable` follows equality rather than printing: nothing in here declares it,
 and every Choice of payload-free Cases answers `cases()` on its own name —

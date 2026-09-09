@@ -38,8 +38,9 @@ export type StdlibFile = {
 // Diagnostic's file attribution should not depend on directory iteration order.
 //
 // NOTE: Reading is separated from parsing because parsing needs the Parser,
-// and the Parser is the Compiler. This package holds eighteen `.es` files and
-// knows where they are; what they mean is the Compiler's question.
+// and the Parser is the Compiler. This package holds the `.es` files and knows
+// where they are; what they mean is the Compiler's question. No count here:
+// nothing checks one, and the number went stale across three waves.
 export function readStdlibFiles(): Array<StdlibFile> {
 	let fileNames = existsSync(STDLIB_DIRECTORY)
 		? readdirSync(STDLIB_DIRECTORY)
