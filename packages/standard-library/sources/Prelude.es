@@ -16,6 +16,7 @@ export {
 		GroupedNonEmptyList
 		NonEmptyDictionary
 	}
+	from "./Enumerable.es" { Enumerable }
 	from "./Integer.es" {
 		Division
 		Integer

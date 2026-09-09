@@ -359,6 +359,12 @@ export const builtinProtocolOrder: Array<string> = [
 	"Printable",
 	"Comparable",
 	"Orderable",
+	// NOTE: After the four a VALUE answers, because its one requirement is
+	// answered by the Type rather than by a value of it — a listing that met it
+	// among the four would offer a static where every neighbour takes a
+	// receiver. It is derived where a Choice carries no payload, as the first
+	// two are.
+	"Enumerable",
 	// NOTE: Last, because it builds on nothing above it and nothing builds on
 	// it — a conformance is what a property test reads instead of deriving a
 	// generator, and no other Protocol asks about one.
