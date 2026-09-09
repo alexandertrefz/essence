@@ -4801,6 +4801,54 @@ third"::lines())
 		"Dictionary.hasKey<ValueType, KeyType is Equatable>(_ KeyType) [absent]",
 		ages::hasKey("kim"),
 	)
+	§ The same question about the other half of an entry, which walks the
+	§ values where a key is found through the store.
+	show(
+		"Dictionary.hasValue<KeyType, ValueType is Equatable>(_ ValueType)",
+		ages::hasValue(25),
+	)
+	show(
+		"Dictionary.hasValue<KeyType, ValueType is Equatable>(_ ValueType) [absent]",
+		ages::hasValue(1),
+	)
+	§ The universal quantifier answers `true` for the empty Dictionary, which
+	§ has no entry to fail the check, and so does the empty one.
+	show(
+		"Dictionary.hasOnlyEntries<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean)",
+		ages::hasOnlyEntries(where ({ key, value }) {
+			<- value::isGreaterThan(20)
+		}),
+	)
+	show(
+		"Dictionary.hasOnlyEntries<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [one refused]",
+		ages::hasOnlyEntries(where ({ key, value }) {
+			<- value::isGreaterThan(30)
+		}),
+	)
+	show(
+		"Dictionary.hasOnlyEntries<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [empty]",
+		noAges::hasOnlyEntries(where ({ key, value }) {
+			<- value::isGreaterThan(30)
+		}),
+	)
+	show(
+		"Dictionary.hasNoEntries<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean)",
+		ages::hasNoEntries(where ({ key, value }) {
+			<- value::isGreaterThan(50)
+		}),
+	)
+	show(
+		"Dictionary.hasNoEntries<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [one accepted]",
+		ages::hasNoEntries(where ({ key, value }) {
+			<- value::isGreaterThan(30)
+		}),
+	)
+	show(
+		"Dictionary.hasNoEntries<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [empty]",
+		noAges::hasNoEntries(where ({ key, value }) {
+			<- value::isGreaterThan(30)
+		}),
+	)
 	show("Dictionary.length<KeyType, ValueType>()", ages::length())
 	show("Dictionary.length<KeyType, ValueType>() [empty]", noAges::length())
 	show(
@@ -4916,6 +4964,20 @@ third"::lines())
 	show(
 		"Dictionary.merge<ValueType, KeyType is Equatable>(with: Dictionary<KeyType, ValueType>) [empty receiver]",
 		noAges::merge(with ages),
+	)
+	§ Counting sees every entry whatever it answers, so the empty Dictionary
+	§ and a check nothing passes both answer none.
+	show(
+		"Dictionary.count<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean)",
+		ages::count(where ({ key, value }) { <- value::isGreaterThan(30) }),
+	)
+	show(
+		"Dictionary.count<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [nothing accepted]",
+		ages::count(where ({ key, value }) { <- key::is("nobody") }),
+	)
+	show(
+		"Dictionary.count<KeyType, ValueType>(where: (_ \{ key: KeyType, value: ValueType \}) -> Boolean) [empty]",
+		noAges::count(where ({ key, value }) { <- value::isGreaterThan(0) }),
 	)
 
 	§ The edges the pairs above stop one short of. A check that accepts EVERY
