@@ -197,14 +197,15 @@ rule above allows, and it is only safe because `StdlibExhaustive.es` calls both
 entries over the same inputs, wherever they stand: the golden capture is what
 stops the two from drifting. Writing another one means adding those lines too.
 
-Most of `NonEmptyList` is native, but not all of it. `indices()` is written on
-`List.of(integersFrom:downTo:)`, which promises a non-empty answer already, and
-on the `reverse` that carries the promise back up the count,
-`replace(at:_:)` hands the transformed item to the native `replace(_:at:)`, and
-`lowestItem(on:)` and `highestItem(on:)` read `List`'s Optional answer off the
-native `firstItem()`.
+Most of `NonEmptyList` is native, but not all of it. `replace(at:_:)` hands the
+transformed item to the native `replace(_:at:)`, and `lowestItem(on:)` and
+`highestItem(on:)` read `List`'s Optional answer off the native `firstItem()`.
 An Essence body can carry a proof another entry already holds; what it can not
-do is mint one.
+do is mint one. `indices()` was written that way — on the
+`List.of(integersFrom:downTo:)` that promises a non-empty answer, and on the
+`reverse` that carried the promise back up the count — and it is `List`'s own
+walk under this Namespace's name now, because borrowing the promise cost a
+second walk of what the first had already built.
 
 A const is emitted only into Programs that reach it. The reachability search
 reads each Method's TYPED body, so it follows a Method reached only through

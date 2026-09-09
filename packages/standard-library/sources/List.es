@@ -830,6 +830,9 @@ declarations {
 		§ `enumerate` is native and walks once. In Essence its body would be
 		§ `@::indices()::map(…)`, which reads every item back through
 		§ `item(at:)` and builds an Optional per item to take apart again.
+		§
+		§ `indices()` is native for the reason `NonEmptyList::indices` gives:
+		§ the two entries are one walk under two names.
 
 		§§ Answers the positions the List has, or the positions of the items a check accepts.
 		§§
@@ -842,9 +845,7 @@ declarations {
 			§§ The positions count from zero and stop before the length. The empty List answers no positions. The answer is a whole List of positions: to walk the items beside their positions in one pass, use `enumerate()`.
 			§§
 			§§ @returns — the List of positions.
-			() -> List<Integer> {
-				<- List.of(integersFrom 0, upTo @::length())
-			}
+			() -> List<Integer>
 
 			§ Written on `enumerate`, which is the one walk that hands a body
 			§ an item and the position it stands at. The fold is what keeps
@@ -2405,27 +2406,21 @@ declarations {
 
 		§ Both carry the proof. There is one entry for every item and one
 		§ position for every item. So neither can answer nothing when it was
-		§ handed something. The `indices` body is written on
-		§ `List.of(integersFrom:downTo:)`, which promises that already, and on
-		§ `reverse`, which carries it. It carries a proof two Methods hold
-		§ rather than minting one.
+		§ handed something.
 		§
-		§ The count runs down and is turned round because `through:` counts up
-		§ and can answer empty, which is the direction that lost the proof. The
-		§ alternative was a native walking up once. It was declined to keep the
-		§ body a reading of two entries beside it. The second walk copies an
-		§ array of Integers already built: 100 000 positions measured 0.66 ms
-		§ against 0.60 ms for the single walk.
+		§ `indices` is the native `List` answers with, under this Namespace's
+		§ name, so the two entries are one walk. The alternative was an Essence
+		§ body counting down through `List.of(integersFrom:downTo:)` to borrow
+		§ its promise, then turning the count round. That reverse walks an
+		§ array of Integers already built a second time: 100 000 positions
+		§ measured 0.90 ms against 0.55 ms for the single walk.
 
 		§§ Answers the positions the List has, in order.
 		§§
 		§§ The positions count from zero and stop before the length. The answer is a whole List of positions: to walk the items beside their positions in one pass, use `enumerate()`.
 		§§
 		§§ @returns — the List of positions, which is never empty.
-		indices() -> NonEmptyList<Integer> {
-			<- List.of(integersFrom @::length()::subtract(1), downTo 0)
-				::reverse()
-		}
+		indices() -> NonEmptyList<Integer>
 
 		§§ Answers every item beside the position it stands at.
 		§§
