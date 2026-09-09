@@ -44,9 +44,14 @@ jobs:
             exit 1
           fi
 
+      # NOTE: The same `.bun-version` the test workflow reads, rather than a
+      # second copy of the number. What it pins is the Bun this repository is
+      # developed against — see that workflow for why the packages care — and
+      # two places holding it is two places to forget: the `.vsix` this job
+      # attaches to a release would then be built by a Bun nothing else runs.
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.14
+          bun-version-file: .bun-version
 
       - run: bun install --frozen-lockfile
 
