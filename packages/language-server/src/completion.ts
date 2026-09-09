@@ -1,4 +1,3 @@
-import { enumerableMethodName } from "@essence-lang/compiler/enricher/resolvers"
 import {
 	caseDefaults,
 	filterMostSpecificByTarget,
@@ -39,6 +38,7 @@ import {
 	moduleSectionCursor,
 } from "./importCompletion"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
+import { typeNamedAt } from "./namedTypes"
 import {
 	derivedEnumerableNamespace,
 	matchingNamespaces,
@@ -167,6 +167,10 @@ const identifierCharacter = /[^\s"§(){}[\]<>|/@,.:=~_-]/
 const trailingIsPattern = /(?:^|[\s"§(){}[\]<>|/@,.:=~_-])is$/
 const methodTriggerPattern = /::(?:<([^>]*)>)?[^\s"§(){}[\]<>|/@,.:=~_-]*$/
 const memberTriggerPattern = /\.[^\s"§(){}[\]<>|/@,.:=~_-]*$/
+// NOTE: The name a base that could name a TYPE is written as. `identifierTail`
+// with `#` excluded as well, so that the Case of `Colour#Red` is read as its
+// own word and the `#` in front of it is what turns the reading away.
+const namedBaseTail = /[^\s"§(){}[\]<>|/@,.:=~_#-]*$/
 // NOTE: A Namespace specifier that is still being typed — the closing `>` is
 // missing, so `methodTriggerPattern` cannot match it yet.
 const specifierTriggerPattern = /::<[^\s"§(){}[\]<>|/@,.:=~_-]*$/
@@ -290,16 +294,18 @@ export function findCompletions(
 		// Both read their members off a Namespace nobody declared, and the
 		// Enricher answers that rail only for a member that Namespace OFFERS —
 		// so the probe's own invented name types the base as an Error and the
-		// cursor was answered with nothing. Asked again under the one member
-		// such a base does offer, which is the derived Case listing.
+		// cursor was answered with nothing. The NAME is resolved instead, in
+		// the Type space the cursor stands in, which asks nothing of a member.
 		let namedType =
 			memberMatch !== null &&
 			(base === null || base.type.type === "Error")
-				? resolveProbedBase(
+				? namedTypeBase(
 						headText,
+						cursor,
+						base,
+						documentText,
 						documentPath,
-						`.${enumerableMethodName}`,
-						enumerableMethodName,
+						document,
 					)
 				: null
 
@@ -536,77 +542,113 @@ type ProbedBase = {
 	program: common.typed.Program
 }
 
-// NOTE: The member the probe in flight spelled, and where it stands. Module
-// state rather than a Parameter because the walk that looks for it recurses
-// through a dozen helpers that have no other reason to carry it, and there is
-// exactly one probe at a time: this is set and cleared around one synchronous
-// call.
-//
-// NOTE: The POSITION is what makes a probe spelled with a REAL member name safe.
-// The suffix is appended straight after the head text, so the probe's own
-// Lookup is the one at that line and column — a `.cases` the document spells
-// somewhere above the cursor stands before it and can not answer in its place.
-// The invented name needs none of this, and is matched by name alone.
-let probedMember: { name: string; line: number; column: number } | null = null
-
-function isProbedMember(member: {
-	content: string
-	position: common.Position
-}): boolean {
-	if (member.content === probeMemberName) {
-		return true
-	}
-
-	return (
-		probedMember !== null &&
-		member.content === probedMember.name &&
-		member.position.start.line === probedMember.line &&
-		member.position.start.column === probedMember.column
-	)
-}
-
 function resolveProbedBase(
 	headText: string,
 	documentPath?: string,
 	suffix: string = `.${probeMemberName}`,
-	memberName: string = probeMemberName,
 ): ProbedBase | null {
-	let headLines = headText.split("\n")
+	for (let probeSource of probeSourcesFor(headText, suffix)) {
+		try {
+			let { program } = parseDocument(probeSource, documentPath)
+			let { program: enrichedProgram } = enrichDocument(
+				program,
+				documentPath,
+				{ tests: true },
+			)
+			let baseType = findProbeReceiver(typedProgramNodes(enrichedProgram))
 
-	probedMember = {
-		name: memberName,
-		line: headLines.length,
-		// NOTE: One past the head text's last column for the `.`, and one more
-		// for the first character of the name.
-		column: (headLines[headLines.length - 1]?.length ?? 0) + 2,
+			if (baseType !== null) {
+				return { type: baseType, program: enrichedProgram }
+			}
+		} catch {
+			// NOTE: A reading that does not parse is simply not the reading —
+			// the next one is tried, and a cursor no reading explains answers
+			// with nothing, exactly as it did.
+		}
+	}
+
+	return null
+}
+
+// NOTE: The base of a `.` that names a TYPE, resolved from the NAME alone.
+// Asked only where the probe answered nothing or an Error, which is what a base
+// that names no value leaves behind — so a value of the name still WINS, the
+// order the Enricher reads the two in.
+//
+// NOTE: The document's OWN Program is read first and the probe's second. The
+// Workspace holds the first enriched already, and it carries the whole file's
+// Scopes rather than the part standing above the cursor; the probe's is what
+// answers where the document as a whole parses into no Scope covering the
+// cursor, which is the state an unclosed block at the end of a file leaves it
+// in.
+function namedTypeBase(
+	headText: string,
+	cursor: common.Cursor,
+	probed: ProbedBase | null,
+	documentText: string,
+	documentPath: string | undefined,
+	document: DocumentAnalysis | null,
+): ProbedBase | null {
+	let name = namedBaseIn(headText)
+
+	if (name === null) {
+		return null
+	}
+
+	for (let program of [
+		enrichedDocumentProgram(documentText, documentPath, document),
+		probed?.program ?? null,
+	]) {
+		if (program === null) {
+			continue
+		}
+
+		let type = typeNamedAt(name, cursor, program)
+
+		if (type !== null) {
+			return { type, program }
+		}
+	}
+
+	return null
+}
+
+// NOTE: The one bare Identifier a `.` stands on, or null where the base is
+// anything else: a Type is named by a NAME and never reached through a member,
+// a Method or a Case, so `shape.corner.`, `sides()::first.` and `Colour#Red.`
+// are none of this rail's business.
+function namedBaseIn(headText: string): string | null {
+	let name = namedBaseTail.exec(headText)?.[0] ?? ""
+
+	if (name === "") {
+		return null
+	}
+
+	let before = headText[headText.length - name.length - 1] ?? ""
+
+	return before === "." || before === ":" || before === "#" ? null : name
+}
+
+// NOTE: The unmodified document, enriched — what the Workspace already holds
+// for every open file, so the Server pays nothing for it. A caller without one
+// derives it, which is what the probe this replaced cost anyway.
+function enrichedDocumentProgram(
+	documentText: string,
+	documentPath: string | undefined,
+	document: DocumentAnalysis | null,
+): common.typed.Program | null {
+	if (document !== null) {
+		return document.enrichedProgram
 	}
 
 	try {
-		for (let probeSource of probeSourcesFor(headText, suffix)) {
-			try {
-				let { program } = parseDocument(probeSource, documentPath)
-				let { program: enrichedProgram } = enrichDocument(
-					program,
-					documentPath,
-					{ tests: true },
-				)
-				let baseType = findProbeReceiver(
-					typedProgramNodes(enrichedProgram),
-				)
-
-				if (baseType !== null) {
-					return { type: baseType, program: enrichedProgram }
-				}
-			} catch {
-				// NOTE: A reading that does not parse is simply not the reading
-				// — the next one is tried, and a cursor no reading explains
-				// answers with nothing, exactly as it did.
-			}
-		}
-
+		return enrichDocument(
+			parseDocument(documentText, documentPath).program,
+			documentPath,
+			{ tests: true },
+		).program
+	} catch {
 		return null
-	} finally {
-		probedMember = null
 	}
 }
 
@@ -742,7 +784,7 @@ function findProbeReceiverInNode(
 				findProbeReceiverInArguments(node.arguments)
 			)
 		case "Lookup":
-			if (isProbedMember(node.member)) {
+			if (node.member.content === probeMemberName) {
 				return node.base.type
 			}
 

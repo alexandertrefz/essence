@@ -2110,6 +2110,30 @@ describe("Completion of a Choice's derived Case listing", () => {
 		)
 	})
 
+	// NOTE: The tests block is a CHILD Scope of the implementation, so the
+	// Choice a file declares is named from inside a test exactly as it is
+	// beside it.
+	it("should offer it inside the tests block", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Colour {",
+			"\t\tRed,",
+			"\t\tGreen,",
+			"\t}",
+			"}",
+			"",
+			"tests {",
+			'\ttest "lists the Cases" {',
+			"\t\tconstant all = Colour.",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(
+			entryFor(source, { line: 10, column: 25 }, "cases")?.detail,
+		).toBe("() -> NonEmptyList<Colour>")
+	})
+
 	it("should offer it on a Type Parameter bound to 'Enumerable'", () => {
 		let source = [
 			"implementation {",
@@ -2190,6 +2214,223 @@ describe("Completion of a Choice's derived Case listing", () => {
 		].join("\n")
 
 		expect(labelsOf(source, { line: 8, column: 8 })).not.toContain("cases")
+	})
+})
+
+// NOTE: The other half of the same rail, and the half that answered with
+// nothing at all. A Protocol-bounded Type Parameter reads its members off the
+// Namespace the Enricher fabricates for the bound — `Kind.label()` and
+// `Item.is(a, b)` compile and run — and only `cases` was ever offered, because
+// the Case listing was the one real member a probe could be spelled with. The
+// NAME in front of the dot is read instead, which asks nothing of a member.
+describe("Completion of a Protocol-bounded Type Parameter", () => {
+	it("should offer a static the bound requires", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Named {",
+			"\t\tstatic label() -> String",
+			"\t}",
+			"",
+			"\tfunction describe <infer Kind is Named>(_ example: Kind) -> String {",
+			"\t\t<- Kind.",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(
+			entryFor(source, { line: 7, column: 11 }, "label"),
+		).toMatchObject({
+			kind: "staticMethod",
+			detail: "() -> String",
+		})
+	})
+
+	// NOTE: An instance Method reached through the TYPE's name, which is a
+	// spelling of its own: the receiver is written as the first Argument, and
+	// `Item.is(a, b)` is how a bounded body compares two of its values.
+	it("should offer the instance Methods of a builtin bound", () => {
+		let source = [
+			"implementation {",
+			"\tfunction same <infer Item is Equatable>(_ a: Item, _ b: Item) -> Boolean {",
+			"\t\t<- Item.",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 3, column: 11 })).toEqual([
+			"is",
+			"isNot",
+		])
+	})
+
+	// NOTE: A Method the Protocol wrote a BODY for is a Method of every
+	// conformer, so it stands in this listing beside the requirements — the
+	// same terms a receiver's `::` listing offers it on.
+	it("should offer a Method the bound provides", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Shape {",
+			"\t\tarea() -> Rational",
+			"",
+			"\t\tdescribe() -> String {",
+			'\t\t\t<- "area {@::area()}"',
+			"\t\t}",
+			"\t}",
+			"",
+			"\tfunction tell <infer Figure is Shape>(_ example: Figure) -> String {",
+			"\t\t<- Figure.",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 11, column: 13 })).toEqual([
+			"area",
+			"describe",
+		])
+	})
+
+	// NOTE: The other two places a bound is written. A Method of a Namespace
+	// declares Type Parameters of its own, and a Namespace declares them for
+	// every Method it holds — both are Scopes the cursor stands in, and the
+	// name in front of the dot is read in the innermost one that declares it.
+	it("should offer the bound of a Namespace Method's own Type Parameter", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Named {",
+			"\t\tstatic label() -> String",
+			"\t}",
+			"",
+			"\tnamespace Box for Integer {",
+			"\t\tstatic describe <infer Kind is Named>(_ example: Kind) -> String {",
+			"\t\t\t<- Kind.",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 8, column: 12 })).toEqual(["label"])
+	})
+
+	it("should offer the bound of the Namespace's own Type Parameter", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Named {",
+			"\t\tstatic label() -> String",
+			"\t}",
+			"",
+			"\ttype Box<ItemType> = { item: ItemType }",
+			"",
+			"\tnamespace Boxes <infer Kind is Named> for Box<Kind> {",
+			"\t\tstatic describe() -> String {",
+			"\t\t\t<- Kind.",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 10, column: 12 })).toEqual(["label"])
+	})
+
+	// NOTE: Extending a Protocol is a promise to conform to it, so a bound
+	// carries what it extends — the members of both, under one name.
+	it("should offer what the bound extends as well", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Sized {",
+			"\t\tstatic minimum() -> Integer",
+			"\t}",
+			"",
+			"\tprotocol Named is Sized {",
+			"\t\tstatic label() -> String",
+			"\t}",
+			"",
+			"\tfunction describe <infer Kind is Named>(_ example: Kind) -> String {",
+			"\t\t<- Kind.",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 11, column: 11 })).toEqual([
+			"minimum",
+			"label",
+		])
+	})
+
+	// NOTE: And the bound that was already answered, held to exactly what it
+	// offers: `Enumerable` requires the Case listing and nothing else, so the
+	// listing that used to be the whole of this rail is still the whole of it
+	// there.
+	it("should offer nothing but the Case listing under an 'Enumerable' bound", () => {
+		let source = [
+			"implementation {",
+			"\tfunction countOf <infer Mode is Enumerable>(_ example: Mode) -> Integer {",
+			"\t\t<- Mode.",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 3, column: 11 })).toEqual(["cases"])
+	})
+
+	// NOTE: A Namespace is fabricated for a BOUND, so an unbounded Type
+	// Parameter reaches nothing — which is what the Enricher answers for it
+	// too, and why it is still worth resolving the name: it SHADOWS, and a
+	// Choice of the same name further out must not answer in its place.
+	it("should offer nothing on an unbounded Type Parameter", () => {
+		let source = [
+			"implementation {",
+			"\tfunction identity <Item>(_ example: Item) -> Item {",
+			"\t\t<- Item.",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 3, column: 11 })).toEqual([])
+	})
+
+	// NOTE: And the shadowing itself, the other way round: the Choice is in
+	// reach and the Type Parameter of that name is nearer, so the bound
+	// answers and the Case listing does not.
+	it("should read the innermost declaration of the name", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Colour {",
+			"\t\tRed,",
+			"\t\tGreen,",
+			"\t}",
+			"",
+			"\tfunction pick <infer Colour is Equatable>(_ a: Colour) -> Boolean {",
+			"\t\t<- Colour.",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 8, column: 13 })).toEqual([
+			"is",
+			"isNot",
+		])
+	})
+
+	// NOTE: The two readings this must not turn into. A name that holds a
+	// VALUE is answered by the value, and a name nothing declares is answered
+	// by nothing — the Type space is only read where the base named no value
+	// at all, which is the order the Enricher reads the two in.
+	it("should offer nothing on a name that holds a value", () => {
+		let source = [
+			"implementation {",
+			"\tconstant count = 2",
+			"",
+			"\tcount.",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 4, column: 8 })).toEqual([])
+	})
+
+	it("should offer nothing on a name in no Scope", () => {
+		let source = ["implementation {", "\tNotAThing.", "}"].join("\n")
+
+		expect(labelsOf(source, { line: 2, column: 12 })).toEqual([])
 	})
 })
 
