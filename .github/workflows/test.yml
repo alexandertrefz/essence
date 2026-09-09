@@ -15,7 +15,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # NOTE: `.bun-version` holds the Bun this repository is developed against,
       # so CI runs the one a contributor does rather than whatever the runner

@@ -27,7 +27,7 @@ jobs:
   package:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # NOTE: First, and loudly: the tag names the version users will install,
       # but the manifest is what the `.vsix` is actually built from. A tag that
@@ -66,7 +66,7 @@ jobs:
 
       - run: bun run --cwd packages/vscode-extension package
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: vsix
           path: packages/vscode-extension/*.vsix
