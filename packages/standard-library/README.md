@@ -42,8 +42,8 @@ that down. `Step` has none, because both of its Cases carry a payload and only a
 Choice of Cases that carry none derives a `toString`.
 The same rule derives `Enumerable`, and that one nobody declares: `Side.cases()`
 answers `[#Start, #End, #BothEnds]`, in the order the Choice declares them, for
-every Choice of payload-free Cases a Program can reach — the library's ten and
-its own alike.
+every Choice of payload-free Cases a Program can reach — the nine modes above
+that are one, `Ordering` with them, and a Program's own alike.
 
 The only things NOT declared here are the ones no declaration could produce:
 the bare Type tags — `Boolean`, `String`, `Integer`, `Rational`, `Algebraic`,

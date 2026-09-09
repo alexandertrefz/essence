@@ -14,7 +14,7 @@ anything else that reacts to a specific Diagnostic keys off the code, and this
 document is the index of every one of them.
 
 Codes are added to `DiagnosticCode` in
-[`src/interfaces/common/index.ts`](https://github.com/alexandertrefz/essence/blob/master/src/interfaces/common/index.ts),
+[`packages/interfaces/src/common/index.ts`](https://github.com/alexandertrefz/essence/blob/master/packages/interfaces/src/common/index.ts),
 which is a required field on every Diagnostic — a new Diagnostic can not be
 reported without one, and a code with no entry here is a code nobody can look
 up.
@@ -23,6 +23,10 @@ Some codes carry a Quick Fix, offered by the Language Server on the underlined
 span and noted below the code it belongs to. There is deliberately no "fix
 all": none of these rewrites is both semantics-preserving and unambiguous, so
 each one is applied by hand and read before it is accepted.
+
+A code's action may also be a **Rewrite**, which sits under Refactor rather than
+on the squiggle and is never the preferred action —
+[`ambiguous-nesting-level`](#ambiguous-nesting-level) is the first to carry one.
 
 ## Syntax
 
