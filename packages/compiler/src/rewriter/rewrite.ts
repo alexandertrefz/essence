@@ -4579,22 +4579,30 @@ function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
 		)
 	}
 
+	// NOTE: A derived `cases`, which is a member of no Namespace at all — the
+	// base may name the Choice itself, or a Namespace written over it that
+	// simply does not hold the Method, and neither is what the emission reads.
+	if (node.derivedCases !== undefined) {
+		return namespaceMember(
+			derivedEnumerableNamespaceName,
+			node.member.name,
+			undefined,
+			false,
+			undefined,
+			node.derivedCases,
+		)
+	}
+
 	if (
 		node.base.nodeType === "Identifier" &&
 		node.base.type.type === "Namespace"
 	) {
 		return namespaceMember(
-			// NOTE: A derived `cases` is a member of no Namespace at all, so
-			// the redirect is asked for under the derive's own name — the base
-			// may well spell a written Namespace that simply does not hold it.
-			node.derivedCases === undefined
-				? node.base.name
-				: derivedEnumerableNamespaceName,
+			node.base.name,
 			node.member.name,
 			undefined,
 			false,
 			node.providedBy,
-			node.derivedCases,
 		)
 	}
 

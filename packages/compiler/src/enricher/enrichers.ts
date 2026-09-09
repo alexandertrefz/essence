@@ -2804,7 +2804,7 @@ function enrichLookup(
 	scope: enricher.Scope,
 ): common.typed.LookupNode {
 	// NOTE: A base naming a TYPE rather than a value — a Choice, or a
-	// Protocol-bounded Type Parameter — is read through a Namespace nobody
+	// Protocol-bounded Type Parameter — reads its member off a Namespace nobody
 	// declared. Asked before the base is enriched, because enriching it is what
 	// reports `unknown-name`, and answered only for a member that Namespace
 	// offers, so every other name reports exactly as it did.
@@ -2816,7 +2816,11 @@ function enrichLookup(
 					nodeType: "Identifier",
 					content: node.base.content,
 					position: node.base.position,
-					type: named,
+					// NOTE: Typed as what the author NAMED rather than as the
+					// Namespace fabricated to read the member off. Hover
+					// answers with this Node, and neither `Choice_Enumerable`
+					// nor `Mode__conformance` is a name a reader has seen.
+					type: named.targetType ?? { type: "Error" },
 				}
 	// NOTE: A Method a conformance put in reach is read off the Namespace it is
 	// in reach through, exactly as a written one is — `Number.isLessThan(a, b)`
@@ -2829,17 +2833,21 @@ function enrichLookup(
 		!Object.hasOwn(base.type.methods, node.member.content)
 			? providedNamespaceMember(base.type, node.member.content, scope)
 			: null
-	// NOTE: And the derived Case listing, which no Namespace declares either.
-	// The base is already the derive where it named the Choice itself; where it
-	// named a Namespace over one, the derive is what that Namespace does not
-	// write. Both answer the same Method, and the tags it is emitted with are
-	// read off the Choice here rather than recovered downstream.
-	let derived = derivedEnumerableMember(base.type, node.member.content, scope)
+	// NOTE: And a Method no Namespace holds at all — a Choice's derived
+	// `cases`, and what a bounded Type Parameter's conformance answers. Both
+	// carry what the emission needs beside the Type, because neither is a
+	// member of anything the Rewriter could read it off.
+	let fabricated = fabricatedMember(
+		named,
+		base.type,
+		node.member.content,
+		scope,
+	)
 	// NOTE: The Lookup and its member Identifier share one Type — the member's
 	// Type *is* the Lookup's Type, so it is resolved once and handed to both.
 	let type =
 		provided?.type ??
-		derived?.type ??
+		fabricated?.type ??
 		lookupTypeOf(base.type, node.member.content, {
 			member: node.member.position,
 			base: node.base.position,
@@ -2857,42 +2865,57 @@ function enrichLookup(
 		position: node.position,
 		type,
 		...(provided === null ? {} : { providedBy: provided.providedBy }),
-		...(derived === null ? {} : { derivedCases: derived.cases }),
-		// NOTE: The hidden Parameter the call is emitted against, where the
-		// base names a bounded Type Parameter. The base Node keeps the name the
-		// author wrote — it is what Hover reads — so the Rewriter is told the
-		// other one rather than left to read it off the base.
-		...(named === null || named.targetType?.type !== "GenericUse"
+		...(fabricated?.derivedCases === undefined
 			? {}
-			: { conformanceName: named.name }),
+			: { derivedCases: fabricated.derivedCases }),
+		...(fabricated?.conformanceName === undefined
+			? {}
+			: { conformanceName: fabricated.conformanceName }),
 	}
 }
 
-// NOTE: The derived `Enumerable::cases` a Lookup reads off a Namespace, with
-// the Case tags its emission needs — null for every other member and for a
-// Namespace whose target is no Choice of payload-free Cases. The fabricated
-// Namespace is the answer where the base named the Choice itself, and a written
-// Namespace derives what it does not write.
-function derivedEnumerableMember(
+// NOTE: A member of a Namespace nobody declared, with what its emission needs.
+// Two reach here. A Choice's derived `cases` is answered by the derive — named
+// by the base itself, or fabricated for a Namespace written over the Choice
+// that does not write one — and is emitted from the Case tags, a static having
+// no receiver to recover the Choice from. A bounded Type Parameter's member is
+// answered by its conformance, and is emitted against the hidden Parameter that
+// witness arrives in.
+function fabricatedMember(
+	named: common.NamespaceType | null,
 	baseType: common.Type,
 	memberName: string,
 	scope: enricher.Scope,
-): { type: common.MethodType; cases: Array<string> } | null {
-	if (baseType.type !== "Namespace" || memberName !== enumerableMethodName) {
+): {
+	type: common.MethodType
+	derivedCases?: Array<string>
+	conformanceName?: string
+} | null {
+	let namespace =
+		named ??
+		(baseType.type === "Namespace" && memberName === enumerableMethodName
+			? derivedEnumerableNamespaceFor(baseType, scope)
+			: null)
+	let method = namespace?.methods[memberName]
+
+	if (namespace === null || namespace === undefined || method === undefined) {
 		return null
 	}
 
-	let derived =
-		baseType.name === derivedEnumerableNamespaceName
-			? baseType
-			: derivedEnumerableNamespaceFor(baseType, scope)
-	let method = derived?.methods[enumerableMethodName]
-	let cases =
-		derived?.targetType == null ? null : derivedCaseTags(derived.targetType)
-
-	return method === undefined || cases === null
-		? null
-		: { type: method, cases }
+	return {
+		type: method,
+		...(namespace.name === derivedEnumerableNamespaceName
+			? {
+					derivedCases:
+						derivedCaseTags(
+							namespace.targetType ?? { type: "Error" },
+						) ?? [],
+				}
+			: {}),
+		...(namespace.targetType?.type === "GenericUse"
+			? { conformanceName: namespace.name }
+			: {}),
+	}
 }
 
 // NOTE: `.price`, `.address.city` — the Function the Compiler writes for the
