@@ -4743,6 +4743,12 @@ third"::lines())
 	show("IntegerList.sum() [empty]", noNumbers::sum())
 	show("IntegerList.product()", numbers::product())
 	show("IntegerList.product() [empty]", noNumbers::product())
+	show("IntegerList.runningTotal()", numbers::runningTotal())
+	show("IntegerList.runningTotal() [empty]", noNumbers::runningTotal())
+	show(
+		"IntegerList.runningTotal() [proof carried]",
+		noNumbers::runningTotal()::firstItem(),
+	)
 	show("IntegerList.average()", numbers::average())
 	show("IntegerList.average() [empty]", noNumbers::average())
 	show(
@@ -4778,6 +4784,8 @@ third"::lines())
 	show("RationalList.sum() [empty]", noRationals::sum())
 	show("RationalList.product()", rationals::product())
 	show("RationalList.product() [empty]", noRationals::product())
+	show("RationalList.runningTotal()", rationals::runningTotal())
+	show("RationalList.runningTotal() [empty]", noRationals::runningTotal())
 	show("RationalList.average()", rationals::average())
 	show("RationalList.average() [empty]", noRationals::average())
 	show(
@@ -4826,6 +4834,8 @@ third"::lines())
 
 	show("NumberList.product()", mixedNumbers::product())
 	show("NumberList.product() [empty]", noMixedNumbers::product())
+	show("NumberList.runningTotal()", mixedNumbers::runningTotal())
+	show("NumberList.runningTotal() [empty]", noMixedNumbers::runningTotal())
 	show("NumberList.average()", mixedNumbers::average())
 	show("NumberList.average() [empty]", noMixedNumbers::average())
 	show(
