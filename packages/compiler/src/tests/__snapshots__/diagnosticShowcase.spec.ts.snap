@@ -2610,3 +2610,72 @@ Error: Case '#Red' is declared by more than one Choice
 ─── 4 errors
 "
 `;
+
+exports[`Diagnostic Showcase NestingLevels.es should render the same report every time 1`] = `
+"[ambiguous-nesting-level]
+Warning: This Argument fits the receiver and what it holds
+    ╭─┤ NestingLevels.es:22:32 │
+    │
+ 22 │     constant isEmpty = nested::is(#Empty)
+    │                                ─┐ ───┬──  
+    │                                 ╰────│──── this takes an Optional<Integer> as well
+    │                                      │    
+    │                                      ╰──── read as an Optional<Optional<Integer>> here
+    │ 
+    │ Help 1: Write '#Value(…)' around the Argument to ask whether the receiver holds it.
+    │ Help 2: Name it in a Constant annotated 'Optional<Optional<Integer>>' to go on asking about the receiver.
+    │ 
+    │ Note: A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.
+────╯
+
+[ambiguous-nesting-level]
+Warning: This Argument fits the receiver and what it holds
+    ╭─┤ NestingLevels.es:26:38 │
+    │
+ 26 │     constant isNotEmpty = nested::isNot(#Empty)
+    │                                   ──┬── ───┬──  
+    │                                     ╰──────│──── this takes an Optional<Integer> as well
+    │                                            │    
+    │                                            ╰──── read as an Optional<Optional<Integer>> here
+    │ 
+    │ Help 1: Write '#Value(…)' around the Argument to ask whether the receiver holds it.
+    │ Help 2: Name it in a Constant annotated 'Optional<Optional<Integer>>' to go on asking about the receiver.
+    │ 
+    │ Note: A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.
+────╯
+
+[ambiguous-nesting-level]
+Warning: This Argument fits the receiver and what it holds
+    ╭─┤ NestingLevels.es:31:34 │
+    │
+ 31 │     constant hasFailed = failed::is(#Failure("gone"))
+    │                                  ─┐ ────────┬───────  
+    │                                   ╰─────────│───────── this takes a Result<Integer, String> as well
+    │                                             │         
+    │                                             ╰───────── read as a Result<Result<Integer, String>, String> here
+    │ 
+    │ Help 1: Write '#Value(…)' around the Argument to ask whether the receiver holds it.
+    │ Help 2: Name it in a Constant annotated 'Result<Result<Integer, String>, String>' to go on asking about the receiver.
+    │ 
+    │ Note: A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.
+────╯
+
+[ambiguous-nesting-level]
+Warning: This Argument fits the receiver and what it holds
+    ╭─┤ NestingLevels.es:37:35 │
+    │
+ 37 │     constant spelledOut = nested::is(Optional<Optional<Integer>>#Empty)
+    │                                   ─┐ ────────────────┬────────────────  
+    │                                    ╰─────────────────│────────────────── this takes an Optional<Integer> as well
+    │                                                      │                  
+    │                                                      ╰────────────────── read as an Optional<Optional<Integer>> here
+    │ 
+    │ Help 1: Write '#Value(…)' around the Argument to ask whether the receiver holds it.
+    │ Help 2: Name it in a Constant annotated 'Optional<Optional<Integer>>' to go on asking about the receiver.
+    │ 
+    │ Note: A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.
+────╯
+
+─── 4 warnings
+"
+`;

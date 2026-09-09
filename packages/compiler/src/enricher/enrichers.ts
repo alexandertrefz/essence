@@ -10470,6 +10470,22 @@ function resolveInvokedMethodInNamespace(
 		return undefined
 	}
 
+	// NOTE: Collected rather than reported, and handed on beside what selecting
+	// the Overload had to say — this Namespace is one candidate among those
+	// probed, and a Warning about the entry it chose is only news once the call
+	// commits to it.
+	let { diagnostics: nestingDiagnostics } = collectDiagnostics(() =>
+		reportAmbiguousNestingLevel(
+			node,
+			receiverType ?? baseType,
+			overloads,
+			selected,
+			matchableArguments,
+			scope,
+			typer,
+		),
+	)
+
 	return {
 		returnType: selected.inferred.returnType,
 		overloadedMethodIndex:
@@ -10477,7 +10493,7 @@ function resolveInvokedMethodInNamespace(
 		unboundGenerics: selected.inferred.unboundGenerics,
 		conformances: selected.conformances,
 		omittedParameterIndices: selected.inferred.omittedParameterIndices,
-		selectionDiagnostics: selected.diagnostics,
+		selectionDiagnostics: [...selected.diagnostics, ...nestingDiagnostics],
 	}
 }
 
@@ -12521,6 +12537,270 @@ function reportDeadFallbackOnFunctionInvocation(
 
 function functionInvocationEntry(overloadedMethodIndex: number | null): string {
 	return selectedEntry([{ namespaceName: "", overloadedMethodIndex }])
+}
+
+// NOTE: A carrier and the value it holds are two levels, and an Overload with an
+// entry for each reads one written Argument at either of them. `Optional::is`
+// takes an `Optional<ItemType>` beside an `ItemType`, so on an
+// `Optional<Optional<Integer>>` receiver a written `#Empty` fits the whole
+// Optional and the Optional it holds both — two questions with two answers — and
+// the entry taking the whole one is reached first because it is written first.
+// `nested::is(#Empty)` therefore answers whether the RECEIVER is empty, and a
+// reader who meant "does it hold an empty Optional" is handed `false` with
+// nothing said. `Result` has the same shape one Case over: a written
+// `#Failure(reason)` fits a `Result<Result<Value, Failure>, Failure>` and the
+// `Result<Value, Failure>` it holds both.
+//
+// Nothing here names `is`, `Optional` or `Result`. What is recognised is the
+// SHAPE — the entry the call selected takes the receiver's own Type, another
+// entry of the same Overload takes what one of that Type's Cases holds, and the
+// value the call built reads at both — so a Namespace a Program declares over a
+// carrier of its own is read exactly the same way.
+//
+// Two entries accepting one call is not a trap on its own: a refinement ladder
+// is exactly that, and `overloadProbeOrder` exists to decide which of them wins.
+// What makes this one is that the two entries ask about different VALUES, one
+// about the receiver and one about the payload inside it, so which entry is
+// reached decides the ANSWER rather than only the evidence carried into it.
+//
+// Written about the order the Library declares — the whole-carrier entry first,
+// which DEVELOPMENT.md pins as load-bearing. An Overload declaring the payload
+// entry first selects that one instead; the mirror of this Warning is a
+// different sentence, and nothing in the Library has that shape to say it about.
+function reportAmbiguousNestingLevel(
+	node: parser.MethodInvocationNode,
+	receiverType: common.Type,
+	overloads: Array<common.BaseFunction>,
+	selected: SelectedOverload,
+	matchableArguments: Array<MatchableArgument>,
+	scope: enricher.Scope,
+	typer: ArgumentTyper,
+): void {
+	let argument = node.arguments[0]
+	let selectedOverload = overloads[selected.index]
+
+	// NOTE: One Argument, written without a label, against an Overload with
+	// something else to reach. Anything else is a signature the two-level
+	// reading is not about: the levels are two readings of ONE written value.
+	if (
+		overloads.length < 2 ||
+		node.arguments.length !== 1 ||
+		argument === undefined ||
+		argument.name !== null ||
+		selectedOverload === undefined
+	) {
+		return
+	}
+
+	let wholeType = soleArgumentType(selectedOverload, selected.inferred)
+
+	if (wholeType === null) {
+		return
+	}
+
+	// NOTE: Asked before anything is probed, and the filter that keeps this off
+	// the numeric comparisons: `Integer::is` takes its receiver's own Type too,
+	// and an Integer holds nothing, so there is no second level for an Argument
+	// to be read at.
+	let held = payloadsByCase(wholeType)
+
+	if (held.length === 0) {
+		return
+	}
+
+	// NOTE: The claim is about the RECEIVER, so the entry has to take the
+	// receiver's own Type rather than one of the same shape. Compared both ways
+	// round: a Parameter the receiver is merely assignable to is a wider
+	// question than the one the Warning describes.
+	if (
+		!matchesType(wholeType, receiverType) ||
+		!matchesType(receiverType, wholeType)
+	) {
+		return
+	}
+
+	for (let [index, other] of overloads.entries()) {
+		if (index === selected.index) {
+			continue
+		}
+
+		let heldType = probeAcceptedOverload(
+			other,
+			matchableArguments,
+			scope,
+			node.position,
+			typer,
+		)
+
+		if (heldType === null) {
+			continue
+		}
+
+		// NOTE: The two entries have to stand at two LEVELS of one value, which
+		// is what the other entry taking a Case's payload says. Anything else is
+		// a pair of entries about the same value — a refinement ladder, a second
+		// numeric kind — and which of those wins changes what a call proves
+		// rather than what it asks.
+		let holding = held.find(
+			([, payloadType]) =>
+				matchesType(payloadType, heldType) &&
+				matchesType(heldType, payloadType),
+		)
+
+		if (holding === undefined) {
+			continue
+		}
+
+		// NOTE: And the VALUE has to read at both levels, not merely the entry
+		// accept the call. An Argument an entry can not read types as Error
+		// somewhere inside itself, and `matchTypes` lets an Error match
+		// anything, so such an entry "accepts" a value it can make no sense of:
+		// `#Value(#Empty)` against an `Optional<Integer>` comes back as an
+		// `Optional<Integer>#Value` with the payload's failure buried in its
+		// member, and the entry says yes. What the Program actually built is
+		// compared instead — a written `#Empty` against an
+		// `Optional<Optional<Integer>>` Parameter is an
+		// `Optional<Optional<Integer>>#Empty` — which is the question this
+		// Warning asks out loud. Asked here rather than up front, so a call with
+		// no second entry to reach costs nothing but the probe.
+		let writtenType = probedArgumentType(matchableArguments, wholeType)
+
+		if (
+			writtenType === null ||
+			typeContainsError(writtenType) ||
+			!matchesType(heldType, writtenType)
+		) {
+			continue
+		}
+
+		let position = argument.value.position
+
+		reportWarning(
+			"This Argument fits the receiver and what it holds",
+			position,
+			{
+				code: "ambiguous-nesting-level",
+				labels: [
+					primary(
+						position,
+						`read as ${withArticle(describeType(wholeType))} here`,
+					),
+					secondary(
+						node.member.position,
+						`this takes ${withArticle(describeType(heldType))} as well`,
+					),
+				],
+				notes: [
+					"A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.",
+				],
+				helps: [
+					`Write '#${holding[0]}(…)' around the Argument to ask whether the receiver holds it.`,
+					`Name it in a Constant annotated '${describeType(wholeType)}' to go on asking about the receiver.`,
+				],
+				data: { kind: "holding-case", caseName: holding[0] },
+			},
+		)
+
+		return
+	}
+}
+
+// NOTE: The Type of an entry's single non-receiver Parameter, as this call bound
+// it — and null for every other signature there is. A Type Parameter the call
+// left unsolved answers null too: what is compared below are Types, and a
+// Parameter standing for whatever some other caller might bind is not one.
+function soleArgumentType(
+	overload: common.BaseFunction,
+	inferred: InferredInvocation,
+): common.Type | null {
+	let parameter = overload.parameterTypes[1]
+
+	if (
+		overload.parameterTypes.length !== 2 ||
+		parameter === undefined ||
+		inferred.unboundGenerics.length > 0
+	) {
+		return null
+	}
+
+	return applyGenericBindings(parameter.type, inferred.bindings)
+}
+
+// NOTE: What each Case of a Choice holds, for the Cases holding exactly one
+// thing. A Case with no payload holds nothing an Argument could be read as, and
+// one carrying several members holds a Record written into a Case rather than a
+// level a single value can be read at.
+function payloadsByCase(type: common.Type): Array<[string, common.Type]> {
+	let members = type.type === "UnionType" ? flattenUnionMembers(type) : [type]
+
+	return members.flatMap((member) => {
+		if (member.type !== "Case") {
+			return []
+		}
+
+		let entries = Object.entries(member.members)
+		let only = entries[0]
+
+		return entries.length === 1 && only !== undefined
+			? [[member.name, only[1]] as [string, common.Type]]
+			: []
+	})
+}
+
+// NOTE: The Parameter Type another entry would read this call's Argument at,
+// where that entry accepts the call, and null everywhere else. Accepting is
+// asked the way `selectOverload` asks it — the Arguments matched, the bounds
+// solved, and neither of them reporting an Error — so an entry whose bounds the
+// receiver can not satisfy is no second reading at all.
+//
+// Held aside on every rail: the Diagnostics are collected and dropped, since an
+// entry that was not selected is not the one the Program runs, and the
+// contextual recordings are made under a recording nobody commits, so an
+// unannotated Function literal Argument stays typed by the entry that won.
+function probeAcceptedOverload(
+	overload: common.BaseFunction,
+	matchableArguments: Array<MatchableArgument>,
+	scope: enricher.Scope,
+	position: common.Position,
+	typer: ArgumentTyper,
+): common.Type | null {
+	let { result } = probeContextualFunctionTypes(() =>
+		collectDiagnostics(() =>
+			probeOverload(overload, matchableArguments, scope, position, typer),
+		),
+	)
+	let probed = result.result
+
+	if (
+		probed === undefined ||
+		probed.sawErrorArgument ||
+		containsErrors(result.diagnostics) ||
+		containsErrors(probed.diagnostics)
+	) {
+		return null
+	}
+
+	return soleArgumentType(overload, probed.inferred)
+}
+
+// NOTE: What the one written Argument comes to under the Parameter Type the call
+// settled on. Held aside like every other question asked twice here: the reading
+// is the one the Invocation commits for itself, and committing it a second time
+// from inside a Warning would leave a second recording behind and report
+// whatever it has to report all over again.
+function probedArgumentType(
+	matchableArguments: Array<MatchableArgument>,
+	expectedType: common.Type,
+): common.Type | null {
+	let argument = matchableArguments[1]
+
+	if (argument === undefined) {
+		return null
+	}
+
+	return probeContextualFunctionTypes(() =>
+		collectDiagnostics(() => argument.getType(expectedType, null)),
+	).result.result
 }
 
 // NOTE: Resolves `ChoiceName#CaseName` to the Case's Type. The Choice's name

@@ -173,6 +173,11 @@ export type Diagnostic = {
 export type DiagnosticData =
 	| { kind: "missing-case"; unhandled: Array<string> }
 	| { kind: "suggestion"; suggestion: string }
+	// NOTE: The Case a value is held in — `#Value` for both `Optional` and
+	// `Result` — so that a fix which wraps an Argument in it does not have to
+	// work out which Case of the receiver's Choice holds anything. The name is
+	// bare, as `suggestion`'s is, and the `#` is written by whoever renders it.
+	| { kind: "holding-case"; caseName: string }
 
 // NOTE: Every Diagnostic carries one, and `docs/diagnostics.md` documents
 // every one of these — a code with no entry there is a code nobody can look
@@ -299,6 +304,7 @@ export type DiagnosticCode =
 	| "ambiguous-overload-default"
 	| "fallback-never-used"
 	| "redundant-key-check"
+	| "ambiguous-nesting-level"
 	// Choices and their Cases.
 	| "empty-choice"
 	| "unknown-case"
