@@ -11,14 +11,14 @@ bun packages/cli/bin/essence run examples/league/Main.es
 
 ```
 After round 7
-----------------------------------------------------------
- #  Team                P  W  D  L     F:A   GD  Pts  Form
- 1  Riverside           7  4  3  0    11:5   +6   15  WDWWW
- 2  Harbour Rovers      7  4  2  1    15:7   +8   14  WDLDW
- 3  Ashgrove Athletic   7  2  3  2     8:6   +2    9  LWWDL
- 4  Northfield United   6  2  2  2    12:7   +5    8  DWWLD
- 5  Kestrel Town        6  2  1  3    9:12   -3    7  DLLWL
- 6  Old Quarry          7  0  1  6    3:21  -18    1  LLLDL
+------------------------------------------------------
+#  Team               P  W  D  L   F:A   GD  Pts  Form
+1  Riverside          7  4  3  0  11:5   +6   15  WDWWW
+2  Harbour Rovers     7  4  2  1  15:7   +8   14  WDLDW
+3  Ashgrove Athletic  7  2  3  2   8:6   +2    9  LWWDL
+4  Northfield United  6  2  2  2  12:7   +5    8  DWWLD
+5  Kestrel Town       6  2  1  3  9:12   -3    7  DLLWL
+6  Old Quarry         7  0  1  6  3:21  -18    1  LLLDL
 
 Riverside lead Harbour Rovers by 1 point.
 They average 15/7 points a game — 2.14 to two places — and have won 57% of their matches.
@@ -36,32 +36,40 @@ They average 15/7 points a game — 2.14 to two places — and have won 57% of t
 - **A Namespace is where a Type's rules live.** [`Standings.es`](Standings.es)
   declares `Standing` and a `namespace Standing for Standing is Comparable`
   whose `compare(to:)` *is* the ranking rule — points, goal difference, goals
-  scored, name — so `Standings.ranked` is one `sort()` with no comparison
-  passed. `is Printable` on `Fixture` and `Outcome` lets a fixture print itself
-  and a form guide join into `WDLDW`.
+  scored, name, chained with `Ordering::then` so that each key decides only
+  what the ones before it left equal — so `Standings.ranked` is one `sort()`
+  with no comparison passed. `is Printable` on `Fixture` and `Outcome` lets a
+  fixture print itself and a form guide join into `WDLDW`.
 - **Every count is a fold.** The season is walked once, `fixtures::reduce`,
   and each Case of a fixture is taken apart by a Pattern into exactly the
   names the arm needs. Recording a result is one Record update,
   `{ @ with … }`.
 - **A Dictionary where the data is keyed.** The rows are worked out in a
   `Dictionary<Team, Standing>`, so a fixture reaches the two rows it changes
-  instead of every row being asked about every fixture. `Dictionary.of` builds
-  the blank table out of the teams, `update(at:with:)` records a result — and
-  it answers the table unchanged where the key holds nothing, which is what
-  makes a fixture between teams this table is not about change nothing. A
-  `Team` is a Record, and a Record is a key like any other: it is found by
-  asking the Record's own `is`. The rows are then read back through the teams,
-  which is what carries the proof that the table has rows.
-  [`Season.tests.es`](Season.tests.es) keys the finished table by team code
-  the same way, so a test asks for a row by name and gets an `Optional`.
+  instead of every row being asked about every fixture. `index(on:)` keys the
+  blank rows by the team each is about — the one-to-one crossing from a List
+  to a Dictionary — `update(at:with:)` records a result, and it answers the
+  table unchanged where the key holds nothing, which is what makes a fixture
+  between teams this table is not about change nothing. A `Team` is a Record,
+  and a Record is a key like any other: it is found by asking the Record's own
+  `is`. The rows are then read back through the teams, which is what carries
+  the proof that the table has rows. [`Season.tests.es`](Season.tests.es)
+  indexes the finished table by team code the same way, so a test asks for a
+  row by name and gets an `Optional`.
 - **Refinements instead of Optionals.** `teams` is a `NonEmptyList<Team>` —
   writing the items down is the proof — so `Standings.leader(of:)` answers a
   `Standing` rather than an `Optional`, and `pointsPerGame` divides by `played`
   inside the `if` that proved it non-zero, where the quotient is bare.
 - **Exact until the last step.** A rate is a `Rational` — `15/7`, not
   `2.142857…` — and the whole league's mean is `average` over a List of exact
-  rates. [`Table.es`](Table.es) holds the one place a number is rounded:
-  `Decimal.formatted`, when a value becomes text.
+  rates. [`Main.es`](Main.es) holds the one place a number is rounded:
+  `rate::toString(as #Decimal, toPlaces 2)`, when a value becomes text.
+- **A table that measures itself.** [`Table.es`](Table.es) declares its ten
+  columns — a heading and which end the cell is padded at — and `render`
+  measures each one against every cell that stands in it, headings included,
+  by turning the grid on its side with `transpose()`. No width is written
+  down, so renaming a team moves the whole table, and a goal difference reads
+  with its sign through `toString(showingSign #Always)`.
 - **Modules.** Four files, private by default, `import { … }` / `export { … }`
   naming exactly what crosses.
 

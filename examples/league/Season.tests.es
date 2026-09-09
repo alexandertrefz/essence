@@ -13,10 +13,7 @@ import {
 		Standing
 		Standings
 	}
-	from "./Table.es" {
-		Decimal
-		Table
-	}
+	from "./Table.es" { Table }
 }
 
 tests {
@@ -26,14 +23,11 @@ tests {
 	constant leader = Standings.leader(of table)
 
 	§ A table is read by hand by team, and a row is found by asking the whole
-	§ List for the one whose code matches. Keyed by the code once, every test
-	§ that wants a row asks for it by name — and a lookup answers an Optional,
-	§ because a code the table has no row for holds nothing.
-	constant byCode = Dictionary.of(
-		table::map((standing) {
-			<- { key = standing.team.code, value = standing }
-		}),
-	)
+	§ List for the one whose code matches. `index(on:)` keys it by the code
+	§ once, so every test that wants a row asks for it by name — and a lookup
+	§ answers an Optional, because a code the table has no row for holds
+	§ nothing.
+	constant byCode = table::index(on (standing) { <- standing.team.code })
 
 	suite "the season as it stands" {
 		test "is led by Riverside" {
@@ -131,9 +125,11 @@ tests {
 	}
 
 	suite "the table as text" {
+		§ A row is its cells; how wide each of them sits is the table's
+		§ business, and `render` is where that is decided.
 		test "writes the leader into the first row" {
-			expect Table.row(leader, at 1)::contains("Riverside")
-			expect Table.row(leader, at 1)::contains("WDWWW")
+			expect Table.cells(leader, at 1)::contains("Riverside")
+			expect Table.cells(leader, at 1)::contains("WDWWW")
 		}
 
 		§ Every column of a row, to the character. What a table IS is its
@@ -147,10 +143,10 @@ tests {
 			require #Value(first) = lines::item(at 3)
 
 			expect header::is(
-				" #  Team                P  W  D  L     F:A   GD  Pts  Form",
+				"#  Team               P  W  D  L   F:A   GD  Pts  Form",
 			)
 			expect first::is(
-				" 1  Riverside           7  4  3  0    11:5   +6   15  WDWWW",
+				"1  Riverside          7  4  3  0  11:5   +6   15  WDWWW",
 			)
 		}
 
@@ -177,13 +173,18 @@ tests {
 		}
 
 		§ Every rate stays exact until it is written down, and this is the one
-		§ place a number is rounded.
+		§ place a number is rounded. A count below one place writes the whole
+		§ number, with no point after it.
 		test "rounds a rate once, at the very end" {
-			expect Decimal.formatted(leader::pointsPerGame())::is("2.14")
-			expect Decimal.formatted(
-				leader::winRate()::multiply(with 100),
-				places 0,
-			)::is("57")
+			expect leader
+				::pointsPerGame()
+				::toString(as #Decimal, toPlaces 2)
+				::is("2.14")
+			expect leader
+				::winRate()
+				::multiply(with 100)
+				::toString(as #Decimal, toPlaces 0)
+				::is("57")
 		}
 	}
 }

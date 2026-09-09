@@ -2,73 +2,52 @@ import {
 	from "./Standings.es" {
 		Outcome
 		Standing
+		Standings
 	}
 }
 
 implementation {
 
-	§ Everything the rest of the program computes stays exact — a rate is a
-	§ Rational, `5/3` is `5/3`. This is the one place a number is rounded, and
-	§ it happens as late as it can: when a value is turned into text.
-	namespace Decimal {
-		§§ A Rational written with `places` decimal places — two unless asked
-		§§ otherwise — rounded once, halves away from zero: `5/3` is `1.67`.
-		static formatted(_ value: Rational, places: Integer = 2) -> String {
-			§ Scale up, round to an Integer, and take that Integer apart into
-			§ the digits before the point and after it. `product` of the
-			§ repeated tens is the power the language has no operator for.
-			§
-			§ A quotient by a COMPUTED divisor is an Optional — the divisor
-			§ might be zero — unless the divisor is proven not to be. The `if`
-			§ is that proof: inside it `scale` is a NonZeroInteger and both
-			§ divisions answer bare. Outside it there is nothing to divide by,
-			§ and the sensible reading of "no places" is the rounded whole.
-			constant scale  = List.repeat(10, times places)::product()
-			constant scaled = value::multiply(with scale)::round()
-			constant sign   = signOf(scaled)
-			constant size   = scaled::absolute()
+	§ A column of the table: what it is headed with, which end its cells are
+	§ padded at, and how wide it is. Padding at `#Start` puts a cell against
+	§ the RIGHT edge of its column, which is where a number reads; text is
+	§ padded at the end and reads from the left. The width written here is
+	§ nothing — `render` measures every column against the cells that stand
+	§ in it.
+	type Column = { heading: String, padded: Side, width: Integer }
 
-			if scale::isNot(0)::and(places::isPositive()) {
-				constant whole    = size::quotient(dividingBy scale)
-				constant fraction = size::remainder(dividingBy scale)
-					::toString()
-					::pad(to places, with "0")
-
-				<- "{sign}{whole}.{fraction}"
-			}
-
-			<- "{sign}{size}"
-		}
+	function column(_ heading: String, padded side: Side = #Start) -> Column {
+		<- { heading, padded = side, width = 0 }
 	}
 
-	function signOf(_ value: Integer) -> String {
-		if value::isNegative() {
-			<- "-"
-		}
+	§ The table, declared as its columns. Adding one here and a cell for it in
+	§ `Table.cells` is the whole of adding a column: nothing else knows how
+	§ many there are or how wide any of them is.
+	constant columns: List<Column> = [
+		column("#"),
+		column("Team", padded #End),
+		column("P"),
+		column("W"),
+		column("D"),
+		column("L"),
+		column("F:A"),
+		column("GD"),
+		column("Pts"),
+		column("Form", padded #End),
+	]
 
-		<- ""
+	§ One line of the table: every cell padded to the width its column was
+	§ measured at, with two spaces between columns. The last column is padded
+	§ like every other and then trimmed back off, so no line ends in a space.
+	function line(_ cells: List<String>, in measured: List<Column>) -> String {
+		<- cells
+			::pair(with measured)
+			::map(({ first as cell, second as column }) {
+				<- cell::pad(to column.width, at column.padded)
+			})
+			::join(with "  ")
+			::trim(at #End)
 	}
-
-	§ A goal difference reads with its sign, and zero reads as itself.
-	function signed(_ difference: Integer) -> String {
-		if difference::isPositive() {
-			<- "+{difference}"
-		}
-
-		<- "{difference}"
-	}
-
-	§ A column is a padded String. Numbers sit against the right edge of
-	§ their column, text against the left.
-	function column(_ text: String, width: Integer) -> String {
-		<- text::pad(to width, with " ")
-	}
-
-	function label(_ text: String, width: Integer) -> String {
-		<- text::pad(to width, with " ", at #End)
-	}
-
-	constant nameWidth = 18
 
 	namespace Table {
 		§§ The table as text: a title, a header, and one row per Standing in
@@ -78,73 +57,95 @@ implementation {
 			_ standings: NonEmptyList<Standing>,
 			titled title: String,
 		) -> String {
-			constant header = ""::append(column("#", width 2))
-				::append("  ")
-				::append(label("Team", width nameWidth))
-				::append(column("P", width 3))
-				::append(column("W", width 3))
-				::append(column("D", width 3))
-				::append(column("L", width 3))
-				::append(column("F:A", width 8))
-				::append(column("GD", width 5))
-				::append(column("Pts", width 5))
-				::append("  Form")
-
 			§ `enumerate` walks the rows beside the positions they stand at,
 			§ and a table counts from one where a List counts from zero.
 			constant rows = standings
 				::enumerate()
 				::map(({ index, item }) {
-					<- Table.row(item, at index::add(1))
+					<- Table.cells(item, at index::add(1))
 				})
 
+			§ The headings and the rows are one grid, and `transpose` turns
+			§ that grid into one List per column — so a column is measured
+			§ against everything that stands in it, its own heading included.
+			§ No width is written down anywhere, which is what makes renaming
+			§ a team move the whole table.
+			constant grid = [columns::map(.heading)]::append(contentsOf rows)
+
+			constant measured = grid::transpose()
+				::pair(with columns)
+				::map(({ first as cells, second as column }) {
+					<- {
+						column with
+							width = cells
+								::map((cell) { <- cell::length() })
+								::highestNumber(defaultingTo 0),
+					}
+				})
+
+			constant header = line(columns::map(.heading), in measured)
+
 			<- [title, "-"::repeat(times header::length()), header]
-				::append(contentsOf rows)
+				::append(
+					contentsOf rows::map((cells) {
+						<- line(cells, in measured)
+					}),
+				)
 				::join(with "\n")
 		}
 
-		§§ One row. The five most recent outcomes print as the form guide.
-		static row(_ standing: Standing, at position: Integer) -> String {
-			constant scored   = standing.goalsFor
-			constant conceded = standing.goalsAgainst
-
-			<- ""::append(column("{position}", width 2))
-				::append("  ")
-				::append(label(standing.team.name, width nameWidth))
-				::append(column("{standing.played}", width 3))
-				::append(column("{standing.won}", width 3))
-				::append(column("{standing.drawn}", width 3))
-				::append(column("{standing.lost}", width 3))
-				::append(column("{scored}:{conceded}", width 8))
-				::append(column(signed(standing::goalDifference()), width 5))
-				::append(column("{standing.points}", width 5))
-				::append("  ")
-				::append(standing::recentForm()::join(with ""))
+		§§ One row, as its cells in column order — how wide each of them sits
+		§§ is `render`'s business. The five most recent outcomes are the form
+		§§ guide, and a goal difference reads with its sign, zero included.
+		static cells(
+			_ standing: Standing,
+			at position: Integer,
+		) -> List<String> {
+			<- [
+				"{position}",
+				standing.team.name,
+				"{standing.played}",
+				"{standing.won}",
+				"{standing.drawn}",
+				"{standing.lost}",
+				"{standing.goalsFor}:{standing.goalsAgainst}",
+				standing::goalDifference()::toString(showingSign #Always),
+				"{standing.points}",
+				standing::recentForm()::join(with ""),
+			]
 		}
 	}
 }
 
 export {
-	Decimal
 	Table
 }
 
 tests {
 
-	suite "Decimal" {
-		test "writes a rate with two places, rounded once at the end" {
-			expect Decimal.formatted(5/3)::is("1.67")
-			expect Decimal.formatted(1/2)::is("0.50")
+	constant longNamed = Standings.blank(of {
+		team = { name = "Association Sportive", code = "ASS" },
+	})
+
+	suite "Table" {
+		§ Nothing writes a width down, so the widest cell in a column is what
+		§ the column is: a name nobody planned for widens it and every row
+		§ moves with it, where a written width would have cut it off.
+		test "makes every column as wide as the widest cell in it" {
+			constant lines = Table.render([longNamed], titled "One row")
+				::split(on "\n")
+
+			require #Value(header) = lines::item(at 2)
+			require #Value(row) = lines::item(at 3)
+
+			expect header::starts(with "#  Team                  P")
+			expect row::starts(with "1  Association Sportive  0")
 		}
 
-		§ Halves go away from zero, which is why this is `-1.67` and not
-		§ `-1.66`.
-		test "writes the sign in front of a value below zero" {
-			expect Decimal.formatted(0/1::subtract(5/3))::is("-1.67")
-		}
-
-		test "writes the whole number where no places were asked for" {
-			expect Decimal.formatted(5/3, places 0)::is("2")
+		§ A goal difference reads with its sign, and a table that has not been
+		§ played is all zeroes — `+0` rather than `0`.
+		test "writes a goal difference with its sign" {
+			expect Table.cells(longNamed, at 1)::contains("+0")
 		}
 	}
 }
