@@ -3,6 +3,7 @@ import { tmpdir } from "node:os"
 import * as path from "node:path"
 import { Worker } from "node:worker_threads"
 
+import { readProjectConfiguration } from "@essence-lang/compiler/configuration"
 import { canonicalPath } from "@essence-lang/compiler/documents"
 import type { MutationSite } from "@essence-lang/compiler/mutation"
 import { coveragePassName } from "@essence-lang/compiler/optimiser"
@@ -27,7 +28,6 @@ import {
 	printDiagnostics,
 	runCompilation,
 } from "./compile"
-import { readProjectConfiguration } from "./configuration"
 import type { CLIContext } from "./context"
 import { discoverTestFiles } from "./discovery"
 import { GLOB_PATTERN } from "./inputs"
@@ -470,7 +470,7 @@ export async function runMutation(
 		return EXIT_USAGE
 	}
 
-	let configuration = await readProjectConfiguration()
+	let configuration = readProjectConfiguration()
 
 	for (let problem of configuration.problems) {
 		context.terminal.err(
@@ -521,7 +521,7 @@ export async function runMutation(
 		command,
 		context.programName,
 		process.cwd(),
-		configuration.test.exclude,
+		configuration.exclude,
 		contracts,
 	)
 

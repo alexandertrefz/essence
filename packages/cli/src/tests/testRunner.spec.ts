@@ -13,12 +13,12 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { readProjectConfiguration } from "@essence-lang/compiler/configuration"
 import type { TestEvent } from "@essence-lang/runtime/Testing"
 
 import { EXIT_FAILURE, EXIT_FOCUSED, EXIT_SUCCESS } from "../actions"
 import { parseArguments, UsageError } from "../args"
 import { findCommand } from "../commands"
-import { readProjectConfiguration } from "../configuration"
 import { createContext } from "../context"
 import { discoverTestFiles, namesTests } from "../discovery"
 import { run } from "../index"
@@ -412,7 +412,7 @@ describe("essence test — project configuration", () => {
 				"nested/deep/keep.txt": "",
 			},
 			async (directory) => {
-				let configuration = await readProjectConfiguration(
+				let configuration = readProjectConfiguration(
 					path.join(directory, "nested", "deep"),
 				)
 
@@ -431,7 +431,7 @@ describe("essence test — project configuration", () => {
 				"inner/package.json": JSON.stringify({ name: "inner" }),
 			},
 			async (directory) => {
-				let configuration = await readProjectConfiguration(
+				let configuration = readProjectConfiguration(
 					path.join(directory, "inner"),
 				)
 
@@ -447,19 +447,19 @@ describe("essence test — project configuration", () => {
 		await withFiles(
 			{
 				"package.json": JSON.stringify({
-					essence: { test: { exclude: ["broken"] } },
+					essence: { exclude: ["broken"] },
 				}),
 				"Rules.es": passing,
 				"broken/Bad.tests.es": broken,
 			},
 			async (directory) => {
-				let configuration = await readProjectConfiguration(directory)
+				let configuration = readProjectConfiguration(directory)
 				let found = await discoverTestFiles(
 					[],
 					testCommand,
 					"essence",
 					directory,
-					configuration.test.exclude,
+					configuration.exclude,
 				)
 
 				expect(found.map((each) => path.basename(each))).toEqual([
@@ -475,21 +475,46 @@ describe("essence test — project configuration", () => {
 		await withFiles(
 			{
 				"package.json": JSON.stringify({
-					essence: { test: { exclude: ["broken"] } },
+					essence: { exclude: ["broken"] },
 				}),
 				"broken/Bad.tests.es": broken,
 			},
 			async (directory) => {
-				let configuration = await readProjectConfiguration(directory)
+				let configuration = readProjectConfiguration(directory)
 				let found = await discoverTestFiles(
 					[path.join(directory, "broken", "Bad.tests.es")],
 					testCommand,
 					"essence",
 					directory,
-					configuration.test.exclude,
+					configuration.exclude,
 				)
 
 				expect(found).toHaveLength(1)
+			},
+		)
+	})
+
+	// NOTE: The key moved out of "test" when the editor grew a Problems panel
+	// that speaks for the whole workspace and needed the same answer. A project
+	// still writing it in the old place has no exclusions in force at all, and
+	// the symptom — a panel full of a corpus it keeps deliberately broken —
+	// reads as the editor being wrong rather than as a key being one level too
+	// deep, so the run says so.
+	it("says so where the exclusions are written in the old place", async () => {
+		await withFiles(
+			{
+				"package.json": JSON.stringify({
+					essence: { test: { exclude: ["broken"] } },
+				}),
+			},
+			async (directory) => {
+				let configuration = readProjectConfiguration(directory)
+
+				expect(configuration.exclude).toEqual([])
+				expect(configuration.problems).toHaveLength(1)
+				expect(configuration.problems[0]).toContain(
+					'"essence.test.exclude" has moved to "essence.exclude"',
+				)
 			},
 		)
 	})
@@ -502,7 +527,7 @@ describe("essence test — project configuration", () => {
 				}),
 			},
 			async (directory) => {
-				let configuration = await readProjectConfiguration(directory)
+				let configuration = readProjectConfiguration(directory)
 
 				expect(configuration.test.contracts).toBe(true)
 				expect(configuration.problems).toEqual([])
@@ -518,7 +543,7 @@ describe("essence test — project configuration", () => {
 				}),
 			},
 			async (directory) => {
-				let configuration = await readProjectConfiguration(directory)
+				let configuration = readProjectConfiguration(directory)
 
 				expect(configuration.test.contracts).toBe(false)
 				expect(configuration.problems).toHaveLength(1)
@@ -537,7 +562,7 @@ describe("essence test — project configuration", () => {
 				}),
 			},
 			async (directory) => {
-				let configuration = await readProjectConfiguration(directory)
+				let configuration = readProjectConfiguration(directory)
 
 				expect(configuration.test.skipTags).toEqual([])
 				expect(configuration.problems).toHaveLength(1)

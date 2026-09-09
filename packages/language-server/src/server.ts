@@ -1,5 +1,7 @@
+import * as path from "node:path"
 import { pathToFileURL } from "node:url"
 
+import { skippedDirectories } from "@essence-lang/compiler/configuration"
 import { isStdlibDocument } from "@essence-lang/compiler/documents"
 import { loadStdlib } from "@essence-lang/compiler/enricher/stdlib"
 import type { common, parser } from "@essence-lang/interfaces"
@@ -553,9 +555,18 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// document events can not see — a branch switch, a file another tool
 		// wrote, a Module deleted. Registered dynamically because the glob is
 		// the Server's business rather than the extension manifest's.
+		// NOTE: And `package.json`, which is where a project says which of its
+		// directories are not its sources (`essence.exclude`). It is not a
+		// Module and nothing analyses it — what it changes is which files this
+		// Server is entitled to report on at all, and a reader who has just
+		// excluded a corpus should watch the panel empty rather than be told to
+		// restart the editor.
 		connection.client
 			.register(DidChangeWatchedFilesNotification.type, {
-				watchers: [{ globPattern: "**/*.es" }],
+				watchers: [
+					{ globPattern: "**/*.es" },
+					{ globPattern: "**/package.json" },
+				],
 			})
 			.catch(() => {})
 
@@ -761,11 +772,35 @@ export function startServer(options: { connection?: Connection } = {}) {
 		void session.dispose()
 	})
 
+	// NOTE: A `package.json` this project could be reading its settings out of.
+	// Not every one under the folder: `bun install` rewrites thousands inside
+	// `node_modules`, and answering each of them with a project rebuilt from
+	// scratch would make an install cost more than the install. The walk that
+	// reads the setting never descends into those directories either, so a
+	// manifest inside one can not be the manifest it read.
+	function isProjectManifest(filePath: string): boolean {
+		if (path.basename(filePath) !== "package.json") {
+			return false
+		}
+
+		return !path
+			.dirname(filePath)
+			.split(path.sep)
+			.some((segment) => skippedDirectories.has(segment))
+	}
+
 	connection.onDidChangeWatchedFiles((params) => {
 		let changed: Array<string> = []
+		let manifestChanged = false
 
 		for (let change of params.changes) {
 			let filePath = documentFilePath(change.uri)
+
+			if (isProjectManifest(filePath)) {
+				manifestChanged = true
+
+				continue
+			}
 
 			changed.push(filePath)
 
@@ -774,6 +809,26 @@ export function startServer(options: { connection?: Connection } = {}) {
 			} else {
 				workspace.changed(filePath)
 			}
+		}
+
+		// NOTE: A manifest is answered by working the whole project out again,
+		// the way a workspace folder arriving is. Every cached answer here was
+		// derived for a project with one boundary, and the file that moved is
+		// the one that draws it — including the discovery walk, which is what
+		// decides whether a file has anybody to report on it at all. Rare
+		// enough to be worth no cleverness: nobody edits a `package.json` on a
+		// keystroke.
+		//
+		// And it answers for the `.es` files in the same notification too: a
+		// sweep is every root of the project and a run is every test of it,
+		// which is strictly more than the two lines below would have asked for.
+		if (manifestChanged) {
+			workspace.setFolders(workspace.folders())
+			tags = null
+			session.runAll("open")
+			scheduleSweep()
+
+			return
 		}
 
 		tags = null

@@ -1577,6 +1577,106 @@ describe("the Server's request loop", () => {
 		}
 	})
 
+	// NOTE: The other half of reporting on a whole project: a project holds
+	// `.es` files that are not its sources — a corpus kept deliberately broken
+	// is the one this repository holds — and a panel that lists those is a panel
+	// nobody reads. `essence.exclude` in the nearest `package.json` is how a
+	// project says which directories those are, and it is the same list the test
+	// walk reads.
+	it("should not report on a directory the project excludes", async () => {
+		let lonely = `implementation {\n\tconstant lonely: Integer = "one"\n}\n`
+		let files = makeSessionWorkspace({
+			"package.json": JSON.stringify({
+				essence: { exclude: ["corpus"] },
+			}),
+			...chain,
+			"corpus/Wrong.es": lonely,
+		})
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.settle(800)
+
+			expect(
+				session.diagnosticsFor(files.pathOf("corpus/Wrong.es")),
+			).toBe(undefined)
+			expect(session.diagnosticsFor(files.pathOf("Top.es"))).toEqual([])
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
+	// NOTE: Excluded from the WALK, not from the Server. A reader looking
+	// straight at a file is owed its Diagnostics — what the setting declines is
+	// the panel listing files nobody asked about.
+	it("should report on an excluded file that is open", async () => {
+		let lonely = `implementation {\n\tconstant lonely: Integer = "one"\n}\n`
+		let files = makeSessionWorkspace({
+			"package.json": JSON.stringify({
+				essence: { exclude: ["corpus"] },
+			}),
+			...chain,
+			"corpus/Wrong.es": lonely,
+		})
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.settle(800)
+			await session.open(files.pathOf("corpus/Wrong.es"), lonely)
+			await session.settle(800)
+
+			expect(session.codesFor(files.pathOf("corpus/Wrong.es"))).toEqual([
+				"assignment-type-mismatch",
+			])
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
+	// NOTE: The manifest is watched, so a reader who has just drawn the boundary
+	// somewhere else watches the panel answer rather than being told to restart
+	// the editor.
+	it("should report on what the manifest stops excluding", async () => {
+		let lonely = `implementation {\n\tconstant lonely: Integer = "one"\n}\n`
+		let files = makeSessionWorkspace({
+			"package.json": JSON.stringify({
+				essence: { exclude: ["corpus"] },
+			}),
+			...chain,
+			"corpus/Wrong.es": lonely,
+		})
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.settle(800)
+
+			expect(
+				session.diagnosticsFor(files.pathOf("corpus/Wrong.es")),
+			).toBe(undefined)
+
+			writeFileSync(
+				files.pathOf("package.json"),
+				JSON.stringify({ essence: { exclude: [] } }),
+			)
+			await session.watchedFileChanged([
+				{ filePath: files.pathOf("package.json"), type: 2 },
+			])
+			await session.settle(800)
+
+			expect(session.codesFor(files.pathOf("corpus/Wrong.es"))).toEqual([
+				"assignment-type-mismatch",
+			])
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
 	// NOTE: What a whole workspace costs to report on: one link per ROOT, and
 	// nothing per file beneath one. Two roots here — the chain's Top, whose
 	// graph holds Middle and Base, and a Module nothing imports.

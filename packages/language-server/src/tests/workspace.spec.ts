@@ -159,6 +159,20 @@ const geometry = [
 	"",
 ].join("\n")
 
+const bad = [
+	"implementation {",
+	"",
+	"\tfunction answer() -> Integer {",
+	"\t\t<- missingName()",
+	"\t}",
+	"}",
+	"",
+	"export {",
+	"\tanswer",
+	"}",
+	"",
+].join("\n")
+
 const math = [
 	"implementation {",
 	"",
@@ -1483,6 +1497,108 @@ describe("Workspace", () => {
 					.map((exported) => exported.name)
 					.sort(),
 			).toEqual(["PI", "sqr"])
+		})
+	})
+
+	// NOTE: `essence.exclude` in the nearest `package.json`. Reported on a
+	// project rather than on the open tabs, the discovery walk decides what the
+	// Problems panel speaks for — and a project holds `.es` files that are not
+	// its sources: a corpus kept deliberately broken, a vendored copy, whatever
+	// the last build wrote into it. This is the only way it can say so.
+	describe("the directories a project excludes", () => {
+		let manifest = JSON.stringify({ essence: { exclude: ["broken"] } })
+
+		it("should stay out of a directory the project excludes", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"package.json": manifest,
+				"Math.es": math,
+				"broken/Bad.es": bad,
+			})
+
+			expect([...workspace.knownFiles()]).toEqual([pathOf("Math.es")])
+			expect(workspace.roots()).toEqual([pathOf("Math.es")])
+			expect(workspace.isExcluded(pathOf("broken/Bad.es"))).toBe(true)
+		})
+
+		// NOTE: The line between "not discovered" and "not analysed". A file
+		// this project IMPORTS is this project's, whichever directory it sits
+		// in — excluding a directory says nothing is to be walked INTO, not
+		// that a Module named out loud stops being checked.
+		it("should still report on an excluded file a source imports", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"package.json": manifest,
+				"Main.es": [
+					"import {",
+					'\tfrom "./broken/Bad.es" { answer }',
+					"}",
+					"",
+					"implementation {",
+					"\tconstant given = answer()",
+					"}",
+					"",
+				].join("\n"),
+				"broken/Bad.es": bad,
+			})
+
+			let mainPath = pathOf("Main.es")
+			let analysis = analyseDocument(
+				workspace.sourceOf(mainPath) ?? "",
+				mainPath,
+				{ host: workspace.host },
+			)
+
+			expect([...analysis.dependencies.keys()]).toEqual([
+				pathOf("broken/Bad.es"),
+			])
+			expect(
+				analysis.dependencies.get(pathOf("broken/Bad.es")),
+			).not.toEqual([])
+		})
+
+		// NOTE: The walk is answered once and the watcher keeps it current
+		// afterwards, so an exclusion the walk obeyed has to hold on the
+		// watcher's path too — a file appearing under an excluded directory is
+		// how a corpus grows.
+		it("should not take an excluded file from the watcher", () => {
+			let { workspace, root, pathOf } = makeWorkspace({
+				"package.json": manifest,
+				"Math.es": math,
+			})
+
+			expect(workspace.knownFiles().size).toBe(1)
+
+			mkdirSync(path.join(root, "broken"), { recursive: true })
+			writeFileSync(path.join(root, "broken", "Late.es"), bad)
+			workspace.changed(pathOf("broken/Late.es"))
+
+			expect(workspace.knownFiles().has(pathOf("broken/Late.es"))).toBe(
+				false,
+			)
+		})
+
+		// NOTE: What the Server does when a manifest changes: sets the folders
+		// again, which is what forgets the exclusions along with every answer
+		// derived under them.
+		it("should read the exclusions again when the folders are set", () => {
+			let { workspace, root, pathOf } = makeWorkspace({
+				"package.json": manifest,
+				"Math.es": math,
+				"broken/Bad.es": bad,
+			})
+
+			expect(workspace.knownFiles().has(pathOf("broken/Bad.es"))).toBe(
+				false,
+			)
+
+			writeFileSync(
+				path.join(root, "package.json"),
+				JSON.stringify({ essence: { exclude: [] } }),
+			)
+			workspace.setFolders(workspace.folders())
+
+			expect(workspace.knownFiles().has(pathOf("broken/Bad.es"))).toBe(
+				true,
+			)
 		})
 	})
 })

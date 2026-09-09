@@ -34,6 +34,7 @@
 		"./diagnostics": "./src/diagnostics/index.ts",
 		"./diagnostics/render": "./src/diagnostics/render.ts",
 		"./compileMode": "./src/compileMode.ts",
+		"./configuration": "./src/configuration.ts",
 		"./documents": "./src/documents.ts",
 		"./helpers": "./src/helpers/index.ts",
 		"./printType": "./src/printType.ts",

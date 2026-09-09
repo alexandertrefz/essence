@@ -20,12 +20,11 @@
 		"publish:packages": "bun scripts/publishing/publish.ts"
 	},
 	"essence": {
-		"test": {
-			"exclude": [
-				"packages/fixtures/files/diagnostics",
-				"packages/vscode-extension/server"
-			]
-		}
+		"exclude": [
+			"packages/fixtures/files/diagnostics",
+			"packages/vscode-extension/server",
+			"packages/client/src/tests/files"
+		]
 	},
 	"keywords": [
 		"language",

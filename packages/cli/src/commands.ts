@@ -423,11 +423,15 @@ export const commands: Array<CommandSpec> = [
 			"A tag that list leaves out still runs when --tag asks for it by " +
 				"name, which is how a nightly job runs what a working day " +
 				"skips.",
-			"The same key takes the directories the walk stays out of — a " +
-				"corpus of deliberately broken sources, an example a book " +
-				"quotes — written relative to the package.json that names " +
-				"them:",
-			'    { "essence": { "test": { "exclude": ["fixtures/broken"] } } }',
+			"The directories a walk stays out of are written beside it, one " +
+				"level up — a corpus of deliberately broken sources, an " +
+				"example a book quotes, a vendored copy — relative to the " +
+				"package.json that names them:",
+			'    { "essence": { "exclude": ["fixtures/broken"] } }',
+			'It sits outside "test" because it is not a statement about ' +
+				"testing: it says which directories are not this project's " +
+				"sources, and the editor reads the same list to decide what " +
+				"its Problems panel speaks for.",
 			"It narrows the WALK and nothing else: a file named on the " +
 				"command line was asked about by name and is still compiled " +
 				"and still reported.",
