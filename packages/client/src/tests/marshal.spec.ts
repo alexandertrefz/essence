@@ -236,6 +236,22 @@ describe("Round trips", () => {
 		})
 	})
 
+	// NOTE: The `Result` row of the table. It is an ordinary generic Choice on
+	// this side — a `$case` and its payload, both ways round — and not the
+	// `undefined` its sibling `Optional` is spelled by: `undefined` says "no
+	// value" and has no room for a reason. So a `Result#Value` is a `$case`
+	// where an `Optional#Value` is the item itself, which is the one thing the
+	// two carriers do not share across the boundary.
+	it("carries a Result as an ordinary Choice, not as absence", () => {
+		expect(through("result", { $case: "Result#Value", item: 3n })).toEqual({
+			$case: "Result#Value",
+			item: 3n,
+		})
+		expect(
+			through("result", { $case: "Result#Failure", reason: "gone" }),
+		).toEqual({ $case: "Result#Failure", reason: "gone" })
+	})
+
 	// NOTE: What the Essence source itself writes — `#Circle` needs no Choice in
 	// front of it there, so neither does a host.
 	it("takes a Case by its bare name", () => {
@@ -791,6 +807,14 @@ describe("The exports of a Module", () => {
 		})
 		expect(module.exports.present).toBe(7n)
 		expect(module.exports.absent).toBeUndefined()
+		expect(module.exports.answered).toEqual({
+			$case: "Result#Value",
+			item: 7n,
+		})
+		expect(module.exports.refused).toEqual({
+			$case: "Result#Failure",
+			reason: "gone",
+		})
 		// NOTE: A constant is read through a door of its own — compiled once
 		// against what was DECLARED, with no call around it — so a unit Choice
 		// reaches this side here without a Parameter or a return having named
@@ -816,6 +840,7 @@ describe("The exports of a Module", () => {
 			"Vertical",
 			"absent",
 			"answer",
+			"answered",
 			"areaOf",
 			"blank",
 			"box",
@@ -846,6 +871,8 @@ describe("The exports of a Module", () => {
 			"point",
 			"present",
 			"rational",
+			"refused",
+			"result",
 			"shape",
 			"styled",
 			"text",
