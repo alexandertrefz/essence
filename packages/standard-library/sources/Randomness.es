@@ -151,6 +151,8 @@ declarations {
 	§ name.
 
 	§§ Anything a property test can build values of.
+	§§
+	§§ A Namespace that declares this conformance replaces the generator a property test derives from the Type. The derived generator also makes a failing value smaller, and a conformance answers `shrink` for that instead. The provided `shrink` answers no candidates, so a Namespace that writes none of its own has its counterexamples reported as they were drawn.
 	protocol Generatable {
 		§§ Answers a value of the conforming Type, built from a source of randomness.
 		§§
@@ -159,6 +161,22 @@ declarations {
 		§§ @param from — the source to draw from.
 		§§ @returns — a value of the conforming Type.
 		static generate(from source: Randomness) -> Self
+
+		§ Provided rather than required, and provided as nothing. A Protocol
+		§ knows nothing about the values `generate` builds. A requirement would
+		§ hold every Namespace that declares this conformance to a second body,
+		§ and most have no use for one. So a conformance costs a conformer one
+		§ Method, and the Namespace that wants its counterexamples small writes
+		§ the other.
+
+		§§ Answers the smaller values a failing one can be reported as.
+		§§
+		§§ A property test that fails asks its counterexample for these candidates, and reports the first one that fails as well. It asks that value for its own, so a body answering one step smaller each time reports the smallest value the property fails on. The runner tries the candidates in the order the List holds them, and skips one that is the failing value itself. The body here answers no candidates, so a Namespace that writes none of its own reports the value the source drew.
+		§§
+		§§ @returns — the smaller values, smallest first.
+		shrink() -> List<Self> {
+			<- []
+		}
 	}
 }
 

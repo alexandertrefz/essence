@@ -65,9 +65,10 @@ it and the `Terminal.ask` that is a prompt and a line (`Terminal.es`).
 Three of every five declared Method entries are also IMPLEMENTED here, in
 Essence — 443 of 725 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
-Seven more are written on a PROTOCOL rather than on a Namespace, once for every
-conformer: `Equatable.isNot`, `Comparable`'s four inequalities, and
-`Orderable`'s `isBetween` and `clamp`. A conformer answers each without writing
+Eight more are written on a PROTOCOL rather than on a Namespace, once for every
+conformer: `Equatable.isNot`, `Comparable`'s four inequalities, `Orderable`'s
+`isBetween` and `clamp`, and `Generatable.shrink`, which answers no candidates
+until a conformer writes one. A conformer answers each without writing
 anything, and a Namespace that writes a Method of the name replaces the provided
 one on its own rung — which is what `Optional::isNot`, `Integer::isNot` and
 `Integer::isLessThan` do, each for a reason its own declaration gives. What stays native is a
