@@ -1082,10 +1082,10 @@ declarations {
 		§§ The text is put in quotes, and anything a String Literal has to escape is escaped. A character with no spelling of its own is written as its code point.
 		§§
 		§§ @example
-		§§   expect "ab"::quoted()::is("\"ab\"")
+		§§   expect "ab"::quote()::is("\"ab\"")
 		§§
 		§§ @returns — the quoted String.
-		quoted() -> String
+		quote() -> String
 	}
 
 	§ What a String proven to have a character answers that a bare one can

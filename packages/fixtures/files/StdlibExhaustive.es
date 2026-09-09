@@ -629,10 +629,10 @@ b"::indent(by 1),
 		"String.separate(every: PositiveInteger, with: String, from?: Side) [shorter than a group]",
 		abText::separate(every 3, with ","),
 	)
-	show("String.quoted()", greeting::quoted())
-	show("String.quoted() [empty]", emptyText::quoted())
-	show("String.quoted() [escapes]", "a\"b
-c"::quoted())
+	show("String.quote()", greeting::quote())
+	show("String.quote() [empty]", emptyText::quote())
+	show("String.quote() [escapes]", "a\"b
+c"::quote())
 
 	§ ——— NonEmptyString ———————————————————————————————————————————————————
 	§ What a String proven to have a character answers, and the sister of the

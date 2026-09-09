@@ -170,8 +170,9 @@ describe("Bundle Size", () => {
 	// rungs the `round` here resolves to for a whole receiver.
 	//
 	// NOTE: 8 are an identifier growing. `String.ts`'s internal `quoted` is
-	// `quotedText` now, so that the Method of that name can be the native it
-	// is, and the printer every Program links calls it under the longer name.
+	// `quotedText` now, so that the Method `quote()` binds to can stand under
+	// the shorter name, and the printer every Program links calls the helper
+	// under the longer one.
 	//
 	// NOTE: 63 are the transcendental registry change Everyday's note above
 	// explains, which every file that reaches the tower pays alike.

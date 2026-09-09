@@ -503,10 +503,10 @@ describe("the rest of the vocabulary", () => {
 	it("quotes as a Program would write it down", async () => {
 		expect(
 			await run(`implementation {
-				Terminal.inspect("Lions"::quoted())
-				Terminal.inspect(""::quoted())
-				Terminal.inspect("a\\nb"::quoted())
-				Terminal.inspect("${family}"::quoted())
+				Terminal.inspect("Lions"::quote())
+				Terminal.inspect(""::quote())
+				Terminal.inspect("a\\nb"::quote())
+				Terminal.inspect("${family}"::quote())
 			}`),
 		).toEqual([
 			'"\\"Lions\\""',

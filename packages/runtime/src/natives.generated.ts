@@ -158,8 +158,8 @@ export type StringNatives = {
 	slice: (self: StringType, from: IntegerType, to: IntegerType) => StringType
 	// separate(every: PositiveInteger, with: String, from: Side) -> String
 	separate: (self: StringType, every: IntegerType, argument2: StringType, from: SideType) => StringType
-	// quoted() -> String
-	quoted: (self: StringType) => StringType
+	// quote() -> String
+	quote: (self: StringType) => StringType
 }
 
 export type NonEmptyStringNatives = {
@@ -868,7 +868,7 @@ export const $StringArity: AssertArities<typeof import("./String"), {
 	reverse: 1
 	slice: 3
 	separate: 4
-	quoted: 1
+	quote: 1
 }> = true
 
 declare const NonEmptyStringModule: typeof import("./NonEmptyString")

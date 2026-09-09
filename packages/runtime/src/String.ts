@@ -37,7 +37,7 @@ const stringEscapes: { [character: string]: string } = {
 // quotes, with anything a Literal has to escape escaped. It is here rather than
 // beside its callers because it is the one answer to one question, and four
 // readers ask it: `List.toString`, `Optional.toString`, the structural
-// rendering `Terminal.inspect` and `Record.toString` share, and the `quoted`
+// rendering `Terminal.inspect` and `Record.toString` share, and the `quote`
 // native at the foot of this file, which hands the same text to a Program.
 //
 // NOTE: Named apart from that native because the two answer different Types.
@@ -1539,6 +1539,6 @@ export function separate(
 // Case, handed to a Program that is building a message of its own. It is the
 // same Function those renderings call, so a value can not read one way in a
 // structure and another in a sentence about it.
-export function quoted(originalString: StringType): StringType {
+export function quote(originalString: StringType): StringType {
 	return createString(quotedText(originalString.value))
 }
