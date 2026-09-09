@@ -8,10 +8,7 @@ import {
 		Standing
 		Standings
 	}
-	from "./Table.es" {
-		Decimal
-		Table
-	}
+	from "./Table.es" { Table }
 }
 
 implementation {
@@ -52,40 +49,41 @@ implementation {
 	)
 
 	§ Points per game, exact — the fraction is the true value and the decimal
-	§ is how it is written down, rounded once, at the very end. `formatted`
-	§ writes two places unless asked for another number of them.
+	§ is how it is written down, rounded once, at the very end. `toPlaces:`
+	§ says how many digits to write after the point, and a count below one
+	§ writes the whole number with no point at all.
 	constant rate = leader::pointsPerGame()
 
 	Terminal.print(
 		"They average {rate} points a game — {
-			Decimal.formatted(rate)
+			rate::toString(as #Decimal, toPlaces 2)
 		} to two places — and have won {
-			Decimal.formatted(leader::winRate()::multiply(with 100), places 0)
+			leader::winRate()::multiply(with 100)::toString(as #Decimal, toPlaces 0)
 		}% of their matches.",
 	)
 	Terminal.print("")
 
 	§ The biggest win of the season. Only a played match has a margin, so the
 	§ Match answers one where there is one and nothing where there is not, and
-	§ `values()` keeps what is there. `highestItem(on:)` then asks the question
-	§ outright, reading the key with a member path — a Record has no natural
-	§ order of its own, and the margin inside it does.
+	§ `everyValue(from:)` is the walk that keeps what is there — a map and a
+	§ filter in one, without the List of Optionals in between.
+	§ `highestItem(on:)` then asks the question outright, reading the key with
+	§ a member path — a Record has no natural order of its own, and the margin
+	§ inside it does.
 	type Margin = { fixture: Fixture, margin: Integer }
 
-	constant margins: List<Margin> = fixtures
-		::map((fixture) {
-			<- match fixture -> Optional<Margin> {
-				case #Played({ homeGoals, awayGoals }) {
-					<- #Value({
-						fixture,
-						margin = homeGoals::subtract(awayGoals)::absolute(),
-					})
-				}
-				case #Forfeited { <- #Empty }
-				case #Postponed { <- #Empty }
+	constant margins: List<Margin> = fixtures::everyValue(from (fixture) {
+		<- match fixture -> Optional<Margin> {
+			case #Played({ homeGoals, awayGoals }) {
+				<- #Value({
+					fixture,
+					margin = homeGoals::subtract(awayGoals)::absolute(),
+				})
 			}
-		})
-		::values()
+			case #Forfeited { <- #Empty }
+			case #Postponed { <- #Empty }
+		}
+	})
 
 	constant widest = margins::highestItem(on .margin)
 

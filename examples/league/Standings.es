@@ -66,20 +66,24 @@ implementation {
 	§ anyone passing a comparison — the conformance is where the rule lives.
 	namespace Standing for Standing is Comparable, is Printable {
 		compare(to other: Standing) -> Ordering {
-			§ The tie-breakers, most important first. The first one that
-			§ decides is the answer; the name breaks whatever is left, and it
-			§ reads the other way — A before B — because it is the one order
-			§ that is not "more is better".
-			constant decisions = [
-				other.points::compare(to @.points),
-				other::goalDifference()::compare(to @::goalDifference()),
-				other.goalsFor::compare(to @.goalsFor),
-				@.team.name::compare(to other.team.name),
-			]
-
-			<- decisions
-				::firstItem(where (decision) { <- decision::isNot(#Equal) })
-				::value(defaultingTo #Equal)
+			§ The tie-breakers, most important first: each `then` decides only
+			§ what the ones before it left equal. The name breaks whatever is
+			§ left, and it reads the other way — A before B — because it is
+			§ the one order that is not "more is better".
+			§
+			§ The goal difference is a subtraction per row and the two after
+			§ it are member reads, so that one is written `computedBy:` — the
+			§ entry that runs its body only where it is reached — and the
+			§ cheap ones are written plainly. A List of every ordering,
+			§ searched for the first decisive one, says the same thing and
+			§ computes all four of them however the points came out.
+			<- other.points
+				::compare(to @.points)
+				::then(computedBy () -> Ordering {
+					<- other::goalDifference()::compare(to @::goalDifference())
+				})
+				::then(other.goalsFor::compare(to @.goalsFor))
+				::then(@.team.name::compare(to other.team.name))
 		}
 
 		toString() -> String {
@@ -133,26 +137,15 @@ implementation {
 			}
 		}
 
-		§§ The longest run of matches without a loss. The form is walked once
-		§§ with a plain fold, carrying the current run and the best so far.
+		§§ The longest run of matches without a loss. `runs(where:)` answers
+		§§ the stretches of neighbouring outcomes the check accepts, and the
+		§§ longest of them is the answer — a form with nothing but losses in
+		§§ it has no stretch at all, which is the zero.
 		unbeatenRun() -> Integer {
-			constant runs = @.form::reduce(
-				startingWith { current = 0, best = 0 },
-				({ current, best }, outcome) {
-					if outcome::is(#Loss) {
-						<- { current = 0, best }
-					}
-
-					constant extended = current::add(1)
-
-					<- {
-						current = extended,
-						best = Number.highest(best, extended),
-					}
-				},
-			)
-
-			<- runs.best
+			<- @.form
+				::runs(where (outcome) { <- outcome::isNot(#Loss) })
+				::map((run) { <- run::length() })
+				::highestNumber(defaultingTo 0)
 		}
 
 		§§ The last `count` outcomes, oldest first — the form guide, which is
@@ -220,14 +213,13 @@ implementation {
 			among teams: NonEmptyList<Team>,
 		) -> NonEmptyList<Standing> {
 			§ A Team is a Record, and a Record is a key like any other: it is
-			§ found by asking the Record's own `is`. `Dictionary.of` builds
-			§ the starting table out of the entries a caller already has in
-			§ hand — one blank row per team, in the order they were given.
-			constant blanks = Dictionary.of(
-				teams::map((team) {
-					<- { key = team, value = Standings.blank(of { team }) }
-				}),
-			)
+			§ found by asking the Record's own `is`. `index(on:)` is the
+			§ crossing from a List to a Dictionary keyed one to one — one
+			§ blank row per team, under the team it is about, in the order
+			§ they were given.
+			constant blanks = teams
+				::map((team) { <- Standings.blank(of { team }) })
+				::index(on .team)
 
 			constant rows = fixtures::reduce(
 				startingWith blanks,
