@@ -3259,6 +3259,38 @@ describe("Choices", () => {
 			])
 		})
 
+		// NOTE: A GENERIC Choice of payload-free Cases answers through a bound,
+		// where the receiver's Type Arguments are already applied — the Cases
+		// carry no payload, so what they bind to decides nothing about the
+		// values. Its own NAME answers nothing: it resolves to a Generic Alias,
+		// and the spelling has nowhere to put the Type Arguments.
+		it("answers a generic Choice through a bound, and not on its name", async () => {
+			const flag = `
+				choice Flag<T> {
+					On,
+					Off,
+				}
+			`
+
+			expect(
+				await run(`implementation { ${flag}
+					function count <infer Mode is Enumerable>(_ example: Mode) -> Integer {
+						<- Mode.cases()::length()
+					}
+
+					constant on: Flag<Integer> = Flag<Integer>#On
+
+					Terminal.inspect(count(on))
+				}`),
+			).toEqual(["2"])
+
+			expect(
+				codesOf(`implementation { ${flag}
+					Terminal.print(Flag.cases()::length()::toString())
+				}`),
+			).toEqual(["unknown-name"])
+		})
+
 		// NOTE: The emission is the runtime helper curried with the tags, for
 		// the reason a static has to be: there is no receiver at the call for
 		// the Choice to be recovered from. The tags are the very strings a Case
