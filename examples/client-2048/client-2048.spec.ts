@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { afterAll, describe, expect, it } from "bun:test"
 import {
 	existsSync,
 	mkdtempSync,
@@ -21,6 +21,20 @@ import type * as Rules from "./src/Game.es"
 
 const EXAMPLE = import.meta.dirname
 const REPOSITORY = path.join(EXAMPLE, "..", "..")
+const ESSENCE = path.join(REPOSITORY, "packages", "cli", "bin", "essence")
+
+// NOTE: A bundle cache of this run's own, so that a spec compiling the example
+// neither answers out of the user's cache nor fills it — and a result cache
+// beside it, for the same reason and one more: this spec runs `essence test` in
+// the example's OWN directory, so an answer left in the user's store would be
+// replayed by the next run a reader does there by hand.
+const cache = mkdtempSync(path.join(tmpdir(), "essence-2048-cache-"))
+const results = mkdtempSync(path.join(tmpdir(), "essence-2048-results-"))
+
+afterAll(() => {
+	rmSync(cache, { recursive: true, force: true })
+	rmSync(results, { recursive: true, force: true })
+})
 
 // NOTE: The rules, checked through the same boundary the page calls them
 // through — `loadModule` hands over the marshalled exports, typed here by the
@@ -32,6 +46,33 @@ async function rules(): Promise<typeof Rules> {
 }
 
 describe("examples/client-2048", () => {
+	// NOTE: The rules' own tests are Essence — `Game.es` and `Board.es` each
+	// write a `tests { … }` section — and nothing below reaches them: the specs
+	// here call the exports through the client boundary. This is the one thing
+	// a bun spec can say that they can not, and what CI runs is `bun test`.
+	it("passes its own tests", () => {
+		let run = Bun.spawnSync(
+			[process.execPath, ESSENCE, "test", "src", "--no-color"],
+			{
+				cwd: EXAMPLE,
+				env: {
+					...process.env,
+					ESSENCE_CLI_CACHE: cache,
+					ESSENCE_RESULTS_CACHE: results,
+				},
+				stdout: "pipe",
+				stderr: "pipe",
+			},
+		)
+
+		let out = run.stdout.toString()
+
+		expect(out).toContain("a new tile")
+		expect(out).toContain("fills one square, with a 2 or a 4")
+		expect(out).not.toContain("failed")
+		expect(run.exitCode).toBe(0)
+	}, 30_000)
+
 	it("slides and merges a row once, left to right", async () => {
 		let { Board } = await rules()
 		let row = (cells: Array<bigint>) => Board.slideRows([cells, [], [], []])
