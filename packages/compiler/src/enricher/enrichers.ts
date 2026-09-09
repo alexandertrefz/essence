@@ -4994,16 +4994,34 @@ function generatableConformance(
 	scope: enricher.Scope,
 	position: common.Position,
 ): common.typed.TestGenerator | null {
-	let targeting = namespacesTargeting(
-		getAllNamespacesInScope(scope, null),
-		type,
-	)
+	// NOTE: Each candidate SPECIALIZED against the Type first, which is what
+	// `solveConformance` does before it asks anything of one: a generic
+	// Namespace's target is `Pair<Item>` and the Type asked about is
+	// `Pair<Twin>`, so the raw target is assignable neither to it nor from it
+	// and `targetsExactly` would pass every generic conformance over in
+	// silence. The raw Namespace is kept beside it, because whether it was
+	// generic is what decides between using it and refusing it.
+	let raw = namespacesTargeting(getAllNamespacesInScope(scope, null), type)
+	let targeting = specializedNamespacesFor(raw, type)
+	let generic: common.NamespaceType | null = null
 
 	for (let [name, namespace] of targeting) {
 		if (
 			!(namespace.conformsTo ?? []).includes(GENERATABLE_PROTOCOL) ||
 			!targetsExactly(namespace, type)
 		) {
+			continue
+		}
+
+		// NOTE: A GENERIC Namespace's conformance can not be reached from here,
+		// and is refused below rather than passed over — but only once the
+		// search is over, because a Program may also hold a Namespace for the
+		// applied Type, and that one is the answer.
+		let declared = raw.get(name)
+
+		if (declared !== undefined && declared.generics.length > 0) {
+			generic ??= declared
+
 			continue
 		}
 
@@ -5098,6 +5116,49 @@ function generatableConformance(
 			shrink: shrunk.result,
 		}
 	}
+
+	return generic === null
+		? null
+		: refuseUnreachableConformance(generic, type, position)
+}
+
+// NOTE: A generic Namespace's `Generatable` conformance, which nothing here can
+// call. `generate` is a STATIC taking a `Randomness` and nothing else, so a call
+// has no Argument for the Namespace's own Type Parameters to be worked out from,
+// and the language has no spelling for a Type Argument at a call — `esc` reports
+// `uninferable-type-parameter` for the very call an author would write by hand.
+// So the conformance is refused out loud instead of being discarded: it was
+// declared to replace the structural draw AND the structural shrink, and
+// silently doing neither runs a different test than the one that was written.
+function refuseUnreachableConformance(
+	namespace: common.NamespaceType,
+	type: common.Type,
+	position: common.Position,
+): null {
+	let parameters = namespace.generics
+		.map((generic) => `'${generic.name}'`)
+		.join(", ")
+
+	reportError(
+		`Namespace '${namespace.name}' is generic, so its '${GENERATABLE_PROTOCOL}' conformance can not be reached`,
+		position,
+		{
+			code: "unreachable-conformance",
+			labels: [
+				primary(
+					position,
+					`nothing here binds ${parameters} for the draw`,
+				),
+			],
+			notes: [
+				`'${GENERATABLE_METHOD}' is a static taking a 'Randomness' and nothing else, so a call has no Argument to work ${parameters} out from — and a call can not be written with a Type Argument.`,
+				`Passed over, the structural generator would draw and shrink ${withArticle(printType(type))} instead, which is what this conformance was written to replace.`,
+			],
+			helps: [
+				`Declare '${GENERATABLE_PROTOCOL}' on a Namespace whose target Type is already applied, rather than on a generic one.`,
+			],
+		},
+	)
 
 	return null
 }
