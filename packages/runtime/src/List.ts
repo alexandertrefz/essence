@@ -1401,30 +1401,43 @@ export function split<ItemType extends AnyType>(
 	return createList(groups)
 }
 
-// NOTE: The INCLUSIVE entry, and the only one with a native. The `upTo:` entry
-// beside it is written in Essence on this one, over an end one lower, because
-// what it adds is a guard rather than a walk.
-export function of__overload$1(
+// NOTE: One walk behind all four range natives. The step is signed and never
+// zero, so the values run from the first and stop where a step passes the last,
+// whichever side of it the step approaches from. `atLeastOne` is the promise the
+// `downTo:` entries carry into their Type: where the first value is already past
+// the end, the walk answers that value rather than nothing.
+//
+// NOTE: Counted in numbers where every bound is held as one, which is every
+// range a List can actually hold — a range needing bigint ends spans more items
+// than there is memory for, and is only ever reached to be refused by whatever
+// runs out first.
+function integerRange(
 	firstInteger: IntegerType,
 	lastInteger: IntegerType,
+	step: number | bigint,
+	atLeastOne: boolean,
 ): ListType<IntegerType> {
 	let integers: Array<IntegerType> = []
 	let first = firstInteger.value
 	let last = lastInteger.value
 
-	// NOTE: Counted in numbers where both ends are held as ones, which is every
-	// range a List can actually hold — a range needing bigint ends spans more
-	// items than there is memory for, and is only ever reached to be refused by
-	// whatever runs out first.
-	if (typeof first === "number" && typeof last === "number") {
-		if (first <= last) {
-			for (let value = first; value <= last; value++) {
+	if (
+		typeof first === "number" &&
+		typeof last === "number" &&
+		typeof step === "number"
+	) {
+		if (step > 0) {
+			for (let value = first; value <= last; value += step) {
 				integers.push(createInteger(value))
 			}
 		} else {
-			for (let value = first; value >= last; value--) {
+			for (let value = first; value >= last; value += step) {
 				integers.push(createInteger(value))
 			}
+		}
+
+		if (atLeastOne && integers.length === 0) {
+			integers.push(createInteger(first))
 		}
 
 		return createList(integers)
@@ -1432,18 +1445,61 @@ export function of__overload$1(
 
 	let from = BigInt(first)
 	let to = BigInt(last)
+	let by = BigInt(step)
 
-	if (from <= to) {
-		for (let value = from; value <= to; value++) {
+	if (by > 0n) {
+		for (let value = from; value <= to; value += by) {
 			integers.push(createInteger(value))
 		}
 	} else {
-		for (let value = from; value >= to; value--) {
+		for (let value = from; value >= to; value += by) {
 			integers.push(createInteger(value))
 		}
 	}
 
+	if (atLeastOne && integers.length === 0) {
+		integers.push(createInteger(from))
+	}
+
 	return createList(integers)
+}
+
+// NOTE: The four range natives, each a step and a promise handed to one walk.
+// The step is passed as the value it holds rather than as an Integer, because
+// `Integer.ts` and this file import each other and a module level
+// `createInteger(1)` here would run before the safe bound it reads is bound.
+// `$1` counts up through its end and `$3` counts down through its own, which is
+// what puts the direction in the label rather than in the pair of bounds. The
+// `upTo:` entries beside them are written in Essence, over an end one step
+// nearer, because what they add is an adjustment rather than a walk.
+export function of__overload$1(
+	firstInteger: IntegerType,
+	lastInteger: IntegerType,
+): ListType<IntegerType> {
+	return integerRange(firstInteger, lastInteger, 1, false)
+}
+
+export function of__overload$3(
+	firstInteger: IntegerType,
+	lastInteger: IntegerType,
+): ListType<IntegerType> {
+	return integerRange(firstInteger, lastInteger, -1, true)
+}
+
+export function of__overload$4(
+	firstInteger: IntegerType,
+	lastInteger: IntegerType,
+	stepInteger: IntegerType,
+): ListType<IntegerType> {
+	return integerRange(firstInteger, lastInteger, stepInteger.value, false)
+}
+
+export function of__overload$6(
+	firstInteger: IntegerType,
+	lastInteger: IntegerType,
+	stepInteger: IntegerType,
+): ListType<IntegerType> {
+	return integerRange(firstInteger, lastInteger, stepInteger.value, true)
 }
 
 // NOTE: The count of this entry is a `PositiveInteger` in the source — proven

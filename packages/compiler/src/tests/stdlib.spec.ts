@@ -276,14 +276,42 @@ describe("Stdlib", () => {
 		// harness covers a count of three, zero and minus one, so the
 		// runtime-direct test that lived here is retired.
 
-		it("builds inclusive Integer ranges, counting either way", () => {
+		// NOTE: The four range natives share one walk, and what tells them
+		// apart is the step it is handed and whether the answer is promised to
+		// hold something. Both halves are read here; `ranges.spec.ts` reads the
+		// same entries through Programs that call them.
+		it("builds inclusive Integer ranges, counting up", () => {
 			expect(list.of__overload$1(int(1n), int(4n))).toEqual(
 				ints(1n, 2n, 3n, 4n),
 			)
-			expect(list.of__overload$1(int(3n), int(1n))).toEqual(
-				ints(3n, 2n, 1n),
-			)
+			expect(list.of__overload$1(int(3n), int(1n))).toEqual(ints())
 			expect(list.of__overload$1(int(2n), int(2n))).toEqual(ints(2n))
+		})
+
+		it("builds inclusive Integer ranges, counting down", () => {
+			expect(list.of__overload$3(int(4n), int(1n))).toEqual(
+				ints(4n, 3n, 2n, 1n),
+			)
+			expect(list.of__overload$3(int(2n), int(2n))).toEqual(ints(2n))
+			expect(list.of__overload$3(int(1n), int(3n))).toEqual(ints(1n))
+		})
+
+		it("steps a range by a signed amount", () => {
+			expect(list.of__overload$4(int(0n), int(9n), int(3n))).toEqual(
+				ints(0n, 3n, 6n, 9n),
+			)
+			expect(list.of__overload$4(int(9n), int(0n), int(-3n))).toEqual(
+				ints(9n, 6n, 3n, 0n),
+			)
+			expect(list.of__overload$4(int(0n), int(9n), int(-3n))).toEqual(
+				ints(),
+			)
+			expect(list.of__overload$6(int(9n), int(0n), int(-3n))).toEqual(
+				ints(9n, 6n, 3n, 0n),
+			)
+			expect(list.of__overload$6(int(9n), int(0n), int(3n))).toEqual(
+				ints(9n),
+			)
 		})
 	})
 

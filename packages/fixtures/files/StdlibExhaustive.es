@@ -3778,7 +3778,7 @@ third"::lines())
 		List.of(integersFrom 1, through 1),
 	)
 	show(
-		"List.of(integersFrom: Integer, through: Integer) [inverted]",
+		"List.of(integersFrom: Integer, through: Integer) [end below the start]",
 		List.of(integersFrom 5, through 1),
 	)
 	show(
@@ -3792,6 +3792,54 @@ third"::lines())
 	show(
 		"List.of(integersFrom: Integer, upTo: Integer) [end below the start]",
 		List.of(integersFrom 3, upTo 1),
+	)
+	show(
+		"List.of(integersFrom: Integer, downTo: Integer)",
+		List.of(integersFrom 5, downTo 1),
+	)
+	show(
+		"List.of(integersFrom: Integer, downTo: Integer) [single]",
+		List.of(integersFrom 1, downTo 1),
+	)
+	show(
+		"List.of(integersFrom: Integer, downTo: Integer) [end above the start]",
+		List.of(integersFrom 1, downTo 5),
+	)
+	show(
+		"List.of(integersFrom: Integer, through: Integer, by: NonZeroInteger)",
+		List.of(integersFrom 0, through 9, by 3),
+	)
+	show(
+		"List.of(integersFrom: Integer, through: Integer, by: NonZeroInteger) [stepping down]",
+		List.of(integersFrom 9, through 0, by -3),
+	)
+	show(
+		"List.of(integersFrom: Integer, through: Integer, by: NonZeroInteger) [step away from the end]",
+		List.of(integersFrom 0, through 9, by -3),
+	)
+	show(
+		"List.of(integersFrom: Integer, through: Integer, by: NonZeroInteger) [step past the end]",
+		List.of(integersFrom 0, through 5, by 10),
+	)
+	show(
+		"List.of(integersFrom: Integer, upTo: Integer, by: NonZeroInteger)",
+		List.of(integersFrom 0, upTo 9, by 3),
+	)
+	show(
+		"List.of(integersFrom: Integer, upTo: Integer, by: NonZeroInteger) [stepping down]",
+		List.of(integersFrom 9, upTo 0, by -3),
+	)
+	show(
+		"List.of(integersFrom: Integer, upTo: Integer, by: NonZeroInteger) [end at the start]",
+		List.of(integersFrom 0, upTo 0, by 3),
+	)
+	show(
+		"List.of(integersFrom: Integer, downTo: Integer, by: NonZeroInteger)",
+		List.of(integersFrom 9, downTo 0, by -3),
+	)
+	show(
+		"List.of(integersFrom: Integer, downTo: Integer, by: NonZeroInteger) [step away from the end]",
+		List.of(integersFrom 9, downTo 0, by 3),
 	)
 	show("List.firstItems<ItemType>(_ Integer)", numbers::firstItems(2))
 	show("List.firstItems<ItemType>(_ Integer) [zero]", numbers::firstItems(0))
@@ -4144,7 +4192,7 @@ third"::lines())
 	§ a promise quietly weakened back to `List` fails here by name.
 	show(
 		"NonEmptyList.firstItem<ItemType>() [from List.of]",
-		List.of(integersFrom 3, through 7)::firstItem(),
+		List.of(integersFrom 7, downTo 3)::firstItem(),
 	)
 	§ The receiver here is EMPTY, which is the whole of what adding an item
 	§ proves: the answer has something in it however little the receiver had.
@@ -4328,7 +4376,7 @@ third"::lines())
 	)
 	show(
 		"NonEmptyIntegerList.average()",
-		List.of(integersFrom 1, through 4)::average(),
+		List.of(integersFrom 4, downTo 1)::average(),
 	)
 	show(
 		"NonEmptyIntegerList.average() [single]",

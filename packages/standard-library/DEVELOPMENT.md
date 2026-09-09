@@ -195,7 +195,8 @@ inputs, wherever they stand: the golden capture is what stops the two from
 drifting. Writing another one means adding those lines too.
 
 Most of `NonEmptyList` is native, but not all of it. `indices()` is written on
-`List.of(integersFrom:through:)`, which promises a non-empty answer already,
+`List.of(integersFrom:downTo:)`, which promises a non-empty answer already, and
+on the `reverse` that carries the promise back up the count,
 `replace(at:_:)` hands the transformed item to the native `replace(_:at:)`, and
 `lowestItem(on:)` and `highestItem(on:)` read `List`'s Optional answer off the
 native `firstItem()`.
