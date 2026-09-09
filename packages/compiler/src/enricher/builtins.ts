@@ -195,13 +195,14 @@ export const builtinMemberOrder: Array<string> = [
 	// NOTE: After the List Namespaces, because a Dictionary is the second
 	// container and a reader of this list meets the first one whole before it.
 	// It shares plenty of Method names with them — `of`, `is`, `toString`,
-	// `isEmpty`, `length`, `map`, `remove` and `removeEvery` with `List`,
-	// `value` with `Optional`, `values` with `OptionalList`, `keys` with
-	// `Record` — and shares them harmlessly, because no value reaches a
-	// Dictionary Namespace and one of theirs at once: this target is a
-	// Dictionary and every target above it is not. So the position decides
-	// nothing but where a reader meets it. `builtins.spec.ts` holds this list
-	// to what the standard library declares.
+	// `isEmpty`, `length`, `map`, `remove`, `removeEvery`, `count` and `sort`
+	// with `List`, `value` and `hasValue` with `Optional`, `values` with
+	// `OptionalList`, `keys` with `Record` — and shares them harmlessly,
+	// because no value reaches a Dictionary Namespace and one of theirs at
+	// once: this target is a Dictionary and every target above it is not. So
+	// the position decides nothing but where a reader meets it.
+	// `builtins.spec.ts` holds this list to what the standard library
+	// declares.
 	"Dictionary",
 	// NOTE: And after it, for the reason every proven Namespace sits after the
 	// one it narrows — a reader meets a Dictionary's own members before the

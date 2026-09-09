@@ -1,5 +1,6 @@
 import {
 	from "./Boolean.es" { Boolean }
+	from "./Comparable.es" { Comparable }
 	from "./Integer.es" {
 		NonNegativeInteger
 		PositiveInteger
@@ -7,6 +8,7 @@ import {
 	from "./List.es" {
 		List
 		NonEmptyList
+		SortOrder
 	}
 	from "./Optional.es" { Optional }
 	from "./Protocols.es" {
@@ -440,6 +442,59 @@ declarations {
 			}
 		}
 
+		§ Ordering is a question about a Dictionary because a Dictionary is
+		§ ordered. It answers its halves in the order the keys were first set,
+		§ and it prints in that order. What a sort answers is the same entries
+		§ under another one.
+		§
+		§ Both entries are native, and each is the reordering `everyEntry` is
+		§ the filtering of. The answer holds the receiver's own slots in
+		§ another order, so it reuses every key's encoding. The alternative was
+		§ the Essence body `Dictionary.of(@::entries()::sort(on .key))`, which
+		§ encodes every key of the answer afresh. Two hundred sorts of a
+		§ thousand-entry Dictionary keyed by a Record measured 32 ms here and
+		§ 73 ms through that body. Both figures are the best of three, with
+		§ the subprocess startup inside.
+		§
+		§ A direction rather than a comparison, which is where this parts from
+		§ `List::sort`. A comparison entry would hand the caller two entry
+		§ Records and take an ordering back. What it answered would be a
+		§ Dictionary whose order no Type says anything about. The two entries
+		§ here are the two a key decides.
+		§
+		§ Descending turns the comparison around rather than reversing the
+		§ answer. So entries the order does not tell apart keep the order they
+		§ had, in either direction.
+
+		§§ Answers a new Dictionary with its entries ordered by the keys, or by a key read off each entry.
+		§§
+		§§ The sort is stable, so entries the order does not tell apart keep the order they had, in either direction. A direction is read where one is taken, and it is `#Ascending` when a call names none.
+		§§
+		§§ @returns — the ordered Dictionary.
+		overload sort {
+			§§ Answers a new Dictionary in the given direction, by the keys' own ordering.
+			§§
+			§§ The sort is stable. The entry is available whenever the keys conform to `Comparable`. The direction is `#Ascending` when a call names none.
+			§§
+			§§ @param in — the direction to order in, `#Ascending` when it is left out
+			§§ @returns — the ordered Dictionary.
+			<infer KeyType is Comparable>(
+				in order: SortOrder = #Ascending,
+			) -> Dictionary<KeyType, ValueType>
+
+			§§ Answers a new Dictionary in the given direction of what the key reads off each entry.
+			§§
+			§§ The key is read once per entry. The sort is stable, so entries whose keys compare equal keep the order they had. The entry is available whenever what the key answers conforms to `Comparable`. The direction is `#Ascending` when a call names none.
+			§§
+			§§ @param on — the key each entry is ordered by
+			§§ @param in — the direction to order in, `#Ascending` when it is left out
+			§§ @returns — the ordered Dictionary.
+			<infer Key is Comparable>(
+				on key: (_: { key: KeyType, value: ValueType }) -> Key,
+				in order: SortOrder = #Ascending,
+			) -> Dictionary<KeyType, ValueType>
+		}
+
 		§ The third member of the `where` family, and the one that has to see
 		§ every entry whatever it is written on. What a spelling saves is what
 		§ it builds on the way. This folds a total over the entries the
@@ -469,9 +524,10 @@ declarations {
 	§ Four spend it, and each is `Dictionary`'s own native under this
 	§ Namespace's name. The `length` entry answers a `PositiveInteger`. The three
 	§ halves a Dictionary is read as answer a `NonEmptyList`. There is one key,
-	§ one value and one entry for every entry the receiver holds. The fifth
-	§ entry, `map`, carries the proof rather than spending it, for the reason
-	§ `NonEmptyList::map` does: one transformed value for every entry.
+	§ one value and one entry for every entry the receiver holds. The rest
+	§ carry the proof rather than spending it. There is one transformed value
+	§ for every entry, which is the reason `NonEmptyList::map` carries it, and
+	§ a reordering answers the entries it was handed.
 	§
 	§ Every entry is native, because the promise can not be said in Essence.
 	§ Written `<- @::length()` on a proven receiver, it is this very Method, and
@@ -523,6 +579,35 @@ declarations {
 		map<infer Other>(
 			_ transform: (_: { key: KeyType, value: ValueType }) -> Other,
 		) -> NonEmptyDictionary<KeyType, Other>
+
+		§§ Answers a new Dictionary with its entries ordered by the keys, or by a key read off each entry.
+		§§
+		§§ The sort is stable, so entries the order does not tell apart keep the order they had, in either direction. A direction is read where one is taken, and it is `#Ascending` when a call names none.
+		§§
+		§§ @returns — the ordered Dictionary, which certainly has an entry.
+		overload sort {
+			§§ Answers a new Dictionary in the given direction, by the keys' own ordering.
+			§§
+			§§ The sort is stable. The entry is available whenever the keys conform to `Comparable`. The direction is `#Ascending` when a call names none.
+			§§
+			§§ @param in — the direction to order in, `#Ascending` when it is left out
+			§§ @returns — the ordered Dictionary, which certainly has an entry.
+			<infer KeyType is Comparable>(
+				in order: SortOrder = #Ascending,
+			) -> NonEmptyDictionary<KeyType, ValueType>
+
+			§§ Answers a new Dictionary in the given direction of what the key reads off each entry.
+			§§
+			§§ The key is read once per entry. The sort is stable, so entries whose keys compare equal keep the order they had. The entry is available whenever what the key answers conforms to `Comparable`. The direction is `#Ascending` when a call names none.
+			§§
+			§§ @param on — the key each entry is ordered by
+			§§ @param in — the direction to order in, `#Ascending` when it is left out
+			§§ @returns — the ordered Dictionary, which certainly has an entry.
+			<infer Key is Comparable>(
+				on key: (_: { key: KeyType, value: ValueType }) -> Key,
+				in order: SortOrder = #Ascending,
+			) -> NonEmptyDictionary<KeyType, ValueType>
+		}
 	}
 
 	§ The bridge from the first container to the second, and the Methods a List

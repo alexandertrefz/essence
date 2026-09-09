@@ -221,6 +221,8 @@ describe("Builtins", () => {
 		}
 
 		expect([...shared].sort()).toEqual([
+			"count",
+			"hasValue",
 			"is",
 			"isEmpty",
 			"keys",
@@ -229,6 +231,7 @@ describe("Builtins", () => {
 			"of",
 			"remove",
 			"removeEvery",
+			"sort",
 			"toString",
 			"value",
 			"values",
