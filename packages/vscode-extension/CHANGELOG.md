@@ -1,5 +1,62 @@
 # Change Log
 
+## [0.7.0]
+
+A standard library that answers the everyday questions, and `Result` beside
+`Optional`. The bundled toolchain moves to 0.5.0 in lockstep.
+
+The language moved: `Result<Value, Failure>` is declared beside `Optional` —
+`#Value` and `#Failure`, sequenced over a List with `allValues` and
+`firstValue`, crossed into JavaScript in both directions — and `Optional`
+gained `or`, `pair`, `toList` and a quantified `hasValue` to match. A
+`choice` answers its own `cases` through an `Enumerable` Protocol, so a
+payload-free Choice can be walked without a hand-written List, and the
+editor offers those Cases where no Namespace answers. A Dictionary crosses
+the boundary as a JavaScript `Map`, and can be built from a host's entries.
+
+The library was audited against what a Program hand-rolls, and the answers
+shipped as Methods: the statistics beyond the mean for a List of Numbers;
+the number-theory questions an Integer is asked, and reading and writing one
+in another base; the character vocabulary a String kept forcing a Program to
+spell out, with both parses reading the notation the language itself writes;
+number formatting in named styles — a separator between digit groups, a
+sign style, a percentage, scientific notation, minor units as a scaled
+decimal, and a rounding direction for `toString`'s last digit, `NearestEven`
+included; the irrationals written in those same formats, approximated on a
+decimal grid, and asked for sign, zero and wholeness; `Ordering::then` and
+an order for `Boolean`; a source of randomness for a Program, and
+`Terminal.readLine` and `Terminal.describe`; and a fuller Dictionary and
+List vocabulary — cut, fill, window, transpose, the set-shaped questions,
+ordering a Dictionary by its keys, building one from keys and a Function.
+The everyday numeric Type is named `Scalar` and preluded, the four
+inequalities moved from `Orderable` to `Comparable`, `ResultList::failures`
+became `reasons`, the grouping bridges became `group(on:)` and `tally()`,
+and `index(on:)` is the one-to-one bridge from a List to a Dictionary.
+
+It is faster where it was slow: a String searches, splits, trims and reads
+its ends without building the pieces in between, and an ASCII String is read
+by its units; `removeDuplicates` is written on `tally()::keys()` rather than
+the quadratic native it had; `partition` walks once and answers
+`{ accepted, refused }`; sorting on a key reads the key once per item;
+`lastIndex(where:)` walks backwards natively; and Choice and Record
+Dictionary keys are encoded canonically and measured on the encoded path.
+
+- The Problems panel no longer reports on directories a project says are not
+  its sources. `"essence": { "exclude": [ … ] }` in the nearest `package.json`
+  names them — a corpus kept deliberately broken, a vendored copy, whatever
+  the last build wrote into the tree — and the editor and `essence test` now
+  read the same list. It narrows what is looked for and nothing else: a file
+  you open, import or name on the command line is analysed and reported
+  exactly as before, and the panel answers a change to the manifest without
+  waiting for a restart. The setting was `essence.test.exclude`; written
+  there now, it says where it went.
+- A generic Namespace that cannot answer `Generatable` is refused out loud
+  rather than quietly, a counterexample shrinks through its `Generatable`
+  conformance, and an Argument that fits a carrier is offered the Case that
+  holds it — by name, for every Case it could be.
+- A Diagnostic never prints the poison Type, and a refused call no longer
+  leaks its Type Parameter name into the cascade behind it.
+
 ## [0.6.0]
 
 Dictionaries, definitions by cases, and a formatter that reads better.

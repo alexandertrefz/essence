@@ -33,11 +33,11 @@
     },
     "packages/ariadne": {
       "name": "@essence-lang/ariadne",
-      "version": "0.4.0",
+      "version": "0.5.0",
     },
     "packages/cli": {
       "name": "@essence-lang/cli",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "bin": {
         "essence": "bin/essence",
         "esc": "bin/esc",
@@ -58,7 +58,7 @@
     },
     "packages/client": {
       "name": "@essence-lang/client",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
         "@essence-lang/compiler": "workspace:*",
         "@essence-lang/interfaces": "workspace:*",
@@ -72,7 +72,7 @@
     },
     "packages/compiler": {
       "name": "@essence-lang/compiler",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
         "@essence-lang/ariadne": "workspace:*",
         "@essence-lang/escodegen": "workspace:*",
@@ -89,7 +89,7 @@
     },
     "packages/debug-adapter": {
       "name": "@essence-lang/debug-adapter",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "bin": {
         "esdap": "bin/esdap",
       },
@@ -106,7 +106,7 @@
     },
     "packages/escodegen": {
       "name": "@essence-lang/escodegen",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
         "estraverse": "5.3.0",
         "esutils": "2.0.3",
@@ -119,7 +119,7 @@
     },
     "packages/formatter": {
       "name": "@essence-lang/formatter",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "bin": {
         "esfmt": "bin/esfmt",
       },
@@ -134,11 +134,11 @@
     },
     "packages/interfaces": {
       "name": "@essence-lang/interfaces",
-      "version": "0.4.0",
+      "version": "0.5.0",
     },
     "packages/language-server": {
       "name": "@essence-lang/language-server",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "bin": {
         "esls": "bin/esls",
       },
@@ -156,18 +156,18 @@
     },
     "packages/runtime": {
       "name": "@essence-lang/runtime",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
         "@essence-lang/interfaces": "workspace:*",
       },
     },
     "packages/standard-library": {
       "name": "@essence-lang/standard-library",
-      "version": "0.4.0",
+      "version": "0.5.0",
     },
     "packages/vscode-extension": {
       "name": "essence-language",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "devDependencies": {
         "@essence-lang/language-server": "0.4.0",
         "@essence-lang/standard-library": "0.4.0",
