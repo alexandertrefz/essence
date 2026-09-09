@@ -479,3 +479,39 @@ constant written = ["alex" = 39]::toString()
 `written` is `["alex" = 39]`, quotes and all — a String key and a String value
 keep their quotes inside a structure. The empty Dictionary prints `[=]`, and
 the empty List prints `[]`, so no two of them are ever the same text.
+
+## Crossing into JavaScript
+
+A Dictionary embedded in a JavaScript host — through `@essence-lang/client`, a
+bundler plugin or a bundle built with `esc build --embed` — crosses as a
+`Map`, at every key Type, holding its entries in the order it holds them:
+
+```js
+let ledger = await loadModule("./Ledger.es")
+
+ledger.exports.ages(new Map([["alex", 39n]])) // Map { "alex" => 39n }
+```
+
+A plain object was the alternative and only for a `Dictionary<String, Value>`:
+one shape would then have crossed as two things depending on a Type Argument,
+an object hands its integer-looking keys back before the rest however they were
+written down, and a key that is not a String would have had nowhere to go. An
+object at such a position is refused, naming the `Map` to write instead.
+
+Every key Type crosses, each spelled as that Type is spelled anywhere else at
+the boundary — a String as a string, an Integer as a `bigint`, a Case of a
+Choice with no payloads as its bare name, and a Record or a Case with a payload
+as the object it always is. That last kind is a key to ITERATE rather than one
+to look up: a `Map` finds a key by identity and the object handed back is a
+fresh one, so walking the entries gives all of them and `get` on an equal object
+finds none.
+
+The two containers do not agree about what one key is — a `Map` decides by
+`===`, a Dictionary by the key Type's own `is` — and where they disagree the
+boundary refuses rather than decides. A Map carrying both `1` and `1n` is
+refused at the entry that repeats a key, since those are one Integer here; and a
+Dictionary whose keys are fewer JavaScript values than it has entries is refused
+on the way out rather than handed back an entry short. The one disagreement it
+can not see is an `is` a Namespace wrote for the key Type: the boundary builds
+with the standard library's own equality, so a Dictionary a host builds is
+organised by that rather than by a rule the Program wrote for itself.
