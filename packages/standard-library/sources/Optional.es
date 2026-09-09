@@ -233,7 +233,7 @@ declarations {
 
 		§§ Answers the Optional when it holds a value, and the given Optional otherwise.
 		§§
-		§§ A chain of calls reads as a list of fallbacks, and the first value in it decides the answer. Two empty Optionals answer empty.
+		§§ A chain of calls reads as a list of fallbacks, and the first value in it decides the answer. Two empty Optionals answer empty. The Argument is read whether or not the receiver holds a value.
 		§§
 		§§ @example
 		§§   constant missing: Optional<Integer> = #Empty
@@ -253,6 +253,13 @@ declarations {
 		§ answers, because Essence has no tuple. Two Optionals are combined
 		§ here rather than at the use site, where the alternative is a nested
 		§ `match` per pair of values a Program reads.
+		§
+		§ This is the one Method here with no counterpart on `Result`. What
+		§ holds it back is which reason survives when both Results failed.
+		§ Nothing in the library settles that. The `or` entry drops the
+		§ receiver's reason and keeps the Argument's, `map`, `andThen` and
+		§ `keep` never hold two, and `ResultList::allValues` accumulates every
+		§ one. A `Result::pair(with:)` is due once the question is decided.
 
 		§§ Answers the two values in one Record, and empty when either Optional is empty.
 		§§
@@ -307,6 +314,8 @@ declarations {
 		§§ Answers the value as a Result, failing with the given reason where there is none.
 		§§
 		§§ An Optional says that there is no value, and a Result says why. The reason is read whether or not it is used.
+		§§
+		§§ The reason's own Type decides the Result's failure Type. A bare `#NotFound` binds it to that Case alone, and a `Problem#NotFound` written out does the same. The next call in the chain then works on a Result of a Type it does not expect. Bind the reason to a Constant annotated with the Choice to say the Choice.
 		§§
 		§§ @example
 		§§   constant missing: Optional<Integer> = #Empty
