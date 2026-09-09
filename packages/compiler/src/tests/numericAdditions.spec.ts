@@ -1,0 +1,267 @@
+import { describe, expect, it } from "bun:test"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
+import * as integer from "@essence-lang/runtime/Integer"
+
+import { containsErrors } from "../diagnostics/index"
+import { enrich } from "../enricher/index"
+import { optimise } from "../optimiser/index"
+import { parseWithDiagnostics } from "../parser/index"
+import { rewrite } from "../rewriter/index"
+import { simplify } from "../simplifier/index"
+import { validate } from "../validator/index"
+
+// NOTE: The entries wave 4 added to the numeric tower — the number theory on
+// `Integer`, the radix pair, the division modes, the kind conversions, the
+// sign refinements on `Rational` and the statistics a List of Numbers answers.
+// Each is exercised through a compiled Program, because what is being checked
+// is what a call RESOLVES to as much as what it computes: several of these
+// entries stand beside one another and are told apart by a proof the receiver
+// carries.
+
+function generate(source: string): string {
+	let parsed = parseWithDiagnostics(source)
+
+	expect(containsErrors(parsed.diagnostics)).toBe(false)
+
+	let enriched = enrich(parsed.program)
+
+	expect(containsErrors(enriched.diagnostics)).toBe(false)
+	expect(containsErrors(validate(enriched.program))).toBe(false)
+
+	return rewrite(optimise(simplify(enriched.program)))
+}
+
+async function run(source: string): Promise<Array<string>> {
+	let js = generate(source)
+	let directory = mkdtempSync(join(tmpdir(), "essence-numeric-"))
+	let file = join(directory, "program.ts")
+
+	writeFileSync(file, js)
+
+	let output: Array<string> = []
+	let originalLog = console.log
+
+	console.log = (...args: Array<unknown>) => {
+		output.push(args.map((argument) => String(argument)).join(" "))
+	}
+
+	try {
+		await import(file)
+	} finally {
+		console.log = originalLog
+		rmSync(directory, { recursive: true, force: true })
+	}
+
+	return output
+}
+
+// NOTE: A Program that prints one line per expression, so a case reads as the
+// list of answers it expects.
+function program(...lines: Array<string>): string {
+	return `implementation {\n\t${lines.join("\n\t")}\n}`
+}
+
+// NOTE: `Terminal.inspect` rather than `Terminal.print`, because `print`
+// writes to the Program's own stream and only `inspect` goes through the
+// `console.log` this file captures. It renders a value through `Printable`,
+// so an Optional reads as `Value(…)` and `Empty`.
+function show(expression: string): string {
+	return `Terminal.inspect(${expression})`
+}
+
+// NOTE: A deterministic pseudo-random sequence, as `irrationals.spec.ts` uses,
+// so a property test draws the same cases on every run and a failure names a
+// case that can be re-run.
+function* deterministicNumbers(seed: number): Generator<number> {
+	let state = seed
+
+	while (true) {
+		state = (state * 1103515245 + 12345) % 2147483648
+
+		yield state
+	}
+}
+
+function integerValue(value: number | bigint): bigint {
+	return BigInt(integer.createInteger(value).value)
+}
+
+describe("Number theory on Integer", () => {
+	it("answers the greatest common divisor, whatever the signs are", async () => {
+		expect(
+			await run(
+				program(
+					show("12::greatestCommonDivisor(with 18)"),
+					show("-12::greatestCommonDivisor(with 18)"),
+					show("12::greatestCommonDivisor(with -18)"),
+					show("0::greatestCommonDivisor(with 7)"),
+					show("7::greatestCommonDivisor(with 0)"),
+					show("0::greatestCommonDivisor(with 0)"),
+					show("13::greatestCommonDivisor(with 17)"),
+				),
+			),
+		).toEqual(["6", "6", "6", "7", "7", "0", "1"])
+	})
+
+	it("answers the least common multiple, and zero where there is none", async () => {
+		expect(
+			await run(
+				program(
+					show("4::leastCommonMultiple(with 6)"),
+					show("-4::leastCommonMultiple(with 6)"),
+					show("21::leastCommonMultiple(with 6)"),
+					show("0::leastCommonMultiple(with 6)"),
+					show("6::leastCommonMultiple(with 0)"),
+					show("0::leastCommonMultiple(with 0)"),
+				),
+			),
+		).toEqual(["12", "12", "42", "0", "0", "0"])
+	})
+
+	// NOTE: The two laws the §§ blocks promise, over a spread of pairs each
+	// representation covers: the divisor divides both, and the product of the
+	// two answers is the product of the two Integers without its sign.
+	it("keeps both laws of the divisor and the multiple, for any pair", () => {
+		let numbers = deterministicNumbers(20260909)
+
+		for (let attempt = 0; attempt < 300; attempt++) {
+			let first = BigInt((numbers.next().value % 2001) - 1000)
+			let second = BigInt((numbers.next().value % 2001) - 1000)
+			let divisor = integerValue(
+				integer.greatestCommonDivisor(
+					integer.createInteger(first),
+					integer.createInteger(second),
+				).value,
+			)
+			let multiple = integerValue(
+				integer.leastCommonMultiple(
+					integer.createInteger(first),
+					integer.createInteger(second),
+				).value,
+			)
+			let product = first * second
+
+			expect(divisor >= 0n).toBe(true)
+			expect(multiple >= 0n).toBe(true)
+
+			if (divisor !== 0n) {
+				expect(first % divisor).toBe(0n)
+				expect(second % divisor).toBe(0n)
+			}
+
+			expect(multiple * divisor).toBe(product < 0n ? -product : product)
+		}
+	})
+
+	it("answers the factorial, and nothing below zero", async () => {
+		expect(
+			await run(
+				program(
+					"constant computedFive = 6::subtract(1)",
+					"constant computedNegative = 0::subtract(3)",
+					show("computedFive::factorial()"),
+					show("computedNegative::factorial()"),
+					show("computedNegative::factorial(defaultingTo 0)"),
+					show("computedFive::factorial(defaultingTo 0)"),
+					show("20::factorial()"),
+				),
+			),
+		).toEqual([
+			"Optional#Value(120)",
+			"Optional#Empty",
+			"0",
+			"120",
+			"2432902008176640000",
+		])
+	})
+
+	// NOTE: A written receiver proves its own sign, so it reaches the entry
+	// `NonNegativeInteger` declares and the answer is bare.
+	it("answers the factorial itself for a receiver proven not to be negative", async () => {
+		expect(
+			await run(
+				program(
+					"constant proven: NonNegativeInteger = 4",
+					show("proven::factorial()"),
+					show("0::factorial()"),
+					show("5::factorial()::multiply(with 2)"),
+				),
+			),
+		).toEqual(["24", "1", "240"])
+	})
+
+	it("decides the primes, the composites and the Carmichael numbers", async () => {
+		expect(
+			await run(
+				program(
+					show("-7::isPrime()"),
+					show("0::isPrime()"),
+					show("1::isPrime()"),
+					show("2::isPrime()"),
+					show("3::isPrime()"),
+					show("91::isPrime()"),
+					show("97::isPrime()"),
+					show("561::isPrime()"),
+					show("2147483647::isPrime()"),
+					show("67280421310721::isPrime()"),
+				),
+			),
+		).toEqual([
+			"false",
+			"false",
+			"false",
+			"true",
+			"true",
+			"false",
+			"true",
+			"false",
+			"true",
+			"true",
+		])
+	})
+
+	// NOTE: The witnesses are what the §§ block promises exactness below its
+	// bound on, so the test is against a sieve rather than against a table of
+	// answers this file wrote down.
+	it("agrees with a sieve below a hundred thousand", () => {
+		let limit = 100000
+		let sieve = new Uint8Array(limit + 1).fill(1)
+
+		sieve[0] = 0
+		sieve[1] = 0
+
+		for (let candidate = 2; candidate * candidate <= limit; candidate++) {
+			if (sieve[candidate] === 0) {
+				continue
+			}
+
+			for (
+				let step = candidate * candidate;
+				step <= limit;
+				step += candidate
+			) {
+				sieve[step] = 0
+			}
+		}
+
+		for (let candidate = 0; candidate <= limit; candidate++) {
+			expect(
+				integer.isPrime(integer.createInteger(candidate)).value,
+			).toBe(sieve[candidate] === 1)
+		}
+	})
+
+	// NOTE: Past 2⁵³ − 1 an Integer is a bigint, and the modular exponentiation
+	// the test rests on is the arm that is only reached there.
+	it("decides a prime past the safe range", () => {
+		expect(
+			integer.isPrime(integer.createInteger(2n ** 61n - 1n)).value,
+		).toBe(true)
+		expect(
+			integer.isPrime(integer.createInteger(2n ** 61n - 3n)).value,
+		).toBe(false)
+	})
+})

@@ -24,7 +24,12 @@ export type BigRational = { numerator: bigint; denominator: bigint }
 // against `NaN`, as every relational comparison is — falls out and answers.
 // The next hole of that kind is a wrong answer somebody can read rather than a
 // run that stops responding.
-function greatestCommonDivisor(first: bigint, second: bigint): bigint {
+//
+// NOTE: Exported because `Integer::greatestCommonDivisor` and
+// `leastCommonMultiple` are this Function under those names. The reduction
+// every Rational already runs is the algorithm both of them want, and a second
+// copy in `Integer.ts` would be one more thing to keep in step.
+export function greatestCommonDivisor(first: bigint, second: bigint): bigint {
 	let a = first < 0n ? -first : first
 	let b = second < 0n ? -second : second
 

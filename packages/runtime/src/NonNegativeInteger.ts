@@ -3,7 +3,11 @@
 // `<Namespace>.<method>(…)`, so a Namespace needs a module of its own name, and
 // this is the whole of it.
 import type { AlgebraicType } from "./Algebraic"
-import { type IntegerType, squareRoot__overload$1 } from "./Integer"
+import {
+	factorial__overload$1,
+	type IntegerType,
+	squareRoot__overload$1,
+} from "./Integer"
 import type { ValueType } from "./Optional"
 
 // NOTE: The sum and the product are `Integer`'s own, for the reason
@@ -35,4 +39,12 @@ export function squareRoot(integer: IntegerType): IntegerType | AlgebraicType {
 			IntegerType | AlgebraicType
 		>
 	).item
+}
+
+// NOTE: A negative Integer is the one receiver `Integer::factorial` answers
+// empty for, and that this can not be one is what the Namespace's target
+// bought. The factorial is READ off that entry rather than computed a second
+// time, for the reason `squareRoot` above reads its root off one.
+export function factorial(integer: IntegerType): IntegerType {
+	return (factorial__overload$1(integer) as ValueType<IntegerType>).item
 }
