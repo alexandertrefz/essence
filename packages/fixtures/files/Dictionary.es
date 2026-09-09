@@ -159,4 +159,41 @@ implementation {
 	) § [ "ada" = "Emma", "grace" = "Mill" ]
 
 	Terminal.inspect(["ada", "grace", "ada"]::tally()) § [ "ada" = 2, "grace" = 1 ]
+
+	§ The `where` family asks how many entries a check accepts, and whether
+	§ every one of them does, or none.
+	Terminal.inspect(
+		loans::count(where ({ key, value }) { <- value::isGreaterThan(1) }),
+	) § 2
+	Terminal.inspect(
+		loans::hasOnlyEntries(where ({ key, value }) {
+			<- value::isGreaterThan(0)
+		}),
+	) § true
+	Terminal.inspect(
+		loans::hasNoEntries(where ({ key, value }) {
+			<- value::isGreaterThan(9)
+		}),
+	) § true
+
+	§ `hasKey` asks after a key, and `hasValue` after the other half of an
+	§ entry.
+	Terminal.inspect(loans::hasValue(3)) § true
+
+	§ A Dictionary is ordered, so it can be read in another order — by the keys
+	§ themselves, or by a key read off each entry. The sort is stable, so
+	§ entries the order does not tell apart keep the order they had.
+	Terminal.inspect(loans::sort())
+	Terminal.inspect(loans::sort(on .value, in #Descending))
+
+	§ The first entry answers an Optional, and the proof takes it off.
+	Terminal.inspect(loans::firstEntry())
+	Terminal.inspect(shelf::firstEntry().key) § "ada", and no Optional
+
+	§ Several keys leave at once, and a List of keys builds a Dictionary with a
+	§ Function answering each value.
+	Terminal.inspect(loans::remove(atEvery ["alan", "brian"]))
+	Terminal.inspect(
+		Dictionary.of(["ada", "grace"], valuedBy (name) { <- name::length() }),
+	)
 }
