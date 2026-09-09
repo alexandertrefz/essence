@@ -275,10 +275,11 @@ async function runtimeBridgeFor(
 		return (sources) => withRuntimeBridge(sources)
 	}
 
-	let { carriesDictionary, describeModule } =
+	let { carriesDictionary, describeModule, describeTypes } =
 		await import("@essence-lang/compiler/embed/describe")
 	let dictionary = carriesDictionary(
 		describeModule(front.surface, front.entryPath),
+		describeTypes(front.surface, front.entryPath),
 	)
 
 	return (sources) => withRuntimeBridge(sources, { dictionary })

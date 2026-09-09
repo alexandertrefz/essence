@@ -357,6 +357,7 @@ export function essenceBun(options: BunPluginOptions = {}): BunPlugin {
 								wrapperFor(
 									compiled.entryPath,
 									compiled.descriptor,
+									compiled.types,
 									options,
 								),
 							),
