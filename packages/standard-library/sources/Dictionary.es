@@ -53,15 +53,50 @@ declarations {
 		is Equatable where KeyType is Equatable, ValueType is Equatable,
 		is Printable where KeyType is Printable, ValueType is Printable
 	{
-		§§ Answers a Dictionary built from a List of entries.
+		§ The second entry is the one a Program holding its keys reaches for,
+		§ where the first is for one holding the pairs already. It is written
+		§ on the first, so the two answer the same Dictionary for the same
+		§ keys, duplicates and all. What it saves the caller is a spelling
+		§ rather than a walk. The alternative it replaces is
+		§ `keys::reduce(startingWith empty, (built, key) { … })`. Two hundred
+		§ builds of a thousand-key Dictionary measured 21 ms either way, best
+		§ of three with the subprocess startup inside. What this body costs
+		§ over that one is an entry Record per key, which `Dictionary.of` is
+		§ handed and drops. A native folding the keys straight into a store
+		§ would take those out.
+
+		§§ Answers a Dictionary built from a List of entries, or from a List of keys and a Function.
 		§§
 		§§ Two entries with equal keys collapse into one. The later value wins, and the key keeps the place of its first occurrence. Equality is the keys' own `is`.
 		§§
-		§§ @param _ — the entries the Dictionary holds
-		§§ @returns — the Dictionary of those entries.
-		static of<infer KeyType is Equatable>(
-			_ entries: List<{ key: KeyType, value: ValueType }>,
-		) -> Dictionary<KeyType, ValueType>
+		§§ @returns — the Dictionary.
+		overload static of {
+			§§ Answers a Dictionary built from a List of entries.
+			§§
+			§§ Two entries with equal keys collapse into one. The later value wins, and the key keeps the place of its first occurrence. Equality is the keys' own `is`.
+			§§
+			§§ @param _ — the entries the Dictionary holds
+			§§ @returns — the Dictionary of those entries.
+			<infer KeyType is Equatable>(
+				_ entries: List<{ key: KeyType, value: ValueType }>,
+			) -> Dictionary<KeyType, ValueType>
+
+			§§ Answers a Dictionary of the given keys, each holding what the Function answers for it.
+			§§
+			§§ The Function is asked once for each key, in the order the keys stand in. A key written down twice keeps the place of its first occurrence and holds what the Function answered the second time. The empty List answers the empty Dictionary.
+			§§
+			§§ @param _ — the keys the Dictionary holds
+			§§ @param valuedBy — the Function answering the value of each key
+			§§ @returns — the Dictionary of those keys.
+			<infer KeyType is Equatable>(
+				_ keys: List<KeyType>,
+				valuedBy valueOf: (_: KeyType) -> ValueType,
+			) -> Dictionary<KeyType, ValueType> {
+				<- Dictionary.of(
+					keys::map((key) { <- { key = key, value = valueOf(key) } }),
+				)
+			}
+		}
 
 		§§ Answers whether the two Dictionaries hold the same keys with equal values.
 		§§

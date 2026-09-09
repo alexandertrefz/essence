@@ -4729,6 +4729,23 @@ third"::lines())
 		"Dictionary.of<ValueType, KeyType is Equatable>(_ List<\{ key: KeyType, value: ValueType \}>) [empty]",
 		Dictionary.of(noPairs),
 	)
+	§ The second entry is handed the keys alone and asks a Function for each
+	§ value. A key written down twice keeps its first place and the second
+	§ answer, exactly as a duplicate entry does above.
+	show(
+		"Dictionary.of<ValueType, KeyType is Equatable>(_ List<KeyType>, valuedBy: (_ KeyType) -> ValueType)",
+		Dictionary.of(["alex", "sam"], valuedBy (name) { <- name::length() }),
+	)
+	show(
+		"Dictionary.of<ValueType, KeyType is Equatable>(_ List<KeyType>, valuedBy: (_ KeyType) -> ValueType) [duplicate key]",
+		Dictionary.of(["alex", "sam", "alex"], valuedBy (name) {
+			<- name::length()
+		}),
+	)
+	show(
+		"Dictionary.of<ValueType, KeyType is Equatable>(_ List<KeyType>, valuedBy: (_ KeyType) -> ValueType) [empty]",
+		Dictionary.of(noKeys, valuedBy (name) { <- name::length() }),
+	)
 	show(
 		"Dictionary.is<KeyType is Equatable, ValueType is Equatable>(_ Dictionary<KeyType, ValueType>)",
 		ages::is(ages),

@@ -579,7 +579,7 @@ export function dictionaryOverFreshStore<
 // before the first entry is read — `runsOf` rather than `viewOf` because
 // nothing here is going to visit the items twice and there is no reason to trim
 // the caller's List for it.
-export function of<Key extends AnyType, Value extends AnyType>(
+export function of__overload$1<Key extends AnyType, Value extends AnyType>(
 	entries: ListType<EntryRecord<Key, Value>>,
 	conformance: EquatableWitness<Key>,
 ): DictionaryType<Key, Value> {

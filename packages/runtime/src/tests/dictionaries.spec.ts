@@ -12,7 +12,7 @@ import {
 	keys as keysOf,
 	length as lengthOf,
 	map as mapEntries,
-	of as dictionaryOf,
+	of__overload$1 as dictionaryOf,
 	remove__overload$1 as removeAt,
 	removeEvery,
 	set as setAt,

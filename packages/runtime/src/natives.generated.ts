@@ -615,7 +615,7 @@ export type NonEmptyKeyedNumberListNatives = {
 
 export type DictionaryNatives = {
 	// static of<ValueType, KeyType is Equatable>(_: List<{ key: KeyType, value: ValueType }>) -> Dictionary<KeyType, ValueType>
-	of: <ValueType extends AnyType, KeyType extends AnyType>(argument0: ListType<RecordType & { key: KeyType; value: ValueType }>, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
+	of__overload$1: <ValueType extends AnyType, KeyType extends AnyType>(argument0: ListType<RecordType & { key: KeyType; value: ValueType }>, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
 	// is<KeyType is Equatable, ValueType is Equatable>(_: Dictionary<KeyType, ValueType>) -> Boolean
 	is: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: DictionaryType<KeyType, ValueType>, KeyType__conformance: EquatableConformance<KeyType>, ValueType__conformance: EquatableConformance<ValueType>) => BooleanType
 	// toString<KeyType is Printable, ValueType is Printable>() -> String
@@ -1110,9 +1110,9 @@ export const $NonEmptyKeyedNumberListAbsent: AssertNoEssenceExports<typeof impor
 
 declare const DictionaryModule: typeof import("./Dictionary")
 export const $Dictionary: DictionaryNatives = DictionaryModule
-export const $DictionaryAbsent: AssertNoEssenceExports<typeof import("./Dictionary"), "hasEntries__overload$1" | "hasEntries__overload$2" | "hasKey" | "hasValue" | "hasOnlyEntries" | "hasNoEntries" | "value__overload$2" | "update__overload$1" | "update__overload$2" | "remove__overload$2" | "merge__overload$1" | "merge__overload$2" | "count"> = true
+export const $DictionaryAbsent: AssertNoEssenceExports<typeof import("./Dictionary"), "of__overload$2" | "hasEntries__overload$1" | "hasEntries__overload$2" | "hasKey" | "hasValue" | "hasOnlyEntries" | "hasNoEntries" | "value__overload$2" | "update__overload$1" | "update__overload$2" | "remove__overload$2" | "merge__overload$1" | "merge__overload$2" | "count"> = true
 export const $DictionaryArity: AssertArities<typeof import("./Dictionary"), {
-	of: 2
+	of__overload$1: 2
 	is: 4
 	toString: 3
 	isEmpty: 1
