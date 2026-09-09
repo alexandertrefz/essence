@@ -480,7 +480,7 @@ exports[`Fixture Sweep Result.es should print what it printed before 1`] = `
 [ Problem#NotPositive, Problem#NotANumber ]
 {
     values = [ 12, 7 ],
-    failures = [ Problem#NotPositive, Problem#NotANumber ]
+    reasons = [ Problem#NotPositive, Problem#NotANumber ]
 }
 Result#Failure([ Problem#NotPositive, Problem#NotANumber ])
 Result#Value([ 12, 7 ])

@@ -37,7 +37,7 @@ implementation {
 	constant sound  = ["12", "7"]::map((row) { <- priceOf(row) })
 
 	Terminal.inspect(priced::values()) § [ 12, 7 ]
-	Terminal.inspect(priced::failures()) § [ Problem#NotPositive, Problem#NotANumber ]
+	Terminal.inspect(priced::reasons()) § [ Problem#NotPositive, Problem#NotANumber ]
 	Terminal.inspect(priced::partition())
 
 	§ Every reason is kept rather than the first one, which is what a Program

@@ -314,7 +314,7 @@ groups, in this order:
    `lastItem`, `firstIndex`, `lastIndex`, `indices`, `keys`, `values`,
    `entries`, `characters`, `words`, `lines`, `character(at:)`,
    `firstCharacter`, `lastCharacter`, `value(defaultingTo:)`, `reason`,
-   `failures`.
+   `reasons`.
 6. **Transforms, and everything else** — `negate`, `round`, `clamp`,
    `reciprocal`, `map`, `reduce`, `everyItem`, `sort`, `slice`, `append`,
    `join`, `split`, `trim`, `pad`, `flatten`, `andThen`.
