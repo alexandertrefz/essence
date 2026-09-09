@@ -184,6 +184,50 @@ exports[`A Module described describes Marshal.es 1`] = `
         "shown": "Integer",
       },
     },
+    "answered": {
+      "emitted": "answered",
+      "kind": "constant",
+      "of": {
+        "arms": [
+          {
+            "choice": "Result",
+            "kind": "case",
+            "name": "Value",
+            "optional": false,
+            "payload": {
+              "item": {
+                "of": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+            },
+            "shown": "Result<Integer, String>#Value",
+            "tag": "Result#Value",
+            "unitChoice": false,
+          },
+          {
+            "choice": "Result",
+            "kind": "case",
+            "name": "Failure",
+            "optional": false,
+            "payload": {
+              "reason": {
+                "of": {
+                  "kind": "string",
+                  "shown": "String",
+                },
+              },
+            },
+            "shown": "Result<Integer, String>#Failure",
+            "tag": "Result#Failure",
+            "unitChoice": false,
+          },
+        ],
+        "kind": "union",
+        "shown": "Result<Integer, String>",
+      },
+    },
     "areaOf": {
       "emitted": "areaOf",
       "kind": "function",
@@ -1822,6 +1866,143 @@ exports[`A Module described describes Marshal.es 1`] = `
           "shown": "Rational",
         },
         "shown": "(_ Rational) -> Rational",
+      },
+    },
+    "refused": {
+      "emitted": "refused",
+      "kind": "constant",
+      "of": {
+        "arms": [
+          {
+            "choice": "Result",
+            "kind": "case",
+            "name": "Value",
+            "optional": false,
+            "payload": {
+              "item": {
+                "of": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+            },
+            "shown": "Result<Integer, String>#Value",
+            "tag": "Result#Value",
+            "unitChoice": false,
+          },
+          {
+            "choice": "Result",
+            "kind": "case",
+            "name": "Failure",
+            "optional": false,
+            "payload": {
+              "reason": {
+                "of": {
+                  "kind": "string",
+                  "shown": "String",
+                },
+              },
+            },
+            "shown": "Result<Integer, String>#Failure",
+            "tag": "Result#Failure",
+            "unitChoice": false,
+          },
+        ],
+        "kind": "union",
+        "shown": "Result<Integer, String>",
+      },
+    },
+    "result": {
+      "emitted": "result",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "arms": [
+                {
+                  "choice": "Result",
+                  "kind": "case",
+                  "name": "Value",
+                  "optional": false,
+                  "payload": {
+                    "item": {
+                      "of": {
+                        "kind": "integer",
+                        "shown": "Integer",
+                      },
+                    },
+                  },
+                  "shown": "Result<Integer, String>#Value",
+                  "tag": "Result#Value",
+                  "unitChoice": false,
+                },
+                {
+                  "choice": "Result",
+                  "kind": "case",
+                  "name": "Failure",
+                  "optional": false,
+                  "payload": {
+                    "reason": {
+                      "of": {
+                        "kind": "string",
+                        "shown": "String",
+                      },
+                    },
+                  },
+                  "shown": "Result<Integer, String>#Failure",
+                  "tag": "Result#Failure",
+                  "unitChoice": false,
+                },
+              ],
+              "kind": "union",
+              "shown": "Result<Integer, String>",
+            },
+          },
+        ],
+        "returns": {
+          "arms": [
+            {
+              "choice": "Result",
+              "kind": "case",
+              "name": "Value",
+              "optional": false,
+              "payload": {
+                "item": {
+                  "of": {
+                    "kind": "integer",
+                    "shown": "Integer",
+                  },
+                },
+              },
+              "shown": "Result<Integer, String>#Value",
+              "tag": "Result#Value",
+              "unitChoice": false,
+            },
+            {
+              "choice": "Result",
+              "kind": "case",
+              "name": "Failure",
+              "optional": false,
+              "payload": {
+                "reason": {
+                  "of": {
+                    "kind": "string",
+                    "shown": "String",
+                  },
+                },
+              },
+              "shown": "Result<Integer, String>#Failure",
+              "tag": "Result#Failure",
+              "unitChoice": false,
+            },
+          ],
+          "kind": "union",
+          "shown": "Result<Integer, String>",
+        },
+        "shown": "(_ Result<Integer, String>) -> Result<Integer, String>",
       },
     },
     "shape": {

@@ -88,6 +88,15 @@ implementation {
 		<- value
 	}
 
+	§ A `Result` is an ordinary generic Choice on the JavaScript side — the
+	§ Optional beside it is the one Choice spelled by absence, and a reason has
+	§ no room in `undefined`.
+	function result(
+		_ value: Result<Integer, String>,
+	) -> Result<Integer, String> {
+		<- value
+	}
+
 	function labelled(_ value: Label) -> Label {
 		<- value
 	}
@@ -188,6 +197,9 @@ implementation {
 	constant present: Optional<Integer> = #Value(7)
 	constant absent: Optional<Integer>  = #Empty
 
+	constant answered: Result<Integer, String> = #Value(7)
+	constant refused: Result<Integer, String>  = #Failure("gone")
+
 	§ A constant typed by a unit Choice, which is read through a different door
 	§ than a Function's answer is — and a Case standing ALONE for a Type, which
 	§ is what an unannotated one is inferred as. `#Plus` rather than `#Up`
@@ -210,6 +222,7 @@ export {
 	Vertical
 	absent
 	answer
+	answered
 	areaOf
 	blank
 	box
@@ -240,6 +253,8 @@ export {
 	point
 	present
 	rational
+	refused
+	result
 	shape
 	styled
 	text
