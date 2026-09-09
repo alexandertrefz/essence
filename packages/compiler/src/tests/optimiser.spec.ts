@@ -710,6 +710,34 @@ const conditionalConformances = `implementation {
 	Terminal.inspect([1, 2]::compare(to [1, 2, 3])::toString())
 }`
 
+// NOTE: Two Choices reaching one bounded Function, and one of them twice. Every
+// Choice's derived `Enumerable` witness is the same one-entry map — what tells
+// two of them apart is the tags the helper is curried with, which is why they
+// are in `pool-constants`' key.
+const derivedCaseListings = `implementation {
+	choice Colour {
+		Red,
+		Green,
+	}
+
+	choice Size {
+		Small,
+		Medium,
+		Large,
+	}
+
+	function count<infer Mode is Enumerable>(_ example: Mode) -> Integer {
+		<- Mode.cases()::length()
+	}
+
+	constant red: Colour = #Red
+	constant small: Size = #Small
+
+	Terminal.inspect(count(red))
+	Terminal.inspect(count(small))
+	Terminal.inspect(count(red))
+}`
+
 // NOTE: A Combination whose right-hand side is a literal, one whose right-hand
 // side is a Record the Program is holding, one member overridden and both — the
 // shapes `collapse-combinations` rewrites. A right-hand side may only be a
@@ -6407,6 +6435,33 @@ describe("Optimiser", () => {
 				"[ [ 1, 2 ], [ 3 ] ]",
 				"[ [ [ 1 ] ], [ [ 2 ] ] ]",
 				'"Less"',
+			])
+		})
+
+		it("tells two Choices' Case listings apart", () => {
+			// NOTE: One const per Choice, and the Choice met twice reads its own
+			// again. A key that dropped the tags would declare one const for
+			// both and hand the second Choice the first one's Cases.
+			let generated = generate(derivedCaseListings)
+			let declarations = [
+				...generated.matchAll(
+					/const (\$pool_\d+) = \{\n\tcases: \$helpers\.choiceCases\(\[/g,
+				),
+			]
+
+			expect(declarations).toHaveLength(2)
+			expect(generated).toMatch(
+				/count\(red, (\$pool_\d+)\)[^]*count\(small, (?!\1)\$pool_\d+\)[^]*count\(red, \1\)/,
+			)
+		})
+
+		it("lists the Cases of the Choice each witness was given", async () => {
+			// NOTE: What a shared constant would answer instead: the second
+			// Choice counted as the first, which is three Cases read as two.
+			expect(await outputOf(generate(derivedCaseListings))).toEqual([
+				"2",
+				"3",
+				"2",
 			])
 		})
 
