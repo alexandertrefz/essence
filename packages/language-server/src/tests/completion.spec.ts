@@ -2084,6 +2084,98 @@ describe("Completion of a Choice's derived Case listing", () => {
 		expect(labelsOf(source, { line: 3, column: 8 })).not.toContain("cases")
 	})
 
+	// NOTE: The two spellings the Protocol's own page headlines, and the two the
+	// editor could not show: a Choice nobody wrote a Namespace for, and the Type
+	// Parameter inside a bounded body. Both compile, run and hover, and both
+	// read their member off a Namespace nobody declared — which the Enricher
+	// answers only for a member that Namespace OFFERS, so the probe's invented
+	// name typed the base as an Error and the cursor was answered with nothing.
+	it("should offer it on a Choice with no Namespace at all", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Colour {",
+			"\t\tRed,",
+			"\t\tGreen,",
+			"\t}",
+			"",
+			"\tColour.",
+			"}",
+		].join("\n")
+
+		expect(entryFor(source, { line: 7, column: 9 }, "cases")).toMatchObject(
+			{
+				kind: "staticMethod",
+				detail: "() -> NonEmptyList<Colour>",
+			},
+		)
+	})
+
+	it("should offer it on a Type Parameter bound to 'Enumerable'", () => {
+		let source = [
+			"implementation {",
+			"\tfunction countOf <infer Mode is Enumerable>(_ example: Mode) -> Integer {",
+			"\t\t<- Mode.",
+			"\t}",
+			"}",
+		].join("\n")
+
+		// NOTE: `NonEmptyList` bare rather than `NonEmptyList<Mode>`, because a
+		// refinement whose Type Arguments are all Type Parameters prints
+		// unapplied — `displayedRefinementArguments`' own rule, and what the
+		// Hover on the same spelling reads.
+		expect(entryFor(source, { line: 3, column: 11 }, "cases")?.detail).toBe(
+			"() -> NonEmptyList",
+		)
+	})
+
+	// NOTE: A Namespace WRITING `cases` is the answer wherever it is reached,
+	// so the listing offers that Method rather than the derive — the same
+	// order every other rail reads the two in.
+	it("should offer a written 'cases' through the Choice's own name", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Colour {",
+			"\t\tRed,",
+			"\t\tGreen,",
+			"\t}",
+			"",
+			"\tnamespace Colours for Colour is Enumerable {",
+			"\t\tstatic cases() -> NonEmptyList<Colour> {",
+			"\t\t\t<- [#Red]",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tColour.",
+			"}",
+		].join("\n")
+
+		expect(entryFor(source, { line: 13, column: 9 }, "cases")?.detail).toBe(
+			"() -> NonEmptyList<Colour>",
+		)
+	})
+
+	// NOTE: And not on a VALUE of the Choice. `cases` is a static, reached on the
+	// Type's own name and on a bounded Type Parameter — `red.cases()` is no
+	// spelling at all, and `red.` and `Colour.` carry the same Type here, so
+	// what tells them apart is which of them the Enricher could read a member
+	// off in the first place.
+	it("should not offer it on a value of the Choice", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Colour {",
+			"\t\tRed,",
+			"\t\tGreen,",
+			"\t}",
+			"",
+			"\tconstant red: Colour = #Red",
+			"",
+			"\tred.",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 9, column: 6 })).toEqual([])
+	})
+
 	it("should not offer it on a Namespace over a Choice with a payload", () => {
 		let source = [
 			"implementation {",

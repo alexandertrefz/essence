@@ -3405,15 +3405,38 @@ describe("Choices", () => {
 		// Case and hand back the Choice's — which is why the Case rail equality
 		// takes is no rail for this. The Choice conforms; the Case is refused.
 		it("refuses a bound bound to a single Case", () => {
+			let source = `implementation { ${colourChoice}
+				function countOf <infer T is Enumerable>(_ example: T) -> Integer {
+					<- T.cases()::length()
+				}
+
+				Terminal.print(countOf(Colour#Red)::toString())
+			}`
+
+			expect(codesOf(source)).toEqual(["unsatisfied-bound"])
+			// NOTE: The Help a Case gets names the CHOICE, because the one
+			// every other binding gets can not be written for it — `namespace X
+			// for Colour#Red is Enumerable` does not parse, and a Namespace's
+			// target is never one Case of a Choice.
+			expect(helpsOf(source)).toEqual([
+				"Annotate the value at 'Colour': a bare Case binds the Case, not the Choice.",
+			])
+		})
+
+		// NOTE: And a value annotated at the Choice is what the Help asks for,
+		// which is the call the page shows beside the bounded example.
+		it("answers a bound for a value annotated at the Choice", async () => {
 			expect(
-				codesOf(`implementation { ${colourChoice}
+				await run(`implementation { ${colourChoice}
 					function countOf <infer T is Enumerable>(_ example: T) -> Integer {
 						<- T.cases()::length()
 					}
 
-					Terminal.print(countOf(Colour#Red)::toString())
+					constant red: Colour = #Red
+
+					Terminal.inspect(countOf(red))
 				}`),
-			).toEqual(["unsatisfied-bound"])
+			).toEqual(["3"])
 		})
 
 		// NOTE: Every mode Choice the library declares answers, and none of
