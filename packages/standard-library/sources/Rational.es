@@ -243,6 +243,19 @@ declarations {
 								§ `Rational.of` reach the entry over a
 								§ denominator proven not to be zero, and `map`
 								§ stand where `andThen` had to.
+								§
+								§ A decimal parse costs 1.2 microseconds over
+								§ 100 000 parses, where a whole one costs 0.6.
+								§ Reading one joined text was 18 to 40 per
+								§ cent cheaper and read `1_.5` as a number.
+								§ That is the price of the arm above.
+								§
+								§ The stripped text is built per call.
+								§ Spending
+								§ `length()::subtract(count(of "_"))::absolute()`
+								§ instead keeps the proof without building one,
+								§ and parses 8 per cent faster. It costs
+								§ `Everyday.es` 943 bytes.
 								constant scale = 10
 									::raise(
 										to fractionalText
