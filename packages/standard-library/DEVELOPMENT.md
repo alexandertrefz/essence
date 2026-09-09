@@ -294,7 +294,22 @@ Composition is not free, and four costs are easy to miss because no test fails:
   the Essence side alone looks equivalent and is not.
 
 Prefer a body that reaches only its own Namespace's primitives. `packages/compiler/src/tests/bundleSize.spec.ts`
-guards three files, but it is a floor, not a substitute for measuring.
+guards six Programs, but it is a floor, not a substitute for measuring.
+
+What the library costs to LOAD is the other figure a wave moves, and nothing
+asserts it. Every Program pays it once: the sources are parsed and enriched
+before the first line of the Program is, and the snapshot cache is what keeps
+the ordinary edit-and-run from paying it twice.
+`ESSENCE_COMPILER_CACHE=off esc check --verbose` over a hello-world reports the
+cold figure, and the same command without the variable reports the warm one.
+These sources measured 9,262 lines and 145 ms cold before the completeness
+wave, and measure 12,474 lines and 200 ms after it — 34.7% more source for 38%
+more time, at 16 microseconds a line. Warm is 21 ms either way, because the
+snapshot is what is read.
+A ceiling over a clock is not the guard for this: five idle runs on one machine
+spread 66%, so a ceiling tight enough to catch a drift of that size fails on an
+ordinary run. `stdlibLoader.spec.ts` counts the declared surface instead, which
+is what the time is a function of, and moves only when the library does.
 
 ## Member order
 
