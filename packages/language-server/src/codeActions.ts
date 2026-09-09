@@ -165,6 +165,8 @@ function actionsFor(
 			return listed(removeImportAction(diagnostic, program, lines))
 		case "fallback-never-used":
 			return listed(removeFallbackAction(diagnostic, lines))
+		case "ambiguous-nesting-level":
+			return listed(wrapInHoldingCaseAction(diagnostic, program))
 		case "focused-tests-remain":
 			return listed(removeFocusedAction(diagnostic, lines))
 		case "wrong-update-brackets":
@@ -652,6 +654,65 @@ function commaAfter(
 		}
 
 		cursor = { line: cursor.line + 1, column: 1 }
+	}
+}
+
+// NOTE: The Warning's own first Help, applied — the Argument wrapped in the Case
+// that holds, which is the spelling of the reading the call did NOT take.
+//
+// A rewrite rather than a fix, and never preferred: both readings are well typed
+// and the Compiler has no way to know which was meant, so applying this CHANGES
+// what the Program answers. That is the whole of what the Warning has to say,
+// and offering it as a quickfix would put it under the same lightbulb as the
+// edits that leave a Program's meaning alone. The other reading is a Constant
+// declared beside the call, which is more than an edit to the span the Warning
+// underlines and is left to the Help that describes it.
+//
+// Two insertions rather than one replacement, so the Argument's own text — a
+// Case carrying a payload, a name, a call spanning lines — is never retyped by a
+// fix that has no reason to read it.
+function wrapInHoldingCaseAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+): CodeActionEntry | null {
+	if (diagnostic.data?.kind !== "holding-case") {
+		return null
+	}
+
+	// NOTE: Found on a fresh parse, as every edit here is: a Position from a
+	// stale analysis would wrap whatever now stands in its place. An Argument's
+	// value is a Node of its own, so the Position the Warning carries is one the
+	// walk finds exactly rather than by containment.
+	let argument = findNodeAt(program, diagnostic.position)
+
+	if (argument === null) {
+		return null
+	}
+
+	let holding = `#${diagnostic.data.caseName}`
+
+	return {
+		title: `Wrap the Argument in '${holding}(…)'`,
+		kind: "refactor.rewrite",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: false,
+		edits: [
+			{
+				range: {
+					start: argument.position.start,
+					end: argument.position.start,
+				},
+				newText: `${holding}(`,
+			},
+			{
+				range: {
+					start: argument.position.end,
+					end: argument.position.end,
+				},
+				newText: ")",
+			},
+		],
 	}
 }
 
@@ -1220,6 +1281,25 @@ function findConstantDeclaration(
 			node.nodeType === "ConstantDeclarationStatement" &&
 			isSamePosition(node.name.position, namePosition)
 		) {
+			found = node
+		}
+	})
+
+	return found
+}
+
+// NOTE: The Node standing at exactly this Position — matched by Position rather
+// than by containment, as the finders beside it are, since what a fix reported
+// against one Node needs is that Node and not whatever encloses it. Where two
+// Nodes share a span the outer one answers, which is the first the walk reaches.
+function findNodeAt(
+	program: parser.Program,
+	position: common.Position,
+): parser.ImplementationNode | null {
+	let found: parser.ImplementationNode | null = null
+
+	walk(program, (node) => {
+		if (found === null && isSamePosition(node.position, position)) {
 			found = node
 		}
 	})
