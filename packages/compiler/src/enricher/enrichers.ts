@@ -12798,13 +12798,18 @@ function reportAmbiguousNestingLevel(
 		// a pair of entries about the same value — a refinement ladder, a second
 		// numeric kind — and which of those wins changes what a call proves
 		// rather than what it asks.
-		let holding = held.find(
+		//
+		// NOTE: EVERY Case whose payload matches, not the first: a carrier may
+		// hold one Type in more than one Case, and each of them asks a different
+		// question. Naming one would present one of several readings as the fix,
+		// and the Rewrite would then commit the Program to it.
+		let holding = held.filter(
 			([, payloadType]) =>
 				matchesType(payloadType, heldType) &&
 				matchesType(heldType, payloadType),
 		)
 
-		if (holding === undefined) {
+		if (holding.length === 0) {
 			continue
 		}
 
@@ -12849,12 +12854,23 @@ function reportAmbiguousNestingLevel(
 				],
 				notes: [
 					"A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.",
+					...(holding.length > 1
+						? [
+								`${holding.length} Cases of the receiver hold ${withArticle(describeType(heldType))}, and each of them is a different question.`,
+							]
+						: []),
 				],
 				helps: [
-					`Write '#${holding[0]}(…)' around the Argument to ask whether the receiver holds it.`,
+					...holding.map(
+						([caseName]) =>
+							`Write '#${caseName}(…)' around the Argument to ask whether the receiver holds it.`,
+					),
 					`Name it in a Constant annotated '${describeType(wholeType)}' to go on asking about the receiver.`,
 				],
-				data: { kind: "holding-case", caseName: holding[0] },
+				data: {
+					kind: "holding-case",
+					caseNames: holding.map(([caseName]) => caseName),
+				},
 			},
 		)
 

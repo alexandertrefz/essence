@@ -78,6 +78,11 @@ function devirtualise(
 // NOTE: A witness that is a forwarded Parameter is not a `ConformanceValue` at
 // all — it is an Identifier, a different value per call — and is refused by the
 // same first line.
+//
+// NOTE: A derived `Enumerable` witness never reaches here, and the node carries
+// no tags for one: the only Method this pass asks for is `toString`, and the
+// derived Case listing maps `cases` alone — `Enumerable` provides nothing —  so
+// the lookup below answers undefined and the witness stays where it is.
 function directMethodOf(
 	witness: common.typedSimple.ExpressionNode,
 	protocolMethodName: string,

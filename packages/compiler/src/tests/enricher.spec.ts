@@ -10881,7 +10881,7 @@ describe("Enricher", () => {
 			])
 			expect(diagnostic.data).toEqual({
 				kind: "holding-case",
-				caseName: "Value",
+				caseNames: ["Value"],
 			})
 		})
 
@@ -11024,7 +11024,93 @@ describe("Enricher", () => {
 			])
 			expect(diagnostics[0].data).toEqual({
 				kind: "holding-case",
-				caseName: "Full",
+				caseNames: ["Full"],
+			})
+		})
+
+		// NOTE: A carrier holding one Type in TWO Cases. Both `#Labelled` and
+		// `#Full` would fit the payload entry, and each of them asks a different
+		// question — `#Labelled` is not even the same Type here, which is what
+		// keeps the two apart — so the Warning names every Case that qualifies
+		// rather than the first with a payload. Naming one would present one of
+		// several readings as the fix, and the Rewrite would commit to it.
+		it("should name every Case of a carrier whose payload fits", () => {
+			let source = `implementation {
+				choice Twin<ItemType> {
+					First { item: ItemType },
+					Second { item: ItemType },
+					Blank,
+				}
+
+				namespace Twins<infer ItemType> for Twin<ItemType> {
+					overload holds {
+						(_ other: Twin<ItemType>) -> Boolean {
+							<- true
+						}
+
+						(_ other: ItemType) -> Boolean {
+							<- false
+						}
+					}
+				}
+
+				constant nested: Twin<Twin<Integer>> = #First(#Blank)
+
+				constant answer = nested::holds(#Blank)
+			}`
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"ambiguous-nesting-level",
+			])
+			expect(diagnostics[0].data).toEqual({
+				kind: "holding-case",
+				caseNames: ["First", "Second"],
+			})
+			expect(diagnostics[0].helps).toEqual([
+				"Write '#First(…)' around the Argument to ask whether the receiver holds it.",
+				"Write '#Second(…)' around the Argument to ask whether the receiver holds it.",
+				"Name it in a Constant annotated 'Twin<Twin<Integer>>' to go on asking about the receiver.",
+			])
+		})
+
+		// NOTE: And the Case that fits is not the first with a payload —
+		// `#Labelled` holds a String and the receiver holds a `Box<Integer>` —
+		// so this is what tells "the Case whose payload matches" from "the first
+		// Case with a payload". The mutant that takes the first names
+		// `#Labelled`, which does not compile.
+		it("should name the Case whose payload fits rather than the first", () => {
+			let source = `implementation {
+				choice Box<ItemType> {
+					Labelled { label: String },
+					Full { item: ItemType },
+					Blank,
+				}
+
+				namespace Boxes<infer ItemType> for Box<ItemType> {
+					overload holds {
+						(_ other: Box<ItemType>) -> Boolean {
+							<- true
+						}
+
+						(_ other: ItemType) -> Boolean {
+							<- false
+						}
+					}
+				}
+
+				constant nested: Box<Box<Integer>> = #Full(#Blank)
+
+				constant answer = nested::holds(#Blank)
+			}`
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"ambiguous-nesting-level",
+			])
+			expect(diagnostics[0].data).toEqual({
+				kind: "holding-case",
+				caseNames: ["Full"],
 			})
 		})
 

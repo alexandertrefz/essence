@@ -1750,8 +1750,13 @@ The rule names no Method, no Namespace and no Type. What is recognised is the
 shape: the entry the call selected takes the receiver's own Type, another entry
 of the same Overload takes what one of that Type's Cases holds, and the value
 the call built reads at both levels. A `choice` of your own with a Namespace
-declaring the same pair of entries is read exactly the same way, and the first
-Help names your Case.
+declaring the same pair of entries is read exactly the same way, and the Helps
+name your Cases.
+
+Cases, plural, because a carrier may hold one Type in more than one of them —
+`choice Twin<Item> { First { item: Item }, Second { item: Item }, Blank }` — and
+each of those is a different question. Every Case whose payload fits is named,
+in declaration order, with a Rewrite of its own.
 
 Three things it deliberately does not report:
 
@@ -1775,7 +1780,8 @@ Compiler has no way to know which was meant, so applying it CHANGES what the
 Program answers — which is the whole of what the Warning has to say, and not
 something to put one click away on the squiggle. The other reading needs a
 Constant declared beside the call, which is more than an edit to the span the
-Warning underlines.
+Warning underlines. Where several Cases hold, one Rewrite is offered per Case
+and its title names which.
 
 ## Choices
 

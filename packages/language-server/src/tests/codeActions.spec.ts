@@ -668,6 +668,52 @@ describe("Code Actions", () => {
 			)
 		})
 
+		// NOTE: A carrier holding one Type in TWO Cases offers one rewrite per
+		// Case, because each of them asks a different question — a single action
+		// would present one of two readings as the answer. Both compile, and the
+		// titles are what tell them apart in the list.
+		it("should offer one rewrite per Case that holds", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Twin<ItemType> {",
+				"\t\tFirst { item: ItemType },",
+				"\t\tSecond { item: ItemType },",
+				"\t\tBlank,",
+				"\t}",
+				"",
+				"\tnamespace Twins<infer ItemType> for Twin<ItemType> {",
+				"\t\toverload holds {",
+				"\t\t\t(_ other: Twin<ItemType>) -> Boolean {",
+				"\t\t\t\t<- true",
+				"\t\t\t}",
+				"",
+				"\t\t\t(_ other: ItemType) -> Boolean {",
+				"\t\t\t\t<- false",
+				"\t\t\t}",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant nested: Twin<Twin<Integer>> = #First(#Blank)",
+				"",
+				"\tconstant answer = nested::holds(#Blank)",
+				"}",
+			]
+			let offered = rewrites(lines)
+
+			expect(offered.map((entry) => entry.title)).toEqual([
+				"Wrap the Argument in '#First(…)'",
+				"Wrap the Argument in '#Second(…)'",
+			])
+			expect(applied(lines, offered[0])[21]).toBe(
+				"\tconstant answer = nested::holds(#First(#Blank))",
+			)
+			expect(applied(lines, offered[1])[21]).toBe(
+				"\tconstant answer = nested::holds(#Second(#Blank))",
+			)
+			expect(codesOf(applied(lines, offered[0]))).toEqual([])
+			expect(codesOf(applied(lines, offered[1]))).toEqual([])
+		})
+
 		it("should offer nothing where nothing warns", () => {
 			expect(
 				rewrites([
