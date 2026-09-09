@@ -2,6 +2,7 @@ import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
+import { anyIs } from "./internalHelpers"
 import type { EncodedKey, EquatableWitness } from "./keyEncoding"
 import { canonicalEncoding, encodeKey } from "./keyEncoding"
 import type { ListType } from "./List"
@@ -521,6 +522,71 @@ export function createDictionary<Key extends AnyType, Value extends AnyType>(
 	}
 
 	return boxAt(store, 0, store.slots.length)
+}
+
+// NOTE: The door a HOST's values come through, and the `From` of
+// `createListFrom` and `createIntegerFrom`: a constructor written for a caller
+// whose calls can not be read and checked, so what the callers inside the
+// runtime are trusted with is decided here instead. Two things are, and the
+// door above leaves both to whoever calls it.
+//
+// NOTE: The WITNESS, which the boundary has none of — a Descriptor is JSON and
+// a conformance is a value, so nothing that crosses carries one. The universal
+// structural comparison stands in, branded `structural` because for every kind
+// whose keys encode it decides exactly what the standard library's own `is`
+// decides, which is the claim the encoding itself is written on. It is the
+// stand-in `Generators.ts` builds a drawn Dictionary with, for the same reason
+// and under the same limit: what it can not stand in for is an `is` a Namespace
+// wrote, and a key Type carrying one can be handed keys this door puts in two
+// slots that Namespace calls one. `describe.ts` says so where it describes the
+// shape, which is where a reader meets the boundary.
+//
+// NOTE: And a DUPLICATE key, which is ANSWERED rather than merged. A `Map`
+// tells its keys apart by `===` where a Dictionary tells them apart by the key
+// Type's own equality, so `1` and `1n` are two Map keys and one Dictionary key
+// — and `Dictionary.of`'s "a later entry wins" is a rule about a List a Program
+// wrote, not about a Map a host believes it is handing over whole. Losing an
+// entry a host wrote is the one thing the boundary may not do.
+//
+// NOTE: The POSITION of the offending entry rather than a thrown Error, because
+// the sentence that names it is the marshaller's: it knows the path the value
+// stands at — `argument 1 → [3].key` — and an Error built in here would name a
+// place no host could find. A `number` can not be mistaken for the Dictionary
+// beside it, which is the whole of what the two answers have to keep apart.
+export function createDictionaryFrom(
+	entries: Array<[AnyType, AnyType]>,
+): DictionaryType<AnyType, AnyType> | number {
+	let store = emptyStore<AnyType, AnyType>()
+
+	registerDictionaryKind()
+
+	for (let index = 0; index < entries.length; index++) {
+		let entry = entries[index]
+		let key = entry[0]
+		let encoded = encodeKey(key, boundaryEquatable)
+
+		if (
+			slotInFreshStore(store, key, encoded, boundaryEquatable) !==
+			undefined
+		) {
+			return index
+		}
+
+		openFreshSlot(store, key, encoded, entry[1])
+	}
+
+	return boxAt(store, 0, store.slots.length)
+}
+
+// NOTE: Held at the top level rather than built per call, and free there for
+// the reason `registerDictionaryKind` is a call rather than a line at the top
+// of this file: an object literal of arrows is a side effect no bundler has to
+// keep, so a Program that never reaches the door above carries neither it nor
+// the comparison behind it.
+const boundaryEquatable: EquatableWitness<AnyType> = {
+	is: (first, second) => createBoolean(anyIs(first, second)),
+	isNot: (first, second) => createBoolean(!anyIs(first, second)),
+	structural: true,
 }
 
 // NOTE: The three doors a native that GATHERS a Dictionary comes through, and

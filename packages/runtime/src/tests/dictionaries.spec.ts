@@ -5,6 +5,7 @@ import { createBoolean } from "../Boolean"
 import type { DictionaryType, EntryRecord, Slot } from "../Dictionary"
 import {
 	createDictionary,
+	createDictionaryFrom,
 	entries as entriesOf,
 	everyEntry,
 	is as dictionaryIs,
@@ -128,6 +129,18 @@ const dictionary = (
 
 const entry = (key: AnyType, value: AnyType): EntryRecord<AnyType, AnyType> =>
 	createRecord({ key, value }) as EntryRecord<AnyType, AnyType>
+
+// NOTE: The Dictionary `createDictionaryFrom` answered with, where the test is
+// about what it built rather than about the duplicate key it can answer instead.
+const built = (
+	answer: DictionaryType<AnyType, AnyType> | number,
+): DictionaryType<AnyType, AnyType> => {
+	if (typeof answer === "number") {
+		throw new Error(`the entry at ${answer} held a duplicate key`)
+	}
+
+	return answer
+}
 
 // NOTE: The written form is what the order tests assert against, because it
 // says the two things they are about in one line — which entries are live, and
@@ -1649,6 +1662,69 @@ describe("construction", () => {
 				valueAt(held, createRecord({ id: integer(1) }), byIdentifier),
 			),
 		).toBe(2)
+	})
+
+	// NOTE: The door the JavaScript boundary comes through, which decides the
+	// two things `createDictionary` leaves to its caller: the witness, and what
+	// a duplicate key means. A host hands over a `Map`, whose keys are told
+	// apart by `===`, and two of those can be one key here.
+	test("createDictionaryFrom builds with the structural equality", () => {
+		let held = built(
+			createDictionaryFrom([
+				[text("alex"), integer(39)],
+				[text("sam"), integer(25)],
+			]),
+		)
+
+		expect(writtenForm(held)).toBe(`["alex" = 39, "sam" = 25]`)
+		// NOTE: Encoded rather than scanned, which is what the brand on the
+		// witness buys: a store built through an unbranded one carries slots
+		// with no encoding at all.
+		expect(held.store.unencoded).toBe(0)
+	})
+
+	test("createDictionaryFrom answers the position of a duplicate key", () => {
+		expect(
+			createDictionaryFrom([
+				[text("a"), integer(1)],
+				[text("b"), integer(2)],
+				[text("a"), integer(9)],
+			]),
+		).toBe(2)
+		// NOTE: The two pairs a `Map` holds apart and a Dictionary does not: an
+		// Integer beside the whole Rational it equals, and the two spellings of
+		// one accented String.
+		expect(
+			createDictionaryFrom([
+				[integer(1), text("first")],
+				[createRational(1n, 1n), text("second")],
+			]),
+		).toBe(1)
+		expect(
+			createDictionaryFrom([
+				[text(composedAccent), integer(1)],
+				[text(decomposedAccent), integer(2)],
+			]),
+		).toBe(1)
+	})
+
+	// NOTE: A key of a kind with no encoding is found by the scan the witness
+	// answers, so a duplicate is caught there as well as where the index can
+	// see one.
+	test("createDictionaryFrom catches a duplicate the scan path finds", () => {
+		expect(
+			createDictionaryFrom([
+				[createList([integer(1), integer(2)]), text("first")],
+				[createList([integer(1), integer(2)]), text("second")],
+			]),
+		).toBe(1)
+	})
+
+	test("createDictionaryFrom builds the empty Dictionary", () => {
+		let held = built(createDictionaryFrom([]))
+
+		expect(lengthOf(held).value).toBe(0)
+		expect(writtenForm(held)).toBe("[=]")
 	})
 })
 
