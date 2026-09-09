@@ -7,10 +7,6 @@
 §
 § Keep it broken. If a change makes one of these compile, the Diagnostic it
 § was showcasing no longer has a home.
-§
-§ Each `#Value` arm draws an `ambiguous-case` beside the showcased Diagnostic,
-§ because `Optional` and `Result` both declare a Case of that name and a
-§ position that decides no Type decides neither Choice.
 
 implementation {
 	function count (_ found: Optional<Integer>) -> Integer {
@@ -24,7 +20,7 @@ implementation {
 	§ Declaration writes no annotation, and the `define` writes no arrow.
 	constant fetched = define {
 		as #Empty if skipped
-		as #Value(1) otherwise
+		as Optional<Integer>#Value(1) otherwise
 	}
 
 	§ define-without-answer-type — and the position that can not be annotated at
@@ -32,6 +28,6 @@ implementation {
 	§ not decided before they are read, and an Argument hands nothing down.
 	constant total = count(define {
 		as #Empty if skipped
-		as #Value(2) otherwise
+		as Optional<Integer>#Value(2) otherwise
 	})
 }
