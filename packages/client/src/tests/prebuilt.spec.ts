@@ -19,6 +19,7 @@ import {
 import {
 	carriesDictionary,
 	describeModule,
+	describeTypes,
 } from "@essence-lang/compiler/embed/describe"
 import { canonicalPath } from "@essence-lang/compiler/modules"
 
@@ -65,7 +66,10 @@ async function build(entryPath: string, name: string): Promise<string> {
 	let compiled = await compileToMemory(entry, {
 		transformSources: (sources) =>
 			withRuntimeBridge(sources, {
-				dictionary: carriesDictionary(descriptor),
+				dictionary: carriesDictionary(
+					descriptor,
+					describeTypes(linked.surface, entry),
+				),
 			}),
 		outputFileName: bundlePath,
 	})
@@ -347,6 +351,46 @@ export {
 			["alex", 39n],
 			["added", 9n],
 		])
+		expect(readFileSync(bundle, "utf8")).toContain("createDictionaryFrom")
+	})
+
+	// NOTE: And the other direction of the same decision, which is the one that
+	// costs bytes rather than answers: `esc` leaves the door out of a bundle
+	// whose boundary names no Dictionary. Without this, a gate that stopped
+	// deciding anything would put 15,655 B of store and key encoding into every
+	// embedded bundle and nothing in the suite would notice.
+	it("leaves the Dictionary door out of a pair that names none", async () => {
+		let built = path.join(directory, "plain")
+		let bundle = path.join(built, "Plain.js")
+		let source = path.join(directory, "Plain.es")
+
+		writeFileSync(
+			source,
+			`implementation {
+
+	function twice(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+}
+
+export {
+	twice
+}
+`,
+		)
+
+		let run = esc("build", source, "-o", bundle, "--embed", "--quiet")
+
+		expect(run.code).toBe(0)
+
+		let code = readFileSync(bundle, "utf8")
+
+		expect(code).not.toContain("createDictionaryFrom")
+		expect(code).not.toContain("liveEntriesOf")
+
+		let module = await loadPrebuilt(bundle)
+
+		expect((module.exports.twice as (value: bigint) => bigint)(3n)).toBe(6n)
 	})
 
 	// NOTE: The Descriptor `esc` wrote and the one an in-memory compile of the

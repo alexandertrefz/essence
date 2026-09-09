@@ -478,6 +478,11 @@ async function writeDeclarations(
 export function wrapperFor(
 	entryPath: string,
 	descriptor: ModuleDescriptor,
+	// NOTE: The Types the Module declares, because the door question is asked of
+	// the WHOLE boundary — a Module whose only Dictionary sits in an exported
+	// `type` publishes it in the declaration file, and a host marshalling
+	// against that Type needs the door the values alone would not have asked for.
+	types: ReadonlyArray<DeclaredType>,
 	options: WrapperOptions = {},
 ): string {
 	let embedded =
@@ -489,7 +494,7 @@ export function wrapperFor(
 	// neither of the two Functions one crosses through, and so carries none of
 	// the store behind them into the host's build.
 	let modules = runtimeBridgeModules({
-		dictionary: carriesDictionary(descriptor),
+		dictionary: carriesDictionary(descriptor, types),
 	})
 	let runtimeImports = modules.map(
 		([fileName]) =>

@@ -18,7 +18,12 @@ import type { OptimiserOptions } from "@essence-lang/compiler/optimiser"
 import { type RuntimeBridge, runtimeBridgeOf } from "./bridge"
 import { bundlePath, cacheBundle, cachedBundle, cacheDirectory } from "./cache"
 import { EssenceCompileError } from "./compile-error"
-import { createMarshaller, describeModule, type Marshaller } from "./descriptor"
+import {
+	createMarshaller,
+	describeModule,
+	describeTypes,
+	type Marshaller,
+} from "./descriptor"
 import { bind } from "./marshal-runtime"
 
 // NOTE: Essence from JavaScript, in one call: a path to a `.es` file goes in and
@@ -153,6 +158,7 @@ export async function attemptLoad(
 			withRuntimeBridge(sources, {
 				dictionary: carriesDictionary(
 					describeModule(linked.surface, entry),
+					describeTypes(linked.surface, entry),
 				),
 			}),
 		// NOTE: The bundle is going to be written into the cache directory, and

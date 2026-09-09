@@ -848,16 +848,32 @@ export function describeTypes(
 // NOTE: Whether any position of this Module's boundary is a Dictionary, which
 // is what decides whether its bundle carries the two runtime Functions a
 // Dictionary crosses through — see `RUNTIME_BRIDGE_MODULES`. It is asked of the
-// whole Descriptor rather than of the exported Types alone for the reason the
-// interpreter's own bare-Case table is: a Dictionary a Module never exports by
-// name still reaches a host through the Type of something it does, and a
-// boundary that names one anywhere has to be able to cross it everywhere.
+// values AND of the declared Types, because both halves are the boundary: a
+// Dictionary a Module never exports by name still reaches a host through the
+// Type of something it does, and a Module whose only Dictionary sits in an
+// exported `type` publishes it in the declaration file and hands it to a host
+// marshalling against `surface.types`. A boundary that names one anywhere has
+// to be able to cross it everywhere.
+//
+// NOTE: Both are Parameters rather than one `describeModule` answer, because
+// `ModuleDescriptor` is the VALUE side alone — it is what a
+// `<name>.descriptor.json` holds and what the marshaller reads — and the
+// declared Types are described beside it by every injector already.
 //
 // NOTE: The answer is DERIVED from the Descriptor rather than carried in it. It
 // is a fact about a Module the Compiler can work out whenever it is asked, and a
 // `<name>.descriptor.json` that stated it as well would be a second copy that
 // could go stale against the tree it is about.
-export function carriesDictionary(module: ModuleDescriptor): boolean {
+export function carriesDictionary(
+	module: ModuleDescriptor,
+	types: ReadonlyArray<DeclaredType>,
+): boolean {
+	for (let declared of types) {
+		if (declared.of !== null && reachesDictionary(declared.of)) {
+			return true
+		}
+	}
+
 	for (let entry of Object.values(module.exports)) {
 		switch (entry.kind) {
 			case "constant":
@@ -934,7 +950,16 @@ function reachesDictionary(descriptor: Descriptor): boolean {
 					reachesDictionary(parameter.of),
 				) || reachesDictionary(descriptor.returns)
 			)
-		default:
+		// NOTE: Every remaining kind spelled out rather than left to a bare
+		// `default`, so a Descriptor kind added later has to be answered here
+		// instead of falling through as "reaches none" — the failure of which
+		// is a bundle with no door for a boundary that needs one, and a value
+		// refused at run time with a sentence blaming a stale bundle.
+		case "integer":
+		case "rational":
+		case "string":
+		case "boolean":
+		case "refused":
 			return false
 	}
 }

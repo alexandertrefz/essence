@@ -629,6 +629,56 @@ export {
 	})
 })
 
+// NOTE: The door question is asked of the WHOLE boundary — the exported values
+// AND the exported Types. A Module whose only Dictionary sits in a declared
+// Type exports no value that names one, so a walk over the values alone left it
+// doorless while the declaration file published `Map<string, bigint>` and the
+// Marshaller refused a host's Map with a sentence blaming a bundle from another
+// compile.
+describe("A Dictionary the boundary names only in a Type", () => {
+	it("crosses against the declared Type it was published under", async () => {
+		await withProject(
+			{
+				"Ledger.es": `implementation {
+	type Ledger = { entries: Dictionary<String, Integer> }
+
+	function count() -> Integer {
+		<- 1
+	}
+}
+
+export {
+	Ledger
+	count
+}
+`,
+			},
+			async (directory) => {
+				let ledger = await loadModule(
+					path.join(directory, "Ledger.es"),
+					{ cacheDirectory },
+				)
+				let crossed = ledger.marshaller.fromJS(
+					{ entries: new Map([["alex", 39n]]) },
+					ledger.surface.types.Ledger!,
+					"argument 1",
+				)
+				let entries = (crossed as Record<string, unknown>).entries
+
+				expect(ledger.marshaller.toJS(entries, "value")).toBeInstanceOf(
+					Map,
+				)
+				expect([
+					...(ledger.marshaller.toJS(entries, "value") as Map<
+						string,
+						bigint
+					>),
+				]).toEqual([["alex", 39n]])
+			},
+		)
+	})
+})
+
 // NOTE: A Choice whose every Case is payload-less crosses as the bare NAME of
 // the Case — `"Up"`, never `{ $case: 'Direction#Up' }` — in both directions. It
 // is the one shape whose JavaScript spelling was chosen for the HOST rather

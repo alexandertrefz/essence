@@ -18,6 +18,7 @@ import {
 	carriesDictionary,
 	type Descriptor,
 	describeModule,
+	describeTypes,
 } from "../embed/describe"
 import { hashGraph } from "../embed/hash"
 import {
@@ -55,6 +56,24 @@ async function withProject<Result>(
 	} finally {
 		rmSync(directory, { recursive: true, force: true })
 	}
+}
+
+// NOTE: The door question as every injector asks it — of the values AND of the
+// declared Types, because both halves are the boundary. Written once here so a
+// module added below can not accidentally ask only half of it.
+async function carriesDictionaryFor(
+	directory: string,
+	name: string,
+): Promise<boolean> {
+	let entry = path.join(directory, name)
+	let result = await compileToMemory(entry)
+
+	expect(result.diagnostics).toEqual([])
+
+	return carriesDictionary(
+		describeModule(result.surface, entry),
+		describeTypes(result.surface, entry),
+	)
 }
 
 // NOTE: The fixture Program prints three lines as it runs, and importing the
@@ -390,27 +409,121 @@ export {
 					{ kind: "integer", shown: "Integer" },
 				)
 				expect(node?.shown).toBe("Dictionary<String, Integer>")
-				expect(carriesDictionary(described)).toBeTrue()
+				expect(
+					carriesDictionary(
+						described,
+						describeTypes(result.surface, entry),
+					),
+				).toBeTrue()
 
 				// NOTE: Asked of the whole boundary rather than of the exported
 				// Types alone: this Module's only Dictionary is reached through
 				// a List, inside a Function's Parameter, which is a position no
 				// export names.
-				let reached = path.join(directory, "Reached.es")
-				let inside = await compileToMemory(reached)
-
-				expect(inside.diagnostics).toEqual([])
 				expect(
-					carriesDictionary(describeModule(inside.surface, reached)),
+					await carriesDictionaryFor(directory, "Reached.es"),
+				).toBeTrue()
+				expect(
+					await carriesDictionaryFor(directory, "Plain.es"),
+				).toBeFalse()
+			},
+		)
+	})
+
+	// NOTE: One Module per arm of the walk, each with its ONLY Dictionary behind
+	// that arm. A broken arm is not a smaller bundle: the door is missing for a
+	// boundary that needs it, and the marshaller refuses a legal value at run
+	// time with a sentence blaming a bundle from another compile.
+	//
+	// NOTE: The Case arm needs a Choice of TWO Cases. A one-Case Choice reaches
+	// its Case through `describeModule`'s own `choice` export arm, and a Union
+	// of Cases reaches it through `union`, so neither would isolate `case`.
+	it("finds a Dictionary behind every arm of the walk", async () => {
+		await withProject(
+			{
+				"ThroughOptional.es": `implementation {
+	function found(_ value: Optional<Dictionary<String, Integer>>) -> Integer {
+		<- 1
+	}
+}
+
+export {
+	found
+}
+`,
+				"ThroughRecord.es": `implementation {
+	function found(_ value: { sizes: Dictionary<String, Integer> }) -> Integer {
+		<- 1
+	}
+}
+
+export {
+	found
+}
+`,
+				"ThroughCase.es": `implementation {
+	choice Holder {
+		Sizes { sizes: Dictionary<String, Integer> },
+		Empty,
+	}
+
+	function found(_ value: Holder) -> Integer {
+		<- 1
+	}
+}
+
+export {
+	found
+}
+`,
+				"ThroughUnion.es": `implementation {
+	type Either = Dictionary<String, Integer> | String
+
+	function found(_ value: Either) -> Integer {
+		<- 1
+	}
+}
+
+export {
+	found
+}
+`,
+				"ThroughType.es": `implementation {
+	type Ledger = { entries: Dictionary<String, Integer> }
+
+	function count() -> Integer {
+		<- 1
+	}
+}
+
+export {
+	Ledger
+	count
+}
+`,
+			},
+			async (directory) => {
+				expect(
+					await carriesDictionaryFor(directory, "ThroughOptional.es"),
+				).toBeTrue()
+				expect(
+					await carriesDictionaryFor(directory, "ThroughRecord.es"),
+				).toBeTrue()
+				expect(
+					await carriesDictionaryFor(directory, "ThroughCase.es"),
+				).toBeTrue()
+				expect(
+					await carriesDictionaryFor(directory, "ThroughUnion.es"),
 				).toBeTrue()
 
-				let plain = path.join(directory, "Plain.es")
-				let other = await compileToMemory(plain)
-
-				expect(other.diagnostics).toEqual([])
+				// NOTE: And the half the values alone can not see. Nothing this
+				// Module exports as a VALUE names a Dictionary — the door is
+				// owed to the declared Type, which the declaration file
+				// publishes as a `Map<string, bigint>` and a host marshals
+				// against through `surface.types`.
 				expect(
-					carriesDictionary(describeModule(other.surface, plain)),
-				).toBeFalse()
+					await carriesDictionaryFor(directory, "ThroughType.es"),
+				).toBeTrue()
 			},
 		)
 	})

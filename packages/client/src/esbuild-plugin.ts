@@ -208,6 +208,7 @@ export function essenceEsbuild(options: PluginOptions = {}): EsbuildPlugin {
 					contents: wrapperFor(
 						compiled.entryPath,
 						compiled.descriptor,
+						compiled.types,
 						options,
 					),
 					loader: "js",

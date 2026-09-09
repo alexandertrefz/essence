@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test"
 import {
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	realpathSync,
 	rmSync,
 	writeFileSync,
@@ -795,6 +796,72 @@ export {
 						fieldOf(edited.raw.value as EssenceValue, "value"),
 					).toBe(2)
 				})
+			},
+		)
+	})
+
+	// NOTE: The Dictionary door is 15,655 B of runtime — the two Functions a
+	// Dictionary crosses through, and behind them the store and the key
+	// encoding — and a bundle carries it only where the boundary names one.
+	// This is the loader's own injector, which is the one every browser host
+	// goes through; the wrapper's is asked the same question in `plugin.spec`.
+	//
+	// NOTE: A cache directory of its own per half is load-bearing rather than
+	// tidy: the bundle hash deliberately does NOT name the door, so a shared
+	// cache would answer for both directions and neither assertion would be
+	// about what this load decided.
+	it("caches the Dictionary door only where the boundary names one", async () => {
+		await withProject(
+			{
+				"Plain.es": `implementation {
+	function twice(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+}
+
+export {
+	twice
+}
+`,
+				"Ledger.es": `implementation {
+	function ages(_ value: Dictionary<String, Integer>) -> Dictionary<String, Integer> {
+		<- value
+	}
+}
+
+export {
+	ages
+}
+`,
+			},
+			async (project) => {
+				let bundleOf = async (name: string): Promise<string> => {
+					return await withProject({}, async (directory) => {
+						await loadModule(path.join(project, name), {
+							cacheDirectory: directory,
+						})
+
+						let bundles = (await readdir(directory)).filter(
+							(entry) => entry.endsWith(".mjs"),
+						)
+
+						expect(bundles).toHaveLength(1)
+
+						return readFileSync(
+							path.join(directory, bundles[0]!),
+							"utf8",
+						)
+					})
+				}
+				let plain = await bundleOf("Plain.es")
+
+				expect(plain).not.toContain("createDictionaryFrom")
+				expect(plain).not.toContain("liveEntriesOf")
+
+				let carrying = await bundleOf("Ledger.es")
+
+				expect(carrying).toContain("createDictionaryFrom")
+				expect(carrying).toContain("liveEntriesOf")
 			},
 		)
 	})

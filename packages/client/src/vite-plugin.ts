@@ -226,7 +226,12 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 			await declare(compiled, "javascript")
 			served(this, compiled.files)
 
-			return wrapperFor(compiled.entryPath, compiled.descriptor, options)
+			return wrapperFor(
+				compiled.entryPath,
+				compiled.descriptor,
+				compiled.types,
+				options,
+			)
 		},
 	}
 }
