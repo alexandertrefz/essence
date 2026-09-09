@@ -261,6 +261,26 @@ describe("the character classes", () => {
 	})
 })
 
+// NOTE: A count is never negative, and the entries say so, so the answer
+// reaches a Parameter that asks for the proof. The refinement erases before
+// anything runs — what this reads back is that the Program compiles at all.
+describe("a counted proof", () => {
+	it("spends a count where a proven Integer is asked for", async () => {
+		expect(
+			await run(`implementation {
+				function double(_ count: NonNegativeInteger) -> Integer {
+					<- count::multiply(with 2)
+				}
+
+				Terminal.inspect(double("banana"::count(of "an")))
+				Terminal.inspect(
+					double("bAnana"::count(of "an", comparing #Insensitive)),
+				)
+			}`),
+		).toEqual(["4", "4"])
+	})
+})
+
 describe("a folded search", () => {
 	it("finds a part under either case over either route", async () => {
 		expect(

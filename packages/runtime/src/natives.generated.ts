@@ -134,9 +134,9 @@ export type StringNatives = {
 	split__overload$2: (self: StringType, on: StringType) => ListType<StringType>
 	// split(on: NonEmptyString, atMost: PositiveInteger) -> NonEmptyList
 	split__overload$5: (self: StringType, on: StringType, atMost: IntegerType) => ListType<StringType>
-	// count(of: String) -> Integer
+	// count(of: String) -> NonNegativeInteger
 	count__overload$1: (self: StringType, of: StringType) => IntegerType
-	// count(of: String, comparing: CaseSensitivity) -> Integer
+	// count(of: String, comparing: CaseSensitivity) -> NonNegativeInteger
 	count__overload$2: (self: StringType, of: StringType, comparing: CaseSensitivityType) => IntegerType
 	// uppercase() -> String
 	uppercase: (self: StringType) => StringType
