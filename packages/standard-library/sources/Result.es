@@ -173,7 +173,9 @@ declarations {
 
 		§§ Answers the value, held in an Optional, or the given fallback in its place.
 		§§
-		§§ @returns — the value, or nothing where the Result failed.
+		§§ The `defaultingTo:` entry answers the given value in place of the failure, and answers a bare value rather than an Optional.
+		§§
+		§§ @returns — the value the Result holds.
 		overload value {
 			§§ Answers the value, held in an Optional.
 			§§
@@ -289,7 +291,7 @@ declarations {
 
 		§§ Answers the Result when its value passes the check, and the given failure otherwise.
 		§§
-		§§ A failed Result answers the same failure, and the check does not run. This is `Optional::keep(where:)` with a reason for the values it drops.
+		§§ A failed Result answers the same failure, and the check does not run. This is `Optional::keep(where:)` with a reason for the values it drops. The reason is read whether or not the check refuses.
 		§§
 		§§ @param where — the question asked of the value
 		§§ @param failingWith — the reason to fail with where the value does not pass
@@ -312,7 +314,7 @@ declarations {
 
 		§§ Answers the Result when it holds a value, and the given Result otherwise.
 		§§
-		§§ A chain of calls reads as a list of fallbacks, and the first value in it decides the answer. The reason of a receiver that failed is dropped.
+		§§ A chain of calls reads as a list of fallbacks, and the first value in it decides the answer. The reason of a receiver that failed is dropped. The Argument is read whether or not the receiver failed.
 		§§
 		§§ @example
 		§§   constant failed: Result<Integer, String> = #Failure("gone")
@@ -357,7 +359,7 @@ declarations {
 	{
 		§§ Answers the inner Result, one level down.
 		§§
-		§§ A failed outer Result answers that failure.
+		§§ A failed outer Result answers that failure. Where the two levels fail with different Types, the answer fails with both of them joined into one Type.
 		§§
 		§§ @returns — the flattened Result.
 		flatten() -> Result<ValueType, FailureType> {
