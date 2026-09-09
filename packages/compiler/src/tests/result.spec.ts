@@ -745,7 +745,10 @@ describe("Result", () => {
 		// NOTE: `#Value` is declared by two builtin Choices now, so a position
 		// that decides neither is `ambiguous-case` rather than a silent choice
 		// of whichever the Compiler met first. Both Choices are named in the
-		// Diagnostic's helps, which is what makes it actionable.
+		// Diagnostic's helps, which is what makes it actionable — and both are
+		// generic, so each Help asks for the Type Arguments as well as the
+		// Choice: the bare `Result#Value` it would otherwise offer resolves the
+		// ambiguity and then meets `undecided-type-arguments`.
 		it("refuses a bare #Value that nothing decides", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				constant carried = #Value(3)
@@ -755,7 +758,7 @@ describe("Result", () => {
 				"ambiguous-case",
 			)
 			expect(diagnostics.flatMap(({ helps }) => helps)).toContain(
-				"Write 'Result#Value' to pick 'Result'.",
+				"Write 'Result<…>#Value' with its Type Arguments to pick 'Result'.",
 			)
 		})
 

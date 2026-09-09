@@ -12565,11 +12565,7 @@ function resolveBareCaseReference(
 			},
 		)
 	} else {
-		reportAmbiguousCase(
-			caseName,
-			candidates.map((candidate) => candidate.choice),
-			"in scope",
-		)
+		reportAmbiguousCase(caseName, candidates, "in scope")
 	}
 
 	return { type: "Error" }
@@ -12599,11 +12595,7 @@ function resolveCaseInExpectedType(
 	}
 
 	if (candidates.length > 1) {
-		reportAmbiguousCase(
-			caseName,
-			candidates.map((candidate) => candidate.choice),
-			"in the expected Type",
-		)
+		reportAmbiguousCase(caseName, candidates, "in the expected Type")
 
 		return { type: "Error" }
 	}
@@ -13877,11 +13869,7 @@ function resolveCaseMatcherType(
 			},
 		)
 	} else {
-		reportAmbiguousCase(
-			node.caseName,
-			candidates.map((candidate) => candidate.choice),
-			"in the matched Union",
-		)
+		reportAmbiguousCase(node.caseName, candidates, "in the matched Union")
 	}
 
 	return { type: "Error" }
@@ -16199,16 +16187,28 @@ export function resolveNamespaceDefinitionStatementType(
 // and the whole point of the Diagnostic is that they can not tell the two
 // Choices apart.
 //
-// NOTE: Handed the Choices' identities, since every caller has Cases rather than
+// NOTE: A GENERIC Choice's name alone is not a spelling that compiles. The bare
+// `Optional#Value` a reader would write from the Help resolves the ambiguity and
+// then meets `undecided-type-arguments`, because a Choice's Type Parameters are
+// applied and never inferred — so the Help says the Type Arguments belong there
+// too, and shows the ellipsis rather than the Parameter names: those are the
+// declaration's own names and are not in scope at the call, and writing one back
+// is `unknown-type`. Only the ambiguity is this Diagnostic's to answer, which is
+// why the Help names the shape and leaves the Arguments to the reader.
+//
+// NOTE: Handed the candidate CASES, since every caller has Cases rather than
 // written names in hand, and spelling them out is this function's business: what
 // a reader has to write to pick one is the Choice's name, never the Module path
-// its identity carries in front of it.
+// its identity carries in front of it — plus whether that Choice is generic,
+// which only the Case knows.
 function reportAmbiguousCase(
 	caseName: parser.IdentifierNode,
-	choiceIdentities: Array<string>,
+	candidates: Array<common.CaseType>,
 	where: string,
 ): void {
-	let choiceNames = choiceIdentities.map(displayChoiceName)
+	let choiceNames = candidates.map((candidate) =>
+		displayChoiceName(candidate.choice),
+	)
 
 	reportError(
 		`Case '#${caseName.content}' is declared by more than one Choice`,
@@ -16231,10 +16231,13 @@ function reportAmbiguousCase(
 			// builtin Choice, `#Empty` and `#Value` collide with names a
 			// Program is likely to declare, where the builtin is the one it
 			// almost certainly did NOT mean.
-			helps: choiceNames.map(
-				(choiceName) =>
-					`Write '${choiceName}#${caseName.content}' to pick '${choiceName}'.`,
-			),
+			helps: candidates.map((candidate) => {
+				let choiceName = displayChoiceName(candidate.choice)
+
+				return candidate.choiceGenerics === undefined
+					? `Write '${choiceName}#${caseName.content}' to pick '${choiceName}'.`
+					: `Write '${choiceName}<…>#${caseName.content}' with its Type Arguments to pick '${choiceName}'.`
+			}),
 		},
 	)
 }

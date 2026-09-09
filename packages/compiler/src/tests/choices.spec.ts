@@ -1373,6 +1373,38 @@ describe("Choices", () => {
 				])
 			})
 
+			// NOTE: The Help has to ask for the Type Arguments where the Choice
+			// it names is generic, because picking the Choice is only half of
+			// what the position is missing: `Optional#Empty` written from a Help
+			// that stopped at the name resolves the ambiguity and then meets
+			// `undecided-type-arguments`, whose own Help asks for the Arguments.
+			// The ellipsis stands in for them rather than the Choice's Parameter
+			// names, which are not in scope here and are `unknown-type` written
+			// back. A non-generic Choice is offered the bare name, since that
+			// spelling is the whole answer there.
+			it("asks a generic Choice's Help for the Type Arguments too", () => {
+				expect(
+					helpsOf(`implementation { ${box}
+						constant empty = #Empty
+					}`),
+				).toEqual([
+					"Write 'Optional<…>#Empty' with its Type Arguments to pick 'Optional'.",
+					"Write 'Box<…>#Empty' with its Type Arguments to pick 'Box'.",
+				])
+
+				expect(
+					helpsOf(`implementation {
+						choice Colour { Red, Blue }
+						choice Shade { Red, Dark }
+
+						constant red = #Red
+					}`),
+				).toEqual([
+					"Write 'Colour#Red' to pick 'Colour'.",
+					"Write 'Shade#Red' to pick 'Shade'.",
+				])
+			})
+
 			it("takes the decision from an annotation", () => {
 				expect(
 					messagesOf(`implementation { ${box}
