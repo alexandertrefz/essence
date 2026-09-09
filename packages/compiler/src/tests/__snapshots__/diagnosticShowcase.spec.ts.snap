@@ -1749,7 +1749,8 @@ Error: Nothing can generate a (_ String) -> Integer
      │                                     ──────────────┬─────────────  
      │                                                   ╰─────────────── nothing knows how to build a (_ String) -> Integer
      │ 
-     │ Help: Write a Type a value can be built of, or declare a 'Generatable' conformance for this one.
+     │ Help 1: Write a Type a value can be built of, or declare a 'Generatable' conformance for this one.
+     │ Help 2: Write 'shrink' in the conformance as well: 'Generatable' provides one that answers no candidates, and a counterexample is otherwise reported as it was drawn.
      │ 
      │ Note: A property test generates a value of every Parameter's Type, once per case.
 ─────╯

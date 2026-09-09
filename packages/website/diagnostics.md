@@ -775,6 +775,31 @@ namespace Team for Team is Generatable {
 }
 ```
 
+A conformance decides how a counterexample SHRINKS as well as how a value is
+drawn. `Generatable` provides a second Method for that, and the provided body
+answers no candidates at all — so a Namespace that writes none reports whatever
+the source drew. Writing one gets the small report back:
+
+```essence
+namespace Team for Team is Generatable {
+	static generate(from source: Randomness) -> Team {
+		<- { name = source::pick(from ["Lions", "Tigers", "Bears"]) }
+	}
+
+	shrink() -> List<Team> {
+		if @.name::is("Lions") {
+			<- []
+		} else {
+			<- [{ name = "Lions" }]
+		}
+	}
+}
+```
+
+The runner tries the candidates in the order the List holds them, keeps the
+first one that fails as well, and asks that value for its own — so a body whose
+smallest candidate comes first is walked down in one pass.
+
 ### `ungeneratable-contract`
 
 A remark rather than a mistake. `essence test --contracts` reads every Method a
