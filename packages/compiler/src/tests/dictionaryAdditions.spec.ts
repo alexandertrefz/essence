@@ -393,4 +393,85 @@ describe("Dictionary additions", () => {
 			).toEqual(["0", "true", "true"])
 		})
 	})
+
+	describe("Removing several keys", () => {
+		it("takes out every key it is handed", async () => {
+			expect(
+				await run(`implementation {
+					${ages}
+					constant noKeys: List<String> = []
+
+					Terminal.inspect(ages::remove(atEvery ["sam", "kim"])::toString())
+					Terminal.inspect(ages::remove(atEvery noKeys)::toString())
+					Terminal.inspect(ages::remove(atEvery ages::keys())::toString())
+				}`),
+			).toEqual([
+				'"[\\"alex\\" = 39]"',
+				'"[\\"alex\\" = 39, \\"sam\\" = 25, \\"kim\\" = 25]"',
+				'"[=]"',
+			])
+		})
+
+		// NOTE: A key nothing holds changes nothing and a key named twice is
+		// removed once, which is `remove(at:)`'s own rule folded over a List.
+		it("is lenient about a repeated key and an absent one", async () => {
+			expect(
+				await run(`implementation {
+					${ages}
+
+					Terminal.inspect(
+						ages::remove(atEvery ["sam", "sam", "nobody"])::toString(),
+					)
+					Terminal.inspect(ages::remove(atEvery ["nobody"])::is(ages))
+				}`),
+			).toEqual(['"[\\"alex\\" = 39, \\"kim\\" = 25]"', "true"])
+		})
+
+		// NOTE: Every Method here is a Query, and a fold of removals is where
+		// that is easiest to get wrong: the receiver has to answer what it
+		// answered before, whatever the answer holds.
+		it("leaves the receiver holding what it held", async () => {
+			expect(
+				await run(`implementation {
+					${ages}
+					constant without = ages::remove(atEvery ["sam", "kim"])
+
+					Terminal.inspect(ages::toString())
+					Terminal.inspect(without::toString())
+					Terminal.inspect(ages::length())
+				}`),
+			).toEqual([
+				'"[\\"alex\\" = 39, \\"sam\\" = 25, \\"kim\\" = 25]"',
+				'"[\\"alex\\" = 39]"',
+				"3",
+			])
+		})
+
+		// NOTE: The claim the fold rests on, over a receiver big enough for
+		// the store to repack under it: what is left is exactly the keys the
+		// caller did not name, in the order they had.
+		it("leaves exactly the keys it was not handed", async () => {
+			expect(
+				await run(`implementation {
+					constant pairs = List.of(integersFrom 1, through 400)
+						::map((n) { <- { key = n, value = n } })
+					constant sample = Dictionary.of(pairs)
+					constant gone = List.of(integersFrom 1, through 400, by 3)
+					constant left = sample::remove(atEvery gone)
+
+					Terminal.inspect(left::length())
+					Terminal.inspect(left::hasEntries(where ({ key, value }) {
+						<- gone::contains(key)
+					}))
+					Terminal.inspect(
+						left::is(sample::removeEvery(where ({ key, value }) {
+							<- gone::contains(key)
+						})),
+					)
+					Terminal.inspect(left::keys()::firstItem())
+					Terminal.inspect(sample::length())
+				}`),
+			).toEqual(["266", "false", "true", "Optional#Value(2)", "400"])
+		})
+	})
 })

@@ -4690,6 +4690,7 @@ third"::lines())
 	§ this section builds its `[empty]` answers from is a List annotated where
 	§ it stands. Written down, the empty Dictionary is `[=]`.
 	constant noPairs: List<{ key: String, value: Integer }> = []
+	constant noKeys: List<String> = []
 	constant ages          = Dictionary.of([
 		{ key = "alex", value = 39 },
 		{ key = "sam", value = 25 },
@@ -4910,6 +4911,24 @@ third"::lines())
 	show(
 		"Dictionary.remove<ValueType, KeyType is Equatable>(at: KeyType) [absent]",
 		ages::remove(at "kim"),
+	)
+	§ The plural entry removes a key it is handed twice once, and leaves a key
+	§ nothing holds alone. The empty List is the receiver back.
+	show(
+		"Dictionary.remove<ValueType, KeyType is Equatable>(atEvery: List<KeyType>)",
+		ages::remove(atEvery ["alex", "kim"]),
+	)
+	show(
+		"Dictionary.remove<ValueType, KeyType is Equatable>(atEvery: List<KeyType>) [repeated and absent]",
+		ages::remove(atEvery ["alex", "alex", "kim"]),
+	)
+	show(
+		"Dictionary.remove<ValueType, KeyType is Equatable>(atEvery: List<KeyType>) [nothing named]",
+		ages::remove(atEvery noKeys),
+	)
+	show(
+		"Dictionary.remove<ValueType, KeyType is Equatable>(atEvery: List<KeyType>) [every key]",
+		ages::remove(atEvery ages::keys()),
 	)
 	§ Every callback here is handed the entry Record, so a Pattern takes it
 	§ apart where it stands.

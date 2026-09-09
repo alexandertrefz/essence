@@ -635,7 +635,7 @@ export type DictionaryNatives = {
 	// set<ValueType, KeyType is Equatable>(_: KeyType, to: ValueType) -> NonEmptyDictionary
 	set: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: KeyType, to: ValueType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
 	// remove<ValueType, KeyType is Equatable>(at: KeyType) -> Dictionary<KeyType, ValueType>
-	remove: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, at: KeyType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
+	remove__overload$1: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, at: KeyType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
 	// removeEvery<KeyType, ValueType>(where: (_: { key: KeyType, value: ValueType }) -> Boolean) -> Dictionary<KeyType, ValueType>
 	removeEvery: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, where: (argument0: RecordType & { key: KeyType; value: ValueType }) => BooleanType) => DictionaryType<KeyType, ValueType>
 	// everyEntry<KeyType, ValueType>(where: (_: { key: KeyType, value: ValueType }) -> Boolean) -> Dictionary<KeyType, ValueType>
@@ -1110,7 +1110,7 @@ export const $NonEmptyKeyedNumberListAbsent: AssertNoEssenceExports<typeof impor
 
 declare const DictionaryModule: typeof import("./Dictionary")
 export const $Dictionary: DictionaryNatives = DictionaryModule
-export const $DictionaryAbsent: AssertNoEssenceExports<typeof import("./Dictionary"), "hasEntries__overload$1" | "hasEntries__overload$2" | "hasKey" | "hasValue" | "hasOnlyEntries" | "hasNoEntries" | "value__overload$2" | "update__overload$1" | "update__overload$2" | "merge__overload$1" | "merge__overload$2" | "count"> = true
+export const $DictionaryAbsent: AssertNoEssenceExports<typeof import("./Dictionary"), "hasEntries__overload$1" | "hasEntries__overload$2" | "hasKey" | "hasValue" | "hasOnlyEntries" | "hasNoEntries" | "value__overload$2" | "update__overload$1" | "update__overload$2" | "remove__overload$2" | "merge__overload$1" | "merge__overload$2" | "count"> = true
 export const $DictionaryArity: AssertArities<typeof import("./Dictionary"), {
 	of: 2
 	is: 4
@@ -1122,7 +1122,7 @@ export const $DictionaryArity: AssertArities<typeof import("./Dictionary"), {
 	values: 1
 	entries: 1
 	set: 4
-	remove: 3
+	remove__overload$1: 3
 	removeEvery: 2
 	everyEntry: 2
 	map: 2

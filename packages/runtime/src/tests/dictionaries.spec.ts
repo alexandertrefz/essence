@@ -13,7 +13,7 @@ import {
 	length as lengthOf,
 	map as mapEntries,
 	of as dictionaryOf,
-	remove as removeAt,
+	remove__overload$1 as removeAt,
 	removeEvery,
 	set as setAt,
 	TOMBSTONE,

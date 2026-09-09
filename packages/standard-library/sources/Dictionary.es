@@ -313,15 +313,52 @@ declarations {
 			}
 		}
 
-		§§ Answers a new Dictionary without the given key.
+		§ The plural entry is a fold of the singular one. A removal is one
+		§ lookup and one tombstone, and the store repacks once its dead
+		§ versions outnumber its slots. So the fold costs a walk of the keys
+		§ the caller named and one repack. The alternative was
+		§ `removeEvery(where (entry) { <- keys::contains(entry.key) })`, which
+		§ walks every entry and asks the List about each. Five hundred rounds
+		§ of removing ten keys from a thousand-entry Dictionary measured 26 ms
+		§ here and 52 ms that way. Both figures are the best of three, with the
+		§ subprocess startup inside.
+
+		§§ Answers a new Dictionary without the given key, or without every key of the given List.
 		§§
-		§§ A key that is not there answers the receiver unchanged. Equality is the keys' own `is`.
+		§§ A key that is not there changes nothing. Equality is the keys' own `is`.
 		§§
-		§§ @param at — the key to remove
-		§§ @returns — the Dictionary without that entry.
-		remove<infer KeyType is Equatable>(
-			at key: KeyType,
-		) -> Dictionary<KeyType, ValueType>
+		§§ @returns — the Dictionary without those entries.
+		overload remove {
+			§§ Answers a new Dictionary without the given key.
+			§§
+			§§ A key that is not there answers the receiver unchanged. Equality is the keys' own `is`.
+			§§
+			§§ @param at — the key to remove
+			§§ @returns — the Dictionary without that entry.
+			<infer KeyType is Equatable>(
+				at key: KeyType,
+			) -> Dictionary<KeyType, ValueType>
+
+			§§ Answers a new Dictionary without any of the given keys.
+			§§
+			§§ A key that is not there changes nothing, and a key written down twice is removed once. The empty List answers the receiver unchanged. The entries that are left keep the order they had. Equality is the keys' own `is`.
+			§§
+			§§ @param atEvery — the keys to remove
+			§§ @returns — the Dictionary without those entries.
+			<infer KeyType is Equatable>(
+				atEvery keys: List<KeyType>,
+			) -> Dictionary<KeyType, ValueType> {
+				§ The fold starts from the receiver, which is already a
+				§ Dictionary of the answer's Types, and `reduce` binds what it
+				§ carries from there. See DEVELOPMENT.md, Why bodies look the
+				§ way they do.
+				constant mine = @
+
+				<- keys::reduce(startingWith mine, (kept, key) {
+					<- kept::remove(at key)
+				})
+			}
+		}
 
 		§ The filter and its complement are native for the reason `map` is.
 		§ The answer reuses the receiver's key encodings rather than encoding
