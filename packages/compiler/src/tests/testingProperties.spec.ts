@@ -92,8 +92,8 @@ function generatorOf(
 function shapeOf(generator: common.typed.TestGenerator): unknown {
 	return JSON.parse(
 		JSON.stringify(generator, (key, value: unknown) => {
-			if (key === "call") {
-				return "<call>"
+			if (key === "call" || key === "shrink") {
+				return `<${key}>`
 			}
 
 			if (key === "checks") {
@@ -576,6 +576,12 @@ describe("Property tests", () => {
 				name: "Team",
 				binding: expect.any(String) as unknown as string,
 				call: "<call>",
+				// NOTE: And the other half of the conformance, which is what
+				// says how a value it drew is made smaller. `Generatable`
+				// provides a body answering no candidates, so a Namespace that
+				// writes none still carries the call.
+				shrinkBinding: expect.any(String) as unknown as string,
+				shrink: "<shrink>",
 			})
 		})
 
@@ -591,6 +597,71 @@ describe("Property tests", () => {
 			}`)
 
 			expect(counterexampleOf(events).team).toMatch(/"(Lions|Tigers)"/)
+		})
+
+		// NOTE: One Namespace written twice, with a `shrink` and without, so
+		// that the difference between the two reports below is that Method and
+		// nothing else. Every value it draws fails the property the tests ask.
+		function counting(shrinking = ""): string {
+			return `type Counter = { count: Integer }
+
+				namespace Counter for Counter is Generatable {
+					static generate(from source: Randomness) -> Counter {
+						<- { count = source::drawInteger(between 50, and 100) }
+					}
+
+					${shrinking}
+				}`
+		}
+
+		// NOTE: The other half of the conformance. A Namespace that writes
+		// `shrink` is asked for the smaller values its counterexample is
+		// reported as, and the runner walks them the way it walks the
+		// structural ones: the first candidate that fails as well is kept, and
+		// then asked for its own. The body below steps down by one, so the
+		// report names the smallest failing count rather than the drawn one.
+		it("shrinks a counterexample through the conformance's own shrink", async () => {
+			let { events } = await run(`implementation {
+				${counting(`shrink() -> List<Counter> {
+					if @.count::isGreaterThan(0) {
+						<- [{ count = @.count::subtract(1) }]
+					} else {
+						<- []
+					}
+				}`)}
+			}
+
+			tests {
+				test "a counter is small" for any (counter: Counter) {
+					expect counter.count::isLessThan(10)
+				}
+			}`)
+			let [property] = propertyEvents(events)
+
+			expect(counterexampleOf(events).counter).toBe("{ count = 10 }")
+			expect(property?.shrinks).toBeGreaterThan(0)
+		})
+
+		// NOTE: And a Namespace that writes none keeps `Generatable`'s own
+		// body, which answers no candidates — so the value stands as it was
+		// drawn, which is what a conformance answered before it could say
+		// anything else.
+		it("reports a drawn value as it stands where the Namespace writes no shrink", async () => {
+			let { events } = await run(`implementation {
+				${counting()}
+			}
+
+			tests {
+				test "a counter is small" for any (counter: Counter) {
+					expect counter.count::isLessThan(10)
+				}
+			}`)
+			let [property] = propertyEvents(events)
+
+			expect(property?.shrinks).toBe(0)
+			expect(counterexampleOf(events).counter).toMatch(
+				/^\{ count = (5|6|7|8|9|10)[0-9] \}$/,
+			)
 		})
 	})
 
@@ -787,7 +858,11 @@ describe("Property tests", () => {
 			expect(javaScript).toContain("$es_Integer_isEven($candidate")
 		})
 
-		it("emits a Generatable conformance as a closure of the source", () => {
+		// NOTE: Both halves of the conformance, each a closure of the one name
+		// it binds — the source a draw reads, and the value a shrink is asked
+		// about. The Namespace below writes no `shrink`, so the second closure
+		// calls the Protocol's provided body, which is a call like any other.
+		it("emits a Generatable conformance as closures of its two halves", () => {
 			let javaScript = generate(
 				`implementation {
 					type Team = { name: String }
@@ -805,6 +880,34 @@ describe("Property tests", () => {
 			expect(javaScript).toContain('kind: "generated"')
 			expect(javaScript).toContain("generate:")
 			expect(javaScript).toContain("Team.generate(")
+			expect(javaScript).toContain("shrink:")
+			expect(javaScript).toContain("$es_Generatable__shrink(")
+		})
+
+		// NOTE: And a Namespace that writes one is called on its own Method
+		// instead, which is the override rule as every other provided Method
+		// follows it.
+		it("emits a written shrink as the Namespace's own call", () => {
+			let javaScript = generate(
+				`implementation {
+					type Team = { name: String }
+
+					namespace Team for Team is Generatable {
+						static generate(from source: Randomness) -> Team {
+							<- { name = "Lions" }
+						}
+
+						shrink() -> List<Team> {
+							<- [{ name = "Ants" }]
+						}
+					}
+				}
+
+				${sectionOf("team: Team", "expect team.name::is(team.name)")}`,
+			)
+
+			expect(javaScript).toContain("Team.shrink(")
+			expect(javaScript).not.toContain("$es_Generatable__shrink(")
 		})
 	})
 

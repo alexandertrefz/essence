@@ -75,10 +75,16 @@ export type Generator =
 			checks: Array<(value: AnyType) => { value: boolean }>
 			narrowing: Narrowing
 	  }
+	// NOTE: A Namespace's own `Generatable` conformance, both halves of it:
+	// `generate` builds a value, and `shrink` answers the smaller values a
+	// failing one is reported as instead. `shrink` is `Generatable`'s provided
+	// Method where the Namespace writes none, and answers an empty List there,
+	// so every conformance carries one and only a written body says anything.
 	| {
 			kind: "generated"
 			name: string
 			generate: (source: RandomnessType) => AnyType
+			shrink: (value: AnyType) => AnyType
 	  }
 
 // NOTE: The witness a Dictionary is built with where the PLAN carries none.
@@ -603,7 +609,12 @@ export function mutate(
 		// NOTE: A Namespace's own generator says how to BUILD a value and
 		// nothing about what one is made of, so the nearest thing to a
 		// neighbour of one is another value it built. It is the same silence
-		// `shrink` and `encode` answer with, for the same reason.
+		// `encode` answers with, for the same reason.
+		//
+		// NOTE: Its `shrink` is no neighbourhood either. What that answers is
+		// SMALLER values, and a search that stepped towards them would walk one
+		// way only — down, away from the values a property has yet to be asked
+		// about.
 		case "generated":
 			return generator.generate(source)
 	}
@@ -895,11 +906,21 @@ export function shrink(
 			)
 		}
 		// NOTE: A Namespace's own generator says how to BUILD a value and
-		// nothing about what a smaller one is, so a counterexample it drew is
-		// reported as it was drawn. Declaring a conformance is declaring that
-		// the structure is nobody else's business.
+		// nothing about what a smaller one is, so the conformance is asked:
+		// `Generatable::shrink` is the half of it that answers that, in the
+		// order the body wrote them. A Namespace that writes none keeps the
+		// Protocol's provided body, which answers no candidates, and a
+		// counterexample it drew is reported as it was drawn.
+		//
+		// NOTE: A candidate that IS the failing value is dropped, the way
+		// `shrinkWhole` drops the value it was handed. Such a candidate can not
+		// be a smaller counterexample, and a body that answers its receiver
+		// where it can go no smaller would otherwise spend the whole shrink
+		// budget re-running the property on the value it already has.
 		case "generated":
-			return []
+			return itemsOf(generator.shrink(value)).filter(
+				(candidate) => !anyIs(candidate, value),
+			)
 	}
 }
 
@@ -907,6 +928,12 @@ export function shrink(
 // all. It is what a Union shrinks TOWARDS — a `#Value(…)` reported as `#Empty`
 // is the shortest true thing a report can say — and what nothing answers for a
 // Namespace's own generator or for a refinement no small value satisfies.
+//
+// NOTE: A conformance answering `shrink` does not change that. A shrink is
+// asked about a value it makes smaller, and this is asked about a Type with no
+// value in hand: drawing one to shrink would answer whatever the source drew,
+// which is a value of the arm rather than the smallest one, and a Union would
+// then trade a small counterexample for a random value of a simpler arm.
 export function minimal(
 	generator: Generator,
 	narrowing: Narrowing = {},

@@ -569,6 +569,7 @@ describe("the composite encoding agrees with the structural comparison", () => {
 		kind: "generated",
 		name,
 		generate: (source) => choices[below(source, choices.length)]!,
+		shrink: () => createList([]),
 	})
 	const integers = oneOf("Integer", [integer(0), integer(1), integer(-2)])
 	const rationals = oneOf("Rational", [

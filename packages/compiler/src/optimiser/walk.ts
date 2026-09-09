@@ -268,8 +268,11 @@ function walkGenerator(
 
 	if (generator.kind === "generated") {
 		let call = walkExpression(generator.call, rewrites)
+		let shrink = walkExpression(generator.shrink, rewrites)
 
-		return call === generator.call ? generator : { ...generator, call }
+		return call === generator.call && shrink === generator.shrink
+			? generator
+			: { ...generator, call, shrink }
 	}
 
 	return generator

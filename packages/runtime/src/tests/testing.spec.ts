@@ -1876,6 +1876,7 @@ describe("The failing-example corpus", () => {
 							kind: "generated",
 							name: "Team",
 							generate: () => string("Lions"),
+							shrink: () => createList([]),
 						},
 					},
 				}),

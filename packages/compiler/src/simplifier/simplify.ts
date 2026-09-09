@@ -1947,6 +1947,8 @@ function simplifyTestGenerator(
 				name: generator.name,
 				binding: generator.binding,
 				call: simplifyExpression(generator.call),
+				shrinkBinding: generator.shrinkBinding,
+				shrink: simplifyExpression(generator.shrink),
 			}
 		default:
 			return generator

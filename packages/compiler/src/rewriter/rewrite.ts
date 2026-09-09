@@ -8330,6 +8330,15 @@ function testGenerator(
 					"generate",
 					generatorClosure(generator.binding, generator.call),
 				),
+				// NOTE: The other half of the conformance: what a value it drew
+				// is reported as instead, where the Namespace wrote a `shrink`.
+				// It is emitted even where the Namespace wrote none, because
+				// the Protocol's provided body is a call like any other — one
+				// that answers an empty List.
+				property(
+					"shrink",
+					generatorClosure(generator.shrinkBinding, generator.shrink),
+				),
 			)
 
 			break

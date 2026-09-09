@@ -4883,9 +4883,16 @@ function predicateArgument(
 	}
 }
 
-// NOTE: A Namespace conforming to `Generatable`, as the call an author could
-// have written — `Team.generate(from <source>)`. The conformance replaces the
-// structural answer entirely, which is the whole point of declaring one.
+// NOTE: A Namespace conforming to `Generatable`, as the calls an author could
+// have written — `Team.generate(from <source>)` and `<drawn>::<Team>shrink()`.
+// The conformance replaces the structural answer entirely, which is the whole
+// point of declaring one.
+//
+// NOTE: Both halves are enriched here, in the Scope the test was written in, so
+// that a conformance which draws a value also says how a failing one gets
+// smaller. `shrink` is `Generatable`'s provided Method where the Namespace
+// writes none, and answers no candidates there — which is what a conformance
+// cost before it could be written at all.
 function generatableConformance(
 	type: common.Type,
 	scope: enricher.Scope,
@@ -4947,11 +4954,52 @@ function generatableConformance(
 			continue
 		}
 
+		let drawn = synthesizedName("drawn", position)
+		// NOTE: The Namespace is named AT the call, for the reason a predicate
+		// names its own: a Program may declare a second Namespace for the same
+		// Type that writes a `shrink`, and a call that named neither would be
+		// ambiguous where the conformance is not.
+		let shrinking: parser.MethodInvocationNode = {
+			nodeType: "MethodInvocation",
+			base: { nodeType: "Identifier", content: drawn, position },
+			member: {
+				nodeType: "Identifier",
+				content: GENERATABLE_SHRINK,
+				position,
+			},
+			namespaceSpecifier: {
+				nodeType: "Identifier",
+				content: name,
+				position,
+			},
+			arguments: [],
+			position,
+		}
+		let drawnScope = childScope(scope, {
+			members: { [drawn]: type },
+			declarations: { [drawn]: position },
+			constants: new Set([drawn]),
+		})
+		let shrunk = collectDiagnostics(() =>
+			enrichExpression(shrinking, drawnScope),
+		)
+
+		// NOTE: A conformance whose `shrink` does not resolve is not one this
+		// derivation can use: the Protocol provides the body, so the only way
+		// to reach here is a Namespace whose own `shrink` the conformance check
+		// already refused, and generating through a broken conformance would
+		// report values of a Type nobody agreed on.
+		if (containsErrors(shrunk.diagnostics)) {
+			continue
+		}
+
 		return {
 			kind: "generated",
 			name,
 			binding: source,
 			call: attempt.result,
+			shrinkBinding: drawn,
+			shrink: shrunk.result,
 		}
 	}
 
@@ -4981,6 +5029,7 @@ function targetsExactly(
 const GENERATABLE_PROTOCOL = "Generatable"
 const GENERATABLE_METHOD = "generate"
 const GENERATABLE_LABEL = "from"
+const GENERATABLE_SHRINK = "shrink"
 
 function refuseUngeneratableType(
 	type: common.Type,
