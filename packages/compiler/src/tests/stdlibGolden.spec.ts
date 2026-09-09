@@ -9,8 +9,12 @@ import type { common, enricher } from "@essence-lang/interfaces"
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
 import {
+	derivedEnumerableNamespaceForChoice,
+	derivedEnumerableNamespaceName,
 	derivedEquatableNamespace,
 	derivedPrintableNamespace,
+	enumerableMethodName,
+	enumerableProtocolName,
 } from "../enricher/resolvers"
 import { loadStdlib } from "../enricher/stdlib"
 import { applyGenericBindings } from "../helpers/types"
@@ -228,6 +232,24 @@ function declaredSignatures(): Array<string> {
 			collectDerived(printable)
 		}
 
+		// NOTE: And the Case listing, which no Namespace declares and nobody
+		// declares the conformance for either — it is derived wherever the
+		// target is a Choice whose Cases carry no payload, and a Namespace
+		// writing `cases` replaces it.
+		let enumerable = loadStdlib().protocols[enumerableProtocolName]
+		let listing =
+			enumerable === undefined ||
+			Object.hasOwn(member.methods, enumerableMethodName)
+				? null
+				: derivedEnumerableNamespaceForChoice(
+						member.targetType,
+						enumerable,
+					)
+
+		if (listing !== null) {
+			collectDerived(listing)
+		}
+
 		// NOTE: A Protocol's PROVIDED Methods are Methods of every conformer,
 		// and no Namespace declares them either — so the loop above never sees
 		// them and the harness could quietly stop calling one.
@@ -374,8 +396,16 @@ function callTargetsIn(node: unknown): Set<string> {
 				callee.base.type.type === "Namespace" &&
 				callee.member.nodeType === "Identifier"
 			) {
+				// NOTE: A derived `cases` is a member of no Namespace at all,
+				// and the Rewriter emits it under the derive's own name for
+				// that reason — so the target is what the label names rather
+				// than the Choice the base spells.
 				targets.add(
-					`${callee.base.name}.${demangle(callee.member.name)}`,
+					`${
+						callee.derivedCases === undefined
+							? callee.base.name
+							: derivedEnumerableNamespaceName
+					}.${demangle(callee.member.name)}`,
 				)
 			} else if (callee.nodeType === "Identifier") {
 				// NOTE: A bare free-Function call — `loop(…)` — whose callee is

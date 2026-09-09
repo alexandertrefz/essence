@@ -452,7 +452,7 @@ And a DERIVE answers ahead of a provided Method. A Choice's `isNot` is
 carries as well — so `Ordering#Less::isNot(#Equal)` compares against a sibling
 Case by tag, directly and through a bound alike.
 
-**`Equatable` and `Printable` are both derived for a Choice.** The
+**`Equatable`, `Printable` and `Enumerable` are all derived for a Choice.** The
 conformance is declared and the Methods are left out. Equality is derived for
 EVERY Choice: it compares by tag, and by payload where a Case carries one.
 Printing is derived for a Choice whose Cases all carry no payload, and answers
@@ -462,6 +462,16 @@ unit Cases declares `is Equatable, is Printable` and writes neither Method:
 `Rounding`, `SignStyle`, `SortOrder` and `Stream` are all that shape, and eight
 of the nine have an empty body besides. `Ordering` is the one that does not:
 `then` is a Method of its own, and no conformance offers it.
+
+`Enumerable` follows equality rather than printing: nothing in here declares it,
+and every Choice of payload-free Cases answers `cases()` on its own name —
+`Side.cases()` is `[#Start, #End, #BothEnds]`, in declaration order.
+It is a static, so it is spelled on the Choice rather than on a value, and that
+is the one thing that makes it read differently from the other two: a Choice
+with no Namespace at all still answers, and inside a `<T is Enumerable>` body
+the spelling is `T.cases()`. `Enumerable.es` says why the declaration was left
+out, and the answer is `NonEmptyList<Self>`, which is why the Protocol has a
+file of its own.
 
 Printing is DECLARED where equality is not — a Choice compares by its tags
 whatever anyone says, but how it READS is a decision, so a Choice whose
@@ -786,7 +796,12 @@ it needs a file, a line in `Prelude.es`, and a place in `builtinProtocolOrder`
 (which `stdlibLoader.spec.ts` asserts outright, because that table has no
 second list to cross-check against). A Method it PROVIDES is emitted like any
 other Essence body, so it is also a call-graph Node — `Orderable.clamp` — and
-belongs in `stdlibCallGraph.spec.ts`'s list with the rest.
+belongs in `stdlibCallGraph.spec.ts`'s list with the rest. A Method the COMPILER
+answers for a whole kind of Type is a fourth kind of registration: the three
+derives are named in `enricher/resolvers.ts` (`Choice_Equatable`,
+`Choice_Printable`, `Choice_Enumerable`), fabricated there as Namespaces nobody
+wrote, and redirected to a runtime helper in the Rewriter's `namespaceMember`
+— which is also where `stdlibGolden.spec.ts` has to be told to expect them.
 
 `builtins.spec.ts` cross-checks the first, third and fourth against each other
 and against the Namespaces declared here, so a missing registration is a failing
