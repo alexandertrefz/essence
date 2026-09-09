@@ -12,11 +12,11 @@ export type ContinueType<State extends AnyType> = {
 	state: State
 }
 
-export type DoneType<Result extends AnyType> = {
+export type DoneType<Answer extends AnyType> = {
 	[typeKeySymbol]: "Step#Done"
-	value: Result
+	value: Answer
 }
 
-export type StepType<State extends AnyType, Result extends AnyType> =
+export type StepType<State extends AnyType, Answer extends AnyType> =
 	| ContinueType<State>
-	| DoneType<Result>
+	| DoneType<Answer>

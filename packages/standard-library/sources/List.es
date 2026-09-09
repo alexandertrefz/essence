@@ -727,16 +727,17 @@ declarations {
 			(contentsOf other: List<ItemType>) -> List<ItemType>
 		}
 
-		§ `map` and `reduce` each carry a Method level Generic, and `reduce`
-		§ reads its `Result` from `startingWith`; see DEVELOPMENT.md, Why bodies
-		§ look the way they do. The Namespace's `ItemType` merges in ahead of
-		§ that Generic, so each Method is generic in `[ItemType, Result]`.
+		§ `map` and `reduce` each carry a Method level Generic. The transform's
+		§ answer is `Other`, and the fold carries `Answer`, which `reduce` reads
+		§ from `startingWith`. See DEVELOPMENT.md, Why bodies look the way they
+		§ do. The Namespace's `ItemType` merges in ahead of that Generic, so
+		§ `map` is generic in `[ItemType, Other]`.
 
 		§§ Answers a new List with the given transform applied to every item.
 		§§
 		§§ @param _ — the transform each item is handed to
 		§§ @returns — the List of transformed items.
-		map<infer Result>(_ transform: (_: ItemType) -> Result) -> List<Result>
+		map<infer Other>(_ transform: (_: ItemType) -> Other) -> List<Other>
 
 		§ The second entry can stop early, because its combiner answers with a
 		§ `Step`, which is what lets an Essence expression leave a walk early.
@@ -752,22 +753,22 @@ declarations {
 			§§ @param startingWith — the value the first combination builds on
 			§§ @param _ — the combiner, handed the value so far and each item
 			§§ @returns — the combined value.
-			<infer Result>(
-				startingWith initial: Result,
-				_ combine: (_: Result, _: ItemType) -> Result,
-			) -> Result
+			<infer Answer>(
+				startingWith initial: Answer,
+				_ combine: (_: Answer, _: ItemType) -> Answer,
+			) -> Answer
 
 			§§ Answers the items combined into a single value, starting from the given one, and can stop before the end.
 			§§
-			§§ The `step` combiner answers with a `Step`: `#Continue` carries the value forward, and `#Done` finishes at once with its own value. Both of that `Step`'s Type Parameters are the `Result` here, so a fold stops with the Type it carries. The empty List answers the starting value untouched.
+			§§ The `step` combiner answers with a `Step`: `#Continue` carries the value forward, and `#Done` finishes at once with its own value. Both of that `Step`'s Type Parameters are the `Answer` here, so a fold stops with the Type it carries. The empty List answers the starting value untouched.
 			§§
 			§§ @param startingWith — the value the first combination builds on
 			§§ @param step — the combiner, handed the value so far and each item, answering with a `Step`
 			§§ @returns — the combined value, or the value the first `#Done` carries.
-			<infer Result>(
-				startingWith initial: Result,
-				step combine: (_: Result, _: ItemType) -> Step<Result, Result>,
-			) -> Result
+			<infer Answer>(
+				startingWith initial: Answer,
+				step combine: (_: Answer, _: ItemType) -> Step<Answer, Answer>,
+			) -> Answer
 		}
 
 		§ The filter, and the complement of `removeEvery(where:)`. There is no
@@ -1418,7 +1419,7 @@ declarations {
 	§
 	§ Every entry is native, because the promise can not be said in Essence:
 	§ `<- @::map(transform)` is the right answer and its Type is
-	§ `List<Result>`. Three of them are written in Essence on `List`, and the
+	§ `List<Other>`. Three of them are written in Essence on `List`, and the
 	§ runtime writes those out twice; see DEVELOPMENT.md, Native and Essence in
 	§ one Namespace.
 	§
@@ -1485,9 +1486,9 @@ declarations {
 		§§
 		§§ @param _ — the transform each item is handed to
 		§§ @returns — the List of transformed items, which certainly has something in it.
-		map<infer Result>(
-			_ transform: (_: ItemType) -> Result,
-		) -> NonEmptyList<Result>
+		map<infer Other>(
+			_ transform: (_: ItemType) -> Other,
+		) -> NonEmptyList<Other>
 
 		§ Neither `reverse` nor `sort` adds an item or drops one, so the answer
 		§ is the receiver's own items in another order. All four are `List`'s

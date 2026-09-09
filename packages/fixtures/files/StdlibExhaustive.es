@@ -2395,19 +2395,19 @@ third"::lines())
 		numbers::firstItem()::isEmpty(),
 	)
 	show(
-		"Optional.map<ItemType, ResultType>(_ (_ ItemType) -> ResultType)",
+		"Optional.map<ItemType, Other>(_ (_ ItemType) -> Other)",
 		numbers::firstItem()::map((item) { <- item::multiply(with 10) }),
 	)
 	show(
-		"Optional.map<ItemType, ResultType>(_ (_ ItemType) -> ResultType) [empty]",
+		"Optional.map<ItemType, Other>(_ (_ ItemType) -> Other) [empty]",
 		noNumbers::firstItem()::map((item) { <- item::multiply(with 10) }),
 	)
 	show(
-		"Optional.andThen<ItemType, ResultType>(_ (_ ItemType) -> Optional<ResultType>)",
+		"Optional.andThen<ItemType, Other>(_ (_ ItemType) -> Optional<Other>)",
 		numbers::firstItem()::andThen((item) { <- numbers::item(at item) }),
 	)
 	show(
-		"Optional.andThen<ItemType, ResultType>(_ (_ ItemType) -> Optional<ResultType>) [empty]",
+		"Optional.andThen<ItemType, Other>(_ (_ ItemType) -> Optional<Other>) [empty]",
 		noNumbers::firstItem()::andThen((item) { <- numbers::item(at item) }),
 	)
 	show(
@@ -3200,31 +3200,31 @@ third"::lines())
 		numbers::append(contentsOf noNumbers),
 	)
 	show(
-		"List.map<ItemType, Result>(_ (_ ItemType) -> Result)",
+		"List.map<ItemType, Other>(_ (_ ItemType) -> Other)",
 		numbers::map((item) { <- item::toString() }),
 	)
 	show(
-		"List.map<ItemType, Result>(_ (_ ItemType) -> Result) [empty]",
+		"List.map<ItemType, Other>(_ (_ ItemType) -> Other) [empty]",
 		noNumbers::map((item) { <- item::toString() }),
 	)
 	show(
-		"List.reduce<ItemType, Result>(startingWith: Result, _ (_ Result, _ ItemType) -> Result)",
+		"List.reduce<ItemType, Answer>(startingWith: Answer, _ (_ Answer, _ ItemType) -> Answer)",
 		numbers::reduce(startingWith 0, (total, item) { <- total::add(item) }),
 	)
 	show(
-		"List.reduce<ItemType, Result>(startingWith: Result, _ (_ Result, _ ItemType) -> Result) [empty]",
+		"List.reduce<ItemType, Answer>(startingWith: Answer, _ (_ Answer, _ ItemType) -> Answer) [empty]",
 		noNumbers::reduce(startingWith 0, (total, item) {
 			<- total::add(item)
 		}),
 	)
 	show(
-		"List.reduce<ItemType, Result>(startingWith: Result, step: (_ Result, _ ItemType) -> Step<Result, Result>)",
+		"List.reduce<ItemType, Answer>(startingWith: Answer, step: (_ Answer, _ ItemType) -> Step<Answer, Answer>)",
 		numbers::reduce(startingWith 0, step (total, item) {
 			<- #Continue(total::add(item))
 		}),
 	)
 	show(
-		"List.reduce<ItemType, Result>(startingWith: Result, step: (_ Result, _ ItemType) -> Step<Result, Result>) [early stop]",
+		"List.reduce<ItemType, Answer>(startingWith: Answer, step: (_ Answer, _ ItemType) -> Step<Answer, Answer>) [early stop]",
 		numbers::reduce(startingWith 0, step (total, item) {
 			if total::isGreaterThan(3) {
 				<- #Done(total)
@@ -3234,7 +3234,7 @@ third"::lines())
 		}),
 	)
 	show(
-		"List.reduce<ItemType, Result>(startingWith: Result, step: (_ Result, _ ItemType) -> Step<Result, Result>) [empty]",
+		"List.reduce<ItemType, Answer>(startingWith: Answer, step: (_ Answer, _ ItemType) -> Step<Answer, Answer>) [empty]",
 		noNumbers::reduce(startingWith 0, step (total, item) {
 			<- #Continue(total::add(item))
 		}),
@@ -3973,11 +3973,11 @@ third"::lines())
 	§ is about the length: Strings go in, their lengths come out, and there are
 	§ as many of one as of the other.
 	show(
-		"NonEmptyList.map<ItemType, Result>(_ (_ ItemType) -> Result)",
+		"NonEmptyList.map<ItemType, Other>(_ (_ ItemType) -> Other)",
 		provenWords::map((word) { <- word::length() }),
 	)
 	show(
-		"NonEmptyList.map<ItemType, Result>(_ (_ ItemType) -> Result) [proof carried]",
+		"NonEmptyList.map<ItemType, Other>(_ (_ ItemType) -> Other) [proof carried]",
 		provenWords::map((word) { <- word::length() })::firstItem(),
 	)
 	show("NonEmptyList.reverse<ItemType>()", provenWords::reverse())
@@ -4622,11 +4622,11 @@ third"::lines())
 		ages::everyEntry(where ({ key, value }) { <- key::is("nobody") }),
 	)
 	show(
-		"Dictionary.map<KeyType, ValueType, Result>(_ (_ \{ key: KeyType, value: ValueType \}) -> Result)",
+		"Dictionary.map<KeyType, ValueType, Other>(_ (_ \{ key: KeyType, value: ValueType \}) -> Other)",
 		ages::map(({ key, value }) { <- "{key}:{value}" }),
 	)
 	show(
-		"Dictionary.map<KeyType, ValueType, Result>(_ (_ \{ key: KeyType, value: ValueType \}) -> Result) [empty]",
+		"Dictionary.map<KeyType, ValueType, Other>(_ (_ \{ key: KeyType, value: ValueType \}) -> Other) [empty]",
 		noAges::map(({ key, value }) { <- "{key}:{value}" }),
 	)
 	§ The Argument wins on a key both hold, and a key only the Argument holds
@@ -4736,11 +4736,11 @@ third"::lines())
 		provenAges::entries()::firstItem().key,
 	)
 	show(
-		"NonEmptyDictionary.map<KeyType, ValueType, Result>(_ (_ \{ key: KeyType, value: ValueType \}) -> Result)",
+		"NonEmptyDictionary.map<KeyType, ValueType, Other>(_ (_ \{ key: KeyType, value: ValueType \}) -> Other)",
 		provenAges::map(({ key, value }) { <- value::add(1) }),
 	)
 	show(
-		"NonEmptyDictionary.map<KeyType, ValueType, Result>(_ (_ \{ key: KeyType, value: ValueType \}) -> Result) [proof carried]",
+		"NonEmptyDictionary.map<KeyType, ValueType, Other>(_ (_ \{ key: KeyType, value: ValueType \}) -> Other) [proof carried]",
 		provenAges::map(({ key, value }) { <- value::add(1) })::length(),
 	)
 	§ Setting a key answers this Type on `Dictionary` itself, whatever it was
@@ -4916,7 +4916,7 @@ third"::lines())
 		),
 	)
 	show(
-		"loop<State, Result>(startingWith: State, step: (_ State) -> Step<State, Result>)",
+		"loop<State, Answer>(startingWith: State, step: (_ State) -> Step<State, Answer>)",
 		loop(
 			startingWith { index = 1, total = 0 },
 			step ({ index, total } as state) {

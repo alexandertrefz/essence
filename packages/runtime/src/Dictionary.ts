@@ -1241,15 +1241,15 @@ export function remove<Key extends AnyType, Value extends AnyType>(
 export function map<
 	Key extends AnyType,
 	Value extends AnyType,
-	Result extends AnyType,
+	Other extends AnyType,
 >(
 	dictionary: DictionaryType<Key, Value>,
-	transform: (entry: EntryRecord<Key, Value>) => Result,
-): DictionaryType<Key, Result> {
+	transform: (entry: EntryRecord<Key, Value>) => Other,
+): DictionaryType<Key, Other> {
 	let generation = dictionary.generation
 	let source = dictionary.store.slots
 	let count = source.length
-	let store = emptyStore<Key, Result>()
+	let store = emptyStore<Key, Other>()
 	let slots = store.slots
 
 	registerDictionaryKind()
@@ -1268,7 +1268,7 @@ export function map<
 			value,
 		})
 
-		let fresh: Slot<Key, Result> = {
+		let fresh: Slot<Key, Other> = {
 			key: slot.key,
 			encoded: slot.encoded,
 			versions: [{ value: result, generation: 0 }],

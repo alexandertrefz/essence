@@ -625,12 +625,12 @@ export function append__overload$2<ItemType extends AnyType>(
 	return listSharingFrontOf(target, target.length, originalList)
 }
 
-export function map<ItemType extends AnyType, Result extends AnyType>(
+export function map<ItemType extends AnyType, Other extends AnyType>(
 	originalList: ListType<ItemType>,
-	transform: (item: ItemType) => Result,
-): ListType<Result> {
+	transform: (item: ItemType) => Other,
+): ListType<Other> {
 	let view = viewOf(originalList)
-	let transformed: Array<Result> = []
+	let transformed: Array<Other> = []
 
 	for (let index = view.frontCount - 1; index >= 0; index--) {
 		transformed.push(transform(view.front[index]))
@@ -645,12 +645,12 @@ export function map<ItemType extends AnyType, Result extends AnyType>(
 
 export function reduce__overload$1<
 	ItemType extends AnyType,
-	Result extends AnyType,
+	Answer extends AnyType,
 >(
 	originalList: ListType<ItemType>,
-	startingValue: Result,
-	combine: (accumulator: Result, item: ItemType) => Result,
-): Result {
+	startingValue: Answer,
+	combine: (accumulator: Answer, item: ItemType) => Answer,
+): Answer {
 	let view = viewOf(originalList)
 	let accumulator = startingValue
 
@@ -673,12 +673,12 @@ export function reduce__overload$1<
 // expression can stop a walk partway, and stopping is the whole point.
 export function reduce__overload$2<
 	ItemType extends AnyType,
-	Result extends AnyType,
+	Answer extends AnyType,
 >(
 	originalList: ListType<ItemType>,
-	startingValue: Result,
-	combine: (accumulator: Result, item: ItemType) => StepType<Result, Result>,
-): Result {
+	startingValue: Answer,
+	combine: (accumulator: Answer, item: ItemType) => StepType<Answer, Answer>,
+): Answer {
 	let view = viewOf(originalList)
 	let accumulator = startingValue
 

@@ -15,7 +15,7 @@
 
 implementation {
 	§ wrong-type-argument-count — `Step` takes two Type Arguments, `State` and
-	§ `Result`; one is not enough.
+	§ `Answer`; one is not enough.
 	type OneArgument = Step<Integer>
 
 	§ recursive-generic-choice — a generic Choice may not name itself in a
@@ -24,13 +24,13 @@ implementation {
 		Wrap { inner: Nested<Item> },
 	}
 
-	§ uninferable-type-parameter — the general loop's `Result` is inferred from
+	§ uninferable-type-parameter — the general loop's `Answer` is inferred from
 	§ the `#Done` its callback answers with, and this callback only ever
-	§ answers `#Continue`, so nothing binds `Result`.
+	§ answers `#Continue`, so nothing binds `Answer`.
 	constant never = loop(startingWith 0,
 		step (state) { <- #Continue(state::add(1)) })
 
-	§ unsatisfied-bound — a `Step` whose `Result` is a Function has no equality,
+	§ unsatisfied-bound — a `Step` whose `Answer` is a Function has no equality,
 	§ because a Function is not Equatable; the because-chain names each level of
 	§ the failure.
 	constant boxed: Step<Integer, (_ x: Integer) -> Integer> =

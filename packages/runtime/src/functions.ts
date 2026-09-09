@@ -27,12 +27,12 @@ export function loop__overload$1<State extends AnyType>(
 }
 
 // NOTE: `$4` is the general loop — each step answers with a `Step`. `#Done` stops the
-// loop and its `value` is the Result; `#Continue` carries the next State and the
+// loop and its `value` is the answer; `#Continue` carries the next State and the
 // loop goes again. The tag is read the same way `List.sort` reads an `Ordering`.
-export function loop__overload$4<State extends AnyType, Result extends AnyType>(
+export function loop__overload$4<State extends AnyType, Answer extends AnyType>(
 	state: State,
-	advance: (state: State) => StepType<State, Result>,
-): Result {
+	advance: (state: State) => StepType<State, Answer>,
+): Answer {
 	while (true) {
 		let next = advance(state)
 

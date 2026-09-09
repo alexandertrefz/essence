@@ -369,7 +369,7 @@ not have to know that `Integer.es` carries the same one.
 
 **A Method Generic has to be written `infer`.** A Generic without it never
 enters `bindableNames`, and inference then leaves it unbound. Every Method
-level Generic here is written `<infer Result>` or
+level Generic here is written `<infer Other>` or
 `<infer ItemType is Equatable>`.
 
 **A written literal is its own refinement proof.** The Compiler reads the value
@@ -529,7 +529,7 @@ routing it through the covering `Number::compare` reaches the whole numeric
 tower, and nearly doubled a Program that only compares two Integers.
 `packages/compiler/src/tests/bundleSize.spec.ts` is the guard.
 
-**`reduce` binds `Result` from `startingWith`.** The seed decides the Type the
+**`reduce` binds `Answer` from `startingWith`.** The seed decides the Type the
 fold carries, and it is read before the callback is checked. So a seed that is
 an empty List or an empty Optional is bound to an annotated Constant first,
 and the Constant is what `startingWith` is given:
