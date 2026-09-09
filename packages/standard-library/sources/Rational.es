@@ -982,14 +982,17 @@ declarations {
 		§§ The denominator is always positive, and never zero. So the answer is a PositiveInteger, which fits every position that asks for a NonZeroInteger or a NonNegativeInteger.
 		denominator() -> PositiveInteger
 
+		§ `absolute` is native for the reason `Integer::absolute` is, and it is
+		§ the same trade the Integers made once `NonNegativeInteger` existed.
+		§ The body was an `if` asking `isNegative`. Its `else` proves the
+		§ receiver is not negative, but its other arm answers a negation
+		§ nothing has proven anything about. So the body could only answer a
+		§ bare Rational, where a distance from zero is never negative.
+
 		§§ Answers the Rational without its sign, which is its distance from zero.
-		absolute() -> Rational {
-			if @::isNegative() {
-				<- @::negate()
-			} else {
-				<- @
-			}
-		}
+		§§
+		§§ @returns — the distance, which is never negative.
+		absolute() -> NonNegativeRational
 
 		§§ Answers the Rational with its sign flipped.
 		negate() -> Rational {
@@ -1167,15 +1170,15 @@ declarations {
 	§ one Function under two names and can not drift. Taking the reciprocal
 	§ and negating are written a second time, because the Essence body
 	§ beside each exports nothing to import. See DEVELOPMENT.md, Native and
-	§ Essence in one Namespace. `absolute` alone is Essence. Both of its
-	§ arms carry the proof already, one through `negate` and one as the
-	§ receiver itself.
+	§ Essence in one Namespace. Every entry here is native.
 	§
 	§ Multiplication, negation and the distance from zero close over the
 	§ proof, as they do for the Integers. A product of two Rationals that are
 	§ not zero is never zero. Neither of the other two can reach zero from a
 	§ value that is not. Addition does not, as `1/2` and `-1/2` show, so
-	§ nothing else here is written on it.
+	§ nothing else here is written on it. The distance closes twice over. A
+	§ value that is not zero stands above zero once its sign is dropped,
+	§ which is what `NonZeroInteger::absolute` promises too.
 	namespace NonZeroRational for NonZeroRational {
 		§§ Multiplies this NonZeroRational with another.
 		§§
@@ -1194,16 +1197,10 @@ declarations {
 
 		§§ Answers this NonZeroRational without its sign, which is its distance from zero.
 		§§
-		§§ The receiver is not zero, so its distance from zero is not zero either.
+		§§ The receiver is not zero, so its distance from zero is above zero. So the answer is a PositiveRational.
 		§§
-		§§ @returns — the distance, which is not zero.
-		absolute() -> NonZeroRational {
-			if @::isNegative() {
-				<- @::negate()
-			} else {
-				<- @
-			}
-		}
+		§§ @returns — the distance, which is above zero.
+		absolute() -> PositiveRational
 
 		§§ Answers the reciprocal of this NonZeroRational.
 		§§

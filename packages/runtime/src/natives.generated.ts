@@ -315,6 +315,8 @@ export type RationalNatives = {
 	numerator: (self: RationalType) => IntegerType
 	// denominator() -> PositiveInteger
 	denominator: (self: RationalType) => IntegerType
+	// absolute() -> NonNegativeRational
+	absolute: (self: RationalType) => RationalType
 }
 
 export type NonZeroRationalNatives = {
@@ -322,6 +324,8 @@ export type NonZeroRationalNatives = {
 	multiply: (self: RationalType, argument1: RationalType) => RationalType
 	// numerator() -> NonZeroInteger
 	numerator: (self: RationalType) => IntegerType
+	// absolute() -> PositiveRational
+	absolute: (self: RationalType) => RationalType
 	// reciprocal() -> NonZeroRational
 	reciprocal: (self: RationalType) => RationalType
 	// negate() -> NonZeroRational
@@ -944,7 +948,7 @@ export const $PositiveIntegerArity: AssertArities<typeof import("./PositiveInteg
 
 declare const RationalModule: typeof import("./Rational")
 export const $Rational: RationalNatives = RationalModule
-export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "of__overload$3" | "parse__overload$1" | "parse__overload$2" | "is__overload$1" | "is__overload$2" | "isNot__overload$1" | "isNot__overload$2" | "toString__overload$1" | "toString__overload$6" | "add__overload$2" | "add__overload$3" | "add__overload$4" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "multiply__overload$2" | "multiply__overload$3" | "multiply__overload$4" | "divide__overload$2" | "divide__overload$4" | "divide__overload$5" | "divide__overload$6" | "remainder__overload$1" | "remainder__overload$2" | "remainder__overload$3" | "quotient__overload$1" | "quotient__overload$2" | "quotient__overload$3" | "raise__overload$2" | "squareRoot__overload$2" | "isLessThan__overload$1" | "isLessThan__overload$2" | "isLessThanOrEqualTo__overload$1" | "isLessThanOrEqualTo__overload$2" | "isGreaterThan__overload$1" | "isGreaterThan__overload$2" | "isGreaterThanOrEqualTo__overload$1" | "isGreaterThanOrEqualTo__overload$2" | "isWholeNumber" | "isPositive" | "isNegative" | "isZero" | "absolute" | "negate" | "reciprocal__overload$1" | "reciprocal__overload$2" | "round__overload$1" | "round__overload$2" | "approximate" | "toRational"> = true
+export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "of__overload$3" | "parse__overload$1" | "parse__overload$2" | "is__overload$1" | "is__overload$2" | "isNot__overload$1" | "isNot__overload$2" | "toString__overload$1" | "toString__overload$6" | "add__overload$2" | "add__overload$3" | "add__overload$4" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "multiply__overload$2" | "multiply__overload$3" | "multiply__overload$4" | "divide__overload$2" | "divide__overload$4" | "divide__overload$5" | "divide__overload$6" | "remainder__overload$1" | "remainder__overload$2" | "remainder__overload$3" | "quotient__overload$1" | "quotient__overload$2" | "quotient__overload$3" | "raise__overload$2" | "squareRoot__overload$2" | "isLessThan__overload$1" | "isLessThan__overload$2" | "isLessThanOrEqualTo__overload$1" | "isLessThanOrEqualTo__overload$2" | "isGreaterThan__overload$1" | "isGreaterThan__overload$2" | "isGreaterThanOrEqualTo__overload$1" | "isGreaterThanOrEqualTo__overload$2" | "isWholeNumber" | "isPositive" | "isNegative" | "isZero" | "negate" | "reciprocal__overload$1" | "reciprocal__overload$2" | "round__overload$1" | "round__overload$2" | "approximate" | "toRational"> = true
 export const $RationalArity: AssertArities<typeof import("./Rational"), {
 	of__overload$1: 2
 	of__overload$2: 2
@@ -964,14 +968,15 @@ export const $RationalArity: AssertArities<typeof import("./Rational"), {
 	squareRoot__overload$1: 1
 	numerator: 1
 	denominator: 1
+	absolute: 1
 }> = true
 
 declare const NonZeroRationalModule: typeof import("./NonZeroRational")
 export const $NonZeroRational: NonZeroRationalNatives = NonZeroRationalModule
-export const $NonZeroRationalAbsent: AssertNoEssenceExports<typeof import("./NonZeroRational"), "absolute"> = true
 export const $NonZeroRationalArity: AssertArities<typeof import("./NonZeroRational"), {
 	multiply: 2
 	numerator: 1
+	absolute: 1
 	reciprocal: 1
 	negate: 1
 }> = true

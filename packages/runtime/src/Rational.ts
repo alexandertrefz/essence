@@ -236,6 +236,24 @@ export function denominator(rational: RationalType): IntegerType {
 	return createInteger(reducedParts(rational).denominator)
 }
 
+// NOTE: Native so that the answer can be declared a `NonNegativeRational`: a
+// refinement erases before anything runs, and an Essence body could only
+// answer a bare Rational for the arm that negates. The value itself is handed
+// back where it is not negative — the same object, since a Rational is never
+// changed in place — so the ordinary call allocates nothing, and a `4/2` stays
+// four over two rather than turning into its own lowest-terms form. The other
+// arm goes through `createRational`, which is where the sign lives.
+// `NonZeroRational` declares this Function again under its own name, where the
+// same answer is a `PositiveRational`.
+//
+// NOTE: The sign is on the numerator by the invariant `createRational` keeps,
+// so the numerator alone answers which arm this is.
+export function absolute(rational: RationalType): RationalType {
+	return rational.numerator < 0n
+		? createRational(-rational.numerator, rational.denominator)
+		: rational
+}
+
 export function raise__overload$1(
 	rational: RationalType,
 	exponent: IntegerType,
