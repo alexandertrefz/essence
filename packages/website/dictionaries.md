@@ -59,6 +59,18 @@ Two entries with equal keys collapse into one: the later value wins, and the
 key keeps the place of its first occurrence — which is the same rule as
 writing the same key twice in a Literal.
 
+A Program that has only the KEYS hands them over with a Function answering each
+value:
+
+```essence
+constant widths = Dictionary.of(["alex", "sam"], valuedBy (name) {
+	<- name::length()
+})
+```
+
+`widths` is `["alex" = 4, "sam" = 3]`. The Function is asked once for each key,
+in the order the keys stand in.
+
 ## Updating a Dictionary
 
 `[original with … ]` answers a new Dictionary with some keys set:
@@ -113,6 +125,13 @@ constant count = ages::length()
 constant empty = nobody::isEmpty()
 ```
 
+`hasValue(_:)` asks after the other half of an entry. A key is found through
+the store in one step and a value is not, so this one walks:
+
+```essence
+constant anyoneIs39 = ages::hasValue(39)
+```
+
 ### The three halves
 
 A Dictionary is read as its keys, its values, or its entries — each in the
@@ -126,6 +145,15 @@ constant pairs = ages::entries()
 
 `entries()` is the one that keeps the two together, and its items are the
 Record every callback below is handed.
+
+`firstEntry()` reads the first of them without building the rest, and answers
+an Optional because the empty Dictionary has none. Its `defaultingTo:` entry
+answers an entry of the caller's in its place:
+
+```essence
+constant first = ages::firstEntry()
+constant either = nobody::firstEntry(defaultingTo { key = "", value = 0 })
+```
 
 ## Changing a Dictionary
 
@@ -168,6 +196,14 @@ holding what the receiver held:
 constant without = ages::remove(at "sam")
 ```
 
+Its `atEvery:` entry takes a List of keys out at once, under the same rules: a
+key that is not there changes nothing, a key named twice is removed once, and
+the empty List answers the receiver:
+
+```essence
+constant fewer = ages::remove(atEvery ["sam", "kim"])
+```
+
 ## The entry Record
 
 Every callback a Dictionary Method takes is handed the whole entry, so a
@@ -199,13 +235,50 @@ constant once = counts::removeEvery(where ({ key, value }) {
 keep the order they had, whichever way round the question was asked.
 
 `hasEntries(where:)` asks whether ANY entry is accepted, and stops at the entry
-that decides the answer:
+that decides the answer. `hasOnlyEntries(where:)` asks whether EVERY entry is,
+`hasNoEntries(where:)` whether NO entry is, and `count(where:)` how many:
 
 ```essence
 constant anyRepeat = counts::hasEntries(where ({ key, value }) {
 	<- value::isGreaterThan(1)
 })
+
+constant allRepeat = counts::hasOnlyEntries(where ({ key, value }) {
+	<- value::isGreaterThan(1)
+})
+
+constant repeats = counts::count(where ({ key, value }) {
+	<- value::isGreaterThan(1)
+})
 ```
+
+Each name reads true on the empty Dictionary: it has no entry to accept, so
+`hasEntries` is `false` there, and no entry to fail the other two, so both are
+`true`.
+
+## Ordering
+
+A Dictionary IS ordered — it answers its halves in the order the keys were
+first set, and prints in that order — so putting it in another order is a
+question it can answer. `sort()` orders by the keys themselves:
+
+```essence
+constant byName = ages::sort()
+```
+
+`sort(on:)` orders by a key read off each entry, and both take a direction:
+
+```essence
+constant youngestFirst = ages::sort(on .value)
+constant oldestFirst = ages::sort(on .value, in #Descending)
+```
+
+The sort is stable in either direction, so two entries whose keys compare equal
+keep the order they had. A direction is `#Ascending` when a call names none,
+and descending turns the comparison around rather than reversing the answer.
+
+There is no `by:` entry taking a comparison, which is where this parts from
+`List::sort` — what a key decides is what a Dictionary is ordered by.
 
 ## Merging
 
@@ -265,11 +338,13 @@ if ages::hasEntries() {
 What the proof buys is the Methods that answer better for having it.
 `length()` answers a `PositiveInteger`; `keys()`, `values()` and `entries()`
 answer a `NonEmptyList`, so `firstItem()` on one of them is a value rather than
-an Optional; and `map` carries the proof through, since it answers one value
-per entry:
+an Optional; `firstEntry()` answers the entry itself rather than an Optional;
+and `map` and `sort` carry the proof through, since a transformed value and a
+reordering are both one answer per entry:
 
 ```essence
 constant best = ratings::values()::firstItem()
+constant opening = ratings::sort()::firstEntry()
 ```
 
 Since `set` answers the proof, a Variable that is to hold a plain Dictionary

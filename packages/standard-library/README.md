@@ -62,7 +62,7 @@ it and the `Terminal.ask` that is a prompt and a line (`Terminal.es`).
 `Randomness.seeded(_)` for a run that replays (`Randomness.es`).
 
 Three of every five declared Method entries are also IMPLEMENTED here, in
-Essence — 345 of 579 as this is written, counting one entry per Overload and
+Essence — 352 of 592 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
 Seven more are written on a PROTOCOL rather than on a Namespace, once for every
 conformer: `Equatable.isNot`, `Comparable`'s four inequalities, and
@@ -85,12 +85,13 @@ written on top of it, count and cut by grapheme). A fourth group joined those
 three for a measured reason rather than for a reason of principle: a search or
 an ordering whose Essence body built a whole List to answer a question about one
 position. `String.firstIndex`/`lastIndex`/`count(of:)` walk the grapheme view,
-`List.sort`, `List.lastIndex(where:)` and `List.partition` walk the runs, and
-`Dictionary.everyEntry`/`removeEvery` keep the encodings the receiver already
-holds. Each says at its own declaration what it measured. The short-circuiting
-`firstItem(where:)` is not among any of them: it is written in Essence on
-`reduce`'s early-stopping entry, and leaves the walk at the item that decides
-the answer.
+`List.sort`, `List.lastIndex(where:)` and `List.partition` walk the runs,
+`Dictionary.everyEntry`/`removeEvery`/`sort` keep the encodings the receiver
+already holds, and `Dictionary.firstEntry` reads the first entry rather than
+building one per entry to drop all but it. Each says at its own declaration
+what it measured. The short-circuiting `firstItem(where:)` is not among any of
+them: it is written in Essence on `reduce`'s early-stopping entry, and leaves
+the walk at the item that decides the answer.
 
 Three Methods are native for a reason worth reading before assuming otherwise:
 `List.is`, because the pairwise form trips an infinite recursion in generic
