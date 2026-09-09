@@ -18,8 +18,14 @@ import {
 // Namespace, so it binds under the bare name. The numerator is the same read:
 // a Rational is zero exactly when its numerator is, and the receiver is proven
 // not to be, so the Integer `Rational.numerator` answers is a `NonZeroInteger`
-// with nothing to do differently.
-export { multiply__overload$1 as multiply, numerator } from "./Rational"
+// with nothing to do differently. The distance from zero is the same test and
+// the same negation, and a receiver that is not zero puts that distance above
+// it.
+export {
+	absolute,
+	multiply__overload$1 as multiply,
+	numerator,
+} from "./Rational"
 
 // NOTE: `Rational.of(@::numerator()::negate(), over @::denominator())`, which
 // is the Essence body of `Rational::negate`, written a second time for the
