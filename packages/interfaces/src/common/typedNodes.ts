@@ -582,6 +582,12 @@ export interface LookupNode {
 	// The base keeps the name the author wrote, which is why the Rewriter is
 	// told the other one. Absent for every Lookup on a Namespace.
 	conformanceName?: string
+	// NOTE: The Namespace this member is read off, where the base names the
+	// CHOICE and a Namespace of another name writes `cases` for it —
+	// `Colour.cases()` beside `namespace Colours for Colour is Enumerable`. The
+	// base keeps the Type the author named, for the same reason as above.
+	// Absent wherever the base's own spelling is what the member comes off.
+	namespaceName?: string
 }
 
 export interface IdentifierNode {

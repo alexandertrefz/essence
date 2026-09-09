@@ -344,6 +344,7 @@ export type DiagnosticCode =
 	| "redundant-interpolation-to-string"
 	| "ambiguous-conformance"
 	| "nonconforming-namespace"
+	| "undeclared-conformance"
 	| "conformance-needs-target-type"
 	| "default-on-protocol-requirement"
 	| "protocol-bound-function-value"

@@ -2715,6 +2715,12 @@ export function derivedEnumerableNamespaceForChoice(
 // writes a `cases` of its own replaces it, exactly as one writing `is` replaces
 // the derived equality, and a GENERIC Namespace derives nothing, because its
 // target names a Type Parameter no call here binds.
+//
+// NOTE: The replacement holds on every rail only where the Namespace DECLARES
+// the conformance, because the derive a bounded call reaches is built from the
+// Choice and consults no Namespace. Writing the Method undeclared is refused at
+// the declaration — see `reportUndeclaredDerivedConformance` — so this guard
+// and the conformance rail can no longer answer one Program two ways.
 export function derivedEnumerableNamespaceFor(
 	namespace: common.NamespaceType,
 	scope: enricher.Scope,
@@ -4331,7 +4337,120 @@ export function checkProtocolConformance(
 		}
 	}
 
+	reportUndeclaredDerivedConformance(node, namespaceType, scope)
+
 	return checked
+}
+
+// NOTE: The Protocols a Choice answers WITHOUT anybody declaring them.
+// `Printable` is deliberately not among them: its derive answers only where a
+// Namespace has said `is Printable`, so writing `toString` without the clause
+// leaves nothing to disagree with.
+const undeclaredDerivedProtocolNames: ReadonlyArray<string> = [
+	"Equatable",
+	enumerableProtocolName,
+]
+
+// NOTE: A Namespace over a Choice that WRITES one of a derived Protocol's
+// Methods and does not DECLARE the conformance is refused, because the two
+// rails would answer one question two ways: a call naming the Namespace reads
+// the written Method, while a call through a bound reaches the derive — which
+// is built from the Choice and never consults a Namespace nobody declared the
+// clause on. Which of the two a Program got even depended on whether the
+// Namespace happened to share the Choice's name.
+//
+// NOTE: Asked of the derive itself rather than of the target's shape, so this
+// and `derivedConformanceSource` can not drift apart: where the derive answers
+// null nothing is replaced and nothing is reported. Collected, because solving
+// a generic Choice's conformance reports about its payloads, and this question
+// is nobody's but this one's.
+function reportUndeclaredDerivedConformance(
+	node: parser.NamespaceDefinitionStatementNode,
+	namespaceType: common.NamespaceType,
+	scope: enricher.Scope,
+): void {
+	let targetType = namespaceType.targetType
+
+	if (targetType === null) {
+		return
+	}
+
+	let declared = new Set(
+		node.conformsTo.map((clause) => clause.protocol.content),
+	)
+
+	for (let protocolName of undeclaredDerivedProtocolNames) {
+		if (declared.has(protocolName)) {
+			continue
+		}
+
+		let protocol = findProtocolInScope(protocolName, scope)
+
+		if (protocol === null) {
+			continue
+		}
+
+		// NOTE: The Protocol's REQUIREMENTS, and not the Methods it PROVIDES.
+		// A requirement is what the derive answers, so a Namespace writing that
+		// name takes the derive's place on the direct rail while the bound rail
+		// goes on reaching it — the split. A provided Method is answered by the
+		// Protocol's own const, which a Namespace writing that name does not
+		// take away: `namespace Extras for Colour { isNot(_ tag: String) }`
+		// stands beside `Equatable::isNot` on the ladder rather than instead of
+		// it, and shadowing a name that way is a documented thing to do.
+		let written = Object.keys(protocol.methods).filter(
+			(methodName) =>
+				providedMethodProtocol(protocol, methodName) === null &&
+				Object.hasOwn(node.methods, methodName),
+		)
+
+		if (written.length === 0) {
+			continue
+		}
+
+		if (
+			collectDiagnostics(() =>
+				derivedConformanceSource(
+					targetType,
+					protocolName,
+					null,
+					scope,
+					node.name.position,
+				),
+			).result === null
+		) {
+			continue
+		}
+
+		let first = node.methods[written[0]]!
+
+		reportError(
+			`Namespace '${namespaceType.name}' writes '${written[0]}' without declaring 'is ${protocolName}'`,
+			first.name.position,
+			{
+				code: "undeclared-conformance",
+				labels: [
+					primary(
+						first.name.position,
+						`${describeType(targetType)} derives '${protocolName}' unless this Namespace declares it`,
+					),
+				],
+				notes: [
+					`A call naming this Namespace answers what is written here; a call through an '${protocolName}' bound answers the derived one.`,
+					...(written.length > 1
+						? [
+								`This Namespace writes ${written
+									.map((name) => `'${name}'`)
+									.join(" and ")}.`,
+							]
+						: []),
+				],
+				helps: [
+					`Declare the conformance: 'is ${protocolName}' on this Namespace.`,
+				],
+			},
+		)
+	}
 }
 
 // NOTE: What a Type Alias means WITHOUT its `where` clause — the Type its body
@@ -5627,10 +5746,17 @@ export function namespaceNamedByType(
 		: null
 }
 
-// NOTE: The derived Case listing for a Type NAMED in a Lookup's base, or null
-// where the name is no Choice of payload-free Cases. A generic Choice's name
-// resolves to a Generic Alias and answers null: the spelling has no Type
-// Arguments to apply, and the answer's item Type is the Choice.
+// NOTE: The Case listing for a Type NAMED in a Lookup's base, or null where the
+// name is no Choice of payload-free Cases. A generic Choice's name resolves to a
+// Generic Alias and answers null: the spelling has no Type Arguments to apply,
+// and the answer's item Type is the Choice.
+//
+// NOTE: A Namespace WRITING `cases` over the Choice is the answer, and the
+// derive fills in only where none does — the same order every other rail reads
+// them in. Without this, `Colour.cases()` derived while a bounded call read the
+// written Method, and which of the two a Program got turned on whether the
+// Namespace happened to be spelled `Colour`: a Namespace of that name is a
+// value in Scope and shadows this question away, one of any other name did not.
 function derivedEnumerableNamespaceForNamedChoice(
 	declared: common.Type,
 	scope: enricher.Scope,
@@ -5641,7 +5767,32 @@ function derivedEnumerableNamespaceForNamedChoice(
 		return null
 	}
 
-	return derivedEnumerableNamespaceForChoice(declared, protocol)
+	return (
+		namespaceWritingCasesFor(declared, scope) ??
+		derivedEnumerableNamespaceForChoice(declared, protocol)
+	)
+}
+
+// NOTE: The Namespace over a Choice that writes `cases`, narrowed to that one
+// Method — the base names a TYPE, so the only member this rail may answer is
+// the one the derive would have answered. Everything else the Namespace holds
+// stays reachable through its own name and nowhere else.
+function namespaceWritingCasesFor(
+	declared: common.Type,
+	scope: enricher.Scope,
+): common.NamespaceType | null {
+	for (let namespace of namespacesTargeting(
+		getAllNamespacesInScope(scope, null),
+		declared,
+	).values()) {
+		let written = namespace.methods[enumerableMethodName]
+
+		if (written !== undefined) {
+			return { ...namespace, properties: {}, methods: { cases: written } }
+		}
+	}
+
+	return null
 }
 
 export function resolveMethodLookupNamespacesForReceiverType(

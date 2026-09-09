@@ -24,8 +24,12 @@ declarations {
 	§ Choice already said.
 	§
 	§ A Namespace over a Choice can write `cases` of its own, and that replaces
-	§ the derived answer. A Choice with a payload anywhere derives nothing, and
-	§ conforms by writing the Method.
+	§ the derived answer wherever the Namespace DECLARES `is Enumerable`. Without
+	§ the clause the two rails would disagree: a call naming the Namespace reads
+	§ the written Method, and the derive — built from the Choice, consulting no
+	§ Namespace — answers every bounded one. So writing it undeclared is refused,
+	§ under `undeclared-conformance`. A Choice with a payload anywhere derives
+	§ nothing, and conforms by writing the Method.
 
 	§§ Anything whose values can be listed, from a Choice whose Cases carry no payload.
 	protocol Enumerable {
