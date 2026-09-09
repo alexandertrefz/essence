@@ -70,13 +70,15 @@ const ACCESSORS = new Set([
 	"firstIndex",
 	"lastIndex",
 	"indices",
-	// NOTE: The plural of the two above, which names every position an item
-	// stands at rather than one of them. `indices(where:)` is an entry on
-	// `indices` instead, because that Method already answers positions.
-	"everyIndex",
 	// NOTE: The middle of `firstItem` and `lastItem`: the item of a List that
-	// holds exactly one. It reads a part of the receiver the way they do.
+	// holds exactly one. It reads a part of the receiver the way they do, and
+	// it stands where `List.es` declares it.
 	"onlyItem",
+	// NOTE: The plural of `firstIndex` and `lastIndex`, which names every
+	// position an item stands at rather than one of them. `indices(where:)` is
+	// an entry on `indices` instead, because that Method already answers
+	// positions.
+	"everyIndex",
 	"keys",
 	// NOTE: A Dictionary's two other halves, beside the keys it shares
 	// with `Record`. An entry is the pair a Dictionary is written in terms

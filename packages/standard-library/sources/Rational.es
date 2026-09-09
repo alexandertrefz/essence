@@ -91,8 +91,8 @@ declarations {
 	type NonZeroRational = Rational where @::isNot(0/1)
 
 	§ The two sign refinements, the sisters of `NonNegativeInteger` and
-	§ `PositiveInteger`. Both rest on `isPositive` being one call on `@`,
-	§ which wave 1 made it. A chain would leave the two Types unrelated, and
+	§ `PositiveInteger`. Both rest on `isPositive` being one call on `@`
+	§ rather than a chain. A chain would leave the two Types unrelated, and
 	§ `PositiveRational` provable nowhere. See DEVELOPMENT.md, Why bodies look
 	§ the way they do.
 
