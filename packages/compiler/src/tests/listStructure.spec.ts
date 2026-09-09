@@ -399,10 +399,18 @@ describe("the set-shaped Methods", () => {
 		).toEqual(['"[\\"first\\", \\"second\\"]"', '"3"'])
 	})
 
+	// NOTE: The rows repeat a key and no whole row, which is what tells the
+	// two entries apart: a `hasDuplicates(on:)` comparing items rather than
+	// keys answers the same `true` over rows that repeat both ways, and only
+	// the golden capture would catch it.
 	it("answers whether anything occurs twice, by item and by key", async () => {
 		expect(
 			await run(`implementation {
-				constant rows = [{ sku = "a" }, { sku = "b" }, { sku = "a" }]
+				constant rows = [
+					{ sku = "a", n = 1 },
+					{ sku = "b", n = 2 },
+					{ sku = "a", n = 3 },
+				]
 				constant none: List<Integer> = []
 
 				Terminal.inspect([1, 2, 1]::hasDuplicates()::toString())
@@ -410,6 +418,8 @@ describe("the set-shaped Methods", () => {
 				Terminal.inspect([1]::hasDuplicates()::toString())
 				Terminal.inspect(none::hasDuplicates()::toString())
 				Terminal.inspect(rows::hasDuplicates(on .sku)::toString())
+				Terminal.inspect(rows::hasDuplicates(on .n)::toString())
+				Terminal.inspect(rows::hasDuplicates()::toString())
 				Terminal.inspect(rows::hasDuplicates(on (row) { <- row })::toString())
 			}`),
 		).toEqual([
@@ -418,7 +428,9 @@ describe("the set-shaped Methods", () => {
 			'"false"',
 			'"false"',
 			'"true"',
-			'"true"',
+			'"false"',
+			'"false"',
+			'"false"',
 		])
 	})
 
