@@ -267,7 +267,14 @@ export type TestGenerator =
 			checks: Array<ExpressionNode>
 			narrowing: TestNarrowing
 	  }
-	| { kind: "generated"; name: string; binding: string; call: ExpressionNode }
+	| {
+			kind: "generated"
+			name: string
+			binding: string
+			call: ExpressionNode
+			shrinkBinding: string
+			shrink: ExpressionNode
+	  }
 
 export type TestGeneratorMember = { name: string; generator: TestGenerator }
 

@@ -215,6 +215,7 @@ function validateGenerator(generator: common.typed.TestGenerator): void {
 			return
 		case "generated":
 			validateExpression(generator.call)
+			validateExpression(generator.shrink)
 
 			return
 		default:

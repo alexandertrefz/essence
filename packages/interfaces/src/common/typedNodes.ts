@@ -229,9 +229,21 @@ export type TestGenerator =
 			checks: Array<ExpressionNode>
 			narrowing: TestNarrowing
 	  }
-	// NOTE: A Namespace's own `Generatable` conformance, as the call an author
-	// could have written — `Team.generate(from <binding>)`.
-	| { kind: "generated"; name: string; binding: string; call: ExpressionNode }
+	// NOTE: A Namespace's own `Generatable` conformance, as the two calls an
+	// author could have written — `Team.generate(from <binding>)` and
+	// `<shrinkBinding>::<Team>shrink()`. The second is the Protocol's provided
+	// Method where the Namespace writes none, which answers no candidates, and
+	// the Namespace's own body where it writes one; either way it is named at
+	// the call, because a second Namespace of the target Type may write a
+	// `shrink` of its own and the conformance decides which one this is.
+	| {
+			kind: "generated"
+			name: string
+			binding: string
+			call: ExpressionNode
+			shrinkBinding: string
+			shrink: ExpressionNode
+	  }
 
 export type TestGeneratorMember = { name: string; generator: TestGenerator }
 

@@ -58,6 +58,12 @@ function textOf(value: AnyType): string {
 	return (value as unknown as { value: string }).value
 }
 
+// NOTE: What `Generatable` provides as `shrink`, which is what the Compiler
+// emits for a conformance whose Namespace writes none of its own.
+function noCandidates(): AnyType {
+	return createList([])
+}
+
 function itemsOf(value: AnyType): Array<AnyType> {
 	let view = viewOf(value as Parameters<typeof viewOf>[0])
 	let items: Array<AnyType> = []
@@ -270,6 +276,7 @@ describe("Generators", () => {
 
 					return createString("Lions")
 				},
+				shrink: noCandidates,
 			}
 
 			expect(draw(generator, 3).map(textOf)).toEqual([
@@ -496,16 +503,84 @@ describe("Generators", () => {
 			expect(shrink(booleans, createBoolean(false))).toEqual([])
 		})
 
-		// NOTE: A Namespace that declares its own generator declares that the
-		// structure is nobody else's business — including a shrink's.
-		test("answers no candidate for a Namespace's own generator", () => {
+		// NOTE: A Namespace that writes no `shrink` keeps the one `Generatable`
+		// provides, which answers no candidates at all — so a value its
+		// generator drew is reported as it was drawn.
+		test("answers no candidate where the conformance answers none", () => {
 			let generator: Generator = {
 				kind: "generated",
 				name: "Team",
 				generate: () => createString("Lions"),
+				shrink: noCandidates,
 			}
 
 			expect(shrink(generator, createString("Lions"))).toEqual([])
+		})
+
+		// NOTE: And a Namespace that writes one is asked, with the failing
+		// value in hand. The candidates are answered in the body's own order,
+		// which is the order the runner tries them in, so a body that writes
+		// its smallest first is shrunk to it first.
+		test("answers what the conformance's own shrink answers, in order", () => {
+			let asked: Array<string> = []
+			let generator: Generator = {
+				kind: "generated",
+				name: "Team",
+				generate: () => createString("Lions"),
+				shrink: (value) => {
+					asked.push(textOf(value))
+
+					return createList([
+						createString("Li"),
+						createString("Lion"),
+					])
+				},
+			}
+
+			expect(
+				shrink(generator, createString("Lions")).map(textOf),
+			).toEqual(["Li", "Lion"])
+			expect(asked).toEqual(["Lions"])
+		})
+
+		// NOTE: A body answering the value it was handed is answering that it
+		// can go no smaller. Trying it would re-run the property on the value
+		// the shrink already has, once for every attempt the budget allows.
+		test("drops a candidate that is the failing value itself", () => {
+			let generator: Generator = {
+				kind: "generated",
+				name: "Team",
+				generate: () => createString("Lions"),
+				shrink: (value) =>
+					createList([value, createString("Li"), value]),
+			}
+
+			expect(
+				shrink(generator, createString("Lions")).map(textOf),
+			).toEqual(["Li"])
+		})
+
+		// NOTE: A refinement of a Type a Namespace generates is the one place
+		// the two kinds of shrink meet: the conformance says what the smaller
+		// values are, and the predicate says which of them the refined Type
+		// admits at all.
+		test("holds a conformance's candidates to the refinement over it", () => {
+			let generator = refined(
+				"LongName",
+				{
+					kind: "generated",
+					name: "Team",
+					generate: () => createString("Lions"),
+					shrink: () =>
+						createList([createString("Li"), createString("Lion")]),
+				},
+				{},
+				[(value) => ({ value: textOf(value).length > 2 })],
+			)
+
+			expect(
+				shrink(generator, createString("Lions")).map(textOf),
+			).toEqual(["Lion"])
 		})
 	})
 
@@ -581,6 +656,7 @@ describe("Generators", () => {
 			kind: "generated",
 			name: "Name",
 			generate: () => createString(spelling++ % 2 === 0 ? "Ada" : "ada"),
+			shrink: noCandidates,
 		}
 
 		const looseText = {
@@ -1191,6 +1267,7 @@ describe("Generators", () => {
 
 					return createString("Lions")
 				},
+				shrink: noCandidates,
 			}
 
 			expect(
@@ -1385,6 +1462,7 @@ describe("Generators", () => {
 				kind: "generated",
 				name: "Team",
 				generate: () => createString("Lions"),
+				shrink: noCandidates,
 			}
 
 			expect(encode(generator, createString("Lions"))).toBeNull()
@@ -1406,6 +1484,7 @@ describe("Generators", () => {
 							kind: "generated",
 							name: "Team",
 							generate: () => createString("Lions"),
+							shrink: noCandidates,
 						},
 					},
 				],

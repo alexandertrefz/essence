@@ -77,6 +77,13 @@ case is drawn on every later run, so a value that broke a property once goes on
 being asked about. A stored value the Types no longer fit is dropped where it is
 met.
 
+A Type whose Namespace conforms to `Generatable` is drawn through that
+conformance rather than through its structure, and shrunk through the `shrink`
+the same Protocol provides: that body answers no candidates, so a Namespace
+that writes none of its own has its counterexample reported as it was drawn.
+Nothing of such a value is written down either — a stored counterexample is
+spelled out of the structure the conformance replaced.
+
 `essence test --mutate` asks what coverage cannot: coverage says a line ran,
 mutation says a bug there would be caught. The compiler changes the code on
 purpose, one deliberate lie at a time — a comparison rotated a single step, `is`
