@@ -144,12 +144,13 @@ export function replace__overload$1<ItemType extends AnyType>(
 	return listRebuildingBack(back, originalList, view)
 }
 
-// NOTE: `enumerate` is `List`'s own native, under the same name: one entry for
-// every item means the answer is as long as the receiver, so a receiver with
-// something in it answers with something in it. `indices` is not here — it is
-// written in Essence on `List.of(integersFrom:through:)`, which already
-// promises what it builds is not empty.
-export { enumerate } from "./List"
+// NOTE: `indices` and `enumerate` are `List`'s own natives, under this
+// Namespace's names: there is one position and one entry for every item, so a
+// receiver with something in it answers with something in it. `indices` was
+// written in Essence here, counting down through
+// `List.of(integersFrom:downTo:)` to borrow that entry's promise and turning
+// the count round — the walk `List.ts` explains it took over.
+export { enumerate, indices__overload$1 as indices } from "./List"
 
 // NOTE: Pairing and splitting, both `List`'s own natives, and here for the
 // reason the declarations are where they are: this file reads in the order
