@@ -13,6 +13,7 @@
 
 import type { AlgebraicType } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
+import type { CaseSensitivityType } from "./CaseSensitivity"
 import type { DictionaryType } from "./Dictionary"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
@@ -85,28 +86,58 @@ export type TerminalNatives = {
 }
 
 export type StringNatives = {
+	// static of(codePoint: NonNegativeInteger) -> Optional<String>
+	of__overload$1: (codePoint: IntegerType) => OptionalType<StringType>
+	// static of(codePoints: List<Integer>) -> Optional<String>
+	of__overload$2: (codePoints: ListType<IntegerType>) => OptionalType<StringType>
 	// compare(to: String) -> Ordering
 	compare__overload$1: (self: StringType, to: StringType) => OrderingType
+	// starts(with: String, comparing: CaseSensitivity) -> Boolean
+	starts__overload$2: (self: StringType, argument1: StringType, comparing: CaseSensitivityType) => BooleanType
 	// ends(with: String) -> Boolean
-	ends: (self: StringType, argument1: StringType) => BooleanType
+	ends__overload$1: (self: StringType, argument1: StringType) => BooleanType
+	// ends(with: String, comparing: CaseSensitivity) -> Boolean
+	ends__overload$2: (self: StringType, argument1: StringType, comparing: CaseSensitivityType) => BooleanType
+	// hasOnlyDigits() -> Boolean
+	hasOnlyDigits: (self: StringType) => BooleanType
+	// hasOnlyLetters() -> Boolean
+	hasOnlyLetters: (self: StringType) => BooleanType
+	// hasOnlyLettersOrDigits() -> Boolean
+	hasOnlyLettersOrDigits: (self: StringType) => BooleanType
+	// hasOnlyWhitespace() -> Boolean
+	hasOnlyWhitespace: (self: StringType) => BooleanType
 	// words() -> List<String>
 	words: (self: StringType) => ListType<StringType>
 	// length() -> NonNegativeInteger
 	length: (self: StringType) => IntegerType
-	// character(at: Integer) -> Optional<String>
+	// characters() -> List<Character>
+	characters: (self: StringType) => ListType<StringType>
+	// character(at: Integer) -> Optional<Character>
 	character__overload$1: (self: StringType, at: IntegerType) => OptionalType<StringType>
 	// firstIndex(of: String) -> Optional<Integer>
 	firstIndex__overload$1: (self: StringType, of: StringType) => OptionalType<IntegerType>
+	// firstIndex(of: String, comparing: CaseSensitivity) -> Optional<Integer>
+	firstIndex__overload$3: (self: StringType, of: StringType, comparing: CaseSensitivityType) => OptionalType<IntegerType>
 	// lastIndex(of: String) -> Optional<Integer>
 	lastIndex__overload$1: (self: StringType, of: StringType) => OptionalType<IntegerType>
+	// lastIndex(of: String, comparing: CaseSensitivity) -> Optional<Integer>
+	lastIndex__overload$3: (self: StringType, of: StringType, comparing: CaseSensitivityType) => OptionalType<IntegerType>
+	// codePoints() -> List<Integer>
+	codePoints: (self: StringType) => ListType<IntegerType>
+	// everyIndex(of: String) -> List<Integer>
+	everyIndex: (self: StringType, of: StringType) => ListType<IntegerType>
 	// append(_: String) -> String
 	append: (self: StringType, argument1: StringType) => StringType
 	// split(on: String) -> List<String>
 	split__overload$1: (self: StringType, on: StringType) => ListType<StringType>
 	// split(on: NonEmptyString) -> NonEmptyList
 	split__overload$2: (self: StringType, on: StringType) => ListType<StringType>
+	// split(on: NonEmptyString, atMost: PositiveInteger) -> NonEmptyList
+	split__overload$5: (self: StringType, on: StringType, atMost: IntegerType) => ListType<StringType>
 	// count(of: String) -> Integer
-	count: (self: StringType, of: StringType) => IntegerType
+	count__overload$1: (self: StringType, of: StringType) => IntegerType
+	// count(of: String, comparing: CaseSensitivity) -> Integer
+	count__overload$2: (self: StringType, of: StringType, comparing: CaseSensitivityType) => IntegerType
 	// uppercase() -> String
 	uppercase: (self: StringType) => StringType
 	// lowercase() -> String
@@ -115,12 +146,20 @@ export type StringNatives = {
 	normalize: (self: StringType, as: NormalizationFormType) => StringType
 	// trim(at: Side) -> String
 	trim: (self: StringType, at: SideType) => StringType
+	// replaceEvery(_: String, with: String, comparing: CaseSensitivity) -> String
+	replaceEvery__overload$2: (self: StringType, argument1: StringType, argument2: StringType, comparing: CaseSensitivityType) => StringType
+	// replaceFirst(_: String, with: String, comparing: CaseSensitivity) -> String
+	replaceFirst__overload$2: (self: StringType, argument1: StringType, argument2: StringType, comparing: CaseSensitivityType) => StringType
 	// repeat(times: Integer) -> String
 	repeat: (self: StringType, times: IntegerType) => StringType
 	// reverse() -> String
 	reverse: (self: StringType) => StringType
 	// slice(from: Integer, to: Integer) -> String
 	slice: (self: StringType, from: IntegerType, to: IntegerType) => StringType
+	// separate(every: PositiveInteger, with: String, from: Side) -> String
+	separate: (self: StringType, every: IntegerType, argument2: StringType, from: SideType) => StringType
+	// quoted() -> String
+	quoted: (self: StringType) => StringType
 }
 
 export type NonEmptyStringNatives = {
@@ -128,9 +167,9 @@ export type NonEmptyStringNatives = {
 	length: (self: StringType) => IntegerType
 	// characters() -> NonEmptyList
 	characters: (self: StringType) => ListType<StringType>
-	// firstCharacter() -> String
+	// firstCharacter() -> Character
 	firstCharacter: (self: StringType) => StringType
-	// lastCharacter() -> String
+	// lastCharacter() -> Character
 	lastCharacter: (self: StringType) => StringType
 	// uppercase() -> NonEmptyString
 	uppercase: (self: StringType) => StringType
@@ -742,26 +781,45 @@ export const $TerminalArity: AssertArities<typeof import("./Terminal"), {
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
-export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "is__overload$1" | "is__overload$2" | "compare__overload$2" | "toString" | "isEmpty" | "hasCharacters" | "contains" | "doesNotContain" | "starts" | "doesNotStart" | "doesNotEnd" | "lines" | "characters" | "character__overload$2" | "firstIndex__overload$2" | "lastIndex__overload$2" | "firstCharacter__overload$1" | "firstCharacter__overload$2" | "lastCharacter__overload$1" | "lastCharacter__overload$2" | "prepend" | "replaceEvery" | "replaceFirst" | "pad"> = true
+export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "is__overload$1" | "is__overload$2" | "compare__overload$2" | "toString" | "isEmpty" | "hasCharacters" | "contains__overload$1" | "contains__overload$2" | "doesNotContain__overload$1" | "doesNotContain__overload$2" | "starts__overload$1" | "doesNotStart__overload$1" | "doesNotStart__overload$2" | "doesNotEnd__overload$1" | "doesNotEnd__overload$2" | "isOneCharacter" | "lines" | "character__overload$2" | "firstIndex__overload$2" | "lastIndex__overload$2" | "firstCharacter__overload$1" | "firstCharacter__overload$2" | "lastCharacter__overload$1" | "lastCharacter__overload$2" | "prepend" | "split__overload$3" | "split__overload$4" | "replaceEvery__overload$1" | "replaceFirst__overload$1" | "pad" | "remove__overload$1" | "remove__overload$2" | "capitalize" | "truncate" | "indent"> = true
 export const $StringArity: AssertArities<typeof import("./String"), {
+	of__overload$1: 1
+	of__overload$2: 1
 	compare__overload$1: 2
-	ends: 2
+	starts__overload$2: 3
+	ends__overload$1: 2
+	ends__overload$2: 3
+	hasOnlyDigits: 1
+	hasOnlyLetters: 1
+	hasOnlyLettersOrDigits: 1
+	hasOnlyWhitespace: 1
 	words: 1
 	length: 1
+	characters: 1
 	character__overload$1: 2
 	firstIndex__overload$1: 2
+	firstIndex__overload$3: 3
 	lastIndex__overload$1: 2
+	lastIndex__overload$3: 3
+	codePoints: 1
+	everyIndex: 2
 	append: 2
 	split__overload$1: 2
 	split__overload$2: 2
-	count: 2
+	split__overload$5: 3
+	count__overload$1: 2
+	count__overload$2: 3
 	uppercase: 1
 	lowercase: 1
 	normalize: 2
 	trim: 2
+	replaceEvery__overload$2: 4
+	replaceFirst__overload$2: 4
 	repeat: 2
 	reverse: 1
 	slice: 3
+	separate: 4
+	quoted: 1
 }> = true
 
 declare const NonEmptyStringModule: typeof import("./NonEmptyString")

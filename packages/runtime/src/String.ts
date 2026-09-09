@@ -1,9 +1,10 @@
 import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
+import type { CaseSensitivityType } from "./CaseSensitivity"
 import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
 import type { ListType } from "./List"
-import { createList } from "./List"
+import { createList, runsOf } from "./List"
 import type { NormalizationFormType } from "./NormalizationForm"
 import type { OptionalType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
@@ -34,10 +35,15 @@ const stringEscapes: { [character: string]: string } = {
 
 // NOTE: A String written the way a Program would write it down — the text in
 // quotes, with anything a Literal has to escape escaped. It is here rather than
-// beside its callers because it is the one answer to one question, and three
-// readers ask it: `List.toString`, `Optional.toString` and the structural
-// rendering `Terminal.inspect` and `Record.toString` share.
-export function quoted(value: string): string {
+// beside its callers because it is the one answer to one question, and four
+// readers ask it: `List.toString`, `Optional.toString`, the structural
+// rendering `Terminal.inspect` and `Record.toString` share, and the `quoted`
+// native at the foot of this file, which hands the same text to a Program.
+//
+// NOTE: Named apart from that native because the two answer different Types.
+// This one takes and answers the JavaScript text, so a reader inside the
+// runtime puts it straight into a rendering it is already building.
+export function quotedText(value: string): string {
 	return `"${value.replace(
 		// oxlint-disable-next-line no-control-regex -- matching control characters is this function's job
 		/[\\"\n\r\t\u0000-\u001F\u007F-\u009F]/g,
@@ -65,7 +71,7 @@ export function itemText<ItemType extends AnyType>(
 	},
 ): string {
 	return value[typeKeySymbol] === "String"
-		? quoted((value as StringType).value)
+		? quotedText((value as StringType).value)
 		: conformance.toString(value).value
 }
 
@@ -467,23 +473,244 @@ export function split__overload$1(
 
 export const split__overload$2 = split__overload$1
 
-// NOTE: The three searches, native so that a question about a POSITION never
-// builds the pieces `split` builds. An Essence `firstIndex` on `split(on
-// part)` reads the first piece's length, so `contains` — written on it —
-// segments and copies a whole String to answer a Boolean: measured on a
-// 10,800-character ASCII String, one `contains` of an absent part, 504 µs
-// that way against 8 µs here.
-// Each search reads the view `split` reads, so an occurrence is a whole run
-// of characters on cluster boundaries, matched by canonical equivalence; and
-// each takes the intrinsic when both sides pass the ASCII scan, for the
-// reason `split` gives.
+// NOTE: The searches, native so that a question about a POSITION never builds
+// the pieces `split` builds. An Essence `firstIndex` on `split(on part)` reads
+// the first piece's length, so `contains` — written on it — segments and copies
+// a whole String to answer a Boolean: measured on a 10,800-character ASCII
+// String, one `contains` of an absent part, 504 µs that way against 8 µs here.
+// Each search reads the view `split` reads, so an occurrence is a whole run of
+// characters on cluster boundaries, matched by canonical equivalence; and each
+// takes the intrinsic when both sides pass the ASCII scan, for the reason
+// `split` gives.
 //
 // NOTE: The empty part matches nowhere, except as a position at either end.
-// The rule is stated ONCE, above `contains` in `String.es`, and the three
-// guards below are its answers: 0, the length, and 0.
+// The rule is stated ONCE, above `contains` in `String.es`, and the guards
+// below are its answers: 0, the length, 0 and no positions at all.
 //
-// NOTE: The first of two entries — the second takes a `defaultingTo:`
-// fallback and is written in Essence on this one.
+// NOTE: Every entry taking a `CaseSensitivity` reads the SAME walk with the
+// two sides folded, so one rule decides where an occurrence stands however the
+// call spells it.
+
+// NOTE: `#Insensitive` folds EACH CHARACTER on its own, where `is` and
+// `compare` fold the whole String. A position Method answers a position of the
+// RECEIVER, and a folding that maps one character onto several code points
+// would move every position after it; folding per character keeps a match
+// exactly as many characters wide as the part is, so `firstIndex`, `count` and
+// the two replacements all cut on the receiver's own boundaries. The two rules
+// part company over the Greek final sigma alone: `"ΟΣ"` folds whole to `"ος"`
+// and per character to `"οσ"`, so `is` finds `"ος"` equal and `contains` does
+// not find it inside.
+function isInsensitive(sensitivity: CaseSensitivityType): boolean {
+	return sensitivity[typeKeySymbol] === "CaseSensitivity#Insensitive"
+}
+
+// NOTE: The ASCII route's text, folded where the call asks for it. Lower-casing
+// ASCII maps each unit to one unit, so a position in the folded text IS a
+// position in the original — which is what lets the intrinsic keep answering
+// for the receiver.
+function foldedText(string: StringType, insensitive: boolean): string {
+	return insensitive ? string.value.toLowerCase() : string.value
+}
+
+// NOTE: The grapheme route's view, folded per character for the reason above.
+// A folding COPIES, because `graphemesIn` hands back the remembered view
+// itself and every caller here only ever reads it.
+function foldedCharacters(
+	string: StringType,
+	insensitive: boolean,
+): Array<string> {
+	let characters = graphemesIn(string)
+
+	return insensitive
+		? characters.map((character) => character.toLowerCase())
+		: characters
+}
+
+// NOTE: Whether both sides take the intrinsic route. Folding does not change
+// the answer: lower-casing an ASCII String answers an ASCII String.
+function bothAscii(originalString: StringType, part: StringType): boolean {
+	return isAsciiIn(originalString) && isAsciiIn(part)
+}
+
+function firstIndexIn(
+	originalString: StringType,
+	part: StringType,
+	insensitive: boolean,
+): number {
+	if (bothAscii(originalString, part)) {
+		return foldedText(originalString, insensitive).indexOf(
+			foldedText(part, insensitive),
+		)
+	}
+
+	let characters = foldedCharacters(originalString, insensitive)
+	let separator = foldedCharacters(part, insensitive)
+
+	for (
+		let position = 0;
+		position + separator.length <= characters.length;
+		position++
+	) {
+		if (separatorMatchesAt(characters, separator, position)) {
+			return position
+		}
+	}
+
+	return -1
+}
+
+// NOTE: The LAST occurrence, which can overlap an earlier one: `"aaa"` holds
+// `"aa"` at 0 and at 1, and the answer is 1, as `lastIndexOf` answers. The
+// walk runs from the last position the part fits at down to the first, so it
+// stops at the first match it meets.
+function lastIndexIn(
+	originalString: StringType,
+	part: StringType,
+	insensitive: boolean,
+): number {
+	if (bothAscii(originalString, part)) {
+		return foldedText(originalString, insensitive).lastIndexOf(
+			foldedText(part, insensitive),
+		)
+	}
+
+	let characters = foldedCharacters(originalString, insensitive)
+	let separator = foldedCharacters(part, insensitive)
+
+	for (
+		let position = characters.length - separator.length;
+		position >= 0;
+		position--
+	) {
+		if (separatorMatchesAt(characters, separator, position)) {
+			return position
+		}
+	}
+
+	return -1
+}
+
+// NOTE: The occurrences that do NOT overlap — the ones `split` cuts at — so
+// `"aaa"::count(of "aa")` is 1: after a match the walk steps over the whole
+// part, exactly as `split` does, and the count is one less than the pieces
+// `split` would answer. An Essence body on `firstIndex` and `slice` would cut
+// the rest of the String at every occurrence found, which is quadratic in the
+// occurrences; this is one walk. Measured on a 10,800-character ASCII String
+// with 3,600 occurrences: 537 µs counting the pieces, 33 µs here.
+//
+// NOTE: `everyIndex` and `count` are this ONE walk, visited two ways, so the
+// two can not answer differently about one String. `count` visits without
+// collecting: a Program asking how many times a part occurs should not
+// allocate a position per occurrence to be told a number.
+function eachOccurrence(
+	originalString: StringType,
+	part: StringType,
+	insensitive: boolean,
+	visit: (position: number) => void,
+): void {
+	if (bothAscii(originalString, part)) {
+		let text = foldedText(originalString, insensitive)
+		let needle = foldedText(part, insensitive)
+		let index = text.indexOf(needle)
+
+		while (index >= 0) {
+			visit(index)
+			index = text.indexOf(needle, index + needle.length)
+		}
+
+		return
+	}
+
+	let characters = foldedCharacters(originalString, insensitive)
+	let separator = foldedCharacters(part, insensitive)
+	let index = 0
+
+	while (index + separator.length <= characters.length) {
+		if (separatorMatchesAt(characters, separator, index)) {
+			visit(index)
+			index += separator.length
+		} else {
+			index++
+		}
+	}
+}
+
+function everyIndexIn(
+	originalString: StringType,
+	part: StringType,
+	insensitive: boolean,
+): Array<number> {
+	let positions: Array<number> = []
+
+	eachOccurrence(originalString, part, insensitive, (position) => {
+		positions.push(position)
+	})
+
+	return positions
+}
+
+function countIn(
+	originalString: StringType,
+	part: StringType,
+	insensitive: boolean,
+): number {
+	let occurrences = 0
+
+	eachOccurrence(originalString, part, insensitive, () => {
+		occurrences++
+	})
+
+	return occurrences
+}
+
+function startsIn(
+	originalString: StringType,
+	prefix: StringType,
+	insensitive: boolean,
+): boolean {
+	if (bothAscii(originalString, prefix)) {
+		return foldedText(originalString, insensitive).startsWith(
+			foldedText(prefix, insensitive),
+		)
+	}
+
+	let characters = foldedCharacters(originalString, insensitive)
+	let prefixCharacters = foldedCharacters(prefix, insensitive)
+
+	return separatorMatchesAt(characters, prefixCharacters, 0)
+}
+
+function endsIn(
+	originalString: StringType,
+	suffix: StringType,
+	insensitive: boolean,
+): boolean {
+	if (bothAscii(originalString, suffix)) {
+		return foldedText(originalString, insensitive).endsWith(
+			foldedText(suffix, insensitive),
+		)
+	}
+
+	let characters = foldedCharacters(originalString, insensitive)
+	let suffixCharacters = foldedCharacters(suffix, insensitive)
+
+	if (suffixCharacters.length > characters.length) {
+		return false
+	}
+
+	return separatorMatchesAt(
+		characters,
+		suffixCharacters,
+		characters.length - suffixCharacters.length,
+	)
+}
+
+function positionAnswer(index: number): OptionalType<IntegerType> {
+	return index < 0 ? createEmpty() : createValue(createInteger(index))
+}
+
+// NOTE: The first of three entries — the second takes a `defaultingTo:`
+// fallback and is written in Essence on this one, and the third folds the case.
 export function firstIndex__overload$1(
 	originalString: StringType,
 	part: StringType,
@@ -492,35 +719,23 @@ export function firstIndex__overload$1(
 		return createValue(createInteger(0))
 	}
 
-	let index: number
-
-	if (isAsciiIn(originalString) && isAsciiIn(part)) {
-		index = originalString.value.indexOf(part.value)
-	} else {
-		let characters = graphemesIn(originalString)
-		let separator = graphemesIn(part)
-
-		index = -1
-
-		for (
-			let position = 0;
-			position + separator.length <= characters.length;
-			position++
-		) {
-			if (separatorMatchesAt(characters, separator, position)) {
-				index = position
-				break
-			}
-		}
-	}
-
-	return index < 0 ? createEmpty() : createValue(createInteger(index))
+	return positionAnswer(firstIndexIn(originalString, part, false))
 }
 
-// NOTE: The LAST occurrence, which can overlap an earlier one: `"aaa"` holds
-// `"aa"` at 0 and at 1, and the answer is 1, as `lastIndexOf` answers. The
-// walk runs from the last position the part fits at down to the first, so it
-// stops at the first match it meets. The first of two entries, as above.
+export function firstIndex__overload$3(
+	originalString: StringType,
+	part: StringType,
+	sensitivity: CaseSensitivityType,
+): OptionalType<IntegerType> {
+	if (part.value === "") {
+		return createValue(createInteger(0))
+	}
+
+	return positionAnswer(
+		firstIndexIn(originalString, part, isInsensitive(sensitivity)),
+	)
+}
+
 export function lastIndex__overload$1(
 	originalString: StringType,
 	part: StringType,
@@ -529,39 +744,42 @@ export function lastIndex__overload$1(
 		return createValue(createInteger(graphemeCountIn(originalString)))
 	}
 
-	let index: number
-
-	if (isAsciiIn(originalString) && isAsciiIn(part)) {
-		index = originalString.value.lastIndexOf(part.value)
-	} else {
-		let characters = graphemesIn(originalString)
-		let separator = graphemesIn(part)
-
-		index = -1
-
-		for (
-			let position = characters.length - separator.length;
-			position >= 0;
-			position--
-		) {
-			if (separatorMatchesAt(characters, separator, position)) {
-				index = position
-				break
-			}
-		}
-	}
-
-	return index < 0 ? createEmpty() : createValue(createInteger(index))
+	return positionAnswer(lastIndexIn(originalString, part, false))
 }
 
-// NOTE: The occurrences that do NOT overlap — the ones `split` cuts at — so
-// `"aaa"::count(of "aa")` is 1: after a match the walk steps over the whole
-// part, exactly as `split` does, and the count is one less than the pieces
-// `split` would answer. An Essence body on `firstIndex` and `slice` would
-// cut the rest of the String at every occurrence found, which is quadratic
-// in the occurrences; this is one walk. Measured on a 10,800-character ASCII
-// String with 3,600 occurrences: 537 µs counting the pieces, 33 µs here.
-export function count(
+export function lastIndex__overload$3(
+	originalString: StringType,
+	part: StringType,
+	sensitivity: CaseSensitivityType,
+): OptionalType<IntegerType> {
+	if (part.value === "") {
+		return createValue(createInteger(graphemeCountIn(originalString)))
+	}
+
+	return positionAnswer(
+		lastIndexIn(originalString, part, isInsensitive(sensitivity)),
+	)
+}
+
+// NOTE: The positions themselves, which a Program scanning a String reads
+// where a hand-written walk would call `firstIndex` and `slice` per occurrence
+// — one pass here against a cut of the rest of the String per hit.
+export function everyIndex(
+	originalString: StringType,
+	part: StringType,
+): ListType<IntegerType> {
+	if (part.value === "") {
+		return createList([])
+	}
+
+	return createList(
+		everyIndexIn(originalString, part, false).map((position) =>
+			createInteger(position),
+		),
+	)
+}
+
+export function count__overload$1(
 	originalString: StringType,
 	part: StringType,
 ): IntegerType {
@@ -569,33 +787,21 @@ export function count(
 		return createInteger(0)
 	}
 
-	let occurrences = 0
+	return createInteger(countIn(originalString, part, false))
+}
 
-	if (isAsciiIn(originalString) && isAsciiIn(part)) {
-		let text = originalString.value
-		let width = part.value.length
-		let index = text.indexOf(part.value)
-
-		while (index >= 0) {
-			occurrences++
-			index = text.indexOf(part.value, index + width)
-		}
-	} else {
-		let characters = graphemesIn(originalString)
-		let separator = graphemesIn(part)
-		let index = 0
-
-		while (index + separator.length <= characters.length) {
-			if (separatorMatchesAt(characters, separator, index)) {
-				occurrences++
-				index += separator.length
-			} else {
-				index++
-			}
-		}
+export function count__overload$2(
+	originalString: StringType,
+	part: StringType,
+	sensitivity: CaseSensitivityType,
+): IntegerType {
+	if (part.value === "") {
+		return createInteger(0)
 	}
 
-	return createInteger(occurrences)
+	return createInteger(
+		countIn(originalString, part, isInsensitive(sensitivity)),
+	)
 }
 
 // NOTE: The reversed String REMEMBERS its character view — the original's
@@ -610,36 +816,41 @@ export function reverse(originalString: StringType): StringType {
 	return createSegmentedString([...graphemesIn(originalString)].reverse())
 }
 
-export function ends(
+// NOTE: `starts(with:)` itself is Essence — its slice begins at zero and needs
+// no length — and this entry is native because a folded prefix and a folded
+// receiver have to be compared character by character, which a slice of the
+// receiver can not do.
+export function starts__overload$2(
+	originalString: StringType,
+	prefix: StringType,
+	sensitivity: CaseSensitivityType,
+): BooleanType {
+	return createBoolean(
+		startsIn(originalString, prefix, isInsensitive(sensitivity)),
+	)
+}
+
+// NOTE: Native — one grapheme pass, where the Essence body sliced the last
+// characters and compared them (four traversals). Both sides are taken as the
+// canonical grapheme view, so the suffix matches only on a cluster boundary and
+// by canonical equivalence, exactly as `starts(with:)` does through `slice`.
+//
+// NOTE: Two ASCII Strings are compared by the intrinsic, for the reason
+// `split` gives, so the Boolean allocates nothing.
+export function ends__overload$1(
 	originalString: StringType,
 	suffix: StringType,
 ): BooleanType {
-	// NOTE: Native — one grapheme pass, where the Essence body sliced the last
-	// characters and compared them (four traversals). Both sides are taken as
-	// the canonical grapheme view, so the suffix matches only on a cluster
-	// boundary and by canonical equivalence, exactly as `starts(with:)` does
-	// through `slice`. `starts` stays Essence because its slice begins at zero
-	// and needs no length.
-	//
-	// NOTE: Two ASCII Strings are compared by the intrinsic, for the reason
-	// `split` gives, so the Boolean allocates nothing.
-	if (isAsciiIn(originalString) && isAsciiIn(suffix)) {
-		return createBoolean(originalString.value.endsWith(suffix.value))
-	}
+	return createBoolean(endsIn(originalString, suffix, false))
+}
 
-	let characters = graphemesIn(originalString)
-	let suffixCharacters = graphemesIn(suffix)
-
-	if (suffixCharacters.length > characters.length) {
-		return createBoolean(false)
-	}
-
-	let offset = characters.length - suffixCharacters.length
-
+export function ends__overload$2(
+	originalString: StringType,
+	suffix: StringType,
+	sensitivity: CaseSensitivityType,
+): BooleanType {
 	return createBoolean(
-		suffixCharacters.every(
-			(character, index) => characters[offset + index] === character,
-		),
+		endsIn(originalString, suffix, isInsensitive(sensitivity)),
 	)
 }
 
@@ -958,4 +1169,376 @@ export function compare__overload$1(
 // marks — or a ZWJ emoji — count as the one character a reader sees.
 export function length(originalString: StringType): IntegerType {
 	return createInteger(graphemeCountIn(originalString))
+}
+
+// NOTE: `@::split(on "")` is what a character IS here, so `characters` is that
+// call rather than a second segmentation of its own. It is native because its
+// answer is a `List<Character>`, and a refinement erases before anything runs:
+// an Essence body could only hand back what `split` answers, which is a
+// `List<String>`, and no expression can say the pieces of an empty separator
+// are one character each. `NonEmptyString::characters` is this same Function
+// under that Namespace's name.
+//
+// NOTE: The separator is built per call rather than held in a const of this
+// module. A const would be a top-level `createString` the bundler can not
+// prove pure, so it would arrive in EVERY Program that reaches `String.ts`
+// at all — 36 bytes measured, in bundles that call none of this. One object
+// beside a whole segmentation walk costs nothing worth keeping it for.
+export function characters(originalString: StringType): ListType<StringType> {
+	return split__overload$1(originalString, createString(""))
+}
+
+// NOTE: The one escape to the level BELOW a character, and the reason it is
+// worth having: nothing character-level could be computed in Essence at all
+// without it — no digit value, no checksum, no base, no escaping. The points
+// are read off the NFC form, as every position Method is, so a String and its
+// canonically equivalent twin answer the same points. A point above the Basic
+// Multilingual Plane occupies two code units, and stepping by that width
+// visits each WHOLE point once; a lone surrogate is no whole point and is read
+// as the single unit it is.
+//
+// NOTE: A character is a grapheme cluster and a point is a code point, so the
+// two counts differ wherever a cluster is built out of several points: the
+// four-person emoji is one character and seven points. That is the level
+// difference, and it is what the `§§` block says.
+export function codePoints(originalString: StringType): ListType<IntegerType> {
+	let text = normalisedFormOf(originalString)
+	let points: Array<IntegerType> = []
+	let index = 0
+
+	while (index < text.length) {
+		let point = text.codePointAt(index) as number
+
+		points.push(createInteger(point))
+		index += point > 0xffff ? 2 : 1
+	}
+
+	return createList(points)
+}
+
+// NOTE: The scalar values, which are the points a String can hold: below
+// 0x110000 and outside the surrogate range, since a surrogate is half of a
+// point rather than one. A proven receiver takes the sign away, and these two
+// are what is left of the question.
+function isScalarValue(point: number | bigint): boolean {
+	if (typeof point !== "number") {
+		return false
+	}
+
+	return (
+		Number.isSafeInteger(point) &&
+		point >= 0 &&
+		point <= 0x10ffff &&
+		(point < 0xd800 || point > 0xdfff)
+	)
+}
+
+// NOTE: A point below 128 that is no carriage return builds a String the ASCII
+// scan would accept, so it is marked rather than scanned for, exactly as a
+// piece of a `split` is.
+function stringOfPoints(points: Array<number>): StringType {
+	let text = String.fromCodePoint(...points)
+
+	return points.every((point) => point < 128 && point !== 13)
+		? createAsciiString(text)
+		: createString(text)
+}
+
+// NOTE: The first of two entries. The receiver's proof says the point is not
+// negative and this says the rest: a surrogate and a point past the last plane
+// are the two shapes left that name no character.
+export function of__overload$1(code: IntegerType): OptionalType<StringType> {
+	if (!isScalarValue(code.value)) {
+		return createEmpty()
+	}
+
+	return createValue(stringOfPoints([Number(code.value)]))
+}
+
+// NOTE: All or nothing, which is the answer a caller can act on: a String
+// built out of the points it could read and quietly missing the rest is a
+// String nobody asked for. The `Optional` is the same shape the single-point
+// entry answers, and `Integer.parse` beside it.
+export function of__overload$2(
+	codes: ListType<IntegerType>,
+): OptionalType<StringType> {
+	let view = runsOf(codes)
+	let points: Array<number> = []
+
+	for (let index = view.frontCount - 1; index >= 0; index--) {
+		let code = view.front[index]!
+
+		if (!isScalarValue(code.value)) {
+			return createEmpty()
+		}
+
+		points.push(Number(code.value))
+	}
+
+	for (let index = 0; index < view.backCount; index++) {
+		let code = view.back[index]!
+
+		if (!isScalarValue(code.value)) {
+			return createEmpty()
+		}
+
+		points.push(Number(code.value))
+	}
+
+	return createValue(stringOfPoints(points))
+}
+
+// NOTE: Character CLASSIFICATION, and the one thing in the library that a host
+// property escape answers. This is not a pattern language reaching a Program:
+// each of the four asks one fixed question of every character and answers a
+// Boolean, and no part of the shape is anything a caller writes. The
+// alternative was a table of ranges maintained here, which would answer a
+// different question per Unicode version than the host's own `is`, `compare`
+// and `normalize` do.
+//
+// NOTE: Read off the NFC form, as every other question about characters is, so
+// that a composed accent and a decomposed one are classified alike. A
+// combining mark counts as part of the letter or digit BEFORE it, which is why
+// the two letter patterns are written as a base followed by its marks rather
+// than as a class holding marks: a mark standing on its own belongs to no
+// letter and is not one.
+//
+// NOTE: All four accept the empty String, for the reason `hasOnlyItems(where:)`
+// answers `true` for an empty List: nothing in it breaks the rule.
+const digitsOnly = /^\p{Nd}*$/u
+const lettersOnly = /^(?:\p{L}\p{M}*)*$/u
+const lettersOrDigitsOnly = /^(?:[\p{L}\p{Nd}]\p{M}*)*$/u
+const whitespaceOnly = /^\s*$/u
+
+export function hasOnlyDigits(originalString: StringType): BooleanType {
+	return createBoolean(digitsOnly.test(normalisedFormOf(originalString)))
+}
+
+export function hasOnlyLetters(originalString: StringType): BooleanType {
+	return createBoolean(lettersOnly.test(normalisedFormOf(originalString)))
+}
+
+export function hasOnlyLettersOrDigits(
+	originalString: StringType,
+): BooleanType {
+	return createBoolean(
+		lettersOrDigitsOnly.test(normalisedFormOf(originalString)),
+	)
+}
+
+export function hasOnlyWhitespace(originalString: StringType): BooleanType {
+	return createBoolean(whitespaceOnly.test(normalisedFormOf(originalString)))
+}
+
+// NOTE: The limited split, where the last piece keeps the separators the walk
+// stopped short of. A Program parsing `key=value=with=equals` wants exactly
+// that, and the Essence spelling — split the whole String and join the tail
+// back — builds every piece to throw most of them away. Both Arguments are
+// proven, so the answer always holds a piece: a separator with a character in
+// it leaves the piece before it, and a count above zero asks for at least one.
+export function split__overload$5(
+	originalString: StringType,
+	splitterString: StringType,
+	count: IntegerType,
+): ListType<StringType> {
+	let limit = Number(count.value)
+
+	if (limit <= 1) {
+		return createList([originalString])
+	}
+
+	if (bothAscii(originalString, splitterString)) {
+		let text = originalString.value
+		let separator = splitterString.value
+		let pieces: Array<StringType> = []
+		let index = 0
+
+		while (pieces.length < limit - 1) {
+			let found = text.indexOf(separator, index)
+
+			if (found < 0) {
+				break
+			}
+
+			pieces.push(createAsciiString(text.slice(index, found)))
+			index = found + separator.length
+		}
+
+		pieces.push(createAsciiString(text.slice(index)))
+
+		return createList(pieces)
+	}
+
+	let characters = graphemesIn(originalString)
+	let separator = graphemesIn(splitterString)
+	let pieces: Array<Array<string>> = []
+	let current: Array<string> = []
+	let index = 0
+
+	while (index < characters.length) {
+		if (
+			pieces.length < limit - 1 &&
+			separatorMatchesAt(characters, separator, index)
+		) {
+			pieces.push(current)
+			current = []
+			index += separator.length
+		} else {
+			current.push(characters[index]!)
+			index++
+		}
+	}
+
+	pieces.push(current)
+
+	return createList(pieces.map((piece) => createSegmentedString(piece)))
+}
+
+// NOTE: The two replacements' folding entries, native for the reason the
+// searches are: a folded receiver is not the text to build the answer out of,
+// so the walk matches on the folded view and cuts on the ORIGINAL characters.
+// Folding per character is what makes the two views the same width, so a match
+// found at a position covers exactly the part's characters there.
+export function replaceEvery__overload$2(
+	originalString: StringType,
+	part: StringType,
+	replacement: StringType,
+	sensitivity: CaseSensitivityType,
+): StringType {
+	if (part.value === "") {
+		return originalString
+	}
+
+	let insensitive = isInsensitive(sensitivity)
+
+	if (bothAscii(originalString, part)) {
+		let text = originalString.value
+		let folded = foldedText(originalString, insensitive)
+		let needle = foldedText(part, insensitive)
+		let pieces: Array<string> = []
+		let index = 0
+		let found = folded.indexOf(needle)
+
+		while (found >= 0) {
+			pieces.push(text.slice(index, found))
+			index = found + needle.length
+			found = folded.indexOf(needle, index)
+		}
+
+		pieces.push(text.slice(index))
+
+		return createString(pieces.join(replacement.value))
+	}
+
+	let characters = graphemesIn(originalString)
+	let folded = foldedCharacters(originalString, insensitive)
+	let separator = foldedCharacters(part, insensitive)
+	let pieces: Array<string> = []
+	let current: Array<string> = []
+	let index = 0
+
+	while (index < folded.length) {
+		if (separatorMatchesAt(folded, separator, index)) {
+			pieces.push(current.join(""))
+			current = []
+			index += separator.length
+		} else {
+			current.push(characters[index]!)
+			index++
+		}
+	}
+
+	pieces.push(current.join(""))
+
+	return createString(pieces.join(replacement.value))
+}
+
+export function replaceFirst__overload$2(
+	originalString: StringType,
+	part: StringType,
+	replacement: StringType,
+	sensitivity: CaseSensitivityType,
+): StringType {
+	if (part.value === "") {
+		return originalString
+	}
+
+	let insensitive = isInsensitive(sensitivity)
+	let position = firstIndexIn(originalString, part, insensitive)
+
+	if (position < 0) {
+		return originalString
+	}
+
+	if (bothAscii(originalString, part)) {
+		let text = originalString.value
+
+		return createString(
+			text.slice(0, position) +
+				replacement.value +
+				text.slice(position + part.value.length),
+		)
+	}
+
+	let characters = graphemesIn(originalString)
+	let width = graphemesIn(part).length
+
+	return createString(
+		characters.slice(0, position).join("") +
+			replacement.value +
+			characters.slice(position + width).join(""),
+	)
+}
+
+// NOTE: Grouping, the piece a currency or a file size is missing — the counting
+// is by character, so it belongs beside the other character walks rather than
+// on a number, and both a numeral and a card number reach it. The separator
+// goes between the groups and never at either end.
+//
+// NOTE: `from:` names the end the counting starts at, so `#End` puts the short
+// group at the FRONT, which is what "1,234,567" is. `#BothEnds` counts from the
+// end as well: grouping has a direction rather than two ends, and the Choice
+// `trim` and `pad` already read was taken over a two-Case Choice of its own,
+// which would have cost the six registration sites a Choice costs for one
+// Method.
+export function separate(
+	originalString: StringType,
+	size: IntegerType,
+	separator: StringType,
+	side: SideType,
+): StringType {
+	let width = Number(size.value)
+	let characters = isAsciiIn(originalString)
+		? originalString.value.split("")
+		: graphemesIn(originalString)
+
+	if (characters.length <= width) {
+		return originalString
+	}
+
+	let groups: Array<string> = []
+
+	if (side[typeKeySymbol] === "Side#Start") {
+		for (let index = 0; index < characters.length; index += width) {
+			groups.push(characters.slice(index, index + width).join(""))
+		}
+	} else {
+		for (let end = characters.length; end > 0; end -= width) {
+			groups.unshift(
+				characters
+					.slice(end - width < 0 ? 0 : end - width, end)
+					.join(""),
+			)
+		}
+	}
+
+	return createString(groups.join(separator.value))
+}
+
+// NOTE: The quoted spelling a String already has inside a List, a Record or a
+// Case, handed to a Program that is building a message of its own. It is the
+// same Function those renderings call, so a value can not read one way in a
+// structure and another in a sentence about it.
+export function quoted(originalString: StringType): StringType {
+	return createString(quotedText(originalString.value))
 }

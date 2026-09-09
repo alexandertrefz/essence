@@ -2170,8 +2170,17 @@ describe("Standard Library Loader", () => {
 			"Result::hasFailed -> not Result::hasValue()",
 			"Result::isNot -> not Result::is(#0)",
 			"String::doesNotContain -> not String::contains(#0)",
+			// NOTE: The folding entry of each pair, which is a row of its own
+			// rather than a second spelling of the one above it: the template
+			// carries the Arguments the CALL writes, and a call naming a
+			// `CaseSensitivity` asks a different question from one that does
+			// not. So an `if` asking either proves what the same entry of the
+			// contrary would.
+			"String::doesNotContain -> not String::contains(#0, #1)",
 			"String::doesNotEnd -> not String::ends(#0)",
+			"String::doesNotEnd -> not String::ends(#0, #1)",
 			"String::doesNotStart -> not String::starts(#0)",
+			"String::doesNotStart -> not String::starts(#0, #1)",
 			"String::hasCharacters -> not String::isEmpty()",
 			"Transcendental::isNegative -> not Transcendental::isPositive()",
 			"protocol Comparable::isGreaterThanOrEqualTo -> not Self::isLessThan(#0)",
@@ -2243,8 +2252,20 @@ describe("Standard Library Loader", () => {
 			"Result::is",
 			"String::contains",
 			"String::ends",
+			// NOTE: The four character classes, native, so there is no body to
+			// read a question off — each asks the host for one Unicode class
+			// and nothing else names it.
+			"String::hasOnlyDigits",
+			"String::hasOnlyLetters",
+			"String::hasOnlyLettersOrDigits",
+			"String::hasOnlyWhitespace",
 			"String::is",
 			"String::isEmpty",
+			// NOTE: A chain, so it is a question of its own — `isOneCharacter`
+			// asks the LENGTH whether it is one, and the `Character` Type is
+			// written on it. The literal evaluator holds a row for it, because
+			// a written `"a"` is what proves a Character at a call site.
+			"String::isOneCharacter",
 			"String::starts",
 			"Transcendental::is",
 			// NOTE: Native, so there is no body to read a question off — the

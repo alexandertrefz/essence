@@ -13,9 +13,10 @@ together reach. The two failure carriers each have a nested Namespace beside
 them, `NestedOptional` and `NestedResult`, holding the `flatten` that only a
 carrier of a carrier answers. A checked refinement is exported beside the base
 it narrows: `NonZeroInteger`, `NonNegativeInteger` and `PositiveInteger` beside
-`Integer`, `NonZeroRational` beside `Rational`, `NonEmptyString` beside
-`String`, `NonEmptyList` beside `List`. Each reaches everything its base
-reaches, and the tighter answers a proof affords on top — `DEVELOPMENT.md` has
+`Integer`, `NonZeroRational` beside `Rational`, `NonEmptyString` and
+`Character` beside `String`, `NonEmptyList` beside `List`. Each reaches
+everything its base reaches, and the tighter answers a proof affords on top —
+`DEVELOPMENT.md` has
 the rule a narrowed receiver is read by. A value written down is its own proof
 and reaches them without being narrowed at all: `4::squareRoot()` answers a
 number and `[1, 2]::firstItem()` answers an item.
@@ -62,7 +63,7 @@ it and the `Terminal.ask` that is a prompt and a line (`Terminal.es`).
 `Randomness.seeded(_)` for a run that replays (`Randomness.es`).
 
 Three of every five declared Method entries are also IMPLEMENTED here, in
-Essence — 377 of 619 as this is written, counting one entry per Overload and
+Essence — 388 of 649 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
 Seven more are written on a PROTOCOL rather than on a Namespace, once for every
 conformer: `Equatable.isNot`, `Comparable`'s four inequalities, and
@@ -74,24 +75,29 @@ deliberate line, not a backlog: the primitives everything else is composed from
 (`Boolean.negate`/`is`/`and`/`or`/`compare`, integer and rational arithmetic,
 same-kind `compare`), the JavaScript intrinsics Essence has no expression for
 (`String.uppercase`, `String.trim(at:)`, `String.normalize(as:)`,
-`String.lines`/`words`, `Record`'s reflective Methods, `String.compare` —
-there is no way to name a character's code point), and the iteration primitives
-the rest rest on (`List.reduce`, `item(at:)`, `slice`, the eager filter
-`everyItem(where:)`, `append(contentsOf:)`, `static of`, and
+`String.lines`/`words`, `String.codePoints` and the `String.of(codePoint:)`
+that reads one back, the four `String.hasOnly…` character classes, `Record`'s
+reflective Methods, and `String.compare`, which orders by code point and would
+build a List of every point of both sides in Essence), and the iteration
+primitives the rest rest on (`List.reduce`, `item(at:)`, `slice`, the eager
+filter `everyItem(where:)`, `append(contentsOf:)`, `static of`, and
 `String.split(on:)`, which is also the one native that decides what a
 "character" is: it segments into Unicode grapheme clusters (see `graphemesOf` in
 `String.ts`), so `length`, `slice`, `reverse`, `firstIndex` and the rest, all
 written on top of it, count and cut by grapheme). A fourth group joined those
 three for a measured reason rather than for a reason of principle: a search or
 an ordering whose Essence body built a whole List to answer a question about one
-position. `String.firstIndex`/`lastIndex`/`count(of:)` walk the grapheme view,
-`List.sort`, `List.lastIndex(where:)`, `List.isSorted` and `List.partition`
-walk the runs, `Dictionary.everyEntry`/`removeEvery`/`sort` keep the encodings
-the receiver already holds, and `Dictionary.firstEntry` reads the first entry
-rather than building one per entry to drop all but it. Each says at its own
-declaration what it measured. The short-circuiting `firstItem(where:)` is not
-among any of them: it is written in Essence on `reduce`'s early-stopping entry,
-and leaves the walk at the item that decides the answer.
+position. `String.firstIndex`/`lastIndex`/`count(of:)`/`everyIndex(of:)` walk
+the grapheme view, and so do the `comparing:` entries beside them, which fold
+each character rather than the whole String so that a position stays a position
+of the receiver; `List.sort`, `List.lastIndex(where:)`, `List.isSorted` and
+`List.partition` walk the runs, `Dictionary.everyEntry`/`removeEvery`/`sort`
+keep the encodings the receiver already holds, and `Dictionary.firstEntry` reads
+the first entry rather than building one per entry to drop all but it. Each says
+at its own declaration what it measured. The short-circuiting
+`firstItem(where:)` is not among any of them: it is written in Essence on
+`reduce`'s early-stopping entry, and leaves the walk at the item that decides
+the answer.
 
 Three Methods are native for a reason worth reading before assuming otherwise:
 `List.is`, because the pairwise form trips an infinite recursion in generic

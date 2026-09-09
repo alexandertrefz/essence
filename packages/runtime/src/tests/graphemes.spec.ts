@@ -4,7 +4,7 @@ import { anyIs } from "../internalHelpers"
 import { createRecord } from "../Record"
 import {
 	createString,
-	ends,
+	ends__overload$1 as ends,
 	length,
 	reverse,
 	split__overload$1 as split,

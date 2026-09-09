@@ -89,6 +89,10 @@ const ACCESSORS = new Set([
 	// String.
 	"firstEntry",
 	"characters",
+	// NOTE: The level below a character, read off the same String — a part of
+	// the value under the name Unicode gives it, beside the characters it is
+	// grouped into.
+	"codePoints",
 	"words",
 	"lines",
 	"character",

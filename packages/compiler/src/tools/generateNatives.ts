@@ -52,6 +52,9 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	DownType: "./Rounding",
 	UpType: "./Rounding",
 	TowardZeroType: "./Rounding",
+	CaseSensitivityType: "./CaseSensitivity",
+	SensitiveType: "./CaseSensitivity",
+	InsensitiveType: "./CaseSensitivity",
 	NormalizationFormType: "./NormalizationForm",
 	ComposedCanonicalType: "./NormalizationForm",
 	DecomposedCanonicalType: "./NormalizationForm",
@@ -87,6 +90,7 @@ const UNION_NAME_ALIASES: Record<string, string> = {
 	NumberFormat: "NumberFormatType",
 	Rounding: "RoundingType",
 	NormalizationForm: "NormalizationFormType",
+	CaseSensitivity: "CaseSensitivityType",
 	Number: "NumberType",
 	Stream: "StreamType",
 }
@@ -116,9 +120,10 @@ const GENERIC_CASE_TYPES: Record<string, string> = {
 }
 
 // NOTE: The runtime unit types of the builtin unit Choices — `Ordering`,
-// `Side`, `SortOrder`, `NumberFormat`, `Rounding`, `NormalizationForm` and `Stream` — the only
-// Cases reachable in a signature, and then only inside their own Union, which is
-// mapped whole before its Cases are ever visited.
+// `Side`, `SortOrder`, `NumberFormat`, `Rounding`, `NormalizationForm`,
+// `CaseSensitivity` and `Stream` — the only Cases reachable in a signature, and
+// then only inside their own Union, which is mapped whole before its Cases are
+// ever visited.
 const CASE_TYPES: Record<string, string> = {
 	"Ordering#Less": "LessType",
 	"Ordering#Equal": "EqualType",
@@ -141,6 +146,8 @@ const CASE_TYPES: Record<string, string> = {
 	"NormalizationForm#DecomposedCanonical": "DecomposedCanonicalType",
 	"NormalizationForm#ComposedCompatibility": "ComposedCompatibilityType",
 	"NormalizationForm#DecomposedCompatibility": "DecomposedCompatibilityType",
+	"CaseSensitivity#Sensitive": "SensitiveType",
+	"CaseSensitivity#Insensitive": "InsensitiveType",
 	"Stream#Output": "OutputType",
 	"Stream#Error": "ErrorType",
 }

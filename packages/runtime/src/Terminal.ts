@@ -6,7 +6,7 @@ import { formatAsRational, type RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import { kindOf, singleLineMaxLength } from "./registry"
 import type { StreamType } from "./Stream"
-import { createString, quoted, type StringType } from "./String"
+import { createString, quotedText, type StringType } from "./String"
 import { toString as transcendentalToString } from "./Transcendental"
 import { type AnyType, typeKeySymbol } from "./type"
 
@@ -142,7 +142,7 @@ export function getStringRepresentation(
 		// for, out of `String.ts` — a String is quoted inside a structure
 		// wherever the structure is rendered, and this walk is one of the
 		// places that renders one.
-		return quoted(obj.value)
+		return quotedText(obj.value)
 	} else if (obj[typeKeySymbol] === "Randomness") {
 		// NOTE: One fixed word, like a Function's. What a source holds is four
 		// words of generator state, which say nothing to a reader and would
