@@ -11110,6 +11110,43 @@ function namespacesDeclaringMethod(
 	return matchingNamespaces
 }
 
+// NOTE: A Type Parameter that no Scope here declares — a name that reached this
+// body out of a CALLEE's signature rather than out of the source. It gets there
+// when an Invocation fails to select an Overload: the last candidate's recorded
+// Parameter Types stand in for the Function literal Argument, so that the
+// literal is not reported as uninferable on top of the failure, and its
+// Parameters are then typed in the callee's Generics. A body typed that way is
+// enriched all the same, and a call in it reports against a name the reader can
+// not see — `price::isPositive()` inside a refused `Result::keep` said "this is
+// a ValueType", naming the standard library's own Type Parameter in a user's
+// file.
+//
+// So it is treated as the poison Type is treated one branch up: the Invocation
+// around it has already reported, and this is its cascade. A Type Parameter the
+// reader DID write — a Method's own `<infer Item>`, a generic Namespace's
+// `ItemType` — is in Scope and reports as before, since asking a Method of an
+// unbounded Generic is a real mistake with nothing else to say about it.
+function isUnwrittenTypeParameter(
+	type: common.Type,
+	scope: enricher.Scope,
+): boolean {
+	if (type.type !== "GenericUse") {
+		return false
+	}
+
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.types[type.name] !== undefined) {
+			return false
+		}
+	}
+
+	return true
+}
+
 function resolveMethodInvocation(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
@@ -11156,7 +11193,10 @@ function resolveMethodInvocation(
 		// has no Method of this name — two different mistakes, so they keep
 		// two different Diagnostics.
 		if (namespaces.size === 0) {
-			if (baseType.type !== "Error") {
+			if (
+				baseType.type !== "Error" &&
+				!isUnwrittenTypeParameter(baseType, scope)
+			) {
 				reportError(
 					`No Namespace provides Methods for this value`,
 					node.base.position,
