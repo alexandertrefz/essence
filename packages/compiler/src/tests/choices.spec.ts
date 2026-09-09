@@ -3227,6 +3227,38 @@ describe("Choices", () => {
 			).toEqual(["unsatisfied-bound"])
 		})
 
+		// NOTE: Every mode Choice the library declares answers, and none of
+		// them says so — which is the whole of what deriving without a
+		// declaration means. `Step`, `Optional` and `Result` are left out
+		// because each carries a payload.
+		it("answers for every mode Choice the library declares", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(Side.cases()::toString())
+					Terminal.inspect(CaseSensitivity.cases()::toString())
+					Terminal.inspect(NormalizationForm.cases()::toString())
+					Terminal.inspect(Ordering.cases()::toString())
+					Terminal.inspect(SortOrder.cases()::toString())
+					Terminal.inspect(Rounding.cases()::toString())
+					Terminal.inspect(NumberFormat.cases()::toString())
+					Terminal.inspect(SignStyle.cases()::toString())
+					Terminal.inspect(Division.cases()::toString())
+					Terminal.inspect(Stream.cases()::toString())
+				}`),
+			).toEqual([
+				'"[Start, End, BothEnds]"',
+				'"[Sensitive, Insensitive]"',
+				'"[ComposedCanonical, DecomposedCanonical, ComposedCompatibility, DecomposedCompatibility]"',
+				'"[Less, Equal, Greater]"',
+				'"[Ascending, Descending]"',
+				'"[Nearest, NearestEven, Down, Up, TowardZero]"',
+				'"[Fraction, Decimal, Percent, Scientific]"',
+				'"[Negative, Always]"',
+				'"[Euclidean, Truncating]"',
+				'"[Output, Error]"',
+			])
+		})
+
 		// NOTE: The emission is the runtime helper curried with the tags, for
 		// the reason a static has to be: there is no receiver at the call for
 		// the Choice to be recovered from. The tags are the very strings a Case

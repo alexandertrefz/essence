@@ -296,6 +296,64 @@ own declaration why: the written Overload holds an entry for the other numeric
 kind, and it reads its own `compare` rather than the cross-kind table, so a
 Program that compares two Integers reaches nothing else.
 
+## What the Compiler answers for
+
+Three conformances are **derived**: the Compiler answers them for a `choice`,
+and no Namespace writes a Method.
+
+| Protocol | Derived for | Declared? |
+|---|---|---|
+| `Equatable` | every Choice | no — every Choice has it |
+| `Printable` | a Choice whose Cases all carry no payload | yes — `is Printable` on a Namespace over the Choice |
+| `Enumerable` | a Choice whose Cases all carry no payload | no — every such Choice has it |
+
+Equality compares the tag, and the payload where a Case carries one. Printing
+answers the Case's own name, so `#Less` prints `Less`. Each answers a call
+written on a value, and each is what the witness carries, so a bounded call
+reaches the same Method.
+
+Printing waits to be declared because how a value READS is a decision. What the
+Cases of a Choice ARE is not, which is why `Enumerable` follows equality:
+
+```essence
+choice Colour {
+	Red,
+	Green,
+	Blue,
+}
+
+§ No Namespace and no conformance clause: the Cases are the answer.
+Terminal.print(Colour.cases()::length()) § 3
+```
+
+`Enumerable` asks for a **static**, so it is spelled on the Choice rather than on
+a value of it:
+
+```essence
+protocol Enumerable {
+	§§ Answers every value of the Type.
+	§§
+	§§ @returns — every Case of the Choice, in declaration order.
+	static cases() -> NonEmptyList<Self>
+}
+```
+
+The answer stands in declaration order and is a `NonEmptyList`, because a Choice
+declares at least one Case — so `Colour.cases()::firstItem()` answers a Colour
+rather than an Optional. Inside a bounded body the Type Parameter is what the
+static is called on, which is the only spelling a static requirement has:
+
+```essence
+function count<infer Mode is Enumerable>(_ example: Mode) -> Integer {
+	<- Mode.cases()::length()
+}
+```
+
+A Choice that carries a payload anywhere derives nothing here: there is no value
+of such a Case to list without inventing one. It conforms by writing the Method,
+which is also how any Namespace replaces a derive — a written `cases` is the
+answer wherever one is written, exactly as a written `is` or `toString` is.
+
 ## How it is compiled
 
 A conformance is a **witness** — a record mapping each requirement to the Method

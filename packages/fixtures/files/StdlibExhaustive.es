@@ -3237,6 +3237,7 @@ c"::quote())
 	show("Choice_Printable.toString() [Ordering#Less]", less::toString())
 	show("Choice_Printable.toString() [Ordering#Equal]", equal::toString())
 	show("Choice_Printable.toString() [Ordering#Greater]", greater::toString())
+	show("Choice_Enumerable.cases() [Ordering]", Ordering.cases())
 	show("Ordering.then(_ Ordering)", equal::then(#Greater))
 	show("Ordering.then(_ Ordering) [decided]", less::then(#Greater))
 	show(
@@ -3262,6 +3263,7 @@ c"::quote())
 	show("Choice_Printable.toString() [Side#Start]", atStart::toString())
 	show("Choice_Printable.toString() [Side#End]", atEnd::toString())
 	show("Choice_Printable.toString() [Side#BothEnds]", atBothEnds::toString())
+	show("Choice_Enumerable.cases() [Side]", Side.cases())
 
 	§ ——— CaseSensitivity ——————————————————————————————————————————————————
 	constant sensitive: CaseSensitivity   = #Sensitive
@@ -3295,6 +3297,7 @@ c"::quote())
 		"Choice_Printable.toString() [CaseSensitivity#Insensitive]",
 		insensitive::toString(),
 	)
+	show("Choice_Enumerable.cases() [CaseSensitivity]", CaseSensitivity.cases())
 
 	§ ——— NormalizationForm ————————————————————————————————————————————————
 	constant composedCanonical: NormalizationForm   = #ComposedCanonical
@@ -3323,6 +3326,10 @@ c"::quote())
 	show(
 		"Choice_Printable.toString() [NormalizationForm#DecomposedCanonical]",
 		decomposedCanonical::toString(),
+	)
+	show(
+		"Choice_Enumerable.cases() [NormalizationForm]",
+		NormalizationForm.cases(),
 	)
 
 	§ ——— NumberFormat ———————————————————————————————————————————————————————
@@ -3357,6 +3364,7 @@ c"::quote())
 		"Choice_Printable.toString() [NumberFormat#Scientific]",
 		asScientific::toString(),
 	)
+	show("Choice_Enumerable.cases() [NumberFormat]", NumberFormat.cases())
 
 	§ ——— Rounding —————————————————————————————————————————————————————————
 	constant toNearest: Rounding     = #Nearest
@@ -3383,6 +3391,7 @@ c"::quote())
 		"Choice_Printable.toString() [Rounding#NearestEven]",
 		toNearestEven::toString(),
 	)
+	show("Choice_Enumerable.cases() [Rounding]", Rounding.cases())
 
 	§ ——— SignStyle ————————————————————————————————————————————————————————
 	constant onlyNegative: SignStyle = #Negative
@@ -3406,6 +3415,7 @@ c"::quote())
 		"Choice_Printable.toString() [SignStyle#Always]",
 		alwaysSigned::toString(),
 	)
+	show("Choice_Enumerable.cases() [SignStyle]", SignStyle.cases())
 
 	§ ——— Division —————————————————————————————————————————————————————————
 	constant euclidean: Division  = #Euclidean
@@ -3429,6 +3439,7 @@ c"::quote())
 		"Choice_Printable.toString() [Division#Truncating]",
 		truncating::toString(),
 	)
+	show("Choice_Enumerable.cases() [Division]", Division.cases())
 
 	§ ——— SortOrder ————————————————————————————————————————————————————————
 	constant ascending: SortOrder  = #Ascending
@@ -3452,6 +3463,7 @@ c"::quote())
 		"Choice_Printable.toString() [SortOrder#Descending]",
 		descending::toString(),
 	)
+	show("Choice_Enumerable.cases() [SortOrder]", SortOrder.cases())
 
 	§ ——— Stream ———————————————————————————————————————————————————————————
 	constant toOutput: Stream = #Output
@@ -3463,6 +3475,7 @@ c"::quote())
 	show("Choice_Equatable.isNot(_ Stream) [same]", toError::isNot(#Error))
 	show("Choice_Printable.toString() [Stream#Output]", toOutput::toString())
 	show("Choice_Printable.toString() [Stream#Error]", toError::toString())
+	show("Choice_Enumerable.cases() [Stream]", Stream.cases())
 
 	§ ——— Record ———————————————————————————————————————————————————————————
 	§ LOAD-BEARING: `point` prints as `{ x = 1, y = 2 }`, well under sixty

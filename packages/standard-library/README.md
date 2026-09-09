@@ -3,23 +3,23 @@
 Essence's standard library, written in Essence.
 
 Everything a Program can reach before its first line is declared here: the core
-Protocols (`Equatable`, `Printable`, `Comparable`, `Orderable`), `Boolean`,
-`Optional`, `Result`, `Ordering`, `Record`, `String`, the whole numeric tower
-(`Integer`, `Rational`, `Algebraic`, `Transcendental` and the covering
-`Number`, which brings the `Number`, `Irrational` and `Scalar` Union Types with
-it), and `List` together with `NestedList`, `OptionalList`, `ResultList`,
-`NonEmptyList` and the `NonEmptyNestedList` that only both of those proofs
-together reach. The two failure carriers each have a nested Namespace beside
-them, `NestedOptional` and `NestedResult`, holding the `flatten` that only a
-carrier of a carrier answers. A checked refinement is exported beside the base
-it narrows: `NonZeroInteger`, `NonNegativeInteger` and `PositiveInteger` beside
-`Integer`, `NonZeroRational`, `NonNegativeRational` and `PositiveRational`
-beside `Rational`, `NonEmptyString` and `Character` beside `String`,
-`NonEmptyList` beside `List`. Each reaches everything its base reaches, and the
-tighter answers a proof affords on top — `DEVELOPMENT.md` has the rule a
-narrowed receiver is read by. A value written down is its own proof and reaches
-them without being narrowed at all: `4::squareRoot()` answers a number and
-`[1, 2]::firstItem()` answers an item.
+Protocols (`Equatable`, `Printable`, `Comparable`, `Orderable`, `Enumerable`),
+`Boolean`, `Optional`, `Result`, `Ordering`, `Record`, `String`, the whole
+numeric tower (`Integer`, `Rational`, `Algebraic`, `Transcendental` and the
+covering `Number`, which brings the `Number`, `Irrational` and `Scalar` Union
+Types with it), and `List` together with `NestedList`, `OptionalList`,
+`ResultList`, `NonEmptyList` and the `NonEmptyNestedList` that only both of
+those proofs together reach. The two failure carriers each have a nested
+Namespace beside them, `NestedOptional` and `NestedResult`, holding the
+`flatten` that only a carrier of a carrier answers. A checked refinement is
+exported beside the base it narrows: `NonZeroInteger`, `NonNegativeInteger` and
+`PositiveInteger` beside `Integer`, `NonZeroRational`, `NonNegativeRational`
+and `PositiveRational` beside `Rational`, `NonEmptyString` and `Character`
+beside `String`, `NonEmptyList` beside `List`. Each reaches everything its base
+reaches, and the tighter answers a proof affords on top — `DEVELOPMENT.md` has
+the rule a narrowed receiver is read by. A value written down is its own proof
+and reaches them without being narrowed at all: `4::squareRoot()` answers a
+number and `[1, 2]::firstItem()` answers an item.
 The aggregates a List of numbers answers are reachable from the List itself,
 through six Namespaces of their own in `NumberList.es` — `IntegerList`,
 `RationalList` and `NumberList`, and the `NonEmptyIntegerList`,
@@ -40,6 +40,10 @@ A Choice whose Cases all carry no payload derives both its `Equatable` and its
 the two and holds no body at all: `#Less` prints `Less` without anybody writing
 that down. `Step` has none, because both of its Cases carry a payload and only a
 Choice of Cases that carry none derives a `toString`.
+The same rule derives `Enumerable`, and that one nobody declares: `Side.cases()`
+answers `[#Start, #End, #BothEnds]`, in the order the Choice declares them, for
+every Choice of payload-free Cases a Program can reach — the library's ten and
+its own alike.
 
 The only things NOT declared here are the ones no declaration could produce:
 the bare Type tags — `Boolean`, `String`, `Integer`, `Rational`, `Algebraic`,
