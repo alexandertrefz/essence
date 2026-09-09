@@ -830,6 +830,7 @@ c"::quoted())
 	show("Integer.absolute()", computedNegativeFive::absolute())
 	show("Integer.absolute() [positive]", computedFive::absolute())
 	show("Integer.negate()", computedFive::negate())
+	show("Integer.toRational()", computedFive::toRational())
 	show("Integer.negate() [zero]", 0::negate())
 	show("Integer.round(toward?: Rounding) [no direction named]", 5::round())
 	show("Integer.round(toward?: Rounding)", -5::round(toward #Up))
@@ -1480,6 +1481,7 @@ c"::quoted())
 	show("Rational.denominator()", 3/4::denominator())
 	show("Rational.absolute()", computedNegativeThreeQuarters::absolute())
 	show("Rational.negate()", computedThreeQuarters::negate())
+	show("Rational.toRational()", computedThreeQuarters::toRational())
 	show("Rational.reciprocal()", computedThreeQuarters::reciprocal())
 	show("Rational.reciprocal() [of zero]", 0/1::reciprocal())
 	show(
@@ -2755,6 +2757,22 @@ c"::quoted())
 	show(
 		"Number.highest(_ Number, _ Number) [first is higher]",
 		Number.highest(Number.Pi, 3),
+	)
+
+	§ Reading a number back. The Integer form is tried first, so a whole
+	§ number answers an Integer rather than the Rational over one that
+	§ `Rational.parse` answers alone.
+	show("Number.parse(_ String)", Number.parse("5"))
+	show("Number.parse(_ String) [fraction]", Number.parse("3/4"))
+	show("Number.parse(_ String) [decimal]", Number.parse("0.75"))
+	show("Number.parse(_ String) [not a number]", Number.parse("nope"))
+	show(
+		"Number.parse(_ String, defaultingTo: Scalar)",
+		Number.parse("3/4", defaultingTo 0),
+	)
+	show(
+		"Number.parse(_ String, defaultingTo: Scalar) [not a number]",
+		Number.parse("nope", defaultingTo 0),
 	)
 
 	§ ——— Optional —————————————————————————————————————————————————————————

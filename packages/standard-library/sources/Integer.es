@@ -1067,6 +1067,21 @@ declarations {
 			}
 		}
 
+		§ The Integer half of the pair that crosses between the two exact
+		§ kinds. What it spells is `Rational.of(@, over 1)`. That is a poor
+		§ thing to have to write for a widening that never fails. The Rational
+		§ half answers its own receiver, so a `Scalar` receiver reaches the
+		§ name as it reaches `round` and `isWholeNumber`.
+
+		§§ Answers the Integer as a Rational.
+		§§
+		§§ Every Integer is a Rational over one, so the crossing never fails. The Rational is whole, and prints as the digits alone.
+		§§
+		§§ @returns — the Rational holding this value.
+		toRational() -> Rational {
+			<- Rational.of(@, over 1)
+		}
+
 		§ `clamp` and `isBetween` are `Orderable`'s provided Methods now. Both
 		§ are written on the four inequalities `Comparable` provides. Those
 		§ read `compare` through the conformance, so an Integer receiver
