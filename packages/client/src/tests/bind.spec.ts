@@ -382,12 +382,13 @@ describe("A Choice", () => {
 })
 
 // NOTE: `Optional` is the one Choice spelled by ABSENCE rather than by a
-// `$case`, and an unannotated `constant present = #Value(3)` is inferred as one
-// of its Cases ALONE rather than as the Union an annotation would have named —
-// so the lone Case is a shape the boundary meets, and it has to read as the
-// item itself in every position it appears in. The way in, the way out and the
-// generated declarations each carry that rule, and this is where they are held
-// to saying the same thing.
+// `$case`, and a `constant present = Optional<Integer>#Value(3)` is inferred as
+// one of its Cases ALONE rather than as the Union an annotation would have
+// named — writing the Choice out is not an annotation, and it is written out
+// because `Result` declares a `#Value` too. So the lone Case is a shape the
+// boundary meets, and it has to read as the item itself in every position it
+// appears in. The way in, the way out and the generated declarations each carry
+// that rule, and this is where they are held to saying the same thing.
 describe("One of Optional's own Cases met alone", () => {
 	it("reads a lone #Value as the item and a lone #Empty as nothing", () => {
 		expect(absence.exports.present).toBe(3n)
