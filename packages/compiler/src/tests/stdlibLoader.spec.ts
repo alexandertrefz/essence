@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import type { common, enricher } from "@essence-lang/interfaces"
+import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 
 import { collectDiagnostics } from "../diagnostics/index"
 import { builtinMemberOrder, builtinTypeOrder } from "../enricher/builtins"
@@ -992,6 +993,78 @@ describe("Standard Library Loader", () => {
 
 		expect(load).toThrow(/Zulu\.es[\s\S]*Nonexistent/)
 		expect(load).not.toThrow(/Alpha\.es:[\s\S]*?Nonexistent/)
+	})
+
+	// NOTE: The shape of the graph is frozen, and `refuseUnexpectedCycles` is
+	// what freezes it — see the standard library's DEVELOPMENT.md. Every other
+	// developer throw in `loadStdlibFrom` is driven here, and this one was not:
+	// the guard is armed against a real third cycle, which every load of the
+	// library on disk would report, but nothing said that its comparison can
+	// not be loosened. A `found.length >= 0` in place of the set comparison
+	// passed the whole suite.
+	//
+	// Driven through the ordinary door rather than by exporting the guard,
+	// because `parseStdlibSource` takes the file name verbatim and the gate the
+	// guard opens on is where the files ARE — so two synthetic sources named
+	// under `STDLIB_DIRECTORY` are a real library as far as it is concerned,
+	// and the same two under bare names are the test library every other case
+	// here builds.
+	const CYCLE_SOURCES: Array<[string, string]> = [
+		[
+			"Aye.es",
+			`import { from "./Bee.es" { Bee } }
+
+			declarations {
+				type Aye = Integer
+
+				namespace Aye for Aye {
+					§§ The Bee this Aye stands for.
+					§§ @returns — the Bee.
+					bee() -> Bee
+				}
+			}`,
+		],
+		[
+			"Bee.es",
+			`import { from "./Aye.es" { Aye } }
+
+			declarations {
+				type Bee = String
+
+				namespace Bee for Bee {
+					§§ The Aye this Bee stands for.
+					§§ @returns — the Aye.
+					aye() -> Aye
+				}
+			}`,
+		],
+	]
+
+	it("refuses a cycle the library did not decide on", () => {
+		let load = () =>
+			loadStdlibFrom(
+				CYCLE_SOURCES.map(([fileName, source]) =>
+					parseStdlibSource(
+						`${STDLIB_DIRECTORY}/${fileName}`,
+						source,
+					),
+				),
+			)
+
+		expect(load).toThrow(/dependency graph changed shape/)
+		expect(load).toThrow(
+			/Algebraic\.es, Integer\.es, List\.es, Rational\.es, String\.es, Transcendental\.es/,
+		)
+		expect(load).toThrow(/Optional\.es, Result\.es/)
+		expect(load).toThrow(/Found 1:\n  Aye\.es, Bee\.es/)
+	})
+
+	// NOTE: The other half of the gate, and what keeps every other case in this
+	// file loadable: the frozen set is a fact about the files in
+	// `packages/standard-library/sources`, not about the loader, so a library
+	// assembled anywhere else may have whatever shape its test wants.
+	it("leaves a test library's own cycles alone", () => {
+		expect(() => load(...CYCLE_SOURCES)).not.toThrow()
 	})
 
 	// NOTE: `Terminal.es` is reachable from nothing — no standard library file
