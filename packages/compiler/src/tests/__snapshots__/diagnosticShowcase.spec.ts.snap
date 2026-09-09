@@ -2463,8 +2463,8 @@ Error: Case '#Value' is declared by more than one Choice
     │            ──┬──  
     │              ╰──── 2 Choices in scope declare it
     │ 
-    │ Help 1: Write 'Optional#Value' to pick 'Optional'.
-    │ Help 2: Write 'Result#Value' to pick 'Result'.
+    │ Help 1: Write 'Optional<…>#Value' with its Type Arguments to pick 'Optional'.
+    │ Help 2: Write 'Result<…>#Value' with its Type Arguments to pick 'Result'.
     │ 
     │ Note 1: 'Optional' declares '#Value'.
     │ Note 2: 'Result' declares '#Value'.
@@ -2512,8 +2512,8 @@ Error: Case '#Value' is declared by more than one Choice
     │            ──┬──  
     │              ╰──── 2 Choices in scope declare it
     │ 
-    │ Help 1: Write 'Optional#Value' to pick 'Optional'.
-    │ Help 2: Write 'Result#Value' to pick 'Result'.
+    │ Help 1: Write 'Optional<…>#Value' with its Type Arguments to pick 'Optional'.
+    │ Help 2: Write 'Result<…>#Value' with its Type Arguments to pick 'Result'.
     │ 
     │ Note 1: 'Optional' declares '#Value'.
     │ Note 2: 'Result' declares '#Value'.

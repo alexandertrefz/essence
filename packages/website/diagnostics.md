@@ -1680,6 +1680,16 @@ only the name is rewritten, and the underlined span stops short of the sigil.
 A bare `#Case` is declared by more than one Choice in scope. Prefix it with
 its Choice's name — `Colour#Red`.
 
+Where the Choice is generic, the name alone is not enough: its Type Arguments
+are applied and never inferred, so `Optional#Value(1)` in a position that
+decides nothing resolves the ambiguity and then reports
+[`undecided-type-arguments`](#undecided-type-arguments). Write both at once —
+`Optional<Integer>#Value(1)`. The Help says so, showing the shape as
+`Optional<…>#Value`, because the Choice's own Parameter names are not in scope
+at the call and writing one back is [`unknown-type`](#unknown-type). `#Value`
+and `#Empty` reach this every day: `Optional` and `Result` are both in every
+Program's scope and both declare a `#Value`.
+
 ### `missing-payload`
 
 A Case that carries a payload was written without one. A bare `#Case` is a UNIT
