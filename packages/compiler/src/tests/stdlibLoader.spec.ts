@@ -1642,6 +1642,7 @@ describe("Standard Library Loader", () => {
 			"Printable",
 			"Comparable",
 			"Orderable",
+			"Enumerable",
 			"Generatable",
 		])
 	})
