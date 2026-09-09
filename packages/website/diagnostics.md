@@ -700,8 +700,9 @@ admitted, and a `0` written beside them is what this reports.
 
 `matches snapshot` records what a value LOOKS like, which is what
 `Printable::toString` answers — so a value with no such answer has nothing to
-record. An `Optional`, a bare structural Union and a `choice` that declares no
-`toString` are the three that reach this:
+record. An `Optional` or a `Result` whose payload is not Printable, a bare
+structural Union, and a `choice` that declares no `toString` are what reach
+this:
 
 ```essence
 tests {
@@ -2151,9 +2152,10 @@ to — either it carries no such bound, or no conforming Namespace is in scope.
 A `{ … }` hole in a String Literal holds a value that does not conform to
 `Printable`, so it has no `toString` to turn it into text. Every builtin is
 Printable, but a bare structural Union belongs to no Namespace and is not, and
-an `Optional` is Printable only when its payload is — match it apart first and
-interpolate each Case, exactly as a `case #Empty { … } case #Value(item) { … }`
-would.
+the two failure carriers are Printable only when what they hold is: an
+`Optional` when its payload is, a `Result` when both its value and its reason
+are. Match one apart first and interpolate each Case, exactly as a
+`case #Empty { … } case #Value(item) { … }` would.
 
 ### `redundant-interpolation-to-string`
 
@@ -2164,8 +2166,8 @@ hole renders its value through that same conformance, so `"{ count }"` and
 Only the bare, String-answering call is redundant. A `toString` given an
 Argument picks a form the hole would not — `"{ ratio::toString(as
 #Decimal) }"` — and a receiver that is not Printable on its own, a bare
-structural Union or an `Optional` whose payload is not Printable, has no
-conformance for the hole to reach at all.
+structural Union or an `Optional` or `Result` whose payload is not Printable,
+has no conformance for the hole to reach at all.
 
 **Quick Fix — "Remove the redundant 'toString' call":** deletes the
 `::toString()` and leaves the receiver.
