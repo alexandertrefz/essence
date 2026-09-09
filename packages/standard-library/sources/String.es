@@ -742,13 +742,16 @@ declarations {
 		§§ The occurrences do not overlap: `"aaa"::count(of "aa")` is 1. The empty String occurs 0 times.
 		overload count {
 			§§ @param of — the String to count
-			§§ @returns — the number of occurrences.
-			(of part: String) -> Integer
+			§§ @returns — the number of occurrences, which is never negative.
+			(of part: String) -> NonNegativeInteger
 
 			§§ @param of — the String to count
 			§§ @param comparing — whether case is significant
-			§§ @returns — the number of occurrences under the given `CaseSensitivity`.
-			(of part: String, comparing sensitivity: CaseSensitivity) -> Integer
+			§§ @returns — the number of occurrences under the given `CaseSensitivity`, which is never negative.
+			(
+				of part: String,
+				comparing sensitivity: CaseSensitivity,
+			) -> NonNegativeInteger
 		}
 
 		§§ Answers the String with every character in upper case.
