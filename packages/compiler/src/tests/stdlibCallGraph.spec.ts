@@ -508,6 +508,7 @@ describe("Stdlib Call Graph", () => {
 			"Dictionary.update__overload$2",
 			"Dictionary.value__overload$2",
 			"Equatable.isNot",
+			"Generatable.shrink",
 			"Integer.add__overload$2",
 			"Integer.add__overload$3",
 			"Integer.add__overload$4",
