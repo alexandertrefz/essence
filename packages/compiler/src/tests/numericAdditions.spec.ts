@@ -310,6 +310,41 @@ describe("Reading and writing an Integer in another base", () => {
 		])
 	})
 
+	// NOTE: The base-less entry reads a leading sign and an underscore between
+	// two digits, and this is the same shape at every base — an Overload whose
+	// two entries read one text two ways is the trap these lines close.
+	it("reads the sign and the separators the base-less entry reads", async () => {
+		expect(
+			await run(
+				program(
+					show('Integer.parse("1_000", inBase 10)'),
+					show('Integer.parse("f_f", inBase 16)'),
+					show('Integer.parse("+42", inBase 10)'),
+					show('Integer.parse("+1_000", inBase 10)'),
+					show('Integer.parse("-1_000", inBase 10)'),
+					show('Integer.parse("1_", inBase 10)'),
+					show('Integer.parse("_1", inBase 10)'),
+					show('Integer.parse("1__0", inBase 10)'),
+					show('Integer.parse("+", inBase 10)'),
+					show('Integer.parse("1_000", inBase 10, defaultingTo 0)'),
+					show('Integer.parse("1_", inBase 10, defaultingTo 0)'),
+				),
+			),
+		).toEqual([
+			"Optional#Value(1000)",
+			"Optional#Value(255)",
+			"Optional#Value(42)",
+			"Optional#Value(1000)",
+			"Optional#Value(-1000)",
+			"Optional#Empty",
+			"Optional#Empty",
+			"Optional#Empty",
+			"Optional#Empty",
+			"1000",
+			"0",
+		])
+	})
+
 	// NOTE: The clamp both entries read a base through, which is what keeps
 	// them a round trip at a base no positional notation has.
 	it("reads a base outside two through thirty-six as the nearest of the two", async () => {

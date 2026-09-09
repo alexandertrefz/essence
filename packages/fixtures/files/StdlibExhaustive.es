@@ -1109,6 +1109,14 @@ c"::quote())
 		Integer.parse("101", inBase 1),
 	)
 	show(
+		"Integer.parse(_ String, inBase: Integer) [separators and a sign]",
+		Integer.parse("+f_f", inBase 16),
+	)
+	show(
+		"Integer.parse(_ String, inBase: Integer) [a separator at the end]",
+		Integer.parse("ff_", inBase 16),
+	)
+	show(
 		"Integer.parse(_ String, inBase: Integer, defaultingTo: Integer)",
 		Integer.parse("zz", inBase 36, defaultingTo 0),
 	)

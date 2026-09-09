@@ -68,7 +68,7 @@ declarations {
 	namespace Integer for Integer is Equatable, is Printable, is Orderable {
 		§§ Reads an Integer from its text form.
 		§§
-		§§ The text form is the one the language writes an Integer down in. It is digits, with an optional sign in front, and an optional underscore between two digits. Text of any other shape answers empty, and the `defaultingTo:` entry answers the given Integer instead.
+		§§ The text form is the notation the language writes an Integer in, and a leading sign in front of it. It is digits, with an optional underscore between two digits. A leading `+` is read for text a Program was handed rather than wrote. Text of any other shape answers empty, and the `defaultingTo:` entry answers the given Integer instead.
 		§§
 		§§ @example
 		§§   expect Integer.parse("-42")::is(-42)
@@ -100,6 +100,11 @@ declarations {
 				§ which is the rule the Lexer reads a written Integer by. A
 				§ `1_000` is a Number, and `_1`, `1_` and `1__0` are not. So
 				§ the notation the language writes reads back through here.
+				§
+				§ A leading `+` is read as well, which the Lexer refuses:
+				§ `constant a = +42` is no Integer, and a `+42` handed to a
+				§ Program is one. The `inBase:` entry reads the same shape,
+				§ so an Overload does not read one text two ways.
 				if digitPoints
 					::isEmpty()
 					::or(digitPoints::firstItem(defaultingTo 0)::is(95))
@@ -177,7 +182,7 @@ declarations {
 
 			§§ Reads an Integer from its text form in the given base.
 			§§
-			§§ The text form is an optional minus sign followed by digits of that base. A digit above nine is a letter, and a capital letter reads as its lowercase. Text of any other shape answers empty. A base below two is read as two, and a base above thirty-six as thirty-six.
+			§§ The text form is the one the entries above read, in digits of that base: a leading sign, and an optional underscore between two digits. A digit above nine is a letter, and a capital letter reads as its lowercase. Text of any other shape answers empty. A base below two is read as two, and a base above thirty-six as thirty-six.
 			§§
 			§§ @param _ — the text to read
 			§§ @param inBase — the base the digits are written in

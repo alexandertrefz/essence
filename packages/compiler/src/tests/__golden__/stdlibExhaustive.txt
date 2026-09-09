@@ -377,6 +377,8 @@
 "Integer.parse(_ String, inBase: Integer) [capital digits] => Value(-255)"
 "Integer.parse(_ String, inBase: Integer) [digit the base has no room for] => Empty"
 "Integer.parse(_ String, inBase: Integer) [base below two] => Value(5)"
+"Integer.parse(_ String, inBase: Integer) [separators and a sign] => Value(255)"
+"Integer.parse(_ String, inBase: Integer) [a separator at the end] => Empty"
 "Integer.parse(_ String, inBase: Integer, defaultingTo: Integer) => 1295"
 "Integer.parse(_ String, inBase: Integer, defaultingTo: Integer) [not a number] => 0"
 "Integer.toString() => 42"
