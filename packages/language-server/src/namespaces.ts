@@ -4,6 +4,7 @@ import {
 	builtinProtocols as builtinProtocolTable,
 } from "@essence-lang/compiler/enricher/builtins"
 import {
+	derivedCaseTags,
 	derivedEnumerableNamespaceForChoice,
 	derivedEquatableNamespaceForChoice,
 	derivedPrintableNamespaceForChoice,
@@ -62,6 +63,66 @@ export function derivedEnumerableNamespace(
 		Object.hasOwn(namespace.methods, enumerableMethodName)
 		? null
 		: derivedEnumerableNamespaceForChoice(namespace.targetType, protocol)
+}
+
+// NOTE: The Namespaces a `.` on a base that names a TYPE reads its members off:
+// a Choice's derived Case listing, and everything a Protocol-bounded Type
+// Parameter's bound offers. Both are Namespaces nobody declared — the mirror of
+// the Enricher's `namespaceNamedByType`, which is the rail these two spellings
+// compile and hover through.
+//
+// NOTE: A Namespace WRITING `cases` over the Choice is the answer where one
+// does, exactly as it is at the call, and narrowed to that one Method: the base
+// names a Type, so the only member this rail offers is the one the derive would
+// have answered.
+export function namedTypeNamespaces(
+	baseType: common.Type,
+	documentText: string,
+	documentPath?: string,
+	document: DocumentAnalysis | null = null,
+): Array<common.NamespaceType> {
+	if (baseType.type === "GenericUse") {
+		return baseType.constraint === undefined
+			? []
+			: matchingNamespaces(
+					documentText,
+					baseType,
+					null,
+					documentPath,
+					[],
+					document,
+				)
+	}
+
+	let protocol = builtinProtocolTable()[enumerableProtocolName]
+
+	if (protocol === undefined || derivedCaseTags(baseType) === null) {
+		return []
+	}
+
+	let written = matchingNamespaces(
+		documentText,
+		baseType,
+		null,
+		documentPath,
+		[],
+		document,
+	).find((namespace) =>
+		Object.hasOwn(namespace.methods, enumerableMethodName),
+	)
+	let listing =
+		written === undefined
+			? derivedEnumerableNamespaceForChoice(baseType, protocol)
+			: {
+					...written,
+					properties: {},
+					methods: {
+						[enumerableMethodName]:
+							written.methods[enumerableMethodName]!,
+					},
+				}
+
+	return listing === null ? [] : [listing]
 }
 
 function targetTypeMatches(

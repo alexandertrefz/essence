@@ -2276,6 +2276,12 @@ A Protocol name was used in a Type position, with the same reasoning.
 A Type Argument does not conform to the Protocol its Type Parameter is bound
 to — either it carries no such bound, or no conforming Namespace is in scope.
 
+A bare Case gets a different Help. `count(Colour#Red)` binds the Type Parameter
+to `Colour#Red` rather than to `Colour`, and a Namespace's target is never one
+Case of a Choice — `namespace Reds for Colour#Red is Enumerable` does not parse
+— so the Help names the Choice instead: annotate the value at `Colour`, and the
+bound is satisfied by the Choice the Case belongs to.
+
 ### `interpolation-not-printable`
 
 A `{ … }` hole in a String Literal holds a value that does not conform to

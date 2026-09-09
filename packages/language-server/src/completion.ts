@@ -1,3 +1,4 @@
+import { enumerableMethodName } from "@essence-lang/compiler/enricher/resolvers"
 import {
 	caseDefaults,
 	filterMostSpecificByTarget,
@@ -38,7 +39,11 @@ import {
 	moduleSectionCursor,
 } from "./importCompletion"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
-import { derivedEnumerableNamespace, matchingNamespaces } from "./namespaces"
+import {
+	derivedEnumerableNamespace,
+	matchingNamespaces,
+	namedTypeNamespaces,
+} from "./namespaces"
 import { contains, isAtOrBefore, isSmaller } from "./positions"
 import { probeSourcesFor, stripNoise } from "./probe"
 import {
@@ -280,6 +285,26 @@ export function findCompletions(
 					: `.${probeMemberName}`,
 			)
 
+		// NOTE: And the base that names a TYPE rather than a value — a Choice
+		// nobody wrote a Namespace for, and a Protocol-bounded Type Parameter.
+		// Both read their members off a Namespace nobody declared, and the
+		// Enricher answers that rail only for a member that Namespace OFFERS —
+		// so the probe's own invented name types the base as an Error and the
+		// cursor was answered with nothing. Asked again under the one member
+		// such a base does offer, which is the derived Case listing.
+		let namedType =
+			memberMatch !== null &&
+			(base === null || base.type.type === "Error")
+				? resolveProbedBase(
+						headText,
+						documentPath,
+						`.${enumerableMethodName}`,
+						enumerableMethodName,
+					)
+				: null
+
+		base = namedType ?? base
+
 		if (base === null) {
 			return []
 		}
@@ -302,7 +327,14 @@ export function findCompletions(
 					workspace.namespaces,
 					document,
 				)
-			: memberCompletions(base.type, base.program)
+			: memberCompletions(
+					base.type,
+					base.program,
+					namedType !== null,
+					documentText,
+					documentPath,
+					document,
+				)
 	}
 
 	// NOTE: A `#` offers Cases rather than Scope names — the two never share a
@@ -504,32 +536,78 @@ type ProbedBase = {
 	program: common.typed.Program
 }
 
+// NOTE: The member the probe in flight spelled, and where it stands. Module
+// state rather than a Parameter because the walk that looks for it recurses
+// through a dozen helpers that have no other reason to carry it, and there is
+// exactly one probe at a time: this is set and cleared around one synchronous
+// call.
+//
+// NOTE: The POSITION is what makes a probe spelled with a REAL member name safe.
+// The suffix is appended straight after the head text, so the probe's own
+// Lookup is the one at that line and column — a `.cases` the document spells
+// somewhere above the cursor stands before it and can not answer in its place.
+// The invented name needs none of this, and is matched by name alone.
+let probedMember: { name: string; line: number; column: number } | null = null
+
+function isProbedMember(member: {
+	content: string
+	position: common.Position
+}): boolean {
+	if (member.content === probeMemberName) {
+		return true
+	}
+
+	return (
+		probedMember !== null &&
+		member.content === probedMember.name &&
+		member.position.start.line === probedMember.line &&
+		member.position.start.column === probedMember.column
+	)
+}
+
 function resolveProbedBase(
 	headText: string,
 	documentPath?: string,
 	suffix: string = `.${probeMemberName}`,
+	memberName: string = probeMemberName,
 ): ProbedBase | null {
-	for (let probeSource of probeSourcesFor(headText, suffix)) {
-		try {
-			let { program } = parseDocument(probeSource, documentPath)
-			let { program: enrichedProgram } = enrichDocument(
-				program,
-				documentPath,
-				{ tests: true },
-			)
-			let baseType = findProbeReceiver(typedProgramNodes(enrichedProgram))
+	let headLines = headText.split("\n")
 
-			if (baseType !== null) {
-				return { type: baseType, program: enrichedProgram }
-			}
-		} catch {
-			// NOTE: A reading that does not parse is simply not the reading —
-			// the next one is tried, and a cursor no reading explains answers
-			// with nothing, exactly as it did.
-		}
+	probedMember = {
+		name: memberName,
+		line: headLines.length,
+		// NOTE: One past the head text's last column for the `.`, and one more
+		// for the first character of the name.
+		column: (headLines[headLines.length - 1]?.length ?? 0) + 2,
 	}
 
-	return null
+	try {
+		for (let probeSource of probeSourcesFor(headText, suffix)) {
+			try {
+				let { program } = parseDocument(probeSource, documentPath)
+				let { program: enrichedProgram } = enrichDocument(
+					program,
+					documentPath,
+					{ tests: true },
+				)
+				let baseType = findProbeReceiver(
+					typedProgramNodes(enrichedProgram),
+				)
+
+				if (baseType !== null) {
+					return { type: baseType, program: enrichedProgram }
+				}
+			} catch {
+				// NOTE: A reading that does not parse is simply not the reading
+				// — the next one is tried, and a cursor no reading explains
+				// answers with nothing, exactly as it did.
+			}
+		}
+
+		return null
+	} finally {
+		probedMember = null
+	}
 }
 
 function findProbeReceiver(
@@ -664,7 +742,7 @@ function findProbeReceiverInNode(
 				findProbeReceiverInArguments(node.arguments)
 			)
 		case "Lookup":
-			if (node.member.content === probeMemberName) {
+			if (isProbedMember(node.member)) {
 				return node.base.type
 			}
 
@@ -950,6 +1028,14 @@ function findProbeReceiverInArguments(
 function memberCompletions(
 	baseType: common.Type,
 	program: common.typed.Program,
+	// NOTE: Whether the base SPELLED a Type rather than a value of one, which is
+	// what the fallback probe above answers and nothing about the Type itself
+	// can say: `Colour.` and `red.` are the same Type at this point, and only
+	// one of them reaches a static.
+	namesType: boolean,
+	documentText: string,
+	documentPath?: string,
+	document: DocumentAnalysis | null = null,
 ): Array<CompletionEntry> {
 	if (baseType.type === "Record") {
 		return Object.entries(baseType.members).map(([name, type]) => ({
@@ -1001,7 +1087,38 @@ function memberCompletions(
 		return entries
 	}
 
-	return []
+	// NOTE: And a base that names a TYPE rather than a value — a Choice whose
+	// `cases` is derived, and a Protocol-bounded Type Parameter whose members
+	// are its bound's. Both read off a Namespace nobody declared, which is the
+	// spelling `protocols.md` headlines, and both compiled, ran and hovered
+	// long before either was offered here.
+	if (!namesType) {
+		return []
+	}
+
+	let entries: Array<CompletionEntry> = []
+
+	for (let namespace of namedTypeNamespaces(
+		baseType,
+		documentText,
+		documentPath,
+		document,
+	)) {
+		for (let [name, method] of Object.entries(namespace.methods)) {
+			entries.push(
+				...callableEntries({
+					name,
+					kind: methodDeclarationKind(method),
+					snippets: qualifiedCallSnippetsFor(name, method),
+					detail: printType(method),
+					documentation: describe(documentationOf(method)) || null,
+					tier: completionTiers.member,
+				}),
+			)
+		}
+	}
+
+	return entries
 }
 
 // NOTE: The `§§` block above each Property, keyed by name. A Namespace Type

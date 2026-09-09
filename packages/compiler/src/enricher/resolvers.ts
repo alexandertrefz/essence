@@ -3865,6 +3865,17 @@ export function resolveConformances(
 			continue
 		}
 
+		// NOTE: The Help a Case gets is a different one, because the one below
+		// can not be written: `namespace X for Colour#Red is Enumerable` does
+		// not parse, and never will — a Namespace targets a Type, and one Case
+		// of a Choice is not one it can be declared for. What a bare `#Red`
+		// binds is the Case; a value annotated at the CHOICE binds the Choice,
+		// which is the Type the conformance is about.
+		let help =
+			binding.type === "Case"
+				? `Annotate the value at '${displayChoiceName(binding.choice)}': a bare Case binds the Case, not the Choice.`
+				: `Declare a Namespace 'for ${describeType(binding)} is ${generic.constraint}'.`
+
 		// NOTE: A single-level chain is the plain "no Namespace conforms" case
 		// and keeps the `unsatisfied-bound` Diagnostic. A multi-level chain is
 		// a conditional conformance whose `where` condition failed — its
@@ -3884,9 +3895,7 @@ export function resolveConformances(
 					notes: [
 						`No Namespace in scope makes ${describeType(binding)} conform to '${generic.constraint}'.`,
 					],
-					helps: [
-						`Declare a Namespace 'for ${describeType(binding)} is ${generic.constraint}'.`,
-					],
+					helps: [help],
 				},
 			)
 		} else {
@@ -3902,9 +3911,7 @@ export function resolveConformances(
 						),
 					],
 					notes: result.chain,
-					helps: [
-						`Declare a Namespace 'for ${describeType(binding)} is ${generic.constraint}'.`,
-					],
+					helps: [help],
 				},
 			)
 		}

@@ -348,11 +348,17 @@ export function choiceName(value: AnyType): StringType {
 // widened `boundChoiceIs` takes its descriptor in.
 //
 // NOTE: A fresh List at every call, rather than one built beside the tags and
-// answered again. A List owns its items — an `append` writes into the very
-// Array this hands over — so one shared answer would let a caller's edit reach
-// the next caller's. The Cases themselves are shared, and are meant to be:
-// `createCase` interns the payload-free ones, so the items cost nothing after
-// the first call.
+// answered again — and what that buys is LOCALITY rather than a bug avoided.
+// One shared answer would in fact be safe today, for two reasons that live
+// elsewhere: `append` stamps the receiver's view closed BEFORE it pushes, which
+// is the one in-place write to a List's Array in this package and the reason it
+// can not leak an item to a second holder; and a rewritten walk seeded by a
+// CALL copies through `ownItemsOf` rather than editing the seed. Both are
+// contracts other files keep, and a shared box would make this one depend on
+// every future List operation keeping them too. Fresh costs about 12 ns a call
+// and keeps the safety here. The Cases themselves ARE shared and are meant to
+// be: `createCase` interns the payload-free ones, so the items cost nothing
+// after the first call.
 //
 // NOTE: The cast is the one `Generators.ts` makes at every Case it builds, and
 // for the reason written there: `CaseInstanceType` is deliberately outside
