@@ -51,15 +51,40 @@ export type RuntimeBridge = {
 	boolean: (value: boolean) => EssenceValue
 	list: (items: Array<EssenceValue>) => EssenceValue
 	record: (fields: Record<string, EssenceValue>) => EssenceValue
+	// NOTE: The two a bundle carries ONLY where its boundary names a Dictionary
+	// — see `runtimeBridgeModules`, which is where that is decided and why. A
+	// host meets them as they are declared here: absent, until the Module it
+	// loaded has somewhere to put one.
+	//
+	// NOTE: The builder answers the POSITION of an entry whose key the
+	// Dictionary already holds rather than the Dictionary — a `Map` tells its
+	// keys apart by `===` and a Dictionary by the key Type's own equality, so
+	// two entries of one Map can be one entry here, and the sentence that says
+	// so is the marshaller's to write. See `createDictionaryFrom`.
+	dictionary?: (
+		entries: Array<[EssenceValue, EssenceValue]>,
+	) => EssenceValue | number
+	dictionaryEntries?: (
+		dictionary: EssenceValue,
+	) => Array<[EssenceValue, EssenceValue]>
 }
 
 type BridgeMember = keyof RuntimeBridge
+
+// NOTE: One runtime Module and the members a bridge takes out of it.
+type BridgeModule = [string, Array<[BridgeMember, string]>]
+
+// NOTE: What the boundary of the Module this bridge is for holds — today the
+// one question, asked of the Descriptor by `carriesDictionary`.
+export type BridgeOptions = {
+	dictionary?: boolean
+}
 
 // NOTE: What a `RuntimeBridge` is MADE OF, as one table: the member, the
 // runtime module it comes from, and the name inside it. Everything that has to
 // know is written out of this one place — the injected Module below, the
 // `BRIDGE_KEY` that names a bundle carrying it, and the client plugin's
-// wrapper, which imports these same seven modules by name instead of injecting
+// wrapper, which imports these same modules by name instead of injecting
 // anything. Two paths, one statement of which Functions the boundary is built
 // on.
 //
@@ -72,9 +97,7 @@ type BridgeMember = keyof RuntimeBridge
 // the runtime is and a host is not. Every caller in there can be read and
 // checked; a host cannot, so the copy and the check are made on this side of
 // the door, and neither contract reaches a published surface at all.
-export const RUNTIME_BRIDGE_MODULES: Array<
-	[string, Array<[BridgeMember, string]>]
-> = [
+export const RUNTIME_BRIDGE_MODULES: Array<BridgeModule> = [
 	[
 		"type",
 		[
@@ -90,12 +113,65 @@ export const RUNTIME_BRIDGE_MODULES: Array<
 	["Record", [["record", "createRecord"]]],
 ]
 
+// NOTE: The Dictionary door, which a bundle carries only where its boundary
+// names one. It is apart from the table above because it is not free: the
+// builder is the whole of `Dictionary.ts` and the key encoding under it, which
+// a bundler can not shake away once a bridge names them — 15,655 bytes measured
+// on a Module whose one export hands a Dictionary straight back: 3,173 bytes
+// without the door and 18,828 with it. A boundary that can not hold a
+// Dictionary anywhere has no use for either, so it is handed neither; see
+// `carriesDictionary`, which is the one question every injector asks.
+//
+// NOTE: The reader is `type.ts`'s rather than the Dictionary Module's, and that
+// is not a saving of bytes but of rules: `liveEntriesOf` is where the runtime
+// already states what a box's live view IS, versions, generation stamps and
+// all, so the way out reads a Dictionary through the same walk its own natives
+// do rather than through a second reading of the store.
+const DICTIONARY_BRIDGE_MODULES: Array<BridgeModule> = [
+	["type", [["dictionaryEntries", "liveEntriesOf"]]],
+	["Dictionary", [["dictionary", "createDictionaryFrom"]]],
+]
+
+// NOTE: The table a bridge is built out of, with the Dictionary door folded in
+// where the Module's boundary names one — merged by runtime Module rather than
+// appended, because two entries for one file would import it twice under one
+// alias and the injected Module would not parse.
+export function runtimeBridgeModules(
+	options: BridgeOptions = {},
+): Array<BridgeModule> {
+	if (options.dictionary !== true) {
+		return RUNTIME_BRIDGE_MODULES
+	}
+
+	let modules: Array<BridgeModule> = RUNTIME_BRIDGE_MODULES.map(
+		([fileName, members]) => [fileName, [...members]],
+	)
+
+	for (let [fileName, members] of DICTIONARY_BRIDGE_MODULES) {
+		let existing = modules.find(([name]) => name === fileName)
+
+		if (existing === undefined) {
+			modules.push([fileName, [...members]])
+		} else {
+			existing[1].push(...members)
+		}
+	}
+
+	return modules
+}
+
 // NOTE: What an embedder contributes to a bundle, named for the Compiler's
 // cache key. A bundle built through the bridge and one built without it are
 // different bytes over identical sources, so they have to be different files —
 // otherwise whichever was written first answers for both, and the loser is
 // either a build handed exports it never asked for or a load told the bundle
 // "exports no runtime bridge".
+//
+// NOTE: The Dictionary door is NOT named here, and it does not have to be:
+// which door a bundle gets is decided by `carriesDictionary` out of the
+// Module's own Descriptor, so it is a function of the sources this key already
+// stands for. Naming it would mean knowing the answer before the graph has been
+// linked, which is exactly when a caller asks for this.
 export const BRIDGE_KEY = `essence-embed-bridge-1:${RUNTIME_BRIDGE_MODULES.map(
 	([fileName, members]) =>
 		`${fileName}(${members
@@ -127,14 +203,18 @@ function moduleAlias(fileName: string): string {
 // word with a `_`. It is also the whole of what a reader has to know, so the
 // half of this that reads a bridge back needs no copy of the table above and can
 // live where no Compiler is.
-export function withRuntimeBridge(sources: ModuleSources): ModuleSources {
-	let imports = RUNTIME_BRIDGE_MODULES.map(
+export function withRuntimeBridge(
+	sources: ModuleSources,
+	options: BridgeOptions = {},
+): ModuleSources {
+	let modules = runtimeBridgeModules(options)
+	let imports = modules.map(
 		([fileName]) =>
 			`import * as ${moduleAlias(fileName)} from "${runtimeModule(
 				fileName,
 			)}"`,
 	)
-	let members = RUNTIME_BRIDGE_MODULES.flatMap(([fileName, entries]) =>
+	let members = modules.flatMap(([fileName, entries]) =>
 		entries.map(
 			([member, name]) =>
 				`\t${member}: ${moduleAlias(fileName)}.${name},`,

@@ -185,6 +185,12 @@ function foreignTag(value: object, own: symbol): string | null {
 
 export type EssenceFunction = (...args: Array<EssenceValue>) => EssenceValue
 
+// NOTE: One entry of a Dictionary as the two halves it is made of, which is what
+// the bridge hands over and what it takes back — the shape a `Map` iterates and
+// the shape its constructor reads, so neither side of the boundary has to lay
+// one out for the other.
+type Entry = [EssenceValue, EssenceValue]
+
 // NOTE: One shape's rule, compiled — the way in and the way out of a single
 // Descriptor node, as the Function each of them is. Everything a call does is
 // one of these being run.
@@ -367,6 +373,14 @@ export function createInterpreter(
 	let makeString = bridge.string
 	let makeBoolean = bridge.boolean
 	let makeList = bridge.list
+	// NOTE: The two halves of the Dictionary door, which a bundle carries only
+	// where its boundary names a Dictionary — see `runtimeBridgeModules`, which
+	// says why it is not carried always. Undefined where it is not, and a
+	// Descriptor that names a Dictionary is then a Descriptor from another
+	// compile, so the shape compiles to the sentence that says so rather than to
+	// a `TypeError` about `undefined` from inside a walk.
+	let makeDictionary = bridge.dictionary
+	let dictionaryEntries = bridge.dictionaryEntries
 	// NOTE: Every unit Choice Case the MODULE names, under the tag its values
 	// carry. Whether a Case crosses as a bare string is a fact about the Choice
 	// and a value carries nothing that says it, so the general walk — which
@@ -731,6 +745,72 @@ export function createInterpreter(
 					// while a host's identical-looking one, on an Array the host
 					// kept, would silently share a run with Essence.
 					return makeList(items(value, { at, step }))
+				}
+			}
+			// NOTE: A `Map` and nothing else. Every key Type crosses, so what
+			// is read is the entries rather than any spelling of a key — in
+			// the order the Map holds them, which is the order a Dictionary
+			// holds its own.
+			//
+			// NOTE: The entries are marshalled HERE and the Dictionary is
+			// built THERE. Which slot a key lands in, whether two keys are
+			// one, and what a key encodes to are the runtime's own and stay
+			// there: this side hands over an Array of pairs it does not keep,
+			// exactly as it hands `bridge.list` an Array of items.
+			case "dictionary": {
+				let build = makeDictionary
+
+				if (build === undefined) {
+					return (value, at, step) => {
+						throw noDictionaryDoor(at, step)
+					}
+				}
+
+				let readKey = compileIn(expected.key)
+				let readValue = compileIn(expected.value)
+
+				return (value, at, step) => {
+					if (!(value instanceof Map)) {
+						// NOTE: An object is what a host reaches for first
+						// where the keys are Strings, so it is answered with
+						// the shape to write instead of with the Type it
+						// already named — see `objectSpelledDictionary`.
+						throw plainObject(value) === null
+							? mismatch(value, shown, at, step)
+							: objectSpelledDictionary(shown, at, step)
+					}
+
+					let inside: Path = { at, step }
+					// oxlint-disable-next-line unicorn/no-new-array -- the length, as above
+					let entries: Array<Entry> = new Array(value.size)
+					let position = 0
+
+					// NOTE: One place per ENTRY, which both halves of it are
+					// spelled below — `argument 1 → [2].value`. A Map has no
+					// accessor that names one entry, so what an Error names is
+					// the entry's position and the half of it that is wrong,
+					// which is the vocabulary the language reads an entry by.
+					for (let [key, held] of value) {
+						let where: Path = { at: inside, step: position }
+
+						entries[position] = [
+							readKey(key, where, "key"),
+							readValue(held, where, "value"),
+						]
+						position++
+					}
+
+					let built = build(entries)
+
+					// NOTE: The position of an entry whose key the Dictionary
+					// already holds — two Map keys that are one key here. It
+					// is answered rather than thrown because the place is this
+					// side's to name; see `createDictionaryFrom`.
+					if (typeof built === "number") {
+						throw duplicateKey({ at: inside, step: built }, "key")
+					}
+
+					return built
 				}
 			}
 			case "record": {
@@ -1414,6 +1494,15 @@ export function createInterpreter(
 						? itemsOf(value as object, at, step, item)
 						: toJS(value, at, step, expected)
 			}
+			case "dictionary": {
+				let key = compileOut(expected.key)
+				let held = compileOut(expected.value)
+
+				return (value, at, step) =>
+					tagged(value, "Dictionary")
+						? mapOf(value as object, at, step, key, held)
+						: toJS(value, at, step, expected)
+			}
 			case "record": {
 				let members = compiledMembers(expected.members)
 
@@ -1659,6 +1748,17 @@ export function createInterpreter(
 				return (value as { value: boolean }).value
 			case "List":
 				return itemsOf(value, at, step, out(listItemOf(expected)))
+			case "Dictionary": {
+				let parts = dictionaryPartsOf(expected)
+
+				return mapOf(
+					value,
+					at,
+					step,
+					out(parts === null ? null : parts.key),
+					out(parts === null ? null : parts.value),
+				)
+			}
 			case "Record": {
 				let members = recordMembersOf(expected)
 
@@ -1798,6 +1898,55 @@ export function createInterpreter(
 		}
 
 		return items
+	}
+
+	// NOTE: The entries a Dictionary holds, in the order it holds them, as a
+	// `Map` of this side's own. It is read through the BRIDGE, unlike the List
+	// above: what a box holds is decided by version stamps against a generation,
+	// and reading that here would be a second copy of a rule rather than a
+	// second reading of a layout — `liveEntriesOf` is where the runtime states
+	// it, and every native of its own reads it there too.
+	//
+	// NOTE: The two halves of an entry are marshalled independently, each by the
+	// reader its own slot was compiled to, and the Map is filled in the order
+	// the walk answers — which is the order the Dictionary holds its entries,
+	// and the order a `Map` gives back.
+	function mapOf(
+		value: object,
+		at: Path | null,
+		step: Step,
+		key: Outbound,
+		held: Outbound,
+	): Map<unknown, unknown> {
+		if (dictionaryEntries === undefined) {
+			throw noDictionaryDoor(at, step)
+		}
+
+		let entries = dictionaryEntries(value)
+		let answer = new Map<unknown, unknown>()
+		let inside: Path = { at, step }
+
+		for (let position = 0; position < entries.length; position++) {
+			let entry = entries[position]!
+			let where: Path = { at: inside, step: position }
+
+			answer.set(
+				key(entry[0], where, "key"),
+				held(entry[1], where, "value"),
+			)
+		}
+
+		// NOTE: The one way this direction can lose something, asked once at the
+		// end rather than per key. A Map tells its keys apart by `===` and a
+		// Dictionary by the key Type's own `is`, and where a Namespace wrote
+		// that `is` the two can disagree — two keys the Module holds apart
+		// landing on one JavaScript value, and an entry quietly gone. A count
+		// that does not match is the whole of what that looks like.
+		if (answer.size !== entries.length) {
+			throw collidingKeys(at, step, entries.length, answer.size)
+		}
+
+		return answer
 	}
 
 	// NOTE: The VALUE's own members rather than the Descriptor's, because a
@@ -2063,6 +2212,90 @@ export function createInterpreter(
 		)
 	}
 
+	// NOTE: The shape a Dictionary crosses as, met where a host wrote the OTHER
+	// object JavaScript has. It is told apart from every other wrong value the
+	// way `objectSpelledCase` is: it is the one that is right about what it
+	// means and wrong only about how to write it, so it is answered with the
+	// shape to write rather than with the Type it already named.
+	//
+	// NOTE: A plain object is not a second spelling on the way in, though every
+	// key of a `Dictionary<String, V>` would fit one. One shape has one spelling
+	// here: a position that took an object as well would be a position two
+	// different JavaScript values cross into, while the way out can hand back
+	// only one of them — and an object hands its integer-looking keys back
+	// first, whatever order they were written in, which is the one thing a
+	// Dictionary promises about its entries.
+	//
+	// NOTE: Marked as having reached INSIDE the value, so that a Union holding a
+	// Dictionary answers with this sentence rather than with the Union — for the
+	// reason `objectSpelledCase` is marked: it is the refusal that says what to
+	// do about it.
+	function objectSpelledDictionary(
+		shown: string,
+		at: Path | null,
+		step: Step,
+	): EssenceMarshalError {
+		let where = spell(at, step)
+
+		return new EssenceMarshalError(
+			`${where}: expected ${shown}, which crosses as a Map rather than as a plain object — 'new Map(Object.entries(…))' builds one.`,
+			where,
+			true,
+		)
+	}
+
+	// NOTE: Two entries of one Map that are one entry of the Dictionary they
+	// were going to become — `1` and `1n` are two Map keys and one Integer, and
+	// a String written twice in its two Unicode spellings is one String. Which
+	// entry it was is the runtime's answer; the place it stands at is this
+	// side's, which is the whole of why the two halves are apart.
+	function duplicateKey(at: Path | null, step: Step): EssenceMarshalError {
+		let where = spell(at, step)
+
+		return new EssenceMarshalError(
+			`${where}: this key is already held — a Map tells its keys apart by '===' where a Dictionary tells them apart by the key Type's own equality, so two entries of this Map are one entry of it.`,
+			where,
+		)
+	}
+
+	// NOTE: The same disagreement met from the other side: keys the Module holds
+	// apart that are one JavaScript value, which only an `is` a Namespace wrote
+	// can arrange. Refused rather than handed over short, because a Map with an
+	// entry missing is the one thing a lossless boundary may not answer with.
+	function collidingKeys(
+		at: Path | null,
+		step: Step,
+		held: number,
+		spelled: number,
+	): EssenceMarshalError {
+		let where = spell(at, step)
+
+		return new EssenceMarshalError(
+			`${where}: this Dictionary's ${held} keys are ${spelled} JavaScript value${
+				spelled === 1 ? "" : "s"
+			} — a Map tells its keys apart by '===' where the Module tells them apart by the key Type's own 'is', so a Map of it would not hold them all.`,
+			where,
+		)
+	}
+
+	// NOTE: A Descriptor naming a Dictionary read against a bundle built for a
+	// boundary that names none. It can not happen where the two come from one
+	// compile — the same Descriptor decides both — so it is a mismatched pair
+	// rather than a value's mistake, and it is said out loud for the reason
+	// `runtimeBridgeOf` says its own: a `TypeError` about `undefined` from
+	// inside a walk names nothing a reader can act on.
+	function noDictionaryDoor(
+		at: Path | null,
+		step: Step,
+	): EssenceMarshalError {
+		let where = spell(at, step)
+
+		return new EssenceMarshalError(
+			`${where}: this bundle can not marshal a Dictionary — it was built for a boundary that names none, and this Descriptor names one, so the two came from different compiles.`,
+			where,
+		)
+	}
+
 	function collidingCase(
 		at: Path | null,
 		step: Step,
@@ -2128,6 +2361,15 @@ export function createInterpreter(
 				: `an array of ${value.length} item${
 						value.length === 1 ? "" : "s"
 					}`
+		}
+
+		// NOTE: Named as the Map it is rather than read for members it has none
+		// of — `Object.keys` answers nothing at all for one, so the clause below
+		// would call a Map of a thousand entries an empty object.
+		if (value instanceof Map) {
+			return value.size === 0
+				? "an empty Map"
+				: `a Map of ${value.size} ${value.size === 1 ? "entry" : "entries"}`
 		}
 
 		switch (typeof value) {
@@ -2967,6 +3209,35 @@ function listItemOf(descriptor: Descriptor | null): Descriptor | null {
 	}
 }
 
+// NOTE: The two slots a Dictionary's pieces were DECLARED as, read for the same
+// reason `listItemOf` reads a List's item and answering `null` under the same
+// rule: a Union offering two Dictionaries does not decide, and the entries still
+// cross as their own tags say.
+function dictionaryPartsOf(
+	descriptor: Descriptor | null,
+): { key: Descriptor; value: Descriptor } | null {
+	if (descriptor === null) {
+		return null
+	}
+
+	switch (descriptor.kind) {
+		case "dictionary":
+			return { key: descriptor.key, value: descriptor.value }
+		case "union": {
+			let candidates = descriptor.arms
+				.map(dictionaryPartsOf)
+				.filter(
+					(parts): parts is { key: Descriptor; value: Descriptor } =>
+						parts !== null,
+				)
+
+			return candidates.length === 1 ? candidates[0]! : null
+		}
+		default:
+			return null
+	}
+}
+
 function recordMembersOf(
 	descriptor: Descriptor | null,
 ): DescribedMembers | null {
@@ -3040,6 +3311,7 @@ function familiesOf(descriptor: Descriptor): Set<string> | null {
 		case "boolean":
 			return new Set(["boolean"])
 		case "list":
+		case "dictionary":
 		case "record":
 			return new Set(["object"])
 		case "case":
@@ -3224,6 +3496,11 @@ function collectBareCases(
 			collectBareCases(descriptor.of, found)
 
 			return
+		case "dictionary":
+			collectBareCases(descriptor.key, found)
+			collectBareCases(descriptor.value, found)
+
+			return
 		case "record":
 			for (let member of Object.values(descriptor.members)) {
 				collectBareCases(member.of, found)
@@ -3260,8 +3537,9 @@ function collectBareCases(
 }
 
 // NOTE: A JavaScript object with members, and nothing that merely is one: an
-// Array is a List's shape and an `EssenceRational` is a Rational's, so admitting
-// either as a Record would make the shape that named it unreachable.
+// Array is a List's shape, an `EssenceRational` is a Rational's and a `Map` is a
+// Dictionary's, so admitting any of them as a Record would make the shape that
+// named it unreachable.
 //
 // NOTE: A labelled call asks the very same question of its one Argument — an
 // `EssenceRational` passed to a Function whose labels happen to be `numerator`
@@ -3272,7 +3550,8 @@ function plainObject(value: unknown): Record<string, unknown> | null {
 		value === null ||
 		typeof value !== "object" ||
 		Array.isArray(value) ||
-		value instanceof EssenceRational
+		value instanceof EssenceRational ||
+		value instanceof Map
 	) {
 		return null
 	}

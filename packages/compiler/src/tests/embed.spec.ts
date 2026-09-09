@@ -14,7 +14,11 @@ import { pathToFileURL } from "node:url"
 import { fixturePath } from "@essence-lang/fixtures"
 import { RUNTIME_DIRECTORY } from "@essence-lang/runtime"
 
-import { type Descriptor, describeModule } from "../embed/describe"
+import {
+	carriesDictionary,
+	type Descriptor,
+	describeModule,
+} from "../embed/describe"
 import { hashGraph } from "../embed/hash"
 import {
 	compileToMemory,
@@ -309,6 +313,104 @@ export {
 				// by absence still is, so this is a difference between the two
 				// Types rather than a rule that stopped applying.
 				expect(carriedBy("missing")?.kind).toBe("optional")
+			},
+		)
+	})
+
+	// NOTE: A Dictionary is described as its two slots and nothing else — not the
+	// store it is held in, not the generation a box reads it at, and not the key
+	// encoding that finds a slot. Building one and reading one are the runtime's,
+	// reached through the bridge, which is what `carriesDictionary` decides a
+	// bundle carries.
+	it("describes a Dictionary as its two slots, and says a boundary holds one", async () => {
+		await withProject(
+			{
+				"Ledger.es": `implementation {
+	choice Direction {
+		Up,
+		Down,
+	}
+
+	constant sizes: Dictionary<String, Integer> = ["small" = 1]
+}
+
+export {
+	Direction
+	sizes
+}
+`,
+				"Reached.es": `implementation {
+	choice Direction {
+		Up,
+		Down,
+	}
+
+	function headings(
+		_ value: List<Dictionary<Direction, Integer>>,
+	) -> List<Dictionary<Direction, Integer>> {
+		<- value
+	}
+}
+
+export {
+	Direction
+	headings
+}
+`,
+				"Plain.es": `implementation {
+	function twice(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+}
+
+export {
+	twice
+}
+`,
+			},
+			async (directory) => {
+				let entry = path.join(directory, "Ledger.es")
+				let result = await compileToMemory(entry)
+
+				expect(result.diagnostics).toEqual([])
+
+				let described = describeModule(result.surface, entry)
+				let sizes = described.exports.sizes
+
+				expect(sizes?.kind).toBe("constant")
+
+				let node = sizes?.kind === "constant" ? sizes.of : null
+
+				expect(node?.kind).toBe("dictionary")
+				expect(node?.kind === "dictionary" ? node.key : null).toEqual({
+					kind: "string",
+					shown: "String",
+				})
+				expect(node?.kind === "dictionary" ? node.value : null).toEqual(
+					{ kind: "integer", shown: "Integer" },
+				)
+				expect(node?.shown).toBe("Dictionary<String, Integer>")
+				expect(carriesDictionary(described)).toBeTrue()
+
+				// NOTE: Asked of the whole boundary rather than of the exported
+				// Types alone: this Module's only Dictionary is reached through
+				// a List, inside a Function's Parameter, which is a position no
+				// export names.
+				let reached = path.join(directory, "Reached.es")
+				let inside = await compileToMemory(reached)
+
+				expect(inside.diagnostics).toEqual([])
+				expect(
+					carriesDictionary(describeModule(inside.surface, reached)),
+				).toBeTrue()
+
+				let plain = path.join(directory, "Plain.es")
+				let other = await compileToMemory(plain)
+
+				expect(other.diagnostics).toEqual([])
+				expect(
+					carriesDictionary(describeModule(other.surface, plain)),
+				).toBeFalse()
 			},
 		)
 	})

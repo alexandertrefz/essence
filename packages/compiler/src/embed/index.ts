@@ -43,9 +43,11 @@ export { type EmitTarget, emitTargetKey } from "../rewriter/index"
 export {
 	BRIDGE_KEY,
 	BRIDGE_SPECIFIER,
+	type BridgeOptions,
 	type EssenceValue,
 	RUNTIME_BRIDGE_MODULES,
 	type RuntimeBridge,
+	runtimeBridgeModules,
 	withRuntimeBridge,
 } from "./bridge"
 // NOTE: The boundary between an emitted Module and the JavaScript that calls
@@ -54,6 +56,7 @@ export {
 // is — see `./describe`. Reached through its own entry as well, so that
 // describing costs nothing more than describing.
 export {
+	carriesDictionary,
 	type CaseDescriptor,
 	type DeclaredType,
 	describe,

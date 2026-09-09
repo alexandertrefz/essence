@@ -348,6 +348,10 @@ function crossesDifferently(node: Descriptor): boolean {
 		case "list":
 		case "optional":
 			return crossesDifferently(node.of)
+		case "dictionary":
+			return (
+				crossesDifferently(node.key) || crossesDifferently(node.value)
+			)
 		// NOTE: A member the callee fills in is the plainest case there is of a
 		// Type whose two directions differ — one going in may leave it out, one
 		// coming out never lacks it — so the Record is spelled out where it is
@@ -395,6 +399,8 @@ function widensOnInput(node: Descriptor): boolean {
 		case "list":
 		case "optional":
 			return widensOnInput(node.of)
+		case "dictionary":
+			return widensOnInput(node.key) || widensOnInput(node.value)
 		case "record":
 			return Object.values(node.members).some((member) =>
 				widensOnInput(member.of),
@@ -545,6 +551,15 @@ function createWalker(
 				return borrow("EssenceRational")
 			case "list":
 				return `Array<${print(node.of, direction)}>`
+			// NOTE: A `Map` at every key Type, which is the whole of what a
+			// Dictionary is on this side — and a unit Choice's Case among the
+			// keys is the literal union its Case names already print as, so
+			// `Map<"Up" | "Down", bigint>` is what a reader is offered.
+			case "dictionary":
+				return `Map<${print(node.key, direction)}, ${print(
+					node.value,
+					direction,
+				)}>`
 			case "record":
 				return inlined(recordEntries(node.members, direction))
 			case "case":

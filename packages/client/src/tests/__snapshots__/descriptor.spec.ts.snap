@@ -176,6 +176,43 @@ exports[`A Module described describes Marshal.es 1`] = `
         "shown": "Optional<Integer>",
       },
     },
+    "ages": {
+      "emitted": "ages",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "key": {
+                "kind": "string",
+                "shown": "String",
+              },
+              "kind": "dictionary",
+              "shown": "Dictionary<String, Integer>",
+              "value": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+            },
+          },
+        ],
+        "returns": {
+          "key": {
+            "kind": "string",
+            "shown": "String",
+          },
+          "kind": "dictionary",
+          "shown": "Dictionary<String, Integer>",
+          "value": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+        },
+        "shown": "(_ Dictionary<String, Integer>) -> Dictionary<String, Integer>",
+      },
+    },
     "answer": {
       "emitted": "answer",
       "kind": "constant",
@@ -660,6 +697,43 @@ exports[`A Module described describes Marshal.es 1`] = `
           "shown": "{ toString: Optional<String> }",
         },
         "shown": "(_ { toString: Optional<String> }) -> { toString: Optional<String> }",
+      },
+    },
+    "counts": {
+      "emitted": "counts",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "key": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+              "kind": "dictionary",
+              "shown": "Dictionary<Integer, String>",
+              "value": {
+                "kind": "string",
+                "shown": "String",
+              },
+            },
+          },
+        ],
+        "returns": {
+          "key": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+          "kind": "dictionary",
+          "shown": "Dictionary<Integer, String>",
+          "value": {
+            "kind": "string",
+            "shown": "String",
+          },
+        },
+        "shown": "(_ Dictionary<Integer, String>) -> Dictionary<Integer, String>",
       },
     },
     "direction": {
@@ -1332,6 +1406,80 @@ exports[`A Module described describes Marshal.es 1`] = `
         "shown": "(_ List<Direction>) -> List<Direction>",
       },
     },
+    "edited": {
+      "emitted": "edited",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "key": {
+                "kind": "string",
+                "shown": "String",
+              },
+              "kind": "dictionary",
+              "shown": "Dictionary<String, Integer>",
+              "value": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+            },
+          },
+        ],
+        "returns": {
+          "key": {
+            "kind": "string",
+            "shown": "String",
+          },
+          "kind": "dictionary",
+          "shown": "Dictionary<String, Integer>",
+          "value": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+        },
+        "shown": "(_ Dictionary<String, Integer>) -> Dictionary<String, Integer>",
+      },
+    },
+    "filled": {
+      "emitted": "filled",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "key": {
+                "kind": "string",
+                "shown": "String",
+              },
+              "kind": "dictionary",
+              "shown": "Dictionary<String, Integer>",
+              "value": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+            },
+          },
+        ],
+        "returns": {
+          "key": {
+            "kind": "string",
+            "shown": "String",
+          },
+          "kind": "dictionary",
+          "shown": "Dictionary<String, Integer>",
+          "value": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+        },
+        "shown": "(_ NonEmptyDictionary<String, Integer>) -> NonEmptyDictionary<String, Integer>",
+      },
+    },
     "flag": {
       "emitted": "flag",
       "kind": "function",
@@ -1351,6 +1499,43 @@ exports[`A Module described describes Marshal.es 1`] = `
           "shown": "Boolean",
         },
         "shown": "(_ Boolean) -> Boolean",
+      },
+    },
+    "flags": {
+      "emitted": "flags",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "key": {
+                "kind": "boolean",
+                "shown": "Boolean",
+              },
+              "kind": "dictionary",
+              "shown": "Dictionary<Boolean, String>",
+              "value": {
+                "kind": "string",
+                "shown": "String",
+              },
+            },
+          },
+        ],
+        "returns": {
+          "key": {
+            "kind": "boolean",
+            "shown": "Boolean",
+          },
+          "kind": "dictionary",
+          "shown": "Dictionary<Boolean, String>",
+          "value": {
+            "kind": "string",
+            "shown": "String",
+          },
+        },
+        "shown": "(_ Dictionary<Boolean, String>) -> Dictionary<Boolean, String>",
       },
     },
     "greeting": {
@@ -1420,6 +1605,87 @@ exports[`A Module described describes Marshal.es 1`] = `
         "shown": "Direction",
       },
     },
+    "headings": {
+      "emitted": "headings",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "key": {
+                "arms": [
+                  {
+                    "choice": "Direction",
+                    "kind": "case",
+                    "name": "Up",
+                    "optional": false,
+                    "payload": {},
+                    "shown": "Direction#Up",
+                    "tag": "./Marshal.es#Direction#Up",
+                    "unitChoice": true,
+                  },
+                  {
+                    "choice": "Direction",
+                    "kind": "case",
+                    "name": "Down",
+                    "optional": false,
+                    "payload": {},
+                    "shown": "Direction#Down",
+                    "tag": "./Marshal.es#Direction#Down",
+                    "unitChoice": true,
+                  },
+                ],
+                "kind": "union",
+                "shown": "Direction",
+              },
+              "kind": "dictionary",
+              "shown": "Dictionary<Direction, Integer>",
+              "value": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+            },
+          },
+        ],
+        "returns": {
+          "key": {
+            "arms": [
+              {
+                "choice": "Direction",
+                "kind": "case",
+                "name": "Up",
+                "optional": false,
+                "payload": {},
+                "shown": "Direction#Up",
+                "tag": "./Marshal.es#Direction#Up",
+                "unitChoice": true,
+              },
+              {
+                "choice": "Direction",
+                "kind": "case",
+                "name": "Down",
+                "optional": false,
+                "payload": {},
+                "shown": "Direction#Down",
+                "tag": "./Marshal.es#Direction#Down",
+                "unitChoice": true,
+              },
+            ],
+            "kind": "union",
+            "shown": "Direction",
+          },
+          "kind": "dictionary",
+          "shown": "Dictionary<Direction, Integer>",
+          "value": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+        },
+        "shown": "(_ Dictionary<Direction, Integer>) -> Dictionary<Direction, Integer>",
+      },
+    },
     "integer": {
       "emitted": "integer",
       "kind": "function",
@@ -1480,6 +1746,104 @@ exports[`A Module described describes Marshal.es 1`] = `
           "shown": "Label",
         },
         "shown": "(_ Label) -> Label",
+      },
+    },
+    "ledger": {
+      "emitted": "ledger",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "record",
+              "members": {
+                "entries": {
+                  "of": {
+                    "key": {
+                      "kind": "string",
+                      "shown": "String",
+                    },
+                    "kind": "dictionary",
+                    "shown": "Dictionary<String, Integer>",
+                    "value": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                },
+              },
+              "shown": "{ entries: Dictionary<String, Integer> }",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "record",
+          "members": {
+            "entries": {
+              "of": {
+                "key": {
+                  "kind": "string",
+                  "shown": "String",
+                },
+                "kind": "dictionary",
+                "shown": "Dictionary<String, Integer>",
+                "value": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+            },
+          },
+          "shown": "{ entries: Dictionary<String, Integer> }",
+        },
+        "shown": "(_ { entries: Dictionary<String, Integer> }) -> { entries: Dictionary<String, Integer> }",
+      },
+    },
+    "ledgers": {
+      "emitted": "ledgers",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "list",
+              "of": {
+                "key": {
+                  "kind": "string",
+                  "shown": "String",
+                },
+                "kind": "dictionary",
+                "shown": "Dictionary<String, Integer>",
+                "value": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+              "shown": "List<Dictionary<String, Integer>>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "list",
+          "of": {
+            "key": {
+              "kind": "string",
+              "shown": "String",
+            },
+            "kind": "dictionary",
+            "shown": "Dictionary<String, Integer>",
+            "value": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+          "shown": "List<Dictionary<String, Integer>>",
+        },
+        "shown": "(_ List<Dictionary<String, Integer>>) -> List<Dictionary<String, Integer>>",
       },
     },
     "marker": {
@@ -1590,6 +1954,51 @@ exports[`A Module described describes Marshal.es 1`] = `
           "shown": "Optional<Integer>",
         },
         "shown": "(_ Optional<Integer>) -> Optional<Integer>",
+      },
+    },
+    "maybeAges": {
+      "emitted": "maybeAges",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "optional",
+              "of": {
+                "key": {
+                  "kind": "string",
+                  "shown": "String",
+                },
+                "kind": "dictionary",
+                "shown": "Dictionary<String, Integer>",
+                "value": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+              "shown": "Optional<Dictionary<String, Integer>>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "optional",
+          "of": {
+            "key": {
+              "kind": "string",
+              "shown": "String",
+            },
+            "kind": "dictionary",
+            "shown": "Dictionary<String, Integer>",
+            "value": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+          "shown": "Optional<Dictionary<String, Integer>>",
+        },
+        "shown": "(_ Optional<Dictionary<String, Integer>>) -> Optional<Dictionary<String, Integer>>",
       },
     },
     "maybeDirection": {
@@ -1714,6 +2123,75 @@ exports[`A Module described describes Marshal.es 1`] = `
         "shown": "List<String>",
       },
     },
+    "nesting": {
+      "emitted": "nesting",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "key": {
+                "kind": "string",
+                "shown": "String",
+              },
+              "kind": "dictionary",
+              "shown": "Dictionary<String, Dictionary<String, Integer>>",
+              "value": {
+                "key": {
+                  "kind": "string",
+                  "shown": "String",
+                },
+                "kind": "dictionary",
+                "shown": "Dictionary<String, Integer>",
+                "value": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+            },
+          },
+        ],
+        "returns": {
+          "key": {
+            "kind": "string",
+            "shown": "String",
+          },
+          "kind": "dictionary",
+          "shown": "Dictionary<String, Dictionary<String, Integer>>",
+          "value": {
+            "key": {
+              "kind": "string",
+              "shown": "String",
+            },
+            "kind": "dictionary",
+            "shown": "Dictionary<String, Integer>",
+            "value": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+        },
+        "shown": "(_ Dictionary<String, Dictionary<String, Integer>>) -> Dictionary<String, Dictionary<String, Integer>>",
+      },
+    },
+    "nothing": {
+      "emitted": "nothing",
+      "kind": "constant",
+      "of": {
+        "key": {
+          "kind": "string",
+          "shown": "String",
+        },
+        "kind": "dictionary",
+        "shown": "Dictionary<String, Integer>",
+        "value": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+      },
+    },
     "ordering": {
       "emitted": "ordering",
       "kind": "function",
@@ -1797,6 +2275,212 @@ exports[`A Module described describes Marshal.es 1`] = `
           "shown": "Ordering",
         },
         "shown": "(_ Ordering) -> Ordering",
+      },
+    },
+    "outlines": {
+      "emitted": "outlines",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "key": {
+                "arms": [
+                  {
+                    "choice": "Shape",
+                    "kind": "case",
+                    "name": "Circle",
+                    "optional": false,
+                    "payload": {
+                      "radius": {
+                        "of": {
+                          "kind": "integer",
+                          "shown": "Integer",
+                        },
+                      },
+                    },
+                    "shown": "Shape#Circle",
+                    "tag": "./Marshal.es#Shape#Circle",
+                    "unitChoice": false,
+                  },
+                  {
+                    "choice": "Shape",
+                    "kind": "case",
+                    "name": "Rect",
+                    "optional": false,
+                    "payload": {
+                      "height": {
+                        "of": {
+                          "kind": "integer",
+                          "shown": "Integer",
+                        },
+                      },
+                      "width": {
+                        "of": {
+                          "kind": "integer",
+                          "shown": "Integer",
+                        },
+                      },
+                    },
+                    "shown": "Shape#Rect",
+                    "tag": "./Marshal.es#Shape#Rect",
+                    "unitChoice": false,
+                  },
+                  {
+                    "choice": "Shape",
+                    "kind": "case",
+                    "name": "Blank",
+                    "optional": false,
+                    "payload": {},
+                    "shown": "Shape#Blank",
+                    "tag": "./Marshal.es#Shape#Blank",
+                    "unitChoice": false,
+                  },
+                ],
+                "kind": "union",
+                "shown": "Shape",
+              },
+              "kind": "dictionary",
+              "shown": "Dictionary<Shape, Integer>",
+              "value": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+            },
+          },
+        ],
+        "returns": {
+          "key": {
+            "arms": [
+              {
+                "choice": "Shape",
+                "kind": "case",
+                "name": "Circle",
+                "optional": false,
+                "payload": {
+                  "radius": {
+                    "of": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                },
+                "shown": "Shape#Circle",
+                "tag": "./Marshal.es#Shape#Circle",
+                "unitChoice": false,
+              },
+              {
+                "choice": "Shape",
+                "kind": "case",
+                "name": "Rect",
+                "optional": false,
+                "payload": {
+                  "height": {
+                    "of": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "width": {
+                    "of": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                },
+                "shown": "Shape#Rect",
+                "tag": "./Marshal.es#Shape#Rect",
+                "unitChoice": false,
+              },
+              {
+                "choice": "Shape",
+                "kind": "case",
+                "name": "Blank",
+                "optional": false,
+                "payload": {},
+                "shown": "Shape#Blank",
+                "tag": "./Marshal.es#Shape#Blank",
+                "unitChoice": false,
+              },
+            ],
+            "kind": "union",
+            "shown": "Shape",
+          },
+          "kind": "dictionary",
+          "shown": "Dictionary<Shape, Integer>",
+          "value": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+        },
+        "shown": "(_ Dictionary<Shape, Integer>) -> Dictionary<Shape, Integer>",
+      },
+    },
+    "plots": {
+      "emitted": "plots",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "key": {
+                "kind": "record",
+                "members": {
+                  "height": {
+                    "of": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                  "width": {
+                    "of": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                  },
+                },
+                "shown": "{ width: Integer, height: Integer }",
+              },
+              "kind": "dictionary",
+              "shown": "Dictionary<{ width: Integer, height: Integer }, Integer>",
+              "value": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+            },
+          },
+        ],
+        "returns": {
+          "key": {
+            "kind": "record",
+            "members": {
+              "height": {
+                "of": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+              "width": {
+                "of": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+              },
+            },
+            "shown": "{ width: Integer, height: Integer }",
+          },
+          "kind": "dictionary",
+          "shown": "Dictionary<{ width: Integer, height: Integer }, Integer>",
+          "value": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+        },
+        "shown": "(_ Dictionary<{ width: Integer, height: Integer }, Integer>) -> Dictionary<{ width: Integer, height: Integer }, Integer>",
       },
     },
     "plus": {
@@ -2128,6 +2812,59 @@ exports[`A Module described describes Marshal.es 1`] = `
           "shown": "Shape",
         },
         "shown": "(_ Shape) -> Shape",
+      },
+    },
+    "shares": {
+      "emitted": "shares",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "key": {
+                "kind": "rational",
+                "shown": "Rational",
+              },
+              "kind": "dictionary",
+              "shown": "Dictionary<Rational, String>",
+              "value": {
+                "kind": "string",
+                "shown": "String",
+              },
+            },
+          },
+        ],
+        "returns": {
+          "key": {
+            "kind": "rational",
+            "shown": "Rational",
+          },
+          "kind": "dictionary",
+          "shown": "Dictionary<Rational, String>",
+          "value": {
+            "kind": "string",
+            "shown": "String",
+          },
+        },
+        "shown": "(_ Dictionary<Rational, String>) -> Dictionary<Rational, String>",
+      },
+    },
+    "sizes": {
+      "emitted": "sizes",
+      "kind": "constant",
+      "of": {
+        "key": {
+          "kind": "string",
+          "shown": "String",
+        },
+        "kind": "dictionary",
+        "shown": "Dictionary<String, Integer>",
+        "value": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
       },
     },
     "styled": {

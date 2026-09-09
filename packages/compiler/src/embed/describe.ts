@@ -59,6 +59,9 @@ export type Descriptor =
 	| { kind: "string"; shown: string }
 	| { kind: "boolean"; shown: string }
 	| { kind: "list"; of: Descriptor; shown: string }
+	// NOTE: The two slots of a `Map`, described independently — a Dictionary
+	// takes two Type Parameters and neither says anything about the other.
+	| { kind: "dictionary"; key: Descriptor; value: Descriptor; shown: string }
 	| { kind: "record"; members: Members; shown: string }
 	// NOTE: The one Union with a JavaScript spelling of its own — `T |
 	// undefined`. It reaches a Surface as the Union of `Optional`'s two Cases and
@@ -326,16 +329,39 @@ function describeBody(
 				of: describeWith(type.itemType, context, printing),
 				shown,
 			}
-		// NOTE: Named rather than left to the catch-all below, so the refusal
-		// says which Type it is about. A Dictionary has no JavaScript shape to
-		// be built from or handed out as yet — its box is a shared store with a
-		// generation stamp, and the key encoding a marshaller would have to
-		// rebuild is the runtime's own — so it crosses in neither direction, and
-		// `bridge.ts` grows nothing until it does.
+		// NOTE: A `Map`, whatever the key Type is — the one JavaScript shape
+		// that holds an entry per key of any kind at all, in the order the
+		// entries were put in, which is exactly what a Dictionary is. A plain
+		// object was the alternative and only for a `Dictionary<String, V>`:
+		// one shape would then have crossed as two things depending on a Type
+		// Parameter, an integer-looking key would have come back first however
+		// it was written down, and a key that is not a String would have had
+		// nowhere to go.
+		//
+		// NOTE: Neither half of the box is described — not the shared store,
+		// not the generation stamp, and not the key encoding that finds a slot.
+		// Building one is `createDictionaryFrom`'s and reading one is
+		// `liveEntriesOf`'s, both the runtime's own and both reached through
+		// the bridge, so the interpreter holds no copy of a rule this side of
+		// the seam owns. `bridge.ts` says when a bundle carries them.
+		//
+		// NOTE: What crosses is what the ENTRIES are, and the identity a `Map`
+		// gives them is not the identity a Dictionary gives them: a Map tells
+		// its keys apart by `===` and a Dictionary by the key Type's own `is`.
+		// Where the two disagree the boundary refuses rather than decides — two
+		// entries of a Map that are one key are refused on the way in, and two
+		// keys of a Dictionary that are one JavaScript value are refused on the
+		// way out. The one thing it can not see is an `is` a NAMESPACE wrote
+		// for the key Type: the equality the boundary builds with is the
+		// standard library's own, so a `Dictionary<NonEmptyString, V>` whose
+		// Program calls two Strings equal by a rule of its own can be handed a
+		// Map holding both. It is the same unproven crossing a refinement makes
+		// below, and it is stated in the README beside it.
 		case "Dictionary":
 			return {
-				kind: "refused",
-				why: `${shown} can not be marshalled yet — a Dictionary has no JavaScript shape it crosses as.`,
+				kind: "dictionary",
+				key: describeWith(type.keyType, context, printing),
+				value: describeWith(type.valueType, context, printing),
 				shown,
 			}
 		case "Record":
@@ -817,6 +843,100 @@ export function describeTypes(
 	}
 
 	return declared
+}
+
+// NOTE: Whether any position of this Module's boundary is a Dictionary, which
+// is what decides whether its bundle carries the two runtime Functions a
+// Dictionary crosses through — see `RUNTIME_BRIDGE_MODULES`. It is asked of the
+// whole Descriptor rather than of the exported Types alone for the reason the
+// interpreter's own bare-Case table is: a Dictionary a Module never exports by
+// name still reaches a host through the Type of something it does, and a
+// boundary that names one anywhere has to be able to cross it everywhere.
+//
+// NOTE: The answer is DERIVED from the Descriptor rather than carried in it. It
+// is a fact about a Module the Compiler can work out whenever it is asked, and a
+// `<name>.descriptor.json` that stated it as well would be a second copy that
+// could go stale against the tree it is about.
+export function carriesDictionary(module: ModuleDescriptor): boolean {
+	for (let entry of Object.values(module.exports)) {
+		switch (entry.kind) {
+			case "constant":
+			case "function":
+				if (reachesDictionary(entry.of)) {
+					return true
+				}
+
+				break
+			case "overloaded":
+				if (
+					entry.overloads.some((overload) =>
+						reachesDictionary(overload.of),
+					)
+				) {
+					return true
+				}
+
+				break
+			case "choice":
+				if (entry.cases.some(reachesDictionary)) {
+					return true
+				}
+
+				break
+			case "namespace":
+				if (
+					Object.values(entry.properties).some((property) =>
+						reachesDictionary(property.of),
+					) ||
+					Object.values(entry.methods).some((method) =>
+						method.kind === "function"
+							? reachesDictionary(method.of)
+							: method.overloads.some((overload) =>
+									reachesDictionary(overload.of),
+								),
+					) ||
+					(entry.cases ?? []).some(reachesDictionary)
+				) {
+					return true
+				}
+
+				break
+		}
+	}
+
+	return false
+}
+
+// NOTE: No guard against walking a node twice, because a Descriptor is a TREE —
+// a Type that reaches itself is answered with a `refused` node rather than
+// followed — which is the same reason the interpreter can compile a node's
+// children while compiling the node.
+function reachesDictionary(descriptor: Descriptor): boolean {
+	switch (descriptor.kind) {
+		case "dictionary":
+			return true
+		case "list":
+		case "optional":
+			return reachesDictionary(descriptor.of)
+		case "record":
+			return Object.values(descriptor.members).some((member) =>
+				reachesDictionary(member.of),
+			)
+		case "case":
+			return Object.values(descriptor.payload).some((member) =>
+				reachesDictionary(member.of),
+			)
+		case "union":
+			return descriptor.arms.some(reachesDictionary)
+		case "function":
+			return (
+				descriptor.parameters.some((parameter) =>
+					reachesDictionary(parameter.of),
+				) || reachesDictionary(descriptor.returns)
+			)
+		default:
+			return false
+	}
 }
 
 // NOTE: A Namespace's members are keyed by the name as it was WRITTEN —

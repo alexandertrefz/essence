@@ -354,6 +354,281 @@ describe("Round trips", () => {
 	})
 })
 
+// NOTE: A Dictionary crosses as a JavaScript `Map` at every key Type, which is
+// the one shape that holds an entry per key of any kind and holds them in the
+// order they were put in. The alternative was a plain object, and only for a
+// `Dictionary<String, V>`: one Essence shape would then have had two JavaScript
+// spellings depending on a Type Argument, an integer-looking key would have come
+// back first however it was written down, and every other key Type would have
+// had nowhere to go.
+describe("A Dictionary", () => {
+	it("carries its entries as a Map, in the order it holds them", () => {
+		let ages = through(
+			"ages",
+			new Map([
+				["alex", 39n],
+				["sam", 25n],
+			]),
+		)
+
+		expect(ages).toBeInstanceOf(Map)
+		expect([...(ages as Map<string, bigint>)]).toEqual([
+			["alex", 39n],
+			["sam", 25n],
+		])
+		expect([
+			...(through("ages", new Map()) as Map<string, bigint>),
+		]).toEqual([])
+	})
+
+	// NOTE: Each key kind spelled as its own Type is spelled everywhere else —
+	// an Integer is a bigint out and either kind in, a Rational is an
+	// `EssenceRational`, and a unit Choice's Case is its bare name.
+	it("carries a key of every kind the boundary spells", () => {
+		expect([
+			...(through(
+				"counts",
+				new Map<bigint | number, string>([
+					[1n, "one"],
+					[2, "two"],
+				]),
+			) as Map<bigint, string>),
+		]).toEqual([
+			[1n, "one"],
+			[2n, "two"],
+		])
+		expect([
+			...(through("flags", new Map([[true, "yes"]])) as Map<
+				boolean,
+				string
+			>),
+		]).toEqual([[true, "yes"]])
+		expect([
+			...(through("headings", new Map([["Up", 1n]])) as Map<
+				string,
+				bigint
+			>),
+		]).toEqual([["Up", 1n]])
+
+		let shares = [
+			...(through(
+				"shares",
+				new Map([[new EssenceRational(1n, 3n), "third"]]),
+			) as Map<EssenceRational, string>),
+		]
+
+		expect(shares).toHaveLength(1)
+		expect(shares[0]![0].toString()).toBe("1/3")
+		expect(shares[0]![1]).toBe("third")
+	})
+
+	// NOTE: A `Map` tells its keys apart by `===`, so a key that crosses as an
+	// object is a key to ITERATE rather than one to look up: the Record that
+	// comes back is a fresh object, and `get` on an equal one finds nothing. The
+	// entries are all there and in order, which is what such a Dictionary is
+	// handed over for.
+	it("carries an object key for iterating rather than for looking up", () => {
+		let plots = through("plots", new Map([[{ width: 1n, height: 2n }, 3n]]))
+
+		expect([...(plots as Map<unknown, bigint>)]).toEqual([
+			[{ width: 1n, height: 2n }, 3n],
+		])
+		expect(
+			(plots as Map<unknown, bigint>).get({ width: 1n, height: 2n }),
+		).toBeUndefined()
+		expect([
+			...(through(
+				"outlines",
+				new Map([[{ $case: "Shape#Circle", radius: 2n }, 1n]]),
+			) as Map<unknown, bigint>),
+		]).toEqual([[{ $case: "Shape#Circle", radius: 2n }, 1n]])
+	})
+
+	it("carries one a Record, a List and an Optional hold", () => {
+		expect(through("ledger", { entries: new Map([["a", 1n]]) })).toEqual({
+			entries: new Map([["a", 1n]]),
+		})
+		expect(through("ledgers", [new Map([["a", 1n]])])).toEqual([
+			new Map([["a", 1n]]),
+		])
+		expect(through("maybeAges", undefined)).toBeUndefined()
+		expect(through("maybeAges", new Map([["a", 1n]]))).toEqual(
+			new Map([["a", 1n]]),
+		)
+	})
+
+	it("carries a Dictionary of Dictionaries", () => {
+		expect(
+			through("nesting", new Map([["a", new Map([["b", 1n]])]])),
+		).toEqual(new Map([["a", new Map([["b", 1n]])]]))
+	})
+
+	// NOTE: A Dictionary is a SHARED STORE with a generation stamp — the
+	// authority is `packages/runtime/src/Dictionary.ts` — so a written key is a
+	// version pushed onto a store other boxes still read, and a removed one
+	// leaves a tombstoned slot standing where it was. What crosses has to be
+	// what the BOX holds, which is the shape a Dictionary built here and handed
+	// straight back can never be in.
+	//
+	// NOTE: It is also what says the value that went in was a real one: the
+	// Module writes to it, and a Dictionary built any other way would have
+	// failed inside the bundle rather than out here.
+	it("carries what the box holds, not what its store does", () => {
+		expect([
+			...(through(
+				"edited",
+				new Map([
+					["dropped", 1n],
+					["kept", 2n],
+				]),
+			) as Map<string, bigint>),
+		]).toEqual([
+			["kept", 2n],
+			["added", 9n],
+		])
+	})
+
+	// NOTE: A refinement crosses unwrapped to its base and unproven — the rule
+	// the boundary keeps for every one of them, stated here because a
+	// `NonEmptyDictionary` is where a reader would expect the empty Map to be
+	// refused. It is not: the predicate belongs at the crossing and does not run
+	// there yet, exactly as a `NonEmptyList` Parameter takes an empty Array.
+	it("takes a refined Dictionary unproven, as every refinement crosses", () => {
+		expect(through("filled", new Map())).toEqual(new Map())
+		expect(through("filled", new Map([["a", 1n]]))).toEqual(
+			new Map([["a", 1n]]),
+		)
+	})
+
+	// NOTE: The other object JavaScript has, met where a host reached for the
+	// one every String key would have fitted. It is answered with the shape to
+	// write rather than with the Type it already named.
+	it("refuses a plain object and says what to write instead", () => {
+		expect(marshalError(() => through("ages", { alex: 39n })).message).toBe(
+			"argument 1: expected Dictionary<String, Integer>, which crosses as a Map rather than as a plain object — 'new Map(Object.entries(…))' builds one.",
+		)
+	})
+
+	// NOTE: A Map tells its keys apart by `===` and a Dictionary by the key
+	// Type's own equality, so two entries of one Map can be one entry of the
+	// other — and taking the second would lose an entry a host wrote. Every
+	// pairing here is one the language calls equal: the two representations of
+	// an Integer, an Integer and the whole Rational it equals, and the two
+	// Unicode spellings of one accented String.
+	it("refuses two entries whose keys are one key", () => {
+		expect(
+			marshalError(() =>
+				through(
+					"counts",
+					new Map<bigint | number, string>([
+						[1n, "one"],
+						[1, "again"],
+					]),
+				),
+			).message,
+		).toBe(
+			"argument 1 → [1].key: this key is already held — a Map tells its keys apart by '===' where a Dictionary tells them apart by the key Type's own equality, so two entries of this Map are one entry of it.",
+		)
+		expect(
+			marshalError(() =>
+				through(
+					"ages",
+					new Map([
+						["caf\u00e9", 1n],
+						["cafe\u0301", 2n],
+					]),
+				),
+			).path,
+		).toBe("argument 1 → [1].key")
+	})
+
+	it("spells where inside an entry a value was wrong", () => {
+		expect(
+			marshalError(() => through("ages", new Map([["alex", "39"]])))
+				.message,
+		).toBe('argument 1 → [0].value: expected Integer, got the string "39".')
+		expect(
+			marshalError(() => through("ages", new Map([[3n, 39n]]))).message,
+		).toBe("argument 1 → [0].key: expected String, got the bigint 3.")
+	})
+
+	it("names a Map for what it is where another shape was wanted", () => {
+		expect(marshalError(() => through("box", new Map())).message).toBe(
+			"argument 1: expected { width: Integer, height: Integer }, got an empty Map.",
+		)
+		expect(
+			marshalError(() => through("box", new Map([["width", 1n]])))
+				.message,
+		).toBe(
+			"argument 1: expected { width: Integer, height: Integer }, got a Map of 1 entry.",
+		)
+	})
+
+	// NOTE: The one thing the way OUT can lose, and the one shape that can
+	// arrange it: a Namespace writing an `is` for the key Type. The boundary
+	// builds a Dictionary with the standard library's own equality — a
+	// Descriptor is JSON and a conformance is a value, so nothing crossing
+	// carries one — and this Module's own `is` calls no two keys equal at all,
+	// so it holds two entries whose keys are one JavaScript string. A Map of it
+	// would have one entry, and handing back a value with an entry missing is
+	// the single thing this boundary may not do.
+	//
+	// NOTE: A project of its own, because `Marshal.es` is a table of the shapes
+	// that CROSS and this is here to be refused.
+	it("refuses a Dictionary whose keys are one JavaScript value", async () => {
+		await withProject(
+			{
+				"Main.es": `implementation {
+	§ No two keys are ever one key, however they are spelled.
+	namespace Apart for NonEmptyString is Equatable {
+		is(_ other: NonEmptyString) -> Boolean {
+			<- false
+		}
+	}
+
+	constant first: NonEmptyString  = "Ada"
+	constant second: NonEmptyString = "Ada"
+
+	function twice() -> Dictionary<NonEmptyString, Integer> {
+		<- Dictionary.of([
+			{ key = first, value = 1 },
+			{ key = second, value = 2 },
+		])
+	}
+}
+
+export {
+	twice
+}
+`,
+			},
+			async (directory) => {
+				let project = await loadModule(
+					path.join(directory, "Main.es"),
+					{ cacheDirectory },
+				)
+				let twice = project.exports.twice as () => unknown
+
+				expect(marshalError(() => twice()).message).toBe(
+					"return value: this Dictionary's 2 keys are 1 JavaScript value — a Map tells its keys apart by '===' where the Module tells them apart by the key Type's own 'is', so a Map of it would not hold them all.",
+				)
+			},
+		)
+	})
+
+	// NOTE: The door a host reaches for when it has no Type to hand over — the
+	// walk the VALUE directs, with both slots read by what each entry says it
+	// is rather than by what a position declared.
+	it("crosses with nothing declared at all", () => {
+		expect(marshaller.toJS(module.raw.sizes)).toEqual(
+			new Map([
+				["small", 1n],
+				["large", 2n],
+			]),
+		)
+	})
+})
+
 // NOTE: A Choice whose every Case is payload-less crosses as the bare NAME of
 // the Case — `"Up"`, never `{ $case: 'Direction#Up' }` — in both directions. It
 // is the one shape whose JavaScript spelling was chosen for the HOST rather
@@ -805,6 +1080,13 @@ describe("The exports of a Module", () => {
 			$case: "Shape#Circle",
 			radius: 3n,
 		})
+		expect(module.exports.sizes).toEqual(
+			new Map([
+				["small", 1n],
+				["large", 2n],
+			]),
+		)
+		expect(module.exports.nothing).toEqual(new Map())
 		expect(module.exports.present).toBe(7n)
 		expect(module.exports.absent).toBeUndefined()
 		expect(module.exports.answered).toEqual({
@@ -839,6 +1121,7 @@ describe("The exports of a Module", () => {
 			"Styled",
 			"Vertical",
 			"absent",
+			"ages",
 			"answer",
 			"answered",
 			"areaOf",
@@ -849,24 +1132,36 @@ describe("The exports of a Module", () => {
 			"card",
 			"circle",
 			"config",
+			"counts",
 			"direction",
 			"directionOrShape",
 			"directionOrSign",
 			"directionOrText",
 			"directionOrVertical",
 			"directions",
+			"edited",
+			"filled",
 			"flag",
+			"flags",
 			"greeting",
 			"grown",
 			"heading",
+			"headings",
 			"integer",
 			"labelled",
+			"ledger",
+			"ledgers",
 			"marker",
 			"maybe",
+			"maybeAges",
 			"maybeDirection",
 			"maybes",
 			"names",
+			"nesting",
+			"nothing",
 			"ordering",
+			"outlines",
+			"plots",
 			"plus",
 			"point",
 			"present",
@@ -874,6 +1169,8 @@ describe("The exports of a Module", () => {
 			"refused",
 			"result",
 			"shape",
+			"shares",
+			"sizes",
 			"styled",
 			"text",
 			"third",

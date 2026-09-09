@@ -58,6 +58,7 @@ math.exports.square(12n) // 144n
 | `String`          | `string`, normalised to NFC on the way in |
 | `Boolean`         | `boolean`                             |
 | `List<T>`         | `Array`                               |
+| `Dictionary<K, V>` | `Map`, at every key Type — entries in the order it holds them |
 | `{ a: T }`        | a plain object, closed — an undeclared key is refused |
 | `Optional<T>`     | `T` or `undefined`                    |
 | `Result<T, F>`    | `{ $case: "Result#Value", item: T }` or `{ $case: "Result#Failure", reason: F }` |
@@ -107,6 +108,51 @@ Type, the value, and where inside it the two parted ways.
 ```
 argument 1 → [1].height: expected Integer, got the string "four".
 ```
+
+A Dictionary is spelled by its ENTRIES rather than by a position, so a refusal
+inside one names the entry and the half of it that is wrong.
+
+```
+argument 1 → [2].value: expected Integer, got the string "four".
+```
+
+### Dictionaries
+
+A `Dictionary<K, V>` crosses as a `Map`, whatever the key Type is. A plain
+object was the alternative, and only for a `Dictionary<String, V>`: one Essence
+shape would then have had two JavaScript spellings depending on a Type
+Argument, an object hands its integer-looking keys back first however they were
+written down, and every other key Type would have had nowhere to go. So an
+object is refused with the shape to write instead — `new Map(Object.entries(…))`
+builds one.
+
+```js
+let ledger = await loadModule("./Ledger.es")
+
+ledger.exports.ages(new Map([["alex", 39n]])) // Map { "alex" => 39n }
+```
+
+Every key Type crosses, spelled as that Type is spelled anywhere else: a
+`String` is a string, an `Integer` a `bigint`, a payload-less Case its bare
+name, a Record or a Case with a payload the object it always is. The last of
+those is a key to **iterate**, not one to look up — a `Map` finds a key by
+`===`, and the object that comes back is a fresh one, so `get` on an equal
+object finds nothing while `for (let [key, value] of …)` gives every entry in
+order.
+
+The two containers do not agree about what one key is, and where they disagree
+the boundary refuses rather than decides. A Map holds `1` and `1n` apart and a
+Dictionary does not, so a Map carrying both is refused on the way in, naming the
+entry; and a Dictionary holding two keys that are one JavaScript value — which
+only a Namespace writing an `is` of its own for the key Type can arrange — is
+refused on the way out rather than handed back an entry short.
+
+That written `is` is the one thing the boundary can not see. It builds with the
+standard library's own equality for the key's kind, so a
+`Dictionary<NonEmptyString, V>` whose Module calls two Strings equal by a rule
+of its own is handed a Map holding both, and holds them as two entries where
+that Module says there is one. It is the same unproven crossing a refinement
+makes; the refusal above catches the other direction of the same disagreement.
 
 ## Calls
 

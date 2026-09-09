@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url"
 import { containsErrors } from "@essence-lang/compiler/diagnostics"
 import {
 	BRIDGE_KEY,
+	carriesDictionary,
 	compileToMemory,
 	linkToMemory,
 	withRuntimeBridge,
@@ -142,7 +143,18 @@ export async function attemptLoad(
 
 	let compiled = await compileToMemory(entry, {
 		...embedding,
-		transformSources: withRuntimeBridge,
+		// NOTE: The bridge, and whether it carries the door a Dictionary
+		// crosses through — asked of this Module's own Descriptor, which is
+		// what keeps the answer a function of the sources the bundle is named
+		// after. Described here rather than beside the binding below because
+		// this is where the bundle is built; a load that finds its bundle in
+		// the cache never asks.
+		transformSources: (sources) =>
+			withRuntimeBridge(sources, {
+				dictionary: carriesDictionary(
+					describeModule(linked.surface, entry),
+				),
+			}),
 		// NOTE: The bundle is going to be written into the cache directory, and
 		// the inline source map spells its `.es` sources relative to wherever the
 		// bundle sits. The hash is not known until the compile is over, so the

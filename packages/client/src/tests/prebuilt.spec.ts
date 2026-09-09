@@ -13,9 +13,13 @@ import * as path from "node:path"
 
 import {
 	compileToMemory,
+	linkToMemory,
 	withRuntimeBridge,
 } from "@essence-lang/compiler/embed"
-import { describeModule } from "@essence-lang/compiler/embed/describe"
+import {
+	carriesDictionary,
+	describeModule,
+} from "@essence-lang/compiler/embed/describe"
 import { canonicalPath } from "@essence-lang/compiler/modules"
 
 import type { EssenceValue } from "../bridge"
@@ -47,11 +51,22 @@ function clientFixture(name: string): string {
 // both against the same entry, because a Case tag is spelled relative to it.
 // What `esc build --embed` does is exactly this, and the block below checks that
 // by loading what `esc` wrote rather than what this wrote.
+//
+// NOTE: Including the one question the bridge asks of the boundary — whether it
+// names a Dictionary anywhere, and so whether the bundle carries the two
+// Functions one crosses through. Every injector asks it of the same Descriptor,
+// which is what keeps the answer a function of the sources rather than of who
+// built them.
 async function build(entryPath: string, name: string): Promise<string> {
 	let entry = canonicalPath(entryPath)
 	let bundlePath = path.join(directory, name)
+	let linked = linkToMemory(entry)
+	let descriptor = describeModule(linked.surface, entry)
 	let compiled = await compileToMemory(entry, {
-		transformSources: withRuntimeBridge,
+		transformSources: (sources) =>
+			withRuntimeBridge(sources, {
+				dictionary: carriesDictionary(descriptor),
+			}),
 		outputFileName: bundlePath,
 	})
 
@@ -293,6 +308,45 @@ describe("`esc build --embed`", () => {
 		expect((module.exports.Colour as Record<string, unknown>).Red).toEqual({
 			$case: "Colour#Red",
 		})
+	})
+
+	// NOTE: A Dictionary through the whole of the CLI path — `esc` decides
+	// whether the bundle carries the Dictionary door out of the same Descriptor
+	// it writes beside it, so a pair whose boundary names one has to be a pair a
+	// host can actually hand a Map to.
+	it("writes a pair that carries a Dictionary", async () => {
+		let built = path.join(directory, "ledger")
+		let bundle = path.join(built, "Ledger.js")
+		let source = path.join(directory, "Ledger.es")
+
+		writeFileSync(
+			source,
+			`implementation {
+
+	function ages(_ value: Dictionary<String, Integer>) -> Dictionary<String, Integer> {
+		<- value::set("added", to 9)
+	}
+}
+
+export {
+	ages
+}
+`,
+		)
+
+		let run = esc("build", source, "-o", bundle, "--embed", "--quiet")
+
+		expect(run.code).toBe(0)
+
+		let module = await loadPrebuilt(bundle)
+		let ages = module.exports.ages as (
+			value: Map<string, bigint>,
+		) => Map<string, bigint>
+
+		expect([...ages(new Map([["alex", 39n]]))]).toEqual([
+			["alex", 39n],
+			["added", 9n],
+		])
 	})
 
 	// NOTE: The Descriptor `esc` wrote and the one an in-memory compile of the

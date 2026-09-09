@@ -136,6 +136,38 @@ export declare const Rectangle: {
 		)
 	})
 
+	// NOTE: A `Map` at every key Type, with the key widened on the way in
+	// exactly as any other Integer position is — and a Type Alias holding one
+	// still named rather than spelled out, since a Map crosses the same way in
+	// both directions.
+	it("declares a Dictionary as a Map of its two slots", async () => {
+		let text = await declarationsOf(clientFixture("Marshal.es"))
+
+		expect(text).toContain(
+			"export declare function ages(p0: Map<string, bigint | number>): Map<string, bigint>",
+		)
+		expect(text).toContain(
+			"export declare function counts(p0: Map<bigint | number, string>): Map<bigint, string>",
+		)
+		expect(text).toContain(
+			"export declare const sizes: Map<string, bigint>",
+		)
+		expect(text).toContain(
+			"export type Ledger = { entries: Map<string, bigint> }",
+		)
+		expect(text).toContain(
+			"export declare function ledger(p0: Input<Ledger>): Ledger",
+		)
+	})
+
+	// NOTE: A unit Choice's Case is its own name here as everywhere else, so a
+	// Dictionary keyed by one reads as the enumeration it is.
+	it("declares a bare Case key as the union of its names", async () => {
+		expect(await declarationsOf(clientFixture("Marshal.es"))).toContain(
+			"export declare function headings(p0: Map<Direction, bigint | number>): Map<Direction, bigint>",
+		)
+	})
+
 	// NOTE: The tag `toJS` writes — the Choice as it was DECLARED and the Case.
 	// Never the path of the machine that compiled it, which is what the Case's
 	// identity carries and what a declaration file must not.
@@ -551,6 +583,46 @@ export let ratio: string = third.toString()
 
 		expect(run.output).toBe("")
 		expect(run.code).toBe(0)
+	})
+
+	// NOTE: A `Map` the consumer built is what the Parameter takes, and the
+	// widening on the way in reaches the KEY — `Input` names a Map before the
+	// mapped Type below it would have walked the Map's own Methods and widened
+	// nothing at all.
+	it("passes a Map to a Dictionary Parameter", async () => {
+		let declarations = await declarationsFor(clientFixture("Marshal.es"))
+		let run = typecheck({
+			"Marshal.d.es.ts": declarations,
+			"consumer.ts": `import { ages, counts, headings, ledger, sizes } from "./Marshal.es"
+import type { Ledger } from "./Marshal.es"
+import type { Input } from "${BORROWED_MODULE}"
+
+export let kept: Map<string, bigint> = ages(sizes)
+export let built: Map<string, bigint> = ages(new Map([["alex", 39]]))
+export let numbered: Map<bigint, string> = counts(new Map([[1, "one"]]))
+export let named: Map<"Up" | "Down", bigint> = headings(new Map([["Up", 1n]]))
+export let held: Ledger = ledger({ entries: new Map([["a", 1]]) })
+export let loose: Input<Ledger> = { entries: new Map([["a", 1]]) }
+export let one: bigint | undefined = kept.get("alex")
+`,
+		})
+
+		expect(run.output).toBe("")
+		expect(run.code).toBe(0)
+	})
+
+	it("is refused a Map whose values are of the wrong Type", async () => {
+		let declarations = await declarationsFor(clientFixture("Marshal.es"))
+		let run = typecheck({
+			"Marshal.d.es.ts": declarations,
+			"consumer.ts": `import { ages } from "./Marshal.es"
+
+export let wrong = ages(new Map([["alex", "39"]]))
+`,
+		})
+
+		expect(run.code).not.toBe(0)
+		expect(run.output).toContain("consumer.ts")
 	})
 
 	// NOTE: The other half of the claim. Declarations that admit everything

@@ -1,7 +1,10 @@
 import * as path from "node:path"
 import { gzipSync } from "node:zlib"
 
-import type { BundleOutput } from "@essence-lang/compiler/bundler"
+import type {
+	BundleOutput,
+	ModuleSources,
+} from "@essence-lang/compiler/bundler"
 import { type CompileMode, modeOf } from "@essence-lang/compiler/compileMode"
 import {
 	containsErrors,
@@ -249,6 +252,36 @@ async function writeDescriptor(
 		)}\n`,
 		"utf8",
 	)
+}
+
+// NOTE: What makes an embedded bundle one — the runtime's own Type key and value
+// constructors, injected as a Module and handed over as the bundle's default
+// export — and whether it carries the door a Dictionary crosses through, which
+// is asked of the Module's own Descriptor. `@essence-lang/client` asks the same
+// question of the same Descriptor before it compiles, so one graph gets one
+// bundle whichever tool built it, and the key both of them cache under does not
+// have to name the answer.
+//
+// NOTE: A standard library source has no Surface — it is one shared declaration
+// space rather than a Module — so there is no boundary to ask about and the
+// plain bridge is what goes in.
+async function runtimeBridgeFor(
+	front: Front,
+): Promise<(sources: ModuleSources) => ModuleSources> {
+	let { withRuntimeBridge } =
+		await import("@essence-lang/compiler/embed/bridge")
+
+	if (front.surface === null) {
+		return (sources) => withRuntimeBridge(sources)
+	}
+
+	let { carriesDictionary, describeModule } =
+		await import("@essence-lang/compiler/embed/describe")
+	let dictionary = carriesDictionary(
+		describeModule(front.surface, front.entryPath),
+	)
+
+	return (sources) => withRuntimeBridge(sources, { dictionary })
 }
 
 // NOTE: A remembered bundle as the outputs of the compile that would have
@@ -724,10 +757,7 @@ export async function compileFile(
 			? await import("@essence-lang/compiler/mutation")
 			: null
 		let embedding =
-			request.embed === true
-				? (await import("@essence-lang/compiler/embed/bridge"))
-						.withRuntimeBridge
-				: undefined
+			request.embed === true ? await runtimeBridgeFor(front) : undefined
 		// NOTE: `run` without `--out` has no name to emit under, and needs none
 		// until the key is known: what it asked for is a file to spawn. The
 		// scratch name is only ever the one it keeps, because a clean emit is

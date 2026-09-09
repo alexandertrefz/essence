@@ -11,12 +11,17 @@ import type { EssenceRational } from "./rational"
 // NOTE: A mapped Type rather than a second declaration of every alias, so that a
 // Parameter still reads `Input<Rectangle>` and hovers to the shape, rather than
 // spelling a Record out at every place it is passed. It walks what a value
-// walks: down a List, into a Record's members, across the arms of a Union (a
-// naked `T` distributes) — and it stops where marshalling does. A Rational is a
-// class and crosses as itself. A Function is not widened, because a callback
-// going in is CALLED by the Module: its Parameters are the Module's own values
-// coming out, and its declared shape is already the one whoever writes it
-// really answers.
+// walks: down a List, through both slots of a Dictionary, into a Record's
+// members, across the arms of a Union (a naked `T` distributes) — and it stops
+// where marshalling does. A Rational is a class and crosses as itself. A
+// Function is not widened, because a callback going in is CALLED by the Module:
+// its Parameters are the Module's own values coming out, and its declared shape
+// is already the one whoever writes it really answers.
+//
+// NOTE: A `Map` is named before the object below rather than left to it. The
+// mapped Type would walk its METHODS — every member `keyof Map` names — and
+// answer a shape that has a `get` and a `set` and no widened key at all, which
+// is the one thing a Parameter of a Dictionary needs said.
 export type Input<T> = T extends bigint
 	? bigint | number
 	: T extends EssenceRational
@@ -25,6 +30,8 @@ export type Input<T> = T extends bigint
 			? T
 			: T extends ReadonlyArray<infer Item>
 				? Array<Input<Item>>
-				: T extends object
-					? { [Key in keyof T]: Input<T[Key]> }
-					: T
+				: T extends ReadonlyMap<infer Key, infer Value>
+					? Map<Input<Key>, Input<Value>>
+					: T extends object
+						? { [Key in keyof T]: Input<T[Key]> }
+						: T
