@@ -3393,6 +3393,38 @@ describe("Enricher", () => {
 			expect(diagnostics[0].code).toBe("no-namespace-for-value")
 		})
 
+		// NOTE: And the cascade of the same shape, which is not the Program's
+		// mistake at all. A refused Invocation still types its Function literal
+		// Argument, from the last candidate it probed — otherwise the literal
+		// would be reported as uninferable on top of the refusal — so the
+		// callback's Parameter stands in the CALLEE's Type Parameter, a name
+		// that is in no Scope the reader can see. Reporting against it names
+		// `Held` in a file that never wrote it, under a call that has already
+		// said what is wrong.
+		it("should not report a Method on a Type Parameter of the callee", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				choice Problem {
+					NotANumber,
+					NotPositive,
+				}
+
+				namespace Problem for Problem is Equatable, is Printable {}
+
+				function priceOf(_ row: String) -> Result<Integer, Problem> {
+					<- Integer.parse(row)
+						::toResult(failingWith #NotANumber)
+						::keep(
+							where (price) { <- price::isPositive() },
+							failingWith #NotPositive,
+						)
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"no-matching-overload",
+			])
+		})
+
 		it("should report a binding without a conforming Namespace", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				protocol Showable {
