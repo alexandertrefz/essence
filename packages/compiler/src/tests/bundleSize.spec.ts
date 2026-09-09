@@ -132,7 +132,7 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(39_100)
 	})
 
-	// NOTE: 47,775 measured. The two tests above watch a Dictionary being shaken
+	// NOTE: 47,794 measured. The two tests above watch a Dictionary being shaken
 	// away whole; this one records what a Program that DOES hold one carries —
 	// the store, every native the file reaches, the written form, the kind
 	// registry and the registration that fills it. The composite key encoding
@@ -151,31 +151,42 @@ describe("Bundle Size", () => {
 	// all: 34 with the `Integer` grid rungs, whose `toString` binding this file
 	// links under its Overload name now, and 24 with `Optional`'s new
 	// combinators.
+	//
+	// NOTE: 19 more are the key encoding moving to `keyEncoding.ts`, so that
+	// the set-shaped List natives can rest on it without the store. The same
+	// functions arrive here in the same order, under one more of esbuild's
+	// per-module banner comments — which is the whole of the difference.
 	it("charges a Dictionary Program for the container it uses", async () => {
 		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(48_900)
 	})
 
-	// NOTE: 18,607 measured, where the same Program without the one call
-	// measures 5,083 — so `removeDuplicates` costs 13,524 bytes, two and a
-	// half times the Program that calls it. It is written `@::tally()::keys()`
-	// on `GroupedList`, so a List Method reaches the whole second container:
-	// the store, the canonical key encoding, the kind registry, the
-	// registration and the written form all arrive with it.
+	// NOTE: 12,753 measured, where the same Program without the one call
+	// measures 5,083 — so `removeDuplicates` costs 7,670 bytes, half again as
+	// much as the Program that calls it. It was 18,607 while the body was
+	// `@::tally()::keys()` on `GroupedList`: a List Method reached the whole
+	// second container, and the store, the kind registry, the registration and
+	// the written form all arrived with it. It is a List native over a plain
+	// Map now, and what it still carries is the canonical key encoding those
+	// two containers share — `keyEncoding.ts`, a runtime module of its own so
+	// that this one can rest on it alone.
 	//
-	// NOTE: That is the price of the body, and the body is what made the
-	// Method linear — 20,000 items with 2,000 distinct went from 66 ms to
-	// 2 ms, and 20,000 all distinct from 435 ms to 6 ms. The figure is here so
-	// the trade is a number rather than a surprise, and so that either half of
-	// it moving is caught: a Dictionary runtime that grows lands here first,
-	// and a body that stops reaching for one takes ten kilobytes off.
-	it("charges a removeDuplicates Program for the Dictionary behind it", async () => {
+	// NOTE: What the 7,670 buys is the Method being linear: one call over
+	// 20,000 items with 2,000 distinct measured 106 ms as a fold on `contains`
+	// and 22 ms here, and with all 20,000 distinct 650 ms against 22 ms — both
+	// best of three with 21 ms of subprocess startup inside. The figure is here so the trade
+	// is a number rather than a surprise, and so that either half of it moving
+	// is caught. The set-shaped Methods beside it — `hasDuplicates`,
+	// `everyItem(alsoIn:)`, `removeEvery(contentsOf:)` and
+	// `contains(everyItemOf:)` — rest on the same module, so this figure
+	// stands for all of them.
+	it("charges a removeDuplicates Program for the key encoding behind it", async () => {
 		expect(
 			await bundleSizeOfSource(`implementation {
 	constant names = ["ada", "bob", "ada", "cy"]
 
 	Terminal.print(names::removeDuplicates()::join(with ", "))
 }`),
-		).toBeLessThan(19_600)
+		).toBeLessThan(13_700)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far

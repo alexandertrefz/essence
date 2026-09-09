@@ -22,7 +22,7 @@ import {
 	is,
 	item__overload$1 as item,
 	join,
-	everyItem,
+	everyItem__overload$1 as everyItem,
 	lastIndex__overload$3 as lastIndexWhere,
 	length,
 	type ListType,

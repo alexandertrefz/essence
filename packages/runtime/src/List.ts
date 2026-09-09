@@ -2,6 +2,8 @@ import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
+import type { EquatableWitness, KeySet } from "./keyEncoding"
+import { addKey, freshKeySet, hasKey } from "./keyEncoding"
 import type { OptionalType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
 import { equal, greater, less, type OrderingType } from "./Ordering"
@@ -705,7 +707,7 @@ export function reduce__overload$2<
 	return accumulator
 }
 
-export function everyItem<ItemType extends AnyType>(
+export function everyItem__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	keepFunction: (item: ItemType) => BooleanType,
 ): ListType<ItemType> {
@@ -1521,4 +1523,228 @@ export function repeat__overload$2<ItemType extends AnyType>(
 	}
 
 	return createList(copies)
+}
+
+// NOTE: THE SET-SHAPED NATIVES, and the one structure all five rest on: a
+// `KeySet` (`keyEncoding.ts`) holding what the walk has met, keyed by the
+// canonical encoding a Dictionary finds a slot by. What a fold on `contains`
+// costs is a scan of everything kept so far per item, which is quadratic; each
+// of these is one walk and one lookup per item. One `removeDuplicates` over
+// 20,000 items with 2,000 distinct measured 106 ms as such a fold, 23 ms
+// through the `tally()::keys()` this replaced, and 22 ms here; with all 20,000
+// distinct the fold measured 650 ms and this walk 22 ms. Best of three, with
+// the 21 ms of subprocess startup inside every figure.
+//
+// NOTE: The encoding lives in a module of its own so that this can reach it
+// without the store, the version stamps, the kind registry and the written
+// form arriving behind it — which is what `@::tally()::keys()` in `Dictionary.es`
+// used to drag into any Program that asked a List for its distinct items.
+// `bundleSize.spec.ts` holds the figure that trade is worth.
+//
+// NOTE: The witness decides, not the encoding. `encodeKey` answers `null` for a
+// witness the Compiler has not branded structural, and every lookup then walks
+// the keys and asks that witness — the same scan path a Dictionary takes for the
+// same reason, and invisible from Essence apart from the time it costs.
+
+// NOTE: The whole item standing as its own key, so that the `on:` entries and
+// the bare ones are one walk each rather than two written twice. A monomorphic
+// identity call per item is inside the noise of the `encodeKey` beside it.
+function itself<ItemType extends AnyType>(item: ItemType): ItemType {
+	return item
+}
+
+// NOTE: Every key of a List, in one set. `runsOf` rather than `viewOf`, for the
+// reason `GroupedList` gives: this walk visits each item once and has no reason
+// to trim the caller's List for it.
+function keySetOver<ItemType extends AnyType, Key extends AnyType>(
+	originalList: ListType<ItemType>,
+	keyOf: (item: ItemType) => Key,
+	conformance: EquatableWitness<Key>,
+): KeySet<Key> {
+	let view = runsOf(originalList)
+	let set = freshKeySet(conformance)
+
+	for (let index = view.frontCount - 1; index >= 0; index--) {
+		addKey(set, keyOf(view.front[index]))
+	}
+
+	for (let index = 0; index < view.backCount; index++) {
+		addKey(set, keyOf(view.back[index]))
+	}
+
+	return set
+}
+
+// NOTE: The intersection and the difference in one walk, told apart by which
+// answer of the membership test keeps an item. Both are filters over the
+// receiver rather than set operations over it: an item is kept every time it
+// occurs, which is what `everyItem(where:)` beside them does with a check.
+function keptByMembership<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	otherList: ListType<ItemType>,
+	conformance: EquatableWitness<ItemType>,
+	keeping: boolean,
+): ListType<ItemType> {
+	let other = keySetOver(otherList, itself, conformance)
+	let view = viewOf(originalList)
+	let kept: Array<ItemType> = []
+
+	for (let index = view.frontCount - 1; index >= 0; index--) {
+		let item = view.front[index]
+
+		if (hasKey(other, item) === keeping) {
+			kept.push(item)
+		}
+	}
+
+	for (let index = 0; index < view.backCount; index++) {
+		let item = view.back[index]
+
+		if (hasKey(other, item) === keeping) {
+			kept.push(item)
+		}
+	}
+
+	return createList(kept)
+}
+
+// NOTE: The first item met at each key, which is what both `removeDuplicates`
+// entries answer. `addKey` says whether the key was new, so the membership test
+// and the insertion are one lookup rather than two.
+function firstAtEachKey<ItemType extends AnyType, Key extends AnyType>(
+	originalList: ListType<ItemType>,
+	keyOf: (item: ItemType) => Key,
+	conformance: EquatableWitness<Key>,
+): ListType<ItemType> {
+	let view = viewOf(originalList)
+	let seen = freshKeySet(conformance)
+	let kept: Array<ItemType> = []
+
+	for (let index = view.frontCount - 1; index >= 0; index--) {
+		let item = view.front[index]
+
+		if (addKey(seen, keyOf(item))) {
+			kept.push(item)
+		}
+	}
+
+	for (let index = 0; index < view.backCount; index++) {
+		let item = view.back[index]
+
+		if (addKey(seen, keyOf(item))) {
+			kept.push(item)
+		}
+	}
+
+	return createList(kept)
+}
+
+// NOTE: The same walk, stopped at the first key it has already met — which is
+// the whole of what `hasDuplicates` asks, and the reason it is not
+// `removeDuplicates()::length()` compared against the receiver's.
+function meetsAKeyTwice<ItemType extends AnyType, Key extends AnyType>(
+	originalList: ListType<ItemType>,
+	keyOf: (item: ItemType) => Key,
+	conformance: EquatableWitness<Key>,
+): BooleanType {
+	let view = runsOf(originalList)
+	let seen = freshKeySet(conformance)
+
+	for (let index = view.frontCount - 1; index >= 0; index--) {
+		if (!addKey(seen, keyOf(view.front[index]))) {
+			return createBoolean(true)
+		}
+	}
+
+	for (let index = 0; index < view.backCount; index++) {
+		if (!addKey(seen, keyOf(view.back[index]))) {
+			return createBoolean(true)
+		}
+	}
+
+	return createBoolean(false)
+}
+
+// NOTE: The subset question. The receiver is indexed and the ARGUMENT is
+// walked, so the answer is settled at the first item that is not there. The
+// empty List asks nothing of the receiver, which is what makes the answer
+// `true` before either List is read.
+export function contains__overload$2<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	otherList: ListType<ItemType>,
+	conformance: EquatableWitness<ItemType>,
+): BooleanType {
+	let others = runsOf(otherList)
+
+	if (others.total === 0) {
+		return createBoolean(true)
+	}
+
+	let held = keySetOver(originalList, itself, conformance)
+
+	for (let index = others.frontCount - 1; index >= 0; index--) {
+		if (!hasKey(held, others.front[index])) {
+			return createBoolean(false)
+		}
+	}
+
+	for (let index = 0; index < others.backCount; index++) {
+		if (!hasKey(held, others.back[index])) {
+			return createBoolean(false)
+		}
+	}
+
+	return createBoolean(true)
+}
+
+export function everyItem__overload$2<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	otherList: ListType<ItemType>,
+	conformance: EquatableWitness<ItemType>,
+): ListType<ItemType> {
+	return keptByMembership(originalList, otherList, conformance, true)
+}
+
+export function removeEvery__overload$3<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	otherList: ListType<ItemType>,
+	conformance: EquatableWitness<ItemType>,
+): ListType<ItemType> {
+	return keptByMembership(originalList, otherList, conformance, false)
+}
+
+export function removeDuplicates__overload$1<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	conformance: EquatableWitness<ItemType>,
+): ListType<ItemType> {
+	return firstAtEachKey(originalList, itself, conformance)
+}
+
+export function removeDuplicates__overload$2<
+	ItemType extends AnyType,
+	Key extends AnyType,
+>(
+	originalList: ListType<ItemType>,
+	keyOf: (item: ItemType) => Key,
+	conformance: EquatableWitness<Key>,
+): ListType<ItemType> {
+	return firstAtEachKey(originalList, keyOf, conformance)
+}
+
+export function hasDuplicates__overload$1<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	conformance: EquatableWitness<ItemType>,
+): BooleanType {
+	return meetsAKeyTwice(originalList, itself, conformance)
+}
+
+export function hasDuplicates__overload$2<
+	ItemType extends AnyType,
+	Key extends AnyType,
+>(
+	originalList: ListType<ItemType>,
+	keyOf: (item: ItemType) => Key,
+	conformance: EquatableWitness<Key>,
+): BooleanType {
+	return meetsAKeyTwice(originalList, keyOf, conformance)
 }

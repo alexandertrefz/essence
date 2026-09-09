@@ -1,11 +1,8 @@
 import { createBoolean } from "./Boolean"
-import {
-	createDictionary,
-	type EquatableWitness,
-	set as setAt,
-} from "./Dictionary"
+import { createDictionary, set as setAt } from "./Dictionary"
 import { createInteger } from "./Integer"
 import { anyIs } from "./internalHelpers"
+import type { EquatableWitness } from "./keyEncoding"
 import { createList, viewOf } from "./List"
 import {
 	type RandomnessType,

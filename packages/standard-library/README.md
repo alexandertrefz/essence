@@ -62,7 +62,7 @@ it and the `Terminal.ask` that is a prompt and a line (`Terminal.es`).
 `Randomness.seeded(_)` for a run that replays (`Randomness.es`).
 
 Three of every five declared Method entries are also IMPLEMENTED here, in
-Essence — 345 of 566 as this is written, counting one entry per Overload and
+Essence — 343 of 573 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
 Seven more are written on a PROTOCOL rather than on a Namespace, once for every
 conformer: `Equatable.isNot`, `Comparable`'s four inequalities, and
@@ -340,7 +340,9 @@ ordered by anything comparable read off it. The key is what has to be ordered,
 and the item never is.
 
 `is`, `contains`, `doesNotContain`, `firstIndex(of:)`, `lastIndex(of:)`,
-`count(of:)`, `removeEvery(_ item:)` and `removeDuplicates` are bounded
+`count(of:)`, `removeEvery(_ item:)` and the five set-shaped Methods —
+`removeDuplicates`, `hasDuplicates`, `contains(everyItemOf:)`,
+`everyItem(alsoIn:)` and `removeEvery(contentsOf:)` — are bounded
 `is Equatable`, so equality between items means the item Type's OWN `is` rather
 than a structural comparison the language can not express. That is a narrowing:
 a Method holding an UNBOUNDED `List<ItemType>` can no longer call them, and the
@@ -348,6 +350,16 @@ Diagnostic says which bound to add. `List` conforms
 `is Equatable where ItemType is Equatable`, so nested Lists still have a witness
 — and that conditional conformance is also what `[1, 2]::isNot([1, 3])` runs on:
 `isNot` is `Equatable`'s provided Method, and the item witness flows into it.
+The `on:` entries of `removeDuplicates` and `hasDuplicates` bound the KEY
+instead, exactly as `sort(on:)` bounds it `Comparable`.
+
+The five are one walk over a Map keyed by the canonical encoding a
+`Dictionary` finds a slot by, which lives in a runtime module of its own so
+that a Program asking a List one of those questions carries neither the store
+nor the written form. `removeDuplicates` was `tally()::keys()` on `GroupedList`
+before that, and cost 13.5 kB to say what a Map says in 7.7. The union of two
+Lists has no name of its own: it is
+`append(contentsOf other)::removeDuplicates()`.
 
 ## Development
 

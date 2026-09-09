@@ -64,10 +64,6 @@ export { length } from "./List"
 // is re-exported straight through, so the two entries are one Function under two
 // names and can not come apart.
 //
-// NOTE: `removeDuplicates` is not here. Both of its entries are written in
-// Essence on `tally` and `keys`, in `Dictionary.es`, under `GroupedList` and
-// `GroupedNonEmptyList` — the proof flows through the natives those read.
-
 // NOTE: `append(contentsOf:)` is `List`'s own second Overload entry under a name
 // with no `__overload$N` on it — this Namespace declares ONE `append`, so the
 // Simplifier emits it unmangled and the re-export renames it. What is added is
@@ -155,10 +151,20 @@ export function replace__overload$1<ItemType extends AnyType>(
 // promises what it builds is not empty.
 export { enumerate } from "./List"
 
-// NOTE: Pairing and splitting, both `List`'s own natives, and last for the
-// reason the declarations are: this file reads in the order `List.es` writes
-// them. Pairing stops where the shorter side does and splitting opens a group
-// per item, so neither can answer nothing when it was handed something. `pair`
-// asks the ARGUMENT for the proof too, which the Type says and the Function
-// neither knows nor needs to.
+// NOTE: Pairing and splitting, both `List`'s own natives, and here for the
+// reason the declarations are where they are: this file reads in the order
+// `List.es` writes them. Pairing stops where the shorter side does and
+// splitting opens a group per item, so neither can answer nothing when it was
+// handed something. `pair` asks the ARGUMENT for the proof too, which the Type
+// says and the Function neither knows nor needs to.
 export { pair, split } from "./List"
+
+// NOTE: `removeDuplicates` is `List`'s own pair of natives, under this
+// Namespace's names: the first occurrence of the first item is kept whatever
+// else is dropped, so a List with something in it comes out with something in
+// it. Both entries were `@::tally()::keys()` in `Dictionary.es`, which reached
+// the whole second container for an answer a plain Map holds.
+export {
+	removeDuplicates__overload$1,
+	removeDuplicates__overload$2,
+} from "./List"

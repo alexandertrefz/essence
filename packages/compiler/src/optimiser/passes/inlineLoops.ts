@@ -340,8 +340,8 @@ class Inlining {
 		// was handed — so a proven receiver reaches `List`'s own entry by
 		// widening and is emitted under `List`'s own name, which is why they
 		// were never affected. Everything else that Namespace declares stays
-		// refused until somebody weighs it: `reverse`, `sort`, `pair` and
-		// `split` are re-exports this pass does not walk, and
+		// refused until somebody weighs it: `reverse`, `sort`, `pair`, `split`
+		// and `removeDuplicates` are re-exports this pass does not walk, and
 		// `prepend(contentsOf:)` and `replace` are not `List`'s Functions at
 		// all.
 		if (node.base.name === "NonEmptyList") {
@@ -355,7 +355,11 @@ class Inlining {
 		switch (node.member.name) {
 			case "map":
 				return this.mapWalk(node)
-			case "everyItem":
+			// NOTE: The filter is an Overload entry — `everyItem(alsoIn:)`
+			// stands beside it — so the name a call carries by this stage is
+			// the mangled one. The `alsoIn:` entry is a native over a Map and
+			// has no walk to write out.
+			case "everyItem__overload$1":
 				return this.keepWalk(node)
 			case "reduce__overload$1":
 				return this.foldWalk(node, false)
