@@ -1679,6 +1679,72 @@ is why a Variable receiver is as safe here as a Constant.
 No Quick Fix. The rewrite is a `match` around the branch's whole body, which is
 more than an edit to the lines the Warning underlines.
 
+### `ambiguous-nesting-level`
+
+A Warning: a call's Argument fits the receiver and what the receiver holds both,
+so the call has two readings and reached the one written first.
+
+```essence
+constant nested: Optional<Optional<Integer>> = #Value(#Empty)
+
+constant isEmpty = nested::is(#Empty)
+```
+
+`Optional::is` has two entries — one taking another `Optional`, one taking a
+bare item — and on an Optional of Optionals a written `#Empty` fits both. The
+whole-Optional entry is written first, so it is the one reached: the call asks
+whether the RECEIVER is empty and answers `false`, while a reader who meant
+"does it hold an empty Optional" is reading a line whose honest answer is
+`true`. `Result` nests the same way one Case over: a `Result<Result<Integer, String>, String>` fails
+with a String at both levels, so `failed::is(#Failure("gone"))` asks about the
+outer failure.
+
+Each reading has a spelling that says which it is, and the Helps offer both:
+
+- **What it holds** — wrap the Argument in the Case that holds it:
+  `nested::is(#Value(#Empty))`. The payload of an `Optional<Integer>`'s `#Value`
+  is an Integer, and an `#Empty` is not one, so only one entry is left.
+- **The receiver** — name the Argument in a Constant annotated at the carrier's
+  level: `constant outer: Optional<Optional<Integer>> = #Empty` and then
+  `nested::is(outer)`. An Optional of Optionals holds a `#Value` carrying an
+  Optional, which no `Optional<Integer>` has, so again only one entry is left.
+
+Writing the Choice in front decides nothing. A Case carries its Type Arguments
+for display and assignability compares its MEMBERS, so a Case with no payload is
+one Type at every level and `Optional<Optional<Integer>>#Empty` reads at both —
+which is why the second Help asks for a Constant rather than for a prefix.
+
+The rule names no Method, no Namespace and no Type. What is recognised is the
+shape: the entry the call selected takes the receiver's own Type, another entry
+of the same Overload takes what one of that Type's Cases holds, and the value
+the call built reads at both levels. A `choice` of your own with a Namespace
+declaring the same pair of entries is read exactly the same way, and the first
+Help names your Case.
+
+Three things it deliberately does not report:
+
+- **A plain carrier.** On an `Optional<Integer>` a written `#Empty` fits the
+  whole-Optional entry and nothing else: the entry beside it takes an Integer,
+  and an `#Empty` is not one. There is one reading, and one reading is never
+  ambiguous.
+- **Two entries that ask about the same value.** A refinement ladder is two
+  entries accepting one call by design — `2::raise(to 3)` fits both of
+  `raise(to Integer)` and `raise(to NonNegativeInteger)` — and which one wins
+  changes what the call PROVES rather than what it asks.
+- **Two Methods.** `nested::or(#Empty)` and `nested::value(defaultingTo #Empty)`
+  read the same Argument at two levels, and each is one entry whose Parameter
+  Type says which level it is: `or` takes what it answers, `value` takes the
+  item. The reader picks the level by picking the Method, and the Compiler picks
+  nothing.
+
+**Rewrite — "Wrap the Argument in '#Value(…)'":** offered under Refactor rather
+than as a Quick Fix, and never preferred. Both readings are well typed and the
+Compiler has no way to know which was meant, so applying it CHANGES what the
+Program answers — which is the whole of what the Warning has to say, and not
+something to put one click away on the squiggle. The other reading needs a
+Constant declared beside the call, which is more than an edit to the span the
+Warning underlines.
+
 ## Choices
 
 ### `empty-choice`

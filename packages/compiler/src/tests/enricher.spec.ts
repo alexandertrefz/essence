@@ -10784,6 +10784,281 @@ describe("Enricher", () => {
 		})
 	})
 
+	// NOTE: A carrier and what it holds are two levels, and `Optional::is` has an
+	// entry for each — so a written `#Empty` against an
+	// `Optional<Optional<Integer>>` fits both, the whole-carrier entry is reached
+	// because it is written first, and the call answers a question about the
+	// RECEIVER that reads like a question about its payload. `Result` has the
+	// same trap one Case over. Only a Diagnostic can say which of the two was
+	// asked.
+	//
+	// The rule names no Method and no Namespace: the entry the call selected
+	// takes the receiver's own Type, another entry takes what one of that Type's
+	// Cases holds, and the value the call built reads at both. A Program's own
+	// carrier is read the same way.
+	describe("Two-level carrier comparisons", () => {
+		function programWith(body: string): string {
+			return `implementation {
+				constant nested: Optional<Optional<Integer>> = #Value(#Empty)
+				constant plain: Optional<Integer> = #Value(1)
+				constant inner: Optional<Integer> = #Empty
+				constant outer: Optional<Optional<Integer>> = #Empty
+				constant failed: Result<Result<Integer, String>, String> = #Value(#Failure("inner"))
+
+				${body}
+			}`
+		}
+
+		function codesFor(source: string): Array<string> {
+			return diagnosticsFor(source).map((diagnostic) => diagnostic.code)
+		}
+
+		// NOTE: `lastConstantMethodInvocation` holds the Program to enriching
+		// cleanly, and half the Programs here are the ones that warn — so the
+		// Overload slot is read from a Program that is allowed to have something
+		// to say.
+		function selectedEntryOf(source: string): number | null {
+			let { program } = enrichSource(source)
+			let constants = program.implementation.nodes.filter(
+				(node) => node.nodeType === "ConstantDeclarationStatement",
+			)
+			let value = constants[constants.length - 1].value
+
+			if (value.nodeType !== "MethodInvocation") {
+				throw new Error("Last Constant is not a MethodInvocation.")
+			}
+
+			return value.overloadedMethodIndex
+		}
+
+		it("should warn where the Argument fits both levels of an Optional", () => {
+			expect(
+				codesFor(programWith("constant answer = nested::is(#Empty)")),
+			).toEqual(["ambiguous-nesting-level"])
+		})
+
+		it("should warn on the negative reading of the same call", () => {
+			expect(
+				codesFor(
+					programWith("constant answer = nested::isNot(#Empty)"),
+				),
+			).toEqual(["ambiguous-nesting-level"])
+		})
+
+		// NOTE: A `Result` of `Result`s fails with one Type at both levels, so a
+		// written `#Failure(reason)` is the Optional trap's twin: it fits the
+		// whole Result and the Result it holds, and the reader is asking about
+		// the outer failure without saying so.
+		it("should warn where a Result of Results is compared to a failure", () => {
+			expect(
+				codesFor(
+					programWith(
+						'constant answer = failed::is(#Failure("inner"))',
+					),
+				),
+			).toEqual(["ambiguous-nesting-level"])
+		})
+
+		// NOTE: The Warning has to name both levels and both spellings, or a
+		// reader is told the call is ambiguous without being told what either
+		// reading is written as.
+		it("should name both levels and both spellings", () => {
+			let source = programWith("constant answer = nested::is(#Empty)")
+			let diagnostic = diagnosticsFor(source)[0]
+
+			expect(diagnostic.severity).toBe("warning")
+			expect(diagnostic.labels[0]).toMatchObject({
+				kind: "primary",
+				message: "read as an Optional<Optional<Integer>> here",
+			})
+			expect(diagnostic.labels[1]).toMatchObject({
+				kind: "secondary",
+				message: "this takes an Optional<Integer> as well",
+			})
+			expect(diagnostic.helps).toEqual([
+				"Write '#Value(…)' around the Argument to ask whether the receiver holds it.",
+				"Name it in a Constant annotated 'Optional<Optional<Integer>>' to go on asking about the receiver.",
+			])
+			expect(diagnostic.data).toEqual({
+				kind: "holding-case",
+				caseName: "Value",
+			})
+		})
+
+		// NOTE: The Argument alone, since the Argument is what both Helps rewrite
+		// — the Method name carries the secondary Label instead.
+		it("should underline the Argument", () => {
+			let source = programWith("constant answer = nested::is(#Empty)")
+
+			expect(underlinedText(source, diagnosticsFor(source)[0])).toBe(
+				"#Empty",
+			)
+		})
+
+		// NOTE: The Warning is a Warning: nothing is refused, and the call goes
+		// on reaching the entry it reached. The whole-carrier entry is Overload
+		// slot 0 of `Optional::is`.
+		it("should leave the call on the entry it selected", () => {
+			expect(
+				selectedEntryOf(
+					programWith("constant answer = nested::is(#Empty)"),
+				),
+			).toBe(0)
+		})
+
+		// NOTE: The other side of the same fact. An Argument annotated at the
+		// item's level reaches the bare-item entry, which is slot 1 — the inner
+		// question, asked unambiguously, and nothing to warn about.
+		it("should stay silent where an annotated Constant asks about the item", () => {
+			let source = programWith("constant answer = nested::is(inner)")
+
+			expect(codesFor(source)).toEqual([])
+			expect(selectedEntryOf(source)).toBe(1)
+		})
+
+		// NOTE: And an Argument annotated at the carrier's level fits the
+		// whole-carrier entry only — a `#Value` holding an Optional is no
+		// Optional of Integers — so the receiver's question is asked with nothing
+		// left to read the other way.
+		it("should stay silent where an annotated Constant asks about the receiver", () => {
+			expect(
+				codesFor(programWith("constant answer = nested::is(outer)")),
+			).toEqual([])
+		})
+
+		// NOTE: The spelling Help 1 asks for. Wrapping the Argument in the Case
+		// that holds decides the level: the payload of an `Optional<Integer>`'s
+		// `#Value` is an Integer, and an `#Empty` is not one.
+		it("should stay silent on the wrapped spelling it recommends", () => {
+			expect(
+				codesFor(
+					programWith("constant answer = nested::is(#Value(#Empty))"),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: Why Help 2 asks for a Constant rather than for the Choice written
+		// in front. A Case carries its Type Arguments for display and `matchTypes`
+		// compares its MEMBERS, so a payload-free Case is one Type at every level
+		// and writing `Optional<Optional<Integer>>#Empty` decides nothing.
+		it("should go on warning where the Case names its Choice", () => {
+			expect(
+				codesFor(
+					programWith(
+						"constant answer = nested::is(Optional<Optional<Integer>>#Empty)",
+					),
+				),
+			).toEqual(["ambiguous-nesting-level"])
+		})
+
+		it("should stay silent on a plain Optional", () => {
+			expect(
+				codesFor(programWith("constant answer = plain::is(#Empty)")),
+			).toEqual([])
+		})
+
+		it("should stay silent on a plain Optional compared to a bare item", () => {
+			expect(
+				codesFor(programWith("constant answer = plain::is(1)")),
+			).toEqual([])
+		})
+
+		// NOTE: `Integer::is` takes its receiver's own Type too, and an Integer
+		// holds nothing — there is no second level for an Argument to be read at,
+		// which is the filter that keeps this off every numeric comparison in
+		// every Program.
+		it("should stay silent where the receiver holds nothing", () => {
+			expect(codesFor(programWith("constant answer = 3::is(4)"))).toEqual(
+				[],
+			)
+		})
+
+		// NOTE: `or` and `value(defaultingTo:)` are the pair this Warning is NOT
+		// about. Each is one entry, and their Parameter Types say which level
+		// they read at — `or` takes what it answers, `value(defaultingTo:)` takes
+		// the item — so the reader picks the level by picking the Method and the
+		// Compiler picks nothing at all. See Optional.es, where the same fact
+		// keeps an `orElse` out of the Namespace.
+		it("should stay silent where the Method's own name picks the level", () => {
+			expect(
+				codesFor(`implementation {
+					constant nested: Optional<Optional<Integer>> = #Value(#Empty)
+
+					constant fallen = nested::or(#Empty)
+					constant item = nested::value(defaultingTo #Empty)
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: Nothing in the rule is about the standard library. A Choice a
+		// Program declares, with a Namespace whose Overload takes the carrier and
+		// what it holds, is read exactly the same way — down to the Case its Help
+		// asks the reader to wrap in.
+		it("should read a Program's own carrier by the same shape", () => {
+			let source = `implementation {
+				choice Box<ItemType> {
+					Full { item: ItemType },
+					Blank,
+				}
+
+				namespace Boxes<infer ItemType> for Box<ItemType> {
+					overload holds {
+						(_ other: Box<ItemType>) -> Boolean {
+							<- true
+						}
+
+						(_ other: ItemType) -> Boolean {
+							<- false
+						}
+					}
+				}
+
+				constant nested: Box<Box<Integer>> = #Full(#Blank)
+
+				constant answer = nested::holds(#Blank)
+			}`
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"ambiguous-nesting-level",
+			])
+			expect(diagnostics[0].data).toEqual({
+				kind: "holding-case",
+				caseName: "Full",
+			})
+		})
+
+		// NOTE: The same Namespace with nothing nested under it. Both entries are
+		// there, and a `#Blank` fits the carrier one alone, so there are not two
+		// readings to report.
+		it("should stay silent on a Program's own carrier holding no carrier", () => {
+			expect(
+				codesFor(`implementation {
+					choice Box<ItemType> {
+						Full { item: ItemType },
+						Blank,
+					}
+
+					namespace Boxes<infer ItemType> for Box<ItemType> {
+						overload holds {
+							(_ other: Box<ItemType>) -> Boolean {
+								<- true
+							}
+
+							(_ other: ItemType) -> Boolean {
+								<- false
+							}
+						}
+					}
+
+					constant plain: Box<Integer> = #Blank
+
+					constant answer = plain::holds(#Blank)
+				}`),
+			).toEqual([])
+		})
+	})
+
 	// NOTE: The Dictionary Type as a Program can reach it — the annotation, the
 	// arity, assignability between two of them, and a user Namespace written for
 	// one. Nothing here constructs a Dictionary: slice 1 builds one only through
