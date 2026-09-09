@@ -120,14 +120,12 @@ implementation {
 				},
 			)
 
-			constant values  = merged.placed::map(.value)
-			constant padding = List.repeat(
-				0,
-				times size::subtract(values::length()),
-			)
-
+			§ `pad` fills a List up to a length, at its end unless another
+			§ side is asked for — which is the row's own length, since a
+			§ merge leaves fewer tiles than it was handed and nothing else
+			§ here changes how many squares a row has.
 			<- {
-				cells = values::append(contentsOf padding),
+				cells = merged.placed::map(.value)::pad(to size, with 0),
 				gained = merged.gained,
 				placed = merged.placed,
 			}
@@ -140,21 +138,6 @@ implementation {
 			times size,
 		)
 
-		§§ Rows become columns.
-		transpose() -> Board {
-			constant board = @
-
-			§ A board is square, so the positions its rows stand at are the
-			§ positions inside a row as well.
-			<- board
-				::indices()
-				::map((column) {
-					<- board::map((row) {
-						<- row::item(at column, defaultingTo 0)
-					})
-				})
-		}
-
 		§§ Every row reversed.
 		mirror() -> Board {
 			<- @::map((row) { <- row::reverse() })
@@ -166,6 +149,11 @@ implementation {
 		slideRows() -> Pushed {
 			constant slid = @::map((row) { <- row::slide() })
 
+			§ Both walks want the tile AND the square it stands on, which is
+			§ what `enumerate` hands a body — where `emptyCells` below wants
+			§ the squares alone and asks `indices(where:)` for them. The
+			§ filter inside is over the sources a tile was made from, and a
+			§ source that is already where the tile ended up is no journey.
 			constant movements = slid::enumerate()
 				::map(({ index as row, item as { placed } }) {
 					<- placed
@@ -236,16 +224,16 @@ implementation {
 			}
 		}
 
-		§§ Every empty square, row by row — where a new tile may go. The
-		§§ host picks one; this side has no dice, and needs none.
+		§§ Every empty square, row by row — where a new tile may go.
 		emptyCells() -> List<Cell> {
+			§ `indices(where:)` answers the positions inside a row that the
+			§ check accepts, which is the question a square asks: not what is
+			§ on it, but where it is.
 			<- @::enumerate()
-				::map(({ index as rowIndex, item as row }) {
-					<- row::enumerate()
-						::everyItem(where ({ item }) { <- item::is(0) })
-						::map(({ index }) {
-							<- { row = rowIndex, column = index }
-						})
+				::map(({ index as row, item as cells }) {
+					<- cells
+						::indices(where (tile) { <- tile::is(0) })
+						::map((column) { <- { row, column } })
 				})
 				::flatten()
 		}
@@ -361,6 +349,9 @@ tests {
 		}
 	}
 
+	§ The two turns the four directions are built out of. `transpose` is the
+	§ standard library's, over any List of Lists; `mirror` is this file's,
+	§ because reversing every row is not a Method a List of Lists has.
 	suite "turns" {
 		test "takes rows into columns" {
 			expect twoTiles

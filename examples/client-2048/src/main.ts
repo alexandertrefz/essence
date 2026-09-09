@@ -1,9 +1,11 @@
-// NOTE: The page. Everything that is a rule of the game lives in `Game.es`;
-// this file draws a Game, turns keys into pushes, and rolls the dice — the two
-// things a pure Module can not do for itself.
+// NOTE: The page. Everything that is a rule of the game lives in `Game.es` —
+// the dice included: `withNewTile` there draws its square and its tile from
+// `Randomness.entropy()`, the host's own source of randomness. What is left
+// here is drawing a Game and turning keys into pushes, which is the whole of
+// what a page is for.
 import * as rules from "./Game.es"
 import type * as Rules from "./Game.es"
-import type { Cell, Direction, Game, Movement } from "./Game.es"
+import type { Direction, Game, Movement } from "./Game.es"
 
 const boardElement = document.querySelector<HTMLDivElement>("#board")!
 const scoreElement = document.querySelector<HTMLElement>("#score")!
@@ -17,21 +19,6 @@ const newButton = document.querySelector<HTMLButtonElement>("#new")!
 // Module answers, and the old one is what `undo` will hand back.
 let game: Game = rules.empty
 
-// NOTE: The dice. `emptyCells` says where a tile may go; the host picks one
-// and tells the Module what it chose. A 4 one time in ten, as the original.
-function withNewTile(current: Game): Game {
-	let cells: Array<Cell> = rules.emptyCells(current)
-
-	if (cells.length === 0) {
-		return current
-	}
-
-	let cell = cells[Math.floor(Math.random() * cells.length)]!
-	let value = Math.random() < 0.1 ? 4 : 2
-
-	return rules.place(current, cell, value)
-}
-
 function distance(movement: Movement, row: number, column: number): number {
 	return (
 		Math.abs(Number(movement.from.row) - row) +
@@ -39,8 +26,11 @@ function distance(movement: Movement, row: number, column: number): number {
 	)
 }
 
+// NOTE: `start` deals a new game its two tiles. That a game opens with two is
+// a rule of the game, so it is a rule of the Module, and the page asks for one
+// rather than dealing it.
 function newGame(): void {
-	game = withNewTile(withNewTile(rules.empty))
+	game = rules.start()
 	render()
 }
 
@@ -71,7 +61,7 @@ function push(direction: Direction): void {
 	// only asks, and slides each tile in from where it was.
 	let movements = rules.movements(game, direction)
 
-	game = withNewTile(moved)
+	game = rules.withNewTile(moved)
 	render(movements)
 }
 
