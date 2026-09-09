@@ -157,7 +157,7 @@ export { enumerate } from "./List"
 // splitting opens a group per item, so neither can answer nothing when it was
 // handed something. `pair` asks the ARGUMENT for the proof too, which the Type
 // says and the Function neither knows nor needs to.
-export { pair, split } from "./List"
+export { pair, split__overload$1 as split } from "./List"
 
 // NOTE: `removeDuplicates` is `List`'s own pair of natives, under this
 // Namespace's names: the first occurrence of the first item is kept whatever

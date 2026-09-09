@@ -3804,6 +3804,32 @@ third"::lines())
 		"List.split<ItemType>(intoGroupsOf: Integer) [empty, zero]",
 		noNumbers::split(intoGroupsOf 0),
 	)
+	§ The two entries that cut at a separator. A separator cuts BETWEEN
+	§ pieces, so a piece stands before the first cut and after the last one —
+	§ which is what makes the answer a NonEmptyList whatever it was handed,
+	§ and the empty List answer one empty piece.
+	constant separated: List<Integer> = [0, 1, 2, 0, 0, 3]
+
+	show(
+		"List.split<ItemType is Equatable>(on: ItemType)",
+		separated::split(on 0),
+	)
+	show(
+		"List.split<ItemType is Equatable>(on: ItemType) [absent]",
+		fiveNumbers::split(on 9),
+	)
+	show(
+		"List.split<ItemType is Equatable>(on: ItemType) [empty]",
+		noNumbers::split(on 0),
+	)
+	show(
+		"List.split<ItemType>(where: (_ ItemType) -> Boolean)",
+		fiveNumbers::split(where (item) { <- item::isEven() }),
+	)
+	show(
+		"List.split<ItemType>(where: (_ ItemType) -> Boolean) [proof carried]",
+		noNumbers::split(where (item) { <- item::isEven() })::firstItem(),
+	)
 	§ `repeat` tells its two entries apart by what is known about the COUNT, so
 	§ the computed Constant from the Integer section keeps this call on the
 	§ entry answering a plain List. A written count above zero is its own proof
@@ -3955,10 +3981,90 @@ third"::lines())
 		"List.removeDuplicates<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [empty]",
 		noNumbers::removeDuplicates(on (item) { <- item }),
 	)
+	§ Filling up to a length, which is `String::pad` over items — with the
+	§ other end as its default, since a List keeps the items it holds where
+	§ they stand.
+	show(
+		"List.pad<ItemType>(to: Integer, with: ItemType, at?: Side)",
+		singleNumber::pad(to 3, with 0),
+	)
+	show(
+		"List.pad<ItemType>(to: Integer, with: ItemType, at?: Side) [start]",
+		singleNumber::pad(to 3, with 0, at #Start),
+	)
+	show(
+		"List.pad<ItemType>(to: Integer, with: ItemType, at?: Side) [both ends]",
+		singleNumber::pad(to 4, with 0, at #BothEnds),
+	)
+	show(
+		"List.pad<ItemType>(to: Integer, with: ItemType, at?: Side) [already long enough]",
+		numbers::pad(to 2, with 0),
+	)
+	show(
+		"List.pad<ItemType>(to: Integer, with: ItemType, at?: Side) [empty]",
+		noNumbers::pad(to 2, with 0),
+	)
+	§ The overlapping stretches, and the maximal ones. Each holds an item, so
+	§ a total `firstItem` reads off one.
+	show("List.windows<ItemType>(of: PositiveInteger)", numbers::windows(of 2))
+	show(
+		"List.windows<ItemType>(of: PositiveInteger) [whole length]",
+		numbers::windows(of 5),
+	)
+	show(
+		"List.windows<ItemType>(of: PositiveInteger) [above the length]",
+		numbers::windows(of 6),
+	)
+	show(
+		"List.windows<ItemType>(of: PositiveInteger) [proven stretches]",
+		numbers::windows(of 2)::map((window) { <- window::firstItem() }),
+	)
+	show(
+		"List.windows<ItemType>(of: PositiveInteger) [empty]",
+		noNumbers::windows(of 2),
+	)
+	show(
+		"List.runs<ItemType>(where: (_ ItemType) -> Boolean)",
+		numbers::runs(where (item) { <- item::isLessThan(3) }),
+	)
+	show(
+		"List.runs<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
+		numbers::runs(where (item) { <- item::isGreaterThan(9) }),
+	)
+	show(
+		"List.runs<ItemType>(where: (_ ItemType) -> Boolean) [every item]",
+		numbers::runs(where (item) { <- item::isLessThan(9) }),
+	)
+	show(
+		"List.runs<ItemType>(where: (_ ItemType) -> Boolean) [empty]",
+		noNumbers::runs(where (item) { <- item::isLessThan(9) }),
+	)
 
 	§ ——— NestedList ———————————————————————————————————————————————————————
 	show("NestedList.flatten<ItemType>()", [[1, 2], [3]]::flatten())
 	show("NestedList.flatten<ItemType>() [empty]", noNestedNumbers::flatten())
+	§ The shortest inner List decides how many columns there are, as
+	§ `pair(with:)` decides how many pairs.
+	show(
+		"NestedList.transpose<ItemType>()",
+		[[1, 2, 3], [4, 5, 6]]::transpose(),
+	)
+	show(
+		"NestedList.transpose<ItemType>() [ragged]",
+		[[1, 2, 3], [4]]::transpose(),
+	)
+	show(
+		"NestedList.transpose<ItemType>() [twice]",
+		[[1, 2, 3], [4, 5, 6]]::transpose()::transpose(),
+	)
+	show(
+		"NestedList.transpose<ItemType>() [empty inner]",
+		[[1, 2], noNumbers]::transpose(),
+	)
+	show(
+		"NestedList.transpose<ItemType>() [empty]",
+		noNestedNumbers::transpose(),
+	)
 
 	§ ——— OptionalList —————————————————————————————————————————————————————
 	§ The Namespace a List of Optionals reaches, as `NestedList` is the one a

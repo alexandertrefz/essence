@@ -64,9 +64,13 @@ async function bundleSizeOfSource(source: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: 76,146 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 76,173 measured. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
+	//
+	// NOTE: 27 of those bytes are `List.split` becoming an Overload entry.
+	// `split__overload$1` stands where `split` did, and esbuild then renames
+	// `String`'s own `split__overload$1` at three sites to keep the two apart.
 	//
 	// NOTE: 381 of those bytes are the four range natives folding into one
 	// walk. `List.of(integersFrom:through:)` counts up only now, and the walk

@@ -62,7 +62,7 @@ it and the `Terminal.ask` that is a prompt and a line (`Terminal.es`).
 `Randomness.seeded(_)` for a run that replays (`Randomness.es`).
 
 Three of every five declared Method entries are also IMPLEMENTED here, in
-Essence — 343 of 573 as this is written, counting one entry per Overload and
+Essence — 345 of 579 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
 Seven more are written on a PROTOCOL rather than on a Namespace, once for every
 conformer: `Equatable.isNot`, `Comparable`'s four inequalities, and
@@ -340,8 +340,8 @@ ordered by anything comparable read off it. The key is what has to be ordered,
 and the item never is.
 
 `is`, `contains`, `doesNotContain`, `firstIndex(of:)`, `lastIndex(of:)`,
-`count(of:)`, `removeEvery(_ item:)` and the five set-shaped Methods —
-`removeDuplicates`, `hasDuplicates`, `contains(everyItemOf:)`,
+`count(of:)`, `removeEvery(_ item:)`, `split(on:)` and the five set-shaped
+Methods — `removeDuplicates`, `hasDuplicates`, `contains(everyItemOf:)`,
 `everyItem(alsoIn:)` and `removeEvery(contentsOf:)` — are bounded
 `is Equatable`, so equality between items means the item Type's OWN `is` rather
 than a structural comparison the language can not express. That is a narrowing:

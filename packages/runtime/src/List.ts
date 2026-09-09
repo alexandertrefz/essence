@@ -1386,7 +1386,7 @@ export function pair<ItemType extends AnyType, Other extends AnyType>(
 // NOTE: The empty List answers with no groups at all, for every size, because
 // there is no item to put in one. That is the same answer a valid size gives
 // it, so the size below one changes nothing there either.
-export function split<ItemType extends AnyType>(
+export function split__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	groupSize: IntegerType,
 ): ListType<ListType<ItemType>> {
@@ -1747,4 +1747,150 @@ export function hasDuplicates__overload$2<
 	conformance: EquatableWitness<Key>,
 ): BooleanType {
 	return meetsAKeyTwice(originalList, keyOf, conformance)
+}
+
+// NOTE: The pieces a separator leaves, which is `String::split(on:)`'s shape
+// over items. A piece is opened before the first item and closed by every
+// accepted one, so a List holding n accepted items answers n+1 pieces and a
+// List holding none answers one — including the empty List, whose one piece is
+// empty. That is what the declared `NonEmptyList<List<ItemType>>` rests on.
+export function split__overload$3<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	check: (item: ItemType) => BooleanType,
+): ListType<ListType<ItemType>> {
+	let view = viewOf(originalList)
+	let pieces: Array<ListType<ItemType>> = []
+	let piece: Array<ItemType> = []
+
+	for (let index = view.frontCount - 1; index >= 0; index--) {
+		let item = view.front[index]
+
+		if (check(item).value) {
+			pieces.push(createList(piece))
+			piece = []
+		} else {
+			piece.push(item)
+		}
+	}
+
+	for (let index = 0; index < view.backCount; index++) {
+		let item = view.back[index]
+
+		if (check(item).value) {
+			pieces.push(createList(piece))
+			piece = []
+		} else {
+			piece.push(item)
+		}
+	}
+
+	pieces.push(createList(piece))
+
+	return createList(pieces)
+}
+
+// NOTE: Every stretch of one size, one position apart. The loop condition is
+// what makes a size above the length answer nothing: the first window would
+// have to reach past the last item. The size is a `PositiveInteger` in the
+// source — proven while compiling, erased to an Integer here — so a stretch
+// always holds something and the Namespace may say so.
+//
+// NOTE: `Number` on the size for the reason `repeat` counts in one: a window
+// needing a bigint size spans more items than there is memory for, and reaches
+// the comparison below only to fail it.
+export function windows<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	windowSize: IntegerType,
+): ListType<ListType<ItemType>> {
+	let items = materialise(originalList)
+	let size = Number(windowSize.value)
+	let stretches: Array<ListType<ItemType>> = []
+
+	for (let start = 0; start + size <= items.length; start++) {
+		stretches.push(createList(items.slice(start, start + size)))
+	}
+
+	return createList(stretches)
+}
+
+// NOTE: The maximal stretches of neighbours the check accepts. A stretch is
+// opened by the first item accepted after a refusal and closed by the next
+// refusal, so every one that reaches the answer holds an item — which is what
+// the declared `NonEmptyList<ItemType>` item Type rests on, and what no Essence
+// fold over the accepted items could say.
+export function runs<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	check: (item: ItemType) => BooleanType,
+): ListType<ListType<ItemType>> {
+	let view = viewOf(originalList)
+	let stretches: Array<ListType<ItemType>> = []
+	let current: Array<ItemType> = []
+
+	for (let index = view.frontCount - 1; index >= 0; index--) {
+		let item = view.front[index]
+
+		if (check(item).value) {
+			current.push(item)
+		} else if (current.length > 0) {
+			stretches.push(createList(current))
+			current = []
+		}
+	}
+
+	for (let index = 0; index < view.backCount; index++) {
+		let item = view.back[index]
+
+		if (check(item).value) {
+			current.push(item)
+		} else if (current.length > 0) {
+			stretches.push(createList(current))
+			current = []
+		}
+	}
+
+	if (current.length > 0) {
+		stretches.push(createList(current))
+	}
+
+	return createList(stretches)
+}
+
+// NOTE: The inner Lists read as columns. The shortest one decides how many
+// there are, which is `pair(with:)`'s rule one dimension along, and it is found
+// in the same walk that materialises the rows — so each inner List is combined
+// at most once however many columns are read out of it.
+//
+// NOTE: `NestedList` re-exports this, as it re-exports `flatten`: the operation
+// is written here beside the List internals it reads, and the Namespace is a
+// name for the receivers that can answer it.
+export function transpose<ItemType extends AnyType>(
+	originalList: ListType<ListType<ItemType>>,
+): ListType<ListType<ItemType>> {
+	let rows = materialise(originalList)
+	let items: Array<Array<ItemType>> = []
+	let shortest = 0
+
+	for (let index = 0; index < rows.length; index++) {
+		let row = materialise(rows[index])
+
+		items.push(row)
+
+		if (index === 0 || row.length < shortest) {
+			shortest = row.length
+		}
+	}
+
+	let columns: Array<ListType<ItemType>> = []
+
+	for (let position = 0; position < shortest; position++) {
+		let column: Array<ItemType> = []
+
+		for (let index = 0; index < items.length; index++) {
+			column.push(items[index][position])
+		}
+
+		columns.push(createList(column))
+	}
+
+	return createList(columns)
 }

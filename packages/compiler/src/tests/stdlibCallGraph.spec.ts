@@ -597,6 +597,7 @@ describe("Stdlib Call Graph", () => {
 			"List.lowestItem__overload$2",
 			"List.of__overload$2",
 			"List.of__overload$5",
+			"List.pad",
 			"List.prepend__overload$2",
 			"List.removeEvery__overload$1",
 			"List.removeEvery__overload$2",
@@ -605,6 +606,7 @@ describe("Stdlib Call Graph", () => {
 			"List.repeat__overload$1",
 			"List.replace__overload$1",
 			"List.replace__overload$2",
+			"List.split__overload$2",
 			// NOTE: `flatten` is the one Optional Method that is not on every
 			// Optional, so it lives in a Namespace of its own — receiver
 			// `Optional<Optional<ItemType>>` — exactly as `NestedList::flatten`

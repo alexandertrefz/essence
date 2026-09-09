@@ -384,19 +384,22 @@ describe("Stdlib", () => {
 		})
 
 		it("splits into groups, the last one shorter, and holds every item in one group for a size below one", () => {
-			const groups = list.split(ints(1n, 2n, 3n, 4n, 5n), int(2n))
+			const groups = list.split__overload$1(
+				ints(1n, 2n, 3n, 4n, 5n),
+				int(2n),
+			)
 
 			expect(groups).toEqual(
 				list.createList([ints(1n, 2n), ints(3n, 4n), ints(5n)]),
 			)
-			expect(list.split(ints(1n, 2n), int(0n))).toEqual(
+			expect(list.split__overload$1(ints(1n, 2n), int(0n))).toEqual(
 				list.createList([ints(1n, 2n)]),
 			)
 			// NOTE: There is no item to put in a group, so the empty List
 			// answers with no groups whatever the size names.
-			expect(list.split(list.createList([]), int(0n))).toEqual(
-				list.createList([]),
-			)
+			expect(
+				list.split__overload$1(list.createList([]), int(0n)),
+			).toEqual(list.createList([]))
 		})
 
 		// NOTE: `List.sorted` is implemented in Essence now
