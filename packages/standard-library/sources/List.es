@@ -15,6 +15,7 @@ import {
 	}
 	from "./Result.es" { Result }
 	from "./Step.es" { Step }
+	from "./String.es" { Side }
 }
 
 declarations {
@@ -1266,18 +1267,64 @@ declarations {
 		) -> List<{ first: ItemType, second: Other }>
 
 		§ Every group holds at least one item, which is what the item Type of
-		§ the answer says. A group is opened for an item and never for the
-		§ space after one. So the shorter last group exists only when
-		§ something remains to put in it. A size below one answers one group
-		§ holding everything, and the empty List answers no groups.
+		§ the first entry's answer says. A group is opened for an item and
+		§ never for the space after one. So the shorter last group exists only
+		§ when something remains to put in it. A size below one answers one
+		§ group holding everything, and the empty List answers no groups.
+		§
+		§ The other two cut at a separator rather than at a count, and their
+		§ proof stands the other way round. A separator cuts between the
+		§ pieces, so a List holding n of them has n+1 pieces and a List
+		§ holding none is one piece. That is `String::split(on:)`'s own rule,
+		§ where the proof is read on the separator because the empty String
+		§ cuts nowhere. An item separator can not be empty, so nothing has to
+		§ be asked for it here. The pieces themselves promise nothing: two
+		§ separators side by side leave the empty piece between them.
 
-		§§ Answers the List split into groups of the given size, in order.
+		§§ Answers the List split into groups of a given size, or into the pieces around the items a separator or a check picks out.
 		§§
-		§§ The last group holds whatever remains, so it can be shorter. Every group holds at least one item. A size below one names no grouping, and the answer is one group holding every item. The empty List answers no groups at all, whatever the size.
-		§§
-		§§ @param intoGroupsOf — how many items each group holds
-		§§ @returns — the List of groups, each of which certainly has something in it.
-		split(intoGroupsOf size: Integer) -> List<NonEmptyList<ItemType>>
+		§§ @returns — the List of pieces.
+		overload split {
+			§§ Answers the List split into groups of the given size, in order.
+			§§
+			§§ The last group holds whatever remains, so it can be shorter. Every group holds at least one item. A size below one names no grouping, and the answer is one group holding every item. The empty List answers no groups at all, whatever the size.
+			§§
+			§§ @param intoGroupsOf — how many items each group holds
+			§§ @returns — the List of groups, each of which certainly has something in it.
+			(intoGroupsOf size: Integer) -> List<NonEmptyList<ItemType>>
+
+			§ The separator entry is the check entry with the items' own `is`
+			§ as the check, which is the shape `removeEvery` and `contains`
+			§ have. The label is `String::split(on:)`'s, for the same idea.
+
+			§§ Answers the pieces around every item equal to the given one.
+			§§
+			§§ The separators are not in the answer. Two separators next to each other leave the empty piece between them, and a separator at an end leaves one there. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @example
+			§§   expect [1, 0, 2, 3]::split(on 0)::is([[1], [2, 3]])
+			§§
+			§§ @param on — the item to split at
+			§§ @returns — the List of pieces, which always holds at least one.
+			<infer ItemType is Equatable>(
+				on separator: ItemType,
+			) -> NonEmptyList<List<ItemType>> {
+				<- @::split(where (candidate) { <- candidate::is(separator) })
+			}
+
+			§§ Answers the pieces around every item the check accepts.
+			§§
+			§§ The accepted items are not in the answer. Two accepted items next to each other leave the empty piece between them, and one at an end leaves one there. The empty List answers one empty piece.
+			§§
+			§§ @example
+			§§   expect [1, 2, 3]::split(where (n) { <- n::isEven() })::is([[1], [3]])
+			§§
+			§§ @param where — the check each item is offered to
+			§§ @returns — the List of pieces, which always holds at least one.
+			(
+				where check: (_: ItemType) -> Boolean,
+			) -> NonEmptyList<List<ItemType>>
+		}
 
 		§ The item a key is lowest or highest at. That is a different
 		§ question from `lowestNumber`, which answers a number the List holds.
@@ -1468,6 +1515,108 @@ declarations {
 				on key: (_: ItemType) -> Key,
 			) -> List<ItemType>
 		}
+
+		§ The twin of `String::pad`, and its default is the other end. A
+		§ String is padded to line a column up, which puts the padding in
+		§ front of the text. A List is padded to reach a length, which leaves
+		§ the items it holds where they stand. The board that hand-rolled this
+		§ in `examples/client-2048` padded at the end.
+
+		§§ Answers the List filled up to the given length with the given item.
+		§§
+		§§ The filler goes at the end when no side is named. A `#BothEnds` side splits it between the two ends, and an odd count leaves the extra one at the end. A length at or below the one the List has answers it unchanged, so nothing is ever dropped.
+		§§
+		§§ @example
+		§§   expect [1, 2]::pad(to 4, with 0)::is([1, 2, 0, 0])
+		§§   expect [1, 2]::pad(to 4, with 0, at #Start)::is([0, 0, 1, 2])
+		§§
+		§§ @param to — the length to fill up to
+		§§ @param with — the item to fill with
+		§§ @param at — the end to fill at, `#End` when it is left out
+		§§ @returns — the filled List. It is the receiver where the List is already that long.
+		pad(
+			to length: Integer,
+			with filler: ItemType,
+			at side: Side = #End,
+		) -> List<ItemType> {
+			constant needed = length::subtract(@::length())
+
+			if needed::isLessThan(1) {
+				<- @
+			}
+
+			§ `@` is rebound inside `match`; see DEVELOPMENT.md, Why bodies
+			§ look the way they do.
+			constant items = @
+
+			<- match side -> List<ItemType> {
+				case #Start {
+					<- items::prepend(
+						contentsOf List.repeat(filler, times needed),
+					)
+				}
+
+				case #End {
+					<- items::append(
+						contentsOf List.repeat(filler, times needed),
+					)
+				}
+
+				case #BothEnds {
+					§ Centring splits the filler between the two ends and
+					§ leaves an odd one over for the end, as `String::pad`
+					§ does. A written `2` is its own refinement proof; see
+					§ DEVELOPMENT.md, Why bodies look the way they do.
+					constant atStart = needed::quotient(dividingBy 2)
+
+					<- items
+						::prepend(contentsOf List.repeat(filler, times atStart))
+						::append(
+							contentsOf List.repeat(
+								filler,
+								times needed::subtract(atStart),
+							),
+						)
+				}
+			}
+		}
+
+		§ Native for the item promise: a window of a size above zero holds
+		§ that many items. An Essence body could only answer a
+		§ `List<List<ItemType>>`. The spelling is
+		§ `indices()::map((start) { <- @::slice(…) })`, and its slices promise
+		§ nothing.
+
+		§§ Answers every stretch of the given size, one position at a time.
+		§§
+		§§ The stretches overlap: each starts one position after the one before it. A size above the length answers no stretches at all, and so does the empty List. Every stretch holds the given number of items. For the pairs of neighbours alone, `list::pair(with list::removeFirst())` answers a Record of `first` and `second` per pair and reads better.
+		§§
+		§§ @example
+		§§   expect [1, 2, 3, 4]::windows(of 2)::is([[1, 2], [2, 3], [3, 4]])
+		§§   expect [1, 2]::windows(of 3)::isEmpty()
+		§§
+		§§ @param of — how many items each stretch holds, which is above zero
+		§§ @returns — the List of stretches, each of which certainly has something in it.
+		windows(of size: PositiveInteger) -> List<NonEmptyList<ItemType>>
+
+		§ Native for the reason `windows` is. A run holds the item that opened
+		§ it, and an Essence fold over the accepted items can not say so. It
+		§ is the adjacent-run half of the grouping family, which `group(on:)`
+		§ answers keyed instead.
+
+		§§ Answers the stretches of neighbouring items the check accepts.
+		§§
+		§§ A stretch ends at the first item the check refuses, and the refused items are in no stretch. Every stretch holds at least one item. A List the check accepts no item of answers no stretches, and so does the empty List.
+		§§
+		§§ @example
+		§§   expect [1, 3, 2, 5, 7]::runs(where (n) { <- n::isOdd() })
+		§§       ::is([[1, 3], [5, 7]])
+		§§
+		§§ @param where — the check each item is offered to
+		§§ @returns — the List of stretches, each of which certainly has something in it.
+		runs(
+			where check: (_: ItemType) -> Boolean,
+		) -> List<NonEmptyList<ItemType>>
 	}
 
 	§ A List of Lists, and the one Method only such a List can answer. Its
@@ -1482,6 +1631,24 @@ declarations {
 		§§
 		§§ @returns — the flattened List.
 		flatten() -> List<ItemType>
+
+		§ Native, and the Essence body is writable: the shortest row's length
+		§ is a fold, and each column is
+		§ `rows::map((row) { <- row::item(at position) })::values()`. That
+		§ builds an Optional per cell to take apart again, and reaches
+		§ `OptionalList` from a Namespace that otherwise reaches only `List`.
+		§ Twenty transposes of a 200 by 200 List measured 42 ms that way and
+		§ 27 ms here. Both figures hold 22 ms of subprocess startup.
+
+		§§ Answers the inner Lists turned round: one List per position, holding what each inner List has there.
+		§§
+		§§ The shortest inner List decides how many the answer holds, as `pair(with:)` does. An empty inner List answers no Lists at all, and so does the empty List of Lists. Transposing twice answers the receiver where every inner List is the same length.
+		§§
+		§§ @example
+		§§   expect [[1, 2, 3], [4, 5, 6]]::transpose()::is([[1, 4], [2, 5], [3, 6]])
+		§§
+		§§ @returns — the List of positions, each holding one item of every inner List.
+		transpose() -> List<List<ItemType>>
 	}
 
 	§ A List of Optionals, and the three Methods only such a List can answer.

@@ -3,4 +3,4 @@
 // of its own name; the implementation stays in `List.ts` beside every other
 // operation on a List, and is re-exported here rather than moved, so that
 // `flatten` keeps the List internals it is written against within reach.
-export { flatten } from "./List"
+export { flatten, transpose } from "./List"

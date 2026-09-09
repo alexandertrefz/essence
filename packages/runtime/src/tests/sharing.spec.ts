@@ -39,7 +39,7 @@ import {
 	sort__overload$1 as sortByOwnOrder,
 	sort__overload$2 as sortBy,
 	sort__overload$3 as sortOn,
-	split,
+	split__overload$1 as split,
 	toString as listToString,
 	viewOf,
 } from "../List"

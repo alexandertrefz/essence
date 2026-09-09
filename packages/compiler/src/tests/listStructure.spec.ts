@@ -14,7 +14,9 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The set-shaped List Methods — `removeDuplicates`, `hasDuplicates`,
+// NOTE: The Methods that read a List's SHAPE — `windows`, `runs`, `pad`,
+// `transpose` and the two `split` entries that cut at a separator — and the
+// four set-shaped ones beside them: `removeDuplicates`, `hasDuplicates`,
 // `contains(everyItemOf:)`, `everyItem(alsoIn:)` and
 // `removeEvery(contentsOf:)`. Every claim here is about a value a compiled
 // Program answered, because what each of these promises is about the answer
@@ -131,6 +133,242 @@ async function outcomesOf(source: string): Promise<Array<string>> {
 				}`,
 		)
 }
+
+describe("windows", () => {
+	it("answers every stretch of the size, one position apart", async () => {
+		expect(
+			await answers(
+				"[1, 2, 3, 4]::windows(of 2)",
+				"[1, 2, 3, 4]::windows(of 1)",
+				"[1, 2, 3, 4]::windows(of 4)",
+			),
+		).toEqual([
+			'"[[1, 2], [2, 3], [3, 4]]"',
+			'"[[1], [2], [3], [4]]"',
+			'"[[1, 2, 3, 4]]"',
+		])
+	})
+
+	// NOTE: A stretch that would reach past the last item is not a stretch of
+	// the size asked for, so there is none at all rather than a shorter one —
+	// which is what `split(intoGroupsOf:)` answers instead, and the reason
+	// both names exist.
+	it("answers nothing for a size above the length", async () => {
+		expect(
+			await run(`implementation {
+				constant few: List<Integer> = [1, 2]
+				constant none: List<Integer> = []
+
+				Terminal.inspect(few::windows(of 3)::toString())
+				Terminal.inspect(none::windows(of 1)::toString())
+			}`),
+		).toEqual(['"[]"', '"[]"'])
+	})
+
+	// NOTE: The item promise, read where it is spent. A `firstItem` off a
+	// stretch answers the item rather than an Optional, which is only a
+	// Program at all because the stretch is a NonEmptyList.
+	it("promises every stretch holds an item", async () => {
+		expect(
+			await answers(
+				"[1, 2, 3]::windows(of 2)::map((window) { <- window::firstItem() })",
+			),
+		).toEqual(['"[1, 2]"'])
+	})
+
+	// NOTE: A size of zero would answer one empty stretch per position, and a
+	// negative one names nothing at all. `PositiveInteger` is what keeps both
+	// out, and a written `0` is its own proof that it is not one.
+	it("refuses a size of zero at compile time", () => {
+		let parsed = parseWithDiagnostics(`implementation {
+			Terminal.inspect([1, 2]::windows(of 0)::toString())
+		}`)
+
+		expect(containsErrors(parsed.diagnostics)).toBe(false)
+		expect(
+			enrich(parsed.program).diagnostics.map(({ code }) => code),
+		).toEqual(["no-matching-overload"])
+	})
+})
+
+describe("runs", () => {
+	it("answers the maximal stretches the check accepts", async () => {
+		expect(
+			await answers(
+				"[1, 3, 2, 5, 7]::runs(where (n) { <- n::isOdd() })",
+				"[2, 4]::runs(where (n) { <- n::isOdd() })",
+				"[1, 3, 5]::runs(where (n) { <- n::isOdd() })",
+				"[2, 1, 4]::runs(where (n) { <- n::isOdd() })",
+			),
+		).toEqual(['"[[1, 3], [5, 7]]"', '"[]"', '"[[1, 3, 5]]"', '"[[1]]"'])
+	})
+
+	it("answers nothing for the empty List", async () => {
+		expect(
+			await run(`implementation {
+				constant none: List<Integer> = []
+
+				Terminal.inspect(none::runs(where (n) { <- n::isOdd() })::toString())
+			}`),
+		).toEqual(['"[]"'])
+	})
+
+	// NOTE: The item promise again, and the reason this is native: a stretch
+	// is opened by an accepted item, so it holds one.
+	it("promises every stretch holds an item", async () => {
+		expect(
+			await answers(
+				"[1, 3, 2, 5]::runs(where (n) { <- n::isOdd() })::map((run) { <- run::lastItem() })",
+			),
+		).toEqual(['"[3, 5]"'])
+	})
+
+	// NOTE: The longest-streak question the examples hand-rolled, written the
+	// way the library now answers it.
+	it("answers the longest streak through highestItem", async () => {
+		expect(
+			await answers(
+				"[1, 3, 2, 5, 7, 9]::runs(where (n) { <- n::isOdd() })::highestItem(on (run) { <- run::length() })",
+			),
+		).toEqual(['"Value([5, 7, 9])"'])
+	})
+})
+
+describe("pad", () => {
+	it("fills at the end when no side is named", async () => {
+		expect(
+			await answers(
+				"[1, 2]::pad(to 4, with 0)",
+				"[1, 2]::pad(to 4, with 0, at #End)",
+				"[1, 2]::pad(to 4, with 0, at #Start)",
+			),
+		).toEqual(['"[1, 2, 0, 0]"', '"[1, 2, 0, 0]"', '"[0, 0, 1, 2]"'])
+	})
+
+	// NOTE: An odd count leaves the extra item at the END, which is
+	// `String::pad`'s own rule for centring.
+	it("splits the filler between the ends, extra one last", async () => {
+		expect(
+			await answers(
+				"[1, 2]::pad(to 6, with 0, at #BothEnds)",
+				"[1, 2]::pad(to 5, with 0, at #BothEnds)",
+			),
+		).toEqual(['"[0, 0, 1, 2, 0, 0]"', '"[0, 1, 2, 0, 0]"'])
+	})
+
+	// NOTE: Nothing is ever dropped. A length at or below the one the List has
+	// answers the receiver, however far below it stands.
+	it("answers the receiver where it is already long enough", async () => {
+		expect(
+			await answers(
+				"[1, 2, 3]::pad(to 3, with 0)",
+				"[1, 2, 3]::pad(to 1, with 0)",
+				"[1, 2, 3]::pad(to -9, with 0)",
+			),
+		).toEqual(['"[1, 2, 3]"', '"[1, 2, 3]"', '"[1, 2, 3]"'])
+	})
+
+	it("fills the empty List up to the length", async () => {
+		expect(
+			await run(`implementation {
+				constant none: List<Integer> = []
+
+				Terminal.inspect(none::pad(to 3, with 7)::toString())
+				Terminal.inspect(none::pad(to 3, with 7, at #BothEnds)::toString())
+			}`),
+		).toEqual(['"[7, 7, 7]"', '"[7, 7, 7]"'])
+	})
+})
+
+describe("transpose", () => {
+	it("turns rows into columns", async () => {
+		expect(
+			await answers(
+				"[[1, 2, 3], [4, 5, 6]]::transpose()",
+				"[[1, 2, 3], [4, 5, 6]]::transpose()::transpose()",
+				'[["a"], ["b"], ["c"]]::transpose()',
+			),
+		).toEqual([
+			'"[[1, 4], [2, 5], [3, 6]]"',
+			'"[[1, 2, 3], [4, 5, 6]]"',
+			'"[[\\"a\\", \\"b\\", \\"c\\"]]"',
+		])
+	})
+
+	// NOTE: The shortest inner List decides, as `pair(with:)` decides how many
+	// pairs — so nothing is invented for a position a row does not have.
+	it("stops with the shortest inner List", async () => {
+		expect(
+			await run(`implementation {
+				constant ragged: List<List<Integer>> = [[1, 2, 3], [4], [5, 6]]
+				constant withEmpty: List<List<Integer>> = [[1, 2], []]
+				constant none: List<List<Integer>> = []
+
+				Terminal.inspect(ragged::transpose()::toString())
+				Terminal.inspect(withEmpty::transpose()::toString())
+				Terminal.inspect(none::transpose()::toString())
+			}`),
+		).toEqual(['"[[1, 4, 5]]"', '"[]"', '"[]"'])
+	})
+})
+
+describe("split at a separator", () => {
+	// NOTE: A separator cuts BETWEEN pieces, so a piece stands before the
+	// first cut and after the last one. That is what makes the count of pieces
+	// one more than the count of separators, and the answer never empty.
+	it("answers the pieces around every separator", async () => {
+		expect(
+			await answers(
+				"[1, 0, 2, 3]::split(on 0)",
+				"[0, 1]::split(on 0)",
+				"[1, 0]::split(on 0)",
+				"[1, 0, 0, 2]::split(on 0)",
+				"[1, 2]::split(on 0)",
+			),
+		).toEqual([
+			'"[[1], [2, 3]]"',
+			'"[[], [1]]"',
+			'"[[1], []]"',
+			'"[[1], [], [2]]"',
+			'"[[1, 2]]"',
+		])
+	})
+
+	it("answers one empty piece for the empty List", async () => {
+		expect(
+			await run(`implementation {
+				constant none: List<Integer> = []
+
+				Terminal.inspect(none::split(on 0)::toString())
+				Terminal.inspect(none::split(where (n) { <- n::isEven() })::toString())
+			}`),
+		).toEqual(['"[[]]"', '"[[]]"'])
+	})
+
+	// NOTE: The proof, read where it is spent: `firstItem` off the answer is
+	// the piece rather than an Optional of one.
+	it("promises at least one piece, whatever it was handed", async () => {
+		expect(
+			await run(`implementation {
+				constant none: List<Integer> = []
+
+				Terminal.inspect(none::split(on 0)::firstItem()::toString())
+				Terminal.inspect([1, 0, 2]::split(on 0)::lastItem()::toString())
+			}`),
+		).toEqual(['"[]"', '"[2]"'])
+	})
+
+	// NOTE: The separator entry is the check entry with the items' own `is` as
+	// the check, so the two answer alike wherever a check spells one out.
+	it("answers as the check entry does for the same cuts", async () => {
+		expect(
+			await answers(
+				"[1, 2, 3, 4]::split(where (n) { <- n::isEven() })",
+				"[1, 0, 2]::split(where (n) { <- n::is(0) })",
+			),
+		).toEqual(['"[[1], [3], []]"', '"[[1], [2]]"'])
+	})
+})
 
 describe("the set-shaped Methods", () => {
 	it("keeps the first occurrence of each item, in order", async () => {
@@ -410,5 +648,112 @@ describe("properties", () => {
 				}
 			}`),
 		).toEqual(["test-pass: deduplicating leaves no duplicate"])
+	})
+
+	// NOTE: The count of stretches, which is the one arithmetic promise
+	// `windows` makes: n − k + 1 where the List is long enough, and none at
+	// all where it is not.
+	it("answers one stretch per position a stretch fits at", async () => {
+		expect(
+			await outcomesOf(`implementation {}
+
+			tests {
+				test "windows count one per fitting position" for any (items: List<Integer>) {
+					constant size = 2
+					constant fitting = items::length()::subtract(size)::add(1)
+
+					if items::length()::isLessThan(size) {
+						expect items::windows(of 2)::isEmpty()
+					} else {
+						expect items::windows(of 2)::length()::is(fitting)
+					}
+
+					expect items::windows(of 2)
+						::hasOnlyItems(where (window) { <- window::length()::is(2) })
+				}
+			}`),
+		).toEqual(["test-pass: windows count one per fitting position"])
+	})
+
+	// NOTE: Splitting and joining are inverse over the items a separator does
+	// not pick out, which is the same claim `String::split(on:)` and
+	// `join(with:)` make about text.
+	it("puts every item a split kept back where it was", async () => {
+		expect(
+			await outcomesOf(`implementation {}
+
+			tests {
+				test "a split keeps every item that is not a separator" for any (items: List<Integer>) {
+					expect items::split(on 0)::flatten()
+						::is(items::removeEvery(0))
+					expect items::split(on 0)::length()
+						::is(items::count(of 0)::add(1))
+				}
+			}`),
+		).toEqual([
+			"test-pass: a split keeps every item that is not a separator",
+		])
+	})
+
+	// NOTE: Transposing twice is the identity on a rectangular List, which is
+	// the whole of what the operation means — and the shortest inner List is
+	// what makes a ragged one a different claim.
+	it("answers the receiver when a rectangle is transposed twice", async () => {
+		expect(
+			await outcomesOf(`implementation {
+				function rectangle(_ rows: List<Integer>) -> List<List<Integer>> {
+					<- rows::map((row) { <- [row, row::add(1), row::add(2)] })
+				}
+			}
+
+			tests {
+				test "transposing a rectangle twice answers it" for any (rows: List<Integer>) {
+					expect rectangle(rows)::transpose()::transpose()::is(rectangle(rows))
+				}
+			}`),
+		).toEqual(["test-pass: transposing a rectangle twice answers it"])
+	})
+
+	// NOTE: The two halves of `runs` in one claim: nothing outside a stretch
+	// passes the check, and every item inside one does.
+	it("answers stretches the check accepts, and nothing beside them", async () => {
+		expect(
+			await outcomesOf(`implementation {
+				function accepted(_ item: Integer) -> Boolean {
+					<- item::isEven()
+				}
+			}
+
+			tests {
+				test "runs hold what the check accepts" for any (items: List<Integer>) {
+					expect items::runs(where accepted)::flatten()
+						::is(items::everyItem(where accepted))
+					expect items::runs(where accepted)
+						::hasOnlyItems(where (run) { <- run::hasOnlyItems(where accepted) })
+				}
+			}`),
+		).toEqual(["test-pass: runs hold what the check accepts"])
+	})
+
+	// NOTE: Padding never drops an item and never overshoots, whichever end it
+	// fills at.
+	it("reaches the length without dropping an item", async () => {
+		expect(
+			await outcomesOf(`implementation {}
+
+			tests {
+				test "padding reaches the length and keeps every item" for any (items: List<Integer>, length: Integer) {
+					constant padded = items::pad(to length, with 0)
+
+					expect padded::length()
+						::is(Number.highest(length, items::length()))
+					expect padded::firstItems(items::length())::is(items)
+					expect items::pad(to length, with 0, at #Start)
+						::lastItems(items::length())::is(items)
+				}
+			}`),
+		).toEqual([
+			"test-pass: padding reaches the length and keeps every item",
+		])
 	})
 })
