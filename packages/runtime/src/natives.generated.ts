@@ -1216,31 +1216,31 @@ export const $NonEmptyNestedListArity: AssertArities<typeof import("./NonEmptyNe
 
 declare const IntegerListModule: typeof import("./IntegerList")
 export const $IntegerList: IntegerListNatives = IntegerListModule
-export const $IntegerListAbsent: AssertNoEssenceExports<typeof import("./IntegerList"), "sum" | "product" | "runningTotal" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "highestNumber__overload$1" | "highestNumber__overload$2"> = true
+export const $IntegerListAbsent: AssertNoEssenceExports<typeof import("./IntegerList"), "sum" | "product" | "runningTotal" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "highestNumber__overload$1" | "highestNumber__overload$2" | "median__overload$1" | "median__overload$2" | "percentile__overload$1" | "percentile__overload$2" | "mode__overload$1" | "mode__overload$2" | "variance__overload$1" | "variance__overload$2" | "standardDeviation__overload$1" | "standardDeviation__overload$2"> = true
 
 declare const RationalListModule: typeof import("./RationalList")
 export const $RationalList: RationalListNatives = RationalListModule
-export const $RationalListAbsent: AssertNoEssenceExports<typeof import("./RationalList"), "sum" | "product" | "runningTotal" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "highestNumber__overload$1" | "highestNumber__overload$2"> = true
+export const $RationalListAbsent: AssertNoEssenceExports<typeof import("./RationalList"), "sum" | "product" | "runningTotal" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "highestNumber__overload$1" | "highestNumber__overload$2" | "median__overload$1" | "median__overload$2" | "percentile__overload$1" | "percentile__overload$2" | "mode__overload$1" | "mode__overload$2" | "variance__overload$1" | "variance__overload$2" | "standardDeviation__overload$1" | "standardDeviation__overload$2"> = true
 
 declare const NumberListModule: typeof import("./NumberList")
 export const $NumberList: NumberListNatives = NumberListModule
-export const $NumberListAbsent: AssertNoEssenceExports<typeof import("./NumberList"), "sum" | "product" | "runningTotal" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "highestNumber__overload$1" | "highestNumber__overload$2"> = true
+export const $NumberListAbsent: AssertNoEssenceExports<typeof import("./NumberList"), "sum" | "product" | "runningTotal" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "highestNumber__overload$1" | "highestNumber__overload$2" | "median__overload$1" | "median__overload$2" | "percentile__overload$1" | "percentile__overload$2" | "mode__overload$1" | "mode__overload$2" | "variance__overload$1" | "variance__overload$2" | "standardDeviation__overload$1" | "standardDeviation__overload$2"> = true
 
 declare const NonEmptyIntegerListModule: typeof import("./NonEmptyIntegerList")
 export const $NonEmptyIntegerList: NonEmptyIntegerListNatives = NonEmptyIntegerListModule
-export const $NonEmptyIntegerListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyIntegerList"), "lowestNumber" | "highestNumber" | "average"> = true
+export const $NonEmptyIntegerListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyIntegerList"), "lowestNumber" | "highestNumber" | "average" | "median" | "percentile" | "mode" | "variance" | "standardDeviation"> = true
 
 declare const NonEmptyRationalListModule: typeof import("./NonEmptyRationalList")
 export const $NonEmptyRationalList: NonEmptyRationalListNatives = NonEmptyRationalListModule
-export const $NonEmptyRationalListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyRationalList"), "lowestNumber" | "highestNumber" | "average"> = true
+export const $NonEmptyRationalListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyRationalList"), "lowestNumber" | "highestNumber" | "average" | "median" | "percentile" | "mode" | "variance" | "standardDeviation"> = true
 
 declare const NonEmptyNumberListModule: typeof import("./NonEmptyNumberList")
 export const $NonEmptyNumberList: NonEmptyNumberListNatives = NonEmptyNumberListModule
-export const $NonEmptyNumberListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyNumberList"), "lowestNumber" | "highestNumber" | "average"> = true
+export const $NonEmptyNumberListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyNumberList"), "lowestNumber" | "highestNumber" | "average" | "median" | "percentile" | "mode" | "variance" | "standardDeviation"> = true
 
 declare const KeyedNumberListModule: typeof import("./KeyedNumberList")
 export const $KeyedNumberList: KeyedNumberListNatives = KeyedNumberListModule
-export const $KeyedNumberListAbsent: AssertNoEssenceExports<typeof import("./KeyedNumberList"), "sum__overload$1" | "sum__overload$2" | "sum__overload$3" | "average__overload$1" | "average__overload$2"> = true
+export const $KeyedNumberListAbsent: AssertNoEssenceExports<typeof import("./KeyedNumberList"), "sum__overload$1" | "sum__overload$2" | "sum__overload$3" | "product__overload$1" | "product__overload$2" | "product__overload$3" | "average__overload$1" | "average__overload$2"> = true
 
 declare const NonEmptyKeyedNumberListModule: typeof import("./NonEmptyKeyedNumberList")
 export const $NonEmptyKeyedNumberList: NonEmptyKeyedNumberListNatives = NonEmptyKeyedNumberListModule

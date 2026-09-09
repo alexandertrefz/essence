@@ -598,3 +598,199 @@ describe("The sign refinements on Rational", () => {
 		).not.toThrow()
 	})
 })
+
+describe("The statistics a List of Numbers answers", () => {
+	// NOTE: The three general Namespaces and the three proven ones are told
+	// apart here by whether the receiver is annotated `NonEmptyList`, which is
+	// what decides between the Optional answer and the bare one.
+	it("answers the median of an odd and an even count", async () => {
+		expect(
+			await run(
+				program(
+					"constant odd: NonEmptyList<Integer> = [3, 1, 2]",
+					"constant even: NonEmptyList<Integer> = [3, 1, 2, 5]",
+					"constant fractions: NonEmptyList<Rational> = [1/2, 1/4]",
+					"constant mixed: NonEmptyList<Integer | Rational> = [1, 1/2, 3]",
+					show("odd::median()"),
+					show("even::median()"),
+					show("fractions::median()"),
+					show("mixed::median()"),
+				),
+			),
+		).toEqual(["2/1", "5/2", "3/8", "1/1"])
+	})
+
+	it("answers nothing for the empty List, and the fallback beside it", async () => {
+		expect(
+			await run(
+				program(
+					"constant none: List<Integer> = []",
+					show("none::median()"),
+					show("none::median(defaultingTo 0/1)"),
+					show("none::percentile(1/2)"),
+					show("none::percentile(1/2, defaultingTo -1/1)"),
+					show("none::mode()"),
+					show("none::mode(defaultingTo -1)"),
+					show("none::variance()"),
+					show("none::variance(defaultingTo 0/1)"),
+					show("none::standardDeviation()"),
+					show("none::standardDeviation(defaultingTo 0/1)"),
+				),
+			),
+		).toEqual([
+			"Optional#Empty",
+			"0/1",
+			"Optional#Empty",
+			"-1/1",
+			"Optional#Empty",
+			"-1",
+			"Optional#Empty",
+			"0/1",
+			"Optional#Empty",
+			"0/1",
+		])
+	})
+
+	// NOTE: A List with an item in it answers each of these bare, so a `match`
+	// over the answer would be `no-matching-case` — which is the point of the
+	// proven Namespaces, and what these lines read back.
+	it("answers the whole family bare for a List with an item in it", async () => {
+		expect(
+			await run(
+				program(
+					"constant numbers: NonEmptyList<Integer> = [3, 1, 2, 5, 4, 4]",
+					show("numbers::median()"),
+					show("numbers::percentile(1/4)"),
+					show("numbers::mode()"),
+					show("numbers::variance()"),
+					show("numbers::standardDeviation()"),
+				),
+			),
+		).toEqual(["7/2", "9/4", "4", "65/36", "1/6·√65"])
+	})
+
+	it("reads the position a percentile names, and clamps the fraction", async () => {
+		expect(
+			await run(
+				program(
+					"constant numbers: NonEmptyList<Integer> = [10, 20, 30, 40]",
+					show("numbers::percentile(0/1)"),
+					show("numbers::percentile(1/1)"),
+					show("numbers::percentile(1/2)"),
+					show("numbers::percentile(1/3)"),
+					show("numbers::percentile(-1/2)"),
+					show("numbers::percentile(5/1)"),
+				),
+			),
+		).toEqual(["10/1", "40/1", "25/1", "20/1", "10/1", "40/1"])
+	})
+
+	it("keeps the earliest of the items that occur equally often", async () => {
+		expect(
+			await run(
+				program(
+					"constant tied: NonEmptyList<Integer> = [7, 3, 7, 3]",
+					"constant single: NonEmptyList<Integer> = [5]",
+					"constant fractions: NonEmptyList<Rational> = [1/2, 1/4, 1/4]",
+					show("tied::mode()"),
+					show("single::mode()"),
+					show("fractions::mode()"),
+				),
+			),
+		).toEqual(["7", "5", "1/4"])
+	})
+
+	it("answers an exact standard deviation over the tower", async () => {
+		expect(
+			await run(
+				program(
+					"constant square: NonEmptyList<Integer> = [1, 3]",
+					"constant root: NonEmptyList<Integer> = [1, 2, 3]",
+					"constant flat: NonEmptyList<Integer> = [4, 4, 4]",
+					show("square::variance()"),
+					show("square::standardDeviation()"),
+					show("root::variance()"),
+					show("root::standardDeviation()"),
+					show("flat::variance()"),
+					show("flat::standardDeviation()"),
+				),
+			),
+		).toEqual(["1/1", "1/1", "2/3", "1/3·√6", "0/1", "0/1"])
+	})
+
+	it("multiplies together what a key reads off every item", async () => {
+		expect(
+			await run(
+				program(
+					"constant rows = [{ count = 2, share = 1/2 }, { count = 3, share = 2/3 }]",
+					"constant none: List<{ count: Integer }> = []",
+					show("rows::product(on .count)"),
+					show("rows::product(on .share)"),
+					show("rows::sum(on .count)"),
+					show("none::product(on .count)"),
+				),
+			),
+		).toEqual(["6", "1/3", "5", "1"])
+	})
+
+	// NOTE: The Types the proofs answer, read back off a declaration. An answer
+	// too wide is a `constant-type-mismatch` here, which is the only way to see
+	// that `variance` promises a NonNegativeRational rather than a Rational.
+	it("answers the proven Types the declarations promise", () => {
+		expect(() =>
+			generate(
+				program(
+					"constant numbers: NonEmptyList<Integer> = [1, 2, 3]",
+					"constant loose: List<Integer> = [1, 2, 3]",
+					"constant middle: Rational = numbers::median()",
+					"constant spread: NonNegativeRational = numbers::variance()",
+					"constant deviation: Rational | Algebraic = numbers::standardDeviation()",
+					"constant item: Integer = numbers::mode()",
+					"constant quarter: Rational = numbers::percentile(1/4)",
+					"constant root: Rational | Algebraic = numbers::variance()::squareRoot()",
+					"constant maybe: Optional<NonNegativeRational> = loose::variance()",
+					"constant kept: NonNegativeRational = loose::variance(defaultingTo 0/1)",
+				),
+			),
+		).not.toThrow()
+	})
+
+	// NOTE: The laws the §§ blocks promise, checked in Essence over a spread of
+	// Lists so that one compile covers every case. Each line answers `true`,
+	// and a failure names the case by its position in this List.
+	it("keeps the laws of the statistics, for any List", async () => {
+		let numbers = deterministicNumbers(20260910)
+		let cases: Array<string> = []
+
+		for (let attempt = 0; attempt < 40; attempt++) {
+			let length = (numbers.next().value % 9) + 1
+			let items: Array<number> = []
+
+			for (let index = 0; index < length; index++) {
+				items.push((numbers.next().value % 41) - 20)
+			}
+
+			cases.push(`[${items.join(", ")}]`)
+		}
+
+		let lines = cases.flatMap((items) => [
+			`constant case${cases.indexOf(items)}: NonEmptyList<Integer> = ${items}`,
+		])
+		let checks = cases.map((items, index) => {
+			let name = `case${index}`
+
+			return show(
+				`${name}::variance()::isGreaterThanOrEqualTo(0/1)` +
+					`::and(${name}::percentile(0/1)::is(${name}::lowestNumber()))` +
+					`::and(${name}::percentile(1/1)::is(${name}::highestNumber()))` +
+					`::and(${name}::median()::isGreaterThanOrEqualTo(${name}::lowestNumber()))` +
+					`::and(${name}::median()::isLessThanOrEqualTo(${name}::highestNumber()))` +
+					`::and(${name}::contains(${name}::mode()))`,
+			)
+		})
+
+		expect(await run(program(...lines, ...checks))).toEqual(
+			cases.map(() => "true"),
+		)
+	})
+})
