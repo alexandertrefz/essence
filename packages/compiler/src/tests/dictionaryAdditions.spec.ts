@@ -552,4 +552,122 @@ describe("Dictionary additions", () => {
 			).toEqual(["true", "true", "Optional#Value(49)"])
 		})
 	})
+
+	describe("The first entry", () => {
+		it("answers the entry the keys were first set at", async () => {
+			expect(
+				await run(`implementation {
+					${ages}
+					${noAges}
+
+					Terminal.inspect(ages::firstEntry())
+					Terminal.inspect(noAges::firstEntry())
+					Terminal.inspect(
+						ages::firstEntry(defaultingTo { key = "nobody", value = 0 }),
+					)
+					Terminal.inspect(
+						noAges::firstEntry(defaultingTo { key = "nobody", value = 0 }),
+					)
+				}`),
+			).toEqual([
+				'Optional#Value({ key = "alex", value = 39 })',
+				"Optional#Empty",
+				'{ key = "alex", value = 39 }',
+				'{ key = "nobody", value = 0 }',
+			])
+		})
+
+		// NOTE: A removed key leaves a tombstoned slot standing where it was,
+		// so the first entry is the first LIVE slot rather than the first
+		// slot. A key set again after a removal lands at the END, so it is not
+		// the first entry either. The middle answer is BARE rather than an
+		// Optional, because `set` answers a `NonEmptyDictionary` whatever it
+		// was handed, and a proven receiver reaches the entry that spends the
+		// proof.
+		it("reads past a removed key", async () => {
+			expect(
+				await run(`implementation {
+					${ages}
+
+					Terminal.inspect(ages::remove(at "alex")::firstEntry())
+					Terminal.inspect(
+						ages::remove(at "alex")::set("alex", to 40)::firstEntry(),
+					)
+					Terminal.inspect(ages::remove(atEvery ["alex", "sam"])::firstEntry())
+				}`),
+			).toEqual([
+				'Optional#Value({ key = "sam", value = 25 })',
+				'{ key = "sam", value = 25 }',
+				'Optional#Value({ key = "kim", value = 25 })',
+			])
+		})
+
+		// NOTE: The proof spends the Optional, so a proven receiver reads the
+		// entry itself and a Pattern takes it apart where it stands.
+		it("answers the entry itself on a proven receiver", async () => {
+			expect(
+				await run(`implementation {
+					constant proven: NonEmptyDictionary<String, Integer> = [
+						"alex" = 39,
+						"sam" = 25,
+					]
+					constant { key, value } = proven::firstEntry()
+
+					Terminal.inspect(key)
+					Terminal.inspect(value)
+					Terminal.inspect(proven::sort(in #Descending)::firstEntry().key)
+				}`),
+			).toEqual(['"alex"', "39", '"sam"'])
+		})
+
+		// NOTE: A Dictionary a Program is handed carries no proof, so it goes
+		// through an `if` to reach the total answer — the same door every
+		// other proven Method is behind.
+		it("is reached bare through an if asking hasEntries", async () => {
+			expect(
+				await run(`implementation {
+					${ages}
+					constant held = ages
+
+					if held::hasEntries() {
+						Terminal.inspect(held::firstEntry().key)
+					} else {
+						Terminal.inspect("nothing")
+					}
+				}`),
+			).toEqual(['"alex"'])
+		})
+
+		// NOTE: The claim the native rests on: it answers what
+		// `entries()::firstItem()` answers, for a receiver built any way at
+		// all.
+		it("answers what the first of the entries answers", async () => {
+			expect(
+				await run(`implementation {
+					constant pairs = List.of(integersFrom 1, through 50)
+						::map((n) { <- { key = n, value = n } })
+					constant sample = Dictionary.of(pairs)
+
+					constant broken = loop(
+						from 1,
+						through 50,
+						startingWith 0,
+						(cut, wrong) {
+							constant left = sample::remove(
+								atEvery List.of(integersFrom 1, through cut),
+							)
+
+							if left::firstEntry()::is(left::entries()::firstItem()) {
+								<- wrong
+							} else {
+								<- wrong::add(1)
+							}
+						},
+					)
+
+					Terminal.inspect(broken)
+				}`),
+			).toEqual(["0"])
+		})
+	})
 })
