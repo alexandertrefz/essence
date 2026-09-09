@@ -707,6 +707,33 @@ export function reduce__overload$2<
 	return accumulator
 }
 
+// NOTE: The running fold — `reduce` keeping every value it built instead of the
+// last one. The starting value is pushed before any item is seen, which is what
+// makes the answer one longer than the receiver and never empty, and is the
+// promise `NonEmptyList<Answer>` records. An Essence body could only be a
+// `reduce` carrying the List it builds, whose answer is a plain `List`.
+export function accumulate<ItemType extends AnyType, Answer extends AnyType>(
+	originalList: ListType<ItemType>,
+	startingValue: Answer,
+	combine: (accumulator: Answer, item: ItemType) => Answer,
+): ListType<Answer> {
+	let view = viewOf(originalList)
+	let accumulator = startingValue
+	let running: Array<Answer> = [accumulator]
+
+	for (let index = view.frontCount - 1; index >= 0; index--) {
+		accumulator = combine(accumulator, view.front[index])
+		running.push(accumulator)
+	}
+
+	for (let index = 0; index < view.backCount; index++) {
+		accumulator = combine(accumulator, view.back[index])
+		running.push(accumulator)
+	}
+
+	return createList(running)
+}
+
 export function everyItem__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	keepFunction: (item: ItemType) => BooleanType,
@@ -738,7 +765,7 @@ export function everyItem__overload$1<ItemType extends AnyType>(
 // 20,000 items on `isEven`, best of three with the subprocess startup inside.
 // This walk measured 49 ms on the same run, and 361 ms against 655 with a
 // check costing a hundred loop turns — where the fold's 566 was already ahead.
-export function partition<ItemType extends AnyType>(
+export function partition__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	check: (item: ItemType) => BooleanType,
 ): RecordType & { accepted: ListType<ItemType>; refused: ListType<ItemType> } {
@@ -1090,6 +1117,70 @@ export function insert<ItemType extends AnyType>(
 	}
 
 	return createList(items)
+}
+
+// NOTE: The ordering asked rather than imposed, and native because every
+// Essence body for it builds something. The adjacent pairs
+// `@::pair(with @::removeFirst())` makes allocate a Record per item, and a fold
+// carrying the item before pays a Record spread per item; two thousand checks of
+// a two thousand item sorted List measured 64 ms and 127 ms against 21 ms here.
+// This walk holds the item before in a local and leaves at the first pair out of
+// order, where the pairs build their whole List anyway and measured 57 ms.
+//
+// NOTE: A descending check turns the comparison around rather than negating the
+// answer, exactly as `sort` does, so items the order calls `#Equal` are in
+// order in either direction.
+export function isSorted<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	order: SortOrderType,
+	conformance: {
+		compare: (self: ItemType, other: ItemType) => OrderingType
+	},
+): BooleanType {
+	let view = viewOf(originalList)
+	let descending = order[typeKeySymbol] === "SortOrder#Descending"
+	let previous: ItemType | null = null
+
+	for (let index = view.frontCount - 1; index >= 0; index--) {
+		let item = view.front[index]
+
+		if (
+			previous !== null &&
+			outOfOrder(conformance, previous, item, descending)
+		) {
+			return createBoolean(false)
+		}
+
+		previous = item
+	}
+
+	for (let index = 0; index < view.backCount; index++) {
+		let item = view.back[index]
+
+		if (
+			previous !== null &&
+			outOfOrder(conformance, previous, item, descending)
+		) {
+			return createBoolean(false)
+		}
+
+		previous = item
+	}
+
+	return createBoolean(true)
+}
+
+function outOfOrder<ItemType extends AnyType>(
+	conformance: { compare: (self: ItemType, other: ItemType) => OrderingType },
+	previous: ItemType,
+	item: ItemType,
+	descending: boolean,
+): boolean {
+	let ordering = descending
+		? conformance.compare(item, previous)
+		: conformance.compare(previous, item)
+
+	return ordering[typeKeySymbol] === "Ordering#Greater"
 }
 
 // NOTE: `sort` is one Method with three Overloads, all native, binding by

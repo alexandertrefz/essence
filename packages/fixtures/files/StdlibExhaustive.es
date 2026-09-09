@@ -67,6 +67,20 @@ implementation {
 		<- value
 	}
 
+	§ The two transforms `everyValue` is shown with. Each is declared rather
+	§ than written at the call, for the reason given there.
+	function evenAsText(_ item: Integer) -> Optional<String> {
+		if item::isEven() {
+			<- #Value(item::toString())
+		} else {
+			<- #Empty
+		}
+	}
+
+	function noText(_ item: Integer) -> Optional<String> {
+		<- #Empty
+	}
+
 	constant greeting     = "Hello, World"
 	constant emptyText    = ""
 	constant numbers      = [3, 1, 2, 1, 4]
@@ -3066,6 +3080,78 @@ third"::lines())
 		"List.doesNotContain<ItemType is Equatable>(_ ItemType) [present]",
 		numbers::doesNotContain(4),
 	)
+	show(
+		"List.starts<ItemType is Equatable>(with: List<ItemType>)",
+		numbers::starts(with [3, 1]),
+	)
+	show(
+		"List.starts<ItemType is Equatable>(with: List<ItemType>) [other items]",
+		numbers::starts(with [1]),
+	)
+	show(
+		"List.starts<ItemType is Equatable>(with: List<ItemType>) [empty prefix]",
+		numbers::starts(with noNumbers),
+	)
+	show(
+		"List.starts<ItemType is Equatable>(with: List<ItemType>) [longer than the List]",
+		singleNumber::starts(with numbers),
+	)
+	show(
+		"List.doesNotStart<ItemType is Equatable>(with: List<ItemType>)",
+		numbers::doesNotStart(with [1]),
+	)
+	show(
+		"List.doesNotStart<ItemType is Equatable>(with: List<ItemType>) [it does]",
+		numbers::doesNotStart(with [3, 1]),
+	)
+	show(
+		"List.ends<ItemType is Equatable>(with: List<ItemType>)",
+		numbers::ends(with [1, 4]),
+	)
+	show(
+		"List.ends<ItemType is Equatable>(with: List<ItemType>) [other items]",
+		numbers::ends(with [1]),
+	)
+	show(
+		"List.ends<ItemType is Equatable>(with: List<ItemType>) [empty suffix]",
+		numbers::ends(with noNumbers),
+	)
+	show(
+		"List.ends<ItemType is Equatable>(with: List<ItemType>) [longer than the List]",
+		singleNumber::ends(with numbers),
+	)
+	show(
+		"List.doesNotEnd<ItemType is Equatable>(with: List<ItemType>)",
+		numbers::doesNotEnd(with [1]),
+	)
+	show(
+		"List.doesNotEnd<ItemType is Equatable>(with: List<ItemType>) [it does]",
+		numbers::doesNotEnd(with [1, 4]),
+	)
+	show(
+		"List.isSorted<ItemType is Comparable>(in?: SortOrder)",
+		numbers::isSorted(),
+	)
+	show(
+		"List.isSorted<ItemType is Comparable>(in?: SortOrder) [in order]",
+		[1, 2, 2, 3]::isSorted(),
+	)
+	show(
+		"List.isSorted<ItemType is Comparable>(in?: SortOrder) [descending]",
+		[3, 2, 1]::isSorted(in #Descending),
+	)
+	show(
+		"List.isSorted<ItemType is Comparable>(in?: SortOrder) [ties either way]",
+		[1, 1]::isSorted(in #Descending),
+	)
+	show(
+		"List.isSorted<ItemType is Comparable>(in?: SortOrder) [empty]",
+		noNumbers::isSorted(),
+	)
+	show(
+		"List.isSorted<ItemType is Comparable>(in?: SortOrder) [single]",
+		singleNumber::isSorted(),
+	)
 	show("List.firstItem<ItemType>()", numbers::firstItem())
 	show("List.firstItem<ItemType>() [empty]", noNumbers::firstItem())
 	show(
@@ -3152,6 +3238,22 @@ third"::lines())
 		"List.removeFirst<ItemType>(_? Integer) [negative]",
 		numbers::removeFirst(-1),
 	)
+	show(
+		"List.removeFirst<ItemType>(while: (_ ItemType) -> Boolean)",
+		numbers::removeFirst(while (item) { <- item::isGreaterThan(2) }),
+	)
+	show(
+		"List.removeFirst<ItemType>(while: (_ ItemType) -> Boolean) [every item]",
+		numbers::removeFirst(while (item) { <- item::isLessThan(9) }),
+	)
+	show(
+		"List.removeFirst<ItemType>(while: (_ ItemType) -> Boolean) [no item]",
+		numbers::removeFirst(while (item) { <- item::isGreaterThan(9) }),
+	)
+	show(
+		"List.removeFirst<ItemType>(while: (_ ItemType) -> Boolean) [empty]",
+		noNumbers::removeFirst(while (item) { <- item::isEven() }),
+	)
 	show("List.remove<ItemType>(at: Integer)", numbers::remove(at 2))
 	show("List.remove<ItemType>(at: Integer) [zero]", numbers::remove(at 0))
 	show(
@@ -3209,6 +3311,22 @@ third"::lines())
 	show(
 		"List.removeLast<ItemType>(_? Integer) [past the end]",
 		numbers::removeLast(99),
+	)
+	show(
+		"List.removeLast<ItemType>(while: (_ ItemType) -> Boolean)",
+		numbers::removeLast(while (item) { <- item::isGreaterThan(1) }),
+	)
+	show(
+		"List.removeLast<ItemType>(while: (_ ItemType) -> Boolean) [every item]",
+		numbers::removeLast(while (item) { <- item::isLessThan(9) }),
+	)
+	show(
+		"List.removeLast<ItemType>(while: (_ ItemType) -> Boolean) [no item]",
+		numbers::removeLast(while (item) { <- item::isGreaterThan(9) }),
+	)
+	show(
+		"List.removeLast<ItemType>(while: (_ ItemType) -> Boolean) [empty]",
+		noNumbers::removeLast(while (item) { <- item::isEven() }),
 	)
 	show("List.prepend<ItemType>(_ ItemType)", numbers::prepend(9))
 	show(
@@ -3269,6 +3387,24 @@ third"::lines())
 		}),
 	)
 	show(
+		"List.accumulate<ItemType, Answer>(startingWith: Answer, _ (_ Answer, _ ItemType) -> Answer)",
+		numbers::accumulate(startingWith 0, (total, item) {
+			<- total::add(item)
+		}),
+	)
+	show(
+		"List.accumulate<ItemType, Answer>(startingWith: Answer, _ (_ Answer, _ ItemType) -> Answer) [empty]",
+		noNumbers::accumulate(startingWith 0, (total, item) {
+			<- total::add(item)
+		}),
+	)
+	show(
+		"List.accumulate<ItemType, Answer>(startingWith: Answer, _ (_ Answer, _ ItemType) -> Answer) [proof carried]",
+		noNumbers
+			::accumulate(startingWith 0, (total, item) { <- total::add(item) })
+			::firstItem(),
+	)
+	show(
 		"List.everyItem<ItemType>(where: (_ ItemType) -> Boolean)",
 		numbers::everyItem(where (item) { <- item::isGreaterThan(1) }),
 	)
@@ -3286,6 +3422,22 @@ third"::lines())
 	show(
 		"List.everyItem<ItemType is Equatable>(alsoIn: List<ItemType>) [empty]",
 		numbers::everyItem(alsoIn noNumbers),
+	)
+
+	§ The transform is a declared Function rather than a literal written at
+	§ the call. A Method Generic that stands only in a callback's answer is
+	§ solved from a named Function value and not from an annotated literal.
+	show(
+		"List.everyValue<ItemType, Other>(from: (_ ItemType) -> Optional<Other>)",
+		numbers::everyValue(from evenAsText),
+	)
+	show(
+		"List.everyValue<ItemType, Other>(from: (_ ItemType) -> Optional<Other>) [no value]",
+		numbers::everyValue(from noText),
+	)
+	show(
+		"List.everyValue<ItemType, Other>(from: (_ ItemType) -> Optional<Other>) [empty]",
+		noNumbers::everyValue(from evenAsText),
 	)
 	show("List.item<ItemType>(at: Integer)", numbers::item(at 2))
 	show("List.item<ItemType>(at: Integer) [zero]", numbers::item(at 0))
@@ -3532,6 +3684,34 @@ third"::lines())
 		"List.highestItem<ItemType, Key is Comparable>(on: (_ ItemType) -> Key) [tie]",
 		tiedRows::highestItem(on .n),
 	)
+	§ The keyless pair, on receivers nothing proved anything about: a written
+	§ List reaches `NonEmptyList`'s own entries, which answer bare.
+	show("List.lowestItem<ItemType is Comparable>()", words::lowestItem())
+	show(
+		"List.lowestItem<ItemType is Comparable>() [empty]",
+		noNumbers::lowestItem(),
+	)
+	show(
+		"List.lowestItem<ItemType is Comparable>(defaultingTo: ItemType)",
+		numbers::lowestItem(defaultingTo 0),
+	)
+	show(
+		"List.lowestItem<ItemType is Comparable>(defaultingTo: ItemType) [empty]",
+		noNumbers::lowestItem(defaultingTo 0),
+	)
+	show("List.highestItem<ItemType is Comparable>()", words::highestItem())
+	show(
+		"List.highestItem<ItemType is Comparable>() [empty]",
+		noNumbers::highestItem(),
+	)
+	show(
+		"List.highestItem<ItemType is Comparable>(defaultingTo: ItemType)",
+		numbers::highestItem(defaultingTo 0),
+	)
+	show(
+		"List.highestItem<ItemType is Comparable>(defaultingTo: ItemType) [empty]",
+		noNumbers::highestItem(defaultingTo 0),
+	)
 	show(
 		"List.compare<ItemType is Comparable>(to: List<ItemType>)",
 		[1, 2]::compare(to [1, 3]),
@@ -3741,6 +3921,37 @@ third"::lines())
 	show("List.indices<ItemType>()", numbers::indices())
 	show("List.indices<ItemType>() [empty]", noNumbers::indices())
 	show(
+		"List.indices<ItemType>(where: (_ ItemType) -> Boolean)",
+		numbers::indices(where (item) { <- item::isEven() }),
+	)
+	show(
+		"List.indices<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
+		numbers::indices(where (item) { <- item::isGreaterThan(9) }),
+	)
+	show(
+		"List.indices<ItemType>(where: (_ ItemType) -> Boolean) [empty]",
+		noNumbers::indices(where (item) { <- item::isEven() }),
+	)
+	show(
+		"List.everyIndex<ItemType is Equatable>(of: ItemType)",
+		numbers::everyIndex(of 1),
+	)
+	show(
+		"List.everyIndex<ItemType is Equatable>(of: ItemType) [absent]",
+		numbers::everyIndex(of 9),
+	)
+	show("List.onlyItem<ItemType>()", singleNumber::onlyItem())
+	show("List.onlyItem<ItemType>() [several]", numbers::onlyItem())
+	show("List.onlyItem<ItemType>() [empty]", noNumbers::onlyItem())
+	show(
+		"List.onlyItem<ItemType>(defaultingTo: ItemType)",
+		singleNumber::onlyItem(defaultingTo 0),
+	)
+	show(
+		"List.onlyItem<ItemType>(defaultingTo: ItemType) [several]",
+		numbers::onlyItem(defaultingTo 0),
+	)
+	show(
 		"List.join<ItemType is Printable>(with: String)",
 		["a", "b", "c"]::join(with " + "),
 	)
@@ -3764,6 +3975,27 @@ third"::lines())
 	show(
 		"List.partition<ItemType>(where: (_ ItemType) -> Boolean) [empty]",
 		noNumbers::partition(where (item) { <- item::isEven() }),
+	)
+	show(
+		"List.partition<ItemType>(while: (_ ItemType) -> Boolean)",
+		numbers::partition(while (item) { <- item::isGreaterThan(2) }),
+	)
+	show(
+		"List.partition<ItemType>(while: (_ ItemType) -> Boolean) [every item]",
+		numbers::partition(while (item) { <- item::isLessThan(9) }),
+	)
+	show(
+		"List.partition<ItemType>(while: (_ ItemType) -> Boolean) [empty]",
+		noNumbers::partition(while (item) { <- item::isEven() }),
+	)
+	show("List.partition<ItemType>(at: Integer)", numbers::partition(at 2))
+	show(
+		"List.partition<ItemType>(at: Integer) [negative]",
+		numbers::partition(at -1),
+	)
+	show(
+		"List.partition<ItemType>(at: Integer) [past the end]",
+		numbers::partition(at 99),
 	)
 	§ A receiver written down proves it has something in it, and both Methods
 	§ below have an entry that spends the proof. So the two receivers that
@@ -3941,6 +4173,22 @@ third"::lines())
 		"List.firstItems<ItemType>(_ Integer) [empty]",
 		noNumbers::firstItems(2),
 	)
+	show(
+		"List.firstItems<ItemType>(while: (_ ItemType) -> Boolean)",
+		numbers::firstItems(while (item) { <- item::isGreaterThan(2) }),
+	)
+	show(
+		"List.firstItems<ItemType>(while: (_ ItemType) -> Boolean) [every item]",
+		numbers::firstItems(while (item) { <- item::isLessThan(9) }),
+	)
+	show(
+		"List.firstItems<ItemType>(while: (_ ItemType) -> Boolean) [no item]",
+		numbers::firstItems(while (item) { <- item::isGreaterThan(9) }),
+	)
+	show(
+		"List.firstItems<ItemType>(while: (_ ItemType) -> Boolean) [empty]",
+		noNumbers::firstItems(while (item) { <- item::isEven() }),
+	)
 	show("List.lastItems<ItemType>(_ Integer)", numbers::lastItems(2))
 	show("List.lastItems<ItemType>(_ Integer) [zero]", numbers::lastItems(0))
 	show(
@@ -3952,6 +4200,23 @@ third"::lines())
 		numbers::lastItems(99),
 	)
 	show("List.lastItems<ItemType>(_ Integer) [empty]", noNumbers::lastItems(2))
+	show(
+		"List.lastItems<ItemType>(while: (_ ItemType) -> Boolean)",
+		numbers::lastItems(while (item) { <- item::isGreaterThan(1) }),
+	)
+	show(
+		"List.lastItems<ItemType>(while: (_ ItemType) -> Boolean) [every item]",
+		numbers::lastItems(while (item) { <- item::isLessThan(9) }),
+	)
+	show(
+		"List.lastItems<ItemType>(while: (_ ItemType) -> Boolean) [no item]",
+		numbers::lastItems(while (item) { <- item::isGreaterThan(9) }),
+	)
+	show(
+		"List.lastItems<ItemType>(while: (_ ItemType) -> Boolean) [empty]",
+		noNumbers::lastItems(while (item) { <- item::isEven() }),
+	)
+
 	§ The set-shaped transform, which keeps the FIRST occurrence of each item
 	§ and the order the kept items stood in. The `on:` entry asks the same of
 	§ a key read off each item, so the row a key was first met at is the row
@@ -4174,6 +4439,22 @@ third"::lines())
 		provenWords::enumerate()::firstItem(),
 	)
 	show("NonEmptyList.indices<ItemType>()", provenNumbers::indices())
+	show(
+		"NonEmptyList.reduce<ItemType>(_ (_ ItemType, _ ItemType) -> ItemType)",
+		provenNumbers::reduce((running, item) { <- running::add(item) }),
+	)
+	show(
+		"NonEmptyList.reduce<ItemType>(_ (_ ItemType, _ ItemType) -> ItemType) [single]",
+		provenOne::reduce((running, item) { <- running::add(item) }),
+	)
+	show(
+		"NonEmptyList.lowestItem<ItemType is Comparable>()",
+		provenWords::lowestItem(),
+	)
+	show(
+		"NonEmptyList.highestItem<ItemType is Comparable>()",
+		provenWords::highestItem(),
+	)
 	show(
 		"NonEmptyList.indices<ItemType>() [proof carried]",
 		provenNumbers::indices()::lastItem(),
