@@ -962,6 +962,38 @@ c"::quoted())
 		7::quotient(dividingBy computedThree, defaultingTo 0),
 	)
 	show(
+		"Integer.remainder(dividingBy: NonZeroInteger, as: Division)",
+		-7::remainder(dividingBy 3, as #Truncating),
+	)
+	show(
+		"Integer.remainder(dividingBy: NonZeroInteger, as: Division) [Euclidean]",
+		-7::remainder(dividingBy 3, as #Euclidean),
+	)
+	show(
+		"Integer.remainder(dividingBy: NonZeroInteger, as: Division) [negative divisor]",
+		-7::remainder(dividingBy -3, as #Truncating),
+	)
+	show(
+		"Integer.remainder(dividingBy: NonZeroInteger, as: Division) [no remainder]",
+		-6::remainder(dividingBy 3, as #Truncating),
+	)
+	show(
+		"Integer.quotient(dividingBy: NonZeroInteger, toward: Rounding)",
+		7::quotient(dividingBy 2, toward #Up),
+	)
+	show(
+		"Integer.quotient(dividingBy: NonZeroInteger, toward: Rounding) [down]",
+		7::quotient(dividingBy 2, toward #Down),
+	)
+	show(
+		"Integer.quotient(dividingBy: NonZeroInteger, toward: Rounding) [negative divisor]",
+		7::quotient(dividingBy -3, toward #Down),
+	)
+	show(
+		"Integer.quotient(dividingBy: NonZeroInteger, toward: Rounding) [toward zero]",
+		-7::quotient(dividingBy 2, toward #TowardZero),
+	)
+	show(
 		"Integer.quotient(dividingBy: Integer, defaultingTo: Integer) [by zero]",
 		7::quotient(dividingBy 0, defaultingTo 0),
 	)
@@ -1557,6 +1589,59 @@ c"::quoted())
 	show(
 		"Rational.approximate(toPlaces: NonNegativeInteger, toward?: Rounding) [no places]",
 		5/3::approximate(toPlaces 0),
+	)
+	§ The Euclidean pairing of two Rationals. A written divisor proves it is
+	§ not zero, so the calls reaching the entry that answers an Optional need a
+	§ computed one.
+	constant computedZeroRational = 1/2::subtract(1/2)
+
+	show(
+		"Rational.remainder(dividingBy: Rational)",
+		7/2::remainder(dividingBy computedSixth),
+	)
+	show(
+		"Rational.remainder(dividingBy: Rational) [by zero]",
+		7/2::remainder(dividingBy computedZeroRational),
+	)
+	show(
+		"Rational.remainder(dividingBy: NonZeroRational)",
+		7/2::remainder(dividingBy 1/3),
+	)
+	show(
+		"Rational.remainder(dividingBy: NonZeroRational) [negative dividend]",
+		-7/2::remainder(dividingBy 1/3),
+	)
+	show(
+		"Rational.remainder(dividingBy: Rational, defaultingTo: Rational)",
+		7/2::remainder(dividingBy computedSixth, defaultingTo 0/1),
+	)
+	show(
+		"Rational.remainder(dividingBy: Rational, defaultingTo: Rational) [by zero]",
+		7/2::remainder(dividingBy computedZeroRational, defaultingTo 0/1),
+	)
+	show(
+		"Rational.quotient(dividingBy: Rational)",
+		7/2::quotient(dividingBy computedSixth),
+	)
+	show(
+		"Rational.quotient(dividingBy: Rational) [by zero]",
+		7/2::quotient(dividingBy computedZeroRational),
+	)
+	show(
+		"Rational.quotient(dividingBy: NonZeroRational)",
+		7/2::quotient(dividingBy 1/3),
+	)
+	show(
+		"Rational.quotient(dividingBy: NonZeroRational) [negative divisor]",
+		7/2::quotient(dividingBy -1/3),
+	)
+	show(
+		"Rational.quotient(dividingBy: Rational, defaultingTo: Integer)",
+		7/2::quotient(dividingBy computedSixth, defaultingTo 0),
+	)
+	show(
+		"Rational.quotient(dividingBy: Rational, defaultingTo: Integer) [by zero]",
+		7/2::quotient(dividingBy computedZeroRational, defaultingTo 0),
 	)
 	§ The same split `Integer::raise` makes, and the same computed exponents
 	§ keep these calls on the entry answering an Optional.
@@ -3221,6 +3306,29 @@ c"::quoted())
 	show(
 		"Choice_Printable.toString() [SignStyle#Always]",
 		alwaysSigned::toString(),
+	)
+
+	§ ——— Division —————————————————————————————————————————————————————————
+	constant euclidean: Division  = #Euclidean
+	constant truncating: Division = #Truncating
+
+	show("Choice_Equatable.is(_ Division)", euclidean::is(#Euclidean))
+	show(
+		"Choice_Equatable.is(_ Division) [differing]",
+		euclidean::is(#Truncating),
+	)
+	show("Choice_Equatable.isNot(_ Division)", euclidean::isNot(#Truncating))
+	show(
+		"Choice_Equatable.isNot(_ Division) [same]",
+		truncating::isNot(#Truncating),
+	)
+	show(
+		"Choice_Printable.toString() [Division#Euclidean]",
+		euclidean::toString(),
+	)
+	show(
+		"Choice_Printable.toString() [Division#Truncating]",
+		truncating::toString(),
 	)
 
 	§ ——— SortOrder ————————————————————————————————————————————————————————
