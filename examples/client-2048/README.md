@@ -2,9 +2,10 @@
 
 The game in the browser. [`src/Game.es`](src/Game.es) and
 [`src/Board.es`](src/Board.es) are the game — the board, sliding and merging,
-scoring, win and game over, and undo. [`src/main.ts`](src/main.ts) draws it,
-turns arrow keys into pushes, and rolls the dice. Vite serves both, through
-one plugin line in [`vite.config.ts`](vite.config.ts).
+scoring, win and game over, undo, and the tile every move deals.
+[`src/main.ts`](src/main.ts) draws it and turns arrow keys into pushes. Vite
+serves both, through one plugin line in
+[`vite.config.ts`](vite.config.ts).
 
 ```sh
 cd examples/client-2048
@@ -30,17 +31,24 @@ run Vite under Bun — `bun --bun vite`. A project installing the published
 - **A push that moves nothing is `undefined`.** `move` answers
   `Optional<Game>`; the page reads it as `Game | undefined` and simply does
   not place a tile. Not an exception, not a flag.
-- **The host rolls the dice.** The rules draw nothing: `emptyCells` says where a
-  tile may go, and `place` is told which square the page chose. The rules stay
-  pure and testable, the page stays five lines. A Program that wants to draw its
-  own square asks `Randomness.entropy()` for a source.
+- **The rules roll the dice.** `withNewTile` asks
+  [`Randomness.entropy()`](../../packages/standard-library/sources/Randomness.es)
+  for the host's own source and draws twice from it: the square, out of the
+  empty ones with `pick(from:)`, and the tile, a 4 one time in ten. The page
+  draws nothing and knows nothing about it — `Math.random` appears nowhere.
+  The entropy source carries no state, so nothing about it has to cross the
+  boundary and a Game stays the plain object the page hands back after an
+  edit; `Randomness.seeded(_)` is the replayable source, and it has to be
+  threaded from draw to draw, which is why a game that wanted to deal itself
+  the same way twice would keep the seed and the moves instead.
 - **The push is told as journeys.** `movements(game, direction)` answers
   where every tile that ended up somewhere came from — a merge from two
   places — so the page slides each tile in from where it was instead of
   guessing from two boards. The rules know; the page asks.
 - **Three directions are one.** [`Board.es`](src/Board.es) slides rows left;
   Right, Up and Down are the same slide seen through a `mirror` or a
-  `transpose`, each its own inverse.
+  `transpose`, each its own inverse. `transpose()` is the standard library's,
+  over any List of Lists; `mirror` is the board's own.
 - **Typed imports.** While the dev server runs the plugin writes
   `src/Game.d.es.ts` beside the source, and `tsc` reads
   `import … from "./Game.es"` against it:

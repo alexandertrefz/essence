@@ -39,16 +39,54 @@ implementation {
 		won = false,
 	}
 
-	§§ Every square a new tile could go on. The host chooses one — Essence has
-	§§ no randomness, and this side does not need any: it says what is
-	§§ possible and is told what happened.
+	§§ Every square a new tile could go on. `withNewTile` draws one of these;
+	§§ a page that puts down a tile of its own — replaying a recorded game,
+	§§ say — asks for them and calls `place`.
 	function emptyCells(_ game: Game) -> List<Cell> {
 		<- game.board::emptyCells()
 	}
 
-	§§ The game with a tile set — how the host puts down the tile it chose.
+	§§ The game with a tile set on the given square.
 	function place(_ game: Game, at cell: Cell, value: Integer) -> Game {
 		<- { game with board = game.board::place(value, at cell) }
+	}
+
+	§ The dice, and they are this side's. `Randomness.entropy()` is the HOST's
+	§ own source: it carries nothing and reads the machine at each draw, so
+	§ nothing about it is held anywhere and a Game stays exactly the plain
+	§ value the page hands back through `resume` after an edit. The other
+	§ source, `Randomness.seeded(_)`, is the one a run can replay — but a
+	§ seeded source has to be threaded from draw to draw, which means keeping
+	§ it in the Game, and a source is not a value the boundary can carry out
+	§ to the page and back. A game that had to deal itself the same way twice
+	§ would keep the seed and the moves instead, and play them again.
+
+	§§ The game with one more tile on it — a 4 one time in ten, as the
+	§§ original — or the game as it was, where there is no square to put one
+	§§ on.
+	function withNewTile(_ game: Game) -> Game {
+		constant source = Randomness.entropy()
+		constant cells  = game.board::emptyCells()
+
+		§ Inside the `if` the squares are proven to be a List with something
+		§ in it, which is what `pick(from:)` asks for — so it answers a square
+		§ rather than an Optional, and there is no empty case to handle twice.
+		if cells::hasItems() {
+			constant cell = source::pick(from cells)
+			constant tile = define {
+				as 4 if source::drawBoolean(withProbability 1/10)
+				as 2 otherwise
+			}
+
+			<- place(game, at cell, value tile)
+		}
+
+		<- game
+	}
+
+	§§ A new game: an empty board with the two tiles it opens with.
+	function start() -> Game {
+		<- withNewTile(withNewTile(empty))
 	}
 
 	§§ The game after a push, or nothing when the push moves nothing — which
@@ -138,8 +176,10 @@ export {
 	moves
 	place
 	resume
+	start
 	status
 	undo
+	withNewTile
 	from "./Board.es" {
 		Board
 		Cell
@@ -182,7 +222,7 @@ tests {
 	}
 
 	suite "place" {
-		test "puts a tile on the square the host chose" {
+		test "puts a tile on the square it was given" {
 			constant placed = place(empty, at { row = 1, column = 2 }, value 4)
 
 			expect highest(placed)::is(4)
@@ -195,6 +235,31 @@ tests {
 			expect place(empty, at { row = 0, column = 0 }, value 2)
 				::isNot(empty)
 			expect highest(empty)::is(0)
+		}
+	}
+
+	§ A draw answers a different tile on a different square every time, so
+	§ what is tested is everything about it that does NOT depend on the draw:
+	§ that one square was filled, that the tile is one of the two the game
+	§ deals, and that a full board is handed back untouched.
+	suite "a new tile" {
+		test "fills one square, with a 2 or a 4" {
+			constant dealt = withNewTile(empty)
+
+			expect emptyCells(dealt)::length()::is(15)
+			expect [2, 4]::contains(highest(dealt))
+		}
+
+		test "has nowhere to put one on a full board" {
+			expect withNewTile(finished)::is(finished)
+		}
+
+		test "opens a new game with two tiles and no moves behind it" {
+			constant game = start()
+
+			expect emptyCells(game)::length()::is(14)
+			expect moves(game)::is(0)
+			expect status(game)::is(#Playing)
 		}
 	}
 
