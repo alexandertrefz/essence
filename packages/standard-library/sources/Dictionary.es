@@ -456,25 +456,12 @@ declarations {
 	§ Dictionary, so the file that owns the answer owns them. That is why
 	§ `NumberList.es` owns the aggregates a List of Numbers answers.
 	§
-	§ The fourth, `removeDuplicates`, crosses and comes back. It is `tally`'s
-	§ keys: the distinct items in the order they were first met. The store
-	§ finds them, where a fold would scan the items kept so far. It is here
-	§ rather than in `List.es` because `List.es` can not import this file.
-	§ That import would close a third cycle in the library's graph, and the
-	§ loader refuses any cycle but the two it names. The numbers are over
-	§ 20,000 items with 2,000 distinct. The fold on `contains` it replaced
-	§ took 113 ms, and the native it replaced on `NonEmptyList` took 110 ms.
-	§ This body takes 0.5 ms on either receiver. The item's own `is` still
-	§ decides: a witness a Namespace wrote takes the scan path through the
-	§ store, as `contains` would.
-	§
-	§ What it costs is the container. A Program whose only call is this one
-	§ carries the store, the key encoding, the kind registry and the written
-	§ form. It measures 18,592 bytes against 5,083 without the call, and
-	§ `bundleSize.spec.ts` holds that figure. The open alternative is a List
-	§ native over a plain Map, which would buy most of it back. It needs the
-	§ encoding and the branded-witness rule this file owns, in a module of
-	§ their own.
+	§ A fourth, `removeDuplicates`, used to cross and come back. It was
+	§ `tally`'s keys, and it dragged the whole store into any Program asking a
+	§ List for its distinct items. It is a `List` native over a plain Map now,
+	§ beside three other set-shaped Methods. The encoding it needs is a
+	§ runtime module of its own; the note above `List::removeDuplicates` says
+	§ why.
 	§
 	§ `group(on:)` replaced a `List::group(on:)` that folded a List of group
 	§ Records, scanning the groups opened so far for each item. Over the same
@@ -521,15 +508,6 @@ declarations {
 		index<infer Key is Equatable>(
 			on key: (_: ItemType) -> Key,
 		) -> Dictionary<Key, ItemType>
-
-		§§ Answers a new List keeping only the first occurrence of each item, in the original order.
-		§§
-		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
-		§§
-		§§ @returns — the List without duplicates.
-		removeDuplicates<infer ItemType is Equatable>() -> List<ItemType> {
-			<- @::tally()::keys()
-		}
 	}
 
 	§ The same crossings with the receiver's proof in hand, and the one thing
@@ -540,12 +518,9 @@ declarations {
 	§ into the empty Dictionary and tallies into it too.
 	§
 	§ It mirrors `GroupedList`, and sits after it for the reason every proven
-	§ Namespace sits after the one it narrows. The three native entries are
+	§ Namespace sits after the one it narrows. All three entries are
 	§ `GroupedList`'s own natives under this Namespace's names. So each pair
-	§ is one Function under two names and can not come apart. The
-	§ `removeDuplicates` here is the same body a second time, and carries the
-	§ proof rather than minting one. On this receiver `tally()` answers a
-	§ `NonEmptyDictionary`, whose `keys()` answers a `NonEmptyList`.
+	§ is one Function under two names and can not come apart.
 	namespace GroupedNonEmptyList<infer ItemType> for NonEmptyList<ItemType> {
 		§§ Answers the items grouped under the key the given Function reads off each one.
 		§§
@@ -574,17 +549,6 @@ declarations {
 		index<infer Key is Equatable>(
 			on key: (_: ItemType) -> Key,
 		) -> NonEmptyDictionary<Key, ItemType>
-
-		§§ Answers a new List keeping only the first occurrence of each item, in the original order.
-		§§
-		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
-		§§
-		§§ @returns — the List without duplicates, which certainly has something in it.
-		removeDuplicates<infer ItemType is Equatable>()
-			-> NonEmptyList<ItemType>
-		{
-			<- @::tally()::keys()
-		}
 	}
 }
 

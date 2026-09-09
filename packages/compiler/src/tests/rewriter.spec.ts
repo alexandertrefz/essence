@@ -1229,7 +1229,7 @@ describe("Rewriter", () => {
 						boolean.createBoolean(item.value > 1n)
 
 					expect(
-						list.everyItem(
+						list.everyItem__overload$1(
 							list.createList([
 								integerOne(),
 								integerTwo(),

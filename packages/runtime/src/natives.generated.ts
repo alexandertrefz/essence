@@ -460,6 +460,12 @@ export type ListNatives = {
 	compare: <ItemType extends AnyType>(self: ListType<ItemType>, to: ListType<ItemType>, ItemType__conformance: ComparableConformance<ItemType>) => OrderingType
 	// toString<ItemType is Printable>() -> String
 	toString: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: PrintableConformance<ItemType>) => StringType
+	// contains<ItemType is Equatable>(everyItemOf: List<ItemType>) -> Boolean
+	contains__overload$2: <ItemType extends AnyType>(self: ListType<ItemType>, everyItemOf: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => BooleanType
+	// hasDuplicates<ItemType is Equatable>() -> Boolean
+	hasDuplicates__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => BooleanType
+	// hasDuplicates<ItemType, Key is Equatable>(on: (_: ItemType) -> Key) -> Boolean
+	hasDuplicates__overload$2: <ItemType extends AnyType, Key extends AnyType>(self: ListType<ItemType>, on: (argument0: ItemType) => Key, Key__conformance: EquatableConformance<Key>) => BooleanType
 	// length<ItemType>() -> NonNegativeInteger
 	length: <ItemType extends AnyType>(self: ListType<ItemType>) => IntegerType
 	// item<ItemType>(at: Integer) -> Optional<ItemType>
@@ -470,6 +476,8 @@ export type ListNatives = {
 	enumerate: <ItemType extends AnyType>(self: ListType<ItemType>) => ListType<RecordType & { index: IntegerType; item: ItemType }>
 	// remove<ItemType>(at: Integer) -> List<ItemType>
 	remove: <ItemType extends AnyType>(self: ListType<ItemType>, at: IntegerType) => ListType<ItemType>
+	// removeEvery<ItemType is Equatable>(contentsOf: List<ItemType>) -> List<ItemType>
+	removeEvery__overload$3: <ItemType extends AnyType>(self: ListType<ItemType>, contentsOf: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => ListType<ItemType>
 	// prepend<ItemType>(_: ItemType) -> NonEmptyList
 	prepend__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType) => ListType<ItemType>
 	// append<ItemType>(_: ItemType) -> NonEmptyList
@@ -483,7 +491,9 @@ export type ListNatives = {
 	// reduce<ItemType, Answer>(startingWith: Answer, step: (_: Answer, _: ItemType) -> Step<Answer, Answer>) -> Answer
 	reduce__overload$2: <ItemType extends AnyType, Answer extends AnyType>(self: ListType<ItemType>, startingWith: Answer, step: (argument0: Answer, argument1: ItemType) => StepType<Answer, Answer>) => Answer
 	// everyItem<ItemType>(where: (_: ItemType) -> Boolean) -> List<ItemType>
-	everyItem: <ItemType extends AnyType>(self: ListType<ItemType>, where: (argument0: ItemType) => BooleanType) => ListType<ItemType>
+	everyItem__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, where: (argument0: ItemType) => BooleanType) => ListType<ItemType>
+	// everyItem<ItemType is Equatable>(alsoIn: List<ItemType>) -> List<ItemType>
+	everyItem__overload$2: <ItemType extends AnyType>(self: ListType<ItemType>, alsoIn: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => ListType<ItemType>
 	// slice<ItemType>(from: Integer, to: Integer) -> List<ItemType>
 	slice: <ItemType extends AnyType>(self: ListType<ItemType>, from: IntegerType, to: IntegerType) => ListType<ItemType>
 	// reverse<ItemType>() -> List<ItemType>
@@ -504,6 +514,10 @@ export type ListNatives = {
 	pair: <ItemType extends AnyType, Other extends AnyType>(self: ListType<ItemType>, argument1: ListType<Other>) => ListType<RecordType & { first: ItemType; second: Other }>
 	// split<ItemType>(intoGroupsOf: Integer) -> List<NonEmptyList>
 	split: <ItemType extends AnyType>(self: ListType<ItemType>, intoGroupsOf: IntegerType) => ListType<ListType<ItemType>>
+	// removeDuplicates<ItemType is Equatable>() -> List<ItemType>
+	removeDuplicates__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => ListType<ItemType>
+	// removeDuplicates<ItemType, Key is Equatable>(on: (_: ItemType) -> Key) -> List<ItemType>
+	removeDuplicates__overload$2: <ItemType extends AnyType, Key extends AnyType>(self: ListType<ItemType>, on: (argument0: ItemType) => Key, Key__conformance: EquatableConformance<Key>) => ListType<ItemType>
 }
 
 export type NestedListNatives = {
@@ -548,6 +562,10 @@ export type NonEmptyListNatives = {
 	pair: <ItemType extends AnyType, Other extends AnyType>(self: ListType<ItemType>, argument1: ListType<Other>) => ListType<RecordType & { first: ItemType; second: Other }>
 	// split<ItemType>(intoGroupsOf: Integer) -> NonEmptyList
 	split: <ItemType extends AnyType>(self: ListType<ItemType>, intoGroupsOf: IntegerType) => ListType<ListType<ItemType>>
+	// removeDuplicates<ItemType is Equatable>() -> NonEmptyList
+	removeDuplicates__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => ListType<ItemType>
+	// removeDuplicates<ItemType, Key is Equatable>(on: (_: ItemType) -> Key) -> NonEmptyList
+	removeDuplicates__overload$2: <ItemType extends AnyType, Key extends AnyType>(self: ListType<ItemType>, on: (argument0: ItemType) => Key, Key__conformance: EquatableConformance<Key>) => ListType<ItemType>
 }
 
 export type NonEmptyNestedListNatives = {
@@ -955,7 +973,7 @@ export const $RecordArity: AssertArities<typeof import("./Record"), {
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "repeat__overload$1" | "of__overload$2" | "of__overload$5" | "hasItems__overload$1" | "hasItems__overload$2" | "isEmpty" | "contains" | "doesNotContain" | "hasOnlyItems" | "hasNoItems" | "firstItem__overload$1" | "firstItem__overload$2" | "firstItem__overload$3" | "firstItem__overload$4" | "lastItem__overload$1" | "lastItem__overload$2" | "lastItem__overload$3" | "lastItem__overload$4" | "item__overload$2" | "firstIndex__overload$1" | "firstIndex__overload$2" | "firstIndex__overload$3" | "firstIndex__overload$4" | "lastIndex__overload$1" | "lastIndex__overload$2" | "lastIndex__overload$4" | "indices" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "prepend__overload$2" | "count__overload$1" | "count__overload$2" | "replace__overload$1" | "replace__overload$2" | "lowestItem__overload$1" | "lowestItem__overload$2" | "highestItem__overload$1" | "highestItem__overload$2" | "firstItems" | "lastItems"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "repeat__overload$1" | "of__overload$2" | "of__overload$5" | "hasItems__overload$1" | "hasItems__overload$2" | "isEmpty" | "contains__overload$1" | "doesNotContain" | "hasOnlyItems" | "hasNoItems" | "firstItem__overload$1" | "firstItem__overload$2" | "firstItem__overload$3" | "firstItem__overload$4" | "lastItem__overload$1" | "lastItem__overload$2" | "lastItem__overload$3" | "lastItem__overload$4" | "item__overload$2" | "firstIndex__overload$1" | "firstIndex__overload$2" | "firstIndex__overload$3" | "firstIndex__overload$4" | "lastIndex__overload$1" | "lastIndex__overload$2" | "lastIndex__overload$4" | "indices" | "removeFirst" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast" | "prepend__overload$2" | "count__overload$1" | "count__overload$2" | "replace__overload$1" | "replace__overload$2" | "lowestItem__overload$1" | "lowestItem__overload$2" | "highestItem__overload$1" | "highestItem__overload$2" | "firstItems" | "lastItems"> = true
 export const $ListArity: AssertArities<typeof import("./List"), {
 	repeat__overload$2: 2
 	of__overload$1: 2
@@ -965,18 +983,23 @@ export const $ListArity: AssertArities<typeof import("./List"), {
 	is: 3
 	compare: 3
 	toString: 2
+	contains__overload$2: 3
+	hasDuplicates__overload$1: 2
+	hasDuplicates__overload$2: 3
 	length: 1
 	item__overload$1: 2
 	lastIndex__overload$3: 2
 	enumerate: 1
 	remove: 2
+	removeEvery__overload$3: 3
 	prepend__overload$1: 2
 	append__overload$1: 2
 	append__overload$2: 2
 	map: 2
 	reduce__overload$1: 3
 	reduce__overload$2: 3
-	everyItem: 2
+	everyItem__overload$1: 2
+	everyItem__overload$2: 3
 	slice: 3
 	reverse: 1
 	sort__overload$1: 3
@@ -987,6 +1010,8 @@ export const $ListArity: AssertArities<typeof import("./List"), {
 	partition: 2
 	pair: 2
 	split: 2
+	removeDuplicates__overload$1: 2
+	removeDuplicates__overload$2: 3
 }> = true
 
 declare const NestedListModule: typeof import("./NestedList")
@@ -1021,6 +1046,8 @@ export const $NonEmptyListArity: AssertArities<typeof import("./NonEmptyList"), 
 	replace__overload$1: 3
 	pair: 2
 	split: 2
+	removeDuplicates__overload$1: 2
+	removeDuplicates__overload$2: 3
 }> = true
 
 declare const NonEmptyNestedListModule: typeof import("./NonEmptyNestedList")
@@ -1093,7 +1120,6 @@ export const $NonEmptyDictionaryArity: AssertArities<typeof import("./NonEmptyDi
 
 declare const GroupedListModule: typeof import("./GroupedList")
 export const $GroupedList: GroupedListNatives = GroupedListModule
-export const $GroupedListAbsent: AssertNoEssenceExports<typeof import("./GroupedList"), "removeDuplicates"> = true
 export const $GroupedListArity: AssertArities<typeof import("./GroupedList"), {
 	group: 3
 	tally: 2
@@ -1102,7 +1128,6 @@ export const $GroupedListArity: AssertArities<typeof import("./GroupedList"), {
 
 declare const GroupedNonEmptyListModule: typeof import("./GroupedNonEmptyList")
 export const $GroupedNonEmptyList: GroupedNonEmptyListNatives = GroupedNonEmptyListModule
-export const $GroupedNonEmptyListAbsent: AssertNoEssenceExports<typeof import("./GroupedNonEmptyList"), "removeDuplicates"> = true
 export const $GroupedNonEmptyListArity: AssertArities<typeof import("./GroupedNonEmptyList"), {
 	group: 3
 	tally: 2

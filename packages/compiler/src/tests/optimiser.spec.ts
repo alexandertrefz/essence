@@ -4224,10 +4224,14 @@ describe("Optimiser", () => {
 		// the guard is asserted against a Namespace that shadows one of them:
 		// with the guard, the call keeps its frame and answers correctly.
 		describe("a walk this pass inlines, given a default", () => {
-			const written =
-				"everyItem(where check: (_: ItemType) -> Boolean) -> List<ItemType>"
-			const defaulted =
-				"everyItem(where check: (_: ItemType) -> Boolean = (_ item: ItemType) -> Boolean { <- true }) -> List<ItemType>"
+			// NOTE: The filter is an Overload entry, so what stands in the
+			// source is the entry's own signature with no name on it. The
+			// `@returns` line above it is what tells this one from the
+			// `removeEvery(where:)` entry, whose signature is identical.
+			const written = `the List of accepted items.
+			(where check: (_: ItemType) -> Boolean) -> List<ItemType>`
+			const defaulted = `the List of accepted items.
+			(where check: (_: ItemType) -> Boolean = (_ item: ItemType) -> Boolean { <- true }) -> List<ItemType>`
 
 			let replacedStdlib: Stdlib | null = null
 
@@ -4567,7 +4571,7 @@ describe("Optimiser", () => {
 				"for (let $loop_0_position = 0; $loop_0_position < $loop_0_count; $loop_0_position++)",
 			)
 			expect(generated).not.toContain("List.reduce__overload$1(")
-			expect(generated).not.toContain("List.everyItem(")
+			expect(generated).not.toContain("List.everyItem__overload$1(")
 		})
 
 		it("holds the items and their count before the first turn", () => {
@@ -4665,7 +4669,7 @@ describe("Optimiser", () => {
 				disabledPasses: new Set(),
 			})
 
-			expect(unoptimised).toContain("List.everyItem(proven,")
+			expect(unoptimised).toContain("List.everyItem__overload$1(proven,")
 			expect(unoptimised).toContain("List.reduce__overload$1(proven,")
 			expect(unoptimised).toContain("List.reduce__overload$2(proven,")
 		})

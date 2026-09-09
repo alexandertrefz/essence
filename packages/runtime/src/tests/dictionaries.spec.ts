@@ -5,7 +5,6 @@ import { createBoolean } from "../Boolean"
 import type { DictionaryType, EntryRecord, Slot } from "../Dictionary"
 import {
 	createDictionary,
-	encodeKey,
 	entries as entriesOf,
 	everyEntry,
 	is as dictionaryIs,
@@ -27,6 +26,7 @@ import { group, tally } from "../GroupedList"
 import type { IntegerType } from "../Integer"
 import { createInteger } from "../Integer"
 import { anyIs, boundChoiceIs } from "../internalHelpers"
+import { encodeKey } from "../keyEncoding"
 import type { ListType } from "../List"
 import {
 	createList,

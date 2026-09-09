@@ -2205,6 +2205,11 @@ describe("Standard Library Loader", () => {
 			"Integer::isMultiple",
 			"Integer::isWholeNumber",
 			"List::contains",
+			// NOTE: Both entries are native, so there is no body to read a
+			// question off. Neither is `removeDuplicates()::length()`
+			// compared against the receiver's, which is what would have made
+			// it a chain.
+			"List::hasDuplicates",
 			"List::hasItems",
 			"List::hasOnlyItems",
 			"List::is",

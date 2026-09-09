@@ -5,7 +5,6 @@ import { createBoolean } from "../Boolean"
 import type { DictionaryType, Slot } from "../Dictionary"
 import {
 	createDictionary,
-	encodeKey,
 	keys as keysOf,
 	length as lengthOf,
 	map as mapEntries,
@@ -19,6 +18,7 @@ import { group, index as indexBy, tally } from "../GroupedList"
 import type { IntegerType } from "../Integer"
 import { createInteger } from "../Integer"
 import { anyIs } from "../internalHelpers"
+import { encodeKey } from "../keyEncoding"
 import type { ListType } from "../List"
 import {
 	append__overload$1 as append,

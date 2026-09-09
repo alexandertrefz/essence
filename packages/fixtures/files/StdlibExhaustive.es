@@ -3039,6 +3039,25 @@ third"::lines())
 		"List.contains<ItemType is Equatable>(_ ItemType) [absent]",
 		numbers::contains(9),
 	)
+	§ The subset question, and the first of the four set-shaped entries. How
+	§ many times an item occurs is not asked, so a receiver holding one `1`
+	§ contains every item of a List holding two.
+	show(
+		"List.contains<ItemType is Equatable>(everyItemOf: List<ItemType>)",
+		numbers::contains(everyItemOf [4, 3]),
+	)
+	show(
+		"List.contains<ItemType is Equatable>(everyItemOf: List<ItemType>) [repeated]",
+		singleNumber::contains(everyItemOf [7, 7]),
+	)
+	show(
+		"List.contains<ItemType is Equatable>(everyItemOf: List<ItemType>) [absent]",
+		numbers::contains(everyItemOf [4, 9]),
+	)
+	show(
+		"List.contains<ItemType is Equatable>(everyItemOf: List<ItemType>) [empty]",
+		numbers::contains(everyItemOf noNumbers),
+	)
 	show(
 		"List.doesNotContain<ItemType is Equatable>(_ ItemType)",
 		numbers::doesNotContain(9),
@@ -3167,6 +3186,16 @@ third"::lines())
 		"List.removeEvery<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
 		numbers::removeEvery(where (item) { <- item::isGreaterThan(9) }),
 	)
+	§ The difference. Every occurrence of an item the other List holds goes,
+	§ and an item it holds that this one does not changes nothing.
+	show(
+		"List.removeEvery<ItemType is Equatable>(contentsOf: List<ItemType>)",
+		numbers::removeEvery(contentsOf [1, 9]),
+	)
+	show(
+		"List.removeEvery<ItemType is Equatable>(contentsOf: List<ItemType>) [empty]",
+		numbers::removeEvery(contentsOf noNumbers),
+	)
 	show(
 		"List.removeLast<ItemType>(_? Integer) [no count]",
 		numbers::removeLast(),
@@ -3246,6 +3275,17 @@ third"::lines())
 	show(
 		"List.everyItem<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
 		numbers::everyItem(where (item) { <- item::isGreaterThan(9) }),
+	)
+	§ The intersection, which is a filter rather than a set operation: an item
+	§ the other List holds is kept every time it occurs, so the repeated `1`
+	§ comes back twice.
+	show(
+		"List.everyItem<ItemType is Equatable>(alsoIn: List<ItemType>)",
+		numbers::everyItem(alsoIn [1, 4, 9]),
+	)
+	show(
+		"List.everyItem<ItemType is Equatable>(alsoIn: List<ItemType>) [empty]",
+		numbers::everyItem(alsoIn noNumbers),
 	)
 	show("List.item<ItemType>(at: Integer)", numbers::item(at 2))
 	show("List.item<ItemType>(at: Integer) [zero]", numbers::item(at 0))
@@ -3552,6 +3592,26 @@ third"::lines())
 	show(
 		"List.hasNoItems<ItemType>(where: (_ ItemType) -> Boolean) [match]",
 		numbers::hasNoItems(where (item) { <- item::isGreaterThan(3) }),
+	)
+	show(
+		"List.hasDuplicates<ItemType is Equatable>()",
+		numbers::hasDuplicates(),
+	)
+	show(
+		"List.hasDuplicates<ItemType is Equatable>() [all distinct]",
+		[1, 2, 3]::hasDuplicates(),
+	)
+	show(
+		"List.hasDuplicates<ItemType is Equatable>() [empty]",
+		noNumbers::hasDuplicates(),
+	)
+	show(
+		"List.hasDuplicates<ItemType, Key is Equatable>(on: (_ ItemType) -> Key)",
+		tiedRows::hasDuplicates(on .n),
+	)
+	show(
+		"List.hasDuplicates<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [distinct keys]",
+		tiedRows::hasDuplicates(on .tag),
 	)
 	show(
 		"List.hasNoItems<ItemType>(where: (_ ItemType) -> Boolean) [empty]",
@@ -3866,6 +3926,35 @@ third"::lines())
 		numbers::lastItems(99),
 	)
 	show("List.lastItems<ItemType>(_ Integer) [empty]", noNumbers::lastItems(2))
+	§ The set-shaped transform, which keeps the FIRST occurrence of each item
+	§ and the order the kept items stood in. The `on:` entry asks the same of
+	§ a key read off each item, so the row a key was first met at is the row
+	§ that survives.
+	show(
+		"List.removeDuplicates<ItemType is Equatable>()",
+		numbers::removeDuplicates(),
+	)
+	show(
+		"List.removeDuplicates<ItemType is Equatable>() [empty]",
+		noNumbers::removeDuplicates(),
+	)
+	§ A Rational key and the whole Integer it equals are one item, which is
+	§ what the covering `Number`'s own `is` says and what the encoding behind
+	§ this walk has to agree with.
+	constant twoSpellings: List<Number> = [3, 3/1, 1/2]
+
+	show(
+		"List.removeDuplicates<ItemType is Equatable>() [across two numeric kinds]",
+		twoSpellings::removeDuplicates(),
+	)
+	show(
+		"List.removeDuplicates<ItemType, Key is Equatable>(on: (_ ItemType) -> Key)",
+		tiedRows::removeDuplicates(on .n),
+	)
+	show(
+		"List.removeDuplicates<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [empty]",
+		noNumbers::removeDuplicates(on (item) { <- item }),
+	)
 
 	§ ——— NestedList ———————————————————————————————————————————————————————
 	show("NestedList.flatten<ItemType>()", [[1, 2], [3]]::flatten())
@@ -4181,6 +4270,27 @@ third"::lines())
 	show(
 		"NonEmptyList.split<ItemType>(intoGroupsOf: Integer) [proof carried]",
 		provenNumbers::split(intoGroupsOf 2)::firstItem()::firstItem(),
+	)
+	§ Deduplicating keeps the first item whatever else it drops, so a List
+	§ with something in it comes out with something in it. Both entries are
+	§ shown twice, as the transforms that carry the proof are: once for the
+	§ value, which has to be the one `List`'s own entry gives, and once
+	§ chained into a Method only a NonEmptyList answers.
+	show(
+		"NonEmptyList.removeDuplicates<ItemType is Equatable>()",
+		provenNumbers::removeDuplicates(),
+	)
+	show(
+		"NonEmptyList.removeDuplicates<ItemType is Equatable>() [proof carried]",
+		provenNumbers::removeDuplicates()::lastItem(),
+	)
+	show(
+		"NonEmptyList.removeDuplicates<ItemType, Key is Equatable>(on: (_ ItemType) -> Key)",
+		tiedProvenRows::removeDuplicates(on .n),
+	)
+	show(
+		"NonEmptyList.removeDuplicates<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [proof carried]",
+		tiedProvenRows::removeDuplicates(on .n)::lastItem(),
 	)
 
 	§ The proofs a Method HANDS OVER rather than ones a literal carries. Each
@@ -4802,9 +4912,6 @@ third"::lines())
 	§ The bridge from the first container to the second: the receiver is a
 	§ List and the answer is a Dictionary. Each group holds an item and each
 	§ count is above zero, which only the native that built them can promise.
-	§ `removeDuplicates` crosses and comes back, and is shown over the same
-	§ receivers `List`'s other transforms are.
-	§
 	§ The receivers here are computed, because a List written where it stands
 	§ proves its own count and would reach the proven Namespace below instead.
 	constant seatedGuests = [
@@ -4867,23 +4974,12 @@ third"::lines())
 		"GroupedList.index<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [empty]",
 		noVotes::index(on (vote) { <- vote }),
 	)
-	show(
-		"GroupedList.removeDuplicates<ItemType is Equatable>()",
-		numbers::removeDuplicates(),
-	)
-	show(
-		"GroupedList.removeDuplicates<ItemType is Equatable>() [empty]",
-		noNumbers::removeDuplicates(),
-	)
 
 	§ ——— GroupedNonEmptyList ——————————————————————————————————————————————
 	§ The same crossings with the receiver's proof in hand. A List with an
 	§ item in it puts that item in a group, under a count, or at a key, so the
 	§ Dictionary each answers holds an entry — which is what the total `length`
-	§ reads off it. `removeDuplicates` is shown twice, as the transforms that
-	§ carry the proof are: once for the value, which has to be the one the
-	§ entry above gives, and once chained into a Method only a NonEmptyList
-	§ answers.
+	§ reads off it.
 	constant provenVotes: NonEmptyList<String> = ["a", "b", "a"]
 
 	show(
@@ -4897,14 +4993,6 @@ third"::lines())
 	show(
 		"GroupedNonEmptyList.index<ItemType, Key is Equatable>(on: (_ ItemType) -> Key)",
 		provenVotes::index(on (vote) { <- vote })::length(),
-	)
-	show(
-		"GroupedNonEmptyList.removeDuplicates<ItemType is Equatable>()",
-		provenNumbers::removeDuplicates(),
-	)
-	show(
-		"GroupedNonEmptyList.removeDuplicates<ItemType is Equatable>() [proof carried]",
-		provenNumbers::removeDuplicates()::lastItem(),
 	)
 
 	§ ——— loop ————————————————————————————————————————————————————————————

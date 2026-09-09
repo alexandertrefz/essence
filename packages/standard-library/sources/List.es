@@ -331,14 +331,40 @@ declarations {
 			<- @::length()::is(0)
 		}
 
-		§§ Answers whether an item equal to the given one is in the List.
+		§§ Answers whether an item equal to the given one is in the List, or whether every item of another List is.
 		§§
 		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
 		§§
-		§§ @param _ — the item to look for
-		§§ @returns — `true` when the item occurs.
-		contains<infer ItemType is Equatable>(_ item: ItemType) -> Boolean {
-			<- @::hasItems(where (candidate) { <- candidate::is(item) })
+		§§ @returns — `true` when the item occurs, or when every item of the other List does.
+		overload contains {
+			§§ Answers whether an item equal to the given one is in the List.
+			§§
+			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @param _ — the item to look for
+			§§ @returns — `true` when the item occurs.
+			<infer ItemType is Equatable>(_ item: ItemType) -> Boolean {
+				<- @::hasItems(where (candidate) { <- candidate::is(item) })
+			}
+
+			§ One of the four set-shaped entries; the note above
+			§ `removeDuplicates` says what they rest on. This one is the
+			§ subset question. It counts nothing: a List is a bag, and
+			§ `count(of:)` is what answers how many times an item occurs.
+
+			§§ Answers whether every item of the given List occurs in this one.
+			§§
+			§§ How many times an item occurs is not asked, so a List holding one `1` contains every item of `[1, 1]`. The empty List has no item to look for, so every List contains its items. The walk stops at the first item that does not occur. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @example
+			§§   expect [1, 2, 3]::contains(everyItemOf [3, 1])
+			§§   expect [1, 2]::contains(everyItemOf [])
+			§§
+			§§ @param everyItemOf — the List whose items to look for
+			§§ @returns — `true` when every item of it occurs.
+			<infer ItemType is Equatable>(
+				everyItemOf other: List<ItemType>,
+			) -> Boolean
 		}
 
 		§§ Answers whether no item equal to the given one is in the List.
@@ -380,6 +406,44 @@ declarations {
 		§§ @returns — `true` when the check accepts no item.
 		hasNoItems(where check: (_: ItemType) -> Boolean) -> Boolean {
 			<- @::hasItems(where check)::negate()
+		}
+
+		§ Asked of the items themselves and of a key read off each, as
+		§ `removeDuplicates` is, and native for the same walk. An Essence body
+		§ is `removeDuplicates()::length()::isNot(@::length())`, which builds
+		§ the whole distinct List to answer a question the second repeat
+		§ settles. Two thousand asks of a 20,001 item List whose first two
+		§ items are equal measured 1,081 ms that way and 21 ms here. Both
+		§ figures hold 20 ms of subprocess startup.
+
+		§§ Answers whether any item occurs twice, or whether any two items share a key.
+		§§
+		§§ Equality is the items' own `is`, or the keys' own where a key is read. The walk stops at the first repeat.
+		§§
+		§§ @returns — `true` when something occurs twice.
+		overload hasDuplicates {
+			§§ Answers whether any item occurs twice.
+			§§
+			§§ The walk stops at the first repeated item. The empty List and a List of one item answer `false`. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @example
+			§§   expect [1, 2, 1]::hasDuplicates()
+			§§
+			§§ @returns — `true` when an item occurs twice.
+			<infer ItemType is Equatable>() -> Boolean
+
+			§§ Answers whether any two items share the key the given Function reads off each one.
+			§§
+			§§ The walk stops at the first repeated key. Equality is the keys' own `is`. The entry is available whenever what the key answers conforms to `Equatable`.
+			§§
+			§§ @example
+			§§   constant rows = [{ sku = "a" }, { sku = "a" }]
+			§§
+			§§   expect rows::hasDuplicates(on .sku)
+			§§
+			§§ @param on — the key read off each item
+			§§ @returns — `true` when two items share a key.
+			<infer Key is Equatable>(on key: (_: ItemType) -> Key) -> Boolean
 		}
 
 		§§ Answers how many items the List has.
@@ -746,6 +810,24 @@ declarations {
 			(where check: (_: ItemType) -> Boolean) -> List<ItemType> {
 				<- @::everyItem(where (item) { <- check(item)::negate() })
 			}
+
+			§ The difference, and one of the four set-shaped entries; the note
+			§ above `removeDuplicates` says what they rest on. The label
+			§ mirrors `append(contentsOf:)`, which is the other Method here
+			§ that is about a whole List rather than one item.
+
+			§§ Answers a new List without any item the given List holds.
+			§§
+			§§ Every occurrence of such an item goes, and the rest keep their order. An item of the given List that this one does not hold changes nothing. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @example
+			§§   expect [1, 2, 3, 2]::removeEvery(contentsOf [2])::is([1, 3])
+			§§
+			§§ @param contentsOf — the List whose items to remove
+			§§ @returns — the List of remaining items.
+			<infer ItemType is Equatable>(
+				contentsOf other: List<ItemType>,
+			) -> List<ItemType>
 		}
 
 		§§ Answers a new List without the last item, or without the given number of trailing items.
@@ -863,13 +945,40 @@ declarations {
 		§ by-value entry: keeping the items equal to a given value is what
 		§ `contains` already answers.
 
-		§§ Answers a new List of every item the check accepts.
+		§§ Answers a new List of every item the check accepts, or of every item another List holds too.
 		§§
-		§§ Each item is offered to the check, and the accepted items keep their order.
+		§§ The kept items keep their order.
 		§§
-		§§ @param where — the check each item is offered to
-		§§ @returns — the List of accepted items.
-		everyItem(where check: (_: ItemType) -> Boolean) -> List<ItemType>
+		§§ @returns — the List of kept items.
+		overload everyItem {
+			§§ Answers a new List of every item the check accepts.
+			§§
+			§§ Each item is offered to the check, and the accepted items keep their order.
+			§§
+			§§ @param where — the check each item is offered to
+			§§ @returns — the List of accepted items.
+			(where check: (_: ItemType) -> Boolean) -> List<ItemType>
+
+			§ The intersection, and one of the four set-shaped entries; the
+			§ note above `removeDuplicates` says what they rest on. It is a
+			§ filter like the entry above rather than a set operation. An item
+			§ the other List holds is kept every time it occurs, so
+			§ `[1, 1]::everyItem(alsoIn [1])` is `[1, 1]`. A caller that wants
+			§ the set asks `removeDuplicates()` after it.
+
+			§§ Answers a new List of every item the given List holds too.
+			§§
+			§§ The kept items keep the order they had here, and an item kept once for every time it occurs. How many times the other List holds it is not asked. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @example
+			§§   expect [3, 1, 2]::everyItem(alsoIn [2, 3])::is([3, 2])
+			§§
+			§§ @param alsoIn — the List whose items to keep
+			§§ @returns — the List of items both Lists hold.
+			<infer ItemType is Equatable>(
+				alsoIn other: List<ItemType>,
+			) -> List<ItemType>
+		}
 
 		§ Both ends are defaulted, so `slice(from n)` is the tail from `n` and
 		§ `slice(to n)` is the head up to it. Four callers in the library spelled
@@ -1304,6 +1413,60 @@ declarations {
 			} else {
 				<- @::slice(from count::negate())
 			}
+		}
+
+		§ The set-shaped Methods, and the one structure all four rest on. Each
+		§ holds what it has met in a Map keyed by the canonical encoding, in
+		§ `keyEncoding.ts` in the runtime. So each is linear, where a fold on
+		§ `contains` is quadratic. The other three are
+		§ `contains(everyItemOf:)`, `everyItem(alsoIn:)` and
+		§ `removeEvery(contentsOf:)`. There is no fifth: the union of two
+		§ Lists is `append(contentsOf other)::removeDuplicates()`, and needs
+		§ no name of its own.
+		§
+		§ The item's own `is` still decides. A witness the Compiler brands
+		§ structural is what the encoding stands in for. Any other is scanned
+		§ instead, exactly as a Dictionary scans its slots.
+		§
+		§ The body was `@::tally()::keys()` on `GroupedList`. That answers the
+		§ same List, and reaches the whole second container behind it: the
+		§ store, the kind registry and the written form. A Program whose only
+		§ call is this one measured 18,607 bytes that way, against 5,083 for
+		§ the same Program without the call. The Map costs 5,854 of those
+		§ 13,524 back, and `bundleSize.spec.ts` holds the figure. The encoding
+		§ is a module of its own so that this walk can rest on it without a
+		§ store arriving behind it.
+
+		§§ Answers a new List keeping only the first occurrence of each item, or the first item met at each key.
+		§§
+		§§ The kept items keep the order they had. Equality is the items' own `is`, or the keys' own where a key is read.
+		§§
+		§§ @returns — the List without duplicates.
+		overload removeDuplicates {
+			§§ Answers a new List keeping only the first occurrence of each item.
+			§§
+			§§ The kept items keep the order they had. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`. The union of two Lists is `append(contentsOf other)::removeDuplicates()`.
+			§§
+			§§ @example
+			§§   expect ["a", "b", "a"]::removeDuplicates()::is(["a", "b"])
+			§§
+			§§ @returns — the List without duplicates.
+			<infer ItemType is Equatable>() -> List<ItemType>
+
+			§§ Answers a new List keeping only the first item met at each key.
+			§§
+			§§ The kept items keep the order they had. A later item whose key is already met goes, whatever the rest of it holds. Equality is the keys' own `is`. The entry is available whenever what the key answers conforms to `Equatable`.
+			§§
+			§§ @example
+			§§   constant rows = [{ id = 1, name = "a" }, { id = 1, name = "b" }]
+			§§
+			§§   expect rows::removeDuplicates(on .id)::is([{ id = 1, name = "a" }])
+			§§
+			§§ @param on — the key read off each item
+			§§ @returns — the List holding the first item met at each key.
+			<infer Key is Equatable>(
+				on key: (_: ItemType) -> Key,
+			) -> List<ItemType>
 		}
 	}
 
@@ -1748,6 +1911,35 @@ declarations {
 			on key: (_: ItemType) -> Key,
 		) -> ItemType {
 			<- @::<List>highestItem(on key)::value(defaultingTo @::firstItem())
+		}
+
+		§ Both entries carry the proof. The first item is always kept, so a
+		§ List with something in it comes out with something in it. They are
+		§ `List`'s own natives under this Namespace's names, so each pair is
+		§ one Function under two names and can not come apart.
+
+		§§ Answers a new List keeping only the first occurrence of each item, or the first item met at each key.
+		§§
+		§§ The kept items keep the order they had. Equality is the items' own `is`, or the keys' own where a key is read.
+		§§
+		§§ @returns — the List without duplicates, which certainly has something in it.
+		overload removeDuplicates {
+			§§ Answers a new List keeping only the first occurrence of each item.
+			§§
+			§§ The kept items keep the order they had. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @returns — the List without duplicates, which certainly has something in it.
+			<infer ItemType is Equatable>() -> NonEmptyList<ItemType>
+
+			§§ Answers a new List keeping only the first item met at each key.
+			§§
+			§§ The kept items keep the order they had. Equality is the keys' own `is`. The entry is available whenever what the key answers conforms to `Equatable`.
+			§§
+			§§ @param on — the key read off each item
+			§§ @returns — the List holding the first item met at each key, which certainly has something in it.
+			<infer Key is Equatable>(
+				on key: (_: ItemType) -> Key,
+			) -> NonEmptyList<ItemType>
 		}
 	}
 
