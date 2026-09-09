@@ -598,6 +598,7 @@ describe("Stdlib Call Graph", () => {
 			"List.lowestItem__overload$1",
 			"List.lowestItem__overload$2",
 			"List.of__overload$2",
+			"List.of__overload$5",
 			"List.prepend__overload$2",
 			"List.removeEvery__overload$1",
 			"List.removeEvery__overload$2",

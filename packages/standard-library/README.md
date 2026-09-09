@@ -58,7 +58,7 @@ it and the `Terminal.ask` that is a prompt and a line (`Terminal.es`).
 `Randomness.seeded(_)` for a run that replays (`Randomness.es`).
 
 Three of every five declared Method entries are also IMPLEMENTED here, in
-Essence — 340 of 558 as this is written, counting one entry per Overload and
+Essence — 341 of 562 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
 Seven more are written on a PROTOCOL rather than on a Namespace, once for every
 conformer: `Equatable.isNot`, `Comparable`'s four inequalities, and

@@ -64,9 +64,15 @@ async function bundleSizeOfSource(source: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: 75,765 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 76,146 measured. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
+	//
+	// NOTE: 381 of those bytes are the four range natives folding into one
+	// walk. `List.of(integersFrom:through:)` counts up only now, and the walk
+	// behind it takes a signed step and the `downTo:` promise as parameters, so
+	// the one Program here that writes a range carries the shape all four
+	// entries share rather than the two loops that entry alone needed.
 	//
 	// NOTE: 834 of those bytes are the four inequalities moving from
 	// `Orderable` to `Comparable`. A witness carries its Protocol's provided
@@ -102,7 +108,7 @@ describe("Bundle Size", () => {
 	// why moving a body into Essence can shrink a String-heavy Program while
 	// growing this one.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(76_900)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(77_200)
 	})
 
 	// NOTE: 37,985 measured; a reintroduced `Number` spread was 54,849. The same
