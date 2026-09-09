@@ -129,11 +129,25 @@ project's own declarations promise — see
 asks about a project that never configured them, and the setting asks for them
 every time.
 
-The same key takes `"exclude"`, a list of directories the search stays out of,
-written relative to the `package.json` that names them — a corpus of
-deliberately broken sources, an example a book quotes. It narrows the search and
-nothing else: a file named on the command line was asked about by name, and is
-still compiled and still reported.
+Beside it — one level up, outside `"test"` — sits `"exclude"`, a list of
+directories that are not this project's sources, written relative to the
+`package.json` that names them: a corpus of deliberately broken files, an
+example a book quotes, a vendored copy of something else.
+
+```json
+{
+	"essence": {
+		"exclude": ["fixtures/broken"]
+	}
+}
+```
+
+It is not a test setting, which is why it is not under one — every walk of a
+project asks the same question, and the editor reads this list too, to decide
+which files its Problems panel speaks for. It narrows the walk and nothing
+else: a file named on the command line was asked about by name and is still
+compiled and still reported, and a file you open in the editor still shows you
+its Diagnostics.
 
 While you are writing them, `essence test --watch` stays up and re-runs only the
 tests a save reached — the entries whose module graph holds the file that

@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
+import { readProjectConfiguration } from "@essence-lang/compiler/configuration"
 import { randomSeed, type TestEvent } from "@essence-lang/runtime/Testing"
 
 import { EXIT_SUCCESS } from "./actions"
@@ -12,7 +13,6 @@ import {
 	printDiagnostics,
 	runCompilation,
 } from "./compile"
-import { readProjectConfiguration } from "./configuration"
 import type { CLIContext } from "./context"
 import { discoverTestFiles } from "./discovery"
 import { redirectStdout } from "./running"
@@ -83,7 +83,7 @@ export async function runTestWatch(
 	files: Array<string>,
 ): Promise<number> {
 	let { palette, terminal, theme } = context
-	let configuration = await readProjectConfiguration()
+	let configuration = readProjectConfiguration()
 
 	for (let problem of configuration.problems) {
 		terminal.err(
@@ -107,7 +107,7 @@ export async function runTestWatch(
 		command,
 		context.programName,
 		process.cwd(),
-		configuration.test.exclude,
+		configuration.exclude,
 		contracts,
 	)
 	let plan = await planCompilation(context, command, inputFileNames, {
@@ -226,7 +226,7 @@ export async function runTestWatch(
 			command,
 			context.programName,
 			process.cwd(),
-			configuration.test.exclude,
+			configuration.exclude,
 			contracts,
 		)
 		let added = found.filter(

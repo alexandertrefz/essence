@@ -1,6 +1,10 @@
 import { glob, readdir, readFile, stat } from "node:fs/promises"
 import * as path from "node:path"
 
+import {
+	isExcludedPath,
+	skippedDirectories,
+} from "@essence-lang/compiler/configuration"
 import { containsErrors } from "@essence-lang/compiler/diagnostics"
 import {
 	canonicalPath,
@@ -18,19 +22,6 @@ import { looksLikeGlob } from "./inputs"
 // pointed at a project. Nothing else in the CLI walks a directory, so this is
 // the walk — one of them, with one ignore set, rather than a third variant
 // beside the Language Server's and the Formatter's.
-
-// NOTE: The directories a discovery walk never descends into, the same set the
-// Language Server's workspace walk uses, so that the two agree about which
-// files belong to a project. `node_modules` is the one that matters: a walk
-// that does not stop there spends all of its time in it, and nothing under it
-// is a Module of THIS project.
-export const skippedDirectories = new Set([
-	".git",
-	"node_modules",
-	"dist",
-	"build",
-	".claude",
-])
 
 // NOTE: The convention from the design: a file that is nothing but imports and
 // a `tests { … }` block, named after the Module it tests. It is discovered by
@@ -66,18 +57,6 @@ async function isDirectory(target: string): Promise<boolean> {
 // NOTE: Symlinked directories are read as files rather than descended into, so
 // a link back up the tree can not send the walk round for ever — the same rule
 // the Language Server's walk follows.
-// NOTE: Whether a path is one the project said to stay out of. Compared as a
-// path rather than as text, so that `fixtures/broken` excludes everything under
-// it and `fixtures/brokenish` beside it stays.
-function isExcluded(target: string, exclude: Array<string>): boolean {
-	let resolved = path.resolve(target)
-
-	return exclude.some(
-		(each) =>
-			resolved === each || resolved.startsWith(`${each}${path.sep}`),
-	)
-}
-
 async function collectEssenceFiles(
 	directory: string,
 	found: Set<string>,
@@ -110,7 +89,7 @@ async function collectEssenceFiles(
 		if (entry.isDirectory) {
 			if (
 				!skippedDirectories.has(entry.name) &&
-				!isExcluded(entryPath, exclude)
+				!isExcludedPath(entryPath, exclude)
 			) {
 				await collectEssenceFiles(
 					entryPath,
@@ -123,7 +102,7 @@ async function collectEssenceFiles(
 			continue
 		}
 
-		if (!entry.name.endsWith(".es") || isExcluded(entryPath, exclude)) {
+		if (!entry.name.endsWith(".es") || isExcludedPath(entryPath, exclude)) {
 			continue
 		}
 
@@ -208,7 +187,7 @@ export async function discoverTestFiles(
 	command: CommandSpec,
 	programName: string = DEFAULT_PROGRAM_NAME,
 	workingDirectory: string = process.cwd(),
-	// NOTE: The project's own `essence.test.exclude`. It narrows the WALK and
+	// NOTE: The project's own `essence.exclude`. It narrows the WALK and
 	// nothing else: a file named on the command line was asked about by name,
 	// and answering "there is a setting" to a direct question would be the
 	// worse reading of both.

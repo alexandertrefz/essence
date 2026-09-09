@@ -3,6 +3,7 @@ import { tmpdir } from "node:os"
 import * as path from "node:path"
 import { pathToFileURL } from "node:url"
 
+import { readProjectConfiguration } from "@essence-lang/compiler/configuration"
 import { displayPath } from "@essence-lang/compiler/diagnostics/render"
 import {
 	type BenchmarkStore,
@@ -41,7 +42,6 @@ import {
 	printDiagnostics,
 	runCompilation,
 } from "./compile"
-import { readProjectConfiguration } from "./configuration"
 import type { CLIContext } from "./context"
 import { discoverTestFiles } from "./discovery"
 import {
@@ -897,7 +897,7 @@ export async function runTest(
 		return EXIT_USAGE
 	}
 
-	let configuration = await readProjectConfiguration()
+	let configuration = readProjectConfiguration()
 
 	for (let problem of configuration.problems) {
 		context.terminal.err(
@@ -944,7 +944,7 @@ export async function runTest(
 		command,
 		context.programName,
 		process.cwd(),
-		configuration.test.exclude,
+		configuration.exclude,
 		contracts,
 	)
 

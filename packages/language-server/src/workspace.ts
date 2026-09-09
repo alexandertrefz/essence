@@ -2,6 +2,11 @@ import { readdirSync, readFileSync } from "node:fs"
 import * as path from "node:path"
 
 import {
+	isExcludedPath,
+	readProjectConfiguration,
+	skippedDirectories,
+} from "@essence-lang/compiler/configuration"
+import {
 	canonicalPath,
 	isStdlibDocument,
 } from "@essence-lang/compiler/documents"
@@ -145,17 +150,6 @@ export type WorkspaceSymbolEntry = {
 
 export type Workspace = ReturnType<typeof createWorkspace>
 
-// NOTE: The directories a discovery walk never descends into. None of them can
-// hold a Module of this workspace, and `node_modules` in particular is where a
-// walk that does not stop spends all of its time.
-const skippedDirectories = new Set([
-	".git",
-	"node_modules",
-	"dist",
-	"build",
-	".claude",
-])
-
 // NOTE: THE cache. One entry is everything this Server ever derives from one
 // file at one version, and every request reads it rather than deriving its own:
 // the parse, the typed Program, the rename index, the written annotations, the
@@ -215,6 +209,9 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 	let folders: Array<string> = []
 	let files = new Map<string, FileEntry>()
 	let discovered: Set<string> | null = null
+	// NOTE: The directories this project said are not its sources, null until
+	// something asks — see `exclusions`.
+	let excluded: Array<string> | null = null
 	let openDocument = options.openDocument ?? (() => undefined)
 	// NOTE: The dependency edges of the workspace, both ways, kept rather than
 	// rebuilt. Rebuilding them meant reading the entries of every known file,
@@ -300,6 +297,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 	function setFolders(nextFolders: Array<string>): void {
 		folders = nextFolders.map((folder) => canonicalPath(folder))
 		discovered = null
+		excluded = null
 		files.clear()
 		outEdges.clear()
 		inEdges.clear()
@@ -311,7 +309,11 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		invalidateEnrichment(filePath)
 		staleEdges.add(filePath)
 
-		if (isInWorkspace(filePath) && discovered?.has(filePath) === false) {
+		if (
+			isInWorkspace(filePath) &&
+			!isExcluded(filePath) &&
+			discovered?.has(filePath) === false
+		) {
 			discovered.add(filePath)
 			// NOTE: A file that did not exist a moment ago is exactly what an
 			// unresolved specifier in some OTHER file was waiting for, so every
@@ -340,12 +342,46 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		)
 	}
 
+	// NOTE: What the project itself said is not its source — `essence.exclude`
+	// in the nearest `package.json` above each workspace folder. A project holds
+	// files that are `.es` without being ITS: a corpus kept deliberately broken,
+	// a vendored copy of a library, the output some other tool writes into it.
+	// Nothing can tell those from sources by looking at them, and reporting on
+	// them is how a Problems panel that speaks for the whole workspace becomes
+	// one nobody reads.
+	//
+	// Read once and held, because the walk it narrows is answered once and held.
+	// `setFolders` is what forgets both — the Server calls it when a manifest
+	// changes, since a project drawing its own boundary somewhere else is a
+	// different project from the one every cached answer was derived for.
+	function exclusions(): Array<string> {
+		if (excluded === null) {
+			excluded = folders.flatMap(
+				(folder) => readProjectConfiguration(folder).exclude,
+			)
+		}
+
+		return excluded
+	}
+
+	// NOTE: Whether the discovery walk stays out of a path — and ONLY the walk.
+	// A file named by an import is still linked, still checked and still
+	// reported, because a file this project imports is this project's whatever
+	// directory it sits in; and an excluded file OPENED in the Editor is
+	// analysed on its own, because a reader looking straight at a file is owed
+	// its Diagnostics (the Server reaches it through `needsOwnEntry`, which
+	// answers for every document no root covers). What exclusion buys is the
+	// half nobody asked for: the files the panel lists unbidden.
+	function isExcluded(filePath: string): boolean {
+		return isExcludedPath(filePath, exclusions())
+	}
+
 	function knownFiles(): Set<string> {
 		if (discovered === null) {
 			discovered = new Set()
 
 			for (let folder of folders) {
-				collectEssenceFiles(folder, discovered)
+				collectEssenceFiles(folder, discovered, exclusions())
 			}
 
 			for (let filePath of discovered) {
@@ -1473,6 +1509,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		setFolders,
 		folders: () => folders,
 		isInWorkspace,
+		isExcluded,
 		changed,
 		removed,
 		knownFiles,
@@ -2079,7 +2116,11 @@ function topLevelDeclarations(
 // keeps this answer current afterwards. Symlinked directories are followed as
 // files rather than descended into, so a link back up the tree can not send the
 // walk round for ever.
-function collectEssenceFiles(directory: string, found: Set<string>): void {
+function collectEssenceFiles(
+	directory: string,
+	found: Set<string>,
+	exclude: Array<string>,
+): void {
 	let entries: Array<{ name: string; isDirectory: boolean }> = []
 
 	try {
@@ -2097,14 +2138,17 @@ function collectEssenceFiles(directory: string, found: Set<string>): void {
 		let entryPath = path.join(directory, entry.name)
 
 		if (entry.isDirectory) {
-			if (!skippedDirectories.has(entry.name)) {
-				collectEssenceFiles(entryPath, found)
+			if (
+				!skippedDirectories.has(entry.name) &&
+				!isExcludedPath(entryPath, exclude)
+			) {
+				collectEssenceFiles(entryPath, found, exclude)
 			}
 
 			continue
 		}
 
-		if (!entry.name.endsWith(".es")) {
+		if (!entry.name.endsWith(".es") || isExcludedPath(entryPath, exclude)) {
 			continue
 		}
 
