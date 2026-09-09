@@ -56,36 +56,33 @@ implementation {
 		Rejected { problems: List<Problem> },
 	}
 
-	§ A line is checked once and comes back as one of two things: priced,
-	§ with the weight shipping will need, or wrong, with why. The order is
-	§ then two folds over these — one collecting the problems, one the prices
-	§ — and neither ever meets a line the other Case describes.
+	§ A line is checked once and comes back as a `Result`: the priced line
+	§ with the weight shipping will need, or the reason the shop can not fill
+	§ it. An `Optional` would say that there is no price; a Result says why,
+	§ and it is the same two Cases every checked thing in the language comes
+	§ back as — so the List of them answers `values()`, `reasons()` and
+	§ `allValues()` without this file writing a fold for any of them.
 	§
 	§ The line is taken apart at the Parameter and the product at the Match,
 	§ so every payload below is written in the names it was handed.
 	type FineLine = { line: PricedLine, weightGrams: Integer }
 
-	choice CheckedLine {
-		Fine { line: PricedLine, weightGrams: Integer },
-		Wrong { problem: Problem },
-	}
-
-	function checked(_ { sku, quantity }: Line) -> CheckedLine {
-		<- match Catalog.find(sku) -> CheckedLine {
+	function checked(_ { sku, quantity }: Line) -> Result<FineLine, Problem> {
+		<- match Catalog.find(sku) -> Result<FineLine, Problem> {
 			case #Value({ name, unitPrice, weightGrams, stock }) {
 				if quantity::isLessThanOrEqualTo(0) {
-					<- #Wrong(#NotPositive({ sku, quantity }))
+					<- #Failure(#NotPositive({ sku, quantity }))
 				}
 
 				if quantity::isGreaterThan(stock) {
-					<- #Wrong(#OutOfStock({
+					<- #Failure(#OutOfStock({
 						sku,
 						requested = quantity,
 						available = stock,
 					}))
 				}
 
-				<- #Fine({
+				<- #Value({
 					line = {
 						sku,
 						name,
@@ -96,7 +93,7 @@ implementation {
 					weightGrams = weightGrams::multiply(with quantity),
 				})
 			}
-			case #Empty { <- #Wrong(#UnknownSku({ sku })) }
+			case #Empty { <- #Failure(#UnknownSku({ sku })) }
 		}
 	}
 
@@ -131,9 +128,13 @@ implementation {
 		weighing grams: Integer,
 		onGoodsWorth goods: Integer,
 	) -> Integer {
+		§ Every 500 g started beyond the first. `toward #Up` is the ceiling,
+		§ so the step count is the division itself; the `clamp` is what
+		§ answers no steps for a weightless order, where the ceiling of
+		§ nothing is nothing and the first step is still taken off.
 		constant extraSteps = grams
+			::quotient(dividingBy 500, toward #Up)
 			::subtract(1)
-			::quotient(dividingBy 500)
 			::clamp(between 0, and 1_000)
 
 		<- match zone -> Integer {
@@ -151,17 +152,9 @@ implementation {
 
 	§§ The price of an order, or every reason it has none.
 	function quote(_ order: Order) -> Quote {
-		constant checks = order.lines::map(checked)
-
-		constant problems: List<Problem> = checks
-			::map((check) {
-				<- match check -> Optional<Problem> {
-					case #Wrong({ problem }) { <- #Value(problem) }
-					case #Fine               { <- #Empty }
-				}
-			})
-			::values()
-
+		§ A coupon the shop does not honour is wrong with the ORDER rather
+		§ than with any line of it, so it is checked here and joins whatever
+		§ the lines came back with.
 		constant couponProblems = match order.coupon -> List<Problem> {
 			case #Value(code) {
 				<- match couponRate(code) -> List<Problem> {
@@ -172,35 +165,44 @@ implementation {
 			case #Empty { <- [] }
 		}
 
-		constant everyProblem = problems::append(contentsOf couponProblems)
-
 		if order.lines::isEmpty() {
-			<- #Rejected({ problems = everyProblem::append(#EmptyOrder) })
+			<- #Rejected({ problems = couponProblems::append(#EmptyOrder) })
 		}
 
-		if everyProblem::hasItems() {
-			<- #Rejected({ problems = everyProblem })
-		}
+		§ Every line asked at once. `allValues()` answers each line's value,
+		§ or every reason where anything failed — it ACCUMULATES rather than
+		§ stopping at the first, which is what an order being checked needs:
+		§ a client is told everything that is wrong with it in one answer,
+		§ and never a price with a warning attached.
+		<- match order.lines::map(checked)::allValues() -> Quote {
+			case #Failure(problems) {
+				<- #Rejected({
+					problems = problems::append(contentsOf couponProblems),
+				})
+			}
 
-		constant fine: List<FineLine> = checks
-			::map((check) {
-				<- match check -> Optional<FineLine> {
-					case #Fine({ line, weightGrams }) {
-						<- #Value({ line, weightGrams })
-					}
-					case #Wrong { <- #Empty }
+			case #Value(fine) {
+				if couponProblems::hasItems() {
+					<- #Rejected({ problems = couponProblems })
 				}
-			})
-			::values()
 
+				<- priced(order, from fine)
+			}
+		}
+	}
+
+	§ The sum, once every line is known to be fine. Two rates add exactly —
+	§ 5/100 and 15/100 are 1/5, not 0.2 twice rounded — and meet the cents
+	§ once, in `percent`.
+	function priced(_ order: Order, from fine: List<FineLine>) -> Quote {
 		constant lines    = fine::map(.line)
 		constant subtotal = lines::sum(on .total)
 		constant items    = lines::sum(on .quantity)
 		constant grams    = fine::sum(on .weightGrams)
 
-		§ Two rates add exactly — 5/100 and 15/100 are 1/5, not 0.2 twice
-		§ rounded — and meet the cents once, in `percent`. `andThen` runs the
-		§ lookup on a coupon that is there and hands an absent one through.
+		§ `andThen` runs the lookup on a coupon that is there and hands an
+		§ absent one through. It can not be empty for an order that reached
+		§ here, since an unknown code is a problem the quote answered above.
 		constant coupon   = order.coupon
 			::andThen(couponRate)
 			::value(defaultingTo 0/1)
@@ -372,7 +374,7 @@ tests {
 
 	suite "a checked line" {
 		test "prices a line the shop can fill, with its shipping weight" {
-			require #Fine({ line, weightGrams }) = checked({
+			require #Value({ line, weightGrams }) = checked({
 				sku = "BEAN-250",
 				quantity = 2,
 			})
@@ -381,8 +383,10 @@ tests {
 			expect weightGrams::is(560)
 		}
 
+		§ The failing Case carries the reason, which is the whole of what a
+		§ Result says over an Optional.
 		test "refuses more than the shop has" {
-			require #Wrong({ problem }) = checked({
+			require #Failure(problem) = checked({
 				sku = "GRND-01",
 				quantity = 4,
 			})
