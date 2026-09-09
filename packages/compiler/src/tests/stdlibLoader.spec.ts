@@ -2146,6 +2146,7 @@ describe("Standard Library Loader", () => {
 		expect([...new Set(aliases)].sort()).toEqual([
 			"Boolean::exclusiveOr -> not Boolean::is(#0)",
 			"Dictionary::hasEntries -> not Dictionary::isEmpty()",
+			"Dictionary::hasNoEntries -> not Dictionary::hasEntries(#0)",
 			"Integer::isGreaterThanOrEqualTo -> not Integer::isLessThan(#0)",
 			"Integer::isLessThanOrEqualTo -> not Integer::isGreaterThan(#0)",
 			"Integer::isNegative -> Integer::isLessThan(0)",
@@ -2194,8 +2195,14 @@ describe("Standard Library Loader", () => {
 			// Function — the bare entry beside it is the alias above.
 			"Dictionary::hasEntries",
 			// NOTE: A chain, so it is a question of its own — `hasKey` asks
-			// the Optional a lookup answers whether it holds anything.
+			// the Optional a lookup answers whether it holds anything, and
+			// `hasValue` asks the List of values whether it contains one.
 			"Dictionary::hasKey",
+			// NOTE: The universal quantifier, whose Argument is a Function of
+			// its own rather than the one the caller wrote — the empty
+			// quantifier beside it forwards its own and is the alias above.
+			"Dictionary::hasOnlyEntries",
+			"Dictionary::hasValue",
 			"Dictionary::is",
 			"Dictionary::isEmpty",
 			"Integer::is",
