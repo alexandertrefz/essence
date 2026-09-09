@@ -185,31 +185,31 @@ third"::lines())
 		greeting::character(at -99),
 	)
 	show(
-		"String.character(at: Integer, defaultingTo: String)",
+		"String.character(at: Integer, defaultingTo: Character)",
 		greeting::character(at 1, defaultingTo "?"),
 	)
 	show(
-		"String.character(at: Integer, defaultingTo: String) [outside]",
+		"String.character(at: Integer, defaultingTo: Character) [outside]",
 		greeting::character(at 99, defaultingTo "?"),
 	)
 	show("String.firstCharacter()", greeting::firstCharacter())
 	show("String.firstCharacter() [empty]", emptyText::firstCharacter())
 	show(
-		"String.firstCharacter(defaultingTo: String)",
+		"String.firstCharacter(defaultingTo: Character)",
 		greeting::firstCharacter(defaultingTo "?"),
 	)
 	show(
-		"String.firstCharacter(defaultingTo: String) [empty]",
+		"String.firstCharacter(defaultingTo: Character) [empty]",
 		emptyText::firstCharacter(defaultingTo "?"),
 	)
 	show("String.lastCharacter()", greeting::lastCharacter())
 	show("String.lastCharacter() [empty]", emptyText::lastCharacter())
 	show(
-		"String.lastCharacter(defaultingTo: String)",
+		"String.lastCharacter(defaultingTo: Character)",
 		greeting::lastCharacter(defaultingTo "?"),
 	)
 	show(
-		"String.lastCharacter(defaultingTo: String) [empty]",
+		"String.lastCharacter(defaultingTo: Character) [empty]",
 		emptyText::lastCharacter(defaultingTo "?"),
 	)
 	show("String.uppercase()", greeting::uppercase())
@@ -421,6 +421,218 @@ third"::lines())
 		"String.normalize(as?: NormalizationForm) [compatibility folds ligature]",
 		"ﬁle"::normalize(as NormalizationForm#ComposedCompatibility),
 	)
+
+	§ Code points, the level below a character. The astral text is three
+	§ characters and four points, which is the difference the two Methods
+	§ are told apart by.
+	show("String.of(codePoint: NonNegativeInteger)", String.of(codePoint 97))
+	show(
+		"String.of(codePoint: NonNegativeInteger) [surrogate]",
+		String.of(codePoint 55296),
+	)
+	show(
+		"String.of(codePoint: NonNegativeInteger) [past the last point]",
+		String.of(codePoint 1114112),
+	)
+	show(
+		"String.of(codePoints: List<Integer>)",
+		String.of(codePoints [104, 105]),
+	)
+	show(
+		"String.of(codePoints: List<Integer>) [empty]",
+		String.of(codePoints noNumbers),
+	)
+	show(
+		"String.of(codePoints: List<Integer>) [one point names nothing]",
+		String.of(codePoints [104, -1]),
+	)
+	show("String.codePoints()", abText::codePoints())
+	show("String.codePoints() [astral]", astralText::codePoints())
+	show("String.codePoints() [empty]", emptyText::codePoints())
+
+	§ The character questions. Each is asked of a String that answers and
+	§ one that does not, and of the empty String, which every one accepts.
+	show("String.isOneCharacter()", "x"::isOneCharacter())
+	show("String.isOneCharacter() [two]", abText::isOneCharacter())
+	show("String.isOneCharacter() [empty]", emptyText::isOneCharacter())
+	show("String.hasOnlyDigits()", "2026"::hasOnlyDigits())
+	show("String.hasOnlyDigits() [mixed]", "2026-09"::hasOnlyDigits())
+	show("String.hasOnlyDigits() [empty]", emptyText::hasOnlyDigits())
+	show("String.hasOnlyLetters()", "Grüße"::hasOnlyLetters())
+	show("String.hasOnlyLetters() [decomposed]", decomposed::hasOnlyLetters())
+	show("String.hasOnlyLetters() [mixed]", "Rule 34"::hasOnlyLetters())
+	show("String.hasOnlyLettersOrDigits()", "route66"::hasOnlyLettersOrDigits())
+	show(
+		"String.hasOnlyLettersOrDigits() [space]",
+		"route 66"::hasOnlyLettersOrDigits(),
+	)
+	show("String.hasOnlyWhitespace()", "  "::hasOnlyWhitespace())
+	show("String.hasOnlyWhitespace() [text]", " x "::hasOnlyWhitespace())
+
+	§ The folding entries. Each is asked under both Cases over the same
+	§ two Strings, so the two answers stand beside each other.
+	show(
+		"String.contains(_ String, comparing: CaseSensitivity)",
+		greeting::contains("WORLD", comparing CaseSensitivity#Insensitive),
+	)
+	show(
+		"String.contains(_ String, comparing: CaseSensitivity) [sensitive]",
+		greeting::contains("WORLD", comparing CaseSensitivity#Sensitive),
+	)
+	show(
+		"String.doesNotContain(_ String, comparing: CaseSensitivity)",
+		greeting::doesNotContain("ZZ", comparing CaseSensitivity#Insensitive),
+	)
+	show(
+		"String.starts(with: String, comparing: CaseSensitivity)",
+		greeting::starts(with "hello", comparing CaseSensitivity#Insensitive),
+	)
+	show(
+		"String.starts(with: String, comparing: CaseSensitivity) [sensitive]",
+		greeting::starts(with "hello", comparing CaseSensitivity#Sensitive),
+	)
+	show(
+		"String.doesNotStart(with: String, comparing: CaseSensitivity)",
+		greeting::doesNotStart(
+			with "world",
+			comparing CaseSensitivity#Insensitive,
+		),
+	)
+	show(
+		"String.ends(with: String, comparing: CaseSensitivity)",
+		greeting::ends(with "WORLD", comparing CaseSensitivity#Insensitive),
+	)
+	show(
+		"String.doesNotEnd(with: String, comparing: CaseSensitivity)",
+		greeting::doesNotEnd(
+			with "HELLO",
+			comparing CaseSensitivity#Insensitive,
+		),
+	)
+	show(
+		"String.firstIndex(of: String, comparing: CaseSensitivity)",
+		greeting::firstIndex(of "WORLD", comparing CaseSensitivity#Insensitive),
+	)
+	show(
+		"String.firstIndex(of: String, comparing: CaseSensitivity) [absent]",
+		greeting::firstIndex(of "WORLD", comparing CaseSensitivity#Sensitive),
+	)
+	show(
+		"String.lastIndex(of: String, comparing: CaseSensitivity)",
+		"a-B-a"::lastIndex(of "A", comparing CaseSensitivity#Insensitive),
+	)
+	show(
+		"String.count(of: String, comparing: CaseSensitivity)",
+		"bAnana"::count(of "A", comparing CaseSensitivity#Insensitive),
+	)
+	show(
+		"String.replaceEvery(_ String, with: String, comparing: CaseSensitivity)",
+		"aAa"
+			::replaceEvery(
+				"a",
+				with "-",
+				comparing CaseSensitivity#Insensitive,
+			),
+	)
+	show(
+		"String.replaceFirst(_ String, with: String, comparing: CaseSensitivity)",
+		"aAa"
+			::replaceFirst(
+				"A",
+				with "-",
+				comparing CaseSensitivity#Insensitive,
+			),
+	)
+
+	§ The cuts and the rest of the vocabulary.
+	show("String.everyIndex(of: String)", "banana"::everyIndex(of "an"))
+	show(
+		"String.everyIndex(of: String) [empty part]",
+		"banana"::everyIndex(of ""),
+	)
+	show(
+		"String.everyIndex(of: String) [absent]",
+		"banana"::everyIndex(of "zz"),
+	)
+	show("String.split(onFirst: String)", "key=a=b"::split(onFirst "="))
+	show("String.split(onFirst: String) [absent]", greeting::split(onFirst "="))
+	show(
+		"String.split(onFirst: String) [empty separator]",
+		"abc"::split(onFirst ""),
+	)
+	show("String.split(onLast: String)", "key=a=b"::split(onLast "="))
+	show("String.split(onLast: String) [absent]", greeting::split(onLast "="))
+	show(
+		"String.split(on: NonEmptyString, atMost: PositiveInteger)",
+		"a=b=c"::split(on "=", atMost 2),
+	)
+	show(
+		"String.split(on: NonEmptyString, atMost: PositiveInteger) [one piece]",
+		"a=b=c"::split(on "=", atMost 1),
+	)
+	show(
+		"String.split(on: NonEmptyString, atMost: PositiveInteger) [room to spare]",
+		"a=b"::split(on "=", atMost 9),
+	)
+	show("String.remove(prefix: String)", "/api/users"::remove(prefix "/api"))
+	show(
+		"String.remove(prefix: String) [absent]",
+		greeting::remove(prefix "zz"),
+	)
+	show("String.remove(suffix: String)", "String.es"::remove(suffix ".es"))
+	show(
+		"String.remove(suffix: String) [absent]",
+		greeting::remove(suffix "zz"),
+	)
+	show("String.capitalize()", "lions"::capitalize())
+	show("String.capitalize() [empty]", emptyText::capitalize())
+	show(
+		"String.truncate(to: Integer, with?: String)",
+		greeting::truncate(to 8),
+	)
+	show(
+		"String.truncate(to: Integer, with?: String) [already short]",
+		greeting::truncate(to 99),
+	)
+	show(
+		"String.truncate(to: Integer, with?: String) [no room for the ellipsis]",
+		greeting::truncate(to 1),
+	)
+	show(
+		"String.truncate(to: Integer, with?: String) [zero]",
+		greeting::truncate(to 0),
+	)
+	show(
+		"String.truncate(to: Integer, with?: String) [named ellipsis]",
+		greeting::truncate(to 7, with "..."),
+	)
+	show("String.indent(by: Integer, with?: String)", "text"::indent(by 2))
+	show(
+		"String.indent(by: Integer, with?: String) [empty line kept bare]",
+		"a
+
+b"::indent(by 1),
+	)
+	show(
+		"String.indent(by: Integer, with?: String) [named unit]",
+		"text"::indent(by 1, with "\t"),
+	)
+	show(
+		"String.separate(every: PositiveInteger, with: String, from?: Side)",
+		"1234567"::separate(every 3, with ","),
+	)
+	show(
+		"String.separate(every: PositiveInteger, with: String, from?: Side) [from the start]",
+		"1234567"::separate(every 3, with ",", from Side#Start),
+	)
+	show(
+		"String.separate(every: PositiveInteger, with: String, from?: Side) [shorter than a group]",
+		abText::separate(every 3, with ","),
+	)
+	show("String.quoted()", greeting::quoted())
+	show("String.quoted() [empty]", emptyText::quoted())
+	show("String.quoted() [escapes]", "a\"b
+c"::quoted())
 
 	§ ——— NonEmptyString ———————————————————————————————————————————————————
 	§ What a String proven to have a character answers, and the sister of the
@@ -787,6 +999,16 @@ third"::lines())
 	show("Integer.parse(_ String) [double sign]", Integer.parse("--42"))
 	show("Integer.parse(_ String) [sign alone]", Integer.parse("-"))
 	show("Integer.parse(_ String) [inner sign]", Integer.parse("4-2"))
+	§ An underscore stands between two digits and nowhere else, which is the
+	§ rule the Lexer reads a written Integer by.
+	show(
+		"Integer.parse(_ String) [separators]",
+		Integer.parse("9_007_199_254_740_991"),
+	)
+	show("Integer.parse(_ String) [leading separator]", Integer.parse("_1"))
+	show("Integer.parse(_ String) [trailing separator]", Integer.parse("1_"))
+	show("Integer.parse(_ String) [doubled separator]", Integer.parse("1__0"))
+	show("Integer.parse(_ String) [separator alone]", Integer.parse("_"))
 	show(
 		"Integer.parse(_ String, defaultingTo: Integer)",
 		Integer.parse("42", defaultingTo 0),
@@ -1308,6 +1530,22 @@ third"::lines())
 	show("Rational.parse(_ String) [leading dot]", Rational.parse(".5"))
 	show("Rational.parse(_ String) [two dots]", Rational.parse("1.2.3"))
 	show("Rational.parse(_ String) [trailing zeroes]", Rational.parse("0.750"))
+	show("Rational.parse(_ String) [plus sign]", Rational.parse("+3/4"))
+	show("Rational.parse(_ String) [separators]", Rational.parse("+1_000.5"))
+	show(
+		"Rational.parse(_ String) [separator in the fraction]",
+		Rational.parse("0.1_0"),
+	)
+	§ The two halves are read apart, so a separator against the dot is refused
+	§ where joining them would have read it as one between two digits.
+	show(
+		"Rational.parse(_ String) [separator against the dot]",
+		Rational.parse("1_.5"),
+	)
+	show(
+		"Rational.parse(_ String) [signed denominator, plus]",
+		Rational.parse("1/+2"),
+	)
 	show("Rational.parse(_ String) [empty]", Rational.parse(emptyText))
 	show(
 		"Rational.parse(_ String, defaultingTo: Rational)",
