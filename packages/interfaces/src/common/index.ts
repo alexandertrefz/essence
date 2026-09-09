@@ -1031,6 +1031,11 @@ export type ConformanceSource =
 			// for every written Namespace and every non-generic Choice, which
 			// keeps their witness emission byte-identical.
 			derivedDescriptor?: DerivedEquatableDescriptor
+			// NOTE: Set only when this source is a Choice's derived
+			// `Enumerable` — the Case tags its one Method answers with, which
+			// no Namespace holds a body for. Absent for every written
+			// Namespace and for the other two derives.
+			derivedCases?: Array<string>
 	  }
 	| { kind: "parameter"; name: string }
 

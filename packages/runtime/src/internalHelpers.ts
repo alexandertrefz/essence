@@ -5,7 +5,7 @@ import type { BooleanType } from "./Boolean"
 import { is as boolIs, createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
-import { itemOfView, viewOf } from "./List"
+import { createList, itemOfView, viewOf } from "./List"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
@@ -14,7 +14,7 @@ import type { StringType } from "./String"
 import { createString, normalisedFormOf } from "./String"
 import type { TranscendentalType } from "./Transcendental"
 import type { AnyType } from "./type"
-import { isValueOfType, typeKeySymbol } from "./type"
+import { createCase, isValueOfType, typeKeySymbol } from "./type"
 
 export function getInt32(number: IntegerType): number {
 	let value = number.value
@@ -338,6 +338,28 @@ export function choiceName(value: AnyType): StringType {
 	let tag = String(value[typeKeySymbol])
 
 	return createString(tag.slice(tag.lastIndexOf("#") + 1))
+}
+
+// NOTE: The runtime half of a Choice's derived `Enumerable` conformance — what
+// `Side.cases()` compiles to when no Namespace writes one. It is CURRIED with
+// the Choice's tags, in declaration order, because the Method is static: there
+// is no receiver at the call for the Choice to be recovered from, so what the
+// Compiler knows has to be carried here instead. That is the same shape the
+// widened `boundChoiceIs` takes its descriptor in.
+//
+// NOTE: A fresh List at every call, rather than one built beside the tags and
+// answered again. A List owns its items — an `append` writes into the very
+// Array this hands over — so one shared answer would let a caller's edit reach
+// the next caller's. The Cases themselves are shared, and are meant to be:
+// `createCase` interns the payload-free ones, so the items cost nothing after
+// the first call.
+//
+// NOTE: The cast is the one `Generators.ts` makes at every Case it builds, and
+// for the reason written there: `CaseInstanceType` is deliberately outside
+// `AnyType`. These are Cases at run time either way.
+export function choiceCases(tags: Array<string>): () => ListType<AnyType> {
+	return () =>
+		createList(tags.map((tag) => createCase(tag) as unknown as AnyType))
 }
 
 // NOTE: The compile-time plan a *generic* Choice's derived equality follows —
