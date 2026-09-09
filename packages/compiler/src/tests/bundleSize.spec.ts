@@ -268,6 +268,25 @@ describe("Bundle Size", () => {
 		).toBeLessThan(12_550)
 	})
 
+	// NOTE: 9,443 measured, where the same Program calling `median` measures
+	// 2,760 — so `mode` costs 6,683 bytes, the count and the canonical key
+	// encoding it counts by. It measured 20,560 while the body was
+	// `@::tally()::entries()::highestItem(on .value).key`: a List Method
+	// reached the whole second container, and the store, the kind registry,
+	// the registration and the written form all arrived with it. That is the
+	// same shape the removeDuplicates ceiling above watches, one Namespace
+	// along, and this figure is what says a numeric aggregate does not pull a
+	// container in either.
+	it("charges a mode Program for the count rather than a Dictionary", async () => {
+		expect(
+			await bundleSizeOfSource(`implementation {
+	constant numbers = [3, 1, 1, 3, 2]
+
+	Terminal.print(numbers::mode(defaultingTo 0)::toString())
+}`),
+		).toBeLessThan(10_450)
+	})
+
 	// NOTE: The same claim for a bundle of several Modules, where it is far
 	// easier to lose: rewriting each Module on its own would give every one of
 	// them its own copy of every Essence-implemented standard library Method it

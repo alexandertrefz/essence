@@ -311,6 +311,73 @@ export function encodeKey<Key extends AnyType>(
 		: null
 }
 
+// NOTE: A COUNT PER KEY over the same encoding, and the second thing a List
+// Method asks of this file: `mode` counts how often each item stands and
+// answers the earliest of the items counted highest. It is the set above with
+// a tally beside each key rather than only the key — `keys` holds one entry per
+// distinct key in the order each was first met, `counts` holds that key's count
+// at the same position, and the two indexes answer WHICH position rather than
+// whether there is one.
+//
+// NOTE: No witness, because the Namespaces that count are `NonEmptyIntegerList`,
+// `NonEmptyRationalList` and `NonEmptyNumberList` — three concrete Types whose
+// equality is the standard library's own, which is the equality the canonical
+// encoding is written to agree with. Every one of those kinds encodes, so the
+// scan path a `KeySet` keeps for the kinds that do not is a case that can not
+// arise: an unencodable key here is a Namespace declaring `mode` over a kind
+// this file has no encoding for, which is a mistake in the declaration rather
+// than a slower answer.
+export type KeyCount<Key extends AnyType> = {
+	primitives: Map<string | number | bigint | boolean, number>
+	texts: Map<string, number>
+	keys: Array<Key>
+	counts: Array<number>
+}
+
+export function freshKeyCount<Key extends AnyType>(): KeyCount<Key> {
+	return {
+		primitives: new Map(),
+		texts: new Map(),
+		keys: [],
+		counts: [],
+	}
+}
+
+export function countKey<Key extends AnyType>(
+	count: KeyCount<Key>,
+	key: Key,
+): void {
+	let encoded = canonicalEncoding(key)
+
+	if (encoded === null) {
+		throw new Error(
+			"A key of this kind has no canonical encoding to count it by.",
+		)
+	}
+
+	let index =
+		typeof encoded === "object"
+			? count.texts.get(encoded.text)
+			: count.primitives.get(encoded)
+
+	if (index !== undefined) {
+		count.counts[index] += 1
+
+		return
+	}
+
+	let fresh = count.keys.length
+
+	count.keys.push(key)
+	count.counts.push(1)
+
+	if (typeof encoded === "object") {
+		count.texts.set(encoded.text, fresh)
+	} else {
+		count.primitives.set(encoded, fresh)
+	}
+}
+
 // NOTE: A SET OF KEYS over the encoding above, and the whole of the second
 // container the set-shaped List natives need. It holds no versions, no
 // insertion order and no values, because none of those questions is asked of

@@ -1,10 +1,6 @@
 import {
 	from "./Algebraic.es" { Algebraic }
 	from "./Comparable.es" { Comparable }
-	from "./Dictionary.es" {
-		GroupedNonEmptyList
-		NonEmptyDictionary
-	}
 	from "./Integer.es" { Integer }
 	from "./List.es" {
 		List
@@ -16,7 +12,6 @@ import {
 	}
 	from "./Optional.es" { Optional }
 	from "./Orderable.es" { Orderable }
-	from "./Protocols.es" { Equatable }
 	from "./Rational.es" {
 		NonNegativeRational
 		Rational
@@ -934,24 +929,23 @@ declarations {
 			<- below::add(above::subtract(below)::multiply(with offset))
 		}
 
-		§ `tally` counts each item once, in the order the items first stand,
-		§ and `highestItem` keeps the earlier of two equal counts. So the
-		§ earliest of the items that occur most often is the answer.
+		§ A native counting each item once, over the canonical key encoding
+		§ the set-shaped List Methods rest on. A later item has to beat a
+		§ count rather than meet it, so the earliest of the items that occur
+		§ most often is the answer.
 		§
-		§ It is the one Method here that crosses to the Dictionary. The store
-		§ it pulls in costs a Program 5,513 bytes over the same Program
-		§ calling `median`. The alternative was a sort and a walk of the
-		§ equal runs. That is free of the store, and answers the lowest of
-		§ the items that tie rather than the earliest one.
+		§ One alternative was `@::tally()::entries()::highestItem(on .value)`,
+		§ which crosses to the Dictionary for a count a plain Map holds. A
+		§ Program calling `mode` measured 20,560 bytes that way and measures
+		§ 9,443. The other was a sort and a walk of the equal runs. That is
+		§ free of the store too, and answers the lowest of the items that tie.
 
 		§§ The item that occurs most often.
 		§§
 		§§ Items occurring equally often keep the earlier one, by where each first stands.
 		§§
 		§§ @returns — the item that occurs most often.
-		mode() -> Integer {
-			<- @::tally()::entries()::highestItem(on .value).key
-		}
+		mode() -> Integer
 
 		§ The mean of the squared distances, and `absolute` is what states
 		§ that a mean of squares is never negative. No fold carries a proof
@@ -1055,9 +1049,7 @@ declarations {
 		§§ Items occurring equally often keep the earlier one, by where each first stands.
 		§§
 		§§ @returns — the item that occurs most often.
-		mode() -> Rational {
-			<- @::tally()::entries()::highestItem(on .value).key
-		}
+		mode() -> Rational
 
 		§§ The mean of the squared distances from the mean.
 		§§
@@ -1149,9 +1141,7 @@ declarations {
 		§§ Items occurring equally often keep the earlier one, by where each first stands.
 		§§
 		§§ @returns — the item that occurs most often.
-		mode() -> Scalar {
-			<- @::tally()::entries()::highestItem(on .value).key
-		}
+		mode() -> Scalar
 
 		§§ The mean of the squared distances from the mean.
 		§§

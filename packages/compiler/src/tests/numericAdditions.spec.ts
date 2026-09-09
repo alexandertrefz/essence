@@ -700,6 +700,25 @@ describe("The statistics a List of Numbers answers", () => {
 		).toEqual(["7", "5", "1/4"])
 	})
 
+	// NOTE: Two spellings of one value are one item to count. The walk counts
+	// by the canonical key encoding — the same rule a Dictionary finds a slot
+	// by — so `2/4` counts with `1/2` and a whole Rational counts with the
+	// Integer it equals, and the item answered is the first of them to stand.
+	it("counts two spellings of one value as one item", async () => {
+		expect(
+			await run(
+				program(
+					"constant halves: NonEmptyList<Rational> = [1/2, 2/4, 1/3]",
+					"constant wholes: NonEmptyList<Scalar> = [3, 3/1, 4]",
+					"constant mixed: NonEmptyList<Scalar> = [4, 1/2, 4/1, 2/4]",
+					show("halves::mode()"),
+					show("wholes::mode()"),
+					show("mixed::mode()"),
+				),
+			),
+		).toEqual(["1/2", "3", "4"])
+	})
+
 	it("answers an exact standard deviation over the tower", async () => {
 		expect(
 			await run(
