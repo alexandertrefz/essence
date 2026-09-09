@@ -3,6 +3,9 @@ import {
 	dividedInto as algebraicDividedInto,
 	squareRootOfRational,
 } from "./Algebraic"
+import { greatestCommonDivisor as greatestCommonDivisorOf } from "./bigRational"
+import type { BooleanType } from "./Boolean"
+import { createBoolean } from "./Boolean"
 import type { OptionalType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
 import type { OrderingType } from "./Ordering"
@@ -437,6 +440,164 @@ export function raise__overload$3(
 export function toString__overload$1(integer: IntegerType): StringType {
 	return createString(integer.value.toString())
 }
+
+// #region Number theory
+
+// NOTE: Euclid's algorithm, imported from `bigRational.ts` rather than written
+// again: the reduction every Rational runs is the same walk, and the sign is
+// taken off both operands there. A gcd is never negative, which is the promise
+// `NonNegativeInteger` carries in the declaration.
+export function greatestCommonDivisor(
+	integer: IntegerType,
+	other: IntegerType,
+): IntegerType {
+	return createInteger(
+		greatestCommonDivisorOf(escaped(integer.value), escaped(other.value)),
+	)
+}
+
+// NOTE: `|a · b| / gcd(a, b)`, with the gcd divided out of the product rather
+// than out of an operand first. Both operands are bigints here, so the product
+// can not overflow, and dividing after keeps the one division exact.
+//
+// NOTE: Zero has no multiple above zero, so a zero operand answers zero. That
+// is the value every peer answers, and it keeps `lcm · gcd = |a · b|` true for
+// every pair.
+export function leastCommonMultiple(
+	integer: IntegerType,
+	other: IntegerType,
+): IntegerType {
+	const left = escaped(integer.value)
+	const right = escaped(other.value)
+
+	if (left === 0n || right === 0n) {
+		return createInteger(0)
+	}
+
+	const product = left * right
+
+	return createInteger(
+		(product < 0n ? -product : product) /
+			greatestCommonDivisorOf(left, right),
+	)
+}
+
+export function factorial__overload$1(
+	integer: IntegerType,
+): OptionalType<IntegerType> {
+	// NOTE: `0` rather than `0n`, for the reason `remainder` asks with one.
+	if (integer.value < 0) {
+		return createEmpty()
+	}
+
+	return createValue(createInteger(factorialOf(escaped(integer.value))))
+}
+
+// NOTE: The product built upwards, one multiplication per step. A halving
+// product tree is asymptotically faster and is what a factorial big enough to
+// notice would want; the crossover is past what a Program that calls this
+// waits for, and the loop is what a reader checks in one breath.
+function factorialOf(value: bigint): bigint {
+	let product = 1n
+
+	for (let factor = 2n; factor <= value; factor++) {
+		product *= factor
+	}
+
+	return product
+}
+
+// NOTE: The first twelve primes, which are the witnesses a deterministic
+// Miller-Rabin test needs to decide every Integer below
+// 3,317,044,064,679,887,385,961,981 — the bound Sorenson and Webster proved
+// for this set. Above it the test is a strong probable-prime test over the
+// same twelve, and the declaration says so.
+const PRIME_WITNESSES = [2n, 3n, 5n, 7n, 11n, 13n, 17n, 19n, 23n, 29n, 31n, 37n]
+
+// NOTE: Trial division decides the small cases the witnesses would otherwise
+// have to be run for, and it is what makes the common answer — a small
+// composite — cost one or two remainders rather than twelve modular
+// exponentiations.
+export function isPrime(integer: IntegerType): BooleanType {
+	const value = escaped(integer.value)
+
+	if (value < 2n) {
+		return createBoolean(false)
+	}
+
+	for (const witness of PRIME_WITNESSES) {
+		if (value === witness) {
+			return createBoolean(true)
+		}
+
+		if (value % witness === 0n) {
+			return createBoolean(false)
+		}
+	}
+
+	// NOTE: `value - 1 = odd · 2^exponent`, the decomposition every witness is
+	// tested against. The value is odd here, since 2 is a witness above.
+	let odd = value - 1n
+	let exponent = 0n
+
+	while (odd % 2n === 0n) {
+		odd /= 2n
+		exponent++
+	}
+
+	for (const witness of PRIME_WITNESSES) {
+		if (!isStrongProbablePrime(value, witness, odd, exponent)) {
+			return createBoolean(false)
+		}
+	}
+
+	return createBoolean(true)
+}
+
+function isStrongProbablePrime(
+	value: bigint,
+	witness: bigint,
+	odd: bigint,
+	exponent: bigint,
+): boolean {
+	let residue = modularPower(witness, odd, value)
+
+	if (residue === 1n || residue === value - 1n) {
+		return true
+	}
+
+	for (let step = 1n; step < exponent; step++) {
+		residue = (residue * residue) % value
+
+		if (residue === value - 1n) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// NOTE: Square-and-multiply, which is what keeps the test logarithmic in the
+// exponent. `base ** exponent % modulus` would build the whole power first, and
+// for a value of any size that is a bigint with more digits than memory holds.
+function modularPower(base: bigint, exponent: bigint, modulus: bigint): bigint {
+	let result = 1n
+	let factor = base % modulus
+	let remaining = exponent
+
+	while (remaining > 0n) {
+		if (remaining % 2n === 1n) {
+			result = (result * factor) % modulus
+		}
+
+		factor = (factor * factor) % modulus
+		remaining /= 2n
+	}
+
+	return result
+}
+
+// #endregion
 
 // #region Irrational operands
 

@@ -873,6 +873,46 @@ c"::quoted())
 		"Integer.isMultiple(of: Integer) [by zero]",
 		9::isMultiple(of computedZero),
 	)
+	show("Integer.isPrime()", 97::isPrime())
+	show("Integer.isPrime() [composite]", 91::isPrime())
+	show("Integer.isPrime() [one]", 1::isPrime())
+	show("Integer.isPrime() [negative]", -7::isPrime())
+	show("Integer.isPrime() [a Carmichael number]", 561::isPrime())
+	show(
+		"Integer.greatestCommonDivisor(with: Integer)",
+		computedEight::greatestCommonDivisor(with 12),
+	)
+	show(
+		"Integer.greatestCommonDivisor(with: Integer) [negative]",
+		computedNegativeFive::greatestCommonDivisor(with 10),
+	)
+	show(
+		"Integer.greatestCommonDivisor(with: Integer) [both zero]",
+		computedZero::greatestCommonDivisor(with 0),
+	)
+	show(
+		"Integer.leastCommonMultiple(with: Integer)",
+		computedEight::leastCommonMultiple(with 12),
+	)
+	show(
+		"Integer.leastCommonMultiple(with: Integer) [negative]",
+		computedNegativeFive::leastCommonMultiple(with 10),
+	)
+	show(
+		"Integer.leastCommonMultiple(with: Integer) [by zero]",
+		computedEight::leastCommonMultiple(with 0),
+	)
+	show("Integer.factorial()", computedFive::factorial())
+	show("Integer.factorial() [zero]", computedZero::factorial())
+	show("Integer.factorial() [negative]", computedNegativeFive::factorial())
+	show(
+		"Integer.factorial(defaultingTo: Integer)",
+		computedFive::factorial(defaultingTo 0),
+	)
+	show(
+		"Integer.factorial(defaultingTo: Integer) [negative]",
+		computedNegativeFive::factorial(defaultingTo 0),
+	)
 	show(
 		"Integer.remainder(dividingBy: Integer)",
 		7::remainder(dividingBy computedThree),
@@ -1186,6 +1226,8 @@ c"::quoted())
 		provenThree::squareRoot(),
 	)
 	show("NonNegativeInteger.squareRoot() [zero]", provenZero::squareRoot())
+	show("NonNegativeInteger.factorial()", provenFour::factorial())
+	show("NonNegativeInteger.factorial() [zero]", provenZero::factorial())
 
 	§ ——— PositiveInteger ——————————————————————————————————————————————————
 	§ Both proofs at once, and a written Integer above zero is one of these

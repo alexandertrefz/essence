@@ -517,6 +517,7 @@ describe("Stdlib Call Graph", () => {
 			"Integer.divide__overload$5",
 			"Integer.divide__overload$6",
 			"Integer.divide__overload$7",
+			"Integer.factorial__overload$2",
 			"Integer.isEven",
 			"Integer.isGreaterThanOrEqualTo__overload$1",
 			"Integer.isGreaterThanOrEqualTo__overload$2",

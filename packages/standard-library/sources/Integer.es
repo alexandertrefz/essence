@@ -819,6 +819,20 @@ declarations {
 			<- @::remainder(dividingBy divisor)::is(0)
 		}
 
+		§ Native, because an Essence body would divide by every candidate in
+		§ turn, and the divisors it would try are a List it has to build. The
+		§ witnesses are the first twelve primes, which decide every Integer
+		§ below the bound the block below names. Above that bound no composite
+		§ passing all twelve is known, and deciding every Integer exactly means
+		§ factoring it.
+
+		§§ Answers whether the Integer has exactly two whole divisors above zero.
+		§§
+		§§ Two is the lowest prime. Zero, one and every negative Integer are not prime. The test is a Miller-Rabin test over the first twelve primes as witnesses. It decides every Integer below 3317044064679887385961981 exactly. A larger Integer it accepts is a strong probable prime to those twelve witnesses.
+		§§
+		§§ @returns — `true` when the Integer is prime.
+		isPrime() -> Boolean
+
 		§ Native, because the promise is about the answer. An Essence body is
 		§ an `if` asking `isNegative`. Its `else` proves the receiver is not
 		§ negative, but its other arm answers a negation nothing has proven
@@ -884,6 +898,51 @@ declarations {
 			toward direction: Rounding = #Nearest,
 		) -> Rational {
 			<- Rational.of(@, over 1)
+		}
+
+		§ The three below are native for one reason: each promises something
+		§ about its answer that no Essence body can mint. A common divisor and
+		§ a common multiple are never negative, and a factorial is above zero.
+		§ The divisor is Euclid's walk exported from `bigRational.ts`, which
+		§ every Rational already reduces through, rather than a second copy of
+		§ the same loop.
+
+		§§ Answers the largest Integer that divides both this Integer and the given one.
+		§§
+		§§ The sign of either Integer is ignored, so the answer is never negative. Zero is divided by every Integer, so the divisor of zero and an Integer is that Integer without its sign. The divisor of two zeroes is zero.
+		§§
+		§§ @param with — the Integer to share a divisor with
+		§§ @returns — the greatest common divisor, which is never negative.
+		greatestCommonDivisor(with other: Integer) -> NonNegativeInteger
+
+		§§ Answers the smallest Integer above zero that both this Integer and the given one divide.
+		§§
+		§§ The sign of either Integer is ignored, so the answer is never negative. Zero has no multiple above zero, so a zero operand answers zero. The product of the two answers holds for every pair: `leastCommonMultiple · greatestCommonDivisor` is the product of the two Integers without its sign.
+		§§
+		§§ @param with — the Integer to share a multiple with
+		§§ @returns — the least common multiple, which is never negative.
+		leastCommonMultiple(with other: Integer) -> NonNegativeInteger
+
+		§§ Answers the product of every Integer from one up to this Integer.
+		§§
+		§§ The factorial of zero is one. A negative Integer has no factorial, and the `defaultingTo:` entry answers the given Integer instead. A receiver proven not to be negative answers the factorial itself, through `NonNegativeInteger`.
+		overload factorial {
+			§§ @returns — the factorial, or nothing for a negative Integer.
+			() -> Optional<PositiveInteger>
+
+			§§ Answers the factorial, with a value to answer for a negative Integer.
+			§§
+			§§ @param defaultingTo — the value to answer with when there is no factorial
+			§§ @returns — the factorial, or the given value in its place.
+			(defaultingTo fallback: Integer) -> Integer {
+				§ The entry above answers an `Optional<PositiveInteger>`, and
+				§ `value(defaultingTo:)` takes the payload's own Type. The
+				§ Constant widens the payload so that any Integer stands in
+				§ for a factorial there is none of.
+				constant factorial: Optional<Integer> = @::factorial()
+
+				<- factorial::value(defaultingTo fallback)
+			}
 		}
 
 		§ `clamp` and `isBetween` are `Orderable`'s provided Methods now. Both
@@ -1039,6 +1098,13 @@ declarations {
 		§§
 		§§ @returns — the root.
 		squareRoot() -> Integer | Algebraic
+
+		§§ Answers the product of every Integer from one up to this NonNegativeInteger.
+		§§
+		§§ A negative Integer is the one receiver with no factorial, and the receiver is proven not to be one. So the answer is the factorial itself rather than an Optional. The factorial of zero is one.
+		§§
+		§§ @returns — the factorial, which is above zero.
+		factorial() -> PositiveInteger
 	}
 
 	§ Both halves of the sign at once. A PositiveInteger reaches every entry
