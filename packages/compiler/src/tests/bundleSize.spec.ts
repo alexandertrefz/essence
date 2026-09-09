@@ -177,10 +177,12 @@ describe("Bundle Size", () => {
 	// carries its `__overload$1` suffix at every call site.
 	//
 	// NOTE: What says this is the fixture and not the runtime is the three
-	// figures that did NOT move: `Everyday.es` at 76,173, the removeDuplicates
-	// Program below at 12,753, and `HelloWorld.es` at 6,930. A Dictionary
-	// runtime that grew would move the second of those, which reaches the
-	// whole store through one call and none of the new Methods.
+	// figures that did NOT move with it: `Everyday.es`, the removeDuplicates
+	// Program below at 12,753, and `HelloWorld.es` at 6,930. `Everyday.es`
+	// reads 76,221 now, and all 48 of the bytes it took later are `List`
+	// Methods becoming Overloads rather than anything a Dictionary reaches. A
+	// Dictionary runtime that grew would move the second of those, which
+	// reaches the whole store through one call and none of the new Methods.
 	it("charges a Dictionary Program for the container it uses", async () => {
 		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(60_500)
 	})
