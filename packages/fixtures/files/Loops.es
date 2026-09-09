@@ -7,15 +7,24 @@ implementation {
 	§ sees it and `<-` keeps its one meaning.
 
 	§ The counted loop — once per Integer from `from` through `through`,
-	§ threading a running total.
-	constant sum = loop(
-		from 1,
-		through 10,
-		startingWith 0,
-		step (index, total) { <- total::add(index) },
-	)
+	§ threading a running total. The body is positional, because it runs the
+	§ walk to its end.
+	constant sum = loop(from 1, through 10, startingWith 0, (index, total) {
+		<- total::add(index)
+	})
 
 	Terminal.print(sum) § 55
+
+	§ The direction is the label. `through` counts up and answers the seed
+	§ where the end is behind the start, and `downTo` counts down.
+	constant digits = loop(
+		from 3,
+		downTo 1,
+		startingWith "",
+		(index, gathered) { <- gathered::append(index::toString()) },
+	)
+
+	Terminal.print(digits) § 321
 
 	§ The general loop — a Record State threaded with `{ state with … }`,
 	§ stopping on the first `#Done`, which finishes with the running total. The
@@ -49,7 +58,7 @@ implementation {
 	constant doubledWhile = loop(
 		startingWith 1,
 		while (n) { <- n::isLessThan(100) },
-		step (n) { <- n::multiply(with 2) },
+		(n) { <- n::multiply(with 2) },
 	)
 
 	Terminal.print(doubledWhile) § 128
@@ -57,10 +66,31 @@ implementation {
 	constant doubledUntil = loop(
 		startingWith 1,
 		until (n) { <- n::isGreaterThanOrEqualTo(100) },
-		step (n) { <- n::multiply(with 2) },
+		(n) { <- n::multiply(with 2) },
 	)
 
 	Terminal.print(doubledUntil) § 128
+
+	§ The counted loop that can leave early — the same labels as the first one
+	§ with a `step` body, which answers a `Step` rather than the next State. The
+	§ count ending answers what the last step carried, and a `#Done` answers
+	§ before the count runs out.
+	constant firstOver = loop(
+		from 1,
+		through 100,
+		startingWith 0,
+		step (index, total) {
+			constant next = total::add(index)
+
+			if next::isGreaterThan(10) {
+				<- #Done(next)
+			}
+
+			<- #Continue(next)
+		},
+	)
+
+	Terminal.print(firstOver) § 15
 
 	§ The early-stopping fold — `reduce`'s `step` sibling leaves the walk on the
 	§ first `#Done`, where the plain fold always runs to the end. Here the

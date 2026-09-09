@@ -202,7 +202,7 @@ const DECLARED = [
 ].join("\n")
 
 // NOTE: A fixture where one mutant PROVABLY never ends. `loop(startingWith:
-// while:step:)` is the language's whole answer to iteration and the Optimiser
+// while:_)` is the language's whole answer to iteration and the Optimiser
 // writes it out as a real `while`, so the mutant that rotates `::isLessThan`
 // into `::isGreaterThan` spins on a State the step never changes — no stack to
 // overflow, no error to catch, and nothing but a timeout that ends it.
@@ -218,7 +218,7 @@ const SPINNING = [
 	"		<- loop(",
 	"			startingWith n,",
 	"			while (each) { <- each::isLessThan(0) },",
-	"			step (each) { <- each },",
+	"			(each) { <- each },",
 	"		)",
 	"	}",
 	"",

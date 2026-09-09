@@ -204,12 +204,12 @@ describe("an emitted operation", () => {
 		<- value::add(value)::add(value)
 	}
 
-	constant chained = loop(from 1, through 3, startingWith 9007199254740990, step (
+	constant chained = loop(from 1, through 3, startingWith 9007199254740990, (
 		index,
 		carried,
 	) { <- carried::add(index)::add(index) })
 
-	constant compared = loop(from 1, through 3, startingWith 0, step (
+	constant compared = loop(from 1, through 3, startingWith 0, (
 		index,
 		carried,
 	) {
@@ -309,7 +309,7 @@ describe("a counted walk", () => {
 	// bound the Compiler can not read is what the run-time test below is for.
 	it("counts in numbers where both bounds are written as ones", () => {
 		let generated = generate(
-			program(`	constant sum = loop(from 1, through 10, startingWith 0, step (
+			program(`	constant sum = loop(from 1, through 10, startingWith 0, (
 		index,
 		total,
 	) { <- total::add(index) })
@@ -319,15 +319,13 @@ describe("a counted walk", () => {
 
 		expect(generated).not.toContain("$loop_0_big")
 		expect(generated).not.toContain("BigInt(")
-		expect(generated).toContain(
-			"const $loop_0_delta = $loop_0_up ? 1 : -1;",
-		)
+		expect(generated).toContain("const $loop_0_delta = 1;")
 	})
 
 	it("asks which kind a bound it can not read is holding", () => {
 		let generated = generate(
 			program(`	function upTo(_ limit: Integer) -> Integer {
-		<- loop(from 1, through limit, startingWith 0, step (
+		<- loop(from 1, through limit, startingWith 0, (
 			index,
 			total,
 		) { <- total::add(index) })
@@ -340,7 +338,7 @@ describe("a counted walk", () => {
 			'const $loop_0_big = typeof $loop_0_from !== "number" || typeof $loop_0_to !== "number";',
 		)
 		expect(generated).toContain(
-			"const $loop_0_delta = $loop_0_big ? $loop_0_up ? 1n : -1n : $loop_0_up ? 1 : -1;",
+			"const $loop_0_delta = $loop_0_big ? 1n : 1;",
 		)
 	})
 
@@ -352,13 +350,13 @@ describe("a counted walk", () => {
 		expect(
 			await outputOf(
 				program(`	constant crossed = loop(from 9007199254740990, through 9007199254740994,
-		startingWith 0, step (index, total) { <- total::add(1) })
+		startingWith 0, (index, total) { <- total::add(1) })
 
 	constant last = loop(from 9007199254740990, through 9007199254740994,
-		startingWith 0, step (index, _total) { <- index })
+		startingWith 0, (index, _total) { <- index })
 
-	constant down = loop(from 9007199254740994, through 9007199254740990,
-		startingWith 0, step (index, _total) { <- index })
+	constant down = loop(from 9007199254740994, downTo 9007199254740990,
+		startingWith 0, (index, _total) { <- index })
 
 	Terminal.print(crossed)
 	Terminal.print(last)
@@ -378,10 +376,10 @@ describe("a counted walk", () => {
 				program(`	constant seed: List<Integer> = []
 
 	constant gathered = loop(from 1, through 3, startingWith seed,
-		step (index, seen) { <- seen::append(index) })
+		(index, seen) { <- seen::append(index) })
 
-	constant nested = loop(from 1, through 3, startingWith 0, step (outer, carried) {
-		<- loop(from 1, through 3, startingWith carried, step (inner, running) {
+	constant nested = loop(from 1, through 3, startingWith 0, (outer, carried) {
+		<- loop(from 1, through 3, startingWith carried, (inner, running) {
 			<- running::add(outer::multiply(with inner))
 		})
 	})
@@ -396,7 +394,7 @@ describe("a counted walk", () => {
 		expect(
 			await outputOf(
 				program(`	constant seen = loop(from 9007199254740991, through 9007199254740993,
-		startingWith "", step (index, gathered) {
+		startingWith "", (index, gathered) {
 		<- gathered::append(index::toString())::append(" ")
 	})
 
@@ -420,17 +418,17 @@ describe("a counted walk", () => {
 		expect(
 			await outputOf(
 				program(`	constant hits = loop(from 9007199254740988, through 9007199254740992,
-		startingWith 0, step (index, found) {
+		startingWith 0, (index, found) {
 		if index::is(9007199254740990) { <- found::add(1) } else { <- found }
 	})
 
 	constant misses = loop(from 9007199254740991, through 9007199254740993,
-		startingWith 0, step (index, found) {
+		startingWith 0, (index, found) {
 		if index::isNot(9007199254740992) { <- found::add(1) } else { <- found }
 	})
 
 	constant below = loop(from -9007199254740992, through -9007199254740988,
-		startingWith 0, step (index, found) {
+		startingWith 0, (index, found) {
 		if index::is(-9007199254740990) { <- found::add(1) } else { <- found }
 	})
 
@@ -449,15 +447,15 @@ describe("a counted walk", () => {
 			await outputOf(
 				program(`	function matches(_ target: Integer, upTo limit: Integer) -> Integer {
 		<- loop(from 9007199254740988, through limit, startingWith 0,
-			step (index, found) {
+			(index, found) {
 			if index::is(target) { <- found::add(1) } else { <- found }
 		})
 	}
 
 	constant paired = loop(from 9007199254740990, through 9007199254740991,
-		startingWith 0, step (outer, carried) {
+		startingWith 0, (outer, carried) {
 		<- loop(from 9007199254740990, through 9007199254740992,
-			startingWith carried, step (inner, running) {
+			startingWith carried, (inner, running) {
 			if inner::is(outer) { <- running::add(1) } else { <- running }
 		})
 	})
@@ -600,17 +598,17 @@ describe("what a Program computes across the boundary", () => {
 describe("a walk's carried State", () => {
 	it("1: is held raw only where its Type is exactly Integer", async () => {
 		let source =
-			program(`	constant summed = loop(from 1, through 3, startingWith 0, step (
+			program(`	constant summed = loop(from 1, through 3, startingWith 0, (
 		index,
 		total,
 	) { <- total::add(index) })
 
-	constant built = loop(from 1, through 3, startingWith { total = 0 }, step (
+	constant built = loop(from 1, through 3, startingWith { total = 0 }, (
 		index,
 		state,
 	) { <- { state with total = state.total::add(index) } })
 
-	constant text = loop(from 1, through 3, startingWith "", step (
+	constant text = loop(from 1, through 3, startingWith "", (
 		_index,
 		seen,
 	) { <- seen::append("x") })
@@ -642,22 +640,22 @@ describe("a walk's carried State", () => {
 		<- value::add(value)
 	}
 
-	constant handed = loop(from 1, through 3, startingWith 1, step (
+	constant handed = loop(from 1, through 3, startingWith 1, (
 		_index,
 		carried,
 	) { <- twice(carried) })
 
-	constant spelled = loop(from 1, through 3, startingWith 7, step (
+	constant spelled = loop(from 1, through 3, startingWith 7, (
 		_index,
 		carried,
 	) { <- carried::add(carried::toString()::length()) })
 
-	constant listed = loop(from 1, through 3, startingWith 5, step (
+	constant listed = loop(from 1, through 3, startingWith 5, (
 		_index,
 		carried,
 	) { <- [carried]::length()::add(carried) })
 
-	constant asked = loop(from 1, through 3, startingWith 5, step (
+	constant asked = loop(from 1, through 3, startingWith 5, (
 		_index,
 		carried,
 	) {
@@ -690,11 +688,11 @@ describe("a walk's carried State", () => {
 		let source =
 			program(`	constant asked = loop(startingWith 0, while (n) {
 		<- n::toString()::length()::isLessThan(3)
-	}, step (n) { <- n::add(7) })
+	}, (n) { <- n::add(7) })
 
 	constant read = loop(startingWith 0, while (n) {
 		<- n::isLessThan(30)
-	}, step (n) { <- n::add(7) })
+	}, (n) { <- n::add(7) })
 
 	Terminal.print(asked)
 	Terminal.print(read)`)
@@ -714,7 +712,7 @@ describe("a walk's carried State", () => {
 		// so a closure that outlives its turn answers what that turn carried.
 		let source = program(`	variable holder = () -> Integer { <- 0 }
 
-	constant total = loop(from 1, through 3, startingWith 100, step (
+	constant total = loop(from 1, through 3, startingWith 100, (
 		index,
 		carried,
 	) {
@@ -771,9 +769,9 @@ describe("a walk's carried State", () => {
 		let generated = generate(
 			program(`	constant conditioned = loop(startingWith 0, while (n) {
 		<- n::isLessThan(20)
-	}, step (n) { <- n::add(7) })
+	}, (n) { <- n::add(7) })
 
-	constant counted = loop(from 1, through 3, startingWith 0, step (
+	constant counted = loop(from 1, through 3, startingWith 0, (
 		index,
 		carried,
 	) { <- carried::add(index) })
@@ -790,8 +788,8 @@ describe("a walk's carried State", () => {
 		if carried::isLessThan(2) { <- #Continue(carried::add(item)) } else { <- #Done(carried) }
 	})
 
-	constant nested = loop(from 1, through 2, startingWith 0, step (outer, carried) {
-		<- loop(from 1, through 2, startingWith carried, step (inner, running) {
+	constant nested = loop(from 1, through 2, startingWith 0, (outer, carried) {
+		<- loop(from 1, through 2, startingWith carried, (inner, running) {
 			<- running::add(outer::multiply(with inner))
 		})
 	})
@@ -813,7 +811,7 @@ describe("a walk's carried State", () => {
 
 	it("6: builds one Integer where the walk is over and none in the turn", () => {
 		let generated = generate(
-			program(`	constant sum = loop(from 1, through 10, startingWith 0, step (
+			program(`	constant sum = loop(from 1, through 10, startingWith 0, (
 		index,
 		total,
 	) { <- total::add(index) })
@@ -842,24 +840,24 @@ describe("a walk's carried State", () => {
 		// below cross the boundary upward, downward, and both ways in one walk.
 		expect(
 			await outputOf(
-				program(`	constant up = loop(from 1, through 3, startingWith 9007199254740990, step (
+				program(`	constant up = loop(from 1, through 3, startingWith 9007199254740990, (
 		_index,
 		carried,
 	) { <- carried::add(1) })
 
-	constant down = loop(from 1, through 3, startingWith 9007199254740994, step (
+	constant down = loop(from 1, through 3, startingWith 9007199254740994, (
 		_index,
 		carried,
 	) { <- carried::subtract(1) })
 
-	constant both = loop(from 1, through 4, startingWith 9007199254740990, step (
+	constant both = loop(from 1, through 4, startingWith 9007199254740990, (
 		index,
 		carried,
 	) {
 		if index::isLessThan(3) { <- carried::add(2) } else { <- carried::subtract(2) }
 	})
 
-	constant far = loop(from 1, through 3, startingWith 1, step (
+	constant far = loop(from 1, through 3, startingWith 1, (
 		_index,
 		carried,
 	) { <- carried::multiply(with 1606938044258990275541962092341162602522202993782792835301376) })
@@ -891,11 +889,11 @@ describe("a walk's carried State", () => {
 		// with a condition in them.
 		let source =
 			program(`	constant hits = loop(from 9007199254740988, through 9007199254740992,
-		startingWith 0, step (index, found) {
+		startingWith 0, (index, found) {
 		if index::is(9007199254740990) { <- found::add(1) } else { <- found }
 	})
 
-	constant kept = loop(from 1, through 5, startingWith 9007199254740991, step (
+	constant kept = loop(from 1, through 5, startingWith 9007199254740991, (
 		index,
 		carried,
 	) {
@@ -972,17 +970,17 @@ describe("a walk's carried State", () => {
 		// recognised by its shape would strip the canonicalisation that site
 		// exists to perform. The second walk here is that site.
 		let source =
-			program(`	constant nested = loop(from 1, through 3, startingWith 9007199254740988, step (
+			program(`	constant nested = loop(from 1, through 3, startingWith 9007199254740988, (
 		outer,
 		carried,
 	) {
-		<- loop(from 1, through 2, startingWith carried, step (inner, running) {
+		<- loop(from 1, through 2, startingWith carried, (inner, running) {
 			<- running::add(outer::multiply(with inner))
 		})
 	})
 
 	constant spelled = loop(from 9007199254740990, through 9007199254740992,
-		startingWith 0, step (index, carried) {
+		startingWith 0, (index, carried) {
 		<- carried::add(index::toString()::length())
 	})
 
@@ -1015,7 +1013,7 @@ describe("a walk's carried State", () => {
 		let source = program(`	constant half: Rational = 1/2
 	constant start = half::denominator()
 
-	constant answer = loop(from 1, through 3, startingWith start, step (
+	constant answer = loop(from 1, through 3, startingWith start, (
 		_index,
 		carried,
 	) { <- carried::add(carried) })
@@ -1033,9 +1031,9 @@ describe("a walk's carried State", () => {
 		let source =
 			program(`	constant conditioned = loop(startingWith 0, while (n) {
 		<- n::isLessThan(9007199254740993)
-	}, step (n) { <- n::add(9007199254740991) })
+	}, (n) { <- n::add(9007199254740991) })
 
-	constant counted = loop(from 1, through 3, startingWith 9007199254740990, step (
+	constant counted = loop(from 1, through 3, startingWith 9007199254740990, (
 		index,
 		carried,
 	) { <- carried::add(index) })
@@ -1090,20 +1088,20 @@ describe("a walk's carried State", () => {
 		// read straight back into the outer slot.
 		expect(
 			await outputOf(
-				program(`	constant nested = loop(from 1, through 3, startingWith 9007199254740988, step (
+				program(`	constant nested = loop(from 1, through 3, startingWith 9007199254740988, (
 		outer,
 		carried,
 	) {
-		<- loop(from 1, through 2, startingWith carried, step (inner, running) {
+		<- loop(from 1, through 2, startingWith carried, (inner, running) {
 			<- running::add(outer::multiply(with inner))
 		})
 	})
 
-	constant escapes = loop(from 1, through 3, startingWith 0, step (
+	constant escapes = loop(from 1, through 3, startingWith 0, (
 		outer,
 		carried,
 	) {
-		<- loop(from 1, through 2, startingWith 0, step (inner, running) {
+		<- loop(from 1, through 2, startingWith 0, (inner, running) {
 			<- running::add(carried)::add(inner)::add(outer)
 		})
 	})
@@ -1123,11 +1121,11 @@ describe("a walk's carried State", () => {
 		// `carried` itself, which is a mention past `.value` and refuses the
 		// outer. Here the inner keeps its box, so the outer keeps its own.
 		let source =
-			program(`	constant seeded = loop(from 1, through 3, startingWith 9007199254740990, step (
+			program(`	constant seeded = loop(from 1, through 3, startingWith 9007199254740990, (
 		_outer,
 		carried,
 	) {
-		<- loop(from 1, through 2, startingWith carried, step (_inner, running) {
+		<- loop(from 1, through 2, startingWith carried, (_inner, running) {
 			<- running::add(running::toString()::length())
 		})
 	})

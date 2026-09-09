@@ -1894,13 +1894,13 @@ describe("Code Generation", () => {
 					Terminal.inspect(loop(
 						startingWith 1,
 						while (n) { <- n::isLessThan(4) },
-						step (n) { <- n::add(1) },
+						(n) { <- n::add(1) },
 					))
 
 					Terminal.inspect(loop(
 						startingWith 1,
 						until (n) { <- n::isLessThan(4) },
-						step (n) { <- n::add(1) },
+						(n) { <- n::add(1) },
 					))
 				}`),
 			).toEqual(["4", "1"])
@@ -2731,6 +2731,10 @@ describe("Code Generation", () => {
 					"loop__overload$2",
 					"loop__overload$3",
 					"loop__overload$5",
+					"loop__overload$6",
+					"loop__overload$7",
+					"loop__overload$8",
+					"loop__overload$9",
 				])
 			})
 

@@ -5,11 +5,12 @@ import { type AnyType, typeKeySymbol } from "./type"
 // NOTE: The `loop` family — the native drivers behind the `loop` Overloads
 // declared in `packages/standard-library/sources/Loop.es`. Each is a free Function, bound by its
 // mangled `loop__overload$N` name to the Overload it implements; the order here
-// is the order the entries are written there. Only TWO are native: a loop can
-// not be written in Essence — it would need a loop to write — so the two
-// irreducible drivers stay here, each a plain JavaScript loop threading the
-// State the callback hands back. The `until` and counted entries are written in
-// Essence on `while` (see `Loop.es`), so they have no driver here.
+// is the order the entries are written there. Only TWO of the nine are native: a
+// loop can not be written in Essence — it would need a loop to write — so the
+// two irreducible drivers stay here, each a plain JavaScript loop threading the
+// State the callback hands back. The `until` entry and the six counted ones are
+// written in Essence on one of these two (see `Loop.es`), so they have no driver
+// here.
 
 // NOTE: `$1` is the `while` loop — steps while the condition holds, checked
 // BEFORE each step, so a condition false on the seed returns it unchanged. It is
@@ -29,6 +30,8 @@ export function loop__overload$1<State extends AnyType>(
 // NOTE: `$4` is the general loop — each step answers with a `Step`. `#Done` stops the
 // loop and its `value` is the answer; `#Continue` carries the next State and the
 // loop goes again. The tag is read the same way `List.sort` reads an `Ordering`.
+// The three counted entries whose body answers a `Step` are written on this one,
+// threading the counter beside the caller's State.
 export function loop__overload$4<State extends AnyType, Answer extends AnyType>(
 	state: State,
 	advance: (state: State) => StepType<State, Answer>,

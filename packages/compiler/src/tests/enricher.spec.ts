@@ -3884,11 +3884,15 @@ describe("Enricher", () => {
 				expect(diagnostics).toHaveLength(1)
 				expect(diagnostics[0].code).toBe("no-matching-overload")
 				expect(diagnostics[0].notes).toEqual([
-					"'loop' takes 3 Arguments: Parameter 'startingWith' is State, Parameter 'while' is (_: State) -> Boolean, Parameter 'step' is (_: State) -> State.",
-					"'loop' takes 3 Arguments: Parameter 'startingWith' is State, Parameter 'until' is (_: State) -> Boolean, Parameter 'step' is (_: State) -> State.",
-					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'through' is Integer, Parameter 'startingWith' is State, Parameter 'step' is (_: Integer, _: State) -> State.",
+					"'loop' takes 3 Arguments: Parameter 'startingWith' is State, Parameter 'while' is (_: State) -> Boolean, Parameter 3 is (_: State) -> State.",
+					"'loop' takes 3 Arguments: Parameter 'startingWith' is State, Parameter 'until' is (_: State) -> Boolean, Parameter 3 is (_: State) -> State.",
+					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'through' is Integer, Parameter 'startingWith' is State, Parameter 4 is (_: Integer, _: State) -> State.",
 					"'loop' takes 2 Arguments: Parameter 'startingWith' is State, Parameter 'step' is (_: State) -> Step<State, Answer>.",
-					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'upTo' is Integer, Parameter 'startingWith' is State, Parameter 'step' is (_: Integer, _: State) -> State.",
+					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'upTo' is Integer, Parameter 'startingWith' is State, Parameter 4 is (_: Integer, _: State) -> State.",
+					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'downTo' is Integer, Parameter 'startingWith' is State, Parameter 4 is (_: Integer, _: State) -> State.",
+					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'through' is Integer, Parameter 'startingWith' is State, Parameter 'step' is (_: Integer, _: State) -> Step<State, State>.",
+					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'upTo' is Integer, Parameter 'startingWith' is State, Parameter 'step' is (_: Integer, _: State) -> Step<State, State>.",
+					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'downTo' is Integer, Parameter 'startingWith' is State, Parameter 'step' is (_: Integer, _: State) -> Step<State, State>.",
 				])
 			})
 

@@ -198,9 +198,11 @@ true
 
 exports[`Fixture Sweep Loops.es should print what it printed before 1`] = `
 "55
+321
 15
 128
 128
+15
 2"
 `;
 

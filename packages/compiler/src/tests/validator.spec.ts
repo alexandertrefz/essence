@@ -2695,7 +2695,7 @@ describe("Validator", () => {
 				Terminal.inspect(loop(
 					startingWith 1,
 					while (n) { <- n::isLessThan(4) },
-					step (n) { <- n::add(1) },
+					(n) { <- n::add(1) },
 				))
 			}`)
 			let calls = overloadedCalls(program)
@@ -2704,7 +2704,7 @@ describe("Validator", () => {
 				calls.map((call) =>
 					call.arguments.map((argument) => argument.name),
 				),
-			).toEqual([["startingWith", "while", "step"]])
+			).toEqual([["startingWith", "while", null]])
 			expect(calls.map((call) => call.overloadedMethodIndex)).toEqual([0])
 			expect(validate(program)).toEqual([])
 
@@ -3429,7 +3429,7 @@ describe("Validator", () => {
 						constant half: Rational = 1/2
 						constant seed = half::denominator()
 
-						constant answer = loop(from 1, through 3, startingWith seed, step (
+						constant answer = loop(from 1, through 3, startingWith seed, (
 							_index,
 							carried,
 						) { <- carried::add(carried) })

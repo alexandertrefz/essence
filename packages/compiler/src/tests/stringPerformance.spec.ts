@@ -115,7 +115,7 @@ function millisecondsToRun(source: string, printed: string): number {
 function searchingSource(): string {
 	return `implementation {
 	constant text = "abcdefghij"::repeat(times ${CHARACTERS / 10})
-	constant found = loop(from 1, through ${SEARCH_TURNS}, startingWith 0, step (
+	constant found = loop(from 1, through ${SEARCH_TURNS}, startingWith 0, (
 		_,
 		count,
 	) { <- count::add(define { as 1 if text::contains("zzz") as 0 otherwise }) })
@@ -130,7 +130,7 @@ function searchingSource(): string {
 function replacingSource(): string {
 	return `implementation {
 	constant text = "abcdefghij"::repeat(times ${CHARACTERS / 10})
-	constant characters = loop(from 1, through ${REPLACE_TURNS}, startingWith 0, step (
+	constant characters = loop(from 1, through ${REPLACE_TURNS}, startingWith 0, (
 		_,
 		count,
 	) { <- count::add(text::replaceFirst("hij", with "X")::length()) })
