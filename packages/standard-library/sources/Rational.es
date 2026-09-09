@@ -1127,6 +1127,21 @@ declarations {
 		) -> Rational {
 			<- @::round(toPlaces places, toward direction)
 		}
+
+		§ The Rational rung of `Integer::toRational`, which answers the
+		§ receiver itself as `isWholeNumber` and `round` answer for an Integer
+		§ what a Rational already answers. Nothing crosses the other way here:
+		§ `round(toward:)` already answers an Integer, and a `toInteger` of the
+		§ same signature would be a second name for it.
+
+		§§ Answers the Rational as a Rational.
+		§§
+		§§ A Rational is one already, so the answer is the receiver itself. The entry is what lets a `Scalar` receiver reach the crossing that an Integer receiver reaches.
+		§§
+		§§ @returns — the receiver itself.
+		toRational() -> Rational {
+			<- @
+		}
 	}
 
 	§ What a Rational proven not to be zero answers that a bare one can not,

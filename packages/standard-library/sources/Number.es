@@ -863,6 +863,52 @@ declarations {
 			}
 		}
 
+		§ Reading a number the way a Program reads one. The Integer form is
+		§ tried first, so `"5"` answers the Integer `5` rather than the
+		§ Rational `5/1` that `Rational.parse` answers alone. The alternative
+		§ was to leave a caller with the two parsers and a `match`, which is
+		§ what every Program reading a number from input wrote.
+		§
+		§ The Rational parser is reached only where the Integer one found no
+		§ Integer. So the text is walked twice for a fraction and once for a
+		§ whole number. Writing the body on `Optional::or` would read shorter
+		§ and walk it twice either way, since both Arguments of a call are
+		§ evaluated.
+
+		§§ Reads a Number from its text form, as an Integer where the text holds one.
+		§§
+		§§ The text form is what `Integer.parse` reads, or what `Rational.parse` reads: a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`. A whole number answers an Integer, and every other shape a Rational. Text of another shape answers empty, and the `defaultingTo:` entry answers the given Number instead.
+		overload static parse {
+			§§ @param _ — the text to read
+			§§ @returns — the Number, or nothing when the text has any other shape.
+			(_ text: String) -> Optional<Scalar> {
+				§ The Constant widens the Integer payload, so that both arms
+				§ answer one Type.
+				constant whole: Optional<Scalar> = Integer.parse(text)
+
+				<- match whole -> Optional<Scalar> {
+					case #Value { <- whole }
+
+					case #Empty {
+						constant fraction: Optional<Scalar> = Rational.parse(
+							text,
+						)
+
+						<- fraction
+					}
+				}
+			}
+
+			§§ Reads a Number from its text form, with a value to answer when the text has another shape.
+			§§
+			§§ @param _ — the text to read
+			§§ @param defaultingTo — the value to answer with when the text is no Number
+			§§ @returns — the Number, or the given value in its place.
+			(_ text: String, defaultingTo fallback: Scalar) -> Scalar {
+				<- Number.parse(text)::value(defaultingTo fallback)
+			}
+		}
+
 		§§ Answers whether the Number has the same numeric value as another Number.
 		§§
 		§§ An Integer and a Rational are the same Number when their values are equal, so `1 is 1/1` holds. The answer is read off `compare`. So two Transcendentals that both carry π and e can stop the Program at the precision cutoff `compare` names.

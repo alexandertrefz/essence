@@ -474,3 +474,52 @@ describe("Division modes", () => {
 		])
 	})
 })
+
+describe("Crossing between the two exact kinds", () => {
+	it("widens an Integer to a Rational, and answers a Rational unchanged", async () => {
+		expect(
+			await run(
+				program(
+					show("5::toRational()"),
+					show("-5::toRational()"),
+					show("0::toRational()"),
+					show("3/4::toRational()"),
+					"constant numbers: List<Scalar> = [1, 1/2]",
+					show("numbers::sum()::toRational()"),
+				),
+			),
+		).toEqual(["5/1", "-5/1", "0/1", "3/4", "3/2"])
+	})
+
+	// NOTE: The Integer form is tried first, which is the whole of what this
+	// static adds over the two parsers it is written on.
+	it("reads a whole number as an Integer and everything else as a Rational", async () => {
+		expect(
+			await run(
+				program(
+					show('Number.parse("5")'),
+					show('Number.parse("-5")'),
+					show('Number.parse("3/4")'),
+					show('Number.parse("0.75")'),
+					show('Number.parse("5/1")'),
+					show('Number.parse("nope")'),
+					show('Number.parse("")'),
+					show('Number.parse("3/0")'),
+					show('Number.parse("3/4", defaultingTo 0)'),
+					show('Number.parse("nope", defaultingTo 0)'),
+				),
+			),
+		).toEqual([
+			"Optional#Value(5)",
+			"Optional#Value(-5)",
+			"Optional#Value(3/4)",
+			"Optional#Value(3/4)",
+			"Optional#Value(5/1)",
+			"Optional#Empty",
+			"Optional#Empty",
+			"Optional#Empty",
+			"3/4",
+			"0",
+		])
+	})
+})
