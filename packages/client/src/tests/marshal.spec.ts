@@ -686,6 +686,46 @@ export {
 // declaration then reads: `turn(direction: "Up" | "Down")` is an enumeration a
 // TypeScript reader already knows, where the object form was this Module's
 // bookkeeping made a caller's problem.
+// NOTE: The conditional door is decided from what the boundary DECLARES, and a
+// Record is structurally open — the outbound walk reads the value's members —
+// so a Dictionary can reach a position no Type names, where there is no door to
+// cross through. It is refused, and what the refusal says has to be the truth:
+// this pair came from one compile.
+describe("A Dictionary at a position the boundary does not name", () => {
+	it("is refused with the reason the bundle has no door", async () => {
+		await withProject(
+			{
+				"Widen.es": `implementation {
+	function widened() -> { width: Integer } {
+		<- { width = 1, extra = ["a" = 1] }
+	}
+}
+
+export {
+	widened
+}
+`,
+			},
+			async (directory) => {
+				let widen = await loadModule(path.join(directory, "Widen.es"), {
+					cacheDirectory,
+				})
+				let error = marshalError(() =>
+					(widen.exports.widened as () => unknown)(),
+				)
+
+				expect(error.message).toContain(
+					"this bundle carries no Dictionary door",
+				)
+				expect(error.message).toContain(
+					"it was built for a boundary that declares none",
+				)
+				expect(error.message).not.toContain("different compiles")
+			},
+		)
+	})
+})
+
 describe("A unit Choice", () => {
 	it("carries each of its Cases as the bare name", () => {
 		expect(called("direction", "Up")).toBe("Up")
