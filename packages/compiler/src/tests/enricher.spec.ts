@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test"
 import type { common } from "@essence-lang/interfaces"
 
 import { builtinNamespaces, builtinProtocols } from "../enricher/builtins"
+import { nestingLevelProbes } from "../enricher/enrichers"
 import { enrich } from "../enricher/index"
 import {
 	derivedEquatableNamespace,
@@ -11112,6 +11113,39 @@ describe("Enricher", () => {
 				kind: "holding-case",
 				caseNames: ["Full"],
 			})
+		})
+
+		// NOTE: What the check COSTS, guarded by a count rather than by a clock.
+		// It runs on every call to an Overload whose selected entry takes the
+		// receiver's own Type — every `Optional::is` and `Optional::isNot` in
+		// the language — and probing an entry is a full match-and-solve, so a
+		// probe per entry on the call that never warns was 2.8x the enrich cost
+		// of the whole Invocation. The written value is asked for first, and it
+		// needs no probe: a value that is no Case's payload can not be a second
+		// reading of anything.
+		//
+		// A clock is no guard for this. `stdlibLoader.spec.ts` says so outright
+		// — five idle runs of an enrich spread 66% — and a ceiling tight enough
+		// to see 16 µs a call is the flake that rule refuses. The count is
+		// exact, and the second half is what keeps it from passing vacuously.
+		function probesFor(source: string): number {
+			nestingLevelProbes.count = 0
+			enrichSource(source)
+
+			return nestingLevelProbes.count
+		}
+
+		it("should probe no Overload for a call that can not warn", () => {
+			expect(
+				probesFor(programWith("constant a = plain::is(#Empty)")),
+			).toBe(0)
+			expect(probesFor(programWith("constant a = plain::isNot(2)"))).toBe(
+				0,
+			)
+			expect(probesFor(programWith("constant a = 3::is(4)"))).toBe(0)
+			expect(
+				probesFor(programWith("constant a = nested::is(#Empty)")),
+			).toBeGreaterThan(0)
 		})
 
 		// NOTE: The same Namespace with nothing nested under it. Both entries are

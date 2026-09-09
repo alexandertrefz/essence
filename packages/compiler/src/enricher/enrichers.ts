@@ -12776,6 +12776,38 @@ function reportAmbiguousNestingLevel(
 		return
 	}
 
+	// NOTE: And the VALUE has to read at both levels, not merely the entry accept
+	// the call. An Argument an entry can not read types as Error somewhere inside
+	// itself, and `matchTypes` lets an Error match anything, so such an entry
+	// "accepts" a value it can make no sense of: `#Value(#Empty)` against an
+	// `Optional<Integer>` comes back as an `Optional<Integer>#Value` with the
+	// payload's failure buried in its member, and the entry says yes. What the
+	// Program actually built is compared instead — a written `#Empty` against an
+	// `Optional<Optional<Integer>>` Parameter is an
+	// `Optional<Optional<Integer>>#Empty` — which is the question this Warning
+	// asks out loud.
+	//
+	// NOTE: Asked BEFORE the loop, because the loop is what costs: probing an
+	// Overload entry is a full match-and-solve, and running one per entry on
+	// every plain `maybe::is(#Empty)` — the call that never warns — was 2.8x the
+	// enrich cost of the whole Method Invocation, about 16 µs a call. This half
+	// of the question needs no probe: the written value must read as SOME Case's
+	// payload, or no entry taking one can be a second reading of it.
+	//
+	// It can only ever lose a Warning the loop would not have reported. The loop
+	// keeps a Case whose payload is mutually assignable with the probed entry's
+	// Parameter and then asks that Parameter to accept the written value, so
+	// every Warning it reports satisfies this too.
+	let writtenType = probedArgumentType(matchableArguments, wholeType)
+
+	if (
+		writtenType === null ||
+		typeContainsError(writtenType) ||
+		!held.some(([, payloadType]) => matchesType(payloadType, writtenType))
+	) {
+		return
+	}
+
 	for (let [index, other] of overloads.entries()) {
 		if (index === selected.index) {
 			continue
@@ -12813,25 +12845,11 @@ function reportAmbiguousNestingLevel(
 			continue
 		}
 
-		// NOTE: And the VALUE has to read at both levels, not merely the entry
-		// accept the call. An Argument an entry can not read types as Error
-		// somewhere inside itself, and `matchTypes` lets an Error match
-		// anything, so such an entry "accepts" a value it can make no sense of:
-		// `#Value(#Empty)` against an `Optional<Integer>` comes back as an
-		// `Optional<Integer>#Value` with the payload's failure buried in its
-		// member, and the entry says yes. What the Program actually built is
-		// compared instead — a written `#Empty` against an
-		// `Optional<Optional<Integer>>` Parameter is an
-		// `Optional<Optional<Integer>>#Empty` — which is the question this
-		// Warning asks out loud. Asked here rather than up front, so a call with
-		// no second entry to reach costs nothing but the probe.
-		let writtenType = probedArgumentType(matchableArguments, wholeType)
-
-		if (
-			writtenType === null ||
-			typeContainsError(writtenType) ||
-			!matchesType(heldType, writtenType)
-		) {
+		// NOTE: And THIS entry has to be the one that reads it — the half of the
+		// question above that needs the probe. The gate above says the written
+		// value is some Case's payload; this says the entry beside the selected
+		// one takes exactly that.
+		if (!matchesType(heldType, writtenType)) {
 			continue
 		}
 
@@ -12920,6 +12938,18 @@ function payloadsByCase(type: common.Type): Array<[string, common.Type]> {
 	})
 }
 
+// NOTE: How many times the two-level Warning has probed an Overload entry, and
+// the whole of what guards its cost. The check runs on EVERY call to an
+// Overload whose selected entry takes the receiver's own Type — which is every
+// `Optional::is` and `Optional::isNot` in the language — and the probe is a full
+// match-and-solve, so a probe per entry on the call that never warns cost 2.8x
+// the enrich time of the Invocation. What guards that has to be deterministic:
+// `stdlibLoader.spec.ts` states outright that a clock is no guard for enrich
+// cost, five idle runs of it spreading 66%, and a ceiling tight enough to see
+// 16 µs a call is the flake that rule refuses. So the count is the guard, and
+// this is the one thing outside this file that reads it.
+export const nestingLevelProbes = { count: 0 }
+
 // NOTE: The Parameter Type another entry would read this call's Argument at,
 // where that entry accepts the call, and null everywhere else. Accepting is
 // asked the way `selectOverload` asks it — the Arguments matched, the bounds
@@ -12937,6 +12967,8 @@ function probeAcceptedOverload(
 	position: common.Position,
 	typer: ArgumentTyper,
 ): common.Type | null {
+	nestingLevelProbes.count += 1
+
 	let { result } = probeContextualFunctionTypes(() =>
 		collectDiagnostics(() =>
 			probeOverload(overload, matchableArguments, scope, position, typer),
@@ -12944,6 +12976,18 @@ function probeAcceptedOverload(
 	)
 	let probed = result.result
 
+	// NOTE: None of the three rejections has a Program behind it today, and the
+	// reason is the shape rather than luck. Reaching them at all needs a written
+	// value that reads at two levels, which is a payload-free Case; a bound can
+	// only be attached to an entry's OWN Type Parameter, which then binds from
+	// that Argument — so the entry's Parameter Type is the Case's Type, and a
+	// Case's Type is never mutually assignable with a sibling Case's payload,
+	// which is what the caller asks for next. An entry taking the Namespace's
+	// Parameter carries no bound of its own to fail. So they are `selectOverload`'s
+	// contract restated at the rails it can arrive on rather than logic with its
+	// own reach — kept because an entry that "accepts" a call its bounds refuse
+	// is no second reading of it, and that has to stay true of whatever
+	// `probeOverload` grows into.
 	if (
 		probed === undefined ||
 		probed.sawErrorArgument ||
