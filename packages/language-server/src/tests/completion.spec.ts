@@ -2038,6 +2038,69 @@ describe("Completion of a converted standard library Namespace", () => {
 // NOTE: A label a call may leave out is still offered — the writer is being
 // shown what CAN be written — but it says so, and it sorts below the labels the
 // call still has to write.
+// NOTE: `cases` is declared by no Namespace — the Compiler derives it for a
+// Choice whose Cases carry no payload — so a listing built from the written
+// members alone would offer less than `Side.` answers. It is a static, and
+// belongs in no `::` listing for that reason.
+describe("Completion of a Choice's derived Case listing", () => {
+	it("should offer the derived static on a builtin mode Choice", () => {
+		let source = ["implementation {", "\tSide.", "}"].join("\n")
+
+		expect(entryFor(source, { line: 2, column: 7 }, "cases")).toMatchObject(
+			{
+				kind: "staticMethod",
+				detail: "() -> NonEmptyList<Side>",
+			},
+		)
+	})
+
+	it("should offer it on a Namespace a Program wrote over its own Choice", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Colour {",
+			"\t\tRed,",
+			"\t\tGreen,",
+			"\t}",
+			"",
+			"\tnamespace Colour for Colour is Printable { }",
+			"",
+			"\tColour.",
+			"}",
+		].join("\n")
+
+		expect(entryFor(source, { line: 9, column: 9 }, "cases")?.detail).toBe(
+			"() -> NonEmptyList<Colour>",
+		)
+	})
+
+	it("should not offer it through '::'", () => {
+		let source = [
+			"implementation {",
+			"\tconstant side: Side = #Start",
+			"\tside::",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 3, column: 8 })).not.toContain("cases")
+	})
+
+	it("should not offer it on a Namespace over a Choice with a payload", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Shape {",
+			"\t\tCircle { radius: Integer },",
+			"\t}",
+			"",
+			"\tnamespace Shape for Shape { }",
+			"",
+			"\tShape.",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 8, column: 8 })).not.toContain("cases")
+	})
+})
+
 describe("Completion of a label a call may leave out", () => {
 	let source = [
 		"implementation {",

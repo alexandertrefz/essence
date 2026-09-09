@@ -38,7 +38,7 @@ import {
 	moduleSectionCursor,
 } from "./importCompletion"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
-import { matchingNamespaces } from "./namespaces"
+import { derivedEnumerableNamespace, matchingNamespaces } from "./namespaces"
 import { contains, isAtOrBefore, isSmaller } from "./positions"
 import { probeSourcesFor, stripNoise } from "./probe"
 import {
@@ -974,7 +974,18 @@ function memberCompletions(
 			})
 		}
 
-		for (let [name, method] of Object.entries(baseType.methods)) {
+		// NOTE: And the Case listing the Enricher derives for a Namespace over
+		// a Choice whose Cases carry no payload — `Side.cases()` is answered by
+		// nobody's Method, so a listing built from the written members alone
+		// would offer less than the Namespace answers. Appended after
+		// everything written, which is where a Method no Namespace declares
+		// goes in every other listing.
+		let methods = {
+			...baseType.methods,
+			...derivedEnumerableNamespace(baseType)?.methods,
+		}
+
+		for (let [name, method] of Object.entries(methods)) {
 			entries.push(
 				...callableEntries({
 					name,

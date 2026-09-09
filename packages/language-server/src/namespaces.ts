@@ -4,8 +4,11 @@ import {
 	builtinProtocols as builtinProtocolTable,
 } from "@essence-lang/compiler/enricher/builtins"
 import {
+	derivedEnumerableNamespaceForChoice,
 	derivedEquatableNamespaceForChoice,
 	derivedPrintableNamespaceForChoice,
+	enumerableMethodName,
+	enumerableProtocolName,
 	printableProtocolName,
 } from "@essence-lang/compiler/enricher/resolvers"
 import {
@@ -37,6 +40,28 @@ export { builtinNamespaces }
 // first call and cached for the process, so this stays a lookup.
 export function builtinProtocols(): Array<common.ProtocolType> {
 	return Object.values(builtinProtocolTable())
+}
+
+// NOTE: The Case listing a Namespace over a Choice derives — the mirror of the
+// Enricher's own hook, for the one listing that answers a `.` on a Namespace
+// rather than a `::` on a value. `cases` is a static, so it belongs in no
+// receiver listing and is not among the derives `derivedNamespacesFor` below
+// collects.
+//
+// NOTE: The requirement's signature and its `§§` come from the Protocol itself,
+// which is what the Enricher builds the derived Method out of — so Completion
+// and Hover describe the very Method a call reaches.
+export function derivedEnumerableNamespace(
+	namespace: common.NamespaceType,
+): common.NamespaceType | null {
+	let protocol = builtinProtocolTable()[enumerableProtocolName]
+
+	return protocol === undefined ||
+		namespace.targetType === null ||
+		namespace.generics.length > 0 ||
+		Object.hasOwn(namespace.methods, enumerableMethodName)
+		? null
+		: derivedEnumerableNamespaceForChoice(namespace.targetType, protocol)
 }
 
 function targetTypeMatches(

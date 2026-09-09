@@ -370,6 +370,43 @@ describe("Hover", () => {
 		)
 	})
 
+	// NOTE: A Method the Compiler DERIVES has no declaration to read a `§§`
+	// off, so the Protocol's own requirement documents it — which is the very
+	// signature the derive is built from.
+	it("should describe a Choice's derived Case listing", () => {
+		let source = [
+			"implementation {",
+			"\tTerminal.print(Side.cases()::length())",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 23 })).toBe(
+			"cases() -> NonEmptyList<Side>",
+		)
+		expect(hoverDocumentation(source, { line: 2, column: 23 })).toContain(
+			"Answers every value of the Type.",
+		)
+	})
+
+	// NOTE: The base of that Lookup is the Choice the author named, not the
+	// Namespace the Compiler fabricated to read the Method off — a reader
+	// hovering `Side` has never heard of `Choice_Enumerable`. The same holds
+	// for the Type Parameter a bounded body calls the static on.
+	it("should describe the base of a derived static as what it names", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Colour { Red, Green, }",
+			"\tfunction count<infer Mode is Enumerable>(_ example: Mode) -> Integer {",
+			"\t\t<- Mode.cases()::length()",
+			"\t}",
+			"\tconstant red: Colour = #Red",
+			"\tTerminal.print(count(red))",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 4, column: 7 })).toBe("Mode: Mode")
+	})
+
 	it("should narrow an Overloaded Method to the invoked signature", () => {
 		let source = [
 			"implementation {",
