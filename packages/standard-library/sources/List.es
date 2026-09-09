@@ -1322,7 +1322,7 @@ declarations {
 	{
 		§§ Answers the values the Results hold, in order.
 		§§
-		§§ The failed Results are left out, so the answer can be shorter than the receiver. A List of failures answers the empty List. Where one failure has to answer nothing at all, the Method is `allValues()`.
+		§§ The failed Results are left out, so the answer can be shorter than the receiver. A List of failed Results answers the empty List. Where one failure has to answer nothing at all, the Method is `allValues()`.
 		§§
 		§§ @returns — the List of values.
 		values() -> List<ValueType> {
@@ -1341,7 +1341,7 @@ declarations {
 		§§ The Results holding a value are left out. A List of values answers the empty List.
 		§§
 		§§ @returns — the List of reasons.
-		failures() -> List<FailureType> {
+		reasons() -> List<FailureType> {
 			constant kept: List<FailureType> = []
 
 			<- @::reduce(startingWith kept, (accumulated, item) {
@@ -1352,11 +1352,13 @@ declarations {
 			})
 		}
 
-		§ The members are named for the two Cases, where `List::partition`
-		§ names its halves for what a check did to an item. There is no check
-		§ here, and `accepted` would say that something passed one.
+		§ The members are named as the singular accessors pluralise: `values`
+		§ for `Result::value`, and `reasons` for `Result::reason`. Where
+		§ `List::partition` names its halves for what a check did to an item,
+		§ there is no check here to name them after. An `accepted` half would
+		§ say that something passed one.
 		§
-		§ The body is written on `values` and `failures` rather than on a fold
+		§ The body is written on `values` and `reasons` rather than on a fold
 		§ carrying a Record, because a fold pays a Record spread per item. Two
 		§ thousand partitions of a two thousand item List measured 45 ms on
 		§ the two walks and 174 ms on the fold. Subprocess startup is inside
@@ -1366,16 +1368,14 @@ declarations {
 		§§
 		§§ Both halves keep the original order. Every item of the receiver is in exactly one of them.
 		§§
-		§§ @returns — a Record holding the values under `values` and the reasons under `failures`.
-		partition()
-			-> { values: List<ValueType>, failures: List<FailureType> }
-		{
-			<- { values = @::values(), failures = @::failures() }
+		§§ @returns — a Record holding the values under `values` and the reasons under `reasons`.
+		partition() -> { values: List<ValueType>, reasons: List<FailureType> } {
+			<- { values = @::values(), reasons = @::reasons() }
 		}
 
 		§ Accumulating rather than stopping at the first failure, because that
 		§ is what the callers of this shape want. A form or a file of rows is
-		§ checked to be told everything that is wrong with it. The failures are
+		§ checked to be told everything that is wrong with it. The reasons are
 		§ read once, and the `if` asking `hasItems` is what mints the proof the
 		§ answer needs. An early-stopping `hasItems(where …)` in front of that
 		§ buys nothing: the walk it cut short proves nothing, so the same `if`
@@ -1393,7 +1393,7 @@ declarations {
 		§§
 		§§ @returns — every value in a Result, or every reason in one.
 		allValues() -> Result<List<ValueType>, NonEmptyList<FailureType>> {
-			constant problems = @::failures()
+			constant problems = @::reasons()
 
 			if problems::hasItems() {
 				<- #Failure(problems)

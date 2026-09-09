@@ -3876,17 +3876,14 @@ third"::lines())
 		"ResultList.values<ValueType, FailureType>() [empty]",
 		noChecks::values(),
 	)
+	show("ResultList.reasons<ValueType, FailureType>()", someChecks::reasons())
 	show(
-		"ResultList.failures<ValueType, FailureType>()",
-		someChecks::failures(),
+		"ResultList.reasons<ValueType, FailureType>() [none failed]",
+		everyCheck::reasons(),
 	)
 	show(
-		"ResultList.failures<ValueType, FailureType>() [none failed]",
-		everyCheck::failures(),
-	)
-	show(
-		"ResultList.failures<ValueType, FailureType>() [empty]",
-		noChecks::failures(),
+		"ResultList.reasons<ValueType, FailureType>() [empty]",
+		noChecks::reasons(),
 	)
 	show(
 		"ResultList.partition<ValueType, FailureType>()",

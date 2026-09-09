@@ -203,7 +203,7 @@ declarations {
 
 		§§ Answers the reason the Result failed, held in an Optional.
 		§§
-		§§ A Result holding a value answers an empty Optional. Where a List of reasons is wanted, `ResultList::failures()` answers it.
+		§§ A Result holding a value answers an empty Optional. Where a List of reasons is wanted, `ResultList::reasons()` answers it.
 		§§
 		§§ @returns — the reason in an Optional, or an empty Optional.
 		reason() -> Optional<FailureType> {

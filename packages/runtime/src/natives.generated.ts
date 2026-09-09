@@ -992,7 +992,7 @@ export const $OptionalListAbsent: AssertNoEssenceExports<typeof import("./Option
 
 declare const ResultListModule: typeof import("./ResultList")
 export const $ResultList: ResultListNatives = ResultListModule
-export const $ResultListAbsent: AssertNoEssenceExports<typeof import("./ResultList"), "values" | "failures" | "partition" | "allValues"> = true
+export const $ResultListAbsent: AssertNoEssenceExports<typeof import("./ResultList"), "values" | "reasons" | "partition" | "allValues"> = true
 
 declare const NonEmptyListModule: typeof import("./NonEmptyList")
 export const $NonEmptyList: NonEmptyListNatives = NonEmptyListModule

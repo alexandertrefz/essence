@@ -786,8 +786,8 @@ describe("Stdlib Call Graph", () => {
 			// in a Namespace of their own — receiver `List<Result<…>>` —
 			// exactly as `OptionalList`'s three do.
 			"ResultList.allValues",
-			"ResultList.failures",
 			"ResultList.partition",
+			"ResultList.reasons",
 			"ResultList.values",
 			// NOTE: The Namespace of the Union `Integer | Rational`, whose two
 			// bodies are the one 2×2 dispatch of `Number.es` — emitted and

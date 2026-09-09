@@ -575,15 +575,15 @@ describe("Result", () => {
 					${lists}
 
 					Terminal.inspect(rows::values())
-					Terminal.inspect(rows::failures())
+					Terminal.inspect(rows::reasons())
 					Terminal.inspect(rows::partition())
 					Terminal.inspect(none::partition())
 				}`),
 			).toEqual([
 				"[ 1, 3 ]",
 				`[ "a", "b" ]`,
-				`{ values = [ 1, 3 ], failures = [ "a", "b" ] }`,
-				"{ values = [], failures = [] }",
+				`{ values = [ 1, 3 ], reasons = [ "a", "b" ] }`,
+				"{ values = [], reasons = [] }",
 			])
 		})
 
@@ -616,7 +616,7 @@ describe("Result", () => {
 
 					Terminal.inspect(none::allValues())
 					Terminal.inspect(none::values())
-					Terminal.inspect(none::failures())
+					Terminal.inspect(none::reasons())
 				}`),
 			).toEqual(["Result#Value([])", "[]", "[]"])
 		})
@@ -642,7 +642,7 @@ describe("Result", () => {
 
 		// NOTE: Both laws are checked over every arrangement of up to three
 		// items, which is where a failure can stand first, last, alone or not
-		// at all. They are written on `values` and `failures` rather than on
+		// at all. They are written on `values` and `reasons` rather than on
 		// the body's own question, so a body rewritten another way is still
 		// held to them.
 		const arrangements = `constant arrangements: List<List<Result<Integer, String>>> = [
@@ -677,7 +677,7 @@ describe("Result", () => {
 			).toEqual(["true"])
 		})
 
-		it("answers the reasons failures() found, in the same order", async () => {
+		it("answers every reason reasons() found, in the same order", async () => {
 			expect(
 				await run(`implementation {
 					${arrangements}
@@ -689,7 +689,7 @@ describe("Result", () => {
 							::reason()
 							::map((reasons) -> List<String> { <- reasons })
 							::value(defaultingTo noReasons)
-							::is(items::failures())
+							::is(items::reasons())
 					}))
 				}`),
 			).toEqual(["true"])
@@ -707,7 +707,7 @@ describe("Result", () => {
 
 						<- halves.values
 							::length()
-							::add(halves.failures::length())
+							::add(halves.reasons::length())
 							::is(items::length())
 					}))
 				}`),
