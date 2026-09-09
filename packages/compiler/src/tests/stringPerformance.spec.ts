@@ -6,7 +6,7 @@ import { join } from "node:path"
 
 import { createInteger } from "@essence-lang/runtime/Integer"
 import {
-	count as occurrencesOf,
+	count__overload$1 as occurrencesOf,
 	createString,
 	firstIndex__overload$1 as firstIndex,
 	hasCharacterView,

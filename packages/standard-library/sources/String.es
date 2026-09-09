@@ -68,6 +68,17 @@ declarations {
 	§§ `split(on:)` reads the proof on its separator rather than on the receiver. A separator with a character in it always leaves a piece, so the answer is a NonEmptyList.
 	type NonEmptyString = String where @::hasCharacters()
 
+	§ The predicate is a chain, so it stays a question of its own and this
+	§ Type is written on it rather than on `length`. See DEVELOPMENT.md, Why
+	§ bodies look the way they do.
+
+	§§ A String of one character, as a checked refinement of `String`.
+	§§
+	§§ A character is a Unicode grapheme cluster, which is the unit every position Method here counts. The proof is what lets `characters` and `character(at:)` name what they answer. A String written down with one character in it carries the proof.
+	§§
+	§§ A Character is a String, so it answers everything a String answers and goes wherever a String is wanted.
+	type Character = String where @::isOneCharacter()
+
 	§ A character here is a Unicode grapheme cluster: a base with its
 	§ combining marks, a ZWJ emoji sequence, a flag's two regional
 	§ indicators. The native `split` decides the segmentation (`graphemesOf`
@@ -77,6 +88,34 @@ declarations {
 	§ normalized to NFC first, so an accent composed and one decomposed
 	§ count, order and compare the same.
 	namespace String for String is Equatable, is Printable, is Comparable {
+		§ Native, both entries. A code point that names no character has to
+		§ be refused, and no Essence expression names a code point at all.
+
+		§§ Builds a String out of Unicode code points.
+		§§
+		§§ A point that names no character answers nothing. A surrogate names none, and neither does a point past the last one Unicode gives.
+		overload static of {
+			§§ @example
+			§§   expect String.of(codePoint 97)::is("a")
+			§§   expect String.of(codePoint 55296)::isEmpty()
+			§§
+			§§ @param codePoint — the code point to read, proven not to be negative
+			§§ @returns — the String of that one character, or nothing when the point names none.
+			(codePoint code: NonNegativeInteger) -> Optional<String>
+
+			§§ Builds a String out of a List of Unicode code points.
+			§§
+			§§ One point that names no character refuses the whole List. A String missing the characters it could not read is a String no caller asked for. An empty List answers the empty String.
+			§§
+			§§ @example
+			§§   expect String.of(codePoints [104, 105])::is("hi")
+			§§   expect String.of(codePoints [104, -1])::isEmpty()
+			§§
+			§§ @param codePoints — the code points to read
+			§§ @returns — the String of those characters, or nothing when a point names none.
+			(codePoints codes: List<Integer>) -> Optional<String>
+		}
+
 		§§ Answers whether the String has the same characters as another one.
 		§§
 		§§ The comparison is case-sensitive unless a `CaseSensitivity` says otherwise.
@@ -173,32 +212,67 @@ declarations {
 		§ on `split`, 8 µs on the native `firstIndex`. A Program making
 		§ 20,000 of them took 1,856 ms and takes 33 ms.
 
+		§ Every entry below taking a `CaseSensitivity` folds each character
+		§ on its own, where `is` and `compare` fold the whole String. A
+		§ Method answering a position answers a position of the receiver. A
+		§ folding that maps one character onto several code points would
+		§ move every position after it. Folding per character keeps a match
+		§ as many characters wide as the part is. So the searches, the two
+		§ replacements and the two ends all cut on the receiver's own
+		§ boundaries. The two rules part company over the Greek final sigma
+		§ alone. A whole String folds a closing capital sigma to the final
+		§ form, so `"ΟΣ"::is("ος", comparing #Insensitive)` holds where
+		§ `contains` of the same part does not.
+
 		§§ Answers whether the given String occurs anywhere in this one.
 		§§
-		§§ The empty String occurs in every String.
+		§§ The empty String occurs in every String. The search is case-sensitive unless a `CaseSensitivity` says otherwise.
 		§§
 		§§ @example
 		§§   expect "Lions"::contains("ion")
 		§§   expect "Lions"::doesNotContain("Tiger")
-		§§
-		§§ @param _ — the String to look for
-		§§ @returns — `true` when it occurs.
-		contains(_ other: String) -> Boolean {
-			<- @::firstIndex(of other)::hasValue()
+		§§   expect "Lions"::contains("ION", comparing #Insensitive)
+		overload contains {
+			§§ @param _ — the String to look for
+			§§ @returns — `true` when it occurs.
+			(_ other: String) -> Boolean {
+				<- @::firstIndex(of other)::hasValue()
+			}
+
+			§§ @param _ — the String to look for
+			§§ @param comparing — whether case is significant
+			§§ @returns — `true` when it occurs under the given `CaseSensitivity`.
+			(
+				_ other: String,
+				comparing sensitivity: CaseSensitivity,
+			) -> Boolean {
+				<- @::firstIndex(of other, comparing sensitivity)::hasValue()
+			}
 		}
 
 		§§ Answers whether the given String occurs nowhere in this one.
-		§§
-		§§ @param _ — the String to look for
-		§§ @returns — `true` when it does not occur.
-		doesNotContain(_ other: String) -> Boolean {
-			§ This body is read as well as run, and so are the two
-			§ `doesNot` bodies below it. Each asks its contrary's
-			§ question over whatever bound the call writes, so the `else`
-			§ of an `if` proves a refinement written on either name.
-			§ Moving one of the three to native would take that away. See
-			§ DEVELOPMENT.md, Why bodies look the way they do.
-			<- @::contains(other)::negate()
+		overload doesNotContain {
+			§§ @param _ — the String to look for
+			§§ @returns — `true` when it does not occur.
+			(_ other: String) -> Boolean {
+				§ This body is read as well as run, and so are the two
+				§ `doesNot` bodies below it. Each asks its contrary's
+				§ question over whatever bound the call writes, so the
+				§ `else` of an `if` proves a refinement written on either
+				§ name. Moving one of the three to native would take that
+				§ away. See DEVELOPMENT.md, Why bodies look the way they do.
+				<- @::contains(other)::negate()
+			}
+
+			§§ @param _ — the String to look for
+			§§ @param comparing — whether case is significant
+			§§ @returns — `true` when it does not occur under the given `CaseSensitivity`.
+			(
+				_ other: String,
+				comparing sensitivity: CaseSensitivity,
+			) -> Boolean {
+				<- @::contains(other, comparing sensitivity)::negate()
+			}
 		}
 
 		§§ Answers whether the String begins with the given one.
@@ -206,15 +280,47 @@ declarations {
 		§§ @example
 		§§   expect "Lions"::starts(with "Li")
 		§§   expect "Lions"::doesNotStart(with "Ti")
-		starts(with prefix: String) -> Boolean {
-			§ A prefix longer than the String slices to the whole String,
-			§ which can not equal the prefix, so it needs no guard.
-			<- @::slice(to prefix::length())::is(prefix)
+		§§   expect "Lions"::starts(with "li", comparing #Insensitive)
+		overload starts {
+			§§ @param with — the String to look for at the front
+			§§ @returns — `true` when the String begins with it.
+			(with prefix: String) -> Boolean {
+				§ A prefix longer than the String slices to the whole
+				§ String, which can not equal the prefix, so it needs no
+				§ guard.
+				<- @::slice(to prefix::length())::is(prefix)
+			}
+
+			§ Native. The slice above compares two whole Strings. A folded
+			§ receiver is compared to a folded prefix character by
+			§ character instead; see the note above `contains`.
+
+			§§ @param with — the String to look for at the front
+			§§ @param comparing — whether case is significant
+			§§ @returns — `true` when the String begins with it under the given `CaseSensitivity`.
+			(
+				with prefix: String,
+				comparing sensitivity: CaseSensitivity,
+			) -> Boolean
 		}
 
 		§§ Answers whether the String does not begin with the given one.
-		doesNotStart(with prefix: String) -> Boolean {
-			<- @::starts(with prefix)::negate()
+		overload doesNotStart {
+			§§ @param with — the String to look for at the front
+			§§ @returns — `true` when the String does not begin with it.
+			(with prefix: String) -> Boolean {
+				<- @::starts(with prefix)::negate()
+			}
+
+			§§ @param with — the String to look for at the front
+			§§ @param comparing — whether case is significant
+			§§ @returns — `true` when the String does not begin with it under the given `CaseSensitivity`.
+			(
+				with prefix: String,
+				comparing sensitivity: CaseSensitivity,
+			) -> Boolean {
+				<- @::starts(with prefix, comparing sensitivity)::negate()
+			}
 		}
 
 		§ Native. The Essence body slices the last `suffix::length()`
@@ -223,12 +329,110 @@ declarations {
 		§ stays in Essence.
 
 		§§ Answers whether the String ends with the given one.
-		ends(with suffix: String) -> Boolean
+		overload ends {
+			§§ @param with — the String to look for at the end
+			§§ @returns — `true` when the String ends with it.
+			(with suffix: String) -> Boolean
+
+			§§ @param with — the String to look for at the end
+			§§ @param comparing — whether case is significant
+			§§ @returns — `true` when the String ends with it under the given `CaseSensitivity`.
+			(
+				with suffix: String,
+				comparing sensitivity: CaseSensitivity,
+			) -> Boolean
+		}
 
 		§§ Answers whether the String does not end with the given one.
-		doesNotEnd(with suffix: String) -> Boolean {
-			<- @::ends(with suffix)::negate()
+		overload doesNotEnd {
+			§§ @param with — the String to look for at the end
+			§§ @returns — `true` when the String does not end with it.
+			(with suffix: String) -> Boolean {
+				<- @::ends(with suffix)::negate()
+			}
+
+			§§ @param with — the String to look for at the end
+			§§ @param comparing — whether case is significant
+			§§ @returns — `true` when the String does not end with it under the given `CaseSensitivity`.
+			(
+				with suffix: String,
+				comparing sensitivity: CaseSensitivity,
+			) -> Boolean {
+				<- @::ends(with suffix, comparing sensitivity)::negate()
+			}
 		}
+
+		§§ Answers whether the String is one character long.
+		§§
+		§§ This is the question the `Character` Type is written on. A String proven to answer `true` here goes wherever a Character is wanted.
+		§§
+		§§ @example
+		§§   expect "a"::isOneCharacter()
+		§§   expect "ab"::isOneCharacter()::negate()
+		§§
+		§§ @returns — `true` when the String holds one character.
+		isOneCharacter() -> Boolean {
+			§ A chain, so it is a question of its own rather than a reading
+			§ of `length`. See DEVELOPMENT.md, Why bodies look the way they
+			§ do.
+			<- @::length()::is(1)
+		}
+
+		§ The four below are native, and each asks the host for a Unicode
+		§ character class. That is classification and not a pattern
+		§ language. The question is fixed, no part of it is anything a
+		§ caller writes, and the answer is a Boolean. The alternative was a
+		§ table of code point ranges kept here. It would answer for a
+		§ different Unicode version than `is`, `compare` and `normalize` do.
+		§ The runtime names the class each one reads.
+		§
+		§ All four answer `true` for the empty String, which is the answer
+		§ `List::hasOnlyItems(where:)` gives an empty List: nothing in it
+		§ breaks the rule.
+
+		§§ Answers whether every character of the String is a decimal digit.
+		§§
+		§§ A digit is any Unicode decimal digit, which is wider than what `Integer.parse` reads: `Integer.parse` reads the notation the language writes. The empty String answers `true`, because nothing in it is not a digit.
+		§§
+		§§ @example
+		§§   expect "2026"::hasOnlyDigits()
+		§§   expect "2026-09"::hasOnlyDigits()::negate()
+		§§
+		§§ @returns — `true` when the String holds decimal digits alone.
+		hasOnlyDigits() -> Boolean
+
+		§§ Answers whether every character of the String is a letter.
+		§§
+		§§ A combining mark counts as part of the letter before it. A mark standing on its own belongs to no letter and answers `false`. The empty String answers `true`.
+		§§
+		§§ @example
+		§§   expect "Grüße"::hasOnlyLetters()
+		§§   expect "Rule 34"::hasOnlyLetters()::negate()
+		§§
+		§§ @returns — `true` when the String holds letters alone.
+		hasOnlyLetters() -> Boolean
+
+		§§ Answers whether every character of the String is a letter or a decimal digit.
+		§§
+		§§ A combining mark counts as part of the character before it. The empty String answers `true`.
+		§§
+		§§ @example
+		§§   expect "route66"::hasOnlyLettersOrDigits()
+		§§   expect "route 66"::hasOnlyLettersOrDigits()::negate()
+		§§
+		§§ @returns — `true` when the String holds letters and digits alone.
+		hasOnlyLettersOrDigits() -> Boolean
+
+		§§ Answers whether every character of the String is whitespace.
+		§§
+		§§ Whitespace is what Unicode calls whitespace, which is the rule `trim` and `words` read. The empty String answers `true`.
+		§§
+		§§ @example
+		§§   expect "   "::hasOnlyWhitespace()
+		§§   expect " x "::hasOnlyWhitespace()::negate()
+		§§
+		§§ @returns — `true` when the String holds whitespace alone.
+		hasOnlyWhitespace() -> Boolean
 
 		§§ Answers the lines of the String, split at every line break.
 		§§
@@ -259,12 +463,16 @@ declarations {
 		§§ @returns — the number of characters, which is never negative.
 		length() -> NonNegativeInteger
 
+		§ Native, and the Essence body it replaced was `@::split(on "")`.
+		§ The answer is what took it here. A refinement erases before
+		§ anything runs, so no expression can say the pieces of the empty
+		§ separator are one character each. The native makes that same
+		§ call.
+
 		§§ Answers the characters of the String, each as its own String.
 		§§
 		§§ @returns — the List of characters.
-		characters() -> List<String> {
-			<- @::split(on "")
-		}
+		characters() -> List<Character>
 
 		§ The first entry is native. The Essence body,
 		§ `@::characters()::item(at index)`, allocates 10,001 values to read
@@ -276,12 +484,12 @@ declarations {
 		overload character {
 			§§ @param at — the position to read
 			§§ @returns — the character, or nothing when the position is outside the String.
-			(at index: Integer) -> Optional<String>
+			(at index: Integer) -> Optional<Character>
 
 			§§ @param at — the position to read
 			§§ @param defaultingTo — the character to answer with when the position is outside the String
 			§§ @returns — the character, or the given one in its place.
-			(at index: Integer, defaultingTo fallback: String) -> String {
+			(at index: Integer, defaultingTo fallback: Character) -> Character {
 				<- @::character(at index)::value(defaultingTo fallback)
 			}
 		}
@@ -302,6 +510,17 @@ declarations {
 			(of part: String, defaultingTo fallback: Integer) -> Integer {
 				<- @::firstIndex(of part)::value(defaultingTo fallback)
 			}
+
+			§ Native, and the same walk with both sides folded; see the note
+			§ above `contains`.
+
+			§§ @param of — the String to look for
+			§§ @param comparing — whether case is significant
+			§§ @returns — the zero-based position, or nothing when it does not occur under the given `CaseSensitivity`.
+			(
+				of part: String,
+				comparing sensitivity: CaseSensitivity,
+			) -> Optional<Integer>
 		}
 
 		§ The first entry is native, and walks the String from the end. The
@@ -324,6 +543,14 @@ declarations {
 			(of part: String, defaultingTo fallback: Integer) -> Integer {
 				<- @::lastIndex(of part)::value(defaultingTo fallback)
 			}
+
+			§§ @param of — the String to look for
+			§§ @param comparing — whether case is significant
+			§§ @returns — the zero-based position, or nothing when it does not occur under the given `CaseSensitivity`.
+			(
+				of part: String,
+				comparing sensitivity: CaseSensitivity,
+			) -> Optional<Integer>
 		}
 
 		§ Both read `character(at:)`, the native that resolves a position.
@@ -335,13 +562,13 @@ declarations {
 		§§ The empty String has no first character and answers nothing. The `defaultingTo:` entry answers the given character instead.
 		overload firstCharacter {
 			§§ @returns — the first character, or nothing when the String is empty.
-			() -> Optional<String> {
+			() -> Optional<Character> {
 				<- @::character(at 0)
 			}
 
 			§§ @param defaultingTo — the character to answer with when the String is empty
 			§§ @returns — the first character, or the given one in its place.
-			(defaultingTo fallback: String) -> String {
+			(defaultingTo fallback: Character) -> Character {
 				<- @::character(at 0, defaultingTo fallback)
 			}
 		}
@@ -351,16 +578,47 @@ declarations {
 		§§ The empty String has no last character and answers nothing. The `defaultingTo:` entry answers the given character instead.
 		overload lastCharacter {
 			§§ @returns — the last character, or nothing when the String is empty.
-			() -> Optional<String> {
+			() -> Optional<Character> {
 				<- @::character(at -1)
 			}
 
 			§§ @param defaultingTo — the character to answer with when the String is empty
 			§§ @returns — the last character, or the given one in its place.
-			(defaultingTo fallback: String) -> String {
+			(defaultingTo fallback: Character) -> Character {
 				<- @::character(at -1, defaultingTo fallback)
 			}
 		}
+
+		§ Native. A code point is the level below a character, and no
+		§ Essence expression reaches it. Without this Method nothing
+		§ character-level can be computed at all. The `Integer.parse` body
+		§ had to look a digit up in a String of the ten of them, once per
+		§ digit.
+
+		§§ Answers the Unicode code points of the String.
+		§§
+		§§ A character is a grapheme cluster and a code point is one point of Unicode. The two counts differ wherever a character is built out of several points. A four-person emoji is one character and seven points.
+		§§
+		§§ @example
+		§§   expect "ab"::codePoints()::is([97, 98])
+		§§
+		§§ @returns — the List of code points, read off the composed form.
+		codePoints() -> List<Integer>
+
+		§ Native, and the same walk `count(of:)` makes; see the note above
+		§ `contains`. The Essence spelling calls `firstIndex` and `slice`
+		§ once per occurrence, which cuts the rest of the String every time.
+
+		§§ Answers the position of every occurrence of the given String.
+		§§
+		§§ The occurrences do not overlap, which is the rule `count(of:)` counts by. The empty String occurs at no position.
+		§§
+		§§ @example
+		§§   expect "banana"::everyIndex(of "an")::is([1, 3])
+		§§
+		§§ @param of — the String to look for
+		§§ @returns — the List of zero-based positions, in the order they occur.
+		everyIndex(of part: String) -> List<Integer>
 
 		§§ Joins another String onto the front of this one.
 		§§
@@ -396,6 +654,81 @@ declarations {
 			§§ @param on — the separator to split at, proven to have a character
 			§§ @returns — the List of pieces, which always holds at least one.
 			(on separator: NonEmptyString) -> NonEmptyList<String>
+
+			§ The two below cut at one separator, which is the shape a
+			§ `key=value` line wants. The value keeps every separator after
+			§ the first. A Program writes them today as a `firstIndex` and
+			§ two slices, with the separator's length added in the middle.
+
+			§§ Splits the String at the first occurrence of the given separator.
+			§§
+			§§ The two pieces are the text before the separator and all the text after it. A separator that does not occur answers nothing. The empty separator occurs at the front, so it answers the empty String and the whole receiver.
+			§§
+			§§ @example
+			§§   constant pair = "key=a=b"::split(onFirst "=")
+			§§
+			§§   expect pair::hasValue(where (halves) { <- halves.trailing::is("a=b") })
+			§§
+			§§ @param onFirst — the separator to cut at
+			§§ @returns — the text before and after the separator, or nothing when it does not occur.
+			(
+				onFirst separator: String,
+			) -> Optional<{ leading: String, trailing: String }> {
+				§ `@` is read inside a Function literal below, so the
+				§ receiver is bound here first.
+				constant text = @
+
+				<- text::firstIndex(of separator)
+					::map((position) {
+						<- {
+							leading = text::slice(to position),
+							trailing = text::slice(
+								from position::add(separator::length()),
+							),
+						}
+					})
+			}
+
+			§§ Splits the String at the last occurrence of the given separator.
+			§§
+			§§ The two pieces are the text before the separator and all the text after it. A separator that does not occur answers nothing. The empty separator occurs at the end, so it answers the whole receiver and the empty String.
+			§§
+			§§ @param onLast — the separator to cut at
+			§§ @returns — the text before and after the separator, or nothing when it does not occur.
+			(
+				onLast separator: String,
+			) -> Optional<{ leading: String, trailing: String }> {
+				constant text = @
+
+				<- text::lastIndex(of separator)
+					::map((position) {
+						<- {
+							leading = text::slice(to position),
+							trailing = text::slice(
+								from position::add(separator::length()),
+							),
+						}
+					})
+			}
+
+			§ Native. The Essence spelling splits the whole String and joins
+			§ the tail back, which builds every piece to throw most of them
+			§ away.
+
+			§§ Splits the String at the separator, into no more than the given number of pieces.
+			§§
+			§§ The last piece keeps every separator the split stopped short of. A count of one answers the receiver alone.
+			§§
+			§§ @example
+			§§   expect "a=b=c"::split(on "=", atMost 2)::is(["a", "b=c"])
+			§§
+			§§ @param on — the separator to split at, proven to have a character
+			§§ @param atMost — how many pieces to answer at the most, proven to be above zero
+			§§ @returns — the List of pieces, which always holds at least one.
+			(
+				on separator: NonEmptyString,
+				atMost count: PositiveInteger,
+			) -> NonEmptyList<String>
 		}
 
 		§ Native; see the note above `contains`. A body on `split(on part)`
@@ -407,10 +740,16 @@ declarations {
 		§§ Answers how many times the given String occurs in this one.
 		§§
 		§§ The occurrences do not overlap: `"aaa"::count(of "aa")` is 1. The empty String occurs 0 times.
-		§§
-		§§ @param of — the String to count
-		§§ @returns — the number of occurrences.
-		count(of part: String) -> Integer
+		overload count {
+			§§ @param of — the String to count
+			§§ @returns — the number of occurrences.
+			(of part: String) -> Integer
+
+			§§ @param of — the String to count
+			§§ @param comparing — whether case is significant
+			§§ @returns — the number of occurrences under the given `CaseSensitivity`.
+			(of part: String, comparing sensitivity: CaseSensitivity) -> Integer
+		}
 
 		§§ Answers the String with every character in upper case.
 		uppercase() -> String
@@ -440,18 +779,34 @@ declarations {
 		§§
 		§§ The occurrences do not overlap. The empty String matches nowhere, so the String comes back unchanged.
 		§§
-		§§ @param _ — the String to look for
-		§§ @param with — the String to put in its place
-		§§ @returns — the String with the replacements made.
-		replaceEvery(_ part: String, with replacement: String) -> String {
-			§ The guard is the empty-part rule above `contains`:
-			§ `split(on "")::join` would put the replacement between the
-			§ characters.
-			if part::isEmpty() {
-				<- @
-			} else {
-				<- @::split(on part)::join(with replacement)
+		overload replaceEvery {
+			§§ @param _ — the String to look for
+			§§ @param with — the String to put in its place
+			§§ @returns — the String with the replacements made.
+			(_ part: String, with replacement: String) -> String {
+				§ The guard is the empty-part rule above `contains`:
+				§ `split(on "")::join` would put the replacement between the
+				§ characters.
+				if part::isEmpty() {
+					<- @
+				} else {
+					<- @::split(on part)::join(with replacement)
+				}
 			}
+
+			§ Native. The split above cuts on the receiver's own text. A
+			§ folded receiver is not the text to build the answer out of;
+			§ see the note above `contains`.
+
+			§§ @param _ — the String to look for
+			§§ @param with — the String to put in its place
+			§§ @param comparing — whether case is significant
+			§§ @returns — the String with the replacements made under the given `CaseSensitivity`.
+			(
+				_ part: String,
+				with replacement: String,
+				comparing sensitivity: CaseSensitivity,
+			) -> String
 		}
 
 		§ Written on `firstIndex` and `slice`, so that a String with one
@@ -466,29 +821,43 @@ declarations {
 		§§
 		§§ The empty String matches nowhere, so it and a part that does not occur leave the String unchanged.
 		§§
-		§§ @param _ — the String to look for
-		§§ @param with — the String to put in its place
-		§§ @returns — the String with the first replacement made.
-		replaceFirst(_ part: String, with replacement: String) -> String {
-			if part::isEmpty() {
-				<- @
-			}
+		overload replaceFirst {
+			§§ @param _ — the String to look for
+			§§ @param with — the String to put in its place
+			§§ @returns — the String with the first replacement made.
+			(_ part: String, with replacement: String) -> String {
+				if part::isEmpty() {
+					<- @
+				}
 
-			§ `@` is rebound inside `match`; see DEVELOPMENT.md, Why bodies
-			§ look the way they do.
-			constant text = @
+				§ `@` is rebound inside `match`; see DEVELOPMENT.md, Why
+				§ bodies look the way they do.
+				constant text = @
 
-			<- match text::firstIndex(of part) -> String {
-				case #Empty { <- text }
+				<- match text::firstIndex(of part) -> String {
+					case #Empty { <- text }
 
-				case #Value(position) {
-					<- text::slice(to position)
-						::append(replacement)
-						::append(
-							text::slice(from position::add(part::length())),
-						)
+					case #Value(position) {
+						<- text::slice(to position)
+							::append(replacement)
+							::append(
+								text::slice(from position::add(part::length())),
+							)
+					}
 				}
 			}
+
+			§ Native, for the reason `replaceEvery`'s folding entry is.
+
+			§§ @param _ — the String to look for
+			§§ @param with — the String to put in its place
+			§§ @param comparing — whether case is significant
+			§§ @returns — the String with the first replacement made under the given `CaseSensitivity`.
+			(
+				_ part: String,
+				with replacement: String,
+				comparing sensitivity: CaseSensitivity,
+			) -> String
 		}
 
 		§ Native. The Essence body builds a List of `count` copies with
@@ -580,6 +949,143 @@ declarations {
 				}
 			}
 		}
+
+		§§ Answers the String without the given prefix or suffix.
+		§§
+		§§ The String comes back unchanged when it does not begin or end with the given one. The empty String is a prefix and a suffix of every String, and taking it away changes nothing.
+		§§
+		§§ @example
+		§§   expect "/api/users"::remove(prefix "/api")::is("/users")
+		§§   expect "String.es"::remove(suffix ".es")::is("String")
+		overload remove {
+			§§ @param prefix — the String to take off the front
+			§§ @returns — the String without that prefix.
+			(prefix part: String) -> String {
+				if @::starts(with part) {
+					<- @::slice(from part::length())
+				} else {
+					<- @
+				}
+			}
+
+			§§ @param suffix — the String to take off the end
+			§§ @returns — the String without that suffix.
+			(suffix part: String) -> String {
+				if @::ends(with part) {
+					<- @::slice(to @::length()::subtract(part::length()))
+				} else {
+					<- @
+				}
+			}
+		}
+
+		§§ Answers the String with its first character in upper case.
+		§§
+		§§ Every other character is left as it stands. The empty String answers itself.
+		§§
+		§§ @example
+		§§   expect "lions"::capitalize()::is("Lions")
+		§§
+		§§ @returns — the String with an upper-case first character.
+		capitalize() -> String {
+			<- @::slice(to 1)::uppercase()::append(@::slice(from 1))
+		}
+
+		§§ Answers the String cut down to the given length, ending with an ellipsis.
+		§§
+		§§ The ellipsis counts toward the length, so the answer is never longer than the length asked for. A String already that short answers itself. A length that leaves no room for the ellipsis answers the ellipsis cut to the length, and a length below one answers the empty String.
+		§§
+		§§ @example
+		§§   expect "Hello, World"::truncate(to 8)::is("Hello, …")
+		§§   expect "Hello"::truncate(to 8)::is("Hello")
+		§§
+		§§ @param to — the length to cut down to
+		§§ @param with — the String to end with; a horizontal ellipsis when it is left out
+		§§ @returns — the cut String, of that length at the most.
+		truncate(to length: Integer, with ellipsis: String = "…") -> String {
+			if @::length()::isLessThanOrEqualTo(length) {
+				<- @
+			}
+
+			if length::isLessThanOrEqualTo(0) {
+				<- ""
+			}
+
+			constant room = length::subtract(ellipsis::length())
+
+			if room::isLessThanOrEqualTo(0) {
+				<- ellipsis::slice(to length)
+			} else {
+				<- @::slice(to room)::append(ellipsis)
+			}
+		}
+
+		§§ Answers the String with every line moved in by the given depth.
+		§§
+		§§ A line that is empty is left as it is, so no line gains whitespace that carries no text. The answer joins the lines with a line feed, whichever line break the String was written with.
+		§§
+		§§ @example
+		§§   expect "text"::indent(by 2)::is("    text")
+		§§
+		§§ @param by — how many units to move each line in by
+		§§ @param with — the unit to move by, repeated as needed; two spaces when it is left out
+		§§ @returns — the indented String.
+		indent(by depth: Integer, with unit: String = "  ") -> String {
+			constant prefix = unit::repeat(times depth)
+
+			<- @::lines()
+				::map((line) {
+					if line::isEmpty() {
+						<- line
+					} else {
+						<- line::prepend(prefix)
+					}
+				})
+				::join(with "\n")
+		}
+
+		§ Native. The counting is by character, so it belongs beside the
+		§ other character walks rather than on a number. A card number
+		§ reaches it as well as a numeral. The `from:` label names the end
+		§ the counting starts at, so `#End` puts the short group at the
+		§ front. A `#BothEnds` counts from the end too, because grouping has
+		§ a direction rather than two ends. The Choice `trim` and `pad`
+		§ already read was taken over a two-Case Choice of its own. That one
+		§ would have cost the six registration sites a Choice costs, for one
+		§ Method.
+
+		§§ Answers the String with a separator put in every so many characters.
+		§§
+		§§ The separator goes between the groups and never at either end. A String no longer than one group answers itself.
+		§§
+		§§ @example
+		§§   expect "1234567"::separate(every 3, with ",")::is("1,234,567")
+		§§   expect "1234567"::separate(every 3, with ",", from #Start)::is("123,456,7")
+		§§
+		§§ @param every — how many characters a group holds, proven to be above zero
+		§§ @param with — the separator to put between the groups
+		§§ @param from — the end to count the groups from; `#End` when it is left out
+		§§ @returns — the grouped String.
+		separate(
+			every size: PositiveInteger,
+			with separator: String,
+			from side: Side = #End,
+		) -> String
+
+		§ Native, and the same Function the printer calls. A String is
+		§ quoted inside a List, a Record or a Case and bare on its own. This
+		§ is how a Program asks for the first spelling while it builds the
+		§ text itself.
+
+		§§ Answers the String as a Program would write it down.
+		§§
+		§§ The text is put in quotes, and anything a String Literal has to escape is escaped. A character with no spelling of its own is written as its code point.
+		§§
+		§§ @example
+		§§   expect "ab"::quoted()::is("\"ab\"")
+		§§
+		§§ @returns — the quoted String.
+		quoted() -> String
 	}
 
 	§ What a String proven to have a character answers that a bare one can
@@ -615,21 +1121,21 @@ declarations {
 		§§ Answers the characters of the String, each as its own String.
 		§§
 		§§ @returns — the List of characters, which always holds at least one.
-		characters() -> NonEmptyList<String>
+		characters() -> NonEmptyList<Character>
 
 		§§ Answers the first character of the String.
 		§§
 		§§ The String has a character in it, so there is a first one to answer.
 		§§
 		§§ @returns — the first character.
-		firstCharacter() -> String
+		firstCharacter() -> Character
 
 		§§ Answers the last character of the String.
 		§§
 		§§ The String has a character in it, so there is a last one to answer.
 		§§
 		§§ @returns — the last character.
-		lastCharacter() -> String
+		lastCharacter() -> Character
 
 		§§ Answers the String with every character in upper case.
 		§§
@@ -664,6 +1170,7 @@ declarations {
 
 export {
 	CaseSensitivity
+	Character
 	NonEmptyString
 	NormalizationForm
 	Side

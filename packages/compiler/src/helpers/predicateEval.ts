@@ -582,6 +582,45 @@ const STRING_PREDICATES: Record<string, PredicateEvaluator> = {
 	// It is a leaf of its own for that reason: the body reads a chain rather
 	// than asking one Method of `@`. `hasCharacters` is this one negated.
 	isEmpty: stringQuestion((value) => value.length === 0),
+
+	// NOTE: `isOneCharacter` is `@::length()::is(1)`, and `length` counts
+	// grapheme clusters — so this one has to segment where `isEmpty` could
+	// read the code units. It is the same segmentation the runtime performs
+	// (`graphemesOf` in `String.ts`): the NFC form, cut by `Intl.Segmenter`.
+	// A written `"a"` is what proves `Character` at a call, so a table that
+	// declined to decide it would leave every Character Argument to be
+	// narrowed by hand.
+	isOneCharacter: stringQuestion((value) => isOneGrapheme(value)),
+}
+
+// NOTE: Whether the text is ONE grapheme cluster, counted the way the runtime
+// counts. The Segmenter is built on first use and remembered, for the reason
+// `String.ts` gives: constructing one costs about a millisecond of table
+// loading, and a compile that never asks this question should not pay it.
+let graphemeSegmenter: Intl.Segmenter | null = null
+
+function isOneGrapheme(value: string): boolean {
+	if (value.length === 0) {
+		return false
+	}
+
+	if (graphemeSegmenter === null) {
+		graphemeSegmenter = new Intl.Segmenter(undefined, {
+			granularity: "grapheme",
+		})
+	}
+
+	let segments = 0
+
+	for (let _ of graphemeSegmenter.segment(value.normalize("NFC"))) {
+		segments++
+
+		if (segments > 1) {
+			return false
+		}
+	}
+
+	return segments === 1
 }
 
 const LIST_PREDICATES: Record<string, PredicateEvaluator> = {

@@ -8,9 +8,9 @@ import { bothEnds, end, start } from "../Side"
 import {
 	character__overload$1 as character,
 	compare__overload$1 as compare,
-	count,
+	count__overload$1 as count,
 	createString,
-	ends,
+	ends__overload$1 as ends,
 	firstIndex__overload$1 as firstIndex,
 	lastIndex__overload$1 as lastIndex,
 	length,

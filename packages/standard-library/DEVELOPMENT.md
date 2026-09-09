@@ -176,19 +176,22 @@ purpose** — wherever it stands. A refinement erases before anything runs, so a
 entry whose promise is about the answer can not say it in Essence and has to be
 native; where the entry it stands beside is an Essence body performing the SAME
 operation, the runtime writes that operation out a second time rather than
-instead of it. Six do. `NonEmptyList` holds two — `prepend(contentsOf:)` and
+instead of it. Five do. `NonEmptyList` holds two — `prepend(contentsOf:)` and
 `replace(_:at:)`, each written in Essence on `List` — `List.repeat`'s
 `PositiveInteger` entry is the third, native because the entry beside it answers
 a `List`, and an expression that is not empty is not one the language can be
-told is not empty; `NonZeroRational::reciprocal` and `negate` are the fourth and
-fifth, for the same reason one level along; and `NonEmptyString::characters` is
-the sixth, spelled out of the `split(on "")` its own Essence twin is.
+told is not empty; and `NonZeroRational::reciprocal` and `negate` are the fourth
+and fifth, for the same reason one level along. `NonEmptyString::characters` was
+the sixth until `String::characters` went native itself: its answer is a
+`List<Character>`, which is a promise about the ANSWER, so the base entry could
+not stay in Essence either — and the refined entry re-exports that one runtime
+Function now.
 `NonEmptyList::firstItem`, `NonEmptyString::firstCharacter` and
 `NonEmptyDictionary::firstEntry` are on no such list, though each stands beside
 a body of the same name: an entry that unwraps an Optional performs a different
 operation from the one that answers it. Every other refined entry READS off the
 native beside it instead — `NonNegativeInteger::squareRoot` is the shape to
-copy — and these six can not, because the entry each stands beside is an Essence
+copy — and these five can not, because the entry each stands beside is an Essence
 body and so exports no runtime Function to import. That is the exception the
 rule above allows, and it is only safe because `StdlibExhaustive.es` calls both
 entries over the same inputs, wherever they stand: the golden capture is what
@@ -313,8 +316,8 @@ groups, in this order:
 5. **Accessors** — the Methods that answer a named part of the receiver:
    `length`, `numerator`, `denominator`, `absolute`, `item(at:)`, `firstItem`,
    `lastItem`, `onlyItem`, `firstIndex`, `lastIndex`, `indices`, `everyIndex`,
-   `keys`, `values`, `entries`, `firstEntry`, `characters`, `words`, `lines`,
-   `character(at:)`, `firstCharacter`, `lastCharacter`,
+   `keys`, `values`, `entries`, `firstEntry`, `characters`, `codePoints`,
+   `words`, `lines`, `character(at:)`, `firstCharacter`, `lastCharacter`,
    `value(defaultingTo:)`, `reason`, `reasons`.
 6. **Transforms, and everything else** — `negate`, `round`, `clamp`,
    `reciprocal`, `map`, `reduce`, `everyItem`, `sort`, `slice`, `append`,
@@ -768,7 +771,10 @@ native signature needs its Union alias in `UNION_NAME_ALIASES`, its Case types
 in `CASE_TYPES`, and each of those names in `RUNTIME_TYPE_MODULES` — otherwise
 `generate:natives` throws `no runtime type known for Case '<Choice>#<Case>'`
 rather than rendering the contract. `Side` needed all three, because
-`String::trim(at:)` takes one.
+`String::trim(at:)` takes one, and so did `CaseSensitivity` the day
+`String::firstIndex(of:comparing:)` became the first native to read one. The
+Choice had been there from the beginning; every entry taking it until then was
+written in Essence.
 
 A GENERIC `choice` uses the other pair of maps. `UNION_NAME_ALIASES` is keyed on
 `UnionType.name`, which an applied generic does not carry — it stamps

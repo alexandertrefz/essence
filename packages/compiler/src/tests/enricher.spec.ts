@@ -10285,13 +10285,13 @@ describe("Enricher", () => {
 				"PositiveInteger",
 			)
 			expect(answerOf('constant characters = "abc"::characters()')).toBe(
-				"NonEmptyList<String>",
+				"NonEmptyList<Character>",
 			)
 			expect(answerOf('constant first = "abc"::firstCharacter()')).toBe(
-				"String",
+				"Character",
 			)
 			expect(answerOf('constant last = "abc"::lastCharacter()')).toBe(
-				"String",
+				"Character",
 			)
 			expect(answerOf('constant loud = "abc"::uppercase()')).toBe(
 				"NonEmptyString",
@@ -10302,7 +10302,7 @@ describe("Enricher", () => {
 			expect(
 				answerOf(`constant text = "abc"::append("d")
 					constant first = text::firstCharacter()`),
-			).toBe("Optional<String>")
+			).toBe("Optional<Character>")
 		})
 
 		// NOTE: A written List is counted by its BRACKETS, and an empty pair

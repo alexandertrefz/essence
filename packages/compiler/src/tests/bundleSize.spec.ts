@@ -115,7 +115,7 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(77_200)
 	})
 
-	// NOTE: 37,985 measured; a reintroduced `Number` spread was 54,849. The same
+	// NOTE: 37,993 measured; a reintroduced `Number` spread was 54,849. The same
 	// claim as Everyday's, on a Program that takes square roots rather than
 	// doing arithmetic — so it reads the other side of several trades. A pass
 	// that pays text for work on Everyday takes bytes OFF here, because a file
@@ -132,6 +132,10 @@ describe("Bundle Size", () => {
 	// that pays for it in bodies it does name. 270 are `Algebraic::raise(to:)`,
 	// 64 the irrationals' `toString(as:)` entries, and 32 the `Integer` grid
 	// rungs the `round` here resolves to for a whole receiver.
+	//
+	// NOTE: 8 are an identifier growing. `String.ts`'s internal `quoted` is
+	// `quotedText` now, so that the Method of that name can be the native it
+	// is, and the printer every Program links calls it under the longer name.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(39_100)
 	})
@@ -154,18 +158,19 @@ describe("Bundle Size", () => {
 	// NOTE: 58 of these bytes arrived without a Dictionary being touched at
 	// all: 34 with the `Integer` grid rungs, whose `toString` binding this file
 	// links under its Overload name now, and 24 with `Optional`'s new
-	// combinators.
+	// combinators. 8 more are the `quotedText` rename Irrational's note
+	// explains, which every Program that prints pays alike.
 	//
 	// NOTE: 19 more are the key encoding moving to `keyEncoding.ts`, so that
 	// the set-shaped List natives can rest on it without the store. The same
 	// functions arrive here in the same order, under one more of esbuild's
 	// per-module banner comments — which is the whole of the difference.
 	//
-	// NOTE: 59,497 measured now, and the 11,655 bytes between the two figures
+	// NOTE: 59,505 measured now, and the 11,655 bytes between the two figures
 	// are what the fixture ITSELF grew by: it exercises the Methods the
 	// completeness wave added, and each drags its own reach in. Measured one
 	// call at a time against a fixture without the new section, which is
-	// 47,842: `sort()` is 3,412 of them and `sort(on:)` 3,139 — the two share
+	// 47,850: `sort()` is 3,412 of them and `sort(on:)` 3,139 — the two share
 	// most of that, since both reach the same native and the `Comparable`
 	// witness of what they order — `Dictionary.of(_, valuedBy:)` 2,137 for the
 	// `List::map` it is written on, `count(where:)` 1,384 for `List::count`,
@@ -181,8 +186,8 @@ describe("Bundle Size", () => {
 	// Program below at 12,753, and `HelloWorld.es` at 6,930. `Everyday.es`
 	// reads 76,221 now, and all 48 of the bytes it took later are `List`
 	// Methods becoming Overloads rather than anything a Dictionary reaches. A
-	// Dictionary runtime that grew would move the second of those, which
-	// reaches the whole store through one call and none of the new Methods.
+	// runtime that grew would move the second of those, which reaches the whole
+	// store through one call and none of the new Methods.
 	it("charges a Dictionary Program for the container it uses", async () => {
 		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(60_500)
 	})

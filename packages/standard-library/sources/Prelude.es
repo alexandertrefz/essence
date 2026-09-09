@@ -76,6 +76,7 @@ export {
 	from "./Step.es" { Step }
 	from "./String.es" {
 		CaseSensitivity
+		Character
 		NonEmptyString
 		NormalizationForm
 		Side

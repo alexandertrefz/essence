@@ -243,6 +243,10 @@ export const builtinTypeOrder: Array<string> = [
 	// NOTE: Directly after the Type it refines, for the reason `NonZeroInteger`
 	// sits directly after `Integer`.
 	"NonEmptyString",
+	// NOTE: The second refinement of `String`, after the one a Program meets
+	// first — a String with something in it is the everyday proof, and a String
+	// of exactly one character is what reading a character answers.
+	"Character",
 	"Integer",
 	// NOTE: Directly after the Type it refines, for the reason `NestedList` sits
 	// directly after `List` — a reader of this table meets `Integer` and then what

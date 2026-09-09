@@ -10,13 +10,11 @@
 // exactly what the Namespace's target bought. The proof is spent HERE, which is
 // why neither of the two ends could be written in Essence: the language has no
 // way to be told that it holds.
-import type { ListType } from "./List"
 import {
 	createAsciiString,
 	createString,
 	graphemesIn,
 	isAsciiIn,
-	split__overload$1,
 	type StringType,
 } from "./String"
 
@@ -49,21 +47,17 @@ export function lastCharacter(string: StringType): StringType {
 	return createString(characters[characters.length - 1]!)
 }
 
-// NOTE: `@::split(on "")`, which is the Essence body of `String::characters`,
-// written here as the one call it is: that body exports nothing to import, and
-// the empty separator is the one arm of `split` this reproduces. Splitting is
-// what decides what a character is (`graphemesOf` in `String.ts`), so going
-// through it is what keeps the two entries answering the same characters.
-const noSeparator = createString("")
-
-export function characters(string: StringType): ListType<StringType> {
-	return split__overload$1(string, noSeparator)
-}
-
 // NOTE: Everything below is `String`'s own Function under this Namespace's
-// name. The count is the same walk, and the four transforms are the same
-// operations — none of them can empty a String that was not empty, which is
-// all the refined answer says. Each is here at all because an Essence body
-// could not write it: `@::length()` on a proven receiver is this Method rather
-// than `String`'s.
-export { length, lowercase, repeat, reverse, uppercase } from "./String"
+// name. The characters are the same segmentation and the count is the same
+// walk, and the four transforms are the same operations — none of them can
+// empty a String that was not empty, which is all the refined answer says.
+// Each is here at all because an Essence body could not write it:
+// `@::length()` on a proven receiver is this Method rather than `String`'s.
+export {
+	characters,
+	length,
+	lowercase,
+	repeat,
+	reverse,
+	uppercase,
+} from "./String"
