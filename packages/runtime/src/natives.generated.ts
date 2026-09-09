@@ -683,15 +683,18 @@ export type NumberListNatives = {
 }
 
 export type NonEmptyIntegerListNatives = {
-
+	// mode() -> Integer
+	mode: (self: ListType<IntegerType>) => IntegerType
 }
 
 export type NonEmptyRationalListNatives = {
-
+	// mode() -> Rational
+	mode: (self: ListType<RationalType>) => RationalType
 }
 
 export type NonEmptyNumberListNatives = {
-
+	// mode() -> Scalar
+	mode: (self: ListType<IntegerType | RationalType>) => IntegerType | RationalType
 }
 
 export type KeyedNumberListNatives = {
@@ -1234,15 +1237,24 @@ export const $NumberListAbsent: AssertNoEssenceExports<typeof import("./NumberLi
 
 declare const NonEmptyIntegerListModule: typeof import("./NonEmptyIntegerList")
 export const $NonEmptyIntegerList: NonEmptyIntegerListNatives = NonEmptyIntegerListModule
-export const $NonEmptyIntegerListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyIntegerList"), "lowestNumber" | "highestNumber" | "average" | "median" | "percentile" | "mode" | "variance" | "standardDeviation"> = true
+export const $NonEmptyIntegerListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyIntegerList"), "lowestNumber" | "highestNumber" | "average" | "median" | "percentile" | "variance" | "standardDeviation"> = true
+export const $NonEmptyIntegerListArity: AssertArities<typeof import("./NonEmptyIntegerList"), {
+	mode: 1
+}> = true
 
 declare const NonEmptyRationalListModule: typeof import("./NonEmptyRationalList")
 export const $NonEmptyRationalList: NonEmptyRationalListNatives = NonEmptyRationalListModule
-export const $NonEmptyRationalListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyRationalList"), "lowestNumber" | "highestNumber" | "average" | "median" | "percentile" | "mode" | "variance" | "standardDeviation"> = true
+export const $NonEmptyRationalListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyRationalList"), "lowestNumber" | "highestNumber" | "average" | "median" | "percentile" | "variance" | "standardDeviation"> = true
+export const $NonEmptyRationalListArity: AssertArities<typeof import("./NonEmptyRationalList"), {
+	mode: 1
+}> = true
 
 declare const NonEmptyNumberListModule: typeof import("./NonEmptyNumberList")
 export const $NonEmptyNumberList: NonEmptyNumberListNatives = NonEmptyNumberListModule
-export const $NonEmptyNumberListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyNumberList"), "lowestNumber" | "highestNumber" | "average" | "median" | "percentile" | "mode" | "variance" | "standardDeviation"> = true
+export const $NonEmptyNumberListAbsent: AssertNoEssenceExports<typeof import("./NonEmptyNumberList"), "lowestNumber" | "highestNumber" | "average" | "median" | "percentile" | "variance" | "standardDeviation"> = true
+export const $NonEmptyNumberListArity: AssertArities<typeof import("./NonEmptyNumberList"), {
+	mode: 1
+}> = true
 
 declare const KeyedNumberListModule: typeof import("./KeyedNumberList")
 export const $KeyedNumberList: KeyedNumberListNatives = KeyedNumberListModule

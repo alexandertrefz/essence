@@ -3,7 +3,13 @@ import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
 import type { EquatableWitness, KeySet } from "./keyEncoding"
-import { addKey, freshKeySet, hasKey } from "./keyEncoding"
+import {
+	addKey,
+	countKey,
+	freshKeyCount,
+	freshKeySet,
+	hasKey,
+} from "./keyEncoding"
 import type { OptionalType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
 import { equal, greater, less, type OrderingType } from "./Ordering"
@@ -1860,6 +1866,43 @@ export function hasDuplicates__overload$2<
 	conformance: EquatableWitness<Key>,
 ): BooleanType {
 	return meetsAKeyTwice(originalList, keyOf, conformance)
+}
+
+// NOTE: The item counted highest, and the sixth Method resting on
+// `keyEncoding.ts` rather than on a container. It is here beside the
+// set-shaped natives because it is one of them with a tally instead of a
+// membership test: one walk, one lookup per item, and the earliest of the keys
+// counted highest — earliest because a later key has to BEAT the count rather
+// than meet it, and the keys are held in the order each was first met.
+//
+// NOTE: The three Namespaces that declare it — `NonEmptyIntegerList`,
+// `NonEmptyRationalList` and `NonEmptyNumberList` — are one Function here, and
+// the answer is the key's FIRST occurrence, which is the item a Dictionary
+// would have kept. That matters where two spellings are one key: `[2/4, 1/2,
+// 1/2]` answers `2/4`, and `[3, 3/1, 4]` answers the Integer `3`.
+export function mode<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+): ItemType {
+	let view = runsOf(originalList)
+	let count = freshKeyCount<ItemType>()
+
+	for (let index = view.frontCount - 1; index >= 0; index--) {
+		countKey(count, view.front[index])
+	}
+
+	for (let index = 0; index < view.backCount; index++) {
+		countKey(count, view.back[index])
+	}
+
+	let highest = 0
+
+	for (let index = 1; index < count.counts.length; index++) {
+		if (count.counts[index] > count.counts[highest]) {
+			highest = index
+		}
+	}
+
+	return count.keys[highest]
 }
 
 // NOTE: The pieces a separator leaves, which is `String::split(on:)`'s shape
