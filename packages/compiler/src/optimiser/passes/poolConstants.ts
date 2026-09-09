@@ -1,6 +1,9 @@
 import type { common } from "@essence-lang/interfaces"
 
-import { derivedEquatableNamespaceName } from "../../enricher/resolvers"
+import {
+	derivedEnumerableNamespaceName,
+	derivedEquatableNamespaceName,
+} from "../../enricher/resolvers"
 import { runtimeNamespaceNames } from "../../rewriter/runtimeNamespaces"
 import type { OptimiserPass } from "../index"
 import type { DeclaredNamespaces } from "../namespaces"
@@ -212,6 +215,13 @@ function conformanceKeyOf(
 		methods: node.methodMap,
 		provided: node.providedMethods ?? null,
 		descriptor: node.derivedDescriptor ?? null,
+		// NOTE: LOAD-BEARING for the Case listing a Choice derives. Every
+		// Choice's witness names one Namespace and one Method — the map is
+		// `{ cases: cases }` for all of them — and what tells two of them apart
+		// is the tags the helper is curried with. A key without these would
+		// declare one const for two Choices and answer the second one's
+		// `cases()` with the first one's Cases.
+		cases: node.derivedCases ?? null,
 		conditions,
 	})}`
 }
@@ -252,8 +262,9 @@ const runtimeNamespaces = new Set<string>(runtimeNamespaceNames)
 // key that can not tell them apart would declare one const and hand it to both.
 //
 // A runtime Module it can: `import * as Integer` binds before any Statement
-// runs, and so does the fabricated Namespace a Choice's derived equality names,
-// which is emitted as a read off the runtime helpers. That holds even where the
+// runs, and so does either fabricated Namespace a Choice's derives name — both
+// are emitted as a read off the runtime helpers, the Case listing curried with
+// the tags that tell one Choice's witness from another's in the key above. That holds even where the
 // Program IS the standard library and declares the name itself — what the
 // emitted Module reads there is still the import.
 //
@@ -272,6 +283,7 @@ function poolableNamespace(
 
 	return (
 		name === derivedEquatableNamespaceName ||
+		name === derivedEnumerableNamespaceName ||
 		runtimeNamespaces.has(name) ||
 		declared.all.has(name)
 	)
