@@ -464,6 +464,10 @@ export interface ConformanceValueNode {
 	// Equatable — the Rewriter then emits `$helpers.boundChoiceIs(<descriptor>)`
 	// for each mapped Method instead of the plain `choiceIs`.
 	derivedDescriptor?: DerivedEquatableDescriptor
+	// NOTE: Present only when this witness is a Choice's derived `Enumerable` —
+	// the Rewriter then emits `$helpers.choiceCases(<tags>)` for the one Method
+	// it maps, there being no Namespace anywhere to read it off.
+	derivedCases?: Array<string>
 	type: Type
 	position?: Position
 }
@@ -678,6 +682,12 @@ export interface LookupNode {
 	// a Namespace, which is what sends the emission to the shared const rather
 	// than to a member of that Namespace.
 	providedBy?: string
+	// NOTE: As on the typed Node — a derived `Enumerable::cases`, and the tags
+	// its answer is built from.
+	derivedCases?: Array<string>
+	// NOTE: As on the typed Node — the conformance Parameter a bounded Type
+	// Parameter's member is read off.
+	conformanceName?: string
 }
 
 export interface IdentifierNode {
@@ -1060,6 +1070,10 @@ export interface DirectMethodNode {
 	// widens to the descriptor-driven helper, and the one function that decides
 	// that is the one this is emitted through.
 	derivedDescriptor?: DerivedEquatableDescriptor
+	// NOTE: Present only when this witness is a Choice's derived `Enumerable` —
+	// the Rewriter then emits `$helpers.choiceCases(<tags>)` for the one Method
+	// it maps, there being no Namespace anywhere to read it off.
+	derivedCases?: Array<string>
 	type: Type
 	position?: Position
 }

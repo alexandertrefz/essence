@@ -3018,6 +3018,231 @@ describe("Choices", () => {
 		})
 	})
 
+	// NOTE: The third derive, and the one whose answer is the Choice itself
+	// rather than a value of it: `Enumerable::cases` is a static, so it is
+	// spelled on the Choice's name. It is derived like equality rather than
+	// like printing — nothing declares it — and it is withheld for a Choice
+	// that carries a payload anywhere, because there is no value of such a Case
+	// to list without inventing one.
+	describe("Derived Case Listing", () => {
+		const colourChoice = `
+			choice Colour {
+				Red,
+				Green,
+				Blue,
+			}
+		`
+
+		// NOTE: The order is the DECLARATION order, which is the promise the
+		// `§§` makes and the only order a caller can build a menu on.
+		it("answers every Case of a builtin Choice in declaration order", async () => {
+			expect(
+				await run(`implementation {
+					Terminal.inspect(Side.cases()::toString())
+					Terminal.inspect(Ordering.cases()::toString())
+				}`),
+			).toEqual(['"[Start, End, BothEnds]"', '"[Less, Equal, Greater]"'])
+		})
+
+		// NOTE: A Choice with no Namespace at all still answers. The name in
+		// the base position is the Choice's, and the derive is what it reads
+		// through — which is what keeps `cases()` from costing an empty
+		// Namespace nobody would otherwise write.
+		it("answers for a Choice no Namespace was written for", async () => {
+			expect(
+				await run(`implementation { ${colourChoice}
+					Terminal.inspect(Colour.cases()::length())
+				}`),
+			).toEqual(["3"])
+		})
+
+		it("answers for a Choice a Namespace was written for", async () => {
+			expect(
+				await run(`implementation { ${colourChoice}
+					namespace Colour for Colour is Printable { }
+
+					Terminal.inspect(Colour.cases()::toString())
+				}`),
+			).toEqual(['"[Red, Green, Blue]"'])
+		})
+
+		// NOTE: The answer's Type is `NonEmptyList`, so `firstItem` answers an
+		// item rather than an Optional. A Choice declares at least one Case,
+		// which is what makes the proof honest.
+		it("answers a List proven to hold an item", async () => {
+			expect(
+				await run(`implementation { ${colourChoice}
+					namespace Colour for Colour is Printable { }
+
+					Terminal.inspect(Colour.cases()::firstItem()::toString())
+				}`),
+			).toEqual(['"Red"'])
+		})
+
+		// NOTE: A Case with a payload has no value the Choice itself can name,
+		// so nothing is derived and the name is simply not a member.
+		it("derives nothing for a Choice with a payload", () => {
+			expect(
+				codesOf(`implementation {
+					choice Shape {
+						Circle { radius: Integer },
+						Square { side: Integer },
+					}
+
+					namespace Shape for Shape is Printable {
+						§§ The Shape's name.
+						§§
+						§§ @returns — a name.
+						toString() -> String {
+							<- "shape"
+						}
+					}
+
+					Terminal.print(Shape.cases()::length()::toString())
+				}`),
+			).toEqual(["unknown-member"])
+		})
+
+		// NOTE: The derive is a fallback, never an override — the same rule
+		// equality and printing follow.
+		it("keeps a written 'cases' in place of the derived one", async () => {
+			expect(
+				await run(`implementation { ${colourChoice}
+					namespace Colour for Colour {
+						§§ The Colours worth offering.
+						§§
+						§§ @returns — one Colour.
+						static cases() -> NonEmptyList<Colour> {
+							<- [#Red]
+						}
+					}
+
+					Terminal.inspect(Colour.cases()::length())
+				}`),
+			).toEqual(["1"])
+		})
+
+		// NOTE: A Namespace may say so, and saying so is neither needed nor
+		// refused — exactly what a Choice declaring `is Equatable` does.
+		it("accepts a declared conformance a Choice already has", () => {
+			expect(
+				messagesOf(`implementation { ${colourChoice}
+					namespace Colour for Colour is Enumerable { }
+
+					Terminal.print(Colour.cases()::length()::toString())
+				}`),
+			).toEqual([])
+		})
+
+		it("refuses a declared conformance a Choice with a payload can not answer", () => {
+			expect(
+				codesOf(`implementation {
+					choice Shape {
+						Circle { radius: Integer },
+					}
+
+					namespace Shape for Shape is Enumerable { }
+
+					Terminal.print("x")
+				}`),
+			).toEqual(["nonconforming-namespace"])
+		})
+
+		it("refuses a declared conformance on a Namespace over no Choice", () => {
+			expect(
+				codesOf(`implementation {
+					namespace Counter for Integer is Enumerable { }
+
+					Terminal.print("x")
+				}`),
+			).toEqual(["nonconforming-namespace"])
+		})
+
+		// NOTE: The Protocol earns its keep here: a body bounded by it calls
+		// the static on the Type Parameter, and the witness the call is handed
+		// is what answers. `T.cases()` is the only spelling a static
+		// requirement has, there being no value of `T` to call it on.
+		it("answers through a Protocol bound, from an Essence body", async () => {
+			expect(
+				await run(`implementation { ${colourChoice}
+					namespace Colour for Colour is Printable { }
+
+					function namesOf <infer T is Enumerable>(_ example: T) -> Integer {
+						<- T.cases()::length()
+					}
+
+					constant red: Colour = #Red
+					constant start: Side = #Start
+
+					Terminal.inspect(namesOf(red))
+					Terminal.inspect(namesOf(start))
+				}`),
+			).toEqual(["3", "3"])
+		})
+
+		// NOTE: And a Choice that carries a payload reaches the same bound by
+		// writing the Method, which is the whole of what a conformance the
+		// derive withholds costs.
+		it("answers through a bound for a written conformance", async () => {
+			expect(
+				await run(`implementation {
+					choice Shape {
+						Circle { radius: Integer },
+						Square { side: Integer },
+					}
+
+					namespace Shape for Shape is Enumerable {
+						§§ The Shapes worth drawing.
+						§§
+						§§ @returns — the Shapes.
+						static cases() -> NonEmptyList<Shape> {
+							<- [#Circle(1), #Square(1)]
+						}
+					}
+
+					function countOf <infer T is Enumerable>(_ example: T) -> Integer {
+						<- T.cases()::length()
+					}
+
+					constant circle: Shape = #Circle(1)
+
+					Terminal.inspect(countOf(circle))
+				}`),
+			).toEqual(["2"])
+		})
+
+		// NOTE: A receiver narrowed to ONE Case does not conform. `Self` stands
+		// in the ANSWER here, so a Case binding would promise a List of that
+		// Case and hand back the Choice's — which is why the Case rail equality
+		// takes is no rail for this. The Choice conforms; the Case is refused.
+		it("refuses a bound bound to a single Case", () => {
+			expect(
+				codesOf(`implementation { ${colourChoice}
+					function countOf <infer T is Enumerable>(_ example: T) -> Integer {
+						<- T.cases()::length()
+					}
+
+					Terminal.print(countOf(Colour#Red)::toString())
+				}`),
+			).toEqual(["unsatisfied-bound"])
+		})
+
+		// NOTE: The emission is the runtime helper curried with the tags, for
+		// the reason a static has to be: there is no receiver at the call for
+		// the Choice to be recovered from. The tags are the very strings a Case
+		// value carries — a Choice a Module declares is prefixed by its path,
+		// which a source parsed without one has none of.
+		it("emits the helper curried with the Case tags", () => {
+			let js = generate(`implementation { ${colourChoice}
+				Terminal.print(Colour.cases()::length()::toString())
+			}`)
+
+			expect(js).toContain("$helpers.choiceCases([")
+			expect(js).toContain('"Colour#Red"')
+			expect(js).toContain('"Colour#Blue"')
+		})
+	})
+
 	// NOTE: A *generic* Choice can only derive Equatable CONDITIONALLY — its
 	// payloads may be Type Parameters, which are equal exactly when the Types
 	// they bind to say so. The derive gains a `where <each payload Parameter> is

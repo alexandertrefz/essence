@@ -571,6 +571,17 @@ export interface LookupNode {
 	// every conformer shares, so the Rewriter has to be told that the member is
 	// not a member of the Namespace it is written on.
 	providedBy?: string
+	// NOTE: The runtime tags of a Choice's Cases, in declaration order, where
+	// this Lookup is a DERIVED `Enumerable::cases` — `Side.cases` is answered by
+	// nobody's Method, so the tags are the whole of what its emission needs.
+	// Absent everywhere else.
+	derivedCases?: Array<string>
+	// NOTE: The hidden conformance Parameter this member is read off, where the
+	// base names a Protocol-bounded Type Parameter rather than a Namespace —
+	// `T.cases()` inside a `<T is Enumerable>` body is `T__conformance.cases()`.
+	// The base keeps the name the author wrote, which is why the Rewriter is
+	// told the other one. Absent for every Lookup on a Namespace.
+	conformanceName?: string
 }
 
 export interface IdentifierNode {

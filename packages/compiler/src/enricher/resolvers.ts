@@ -1559,11 +1559,25 @@ export const derivedEquatableNamespaceName = "Choice_Equatable"
 // turns the one reference to it into the runtime helper.
 export const derivedPrintableNamespaceName = "Choice_Printable"
 
+// NOTE: The Namespace name the derived Case listing answers to, under the same
+// rule as the two above: the `_` keeps it unspellable from Essence, and the
+// Rewriter turns a reference to it into the runtime helper, curried with the
+// tags the Choice's Cases carry.
+export const derivedEnumerableNamespaceName = "Choice_Enumerable"
+
 // NOTE: The Protocol printing is derived for. Named once and exported, because
 // three places ask whether a conformance is that one — the two below and the
 // Language Server's mirror of them — and a typo in any of them would silently
 // derive nothing.
 export const printableProtocolName = "Printable"
+
+// NOTE: The Protocol a Choice's own Cases are listed through, and the one
+// Method it asks for. Both are named once for the reason the Protocol above is:
+// the derive is found by name in four places, and a typo in any of them would
+// leave a Choice quietly answering nothing.
+export const enumerableProtocolName = "Enumerable"
+
+export const enumerableMethodName = "cases"
 
 // NOTE: The identity of the Choice a receiver belongs to, or null when it
 // belongs to none — a single Case names its own Choice, and a Union names one
@@ -2636,6 +2650,90 @@ export function derivedPrintableNamespaceForChoice(
 	}
 }
 
+// NOTE: The runtime tags of a payload-free Choice's Cases, in the order the
+// Choice declares them — the whole of what a derived `cases()` needs to answer,
+// and the same string a Case value carries under `typeKeySymbol`. Null for a
+// Choice that carries a payload anywhere, which derives nothing.
+//
+// NOTE: The order is the Union's own member order, which is the declaration
+// order the Choice was read in — the same order the derived equality's
+// descriptor is keyed in, and what `cases()` promises its caller.
+export function derivedCaseTags(choiceType: common.Type): Array<string> | null {
+	if (!choiceCasesArePayloadFree(choiceType)) {
+		return null
+	}
+
+	let cases =
+		choiceType.type === "UnionType"
+			? flattenUnionMembers(choiceType)
+			: [choiceType]
+
+	return cases.map((caseType) =>
+		caseType.type === "Case" ? `${caseType.choice}#${caseType.name}` : "",
+	)
+}
+
+// NOTE: The Namespace a Choice of payload-free Cases lists its Cases through,
+// or null for one that carries a payload anywhere. Fabricated on demand like
+// the two derives above it, and holding the one Method `Enumerable` asks for.
+//
+// NOTE: Its signature is the Protocol's own requirement with `Self` bound to
+// the Choice, rather than one built here. The answer's Type is `NonEmptyList`,
+// which this module has no way to spell — and reading it off the declaration
+// keeps the derive and the requirement one thing, so a change to the Protocol
+// can not leave a derived Namespace behind that no longer fulfills it.
+export function derivedEnumerableNamespaceForChoice(
+	choiceType: common.Type,
+	protocol: common.ProtocolType,
+): common.NamespaceType | null {
+	let requirement = protocol.methods[enumerableMethodName]
+
+	if (requirement === undefined || !choiceCasesArePayloadFree(choiceType)) {
+		return null
+	}
+
+	return {
+		type: "Namespace",
+		name: derivedEnumerableNamespaceName,
+		targetType: choiceType,
+		generics: [],
+		properties: {},
+		methods: {
+			[enumerableMethodName]: applyGenericBindings(
+				requirement,
+				new Map([["Self", choiceType]]),
+			) as common.MethodType,
+		},
+		conformsTo: [enumerableProtocolName],
+	}
+}
+
+// NOTE: The derived Case listing a Namespace over a Choice reaches, or null
+// where it reaches none. Unlike printing it is DECLARED by nobody: what the
+// Cases of a Choice ARE is a fact about the declaration rather than a decision,
+// which is the rule equality follows — see `Enumerable.es`. A Namespace that
+// writes a `cases` of its own replaces it, exactly as one writing `is` replaces
+// the derived equality, and a GENERIC Namespace derives nothing, because its
+// target names a Type Parameter no call here binds.
+export function derivedEnumerableNamespaceFor(
+	namespace: common.NamespaceType,
+	scope: enricher.Scope,
+): common.NamespaceType | null {
+	if (
+		namespace.generics.length > 0 ||
+		namespace.targetType === null ||
+		Object.hasOwn(namespace.methods, enumerableMethodName)
+	) {
+		return null
+	}
+
+	let protocol = findProtocolInScope(enumerableProtocolName, scope)
+
+	return protocol === null
+		? null
+		: derivedEnumerableNamespaceForChoice(namespace.targetType, protocol)
+}
+
 // NOTE: The derived printing a receiver can reach, or null when it reaches
 // none. Printing is DECLARED where equality is not: a Choice compares by its
 // tags whatever anyone says, but how it READS is a decision, so this answers
@@ -2698,20 +2796,28 @@ function derivedConformanceSource(
 	// `derivedEquatableNamespace` builds are for the direct-call rail, where
 	// invocation inference binds their Parameters; here the witnesses are solved
 	// by hand below instead.
+	let protocol = findProtocolInScope(protocolName, scope)
+
+	if (protocol === null) {
+		return null
+	}
+
+	// NOTE: Listing the Cases is derived like equality rather than like
+	// printing: a Choice of payload-free Cases IS its Case names, so the answer
+	// is a fact about the declaration and nobody has to declare it. A Choice
+	// with a payload anywhere derives nothing here and conforms by writing the
+	// Method — which is the one thing the payload-free rule inside the builder
+	// says.
 	let derived =
 		protocolName === printableProtocolName
 			? written === null
 				? null
 				: derivedPrintableNamespaceForChoice(choiceType)
-			: derivedEquatableNamespaceForChoice(choiceType)
+			: protocolName === enumerableProtocolName
+				? derivedEnumerableNamespaceForChoice(choiceType, protocol)
+				: derivedEquatableNamespaceForChoice(choiceType)
 
 	if (derived === null || !derived.conformsTo?.includes(protocolName)) {
-		return null
-	}
-
-	let protocol = findProtocolInScope(protocolName, scope)
-
-	if (protocol === null) {
 		return null
 	}
 
@@ -2747,6 +2853,21 @@ function derivedConformanceSource(
 			methodMap: result.methodMap,
 			...providedMethodsOf(result),
 			conditions: [],
+		}
+	}
+
+	// NOTE: And the Case listing needs no witness either, for the same reason
+	// and one more: its Method takes no value at all. What it does need is the
+	// tags, because the answer is built rather than read off anything — a
+	// static has no receiver to recover the Choice from at run time.
+	if (derived.name === derivedEnumerableNamespaceName) {
+		return {
+			kind: "namespace",
+			name: derivedEnumerableNamespaceName,
+			methodMap: result.methodMap,
+			...providedMethodsOf(result),
+			conditions: [],
+			derivedCases: derivedCaseTags(choiceType) ?? [],
 		}
 	}
 
@@ -5404,6 +5525,125 @@ function computeNamespacesTargeting(
 	return matchingNamespaces
 }
 
+// NOTE: The pseudo-Namespace a Protocol-bounded Type Parameter's Methods are
+// reached through — named after the hidden conformance parameter the call is
+// emitted against, with `Self` substituted by the Type Parameter itself. Null
+// where the bound names no Protocol in scope, which is a Diagnostic of its own
+// at the declaration.
+//
+// NOTE: The whole Protocol surface, requirements and PROVIDED Methods alike — a
+// witness carries an entry for every one of them, which is what makes a bounded
+// call reach the conformer's override where it wrote one and the shared const
+// where it did not. A Protocol's ancestors are in `protocol.methods` already,
+// so one pseudo Namespace answers for the whole chain.
+//
+// It answers both spellings a bound reaches: the `::` call on a value of the
+// Parameter, and the `T.method(…)` Lookup that names the Parameter itself —
+// which is the only spelling a static requirement has, there being no value of
+// `T` to call `cases()` on.
+export function conformanceNamespaceFor(
+	baseType: common.GenericUse,
+	scope: enricher.Scope,
+): common.NamespaceType | null {
+	if (baseType.constraint === undefined) {
+		return null
+	}
+
+	let protocol = findProtocolInScope(baseType.constraint, scope)
+
+	if (protocol === null) {
+		return null
+	}
+
+	let selfBindings: GenericBindings = new Map([["Self", baseType]])
+	let methods: Record<string, common.MethodType> = {}
+	let providedMembers: Record<string, string> = {}
+
+	for (let [methodName, method] of Object.entries(protocol.methods)) {
+		methods[methodName] = applyGenericBindings(
+			method,
+			selfBindings,
+		) as common.MethodType
+
+		let providingProtocol = providedMethodProtocol(protocol, methodName)
+
+		if (providingProtocol !== null) {
+			providedMembers[methodName] = providingProtocol
+		}
+	}
+
+	return {
+		type: "Namespace",
+		name: conformanceParameterName(baseType.name),
+		targetType: baseType,
+		generics: [],
+		properties: {},
+		methods,
+		...(Object.keys(providedMembers).length === 0
+			? {}
+			: { providedMembers }),
+	}
+}
+
+// NOTE: The Namespace a Lookup reads its member off where the base names no
+// VALUE — `Colour.cases()` on a Choice nobody wrote a Namespace for, and
+// `T.cases()` inside a `<T is Enumerable>` body. Both are Namespaces nobody
+// declared: a Choice's derived `Enumerable`, and a bounded Type Parameter's
+// conformance.
+//
+// NOTE: Answered only for a member that Namespace offers. A name neither
+// offers is left to report `unknown-name` on the base exactly as it did, which
+// is what keeps `Colour.spelledWrong` from answering with a Namespace whose
+// name no source can write.
+//
+// NOTE: A value of the name WINS. The question is asked of a base that resolves
+// to nothing, so a Constant named after a Choice shadows the Choice here as it
+// shadows it everywhere else.
+export function namespaceNamedByType(
+	node: parser.LookupNode,
+	scope: enricher.Scope,
+): common.NamespaceType | null {
+	if (
+		node.base.nodeType !== "Identifier" ||
+		findVariableOrBarredName(node.base.content, scope) !== null
+	) {
+		return null
+	}
+
+	let declared = findTypeInScope(node.base.content, scope)
+
+	if (declared === null) {
+		return null
+	}
+
+	let namespace =
+		declared.type === "GenericUse"
+			? conformanceNamespaceFor(declared, scope)
+			: derivedEnumerableNamespaceForNamedChoice(declared, scope)
+
+	return namespace !== null &&
+		Object.hasOwn(namespace.methods, node.member.content)
+		? namespace
+		: null
+}
+
+// NOTE: The derived Case listing for a Type NAMED in a Lookup's base, or null
+// where the name is no Choice of payload-free Cases. A generic Choice's name
+// resolves to a Generic Alias and answers null: the spelling has no Type
+// Arguments to apply, and the answer's item Type is the Choice.
+function derivedEnumerableNamespaceForNamedChoice(
+	declared: common.Type,
+	scope: enricher.Scope,
+): common.NamespaceType | null {
+	let protocol = findProtocolInScope(enumerableProtocolName, scope)
+
+	if (protocol === null || choiceIdentityOf(declared) === null) {
+		return null
+	}
+
+	return derivedEnumerableNamespaceForChoice(declared, protocol)
+}
+
 export function resolveMethodLookupNamespacesForReceiverType(
 	baseType: common.Type,
 	namespaceSpecifier: parser.MethodInvocationNode["namespaceSpecifier"],
@@ -5419,54 +5659,15 @@ export function resolveMethodLookupNamespacesForReceiverType(
 	}
 
 	// NOTE: A receiver whose Type is a Protocol-bounded Type Parameter
-	// resolves ONLY through its Protocol — a pseudo-Namespace named after the
-	// hidden conformance parameter, with `Self` substituted by the Type
-	// Parameter itself. The Simplifier emits the Namespace name as the call
-	// base, so bodies compile to `Item__conformance.method(item, …)` without
-	// any further machinery.
+	// resolves ONLY through its Protocol — the pseudo-Namespace below, named
+	// after the hidden conformance parameter. The Simplifier emits the
+	// Namespace name as the call base, so bodies compile to
+	// `Item__conformance.method(item, …)` without any further machinery.
 	if (baseType.type === "GenericUse" && baseType.constraint !== undefined) {
-		let protocol = findProtocolInScope(baseType.constraint, scope)
+		let conformance = conformanceNamespaceFor(baseType, scope)
 
-		if (protocol !== null) {
-			let conformanceName = conformanceParameterName(baseType.name)
-			let selfBindings: GenericBindings = new Map([["Self", baseType]])
-			let methods: Record<string, common.MethodType> = {}
-
-			// NOTE: The whole Protocol surface, requirements and PROVIDED
-			// Methods alike — a witness carries an entry for every one of them,
-			// which is what makes a bounded call reach the conformer's override
-			// where it wrote one and the shared const where it did not. A
-			// Protocol's ancestors are in `protocol.methods` already, so one
-			// pseudo Namespace answers for the whole chain.
-			let providedMembers: Record<string, string> = {}
-
-			for (let [methodName, method] of Object.entries(protocol.methods)) {
-				methods[methodName] = applyGenericBindings(
-					method,
-					selfBindings,
-				) as common.MethodType
-
-				let providingProtocol = providedMethodProtocol(
-					protocol,
-					methodName,
-				)
-
-				if (providingProtocol !== null) {
-					providedMembers[methodName] = providingProtocol
-				}
-			}
-
-			matchingNamespaces.set(conformanceName, {
-				type: "Namespace",
-				name: conformanceName,
-				targetType: baseType,
-				generics: [],
-				properties: {},
-				methods,
-				...(Object.keys(providedMembers).length === 0
-					? {}
-					: { providedMembers }),
-			})
+		if (conformance !== null) {
+			matchingNamespaces.set(conformance.name, conformance)
 		}
 
 		return matchingNamespaces

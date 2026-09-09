@@ -514,6 +514,12 @@ function conformanceExpression(
 			: { providedMethods: conformance.source.providedMethods }),
 		conditions: conformance.source.conditions.map(conformanceExpression),
 		derivedDescriptor: conformance.source.derivedDescriptor,
+		// NOTE: The Case tags a derived `Enumerable` witness is built from,
+		// carried for the reason the descriptor beside it is: no Namespace
+		// holds the Method, so the emission has nothing else to read.
+		...(conformance.source.derivedCases === undefined
+			? {}
+			: { derivedCases: conformance.source.derivedCases }),
 		type: { type: "Unknown" },
 	}
 }
@@ -692,6 +698,15 @@ function simplifyLookup(
 		...(node.providedBy === undefined
 			? {}
 			: { providedBy: node.providedBy }),
+		// NOTE: And the two answers a member no Namespace holds needs: the tags
+		// a derived `cases` is built from, and the hidden Parameter a bounded
+		// Type Parameter's member is read off.
+		...(node.derivedCases === undefined
+			? {}
+			: { derivedCases: node.derivedCases }),
+		...(node.conformanceName === undefined
+			? {}
+			: { conformanceName: node.conformanceName }),
 	}
 }
 

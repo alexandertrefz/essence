@@ -77,10 +77,14 @@ import {
 	findTypeInScope,
 	combinationTypeOf,
 	derivedEquatableDescriptorFor,
+	derivedCaseTags,
+	derivedEnumerableNamespaceFor,
+	derivedEnumerableNamespaceName,
 	derivedEquatableNamespace,
 	derivedEquatableNamespaceName,
 	derivedPrintableNamespace,
 	derivedPrintableNamespaceName,
+	enumerableMethodName,
 	findProtocolInScope,
 	getAllNamespacesInScope,
 	protocolMethodBody,
@@ -90,6 +94,7 @@ import {
 	specializedNamespacesFor,
 	listItemTypeOf,
 	lookupTypeOf,
+	namespaceNamedByType,
 	providedNamespaceMember,
 	recordValueTypeOf,
 	parameterDocumentation,
@@ -2798,7 +2803,21 @@ function enrichLookup(
 	node: parser.LookupNode,
 	scope: enricher.Scope,
 ): common.typed.LookupNode {
-	let base = enrichExpression(node.base, scope)
+	// NOTE: A base naming a TYPE rather than a value — a Choice, or a
+	// Protocol-bounded Type Parameter — is read through a Namespace nobody
+	// declared. Asked before the base is enriched, because enriching it is what
+	// reports `unknown-name`, and answered only for a member that Namespace
+	// offers, so every other name reports exactly as it did.
+	let named = namespaceNamedByType(node, scope)
+	let base: common.typed.ExpressionNode =
+		named === null || node.base.nodeType !== "Identifier"
+			? enrichExpression(node.base, scope)
+			: {
+					nodeType: "Identifier",
+					content: node.base.content,
+					position: node.base.position,
+					type: named,
+				}
 	// NOTE: A Method a conformance put in reach is read off the Namespace it is
 	// in reach through, exactly as a written one is — `Number.isLessThan(a, b)`
 	// beside `Number.compare(a, to b)`. Asked before `lookupTypeOf`, which would
@@ -2810,10 +2829,17 @@ function enrichLookup(
 		!Object.hasOwn(base.type.methods, node.member.content)
 			? providedNamespaceMember(base.type, node.member.content, scope)
 			: null
+	// NOTE: And the derived Case listing, which no Namespace declares either.
+	// The base is already the derive where it named the Choice itself; where it
+	// named a Namespace over one, the derive is what that Namespace does not
+	// write. Both answer the same Method, and the tags it is emitted with are
+	// read off the Choice here rather than recovered downstream.
+	let derived = derivedEnumerableMember(base.type, node.member.content, scope)
 	// NOTE: The Lookup and its member Identifier share one Type — the member's
 	// Type *is* the Lookup's Type, so it is resolved once and handed to both.
 	let type =
 		provided?.type ??
+		derived?.type ??
 		lookupTypeOf(base.type, node.member.content, {
 			member: node.member.position,
 			base: node.base.position,
@@ -2831,7 +2857,42 @@ function enrichLookup(
 		position: node.position,
 		type,
 		...(provided === null ? {} : { providedBy: provided.providedBy }),
+		...(derived === null ? {} : { derivedCases: derived.cases }),
+		// NOTE: The hidden Parameter the call is emitted against, where the
+		// base names a bounded Type Parameter. The base Node keeps the name the
+		// author wrote — it is what Hover reads — so the Rewriter is told the
+		// other one rather than left to read it off the base.
+		...(named === null || named.targetType?.type !== "GenericUse"
+			? {}
+			: { conformanceName: named.name }),
 	}
+}
+
+// NOTE: The derived `Enumerable::cases` a Lookup reads off a Namespace, with
+// the Case tags its emission needs — null for every other member and for a
+// Namespace whose target is no Choice of payload-free Cases. The fabricated
+// Namespace is the answer where the base named the Choice itself, and a written
+// Namespace derives what it does not write.
+function derivedEnumerableMember(
+	baseType: common.Type,
+	memberName: string,
+	scope: enricher.Scope,
+): { type: common.MethodType; cases: Array<string> } | null {
+	if (baseType.type !== "Namespace" || memberName !== enumerableMethodName) {
+		return null
+	}
+
+	let derived =
+		baseType.name === derivedEnumerableNamespaceName
+			? baseType
+			: derivedEnumerableNamespaceFor(baseType, scope)
+	let method = derived?.methods[enumerableMethodName]
+	let cases =
+		derived?.targetType == null ? null : derivedCaseTags(derived.targetType)
+
+	return method === undefined || cases === null
+		? null
+		: { type: method, cases }
 }
 
 // NOTE: `.price`, `.address.city` — the Function the Compiler writes for the

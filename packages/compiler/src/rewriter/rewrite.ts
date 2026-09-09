@@ -11,6 +11,7 @@ import {
 	PRELUDE_SPECIFIER,
 } from "../bundler/index"
 import {
+	derivedEnumerableNamespaceName,
 	derivedEquatableNamespaceName,
 	derivedPrintableNamespaceName,
 } from "../enricher/resolvers"
@@ -3518,6 +3519,9 @@ function rewriteConformanceValue(
 					node.namespaceName,
 					namespaceMethodName,
 					node.derivedDescriptor,
+					false,
+					undefined,
+					node.derivedCases,
 				),
 				kind: "init",
 				method: false,
@@ -3745,6 +3749,10 @@ function namespaceMember(
 	// a Namespace may be spelled like a Protocol, and only the caller knows
 	// which of the two answered.
 	providedBy?: string,
+	// NOTE: The Case tags a derived `Enumerable::cases` is curried with. Set by
+	// the two sites that reach that derive — a Lookup and a conformance witness
+	// — and by nothing else.
+	derivedCases?: Array<string>,
 ): estree.Expression {
 	// NOTE: A Protocol's provided Method, whose const is named out of the
 	// Namespace scheme's way. Asked first, because a Namespace of the same name
@@ -3797,6 +3805,24 @@ function namespaceMember(
 				type: "Identifier",
 				name: memberName === "isNot" ? "choiceIsNot" : "choiceIs",
 			},
+		}
+	}
+
+	// NOTE: And the Case-listing derive, which is the redirect the equality one
+	// is when it widens: the helper is curried with the tags, because a static
+	// Method has no receiver for the Choice to be read off at run time.
+	if (namespaceName === derivedEnumerableNamespaceName) {
+		return {
+			type: "CallExpression",
+			optional: false,
+			callee: {
+				type: "MemberExpression",
+				optional: false,
+				computed: false,
+				object: { type: "Identifier", name: "$helpers" },
+				property: { type: "Identifier", name: "choiceCases" },
+			},
+			arguments: [jsonExpression(derivedCases ?? [])],
 		}
 	}
 
@@ -4542,16 +4568,33 @@ function rewriteDictionaryValue(
 // simply the wrong one. Every other base — a shadowing local, a chained access,
 // a call result — keeps the plain member read.
 function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
+	// NOTE: A member read off a bounded Type Parameter's conformance rather
+	// than off the Namespace the base spells — `T.cases()` is
+	// `T__conformance.cases()`. The base Node holds the author's name, which is
+	// what Hover reads, so the emitted one comes from the Lookup instead.
+	if (node.conformanceName !== undefined) {
+		return memberRead(
+			{ type: "Identifier", name: node.conformanceName },
+			node.member.name,
+		)
+	}
+
 	if (
 		node.base.nodeType === "Identifier" &&
 		node.base.type.type === "Namespace"
 	) {
 		return namespaceMember(
-			node.base.name,
+			// NOTE: A derived `cases` is a member of no Namespace at all, so
+			// the redirect is asked for under the derive's own name — the base
+			// may well spell a written Namespace that simply does not hold it.
+			node.derivedCases === undefined
+				? node.base.name
+				: derivedEnumerableNamespaceName,
 			node.member.name,
 			undefined,
 			false,
 			node.providedBy,
+			node.derivedCases,
 		)
 	}
 
