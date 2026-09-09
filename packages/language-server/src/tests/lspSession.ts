@@ -372,6 +372,44 @@ export function startSession() {
 
 			return arrived()
 		},
+		// NOTE: Waits for a Diagnostic to be GONE from a file, for a test that
+		// has just made the thing it reported true again. The wait is over the
+		// state rather than over a length of time on purpose: a run's results
+		// and the republish that carries them are two callbacks — `notify` puts
+		// the run's end on the wire and `onResults` re-analyses and publishes
+		// after it (see `server.ts`) — so a test that has seen the end has not
+		// yet seen the publish, and how long the analysis between them takes is
+		// a fact about the machine. A sleep long enough for this Mac is not
+		// long enough for a starved two-core runner, and it fails there as a
+		// stale list rather than as a slow one.
+		//
+		// The deadline THROWS, for the reason `waitForTestRuns` gives: a
+		// Diagnostic that never clears is the failure this is watching for, and
+		// it should be reported as itself rather than as the assertion after it.
+		waitForCodeToClear: async (
+			filePath: string,
+			code: string,
+			timeout = 30_000,
+		) => {
+			let uri = uriOf(filePath)
+			let deadline = Date.now() + timeout
+			let present = () =>
+				(published.get(uri) ?? []).some(
+					(diagnostic) => diagnostic.code === code,
+				)
+
+			while (present() && Date.now() < deadline) {
+				await new Promise<void>((resolve) => {
+					setImmediate(resolve)
+				})
+			}
+
+			if (present()) {
+				throw new Error(
+					`\`${code}\` was still published for ${path.basename(filePath)} after ${timeout} ms`,
+				)
+			}
+		},
 		resetCounts: resetCompilationCounts,
 		counts: currentTally,
 		tallySince: tallyOf,

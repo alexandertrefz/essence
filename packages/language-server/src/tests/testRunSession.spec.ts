@@ -133,7 +133,15 @@ describe("The Server's live test session", () => {
 		await session.waitForTestRuns(1)
 		await session.change(pathOf("Season.tests.es"), passing)
 		await session.waitForTestRuns(2)
-		await session.settle()
+		// NOTE: For the CLEAR rather than for a length of time. The run's end
+		// crosses the wire before the republish that drops what it found does,
+		// so a test that waits out a fixed settle here is betting that the
+		// analysis between the two fits inside it — a bet this machine wins and
+		// a loaded runner loses. See `waitForCodeToClear`.
+		await session.waitForCodeToClear(
+			pathOf("Season.tests.es"),
+			"test-failed",
+		)
 
 		expect(session.codesFor(pathOf("Season.tests.es"))).not.toContain(
 			"test-failed",
