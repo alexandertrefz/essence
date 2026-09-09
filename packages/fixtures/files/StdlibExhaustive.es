@@ -5292,6 +5292,43 @@ c"::quoted())
 		noNumbers::highestNumber(defaultingTo 0),
 	)
 
+	show("IntegerList.median()", numbers::median())
+	show("IntegerList.median() [empty]", noNumbers::median())
+	show(
+		"IntegerList.median(defaultingTo: Rational)",
+		noNumbers::median(defaultingTo 0/1),
+	)
+	show("IntegerList.percentile(_ Rational)", numbers::percentile(1/4))
+	show(
+		"IntegerList.percentile(_ Rational) [empty]",
+		noNumbers::percentile(1/4),
+	)
+	show(
+		"IntegerList.percentile(_ Rational, defaultingTo: Rational)",
+		noNumbers::percentile(1/4, defaultingTo 0/1),
+	)
+	show("IntegerList.mode()", numbers::mode())
+	show("IntegerList.mode() [empty]", noNumbers::mode())
+	show(
+		"IntegerList.mode(defaultingTo: Integer)",
+		noNumbers::mode(defaultingTo 0),
+	)
+	show("IntegerList.variance()", numbers::variance())
+	show("IntegerList.variance() [empty]", noNumbers::variance())
+	show(
+		"IntegerList.variance(defaultingTo: NonNegativeRational)",
+		noNumbers::variance(defaultingTo 0/1),
+	)
+	show("IntegerList.standardDeviation()", numbers::standardDeviation())
+	show(
+		"IntegerList.standardDeviation() [empty]",
+		noNumbers::standardDeviation(),
+	)
+	show(
+		"IntegerList.standardDeviation(defaultingTo: Rational | Algebraic)",
+		noNumbers::standardDeviation(defaultingTo 0/1),
+	)
+
 	show("RationalList.sum()", rationals::sum())
 	show("RationalList.sum() [empty]", noRationals::sum())
 	show("RationalList.product()", rationals::product())
@@ -5327,6 +5364,43 @@ c"::quoted())
 	show(
 		"RationalList.highestNumber(defaultingTo: Rational) [empty]",
 		noRationals::highestNumber(defaultingTo 0/1),
+	)
+
+	show("RationalList.median()", rationals::median())
+	show("RationalList.median() [empty]", noRationals::median())
+	show(
+		"RationalList.median(defaultingTo: Rational)",
+		noRationals::median(defaultingTo 0/1),
+	)
+	show("RationalList.percentile(_ Rational)", rationals::percentile(1/4))
+	show(
+		"RationalList.percentile(_ Rational) [empty]",
+		noRationals::percentile(1/4),
+	)
+	show(
+		"RationalList.percentile(_ Rational, defaultingTo: Rational)",
+		noRationals::percentile(1/4, defaultingTo 0/1),
+	)
+	show("RationalList.mode()", rationals::mode())
+	show("RationalList.mode() [empty]", noRationals::mode())
+	show(
+		"RationalList.mode(defaultingTo: Rational)",
+		noRationals::mode(defaultingTo 0/1),
+	)
+	show("RationalList.variance()", rationals::variance())
+	show("RationalList.variance() [empty]", noRationals::variance())
+	show(
+		"RationalList.variance(defaultingTo: NonNegativeRational)",
+		noRationals::variance(defaultingTo 0/1),
+	)
+	show("RationalList.standardDeviation()", rationals::standardDeviation())
+	show(
+		"RationalList.standardDeviation() [empty]",
+		noRationals::standardDeviation(),
+	)
+	show(
+		"RationalList.standardDeviation(defaultingTo: Rational | Algebraic)",
+		noRationals::standardDeviation(defaultingTo 0/1),
 	)
 
 	show("NumberList.sum()", mixedNumbers::sum())
@@ -5379,6 +5453,43 @@ c"::quoted())
 		noMixedNumbers::highestNumber(defaultingTo 0),
 	)
 
+	show("NumberList.median()", mixedNumbers::median())
+	show("NumberList.median() [empty]", noMixedNumbers::median())
+	show(
+		"NumberList.median(defaultingTo: Rational)",
+		noMixedNumbers::median(defaultingTo 0/1),
+	)
+	show("NumberList.percentile(_ Rational)", mixedNumbers::percentile(1/4))
+	show(
+		"NumberList.percentile(_ Rational) [empty]",
+		noMixedNumbers::percentile(1/4),
+	)
+	show(
+		"NumberList.percentile(_ Rational, defaultingTo: Rational)",
+		noMixedNumbers::percentile(1/4, defaultingTo 0/1),
+	)
+	show("NumberList.mode()", mixedNumbers::mode())
+	show("NumberList.mode() [empty]", noMixedNumbers::mode())
+	show(
+		"NumberList.mode(defaultingTo: Scalar)",
+		noMixedNumbers::mode(defaultingTo 0),
+	)
+	show("NumberList.variance()", mixedNumbers::variance())
+	show("NumberList.variance() [empty]", noMixedNumbers::variance())
+	show(
+		"NumberList.variance(defaultingTo: NonNegativeRational)",
+		noMixedNumbers::variance(defaultingTo 0/1),
+	)
+	show("NumberList.standardDeviation()", mixedNumbers::standardDeviation())
+	show(
+		"NumberList.standardDeviation() [empty]",
+		noMixedNumbers::standardDeviation(),
+	)
+	show(
+		"NumberList.standardDeviation(defaultingTo: Rational | Algebraic)",
+		noMixedNumbers::standardDeviation(defaultingTo 0/1),
+	)
+
 	§ ——— NonEmptyIntegerList, NonEmptyRationalList, NonEmptyNumberList ————
 	§ The same three questions answered BARE, which is what the proof buys. A
 	§ written List in receiver position has been proven nothing, so each
@@ -5401,6 +5512,17 @@ c"::quoted())
 		"NonEmptyIntegerList.average() [single]",
 		noNumbers::append(5)::average(),
 	)
+	show("NonEmptyIntegerList.median()", provenNumbers::median())
+	show(
+		"NonEmptyIntegerList.percentile(_ Rational)",
+		provenNumbers::percentile(1/4),
+	)
+	show("NonEmptyIntegerList.mode()", provenNumbers::mode())
+	show("NonEmptyIntegerList.variance()", provenNumbers::variance())
+	show(
+		"NonEmptyIntegerList.standardDeviation()",
+		provenNumbers::standardDeviation(),
+	)
 	show(
 		"NonEmptyRationalList.lowestNumber()",
 		noRationals::append(3/2)::append(1/2)::lowestNumber(),
@@ -5412,6 +5534,26 @@ c"::quoted())
 	show(
 		"NonEmptyRationalList.average()",
 		noRationals::append(3/2)::append(1/2)::average(),
+	)
+	show(
+		"NonEmptyRationalList.median()",
+		noRationals::append(3/2)::append(1/2)::append(5/2)::median(),
+	)
+	show(
+		"NonEmptyRationalList.percentile(_ Rational)",
+		noRationals::append(3/2)::append(1/2)::append(5/2)::percentile(1/4),
+	)
+	show(
+		"NonEmptyRationalList.mode()",
+		noRationals::append(3/2)::append(1/2)::append(5/2)::mode(),
+	)
+	show(
+		"NonEmptyRationalList.variance()",
+		noRationals::append(3/2)::append(1/2)::append(5/2)::variance(),
+	)
+	show(
+		"NonEmptyRationalList.standardDeviation()",
+		noRationals::append(3/2)::append(1/2)::append(5/2)::standardDeviation(),
 	)
 	show(
 		"NonEmptyNumberList.lowestNumber()",
@@ -5430,6 +5572,26 @@ c"::quoted())
 	show(
 		"NonEmptyNumberList.average() [rational total]",
 		noMixedNumbers::append(3)::append(1/2)::average(),
+	)
+	show(
+		"NonEmptyNumberList.median()",
+		noMixedNumbers::append(3)::append(1/2)::append(2)::median(),
+	)
+	show(
+		"NonEmptyNumberList.percentile(_ Rational)",
+		noMixedNumbers::append(3)::append(1/2)::append(2)::percentile(1/4),
+	)
+	show(
+		"NonEmptyNumberList.mode()",
+		noMixedNumbers::append(3)::append(1/2)::append(2)::mode(),
+	)
+	show(
+		"NonEmptyNumberList.variance()",
+		noMixedNumbers::append(3)::append(1/2)::append(2)::variance(),
+	)
+	show(
+		"NonEmptyNumberList.standardDeviation()",
+		noMixedNumbers::append(3)::append(1/2)::append(2)::standardDeviation(),
 	)
 
 	§ ——— KeyedNumberList —————————————————————————————————————————————————
@@ -5451,6 +5613,22 @@ c"::quoted())
 	show(
 		"KeyedNumberList.sum<ItemType>(on: (_ ItemType) -> Scalar)",
 		rows::sum(on .m),
+	)
+	show(
+		"KeyedNumberList.product<ItemType>(on: (_ ItemType) -> Integer)",
+		rows::product(on .n),
+	)
+	show(
+		"KeyedNumberList.product<ItemType>(on: (_ ItemType) -> Integer) [empty]",
+		noRows::product(on .n),
+	)
+	show(
+		"KeyedNumberList.product<ItemType>(on: (_ ItemType) -> Rational)",
+		rows::product(on .r),
+	)
+	show(
+		"KeyedNumberList.product<ItemType>(on: (_ ItemType) -> Scalar)",
+		rows::product(on .m),
 	)
 	show(
 		"KeyedNumberList.average<ItemType>(on: (_ ItemType) -> Scalar)",

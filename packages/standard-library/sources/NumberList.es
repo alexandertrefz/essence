@@ -1,4 +1,10 @@
 import {
+	from "./Algebraic.es" { Algebraic }
+	from "./Comparable.es" { Comparable }
+	from "./Dictionary.es" {
+		GroupedNonEmptyList
+		NonEmptyDictionary
+	}
 	from "./Integer.es" { Integer }
 	from "./List.es" {
 		List
@@ -9,7 +15,13 @@ import {
 		Scalar
 	}
 	from "./Optional.es" { Optional }
-	from "./Rational.es" { Rational }
+	from "./Orderable.es" { Orderable }
+	from "./Protocols.es" { Equatable }
+	from "./Rational.es" {
+		NonNegativeRational
+		Rational
+		Rounding
+	}
 }
 
 declarations {
@@ -127,6 +139,154 @@ declarations {
 				<- @::highestNumber()::value(defaultingTo fallback)
 			}
 		}
+
+		§ The statistics beyond the mean. None of these is a `Number` static,
+		§ and the five aggregates above are. A static only a List Method calls
+		§ is a second spelling of it. The five have one because each is the
+		§ fold its kind's own arithmetic is written on.
+		§
+		§ Each general entry asks `hasItems` and hands the proven receiver on.
+		§ So every body is written once, in the proven Namespace at the end of
+		§ the file. A receiver carrying the proof already reaches that entry
+		§ without the `if`.
+		§
+		§ `variance` divides by the count rather than by one less than it. The
+		§ items handed over are the whole population, and the answer is their
+		§ variance. A sample estimate is a second name nobody has asked for.
+		§
+		§ `percentile` clamps its fraction between zero and one. The
+		§ alternative was an empty answer outside that range. It reads at the
+		§ call site as the empty List does, and nothing tells the two apart.
+		§ Every List with an item in it has a lowest and a highest one.
+
+		§§ The middle item, once the items are put in order.
+		§§
+		§§ A count that is even has two middle items, and the answer is their mean. The empty List has no median, and the `defaultingTo:` entry answers the given Rational in place of nothing.
+		overload median {
+			§§ The median of the items.
+			§§
+			§§ @returns — the median, or nothing for the empty List.
+			() -> Optional<Rational> {
+				if @::hasItems() {
+					<- #Value(@::median())
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ The median of the items, or the given fallback for the empty List.
+			§§
+			§§ @param defaultingTo — the median to answer with when there is none
+			§§ @returns — the median, or the fallback in its place.
+			(defaultingTo fallback: Rational) -> Rational {
+				<- @::median()::value(defaultingTo fallback)
+			}
+		}
+
+		§§ The value at the given position through the items, once they are put in order.
+		§§
+		§§ A position between two items answers the point between those items, in proportion. The fraction is clamped between zero and one. The empty List has no such value, and the `defaultingTo:` entry answers the given Rational in place of nothing.
+		overload percentile {
+			§§ The value at the given position through the items.
+			§§
+			§§ @param _ — the position through the items, from zero to one
+			§§ @returns — the value, or nothing for the empty List.
+			(_ fraction: Rational) -> Optional<Rational> {
+				if @::hasItems() {
+					<- #Value(@::percentile(fraction))
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ The value at the given position, or the given fallback for the empty List.
+			§§
+			§§ @param _ — the position through the items, from zero to one
+			§§ @param defaultingTo — the value to answer with when there is none
+			§§ @returns — the value, or the fallback in its place.
+			(
+				_ fraction: Rational,
+				defaultingTo fallback: Rational,
+			) -> Rational {
+				<- @::percentile(fraction)::value(defaultingTo fallback)
+			}
+		}
+
+		§§ The item that occurs most often.
+		§§
+		§§ Items occurring equally often keep the earlier one, by where each first stands. The empty List has no such item, and the `defaultingTo:` entry answers the given item in place of nothing.
+		overload mode {
+			§§ The item that occurs most often.
+			§§
+			§§ @returns — the item, or nothing for the empty List.
+			() -> Optional<Integer> {
+				if @::hasItems() {
+					<- #Value(@::mode())
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ The item that occurs most often, or the given fallback for the empty List.
+			§§
+			§§ @param defaultingTo — the item to answer with when there is none
+			§§ @returns — the item, or the fallback in its place.
+			(defaultingTo fallback: Integer) -> Integer {
+				<- @::mode()::value(defaultingTo fallback)
+			}
+		}
+
+		§§ The mean of the squared distances from the mean.
+		§§
+		§§ The count divides, so the answer is the variance of the items as a whole population. The empty List has no variance, and the `defaultingTo:` entry answers the given Rational in place of nothing.
+		overload variance {
+			§§ The variance of the items.
+			§§
+			§§ @returns — the variance, which is never negative, or nothing for the empty List.
+			() -> Optional<NonNegativeRational> {
+				if @::hasItems() {
+					<- #Value(@::variance())
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ The variance of the items, or the given fallback for the empty List.
+			§§
+			§§ @param defaultingTo — the variance to answer with when there is none
+			§§ @returns — the variance, or the fallback in its place.
+			(
+				defaultingTo fallback: NonNegativeRational,
+			) -> NonNegativeRational {
+				<- @::variance()::value(defaultingTo fallback)
+			}
+		}
+
+		§§ The square root of the variance.
+		§§
+		§§ A variance that is a ratio of two perfect squares answers a Rational, and every other variance answers an exact Algebraic. The empty List has none, and the `defaultingTo:` entry answers the given value in place of nothing.
+		overload standardDeviation {
+			§§ The standard deviation of the items.
+			§§
+			§§ @returns — the standard deviation, or nothing for the empty List.
+			() -> Optional<Rational | Algebraic> {
+				if @::hasItems() {
+					<- #Value(@::standardDeviation())
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ The standard deviation of the items, or the given fallback for the empty List.
+			§§
+			§§ @param defaultingTo — the value to answer with when there is none
+			§§ @returns — the standard deviation, or the fallback in its place.
+			(
+				defaultingTo fallback: Rational | Algebraic,
+			) -> Rational | Algebraic {
+				<- @::standardDeviation()::value(defaultingTo fallback)
+			}
+		}
 	}
 
 	namespace RationalList for List<Rational> {
@@ -216,6 +376,135 @@ declarations {
 			§§ @returns — the highest item, or the fallback in its place.
 			(defaultingTo fallback: Rational) -> Rational {
 				<- @::highestNumber()::value(defaultingTo fallback)
+			}
+		}
+
+		§§ The middle item, once the items are put in order.
+		§§
+		§§ A count that is even has two middle items, and the answer is their mean. The empty List has no median, and the `defaultingTo:` entry answers the given Rational in place of nothing.
+		overload median {
+			§§ The median of the items.
+			§§
+			§§ @returns — the median, or nothing for the empty List.
+			() -> Optional<Rational> {
+				if @::hasItems() {
+					<- #Value(@::median())
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ The median of the items, or the given fallback for the empty List.
+			§§
+			§§ @param defaultingTo — the median to answer with when there is none
+			§§ @returns — the median, or the fallback in its place.
+			(defaultingTo fallback: Rational) -> Rational {
+				<- @::median()::value(defaultingTo fallback)
+			}
+		}
+
+		§§ The value at the given position through the items, once they are put in order.
+		§§
+		§§ A position between two items answers the point between those items, in proportion. The fraction is clamped between zero and one. The empty List has no such value, and the `defaultingTo:` entry answers the given Rational in place of nothing.
+		overload percentile {
+			§§ The value at the given position through the items.
+			§§
+			§§ @param _ — the position through the items, from zero to one
+			§§ @returns — the value, or nothing for the empty List.
+			(_ fraction: Rational) -> Optional<Rational> {
+				if @::hasItems() {
+					<- #Value(@::percentile(fraction))
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ The value at the given position, or the given fallback for the empty List.
+			§§
+			§§ @param _ — the position through the items, from zero to one
+			§§ @param defaultingTo — the value to answer with when there is none
+			§§ @returns — the value, or the fallback in its place.
+			(
+				_ fraction: Rational,
+				defaultingTo fallback: Rational,
+			) -> Rational {
+				<- @::percentile(fraction)::value(defaultingTo fallback)
+			}
+		}
+
+		§§ The item that occurs most often.
+		§§
+		§§ Items occurring equally often keep the earlier one, by where each first stands. The empty List has no such item, and the `defaultingTo:` entry answers the given item in place of nothing.
+		overload mode {
+			§§ The item that occurs most often.
+			§§
+			§§ @returns — the item, or nothing for the empty List.
+			() -> Optional<Rational> {
+				if @::hasItems() {
+					<- #Value(@::mode())
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ The item that occurs most often, or the given fallback for the empty List.
+			§§
+			§§ @param defaultingTo — the item to answer with when there is none
+			§§ @returns — the item, or the fallback in its place.
+			(defaultingTo fallback: Rational) -> Rational {
+				<- @::mode()::value(defaultingTo fallback)
+			}
+		}
+
+		§§ The mean of the squared distances from the mean.
+		§§
+		§§ The count divides, so the answer is the variance of the items as a whole population. The empty List has no variance, and the `defaultingTo:` entry answers the given Rational in place of nothing.
+		overload variance {
+			§§ The variance of the items.
+			§§
+			§§ @returns — the variance, which is never negative, or nothing for the empty List.
+			() -> Optional<NonNegativeRational> {
+				if @::hasItems() {
+					<- #Value(@::variance())
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ The variance of the items, or the given fallback for the empty List.
+			§§
+			§§ @param defaultingTo — the variance to answer with when there is none
+			§§ @returns — the variance, or the fallback in its place.
+			(
+				defaultingTo fallback: NonNegativeRational,
+			) -> NonNegativeRational {
+				<- @::variance()::value(defaultingTo fallback)
+			}
+		}
+
+		§§ The square root of the variance.
+		§§
+		§§ A variance that is a ratio of two perfect squares answers a Rational, and every other variance answers an exact Algebraic. The empty List has none, and the `defaultingTo:` entry answers the given value in place of nothing.
+		overload standardDeviation {
+			§§ The standard deviation of the items.
+			§§
+			§§ @returns — the standard deviation, or nothing for the empty List.
+			() -> Optional<Rational | Algebraic> {
+				if @::hasItems() {
+					<- #Value(@::standardDeviation())
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ The standard deviation of the items, or the given fallback for the empty List.
+			§§
+			§§ @param defaultingTo — the value to answer with when there is none
+			§§ @returns — the standard deviation, or the fallback in its place.
+			(
+				defaultingTo fallback: Rational | Algebraic,
+			) -> Rational | Algebraic {
+				<- @::standardDeviation()::value(defaultingTo fallback)
 			}
 		}
 	}
@@ -319,6 +608,135 @@ declarations {
 				<- @::highestNumber()::value(defaultingTo fallback)
 			}
 		}
+
+		§§ The middle item, once the items are put in order.
+		§§
+		§§ A count that is even has two middle items, and the answer is their mean. The empty List has no median, and the `defaultingTo:` entry answers the given Rational in place of nothing.
+		overload median {
+			§§ The median of the items.
+			§§
+			§§ @returns — the median, or nothing for the empty List.
+			() -> Optional<Rational> {
+				if @::hasItems() {
+					<- #Value(@::median())
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ The median of the items, or the given fallback for the empty List.
+			§§
+			§§ @param defaultingTo — the median to answer with when there is none
+			§§ @returns — the median, or the fallback in its place.
+			(defaultingTo fallback: Rational) -> Rational {
+				<- @::median()::value(defaultingTo fallback)
+			}
+		}
+
+		§§ The value at the given position through the items, once they are put in order.
+		§§
+		§§ A position between two items answers the point between those items, in proportion. The fraction is clamped between zero and one. The empty List has no such value, and the `defaultingTo:` entry answers the given Rational in place of nothing.
+		overload percentile {
+			§§ The value at the given position through the items.
+			§§
+			§§ @param _ — the position through the items, from zero to one
+			§§ @returns — the value, or nothing for the empty List.
+			(_ fraction: Rational) -> Optional<Rational> {
+				if @::hasItems() {
+					<- #Value(@::percentile(fraction))
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ The value at the given position, or the given fallback for the empty List.
+			§§
+			§§ @param _ — the position through the items, from zero to one
+			§§ @param defaultingTo — the value to answer with when there is none
+			§§ @returns — the value, or the fallback in its place.
+			(
+				_ fraction: Rational,
+				defaultingTo fallback: Rational,
+			) -> Rational {
+				<- @::percentile(fraction)::value(defaultingTo fallback)
+			}
+		}
+
+		§§ The item that occurs most often.
+		§§
+		§§ Items occurring equally often keep the earlier one, by where each first stands. The empty List has no such item, and the `defaultingTo:` entry answers the given item in place of nothing.
+		overload mode {
+			§§ The item that occurs most often.
+			§§
+			§§ @returns — the item, or nothing for the empty List.
+			() -> Optional<Scalar> {
+				if @::hasItems() {
+					<- #Value(@::mode())
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ The item that occurs most often, or the given fallback for the empty List.
+			§§
+			§§ @param defaultingTo — the item to answer with when there is none
+			§§ @returns — the item, or the fallback in its place.
+			(defaultingTo fallback: Scalar) -> Scalar {
+				<- @::mode()::value(defaultingTo fallback)
+			}
+		}
+
+		§§ The mean of the squared distances from the mean.
+		§§
+		§§ The count divides, so the answer is the variance of the items as a whole population. The empty List has no variance, and the `defaultingTo:` entry answers the given Rational in place of nothing.
+		overload variance {
+			§§ The variance of the items.
+			§§
+			§§ @returns — the variance, which is never negative, or nothing for the empty List.
+			() -> Optional<NonNegativeRational> {
+				if @::hasItems() {
+					<- #Value(@::variance())
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ The variance of the items, or the given fallback for the empty List.
+			§§
+			§§ @param defaultingTo — the variance to answer with when there is none
+			§§ @returns — the variance, or the fallback in its place.
+			(
+				defaultingTo fallback: NonNegativeRational,
+			) -> NonNegativeRational {
+				<- @::variance()::value(defaultingTo fallback)
+			}
+		}
+
+		§§ The square root of the variance.
+		§§
+		§§ A variance that is a ratio of two perfect squares answers a Rational, and every other variance answers an exact Algebraic. The empty List has none, and the `defaultingTo:` entry answers the given value in place of nothing.
+		overload standardDeviation {
+			§§ The standard deviation of the items.
+			§§
+			§§ @returns — the standard deviation, or nothing for the empty List.
+			() -> Optional<Rational | Algebraic> {
+				if @::hasItems() {
+					<- #Value(@::standardDeviation())
+				} else {
+					<- #Empty
+				}
+			}
+
+			§§ The standard deviation of the items, or the given fallback for the empty List.
+			§§
+			§§ @param defaultingTo — the value to answer with when there is none
+			§§ @returns — the standard deviation, or the fallback in its place.
+			(
+				defaultingTo fallback: Rational | Algebraic,
+			) -> Rational | Algebraic {
+				<- @::standardDeviation()::value(defaultingTo fallback)
+			}
+		}
 	}
 
 	§ The same aggregates over a List of anything, reached through a key. The
@@ -368,6 +786,39 @@ declarations {
 			§§ @returns — the total.
 			(on key: (_: ItemType) -> Scalar) -> Scalar {
 				<- @::map(key)::sum()
+			}
+		}
+
+		§§ Multiplies together what the key reads off every item.
+		§§
+		§§ The empty List answers one.
+		§§
+		§§ @returns — the product.
+		overload product {
+			§§ Multiplies together the Integers the key reads off the items.
+			§§
+			§§ @param on — the key read off each item
+			§§ @returns — the product.
+			(on key: (_: ItemType) -> Integer) -> Integer {
+				<- @::map(key)::product()
+			}
+
+			§§ Multiplies together the Rationals the key reads off the items.
+			§§
+			§§ @param on — the key read off each item
+			§§ @returns — the product.
+			(on key: (_: ItemType) -> Rational) -> Rational {
+				<- @::map(key)::product()
+			}
+
+			§§ Multiplies together the Numbers the key reads off the items.
+			§§
+			§§ A whole product answers as an Integer, and a fractional one as a Rational.
+			§§
+			§§ @param on — the key read off each item
+			§§ @returns — the product.
+			(on key: (_: ItemType) -> Scalar) -> Scalar {
+				<- @::map(key)::product()
 			}
 		}
 
@@ -423,6 +874,116 @@ declarations {
 		average() -> Rational {
 			<- Number.average(@)
 		}
+
+		§ The two middle positions are read rather than one, and an odd count
+		§ names the same position twice. So one body serves both counts, and
+		§ the mean of an item with itself is that item.
+		§
+		§ `item(at:)` answers an Optional for a position outside the List, and
+		§ neither of these positions is outside it. The fallback is the first
+		§ item, which the proof answers bare, and no call reaches it.
+
+		§§ The middle item, once the items are put in order.
+		§§
+		§§ A count that is even has two middle items, and the answer is their mean.
+		§§
+		§§ @returns — the median.
+		median() -> Rational {
+			constant sorted = @::sort()
+			constant count  = sorted::length()
+			constant first  = sorted::firstItem()
+
+			<- Number.average([
+				sorted
+					::item(at count::subtract(1)::quotient(dividingBy 2))
+					::value(defaultingTo first),
+				sorted
+					::item(at count::quotient(dividingBy 2))
+					::value(defaultingTo first),
+			])
+		}
+
+		§ The rank is the fraction of the way from the first position to the
+		§ last. A rank landing between two positions reads both items and
+		§ answers the point between them, in proportion. The exact arithmetic
+		§ makes that point exact.
+		§
+		§ The item above is read with the item below as its fallback, and a
+		§ rank of exactly the last position is where that fallback answers.
+		§ The distance is then zero, so the item below is the whole answer.
+
+		§§ The value at the given position through the items, once they are put in order.
+		§§
+		§§ A position between two items answers the point between those items, in proportion. The fraction is clamped between zero and one.
+		§§
+		§§ @param _ — the position through the items, from zero to one
+		§§ @returns — the value at that position.
+		percentile(_ fraction: Rational) -> Rational {
+			constant sorted = @::sort()
+			constant first  = sorted::firstItem()
+			constant rank   = fraction
+				::clamp(between 0/1, and 1/1)
+				::multiply(with sorted::length()::subtract(1))
+			constant lower  = rank::round(toward Rounding#Down)
+			constant offset = rank::subtract(lower)
+			constant below  = sorted::item(at lower)::value(defaultingTo first)
+			constant above  = sorted
+				::item(at lower::add(1))
+				::value(defaultingTo below)
+
+			<- below::add(above::subtract(below)::multiply(with offset))
+		}
+
+		§ `tally` counts each item once, in the order the items first stand,
+		§ and `highestItem` keeps the earlier of two equal counts. So the
+		§ earliest of the items that occur most often is the answer.
+		§
+		§ It is the one Method here that crosses to the Dictionary. The store
+		§ it pulls in costs a Program 5,513 bytes over the same Program
+		§ calling `median`. The alternative was a sort and a walk of the
+		§ equal runs. That is free of the store, and answers the lowest of
+		§ the items that tie rather than the earliest one.
+
+		§§ The item that occurs most often.
+		§§
+		§§ Items occurring equally often keep the earlier one, by where each first stands.
+		§§
+		§§ @returns — the item that occurs most often.
+		mode() -> Integer {
+			<- @::tally()::entries()::highestItem(on .value).key
+		}
+
+		§ The mean of the squared distances, and `absolute` is what states
+		§ that a mean of squares is never negative. No fold carries a proof
+		§ through, so the Rational the mean answers has none. The alternative
+		§ was a native over the items, which writes the exact arithmetic
+		§ beside it a second time.
+
+		§§ The mean of the squared distances from the mean.
+		§§
+		§§ The count divides, so the answer is the variance of the items as a whole population.
+		§§
+		§§ @returns — the variance, which is never negative.
+		variance() -> NonNegativeRational {
+			constant mean = @::average()
+
+			<- @::map((item) {
+				constant distance = item::subtract(mean)
+
+				<- distance::multiply(with distance)
+			})
+				::average()
+				::absolute()
+		}
+
+		§§ The square root of the variance.
+		§§
+		§§ A variance that is a ratio of two perfect squares answers a Rational, and every other variance answers an exact Algebraic.
+		§§
+		§§ @returns — the standard deviation.
+		standardDeviation() -> Rational | Algebraic {
+			<- @::variance()::squareRoot()
+		}
 	}
 
 	namespace NonEmptyRationalList for NonEmptyList<Rational> {
@@ -446,6 +1007,83 @@ declarations {
 		average() -> Rational {
 			<- Number.average(@)
 		}
+
+		§§ The middle item, once the items are put in order.
+		§§
+		§§ A count that is even has two middle items, and the answer is their mean.
+		§§
+		§§ @returns — the median.
+		median() -> Rational {
+			constant sorted = @::sort()
+			constant count  = sorted::length()
+			constant first  = sorted::firstItem()
+
+			<- Number.average([
+				sorted
+					::item(at count::subtract(1)::quotient(dividingBy 2))
+					::value(defaultingTo first),
+				sorted
+					::item(at count::quotient(dividingBy 2))
+					::value(defaultingTo first),
+			])
+		}
+
+		§§ The value at the given position through the items, once they are put in order.
+		§§
+		§§ A position between two items answers the point between those items, in proportion. The fraction is clamped between zero and one.
+		§§
+		§§ @param _ — the position through the items, from zero to one
+		§§ @returns — the value at that position.
+		percentile(_ fraction: Rational) -> Rational {
+			constant sorted = @::sort()
+			constant first  = sorted::firstItem()
+			constant rank   = fraction
+				::clamp(between 0/1, and 1/1)
+				::multiply(with sorted::length()::subtract(1))
+			constant lower  = rank::round(toward Rounding#Down)
+			constant offset = rank::subtract(lower)
+			constant below  = sorted::item(at lower)::value(defaultingTo first)
+			constant above  = sorted
+				::item(at lower::add(1))
+				::value(defaultingTo below)
+
+			<- below::add(above::subtract(below)::multiply(with offset))
+		}
+
+		§§ The item that occurs most often.
+		§§
+		§§ Items occurring equally often keep the earlier one, by where each first stands.
+		§§
+		§§ @returns — the item that occurs most often.
+		mode() -> Rational {
+			<- @::tally()::entries()::highestItem(on .value).key
+		}
+
+		§§ The mean of the squared distances from the mean.
+		§§
+		§§ The count divides, so the answer is the variance of the items as a whole population.
+		§§
+		§§ @returns — the variance, which is never negative.
+		variance() -> NonNegativeRational {
+			constant mean = @::average()
+
+			<- @::map((item) {
+				constant distance = item::subtract(mean)
+
+				<- distance::multiply(with distance)
+			})
+				::average()
+				::absolute()
+		}
+
+		§§ The square root of the variance.
+		§§
+		§§ A variance that is a ratio of two perfect squares answers a Rational, and every other variance answers an exact Algebraic.
+		§§
+		§§ @returns — the standard deviation.
+		standardDeviation() -> Rational | Algebraic {
+			<- @::variance()::squareRoot()
+		}
 	}
 
 	namespace NonEmptyNumberList for NonEmptyList<Scalar> {
@@ -468,6 +1106,69 @@ declarations {
 		§§ @returns — the mean.
 		average() -> Rational {
 			<- Number.average(@)
+		}
+
+		§§ The middle item, once the items are put in order.
+		§§
+		§§ A count that is even has two middle items, and the answer is their mean.
+		§§
+		§§ @returns — the median.
+		median() -> Rational {
+			constant sorted = @::sort()
+			constant count  = sorted::length()
+			constant first  = sorted::firstItem()
+
+			<- Number.average([
+				sorted
+					::item(at count::subtract(1)::quotient(dividingBy 2))
+					::value(defaultingTo first),
+				sorted
+					::item(at count::quotient(dividingBy 2))
+					::value(defaultingTo first),
+			])
+		}
+
+		§ Two of the five read the items as Rationals first. A difference of
+		§ two Scalars has no entry at all. The Namespace `Scalar` holds the
+		§ sum and the product alone, because those two are what the mixed
+		§ aggregates fold on. So each body that subtracts hands the proven
+		§ List to the Namespace above, whose items are one kind.
+
+		§§ The value at the given position through the items, once they are put in order.
+		§§
+		§§ A position between two items answers the point between those items, in proportion. The fraction is clamped between zero and one.
+		§§
+		§§ @param _ — the position through the items, from zero to one
+		§§ @returns — the value at that position.
+		percentile(_ fraction: Rational) -> Rational {
+			<- @::map((item) { <- item::toRational() })::percentile(fraction)
+		}
+
+		§§ The item that occurs most often.
+		§§
+		§§ Items occurring equally often keep the earlier one, by where each first stands.
+		§§
+		§§ @returns — the item that occurs most often.
+		mode() -> Scalar {
+			<- @::tally()::entries()::highestItem(on .value).key
+		}
+
+		§§ The mean of the squared distances from the mean.
+		§§
+		§§ The count divides, so the answer is the variance of the items as a whole population.
+		§§
+		§§ @returns — the variance, which is never negative.
+		variance() -> NonNegativeRational {
+			<- @::map((item) { <- item::toRational() })::variance()
+		}
+
+		§§ The square root of the variance.
+		§§
+		§§ A variance that is a ratio of two perfect squares answers a Rational, and every other variance answers an exact Algebraic.
+		§§
+		§§ @returns — the standard deviation.
+		standardDeviation() -> Rational | Algebraic {
+			<- @::variance()::squareRoot()
 		}
 	}
 
