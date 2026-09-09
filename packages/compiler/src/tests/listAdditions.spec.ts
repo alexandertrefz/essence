@@ -15,11 +15,13 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// NOTE: The everyday additions to `List` and `NonEmptyList` — the checked ends
-// of `firstItems`, `lastItems`, `removeFirst` and `removeLast`, the running
-// fold `accumulate`, the seedless `NonEmptyList::reduce`, the keyless extrema,
-// `onlyItem`, `isSorted`, `indices(where:)`, `everyIndex(of:)`, the four end
-// questions, the two new `partition` entries and the filter-map `everyValue`.
+// NOTE: The everyday additions to `List`, `NonEmptyList` and the three
+// `…List` Namespaces that read numbers — the checked ends of `firstItems`,
+// `lastItems`, `removeFirst` and `removeLast`, the running fold `accumulate`
+// and the `runningTotal` on top of it, the seedless `NonEmptyList::reduce`,
+// the keyless extrema, `onlyItem`, `isSorted`, `indices(where:)`,
+// `everyIndex(of:)`, the four end questions, the two new `partition` entries
+// and the filter-map `everyValue`.
 //
 // NOTE: Every claim here is about a value a run answered, not about a Type the
 // Enricher handed out. A boundary read one position out is a Program that
@@ -237,6 +239,44 @@ describe("The running fold", () => {
 				"numbers::accumulate(startingWith 0, (total, item) { <- total::add(item) })::lastItem()::add(1)",
 			),
 		).toEqual(['"8"', '"12"'])
+	})
+})
+
+describe("The running total", () => {
+	it("answers every total the items build", async () => {
+		expect(
+			await answers(
+				"numbers::runningTotal()",
+				"noNumbers::runningTotal()",
+			),
+		).toEqual(['"[0, 3, 4, 6, 7, 11]"', '"[0]"'])
+	})
+
+	// NOTE: One Namespace per item Type, so the receiver decides which entry
+	// answers and which zero it opens with. The mixed entry leaves a whole
+	// total as the Rational the fold built, which prints as the Integer it
+	// equals — the difference the entry documents at its own site.
+	it("opens with the zero of the receiver's own kind", async () => {
+		expect(
+			await run(`implementation {
+				constant rationals = [3/2, 1/2, 5/2]
+				constant mixed = [3, 1/2, 2]
+				constant noRationals: List<Rational> = []
+
+				Terminal.inspect(rationals::runningTotal()::toString())
+				Terminal.inspect(mixed::runningTotal()::toString())
+				Terminal.inspect(noRationals::runningTotal()::toString())
+			}`),
+		).toEqual(['"[0, 3/2, 2, 9/2]"', '"[0, 3, 7/2, 11/2]"', '"[0]"'])
+	})
+
+	// NOTE: The proof `accumulate` hands on. Adding to `firstItem()` is only
+	// a Program at all where the answer carries it, and the empty receiver is
+	// the case the promise is about.
+	it("promises a total whatever the receiver", async () => {
+		expect(
+			await answers("noNumbers::runningTotal()::firstItem()::add(1)"),
+		).toEqual(['"1"'])
 	})
 })
 
@@ -636,6 +676,23 @@ describe("What holds for every List", () => {
 					}))
 			}
 
+			test "a running total ends at the sum" for any (
+				items: List<Integer>,
+			) {
+				expect items::runningTotal()::lastItem()::is(items::sum())
+			}
+
+			test "each running total sums the items before it" for any (
+				items: List<Integer>,
+			) {
+				constant totals = items::runningTotal()
+
+				expect totals::length()::is(items::length()::add(1))
+				expect totals::enumerate()::hasOnlyItems(where (entry) {
+					<- entry.item::is(items::firstItems(entry.index)::sum())
+				})
+			}
+
 			test "the lowest item is in the List and below every item" for any (
 				items: NonEmptyList<Integer>,
 			) {
@@ -729,6 +786,6 @@ describe("What holds for every List", () => {
 		expect(failedProperties(events)).toEqual([])
 		expect(
 			events.filter((event) => event.kind === "test-pass").length,
-		).toBe(16)
+		).toBe(18)
 	})
 })

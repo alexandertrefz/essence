@@ -1088,15 +1088,15 @@ export const $NonEmptyNestedListArity: AssertArities<typeof import("./NonEmptyNe
 
 declare const IntegerListModule: typeof import("./IntegerList")
 export const $IntegerList: IntegerListNatives = IntegerListModule
-export const $IntegerListAbsent: AssertNoEssenceExports<typeof import("./IntegerList"), "sum" | "product" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "highestNumber__overload$1" | "highestNumber__overload$2"> = true
+export const $IntegerListAbsent: AssertNoEssenceExports<typeof import("./IntegerList"), "sum" | "product" | "runningTotal" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "highestNumber__overload$1" | "highestNumber__overload$2"> = true
 
 declare const RationalListModule: typeof import("./RationalList")
 export const $RationalList: RationalListNatives = RationalListModule
-export const $RationalListAbsent: AssertNoEssenceExports<typeof import("./RationalList"), "sum" | "product" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "highestNumber__overload$1" | "highestNumber__overload$2"> = true
+export const $RationalListAbsent: AssertNoEssenceExports<typeof import("./RationalList"), "sum" | "product" | "runningTotal" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "highestNumber__overload$1" | "highestNumber__overload$2"> = true
 
 declare const NumberListModule: typeof import("./NumberList")
 export const $NumberList: NumberListNatives = NumberListModule
-export const $NumberListAbsent: AssertNoEssenceExports<typeof import("./NumberList"), "sum" | "product" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "highestNumber__overload$1" | "highestNumber__overload$2"> = true
+export const $NumberListAbsent: AssertNoEssenceExports<typeof import("./NumberList"), "sum" | "product" | "runningTotal" | "average__overload$1" | "average__overload$2" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "highestNumber__overload$1" | "highestNumber__overload$2"> = true
 
 declare const NonEmptyIntegerListModule: typeof import("./NonEmptyIntegerList")
 export const $NonEmptyIntegerList: NonEmptyIntegerListNatives = NonEmptyIntegerListModule

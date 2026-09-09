@@ -564,6 +564,7 @@ describe("Stdlib Call Graph", () => {
 			"IntegerList.lowestNumber__overload$1",
 			"IntegerList.lowestNumber__overload$2",
 			"IntegerList.product",
+			"IntegerList.runningTotal",
 			"IntegerList.sum",
 			"KeyedNumberList.average__overload$1",
 			"KeyedNumberList.average__overload$2",
@@ -715,6 +716,7 @@ describe("Stdlib Call Graph", () => {
 			"NumberList.lowestNumber__overload$1",
 			"NumberList.lowestNumber__overload$2",
 			"NumberList.product",
+			"NumberList.runningTotal",
 			"NumberList.sum",
 			"Optional.andThen",
 			"Optional.hasValue__overload$1",
@@ -791,6 +793,7 @@ describe("Stdlib Call Graph", () => {
 			"RationalList.lowestNumber__overload$1",
 			"RationalList.lowestNumber__overload$2",
 			"RationalList.product",
+			"RationalList.runningTotal",
 			"RationalList.sum",
 			// NOTE: Every Method of the carrier that says why, and every one
 			// of them is written in Essence — `toString` is the one native,
