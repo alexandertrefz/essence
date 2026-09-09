@@ -1073,10 +1073,6 @@ export interface DirectMethodNode {
 	// widens to the descriptor-driven helper, and the one function that decides
 	// that is the one this is emitted through.
 	derivedDescriptor?: DerivedEquatableDescriptor
-	// NOTE: Present only when this witness is a Choice's derived `Enumerable` —
-	// the Rewriter then emits `$helpers.choiceCases(<tags>)` for the one Method
-	// it maps, there being no Namespace anywhere to read it off.
-	derivedCases?: Array<string>
 	type: Type
 	position?: Position
 }

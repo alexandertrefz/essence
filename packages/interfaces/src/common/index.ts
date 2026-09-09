@@ -173,11 +173,16 @@ export type Diagnostic = {
 export type DiagnosticData =
 	| { kind: "missing-case"; unhandled: Array<string> }
 	| { kind: "suggestion"; suggestion: string }
-	// NOTE: The Case a value is held in — `#Value` for both `Optional` and
-	// `Result` — so that a fix which wraps an Argument in it does not have to
-	// work out which Case of the receiver's Choice holds anything. The name is
-	// bare, as `suggestion`'s is, and the `#` is written by whoever renders it.
-	| { kind: "holding-case"; caseName: string }
+	// NOTE: The Cases a value is held in — `#Value` for both `Optional` and
+	// `Result` — so that a fix which wraps an Argument in one does not have to
+	// work out which Cases of the receiver's Choice hold anything. Names are
+	// bare, as `suggestion`'s is, and the `#` is written by whoever renders one.
+	//
+	// NOTE: SEVERAL, because a carrier may hold one Type in more than one Case
+	// — `choice Twin<Item> { First { item: Item }, Second { item: Item } }` —
+	// and each of them is a different question. Naming one would present one of
+	// two readings as the fix.
+	| { kind: "holding-case"; caseNames: Array<string> }
 
 // NOTE: Every Diagnostic carries one, and `docs/diagnostics.md` documents
 // every one of these — a code with no entry there is a code nobody can look

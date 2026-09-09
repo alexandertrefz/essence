@@ -166,7 +166,7 @@ function actionsFor(
 		case "fallback-never-used":
 			return listed(removeFallbackAction(diagnostic, lines))
 		case "ambiguous-nesting-level":
-			return listed(wrapInHoldingCaseAction(diagnostic, program))
+			return wrapInHoldingCaseActions(diagnostic, program)
 		case "focused-tests-remain":
 			return listed(removeFocusedAction(diagnostic, lines))
 		case "wrong-update-brackets":
@@ -657,8 +657,8 @@ function commaAfter(
 	}
 }
 
-// NOTE: The Warning's own first Help, applied — the Argument wrapped in the Case
-// that holds, which is the spelling of the reading the call did NOT take.
+// NOTE: The Warning's own Helps, applied — the Argument wrapped in a Case that
+// holds, which is the spelling of a reading the call did NOT take.
 //
 // A rewrite rather than a fix, and never preferred: both readings are well typed
 // and the Compiler has no way to know which was meant, so applying this CHANGES
@@ -668,15 +668,20 @@ function commaAfter(
 // declared beside the call, which is more than an edit to the span the Warning
 // underlines and is left to the Help that describes it.
 //
+// ONE PER CASE, because a carrier may hold one Type in more than one Case and
+// each of them asks a different question — a single action would present one of
+// them as the answer. The titles name the Case, which is what tells them apart
+// in the list.
+//
 // Two insertions rather than one replacement, so the Argument's own text — a
 // Case carrying a payload, a name, a call spanning lines — is never retyped by a
 // fix that has no reason to read it.
-function wrapInHoldingCaseAction(
+function wrapInHoldingCaseActions(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
-): CodeActionEntry | null {
+): Array<CodeActionEntry> {
 	if (diagnostic.data?.kind !== "holding-case") {
-		return null
+		return []
 	}
 
 	// NOTE: Found on a fresh parse, as every edit here is: a Position from a
@@ -686,34 +691,36 @@ function wrapInHoldingCaseAction(
 	let argument = findNodeAt(program, diagnostic.position)
 
 	if (argument === null) {
-		return null
+		return []
 	}
 
-	let holding = `#${diagnostic.data.caseName}`
+	return diagnostic.data.caseNames.map((caseName) => {
+		let holding = `#${caseName}`
 
-	return {
-		title: `Wrap the Argument in '${holding}(…)'`,
-		kind: "refactor.rewrite",
-		diagnosticCode: diagnostic.code,
-		diagnosticPosition: diagnostic.position,
-		isPreferred: false,
-		edits: [
-			{
-				range: {
-					start: argument.position.start,
-					end: argument.position.start,
+		return {
+			title: `Wrap the Argument in '${holding}(…)'`,
+			kind: "refactor.rewrite",
+			diagnosticCode: diagnostic.code,
+			diagnosticPosition: diagnostic.position,
+			isPreferred: false,
+			edits: [
+				{
+					range: {
+						start: argument.position.start,
+						end: argument.position.start,
+					},
+					newText: `${holding}(`,
 				},
-				newText: `${holding}(`,
-			},
-			{
-				range: {
-					start: argument.position.end,
-					end: argument.position.end,
+				{
+					range: {
+						start: argument.position.end,
+						end: argument.position.end,
+					},
+					newText: ")",
 				},
-				newText: ")",
-			},
-		],
-	}
+			],
+		}
+	})
 }
 
 // NOTE: The Diagnostic spans exactly the `focused` Modifier, and what has to go
