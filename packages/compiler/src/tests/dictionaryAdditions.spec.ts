@@ -474,4 +474,82 @@ describe("Dictionary additions", () => {
 			).toEqual(["266", "false", "true", "Optional#Value(2)", "400"])
 		})
 	})
+
+	describe("Building from keys", () => {
+		it("asks the Function for the value of each key", async () => {
+			expect(
+				await run(`implementation {
+					constant noKeys: List<String> = []
+
+					Terminal.inspect(
+						Dictionary.of(["alex", "sam"], valuedBy (name) {
+							<- name::length()
+						})::toString(),
+					)
+					Terminal.inspect(
+						Dictionary.of(noKeys, valuedBy (name) {
+							<- name::length()
+						})::toString(),
+					)
+				}`),
+			).toEqual(['"[\\"alex\\" = 4, \\"sam\\" = 3]"', '"[=]"'])
+		})
+
+		// NOTE: The rule the entry it is written on already has: the key keeps
+		// the place of its first occurrence and holds what the LATER value
+		// answered. The Function is asked once for each occurrence, which is
+		// what makes the two answers differ where it reads something other
+		// than the key.
+		it("collapses a duplicate key onto its first position", async () => {
+			expect(
+				await run(`implementation {
+					constant built = Dictionary.of(
+						["alex", "sam", "alex"],
+						valuedBy (name) { <- name::length() },
+					)
+
+					Terminal.inspect(built::toString())
+					Terminal.inspect(built::length())
+				}`),
+			).toEqual(['"[\\"alex\\" = 4, \\"sam\\" = 3]"', "2"])
+		})
+
+		// NOTE: A named Function value rather than a literal, because the two
+		// reach inference differently: the value Type is read off what the
+		// Function answers, and a named one carries its Type rather than
+		// taking it from the position it stands in.
+		it("takes a named Function as the value reader", async () => {
+			expect(
+				await run(`implementation {
+					function widthOf(_ name: String) -> Integer {
+						<- name::length()
+					}
+
+					Terminal.inspect(
+						Dictionary.of(["alex", "sam"], valuedBy widthOf)::toString(),
+					)
+				}`),
+			).toEqual(['"[\\"alex\\" = 4, \\"sam\\" = 3]"'])
+		})
+
+		// NOTE: The two entries are one Dictionary under two spellings, which
+		// is the whole of what writing the second on the first buys.
+		it("answers what the entries entry answers for the same keys", async () => {
+			expect(
+				await run(`implementation {
+					constant keys = List.of(integersFrom 1, through 60)
+					constant fromKeys = Dictionary.of(keys, valuedBy (n) {
+						<- n::multiply(with n)
+					})
+					constant fromEntries = Dictionary.of(keys::map((n) {
+						<- { key = n, value = n::multiply(with n) }
+					}))
+
+					Terminal.inspect(fromKeys::is(fromEntries))
+					Terminal.inspect(fromKeys::keys()::is(fromEntries::keys()))
+					Terminal.inspect(fromKeys::value(at 7))
+				}`),
+			).toEqual(["true", "true", "Optional#Value(49)"])
+		})
+	})
 })

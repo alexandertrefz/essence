@@ -501,6 +501,7 @@ describe("Stdlib Call Graph", () => {
 			"Dictionary.hasValue",
 			"Dictionary.merge__overload$1",
 			"Dictionary.merge__overload$2",
+			"Dictionary.of__overload$2",
 			"Dictionary.remove__overload$2",
 			"Dictionary.update__overload$1",
 			"Dictionary.update__overload$2",
