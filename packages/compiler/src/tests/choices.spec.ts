@@ -1478,6 +1478,57 @@ describe("Choices", () => {
 			])
 		})
 
+		// NOTE: The near miss is looked for among the matched Union's Cases OF
+		// THIS CHOICE, because a Quick Fix replaces the NAME and nothing else —
+		// which is also why the underline stops short of the prefix, exactly as
+		// the bare form's does.
+		it("suggests a Case of this Choice the matched value still has", () => {
+			let [diagnostic] = diagnosticsOf(`implementation {
+					choice Stride { Walk, Walks }
+
+					constant taken: Stride = Stride#Walk
+
+					match taken -> {} {
+						case Stride#Walk { <- {} }
+						case _ {
+							match @ -> {} {
+								case Stride#Walk { <- {} }
+								case _ { <- {} }
+							}
+						}
+					}
+				}`)
+
+			expect(diagnostic.code).toBe("unknown-case")
+			expect(diagnostic.helps).toEqual(["Did you mean '#Walks'?"])
+			expect(diagnostic.data).toEqual({
+				kind: "suggestion",
+				suggestion: "Walks",
+			})
+		})
+
+		// NOTE: Where the PREFIX is what went wrong, no rewrite of the name
+		// answers — `B#Wait` on an `A` is not a misspelling of anything — so
+		// nothing is suggested rather than a rewrite that changes the spelling
+		// without changing the answer.
+		it("suggests nothing where the prefix names another Choice", () => {
+			let [diagnostic] = diagnosticsOf(`implementation {
+					choice A { Wait, Go }
+					choice B { Wait, Stop }
+
+					constant command: A = A#Wait
+
+					match command -> {} {
+						case B#Wait { <- {} }
+						case _ { <- {} }
+					}
+				}`)
+
+			expect(diagnostic.code).toBe("unknown-case")
+			expect(diagnostic.helps).toEqual([])
+			expect(diagnostic.data).toBeUndefined()
+		})
+
 		it("rejects a bounded Choice's Case the matched value can not be", () => {
 			expect(
 				codesOf(`implementation {

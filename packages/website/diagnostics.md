@@ -1894,11 +1894,14 @@ reaches every Choice in the language.
 
 A prefixed Matcher says which Choice's Case is meant, never which value it
 matches, so it has to name one the matched Union has — `case Signal#Red` on a
-`Command` is refused.
+`Command` is refused. Its near miss is looked for among the matched Union's
+Cases OF THE NAMED CHOICE, since the name is all a rewrite replaces: where the
+prefix itself is what went wrong, nothing is suggested.
 
 **Quick Fix — "Change to '#X'":** replaces the Case name with the suggestion,
-when there is one — offered on all three forms. The `#` is already written, so
-only the name is rewritten, and the underlined span stops short of the sigil.
+when there is one — offered on all four forms. The `#` is already written, so
+only the name is rewritten, and the underlined span stops short of the sigil and
+of any Choice prefix in front of it.
 
 ### `ambiguous-case`
 

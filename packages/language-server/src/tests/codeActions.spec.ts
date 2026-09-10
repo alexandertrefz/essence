@@ -561,6 +561,35 @@ describe("Code Actions", () => {
 			expect(applied(lines, fix)[4]).toBe('\t\tcase #Add { <- "add" }')
 		})
 
+		// NOTE: The prefixed Matcher resolves through a path of its own, and it
+		// underlines the NAME rather than the whole Matcher for exactly this
+		// reason: the fix writes the suggestion over what is underlined, and
+		// the prefix the reader wrote stays where it is.
+		it("should suggest a Case for a prefixed Matcher", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Stride { Walk, Walks }",
+				"\tconstant taken: Stride = Stride#Walk",
+				"\tconstant described = match taken -> String {",
+				'\t\tcase Stride#Walk { <- "walk" }',
+				"\t\tcase _ {",
+				"\t\t\t<- match @ -> String {",
+				'\t\t\t\tcase Stride#Walk { <- "again" }',
+				'\t\t\t\tcase _ { <- "other" }',
+				"\t\t\t}",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = unknownCaseFixes(lines)
+
+			expect(fix.title).toBe("Change to '#Walks'")
+			expect(applied(lines, fix)[7]).toBe(
+				'\t\t\t\tcase Stride#Walks { <- "again" }',
+			)
+		})
+
 		// NOTE: A guess is only worth offering when it is close. A name nothing
 		// resembles must leave the Diagnostic to speak for itself rather than
 		// send the reader to an unrelated Case.

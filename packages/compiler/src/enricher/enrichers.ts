@@ -14385,16 +14385,38 @@ function resolveCaseMatcherType(
 		// bare form says outright and this one used to answer with the declared
 		// Case instead — a Handler that can never run, typed by Type Parameters
 		// nothing here binds.
+		//
+		// NOTE: The NAME alone is underlined, as the bare form's is and for the
+		// same reason — a Quick Fix rewrites exactly what the Diagnostic
+		// underlines, and the prefix the reader wrote is no part of a near miss.
+		// The near miss is looked for among the matched Union's Cases OF THIS
+		// CHOICE and nowhere else, because a name is all the fix replaces: a
+		// Case of another Choice written after this prefix would not resolve
+		// either. Where the PREFIX is what went wrong there is no such name, so
+		// nothing is suggested rather than a rewrite that changes the spelling
+		// without changing the answer.
 		if (!typeContainsError(valueType)) {
 			reportError(
 				`The matched value has no Case '${node.choice.content}#${node.caseName.content}'`,
-				node.position,
+				node.caseName.position,
 				{
 					code: "unknown-case",
 					labels: [
-						primary(node.position, "no such Case in this Union"),
+						primary(
+							node.caseName.position,
+							"no such Case in this Union",
+						),
 					],
 					notes: [`The matched value is ${describeType(valueType)}.`],
+					...caseSuggestion(
+						node.caseName.content,
+						unionArmsOf(valueType).flatMap((member) =>
+							member.type === "Case" &&
+							member.choice === declaredCase.choice
+								? [member.name]
+								: [],
+						),
+					),
 				},
 			)
 		}
