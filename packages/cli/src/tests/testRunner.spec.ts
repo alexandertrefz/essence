@@ -3263,8 +3263,9 @@ describe("essence test — the result cache", () => {
 describe("the test command's own documentation", () => {
 	it("says where a project writes the tags it skips", () => {
 		expect(testCommand.description.join(" ")).toContain(
-			'"essence": { "test": { "skipTags": ["slow"] } }',
+			'{ "test": { "skipTags": ["slow"] } }',
 		)
+		expect(testCommand.description.join(" ")).toContain("essence.json")
 	})
 
 	// NOTE: `optimisations.md` documents `--no-optimise --coverage` and turning

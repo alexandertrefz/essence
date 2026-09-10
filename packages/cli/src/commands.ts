@@ -122,7 +122,8 @@ const outputOption: OptionSpec = {
 	details:
 		"With a single input this is the output file. With several inputs it " +
 		"is a directory, and each source keeps its own name. Missing parent " +
-		"directories are created.",
+		"directories are created. A project may name a directory once as " +
+		`"build.out" in its ${PROJECT_FILE} instead.`,
 	defaultDescription: "next to each source file",
 }
 
@@ -258,6 +259,14 @@ export const commands: Array<CommandSpec> = [
 			"Compilation stops at the first stage that reports an Error, and " +
 				"every Diagnostic that stage found is shown. Warnings never stop " +
 				"a build.",
+			"A project that always builds the same way writes it down once " +
+				`instead, in the ${PROJECT_FILE} at its root — "out", ` +
+				'"sourcemap", "minify", "embed", "optimise" and ' +
+				'"withoutOptimisations", under "build":',
+			'    { "build": { "out": "dist", "sourcemap": true } }',
+			"A flag wins over the setting, and --no-sourcemap, --no-minify and " +
+				"--no-embed are how one run says no to one of them. " +
+				`${PROGRAM} init writes the file to start from.`,
 		],
 		usage: [
 			`${PROGRAM} build <file...> [options]`,
@@ -320,6 +329,10 @@ export const commands: Array<CommandSpec> = [
 				`${PROGRAM} exits with the program's own exit code. Arguments ` +
 				"after a bare -- are handed to the program rather than read by " +
 				`${PROGRAM}.`,
+			`What the project's ${PROJECT_FILE} says under "build" holds here ` +
+				'too — a project that names an "out" keeps the compiled file ' +
+				"there rather than in the cache — and every flag wins over the " +
+				"setting it mirrors.",
 		],
 		usage: [`${PROGRAM} run <file> [options] [-- <program arguments...>]`],
 		options: [
@@ -398,6 +411,9 @@ export const commands: Array<CommandSpec> = [
 				"itself.",
 			"While watching, press r to force a rebuild, c to clear the " +
 				"screen and q — or Ctrl+C — to quit.",
+			`Everything the project's ${PROJECT_FILE} says under "build" holds ` +
+				"here as it does for a one-shot build, and every flag wins over " +
+				"the setting it mirrors.",
 		],
 		usage: [
 			`${PROGRAM} watch <file...> [options]`,
@@ -445,10 +461,13 @@ export const commands: Array<CommandSpec> = [
 			"Compiles every module that writes a tests { … } section — and " +
 				"every *.tests.es file — with the tests enriched, then runs " +
 				"them in this process and reports what held. Without " +
-				"arguments every Essence source under the working directory is " +
-				"searched, skipping .git, node_modules, dist, build and " +
-				".claude. With arguments only those files, or every source " +
-				"under a directory named as one.",
+				"arguments every Essence source under the PROJECT is " +
+				`searched — the directory holding its ${PROJECT_FILE}, or the ` +
+				"working directory where no project file governs — skipping " +
+				".git, node_modules, dist, build and .claude, so that the same " +
+				"command run in a nested directory runs the same tests. With " +
+				"arguments only those files, or every source under a directory " +
+				"named as one, read against the working directory.",
 			"A failed assertion is reported as an ordinary Essence Diagnostic " +
 				"— the asserted Expression underlined, and the value of every " +
 				"sub-expression the Compiler recorded shown at the span it was " +
@@ -458,16 +477,17 @@ export const commands: Array<CommandSpec> = [
 				"matches a substring of a test's name, --tag runs only the " +
 				"tests carrying one of the given tags and --skip-tag leaves " +
 				"them out. --skip-tag wins over --tag. A project may skip tags " +
-				"by default by writing them in the nearest package.json:",
-			'    { "essence": { "test": { "skipTags": ["slow"] } } }',
+				`by default by writing them in the ${PROJECT_FILE} at its ` +
+				`root, which ${PROGRAM} init writes to start from:`,
+			'    { "test": { "skipTags": ["slow"] } }',
 			"A tag that list leaves out still runs when --tag asks for it by " +
 				"name, which is how a nightly job runs what a working day " +
 				"skips.",
-			"The directories a walk stays out of are written beside it, one " +
-				"level up — a corpus of deliberately broken sources, an " +
-				"example a book quotes, a vendored copy — relative to the " +
-				"package.json that names them:",
-			'    { "essence": { "exclude": ["fixtures/broken"] } }',
+			"The directories a walk stays out of are written in the same " +
+				"file — a corpus of deliberately broken sources, an example a " +
+				"book quotes, a vendored copy — relative to the " +
+				`${PROJECT_FILE} that names them:`,
+			'    { "exclude": ["fixtures/broken"] }',
 			'It sits outside "test" because it is not a statement about ' +
 				"testing: it says which directories are not this project's " +
 				"sources, and the editor reads the same list to decide what " +
@@ -497,9 +517,8 @@ export const commands: Array<CommandSpec> = [
 				"generated goal per Namespace Method, calling it with values " +
 				"drawn from the declared Types and expecting the answer to " +
 				"hold every conjunct of the return Type's refinement. A " +
-				"project may ask for them by default in the nearest " +
-				"package.json:",
-			'    { "essence": { "test": { "contracts": true } } }',
+				"project may ask for them by default in the same file:",
+			'    { "test": { "contracts": true } }',
 			"--mutate answers the question coverage can not: coverage says a " +
 				"line RAN, and mutation says a bug there would be CAUGHT. The " +
 				"project is compiled once with counters in it and run once to " +
@@ -610,7 +629,7 @@ export const commands: Array<CommandSpec> = [
 				type: "boolean",
 				summary: "Run without goals whatever the project configured",
 				details:
-					"The way out of `essence.test.contracts` for one run: a " +
+					"The way out of `test.contracts` for one run: a " +
 					"project that always tests its declarations still gets a " +
 					"plain run on demand — while a broken declaration is " +
 					"repaired, or when only the written tests are the " +
@@ -679,7 +698,9 @@ export const commands: Array<CommandSpec> = [
 					"with Match arms written as branches. json writes the " +
 					"Compiler's own vocabulary — the arms, the doorways and " +
 					"the scope each point stands in — which lcov has no way of " +
-					"saying. Implies --coverage.",
+					"saying. Implies --coverage. A project may name the format " +
+					"once as `test.coverage.report` instead, which says how a " +
+					"coverage run reports and never asks for one.",
 			},
 			{
 				name: "coverage-out",
@@ -687,9 +708,10 @@ export const commands: Array<CommandSpec> = [
 				placeholder: "directory",
 				summary: "Where --coverage-report writes",
 				details:
-					"Defaults to `coverage` under the working directory. The " +
-					"file is called lcov.info or coverage.json after the " +
-					"format.",
+					"Defaults to what `test.coverage.out` names in " +
+					`${PROJECT_FILE}, and to \`coverage\` under the working ` +
+					"directory where nothing does. The file is called " +
+					"lcov.info or coverage.json after the format.",
 			},
 			{
 				name: "update",
@@ -721,7 +743,8 @@ export const commands: Array<CommandSpec> = [
 				placeholder: "count",
 				summary: "How many values each property test runs for",
 				details:
-					"100 by default. A property that failed reports how many " +
+					"100 by default, or what `test.cases` says in " +
+					`${PROJECT_FILE}. A property that failed reports how many ` +
 					"cases it took and the smallest value it could shrink the " +
 					"failure to.",
 			},

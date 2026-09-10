@@ -29,6 +29,7 @@ essence <file.es>              same as: essence build <file.es>
 | `check`  | Type-check sources without writing any output            |
 | `watch`  | Recompile automatically whenever a source changes        |
 | `test`   | Compile the tests a project writes and run them          |
+| `init`   | Write the file a project's settings live in              |
 | `format` | Format Essence sources in place                          |
 | `lsp`    | Start the Essence Language Server, speaking over stdio   |
 | `dap`    | Start the Essence Debug Adapter, speaking over stdio     |
@@ -40,6 +41,20 @@ tree-shaken into it — and runs under Node or Bun with no dependencies.
 `--sourcemap` emits a source map whose positions are the `.es` lines the
 author wrote, which is what the debugger and mapped stack traces read.
 
+A project that always builds the same way writes it down once instead, in the
+`essence.json` at its root — `essence init` writes one to start from:
+
+```json
+{ "build": { "out": "dist", "sourcemap": true, "minify": true } }
+```
+
+`build.out`, `build.sourcemap`, `build.minify`, `build.embed`,
+`build.optimise` and `build.withoutOptimisations` are what `--out`,
+`--sourcemap`, `--minify`, `--embed`, `--no-optimise` and
+`--without-optimisation` say for one run. A flag wins over the setting, and
+`--no-sourcemap`, `--no-minify` and `--no-embed` are how one run says no to one
+of them.
+
 `--embed` builds a Module for a JavaScript host to **load** rather than a
 program to run: the bundle carries the runtime's own Type key and value
 constructors, and a `<name>.descriptor.json` is written beside it describing
@@ -49,18 +64,32 @@ JavaScript — no compiler in reach, nothing to install where it runs.
 
 `essence test` runs the tests a project writes in the language itself — every
 module with a `tests { … }` section and every `*.tests.es` file under the
-working directory, or only the files it is given. A failed `expect` is reported
-as an ordinary Diagnostic, showing the value of every sub-expression the
-compiler recorded at the span it was written at. `-f` filters by name, `--tag`
-and `--skip-tag` by tag, `--watch` stays up and re-runs only what a change
-reached, `--coverage` reports what the run reached — lines, branches, `match`
-arms and the Cases of a `choice` nothing built, with `--coverage-report
-lcov|json` writing a file as well — and a project skips tags by default by
-naming them in the nearest `package.json`:
+project, or only the files it is given. The project is the directory holding
+its `essence.json`, so the same command run in a nested directory runs the same
+tests; where no project file governs, the walk starts at the working directory.
+A path that was typed narrows the run and is read where the run was started.
+
+A failed `expect` is reported as an ordinary Diagnostic, showing the value of
+every sub-expression the compiler recorded at the span it was written at.
+`-f` filters by name, `--tag` and `--skip-tag` by tag, `--watch` stays up and
+re-runs only what a change reached, `--coverage` reports what the run reached —
+lines, branches, `match` arms and the Cases of a `choice` nothing built, with
+`--coverage-report lcov|json` writing a file as well — and a project skips tags
+by default by naming them in its `essence.json`:
 
 ```json
-{ "essence": { "test": { "skipTags": ["slow"] } } }
+{ "test": { "skipTags": ["slow"], "contracts": true } }
 ```
+
+`test.skipTags`, `test.contracts`, `test.cases`, `test.coverage.report` and
+`test.coverage.out` are what `--skip-tag`, `--contracts`, `--cases`,
+`--coverage-report` and `--coverage-out` say for one run; `--tag` brings back a
+tag the list leaves out, and `--no-contracts` runs without the goals whatever
+the project configured. Collecting coverage stays `--coverage`: a configured
+format says how a coverage run reports, and never asks for one. `exclude`, at
+the top of the file, names the directories no walk descends into — a corpus
+kept broken on purpose, a vendored copy — and the editor reads the same list to
+decide what its Problems panel speaks for.
 
 A test runs once per row of a table it is written `across`, and a
 `matches snapshot` compares against a value the first run records — inline in
@@ -69,13 +98,13 @@ was given a name. `--update` records a snapshot that differs rather than
 reporting it.
 
 A test written `for any (…)` runs for values the runner derives from its
-Parameters' Types — a hundred of them, `--cases` for another number. A failure
-is shrunk to the smallest values that still fail and reported with the seed it
-drew them from; `--seed` draws them again. The shrunk value is kept in
-`__counterexamples__/<File>.es.json` beside the source and re-run before any
-case is drawn on every later run, so a value that broke a property once goes on
-being asked about. A stored value the Types no longer fit is dropped where it is
-met.
+Parameters' Types — a hundred of them, `--cases` or `test.cases` for another
+number. A failure is shrunk to the smallest values that still fail and reported
+with the seed it drew them from; `--seed` draws them again. The shrunk value is
+kept in `__counterexamples__/<File>.es.json` beside the source and re-run
+before any case is drawn on every later run, so a value that broke a property
+once goes on being asked about. A stored value the Types no longer fit is
+dropped where it is met.
 
 A Type whose Namespace conforms to `Generatable` is drawn through that
 conformance rather than through its structure, and shrunk through the `shrink`
