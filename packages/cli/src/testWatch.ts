@@ -2,7 +2,6 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
-import { readProjectConfiguration } from "@essence-lang/compiler/configuration"
 import { randomSeed, type TestEvent } from "@essence-lang/runtime/Testing"
 
 import { EXIT_SUCCESS } from "./actions"
@@ -82,17 +81,7 @@ export async function runTestWatch(
 	command: CommandSpec,
 	files: Array<string>,
 ): Promise<number> {
-	let { palette, terminal, theme } = context
-	let configuration = readProjectConfiguration()
-
-	for (let problem of configuration.problems) {
-		terminal.err(
-			`  ${palette.warning(theme.symbols.warning)} ${palette.muted(
-				problem,
-			)}`,
-		)
-	}
-
+	let { configuration, palette, terminal, theme } = context
 	let filters: TestFilters = resolveFilters(
 		context.options,
 		configuration.test.skipTags,

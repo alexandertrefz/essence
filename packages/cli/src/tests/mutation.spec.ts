@@ -661,16 +661,14 @@ describe("essence test --mutate", () => {
 
 	// NOTE: And the setting says it without the flag, which is what a project
 	// that always tests its declarations has written down. Read out of the
-	// nearest package.json, which is found from the working directory — so the
+	// nearest essence.json, which is found from the working directory — so the
 	// working directory is what has to move.
 	it("honours a configured project's goals", async () => {
 		await withFiles({ "Tally.es": DECLARED }, async (directory) => {
 			await withFiles(
 				{
 					"Tally.es": DECLARED,
-					"package.json": JSON.stringify({
-						essence: { test: { contracts: true } },
-					}),
+					"essence.json": `{ "test": { "contracts": true } }`,
 				},
 				async (configured) =>
 					within(configured, async () => {

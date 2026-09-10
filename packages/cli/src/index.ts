@@ -16,6 +16,10 @@ import { DEFAULT_PROGRAM_NAME, findCommand } from "./commands"
 import { type CLIContext, createContext, version } from "./context"
 import { renderCommandHelp, renderOverview, renderUsageLine } from "./help"
 import { toJSONUsageError } from "./json"
+import {
+	projectConfigurationFor,
+	reportProjectSettings,
+} from "./projectOptions"
 import { runWatch } from "./watch"
 
 // NOTE: `run` returns an exit code instead of calling `process.exit`, so that
@@ -283,7 +287,21 @@ export async function run(
 
 	try {
 		invocation = parseArguments(argv, programName)
-		context = createContext(invocation.options, programName)
+
+		// NOTE: The project file is read HERE, once, before a command has run
+		// anything — every setting it holds is either a flag the command line
+		// could have written or a fact about where the project is, and both are
+		// answers a command wants in hand rather than a file it goes looking
+		// for. A command that reads none of them reads no file; see
+		// `readsProjectConfiguration`.
+		let configuration = projectConfigurationFor(invocation.command)
+
+		context = createContext(
+			invocation.options,
+			programName,
+			undefined,
+			configuration,
+		)
 	} catch (error) {
 		// NOTE: The arguments could not be read, so there are no resolved
 		// options to build a context from — a default one is used purely to
@@ -318,6 +336,10 @@ export async function run(
 	) {
 		return showHelp(context, invocation)
 	}
+
+	// NOTE: After the two ways out that print instead of running — a version and
+	// a help screen are not a run, and neither is answered out of a project.
+	reportProjectSettings(context)
 
 	try {
 		return await dispatch(context, invocation)

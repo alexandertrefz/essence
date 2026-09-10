@@ -63,7 +63,7 @@ export async function capture(
 	}
 }
 
-// NOTE: A project's settings are read out of the nearest package.json, found by
+// NOTE: A project's settings are read out of the nearest essence.json, found by
 // walking up from the WORKING DIRECTORY — so a spec about a configured project
 // has to stand in one. Restored before `withFiles` removes the directory, which
 // is why the two are nested rather than folded together.

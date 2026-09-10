@@ -3,7 +3,6 @@ import { tmpdir } from "node:os"
 import * as path from "node:path"
 import { pathToFileURL } from "node:url"
 
-import { readProjectConfiguration } from "@essence-lang/compiler/configuration"
 import { displayPath } from "@essence-lang/compiler/diagnostics/render"
 import {
 	type BenchmarkStore,
@@ -897,16 +896,7 @@ export async function runTest(
 		return EXIT_USAGE
 	}
 
-	let configuration = readProjectConfiguration()
-
-	for (let problem of configuration.problems) {
-		context.terminal.err(
-			`  ${context.palette.warning(
-				context.theme.symbols.warning,
-			)} ${context.palette.muted(problem)}`,
-		)
-	}
-
+	let { configuration } = context
 	let filters = resolveFilters(context.options, configuration.test.skipTags)
 	let contracts = resolveContracts(
 		context.options,

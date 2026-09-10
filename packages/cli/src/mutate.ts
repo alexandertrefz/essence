@@ -3,7 +3,6 @@ import { tmpdir } from "node:os"
 import * as path from "node:path"
 import { Worker } from "node:worker_threads"
 
-import { readProjectConfiguration } from "@essence-lang/compiler/configuration"
 import { canonicalPath } from "@essence-lang/compiler/documents"
 import type { MutationSite } from "@essence-lang/compiler/mutation"
 import { coveragePassName } from "@essence-lang/compiler/optimiser"
@@ -470,15 +469,7 @@ export async function runMutation(
 		return EXIT_USAGE
 	}
 
-	let configuration = readProjectConfiguration()
-
-	for (let problem of configuration.problems) {
-		context.terminal.err(
-			`  ${context.palette.warning(
-				context.theme.symbols.warning,
-			)} ${context.palette.muted(problem)}`,
-		)
-	}
+	let { configuration } = context
 
 	// NOTE: BOUND before anything redirects it. The baseline is run with stdout
 	// pointed at stderr — a mutated Module's own top-level output belongs to

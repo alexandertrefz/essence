@@ -33,7 +33,7 @@ import {
 	testFailureDiagnostic,
 } from "../testReport"
 import { createPalette, createTheme } from "../theme"
-import { capture, withFiles as withProject } from "./harness"
+import { capture, within, withFiles as withProject } from "./harness"
 
 // NOTE: A bundle cache of this spec's own, and a result cache beside it. They
 // are assigned rather than exported because where a cache lives is read off the
@@ -403,52 +403,15 @@ describe("essence test — discovery", () => {
 // #region Configuration
 
 describe("essence test — project configuration", () => {
-	it("reads the tags a project skips by default", async () => {
-		await withFiles(
-			{
-				"package.json": JSON.stringify({
-					essence: { test: { skipTags: ["slow"] } },
-				}),
-				"nested/deep/keep.txt": "",
-			},
-			async (directory) => {
-				let configuration = readProjectConfiguration(
-					path.join(directory, "nested", "deep"),
-				)
-
-				expect(configuration.test.skipTags).toEqual(["slow"])
-				expect(configuration.problems).toEqual([])
-			},
-		)
-	})
-
-	it("walks past a package.json with nothing to say about Essence", async () => {
-		await withFiles(
-			{
-				"package.json": JSON.stringify({
-					essence: { test: { skipTags: ["slow"] } },
-				}),
-				"inner/package.json": JSON.stringify({ name: "inner" }),
-			},
-			async (directory) => {
-				let configuration = readProjectConfiguration(
-					path.join(directory, "inner"),
-				)
-
-				expect(configuration.test.skipTags).toEqual(["slow"])
-			},
-		)
-	})
-
 	// NOTE: Every project holds sources that are not its own tests — a corpus
 	// of deliberately broken files is the one this repository holds, and it is
-	// what made `essence test` unrunnable at its own root.
+	// what made `essence test` unrunnable at its own root. What the file itself
+	// reads, and how a mistake in it is reported, is the Compiler's own spec;
+	// what is here is what the COMMAND does with the answer.
 	it("stays out of the directories a project excludes", async () => {
 		await withFiles(
 			{
-				"package.json": JSON.stringify({
-					essence: { exclude: ["broken"] },
-				}),
+				"essence.json": `{ "exclude": ["broken"] }`,
 				"Rules.es": passing,
 				"broken/Bad.tests.es": broken,
 			},
@@ -474,9 +437,7 @@ describe("essence test — project configuration", () => {
 	it("still compiles an excluded file that was named", async () => {
 		await withFiles(
 			{
-				"package.json": JSON.stringify({
-					essence: { exclude: ["broken"] },
-				}),
+				"essence.json": `{ "exclude": ["broken"] }`,
 				"broken/Bad.tests.es": broken,
 			},
 			async (directory) => {
@@ -490,85 +451,6 @@ describe("essence test — project configuration", () => {
 				)
 
 				expect(found).toHaveLength(1)
-			},
-		)
-	})
-
-	// NOTE: The key moved out of "test" when the editor grew a Problems panel
-	// that speaks for the whole workspace and needed the same answer. A project
-	// still writing it in the old place has no exclusions in force at all, and
-	// the symptom — a panel full of a corpus it keeps deliberately broken —
-	// reads as the editor being wrong rather than as a key being one level too
-	// deep, so the run says so.
-	it("says so where the exclusions are written in the old place", async () => {
-		await withFiles(
-			{
-				"package.json": JSON.stringify({
-					essence: { test: { exclude: ["broken"] } },
-				}),
-			},
-			async (directory) => {
-				let configuration = readProjectConfiguration(directory)
-
-				expect(configuration.exclude).toEqual([])
-				expect(configuration.problems).toHaveLength(1)
-				expect(configuration.problems[0]).toContain(
-					'"essence.test.exclude" has moved to "essence.exclude"',
-				)
-			},
-		)
-	})
-
-	it("reads whether a project tests what its declarations promise", async () => {
-		await withFiles(
-			{
-				"package.json": JSON.stringify({
-					essence: { test: { contracts: true } },
-				}),
-			},
-			async (directory) => {
-				let configuration = readProjectConfiguration(directory)
-
-				expect(configuration.test.contracts).toBe(true)
-				expect(configuration.problems).toEqual([])
-			},
-		)
-	})
-
-	it("leaves the contract goals out where the setting is the wrong shape", async () => {
-		await withFiles(
-			{
-				"package.json": JSON.stringify({
-					essence: { test: { contracts: "yes" } },
-				}),
-			},
-			async (directory) => {
-				let configuration = readProjectConfiguration(directory)
-
-				expect(configuration.test.contracts).toBe(false)
-				expect(configuration.problems).toHaveLength(1)
-				expect(configuration.problems[0]).toContain(
-					"essence.test.contracts",
-				)
-			},
-		)
-	})
-
-	it("reports a setting of the wrong shape rather than obeying it", async () => {
-		await withFiles(
-			{
-				"package.json": JSON.stringify({
-					essence: { test: { skipTags: "slow" } },
-				}),
-			},
-			async (directory) => {
-				let configuration = readProjectConfiguration(directory)
-
-				expect(configuration.test.skipTags).toEqual([])
-				expect(configuration.problems).toHaveLength(1)
-				expect(configuration.problems[0]).toContain(
-					"essence.test.skipTags",
-				)
 			},
 		)
 	})
@@ -597,6 +479,65 @@ describe("essence test — project configuration", () => {
 			skipTags: ["slow"],
 			bench: false,
 		})
+	})
+
+	// NOTE: And the goals are a union with the setting, which `--no-contracts`
+	// beats in either direction — a project that always tests its declarations
+	// still gets a plain run on demand.
+	it("unions the goals with the setting, and lets one run out", () => {
+		let flags = { contracts: false, noContracts: false }
+
+		expect(resolveContracts(flags, true)).toBe(true)
+		expect(resolveContracts({ ...flags, contracts: true }, false)).toBe(
+			true,
+		)
+		expect(resolveContracts({ ...flags, noContracts: true }, true)).toBe(
+			false,
+		)
+		expect(resolveContracts(flags, false)).toBe(false)
+	})
+
+	// NOTE: What the settings could not be read out of is a Warning with a
+	// span, rendered by the renderer every other Diagnostic goes through and
+	// printed ahead of the run — which happens anyway, with that setting at its
+	// default. The manifest key is the one a project moving to `essence.json`
+	// is most likely to still be holding.
+	it("renders what it could not read, and runs the project anyway", async () => {
+		await withFiles(
+			{
+				"essence.json": `{ "test": { "skipTags": ["slow"] } }`,
+				"package.json": `{\n\t"name": "old",\n\t"essence": { "exclude": ["broken"] }\n}`,
+				"Rules.es": passing,
+			},
+			async (directory) =>
+				within(directory, async () => {
+					let { code, err, out } = await runTests(directory)
+
+					expect(err).toContain("moved-setting")
+					expect(err).toContain(
+						'The "essence" key of package.json has moved to essence.json',
+					)
+					expect(err).toContain("package.json")
+					expect(out).toContain("1 passed")
+					expect(out).toContain("1 deselected")
+					expect(code).toBe(EXIT_SUCCESS)
+				}),
+		)
+	})
+
+	// NOTE: And under `--verbose`, which file the settings came from — the
+	// question a project with more than one of them asks first.
+	it("names the file the settings came from under --verbose", async () => {
+		await withFiles(
+			{ "essence.json": `{}`, "Rules.es": passing },
+			async (directory) =>
+				within(directory, async () => {
+					let { err } = await runTests(directory, ["--verbose"])
+
+					expect(err).toContain("settings read from")
+					expect(err).toContain("essence.json")
+				}),
+		)
 	})
 })
 

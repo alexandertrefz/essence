@@ -1,3 +1,8 @@
+import {
+	defaultConfiguration,
+	type ProjectConfiguration,
+} from "@essence-lang/compiler/configuration"
+
 import manifest from "../package.json" with { type: "json" }
 import type { OptionValues } from "./args"
 import { DEFAULT_PROGRAM_NAME } from "./commands"
@@ -35,6 +40,11 @@ export type CLIContext = {
 	theme: Theme
 	palette: Palette
 	options: OptionValues
+	// NOTE: The project's own settings, read once for the whole invocation —
+	// see `projectOptions`. Every command reads them here rather than from the
+	// disk, so that the two commands a run reaches (`test` and the compile
+	// under it) can not answer to two different files.
+	configuration: ProjectConfiguration
 	report: ReportContext
 	help: HelpContext
 	version: string
@@ -60,6 +70,7 @@ export function createContext(
 	options: OptionValues,
 	programName: string = DEFAULT_PROGRAM_NAME,
 	terminal: Terminal = createTerminal(),
+	configuration: ProjectConfiguration = defaultConfiguration(),
 ): CLIContext {
 	// NOTE: Colour support is decided from stderr rather than stdout, because
 	// stderr is where the human-facing output goes when stdout is a pipe.
@@ -75,6 +86,7 @@ export function createContext(
 		theme,
 		palette,
 		options,
+		configuration,
 		version,
 		programName,
 		report: {
