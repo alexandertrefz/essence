@@ -113,9 +113,17 @@ Development Host, over a workspace holding at least two files that write
 - Half-typing a line so the file stops compiling leaves the tree and the marks
   as they were rather than emptying them; the compile error is in Problems.
 - Setting `essence.tests.enabled` to false stops the automatic runs — the marks
-  stop changing as you type — while ▶ and the Run lens still work. Setting
-  `essence.tests.skipTags` to a tag the workspace uses re-runs everything and
-  leaves those tests unmarked.
+  stop changing as you type — while ▶ and the Run lens still work. Writing a
+  tag the workspace uses into `test.skipTags` of the project's `essence.json`
+  and saving re-runs everything and leaves those tests unmarked; a stale
+  `essence.tests.skipTags` in the editor settings does nothing.
+- `essence.json` itself opens as JSON with comments — a `//` line is not red —
+  and typing a `"` inside the top-level object offers `exclude`, `test` and
+  `build`, each with its description on hover. Writing `"skipTag"` instead of
+  `"skipTags"` puts an `unknown-setting` Warning in Problems on that key, out
+  of the unsaved buffer, and it goes when the key is fixed. Excluding the
+  directory that holds one of the two test files and saving removes that file
+  from the Testing view and from Problems.
 - **Essence: Show Test Session Output** writes one line per cycle.
 - Running with coverage (the profile picker's "Run with Coverage") sets
   `essence.tests.coverage` to true in the workspace settings, and from then on
