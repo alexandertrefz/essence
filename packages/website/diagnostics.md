@@ -1923,6 +1923,13 @@ at the call and writing one back is [`unknown-type`](#unknown-type). `#Value`
 and `#Empty` reach this every day: `Optional` and `Result` are both in every
 Program's scope and both declare a `#Value`.
 
+**Quick Fix — "Prefix with 'Colour#'":** one action per declaring Choice,
+writing its name in front of the `#`. None of them is preferred — which Choice
+was meant is the one thing this Diagnostic can not say — and a generic Choice
+gets its name alone, which settles the ambiguity and leaves
+[`undecided-type-arguments`](#undecided-type-arguments) pointing at where the
+Type Arguments go.
+
 ### `missing-payload`
 
 A Case that carries a payload was written without one. A bare `#Case` is a UNIT

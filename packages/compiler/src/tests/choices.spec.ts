@@ -1405,6 +1405,34 @@ describe("Choices", () => {
 				])
 			})
 
+			// NOTE: The `data` carries the NAMES and stops there — the `<…>`
+			// the Help shows is a shape rather than a spelling, and a Quick Fix
+			// writing it would produce source that does not parse. Prefixing
+			// settles the ambiguity, `undecided-type-arguments` asks for the
+			// rest, and both halves are what the Helps already describe.
+			it("carries the candidate Choices as data, generic or not", () => {
+				expect(
+					diagnosticsOf(`implementation { ${box}
+						constant empty = #Empty
+					}`)[0].data,
+				).toEqual({
+					kind: "choice-candidates",
+					names: ["Optional", "Box"],
+				})
+
+				expect(
+					diagnosticsOf(`implementation {
+						choice Colour { Red, Blue }
+						choice Shade { Red, Dark }
+
+						constant red = #Red
+					}`)[0].data,
+				).toEqual({
+					kind: "choice-candidates",
+					names: ["Colour", "Shade"],
+				})
+			})
+
 			it("takes the decision from an annotation", () => {
 				expect(
 					messagesOf(`implementation { ${box}

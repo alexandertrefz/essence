@@ -183,6 +183,11 @@ export type DiagnosticData =
 	// and each of them is a different question. Naming one would present one of
 	// two readings as the fix.
 	| { kind: "holding-case"; caseNames: Array<string> }
+	// NOTE: The Choices that declare a bare `#Case`, in the order the Helps
+	// name them. Display names, so what a fix writes in front of the `#` is
+	// what the reader was told to write — a generic Choice's Type Arguments
+	// are not part of one and stay the reader's to add.
+	| { kind: "choice-candidates"; names: Array<string> }
 	// NOTE: What a call would write between the angle brackets of
 	// `value::<Name>method(…)` to pick one candidate — a Protocol's name where
 	// the candidate is a Method that Protocol PROVIDES, and the Namespace's

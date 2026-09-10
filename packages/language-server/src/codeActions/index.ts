@@ -20,6 +20,7 @@ import {
 	unreachableDefineArmActions,
 } from "./defineFixes"
 import {
+	choicePrefixActions,
 	constantToVariableAction,
 	elseBranchAction,
 	type ImportContext,
@@ -241,6 +242,8 @@ const importOrSpellingFix: FixProvider = (context) => [
 // beside this one and a line here, and two of them landing at once meet in a
 // sorted list rather than in the middle of one function.
 const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
+	"ambiguous-case": ({ diagnostic, lines }) =>
+		choicePrefixActions(diagnostic, lines),
 	"ambiguous-namespace": ({ diagnostic, program, lines }) =>
 		namespaceSpecifierActions(diagnostic, program, lines),
 	"ambiguous-nesting-level": ({ diagnostic, program }) =>

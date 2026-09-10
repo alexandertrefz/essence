@@ -702,6 +702,82 @@ describe("Code Actions", () => {
 	// it is a rewrite rather than a quickfix and is picked out by the code it
 	// answers. Applying it leaves a Program that says which question it asks, so
 	// the Warning is gone from the buffer the fix produced.
+	describe("ambiguous-case", () => {
+		// NOTE: Two Choices of the Program's own, so both actions leave a
+		// Program that compiles — the builtin `Optional` and `Result` are
+		// generic and would leave `undecided-type-arguments` behind, which the
+		// test below is about.
+		const TWO_CHOICES = [
+			"implementation {",
+			"\tchoice Colour { Red, Blue }",
+			"\tchoice Shade { Red, Dark }",
+			"",
+			"\tconstant red = #Red",
+			"}",
+		]
+
+		it("should offer one prefix per declaring Choice", () => {
+			let fixes = quickFixes(TWO_CHOICES)
+
+			expect(titles(fixes)).toEqual([
+				"Prefix with 'Colour#'",
+				"Prefix with 'Shade#'",
+			])
+			expect(fixes.map((entry) => entry.isPreferred)).toEqual([
+				false,
+				false,
+			])
+		})
+
+		// NOTE: The Diagnostic underlines the name and stops short of the `#`,
+		// so the Choice is written in FRONT of a sigil that is already there —
+		// the Case's own spelling is never retyped.
+		it("should write the Choice in front of the sigil", () => {
+			let [fix] = quickFixes(TWO_CHOICES)
+			let result = applied(TWO_CHOICES, fix)
+
+			expect(result[4]).toBe("\tconstant red = Colour#Red")
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should write the second Choice for the second action", () => {
+			let result = applied(TWO_CHOICES, quickFixes(TWO_CHOICES)[1])
+
+			expect(result[4]).toBe("\tconstant red = Shade#Red")
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A generic Choice's Type Arguments are the reader's to write —
+		// an ellipsis is no spelling, and picking Arguments is a second
+		// decision. The prefix settles the ambiguity and what is left points at
+		// where the Arguments go, which is exactly what the Helps say.
+		it("should leave a generic Choice's Type Arguments to the reader", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Box<ItemType> { Value { item: ItemType }, Blank }",
+				"",
+				"\tconstant boxed = #Value(1)",
+				"}",
+			]
+
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Prefix with 'Optional#'",
+				"Prefix with 'Result#'",
+				"Prefix with 'Box#'",
+			])
+
+			let result = applied(lines, fixes[2])
+
+			expect(result[3]).toBe("\tconstant boxed = Box#Value(1)")
+
+			expect(codesOf(result)).toEqual(["undecided-type-arguments"])
+		})
+	})
+
 	describe("ambiguous-namespace", () => {
 		// NOTE: A Namespace of the Program's own tying with a Method
 		// `Orderable` provides — two candidates, and which of them was meant is

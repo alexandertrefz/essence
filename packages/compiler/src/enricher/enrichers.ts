@@ -16874,6 +16874,12 @@ function reportAmbiguousCase(
 					? `Write '${choiceName}#${caseName.content}' to pick '${choiceName}'.`
 					: `Write '${choiceName}<…>#${caseName.content}' with its Type Arguments to pick '${choiceName}'.`
 			}),
+			// NOTE: The names alone, one Help each and one action each, in the
+			// same order. A generic Choice's `<…>` is not part of its name and
+			// is not carried: an ellipsis is not a Type Argument list, so what
+			// a fix can write is the prefix, and `undecided-type-arguments`
+			// then points at where the Arguments go.
+			data: { kind: "choice-candidates", names: choiceNames },
 		},
 	)
 }

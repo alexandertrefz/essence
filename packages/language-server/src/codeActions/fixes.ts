@@ -727,3 +727,47 @@ export function namespaceSpecifierActions(
 		],
 	}))
 }
+
+// NOTE: One action per Choice that declares the Case, none of them preferred —
+// the Diagnostic exists because the two can not be told apart, and an Editor
+// applies a preferred fix without asking.
+//
+// The Diagnostic spans the NAME and stops short of the `#`, which is what makes
+// this an insertion rather than a rewrite: the Choice's name goes in front of a
+// sigil that is already written, and the Case's own spelling is never retyped.
+// The sigil is read back off the buffer first, as every edit here is measured
+// against the live text.
+//
+// A GENERIC Choice's Type Arguments are not written: `Optional<…>` is a shape
+// rather than a spelling, and picking Arguments for the reader is a second
+// decision this knows nothing about. The prefix settles the ambiguity and
+// `undecided-type-arguments` then points at where the Arguments go, which is
+// the same two steps the Helps describe.
+export function choicePrefixActions(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
+): Array<CodeActionEntry> {
+	if (diagnostic.data?.kind !== "choice-candidates") {
+		return []
+	}
+
+	let sigil = {
+		line: diagnostic.position.start.line,
+		column: diagnostic.position.start.column - 1,
+	}
+
+	if (
+		sliceOf(lines, { start: sigil, end: diagnostic.position.start }) !== "#"
+	) {
+		return []
+	}
+
+	return diagnostic.data.names.map((name) => ({
+		title: `Prefix with '${name}#'`,
+		kind: "quickfix" as const,
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: false,
+		edits: [{ range: { start: sigil, end: sigil }, newText: name }],
+	}))
+}
