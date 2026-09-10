@@ -161,6 +161,11 @@ not. An update takes either a key list or one Expression and never both, so a
 list that also carries a computed key — `{ game with board = board, history =
 game.history::removeLast() }` — has no shorthand spelling at all.
 
+**Quick Fix — "Write 'port = port'":** expands the bare key to the member it
+sets. Offered on a RECORD update only: a Dictionary's key is a value rather
+than a name, so `[d with a, b]` reports this code and has nothing for `a = a`
+to have meant.
+
 ### `dictionary-entry-syntax`
 
 A Dictionary entry was written some other way than `key = value`. `["a": 1]` and
@@ -197,6 +202,9 @@ rescues a bare path, so the message that says why is the one to give.
 either a key list or one Expression, and one path is an Expression: it merges
 the members of the value `config.server.port` into `config`, exactly as
 `{ config with other }` merges `other`'s.
+
+**Quick Fix — "Write 'server.port = port'":** writes the last step as the value
+the path sets, which is the local a reader who wrote the path meant.
 
 ### `empty-path-group`
 
@@ -242,6 +250,10 @@ may carry is one default for the payload as a WHOLE, written after the shape —
 default rather than a Parameter one, because Record construction is not a call.
 See `case-default-without-payload` and `default-type-mismatch`.
 
+**Quick Fix — "Remove the default":** deletes the `= expression` and the `=` in
+front of it. The Parser drops the default once it has reported, so removing it
+is what makes the source say what the Program already means.
+
 ### `case-default-without-payload`
 
 A Case with no payload shape was given a `= { … }` default. A default fills
@@ -257,6 +269,10 @@ choice Direction {
 
 Give the Case a payload shape — `Up { degrees: Integer } = { degrees = 0 }` —
 or write it on its own.
+
+**Quick Fix — "Remove the default":** deletes the `= { … }` and the `=` in
+front of it, which is the second of those two answers. Giving the Case a
+payload shape is a decision about the Choice and is left to the reader.
 
 ### `declarations-outside-stdlib`
 
@@ -2394,6 +2410,10 @@ requirement without the default and write the default on the fulfilling Method.
 Note that in this version a fulfilling Method's signature must match its
 requirement exactly, defaulted Parameters included — a Method carrying a
 default can not fulfil a requirement that does not.
+
+**Quick Fix — "Remove the default":** deletes the `= expression` and the `=` in
+front of it. The Parser drops the default once it has reported, so removing it
+is what makes the source say what the Program already means.
 
 ### `protocol-bound-function-value`
 

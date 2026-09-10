@@ -127,6 +127,43 @@ export function endOfLine(lines: Array<string>, line: number): common.Cursor {
 	return { line, column: lineAt(lines, line).length + 1 }
 }
 
+// NOTE: Where the `=` that introduces a default stands, with the whitespace in
+// front of it, or null where the text does not read that way. A Diagnostic
+// about a default underlines the VALUE, and deleting that alone would leave
+// `side: Integer =` behind — what has to go is the `=` and the space that
+// separated it from what it was written on.
+//
+// Only ever the `=` a default is written with: a comparison is a Method call in
+// this language, so nothing spelled `==`, `>=` or `!=` exists here to be
+// mistaken for one.
+export function defaultEqualsBefore(
+	lines: Array<string>,
+	start: common.Cursor,
+): common.Cursor | null {
+	let cursor = start
+
+	while (true) {
+		let before = lineAt(lines, cursor.line)
+			.slice(0, cursor.column - 1)
+			.replace(/[ \t]+$/, "")
+
+		if (before.endsWith("=")) {
+			let kept = before.slice(0, -1).replace(/[ \t]+$/, "")
+
+			return { line: cursor.line, column: kept.length + 1 }
+		}
+
+		if (before !== "" || cursor.line === 1) {
+			return null
+		}
+
+		cursor = {
+			line: cursor.line - 1,
+			column: lineAt(lines, cursor.line - 1).length + 1,
+		}
+	}
+}
+
 // NOTE: The WHOLE LINES a Node stands on, deleted — what a list with no
 // delimiters is removed by. Deleting the Node alone would leave the blank line
 // it sat on behind, so the deletion runs from the start of its first line to

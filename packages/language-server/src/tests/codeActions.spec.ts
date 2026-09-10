@@ -5,6 +5,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { analyse } from "../analyse"
 import { type CodeActionEntry, findCodeActions } from "../codeActions"
+import { removeDefaultAction } from "../codeActions/defaultFixes"
 import {
 	closeStringAction,
 	documentationSeparatorAction,
@@ -16,6 +17,10 @@ import {
 	enclosingStatementOf,
 	findInnermostNodeContaining,
 } from "../codeActions/lookups"
+import {
+	expandShorthandKeyAction,
+	expandShorthandPathAction,
+} from "../codeActions/shorthandFixes"
 
 // NOTE: Fixtures are joined line arrays with literal `\t`, so an assertion on
 // an inserted arm's indentation is an assertion on the exact characters —
@@ -1189,6 +1194,203 @@ describe("Code Actions", () => {
 					staleDiagnostic(
 						"missing-documentation-separator",
 						spanOf(lines, 2, "— who to greet"),
+					),
+					lines,
+				),
+			).toBeNull()
+		})
+	})
+
+	describe("shorthand-in-combination", () => {
+		it("should write the value a bare key stood for", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant base = { port = 1, host = 2 }",
+				"\tconstant port = 3",
+				"\tconstant host = 4",
+				"\tconstant updated = { base with port, host }",
+				"}",
+			]
+
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Write 'port = port'",
+				"Write 'host = host'",
+			])
+
+			expect(fixes[0].isPreferred).toBe(true)
+
+			let result = applied(applied(lines, fixes[1]), fixes[0])
+
+			expect(result[4]).toBe(
+				"\tconstant updated = { base with port = port, host = host }",
+			)
+
+			expect(codesOf(result)).not.toContain("shorthand-in-combination")
+		})
+
+		// NOTE: A Dictionary's key is a VALUE rather than a name, so there is
+		// nothing for a bare one to have been short for — the code is shared, the
+		// answer is not.
+		it("should stay silent for a bare name in a Dictionary update", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant base = ["a" = 1]',
+				"\tconstant a = 2",
+				"\tconstant b = 3",
+				"\tconstant updated = [base with a, b]",
+				"}",
+			]
+
+			expect(
+				quickFixes(lines).filter(
+					(fix) => fix.diagnosticCode === "shorthand-in-combination",
+				),
+			).toEqual([])
+		})
+
+		it("should stay silent where the span no longer reads as a name", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant updated = { base with port = 1 }",
+				"}",
+			]
+
+			let { program } = parseWithDiagnostics(lines.join("\n"))
+
+			expect(
+				expandShorthandKeyAction(
+					staleDiagnostic(
+						"shorthand-in-combination",
+						spanOf(lines, 2, "port = 1"),
+					),
+					program,
+					lines,
+				),
+			).toBeNull()
+		})
+	})
+
+	describe("shorthand-on-path-key", () => {
+		it("should write the last step as the value the path sets", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant config = { server = { port = 1, name = 2 } }",
+				"\tconstant port = 3",
+				"\tconstant updated = { config with server.port, name = 5 }",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Write 'server.port = port'")
+			expect(fix.diagnosticCode).toBe("shorthand-on-path-key")
+			expect(fix.isPreferred).toBe(true)
+
+			let result = applied(lines, fix)
+
+			expect(result[3]).toBe(
+				"\tconstant updated = { config with server.port = port, name = 5 }",
+			)
+
+			expect(codesOf(result)).not.toContain("shorthand-on-path-key")
+		})
+
+		it("should stay silent where the span no longer reads as a path", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant updated = { config with server = s }",
+				"}",
+			]
+
+			expect(
+				expandShorthandPathAction(
+					staleDiagnostic(
+						"shorthand-on-path-key",
+						spanOf(lines, 2, "server"),
+					),
+					lines,
+				),
+			).toBeNull()
+		})
+	})
+
+	describe("defaults written where they can never fire", () => {
+		it("should remove a default on a Case with no payload", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Colour { Red = { a = 1 }, Green }",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Remove the default")
+			expect(fix.diagnosticCode).toBe("case-default-without-payload")
+			expect(fix.isPreferred).toBe(true)
+
+			let result = applied(lines, fix)
+
+			expect(result[1]).toBe("\tchoice Colour { Red, Green }")
+			expect(codesOf(result)).not.toContain(
+				"case-default-without-payload",
+			)
+		})
+
+		it("should remove a default on a Function literal", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant twice = (value: Integer = 3) -> Integer { <- value }",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.diagnosticCode).toBe("default-on-function-literal")
+
+			let result = applied(lines, fix)
+
+			expect(result[1]).toBe(
+				"\tconstant twice = (value: Integer) -> Integer { <- value }",
+			)
+
+			expect(codesOf(result)).not.toContain("default-on-function-literal")
+		})
+
+		it("should remove a default on a Protocol requirement", () => {
+			let lines = [
+				"implementation {",
+				"\tprotocol Trimmable {",
+				"\t\ttrim(at side: Integer = 1) -> Self",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.diagnosticCode).toBe("default-on-protocol-requirement")
+
+			let result = applied(lines, fix)
+
+			expect(result[2]).toBe("\t\ttrim(at side: Integer) -> Self")
+			expect(codesOf(result)).not.toContain(
+				"default-on-protocol-requirement",
+			)
+		})
+
+		it("should stay silent where no '=' stands in front of the span", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Colour { Red, Green }",
+				"}",
+			]
+
+			expect(
+				removeDefaultAction(
+					staleDiagnostic(
+						"case-default-without-payload",
+						spanOf(lines, 2, "Green"),
 					),
 					lines,
 				),

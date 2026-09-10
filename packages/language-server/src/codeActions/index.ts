@@ -2,6 +2,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { type Analysis, analyseDocument, documentFilePath } from "../analyse"
 import type { Workspace } from "../workspace"
+import { removeDefaultAction } from "./defaultFixes"
 import {
 	constantToVariableAction,
 	elseBranchAction,
@@ -28,6 +29,10 @@ import {
 	partialDecimalActions,
 } from "./literalFixes"
 import { annotationActions, shorthandActions } from "./refactors"
+import {
+	expandShorthandKeyAction,
+	expandShorthandPathAction,
+} from "./shorthandFixes"
 
 // NOTE: Every edit here is computed from the text handed in, on a fresh
 // analysis — never from a Diagnostic the client echoed back. Published
@@ -203,8 +208,14 @@ const importOrSpellingFix: FixProvider = (context) => [
 const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"ambiguous-nesting-level": ({ diagnostic, program }) =>
 		wrapInHoldingCaseActions(diagnostic, program),
+	"case-default-without-payload": ({ diagnostic, lines }) =>
+		listed(removeDefaultAction(diagnostic, lines)),
 	"constant-reassignment": ({ diagnostic, program, lines }) =>
 		listed(constantToVariableAction(diagnostic, program, lines)),
+	"default-on-function-literal": ({ diagnostic, lines }) =>
+		listed(removeDefaultAction(diagnostic, lines)),
+	"default-on-protocol-requirement": ({ diagnostic, lines }) =>
+		listed(removeDefaultAction(diagnostic, lines)),
 	"fallback-never-used": ({ diagnostic, lines }) =>
 		listed(removeFallbackAction(diagnostic, lines)),
 	"focused-tests-remain": ({ diagnostic, lines }) =>
@@ -225,6 +236,10 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(removeToStringAction(diagnostic, lines)),
 	"redundant-parameter-label": ({ diagnostic, lines }) =>
 		listed(removeLabelAction(diagnostic, lines)),
+	"shorthand-in-combination": ({ diagnostic, program, lines }) =>
+		listed(expandShorthandKeyAction(diagnostic, program, lines)),
+	"shorthand-on-path-key": ({ diagnostic, lines }) =>
+		listed(expandShorthandPathAction(diagnostic, lines)),
 	"similar-tags": spellingFix,
 	"unclosed-string": ({ diagnostic, lines }) =>
 		listed(closeStringAction(diagnostic, lines)),
