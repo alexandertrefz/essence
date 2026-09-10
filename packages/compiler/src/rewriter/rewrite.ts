@@ -2301,7 +2301,22 @@ export function essenceMethodReferences(
 			}
 		}
 
-		for (let value of Object.values(record)) {
+		// NOTE: A Node's `type` and `position` are stepped over. Neither holds
+		// a Node this search draws an edge from: a Position is line and column
+		// numbers, and a Type is deliberately written to carry no Expression —
+		// the one exception, a Case payload default, is data the Enricher has
+		// already held to literals (`case-default-not-a-literal`), so it can
+		// name no Method, Function, Property or witness. What they DO hold is
+		// most of the object graph: every Node carries its Type, and a Type
+		// reaches Namespaces, Methods and Parameters with Types of their own.
+		// Walking into them made this search — run over every candidate of the
+		// prelude on every emission — thirty times the cost of the emission
+		// itself, for no edge it would not have found without.
+		for (let [key, value] of Object.entries(record)) {
+			if (key === "type" || key === "position") {
+				continue
+			}
+
 			visit(value, isStored)
 		}
 	}
