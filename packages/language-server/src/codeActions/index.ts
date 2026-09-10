@@ -27,6 +27,7 @@ import {
 	declareConformanceAction,
 	declareParameterAction,
 	constantToVariableAction,
+	documentationLineAction,
 	elseBranchAction,
 	type ImportContext,
 	importActions,
@@ -34,6 +35,7 @@ import {
 	missingMembersAction,
 	namespaceImportActions,
 	namespaceSpecifierActions,
+	removeDocumentationTagAction,
 	removeFallbackAction,
 	removeFocusedAction,
 	removeImportAction,
@@ -242,6 +244,12 @@ const importOrSpellingFix: FixProvider = (context) => [
 	...spellingFix(context),
 ]
 
+// NOTE: A `@param` suggestion is the Parameter's NAME and the span it is
+// written over is that name alone, so the title spells the whole tag back while
+// the edit rewrites only what the tag named.
+const documentationSpellingFix: FixProvider = ({ diagnostic }) =>
+	listed(suggestionAction(diagnostic, (suggestion) => `@param ${suggestion}`))
+
 // NOTE: One provider per Diagnostic code, looked up rather than switched on.
 // A code that has more than one answer keeps a provider that concatenates them,
 // in the order they are offered in. The table is what makes a Quick Fix a
@@ -312,6 +320,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(matcherBeforeValueAction(diagnostic, lines)),
 	"matcher-on-expect": ({ diagnostic, lines }) =>
 		listed(requireKeywordAction(diagnostic, lines)),
+	"misnamed-documentation-parameter": documentationSpellingFix,
 	"missing-case": ({ diagnostic, program, lines }) =>
 		listed(missingCaseAction(diagnostic, program, lines)),
 	"missing-documentation-separator": ({ diagnostic, lines }) =>
@@ -341,6 +350,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(closeStringAction(diagnostic, lines)),
 	"undeclared-conformance": ({ diagnostic, program }) =>
 		listed(declareConformanceAction(diagnostic, program)),
+	"undocumented-parameter": ({ diagnostic, lines }) =>
+		listed(documentationLineAction(diagnostic, lines)),
 	"unexpected-payload": ({ diagnostic, program, lines }) =>
 		listed(bareCaseAction(diagnostic, program, lines)),
 	"uninferred-namespace-parameter": ({ diagnostic, program, lines }) =>
@@ -349,6 +360,16 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	// the whole `#Name`, so the sigil is written back in front of it.
 	"unknown-case": ({ diagnostic }) =>
 		listed(suggestionAction(diagnostic, (suggestion) => `#${suggestion}`)),
+	// NOTE: A tag naming nothing is either misspelled or about a Parameter that
+	// is gone, and nothing in the Diagnostic chooses between them. The
+	// suggestion stands above the removal, since keeping the description is the
+	// answer that throws nothing away.
+	"unknown-documentation-parameter": (context) => [
+		...documentationSpellingFix(context),
+		...listed(
+			removeDocumentationTagAction(context.diagnostic, context.lines),
+		),
+	],
 	"unknown-member": spellingFix,
 	"unknown-method": (context) => [
 		...namespaceImportActions(context.diagnostic, context.imports),

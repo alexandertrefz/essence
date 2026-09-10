@@ -43,6 +43,37 @@ export function indentationOf(lines: Array<string>, line: number): string {
 	return lineAt(lines, line).match(/^[ \t]*/)?.[0] ?? ""
 }
 
+// NOTE: `first` through `last` as a range that covers WHOLE lines — the break
+// that ends the last of them included, so what a deletion leaves behind is the
+// lines around it rather than the blank line these stood on.
+//
+// A run that ends the document has no break after it to take, and takes the one
+// in FRONT of it instead. A run that is the whole document has neither, and
+// leaves the buffer empty.
+export function wholeLines(
+	lines: Array<string>,
+	first: number,
+	last: number,
+): common.Position {
+	if (last < lines.length) {
+		return {
+			start: { line: first, column: 1 },
+			end: { line: last + 1, column: 1 },
+		}
+	}
+
+	let end = { line: last, column: lineAt(lines, last).length + 1 }
+
+	if (first === 1) {
+		return { start: { line: 1, column: 1 }, end }
+	}
+
+	return {
+		start: { line: first - 1, column: lineAt(lines, first - 1).length + 1 },
+		end,
+	}
+}
+
 export function sliceOf(
 	lines: Array<string>,
 	position: common.Position,

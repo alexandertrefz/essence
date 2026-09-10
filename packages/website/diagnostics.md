@@ -2785,6 +2785,16 @@ unchecked: `constant alias = greet` is function-valued, but its Parameters
 survive only in a resolved Type, which keeps no internal names, so a `@param`
 there cannot be told from a typo.
 
+**Quick Fix — "Change to '@param x'":** rewrites the name the tag wrote,
+offered where an `overload` block's line is a near miss for a Parameter one of
+its Overloads takes. A line past the end of a positional run names nothing that
+exists, near or otherwise, and gets no suggestion.
+
+**Quick Fix — "Remove the '@param' line":** deletes the whole line and the ones
+that continue its description, since a description left behind would read as
+prose about the tag above it. Preferred only where there is no near miss to
+offer — keeping the text is the answer that throws nothing away.
+
 ### `misnamed-documentation-parameter`
 
 A `@param` line names a Parameter other than the one at its position. The
@@ -2792,11 +2802,22 @@ common cause is a line left out rather than a name misspelled: the lines then
 describe the second Parameter first, and the Diagnostic says which Parameter
 the written name belongs to.
 
+**Quick Fix — "Change to '@param x'":** rewrites the tag's name to the one the
+signature writes for the Parameter standing at that position — its label, or
+`_` where it carries none.
+
 ### `undocumented-parameter`
 
 A Parameter that no `@param` line reached. A block that writes no `@param` at
 all documents the Declaration as a whole and is left alone; once a block starts
 documenting Parameters, it documents every one of them.
+
+**Quick Fix — "Add a '@param x' line":** writes the line under the last
+`@param` the block wrote, and under whatever lines continue it. The description
+is left empty, so the Warning stands until it is filled in. Offered for the
+first Parameter the run falls short of and no other: the lines document
+Parameters by position, so a line for the one below it would leave a hole above
+it.
 
 ## Modules
 

@@ -188,12 +188,31 @@ export type DiagnosticData =
 	// what the reader was told to write — a generic Choice's Type Arguments
 	// are not part of one and stay the reader's to add.
 	| { kind: "choice-candidates"; names: Array<string> }
+	// NOTE: The `§§` line a Parameter is missing. `parameter` is the name the
+	// line has to write — the label, or `_` where the Parameter carries none —
+	// and `after` is the `@param` line the new one belongs under, which is the
+	// last one the block already wrote.
+	//
+	// NOTE: Carried for the FIRST Parameter the run does not reach, and for no
+	// other. The lines document Parameters by POSITION, so a Parameter two
+	// short of the run has no line that can be written for it without leaving
+	// the one above it undocumented — and writing that one puts this one back
+	// in reach.
+	| { kind: "documentation-line"; parameter: string; after: Position }
 	// NOTE: The label a Parameter declares and the one the call WROTE, either
 	// of them null where there is none. The pair is the fact; which of the
 	// three edits it implies — write a label, change one, drop one — is the
 	// Server's reading of it, and there is no fourth pair: two equal labels
 	// are no mismatch.
 	| { kind: "expected-label"; label: string | null; written: string | null }
+	// NOTE: The names a Matcher introduces, in written order — what
+	// `require MATCHER = EXPR` brought into scope left of the `=`. Read here
+	// rather than off the source because the Statement they were written in was
+	// refused: the Program a fix reads holds no Node that names them.
+	//
+	// NOTE: SEVERAL, because a Pattern names as many as it has members, and
+	// which of them a line meant is not something a Diagnostic can say.
+	| { kind: "introduced-names"; names: Array<string> }
 	// NOTE: The members a Record Literal has to grow, in the order the
 	// Parameter's Type or the Case declares them, so that a scaffold writes
 	// them in the order the reader would have.
@@ -212,6 +231,15 @@ export type DiagnosticData =
 			kind: "required-protocol"
 			protocol: string
 			parameter: string | null
+	  }
+	// NOTE: A Module section standing where it does not belong, with the span
+	// of the whole block. The Parser DROPS such a section rather than carry it
+	// along broken, so the Program a fix reads holds no Node for it and this is
+	// the only record of where its text stands.
+	| {
+			kind: "section-order"
+			section: "import" | "export"
+			block: Position
 	  }
 	// NOTE: The Namespace a static Method is reached through, so a fix can
 	// write `Namespace.make(value, …)` for a `value::make(…)`. ONE name rather

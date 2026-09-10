@@ -6535,6 +6535,28 @@ function documentedParameter(
 const positionalRule =
 	"A '@param' line documents the Parameter at its own position — the first line the first Parameter — and names it the way the signature does: its label, or '_' where it carries none."
 
+// NOTE: The line a Quick Fix would write, for the ONE Parameter that has a
+// place to write it: the first the run falls short of. The lines document
+// Parameters by position, so a line for the Parameter below that one would
+// leave a hole above it — and writing the one above puts it back in reach on
+// the next analysis. Spread rather than assigned, for `suggestionData`'s
+// reason.
+function documentationLineData(
+	tags: Array<common.DocumentationParameter>,
+	parameter: string,
+	index: number,
+): { data?: common.DiagnosticData } {
+	let last = tags[tags.length - 1]?.tag
+
+	if (index !== tags.length || last === undefined) {
+		return {}
+	}
+
+	return {
+		data: { kind: "documentation-line", parameter, after: last.position },
+	}
+}
+
 function reportPositionalDocumentation(
 	tags: Array<common.DocumentationParameter>,
 	signature: Array<parser.ParameterNode>,
@@ -6559,6 +6581,11 @@ function reportPositionalDocumentation(
 				parameter.position,
 				{
 					code: "undocumented-parameter",
+					...documentationLineData(
+						tags,
+						written[problem.index]!,
+						problem.index,
+					),
 					labels: [
 						primary(
 							parameter.position,
@@ -6633,6 +6660,10 @@ function reportPositionalDocumentation(
 			tag.tag.position,
 			{
 				code: "misnamed-documentation-parameter",
+				// NOTE: What the signature WRITES for the Parameter rather than
+				// what a reader is shown for it — the fix rewrites the tag, and
+				// a tag names a Parameter by its label or by `_`.
+				...suggestionData(written[problem.index]!),
 				labels: [
 					primary(
 						tag.tag.position,
@@ -6686,6 +6717,7 @@ function reportUnknownDocumentationNames(
 			tag.tag.position,
 			{
 				code: "unknown-documentation-parameter",
+				...suggestionData(suggestion),
 				labels: [
 					primary(
 						tag.tag.position,

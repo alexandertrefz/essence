@@ -23,6 +23,7 @@ import {
 	openingParenthesisAfter,
 	removeLinesEdit,
 	sliceOf,
+	wholeLines,
 } from "./geometry"
 import type { CodeActionEdit, CodeActionEntry } from "./index"
 import {
@@ -1360,5 +1361,137 @@ function reboundRegionsOf(
 			return [node.position]
 		default:
 			return []
+	}
+}
+
+// NOTE: A `§§` block read as LINES rather than as the Documentation the Parser
+// made of it. What the fixes below have to find is where a tag's text ends, and
+// a tag carries the span of its own name alone — the lines under it that
+// continue its description belong to no Node at all.
+const documentationPrefix = "§§"
+
+// NOTE: What a `§§` line says, or null where the line is not one. The one space
+// after the sigil is the separator rather than content, exactly as the grammar
+// reads it.
+function documentationBody(line: string): string | null {
+	let text = line.trimStart()
+
+	if (!text.startsWith(documentationPrefix)) {
+		return null
+	}
+
+	let body = text.slice(documentationPrefix.length)
+
+	return body.startsWith(" ") ? body.slice(1) : body
+}
+
+// NOTE: The three tags the grammar knows. An `@` line naming anything else is
+// prose the description keeps — writing about an `@address` costs nothing —
+// so it continues the tag above it rather than opening one.
+const documentationTagPattern = /^@(param|returns|example)\b/
+
+const parameterTagPattern = /^@param\b/
+
+// NOTE: The last line of the section a tag opens: it runs until the next tag
+// does, or until the block ends.
+function documentationSectionEnd(
+	lines: Array<string>,
+	tagLine: number,
+): number {
+	let last = tagLine
+
+	while (true) {
+		let body = documentationBody(lineAt(lines, last + 1))
+
+		if (body === null || documentationTagPattern.test(body)) {
+			return last
+		}
+
+		last += 1
+	}
+}
+
+// NOTE: The line the block never wrote, put under the last `@param` it did —
+// and under the lines continuing that one, since a description may run over as
+// many as it needs. The Warning underlines the PARAMETER, which is nowhere near
+// the block, so where the line goes is what the Diagnostic carries.
+//
+// The description is left empty: what the Compiler knows is the name the line
+// has to write, and what the Parameter is for is the reader's to say. That is
+// also why it is not preferred — the Warning stands until the description is
+// written, which is a hole in plain sight rather than a line claiming to
+// document something.
+export function documentationLineAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
+): CodeActionEntry | null {
+	if (diagnostic.data?.kind !== "documentation-line") {
+		return null
+	}
+
+	let anchor = diagnostic.data.after.start
+	// NOTE: Read back off the buffer, as every edit here is: a Position from a
+	// stale analysis pointing at a line that no longer opens a `@param` would
+	// write the new one into the middle of somebody's prose.
+	let body = documentationBody(lineAt(lines, anchor.line))
+
+	if (body === null || !parameterTagPattern.test(body)) {
+		return null
+	}
+
+	let last = documentationSectionEnd(lines, anchor.line)
+	let end = { line: last, column: lineAt(lines, last).length + 1 }
+	let indentation = indentationOf(lines, anchor.line)
+
+	return {
+		title: `Add a '@param ${diagnostic.data.parameter}' line`,
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: false,
+		edits: [
+			{
+				range: { start: end, end },
+				newText: `\n${indentation}${documentationPrefix} @param ${diagnostic.data.parameter} —`,
+			},
+		],
+	}
+}
+
+// NOTE: The whole `@param` line and the lines that continue it. Deleting the
+// name alone would leave `§§ @param` describing nothing, and deleting the line
+// alone would strand its description in the prose of whatever stands above it.
+export function removeDocumentationTagAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
+): CodeActionEntry | null {
+	let tagLine = diagnostic.position.start.line
+	let body = documentationBody(lineAt(lines, tagLine))
+
+	if (body === null || !parameterTagPattern.test(body)) {
+		return null
+	}
+
+	return {
+		title: "Remove the '@param' line",
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		// NOTE: Preferred only where there is nothing else to do with the line.
+		// A near miss on the name is the likelier reading wherever the Compiler
+		// found one — the description was written about something, and a rename
+		// is what left the tag behind — so the fix that keeps the text stands
+		// above the one that drops it.
+		isPreferred: diagnostic.data?.kind !== "suggestion",
+		edits: [
+			{
+				range: wholeLines(
+					lines,
+					tagLine,
+					documentationSectionEnd(lines, tagLine),
+				),
+				newText: "",
+			},
+		],
 	}
 }

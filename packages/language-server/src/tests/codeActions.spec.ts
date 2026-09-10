@@ -3312,6 +3312,161 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("documentation tags", () => {
+		it("should write the line a Parameter is missing under the run", () => {
+			let lines = [
+				"implementation {",
+				"\t§§ Joins two texts.",
+				"\t§§ @param left — the text to put first",
+				"\tfunction join(left: String, right: String) -> String {",
+				"\t\t<- left::append(right)",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Add a '@param right' line")
+			expect(fix.diagnosticCode).toBe("undocumented-parameter")
+			// NOTE: The description is left empty, so the reader still has
+			// something to write — which is why the fix is not preferred.
+			expect(fix.isPreferred).toBe(false)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\t§§ Joins two texts.",
+				"\t§§ @param left — the text to put first",
+				"\t§§ @param right —",
+				"\tfunction join(left: String, right: String) -> String {",
+				"\t\t<- left::append(right)",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(result)).not.toContain("undocumented-parameter")
+		})
+
+		// NOTE: A tag's description runs until the next tag opens, so the line
+		// goes under everything the tag above it wrote — and above the tag
+		// below it, whatever that tag is.
+		it("should write it below the lines that continue the tag above", () => {
+			let lines = [
+				"implementation {",
+				"\t§§ Joins two texts.",
+				"\t§§ @param left — the text to put first",
+				"\t§§ and it goes on about it",
+				"\t§§ @returns — the two of them",
+				"\tfunction join(left: String, right: String) -> String {",
+				"\t\t<- left::append(right)",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(result[4]).toBe("\t§§ @param right —")
+			expect(result[5]).toBe("\t§§ @returns — the two of them")
+			expect(codesOf(result)).not.toContain("undocumented-parameter")
+		})
+
+		it("should offer no line for a Parameter the run cannot reach", () => {
+			let lines = [
+				"implementation {",
+				"\t§§ Joins.",
+				"\t§§ @param left — the text to put first",
+				"\tfunction join(left: String, middle: String, right: String) -> String {",
+				"\t\t<- left::append(middle)::append(right)",
+				"\t}",
+				"}",
+			]
+
+			expect(titles(quickFixes(lines))).toEqual([
+				"Add a '@param middle' line",
+			])
+		})
+
+		it("should rewrite a tag to the Parameter standing at its position", () => {
+			let lines = [
+				"implementation {",
+				"\t§§ Greets.",
+				"\t§§ @param subjekt — who to greet",
+				"\tfunction greet(subject: String) -> String { <- subject }",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Change to '@param subject'")
+			expect(fix.diagnosticCode).toBe("misnamed-documentation-parameter")
+			expect(fix.isPreferred).toBe(true)
+			expect(result[2]).toBe("\t§§ @param subject — who to greet")
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: The whole line and the lines under it, since a description left
+		// behind would read as prose about whatever tag stands above it.
+		it("should remove a tag past the last Parameter, description and all", () => {
+			let lines = [
+				"implementation {",
+				"\t§§ Greets.",
+				"\t§§ @param subject — who to greet",
+				"\t§§ @param loudly — and how",
+				"\t§§ which nobody asked about",
+				"\tfunction greet(subject: String) -> String { <- subject }",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Remove the '@param' line")
+			expect(fix.isPreferred).toBe(true)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\t§§ Greets.",
+				"\t§§ @param subject — who to greet",
+				"\tfunction greet(subject: String) -> String { <- subject }",
+				"}",
+			])
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: An `overload` block's tags are read by NAME, so a near miss is
+		// tellable there — and the fix that keeps the description stands above
+		// the one that throws it away.
+		it("should offer a near miss above the removal", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Ladder for Integer {",
+				"\t\t§§ Climbs.",
+				"\t\t§§ @param hight — how far",
+				"\t\toverload climb {",
+				"\t\t\t(_ height: Integer) -> Integer { <- @ }",
+				"\t\t\t() -> Integer { <- @ }",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Change to '@param height'",
+				"Remove the '@param' line",
+			])
+			expect(fixes[1].isPreferred).toBe(false)
+			expect(applied(lines, fixes[0])[3]).toBe(
+				"\t\t§§ @param height — how far",
+			)
+			expect(codesOf(applied(lines, fixes[0]))).toEqual([])
+		})
+	})
+
 	describe("Type annotations", () => {
 		it("should offer the inferred Type of a Constant as an edit", () => {
 			let lines = ["implementation {", '\tconstant name = "Ada"', "}"]

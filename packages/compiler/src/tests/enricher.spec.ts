@@ -5174,6 +5174,64 @@ describe("Enricher", () => {
 			])
 		})
 
+		// NOTE: The Help and the `data` must name the same thing — the Help is
+		// what the reader is told and the `data` is what a Quick Fix writes.
+		// `after` is the tag the missing line goes under, which is the only
+		// thing about the block a Warning underlining a PARAMETER carries.
+		it("should carry the tag a missing '@param' is written under", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				§§ Joins.
+				§§ @param left — the text to put first
+				function join(left: String, right: String) -> String {
+					<- left::append(right)
+				}
+			}`)
+
+			expect(diagnostics[0].data).toEqual({
+				kind: "documentation-line",
+				parameter: "right",
+				after: {
+					start: { line: 3, column: 15 },
+					end: { line: 3, column: 19 },
+				},
+			})
+		})
+
+		// NOTE: A run two Parameters short has no mechanical answer for the
+		// second of them: the lines document Parameters by position, so writing
+		// a line for the last would leave a hole above it. Writing the first is
+		// what puts the second back in reach.
+		it("should carry no line for a Parameter the run cannot reach yet", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				§§ Joins.
+				§§ @param left — the text to put first
+				function join(left: String, middle: String, right: String) -> String {
+					<- left::append(middle)::append(right)
+				}
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => diagnostic.data?.kind),
+			).toEqual(["documentation-line", undefined])
+		})
+
+		// NOTE: What the SIGNATURE writes for the Parameter rather than what a
+		// Hover shows for it — a tag names a Parameter by its label or by `_`,
+		// and the fix rewrites the tag.
+		it("should carry the written name of a misnamed Parameter", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				§§ Greets.
+				§§ @param subject — who to greet
+				function greet(_ subject: String) -> String { <- subject }
+			}`)
+
+			expect(diagnostics[0].code).toBe("misnamed-documentation-parameter")
+			expect(diagnostics[0].data).toEqual({
+				kind: "suggestion",
+				suggestion: "_",
+			})
+		})
+
 		it("should let an overload block name a Parameter of any Overload", () => {
 			expect(
 				diagnosticsFor(`implementation {
@@ -5205,6 +5263,25 @@ describe("Enricher", () => {
 			expect(diagnostics[0].code).toBe("unknown-documentation-parameter")
 			expect(diagnostics[0].helps).toEqual(["Did you mean 'height'?"])
 			expect(diagnostics[0].notes).toHaveLength(1)
+			expect(diagnostics[0].data).toEqual({
+				kind: "suggestion",
+				suggestion: "height",
+			})
+		})
+
+		// NOTE: A tag past the end of a positional run names no Parameter that
+		// exists, near or otherwise, so the only answer is to drop the line and
+		// the Diagnostic says so rather than offering a name.
+		it("should carry no suggestion for a tag past the last Parameter", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				§§ Greets.
+				§§ @param subject — who to greet
+				§§ @param loudly — and how
+				function greet(subject: String) -> String { <- subject }
+			}`)
+
+			expect(diagnostics[0].code).toBe("unknown-documentation-parameter")
+			expect(diagnostics[0].data).toBeUndefined()
 		})
 
 		it("should report a '@param' on a Declaration that holds no Function", () => {
