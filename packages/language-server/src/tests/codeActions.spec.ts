@@ -6,6 +6,11 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { analyse } from "../analyse"
 import { type CodeActionEntry, findCodeActions } from "../codeActions"
 import {
+	closeStringAction,
+	documentationSeparatorAction,
+	invalidEscapeActions,
+} from "../codeActions/literalFixes"
+import {
 	enclosingStatementOf,
 	findInnermostNodeContaining,
 } from "../codeActions/lookups"
@@ -73,6 +78,47 @@ function applied(lines: Array<string>, entry: CodeActionEntry): Array<string> {
 // is expected and is the reader's to fill in.
 function codesOf(lines: Array<string>): Array<common.DiagnosticCode> {
 	return analyse(lines.join("\n")).map((diagnostic) => diagnostic.code)
+}
+
+// NOTE: A span by what it points AT rather than by a column counted out by
+// hand — the fixtures are tab-indented, so a counted column is a fact about the
+// whitespace rather than about the text under it.
+function spanOf(
+	lines: Array<string>,
+	line: number,
+	needle: string,
+): common.Position {
+	let column = (lines[line - 1] as string).indexOf(needle)
+
+	if (column === -1) {
+		throw new Error(`'${needle}' is not on line ${line}`)
+	}
+
+	return {
+		start: { line, column: column + 1 },
+		end: { line, column: column + 1 + needle.length },
+	}
+}
+
+// NOTE: A Diagnostic as a DEBOUNCED Editor hands one back: the code and the
+// span it was reported at, over a buffer that has been edited since. Every fix
+// reads its span back off the buffer before it writes, and handing the two
+// apart is the only way to ask one whether it really does — an analysis run on
+// the text under test agrees with it by construction.
+function staleDiagnostic(
+	code: common.DiagnosticCode,
+	position: common.Position,
+	labels: Array<common.DiagnosticLabel> = [],
+): common.Diagnostic & { position: common.Position } {
+	return {
+		severity: "error",
+		message: "",
+		code,
+		position,
+		labels: [{ position, message: "", kind: "primary" }, ...labels],
+		notes: [],
+		helps: [],
+	}
 }
 
 function offsetOf(text: string, cursor: common.Cursor): number {
@@ -892,6 +938,140 @@ describe("Code Actions", () => {
 			expect(fix.diagnosticCode).toBe("missing-return")
 			expect(applied(lines, fix)[5]).toBe("\t\t\t} else {")
 			expect(applied(lines, fix)[6]).toBe("\t\t\t}")
+		})
+	})
+
+	describe("unclosed-string", () => {
+		it("should close the String at the end of the line it opened on", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant greeting = "hello',
+				"\tconstant other = 1",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Add the missing '\"'")
+			expect(fix.diagnosticCode).toBe("unclosed-string")
+			expect(fix.isPreferred).toBe(true)
+
+			let result = applied(lines, fix)
+
+			expect(result).toEqual([
+				"implementation {",
+				'\tconstant greeting = "hello"',
+				"\tconstant other = 1",
+				"}",
+			])
+
+			expect(codesOf(result)).not.toContain("unclosed-string")
+		})
+
+		it("should stay silent where the opening quote has been typed over", () => {
+			let lines = ["implementation {", "\tconstant greeting = hello", "}"]
+
+			expect(
+				closeStringAction(
+					staleDiagnostic("unclosed-string", spanOf(lines, 3, "}"), [
+						{
+							position: spanOf(lines, 2, "h"),
+							message: "opened here",
+							kind: "secondary",
+						},
+					]),
+					lines,
+				),
+			).toBeNull()
+		})
+	})
+
+	describe("invalid-escape", () => {
+		it("should offer both readings of the backslash, neither preferred", () => {
+			let lines = ["implementation {", '\tconstant quoted = "a\\qb"', "}"]
+
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Write '\\\\' for a literal backslash",
+				"Drop the backslash",
+			])
+
+			expect(fixes.every((fix) => !fix.isPreferred)).toBe(true)
+
+			expect(applied(lines, fixes[0])).toEqual([
+				"implementation {",
+				'\tconstant quoted = "a\\\\qb"',
+				"}",
+			])
+
+			expect(applied(lines, fixes[1])).toEqual([
+				"implementation {",
+				'\tconstant quoted = "aqb"',
+				"}",
+			])
+
+			expect(codesOf(applied(lines, fixes[0]))).not.toContain(
+				"invalid-escape",
+			)
+
+			expect(codesOf(applied(lines, fixes[1]))).not.toContain(
+				"invalid-escape",
+			)
+		})
+
+		it("should stay silent where the span no longer reads as an escape", () => {
+			let lines = ["implementation {", '\tconstant quoted = "ab"', "}"]
+
+			expect(
+				invalidEscapeActions(
+					staleDiagnostic("invalid-escape", spanOf(lines, 2, "ab")),
+					lines,
+				),
+			).toEqual([])
+		})
+	})
+
+	describe("missing-documentation-separator", () => {
+		it("should write the em-dash in front of the tag's text", () => {
+			let lines = [
+				"implementation {",
+				"\t§§ @param subject who to greet",
+				"\tfunction greet (subject: String) -> String { <- subject }",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Insert the '—' separator")
+			expect(fix.diagnosticCode).toBe("missing-documentation-separator")
+			expect(fix.isPreferred).toBe(true)
+
+			let result = applied(lines, fix)
+
+			expect(result[1]).toBe("\t§§ @param subject — who to greet")
+			expect(codesOf(result)).not.toContain(
+				"missing-documentation-separator",
+			)
+		})
+
+		it("should stay silent where the separator already stands there", () => {
+			let lines = [
+				"implementation {",
+				"\t§§ @param subject — who to greet",
+				"\tfunction greet (subject: String) -> String { <- subject }",
+				"}",
+			]
+
+			expect(
+				documentationSeparatorAction(
+					staleDiagnostic(
+						"missing-documentation-separator",
+						spanOf(lines, 2, "— who to greet"),
+					),
+					lines,
+				),
+			).toBeNull()
 		})
 	})
 

@@ -20,6 +20,11 @@ import {
 	wrapInHoldingCaseActions,
 } from "./fixes"
 import { overlaps } from "./geometry"
+import {
+	closeStringAction,
+	documentationSeparatorAction,
+	invalidEscapeActions,
+} from "./literalFixes"
 import { annotationActions, shorthandActions } from "./refactors"
 
 // NOTE: Every edit here is computed from the text handed in, on a fresh
@@ -202,8 +207,12 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(removeFallbackAction(diagnostic, lines)),
 	"focused-tests-remain": ({ diagnostic, lines }) =>
 		listed(removeFocusedAction(diagnostic, lines)),
+	"invalid-escape": ({ diagnostic, lines }) =>
+		invalidEscapeActions(diagnostic, lines),
 	"missing-case": ({ diagnostic, program, lines }) =>
 		listed(missingCaseAction(diagnostic, program, lines)),
+	"missing-documentation-separator": ({ diagnostic, lines }) =>
+		listed(documentationSeparatorAction(diagnostic, lines)),
 	"missing-return": ({ diagnostic, program, lines }) =>
 		listed(elseBranchAction(diagnostic, program, lines)),
 	"redundant-interpolation-to-string": ({ diagnostic, lines }) =>
@@ -211,6 +220,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"redundant-parameter-label": ({ diagnostic, lines }) =>
 		listed(removeLabelAction(diagnostic, lines)),
 	"similar-tags": spellingFix,
+	"unclosed-string": ({ diagnostic, lines }) =>
+		listed(closeStringAction(diagnostic, lines)),
 	// NOTE: A suggestion is the Case's NAME and the span it is written over is
 	// the whole `#Name`, so the sigil is written back in front of it.
 	"unknown-case": ({ diagnostic }) =>

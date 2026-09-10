@@ -121,6 +121,34 @@ export function keywordBefore(
 	return index === -1 ? null : index + 1
 }
 
+// NOTE: The Cursor one past the last character of a line — where an insertion
+// that belongs at the END of what was written on it goes.
+export function endOfLine(lines: Array<string>, line: number): common.Cursor {
+	return { line, column: lineAt(lines, line).length + 1 }
+}
+
+// NOTE: The WHOLE LINES a Node stands on, deleted — what a list with no
+// delimiters is removed by. Deleting the Node alone would leave the blank line
+// it sat on behind, so the deletion runs from the start of its first line to
+// the start of the line below its last.
+//
+// A Node on the LAST line of the document has no following line to reach into,
+// so the deletion stops at the end of its own — otherwise it would end past the
+// end of the document.
+export function removeLinesEdit(
+	lines: Array<string>,
+	position: common.Position,
+): CodeActionEdit {
+	let start = { line: position.start.line, column: 1 }
+	let end = { line: position.end.line + 1, column: 1 }
+
+	if (end.line > lines.length) {
+		end = endOfLine(lines, position.end.line)
+	}
+
+	return { range: { start, end }, newText: "" }
+}
+
 // NOTE: A deletion that starts at the first non-whitespace of its line takes
 // the preceding line break and the indentation with it; one that does not
 // (`case Integer { … } case String { … }` on one line) stays where it is.

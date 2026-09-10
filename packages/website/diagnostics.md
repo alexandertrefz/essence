@@ -49,6 +49,11 @@ A String Literal runs to the end of the file without its closing quote. The
 end of the input is where that is noticed; the opening quote is where the
 String began, and the report points at both.
 
+**Quick Fix — "Add the missing '\"'":** writes the quote at the end of the line
+the String opened on, which is where a forgotten one belongs and what gives the
+lines below it back to the Program. Not offered where the buffer no longer
+reads a quote at the opening the report points back at.
+
 ### `unclosed-block`
 
 A `{` was never closed. Only the innermost torn-open block reports — a missing
@@ -90,6 +95,12 @@ A backslash in a String Literal is followed by something that is not a known
 escape. A String understands `\"`, `\\`, `\n`, `\t`, `\{` and `\}`; every other
 backslash is an error. The character after it is read as itself so the rest of
 the String still lexes — write `\\` for a literal backslash.
+
+**Quick Fixes — "Write `\\` for a literal backslash" and "Drop the
+backslash":** the two readings of what was written, both offered and neither
+preferred. Which was meant is the writer's to say — `"C:\temp"` wants the first
+and a stray backslash wants the second — so an Editor never picks one on its
+own.
 
 ### `comment-in-hole`
 
@@ -2552,6 +2563,10 @@ together. The two are separated by an em-dash — `@param other — the String t
 add` — so that the name and its description stay legible in the source. A tag
 that leaves its text to the lines below it needs no separator. The text is
 lifted into the Documentation either way.
+
+**Quick Fix — "Insert the '—' separator":** writes the em-dash and a space in
+front of the text, which is where the Diagnostic underlines. Not offered where
+the buffer already reads one there.
 
 A `@param` line documents the Parameter at its own position. The first line
 documents the first Parameter, the second the second, and each names its

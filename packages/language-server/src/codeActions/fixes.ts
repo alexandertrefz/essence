@@ -12,8 +12,8 @@ import {
 	indentationOf,
 	insertBeforeClosingBrace,
 	keywordBefore,
-	lineAt,
 	openingBracketEdit,
+	removeLinesEdit,
 	sliceOf,
 } from "./geometry"
 import type { CodeActionEntry } from "./index"
@@ -315,26 +315,13 @@ export function removeImportAction(
 					),
 				)!.position
 
-	let start = { line: removed.start.line, column: 1 }
-	let end = { line: removed.end.line + 1, column: 1 }
-
-	// NOTE: A last line has no following line to reach into, so the break
-	// BEFORE it is taken instead — otherwise the deletion ends past the end of
-	// the document.
-	if (end.line > lines.length) {
-		end = {
-			line: removed.end.line,
-			column: lineAt(lines, removed.end.line).length + 1,
-		}
-	}
-
 	return {
 		title: `Remove the unused import of '${sliceOf(lines, diagnostic.position)}'`,
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
 		isPreferred: true,
-		edits: [{ range: { start, end }, newText: "" }],
+		edits: [removeLinesEdit(lines, removed)],
 	}
 }
 
