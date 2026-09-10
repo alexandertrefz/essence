@@ -60,6 +60,15 @@ type TestSessionOptions = {
 	// answer to disagree with.
 	testFiles: () => Array<string>
 	dependentsOf: (filePath: string) => Array<string>
+	// NOTE: What the project governing one entry says about running it — the
+	// tags it skips and whether its declarations are tested. Asked per entry,
+	// and asked at the moment a run is built rather than held: a workspace is
+	// not one project, and the file that answers this is one the reader may
+	// have just edited.
+	settingsFor: (filePath: string) => {
+		skipTags: Array<string>
+		contracts: boolean
+	}
 	// NOTE: The unsaved buffers, by absolute path.
 	overlays: () => Record<string, string>
 	notify: (notification: TestRunNotification) => void
@@ -102,10 +111,6 @@ export type TestSession = {
 	}): number | null
 	setEnabled(enabled: boolean): void
 	isEnabled(): boolean
-	// NOTE: Tags no run of this session selects. It is the client's setting
-	// rather than a filter of its own: an Editor running a project's tests on
-	// every keystroke is exactly where "not the slow ones" is worth saying.
-	setSkipTags(tags: Array<string>): void
 	// NOTE: How long a burst of edits is allowed to be before it costs a run.
 	setDebounce(milliseconds: number): void
 	// NOTE: Whether a run counts what it reached. Turning it on compiles every
@@ -142,7 +147,6 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 	let workerPath = options.workerPath ?? defaultWorkerPath()
 	let debounce = options.debounce ?? debounceInMilliseconds
 	let deadline = options.deadline ?? deadlineInMilliseconds
-	let skipTags: Array<string> = []
 	let enabled = true
 	let coverageEnabled = false
 	// NOTE: Laid over cycle by cycle. A cycle covers what a change reached and
@@ -531,7 +535,14 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		let request: TestWorkerRequest = {
 			kind: "run",
 			run,
-			entries,
+			// NOTE: Each entry carries what the project governing IT says, read
+			// here rather than in the Worker: the Worker has a filesystem but no
+			// Workspace, and the settings are already answered per directory on
+			// this side.
+			entries: entries.map((entry) => ({
+				filePath: entry,
+				...options.settingsFor(entry),
+			})),
 			overlays: snapshot,
 			// NOTE: A focus anywhere in the workspace silences everything else,
 			// exactly as it does on the command line — and a Worker message
@@ -539,7 +550,6 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			// is told. It converges after one cycle, which is one keystroke's
 			// worth of being wrong about a test nobody is looking at.
 			filters: {
-				skipTags,
 				focusedElsewhere: [...focusedEntries].some(
 					(each) => !entries.includes(each),
 				),
@@ -799,23 +809,6 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			this.runAll("open")
 		},
 		isEnabled: () => enabled,
-		setSkipTags(tags: Array<string>): void {
-			// NOTE: Sorted before the comparison, so that a client re-reading
-			// its configuration and answering with the same tags in another
-			// order does not re-run the whole workspace.
-			let next = [...tags].sort()
-
-			if (next.join("\u0000") === [...skipTags].sort().join("\u0000")) {
-				return
-			}
-
-			skipTags = next
-
-			// NOTE: What runs changed, so everything runs again — a test the
-			// old tags left out has no result at all, and a client would go on
-			// drawing the deselection it was last told about.
-			this.runAll("settings")
-		},
 		setDebounce(milliseconds: number): void {
 			debounce = Math.max(0, milliseconds)
 		},

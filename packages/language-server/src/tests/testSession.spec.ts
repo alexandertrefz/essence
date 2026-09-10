@@ -9,6 +9,7 @@ import {
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
+import { createConfigurationCache } from "@essence-lang/compiler/configuration"
 import { canonicalPath } from "@essence-lang/compiler/documents"
 
 import { TEST_RUN_VERSION, type TestRunNotification } from "../testProtocol"
@@ -19,6 +20,25 @@ import { createTestSession, type TestSession } from "../testSession"
 // which files a change reaches, what it re-runs, and what it tells a client.
 // The Worker it starts is the real one, because compiling and running is the
 // half that can not be faked and still mean anything.
+
+// NOTE: What the Server hands the session: the settings of the project
+// governing each entry, read through the same per-directory cache. A fixture
+// that writes an `essence.json` beside its sources is a fixture whose tags the
+// session obeys — which is the whole of how the editor and `essence test` came
+// to run the same thing. One cache per session, since nothing here edits a
+// project file under a session that has already read it.
+function projectSettings(): (filePath: string) => {
+	skipTags: Array<string>
+	contracts: boolean
+} {
+	let configurations = createConfigurationCache()
+
+	return (filePath) => {
+		let { contracts, skipTags } = configurations.forFile(filePath).test
+
+		return { contracts, skipTags }
+	}
+}
 
 const passing = [
 	"implementation {",
@@ -108,6 +128,7 @@ function harness(
 	let overlays: Record<string, string> = {}
 	let problems: Array<string> = []
 	let session = createTestSession({
+		settingsFor: projectSettings(),
 		onProblem: (filePath, problem) =>
 			problems.push(`${filePath}: ${problem}`),
 		testFiles: () => files,
@@ -178,6 +199,7 @@ describe("A session whose run never ends", () => {
 		let problems: Array<string> = []
 		let notifications: Array<TestRunNotification> = []
 		let session = createTestSession({
+			settingsFor: projectSettings(),
 			testFiles: () => [file],
 			dependentsOf: (filePath) => [filePath],
 			overlays: () => ({}),
@@ -243,6 +265,7 @@ describe("A session asked to accept a snapshot", () => {
 		let rewrites: Array<{ module: string; text: string }> = []
 		let live = harness({ files: [file] })
 		let session = createTestSession({
+			settingsFor: projectSettings(),
 			testFiles: () => [file],
 			dependentsOf: (filePath) => [filePath],
 			overlays: () => ({}),
@@ -287,6 +310,7 @@ describe("A session asked to accept a snapshot", () => {
 		await live.session.dispose()
 
 		let session = createTestSession({
+			settingsFor: projectSettings(),
 			testFiles: () => [file],
 			dependentsOf: (filePath) => [filePath],
 			overlays: () => ({}),
@@ -638,39 +662,133 @@ describe("The Language Server's test session", () => {
 		}
 	}, 60_000)
 
-	it("leaves out the tags the client asked it to skip", async () => {
-		let live = harness({ files: [taggedFile] })
+	// NOTE: The tags come out of the project file rather than out of the
+	// editor's settings, which is what makes the live session and `essence
+	// test` leave out the same tests: one list, in the file the project owns.
+	it("leaves out the tags the project file skips", async () => {
+		let directory = path.join(root, "skipping")
+		let file = path.join(directory, "Tagged.tests.es")
+
+		mkdirSync(directory, { recursive: true })
+		writeFileSync(file, tagged)
+		writeFileSync(
+			path.join(directory, "essence.json"),
+			JSON.stringify({ test: { skipTags: ["slow"] } }),
+		)
+
+		let live = harness({ files: [file] })
 
 		try {
-			live.session.setSkipTags(["slow"])
+			live.session.runAll("open")
 
 			await live.waitForRuns(1)
 
 			expect(
 				live.session
-					.recordsFor(taggedFile)
+					.recordsFor(file)
 					.map((record) => [record.name, record.state]),
 			).toEqual([
 				["waits", "deselected"],
 				["is quick", "passed"],
 			])
-			expect(live.notifications[0]).toMatchObject({
-				kind: "start",
-				reason: "settings",
-			})
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
 
-			// NOTE: The same tags again is not a reason to run the workspace a
-			// second time — a client re-reads its whole configuration whenever
-			// anything under `essence` changes.
-			live.session.setSkipTags(["slow"])
+	// NOTE: Per ENTRY, because a workspace is not one project. The Worker runs
+	// the entries one at a time and each carries the answer of the project it
+	// belongs to, so a folder that skips `slow` and a folder that does not are
+	// two different selections inside one cycle.
+	it("skips one project's tags and not its neighbour's", async () => {
+		let skipping = path.join(root, "twoProjects", "skipping")
+		let keeping = path.join(root, "twoProjects", "keeping")
+		let skipped = path.join(skipping, "Tagged.tests.es")
+		let kept = path.join(keeping, "Tagged.tests.es")
 
-			await new Promise((resolve) => setTimeout(resolve, 100))
+		mkdirSync(skipping, { recursive: true })
+		mkdirSync(keeping, { recursive: true })
+		writeFileSync(skipped, tagged)
+		writeFileSync(kept, tagged)
+		writeFileSync(
+			path.join(skipping, "essence.json"),
+			JSON.stringify({ test: { skipTags: ["slow"] } }),
+		)
+		writeFileSync(path.join(keeping, "essence.json"), "{}")
+
+		let live = harness({ files: [skipped, kept] })
+
+		try {
+			live.session.runAll("open")
+
+			await live.waitForRuns(1)
 
 			expect(
-				live.notifications.filter(
-					(notification) => notification.kind === "start",
-				),
-			).toHaveLength(1)
+				live.session
+					.recordsFor(skipped)
+					.map((record) => [record.name, record.state]),
+			).toEqual([
+				["waits", "deselected"],
+				["is quick", "passed"],
+			])
+			expect(
+				live.session
+					.recordsFor(kept)
+					.map((record) => [record.name, record.state]),
+			).toEqual([
+				["waits", "passed"],
+				["is quick", "passed"],
+			])
+		} finally {
+			await live.session.dispose()
+		}
+	}, 60_000)
+
+	// NOTE: A project that asked for the goals its declarations promise gets
+	// them from the live session too, as the `contracts` suite the compile
+	// synthesizes — the same suite `essence test --contracts` reports. The file
+	// wrote no `tests { … }` block at all: what makes it an entry is that it
+	// declares a Namespace under a project that asked.
+	it("runs the goals a project's declarations promise", async () => {
+		let directory = path.join(root, "contracts")
+		let file = path.join(directory, "Measures.es")
+
+		mkdirSync(directory, { recursive: true })
+		writeFileSync(
+			file,
+			[
+				"implementation {",
+				"\tnamespace Measures for Integer {",
+				"\t\tdoubled() -> Integer {",
+				"\t\t\t<- @::multiply(with 2)",
+				"\t\t}",
+				"\t}",
+				"}",
+				"",
+			].join("\n"),
+		)
+		writeFileSync(
+			path.join(directory, "essence.json"),
+			JSON.stringify({ test: { contracts: true } }),
+		)
+
+		let live = harness({ files: [file] })
+
+		try {
+			live.session.runAll("open")
+
+			await live.waitForRuns(1)
+
+			let [ended] = live.notifications.filter(
+				(notification) => notification.kind === "end",
+			)
+
+			expect(
+				ended?.sites.map((site) => site.suitePath.join("/")),
+			).toEqual(["contracts"])
+			expect(
+				live.session.recordsFor(file).map((record) => record.state),
+			).toEqual(["passed"])
 		} finally {
 			await live.session.dispose()
 		}
@@ -834,6 +952,7 @@ describe("A session narrowing a change to the tests it reached", () => {
 		let overlays: Record<string, string> = {}
 		let problems: Array<string> = []
 		let live = createTestSession({
+			settingsFor: projectSettings(),
 			onProblem: (filePath, problem) =>
 				problems.push(`${filePath}: ${problem}`),
 			testFiles: () => [doublesFile, triplesFile],
@@ -1059,6 +1178,7 @@ function coverageSession(
 	let notifications: Array<TestRunNotification> = []
 	let overlays: Record<string, string> = {}
 	let live = createTestSession({
+		settingsFor: projectSettings(),
 		testFiles: () => entries,
 		dependentsOf: (filePath) =>
 			filePath === sourceModule ? [sourceModule, ...entries] : [filePath],

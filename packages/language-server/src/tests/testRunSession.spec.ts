@@ -362,4 +362,55 @@ describe("The Server's live test session", () => {
 			"similar-tags",
 		)
 	}, 60_000)
+
+	// NOTE: A file is an entry because it has tests, and under a project that
+	// asked for `test.contracts` a file declaring a Namespace HAS them: the
+	// goals its declarations promise, synthesized into a `contracts` suite by
+	// the compile. Nothing here wrote a `tests { … }` block at all.
+	const namespaceSource = [
+		"implementation {",
+		"\tnamespace Measures for Integer {",
+		"\t\tdoubled() -> Integer {",
+		"\t\t\t<- @::multiply(with 2)",
+		"\t\t}",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	it("makes an entry of a Namespace where the project asks for contracts", async () => {
+		let { session, pathOf } = await openWorkspace(
+			{
+				"essence.json": JSON.stringify({
+					test: { contracts: true },
+				}),
+				"Measures.es": namespaceSource,
+			},
+			"Measures.es",
+		)
+		let [ended] = await session.waitForTestRuns(1)
+
+		expect(ended?.files).toEqual([pathOf("Measures.es")])
+		expect(ended?.sites.map((site) => site.suitePath.join("/"))).toEqual([
+			"contracts",
+		])
+		expect(ended?.counts.passed).toBe(1)
+	}, 60_000)
+
+	// NOTE: And it is the PROJECT that decides. The same file under a project
+	// that said nothing is no entry at all, so a workspace that never asked for
+	// the goals does not start compiling and running every Namespace it holds.
+	it("leaves the same Namespace alone where the project did not ask", async () => {
+		let { session, pathOf } = await openWorkspace(
+			{
+				"essence.json": "{}",
+				"Measures.es": namespaceSource,
+				"Season.tests.es": passing,
+			},
+			"Measures.es",
+		)
+		let [ended] = await session.waitForTestRuns(1)
+
+		expect(ended?.files).toEqual([pathOf("Season.tests.es")])
+	}, 60_000)
 })

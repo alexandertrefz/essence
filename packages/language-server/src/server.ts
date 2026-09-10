@@ -383,6 +383,16 @@ export function startServer(options: { connection?: Connection } = {}) {
 	let session = createTestSession({
 		testFiles,
 		dependentsOf: (filePath) => workspace.dependentsOf(filePath),
+		// NOTE: The project governing THIS entry, rather than one answer for the
+		// whole session: the tags it skips and whether its declarations are
+		// tested are the project's to say, and a workspace holds as many
+		// projects as it holds `essence.json` files.
+		settingsFor: (filePath) => {
+			let { skipTags, contracts } =
+				workspace.configurationFor(filePath).test
+
+			return { skipTags, contracts }
+		},
 		overlays: () => {
 			let overlays: Record<string, string> = {}
 
@@ -487,10 +497,32 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// off the parses the Workspace already holds. A file is an entry because of
 	// what it says rather than because of what it is called: `Foo.tests.es` is a
 	// convention and a section is the fact.
+	//
+	// NOTE: And, under a project that asked for `test.contracts`, every file
+	// that declares a Namespace — because such a file HAS tests: the goals its
+	// declarations promise, synthesized into a `contracts` suite by the compile
+	// (see `contractSuite`). A file with neither is still no entry, and the
+	// question is asked per file, since one folder of a workspace may ask for
+	// the goals while the next does not.
 	function testFiles(): Array<string> {
-		return [...workspace.knownFiles()].filter(
-			(filePath) => workspace.programOf(filePath)?.tests != null,
-		)
+		return [...workspace.knownFiles()].filter((filePath) => {
+			let program = workspace.programOf(filePath)
+
+			if (program === null) {
+				return false
+			}
+
+			if (program.tests != null) {
+				return true
+			}
+
+			return (
+				workspace.configurationFor(filePath).test.contracts &&
+				program.implementation.nodes.some(
+					(node) => node.nodeType === "NamespaceDefinitionStatement",
+				)
+			)
+		})
 	}
 
 	// NOTE: What the tags of the WHOLE workspace say about each other, which no
@@ -618,20 +650,17 @@ export function startServer(options: { connection?: Connection } = {}) {
 			// decline: it compiles and runs a project's tests on every edit,
 			// and a project where that is too much work is a project where
 			// this has to be off rather than merely quiet. The whole section
-			// is pulled at once — four settings that are one decision, and
-			// four round trips to answer it would be four.
+			// is pulled at once — three settings that are one decision, and
+			// three round trips to answer it would be three.
+			//
+			// NOTE: Which tags a run skips is NOT among them. It is a fact
+			// about the project rather than about the reader — the same list
+			// `essence test` obeys — so it is read out of the project file, per
+			// entry, and the editor's copy of it is gone.
 			let readTestSettings = () =>
 				connection.workspace
 					.getConfiguration("essence.tests")
 					.then((tests: TestSettings | null | undefined) => {
-						session.setSkipTags(
-							Array.isArray(tests?.skipTags)
-								? tests.skipTags.filter(
-										(tag) => typeof tag === "string",
-									)
-								: [],
-						)
-
 						if (typeof tests?.debounce === "number") {
 							session.setDebounce(tests.debounce)
 						}
@@ -643,8 +672,8 @@ export function startServer(options: { connection?: Connection } = {}) {
 						session.setCoverage(tests?.coverage === true)
 
 						// NOTE: Last, so that a session being switched ON runs
-						// with the tags and the delay it was just told about
-						// rather than with the ones it started with.
+						// with the delay it was just told about rather than
+						// with the one it started with.
 						session.setEnabled(tests?.enabled !== false)
 					})
 					.catch(() => {})

@@ -22,6 +22,7 @@ import {
 } from "@essence-lang/runtime/Testing"
 
 import type {
+	TestEntry,
 	TestSite,
 	TestWorkerRequest,
 	TestWorkerResponse,
@@ -124,7 +125,7 @@ function sitesOf(registry: Registry, entry: string): Array<TestSite> {
 
 async function runEntry(
 	request: Extract<TestWorkerRequest, { kind: "run" }>,
-	entry: string,
+	entry: TestEntry,
 ): Promise<TestWorkerResponse> {
 	let answer = (
 		events: Array<TestEvent>,
@@ -136,7 +137,7 @@ async function runEntry(
 	): TestWorkerResponse => ({
 		kind: "entry",
 		run: request.run,
-		entry,
+		entry: entry.filePath,
 		events,
 		sites,
 		focused,
@@ -144,12 +145,22 @@ async function runEntry(
 		problem,
 		rewrites,
 	})
+	// NOTE: The project's own filters, laid under the run's — what the whole
+	// run selects is one question and what THIS entry's project skips is
+	// another, and the second is what makes a workspace of two projects run
+	// each of them as its own author asked.
+	let filters = { ...request.filters, skipTags: entry.skipTags }
 	let bundle: string
 
 	try {
-		let emitted = await compileToMemory(entry, {
+		let emitted = await compileToMemory(entry.filePath, {
 			host: hostOf(request.overlays),
 			tests: true,
+			// NOTE: Part of the compile MODE, so it is part of `bundleHash` the
+			// way `tests` is: the goals a project's declarations promise are a
+			// suite synthesized into the section, out of sources that are byte
+			// for byte the same as a plain run's.
+			contracts: entry.contracts,
 			// NOTE: The instrumentation is part of the Optimiser's Options, so
 			// it is part of `bundleHash` — an instrumented bundle and a plain
 			// one never share a staged name, and turning the setting on or off
@@ -208,10 +219,12 @@ async function runEntry(
 		// a file that WROTE a section, so every section is somebody's entry
 		// exactly once.
 		let registry = tests.registryOf(
-			tests.registry().modules.filter((each) => each.module === entry),
+			tests
+				.registry()
+				.modules.filter((each) => each.module === entry.filePath),
 		)
-		let filters = {
-			...request.filters,
+		let selection = {
+			...filters,
 			...(request.ids.length > 0 ? { ids: request.ids } : {}),
 		}
 		let events: Array<TestEvent> = []
@@ -235,7 +248,7 @@ async function runEntry(
 
 				events.push(event)
 			},
-			filters,
+			filters: selection,
 			// NOTE: A bundle with no counters in it answers with nothing, so
 			// asking costs a run that was not instrumented exactly nothing.
 			coverage: request.coverage,
@@ -269,8 +282,8 @@ async function runEntry(
 
 		return answer(
 			events,
-			sitesOf(registry, entry),
-			tests.select(registry, request.filters).focused,
+			sitesOf(registry, entry.filePath),
+			tests.select(registry, filters).focused,
 			true,
 			written === null || written.problems.length === 0
 				? null

@@ -151,10 +151,17 @@ export type TestRunNotification = {
 // whenever the client says something under `essence` changed. It is part of
 // this contract rather than of the extension's manifest because any client may
 // answer it, and a client that answers nothing keeps the defaults — a session
-// that is on, skips nothing, and waits `450` milliseconds.
+// that is on, counts nothing, and waits `450` milliseconds.
+//
+// NOTE: Every one of these is a fact about the READER: whether they want their
+// project run as they type, whether they want it instrumented, and how long a
+// burst of keystrokes is allowed to be. What a project RUNS — the tags it
+// skips, whether its declarations are tested — is a fact about the project, and
+// lives in the `essence.json` the terminal reads too. `essence.tests.skipTags`
+// used to be spelled here as well, which left a project with two lists to keep
+// agreeing and an editor that ran something else than `essence test`.
 export type TestSettings = {
 	enabled?: boolean
-	skipTags?: Array<string>
 	debounce?: number
 	// NOTE: Whether a run counts what it reached. It is off by default and
 	// deliberately: instrumentation makes every compile of the session a
@@ -216,24 +223,46 @@ export type RunTestsResult = {
 //    beside the Server's own analysis is the one thing that discipline forbids.
 // 3. A test can loop forever. A Worker can be terminated; a Server cannot
 //    interrupt itself.
+
+// NOTE: What one entry of a run is: the file, and what the project governing
+// THAT file says about running it. Per entry rather than per run because a
+// workspace is not one project — two folders are two of them, and a folder
+// holds a nested project as easily as none — and the Worker compiles and runs
+// the entries one at a time anyway, so carrying a list per run would only be a
+// way of getting the second project wrong.
+export type TestEntry = {
+	// NOTE: The file to compile and run. It runs the tests of its OWN Module
+	// and no others: a file two entries import runs its tests under its own
+	// name once.
+	filePath: string
+	// NOTE: The tags this entry's project skips — `test.skipTags` of the
+	// `essence.json` governing it, which is the same list `essence test` obeys.
+	skipTags: Array<string>
+	// NOTE: Whether this entry also tests what its own declarations promise, as
+	// `essence test --contracts` does for one run. It changes the emitted bytes
+	// — the goals are a suite synthesized into the section — so it is part of
+	// the compile rather than of the selection.
+	contracts: boolean
+}
+
 export type TestWorkerRequest =
 	| {
 			kind: "run"
 			run: number
-			// NOTE: The entry files to compile and run. Each runs the tests of
-			// its OWN Module and no others: an entry is a file that wrote a
-			// `tests { … }` block, and a file two entries import runs its tests
-			// under its own name once.
-			entries: Array<string>
+			// NOTE: The entries to compile and run, each with the settings of
+			// the project it belongs to — see `TestEntry`.
+			entries: Array<TestEntry>
 			// NOTE: The unsaved buffers, by absolute path. The Worker reads
 			// these before it reads disk, which is what makes the session
 			// answer for the file as it is being typed rather than as it was
 			// last saved.
 			overlays: Record<string, string>
+			// NOTE: What every entry of this run is selected by. The tags one
+			// SKIPS is not among them: that is the project's answer rather than
+			// the run's, and it rides on the entry.
 			filters: {
 				filter?: string | null
 				tags?: Array<string>
-				skipTags?: Array<string>
 				focusedElsewhere?: boolean
 			}
 			// NOTE: Run only these tests, by structural id. Empty runs whatever
