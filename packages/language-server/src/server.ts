@@ -2979,15 +2979,46 @@ export function toLspCodeAction(
 								toLspRange(position),
 							),
 					),
-		edit: {
-			changes: {
-				[params.textDocument.uri]: entry.edits.map((edit) => ({
-					range: toLspRange(edit.range),
-					newText: edit.newText,
-				})),
-			},
-		},
+		edit: { changes: changesOf(entry, params) },
+		// NOTE: Handed through untouched. What a command does happens in the
+		// Editor after the edits land — an extraction opens rename on the name
+		// it just invented — and there is no edit that puts a cursor anywhere.
+		command: entry.command,
 	}
+}
+
+// NOTE: One key per file. Every edit of an action used to belong to the
+// document it was asked about, and a refactoring that moves something does not
+// — a name lifted into another Module is two files edited at once, which the
+// protocol says as two entries of one map.
+//
+// The URI the request came in under wins for the document it names, the way
+// `onRenameRequest` decides it: an edit computed against the open buffer has
+// to land on the buffer the Editor is holding, and a second spelling of the
+// same path is a second file as far as the Editor is concerned.
+function changesOf(
+	entry: CodeActionEntry,
+	params: CodeActionParams,
+): Record<string, Array<TextEdit>> {
+	let changes: Record<string, Array<TextEdit>> = {}
+
+	for (let edit of entry.edits) {
+		let uri =
+			edit.filePath === undefined ||
+			edit.filePath === documentFilePath(params.textDocument.uri)
+				? params.textDocument.uri
+				: uriOf(edit.filePath)
+		let edits = changes[uri]
+
+		if (edits === undefined) {
+			edits = []
+			changes[uri] = edits
+		}
+
+		edits.push({ range: toLspRange(edit.range), newText: edit.newText })
+	}
+
+	return changes
 }
 
 function rangesOverlap(a: Range, b: Range): boolean {

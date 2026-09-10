@@ -30,8 +30,8 @@ import {
 	TextDocumentSyncKind,
 } from "vscode-languageserver"
 
-import { analyse } from "../analyse"
-import { findCodeActions } from "../codeActions"
+import { analyse, documentFilePath } from "../analyse"
+import { type CodeActionEntry, findCodeActions } from "../codeActions"
 import { type CompletionEntry, findCompletions } from "../completion"
 import { toLspDiagnostic, toLspRange, toRange } from "../conversion"
 import { findHover } from "../hover"
@@ -43,6 +43,7 @@ import {
 	serverCapabilities,
 	toLspCodeAction,
 	toLspCompletionItem,
+	uriOf,
 } from "../server"
 
 describe("LSP", () => {
@@ -589,6 +590,27 @@ describe("LSP", () => {
 			return { code, range, message: "", source: "essence" }
 		}
 
+		// NOTE: Spelled out rather than found, for the shapes no fix produces
+		// yet — an entry reaching a second file, and one carrying a command.
+		const span = {
+			start: { line: 2, column: 2 },
+			end: { line: 2, column: 6 },
+		}
+
+		function entryWith(
+			overrides: Partial<CodeActionEntry>,
+		): CodeActionEntry {
+			return {
+				title: "Extract the Expression",
+				kind: "refactor.rewrite",
+				diagnosticCode: null,
+				diagnosticPosition: null,
+				isPreferred: false,
+				edits: [],
+				...overrides,
+			}
+		}
+
 		it("should map the edits onto the document it was asked about", () => {
 			let action = fixFor("missing-case")
 			let item = toLspCodeAction(action, paramsWith([]))
@@ -654,6 +676,70 @@ describe("LSP", () => {
 
 			expect(item.kind).toBe(CodeActionKind.RefactorRewrite)
 			expect(item.diagnostics).toBeUndefined()
+		})
+
+		// NOTE: Every fix edits the document it was offered on, and a
+		// refactoring that moves something does not — which the protocol says
+		// as a second key of the one map.
+		it("should group the edits of an action by the file each belongs to", () => {
+			let other = "/Other.es"
+			let item = toLspCodeAction(
+				entryWith({
+					edits: [
+						{ range: span, newText: "here" },
+						{ range: span, newText: "there", filePath: other },
+					],
+				}),
+				paramsWith([]),
+			)
+
+			expect(Object.keys(item.edit?.changes ?? {})).toEqual([
+				uri,
+				uriOf(other),
+			])
+			expect(item.edit?.changes?.[uriOf(other)]).toEqual([
+				{ range: toLspRange(span), newText: "there" },
+			])
+		})
+
+		// NOTE: A path that spells the open document IS the open document. Two
+		// keys to the one file would have the Editor apply half the action to a
+		// buffer it is holding and half to the file under it.
+		it("should keep an edit naming the open file under the URI it came in under", () => {
+			let item = toLspCodeAction(
+				entryWith({
+					edits: [
+						{ range: span, newText: "here" },
+						{
+							range: span,
+							newText: "there",
+							filePath: documentFilePath(uri),
+						},
+					],
+				}),
+				paramsWith([]),
+			)
+
+			expect(Object.keys(item.edit?.changes ?? {})).toEqual([uri])
+			expect(item.edit?.changes?.[uri]).toHaveLength(2)
+		})
+
+		it("should hand a client command through untouched", () => {
+			let command = {
+				title: "Rename the extracted Constant",
+				command: "essence.startRename",
+				arguments: [uri, 2],
+			}
+
+			let item = toLspCodeAction(entryWith({ command }), paramsWith([]))
+
+			expect(item.command).toEqual(command)
+		})
+
+		it("should carry no command for an action that asked for none", () => {
+			let item = toLspCodeAction(entryWith({}), paramsWith([]))
+
+			expect(item.command).toBeUndefined()
 		})
 	})
 

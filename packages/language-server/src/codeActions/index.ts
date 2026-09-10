@@ -35,6 +35,12 @@ export type CodeActionEdit = {
 	// same Cursor — so there is one edit shape rather than two.
 	range: common.Position
 	newText: string
+	// NOTE: Absent for the document the request was made on, which is where
+	// nearly every edit goes. An action that reaches a SECOND file — a name
+	// moved to the Module that should export it, an import written into the
+	// file that will need it — names that file by absolute path, and the
+	// Server groups the edits per file on the way out.
+	filePath?: string
 }
 
 export type CodeActionEntry = {
@@ -47,6 +53,15 @@ export type CodeActionEntry = {
 	diagnosticPosition: common.Position | null
 	isPreferred: boolean
 	edits: Array<CodeActionEdit>
+	// NOTE: A command for the CLIENT to run once the edits have landed. An
+	// extraction ends by opening rename on the name it just invented, and no
+	// edit can do that — putting a cursor somewhere is the Editor's to do.
+	// Handed through untouched as the LSP `CodeAction.command`.
+	command?: {
+		title: string
+		command: string
+		arguments?: Array<unknown>
+	}
 }
 
 // NOTE: What a Code Action offers depends on the document, not on where in it
