@@ -2945,3 +2945,134 @@ describe("Completion of a declaration written below the cursor", () => {
 		expect(labelsOf(source, { line: 5, column: 11 })).toEqual(["name"])
 	})
 })
+
+// NOTE: A Function LITERAL is a Scope, and the only one an Expression opens.
+// The name in front of a `.` used to be resolved by a walk of Statements alone,
+// so a literal's own Type Parameters and everything its body declares were
+// invisible — wherever the literal was written, and however shallow.
+describe("Completion of a name a Function literal declares", () => {
+	it("should offer the bound of a literal's own Type Parameter", () => {
+		let source = [
+			"implementation {",
+			"\tconstant same = <infer Item is Equatable>(_ a: Item) -> Boolean {",
+			"\t\t<- Item.",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 3, column: 11 })).toEqual([
+			"is",
+			"isNot",
+		])
+	})
+
+	it("should offer a Choice declared in a literal's body", () => {
+		let source = [
+			"implementation {",
+			"\tconstant pick = (_ index: Integer) -> Integer {",
+			"\t\tchoice Colour {",
+			"\t\t\tRed,",
+			"\t\t\tGreen,",
+			"\t\t}",
+			"",
+			"\t\tconstant listed = Colour.",
+			"\t\t<- index",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(entryFor(source, { line: 8, column: 28 }, "cases")?.detail).toBe(
+			"() -> NonEmptyList<Colour>",
+		)
+	})
+
+	// NOTE: A literal written as an ARGUMENT is the position they are written
+	// in most, and the walk reaches it the same way it reaches every other
+	// Expression: blindly, rather than through a list of the Nodes that can
+	// hold one.
+	it("should offer a Choice declared in a literal written as an Argument", () => {
+		let source = [
+			"implementation {",
+			"\tfunction apply (_ make: (Integer) -> Integer) -> Integer {",
+			"\t\t<- make(1)",
+			"\t}",
+			"",
+			"\tconstant used = apply((_ index: Integer) -> Integer {",
+			"\t\tchoice Colour {",
+			"\t\t\tRed,",
+			"\t\t}",
+			"",
+			"\t\tconstant listed = Colour.",
+			"\t\t<- index",
+			"\t})",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 11, column: 28 })).toEqual(["cases"])
+	})
+
+	// NOTE: The reading that already worked, pinned: a Choice declared in the
+	// Function AROUND the literal is in reach inside it, and descending into
+	// the literal must not lose the Scopes it stands in.
+	it("should still offer a Choice the Function around the literal declares", () => {
+		let source = [
+			"implementation {",
+			"\tfunction run () -> Integer {",
+			"\t\tchoice Colour {",
+			"\t\t\tRed,",
+			"\t\t}",
+			"",
+			"\t\tconstant pick = (_ index: Integer) -> Integer {",
+			"\t\t\tconstant listed = Colour.",
+			"\t\t\t<- index",
+			"\t\t}",
+			"",
+			"\t\t<- pick(1)",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 8, column: 29 })).toEqual(["cases"])
+	})
+
+	// NOTE: And the shadowing, which is what the depth rule is for: the
+	// literal's Type Parameter stands nearer than the Choice outside it.
+	it("should read the literal's Type Parameter over an outer Choice", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Colour {",
+			"\t\tRed,",
+			"\t}",
+			"",
+			"\tconstant same = <infer Colour is Equatable>(_ a: Colour) -> Boolean {",
+			"\t\t<- Colour.",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 7, column: 13 })).toEqual([
+			"is",
+			"isNot",
+		])
+	})
+
+	// NOTE: A literal the cursor does NOT stand in declares nothing in reach,
+	// exactly as a Function beside this one does.
+	it("should offer nothing a literal beside the cursor declares", () => {
+		let source = [
+			"implementation {",
+			"\tconstant pick = (_ index: Integer) -> Integer {",
+			"\t\tchoice Colour {",
+			"\t\t\tRed,",
+			"\t\t}",
+			"",
+			"\t\t<- index",
+			"\t}",
+			"",
+			"\tconstant listed = Colour.",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 10, column: 27 })).toEqual([])
+	})
+})

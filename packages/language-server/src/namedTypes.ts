@@ -1,6 +1,7 @@
 import { builtinTypes } from "@essence-lang/compiler/enricher/builtins"
 import type { common } from "@essence-lang/interfaces"
 
+import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { contains } from "./positions"
 import { typedProgramSections } from "./sections"
 
@@ -30,6 +31,7 @@ export function typeNamedAt(
 		type: null,
 		depth: -1,
 	}
+	let visited = new WeakSet<object>()
 
 	function record(type: common.Type, depth: number) {
 		if (depth > found.depth) {
@@ -127,12 +129,14 @@ export function typeNamedAt(
 			}
 			case "IfStatement":
 				if (contains(node.position, cursor)) {
+					visitNode(node.condition, depth)
 					visitBody(node.body, depth + 1)
 				}
 
 				return
 			case "IfElseStatement":
 				if (contains(node.position, cursor)) {
+					visitNode(node.condition, depth)
 					visitBody(node.trueBody, depth + 1)
 					visitBody(node.falseBody, depth + 1)
 				}
@@ -140,15 +144,91 @@ export function typeNamedAt(
 				return
 			case "Match":
 				if (contains(node.position, cursor)) {
+					visitNode(node.value, depth)
+
 					for (let handler of node.handlers) {
+						for (let expression of typedHandlerExpressions(
+							handler,
+						)) {
+							visitNode(expression, depth + 1)
+						}
+
 						visitBody(handler.body, depth + 1)
 					}
 				}
 
 				return
+			// NOTE: A Function LITERAL is a Scope like a declared one, and the
+			// only one an Expression opens: its own Type Parameters, and
+			// everything its body declares, are in reach inside it and nowhere
+			// else. Read on the same terms `FunctionStatement` is, which is
+			// what makes `<infer T is Equatable>(…) { <- T.` and the `choice`
+			// written in a literal's body answer at all.
+			case "FunctionValue":
+				if (!contains(node.position, cursor)) {
+					return
+				}
+
+				readGenerics(node.value.generics, depth + 1)
+				visitInside(node.value.parameters, depth + 1)
+				visitBody(node.value.body, depth + 2)
+
+				return
 			default:
+				visitChildren(node, depth)
+
 				return
 		}
+	}
+
+	// NOTE: Every Expression a Node holds, whatever kind it is. The walk above
+	// names the Nodes that open a Scope or declare a name; everything else is
+	// descended into blindly, because a Function literal can be written in any
+	// Expression position there is — an Argument, a Record member, a `define`
+	// arm — and a list of the ones that can hold one is a list of every
+	// Expression Node in the language, kept in step by hand.
+	//
+	// Types are stepped over: they are most of what a typed Program weighs,
+	// they hold no Statement, and they are where its only cycles are. The same
+	// three keys `providedMethodDeclarations` steps over, and for the same
+	// reasons — with a `visited` set behind them, because a Language Server
+	// that walks into a cycle stops answering at all.
+	function visitChildren(node: object, depth: number) {
+		for (let [key, entry] of Object.entries(node)) {
+			if (
+				key !== "type" &&
+				key !== "returnType" &&
+				key !== "protocolType"
+			) {
+				visitInside(entry, depth)
+			}
+		}
+	}
+
+	function visitInside(value: unknown, depth: number) {
+		if (value === null || typeof value !== "object" || visited.has(value)) {
+			return
+		}
+
+		visited.add(value)
+
+		if (Array.isArray(value)) {
+			for (let entry of value) {
+				visitInside(entry, depth)
+			}
+
+			return
+		}
+
+		if (
+			typeof (value as Record<string, unknown>)["nodeType"] === "string"
+		) {
+			visitNode(value as common.typed.ImplementationNode, depth)
+
+			return
+		}
+
+		visitChildren(value, depth)
 	}
 
 	// NOTE: The implementation, and every Section the cursor stands in — a
@@ -157,12 +237,14 @@ export function typeNamedAt(
 	// declares is in reach nowhere else. Each Section further in counts as a
 	// step deeper, which is what lets a test shadow the file it tests.
 	//
-	// NOTE: The bodies a STATEMENT opens, and no Expression — the same limit
-	// `namespacePropertyDocumentation` and `collectNamespaceTypes` walk under.
-	// The only declaration an Expression can hide is one written inside a
-	// Function literal, and a literal's own BOUND is refused anyway: a bounded
-	// Function carries hidden conformance Parameters that exist at a direct
-	// invocation alone, so the Validator will not let one be stored or passed.
+	// NOTE: The bodies a Statement opens AND the ones an Expression does — a
+	// Function literal is a Scope, and both its own Type Parameters and
+	// whatever its body declares are in reach only inside it. A literal that
+	// writes a BOUND can not be stored or passed, since a bounded Function
+	// carries hidden conformance Parameters that exist at a direct invocation
+	// alone — but the Validator is what says so, and a writer halfway through
+	// one is asking this question of the Enricher's answer, which types the
+	// literal and its Type Parameters like any other.
 	let depth = 0
 
 	for (let section of typedProgramSections(program)) {
