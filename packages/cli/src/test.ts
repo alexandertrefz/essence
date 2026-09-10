@@ -934,6 +934,7 @@ export async function runTest(
 		command,
 		context.programName,
 		process.cwd(),
+		configuration.root,
 		configuration.exclude,
 		contracts,
 	)

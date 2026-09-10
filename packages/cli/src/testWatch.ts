@@ -96,6 +96,7 @@ export async function runTestWatch(
 		command,
 		context.programName,
 		process.cwd(),
+		configuration.root,
 		configuration.exclude,
 		contracts,
 	)
@@ -215,6 +216,7 @@ export async function runTestWatch(
 			command,
 			context.programName,
 			process.cwd(),
+			configuration.root,
 			configuration.exclude,
 			contracts,
 		)

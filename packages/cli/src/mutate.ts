@@ -512,6 +512,7 @@ export async function runMutation(
 		command,
 		context.programName,
 		process.cwd(),
+		configuration.root,
 		configuration.exclude,
 		contracts,
 	)

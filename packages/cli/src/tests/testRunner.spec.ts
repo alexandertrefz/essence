@@ -422,11 +422,96 @@ describe("essence test — project configuration", () => {
 					testCommand,
 					"essence",
 					directory,
+					configuration.root,
 					configuration.exclude,
 				)
 
 				expect(found.map((each) => path.basename(each))).toEqual([
 					"Rules.es",
+				])
+			},
+		)
+	})
+
+	// NOTE: `essence test` with nothing typed is about the PROJECT, and a
+	// project is where its `essence.json` is — so the same command run in a
+	// nested directory runs the same tests. Before, the walk started at the
+	// working directory, and a run from `packages/cli` reported a green project
+	// while the twelve packages beside it went unasked.
+	it("walks the whole project from a directory inside it", async () => {
+		await withFiles(
+			{
+				"essence.json": `{}`,
+				"Rules.es": passing,
+				"nested/More.tests.es": failing,
+			},
+			async (directory) => {
+				let nested = path.join(directory, "nested")
+				let configuration = readProjectConfiguration(nested)
+				let found = await discoverTestFiles(
+					[],
+					testCommand,
+					"essence",
+					nested,
+					configuration.root,
+				)
+
+				expect(found.map((each) => path.basename(each)).sort()).toEqual(
+					["More.tests.es", "Rules.es"],
+				)
+			},
+		)
+	})
+
+	// NOTE: A path that WAS typed narrows the run and is read where the run was
+	// started, because that is what a path typed into a shell means.
+	it("narrows to a path that was typed, against the working directory", async () => {
+		await withFiles(
+			{
+				"essence.json": `{}`,
+				"Rules.es": passing,
+				"nested/More.tests.es": failing,
+			},
+			async (directory) => {
+				let nested = path.join(directory, "nested")
+				let configuration = readProjectConfiguration(nested)
+				let found = await discoverTestFiles(
+					["More.tests.es"],
+					testCommand,
+					"essence",
+					nested,
+					configuration.root,
+				)
+
+				expect(found.map((each) => path.basename(each))).toEqual([
+					"More.tests.es",
+				])
+			},
+		)
+	})
+
+	it("walks the working directory where no project file governs", async () => {
+		await withFiles(
+			{
+				"Rules.es": passing,
+				"nested/More.tests.es": failing,
+			},
+			async (directory) => {
+				let nested = path.join(directory, "nested")
+				let configuration = readProjectConfiguration(nested)
+
+				expect(configuration.root).toBeNull()
+
+				let found = await discoverTestFiles(
+					[],
+					testCommand,
+					"essence",
+					nested,
+					configuration.root,
+				)
+
+				expect(found.map((each) => path.basename(each))).toEqual([
+					"More.tests.es",
 				])
 			},
 		)
@@ -447,6 +532,7 @@ describe("essence test — project configuration", () => {
 					testCommand,
 					"essence",
 					directory,
+					configuration.root,
 					configuration.exclude,
 				)
 

@@ -180,17 +180,30 @@ async function keepsFile(
 }
 
 // NOTE: Every file `essence test` will compile, from what was typed. Nothing
-// typed means the working directory; a directory means every Essence source
+// typed means the project — see `root` — a directory means every Essence source
 // under it; anything else is a file or a glob, and is a file the caller named.
 export async function discoverTestFiles(
 	patterns: Array<string>,
 	command: CommandSpec,
 	programName: string = DEFAULT_PROGRAM_NAME,
 	workingDirectory: string = process.cwd(),
-	// NOTE: The project's own `essence.exclude`. It narrows the WALK and
-	// nothing else: a file named on the command line was asked about by name,
-	// and answering "there is a setting" to a direct question would be the
-	// worse reading of both.
+	// NOTE: Where a walk that was given nothing starts: the directory the
+	// project file sits in, which is what `essence test` typed with no argument
+	// is about. Null where no project file governs the run, and then the
+	// working directory answers as it always did. Handed over rather than read
+	// here, because this is the walk and not the place a project is worked out
+	// — the commands read the file once, at the head of a run, and hand what it
+	// said to everything that needs it.
+	//
+	// NOTE: It moves the WALK and nothing else. A pattern that WAS typed — a
+	// file, a glob, a directory — is still read against the working directory,
+	// because a path typed into a shell means what that shell's directory says
+	// it means.
+	root: string | null = null,
+	// NOTE: The project's own `exclude`. It narrows the WALK and nothing else:
+	// a file named on the command line was asked about by name, and answering
+	// "there is a setting" to a direct question would be the worse reading of
+	// both.
 	exclude: Array<string> = [],
 	// NOTE: Whether this run reads a declaration as a test — see `keepsFile`.
 	contracts: boolean = false,
@@ -198,18 +211,16 @@ export async function discoverTestFiles(
 	let walked = new Set<string>()
 	let named = new Set<string>()
 	// NOTE: Everything typed is read against the working directory rather than
-	// against `process.cwd()`, so that the one parameter that says where the
-	// project is says it for the walk, the globs and the named files alike.
+	// against `process.cwd()`, so that a caller driving this from somewhere
+	// else — a spec, a run started in a nested directory — says once where the
+	// globs and the named files are read from.
 	let against = (target: string): string =>
 		path.resolve(workingDirectory, target)
 
 	if (patterns.length === 0) {
-		await collectEssenceFiles(
-			workingDirectory,
-			walked,
-			isStdlibWalk(workingDirectory),
-			exclude,
-		)
+		let from = root ?? workingDirectory
+
+		await collectEssenceFiles(from, walked, isStdlibWalk(from), exclude)
 	}
 
 	for (let pattern of patterns) {
