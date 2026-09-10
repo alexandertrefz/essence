@@ -263,14 +263,18 @@ Bun runs the sources.
 
 ```sh
 bun install
-bun test          # run the test suite
+bun run test      # run the test suite, a worker per core
 bun run check     # lint and format
 bun run typecheck # type-check every package, as one program
 ```
 
-Every push and every pull request runs `bun run typecheck` and `bun test` on GitHub Actions, against the Bun
-named in `.bun-version` — the one this repository is developed against, so a failure there is a failure that
-reproduces here. `bun run check` is not run there, so lint and format stay a local habit.
+`bun run test` is `bun test --parallel`: a worker process per core, and every spec file in a global of its
+own. A plain `bun test <pattern>` still runs a file or a few in one process, which is what to reach for while
+working on one.
+
+Every push and every pull request runs `bun run typecheck` and `bun run test` on GitHub Actions, against the
+Bun named in `.bun-version` — the one this repository is developed against, so a failure there is a failure
+that reproduces here. `bun run check` is not run there, so lint and format stay a local habit.
 
 `essence lsp` starts the Language Server on stdio, as does the `esls` executable in
 [packages/language-server/bin](packages/language-server/bin). To develop the VS Code extension against a live

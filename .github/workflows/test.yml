@@ -37,4 +37,13 @@ jobs:
       - run: bun install --frozen-lockfile
 
       - run: bun run typecheck
-      - run: bun test
+
+      # NOTE: Through the script rather than as `bun test` spelled out, so that
+      # what CI runs is what a contributor runs — the script is where the
+      # flags live, and a flag added there is added here without anybody
+      # remembering to. What it carries today is `--parallel`: a worker per
+      # core, each file in a global of its own, which is a third of the wall
+      # time on this runner and no change to what passes — a file that only
+      # passed because of what an earlier one left behind would have been a
+      # bug here, not a feature.
+      - run: bun run test
