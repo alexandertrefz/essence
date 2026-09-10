@@ -2578,8 +2578,8 @@ Error: This arm stands below the 'otherwise' arm
     ╭─┤ DefineSyntax.es:22:3 │
     │
  22 │        as "low" if score::isLessThan(10)
-    │        ─┐  
-    │         ╰── nothing here can ever be reached
+    │        ────────────────┬────────────────  
+    │                        ╰────────────────── nothing here can ever be reached
     │ 
     │ Help: Move this arm above the 'otherwise' arm, or delete it.
     │ 

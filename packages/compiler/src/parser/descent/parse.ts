@@ -3426,65 +3426,40 @@ class DescentParser {
 			try {
 				let keyword = this.tokens.expect(TokenType.KeywordAs)
 
-				// NOTE: Reported here and DROPPED rather than thrown, which is
-				// the one refusal this loop answers for itself. The arm reads
-				// perfectly well — what is wrong with it is where it stands —
-				// so the text below it is still text this Parser can read, and
-				// a thrown refusal would take the whole Statement the `define`
-				// stands in with it: every use of the Constant it declares then
-				// names nothing, which is a great many Diagnostics for one
-				// misplaced arm. Never recording it is what keeps the Node's
-				// "the `otherwise` arm is last" invariant.
+				// NOTE: Whether this arm stands below the `otherwise` one, which
+				// is decided before it is read and answered for once it has
+				// been — see `reportUnreachableArm`. Never RECORDING it is what
+				// keeps the Node's "the `otherwise` arm is last" invariant.
 				let unreachable = otherwise !== null
-
-				if (unreachable) {
-					this.reportParseError(
-						new ParseError(
-							"This arm stands below the 'otherwise' arm",
-							keyword.position,
-							"nothing here can ever be reached",
-							{
-								code: "unreachable-define-arm",
-								notes: [
-									"The 'otherwise' arm is the one that always holds, so a 'define' answers there whenever it gets that far.",
-								],
-								helps: [
-									"Move this arm above the 'otherwise' arm, or delete it.",
-								],
-							},
-						),
-					)
-				}
-
 				let value = this.parseExpression()
 				let follower = this.peekOrFail("'if' or 'otherwise'")
 
 				if (follower.type === TokenType.KeywordOtherwise) {
 					this.tokens.next()
 
-					if (!unreachable) {
-						otherwise = {
-							value,
-							position: {
-								start: keyword.position.start,
-								end: follower.position.end,
-							},
-						}
+					let position = {
+						start: keyword.position.start,
+						end: follower.position.end,
+					}
+
+					if (unreachable) {
+						this.reportUnreachableArm(position)
+					} else {
+						otherwise = { value, position }
 					}
 				} else if (follower.type === TokenType.KeywordIf) {
 					this.tokens.next()
 
 					let condition = this.parseExpression()
+					let position = {
+						start: keyword.position.start,
+						end: condition.position.end,
+					}
 
-					if (!unreachable) {
-						arms.push({
-							value,
-							condition,
-							position: {
-								start: keyword.position.start,
-								end: condition.position.end,
-							},
-						})
+					if (unreachable) {
+						this.reportUnreachableArm(position)
+					} else {
+						arms.push({ value, condition, position })
 					}
 				} else {
 					fail(
@@ -3509,6 +3484,39 @@ class DescentParser {
 		}
 
 		return { arms, otherwise, recovered }
+	}
+
+	// NOTE: Reported and DROPPED rather than thrown, which is the one refusal
+	// the arm loop answers for itself. The arm reads perfectly well — what is
+	// wrong with it is where it stands — so the text below it is still text this
+	// Parser can read, and a thrown refusal would take the whole Statement the
+	// `define` stands in with it: every use of the Constant it declares then
+	// names nothing, which is a great many Diagnostics for one misplaced arm.
+	//
+	// NOTE: Reported once the arm has been READ, so the span is the whole arm
+	// rather than the `as` that opens it. That is what the reader has to move or
+	// delete, and it is the only record of the arm's extent there is: an
+	// unreachable arm is never put on the Node, so nothing downstream — an
+	// Editor's Quick Fix above all — could work out where it ends. An arm that
+	// broke while being read reports what broke instead, which is the more
+	// pressing of the two things wrong with it.
+	protected reportUnreachableArm(position: common.Position): void {
+		this.reportParseError(
+			new ParseError(
+				"This arm stands below the 'otherwise' arm",
+				position,
+				"nothing here can ever be reached",
+				{
+					code: "unreachable-define-arm",
+					notes: [
+						"The 'otherwise' arm is the one that always holds, so a 'define' answers there whenever it gets that far.",
+					],
+					helps: [
+						"Move this arm above the 'otherwise' arm, or delete it.",
+					],
+				},
+			),
+		)
 	}
 
 	protected recoverFromDefineArm(

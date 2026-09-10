@@ -2256,6 +2256,11 @@ The Node has no shape for a missing `otherwise` arm at all: the Parser refuses
 the text rather than building one, which is what makes every `define` the rest
 of the Compiler ever sees total by construction.
 
+**Quick Fix — "Add an empty 'otherwise' arm":** writes `as  otherwise` below the
+last arm, at the indentation the arms stand at. Not preferred, and honest about
+why: the arm it writes has no value in it, so the file does not compile until
+one is filled in — what the fix buys is the hole in the place it belongs.
+
 ### `unreachable-define-arm`
 
 An arm stands below the `otherwise` arm. The arms are tried in the order they
@@ -2263,6 +2268,12 @@ were written and the `otherwise` arm is the one that always holds, so a `define`
 answers there whenever it gets that far and nothing below it can ever run.
 
 Move the arm above the `otherwise` arm, or delete it.
+
+**Quick Fixes — "Remove the arm" and "Move the arm above the 'otherwise'
+arm":** both answers, with the deletion preferred — the arm is unreachable, so
+removing it provably leaves the Program answering what it answered before,
+which moving it just as provably does not. The move writes whole lines, so it
+is not offered for a `define` written on one.
 
 ### `define-without-answer-type`
 
@@ -2301,6 +2312,10 @@ rather than underline it — what is wrong with it is that it does nothing.
 
 Write the `otherwise` value on its own, or add the arms the `define` was going
 to ask.
+
+**Quick Fix — "Write the value on its own":** replaces the whole `define` with
+the text of its `otherwise` value, copied rather than retyped. Adding the arms
+the `define` was going to ask is the other answer, and it is the reader's.
 
 ## Protocols
 

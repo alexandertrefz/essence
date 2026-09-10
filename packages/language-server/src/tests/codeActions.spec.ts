@@ -7,6 +7,11 @@ import { analyse } from "../analyse"
 import { type CodeActionEntry, findCodeActions } from "../codeActions"
 import { removeDefaultAction } from "../codeActions/defaultFixes"
 import {
+	inlineDefineValueAction,
+	otherwiseArmAction,
+	unreachableDefineArmActions,
+} from "../codeActions/defineFixes"
+import {
 	closeStringAction,
 	documentationSeparatorAction,
 	invalidEscapeActions,
@@ -1391,6 +1396,178 @@ describe("Code Actions", () => {
 					staleDiagnostic(
 						"case-default-without-payload",
 						spanOf(lines, 2, "Green"),
+					),
+					lines,
+				),
+			).toBeNull()
+		})
+	})
+
+	describe("unreachable-define-arm", () => {
+		let ladder = [
+			"implementation {",
+			"\tconstant flag = true",
+			"\tconstant other = false",
+			"\tconstant grade = define {",
+			"\t\tas 1 if flag",
+			"\t\tas 0 otherwise",
+			"\t\tas 2 if other",
+			"\t}",
+			"}",
+		]
+
+		it("should delete the arm, and offer to move it above the otherwise arm", () => {
+			let fixes = quickFixes(ladder)
+
+			expect(titles(fixes)).toEqual([
+				"Remove the arm",
+				"Move the arm above the 'otherwise' arm",
+			])
+
+			expect(fixes[0].isPreferred).toBe(true)
+			expect(fixes[1].isPreferred).toBe(false)
+
+			let removed = applied(ladder, fixes[0])
+
+			expect(removed).toEqual([
+				"implementation {",
+				"\tconstant flag = true",
+				"\tconstant other = false",
+				"\tconstant grade = define {",
+				"\t\tas 1 if flag",
+				"\t\tas 0 otherwise",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(removed)).not.toContain("unreachable-define-arm")
+
+			let moved = applied(ladder, fixes[1])
+
+			expect(moved).toEqual([
+				"implementation {",
+				"\tconstant flag = true",
+				"\tconstant other = false",
+				"\tconstant grade = define {",
+				"\t\tas 1 if flag",
+				"\t\tas 2 if other",
+				"\t\tas 0 otherwise",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(moved)).not.toContain("unreachable-define-arm")
+		})
+
+		// NOTE: The move writes whole lines, and a `define` on one line has no
+		// line above its `otherwise` arm to write into.
+		it("should offer the deletion alone for a define written on one line", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant flag = true",
+				"\tconstant grade = define { as 1 if flag as 0 otherwise as 2 if flag }",
+				"}",
+			]
+
+			expect(titles(quickFixes(lines))).toEqual(["Remove the arm"])
+		})
+
+		it("should stay silent where the span no longer opens with 'as'", () => {
+			let { program } = parseWithDiagnostics(ladder.join("\n"))
+
+			expect(
+				unreachableDefineArmActions(
+					staleDiagnostic(
+						"unreachable-define-arm",
+						spanOf(ladder, 5, "1 if flag"),
+					),
+					program,
+					ladder,
+				),
+			).toEqual([])
+		})
+	})
+
+	describe("define-without-cases", () => {
+		it("should write the otherwise value in place of the define", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant grade = define {",
+				"\t\tas 1 otherwise",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Write the value on its own")
+			expect(fix.diagnosticCode).toBe("define-without-cases")
+			expect(fix.isPreferred).toBe(true)
+
+			let result = applied(lines, fix)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tconstant grade = 1",
+				"}",
+			])
+
+			expect(codesOf(result)).not.toContain("define-without-cases")
+		})
+
+		it("should stay silent where no define stands at the span", () => {
+			let lines = ["implementation {", "\tconstant grade = 1", "}"]
+			let { program } = parseWithDiagnostics(lines.join("\n"))
+
+			expect(
+				inlineDefineValueAction(
+					staleDiagnostic(
+						"define-without-cases",
+						spanOf(lines, 2, "1"),
+					),
+					program,
+					lines,
+				),
+			).toBeNull()
+		})
+	})
+
+	describe("define-without-otherwise", () => {
+		it("should scaffold an empty otherwise arm below the last one", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant flag = true",
+				"\tconstant grade = define {",
+				"\t\tas 1 if flag",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Add an empty 'otherwise' arm")
+			expect(fix.diagnosticCode).toBe("define-without-otherwise")
+			expect(fix.isPreferred).toBe(false)
+
+			expect(applied(lines, fix)).toEqual([
+				"implementation {",
+				"\tconstant flag = true",
+				"\tconstant grade = define {",
+				"\t\tas 1 if flag",
+				"\t\tas  otherwise",
+				"\t}",
+				"}",
+			])
+		})
+
+		it("should stay silent where the span no longer reads as a define", () => {
+			let lines = ["implementation {", "\tconstant grade = 1", "}"]
+
+			expect(
+				otherwiseArmAction(
+					staleDiagnostic(
+						"define-without-otherwise",
+						spanOf(lines, 2, "grade = 1"),
 					),
 					lines,
 				),

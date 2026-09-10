@@ -4,6 +4,11 @@ import { type Analysis, analyseDocument, documentFilePath } from "../analyse"
 import type { Workspace } from "../workspace"
 import { removeDefaultAction } from "./defaultFixes"
 import {
+	inlineDefineValueAction,
+	otherwiseArmAction,
+	unreachableDefineArmActions,
+} from "./defineFixes"
+import {
 	constantToVariableAction,
 	elseBranchAction,
 	type ImportContext,
@@ -216,6 +221,10 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(removeDefaultAction(diagnostic, lines)),
 	"default-on-protocol-requirement": ({ diagnostic, lines }) =>
 		listed(removeDefaultAction(diagnostic, lines)),
+	"define-without-cases": ({ diagnostic, program, lines }) =>
+		listed(inlineDefineValueAction(diagnostic, program, lines)),
+	"define-without-otherwise": ({ diagnostic, lines }) =>
+		listed(otherwiseArmAction(diagnostic, lines)),
 	"fallback-never-used": ({ diagnostic, lines }) =>
 		listed(removeFallbackAction(diagnostic, lines)),
 	"focused-tests-remain": ({ diagnostic, lines }) =>
@@ -257,6 +266,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"unknown-type": importOrSpellingFix,
 	"unreachable-case": ({ diagnostic, program, lines }) =>
 		listed(unreachableCaseAction(diagnostic, program, lines)),
+	"unreachable-define-arm": ({ diagnostic, program, lines }) =>
+		unreachableDefineArmActions(diagnostic, program, lines),
 	"unused-import": ({ diagnostic, program, lines }) =>
 		listed(removeImportAction(diagnostic, program, lines)),
 	"wrong-update-brackets": ({ diagnostic, lines }) =>
