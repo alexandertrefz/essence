@@ -280,6 +280,10 @@ A file opened with `declarations { … }`, the standard library's private
 Program form for body-less native Method signatures. Only the standard library
 may open one — write `implementation { … }` instead.
 
+**Quick Fix — "Open the Program with 'implementation'":** swaps the keyword.
+The block behind it is parsed as an implementation section either way, so the
+edit is what makes the source say what the Parser already read.
+
 ### `overload-function-outside-stdlib`
 
 An `overload function … { … }` block was written outside a `declarations { … }`
@@ -2672,6 +2676,12 @@ standard library is one shared declaration space rather than a graph of
 Modules — everything it declares is already in scope in every Program, so
 there is nothing to import and no way to import it.
 
+**Quick Fix — "Write './Geometry.es'":** offered only where the report spells a
+concrete specifier, which is the two rejections that have one: a relative path
+missing its `.es`, and a `.es` file named with no `./` in front. The extension
+is preferred and the `./` is not — the extension is part of the path this
+Module names, while the `./` guesses that the file sits beside this one.
+
 ### `module-not-found`
 
 The specifier resolved to a path nothing could be read at. The Diagnostic names
@@ -2684,6 +2694,12 @@ code as well, without a source location — there is no Program to point into.
 A specifier resolves to the file it is written in. Everything a Module declares
 is in scope inside it already, exported or not, so such an entry can only be a
 path that was meant to point elsewhere.
+
+**Quick Fix — "Remove the entry for './Main.es'":** deletes the whole `from`
+group, since the specifier is the group's and every name under it names this
+file. Preferred in the import section, where everything the entry asks for is
+in scope anyway; offered without preference in the export section, where
+dropping the group changes what the Module publishes.
 
 ### `not-exported`
 
@@ -2723,6 +2739,12 @@ exported. A Variable cannot: a Variable another Module can read is state two
 files share and neither owns, and which of them wrote it last is not something
 either one states. Declare it as a Constant, or export a Function that answers
 with its value.
+
+**Quick Fix — "Declare 'x' as a Constant":** rewrites the `variable` keyword of
+the Declaration the Diagnostic points back at. Never preferred: whatever
+assigned to the Variable becomes a `constant-reassignment` the moment this
+lands, which is the conversation the fix starts rather than one an Editor may
+start on its own.
 
 ### `cyclic-constant-import`
 

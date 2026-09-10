@@ -22,6 +22,7 @@ import {
 	enclosingStatementOf,
 	findInnermostNodeContaining,
 } from "../codeActions/lookups"
+import { implementationHeaderAction } from "../codeActions/sectionFixes"
 import {
 	expandShorthandKeyAction,
 	expandShorthandPathAction,
@@ -1568,6 +1569,42 @@ describe("Code Actions", () => {
 					staleDiagnostic(
 						"define-without-otherwise",
 						spanOf(lines, 2, "grade = 1"),
+					),
+					lines,
+				),
+			).toBeNull()
+		})
+	})
+
+	describe("declarations-outside-stdlib", () => {
+		it("should swap the keyword for 'implementation'", () => {
+			let lines = ["declarations {", "\tconstant one = 1", "}"]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Open the Program with 'implementation'")
+			expect(fix.diagnosticCode).toBe("declarations-outside-stdlib")
+			expect(fix.isPreferred).toBe(true)
+
+			let result = applied(lines, fix)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tconstant one = 1",
+				"}",
+			])
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should stay silent where the span no longer reads the keyword", () => {
+			let lines = ["implementation {", "\tconstant one = 1", "}"]
+
+			expect(
+				implementationHeaderAction(
+					staleDiagnostic(
+						"declarations-outside-stdlib",
+						spanOf(lines, 1, "implementation"),
 					),
 					lines,
 				),

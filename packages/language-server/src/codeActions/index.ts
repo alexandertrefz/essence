@@ -35,6 +35,12 @@ import {
 } from "./literalFixes"
 import { annotationActions, shorthandActions } from "./refactors"
 import {
+	implementationHeaderAction,
+	moduleSpecifierActions,
+	removeSelfImportAction,
+	variableToConstantAction,
+} from "./sectionFixes"
+import {
 	expandShorthandKeyAction,
 	expandShorthandPathAction,
 } from "./shorthandFixes"
@@ -217,6 +223,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(removeDefaultAction(diagnostic, lines)),
 	"constant-reassignment": ({ diagnostic, program, lines }) =>
 		listed(constantToVariableAction(diagnostic, program, lines)),
+	"declarations-outside-stdlib": ({ diagnostic, lines }) =>
+		listed(implementationHeaderAction(diagnostic, lines)),
 	"default-on-function-literal": ({ diagnostic, lines }) =>
 		listed(removeDefaultAction(diagnostic, lines)),
 	"default-on-protocol-requirement": ({ diagnostic, lines }) =>
@@ -225,12 +233,16 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(inlineDefineValueAction(diagnostic, program, lines)),
 	"define-without-otherwise": ({ diagnostic, lines }) =>
 		listed(otherwiseArmAction(diagnostic, lines)),
+	"export-of-variable": ({ diagnostic, program, lines }) =>
+		listed(variableToConstantAction(diagnostic, program, lines)),
 	"fallback-never-used": ({ diagnostic, lines }) =>
 		listed(removeFallbackAction(diagnostic, lines)),
 	"focused-tests-remain": ({ diagnostic, lines }) =>
 		listed(removeFocusedAction(diagnostic, lines)),
 	"invalid-escape": ({ diagnostic, lines }) =>
 		invalidEscapeActions(diagnostic, lines),
+	"invalid-module-specifier": ({ diagnostic, lines }) =>
+		moduleSpecifierActions(diagnostic, lines),
 	"missing-case": ({ diagnostic, program, lines }) =>
 		listed(missingCaseAction(diagnostic, program, lines)),
 	"missing-documentation-separator": ({ diagnostic, lines }) =>
@@ -245,6 +257,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(removeToStringAction(diagnostic, lines)),
 	"redundant-parameter-label": ({ diagnostic, lines }) =>
 		listed(removeLabelAction(diagnostic, lines)),
+	"self-import": ({ diagnostic, program, lines }) =>
+		listed(removeSelfImportAction(diagnostic, program, lines)),
 	"shorthand-in-combination": ({ diagnostic, program, lines }) =>
 		listed(expandShorthandKeyAction(diagnostic, program, lines)),
 	"shorthand-on-path-key": ({ diagnostic, lines }) =>

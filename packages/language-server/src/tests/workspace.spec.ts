@@ -8,7 +8,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import { analyseDocument, documentFilePath } from "../analyse"
 import { insertImportEdit, relativeSpecifier } from "../autoImport"
-import { findCodeActions } from "../codeActions"
+import { type CodeActionEntry, findCodeActions } from "../codeActions"
 import { findCompletions } from "../completion"
 import { findHover } from "../hover"
 import { uriOf } from "../server"
@@ -94,6 +94,28 @@ function spanOf(source: string, line: number, needle: string): common.Position {
 	return { start, end: { line, column: start.column + needle.length } }
 }
 
+// NOTE: A Cursor as an offset into the text, which is what a textual edit is
+// applied by — the same conversion `codeActions.spec.ts` makes, since an
+// assertion on the resulting buffer is what catches an off-by-one in a range.
+function offsetOf(text: string, cursor: common.Cursor): number {
+	let lines = text.split("\n")
+	let offset = 0
+
+	for (let line = 1; line < cursor.line; line++) {
+		offset += (lines[line - 1] as string).length + 1
+	}
+
+	return offset + cursor.column - 1
+}
+
+function sliceUntil(text: string, cursor: common.Cursor): string {
+	return text.slice(0, offsetOf(text, cursor))
+}
+
+function sliceFrom(text: string, cursor: common.Cursor): string {
+	return text.slice(offsetOf(text, cursor))
+}
+
 // NOTE: Applies a workspace rename textually, file by file, so the expectations
 // below can state whole Programs instead of position lists — the same shape
 // `rename.spec.ts` uses for one file.
@@ -160,6 +182,18 @@ const geometry = [
 	"export {",
 	"\tRectangle",
 	"\tRectangleMeasurable",
+	"}",
+	"",
+].join("\n")
+
+const other = [
+	"implementation {",
+	"",
+	"\tconstant thing = 1",
+	"}",
+	"",
+	"export {",
+	"\tthing",
 	"}",
 	"",
 ].join("\n")
@@ -1324,6 +1358,224 @@ describe("Workspace", () => {
 					"/project/math/Math.es",
 				),
 			).toBe("../math/Math.es")
+		})
+	})
+
+	// NOTE: These four are reported by the graph rather than by a single
+	// document's pipeline, so they need a workspace to be reported at all —
+	// which is what puts their fixes here rather than in `codeActions.spec.ts`.
+	describe("the Module Diagnostics a Quick Fix answers", () => {
+		function fixesFor(
+			workspace: Workspace,
+			filePath: string,
+			line: number,
+			needle: string,
+		): Array<CodeActionEntry> {
+			let source = workspace.sourceOf(filePath) ?? ""
+
+			return findCodeActions(
+				source,
+				spanOf(source, line, needle),
+				filePath,
+				workspace,
+			).filter((action) => action.kind === "quickfix")
+		}
+
+		function applied(source: string, entry: CodeActionEntry): string {
+			let text = source
+
+			for (let edit of [...entry.edits].reverse()) {
+				text = `${sliceUntil(text, edit.range.start)}${edit.newText}${sliceFrom(text, edit.range.end)}`
+			}
+
+			return text
+		}
+
+		function codesAfter(
+			workspace: Workspace,
+			filePath: string,
+			text: string,
+		): Array<common.DiagnosticCode> {
+			return analyseDocument(text, filePath, {
+				host: workspace.host,
+			}).diagnostics.map((diagnostic) => diagnostic.code)
+		}
+
+		it("should remove the whole entry of a self-import", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Main.es": [
+					"import {",
+					'\tfrom "./Main.es" { thing }',
+					"}",
+					"",
+					"implementation {",
+					"\tconstant thing = 1",
+					"\tconstant used = thing",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let [fix] = fixesFor(workspace, mainPath, 2, '"./Main.es"')
+
+			expect(fix.title).toBe(`Remove the entry for "./Main.es"`)
+			expect(fix.diagnosticCode).toBe("self-import")
+			expect(fix.isPreferred).toBe(true)
+
+			let result = applied(source, fix)
+
+			// NOTE: The group goes and the section stays, which is what
+			// `removeImportAction` does with the last unused name of one too: an
+			// empty `import { }` is a block a reader deletes or fills, and
+			// nothing about it is wrong.
+			expect(result).toBe(
+				[
+					"import {",
+					"}",
+					"",
+					"implementation {",
+					"\tconstant thing = 1",
+					"\tconstant used = thing",
+					"}",
+					"",
+				].join("\n"),
+			)
+
+			expect(codesAfter(workspace, mainPath, result)).toEqual([])
+		})
+
+		// NOTE: Dropping a self-EXPORT changes what the Module publishes, which
+		// is not something an Editor may decide on its own.
+		it("should offer the removal of a self-export without preferring it", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Main.es": [
+					"implementation {",
+					"\tconstant thing = 1",
+					"}",
+					"",
+					"export {",
+					'\tfrom "./Main.es" { thing }',
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let [fix] = fixesFor(workspace, mainPath, 6, '"./Main.es"')
+
+			expect(fix.diagnosticCode).toBe("self-import")
+			expect(fix.isPreferred).toBe(false)
+		})
+
+		it("should write the relative specifier a package-shaped one meant", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Other.es": other,
+				"Main.es": [
+					"import {",
+					'\tfrom "Other.es" { thing }',
+					"}",
+					"",
+					"implementation {",
+					"\tconstant used = thing",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let [fix] = fixesFor(workspace, mainPath, 2, '"Other.es"')
+
+			expect(fix.title).toBe("Write './Other.es'")
+			expect(fix.diagnosticCode).toBe("invalid-module-specifier")
+			// NOTE: A guess at where the file sits, which the Help itself
+			// hedges — so the reader applies it rather than the Editor.
+			expect(fix.isPreferred).toBe(false)
+
+			let result = applied(source, fix)
+
+			expect(result.split("\n")[1]).toBe('\tfrom "./Other.es" { thing }')
+			expect(codesAfter(workspace, mainPath, result)).toEqual([])
+		})
+
+		it("should write the extension a specifier left off", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Other.es": other,
+				"Main.es": [
+					"import {",
+					'\tfrom "./Other" { thing }',
+					"}",
+					"",
+					"implementation {",
+					"\tconstant used = thing",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let [fix] = fixesFor(workspace, mainPath, 2, '"./Other"')
+
+			expect(fix.title).toBe("Write './Other.es'")
+			expect(fix.isPreferred).toBe(true)
+
+			let result = applied(source, fix)
+
+			expect(result.split("\n")[1]).toBe('\tfrom "./Other.es" { thing }')
+			expect(codesAfter(workspace, mainPath, result)).toEqual([])
+		})
+
+		// NOTE: Two of the four rejections sharing this code spell no concrete
+		// specifier at all, and there is nothing to offer for those.
+		it("should stay silent where the Diagnostic spells no specifier", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Main.es": [
+					"import {",
+					'\tfrom "./shapes/" { thing }',
+					"}",
+					"",
+					"implementation {",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			expect(
+				fixesFor(workspace, pathOf("Main.es"), 2, '"./shapes/"'),
+			).toEqual([])
+		})
+
+		it("should declare an exported Variable as a Constant", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Main.es": [
+					"implementation {",
+					"\tvariable counter = 1",
+					"}",
+					"",
+					"export {",
+					"\tcounter",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let [fix] = fixesFor(workspace, mainPath, 6, "counter")
+
+			expect(fix.title).toBe("Declare 'counter' as a Constant")
+			expect(fix.diagnosticCode).toBe("export-of-variable")
+			// NOTE: Every assignment to the Variable becomes a
+			// `constant-reassignment` the moment this lands.
+			expect(fix.isPreferred).toBe(false)
+
+			let result = applied(source, fix)
+
+			expect(result.split("\n")[1]).toBe("\tconstant counter = 1")
+			expect(codesAfter(workspace, mainPath, result)).toEqual([])
 		})
 	})
 

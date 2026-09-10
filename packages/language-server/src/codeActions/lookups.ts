@@ -97,6 +97,29 @@ export function findConstantDeclaration(
 	return found
 }
 
+// NOTE: The mirror of `findConstantDeclaration`, for the fix that swaps the
+// keyword the other way. A pattern Declaration answers nothing: `variable { a,
+// b } = pair` names no single Position, and a fix reported against one name of
+// it has no keyword of its own to rewrite.
+export function findVariableDeclaration(
+	program: parser.Program,
+	namePosition: common.Position,
+): parser.VariableDeclarationStatementNode | null {
+	let found: parser.VariableDeclarationStatementNode | null = null
+
+	walk(program, (node) => {
+		if (
+			node.nodeType === "VariableDeclarationStatement" &&
+			node.name.nodeType === "Identifier" &&
+			isSamePosition(node.name.position, namePosition)
+		) {
+			found = node
+		}
+	})
+
+	return found
+}
+
 // NOTE: The Node standing at exactly this Position — matched by Position rather
 // than by containment, as the finders beside it are, since what a fix reported
 // against one Node needs is that Node and not whatever encloses it. Where two
