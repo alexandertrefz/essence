@@ -4797,6 +4797,56 @@ describe("Enricher", () => {
 			])
 		})
 
+		// NOTE: The Help shows ONE specifier because a sentence can only lead
+		// with one; the `data` carries every candidate, because the Quick Fix
+		// offers a choice and picking for the reader is the one thing this
+		// Diagnostic must not do. The first name is the same in both, so the
+		// fix the lightbulb lists first is the one the terminal named.
+		it("should carry every candidate specifier as data", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace IntegerTally for List<Integer> {
+					firstItem() -> Integer {
+						<- 0
+					}
+				}
+
+				constant first = [1, 2, 3]::firstItem()
+			}`)
+
+			expect(diagnostics[0].data).toEqual({
+				kind: "namespace-candidates",
+				names: ["NonEmptyList", "IntegerTally"],
+			})
+		})
+
+		// NOTE: A Union receiver reports from its own site, per member — and a
+		// specifier written at the call picks the candidate for every member at
+		// once, so the fix is the same one and needs the same `data`.
+		it("should carry the candidate specifiers for a Union member too", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace FirstTag for Integer {
+					tag() -> String {
+						<- "first"
+					}
+				}
+
+				namespace SecondTag for Integer {
+					tag() -> String {
+						<- "second"
+					}
+				}
+
+				constant value: Integer | String = 1
+				constant tagged = value::tag()
+			}`)
+
+			expect(diagnostics[0].code).toBe("ambiguous-namespace")
+			expect(diagnostics[0].data).toEqual({
+				kind: "namespace-candidates",
+				names: ["FirstTag", "SecondTag"],
+			})
+		})
+
 		it("should prefer a nested generic target over a flat one", () => {
 			// NOTE: Both targets are generic, so neither is concrete — the
 			// deeper structure is what decides: `List<List<ItemType>>` covers

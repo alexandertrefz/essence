@@ -11138,6 +11138,14 @@ function reportAmbiguousNamespace(
 			helps: [
 				`Name it at the call, e.g. 'value::<${candidates[0]?.specifier}>${node.member.content}(…)'.`,
 			],
+			// NOTE: The specifiers rather than the declarations, and every one
+			// of them rather than the first: the Help can only show one shape
+			// and a Quick Fix offers a choice, which is what this Diagnostic
+			// has to be answered with.
+			data: {
+				kind: "namespace-candidates",
+				names: candidates.map((candidate) => candidate.specifier),
+			},
 		},
 	)
 }
@@ -11875,6 +11883,18 @@ function resolveUnionMethodDispatch(
 					helps: [
 						`Name it at the call, e.g. 'value::<${candidateSpecifierName(resolvedMethods[0].namespaceName, resolvedMethods[0].namespaceType)}>${node.member.content}(…)'.`,
 					],
+					// NOTE: As at the report for a receiver that is no Union —
+					// a specifier written at the call picks the candidate for
+					// every member of the Union at once.
+					data: {
+						kind: "namespace-candidates",
+						names: resolvedMethods.map((method) =>
+							candidateSpecifierName(
+								method.namespaceName,
+								method.namespaceType,
+							),
+						),
+					},
 				},
 			)
 

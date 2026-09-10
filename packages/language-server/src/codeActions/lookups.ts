@@ -336,6 +336,35 @@ export function findNodeAt(
 	return found
 }
 
+// NOTE: The Method Invocation a Position names — its own span, or its MEMBER's,
+// because the two Diagnostics that rewrite a call report against one each: an
+// ambiguous dispatch against the whole call, a static called on a value against
+// the name alone. Both then need the call around it, and one finder answering
+// both keeps the two fixes from each carrying half a walk. The two spans can not
+// be confused for one another: a member's is inside the call it belongs to and
+// no call ever spans a bare name.
+export function findMethodInvocation(
+	program: parser.Program,
+	position: common.Position,
+): parser.MethodInvocationNode | null {
+	let found: parser.MethodInvocationNode | null = null
+
+	walk(program, (node) => {
+		if (node.nodeType !== "MethodInvocation") {
+			return
+		}
+
+		if (
+			isSamePosition(node.position, position) ||
+			isSamePosition(node.member.position, position)
+		) {
+			found = node
+		}
+	})
+
+	return found
+}
+
 // NOTE: Matched by Position exactly rather than by containment. A
 // `missing-return` names the Node the Validator was looking at — a Function
 // Statement, a Function literal, a Method — and a Match Handler that does not

@@ -183,6 +183,12 @@ export type DiagnosticData =
 	// and each of them is a different question. Naming one would present one of
 	// two readings as the fix.
 	| { kind: "holding-case"; caseNames: Array<string> }
+	// NOTE: What a call would write between the angle brackets of
+	// `value::<Name>method(…)` to pick one candidate — a Protocol's name where
+	// the candidate is a Method that Protocol PROVIDES, and the Namespace's
+	// own everywhere else. Not the declaration the notes describe: those two
+	// differ for a provided Method, and only this one is a spelling.
+	| { kind: "namespace-candidates"; names: Array<string> }
 
 // NOTE: Every Diagnostic carries one, and `docs/diagnostics.md` documents
 // every one of these — a code with no entry there is a code nobody can look

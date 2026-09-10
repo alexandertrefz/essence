@@ -1618,6 +1618,11 @@ one — `'Orderable' provides 'isBetween' for 'Integer'.` Qualify the call to pi
 one — `value::<Name>method(…)`, where `Name` is either a Namespace or a Protocol
 whose provided Method is one of the candidates.
 
+**Quick Fix — "Write '::<Name>' at the call":** one action per candidate,
+writing the specifier between the `::` and the Method's name. None of them is
+preferred — which candidate was meant is the one thing this Diagnostic can not
+say — and none is offered on a call that already carries a specifier.
+
 ### `undecided-receiver-type`
 
 The receiver's Type still holds a slot nothing has decided — the `List<Unknown>`

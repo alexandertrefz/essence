@@ -702,6 +702,87 @@ describe("Code Actions", () => {
 	// it is a rewrite rather than a quickfix and is picked out by the code it
 	// answers. Applying it leaves a Program that says which question it asks, so
 	// the Warning is gone from the buffer the fix produced.
+	describe("ambiguous-namespace", () => {
+		// NOTE: A Namespace of the Program's own tying with a Method
+		// `Orderable` provides — two candidates, and which of them was meant is
+		// exactly what the Diagnostic could not decide. So one action each, in
+		// the order the notes named them, and neither of them preferred.
+		const TIED = [
+			"implementation {",
+			"\tnamespace Extras for Integer {",
+			"\t\tisBetween(_ lower: Integer, and upper: Integer) -> Boolean {",
+			"\t\t\t<- false",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tconstant inside = 5::isBetween(1, and 9)",
+			"}",
+		]
+
+		it("should offer one specifier per candidate", () => {
+			let fixes = quickFixes(TIED)
+
+			expect(titles(fixes)).toEqual([
+				"Write '::<Extras>' at the call",
+				"Write '::<Orderable>' at the call",
+			])
+			expect(fixes.map((entry) => entry.isPreferred)).toEqual([
+				false,
+				false,
+			])
+		})
+
+		it("should write the specifier between the '::' and the name", () => {
+			let [fix] = quickFixes(TIED)
+			let result = applied(TIED, fix)
+
+			expect(result[7]).toBe(
+				"\tconstant inside = 5::<Extras>isBetween(1, and 9)",
+			)
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: The Protocol that PROVIDES the Method is what the specifier
+		// writes — `5::<Integer>isBetween(…)` names a Namespace that declares
+		// no such Method, and the second action would be the first one's edit
+		// spelled a second wrong way.
+		it("should name the providing Protocol for a provided Method", () => {
+			let result = applied(TIED, quickFixes(TIED)[1])
+
+			expect(result[7]).toBe(
+				"\tconstant inside = 5::<Orderable>isBetween(1, and 9)",
+			)
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A receiver on a line of its own puts the `::` on the next one,
+		// which is why the specifier is written in front of the NAME rather
+		// than measured off the `::`.
+		it("should write it over a call broken across lines", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Extras for Integer {",
+				"\t\tisBetween(_ lower: Integer, and upper: Integer) -> Boolean {",
+				"\t\t\t<- false",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant inside = 5",
+				"\t\t::isBetween(1, and 9)",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(result[8]).toBe("\t\t::<Extras>isBetween(1, and 9)")
+
+			expect(codesOf(result)).toEqual([])
+		})
+	})
+
 	describe("ambiguous-nesting-level", () => {
 		function rewrites(lines: Array<string>): Array<CodeActionEntry> {
 			return actionsOf(lines).filter(

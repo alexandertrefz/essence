@@ -454,6 +454,14 @@ describe("Protocol-provided Methods", () => {
 				"'Left' provides 'label' for 'Boxes'.",
 				"'Right' provides 'label' for 'Boxes'.",
 			])
+			// NOTE: The Quick Fix writes what the notes named and not the
+			// Namespace they were needed instead of — `box::<Boxes>label()`
+			// resolves nothing, and two actions spelling it would be the same
+			// wrong edit offered twice.
+			expect(diagnosticsOf(source)[0].data).toEqual({
+				kind: "namespace-candidates",
+				names: ["Left", "Right"],
+			})
 		})
 
 		// NOTE: A Namespace declaring the name ties with the provided Method it

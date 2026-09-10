@@ -26,6 +26,7 @@ import {
 	importActions,
 	missingCaseAction,
 	namespaceImportActions,
+	namespaceSpecifierActions,
 	removeFallbackAction,
 	removeFocusedAction,
 	removeImportAction,
@@ -240,6 +241,8 @@ const importOrSpellingFix: FixProvider = (context) => [
 // beside this one and a line here, and two of them landing at once meet in a
 // sorted list rather than in the middle of one function.
 const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
+	"ambiguous-namespace": ({ diagnostic, program, lines }) =>
+		namespaceSpecifierActions(diagnostic, program, lines),
 	"ambiguous-nesting-level": ({ diagnostic, program }) =>
 		wrapInHoldingCaseActions(diagnostic, program),
 	"at-in-static-method": ({ diagnostic, program, lines }) =>

@@ -24,6 +24,7 @@ import {
 	findFunctionDefinition,
 	findHandler,
 	findMatch,
+	findMethodInvocation,
 	findNodeAt,
 	handlerBodyEnd,
 } from "./lookups"
@@ -676,4 +677,53 @@ export function elseBranchAction(
 			},
 		],
 	}
+}
+
+// NOTE: One action per candidate Namespace and none of them preferred — which
+// of them was meant is precisely what the Diagnostic could not decide, and an
+// Editor applies a preferred fix without asking.
+//
+// The specifier is written in FRONT of the Method's name rather than measured
+// off the `::`: the two are separate Tokens with whitespace allowed between
+// them, and a call broken over lines writes `value` on one and `::method(…)` on
+// the next. What is checked instead is that the text between the receiver and
+// the name IS a bare `::` — a specifier already written, a Comment standing
+// there — and anything else turns the fix away.
+export function namespaceSpecifierActions(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+	lines: Array<string>,
+): Array<CodeActionEntry> {
+	if (diagnostic.data?.kind !== "namespace-candidates") {
+		return []
+	}
+
+	let invocation = findMethodInvocation(program, diagnostic.position)
+
+	if (invocation === null || invocation.namespaceSpecifier !== null) {
+		return []
+	}
+
+	let written = {
+		start: invocation.base.position.end,
+		end: invocation.member.position.start,
+	}
+
+	if (!/^\s*::\s*$/.test(sliceOf(lines, written))) {
+		return []
+	}
+
+	return diagnostic.data.names.map((name) => ({
+		title: `Write '::<${name}>' at the call`,
+		kind: "quickfix" as const,
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: false,
+		edits: [
+			{
+				range: { start: written.end, end: written.end },
+				newText: `<${name}>`,
+			},
+		],
+	}))
 }
