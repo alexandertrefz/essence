@@ -120,6 +120,55 @@ export function findVariableDeclaration(
 	return found
 }
 
+// NOTE: The Case construction whose PAYLOAD stands at this Position. An
+// `unexpected-payload` is reported against the payload rather than against the
+// construction, and what has to go is the pair of parentheses around it —
+// which only the construction's own span reaches, since a Position runs one
+// past the `)` it ends on.
+export function findCaseValueOfPayload(
+	program: parser.Program,
+	payloadPosition: common.Position,
+): parser.CaseValueNode | null {
+	let found: parser.CaseValueNode | null = null
+
+	walk(program, (node) => {
+		if (
+			node.nodeType === "CaseValue" &&
+			node.value !== null &&
+			isSamePosition(node.value.position, payloadPosition)
+		) {
+			found = node
+		}
+	})
+
+	return found
+}
+
+// NOTE: The bracket-list entry whose KEY stands at this Position — a
+// `duplicate-key` names the key, and the whole entry is what a fix takes out.
+// The walk reaches an update's key list as well as a Literal's, because both
+// are one Node kind and an entry written twice is the same mistake in either.
+export function findDictionaryEntry(
+	program: parser.Program,
+	keyPosition: common.Position,
+): parser.DictionaryEntryNode | null {
+	let found: parser.DictionaryEntryNode | null = null
+
+	walk(program, (node) => {
+		if (node.nodeType !== "DictionaryValue") {
+			return
+		}
+
+		for (let entry of node.entries) {
+			if (isSamePosition(entry.key.position, keyPosition)) {
+				found = entry
+			}
+		}
+	})
+
+	return found
+}
+
 // NOTE: The NAME of the static Method whose body holds this Position, and null
 // where the Position stands anywhere else. The name is what a fix needs rather
 // than the Method: `static` is written directly in front of it in both forms

@@ -1463,6 +1463,11 @@ Keys that repeat ACROSS the base and the entries of an update — `[ages with
 "alex" = 40]` where `ages` already holds `"alex"` — are not duplicates at all:
 overriding is what an update is for.
 
+**Quick Fix — "Remove this entry":** deletes the whole entry the Diagnostic
+names, together with the comma in front of it, so the list closes up rather than
+being left with a key and no value. It reaches an update's key list as well as a
+Literal's, since a key written twice is the same mistake in either.
+
 ### `partial-type-mismatch`
 
 The right hand side of a combination is not a Partial of the left hand side. An
@@ -1905,6 +1910,11 @@ meaning exactly one thing, on both sides of the JavaScript boundary.
 ### `unexpected-payload`
 
 A Case that carries no payload was given one.
+
+**Quick Fix — "Write '#Case' on its own":** deletes the payload together with
+the parentheses around it, which is the only spelling a unit Case has. Offered
+where the construction still reads as one — a payload the Parser recovered from
+is left alone.
 
 ### `payload-type-mismatch`
 

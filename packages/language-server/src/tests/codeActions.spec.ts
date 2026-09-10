@@ -2019,6 +2019,106 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("unexpected-payload", () => {
+		it("should take the payload and its brackets off the Case", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Signal { Red, Green }",
+				"\tconstant chosen = Signal#Red(1)",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Write '#Red' on its own")
+			expect(fix.isPreferred).toBe(true)
+			expect(result[2]).toBe("\tconstant chosen = Signal#Red")
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should carry a payload written over several lines", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Signal { Red, Green }",
+				"\tconstant chosen = #Red({",
+				"\t\tbrightness = 1,",
+				"\t})",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(applied(lines, fix)).toEqual([
+				"implementation {",
+				"\tchoice Signal { Red, Green }",
+				"\tconstant chosen = #Red",
+				"}",
+			])
+		})
+	})
+
+	describe("duplicate-key", () => {
+		it("should remove the entry and the comma in front of it", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant ages = ["alex" = 39, "alex" = 40]',
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Remove this entry")
+			expect(fix.isPreferred).toBe(true)
+			expect(result[1]).toBe('\tconstant ages = ["alex" = 39]')
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: An update's key list is one bracket list on the same terms, and
+		// the walk reaches it because both spellings build one Node kind.
+		it("should reach the key list of an update", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant ages = ["alex" = 39]',
+				'\tconstant updated = [ages with "sam" = 25, "sam" = 26]',
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(result[2]).toBe(
+				'\tconstant updated = [ages with "sam" = 25]',
+			)
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should leave the line the entry stood on empty", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant ages = [",
+				'\t\t"alex" = 39,',
+				'\t\t"alex" = 40,',
+				"\t]",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(applied(lines, fix)).toEqual([
+				"implementation {",
+				"\tconstant ages = [",
+				'\t\t"alex" = 39,',
+				"\t]",
+				"}",
+			])
+		})
+	})
+
 	describe("Type annotations", () => {
 		it("should offer the inferred Type of a Constant as an edit", () => {
 			let lines = ["implementation {", '\tconstant name = "Ada"', "}"]

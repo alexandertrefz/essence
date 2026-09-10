@@ -56,6 +56,7 @@ import {
 	expandShorthandKeyAction,
 	expandShorthandPathAction,
 } from "./shorthandFixes"
+import { bareCaseAction, removeEntryAction } from "./valueFixes"
 
 // NOTE: Every edit here is computed from the text handed in, on a fresh
 // analysis — never from a Diagnostic the client echoed back. Published
@@ -247,6 +248,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(inlineDefineValueAction(diagnostic, program, lines)),
 	"define-without-otherwise": ({ diagnostic, lines }) =>
 		listed(otherwiseArmAction(diagnostic, lines)),
+	"duplicate-key": ({ diagnostic, program, lines }) =>
+		listed(removeEntryAction(diagnostic, program, lines)),
 	"export-of-variable": ({ diagnostic, program, lines }) =>
 		listed(variableToConstantAction(diagnostic, program, lines)),
 	"fallback-never-used": ({ diagnostic, lines }) =>
@@ -288,6 +291,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"similar-tags": spellingFix,
 	"unclosed-string": ({ diagnostic, lines }) =>
 		listed(closeStringAction(diagnostic, lines)),
+	"unexpected-payload": ({ diagnostic, program, lines }) =>
+		listed(bareCaseAction(diagnostic, program, lines)),
 	"uninferred-namespace-parameter": ({ diagnostic, lines }) =>
 		listed(inferParameterAction(diagnostic, lines)),
 	// NOTE: A suggestion is the Case's NAME and the span it is written over is
