@@ -24,6 +24,8 @@ import {
 	closeStringAction,
 	documentationSeparatorAction,
 	invalidEscapeActions,
+	mixedRationalActions,
+	partialDecimalActions,
 } from "./literalFixes"
 import { annotationActions, shorthandActions } from "./refactors"
 
@@ -215,6 +217,10 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(documentationSeparatorAction(diagnostic, lines)),
 	"missing-return": ({ diagnostic, program, lines }) =>
 		listed(elseBranchAction(diagnostic, program, lines)),
+	"mixed-rational-literal": ({ diagnostic, lines }) =>
+		mixedRationalActions(diagnostic, lines),
+	"partial-decimal-literal": ({ diagnostic, lines }) =>
+		partialDecimalActions(diagnostic, lines),
 	"redundant-interpolation-to-string": ({ diagnostic, lines }) =>
 		listed(removeToStringAction(diagnostic, lines)),
 	"redundant-parameter-label": ({ diagnostic, lines }) =>

@@ -76,6 +76,12 @@ the reader which digits belong to which.
 Write one of them. The whole Literal is dropped rather than its tail alone, so
 what is left behind is never read as a Statement of its own.
 
+**Quick Fixes — "Write it as '3/4'" and "Write it as '0.75'":** the value the
+two spellings say between them, written back each way, with neither preferred —
+which of them a file should read is a matter of what it is about. A value with
+no terminating decimal is offered as a fraction alone, since rounding one would
+answer with a different number.
+
 ### `partial-decimal-literal`
 
 A decimal Literal was written with one side of its point empty — `.5`, or `1.`
@@ -84,6 +90,12 @@ it, all three written flush, and neither half stands for a Rational on its own.
 
 Write both sides: `0.5`, `1.0`. Dropping the `.` is the other answer where a
 whole Number was what was meant.
+
+**Quick Fix — "Write it as '0.5'":** offered for a leading point, where the
+whole part is the only thing that can be missing, and preferred. A TRAILING
+point has both answers instead — "Write it as '1.0'" and "Write it as '1'" —
+and neither is preferred, because the two leave the Literal a Rational and an
+Integer respectively.
 
 A `.` that is not followed flush by digits is untouched by this, and means what
 it always did: `1.foo` reads a member off an Integer, and `.price` is a member

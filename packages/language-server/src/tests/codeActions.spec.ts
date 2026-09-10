@@ -9,6 +9,8 @@ import {
 	closeStringAction,
 	documentationSeparatorAction,
 	invalidEscapeActions,
+	mixedRationalActions,
+	partialDecimalActions,
 } from "../codeActions/literalFixes"
 import {
 	enclosingStatementOf,
@@ -1026,6 +1028,125 @@ describe("Code Actions", () => {
 			expect(
 				invalidEscapeActions(
 					staleDiagnostic("invalid-escape", spanOf(lines, 2, "ab")),
+					lines,
+				),
+			).toEqual([])
+		})
+	})
+
+	describe("partial-decimal-literal", () => {
+		it("should write the missing whole part of a leading point", () => {
+			let lines = ["implementation {", "\tconstant share = .5", "}"]
+
+			let [fix] = quickFixes(lines)
+
+			expect(titles(quickFixes(lines))).toEqual(["Write it as '0.5'"])
+			expect(fix.diagnosticCode).toBe("partial-decimal-literal")
+			expect(fix.isPreferred).toBe(true)
+
+			let result = applied(lines, fix)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tconstant share = 0.5",
+				"}",
+			])
+
+			expect(codesOf(result)).not.toContain("partial-decimal-literal")
+		})
+
+		// NOTE: The two answers differ in the Type the Literal ends up with, so
+		// the reader picks and the Editor does not.
+		it("should offer both readings of a trailing point", () => {
+			let lines = ["implementation {", "\tconstant share = 1.", "}"]
+
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Write it as '1.0'",
+				"Write it as '1'",
+			])
+
+			expect(fixes.every((fix) => !fix.isPreferred)).toBe(true)
+
+			expect(applied(lines, fixes[0])[1]).toBe("\tconstant share = 1.0")
+			expect(applied(lines, fixes[1])[1]).toBe("\tconstant share = 1")
+
+			expect(codesOf(applied(lines, fixes[0]))).not.toContain(
+				"partial-decimal-literal",
+			)
+
+			expect(codesOf(applied(lines, fixes[1]))).not.toContain(
+				"partial-decimal-literal",
+			)
+		})
+
+		it("should stay silent where the span no longer reads as half a decimal", () => {
+			let lines = ["implementation {", "\tconstant share = 15", "}"]
+
+			expect(
+				partialDecimalActions(
+					staleDiagnostic(
+						"partial-decimal-literal",
+						spanOf(lines, 2, "15"),
+					),
+					lines,
+				),
+			).toEqual([])
+		})
+	})
+
+	describe("mixed-rational-literal", () => {
+		it("should offer the value as a fraction and as a decimal", () => {
+			let lines = ["implementation {", "\tconstant ratio = 1.5/2", "}"]
+
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Write it as '3/4'",
+				"Write it as '0.75'",
+			])
+
+			expect(fixes.every((fix) => !fix.isPreferred)).toBe(true)
+
+			expect(applied(lines, fixes[0])[1]).toBe("\tconstant ratio = 3/4")
+			expect(applied(lines, fixes[1])[1]).toBe("\tconstant ratio = 0.75")
+
+			expect(codesOf(applied(lines, fixes[0]))).not.toContain(
+				"mixed-rational-literal",
+			)
+
+			expect(codesOf(applied(lines, fixes[1]))).not.toContain(
+				"mixed-rational-literal",
+			)
+		})
+
+		it("should read a decimal written behind the fraction the same way", () => {
+			let lines = ["implementation {", "\tconstant ratio = 1/2.5", "}"]
+
+			expect(titles(quickFixes(lines))).toEqual([
+				"Write it as '2/5'",
+				"Write it as '0.4'",
+			])
+		})
+
+		// NOTE: A third has no decimal that says it, and a rounded one would be
+		// a different number.
+		it("should offer the fraction alone where no decimal says the value", () => {
+			let lines = ["implementation {", "\tconstant ratio = 1.5/7", "}"]
+
+			expect(titles(quickFixes(lines))).toEqual(["Write it as '3/14'"])
+		})
+
+		it("should stay silent where the span no longer reads as a Literal", () => {
+			let lines = ["implementation {", "\tconstant ratio = 34", "}"]
+
+			expect(
+				mixedRationalActions(
+					staleDiagnostic(
+						"mixed-rational-literal",
+						spanOf(lines, 2, "34"),
+					),
 					lines,
 				),
 			).toEqual([])
