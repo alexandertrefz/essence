@@ -45,14 +45,14 @@ import {
 	matchingNamespaces,
 	namedTypeNamespaces,
 } from "./namespaces"
-import { contains, isAtOrBefore, isSmaller } from "./positions"
+import { isAtOrBefore } from "./positions"
 import { probeSourcesFor, stripNoise } from "./probe"
 import {
 	type Declaration,
 	type DeclarationKind,
 	indexProgram,
 	type Scope,
-	type ScopeRange,
+	scopeAt,
 	type SymbolSpace,
 } from "./rename"
 import { typedProgramBodies, typedProgramNodes } from "./sections"
@@ -2399,24 +2399,4 @@ function keywordCompletions(headText: string): Array<CompletionEntry> {
 
 function lastLineOf(text: string): string {
 	return text.slice(text.lastIndexOf("\n") + 1)
-}
-
-function scopeAt(scopes: Array<ScopeRange>, cursor: common.Cursor): Scope {
-	let best: ScopeRange | null = null
-
-	for (let candidate of scopes) {
-		if (candidate.range !== null && !contains(candidate.range, cursor)) {
-			continue
-		}
-
-		if (
-			best === null ||
-			best.range === null ||
-			(candidate.range !== null && isSmaller(candidate.range, best.range))
-		) {
-			best = candidate
-		}
-	}
-
-	return (best ?? scopes[0]).scope
 }

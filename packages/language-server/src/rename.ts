@@ -17,6 +17,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { defineExpressions } from "./defineArmChildren"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
+import { contains, isSmaller } from "./positions"
 import {
 	type ParserSection,
 	programSections,
@@ -538,6 +539,33 @@ export function indexProgram(
 		protocolMembers: context.protocolMembers,
 		externalMembers: context.externalMembers,
 	}
+}
+
+// NOTE: The innermost Scope a Cursor stands in. Beside the index that hands
+// the ranges out rather than inside the one feature that used to ask for it:
+// reading a `ScopeRange` list at a Position is what the list is FOR, and
+// Completion was only the first to need it.
+export function scopeAt(
+	scopes: Array<ScopeRange>,
+	cursor: common.Cursor,
+): Scope {
+	let best: ScopeRange | null = null
+
+	for (let candidate of scopes) {
+		if (candidate.range !== null && !contains(candidate.range, cursor)) {
+			continue
+		}
+
+		if (
+			best === null ||
+			best.range === null ||
+			(candidate.range !== null && isSmaller(candidate.range, best.range))
+		) {
+			best = candidate
+		}
+	}
+
+	return (best ?? scopes[0]).scope
 }
 
 // NOTE: An entry binds its local name across BOTH symbol spaces through one
