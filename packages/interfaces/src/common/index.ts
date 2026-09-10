@@ -188,6 +188,12 @@ export type DiagnosticData =
 	// what the reader was told to write — a generic Choice's Type Arguments
 	// are not part of one and stay the reader's to add.
 	| { kind: "choice-candidates"; names: Array<string> }
+	// NOTE: The label a Parameter declares and the one the call WROTE, either
+	// of them null where there is none. The pair is the fact; which of the
+	// three edits it implies — write a label, change one, drop one — is the
+	// Server's reading of it, and there is no fourth pair: two equal labels
+	// are no mismatch.
+	| { kind: "expected-label"; label: string | null; written: string | null }
 	// NOTE: What a call would write between the angle brackets of
 	// `value::<Name>method(…)` to pick one candidate — a Protocol's name where
 	// the candidate is a Method that Protocol PROVIDES, and the Namespace's

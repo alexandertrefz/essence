@@ -20,6 +20,7 @@ import {
 	unreachableDefineArmActions,
 } from "./defineFixes"
 import {
+	argumentLabelAction,
 	choicePrefixActions,
 	constantToVariableAction,
 	elseBranchAction,
@@ -248,6 +249,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		namespaceSpecifierActions(diagnostic, program, lines),
 	"ambiguous-nesting-level": ({ diagnostic, program }) =>
 		wrapInHoldingCaseActions(diagnostic, program),
+	"argument-label-mismatch": ({ diagnostic, lines }) =>
+		listed(argumentLabelAction(diagnostic, lines)),
 	"at-in-static-method": ({ diagnostic, program, lines }) =>
 		listed(dropStaticAction(diagnostic, program, lines)),
 	"case-default-without-payload": ({ diagnostic, lines }) =>

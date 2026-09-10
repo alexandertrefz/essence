@@ -998,6 +998,105 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("argument-label-mismatch", () => {
+		const SHOUT = [
+			"implementation {",
+			"\tfunction shout(about topic: String) -> String {",
+			"\t\t<- topic",
+			"\t}",
+			"",
+		]
+
+		// NOTE: The Parameter declares a label the call never wrote, so the
+		// label is written in — the value itself is never retyped.
+		it("should write a label the call left out", () => {
+			let lines = [...SHOUT, '\tconstant said = shout("hi")', "}"]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Write 'about' before the value")
+			expect(fix.isPreferred).toBe(true)
+			expect(result[5]).toBe('\tconstant said = shout(about "hi")')
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A label was written and it is the wrong one, so the word alone
+		// is replaced — read backwards out of the buffer, because an Argument
+		// is no Node of its own and the label has no Position to read off.
+		it("should change a label the Parameter does not declare", () => {
+			let lines = [
+				...SHOUT,
+				'\tconstant said = shout(regarding "hi")',
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Change the label to 'about'")
+			expect(result[5]).toBe('\tconstant said = shout(about "hi")')
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: And a Parameter that takes none has the written label taken
+		// away, together with the space that separated it from the value.
+		it("should remove a label the Parameter takes none of", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction shout(_ topic: String) -> String {",
+				"\t\t<- topic",
+				"\t}",
+				"",
+				'\tconstant said = shout(about "hi")',
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Remove the label")
+			expect(result[5]).toBe('\tconstant said = shout("hi")')
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A label written on a line of its own is found all the same —
+		// what is walked back over is whitespace, line breaks included.
+		it("should find a label written above its value", () => {
+			let lines = [
+				...SHOUT,
+				"\tconstant said = shout(",
+				"\t\tregarding",
+				'\t\t\t"hi",',
+				"\t)",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(result[6]).toBe("\t\tabout")
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A Comment between the label and the value means the span in
+		// front of the value is not the label, and nothing is offered rather
+		// than a rewrite of text nobody read back.
+		it("should offer nothing when the label is not what stands there", () => {
+			let lines = [
+				...SHOUT,
+				'\tconstant said = shout(regarding §note§ "hi")',
+				"}",
+			]
+
+			expect(quickFixes(lines)).toEqual([])
+		})
+	})
+
 	describe("fallback-never-used", () => {
 		// NOTE: The Argument the Warning names goes, and the comma in front of it
 		// goes with it — a call left holding `(by 2, )` is not what the Help asks

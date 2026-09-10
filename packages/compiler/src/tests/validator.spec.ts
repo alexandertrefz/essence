@@ -487,6 +487,49 @@ describe("Validator", () => {
 			])
 		})
 
+		// NOTE: Both halves of the pair, at all three of its shapes — which of
+		// the three edits a Quick Fix offers is decided by the pair and by
+		// nothing in the message, so a site that carried only the expected half
+		// would leave the fix guessing whether there is a written label to
+		// replace.
+		it("should carry the expected label and the written one", () => {
+			let shout = (call: string) => `implementation {
+				function shout (about topic: String) -> String {
+					<- topic
+				}
+
+				Terminal.inspect(${call})
+			}`
+
+			expect(
+				diagnosticsFor(shout('shout(regarding "hi")'))[0].data,
+			).toEqual({
+				kind: "expected-label",
+				label: "about",
+				written: "regarding",
+			})
+
+			expect(diagnosticsFor(shout('shout("hi")'))[0].data).toEqual({
+				kind: "expected-label",
+				label: "about",
+				written: null,
+			})
+
+			expect(
+				diagnosticsFor(`implementation {
+					function shout (_ topic: String) -> String {
+						<- topic
+					}
+
+					Terminal.inspect(shout(about "hi"))
+				}`)[0].data,
+			).toEqual({
+				kind: "expected-label",
+				label: null,
+				written: "about",
+			})
+		})
+
 		// NOTE: The label is answered first — an Argument that agrees with
 		// NEITHER half of its Parameter is told about the label, because the
 		// Type it should have had is the Type of whichever Parameter it was

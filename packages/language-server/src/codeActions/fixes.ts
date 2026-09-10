@@ -13,11 +13,12 @@ import {
 	indentationOf,
 	insertBeforeClosingBrace,
 	keywordBefore,
+	labelBefore,
 	openingBracketEdit,
 	removeLinesEdit,
 	sliceOf,
 } from "./geometry"
-import type { CodeActionEntry } from "./index"
+import type { CodeActionEdit, CodeActionEntry } from "./index"
 import {
 	bodyReturns,
 	findConstantDeclaration,
@@ -770,4 +771,65 @@ export function choicePrefixActions(
 		isPreferred: false,
 		edits: [{ range: { start: sigil, end: sigil }, newText: name }],
 	}))
+}
+
+// NOTE: Three edits under one code, and which of them is offered is decided by
+// the PAIR the Compiler carried rather than by the message: a Parameter that
+// declares a label the call left out takes an insertion, one that declares a
+// different label takes a replacement of what was written, and a Parameter that
+// takes no label takes the written one away. Every one of them is preferred —
+// the label is the whole of what the call got wrong, and none of the three
+// leaves a hole behind.
+//
+// The Diagnostic spans the VALUE, which is why a written label is read backwards
+// out of the buffer rather than off a Node: an Argument is no Node of its own,
+// so the label has no Position anybody recorded.
+export function argumentLabelAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
+): CodeActionEntry | null {
+	if (diagnostic.data?.kind !== "expected-label") {
+		return null
+	}
+
+	let { label, written } = diagnostic.data
+	let entry = (title: string, edit: CodeActionEdit): CodeActionEntry => ({
+		title,
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [edit],
+	})
+
+	if (written === null) {
+		return label === null
+			? null
+			: entry(`Write '${label}' before the value`, {
+					range: {
+						start: diagnostic.position.start,
+						end: diagnostic.position.start,
+					},
+					newText: `${label} `,
+				})
+	}
+
+	let span = labelBefore(lines, diagnostic.position.start, written)
+
+	if (span === null) {
+		return null
+	}
+
+	// NOTE: The whitespace between the two goes with the label being dropped —
+	// the value keeps the one space that separated it from the bracket or the
+	// comma in front, which is where it would have stood unlabelled.
+	return label === null
+		? entry("Remove the label", {
+				range: { start: span.start, end: diagnostic.position.start },
+				newText: "",
+			})
+		: entry(`Change the label to '${label}'`, {
+				range: span,
+				newText: label,
+			})
 }

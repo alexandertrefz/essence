@@ -275,6 +275,49 @@ export function commaBefore(
 	}
 }
 
+// NOTE: Where the label written immediately in front of a value stands, or null
+// where the text does not read as that label. Whitespace and line breaks are
+// walked through and nothing else is — a Comment between the two, a name the
+// label is only the tail of — because what is measured here is rewritten next,
+// and a span nobody read back is a span that could hold anything.
+export function labelBefore(
+	lines: Array<string>,
+	start: common.Cursor,
+	label: string,
+): common.Position | null {
+	let cursor = start
+
+	while (true) {
+		let line = lineAt(lines, cursor.line)
+		let before = line.slice(0, cursor.column - 1).replace(/[ \t]+$/, "")
+
+		if (before !== "") {
+			let column = before.length - label.length + 1
+
+			if (
+				!before.endsWith(label) ||
+				/[A-Za-z0-9_]/.test(line[column - 2] ?? "")
+			) {
+				return null
+			}
+
+			return {
+				start: { line: cursor.line, column },
+				end: { line: cursor.line, column: before.length + 1 },
+			}
+		}
+
+		if (cursor.line === 1) {
+			return null
+		}
+
+		cursor = {
+			line: cursor.line - 1,
+			column: lineAt(lines, cursor.line - 1).length + 1,
+		}
+	}
+}
+
 // NOTE: The mirror, for a fallback somebody wrote ahead of another Argument. The
 // comma after it is what separates the two, and a `)` says this Argument was
 // last. The blanks on the far side of the comma go with it here, so the

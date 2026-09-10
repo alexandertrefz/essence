@@ -1240,6 +1240,12 @@ as at a Method's: `loop(startingWith 1, …)` reads its labels the way
 the call was supposed to write are all in one place; an overloaded callee is
 told the same thing by `no-matching-overload`, once per candidate.
 
+**Quick Fix — "Write 'about' before the value" / "Change the label to 'about'"
+/ "Remove the label":** which of the three is offered follows from the pair —
+the label the Parameter declares and the one the call wrote. It is not offered
+where the text in front of the value does not read as the written label, a
+Comment between the two being the usual reason.
+
 ### `argument-count-mismatch`
 
 More or fewer Arguments were passed than the signature declares.

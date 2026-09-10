@@ -3282,6 +3282,17 @@ function reportArgumentLabelMismatch(
 					? "Pass the value with no label."
 					: `Write '${parameter.name}' before the value.`,
 			],
+			// NOTE: Both halves, because which of the three edits the mismatch
+			// asks for is decided by the PAIR — a label written where none is
+			// declared is dropped, one written where another is declared is
+			// changed, and one that was never written is inserted. The Help
+			// leads with the second half of that and the Quick Fix needs the
+			// first as well.
+			data: {
+				kind: "expected-label",
+				label: parameter.name,
+				written: argumentNode.name,
+			},
 		},
 	)
 }
