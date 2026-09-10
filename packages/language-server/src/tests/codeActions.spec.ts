@@ -5310,6 +5310,149 @@ describe("Code Actions", () => {
 		})
 	})
 
+	// NOTE: The Record member shorthand one level up — a Case of exactly one
+	// member takes that member's value directly, and the Enricher wraps it back
+	// up. Which of the two was written is a question only the enriched Program
+	// answers, since a payload that is itself a Record fits both readings.
+	describe("Case payloads", () => {
+		let payloadRefactors = (
+			lines: Array<string>,
+			range?: common.Position,
+		): Array<CodeActionEntry> =>
+			actionsOf(lines, range).filter((entry) =>
+				entry.title.includes("payload"),
+			)
+
+		let onlyRefactor = (lines: Array<string>): CodeActionEntry => {
+			let [entry, ...rest] = payloadRefactors(lines)
+
+			expect(rest).toEqual([])
+
+			return entry
+		}
+
+		let choice = [
+			"implementation {",
+			"\tchoice Progress {",
+			"\t\tStopped { total: Integer },",
+			"\t\tRunning { done: Integer, total: Integer },",
+			"\t}",
+		]
+
+		it("should offer the Record a shorthand payload stands for", () => {
+			let lines = [
+				...choice,
+				"\tconstant total = 5",
+				"\tconstant done: Progress = #Stopped(total)",
+				"}",
+			]
+
+			let refactor = onlyRefactor(lines)
+
+			expect(refactor.title).toBe("Expand the payload to '{ total = … }'")
+			expect(refactor.kind).toBe("refactor.rewrite")
+			expect(refactor.diagnosticCode).toBeNull()
+			expect(refactor.isPreferred).toBe(false)
+
+			let result = applied(lines, refactor)
+
+			expect(result[6]).toBe(
+				"\tconstant done: Progress = #Stopped({ total = total })",
+			)
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should offer the shorthand a one-member Record stands for", () => {
+			let lines = [
+				...choice,
+				"\tconstant total = 5",
+				"\tconstant done: Progress = #Stopped({ total = total })",
+				"}",
+			]
+
+			let refactor = onlyRefactor(lines)
+
+			expect(refactor.title).toBe(
+				"Shorten the payload to the value of 'total'",
+			)
+			expect(applied(lines, refactor)[6]).toBe(
+				"\tconstant done: Progress = #Stopped(total)",
+			)
+		})
+
+		it("should hand the text back when both directions are applied", () => {
+			let lines = [
+				...choice,
+				"\tconstant total = 5",
+				"\tconstant done: Progress = #Stopped(total)",
+				"}",
+			]
+
+			let expanded = applied(lines, onlyRefactor(lines))
+
+			expect(codesOf(lines)).toEqual([])
+			expect(codesOf(expanded)).toEqual([])
+			expect(applied(expanded, onlyRefactor(expanded))).toEqual(lines)
+		})
+
+		it("should offer nothing on a Case carrying more than one member", () => {
+			expect(
+				titles(
+					payloadRefactors([
+						...choice,
+						"\tconstant running: Progress = #Running({ done = 1, total = 5 })",
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: The payload the Enricher read as the Case's whole Record, not
+		// as its one member — shortening it would hand the Record where the
+		// member goes, which is a different value.
+		it("should offer nothing where the payload IS the Record", () => {
+			let lines = [
+				...choice,
+				"\tconstant payload = { total = 5 }",
+				"\tconstant done: Progress = #Stopped(payload)",
+				"}",
+			]
+
+			expect(codesOf(lines)).toEqual([])
+			expect(titles(payloadRefactors(lines))).toEqual([])
+		})
+
+		// NOTE: The Comment stands inside the braces this deletes, and the
+		// shorthand has nowhere to write it.
+		it("should offer nothing on a Record holding a Comment", () => {
+			expect(
+				titles(
+					payloadRefactors([
+						...choice,
+						"\tconstant done: Progress = #Stopped({",
+						"\t\t§ everything",
+						"\t\ttotal = 5,",
+						"\t})",
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+
+		it("should reach a shorthand member of the payload Record", () => {
+			let lines = [
+				...choice,
+				"\tconstant total = 5",
+				"\tconstant done: Progress = #Stopped({ total })",
+				"}",
+			]
+
+			expect(applied(lines, onlyRefactor(lines))[6]).toBe(
+				"\tconstant done: Progress = #Stopped(total)",
+			)
+		})
+	})
+
 	describe("selection", () => {
 		it("should find nothing in a Program with nothing to fix", () => {
 			let lines = [

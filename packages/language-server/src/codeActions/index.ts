@@ -79,6 +79,7 @@ import {
 } from "./matchFixes"
 import { matchOnValueActions } from "./matchOnValue"
 import { pathActions } from "./paths"
+import { payloadActions } from "./payloads"
 import { annotationActions, shorthandActions } from "./refactors"
 import {
 	implementationHeaderAction,
@@ -239,6 +240,7 @@ export function findCodeActions(
 
 	entries.push(...pathActions(program, () => indexed().scopes, lines, range))
 	entries.push(...defineActions(program, lines, range))
+	entries.push(...payloadActions(program, enrichedProgram, lines, range))
 
 	return entries
 }
