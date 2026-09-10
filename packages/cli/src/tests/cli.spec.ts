@@ -15,7 +15,9 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 
 import {
 	defaultConfiguration,
+	PROJECT_FILE_NAME,
 	type ProjectConfiguration,
+	readProjectConfiguration,
 } from "@essence-lang/compiler/configuration"
 import { closestMatch } from "@essence-lang/compiler/helpers"
 import { optimiserPassNames } from "@essence-lang/compiler/optimiser"
@@ -36,6 +38,7 @@ import {
 	findCommand,
 	globalOptions,
 	PROGRAM,
+	PROJECT_FILE,
 } from "../commands"
 import { colorChoiceFor, createContext, version } from "../context"
 import { runtimeArguments } from "../execute"
@@ -2581,6 +2584,98 @@ describe("a project's build settings, end to end", () => {
 		expect(code).toBe(EXIT_USAGE)
 		expect(err).toContain(
 			"--minify and --no-minify contradict each other — say one.",
+		)
+	})
+})
+
+describe("essence init", () => {
+	// NOTE: The Help names the file, and the reader finds it. Two spellings of
+	// one name is a command that documents a file nothing reads.
+	it("spells the project file the way the reader does", () => {
+		expect(PROJECT_FILE).toBe(PROJECT_FILE_NAME)
+	})
+
+	// NOTE: The file marks the project, so what this asserts is where it lands
+	// and that it reads: an `essence.json` the reader could not read would be a
+	// project whose every setting is at its default from the first minute.
+	it("writes a project file the reader reads back", async () => {
+		await withModules({ "keep.txt": "" }, async (directory) =>
+			within(directory, async () => {
+				let { code, out } = await capture(() =>
+					run(["init", "--no-color"], "essence"),
+				)
+				// NOTE: Read back through `process.cwd()` rather than through
+				// the directory `withModules` made, which on macOS is the same
+				// place under a different name: /var is a link to /private/var,
+				// and the reader answers with the path it was asked about.
+				let root = process.cwd()
+				let written = path.join(root, "essence.json")
+
+				expect(code).toBe(EXIT_SUCCESS)
+				expect(out).toContain("wrote")
+				expect(out).toContain("essence.json")
+				expect(existsSync(written)).toBe(true)
+
+				let configuration = readProjectConfiguration(root)
+
+				expect(configuration.problems).toEqual([])
+				expect(configuration.root).toBe(root)
+				expect(configuration.exclude).toEqual([])
+				expect(configuration.test.skipTags).toEqual([])
+				expect(configuration.test.contracts).toBe(false)
+				expect(readFileSync(written, "utf8")).toContain(
+					"// Directories under this project that are not its sources.",
+				)
+			}),
+		)
+	})
+
+	// NOTE: What is in the file is a project's own decisions, comments and all.
+	it("refuses a directory that already holds one, and writes nothing", async () => {
+		await withModules(
+			{ "essence.json": `{ "test": { "skipTags": ["slow"] } }` },
+			async (directory) =>
+				within(directory, async () => {
+					let { code, err } = await capture(() =>
+						run(["init", "--no-color"], "essence"),
+					)
+
+					expect(code).toBe(EXIT_USAGE)
+					expect(err).toContain("essence.json already exists.")
+					expect(
+						readFileSync(
+							path.join(process.cwd(), "essence.json"),
+							"utf8",
+						),
+					).toBe(`{ "test": { "skipTags": ["slow"] } }`)
+				}),
+		)
+	})
+
+	// NOTE: A project inside a project is allowed — a package of a monorepo
+	// that runs its own tests is one — and it is also the shape of a mistake,
+	// so it is written AND said.
+	it("writes under a project that already governs, and says so", async () => {
+		await withModules(
+			{
+				"essence.json": `{ "test": { "skipTags": ["slow"] } }`,
+				"inner/keep.txt": "",
+			},
+			async (directory) =>
+				within(path.join(directory, "inner"), async () => {
+					let { code, out } = await capture(() =>
+						run(["init", "--no-color"], "essence"),
+					)
+
+					expect(code).toBe(EXIT_SUCCESS)
+					expect(
+						existsSync(path.join(process.cwd(), "essence.json")),
+					).toBe(true)
+					expect(out).toContain("governs the directory above")
+					expect(
+						readProjectConfiguration(process.cwd()).test.skipTags,
+					).toEqual([])
+				}),
 		)
 	})
 })

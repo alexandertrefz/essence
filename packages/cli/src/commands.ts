@@ -16,6 +16,13 @@ export const PROGRAM = "{program}"
 // in-process — a spec, or a script written before the second name existed.
 export const DEFAULT_PROGRAM_NAME = "esc"
 
+// NOTE: The project file's name, written into the Help in the several places
+// that name it. Spelled here rather than imported from the Compiler because
+// this table is data about the command line and imports nothing; the Compiler's
+// `PROJECT_FILE_NAME` is what every reader of the file itself uses, and the two
+// are checked against each other by a spec.
+export const PROJECT_FILE = "essence.json"
+
 export function withProgramName(text: string, programName: string): string {
 	return text.replaceAll(PROGRAM, programName)
 }
@@ -768,6 +775,43 @@ export const commands: Array<CommandSpec> = [
 			{
 				command: `${PROGRAM} test --mutate src/Standings.es`,
 				description: "Ask which deliberate bugs one file's tests catch",
+			},
+		],
+	},
+	{
+		name: "init",
+		aliases: [],
+		// NOTE: The summary names the file by what it IS rather than by its
+		// name, because the overview is rendered under whichever name the
+		// binary was invoked as and may not say the other one — and the file is
+		// called `essence.json` whichever that was. The description says it.
+		summary: "Write the file a project's settings live in",
+		description: [
+			`Writes an ${PROJECT_FILE} into the working directory — the file ` +
+				"every Essence tool reads a project's settings out of, and " +
+				"whose directory IS the project: what a test run with no " +
+				"arguments walks, and what the editor's Problems panel speaks " +
+				"for.",
+			"What it writes is a starting point rather than an inventory: the " +
+				"two settings a project reaches for first, both at their " +
+				"defaults, each under the sentence that says what it is for. " +
+				`${PROGRAM} help test and ${PROGRAM} help build document the ` +
+				"rest, each beside the flag it mirrors.",
+			"The file is JSON with comments and trailing commas allowed, as " +
+				"tsconfig.json is, because a project file is where the reason " +
+				"behind a setting gets written down.",
+			`A directory that already holds an ${PROJECT_FILE} is left alone. ` +
+				"One ABOVE this directory is not in the way — a project may " +
+				"hold another, and a package of a monorepo that runs its own " +
+				"tests is one — but the run says which file that is, because " +
+				"nothing the outer one says reaches this project afterwards.",
+		],
+		usage: [`${PROGRAM} init`],
+		options: [],
+		examples: [
+			{
+				command: `${PROGRAM} init`,
+				description: "Start a project file in this directory",
 			},
 		],
 	},

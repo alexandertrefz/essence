@@ -15,6 +15,7 @@ import {
 import { DEFAULT_PROGRAM_NAME, findCommand } from "./commands"
 import { type CLIContext, createContext, version } from "./context"
 import { renderCommandHelp, renderOverview, renderUsageLine } from "./help"
+import { runInit } from "./init"
 import { toJSONUsageError } from "./json"
 import {
 	projectConfigurationFor,
@@ -229,6 +230,9 @@ async function dispatch(
 
 		case "check":
 			return runCheck(context, command, files)
+
+		case "init":
+			return runInit(context, command)
 
 		case "run":
 			return runRun(context, command, files, programArguments)
