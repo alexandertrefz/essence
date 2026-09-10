@@ -70,6 +70,7 @@ import {
 	dropGuardAction,
 	guardEmptyAction,
 } from "./matchFixes"
+import { matchOnValueActions } from "./matchOnValue"
 import { annotationActions, shorthandActions } from "./refactors"
 import {
 	implementationHeaderAction,
@@ -221,6 +222,7 @@ export function findCodeActions(
 	entries.push(
 		...implementProtocolActions(program, enrichedProgram, lines, range),
 	)
+	entries.push(...matchOnValueActions(enrichedProgram, lines, range))
 	entries.push(...shorthandActions(program, lines, range))
 
 	return entries

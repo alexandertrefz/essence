@@ -4179,6 +4179,165 @@ describe("Code Actions", () => {
 		})
 	})
 
+	// NOTE: The Match a reader is about to write, scaffolded from the value the
+	// cursor stands on. Its arms are the `missing-case` fix's arms, by the same
+	// rule and in the same spelling, so a scaffold and a Case added later meet
+	// as one thing rather than two.
+	describe("Match on a value", () => {
+		let matchActions = (
+			lines: Array<string>,
+			range: common.Position,
+		): Array<CodeActionEntry> =>
+			actionsOf(lines, range).filter((entry) =>
+				entry.title.startsWith("Match on"),
+			)
+
+		it("should scaffold an arm per Case of a Choice", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Colour { Red, Green, Blue }",
+				"",
+				"\tfunction describe (chosen: Colour) -> String {",
+				"\t\t<- chosen",
+				"\t}",
+				"}",
+			]
+
+			let [refactor] = matchActions(lines, {
+				start: { line: 5, column: 9 },
+				end: { line: 5, column: 9 },
+			})
+			let result = applied(lines, refactor)
+
+			expect(refactor.title).toBe("Match on 'chosen'")
+			expect(refactor.kind).toBe("refactor.rewrite")
+			expect(refactor.diagnosticCode).toBeNull()
+			expect(refactor.isPreferred).toBe(false)
+
+			// NOTE: The `<- ` is left where it was — only what stands between
+			// `match ` and ` -> ` is written, so the Return stays a Return and
+			// the Function's own `-> String` is what the Match answers with.
+			expect(result).toEqual([
+				"implementation {",
+				"\tchoice Colour { Red, Green, Blue }",
+				"",
+				"\tfunction describe (chosen: Colour) -> String {",
+				"\t\t<- match chosen -> String {",
+				"\t\t\tcase Colour#Red {}",
+				"\t\t\tcase Colour#Green {}",
+				"\t\t\tcase Colour#Blue {}",
+				"\t\t}",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(result)).not.toContain("syntax-error")
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		it("should scaffold an Optional's two Cases as the Choice they are", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant maybe: Optional<Integer> = #Value(1)",
+				"\tconstant described = maybe",
+				"}",
+			]
+
+			let [refactor] = matchActions(lines, {
+				start: { line: 3, column: 24 },
+				end: { line: 3, column: 24 },
+			})
+			let result = applied(lines, refactor)
+
+			expect(refactor.title).toBe("Match on 'maybe'")
+			expect(result).toEqual([
+				"implementation {",
+				"\tconstant maybe: Optional<Integer> = #Value(1)",
+				"\tconstant described = match maybe -> Optional<Integer> {",
+				"\t\tcase Optional#Value {}",
+				"\t\tcase Optional#Empty {}",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(result)).not.toContain("syntax-error")
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		it("should scaffold a Union of Types under its member Types", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant value: Integer | String | Boolean = 1",
+				"\tconstant described = value",
+				"}",
+			]
+
+			let [refactor] = matchActions(lines, {
+				start: { line: 3, column: 24 },
+				end: { line: 3, column: 24 },
+			})
+			let result = applied(lines, refactor)
+
+			expect(result.slice(2)).toEqual([
+				"\tconstant described = match value -> Integer | String | Boolean {",
+				"\t\tcase Integer {}",
+				"\t\tcase String {}",
+				"\t\tcase Boolean {}",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(result)).not.toContain("syntax-error")
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		it("should reach the call a chain ends in", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant items = [1, 2]",
+				"\tconstant first = items::firstItem()",
+				"}",
+			]
+
+			let [refactor] = matchActions(lines, {
+				start: { line: 3, column: 30 },
+				end: { line: 3, column: 30 },
+			})
+
+			expect(refactor.title).toBe("Match on 'items::firstItem()'")
+			expect(applied(lines, refactor)[2]).toBe(
+				"\tconstant first = match items::firstItem() -> Optional<Integer> {",
+			)
+		})
+
+		// NOTE: There is nothing to take apart — a Match over a Type with no
+		// members to name would be a `case Integer` and nothing else.
+		it("should offer nothing on a value that is no Union", () => {
+			expect(
+				matchActions(["implementation {", "\tconstant n = 1", "}"], {
+					start: { line: 2, column: 15 },
+					end: { line: 2, column: 15 },
+				}),
+			).toEqual([])
+		})
+
+		// NOTE: The request has to sit INSIDE the Expression. A client asking
+		// about a selection of the whole file is asking about no Expression in
+		// particular, and scaffolding into the last one would be a guess.
+		it("should offer nothing for a request no Expression contains", () => {
+			expect(
+				titles(
+					actionsOf([
+						"implementation {",
+						"\tconstant maybe: Optional<Integer> = #Value(1)",
+						"\tconstant described = maybe",
+						"}",
+					]),
+				).filter((title) => title.startsWith("Match on")),
+			).toEqual([])
+		})
+	})
+
 	// NOTE: The Formatter refuses to move between the two spellings, so this is
 	// where a reader gets to. Both directions, and neither of them inside an
 	// update's key list, where the two spellings do not mean the same thing.

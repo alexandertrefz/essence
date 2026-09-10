@@ -55,7 +55,11 @@ import {
 // and a Signature under a shape the checks below turn away. A member spelled
 // that way is covered by a `case _` instead, which is what the reader would
 // have to write themselves.
-function isWritableMatcher(spelling: string): boolean {
+//
+// Exported because the Match a refactoring SCAFFOLDS writes the same arms this
+// fix adds to one — the two would otherwise be two rules about which members of
+// a Union can be written down, and a reader who used both would meet them.
+export function isWritableMatcher(spelling: string): boolean {
 	if (/\bFunction\b/.test(spelling)) {
 		return false
 	}
