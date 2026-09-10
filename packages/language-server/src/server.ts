@@ -1,7 +1,11 @@
 import * as path from "node:path"
 import { pathToFileURL } from "node:url"
 
-import { skippedDirectories } from "@essence-lang/compiler/configuration"
+import {
+	parseProjectConfiguration,
+	PROJECT_FILE_NAME,
+	skippedDirectories,
+} from "@essence-lang/compiler/configuration"
 import { isStdlibDocument } from "@essence-lang/compiler/documents"
 import { loadStdlib } from "@essence-lang/compiler/enricher/stdlib"
 import type { common, parser } from "@essence-lang/interfaces"
@@ -318,6 +322,13 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// than searched for on every read: the graph asks for a file once per Module
 	// per analysis, and an Editor's unsaved buffer must win every one of them.
 	let openPaths = new Map<string, string>()
+	// NOTE: The open `essence.json` buffers, the same bookkeeping and kept
+	// deliberately apart from it: a project file is not a source. Everything
+	// keyed by `openPaths` treats what it holds as Essence — the Module host
+	// reads it, the test session sends it to the Worker as an overlay, and a
+	// sweep makes an ENTRY of an open document no root reaches, which would
+	// analyse a JSON file as a Program and publish a parse error per line.
+	let openProjectFiles = new Map<string, string>()
 	let workspace = createWorkspace({
 		openDocument: (filePath) => {
 			let uri = openPaths.get(filePath)
@@ -351,6 +362,13 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// again. Kept by URI rather than by entry because two roots can both reach
 	// one dependency, and what the client holds for it is one list.
 	let publishedContent = new Map<string, string>()
+	// NOTE: The URIs the CONFIGURATION was last published to — an `essence.json`
+	// and any `package.json` still spelling the old key. Held for the reason
+	// `publishedByEntry` is held: a file whose problems went away is owed an
+	// explicitly empty list, and nothing else will ever clear one. Kept apart
+	// from the entries, because no analysis reaches these files and no entry can
+	// take them over.
+	let publishedConfiguration = new Set<string>()
 	// NOTE: Whether Type Hints are served — the client's
 	// `essence.inlayHints.enabled`. True until a client says otherwise, so an
 	// editor that answers no configuration requests keeps the Hints it always
@@ -555,16 +573,23 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// document events can not see — a branch switch, a file another tool
 		// wrote, a Module deleted. Registered dynamically because the glob is
 		// the Server's business rather than the extension manifest's.
-		// NOTE: And `package.json`, which is where a project says which of its
-		// directories are not its sources (`essence.exclude`). It is not a
+		// NOTE: And `essence.json`, which is where a project says which of its
+		// directories are not its sources and how its tests run. It is not a
 		// Module and nothing analyses it — what it changes is which files this
 		// Server is entitled to report on at all, and a reader who has just
 		// excluded a corpus should watch the panel empty rather than be told to
 		// restart the editor.
+		//
+		// NOTE: `package.json` is watched for one reason only: an `essence` key
+		// in one is where these settings USED to live, and a manifest that still
+		// spells it is told so on the key. Nothing is read from it, so a change
+		// to one moves no boundary and re-runs nothing — it only republishes
+		// that Diagnostic.
 		connection.client
 			.register(DidChangeWatchedFilesNotification.type, {
 				watchers: [
 					{ globPattern: "**/*.es" },
+					{ globPattern: `**/${PROJECT_FILE_NAME}` },
 					{ globPattern: "**/package.json" },
 				],
 			})
@@ -636,6 +661,12 @@ export function startServer(options: { connection?: Connection } = {}) {
 			readInlayHintSetting()
 			readTestSettings()
 		}
+
+		// NOTE: Before anything is walked or run, because it is what the walk
+		// and the run were configured BY: a project file that could not be read
+		// is why the panel is about to list a corpus, and the reader is owed
+		// that before the listing rather than after it.
+		publishConfiguration()
 
 		// NOTE: Started once the client has finished initialising, rather than
 		// in `onInitialize`: the first thing it does is walk the workspace for
@@ -772,14 +803,22 @@ export function startServer(options: { connection?: Connection } = {}) {
 		void session.dispose()
 	})
 
-	// NOTE: A `package.json` this project could be reading its settings out of.
-	// Not every one under the folder: `bun install` rewrites thousands inside
-	// `node_modules`, and answering each of them with a project rebuilt from
-	// scratch would make an install cost more than the install. The walk that
-	// reads the setting never descends into those directories either, so a
-	// manifest inside one can not be the manifest it read.
-	function isProjectManifest(filePath: string): boolean {
-		if (path.basename(filePath) !== "package.json") {
+	// NOTE: A file NAMED `essence.json`, wherever it sits. It is the question
+	// every document handler asks — a document the client forwarded is either a
+	// project file or Essence, and where it lies has nothing to do with which —
+	// while the watcher below asks the narrower one.
+	function isProjectDocument(filePath: string): boolean {
+		return path.basename(filePath) === PROJECT_FILE_NAME
+	}
+
+	// NOTE: A file this Server reads a project's settings out of, or used to.
+	// Not every one under the folder: `bun install` rewrites thousands of
+	// manifests inside `node_modules`, and answering each of them with a project
+	// rebuilt from scratch would make an install cost more than the install. The
+	// walk that reads the settings never descends into those directories either,
+	// so a file inside one can not be a file it read.
+	function isConfigured(filePath: string, name: string): boolean {
+		if (path.basename(filePath) !== name) {
 			return false
 		}
 
@@ -789,14 +828,32 @@ export function startServer(options: { connection?: Connection } = {}) {
 			.some((segment) => skippedDirectories.has(segment))
 	}
 
+	// NOTE: The project file itself, which draws the boundary.
+	function isProjectFile(filePath: string): boolean {
+		return isConfigured(filePath, PROJECT_FILE_NAME)
+	}
+
+	// NOTE: And a `package.json`, which draws nothing any more. All it can say
+	// is that its `essence` key has moved.
+	function isManifest(filePath: string): boolean {
+		return isConfigured(filePath, "package.json")
+	}
+
 	connection.onDidChangeWatchedFiles((params) => {
 		let changed: Array<string> = []
+		let projectFileChanged = false
 		let manifestChanged = false
 
 		for (let change of params.changes) {
 			let filePath = documentFilePath(change.uri)
 
-			if (isProjectManifest(filePath)) {
+			if (isProjectFile(filePath)) {
+				projectFileChanged = true
+
+				continue
+			}
+
+			if (isManifest(filePath)) {
 				manifestChanged = true
 
 				continue
@@ -811,23 +868,38 @@ export function startServer(options: { connection?: Connection } = {}) {
 			}
 		}
 
-		// NOTE: A manifest is answered by working the whole project out again,
-		// the way a workspace folder arriving is. Every cached answer here was
-		// derived for a project with one boundary, and the file that moved is
-		// the one that draws it — including the discovery walk, which is what
-		// decides whether a file has anybody to report on it at all. Rare
-		// enough to be worth no cleverness: nobody edits a `package.json` on a
-		// keystroke.
+		// NOTE: A project file is answered by working the whole project out
+		// again, the way a workspace folder arriving is. Every cached answer
+		// here was derived for a project with one boundary, and the file that
+		// moved is the one that draws it — including the discovery walk, which
+		// is what decides whether a file has anybody to report on it at all, and
+		// the tags each entry skips. Rare enough to be worth no cleverness:
+		// nobody edits an `essence.json` on a keystroke.
 		//
 		// And it answers for the `.es` files in the same notification too: a
 		// sweep is every root of the project and a run is every test of it,
 		// which is strictly more than the two lines below would have asked for.
-		if (manifestChanged) {
+		if (projectFileChanged) {
 			workspace.setFolders(workspace.folders())
 			tags = null
+			publishConfiguration()
 			session.runAll("open")
 			scheduleSweep()
 
+			return
+		}
+
+		// NOTE: A manifest moves nothing, so nothing is worked out again: the
+		// settings are read once more — which is what finds, or stops finding,
+		// the `essence` key — and the Diagnostics that come of it are published.
+		// No sweep and no test run: what the file says about this project is
+		// that it says nothing about it.
+		if (manifestChanged) {
+			workspace.forgetConfiguration()
+			publishConfiguration()
+		}
+
+		if (changed.length === 0) {
 			return
 		}
 
@@ -853,6 +925,26 @@ export function startServer(options: { connection?: Connection } = {}) {
 		scheduleAnalysis(changed)
 	})
 
+	// NOTE: The open document behind a request, and the ONE place that answers
+	// "is this Essence at all". Every request that reads a buffer comes through
+	// here, so a document the client forwards that is not a source is refused
+	// once rather than in each of twenty handlers — and a project file is
+	// exactly that: the extension forwards `essence.json` so that the Server can
+	// report on it, and a Hover, a Completion or a Format over one would be the
+	// Essence Parser reading JSON.
+	function sourceDocument(uri: string): TextDocument | undefined {
+		let document = documents.get(uri)
+
+		if (
+			document === undefined ||
+			isProjectDocument(documentFilePath(uri))
+		) {
+			return undefined
+		}
+
+		return document
+	}
+
 	// NOTE: Every request that answers ABOUT a document comes through here, and
 	// what it gets is the Workspace's cache entry for that document at its
 	// current version — the parse, the typed Program, the rename index and, for
@@ -869,7 +961,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		uri: string,
 		options: { annotations?: boolean; cancellation?: Cancellation } = {},
 	) {
-		let document = documents.get(uri)
+		let document = sourceDocument(uri)
 
 		if (document === undefined) {
 			return null
@@ -1000,7 +1092,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// the same cache as everything else so that a Folding Range and a Hover over
 	// one document are two readers of one parse.
 	function parsedOf(uri: string): parser.Program | null {
-		let document = documents.get(uri)
+		let document = sourceDocument(uri)
 
 		if (document === undefined) {
 			return null
@@ -1296,7 +1388,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			toCursor(params.position),
 			parsed.program,
 			parsed.annotations,
-			documents.get(params.textDocument.uri)?.getText() ?? null,
+			sourceDocument(params.textDocument.uri)?.getText() ?? null,
 		)
 
 		if (hover === null) {
@@ -1599,7 +1691,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 	})
 
 	connection.onDocumentFormatting((params) => {
-		let document = documents.get(params.textDocument.uri)
+		let document = sourceDocument(params.textDocument.uri)
 
 		if (document === undefined) {
 			return null
@@ -1629,7 +1721,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return abandoned(token)
 		}
 
-		let document = documents.get(params.textDocument.uri)
+		let document = sourceDocument(params.textDocument.uri)
 
 		if (document === undefined) {
 			return null
@@ -1710,7 +1802,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			start: toCursor(params.range.start),
 			end: toCursor(params.range.end),
 		}
-		let document = documents.get(params.textDocument.uri)
+		let document = sourceDocument(params.textDocument.uri)
 		// NOTE: What the last run RECORDED, beside the Types the source left
 		// out. Two kinds of ghost text with two sources: one is read off the
 		// typed Program and is true of the code, the other is read off the
@@ -1744,7 +1836,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return abandoned(token)
 		}
 
-		let document = documents.get(params.textDocument.uri)
+		let document = sourceDocument(params.textDocument.uri)
 
 		if (document === undefined) {
 			return null
@@ -1787,7 +1879,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return abandoned(token)
 		}
 
-		let document = documents.get(params.textDocument.uri)
+		let document = sourceDocument(params.textDocument.uri)
 
 		if (document === undefined) {
 			return null
@@ -1911,6 +2003,69 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}
 
 		publishedByEntry.set(entryPath, new Set(results.keys()))
+	}
+
+	// NOTE: What the project files themselves could not be read as, published on
+	// those files. A mistake in an `essence.json` is a Warning with a span like
+	// every other Diagnostic — the setting falls back to its default and the
+	// note says so — and the file it is about is the only place a reader would
+	// look for it. The stale `essence` key of a `package.json` lands here too,
+	// on the key.
+	//
+	// NOTE: An OPEN project file answers out of its buffer rather than off disk,
+	// because that is the text the reader is looking at. Everything else the
+	// Server reads out of the settings — the exclusions, the tags an entry skips
+	// — still comes off the file that was SAVED: what a walk obeys and what a
+	// run runs may not change while a line is half typed. So the buffer decides
+	// what is reported and the file decides what is done, and saving is what
+	// makes the two agree.
+	function publishConfiguration(): void {
+		let byUri = new Map<string, Array<common.Diagnostic>>()
+
+		for (let problem of workspace.configurationProblems()) {
+			byUri.set(
+				configurationUriFor(problem.filePath),
+				problem.diagnostics,
+			)
+		}
+
+		for (let [filePath, uri] of openProjectFiles) {
+			let document = documents.get(uri)
+
+			if (document === undefined) {
+				continue
+			}
+
+			byUri.set(
+				uri,
+				parseProjectConfiguration(
+					document.getText(),
+					filePath,
+				).problems.flatMap((each) => each.diagnostics),
+			)
+		}
+
+		for (let [uri, diagnostics] of byUri) {
+			publish(uri, diagnostics)
+		}
+
+		// NOTE: A file whose problems went away is owed an explicitly empty
+		// list, exactly as a retired entry's files are: nothing else is ever
+		// going to clear a squiggle in a file no analysis reaches.
+		for (let uri of publishedConfiguration) {
+			if (!byUri.has(uri)) {
+				publish(uri, [])
+			}
+		}
+
+		publishedConfiguration = new Set(byUri.keys())
+	}
+
+	// NOTE: The mirror of `uriFor` for a file no analysis reports on — the
+	// buffer's own URI while something has it open, and the path's otherwise, so
+	// that a project file is not published under two spellings of itself.
+	function configurationUriFor(filePath: string): string {
+		return openProjectFiles.get(filePath) ?? uriOf(filePath)
 	}
 
 	// NOTE: Everything an entry's graph is expected to cover — the entry and its
@@ -2179,6 +2334,12 @@ export function startServer(options: { connection?: Connection } = {}) {
 			retireEntries(sweepDropped)
 			sweepDropped.clear()
 			sweepFocus = undefined
+			// NOTE: With the panel it just filled. A sweep is the one moment
+			// the Server speaks for the whole workspace, and what a project
+			// file could not be read as belongs beside what its sources could
+			// not: the walk the sweep performed is the walk that setting
+			// narrowed.
+			publishConfiguration()
 
 			return
 		}
@@ -2515,6 +2676,18 @@ export function startServer(options: { connection?: Connection } = {}) {
 	documents.onDidChangeContent((event) => {
 		let filePath = documentFilePath(event.document.uri)
 
+		// NOTE: A project file is answered for out of its own reader rather
+		// than as a source, and it is kept out of `openPaths` so that nothing
+		// downstream mistakes it for one — see the NOTE there. It is reported
+		// on per keystroke, which is what makes an unclosed brace visible while
+		// it is being typed rather than once the file is saved.
+		if (isProjectDocument(filePath)) {
+			openProjectFiles.set(filePath, event.document.uri)
+			publishConfiguration()
+
+			return
+		}
+
 		openPaths.set(filePath, event.document.uri)
 		workspace.changed(filePath)
 		tags = null
@@ -2527,6 +2700,15 @@ export function startServer(options: { connection?: Connection } = {}) {
 
 	documents.onDidClose((event) => {
 		let filePath = documentFilePath(event.document.uri)
+
+		// NOTE: The buffer is gone, so the file on disk answers for it again —
+		// which for a project file means the settings every other reader of it
+		// has been obeying all along.
+		if (openProjectFiles.delete(filePath)) {
+			publishConfiguration()
+
+			return
+		}
 
 		openPaths.delete(filePath)
 		// NOTE: The buffer is gone, so what the workspace holds for it was built

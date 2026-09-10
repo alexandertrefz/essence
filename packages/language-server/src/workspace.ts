@@ -2,8 +2,11 @@ import { readdirSync, readFileSync } from "node:fs"
 import * as path from "node:path"
 
 import {
+	type ConfigurationCache,
+	createConfigurationCache,
 	isExcludedPath,
-	readProjectConfiguration,
+	type ProjectConfiguration,
+	type ProjectProblems,
 	skippedDirectories,
 } from "@essence-lang/compiler/configuration"
 import {
@@ -216,9 +219,11 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 	let folders: Array<string> = []
 	let files = new Map<string, FileEntry>()
 	let discovered: Set<string> | null = null
-	// NOTE: The directories this project said are not its sources, null until
-	// something asks — see `exclusions`.
-	let excluded: Array<string> | null = null
+	// NOTE: The project file governing each directory, answered once and held —
+	// see `configurationFor`. It is a cache rather than one configuration
+	// because a workspace is not one project: two folders are two of them, and
+	// a nested `essence.json` is a third inside one of those.
+	let configurations: ConfigurationCache = createConfigurationCache()
 	let openDocument = options.openDocument ?? (() => undefined)
 	// NOTE: The dependency edges of the workspace, both ways, kept rather than
 	// rebuilt. Rebuilding them meant reading the entries of every known file,
@@ -304,7 +309,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 	function setFolders(nextFolders: Array<string>): void {
 		folders = nextFolders.map((folder) => canonicalPath(folder))
 		discovered = null
-		excluded = null
+		configurations.clear()
 		files.clear()
 		outEdges.clear()
 		inEdges.clear()
@@ -349,26 +354,64 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		)
 	}
 
-	// NOTE: What the project itself said is not its source — `essence.exclude`
-	// in the nearest `package.json` above each workspace folder. A project holds
-	// files that are `.es` without being ITS: a corpus kept deliberately broken,
-	// a vendored copy of a library, the output some other tool writes into it.
-	// Nothing can tell those from sources by looking at them, and reporting on
-	// them is how a Problems panel that speaks for the whole workspace becomes
-	// one nobody reads.
+	// NOTE: What the project itself said is not its source — `exclude` in the
+	// nearest `essence.json` at or above the file. A project holds files that
+	// are `.es` without being ITS: a corpus kept deliberately broken, a vendored
+	// copy of a library, the output some other tool writes into it. Nothing can
+	// tell those from sources by looking at them, and reporting on them is how a
+	// Problems panel that speaks for the whole workspace becomes one nobody
+	// reads.
 	//
-	// Read once and held, because the walk it narrows is answered once and held.
-	// `setFolders` is what forgets both — the Server calls it when a manifest
-	// changes, since a project drawing its own boundary somewhere else is a
-	// different project from the one every cached answer was derived for.
-	function exclusions(): Array<string> {
-		if (excluded === null) {
-			excluded = folders.flatMap(
-				(folder) => readProjectConfiguration(folder).exclude,
-			)
+	// NOTE: The settings governing one FILE, rather than one list for the whole
+	// workspace. A workspace is two folders as easily as one and a folder holds
+	// a nested project as easily as none, and the union the two used to be let
+	// one folder's `exclude` silence a directory of the same name in the other.
+	// The Server reads the test settings through here too, so what an entry runs
+	// under is the project that entry belongs to.
+	//
+	// Answered once per directory and held, because the walk it narrows is
+	// answered once and held. `setFolders` is what forgets both — a project
+	// drawing its own boundary somewhere else is a different project from the
+	// one every cached answer was derived for — and `forgetConfiguration` drops
+	// the settings alone, which is all a `package.json` can ask for.
+	function configurationFor(filePath: string): ProjectConfiguration {
+		return configurations.forFile(filePath)
+	}
+
+	// NOTE: What every project file the walk has met could not read, one entry
+	// per file holding a mistake: the project files themselves, and any
+	// `package.json` still spelling the old `essence` key. The Server publishes
+	// each of them on its own file.
+	//
+	// NOTE: Every workspace folder's root is asked about first, so that a stale
+	// manifest at the top of a folder is reported even where no `.es` file sits
+	// beside it — nothing else would ever make the cache read that directory.
+	// De-duplicated by file, since one file's problems are one set however many
+	// configurations were derived along the way.
+	function configurationProblems(): Array<ProjectProblems> {
+		for (let folder of folders) {
+			configurations.forDirectory(folder)
 		}
 
-		return excluded
+		let byFile = new Map<string, ProjectProblems>()
+
+		for (let configuration of configurations.known()) {
+			for (let problem of configuration.problems) {
+				if (!byFile.has(problem.filePath)) {
+					byFile.set(problem.filePath, problem)
+				}
+			}
+		}
+
+		return [...byFile.values()]
+	}
+
+	// NOTE: The settings alone, without the discovered files and the edges
+	// `setFolders` drops along with them. It is what a `package.json` changing
+	// asks for: the only thing such a file has to say now is that its `essence`
+	// key has moved, so the Diagnostics are read again and nothing else is.
+	function forgetConfiguration(): void {
+		configurations.clear()
 	}
 
 	// NOTE: Whether the discovery walk stays out of a path — and ONLY the walk.
@@ -380,7 +423,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 	// answers for every document no root covers). What exclusion buys is the
 	// half nobody asked for: the files the panel lists unbidden.
 	function isExcluded(filePath: string): boolean {
-		return isExcludedPath(filePath, exclusions())
+		return isExcludedPath(filePath, configurationFor(filePath).exclude)
 	}
 
 	function knownFiles(): Set<string> {
@@ -388,7 +431,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			discovered = new Set()
 
 			for (let folder of folders) {
-				collectEssenceFiles(folder, discovered, exclusions())
+				collectEssenceFiles(folder, discovered, configurations)
 			}
 
 			for (let filePath of discovered) {
@@ -1526,6 +1569,9 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		folders: () => folders,
 		isInWorkspace,
 		isExcluded,
+		configurationFor,
+		configurationProblems,
+		forgetConfiguration,
 		changed,
 		removed,
 		knownFiles,
@@ -2132,11 +2178,20 @@ function topLevelDeclarations(
 // keeps this answer current afterwards. Symlinked directories are followed as
 // files rather than descended into, so a link back up the tree can not send the
 // walk round for ever.
+//
+// NOTE: The exclusions are asked for per DIRECTORY as the walk enters it,
+// rather than taken once for the whole folder, so an `essence.json` inside the
+// tree governs the subtree beneath it: the directory holding a project file is
+// where that project's boundary starts, and a walk that read one list at the
+// top could only ever obey the outermost one. It costs one look for a file
+// that is usually not there per directory entered, beside the `readdir` the
+// walk was going to do anyway.
 function collectEssenceFiles(
 	directory: string,
 	found: Set<string>,
-	exclude: Array<string>,
+	configurations: ConfigurationCache,
 ): void {
+	let exclude = configurations.forDirectory(directory).exclude
 	let entries: Array<{ name: string; isDirectory: boolean }> = []
 
 	try {
@@ -2158,7 +2213,7 @@ function collectEssenceFiles(
 				!skippedDirectories.has(entry.name) &&
 				!isExcludedPath(entryPath, exclude)
 			) {
-				collectEssenceFiles(entryPath, found, exclude)
+				collectEssenceFiles(entryPath, found, configurations)
 			}
 
 			continue

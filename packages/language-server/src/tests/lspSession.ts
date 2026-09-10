@@ -150,13 +150,21 @@ export function startSession() {
 		await client.sendNotification(InitializedNotification.type, {})
 	}
 
-	async function open(filePath: string, text: string): Promise<void> {
+	// NOTE: The language id is the client's, and a client forwards more than
+	// Essence: the extension's document selector names `essence.json` too, so
+	// that the Server can report on a project file it could not read. Defaulted
+	// rather than passed everywhere, because every other caller opens a source.
+	async function open(
+		filePath: string,
+		text: string,
+		languageId = "essence",
+	): Promise<void> {
 		versions.set(filePath, 1)
 
 		await client.sendNotification(DidOpenTextDocumentNotification.type, {
 			textDocument: {
 				uri: uriOf(filePath),
-				languageId: "essence",
+				languageId,
 				version: 1,
 				text,
 			},

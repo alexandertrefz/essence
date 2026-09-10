@@ -20,11 +20,7 @@ import { createWorkspace, type Workspace } from "../workspace"
 // whether the discovery walk finds a file at all.
 let directories: Array<string> = []
 
-function makeWorkspace(files: Record<string, string>): {
-	workspace: Workspace
-	root: string
-	pathOf: (name: string) => string
-} {
+function makeFolder(files: Record<string, string>): string {
 	let root = canonicalPath(mkdtempSync(path.join(tmpdir(), "essence-ws-")))
 
 	directories.push(root)
@@ -36,6 +32,15 @@ function makeWorkspace(files: Record<string, string>): {
 		writeFileSync(filePath, contents)
 	}
 
+	return root
+}
+
+function makeWorkspace(files: Record<string, string>): {
+	workspace: Workspace
+	root: string
+	pathOf: (name: string) => string
+} {
+	let root = makeFolder(files)
 	let workspace = createWorkspace()
 
 	workspace.setFolders([root])
@@ -1500,17 +1505,17 @@ describe("Workspace", () => {
 		})
 	})
 
-	// NOTE: `essence.exclude` in the nearest `package.json`. Reported on a
-	// project rather than on the open tabs, the discovery walk decides what the
-	// Problems panel speaks for — and a project holds `.es` files that are not
-	// its sources: a corpus kept deliberately broken, a vendored copy, whatever
-	// the last build wrote into it. This is the only way it can say so.
+	// NOTE: `exclude` in the nearest `essence.json`. Reported on a project
+	// rather than on the open tabs, the discovery walk decides what the Problems
+	// panel speaks for — and a project holds `.es` files that are not its
+	// sources: a corpus kept deliberately broken, a vendored copy, whatever the
+	// last build wrote into it. This is the only way it can say so.
 	describe("the directories a project excludes", () => {
-		let manifest = JSON.stringify({ essence: { exclude: ["broken"] } })
+		let projectFile = JSON.stringify({ exclude: ["broken"] })
 
 		it("should stay out of a directory the project excludes", () => {
 			let { workspace, pathOf } = makeWorkspace({
-				"package.json": manifest,
+				"essence.json": projectFile,
 				"Math.es": math,
 				"broken/Bad.es": bad,
 			})
@@ -1526,7 +1531,7 @@ describe("Workspace", () => {
 		// that a Module named out loud stops being checked.
 		it("should still report on an excluded file a source imports", () => {
 			let { workspace, pathOf } = makeWorkspace({
-				"package.json": manifest,
+				"essence.json": projectFile,
 				"Main.es": [
 					"import {",
 					'\tfrom "./broken/Bad.es" { answer }',
@@ -1561,7 +1566,7 @@ describe("Workspace", () => {
 		// how a corpus grows.
 		it("should not take an excluded file from the watcher", () => {
 			let { workspace, root, pathOf } = makeWorkspace({
-				"package.json": manifest,
+				"essence.json": projectFile,
 				"Math.es": math,
 			})
 
@@ -1576,12 +1581,12 @@ describe("Workspace", () => {
 			)
 		})
 
-		// NOTE: What the Server does when a manifest changes: sets the folders
-		// again, which is what forgets the exclusions along with every answer
-		// derived under them.
+		// NOTE: What the Server does when the project file changes: sets the
+		// folders again, which is what forgets the exclusions along with every
+		// answer derived under them.
 		it("should read the exclusions again when the folders are set", () => {
 			let { workspace, root, pathOf } = makeWorkspace({
-				"package.json": manifest,
+				"essence.json": projectFile,
 				"Math.es": math,
 				"broken/Bad.es": bad,
 			})
@@ -1591,14 +1596,124 @@ describe("Workspace", () => {
 			)
 
 			writeFileSync(
-				path.join(root, "package.json"),
-				JSON.stringify({ essence: { exclude: [] } }),
+				path.join(root, "essence.json"),
+				JSON.stringify({ exclude: [] }),
 			)
 			workspace.setFolders(workspace.folders())
 
 			expect(workspace.knownFiles().has(pathOf("broken/Bad.es"))).toBe(
 				true,
 			)
+		})
+
+		// NOTE: Per FILE rather than per workspace. The exclusions used to be
+		// every folder's laid together, which let one folder of a multi-root
+		// workspace silence a directory of the same name in the other — and
+		// there is no way for a project to say anything about a folder it is
+		// not in.
+		it("should keep one folder's exclusions out of another's", () => {
+			let excluding = makeFolder({
+				"essence.json": projectFile,
+				"Math.es": math,
+				"broken/Bad.es": bad,
+			})
+			let plain = makeFolder({
+				"Other.es": math,
+				"broken/Bad.es": bad,
+			})
+			let workspace = createWorkspace()
+
+			workspace.setFolders([excluding, plain])
+
+			let known = workspace.knownFiles()
+
+			expect(
+				known.has(canonicalPath(path.join(excluding, "broken/Bad.es"))),
+			).toBe(false)
+			expect(
+				known.has(canonicalPath(path.join(plain, "broken/Bad.es"))),
+			).toBe(true)
+		})
+
+		// NOTE: A project inside a project. The nearest file governs, so the
+		// inner one draws its own boundary and the outer one's says nothing
+		// about what is under it.
+		it("should let a nested project file govern its own subtree", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"essence.json": JSON.stringify({ exclude: [] }),
+				"Math.es": math,
+				"inner/essence.json": JSON.stringify({ exclude: ["broken"] }),
+				"inner/Kept.es": math,
+				"inner/broken/Bad.es": bad,
+				"broken/Bad.es": bad,
+			})
+
+			let known = workspace.knownFiles()
+
+			expect(known.has(pathOf("inner/Kept.es"))).toBe(true)
+			expect(known.has(pathOf("broken/Bad.es"))).toBe(true)
+			expect(known.has(pathOf("inner/broken/Bad.es"))).toBe(false)
+			expect(workspace.isExcluded(pathOf("inner/broken/Bad.es"))).toBe(
+				true,
+			)
+			expect(workspace.isExcluded(pathOf("broken/Bad.es"))).toBe(false)
+		})
+
+		// NOTE: The `essence` key of a `package.json` is where these settings
+		// used to live. Nothing is read from one now — the corpus it named is
+		// walked and reported on — and the key is answered with a Diagnostic on
+		// itself rather than with silence, because a setting the author
+		// believes is in force is the failure the report exists to prevent.
+		it("should read nothing from a manifest that still spells the old key", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"package.json": JSON.stringify({
+					essence: { exclude: ["broken"] },
+				}),
+				"Math.es": math,
+				"broken/Bad.es": bad,
+			})
+
+			expect(workspace.knownFiles().has(pathOf("broken/Bad.es"))).toBe(
+				true,
+			)
+			expect(workspace.isExcluded(pathOf("broken/Bad.es"))).toBe(false)
+			expect(
+				workspace
+					.configurationProblems()
+					.map((problem) => [
+						problem.filePath,
+						problem.diagnostics.map(
+							(diagnostic) => diagnostic.code,
+						),
+					]),
+			).toEqual([[pathOf("package.json"), ["moved-setting"]]])
+		})
+
+		// NOTE: What a `package.json` changing asks for: the settings are read
+		// again, and the walk the Server already paid for is not. It is the one
+		// case where forgetting everything would be wrong — a manifest draws no
+		// boundary, so nothing derived from one has moved.
+		it("should forget the settings without forgetting the files", () => {
+			let { workspace, root, pathOf } = makeWorkspace({
+				"package.json": JSON.stringify({
+					essence: { exclude: ["broken"] },
+				}),
+				"Math.es": math,
+			})
+
+			expect(workspace.configurationProblems()).toHaveLength(1)
+
+			let known = workspace.knownFiles()
+
+			writeFileSync(
+				path.join(root, "package.json"),
+				JSON.stringify({ name: "moved" }),
+			)
+			workspace.forgetConfiguration()
+
+			expect(workspace.configurationProblems()).toEqual([])
+			expect(workspace.knownFiles()).toBe(known)
+			expect(workspace.knownFiles().has(pathOf("Math.es"))).toBe(true)
 		})
 	})
 })

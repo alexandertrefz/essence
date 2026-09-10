@@ -17,6 +17,7 @@ import {
 
 import { analyseDocument } from "../analyse"
 import { compilationCounts, resetCompilationCounts } from "../compilation"
+import { uriOf } from "../server"
 import {
 	createWorkspace,
 	type OpenDocument,
@@ -1580,15 +1581,15 @@ describe("the Server's request loop", () => {
 	// NOTE: The other half of reporting on a whole project: a project holds
 	// `.es` files that are not its sources — a corpus kept deliberately broken
 	// is the one this repository holds — and a panel that lists those is a panel
-	// nobody reads. `essence.exclude` in the nearest `package.json` is how a
-	// project says which directories those are, and it is the same list the test
-	// walk reads.
+	// nobody reads. `exclude` in the nearest `essence.json` is how a project
+	// says which directories those are, and it is the same list the test walk
+	// reads.
+	const excludingCorpus = JSON.stringify({ exclude: ["corpus"] })
+	const lonely = `implementation {\n\tconstant lonely: Integer = "one"\n}\n`
+
 	it("should not report on a directory the project excludes", async () => {
-		let lonely = `implementation {\n\tconstant lonely: Integer = "one"\n}\n`
 		let files = makeSessionWorkspace({
-			"package.json": JSON.stringify({
-				essence: { exclude: ["corpus"] },
-			}),
+			"essence.json": excludingCorpus,
 			...chain,
 			"corpus/Wrong.es": lonely,
 		})
@@ -1612,11 +1613,8 @@ describe("the Server's request loop", () => {
 	// straight at a file is owed its Diagnostics — what the setting declines is
 	// the panel listing files nobody asked about.
 	it("should report on an excluded file that is open", async () => {
-		let lonely = `implementation {\n\tconstant lonely: Integer = "one"\n}\n`
 		let files = makeSessionWorkspace({
-			"package.json": JSON.stringify({
-				essence: { exclude: ["corpus"] },
-			}),
+			"essence.json": excludingCorpus,
 			...chain,
 			"corpus/Wrong.es": lonely,
 		})
@@ -1637,15 +1635,12 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// NOTE: The manifest is watched, so a reader who has just drawn the boundary
-	// somewhere else watches the panel answer rather than being told to restart
-	// the editor.
-	it("should report on what the manifest stops excluding", async () => {
-		let lonely = `implementation {\n\tconstant lonely: Integer = "one"\n}\n`
+	// NOTE: The project file is watched, so a reader who has just drawn the
+	// boundary somewhere else watches the panel answer rather than being told
+	// to restart the editor.
+	it("should report on what the project file stops excluding", async () => {
 		let files = makeSessionWorkspace({
-			"package.json": JSON.stringify({
-				essence: { exclude: ["corpus"] },
-			}),
+			"essence.json": excludingCorpus,
 			...chain,
 			"corpus/Wrong.es": lonely,
 		})
@@ -1660,17 +1655,218 @@ describe("the Server's request loop", () => {
 			).toBe(undefined)
 
 			writeFileSync(
-				files.pathOf("package.json"),
-				JSON.stringify({ essence: { exclude: [] } }),
+				files.pathOf("essence.json"),
+				JSON.stringify({ exclude: [] }),
 			)
 			await session.watchedFileChanged([
-				{ filePath: files.pathOf("package.json"), type: 2 },
+				{ filePath: files.pathOf("essence.json"), type: 2 },
 			])
 			await session.settle(800)
 
 			expect(session.codesFor(files.pathOf("corpus/Wrong.es"))).toEqual([
 				"assignment-type-mismatch",
 			])
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
+	// NOTE: And the other direction, which is the one a reader reaches for: a
+	// corpus that was being reported on goes quiet the moment the project says
+	// it is not a source. The discovery walk has to be answered again, and the
+	// squiggles it stops owning have to be cleared rather than left standing on
+	// a file nothing will ever analyse again.
+	it("should stop reporting on what the project file starts excluding", async () => {
+		let files = makeSessionWorkspace({
+			"essence.json": "{}",
+			...chain,
+			"corpus/Wrong.es": lonely,
+		})
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.settle(800)
+
+			expect(session.codesFor(files.pathOf("corpus/Wrong.es"))).toEqual([
+				"assignment-type-mismatch",
+			])
+
+			writeFileSync(files.pathOf("essence.json"), excludingCorpus)
+			await session.watchedFileChanged([
+				{ filePath: files.pathOf("essence.json"), type: 2 },
+			])
+			await session.settle(800)
+
+			expect(session.codesFor(files.pathOf("corpus/Wrong.es"))).toEqual(
+				[],
+			)
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
+	// NOTE: A mistake in the project file is a Warning with a span, published on
+	// the project file — the only place a reader would look for it. The setting
+	// falls back to its default and the note says so, which is the point: a
+	// setting that did not read is a setting the author believes is in force.
+	it("should publish what the project file could not be read as", async () => {
+		let files = makeSessionWorkspace({
+			"essence.json": JSON.stringify({ excludes: ["corpus"] }),
+			...chain,
+		})
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.settle(800)
+
+			expect(session.codesFor(files.pathOf("essence.json"))).toEqual([
+				"unknown-setting",
+			])
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
+	// NOTE: And out of the BUFFER while one is open, because that is the text
+	// the reader is looking at. It is the whole reason the extension forwards
+	// `essence.json` at all: a Diagnostic that waited for a save would arrive
+	// after the mistake had already been obeyed.
+	it("should read an open project file out of its unsaved text", async () => {
+		let files = makeSessionWorkspace({ "essence.json": "{}", ...chain })
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.settle(800)
+
+			expect(session.codesFor(files.pathOf("essence.json"))).toEqual([])
+
+			await session.open(
+				files.pathOf("essence.json"),
+				JSON.stringify({ excludes: ["corpus"] }),
+				"jsonc",
+			)
+			await session.settle(200)
+
+			expect(session.codesFor(files.pathOf("essence.json"))).toEqual([
+				"unknown-setting",
+			])
+
+			// NOTE: And the file on disk answers again once the buffer is gone
+			// — which is what the walk and the run have been obeying all along.
+			await session.close(files.pathOf("essence.json"))
+			await session.settle(200)
+
+			expect(session.codesFor(files.pathOf("essence.json"))).toEqual([])
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
+	// NOTE: An open project file is never treated as Essence. Every request that
+	// reads a buffer goes through one lookup and it refuses this one — otherwise
+	// the Essence Parser would read JSON, and a file that is perfectly well
+	// formed would fill the panel with syntax errors.
+	it("should answer no Essence request over an open project file", async () => {
+		let files = makeSessionWorkspace({ "essence.json": "{}", ...chain })
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.open(files.pathOf("essence.json"), "{}", "jsonc")
+			await session.settle(400)
+
+			let uri = uriOf(files.pathOf("essence.json"))
+			let tokens = await session.request<{ data: Array<number> }>(
+				SemanticTokensRequest.type,
+				{ textDocument: { uri } },
+			)
+			let hover = await session.request<Hover | null>(HoverRequest.type, {
+				textDocument: { uri },
+				position: { line: 0, character: 1 },
+			})
+
+			expect(tokens.result).toEqual({ data: [] })
+			expect(hover.result).toBe(null)
+			expect(session.codesFor(files.pathOf("essence.json"))).toEqual([])
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
+	// NOTE: The `essence` key of a `package.json` is where these settings used
+	// to live. Nothing is read from one now — the corpus it named is walked and
+	// reported on — and the key is answered with a Diagnostic on itself rather
+	// than with silence, because a setting the author believes is in force is
+	// the failure the report exists to prevent.
+	it("should say that a manifest's essence key has moved", async () => {
+		let files = makeSessionWorkspace({
+			"package.json": JSON.stringify({
+				essence: { exclude: ["corpus"] },
+			}),
+			...chain,
+			"corpus/Wrong.es": lonely,
+		})
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.settle(800)
+
+			expect(session.codesFor(files.pathOf("package.json"))).toEqual([
+				"moved-setting",
+			])
+			expect(session.codesFor(files.pathOf("corpus/Wrong.es"))).toEqual([
+				"assignment-type-mismatch",
+			])
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
+	// NOTE: A manifest changing costs the settings and nothing else: no walk, no
+	// analysis, no test run. All one can say is that its `essence` key has
+	// moved, and answering `bun install` with a project rebuilt from scratch
+	// would make an install cost more than the install.
+	it("should republish a manifest's Diagnostic without analysing anything", async () => {
+		let files = makeSessionWorkspace({ ...chain })
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.settle(800)
+
+			expect(session.diagnosticsFor(files.pathOf("package.json"))).toBe(
+				undefined,
+			)
+
+			let before = session.counts()
+
+			writeFileSync(
+				files.pathOf("package.json"),
+				JSON.stringify({ essence: { exclude: ["corpus"] } }),
+			)
+			await session.watchedFileChanged([
+				{ filePath: files.pathOf("package.json"), type: 1 },
+			])
+			await session.settle(800)
+
+			expect(session.codesFor(files.pathOf("package.json"))).toEqual([
+				"moved-setting",
+			])
+			// NOTE: Not one link, which is what tells the two paths apart: a
+			// PROJECT file changing sets the folders again, and that drops
+			// every cached analysis, so the sweep behind it links the whole
+			// workspace from scratch. A manifest drops the settings alone.
+			expect(session.tallySince(before).links).toBe(0)
 		} finally {
 			await session.dispose()
 			files.dispose()
