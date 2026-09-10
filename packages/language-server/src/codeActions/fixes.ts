@@ -1495,3 +1495,67 @@ export function removeDocumentationTagAction(
 		],
 	}
 }
+
+// NOTE: `require MATCHER = EXPR matches snapshot` split in two — the require
+// left exactly as it was written, and the snapshot moved onto a line of its own
+// over a name the Matcher introduced. That is what the language has for it: the
+// require takes the value apart, and what there is to record is one of the
+// names that came of it.
+//
+// ONE PER NAME, because a Pattern names as many members as it has and which of
+// them the snapshot meant is not something the Diagnostic can say. The titles
+// name the binding, which is what tells them apart in the list.
+//
+// A Matcher that introduced nothing — `require Integer = value` — is left
+// alone. There is no name to record, and the other answer is to snapshot the
+// value whole, which is a rewrite of the require rather than an edit to the
+// span the Diagnostic underlines.
+export function splitSnapshotActions(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
+): Array<CodeActionEntry> {
+	if (diagnostic.data?.kind !== "introduced-names") {
+		return []
+	}
+
+	let names = diagnostic.data.names
+	let start = diagnostic.position.start
+	let indentation = indentationOf(lines, start.line)
+
+	// NOTE: Measured against the buffer rather than against the AST, because
+	// there is no AST: the Statement was refused and dropped, so nothing records
+	// where the require ended and the snapshot began. A `require` that does not
+	// open the underlined line is a Statement written over several of them, and
+	// the one line an insertion here can measure is this one.
+	if (
+		keywordBefore(lines, start, "require") !== indentation.length + 1 ||
+		!/^matches\b/.test(sliceOf(lines, diagnostic.position))
+	) {
+		return []
+	}
+
+	// NOTE: The blanks between the value and the `matches` go with the split —
+	// what is left at the end of the require is the value it was written over.
+	let before = lineAt(lines, start.line).slice(0, start.column - 1)
+	let end = {
+		line: start.line,
+		column: before.replace(/[ \t]+$/, "").length + 1,
+	}
+
+	return names.map((name) => ({
+		title: `Record '${name}' on a line of its own`,
+		kind: "quickfix" as const,
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		// NOTE: Preferred where the Matcher introduced ONE name, which is the
+		// shape the Help describes. Where it introduced several, choosing one
+		// of them for the reader is exactly what this must not do.
+		isPreferred: names.length === 1,
+		edits: [
+			{
+				range: { start: end, end: start },
+				newText: `\n${indentation}expect ${name} `,
+			},
+		],
+	}))
+}

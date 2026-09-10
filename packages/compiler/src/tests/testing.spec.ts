@@ -933,6 +933,29 @@ describe("Tests Section", () => {
 			})
 		})
 
+		// NOTE: The Statement is DROPPED, so the names it introduced survive
+		// nowhere else — a Quick Fix that writes one of them onto a line of its
+		// own reads them here.
+		it("should carry the names the refused Matcher introduced", () => {
+			let { diagnostics } = parse(
+				`implementation {}
+
+				tests {
+					test "reads" {
+						require #Value(second) = first matches snapshot
+						require { points, played } = row matches snapshot
+						require Integer = count matches snapshot
+					}
+				}`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.data)).toEqual([
+				{ kind: "introduced-names", names: ["second"] },
+				{ kind: "introduced-names", names: ["points", "played"] },
+				{ kind: "introduced-names", names: [] },
+			])
+		})
+
 		it("should refuse a snapshot that has never run the same way", () => {
 			let { program, diagnostics } = parse(
 				`implementation {}

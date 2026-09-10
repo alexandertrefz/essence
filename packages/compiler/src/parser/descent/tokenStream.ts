@@ -43,6 +43,12 @@ export class ParseError {
 	code: common.DiagnosticCode
 	notes: Array<string>
 	helps: Array<string>
+	// NOTE: What a Quick Fix would need of the refusal, for the few that have
+	// one. A refused Statement is DROPPED, so whatever the Parser saw of it —
+	// the names a Matcher introduced, the span of a block — survives nowhere
+	// else, and a fix that re-derived it would be re-reading text this Parser
+	// has already read.
+	data: common.DiagnosticData | undefined
 	// NOTE: Whether what went wrong here has already been said. A recovery loop
 	// reports the failure it recovered FROM and then discovers that what it
 	// recovered INTO can not be built — the loop's own Diagnostic is the whole
@@ -60,6 +66,7 @@ export class ParseError {
 			labels?: Array<common.DiagnosticLabel>
 			notes?: Array<string>
 			helps?: Array<string>
+			data?: common.DiagnosticData
 			reported?: boolean
 		} = {},
 	) {
@@ -70,6 +77,7 @@ export class ParseError {
 		this.labels = details.labels ?? []
 		this.notes = details.notes ?? []
 		this.helps = details.helps ?? []
+		this.data = details.data
 		this.reported = details.reported ?? false
 	}
 }

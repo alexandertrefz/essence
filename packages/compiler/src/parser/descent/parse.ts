@@ -11,6 +11,7 @@ import {
 	rewindDiagnostics,
 	secondary,
 } from "../../diagnostics/index"
+import { matcherNames } from "../../helpers/patterns"
 import * as generators from "../nodeGenerators"
 import {
 	describeToken,
@@ -1315,6 +1316,7 @@ class DescentParser {
 				labels: [],
 				notes: error.notes,
 				helps: error.helps,
+				data: error.data,
 			})
 
 			return
@@ -1330,6 +1332,7 @@ class DescentParser {
 			],
 			notes: error.notes,
 			helps: error.helps,
+			data: error.data,
 		})
 	}
 
@@ -2557,7 +2560,7 @@ class DescentParser {
 				matches?.type === TokenType.Identifier &&
 				matches.value === MATCHES
 			) {
-				this.refuseSnapshotAfterMatcher()
+				this.refuseSnapshotAfterMatcher(matcher)
 			}
 
 			this.reportAssertionOutsideTest(keyword, position)
@@ -2736,7 +2739,7 @@ class DescentParser {
 	// The snapshot is read to its end before the report, so the Diagnostic
 	// underlines the whole of what was written and no tail of it is read again
 	// as a Statement of its own.
-	protected refuseSnapshotAfterMatcher(): never {
+	protected refuseSnapshotAfterMatcher(matcher: parser.MatcherNode): never {
 		let snapshot = this.parseSnapshot()
 
 		throw new ParseError(
@@ -2745,6 +2748,13 @@ class DescentParser {
 			"there is no value here to record",
 			{
 				code: "snapshot-after-matcher",
+				// NOTE: The names the Matcher introduced, since one of them is
+				// what the line below has to record. The Statement is dropped
+				// here, so nothing downstream ever sees the Matcher again.
+				data: {
+					kind: "introduced-names",
+					names: matcherNames(matcher),
+				},
 				notes: [
 					"A snapshot is of the value an assertion is written over, printed as text. 'require MATCHER = EXPR' is written over a shape instead: it asks what the value has to be and names its parts, so what there is to record is one of those names.",
 				],

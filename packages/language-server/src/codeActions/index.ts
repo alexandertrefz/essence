@@ -41,6 +41,7 @@ import {
 	removeImportAction,
 	removeLabelAction,
 	removeToStringAction,
+	splitSnapshotActions,
 	staticCallActions,
 	suggestionAction,
 	unreachableCaseAction,
@@ -344,6 +345,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"shorthand-on-path-key": ({ diagnostic, lines }) =>
 		listed(expandShorthandPathAction(diagnostic, lines)),
 	"similar-tags": spellingFix,
+	"snapshot-after-matcher": ({ diagnostic, lines }) =>
+		splitSnapshotActions(diagnostic, lines),
 	"static-method-on-value": ({ diagnostic, program, lines }) =>
 		staticCallActions(diagnostic, program, lines),
 	"unclosed-string": ({ diagnostic, lines }) =>

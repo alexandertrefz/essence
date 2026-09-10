@@ -492,6 +492,13 @@ the value whole is the other way, where it is one that prints: an `Optional` is
 not (see `snapshot-not-printable`), which is usually why the line took it apart
 in the first place.
 
+**Quick Fix — "Record 'x' on a line of its own":** splits the line in two,
+leaving the require exactly as it was written and moving the whole snapshot —
+a stored one's name included — onto a line below it. One action per name the
+Matcher introduced, preferred where it introduced exactly one; a Matcher that
+introduced none is left alone, since snapshotting the value whole is a rewrite
+of the require rather than a split of the line.
+
 ### `unknown-modifier`
 
 A `test` or a `suite` carries a Modifier that is not one. The Modifiers are

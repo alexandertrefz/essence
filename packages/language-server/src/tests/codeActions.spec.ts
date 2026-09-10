@@ -3467,6 +3467,110 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("snapshot-after-matcher", () => {
+		it("should record the name on a line of its own", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant found: Optional<Integer> = #Value(1)",
+				"}",
+				"",
+				"tests {",
+				'\ttest "records the item" {',
+				"\t\trequire #Value(item) = found matches snapshot",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Record 'item' on a line of its own")
+			expect(fix.diagnosticCode).toBe("snapshot-after-matcher")
+			expect(fix.isPreferred).toBe(true)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tconstant found: Optional<Integer> = #Value(1)",
+				"}",
+				"",
+				"tests {",
+				'\ttest "records the item" {',
+				"\t\trequire #Value(item) = found",
+				"\t\texpect item matches snapshot",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: The snapshot is moved WHOLE — a stored one names an entry of
+		// the snapshot file, and the name goes with it.
+		it("should take a stored snapshot's name along", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant found: Optional<Integer> = #Value(1)",
+				"}",
+				"",
+				"tests {",
+				'\ttest "records the item" {',
+				'\t\trequire #Value(item) = found matches snapshot from "the item"',
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(applied(lines, fix)[7]).toBe(
+				'\t\texpect item matches snapshot from "the item"',
+			)
+		})
+
+		// NOTE: One action per name, and none of them preferred: which member
+		// of the Pattern the snapshot meant is not something the Diagnostic
+		// can say.
+		it("should offer one line per name a Pattern introduced", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant standing = { points = 3, played = 1 }",
+				"}",
+				"",
+				"tests {",
+				'\ttest "records the row" {',
+				"\t\trequire { points, played } = standing matches snapshot",
+				"\t}",
+				"}",
+			]
+
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Record 'points' on a line of its own",
+				"Record 'played' on a line of its own",
+			])
+			expect(fixes.every((fix) => !fix.isPreferred)).toBe(true)
+			expect(applied(lines, fixes[1])[7]).toBe(
+				"\t\texpect played matches snapshot",
+			)
+		})
+
+		it("should offer nothing where the Matcher introduced no name", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant value: Integer = 1",
+				"}",
+				"",
+				"tests {",
+				'\ttest "records it" {',
+				"\t\trequire Integer = value matches snapshot",
+				"\t}",
+				"}",
+			]
+
+			expect(titles(quickFixes(lines))).toEqual([])
+		})
+	})
+
 	describe("Type annotations", () => {
 		it("should offer the inferred Type of a Constant as an edit", () => {
 			let lines = ["implementation {", '\tconstant name = "Ada"', "}"]

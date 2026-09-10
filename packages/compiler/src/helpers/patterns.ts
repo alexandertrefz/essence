@@ -87,6 +87,30 @@ export function patternBindings(
 	return bindings
 }
 
+// NOTE: Every name a MATCHER introduces, in written order. Two Matchers
+// introduce anything at all: a Pattern names what its members name, and a Case
+// Matcher names what its payload binder names. A Type, a wildcard and a written
+// value each ask something of the value and name nothing.
+//
+// The names alone, since this answers the one question that can be asked
+// without Types in hand — `resolveMatcherBindings` is the Enricher's answer,
+// and it knows what each name stands for as well as what it is called.
+export function matcherNames(matcher: parser.MatcherNode): Array<string> {
+	if (matcher.nodeType === "Pattern") {
+		return patternBindings(matcher).map((binding) => binding.name.content)
+	}
+
+	if (matcher.nodeType !== "CaseMatcher" || matcher.binding === null) {
+		return []
+	}
+
+	return matcher.binding.nodeType === "Pattern"
+		? patternBindings(matcher.binding).map(
+				(binding) => binding.name.content,
+			)
+		: [matcher.binding.content]
+}
+
 // NOTE: The members that make a Pattern able to DECLINE a value — a member
 // constrained by a written value, at any depth. A Matcher may hold them,
 // because an arm that declines falls through to the next one; a Parameter and
