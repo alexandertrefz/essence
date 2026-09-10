@@ -1,6 +1,7 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { type Analysis, analyseDocument, documentFilePath } from "../analyse"
+import { indexProgram, type ProgramIndex } from "../rename"
 import type { Workspace } from "../workspace"
 import {
 	compareWrittenValueAction,
@@ -76,6 +77,7 @@ import {
 	guardEmptyAction,
 } from "./matchFixes"
 import { matchOnValueActions } from "./matchOnValue"
+import { pathActions } from "./paths"
 import { annotationActions, shorthandActions } from "./refactors"
 import {
 	implementationHeaderAction,
@@ -232,7 +234,29 @@ export function findCodeActions(
 	entries.push(...matchOnValueActions(enrichedProgram, lines, range))
 	entries.push(...shorthandActions(program, lines, range))
 
+	let indexed = programIndexer(program, enrichedProgram)
+
+	entries.push(...pathActions(program, () => indexed().scopes, lines, range))
+
 	return entries
+}
+
+// NOTE: The rename index, built at most once per request and only where an
+// action actually reaches for it. Indexing a Program costs what a Rename costs,
+// a Code Action request fires on every cursor move, and the Nodes the
+// refactorings that ask for it are written on are not in every file — so it is
+// handed around as the question rather than as the answer.
+//
+// A function rather than a `let` beside the call, because a closure over a
+// `let` reads its declared Type: the Program is known not to be null HERE, and
+// a thunk written inline would have to say so again.
+function programIndexer(
+	program: parser.Program,
+	enrichedProgram: common.typed.Program | null,
+): () => ProgramIndex {
+	let index: ProgramIndex | null = null
+
+	return () => (index ??= indexProgram(program, enrichedProgram))
 }
 
 // NOTE: Everything a fix is allowed to read: the Diagnostic it answers, the

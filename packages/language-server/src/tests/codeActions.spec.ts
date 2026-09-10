@@ -4814,6 +4814,195 @@ describe("Code Actions", () => {
 		})
 	})
 
+	// NOTE: The Enricher writes a path's Function literal for it, so the two
+	// spellings reach the rest of the pipeline as one Node — which is what
+	// makes this a round trip rather than a rewording. Both directions are
+	// offered inside an Argument and nowhere else, so that neither of them can
+	// produce something the other would refuse to turn back.
+	describe("Member paths", () => {
+		let pathRefactors = (
+			lines: Array<string>,
+			range?: common.Position,
+		): Array<CodeActionEntry> =>
+			actionsOf(lines, range).filter((entry) =>
+				entry.title.startsWith("Write it as"),
+			)
+
+		let onlyRefactor = (lines: Array<string>): CodeActionEntry => {
+			let [entry, ...rest] = pathRefactors(lines)
+
+			expect(rest).toEqual([])
+
+			return entry
+		}
+
+		it("should offer the path a reading literal stands for", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant people = [{ name = "Ada", city = "London" }]',
+				"\tconstant names = people::map((item) { <- item.name })",
+				"}",
+			]
+
+			let refactor = onlyRefactor(lines)
+
+			expect(refactor.title).toBe("Write it as the path '.name'")
+			expect(refactor.kind).toBe("refactor.rewrite")
+			expect(refactor.diagnosticCode).toBeNull()
+			expect(refactor.isPreferred).toBe(false)
+			expect(applied(lines, refactor)[2]).toBe(
+				"\tconstant names = people::map(.name)",
+			)
+		})
+
+		it("should offer the literal a path stands for", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant people = [{ name = "Ada", city = "London" }]',
+				"\tconstant names = people::map(.name)",
+				"}",
+			]
+
+			let refactor = onlyRefactor(lines)
+
+			expect(refactor.title).toBe("Write it as a Function literal")
+			expect(applied(lines, refactor)[2]).toBe(
+				"\tconstant names = people::map((item) { <- item.name })",
+			)
+		})
+
+		// NOTE: The two directions are inverses, and the Compiler is asked
+		// about every text either of them wrote — a rewrite that produced a
+		// Program nobody can compile would still round trip.
+		it("should hand the text back when both directions are applied", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant people = [{ name = "Ada", city = "London" }]',
+				"\tconstant names = people::map((item) { <- item.name })",
+				"}",
+			]
+
+			let asPath = applied(lines, onlyRefactor(lines))
+
+			expect(codesOf(asPath)).toEqual([])
+			expect(applied(asPath, onlyRefactor(asPath))).toEqual(lines)
+			expect(codesOf(lines)).toEqual([])
+		})
+
+		it("should step through every member a path names", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant people = [{ home = { city = "London" } }]',
+				"\tconstant cities = people::map((item) { <- item.home.city })",
+				"}",
+			]
+
+			let refactor = onlyRefactor(lines)
+
+			expect(refactor.title).toBe("Write it as the path '.home.city'")
+			expect(applied(lines, refactor)[2]).toBe(
+				"\tconstant cities = people::map(.home.city)",
+			)
+			expect(codesOf(applied(lines, refactor))).toEqual([])
+		})
+
+		// NOTE: A path reads members and does nothing else — a call in the
+		// chain is a Function that only the literal can write.
+		it("should offer nothing on a body that computes", () => {
+			expect(
+				titles(
+					pathRefactors([
+						"implementation {",
+						'\tconstant people = [{ name = "Ada" }]',
+						"\tconstant loud = people::map((item) { <- item.name::uppercased() })",
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+
+		it("should offer nothing on a literal of two Parameters", () => {
+			expect(
+				titles(
+					pathRefactors([
+						"implementation {",
+						'\tconstant people = [{ name = "Ada" }]',
+						"\tconstant sorted = people::sort(by (first, second) { <- #Ascending })",
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: A path is read in several kinds of position and an Argument is
+		// only one of them, but it is the one that can be recognised without
+		// asking the Enricher what the position expected. A literal bound to an
+		// annotated name keeps its own spelling.
+		it("should offer nothing outside an Argument", () => {
+			expect(
+				titles(
+					pathRefactors([
+						"implementation {",
+						"\tconstant read: (_ item: { name: String }) -> String = (item) { <- item.name }",
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: The Comment stands between the brackets that are about to go,
+		// and there is nowhere in a path to write it.
+		it("should offer nothing on a literal holding a Comment", () => {
+			expect(
+				titles(
+					pathRefactors([
+						"implementation {",
+						'\tconstant people = [{ name = "Ada" }]',
+						"\tconstant names = people::map((item) { § the name",
+						"\t\t<- item.name",
+						"\t})",
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+
+		it("should step past a name the Scope already binds", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant item = 1",
+				"\tconstant item2 = 2",
+				'\tconstant people = [{ name = "Ada" }]',
+				"\tconstant names = people::map(.name)",
+				"}",
+			]
+
+			expect(applied(lines, onlyRefactor(lines))[4]).toBe(
+				"\tconstant names = people::map((item3) { <- item3.name })",
+			)
+			expect(codesOf(applied(lines, onlyRefactor(lines)))).toEqual([])
+		})
+
+		it("should only offer what the requested range touches", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant people = [{ name = "Ada", city = "London" }]',
+				"\tconstant names = people::map(.name)",
+				"\tconstant cities = people::map(.city)",
+				"}",
+			]
+
+			expect(
+				titles(
+					pathRefactors(lines, {
+						start: { line: 3, column: 31 },
+						end: { line: 3, column: 31 },
+					}),
+				),
+			).toEqual(["Write it as a Function literal"])
+		})
+	})
+
 	describe("selection", () => {
 		it("should find nothing in a Program with nothing to fix", () => {
 			let lines = [
