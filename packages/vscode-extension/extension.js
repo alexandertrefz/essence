@@ -20,6 +20,7 @@ import {
 	resolveRuntime,
 	resolveServer,
 } from "./launch.js"
+import { revealForRename } from "./renameAt.js"
 import { createTestView } from "./testView.js"
 
 let client
@@ -760,6 +761,18 @@ export async function activate(context) {
 
 			await testView?.debugIds(item.ids ?? [], [item.filePath])
 		}),
+		// NOTE: What an extraction carries. The Editor applies an action's edits
+		// before it runs the action's command, so by the time this is called the
+		// derived name is standing where the Server said it would, and all that
+		// is left is to put the cursor on it and open rename.
+		//
+		// Deliberately not in `contributes.commands`, for the reason its
+		// neighbours are not: it needs the URI and the Position the action
+		// carries, and invoked from the palette with neither there is nothing it
+		// could rename.
+		vscode.commands.registerCommand("essence.renameAt", (uri, position) =>
+			revealForRename(uri, position),
+		),
 		vscode.debug.registerDebugConfigurationProvider("essence", {
 			resolveDebugConfigurationWithSubstitutedVariables: (
 				folder,

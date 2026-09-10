@@ -1,8 +1,9 @@
-// NOTE: Enough of VS Code's API for `testView.js` to run outside an extension
-// host, and no more: a TestController and its items, runs and profiles, the
-// decoration types, the output channel and the handful of value classes the
-// view constructs. Every call is recorded, so a spec asserts what the view DID
-// rather than what it holds.
+// NOTE: Enough of VS Code's API for the parts of this extension that only ever
+// call it to run outside an extension host, and no more: a TestController and
+// its items, runs and profiles, the decoration types, the output channel, the
+// editor `renameAt.js` opens and the handful of value classes both construct.
+// Every call is recorded, so a spec asserts what the extension DID rather than
+// what it holds.
 //
 // NOTE: A stand-in is not the product. What this pins is the bookkeeping —
 // which item was created, which run was ended, what was drawn where — none of
@@ -19,7 +20,20 @@ export type StubRange = {
 	endCharacter: number
 }
 
-// NOTE: The value class the view builds ranges with.
+export class StubPositionValue {
+	line: number
+	character: number
+
+	constructor(line: number, character: number) {
+		this.line = line
+		this.character = character
+	}
+}
+
+// NOTE: The value class the extension builds ranges with, flattened to four
+// numbers so a spec asserts on a record rather than on two more objects. Both
+// of VS Code's constructors are accepted, because both are written here: the
+// test view spells the four numbers out, and a cursor is a Position twice.
 class StubRangeValue implements StubRange {
 	startLine: number
 	startCharacter: number
@@ -27,15 +41,26 @@ class StubRangeValue implements StubRange {
 	endCharacter: number
 
 	constructor(
-		startLine: number,
-		startCharacter: number,
-		endLine: number,
-		endCharacter: number,
+		startLine: number | StubPositionValue,
+		startCharacter: number | StubPositionValue,
+		endLine?: number,
+		endCharacter?: number,
 	) {
+		if (startLine instanceof StubPositionValue) {
+			let end = startCharacter as StubPositionValue
+
+			this.startLine = startLine.line
+			this.startCharacter = startLine.character
+			this.endLine = end.line
+			this.endCharacter = end.character
+
+			return
+		}
+
 		this.startLine = startLine
-		this.startCharacter = startCharacter
-		this.endLine = endLine
-		this.endCharacter = endCharacter
+		this.startCharacter = startCharacter as number
+		this.endLine = endLine as number
+		this.endCharacter = endCharacter as number
 	}
 }
 
@@ -197,6 +222,15 @@ export type StubEditor = {
 	document: { languageId: string; uri: StubUri }
 	drawn: Map<unknown, Array<unknown>>
 	setDecorations: (type: unknown, ranges: Array<unknown>) => void
+	selection: StubRange | undefined
+}
+
+// NOTE: What `window.showTextDocument` was asked to open, and under which
+// options — the whole of what putting a cursor somewhere looks like from
+// outside, since the selection travels as one of them.
+export type StubShownDocument = {
+	uri: StubUri
+	options: { selection?: StubRange } | undefined
 }
 
 export type Stub = {
@@ -223,6 +257,11 @@ export type Stub = {
 	}>
 	refuseDebugStart: () => void
 	editors: Array<StubEditor>
+	shownDocuments: Array<StubShownDocument>
+	// NOTE: What `commands.executeCommand` was asked to run, in order — an
+	// extension that drives one of the Editor's own commands has nothing else
+	// to show for it.
+	executedCommands: Array<{ command: string; arguments: Array<unknown> }>
 	deletions: Array<(uri: StubUri) => void>
 	// NOTE: The client's own settings, so a spec can read back a setting the
 	// view WROTE — running with coverage turns `essence.tests.coverage` on.
@@ -265,6 +304,11 @@ export function createStub(): Stub {
 	let debugTerminations: Array<(session: { name: unknown }) => void> = []
 	let debugStarts = true
 	let editors: Array<StubEditor> = []
+	let shownDocuments: Array<StubShownDocument> = []
+	let executedCommands: Array<{
+		command: string
+		arguments: Array<unknown>
+	}> = []
 	let deletions: Array<(uri: StubUri) => void> = []
 	let answer: string | undefined = undefined
 	// NOTE: The client's own settings, so that a gesture which WRITES one — the
@@ -367,6 +411,32 @@ export function createStub(): Stub {
 				messages.push({ text, actions })
 
 				return Promise.resolve(answer)
+			},
+			// NOTE: The editor for a URI, opened if this is the first time it
+			// was asked for — which is what the real one does, and what makes
+			// the selection an OPTION rather than something written afterwards.
+			showTextDocument: (
+				uri: StubUri,
+				options?: { selection?: StubRange },
+			) => {
+				shownDocuments.push({ uri, options })
+
+				let editor =
+					editors.find(
+						(candidate) =>
+							candidate.document.uri.fsPath === uri.fsPath,
+					) ?? makeEditor(uri, "essence")
+
+				editor.selection = options?.selection
+
+				return Promise.resolve(editor)
+			},
+		},
+		commands: {
+			executeCommand: (command: string, ...args: Array<unknown>) => {
+				executedCommands.push({ command, arguments: args })
+
+				return Promise.resolve(undefined)
 			},
 		},
 		// NOTE: A debug session that starts and ends at once. What a spec reads
@@ -570,15 +640,7 @@ export function createStub(): Stub {
 				this.location = location
 			}
 		},
-		Position: class {
-			line: number
-			character: number
-
-			constructor(line: number, character: number) {
-				this.line = line
-				this.character = character
-			}
-		},
+		Position: StubPositionValue,
 		TestTag: class {
 			id: string
 
@@ -614,6 +676,8 @@ export function createStub(): Stub {
 			debugStarts = false
 		},
 		editors,
+		shownDocuments,
+		executedCommands,
 		deletions,
 		settings,
 		updates,
@@ -632,6 +696,8 @@ export function createStub(): Stub {
 			debugTerminations.length = 0
 			debugStarts = true
 			editors.length = 0
+			shownDocuments.length = 0
+			executedCommands.length = 0
 			deletions.length = 0
 			answer = undefined
 
@@ -645,19 +711,23 @@ export function createStub(): Stub {
 			controller.refreshHandler = undefined
 			controller.disposals = 0
 		},
-		editor: (filePath, languageId = "essence") => {
-			let drawn = new Map<unknown, Array<unknown>>()
-			let editor: StubEditor = {
-				document: { languageId, uri: uriOf(filePath) },
-				drawn,
-				setDecorations: (type, ranges) => {
-					drawn.set(type, ranges)
-				},
-			}
+		editor: (filePath, languageId = "essence") =>
+			makeEditor(uriOf(filePath), languageId),
+	}
 
-			editors.push(editor)
+	function makeEditor(uri: StubUri, languageId: string): StubEditor {
+		let drawn = new Map<unknown, Array<unknown>>()
+		let editor: StubEditor = {
+			document: { languageId, uri },
+			drawn,
+			setDecorations: (type, ranges) => {
+				drawn.set(type, ranges)
+			},
+			selection: undefined,
+		}
 
-			return editor
-		},
+		editors.push(editor)
+
+		return editor
 	}
 }
