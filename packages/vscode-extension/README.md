@@ -163,12 +163,17 @@ runs everything, and so does the first run of a file and anything with coverage
 off. A narrowed run leaves the coverage marks exactly where the last whole run
 put them, so nothing repaints on the keystroke it was meant to make cheap.
 
-Four settings, all read by the server: `essence.tests.enabled` stops the
-automatic runs while leaving every gesture above working — a run you ask for
-still runs, and still says what it found — `essence.tests.skipTags` names tags
-no run selects, `essence.tests.debounce` is how long a burst of edits may be
-before it costs a run, and `essence.tests.coverage` counts what each run
-reaches.
+Three settings, all read by the server, all about you rather than the project:
+`essence.tests.enabled` stops the automatic runs while leaving every gesture
+above working — a run you ask for still runs, and still says what it found —
+`essence.tests.debounce` is how long a burst of edits may be before it costs a
+run, and `essence.tests.coverage` counts what each run reaches. What the
+_project_ says about its tests — the tags an everyday run leaves out, whether
+the declarations' own goals run — lives in its `essence.json`, and the live
+session reads it there, so the editor and `essence test` never disagree about
+which tests exist. The extension knows that file: it is edited as JSON with
+comments, completed and checked against the bundled schema, and a mistake in
+it shows up in Problems on the line that made it.
 
 **Debug** — the profile in the Test Explorer and the lens above a `test` or a
 `suite` — steps through the test itself. The file is compiled with its tests

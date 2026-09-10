@@ -1,21 +1,24 @@
 ---
 title: Project Layout
 description:
-  There is no manifest and no project file. A program is an entry file and
-  whatever it imports, and what comes out of the compiler runs on its own.
+  A program is an entry file and whatever it imports, and what comes out of
+  the compiler runs on its own. A project that has something to say about
+  itself says it once, in essence.json at its root.
 section: getting-started
 order: 30
 template: article
 ---
 
-essence has no project format. There is nothing to initialise, no manifest to
-fill in and no lockfile of its own — a program is a `.es` file, and `essence` is
-pointed at it directly.
+A program needs no manifest, no lockfile of its own and nothing to initialise —
+it is a `.es` file, and `essence` is pointed at it directly.
 
 A program can still be several files. One file is one module, and an `import`
-block above the implementation names what it takes from another. What there is
-no format for is the project
-around them: the imports are the file list, and the compiler needs nothing else.
+block above the implementation names what it takes from another. The imports
+are the file list, and the compiler needs nothing else to build. What a
+_project_ may want to say about itself — which directories are not its sources,
+which tags an everyday test run leaves out — it says once, in an `essence.json`
+at its root, and every tool reads it there. A project with nothing to say needs
+no such file.
 
 ## Every file opens with one wrapper
 
@@ -69,6 +72,7 @@ complete setup:
 
 ```
 my-app/
+  essence.json   ← optional: what the project says about itself
   src/
     main.es      ← imports report.es
     report.es
@@ -92,86 +96,116 @@ imports yet is a module the entry cannot reach — and it is the file most likel
 to be the one you are working on.
 
 Several files given at once are compiled **in parallel**, one worker per core
-up to eight, and `--jobs 1` puts everything back on the main thread — which is
+up to four, and `--jobs 1` puts everything back on the main thread — which is
 what you want when a compiler crash gives you a stack trace to read.
 
 ## What a project may configure
 
 Tests are written in the language: a file ends in a `tests { … }` section beside
 its `implementation`, or is a `Foo.tests.es` of nothing but imports and tests.
-`essence test` finds them under the working directory, compiles them and runs
-them; every other command drops the sections before anything is enriched, so
-they cost a shipped program nothing.
+`essence test` finds them, compiles them and runs them; every other command
+drops the sections before anything is enriched, so they cost a shipped program
+nothing.
 
-A test may carry tags, and a project usually wants some of them left out of an
-everyday run. That is the one setting there is, and it lives in the nearest
-`package.json` — the file a project already has, under a key a project file can
-adopt whole later:
+What a project wants to say about itself goes in **`essence.json`** at its
+root. `essence init` writes one to start from:
 
-```json
+```jsonc
 {
-	"essence": {
-		"test": {
-			"skipTags": ["slow"]
-		}
+	"$schema": "https://essencelang.org/schemas/essence.schema.json",
+
+	// Directories under this project that are not its sources.
+	"exclude": [],
+
+	"test": {
+		// Tags an everyday `essence test` leaves out; `--tag` brings one back.
+		"skipTags": [],
+		// Whether every run also tests what the declarations promise.
+		"contracts": false
 	}
 }
 ```
 
-`essence test --skip-tag slow` says the same thing for one run, and
-`essence test --tag slow` runs exactly the tests a default like that leaves out
-— which is how a nightly job runs what a working day skips.
+The file is JSON with comments and trailing commas allowed, the way
+`tsconfig.json` is — a project file is where the reason behind a setting gets
+written down. The `$schema` line is for your editor: the VS Code extension
+already knows the filename, and with the line any editor that reads JSON
+Schemas completes and checks the file too.
 
-The same key takes `"contracts"`, which says whether a run also tests what the
-project's own declarations promise — see
-[the properties a declaration already states](#the-properties-a-declaration-already-states).
-`essence test --contracts` says it for one run, and the two are a union: the flag
-asks about a project that never configured them, and the setting asks for them
-every time.
+**Where the file is, is the project root.** `essence test` run anywhere inside
+the project runs the project; a path on the command line narrows it to that
+path. Without a file, the working directory is the root, and every setting is
+at its default — nothing about a project with no file has changed. A nested
+`essence.json` governs the files under it, so a repository may hold several
+projects, each with its own settings.
 
-Beside it — one level up, outside `"test"` — sits `"exclude"`, a list of
-directories that are not this project's sources, written relative to the
-`package.json` that names them: a corpus of deliberately broken files, an
-example a book quotes, a vendored copy of something else.
+### Every setting
 
-```json
+| Key                           | Says                                                                                                                                | For one run                                     |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `exclude`                     | Directories that are not this project's sources, relative to the file. Paths, not globs.                                             | —                                               |
+| `test.skipTags`               | Tags an everyday run leaves out.                                                                                                     | `--skip-tag`, and `--tag` brings one back       |
+| `test.contracts`              | Whether every run also tests what the declarations promise.                                                                         | `--contracts`, `--no-contracts`                 |
+| `test.cases`                  | How many values each property test draws.                                                                                           | `--cases`                                       |
+| `test.coverage.report`        | The report a coverage run writes: `"lcov"` or `"json"`. Collecting coverage stays a choice about a run.                             | `--coverage-report`                             |
+| `test.coverage.out`           | Where that report is written, relative to the file.                                                                                 | `--coverage-out`                                |
+| `build.out`                   | Where bundles are written, relative to the file.                                                                                    | `--out`                                         |
+| `build.sourcemap`             | Whether a source map is written beside every bundle.                                                                                | `--sourcemap`, `--no-sourcemap`                 |
+| `build.minify`                | Whether bundles are minified.                                                                                                        | `--minify`, `--no-minify`                       |
+| `build.embed`                 | Whether bundles are built for embedding, with a descriptor beside each.                                                             | `--embed`, `--no-embed`                         |
+| `build.optimise`              | Whether the Optimiser runs.                                                                                                          | `--no-optimise`                                 |
+| `build.withoutOptimisations`  | Optimiser passes left out, by name.                                                                                                 | `--without-optimisation`                        |
+
+A flag speaks for one run and the file for every run. Where both speak, the
+flag wins: lists merge, so `--skip-tag` adds to the configured tags and
+`--tag` asks for one back, and every setting the file can turn on has a `--no-`
+twin on the command line, so a project that builds with source maps can be
+built without them once. Writing both twins at once is a usage error.
+
+Three questions decide where a setting lives, and the file only grows by them.
+Is it a fact about the project that every collaborator and every tool should
+share? Then it belongs here. Is it a fact about this machine or this person —
+where `bun` is, how long the editor waits before re-running tests? Then it
+stays in the editor's settings or the environment. Is it a choice about this
+run — `--watch`, `--filter`, `--seed`, `--coverage`, `--mutate`? Then it is a
+flag and nothing else.
+
+### `exclude` narrows the walk, and only the walk
+
+Every project holds `.es` files that are not its own: a corpus of deliberately
+broken files, an example a book quotes, a vendored copy of something else.
+Nothing can tell those from sources by looking at them, so the project says
+which directories they are:
+
+```jsonc
 {
-	"essence": {
-		"exclude": ["fixtures/broken"]
-	}
+	"exclude": ["fixtures/broken"]
 }
 ```
 
-It is not a test setting, which is why it is not under one — every walk of a
-project asks the same question, and the editor reads this list too, to decide
-which files its Problems panel speaks for. It narrows the walk and nothing
-else: a file named on the command line was asked about by name and is still
-compiled and still reported, and a file you open in the editor still shows you
-its Diagnostics.
+Every walk of the project asks this same question — `essence test` finding
+tests, and the editor deciding which files its Problems panel speaks for — and
+both read this one list. It narrows the walk and nothing else: a file named on
+the command line was asked about by name and is still compiled and still
+reported, and a file you open in the editor still shows you its Diagnostics.
+`node_modules`, `.git`, `dist` and `build` are never walked, whatever the file
+says.
 
-While you are writing them, `essence test --watch` stays up and re-runs only the
-tests a save reached — the entries whose module graph holds the file that
-changed — clearing the screen and reprinting the whole picture each time. A
-statement whose line ends in `§?` answers with what it held; it is an ordinary
-comment to every other command.
+### Mistakes in the file are Warnings
 
-`essence test --coverage` reports what the run reached, in a table beside the
-results: lines and branches as percentages, `match` arms as taken out of total,
-and then the part a line-counting tool can not say — every arm no value took
-and every Case of a `choice` no test ever built, each named by the Method it
-was written in.
+A key the file does not have, a setting of the wrong shape, a file that does
+not parse: each is reported as a Warning with a span, rendered like every other
+Diagnostic — in the terminal at the head of a run, and on `essence.json` itself
+in the editor — and the run continues with that setting at its default, which
+the Warning's note says out loud. A project should not fail to run its tests
+over a key it wrote wrongly; it should be told, in the place it wrote it. The
+codes are `unknown-setting`, `setting-shape`, `moved-setting` and
+`unreadable-project-file`, each with an entry in the Diagnostics reference.
 
-```
- File          Lines  Branches  Cases  Not taken
- Season.es     43%    –         0/6    Fixture::toString › case #Played
- Standings.es  97%    95%       9/9    Standing::recentForm › else
- Table.es      96%    83%       –      signOf › if
-```
-
-`--coverage-report lcov` writes the tracefile a coverage viewer reads, and
-`--coverage-report json` the Compiler's own vocabulary — the arms, the guarded
-branches and the scope each point stands in, none of which lcov can spell. Both
-write into `coverage/`, or into `--coverage-out <directory>`.
+The settings used to live under an `essence` key of the nearest `package.json`.
+That key is no longer read; a manifest that still spells it gets a
+`moved-setting` Warning on the key, and the same object moved into an
+`essence.json` beside it is the whole migration.
 
 ## Properties
 
@@ -284,14 +318,12 @@ value of. Both are named once per Namespace as an `ungeneratable-contract`
 remark, which is a note about what a run is covering rather than a mistake
 anybody made.
 
-A project that wants them every run says so in the same `package.json` key:
+A project that wants them every run says so in its `essence.json`:
 
-```json
+```jsonc
 {
-	"essence": {
-		"test": {
-			"contracts": true
-		}
+	"test": {
+		"contracts": true
 	}
 }
 ```

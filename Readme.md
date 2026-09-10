@@ -194,8 +194,11 @@ exactly what it asked the code, and two runs at one seed are the same report.
 A score is information, so `--mutate` exits 0 whatever it found; `--strict` makes a survivor a failure, and
 `--mutation-limit` caps how many mutants are compiled.
 
-`--json` writes the run as one JSON event per line. A project skips tags by default by naming them in the
-nearest `package.json`, under `{ "essence": { "test": { "skipTags": ["slow"] } } }`.
+`--json` writes the run as one JSON event per line. A project skips tags by default by naming them in its
+`essence.json`, under `{ "test": { "skipTags": ["slow"] } }` — the one file a project says everything about
+itself in: which directories are not its sources, whether every run tests the declarations' own goals, how its
+bundles are built. `essence init` writes one; where it sits is the project root, and `essence test` run anywhere
+inside runs the whole project.
 
 A run remembers what every compiled entry answered, under a name made from that entry's whole module graph, the
 snapshots, baselines and counterexamples it compares itself against, the host, and how the run was narrowed —
