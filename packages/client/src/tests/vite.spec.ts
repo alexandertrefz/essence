@@ -120,11 +120,63 @@ async function serve(root: string): Promise<ViteDevServer> {
 // watcher is a no-op one under `watch: null`, but the handlers are attached to
 // it all the same, and emitting on it reaches them — `watchChange` for every
 // plugin, the module graph, and then the HMR propagation. The handler is fired
-// rather than awaited by the watcher, so it is given a moment to settle.
+// rather than awaited by the watcher, so what is waited for is the mark the
+// propagation leaves behind: it ends by invalidating every module the file
+// belongs to once more, as an HMR update, and that stamps each of them with
+// the update's own time. A stamp from after the emit is the whole chain done —
+// the plugin told, the graph invalidated, the update sent.
+//
+// NOTE: Waited for rather than slept through. This used to be a sleep of a
+// hundred milliseconds, which was enough here and not on a loaded runner —
+// where a module still holding its old transform result was served as if
+// nothing had changed, and the test that expected the edit to break the build
+// found it still standing.
+//
+// NOTE: The wait is over the modules the graph holds for the file BEFORE the
+// emit, which is what the propagation reaches — a file no served module was
+// compiled from is a change Vite has nothing to say about, and asking this to
+// wait for it would wait forever. That is refused rather than waited on.
 async function changed(server: ViteDevServer, file: string): Promise<void> {
+	let modules = [
+		...(server.environments.client.moduleGraph.getModulesByFile(file) ??
+			[]),
+	]
+
+	if (modules.length === 0) {
+		throw new Error(`No served module was compiled from ${file}.`)
+	}
+
+	// NOTE: Newer than every stamp the modules already carry, and not merely
+	// the clock: Vite stamps from a monotonic clock that steps ahead of the
+	// wall clock whenever it is read twice in one millisecond, so the stamp of
+	// the change BEFORE this one can read as later than now — and a wait
+	// keyed on now alone would answer out of it. The new stamp is read after
+	// the emit, and the clock never hands out the same value twice.
+	let before = Math.max(
+		Date.now(),
+		...modules.map((module) => module.lastHMRTimestamp + 1),
+	)
+	// NOTE: Under bun's own per-test timeout of five seconds, for the reason
+	// `client.spec.ts` gives: a wait that gives up after the test already
+	// has throws where nobody is listening, and bun reports that as a second
+	// failure between tests, attributed to nothing.
+	let deadline = Date.now() + 4_000
+	let stamped = () =>
+		modules.every((module) => module.lastHMRTimestamp >= before)
+
 	server.watcher.emit("change", file)
 
-	await new Promise((resolve) => setTimeout(resolve, 100))
+	while (!stamped() && Date.now() < deadline) {
+		await new Promise<void>((resolve) => {
+			setImmediate(resolve)
+		})
+	}
+
+	if (!stamped()) {
+		throw new Error(
+			`Vite had not propagated the change to ${file} within 4 seconds.`,
+		)
+	}
 }
 
 async function transformed(
@@ -301,6 +353,43 @@ describe("Under a Vite dev server", () => {
 			)
 			await changed(server, math)
 
+			expect(await transformed(server, rawUrl(math))).toContain(
+				"createInteger(2)",
+			)
+		} finally {
+			await server.close()
+		}
+	})
+
+	// NOTE: The raw door asked for FIRST, before anything that imports the
+	// Module has been analysed — which is when the node the served Module
+	// hangs off does not exist until its load has returned, and the files the
+	// load named would be dropped with it (see `served` in the plugin). An
+	// edit has to reach a Module however it was first reached; the order the
+	// requests arrive in is a fact about the browser, or the machine.
+	//
+	// NOTE: This is the one the runner found. The wrapper's analysis warms
+	// the raw Module up in the background, and on a machine fast enough that
+	// warmup creates the node before a test asks for the Module — so the edge
+	// was there by luck, and a loaded runner is where the luck ran out.
+	it("reaches a Module served before its importer was analysed", async () => {
+		let root = squaringProject()
+		let server = await serve(root)
+
+		try {
+			let math = path.join(root, "src", "Math.es")
+
+			expect(await transformed(server, rawUrl(math))).not.toContain(
+				"createInteger(2)",
+			)
+
+			writeFileSync(
+				math,
+				MATH_MODULE("value::multiply(with value)::add(2)"),
+			)
+			await changed(server, math)
+
+			expect(transformResult(server, rawUrl(math))).toBe(null)
 			expect(await transformed(server, rawUrl(math))).toContain(
 				"createInteger(2)",
 			)

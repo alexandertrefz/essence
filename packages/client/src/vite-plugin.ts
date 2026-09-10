@@ -46,6 +46,11 @@ export type VitePlugin = {
 		this: PluginContext | undefined,
 		id: string,
 	) => Promise<string | null>
+	transform: (
+		this: PluginContext | undefined,
+		code: string,
+		id: string,
+	) => null
 }
 
 export function essence(options: PluginOptions = {}): VitePlugin {
@@ -69,11 +74,32 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 	// the same door was reached by the graph rather than imported by anybody,
 	// and declaring it would leave a file beside every source of the project.
 	let rawDoors = new Set<string>()
+	// NOTE: The sources each served id was compiled from, as `load` last saw
+	// them — what `transform` says again. See `served` for why it has to.
+	let sourcesOf = new Map<string, Array<string>>()
 
+	// NOTE: Named at `load` AND again at `transform`, and the second is not a
+	// courtesy. A dev server turns a watch file into an edge of its module
+	// graph, which is what carries an edit from the file to the modules
+	// compiled from it — but Vite records the files `load` names against the
+	// module's NODE, and a module nobody has imported yet has no node until its
+	// load has returned. Ask a dev server for a Module straight away — the way
+	// a test does, or a second tab — and the files its load named are dropped
+	// on the floor: the module is served, and an edit to what it was compiled
+	// from never reaches it, so the stale text is served again as if nothing
+	// had changed. Whether that happens turns on a race between the request
+	// and the analysis of whichever importer would have created the node
+	// first, which is why it was seen on a loaded runner and nowhere else. By
+	// `transform` the node exists, and a file named there reaches the same
+	// analysis, so the edge is drawn whichever came first. The `load` half
+	// stays: it is also what puts the file under the real watcher.
 	function served(
 		context: PluginContext | undefined,
+		id: string,
 		files: Array<string>,
 	): void {
+		sourcesOf.set(id, files)
+
 		for (let source of files) {
 			context?.addWatchFile?.(source)
 		}
@@ -210,7 +236,7 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 					await declare(await compiler.compile(raw), "bundle")
 				}
 
-				served(this, module.files)
+				served(this, id, module.files)
 
 				return module.code
 			}
@@ -224,7 +250,7 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 			let compiled = await compiler.compile(file)
 
 			await declare(compiled, "javascript")
-			served(this, compiled.files)
+			served(this, id, compiled.files)
 
 			return wrapperFor(
 				compiled.entryPath,
@@ -232,6 +258,18 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 				compiled.types,
 				options,
 			)
+		},
+		// NOTE: Changes nothing about the text — see `served` for what it is
+		// here for. Only ids this plugin loaded have sources to name; everything
+		// else is answered with nothing, which Vite reads as "not mine".
+		transform(_code, id) {
+			let files = sourcesOf.get(id)
+
+			if (files !== undefined) {
+				served(this, id, files)
+			}
+
+			return null
 		},
 	}
 }
