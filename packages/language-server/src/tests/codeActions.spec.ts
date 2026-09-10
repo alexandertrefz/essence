@@ -5003,6 +5003,313 @@ describe("Code Actions", () => {
 		})
 	})
 
+	// NOTE: The other way round: an if/else whose branches only answer is a
+	// definition by cases with the case written after the answer instead of in
+	// front of it. Both directions are offered, and the `-> Type` is what a
+	// `define` needs and an if/else does not.
+	describe("define ladders", () => {
+		let defineRefactors = (
+			lines: Array<string>,
+			range?: common.Position,
+		): Array<CodeActionEntry> =>
+			actionsOf(lines, range).filter(
+				(entry) =>
+					entry.title === "Write it as a define" ||
+					entry.title === "Write it as if/else",
+			)
+
+		let onlyRefactor = (lines: Array<string>): CodeActionEntry => {
+			let [entry, ...rest] = defineRefactors(lines)
+
+			expect(rest).toEqual([])
+
+			return entry
+		}
+
+		let ladder = [
+			"implementation {",
+			"\tfunction grade(_ score: Integer) -> String {",
+			"\t\tif score::isGreaterThan(90) {",
+			'\t\t\t<- "A"',
+			"\t\t} else {",
+			'\t\t\t<- "F"',
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+
+		let written = [
+			"implementation {",
+			"\tfunction grade(_ score: Integer) -> String {",
+			"\t\t<- define -> String {",
+			'\t\t\tas "A" if score::isGreaterThan(90)',
+			'\t\t\tas "F" otherwise',
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+
+		it("should offer the define a returning if/else stands for", () => {
+			let refactor = onlyRefactor(ladder)
+
+			expect(refactor.title).toBe("Write it as a define")
+			expect(refactor.kind).toBe("refactor.rewrite")
+			expect(refactor.diagnosticCode).toBeNull()
+			expect(refactor.isPreferred).toBe(false)
+			expect(applied(ladder, refactor)).toEqual(written)
+			expect(codesOf(written)).toEqual([])
+		})
+
+		it("should offer the if/else a define stands for", () => {
+			let refactor = onlyRefactor(written)
+
+			expect(refactor.title).toBe("Write it as if/else")
+			expect(applied(written, refactor)).toEqual(ladder)
+		})
+
+		it("should hand the text back when both directions are applied", () => {
+			expect(codesOf(ladder)).toEqual([])
+			expect(applied(ladder, onlyRefactor(ladder))).toEqual(written)
+			expect(applied(written, onlyRefactor(written))).toEqual(ladder)
+		})
+
+		// NOTE: One action rather than one per rung — every `else if` of a
+		// cascade is an if/else of its own, and each would offer the same
+		// rewrite one arm shorter.
+		it("should read a whole else-if cascade as one ladder", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction grade(_ score: Integer) -> String {",
+				"\t\tif score::isGreaterThan(90) {",
+				'\t\t\t<- "A"',
+				"\t\t} else if score::isGreaterThan(80) {",
+				'\t\t\t<- "B"',
+				"\t\t} else {",
+				'\t\t\t<- "F"',
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let result = applied(lines, onlyRefactor(lines))
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tfunction grade(_ score: Integer) -> String {",
+				"\t\t<- define -> String {",
+				'\t\t\tas "A" if score::isGreaterThan(90)',
+				'\t\t\tas "B" if score::isGreaterThan(80)',
+				'\t\t\tas "F" otherwise',
+				"\t\t}",
+				"\t}",
+				"}",
+			])
+			expect(codesOf(result)).toEqual([])
+			expect(applied(result, onlyRefactor(result))).toEqual(lines)
+		})
+
+		// NOTE: A `define` takes its Type from its own annotation and not from
+		// the `<-` it stands under, so an arm answering with a bare `#Case`
+		// needs the one the Function wrote. A contextually typed literal wrote
+		// none, and there is nothing to copy.
+		it("should leave the annotation out where the Function wrote none", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant kept = [1, 2, 3]::removeEvery(where (item) {",
+				"\t\tif item::isGreaterThan(2) {",
+				"\t\t\t<- true",
+				"\t\t} else {",
+				"\t\t\t<- false",
+				"\t\t}",
+				"\t})",
+				"}",
+			]
+
+			let result = applied(lines, onlyRefactor(lines))
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tconstant kept = [1, 2, 3]::removeEvery(where (item) {",
+				"\t\t<- define {",
+				"\t\t\tas true if item::isGreaterThan(2)",
+				"\t\t\tas false otherwise",
+				"\t\t}",
+				"\t})",
+				"}",
+			])
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: An arm below the first is read behind the COMPLEMENT of every
+		// Condition above it, and an `else` branch is read behind its own —
+		// `separator::isEmpty()` proves the `NonEmptyString` that `split` asks
+		// for either way. Both spellings are put to the Compiler, since a
+		// narrowing that survived one direction and not the other would be a
+		// rewrite that changes what compiles.
+		it("should keep what a Condition proves about the branch below it", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction pieces(_ text: String, on separator: String) -> List<String> {",
+				"\t\tif separator::isEmpty() {",
+				"\t\t\t<- [text]",
+				"\t\t} else {",
+				"\t\t\t<- text::split(on separator)",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let result = applied(lines, onlyRefactor(lines))
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tfunction pieces(_ text: String, on separator: String) -> List<String> {",
+				"\t\t<- define -> List<String> {",
+				"\t\t\tas [text] if separator::isEmpty()",
+				"\t\t\tas text::split(on separator) otherwise",
+				"\t\t}",
+				"\t}",
+				"}",
+			])
+			expect(codesOf(lines)).toEqual([])
+			expect(codesOf(result)).toEqual([])
+			expect(applied(result, onlyRefactor(result))).toEqual(lines)
+		})
+
+		it("should reach a Method's body as well as a Function's", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Sign for Integer {",
+				"\t\tdescribe() -> String {",
+				"\t\t\tif @::isGreaterThan(0) {",
+				'\t\t\t\t<- "positive"',
+				"\t\t\t} else {",
+				'\t\t\t\t<- "other"',
+				"\t\t\t}",
+				"\t\t}",
+				"\t}",
+				"\tTerminal.print(1::describe())",
+				"}",
+			]
+
+			let result = applied(lines, onlyRefactor(lines))
+
+			expect(result[3]).toBe("\t\t\t<- define -> String {")
+			expect(result[4]).toBe(
+				'\t\t\t\tas "positive" if @::isGreaterThan(0)',
+			)
+			expect(result[5]).toBe('\t\t\t\tas "other" otherwise')
+			expect(result[6]).toBe("\t\t\t}")
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: The annotation is the Function's own, copied as it was spelled
+		// — and one written over several lines can not be copied onto the line
+		// the `define` opens. Leaving it out is a different rewrite, so nothing
+		// is offered instead.
+		it("should offer nothing where the return Type spans lines", () => {
+			expect(
+				titles(
+					defineRefactors([
+						"implementation {",
+						"\tfunction sized(_ big: Boolean) -> {",
+						"\t\twidth: Integer,",
+						"\t\theight: Integer,",
+						"\t} {",
+						"\t\tif big {",
+						"\t\t\t<- { width = 10, height = 10 }",
+						"\t\t} else {",
+						"\t\t\t<- { width = 1, height = 1 }",
+						"\t\t}",
+						"\t}",
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+
+		it("should offer nothing on a branch that does more than answer", () => {
+			expect(
+				titles(
+					defineRefactors([
+						"implementation {",
+						"\tfunction grade(_ score: Integer) -> String {",
+						"\t\tif score::isGreaterThan(90) {",
+						'\t\t\tconstant top = "A"',
+						"\t\t\t<- top",
+						"\t\t} else {",
+						'\t\t\t<- "F"',
+						"\t\t}",
+						"\t}",
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: The Comment stands between two of the Expressions this moves,
+		// and an arm has nowhere to put it.
+		it("should offer nothing on an if/else holding a Comment", () => {
+			expect(
+				titles(
+					defineRefactors([
+						"implementation {",
+						"\tfunction grade(_ score: Integer) -> String {",
+						"\t\tif score::isGreaterThan(90) {",
+						"\t\t\t§ the top grade",
+						'\t\t\t<- "A"',
+						"\t\t} else {",
+						'\t\t\t<- "F"',
+						"\t\t}",
+						"\t}",
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+
+		it("should offer nothing on a define holding a define", () => {
+			expect(
+				titles(
+					defineRefactors([
+						"implementation {",
+						"\tfunction describe(_ value: Integer) -> String {",
+						"\t\t<- define -> String {",
+						"\t\t\tas define {",
+						'\t\t\t\tas "exactly one" if value::is(1)',
+						'\t\t\t\tas "several" otherwise',
+						"\t\t\t} if value::isPositive()",
+						'\t\t\tas "none at all" otherwise',
+						"\t\t}",
+						"\t}",
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: A Condition written over several lines lands in a column
+		// nobody chose, whichever way it is moved.
+		it("should offer nothing on a Condition written over two lines", () => {
+			expect(
+				titles(
+					defineRefactors([
+						"implementation {",
+						"\tfunction grade(_ score: Integer) -> String {",
+						"\t\tif score",
+						"\t\t\t::isGreaterThan(90) {",
+						'\t\t\t<- "A"',
+						"\t\t} else {",
+						'\t\t\t<- "F"',
+						"\t\t}",
+						"\t}",
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+	})
+
 	describe("selection", () => {
 		it("should find nothing in a Program with nothing to fix", () => {
 			let lines = [
