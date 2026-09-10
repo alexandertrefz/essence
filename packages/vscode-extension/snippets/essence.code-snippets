@@ -87,6 +87,13 @@
 		],
 		"description": "A variable declaration."
 	},
+	"destructure": {
+		"prefix": "destructure",
+		"body": [
+			"constant { ${1:first}, ${2:second} } = ${0:value}"
+		],
+		"description": "A declaration that takes its value apart — the Pattern names the members it wants."
+	},
 	"function": {
 		"prefix": "function",
 		"body": [
@@ -281,12 +288,96 @@
 		],
 		"description": "A named snapshot, kept in `__snapshots__` beside the file — where output too large to read inline belongs."
 	},
+	"record": {
+		"prefix": "record",
+		"body": [
+			"{ ${1:member} = ${0:value} }"
+		],
+		"description": "A Record literal."
+	},
 	"record-typed": {
 		"prefix": "record-typed",
 		"body": [
 			"${1:Type} ~> { ${2:member} = ${0:value} }"
 		],
 		"description": "A typed Record literal."
+	},
+	"with": {
+		"prefix": "with",
+		"body": [
+			"{ ${1:record} with ${2:member} = ${0:value} }"
+		],
+		"description": "An update — it answers a new Record and leaves the one it read alone."
+	},
+	"with-self": {
+		"prefix": "with-self",
+		"body": [
+			"{ @ with ${1:member} = ${0:value} }"
+		],
+		"description": "An update of `@`, the value a Method was called on."
+	},
+	"with-path": {
+		"prefix": "with-path",
+		"body": [
+			"{ ${1:record} with ${2:member}.${3:nested} = ${0:value} }"
+		],
+		"description": "An update through a path key — it reaches into a member rather than replacing it."
+	},
+	"with-descend": {
+		"prefix": "with-descend",
+		"body": [
+			"{ ${1:record} with ${2:member}.{ ${3:nested} = ${0:value} } }"
+		],
+		"description": "An update that descends — a whole member list written one level down."
+	},
+	"dictionary": {
+		"prefix": "dictionary",
+		"body": [
+			"[${1:\"key\"} = ${0:value}]"
+		],
+		"description": "A Dictionary literal — the same brackets a List is written in, and the `=` is the whole difference."
+	},
+	"dictionary-empty": {
+		"prefix": "dictionary-empty",
+		"body": [
+			"[=]"
+		],
+		"description": "The empty Dictionary — spelled with the `=` that tells it from the empty List."
+	},
+	"dictionary-with": {
+		"prefix": "dictionary-with",
+		"body": [
+			"[${1:dictionary} with ${2:\"key\"} = ${0:value}]"
+		],
+		"description": "A Dictionary update — it sets its entries against a base and answers a new Dictionary."
+	},
+	"case-value": {
+		"prefix": "case-value",
+		"body": [
+			"#${1:Case}({ ${2:member} = ${0:value} })"
+		],
+		"description": "A Case built with its payload written out."
+	},
+	"case-prefixed": {
+		"prefix": "case-prefixed",
+		"body": [
+			"${1:Choice}#${0:Case}"
+		],
+		"description": "A Case named through its Choice, for where no annotation says which Choice is meant."
+	},
+	"closure": {
+		"prefix": "closure",
+		"body": [
+			"(${1:item}) { <- $0 }"
+		],
+		"description": "A Function literal — its Parameter Types come from where it is written."
+	},
+	"closure-typed": {
+		"prefix": "closure-typed",
+		"body": [
+			"(_ ${1:item}: ${2:Type}) -> ${3:ReturnType} { <- $0 }"
+		],
+		"description": "A Function literal stating its own Types, for where nothing else does."
 	},
 	"if": {
 		"prefix": "if",
@@ -331,6 +422,20 @@
 			"case ${1:Matcher} where ${2:condition} { <- ${0:value} }"
 		],
 		"description": "A guarded case handler within a match expression."
+	},
+	"case-payload": {
+		"prefix": "case-payload",
+		"body": [
+			"case #${1:Case}(${2:binding}) { <- ${0:value} }"
+		],
+		"description": "A case handler naming what the Case's constructor took."
+	},
+	"case-pattern": {
+		"prefix": "case-pattern",
+		"body": [
+			"case #${1:Case}({ ${2:member} }) { <- ${0:value} }"
+		],
+		"description": "A case handler taking the Case's payload apart."
 	},
 	"define": {
 		"prefix": "define",

@@ -195,6 +195,13 @@ export const snippets: Array<Snippet> = [
 		contexts: ["implementation", "tests", "test"],
 	},
 	{
+		prefix: "destructure",
+		description:
+			"A declaration that takes its value apart — the Pattern names the members it wants.",
+		body: ["constant { ${1:first}, ${2:second} } = ${0:value}"],
+		contexts: ["implementation", "tests", "test"],
+	},
+	{
 		prefix: "function",
 		description: "A function declaration.",
 		body: [
@@ -399,9 +406,90 @@ export const snippets: Array<Snippet> = [
 	/* Values */
 
 	{
+		prefix: "record",
+		description: "A Record literal.",
+		body: ["{ ${1:member} = ${0:value} }"],
+		contexts: ["expression"],
+	},
+	{
 		prefix: "record-typed",
 		description: "A typed Record literal.",
 		body: ["${1:Type} ~> { ${2:member} = ${0:value} }"],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "with",
+		description:
+			"An update — it answers a new Record and leaves the one it read alone.",
+		body: ["{ ${1:record} with ${2:member} = ${0:value} }"],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "with-self",
+		description: "An update of `@`, the value a Method was called on.",
+		body: ["{ @ with ${1:member} = ${0:value} }"],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "with-path",
+		description:
+			"An update through a path key — it reaches into a member rather than replacing it.",
+		body: ["{ ${1:record} with ${2:member}.${3:nested} = ${0:value} }"],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "with-descend",
+		description:
+			"An update that descends — a whole member list written one level down.",
+		body: ["{ ${1:record} with ${2:member}.{ ${3:nested} = ${0:value} } }"],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "dictionary",
+		description:
+			"A Dictionary literal — the same brackets a List is written in, and the `=` is the whole difference.",
+		body: ['[${1:"key"} = ${0:value}]'],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "dictionary-empty",
+		description:
+			"The empty Dictionary — spelled with the `=` that tells it from the empty List.",
+		body: ["[=]"],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "dictionary-with",
+		description:
+			"A Dictionary update — it sets its entries against a base and answers a new Dictionary.",
+		body: ['[${1:dictionary} with ${2:"key"} = ${0:value}]'],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "case-value",
+		description: "A Case built with its payload written out.",
+		body: ["#${1:Case}({ ${2:member} = ${0:value} })"],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "case-prefixed",
+		description:
+			"A Case named through its Choice, for where no annotation says which Choice is meant.",
+		body: ["${1:Choice}#${0:Case}"],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "closure",
+		description:
+			"A Function literal — its Parameter Types come from where it is written.",
+		body: ["(${1:item}) { <- $0 }"],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "closure-typed",
+		description:
+			"A Function literal stating its own Types, for where nothing else does.",
+		body: ["(_ ${1:item}: ${2:Type}) -> ${3:ReturnType} { <- $0 }"],
 		contexts: ["expression"],
 	},
 
@@ -440,6 +528,18 @@ export const snippets: Array<Snippet> = [
 		prefix: "case-where",
 		description: "A guarded case handler within a match expression.",
 		body: ["case ${1:Matcher} where ${2:condition} { <- ${0:value} }"],
+		contexts: ["match"],
+	},
+	{
+		prefix: "case-payload",
+		description: "A case handler naming what the Case's constructor took.",
+		body: ["case #${1:Case}(${2:binding}) { <- ${0:value} }"],
+		contexts: ["match"],
+	},
+	{
+		prefix: "case-pattern",
+		description: "A case handler taking the Case's payload apart.",
+		body: ["case #${1:Case}({ ${2:member} }) { <- ${0:value} }"],
 		contexts: ["match"],
 	},
 	{

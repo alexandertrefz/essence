@@ -221,8 +221,10 @@ describe("Snippet completion", () => {
 		})
 
 		expect(offered).toContain("constant")
+		expect(offered).toContain("destructure")
 		expect(offered).toContain("function")
 		expect(offered).not.toContain("overload")
+		expect(offered).not.toContain("expect")
 		expect(offered).not.toContain("test")
 	})
 
@@ -351,9 +353,11 @@ describe("Snippet completion", () => {
 			{ line: 2, column: 19 },
 		)
 
+		expect(offered).toContain("with")
+		expect(offered).toContain("closure")
+		expect(offered).toContain("record")
 		expect(offered).toContain("match")
 		expect(offered).toContain("define")
-		expect(offered).toContain("record-typed")
 		expect(offered).not.toContain("function")
 		expect(offered).not.toContain("constant")
 	})
@@ -373,8 +377,9 @@ describe("Snippet completion", () => {
 
 		expect(offered).toContain("case")
 		expect(offered).toContain("case-where")
+		expect(offered).toContain("case-payload")
 		expect(offered).not.toContain("constant")
-		expect(offered).not.toContain("match")
+		expect(offered).not.toContain("with")
 	})
 
 	// NOTE: The context that earns its place by what it refuses. Nothing but
