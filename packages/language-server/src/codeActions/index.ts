@@ -35,6 +35,7 @@ import {
 	constantToVariableAction,
 	documentationLineAction,
 	elseBranchAction,
+	exportNameAction,
 	type ImportContext,
 	importActions,
 	missingCaseAction,
@@ -445,6 +446,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"mixed-rational-literal": ({ diagnostic, lines }) =>
 		mixedRationalActions(diagnostic, lines),
 	"nonconforming-namespace": implementProtocolAction,
+	"not-exported": ({ diagnostic, imports }) =>
+		listed(exportNameAction(diagnostic, imports)),
 	"partial-decimal-literal": ({ diagnostic, lines }) =>
 		partialDecimalActions(diagnostic, lines),
 	"redundant-interpolation-to-string": ({ diagnostic, lines }) =>

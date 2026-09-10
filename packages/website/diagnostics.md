@@ -2920,6 +2920,11 @@ name is private unless the `export { … }` block lists it, so the fix belongs t
 the file being imported from rather than to the entry: add the name to its
 export block, under an `as` if it should be published differently.
 
+**Quick Fix — "Export 'x' from ./A.es":** writes the name into the
+`export { … }` block of the Module that declares it, opening the block below its
+implementation where there is none. Not offered for a Variable, which no block
+may publish, nor for a Module the editor has not read.
+
 ### `unknown-export`
 
 The Module the specifier names declares nothing under that name. Names are

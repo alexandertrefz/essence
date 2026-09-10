@@ -28,6 +28,20 @@ type ImportEntry = {
 	specifier: string
 }
 
+// NOTE: An entry of an `export { … }` block, which holds two shapes where an
+// import block holds one: a bare name is something this Module declares, and a
+// name written under a `from` is one it forwards without ever binding.
+// `specifier` is what tells them apart — the Module the name comes FROM, and
+// null for the ordinary entry.
+type ExportEntry = {
+	// NOTE: The name as it is written at home, which is what the block is
+	// ordered by — an `as` renames what the entry PUBLISHES and leaves where it
+	// stands alone.
+	name: string
+	alias: string | null
+	specifier: string | null
+}
+
 // NOTE: The relative path an entry in `fromPath` would write for `toPath`,
 // spelled with forward slashes on every platform — a specifier is a path in the
 // source text rather than a path of the machine that reads it.
@@ -68,11 +82,17 @@ function spellGroup(entry: ImportEntry): string {
 	return `from "${entry.specifier}" { ${spellName(entry)} }`
 }
 
-function entryOf(node: parser.ImportNode): ImportEntry {
+// NOTE: The specifier is handed in rather than read off the entry, because the
+// entry of an export group carries the same one its group does and an entry
+// written bare carries none at all.
+function entryOf(
+	node: parser.ImportNode | parser.ExportNode,
+	specifier: string,
+): ImportEntry {
 	return {
 		name: node.name.content,
 		alias: node.alias === null ? null : node.alias.content,
-		specifier: node.source.path,
+		specifier,
 	}
 }
 
@@ -176,29 +196,7 @@ export function insertImportEdit(
 	}
 
 	if (section.groups.length === 0) {
-		let line = section.position.start.line
-
-		// NOTE: A one-line `import {}` takes the group INSIDE its braces — an
-		// insertion on the line after the statement lands outside the block,
-		// and the file no longer parses.
-		if (section.position.end.line === line) {
-			let column = section.position.end.column - 1
-			let separator =
-				(lines[line - 1] ?? "")[column - 2] === "{" ? " " : ""
-
-			return insertionAt(
-				line,
-				`${separator}${spellGroup(entry)} `,
-				column,
-			)
-		}
-
-		// NOTE: An empty block still owns two lines, so the group goes on the
-		// one after the brace rather than replacing anything.
-		return insertionAt(
-			line + 1,
-			`${indentationOf(lines, line)}\t${spellGroup(entry)}\n`,
-		)
+		return insertIntoEmptyBlock(lines, section, spellGroup(entry))
 	}
 
 	let successor = section.groups.find(
@@ -216,6 +214,154 @@ export function insertImportEdit(
 	)
 }
 
+// NOTE: The `export { … }` block's side of the same builder, and null for the
+// same reason: a name this Module already publishes must not be published a
+// second time, whichever of the two shapes carries it.
+//
+// The canonical order is the Formatter's — what the Module declares itself
+// first, by name, then what it forwards, by specifier — because a reader who
+// accepts this and then formats the file has to be shown the same block twice.
+export function insertExportEdit(
+	sourceText: string,
+	program: parser.Program,
+	entry: ExportEntry,
+): ImportEdit | null {
+	let lines = sourceText.split("\n")
+	let section = program.exports
+	// NOTE: The same shape an import entry has, so that one comparison orders
+	// both blocks — a bare entry carries no specifier and never needs the empty
+	// one this gives it, since nothing spells a bare entry with its Module.
+	let sorted: ImportEntry = {
+		name: entry.name,
+		alias: entry.alias,
+		specifier: entry.specifier ?? "",
+	}
+	let spelling =
+		entry.specifier === null ? spellName(sorted) : spellGroup(sorted)
+
+	if (section === null) {
+		return openExportBlock(lines, program, spelling)
+	}
+
+	// NOTE: Matched on the name the block PUBLISHES — an entry's alias where it
+	// carries one — since that is the name a second entry would collide with,
+	// whether it forwards the same thing or something else entirely.
+	if (
+		section.entries.some(
+			(candidate) =>
+				(candidate.alias ?? candidate.name).content ===
+				(entry.alias ?? entry.name),
+		)
+	) {
+		return null
+	}
+
+	let group =
+		entry.specifier === null
+			? undefined
+			: section.groups.find(
+					(candidate) => candidate.source.path === entry.specifier,
+				)
+
+	if (group !== undefined) {
+		return insertIntoGroup(lines, group, {
+			...sorted,
+			specifier: group.source.path,
+		})
+	}
+
+	// NOTE: A bare name goes among the bare names and in front of every group;
+	// a forwarded one goes among the groups, which stand after all of them. So
+	// the member the block ends on is the last group where there is one, and
+	// that is what either shape falls back to when nothing follows it.
+	let bare = section.entries.filter((candidate) => candidate.source === null)
+	let successor =
+		entry.specifier === null
+			? ((
+					bare.find(
+						(candidate) =>
+							compareNames(sorted, entryOf(candidate, "")) < 0,
+					) ?? section.groups[0]
+				)?.position ?? null)
+			: (laterGroup(section.groups, entry.specifier)?.position ?? null)
+	let last =
+		(section.groups[section.groups.length - 1] ?? bare[bare.length - 1])
+			?.position ?? null
+
+	if (last === null) {
+		return insertIntoEmptyBlock(lines, section, spelling)
+	}
+
+	return insertAmong(
+		lines,
+		spelling,
+		successor,
+		last,
+		section.position.end.line,
+	)
+}
+
+// NOTE: The first group of the block a new one for `specifier` belongs in front
+// of. Written out rather than inlined because the search reads `specifier` in a
+// closure, where its being a String rather than null is no longer in hand.
+function laterGroup(
+	groups: Array<parser.ExportGroupNode>,
+	specifier: string,
+): parser.ExportGroupNode | undefined {
+	return groups.find(
+		(candidate) => compareStrings(specifier, candidate.source.path) < 0,
+	)
+}
+
+// NOTE: Below the implementation, with a blank line between them, since that is
+// where the Parser reads the block and where the Formatter writes it. The
+// insertion goes at the END of the implementation's last line rather than at the
+// start of the line under it: a file whose last line is that closing brace has
+// no line under it to insert at, and a `tests { … }` block that does stand there
+// belongs below the export block rather than above it.
+function openExportBlock(
+	lines: Array<string>,
+	program: parser.Program,
+	spelling: string,
+): ImportEdit {
+	let line = program.implementation.position.end.line
+	let indentation = indentationOf(
+		lines,
+		program.implementation.position.start.line,
+	)
+
+	return insertionAt(
+		line,
+		`\n\n${indentation}export {\n${indentation}\t${spelling}\n${indentation}}`,
+		(lines[line - 1] ?? "").length + 1,
+	)
+}
+
+// NOTE: A block with no members of its own, which is the one shape that has
+// nowhere to insert BESIDE — the member goes inside the braces rather than
+// beside anything, and where the braces stand decides how.
+function insertIntoEmptyBlock(
+	lines: Array<string>,
+	section: parser.ImportSectionNode | parser.ExportSectionNode,
+	spelling: string,
+): ImportEdit {
+	let line = section.position.start.line
+
+	// NOTE: A one-line `import {}` takes the member INSIDE its braces — an
+	// insertion on the line after the statement lands outside the block, and
+	// the file no longer parses.
+	if (section.position.end.line === line) {
+		let column = section.position.end.column - 1
+		let separator = (lines[line - 1] ?? "")[column - 2] === "{" ? " " : ""
+
+		return insertionAt(line, `${separator}${spelling} `, column)
+	}
+
+	// NOTE: An empty block still owns two lines, so the member goes on the one
+	// after the brace rather than replacing anything.
+	return insertionAt(line + 1, `${indentationOf(lines, line)}\t${spelling}\n`)
+}
+
 // NOTE: A group written flat holds one name, and gaining a second is what
 // writes it out — so the whole of it is replaced with the two names one to a
 // line, in order, which is what the Formatter would make of it. A group
@@ -223,7 +369,7 @@ export function insertImportEdit(
 // position, and keeps every Comment it holds.
 function insertIntoGroup(
 	lines: Array<string>,
-	group: parser.ImportGroupNode,
+	group: parser.ImportGroupNode | parser.ExportGroupNode,
 	entry: ImportEntry,
 ): ImportEdit {
 	let position = group.position
@@ -233,7 +379,7 @@ function insertIntoGroup(
 		group.entries.length === 1
 	) {
 		let indentation = indentationOf(lines, position.start.line)
-		let names = [entryOf(group.entries[0]!), entry]
+		let names = [entryOf(group.entries[0]!, entry.specifier), entry]
 			.sort(compareNames)
 			.map((name) => `${indentation}\t${spellName(name)}`)
 
@@ -248,7 +394,8 @@ function insertIntoGroup(
 	}
 
 	let successor = group.entries.find(
-		(candidate) => compareNames(entry, entryOf(candidate)) < 0,
+		(candidate) =>
+			compareNames(entry, entryOf(candidate, entry.specifier)) < 0,
 	)
 	let last = group.entries[group.entries.length - 1]!
 

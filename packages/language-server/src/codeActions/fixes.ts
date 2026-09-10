@@ -1,7 +1,11 @@
 import { patternBindings } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
-import { insertImportEdit, relativeSpecifier } from "../autoImport"
+import {
+	insertExportEdit,
+	insertImportEdit,
+	relativeSpecifier,
+} from "../autoImport"
 import { isSamePosition } from "../positions"
 import type { Workspace } from "../workspace"
 import {
@@ -251,6 +255,122 @@ export function importActions(
 				edits: [edit],
 			},
 		]
+	})
+}
+
+// NOTE: The one fix in this file whose edit lands in a file the reader is not
+// looking at, because the mistake is not there either: the name IS declared in
+// the Module the entry names, and that Module keeps it private. Nothing about
+// the entry can be improved, so the entry is left exactly as it was written and
+// the other Module's `export { … }` block gains the name.
+//
+// Reported against an import entry and against a re-export alike — both name
+// something another Module publishes — so the entry is looked for in whichever
+// of the two blocks it stands in.
+//
+// Nothing is offered for a file the Workspace holds no analysis of: its text and
+// its Program are what the edit is measured against, and one without the other
+// is an edit measured against a guess.
+export function exportNameAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	imports: ImportContext | null,
+): CodeActionEntry | null {
+	if (imports === null) {
+		return null
+	}
+
+	let entry = moduleEntryAt(imports.program, diagnostic.position)
+
+	if (entry === null) {
+		return null
+	}
+
+	let targetPath = imports.workspace
+		.dependenciesOf(imports.filePath)
+		.get(entry.specifier)
+
+	if (targetPath === undefined) {
+		return null
+	}
+
+	let targetText = imports.workspace.sourceOf(targetPath)
+	let targetProgram = imports.workspace.programOf(targetPath)
+
+	if (targetText === null || targetProgram === null) {
+		return null
+	}
+
+	// NOTE: A Variable is the one declaration an export block may not list, so
+	// listing it would answer this Diagnostic with `export-of-variable` in
+	// another file — a fix that moves the mistake rather than ending it.
+	if (declaresVariable(targetProgram, entry.name)) {
+		return null
+	}
+
+	let edit = insertExportEdit(targetText, targetProgram, {
+		name: entry.name,
+		alias: null,
+		specifier: null,
+	})
+
+	if (edit === null) {
+		return null
+	}
+
+	return {
+		title: `Export '${entry.name}' from ${entry.specifier}`,
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		// NOTE: Preferred: there is one Module the name could be exported from,
+		// and publishing it is the only thing that makes the entry resolve.
+		isPreferred: true,
+		edits: [{ ...edit, filePath: targetPath }],
+	}
+}
+
+// NOTE: The entry of either Module block whose name stands at this Position,
+// with the specifier its group carries. A bare export entry is deliberately not
+// among them: it names something this Module declares, and every Diagnostic
+// answered here is about a name another Module was asked for.
+function moduleEntryAt(
+	program: parser.Program,
+	position: common.Position,
+): { name: string; specifier: string } | null {
+	let entries: Array<parser.ImportNode | parser.ExportNode> = [
+		...(program.imports?.entries ?? []),
+		...(program.exports?.entries ?? []),
+	]
+
+	for (let entry of entries) {
+		if (
+			entry.source !== null &&
+			isSamePosition(entry.name.position, position)
+		) {
+			return { name: entry.name.content, specifier: entry.source.path }
+		}
+	}
+
+	return null
+}
+
+// NOTE: Whether the Module declares this name as a Variable — read off its own
+// parse, since what an export block may hold is a question about the file the
+// name is written in and not about the file that asked for it. A Pattern
+// declares one Variable per binding, and each of them is one an entry could name.
+function declaresVariable(program: parser.Program, name: string): boolean {
+	return program.implementation.nodes.some((node) => {
+		if (node.nodeType !== "VariableDeclarationStatement") {
+			return false
+		}
+
+		if (node.name.nodeType === "Pattern") {
+			return patternBindings(node.name).some(
+				(binding) => binding.name.content === name,
+			)
+		}
+
+		return node.name.content === name
 	})
 }
 

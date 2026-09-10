@@ -7,7 +7,11 @@ import { canonicalPath, parseDocument } from "@essence-lang/compiler/documents"
 import type { common } from "@essence-lang/interfaces"
 
 import { analyseDocument, documentFilePath } from "../analyse"
-import { insertImportEdit, relativeSpecifier } from "../autoImport"
+import {
+	insertExportEdit,
+	insertImportEdit,
+	relativeSpecifier,
+} from "../autoImport"
 import {
 	type CodeActionEdit,
 	type CodeActionEntry,
@@ -1862,6 +1866,475 @@ describe("Workspace", () => {
 			})
 
 			expect(organizeAction(workspace, pathOf("Main.es"))).toBeUndefined()
+		})
+	})
+
+	// NOTE: The fixes whose edit lands in a file the reader is not looking at.
+	// Each of them is checked on the text of BOTH files — the one the action was
+	// asked for and the one it reaches — and then by re-analysing the workspace
+	// with the result written back, which is the only answer to "does this end
+	// the Diagnostic" that is not the fix marking its own homework.
+	describe("cross-Module fixes", () => {
+		function actionsFor(
+			workspace: Workspace,
+			filePath: string,
+			line: number,
+			needle: string,
+		): Array<CodeActionEntry> {
+			let source = workspace.sourceOf(filePath) ?? ""
+
+			return findCodeActions(
+				source,
+				spanOf(source, line, needle),
+				filePath,
+				workspace,
+			)
+		}
+
+		// NOTE: What the buffers look like once the action is applied, keyed by
+		// the file each edit named — an action that reaches a second Module is
+		// two texts, and asserting on one of them says nothing about the other.
+		function appliedAcross(
+			workspace: Workspace,
+			documentPath: string,
+			entry: CodeActionEntry,
+		): Record<string, string> {
+			let byFile = new Map<string, Array<CodeActionEdit>>()
+
+			for (let edit of entry.edits) {
+				let filePath = edit.filePath ?? documentPath
+				let edits = byFile.get(filePath)
+
+				if (edits === undefined) {
+					edits = []
+					byFile.set(filePath, edits)
+				}
+
+				edits.push(edit)
+			}
+
+			let result: Record<string, string> = {}
+
+			for (let [filePath, edits] of byFile) {
+				result[filePath] = applyEdits(
+					workspace.sourceOf(filePath) ?? "",
+					edits,
+				)
+			}
+
+			return result
+		}
+
+		// NOTE: Back to front, so that every edit is applied at the offset it was
+		// computed for. The action's own order says nothing — an action that
+		// deletes an entry and writes it somewhere else hands both over as it
+		// found them.
+		function applyEdits(
+			text: string,
+			edits: Array<CodeActionEdit>,
+		): string {
+			let ordered = [...edits].sort(
+				(left, right) =>
+					offsetOf(text, right.range.start) -
+					offsetOf(text, left.range.start),
+			)
+
+			for (let edit of ordered) {
+				text =
+					text.slice(0, offsetOf(text, edit.range.start)) +
+					edit.newText +
+					text.slice(offsetOf(text, edit.range.end))
+			}
+
+			return text
+		}
+
+		function offsetOf(text: string, cursor: common.Cursor): number {
+			let lines = text.split("\n")
+			let offset = 0
+
+			for (let line = 1; line < cursor.line; line++) {
+				offset += (lines[line - 1] ?? "").length + 1
+			}
+
+			return offset + cursor.column - 1
+		}
+
+		// NOTE: The workspace with the action's result written back to disk,
+		// analysed again — every file it touched, since a Diagnostic that moved
+		// to the other Module is not a Diagnostic that went away.
+		function codesAfter(
+			workspace: Workspace,
+			texts: Record<string, string>,
+			filePath: string,
+		): Array<common.DiagnosticCode> {
+			for (let [written, text] of Object.entries(texts)) {
+				writeFileSync(written, text)
+				workspace.changed(written)
+			}
+
+			return analyseDocument(
+				workspace.sourceOf(filePath) ?? "",
+				filePath,
+				{ host: workspace.host },
+			).diagnostics.map((diagnostic) => diagnostic.code)
+		}
+
+		describe("not-exported", () => {
+			it("should write the name into the export block of the Module that declares it", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tconstant hidden = 1",
+						"}",
+						"",
+					].join("\n"),
+					"Main.es": [
+						"import {",
+						'\tfrom "./A.es" { hidden }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(hidden::toString())",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let mainPath = pathOf("Main.es")
+				let [fix] = actionsFor(workspace, mainPath, 2, "hidden")
+
+				expect(fix?.title).toBe("Export 'hidden' from ./A.es")
+				expect(fix?.diagnosticCode).toBe("not-exported")
+				expect(fix?.isPreferred).toBe(true)
+				expect(fix?.edits[0]?.filePath).toBe(pathOf("A.es"))
+
+				let texts = appliedAcross(workspace, mainPath, fix)
+
+				expect(texts[pathOf("A.es")]).toBe(
+					[
+						"implementation {",
+						"\tconstant hidden = 1",
+						"}",
+						"",
+						"export {",
+						"\thidden",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(texts[mainPath]).toBeUndefined()
+				expect(codesAfter(workspace, texts, mainPath)).toEqual([])
+			})
+
+			it("should add the name among the ones the block already publishes", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tconstant alpha = 1",
+						"\tconstant middle = 2",
+						"\tconstant zulu = 3",
+						"}",
+						"",
+						"export {",
+						"\talpha",
+						"\tzulu",
+						"}",
+						"",
+					].join("\n"),
+					"Main.es": [
+						"import {",
+						'\tfrom "./A.es" { middle }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(middle::toString())",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let mainPath = pathOf("Main.es")
+				let [fix] = actionsFor(workspace, mainPath, 2, "middle")
+				let texts = appliedAcross(workspace, mainPath, fix)
+
+				expect(texts[pathOf("A.es")]?.split("\n").slice(6, 11)).toEqual(
+					["export {", "\talpha", "\tmiddle", "\tzulu", "}"],
+				)
+				expect(codesAfter(workspace, texts, mainPath)).toEqual([])
+			})
+
+			// NOTE: A re-export asks another Module for a name exactly as an
+			// import does, and is answered here exactly as one.
+			it("should answer a re-export of a private name too", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tconstant hidden = 1",
+						"}",
+						"",
+					].join("\n"),
+					"Shapes.es": [
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						'\tfrom "./A.es" { hidden }',
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let shapesPath = pathOf("Shapes.es")
+				let [fix] = actionsFor(workspace, shapesPath, 5, "hidden")
+
+				expect(fix?.title).toBe("Export 'hidden' from ./A.es")
+
+				let texts = appliedAcross(workspace, shapesPath, fix)
+
+				expect(texts[pathOf("A.es")]).toBe(
+					[
+						"implementation {",
+						"\tconstant hidden = 1",
+						"}",
+						"",
+						"export {",
+						"\thidden",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(codesAfter(workspace, texts, shapesPath)).toEqual([])
+			})
+
+			// NOTE: A Variable is the one declaration an export block may not
+			// list, so publishing it would answer this Diagnostic with
+			// `export-of-variable` in the other file.
+			it("should offer nothing for a Variable", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tvariable counter = 0",
+						"}",
+						"",
+					].join("\n"),
+					"Main.es": [
+						"import {",
+						'\tfrom "./A.es" { counter }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(counter::toString())",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				expect(
+					actionsFor(workspace, pathOf("Main.es"), 2, "counter").map(
+						(action) => action.title,
+					),
+				).toEqual([])
+			})
+		})
+
+		describe("insertExportEdit", () => {
+			function edited(
+				lines: Array<string>,
+				entry: {
+					name: string
+					alias?: string | null
+					specifier: string | null
+				},
+			) {
+				let source = lines.join("\n")
+				let edit = insertExportEdit(
+					source,
+					parseDocument(source).program,
+					{
+						alias: null,
+						...entry,
+					},
+				)
+
+				return edit === null
+					? null
+					: applyEdits(source, [edit]).split("\n")
+			}
+
+			it("should open a block below the implementation and above the tests", () => {
+				expect(
+					edited(
+						[
+							"implementation {",
+							"\tconstant one = 1",
+							"}",
+							"",
+							"tests {",
+							'\ttest "one" {',
+							"\t\texpect one::isEqualTo(1)",
+							"\t}",
+							"}",
+							"",
+						],
+						{ name: "one", specifier: null },
+					),
+				).toEqual([
+					"implementation {",
+					"\tconstant one = 1",
+					"}",
+					"",
+					"export {",
+					"\tone",
+					"}",
+					"",
+					"tests {",
+					'\ttest "one" {',
+					"\t\texpect one::isEqualTo(1)",
+					"\t}",
+					"}",
+					"",
+				])
+			})
+
+			it("should write a forwarded name as a group of its own", () => {
+				expect(
+					edited(
+						[
+							"implementation {",
+							"}",
+							"",
+							"export {",
+							"\tone",
+							'\tfrom "./C.es" { three }',
+							"}",
+							"",
+						],
+						{ name: "two", specifier: "./B.es" },
+					),
+				).toEqual([
+					"implementation {",
+					"}",
+					"",
+					"export {",
+					"\tone",
+					'\tfrom "./B.es" { two }',
+					'\tfrom "./C.es" { three }',
+					"}",
+					"",
+				])
+			})
+
+			// NOTE: A bare name stands in front of every group, whatever it is
+			// called — what a Module declares itself is one list and what it
+			// forwards is another.
+			it("should write a bare name above the groups", () => {
+				expect(
+					edited(
+						[
+							"implementation {",
+							"\tconstant zulu = 1",
+							"}",
+							"",
+							"export {",
+							'\tfrom "./B.es" { two }',
+							"}",
+							"",
+						],
+						{ name: "zulu", specifier: null },
+					),
+				).toEqual([
+					"implementation {",
+					"\tconstant zulu = 1",
+					"}",
+					"",
+					"export {",
+					"\tzulu",
+					'\tfrom "./B.es" { two }',
+					"}",
+					"",
+				])
+			})
+
+			it("should join the group already written for the Module", () => {
+				expect(
+					edited(
+						[
+							"implementation {",
+							"}",
+							"",
+							"export {",
+							'\tfrom "./B.es" { two }',
+							"}",
+							"",
+						],
+						{ name: "four", specifier: "./B.es" },
+					),
+				).toEqual([
+					"implementation {",
+					"}",
+					"",
+					"export {",
+					'\tfrom "./B.es" {',
+					"\t\tfour",
+					"\t\ttwo",
+					"\t}",
+					"}",
+					"",
+				])
+			})
+
+			// NOTE: A block is ordered by the name each entry is written under at
+			// home rather than by the one it publishes, which is the order the
+			// Formatter puts it in — an `as` renames what the importer writes
+			// and leaves the entry where the reader will look for it.
+			it("should order a name against what an aliased entry is called at home", () => {
+				expect(
+					edited(
+						[
+							"implementation {",
+							"\tconstant alpha = 1",
+							"\tconstant beta = 2",
+							"}",
+							"",
+							"export {",
+							"\talpha as zzz",
+							"}",
+							"",
+						],
+						{ name: "beta", alias: "second", specifier: null },
+					),
+				).toEqual([
+					"implementation {",
+					"\tconstant alpha = 1",
+					"\tconstant beta = 2",
+					"}",
+					"",
+					"export {",
+					"\talpha as zzz",
+					"\tbeta as second",
+					"}",
+					"",
+				])
+			})
+
+			it("should answer with nothing for a name the block already publishes", () => {
+				expect(
+					edited(
+						[
+							"implementation {",
+							"\tconstant one = 1",
+							"}",
+							"",
+							"export {",
+							"\tone",
+							"}",
+							"",
+						],
+						{ name: "one", specifier: null },
+					),
+				).toBeNull()
+			})
 		})
 	})
 
