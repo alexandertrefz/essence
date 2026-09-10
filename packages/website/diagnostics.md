@@ -2578,6 +2578,14 @@ bound instead.
 A `where` condition's left-hand side does not name one of the Namespace's own
 Type Parameters — only a declared Generic can be bound by a condition.
 
+**Quick Fix — "Declare it as '<infer T>'":** writes the Parameter into the
+Namespace's Generic list — after the Namespace's name where there is no list,
+after the last Parameter where there is. `infer` either way, since a Namespace's
+Type Parameters are all inferred. Where the target Type does not mention the
+Parameter either, what is left is
+[`unwitnessable-where-condition`](#unwitnessable-where-condition), which is the
+next question and not this one.
+
 ### `conflicting-where-condition`
 
 A `where` clause binds the same Type Parameter twice, or a single Method would

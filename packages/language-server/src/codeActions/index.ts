@@ -24,6 +24,7 @@ import {
 	boundParameterAction,
 	choicePrefixActions,
 	declareConformanceAction,
+	declareParameterAction,
 	constantToVariableAction,
 	elseBranchAction,
 	type ImportContext,
@@ -367,6 +368,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"unknown-name": importOrSpellingFix,
 	"unknown-protocol": importOrSpellingFix,
 	"unknown-type": importOrSpellingFix,
+	"unknown-where-generic": ({ diagnostic, program }) =>
+		listed(declareParameterAction(diagnostic, program)),
 	"unreachable-case": ({ diagnostic, program, lines }) =>
 		listed(unreachableCaseAction(diagnostic, program, lines)),
 	"unreachable-define-arm": ({ diagnostic, program, lines }) =>

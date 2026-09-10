@@ -3072,6 +3072,79 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("unknown-where-generic", () => {
+		// NOTE: A Type Parameter a Namespace never declared is `unknown-type`
+		// in its target Type as well, so the fix under test is picked out by
+		// its code rather than taken as the first offered.
+		function parameterFixes(lines: Array<string>): Array<CodeActionEntry> {
+			return quickFixes(lines).filter(
+				(entry) => entry.diagnosticCode === "unknown-where-generic",
+			)
+		}
+
+		const BOXES = [
+			"implementation {",
+			"\tprotocol Sized {",
+			"\t\tsize() -> Integer",
+			"\t}",
+			"",
+			"\ttype Box<Item> = { item: Item }",
+			"",
+		]
+
+		// NOTE: The shape this is nearly always written by hand — a target Type
+		// naming a Parameter the Generic list forgot — where declaring it
+		// answers the `unknown-type` beside it as well and the Namespace
+		// compiles.
+		it("should declare the Parameter after the Namespace's name", () => {
+			let lines = [
+				...BOXES,
+				"\tnamespace Boxes for Box<Thing> is Sized where Thing is Sized {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- 1",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = parameterFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Declare it as '<infer Thing>'")
+			expect(fix.isPreferred).toBe(true)
+			expect(result[7]).toBe(
+				"\tnamespace Boxes<infer Thing> for Box<Thing> is Sized where Thing is Sized {",
+			)
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A list that already holds Parameters takes the new one after
+		// them — `infer` and all, since a Namespace's Type Parameters are every
+		// one of them inferred. What is left is the condition speaking about a
+		// Parameter the target Type never mentions, which is the reader's to
+		// answer and says so in its own words.
+		it("should write it into a Generic list already there", () => {
+			let lines = [
+				...BOXES,
+				"\tnamespace Boxes<infer Item> for Box<Item> is Sized where Thing is Sized {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- 1",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let result = applied(lines, parameterFixes(lines)[0])
+
+			expect(result[7]).toBe(
+				"\tnamespace Boxes<infer Item, infer Thing> for Box<Item> is Sized where Thing is Sized {",
+			)
+
+			expect(codesOf(result)).toEqual(["unwitnessable-where-condition"])
+		})
+	})
+
 	describe("Type annotations", () => {
 		it("should offer the inferred Type of a Constant as an edit", () => {
 			let lines = ["implementation {", '\tconstant name = "Ada"', "}"]

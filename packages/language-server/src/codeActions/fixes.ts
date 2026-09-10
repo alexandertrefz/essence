@@ -1149,3 +1149,47 @@ export function declareConformanceAction(
 		],
 	}
 }
+
+// NOTE: The Type Parameter a `where` condition binds and the Namespace never
+// declared, written into the Generic list — `<infer T>` after the Namespace's
+// name where there is no list, `, infer T` after the last Parameter where there
+// is. `infer` either way: a Namespace's Type Parameters are all inferred, which
+// `uninferred-namespace-parameter` says in its own words, so the applied form is
+// not a spelling a fix could choose here.
+//
+// The condition is written on the Namespace's HEAD, which is what the walk out
+// to the enclosing Namespace finds — a `where` clause is part of a conformance
+// and a conformance is part of the head.
+export function declareParameterAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+): CodeActionEntry | null {
+	if (diagnostic.data?.kind !== "undeclared-parameter") {
+		return null
+	}
+
+	let namespace = enclosingNamespace(program, diagnostic.position)
+
+	if (namespace === null) {
+		return null
+	}
+
+	let { name } = diagnostic.data
+	let last = namespace.generics.at(-1)
+	let after = last?.position.end ?? namespace.name.position.end
+
+	return {
+		title: `Declare it as '<infer ${name}>'`,
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [
+			{
+				range: { start: after, end: after },
+				newText:
+					last === undefined ? `<infer ${name}>` : `, infer ${name}`,
+			},
+		],
+	}
+}

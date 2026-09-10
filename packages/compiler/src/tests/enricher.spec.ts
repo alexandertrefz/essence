@@ -2773,6 +2773,26 @@ describe("Enricher", () => {
 			)
 		})
 
+		// NOTE: The name as the condition wrote it, so the Quick Fix declares the
+		// Parameter the condition goes on reading — a list that gained any other
+		// spelling would leave the condition naming nothing all over again.
+		it("should carry that Generic's name as data", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Wrapper<infer Item> for { value: Item }
+					is Comparable where Other is Comparable
+				{
+					compare(to other: { value: Item }) -> Ordering {
+						<- Ordering#Equal
+					}
+				}
+			}`)
+
+			expect(diagnostics[0].data).toEqual({
+				kind: "undeclared-parameter",
+				name: "Other",
+			})
+		})
+
 		it("should reject a where condition on a Generic the target Type never mentions", () => {
 			// NOTE: Regression — a phantom Generic's condition can never be
 			// witnessed at a use site, so before this Diagnostic the hidden

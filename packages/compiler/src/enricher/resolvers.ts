@@ -4196,6 +4196,13 @@ export function checkProtocolConformance(
 							helps: [
 								`Declare it in the Namespace's Generic list: '<infer ${condition.generic.content}>'.`,
 							],
+							// NOTE: The name as the condition wrote it — what a
+							// fix inserts into the Generic list is the very name
+							// the condition reads, or the two go on disagreeing.
+							data: {
+								kind: "undeclared-parameter",
+								name: condition.generic.content,
+							},
 						},
 					)
 				} else if (rejection.kind === "unwitnessable") {

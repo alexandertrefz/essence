@@ -218,6 +218,10 @@ export type DiagnosticData =
 	// than every candidate: the Namespace that declares the static is the one
 	// the call has to name, and the Help names that one too.
 	| { kind: "static-owner"; namespace: string }
+	// NOTE: The Type Parameter a `where` condition named and the Namespace
+	// never declared — carried as written, since what a fix inserts into the
+	// Generic list is the very name the condition reads.
+	| { kind: "undeclared-parameter"; name: string }
 
 // NOTE: Every Diagnostic carries one, and `docs/diagnostics.md` documents
 // every one of these — a code with no entry there is a code nobody can look
