@@ -2119,6 +2119,155 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("literal-match-shape", () => {
+		it("should write a 'case _' before the Match's closing brace", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant n = 3",
+				"\tconstant described = match n -> String {",
+				'\t\tcase 0 { <- "zero" }',
+				'\t\tcase 1 { <- "one" }',
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Add a 'case _' for the rest of the values")
+			// NOTE: The arm it writes is empty, so the `missing-return` behind
+			// it is the reader's to fill in — a hole that is visible rather
+			// than a Match that answers for nothing.
+			expect(fix.isPreferred).toBe(false)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tconstant n = 3",
+				"\tconstant described = match n -> String {",
+				'\t\tcase 0 { <- "zero" }',
+				'\t\tcase 1 { <- "one" }',
+				"\t\tcase _ {}",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(result)).not.toContain("literal-match-shape")
+		})
+
+		it("should take a Guard off a Case that names a value", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant n = 3",
+				"\tconstant described = match n -> String {",
+				'\t\tcase 0 where true { <- "zero" }',
+				'\t\tcase _ { <- "more" }',
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Drop the Guard")
+			expect(fix.isPreferred).toBe(false)
+			expect(result[3]).toBe('\t\tcase 0 { <- "zero" }')
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: Two of the four sites report at a Handler's Matcher, and the
+		// primary Label is the whole of what tells them apart — a Guard's fix
+		// applied to a Case whose problem is that it names no value would take
+		// a Guard off something else entirely.
+		it("should offer nothing for a Case that names no value", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant n = 3",
+				"\tconstant described = match n -> String {",
+				'\t\tcase Integer where true { <- "number" }',
+				'\t\tcase 0 { <- "zero" }',
+				'\t\tcase _ { <- "more" }',
+				"\t}",
+				"}",
+			]
+
+			expect(titles(quickFixes(lines))).toEqual([])
+		})
+	})
+
+	describe("empty-list-overlap", () => {
+		it("should guard the Case that runs first", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant value: List<String> | List<Integer> = [1]",
+				"\tconstant described = match value -> String {",
+				'\t\tcase List<String> { <- "strings" }',
+				'\t\tcase List<Integer> { <- "integers" }',
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Guard it with 'where @::hasItems()'")
+			// NOTE: The empty List the Cases stop answering for wants a Case of
+			// its own, and that Case is the reader's to write — which is why
+			// the `missing-case` below is expected rather than a regression.
+			expect(fix.isPreferred).toBe(false)
+			expect(result[3]).toBe(
+				'\t\tcase List<String> where @::hasItems() { <- "strings" }',
+			)
+
+			expect(codesOf(result)).not.toContain("empty-list-overlap")
+		})
+
+		// NOTE: The dispatch branches of a Method Invocation report the same
+		// Warning, and its secondary Label points at the receiver rather than
+		// at a Matcher. There is no arm to edit, and the lookup answering
+		// nothing is what says so.
+		it("should offer nothing where the branches are a dispatch", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Firsts for List<String> {",
+				'\t\tdescribe () -> String { <- "strings" }',
+				"\t}",
+				"\tnamespace Seconds for List<Integer> {",
+				'\t\tdescribe () -> String { <- "integers" }',
+				"\t}",
+				"\tconstant value: List<String> | List<Integer> = [1]",
+				"\tconstant described = value::describe()",
+				"}",
+			]
+
+			expect(titles(quickFixes(lines))).toEqual([])
+		})
+	})
+
+	describe("empty-dictionary-overlap", () => {
+		it("should ask the Dictionary's own question", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant value: Dictionary<String, Integer> | Dictionary<Integer, String> = ["a" = 1]',
+				"\tconstant described = match value -> String {",
+				'\t\tcase Dictionary<String, Integer> { <- "one" }',
+				'\t\tcase Dictionary<Integer, String> { <- "two" }',
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Guard it with 'where @::hasEntries()'")
+			expect(result[3]).toBe(
+				'\t\tcase Dictionary<String, Integer> where @::hasEntries() { <- "one" }',
+			)
+
+			expect(codesOf(result)).not.toContain("empty-dictionary-overlap")
+		})
+	})
+
 	describe("unknown-modifier", () => {
 		it("should remove the word and the space in front of it", () => {
 			let lines = [
@@ -2464,6 +2613,78 @@ describe("Code Actions", () => {
 				),
 			).toEqual(["Change to 'first'"])
 		})
+	})
+})
+
+// NOTE: The one door a Diagnostic this analysis did NOT produce comes in by —
+// the Server hands the workspace-wide `similar-tags` through it, and the focus
+// Warning too. A Diagnostic arriving that way carries a Position from some other
+// reading of the file, which is why every fix measures its edit against the LIVE
+// text and refuses where that text does not read as the Diagnostic says.
+//
+// One Program with none of the constructs these codes are about, and one
+// Diagnostic per code laid over a Constant standing in it: nothing may be
+// offered for any of them. The failure this guards against is a fix that trusts
+// a Position and rewrites whatever happens to stand there.
+describe("A Diagnostic the analysis did not produce", () => {
+	const lines = ["implementation {", "\tconstant count = 1", "}"]
+
+	// NOTE: `count` and the `1` beside it — a primary span for the codes that
+	// read one, and a secondary for the four that point back at a second place.
+	const name = {
+		start: { line: 2, column: 11 },
+		end: { line: 2, column: 16 },
+	}
+	const value = {
+		start: { line: 2, column: 19 },
+		end: { line: 2, column: 20 },
+	}
+
+	function stale(code: common.DiagnosticCode): common.Diagnostic {
+		return {
+			severity: "error",
+			message: "This Diagnostic belongs to another buffer",
+			code,
+			notes: [],
+			helps: [],
+			position: name,
+			labels: [
+				{ position: name, message: "here", kind: "primary" },
+				{ position: value, message: "and here", kind: "secondary" },
+			],
+		}
+	}
+
+	it("should offer nothing the buffer does not bear out", () => {
+		let source = lines.join("\n")
+		let range = {
+			start: { line: 1, column: 1 },
+			end: { line: lines.length, column: 2 },
+		}
+		let codes: Array<common.DiagnosticCode> = [
+			"at-in-static-method",
+			"contradictory-modifiers",
+			"duplicate-key",
+			"duplicate-modifier",
+			"empty-dictionary-overlap",
+			"empty-list-overlap",
+			"infer-on-applied-parameter",
+			"literal-match-shape",
+			"unexpected-payload",
+			"uninferred-namespace-parameter",
+			"unknown-modifier",
+			"where-on-protocol-extension",
+		]
+
+		let offered = codes.flatMap((code) =>
+			findCodeActions(source, range, undefined, undefined, null, [
+				stale(code),
+			])
+				.filter((entry) => entry.kind === "quickfix")
+				.map((entry) => `${code}: ${entry.title}`),
+		)
+
+		expect(offered).toEqual([])
 	})
 })
 

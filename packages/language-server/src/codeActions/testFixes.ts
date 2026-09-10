@@ -3,7 +3,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { removeWordAction } from "./fixes"
 import { extendOverLeadingSpace, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
-import { findTestModifier } from "./lookups"
+import { findTestModifierWord } from "./lookups"
 
 // NOTE: The Diagnostics a test's or a suite's MODIFIERS carry. Each of them is
 // answered by taking a Modifier back out — the vocabulary is three words and
@@ -21,13 +21,13 @@ const tagged = "tagged"
 
 // NOTE: The Diagnostic spans the NAME, and what has to go is the Modifier — a
 // name the Parser read arguments into takes them with it, or `test "a" retries
-// 3 {}` is left holding a `3` that opens nothing.
+// 3 {}` is left holding a `3` that opens nothing. Where the Enricher's
+// regrouping reported about an ARGUMENT instead, the word goes alone, which is
+// what leaves `tagged slow` standing.
 //
-// The Modifier is looked up rather than assumed, because the Enricher regroups
-// what the Parser read before it reports: `tagged slow focussed` reports about
-// a name that is an ARGUMENT here, and the word alone is exactly what such a
-// one needs taken out. A lookup that finds nothing is that case, and the word's
-// own span answers it.
+// So the word is looked up rather than assumed to be one: a Position that names
+// neither belongs to some other reading of the file, and nothing is offered for
+// it.
 //
 // Preferred only where the Diagnostic names no near miss. Where it does, the
 // spelling fix beside this one is the likelier answer and is the one an Editor
@@ -38,14 +38,18 @@ export function removeModifierAction(
 	lines: Array<string>,
 ): CodeActionEntry | null {
 	let written = sliceOf(lines, diagnostic.position)
+	let site = findTestModifierWord(program, diagnostic.position)
 
-	if (!bareWord.test(written)) {
+	if (site === null || !bareWord.test(written)) {
 		return null
 	}
 
 	return removeWordAction(diagnostic, lines, {
 		word: written,
-		span: findTestModifier(program, diagnostic.position)?.position,
+		span:
+			site.argument === null
+				? site.modifier.position
+				: site.argument.position,
 		title: `Remove '${written}'`,
 		isPreferred: diagnostic.data?.kind !== "suggestion",
 	})

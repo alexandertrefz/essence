@@ -2,7 +2,11 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { keywordBefore, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
-import { findProtocolExtension, findStaticMethodName } from "./lookups"
+import {
+	findProtocolExtension,
+	findStaticMethodName,
+	findTypeParameter,
+} from "./lookups"
 
 // NOTE: The Diagnostics a DECLARATION'S HEAD carries — the Type Parameter list,
 // the `static` a Method opens with, the `where` on a Protocol's extension list.
@@ -10,26 +14,36 @@ import { findProtocolExtension, findStaticMethodName } from "./lookups"
 // announced on, never to the body under it, which is why they are read together
 // rather than beside the fixes for the Statements they hold.
 
-const inferKeyword = /^infer[ \t]+/
-const parameterName = /^[A-Za-z][A-Za-z0-9]*/
+const inferKeyword = /^infer[ \t]+$/
 const staticKeyword = "static"
 
-// NOTE: A Type Parameter's Position opens on `infer` where the marker was
-// written, so the keyword and the space behind it are the front of the span the
-// Diagnostic underlines — read back off the buffer rather than measured from the
-// name, since a marker written over a line break is a shape no fix here has an
-// answer for and one it must not guess at.
+// NOTE: What goes is the marker and the blanks behind it, which is the span
+// between where the Type Parameter starts and where its NAME does — the
+// Parameter's own Position opens on `infer` wherever one was written. Measured
+// from the Node rather than from the Diagnostic's span, and then read back off
+// the buffer: a marker carried over a line break is a shape this has no answer
+// for, and the check is what turns one away instead of guessing.
 //
-// What follows is left exactly as it stands: a bound (`infer Item is
+// What follows the name is left exactly as it stands: a bound (`infer Item is
 // Comparable`) and a default (`infer Item = Integer`) are no part of what the
 // Diagnostic refuses.
 export function removeInferAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
 	lines: Array<string>,
 ): CodeActionEntry | null {
-	let written = inferKeyword.exec(sliceOf(lines, diagnostic.position))
+	let parameter = findTypeParameter(program, diagnostic.position)
 
-	if (written === null) {
+	if (parameter === null || !parameter.inferred) {
+		return null
+	}
+
+	let range = {
+		start: parameter.position.start,
+		end: parameter.name.position.start,
+	}
+
+	if (!inferKeyword.test(sliceOf(lines, range))) {
 		return null
 	}
 
@@ -39,41 +53,32 @@ export function removeInferAction(
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
 		isPreferred: true,
-		edits: [
-			{
-				range: {
-					start: diagnostic.position.start,
-					end: {
-						line: diagnostic.position.start.line,
-						column:
-							diagnostic.position.start.column +
-							written[0].length,
-					},
-				},
-				newText: "",
-			},
-		],
+		edits: [{ range, newText: "" }],
 	}
 }
 
 // NOTE: The mirror, and the mirror of the span too: a Parameter written without
-// the marker opens on its own name, so the marker goes in front of where the
-// Diagnostic starts. The name is read back off the buffer to say the span still
-// reads as a Parameter — and a span that already opens on `infer` is a stale
-// analysis answering about a buffer somebody has since fixed.
+// the marker opens on its own name, so the marker goes in front of that name.
+// The name is read back off the buffer first — an insertion can not be checked
+// after the fact, so what has to be checked is that the Node and the text still
+// agree about where the name stands.
 export function inferParameterAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
 	lines: Array<string>,
 ): CodeActionEntry | null {
-	let written = sliceOf(lines, diagnostic.position)
-	let name = parameterName.exec(written)
+	let parameter = findTypeParameter(program, diagnostic.position)
 
-	if (name === null || inferKeyword.test(written)) {
+	if (parameter === null || parameter.inferred) {
+		return null
+	}
+
+	if (sliceOf(lines, parameter.name.position) !== parameter.name.content) {
 		return null
 	}
 
 	return {
-		title: `Declare it as 'infer ${name[0]}'`,
+		title: `Declare it as 'infer ${parameter.name.content}'`,
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
@@ -81,8 +86,8 @@ export function inferParameterAction(
 		edits: [
 			{
 				range: {
-					start: diagnostic.position.start,
-					end: diagnostic.position.start,
+					start: parameter.name.position.start,
+					end: parameter.name.position.start,
 				},
 				newText: "infer ",
 			},

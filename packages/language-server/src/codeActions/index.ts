@@ -45,6 +45,11 @@ import {
 	ordinaryCommentAction,
 	partialDecimalActions,
 } from "./literalFixes"
+import {
+	catchAllCaseAction,
+	dropGuardAction,
+	guardEmptyAction,
+} from "./matchFixes"
 import { annotationActions, shorthandActions } from "./refactors"
 import {
 	implementationHeaderAction,
@@ -259,20 +264,33 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(removeEntryAction(diagnostic, program, lines)),
 	"duplicate-modifier": ({ diagnostic, lines }) =>
 		listed(mergeModifierAction(diagnostic, lines)),
+	"empty-dictionary-overlap": ({ diagnostic, program, lines }) =>
+		listed(guardEmptyAction(diagnostic, program, lines)),
+	"empty-list-overlap": ({ diagnostic, program, lines }) =>
+		listed(guardEmptyAction(diagnostic, program, lines)),
 	"export-of-variable": ({ diagnostic, program, lines }) =>
 		listed(variableToConstantAction(diagnostic, program, lines)),
 	"fallback-never-used": ({ diagnostic, lines }) =>
 		listed(removeFallbackAction(diagnostic, lines)),
 	"focused-tests-remain": ({ diagnostic, lines }) =>
 		listed(removeFocusedAction(diagnostic, lines)),
-	"infer-on-applied-parameter": ({ diagnostic, lines }) =>
-		listed(removeInferAction(diagnostic, lines)),
+	"infer-on-applied-parameter": ({ diagnostic, program, lines }) =>
+		listed(removeInferAction(diagnostic, program, lines)),
 	"invalid-escape": ({ diagnostic, lines }) =>
 		invalidEscapeActions(diagnostic, lines),
 	"invalid-module-specifier": ({ diagnostic, lines }) =>
 		moduleSpecifierActions(diagnostic, lines),
 	"literal-in-require": ({ diagnostic, lines }) =>
 		listed(compareWrittenValueAction(diagnostic, lines)),
+	// NOTE: Four sites report this code and two of them have a mechanical
+	// answer. Each fix tells its own site apart from the rest by what the
+	// Diagnostic was reported against, and the two that are left — a Case
+	// naming no value, and one naming a value of another Type — are offered
+	// nothing, because what to write there is not something the source says.
+	"literal-match-shape": ({ diagnostic, program, lines }) => [
+		...listed(catchAllCaseAction(diagnostic, program, lines)),
+		...listed(dropGuardAction(diagnostic, program, lines)),
+	],
 	"matcher-after-value": ({ diagnostic, lines }) =>
 		listed(matcherBeforeValueAction(diagnostic, lines)),
 	"matcher-on-expect": ({ diagnostic, lines }) =>
@@ -302,8 +320,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(closeStringAction(diagnostic, lines)),
 	"unexpected-payload": ({ diagnostic, program, lines }) =>
 		listed(bareCaseAction(diagnostic, program, lines)),
-	"uninferred-namespace-parameter": ({ diagnostic, lines }) =>
-		listed(inferParameterAction(diagnostic, lines)),
+	"uninferred-namespace-parameter": ({ diagnostic, program, lines }) =>
+		listed(inferParameterAction(diagnostic, program, lines)),
 	// NOTE: A suggestion is the Case's NAME and the span it is written over is
 	// the whole `#Name`, so the sigil is written back in front of it.
 	"unknown-case": ({ diagnostic }) =>

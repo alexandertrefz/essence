@@ -120,6 +120,37 @@ export function findVariableDeclaration(
 	return found
 }
 
+// NOTE: The Type Parameter standing at this Position, looked for on the three
+// declarations that can carry one wrongly — a Choice and a Type Alias, whose
+// Parameters are applied and may not be marked `infer`, and a Namespace, whose
+// Parameters are inferred and must be. A Function's and a Method's are never
+// reported about, so a walk that reached them would only widen what an edit
+// here can land on.
+export function findTypeParameter(
+	program: parser.Program,
+	position: common.Position,
+): parser.GenericDeclarationNode | null {
+	let found: parser.GenericDeclarationNode | null = null
+
+	walk(program, (node) => {
+		if (
+			node.nodeType !== "NamespaceDefinitionStatement" &&
+			node.nodeType !== "ChoiceDeclarationStatement" &&
+			node.nodeType !== "TypeAliasStatement"
+		) {
+			return
+		}
+
+		for (let generic of node.generics) {
+			if (isSamePosition(generic.position, position)) {
+				found = generic
+			}
+		}
+	})
+
+	return found
+}
+
 // NOTE: The Case construction whose PAYLOAD stands at this Position. An
 // `unexpected-payload` is reported against the payload rather than against the
 // construction, and what has to go is the pair of parentheses around it —
@@ -235,21 +266,27 @@ export function findProtocolExtension(
 	return found
 }
 
-// NOTE: The Modifier of a test or a suite whose NAME stands at this Position.
-// A test and a suite are no part of `walk` — neither is a Statement, which is
-// what keeps every stage that walks Statements from answering for a form it can
-// never meet — so this walks the tests section itself.
-//
-// Null is a real answer rather than a failure. `tagged slow focussed` is read
-// by the Parser as `tagged` and `slow(focussed)`, and the Enricher takes that
-// pair apart before it reports the typo — so the name it reports about is an
-// ARGUMENT of a Modifier here, and a fix that finds no Modifier deletes the
-// word alone, which is exactly what an argument needs.
-export function findTestModifier(
+// NOTE: Where a Modifier word the Enricher reported about actually stands. The
+// Enricher REGROUPS what the Parser read before it says anything — `tagged slow
+// focussed` is read as `tagged` and `slow(focussed)`, and the typo it reports
+// is an ARGUMENT of a Modifier in this tree rather than a Modifier of its own.
+// Both readings are answered here, because a fix has to know which: a Modifier
+// takes its arguments with it when it goes, and an argument goes alone.
+export type TestModifierSite = {
+	modifier: parser.TestModifierNode
+	// NOTE: Null where the Position names the Modifier itself, which is every
+	// Modifier the Parser and the Enricher read the same way.
+	argument: parser.TestModifierArgumentNode | null
+}
+
+// NOTE: A test and a suite are no part of `walk` — neither is a Statement,
+// which is what keeps every stage that walks Statements from answering for a
+// form it can never meet — so this walks the tests section itself.
+export function findTestModifierWord(
 	program: parser.Program,
-	namePosition: common.Position,
-): parser.TestModifierNode | null {
-	let found: parser.TestModifierNode | null = null
+	position: common.Position,
+): TestModifierSite | null {
+	let found: TestModifierSite | null = null
 
 	let search = (nodes: Array<parser.TestsNode>): void => {
 		for (let node of nodes) {
@@ -258,8 +295,14 @@ export function findTestModifier(
 			}
 
 			for (let modifier of node.modifiers) {
-				if (isSamePosition(modifier.name.position, namePosition)) {
-					found = modifier
+				if (isSamePosition(modifier.name.position, position)) {
+					found = { modifier, argument: null }
+				}
+
+				for (let argument of modifier.arguments) {
+					if (isSamePosition(argument.position, position)) {
+						found = { modifier, argument }
+					}
 				}
 			}
 

@@ -2223,6 +2223,12 @@ its items belong to. Guard the Cases with `where @::hasItems()` and answer for
 the empty List in a Case of its own, or, for a Method Invocation, narrow the
 receiver with a Match before calling the Method.
 
+**Quick Fix — "Guard it with 'where @::hasItems()'":** writes the Guard onto the
+Case that runs FIRST, which is the one the secondary Label points at. Offered on
+a `match` alone — a dispatch has no arm to edit — and never preferred: it is the
+mechanical half of the Help, and the Case for the empty List is still yours to
+write, which the `missing-case` it leaves behind says so.
+
 ### `empty-dictionary-overlap`
 
 A Warning, and the empty Dictionary's half of `empty-list-overlap`: an earlier
@@ -2238,6 +2244,9 @@ reaches the Case its entries belong to. Guard the Cases with
 `where @::hasEntries()` and answer for the empty Dictionary in a Case of its own,
 or, for a Method Invocation, narrow the receiver with a Match before calling the
 Method.
+
+**Quick Fix — "Guard it with 'where @::hasEntries()'":** the same edit asking
+the Dictionary's own question, under the same conditions.
 
 ### `refinement-as-matcher`
 
@@ -2297,6 +2306,14 @@ leave the Match with no answer:
 - a Match that ends in a Case answering for only some of the values — one naming
   a value, one carrying a Guard, or one whose Type does not accept everything
   that reaches it.
+
+**Quick Fix — "Add a 'case _' for the rest of the values":** writes the arm the
+last of the four is missing, before the Match's closing brace. Never preferred,
+because the arm is empty and the `missing-return` behind it points at the hole.
+The Guard is answered by **"Drop the Guard"**, also never preferred — the
+question it asked still has to be asked, with an `if` inside the Handler. The
+other two are offered nothing: what to write in place of them is not something
+the source says.
 
 ## Define Expressions
 
