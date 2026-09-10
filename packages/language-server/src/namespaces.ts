@@ -242,6 +242,7 @@ export function matchingNamespaces(
 			(namespace) => !shadowed.has(namespace.name),
 		),
 		...documentNamespaces,
+		...importedNamespaces(document),
 		...workspaceNamespaces,
 	]
 
@@ -601,7 +602,9 @@ function collectProtocolTypes(
 				documentPath,
 				{ tests: true },
 			).program
-		let protocols: Array<common.ProtocolType> = []
+		let protocols: Array<common.ProtocolType> = Object.values(
+			document?.module?.imported.protocols ?? {},
+		)
 
 		for (let node of typedProgramNodes(enrichedProgram)) {
 			if (node.nodeType === "ProtocolDeclarationStatement") {
@@ -613,4 +616,18 @@ function collectProtocolTypes(
 	} catch {
 		return []
 	}
+}
+
+// NOTE: The Namespaces the import block brought in — declared in another
+// Module, so no walk of THIS document's Nodes can find them, and a `::` on a
+// value of an imported Type would be answered by the builtins alone. They take
+// part in matching on the same terms every other Namespace does: a Method
+// resolves through a Namespace whose target Type matches the receiver, and an
+// import is exactly what makes one reachable here.
+function importedNamespaces(
+	document: DocumentAnalysis | null,
+): Array<common.NamespaceType> {
+	return Object.values(document?.module?.imported.values ?? {}).filter(
+		(type): type is common.NamespaceType => type.type === "Namespace",
+	)
 }

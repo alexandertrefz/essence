@@ -1,7 +1,13 @@
-import { describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import * as path from "node:path"
+
+import { canonicalPath } from "@essence-lang/compiler/documents"
 
 import { buildCallSnippet } from "../callSnippets"
 import { findCompletions } from "../completion"
+import { createWorkspace } from "../workspace"
 
 function labelsOf(source: string, cursor: { line: number; column: number }) {
 	return findCompletions(source, cursor).map((entry) => entry.label)
@@ -3074,5 +3080,256 @@ describe("Completion of a name a Function literal declares", () => {
 		].join("\n")
 
 		expect(labelsOf(source, { line: 10, column: 27 })).toEqual([])
+	})
+})
+
+// NOTE: A Module takes its names from other files, and a probe used to enrich
+// ONE document: enrichment seeds a Scope from the builtins and the file's own
+// declarations, and linking is what seeds an import block. So every imported
+// name was unknown to every probe — `Colour.` offered nothing, and `red::`
+// offered the Methods of every Namespace there is, since a receiver typed as an
+// Error matches them all. A probe of a Module is linked against the
+// dependencies the document was linked against, which are read back rather than
+// re-read.
+//
+// NOTE: Against a real directory, for the reason `workspace.spec.ts` runs
+// against one: an in-memory host exercises everything except which path a
+// specifier resolves to.
+describe("Completion in a Module", () => {
+	let directories: Array<string> = []
+
+	afterEach(() => {
+		for (let directory of directories) {
+			rmSync(directory, { recursive: true, force: true })
+		}
+
+		directories = []
+	})
+
+	function makeFiles(files: Record<string, string>): {
+		root: string
+		pathOf: (name: string) => string
+	} {
+		let root = canonicalPath(
+			mkdtempSync(path.join(tmpdir(), "essence-module-completion-")),
+		)
+
+		directories.push(root)
+
+		for (let [name, contents] of Object.entries(files)) {
+			writeFileSync(path.join(root, name), contents)
+		}
+
+		return {
+			root,
+			pathOf: (name: string) => canonicalPath(path.join(root, name)),
+		}
+	}
+
+	const colours = [
+		"implementation {",
+		"\tchoice Colour {",
+		"\t\tRed,",
+		"\t\tGreen,",
+		"\t}",
+		"",
+		"\tnamespace Palette for Colour is Printable {",
+		"\t\tstatic primary() -> Colour {",
+		"\t\t\t<- #Red",
+		"\t\t}",
+		"\t}",
+		"",
+		"\tprotocol Named {",
+		"\t\tstatic label() -> String",
+		"\t}",
+		"",
+		"\tfunction shade(_ colour: Colour) -> Colour {",
+		"\t\t<- colour",
+		"\t}",
+		"}",
+		"",
+		"export {",
+		"\tColour",
+		"\tNamed",
+		"\tPalette",
+		"\tshade",
+		"}",
+		"",
+	].join("\n")
+
+	const main = [
+		"import {",
+		'\tfrom "./Colours.es" {',
+		"\t\tColour",
+		"\t\tNamed",
+		"\t\tPalette",
+		"\t\tshade",
+		"\t}",
+		"}",
+		"",
+		"implementation {",
+		"\tconstant red: Colour = #Red",
+		"}",
+		"",
+	].join("\n")
+
+	// NOTE: The line under the Constant, which is inside the implementation and
+	// below every declaration the readings need — the cursor is the last
+	// character of the line written there.
+	function writing(line: string): {
+		source: string
+		cursor: { line: number; column: number }
+	} {
+		let lines = main.split("\n")
+		let index = lines.findIndex((entry) => entry.includes("constant red"))
+
+		return {
+			source: [
+				...lines.slice(0, index + 1),
+				`\t${line}`,
+				...lines.slice(index + 1),
+			].join("\n"),
+			cursor: { line: index + 2, column: line.length + 2 },
+		}
+	}
+
+	function offeredFor(line: string, files: Record<string, string> = {}) {
+		let { pathOf } = makeFiles({
+			"Colours.es": colours,
+			"Main.es": main,
+			...files,
+		})
+		let { source, cursor } = writing(line)
+
+		return findCompletions(source, cursor, pathOf("Main.es"))
+	}
+
+	function labelsFor(line: string, files: Record<string, string> = {}) {
+		return offeredFor(line, files).map((entry) => entry.label)
+	}
+
+	it("should offer the Case listing of an imported Choice", () => {
+		expect(
+			offeredFor("constant listed = Colour.").find(
+				(entry) => entry.label === "cases",
+			),
+		).toMatchObject({
+			kind: "staticMethod",
+			detail: "() -> NonEmptyList<Colour>",
+		})
+	})
+
+	// NOTE: The listing the every-Method fallback used to bury: an Error
+	// receiver matches every Namespace there is, so `red::` answered with the
+	// whole standard library — `isEmpty`, `hasCharacters` and the rest of
+	// String's — instead of the three Methods a Colour reaches.
+	it("should offer an imported value's own Methods", () => {
+		let labels = labelsFor("constant shown = red::")
+
+		expect(labels).toEqual(["is", "isNot", "toString"])
+	})
+
+	it("should offer the Methods of an imported Function's result", () => {
+		expect(labelsFor("constant shown = shade(red)::")).toEqual([
+			"is",
+			"isNot",
+			"toString",
+		])
+	})
+
+	it("should offer the statics of an imported Namespace", () => {
+		expect(labelsFor("constant first = Palette.")).toEqual([
+			"primary",
+			"cases",
+		])
+	})
+
+	// NOTE: A Protocol is imported to be USED, and a bound is where a Protocol
+	// this file never names again still has to resolve — the name in front of
+	// the dot reads its members off the Namespace fabricated for the bound.
+	it("should offer a static an imported Protocol requires as a bound", () => {
+		let { pathOf } = makeFiles({ "Colours.es": colours, "Main.es": main })
+		let source = [
+			...main.split("\n").slice(0, -2),
+			"",
+			"\tfunction describe <infer Kind is Named>(_ example: Kind) -> String {",
+			"\t\t<- Kind.",
+			"\t}",
+			"}",
+			"",
+		].join("\n")
+
+		expect(
+			findCompletions(
+				source,
+				{ line: 14, column: 11 },
+				pathOf("Main.es"),
+			).map((entry) => entry.label),
+		).toEqual(["label"])
+	})
+
+	// NOTE: The same answers through the Workspace, which is what an Editor
+	// asks: the linked dependencies are read off the analysis it already holds
+	// rather than built here, and the two must not answer differently.
+	it("should answer the same from the analysis the Workspace holds", () => {
+		let { root, pathOf } = makeFiles({
+			"Colours.es": colours,
+			"Main.es": main,
+		})
+		let workspace = createWorkspace()
+
+		workspace.setFolders([root])
+
+		let mainPath = pathOf("Main.es")
+		let { source, cursor } = writing("constant shown = red::")
+
+		expect(
+			findCompletions(
+				source,
+				cursor,
+				mainPath,
+				{ offers: [], namespaces: [] },
+				workspace.documentOf(mainPath),
+			).map((entry) => entry.label),
+		).toEqual(["is", "isNot", "toString"])
+	})
+
+	// NOTE: A specifier naming a file nobody has written yet is the ordinary
+	// state of a Module being built, and it must cost the answer nothing it
+	// used to give: the graph reports what it could not read, the rest of the
+	// block still binds, and the name that resolved to nothing is answered the
+	// way an unknown receiver always was.
+	it("should still answer where a specifier names no file", () => {
+		let unresolved = main.replace(
+			'\tfrom "./Colours.es" {',
+			'\tfrom "./Gone.es" { missing }\n\tfrom "./Colours.es" {',
+		)
+		let { pathOf } = makeFiles({
+			"Colours.es": colours,
+			"Main.es": unresolved,
+		})
+		let lines = unresolved.split("\n")
+		let index = lines.findIndex((entry) => entry.includes("constant red"))
+		let line = "constant shown = red::"
+		let source = [
+			...lines.slice(0, index + 1),
+			`\t${line}`,
+			...lines.slice(index + 1),
+		].join("\n")
+
+		expect(
+			findCompletions(
+				source,
+				{ line: index + 2, column: line.length + 2 },
+				pathOf("Main.es"),
+			).map((entry) => entry.label),
+		).toEqual(["is", "isNot", "toString"])
+	})
+
+	// NOTE: And the reading this must not turn into: a name that holds a VALUE
+	// is answered by the value, whatever a Type of the same name would offer.
+	// `red` is a Colour, and a Colour has no members at all.
+	it("should offer nothing on a value named after nothing it imports", () => {
+		expect(labelsFor("constant member = red.")).toEqual([])
 	})
 })

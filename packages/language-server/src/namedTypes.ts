@@ -1,4 +1,5 @@
 import { builtinTypes } from "@essence-lang/compiler/enricher/builtins"
+import type { ImportedNames } from "@essence-lang/compiler/modules"
 import type { common } from "@essence-lang/interfaces"
 
 import { typedHandlerExpressions } from "./matchHandlerChildren"
@@ -21,6 +22,12 @@ export function typeNamedAt(
 	name: string,
 	cursor: common.Cursor,
 	program: common.typed.Program,
+	// NOTE: What the document's import block bound, for a Module. An imported
+	// Choice is declared in another file, so no Statement of this Program
+	// declares it and the walk below can never answer for it — and the typed
+	// import entries are no better: one carries the VALUE where a name came
+	// across as both, which is the reading a probe already tried.
+	imported: ImportedNames | null = null,
 ): common.Type | null {
 	// NOTE: The innermost Scope that declares the name wins, exactly as it does
 	// in the Enricher — a Type Parameter called `Colour` shadows the Choice of
@@ -259,8 +266,13 @@ export function typeNamedAt(
 		depth += 1
 	}
 
+	// NOTE: The import block stands between what the file declares and the
+	// builtins, exactly as it does in the Scope linking seeds: a Choice this
+	// file declares shadows one it imports, and an imported `Side` is the one
+	// its own `Side` names.
+	//
 	// NOTE: The builtins are the outermost Scope, so they answer last and only
 	// for a name the document declares nothing under — a Program writing its
 	// own `choice Side` means that one.
-	return found.type ?? builtinTypes()[name] ?? null
+	return found.type ?? imported?.types[name] ?? builtinTypes()[name] ?? null
 }

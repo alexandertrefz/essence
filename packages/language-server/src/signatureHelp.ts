@@ -12,10 +12,10 @@ import type { common } from "@essence-lang/interfaces"
 
 import type { DocumentAnalysis } from "./analyse"
 import { typedAssertionExpressions } from "./assertionChildren"
-import { enrichDocument, parseDocument } from "./compilation"
 import { defineExpressions } from "./defineArmChildren"
 import { describe, documentationOf } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
+import { enrichProbe, moduleDocumentOf } from "./moduleLink"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isAtOrBefore, isSmaller } from "./positions"
 import { probeSourcesFor, stripNoise } from "./probe"
@@ -64,8 +64,14 @@ export function findSignatureHelp(
 	documentText: string,
 	cursor: common.Cursor,
 	documentPath?: string,
-	document: DocumentAnalysis | null = null,
+	analysis: DocumentAnalysis | null = null,
 ): SignatureHelpInfo | null {
+	// NOTE: The same reading Completion makes, for the same reason — see
+	// `findCompletions`: a probe of a Module is linked against the document's
+	// dependencies, and a caller with no Workspace behind it pays for the link
+	// here rather than going without the names an import block brought in.
+	let document = analysis ?? moduleDocumentOf(documentText, documentPath)
+	let moduleView = document?.module ?? null
 	let lines = documentText.split("\n")
 	let headText = [
 		...lines.slice(0, cursor.line - 1),
@@ -82,23 +88,18 @@ export function findSignatureHelp(
 	}
 	let cursorPoint: common.Position = { start: probeCursor, end: probeCursor }
 
-	let enrichedProgram: common.typed.Program | null = null
 	let invocation: Invocation | null = null
 
 	// NOTE: A call written inside a Parameter's `= expression` default is one of
 	// the readings — see `probeSourcesFor`, which is what makes a Declaration
 	// whose head the cursor sits in parse at all.
 	for (let probeSource of probeSourcesFor(headText)) {
-		try {
-			let { program } = parseDocument(probeSource, documentPath)
+		// NOTE: The probe types the `tests { … }` block too — a call being
+		// written inside a test body is a call, and a Program enriched without
+		// the tests holds no Node for it at all.
+		let enrichedProgram = enrichProbe(probeSource, documentPath, moduleView)
 
-			// NOTE: The probe types the `tests { … }` block too — a call being
-			// written inside a test body is a call, and a Program enriched
-			// without the tests holds no Node for it at all.
-			enrichedProgram = enrichDocument(program, documentPath, {
-				tests: true,
-			}).program
-		} catch {
+		if (enrichedProgram === null) {
 			continue
 		}
 

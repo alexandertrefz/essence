@@ -38,6 +38,7 @@ import {
 	moduleSectionCursor,
 } from "./importCompletion"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
+import { enrichProbe, moduleDocumentOf, type ModuleView } from "./moduleLink"
 import { typeNamedAt } from "./namedTypes"
 import {
 	derivedEnumerableNamespace,
@@ -223,7 +224,7 @@ export function findCompletions(
 	cursor: common.Cursor,
 	documentPath?: string,
 	workspace: WorkspaceCompletions = { offers: [], namespaces: [] },
-	document: DocumentAnalysis | null = null,
+	analysis: DocumentAnalysis | null = null,
 ): Array<CompletionEntry> {
 	let lines = documentText.split("\n")
 	let currentLine = lines[cursor.line - 1] ?? ""
@@ -244,6 +245,21 @@ export function findCompletions(
 			workspace.offers,
 		)
 	}
+
+	// NOTE: The Workspace holds the document's own analysis for every open file
+	// and hands it in. A caller with no Workspace behind it — the tests, and
+	// anything holding a document as a string — pays here for the one thing it
+	// can not do without: a Module LINKED against its dependencies, so that the
+	// names its import block brought in are in reach of the probes below. A
+	// Program that is no Module needs nothing of the sort and gets nothing.
+	//
+	// Below the Module sections on purpose: a cursor inside `import { … }` is
+	// answered by the block itself, and paying for the graph to answer it would
+	// be paying for what that answer never reads.
+	let document = analysis ?? moduleDocumentOf(documentText, documentPath)
+	// NOTE: What every probe of this document is read against — null wherever
+	// the document is no Module, which is where a probe enriches alone.
+	let moduleView = document?.module ?? null
 
 	let specifierMatch = specifierTriggerPattern.exec(beforeCursor)
 	let methodMatch =
@@ -285,7 +301,9 @@ export function findCompletions(
 						headText,
 						documentPath,
 						`.${probeKeyName} = 0`,
-					)) ?? resolveProbedBase(headText, documentPath, suffix)
+						moduleView,
+					)) ??
+			resolveProbedBase(headText, documentPath, suffix, moduleView)
 
 		// NOTE: And the same probe with the document's own TAIL behind it,
 		// which is the only reading that can see what is declared BELOW the
@@ -305,8 +323,11 @@ export function findCompletions(
 			].join("\n")
 
 			base =
-				probeReading(`${headText}${suffix}${tailText}`, documentPath) ??
-				base
+				probeReading(
+					`${headText}${suffix}${tailText}`,
+					documentPath,
+					moduleView,
+				) ?? base
 		}
 
 		// NOTE: And the base that names a TYPE rather than a value — a Choice
@@ -377,6 +398,7 @@ export function findCompletions(
 			caseMatch.index,
 			caseMatch[1] ?? "",
 			documentPath,
+			moduleView,
 		)
 	}
 
@@ -409,6 +431,7 @@ export function findCompletions(
 			lines,
 			cursor,
 			documentPath,
+			moduleView,
 			space === "values" ? bindingsInReach(scopeEntries) : new Set(),
 		),
 		...scopeEntries,
@@ -447,7 +470,8 @@ function bindingsInReach(entries: Array<CompletionEntry>): Set<string> {
 function contextualCompletions(
 	lines: Array<string>,
 	cursor: common.Cursor,
-	documentPath?: string,
+	documentPath: string | undefined,
+	moduleView: ModuleView | null,
 	// NOTE: See `bindingsInReach`. Empty is not "nothing is in reach" but "do
 	// not say anything about the shorthand" — the offers themselves are the
 	// same either way.
@@ -461,17 +485,16 @@ function contextualCompletions(
 	let context: ArgumentContext | null = null
 
 	for (let probeSource of probeSourcesFor(headText)) {
-		try {
-			let { program } = parseDocument(probeSource, documentPath)
-			let { program: enrichedProgram } = enrichDocument(
-				program,
-				documentPath,
-				// NOTE: The probe types the `tests { … }` block too — an
-				// Argument being written inside a test body is an Argument, and
-				// a Program enriched without the tests holds no Node for it.
-				{ tests: true },
-			)
+		// NOTE: The probe types the `tests { … }` block too — an Argument being
+		// written inside a test body is an Argument, and a Program enriched
+		// without the tests holds no Node for it.
+		let enrichedProgram = enrichProbe(probeSource, documentPath, moduleView)
 
+		if (enrichedProgram === null) {
+			continue
+		}
+
+		try {
 			context = findArgumentContext(enrichedProgram, cursor, lines)
 		} catch {
 			continue
@@ -564,11 +587,12 @@ type ProbedBase = {
 
 function resolveProbedBase(
 	headText: string,
-	documentPath?: string,
-	suffix: string = `.${probeMemberName}`,
+	documentPath: string | undefined,
+	suffix: string,
+	moduleView: ModuleView | null,
 ): ProbedBase | null {
 	for (let probeSource of probeSourcesFor(headText, suffix)) {
-		let reading = probeReading(probeSource, documentPath)
+		let reading = probeReading(probeSource, documentPath, moduleView)
 
 		if (reading !== null) {
 			return reading
@@ -585,20 +609,24 @@ function resolveProbedBase(
 function probeReading(
 	probeSource: string,
 	documentPath: string | undefined,
+	moduleView: ModuleView | null,
 ): ProbedBase | null {
+	let enrichedProgram = enrichProbe(probeSource, documentPath, moduleView)
+
+	if (enrichedProgram === null) {
+		return null
+	}
+
 	try {
-		let { program } = parseDocument(probeSource, documentPath)
-		let { program: enrichedProgram } = enrichDocument(
-			program,
-			documentPath,
-			{ tests: true },
-		)
 		let baseType = findProbeReceiver(typedProgramNodes(enrichedProgram))
 
 		return baseType === null
 			? null
 			: { type: baseType, program: enrichedProgram }
 	} catch {
+		// NOTE: A reading the search itself could not finish is no reading
+		// either — a Completion list that throws is a Completion list that
+		// stops appearing, and the next reading may well answer.
 		return null
 	}
 }
@@ -636,7 +664,12 @@ function namedTypeBase(
 			continue
 		}
 
-		let type = typeNamedAt(name, cursor, program)
+		let type = typeNamedAt(
+			name,
+			cursor,
+			program,
+			document?.module?.imported ?? null,
+		)
 
 		if (type !== null) {
 			return { type, program }
@@ -1504,7 +1537,8 @@ function caseCompletions(
 	currentLine: string,
 	matchIndex: number,
 	choicePrefix: string,
-	documentPath?: string,
+	documentPath: string | undefined,
+	moduleView: ModuleView | null,
 ): Array<CompletionEntry> {
 	// NOTE: The in-progress `#name` is swapped for a synthetic Case reference so
 	// the whole document parses — later Choice declarations stay in view, and
@@ -1521,14 +1555,9 @@ function caseCompletions(
 		...lines.slice(cursor.line),
 	].join("\n")
 
-	let enrichedProgram: common.typed.Program | null = null
+	let enrichedProgram = enrichProbe(probeText, documentPath, moduleView)
 
-	try {
-		let { program } = parseDocument(probeText, documentPath)
-		enrichedProgram = enrichDocument(program, documentPath, {
-			tests: true,
-		}).program
-	} catch {
+	if (enrichedProgram === null) {
 		return []
 	}
 

@@ -9,8 +9,13 @@ export {
 } from "./graph"
 export { diskModuleHost, type ModuleHost } from "./host"
 export {
+	type Declaration,
 	type DeclaredKind,
 	type ExportSurface,
+	type ImportedNames,
+	type LinkContext,
+	linkContextOf,
+	linkModuleAgainst,
 	linkModuleGraph,
 	type LinkedGraph,
 	type LinkedModule,

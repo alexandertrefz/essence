@@ -23,6 +23,7 @@ import {
 	loadModuleGraph,
 	parseDocument,
 } from "./compilation"
+import type { ModuleView } from "./moduleLink"
 import type { ProgramIndex } from "./rename"
 
 // NOTE: Either Program is null when the stage that builds it threw — the
@@ -57,6 +58,11 @@ export type DocumentAnalysis = {
 	// comes from. Null where the caller holds none — it is rebuilt then, exactly
 	// as it always was.
 	index: ProgramIndex | null
+	// NOTE: What this document is LINKED against, when it is a Module: the
+	// names its import block bound, and the linked dependencies a probe of it
+	// has to be read against. Null for a Program that is no Module — nothing
+	// outside such a file is in reach, and a probe of it enriches alone.
+	module: ModuleView | null
 }
 
 type AnalysisOptions = {

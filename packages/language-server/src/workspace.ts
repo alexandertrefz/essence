@@ -34,6 +34,7 @@ import {
 	type DocumentSymbolEntry,
 	findDocumentSymbols,
 } from "./documentSymbols"
+import { type ModuleView, moduleViewsOf } from "./moduleLink"
 import {
 	type Declaration,
 	type DeclarationKind,
@@ -201,6 +202,12 @@ type FileEntry = {
 	// Memoised because it costs a `realpath` per specifier and is asked for by
 	// every walk of the dependency edges.
 	dependencies: Map<string, string> | null
+	// NOTE: What this file was LINKED against, when it is a Module: what its
+	// import block bound, and the surfaces of the graph it was linked in. Kept
+	// beside the typed Program because it belongs to the same link — it is what
+	// lets a probe of this file resolve the names the block brought in without
+	// reading the graph again. Null for a file that is no Module.
+	module: ModuleView | null
 }
 
 const diskVersion = -1
@@ -740,6 +747,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			diagnostics: null,
 			dependencyDiagnostics: null,
 			dependencies: null,
+			module: null,
 		}
 
 		files.set(filePath, entry)
@@ -935,6 +943,11 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			return false
 		}
 
+		// NOTE: One view per Module of this graph, built once: every Module in
+		// it is linked against the same surfaces, so the file under the cursor
+		// needs no graph of its own to probe against.
+		let views = moduleViewsOf(linked)
+
 		// NOTE: The graph knows every Module's dependencies for free, so the edge
 		// index is maintained from it rather than re-derived — but only the ones
 		// it could READ, and the edge an invalidation most needs is the other
@@ -984,6 +997,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			if (!moduleEntry.enrichmentAttempted) {
 				moduleEntry.enriched = module.program
 				moduleEntry.enrichmentAttempted = true
+				moduleEntry.module = views.get(modulePath) ?? null
 			}
 
 			if (modulePath === annotated && moduleEntry.annotations === null) {
@@ -1117,6 +1131,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		options: { cancellation?: Cancellation } = {},
 	): DocumentAnalysis | null {
 		let analysis = analysisOf(filePath, options)
+		let entry = files.get(filePath)
 
 		// NOTE: Null covers both "there is nothing here" and "the work was
 		// abandoned". Neither is a document a request may answer from: half an
@@ -1130,6 +1145,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			program: analysis.program,
 			enrichedProgram: analysis.enrichedProgram,
 			index: indexOf(filePath),
+			module: entry?.module ?? null,
 		}
 	}
 

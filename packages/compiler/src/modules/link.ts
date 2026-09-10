@@ -30,7 +30,7 @@ export type DeclaredKind =
 	| "choice"
 	| "protocol"
 
-type Declaration = {
+export type Declaration = {
 	kind: DeclaredKind
 	position: common.Position
 }
@@ -68,6 +68,23 @@ export type LinkedModule = {
 	// unless this is the Module `annotationsFor` asked about. Only a Hover ever
 	// wants them, and only for the file under the cursor.
 	annotations: Array<common.TypeAnnotation>
+	// NOTE: What this Module's `import { … }` block BOUND, under the local name
+	// each entry binds it as. The typed Program's own entries carry one Type
+	// apiece and no Protocol at all — see `boundEntryType` — which is enough to
+	// emit and to Hover over and not enough to say what a name in this file
+	// reaches: a Protocol imported to be used as a BOUND is in no table there,
+	// and a name that came across as both a Type and a Namespace shows only the
+	// value. A Language Server resolving a name against this Module needs the
+	// three tables its Scope was seeded with, so they are kept.
+	imported: ImportedNames
+}
+
+// NOTE: The three tables a Scope holds names in, narrowed to what one import
+// block put there.
+export type ImportedNames = {
+	values: Record<string, common.Type>
+	types: Record<string, common.Type>
+	protocols: Record<string, common.ProtocolType>
 }
 
 export type LinkedGraph = {
@@ -76,6 +93,12 @@ export type LinkedGraph = {
 	// it is the order the Module bodies run in.
 	modules: Map<string, LinkedModule>
 	diagnostics: Array<common.Diagnostic>
+	// NOTE: What every Module of the graph declares at its top level, which
+	// linking read off the AST before anything was enriched. Kept because
+	// linking ONE more Module against this graph needs the same answer — see
+	// `linkContextOf` — and reading it again is a walk per Module for something
+	// that was already computed here.
+	declarations: Map<string, Map<string, Declaration>>
 }
 
 function emptySurface(): ExportSurface {
@@ -566,7 +589,57 @@ export function linkModuleGraph(
 		entryPath: graph.entryPath,
 		modules: linked,
 		diagnostics: graph.diagnostics,
+		declarations,
 	}
+}
+
+// NOTE: What linking ONE more Module against a graph that is already linked
+// needs of that graph, and nothing else: the export surface every Module in it
+// published, and what each declares. Held apart from the `LinkedGraph` itself
+// because a caller that keeps one of these keeps a Type table and a name list,
+// while keeping the graph would pin every typed Program it produced.
+export type LinkContext = {
+	surfaces: Map<string, ExportSurface>
+	declarations: Map<string, Map<string, Declaration>>
+}
+
+export function linkContextOf(linked: LinkedGraph): LinkContext {
+	return {
+		surfaces: new Map(
+			[...linked.modules].map(([filePath, module]) => [
+				filePath,
+				module.surface,
+			]),
+		),
+		declarations: linked.declarations,
+	}
+}
+
+// NOTE: One Module, linked against dependencies that are linked already —
+// which is what a Language Server's probe is. A probe is the document with a
+// synthetic member written into it, so its whole import block resolves to the
+// same Modules the document's did, and re-reading and re-linking those on every
+// keystroke is the whole of what makes linking too expensive to probe through.
+// The surfaces are final and simply read back, exactly as they are for a lone
+// Module of an ordinary link.
+//
+// The Module's own surface is dropped first: it is the one thing in the context
+// that this link REPLACES, and `surfaceOf` reads a finished surface back before
+// it asks the Module being linked to build one.
+export function linkModuleAgainst(
+	module: Module,
+	context: LinkContext,
+	options: LinkOptions = {},
+): LinkedModule {
+	let declarations = new Map(context.declarations)
+
+	declarations.set(module.filePath, topLevelDeclarations(module.program))
+
+	let surfaces = new Map(context.surfaces)
+
+	surfaces.delete(module.filePath)
+
+	return linkGroup([module], declarations, surfaces, options)[0]!
 }
 
 // NOTE: Every Protocol declaration in a Module that provides at least one
@@ -820,8 +893,42 @@ function linkGroup(
 			],
 			surface,
 			annotations: enriched[index]!.annotations,
+			imported: importedNames(state),
 		}
 	})
+}
+
+// NOTE: Read off the Scope rather than off the surfaces the entries were bound
+// from, so that what is reported is what the Module actually ended up with: an
+// entry the hoist rounds never bound is absent, and one whose name a
+// declaration of this Module's own took is the declaration — which is the name
+// this file reaches, whatever the entry asked for.
+function importedNames(state: ModuleState): ImportedNames {
+	let imported: ImportedNames = { values: {}, types: {}, protocols: {} }
+
+	for (let binding of state.imports) {
+		if (binding.state !== "bound") {
+			continue
+		}
+
+		let value = state.scope.members[binding.localName]
+		let type = state.scope.types[binding.localName]
+		let protocol = state.scope.protocols[binding.localName]
+
+		if (value !== undefined) {
+			imported.values[binding.localName] = value
+		}
+
+		if (type !== undefined) {
+			imported.types[binding.localName] = type
+		}
+
+		if (protocol !== undefined) {
+			imported.protocols[binding.localName] = protocol
+		}
+	}
+
+	return imported
 }
 
 // NOTE: The surface of a Module already linked is final and simply read back; a
