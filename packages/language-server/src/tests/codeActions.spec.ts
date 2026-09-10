@@ -2119,6 +2119,166 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("unknown-modifier", () => {
+		it("should remove the word and the space in front of it", () => {
+			let lines = [
+				"implementation {",
+				"}",
+				"tests {",
+				'\ttest "ranks the table" slowly {}',
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Remove 'slowly'")
+			expect(fix.isPreferred).toBe(true)
+			expect(result[3]).toBe('\ttest "ranks the table" {}')
+
+			expect(testCodesOf(result)).toEqual([])
+		})
+
+		// NOTE: A literal always belongs to the Modifier in front of it, so the
+		// word deleted on its own would leave a `3` that opens nothing.
+		it("should take the arguments the Modifier was read with", () => {
+			let lines = [
+				"implementation {",
+				"}",
+				"tests {",
+				'\ttest "ranks the table" retries 3 {}',
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Remove 'retries'")
+			expect(result[3]).toBe('\ttest "ranks the table" {}')
+
+			expect(testCodesOf(result)).toEqual([])
+		})
+
+		// NOTE: The Enricher regroups what the Parser read before it reports —
+		// `tagged slow focussed` is read as `tagged` and `slow(focussed)`, and
+		// the typo it reports about is an ARGUMENT in the tree. So the fix finds
+		// no Modifier and takes the word alone, which is what `tagged slow`
+		// needs. The near miss also puts a spelling above the removal, and the
+		// removal stops being the preferred answer.
+		it("should offer the spelling above the removal for a near miss", () => {
+			let lines = [
+				"implementation {",
+				"}",
+				"tests {",
+				'\ttest "ranks the table" tagged slow focussed {}',
+				"}",
+			]
+
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Change to 'focused'",
+				"Remove 'focussed'",
+			])
+
+			expect(fixes[1].isPreferred).toBe(false)
+			expect(applied(lines, fixes[1])[3]).toBe(
+				'\ttest "ranks the table" tagged slow {}',
+			)
+		})
+	})
+
+	describe("contradictory-modifiers", () => {
+		// NOTE: Neither is preferred, which is the whole of what the Diagnostic
+		// has to say: which of the two was meant is not something the source
+		// says, and an Editor applying one unasked would be the guess it refuses
+		// to make.
+		it("should offer both Modifiers, and neither as the answer", () => {
+			let lines = [
+				"implementation {",
+				"}",
+				"tests {",
+				'\ttest "ranks the table" focused skipped "flaky" {}',
+				"}",
+			]
+
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Remove 'skipped'",
+				"Remove 'focused'",
+			])
+
+			expect(fixes.map((fix) => fix.isPreferred)).toEqual([false, false])
+		})
+
+		it("should take the reason String with the skip", () => {
+			let lines = [
+				"implementation {",
+				"}",
+				"tests {",
+				'\ttest "ranks the table" focused skipped "flaky" {}',
+				"}",
+			]
+
+			let [skip, focus] = quickFixes(lines)
+
+			expect(applied(lines, skip)[3]).toBe(
+				'\ttest "ranks the table" focused {}',
+			)
+
+			expect(applied(lines, focus)[3]).toBe(
+				'\ttest "ranks the table" skipped "flaky" {}',
+			)
+
+			expect(testCodesOf(applied(lines, focus))).toEqual([])
+		})
+	})
+
+	describe("duplicate-modifier", () => {
+		it("should write the second tagged's names onto the first", () => {
+			let lines = [
+				"implementation {",
+				"}",
+				"tests {",
+				'\ttest "ranks the table" tagged slow tagged network, flaky {}',
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Merge into one 'tagged'")
+			expect(fix.isPreferred).toBe(true)
+			expect(result[3]).toBe(
+				'\ttest "ranks the table" tagged slow, network, flaky {}',
+			)
+
+			expect(testCodesOf(result)).toEqual([])
+		})
+
+		// NOTE: Every other Modifier says ONE thing, so there is nothing to
+		// merge. The Enricher already keeps the first, and the edit says so.
+		it("should remove the second of a Modifier that carries nothing", () => {
+			let lines = [
+				"implementation {",
+				"}",
+				"tests {",
+				'\ttest "ranks the table" focused focused {}',
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Remove the second 'focused'")
+			expect(fix.isPreferred).toBe(false)
+			expect(result[3]).toBe('\ttest "ranks the table" focused {}')
+
+			expect(testCodesOf(result)).toEqual([])
+		})
+	})
+
 	describe("Type annotations", () => {
 		it("should offer the inferred Type of a Constant as an edit", () => {
 			let lines = ["implementation {", '\tconstant name = "Ada"', "}"]

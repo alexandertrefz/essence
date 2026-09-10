@@ -205,6 +205,24 @@ export function extendOverLeadingBreak(
 	}
 }
 
+// NOTE: The smaller sibling of the deletion above: the blanks in FRONT of
+// `cursor` on its own line, taken with whatever starts there. `test "a"
+// focused {` becomes `test "a" {` rather than `test "a"  {`. Where nothing but
+// whitespace precedes it, that whitespace is the line's indentation and stays
+// — eating it would join the line to the one above, which is what
+// `extendOverLeadingBreak` is for.
+export function extendOverLeadingSpace(
+	lines: Array<string>,
+	cursor: common.Cursor,
+): common.Cursor {
+	let before = lineAt(lines, cursor.line).slice(0, cursor.column - 1)
+	let trimmed = before.replace(/[ \t]+$/, "")
+
+	return trimmed === ""
+		? cursor
+		: { line: cursor.line, column: trimmed.length + 1 }
+}
+
 // NOTE: The first `}` at or after `cursor`, one past it — the Handler's own
 // closing brace, since everything its body opened is already closed by the
 // time its last Node ends. Text inside a `§` comment is skipped, which is the

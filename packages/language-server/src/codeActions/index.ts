@@ -56,6 +56,11 @@ import {
 	expandShorthandKeyAction,
 	expandShorthandPathAction,
 } from "./shorthandFixes"
+import {
+	contradictoryModifierActions,
+	mergeModifierAction,
+	removeModifierAction,
+} from "./testFixes"
 import { bareCaseAction, removeEntryAction } from "./valueFixes"
 
 // NOTE: Every edit here is computed from the text handed in, on a fresh
@@ -238,6 +243,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(removeDefaultAction(diagnostic, lines)),
 	"constant-reassignment": ({ diagnostic, program, lines }) =>
 		listed(constantToVariableAction(diagnostic, program, lines)),
+	"contradictory-modifiers": ({ diagnostic, lines }) =>
+		contradictoryModifierActions(diagnostic, lines),
 	"declarations-outside-stdlib": ({ diagnostic, lines }) =>
 		listed(implementationHeaderAction(diagnostic, lines)),
 	"default-on-function-literal": ({ diagnostic, lines }) =>
@@ -250,6 +257,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(otherwiseArmAction(diagnostic, lines)),
 	"duplicate-key": ({ diagnostic, program, lines }) =>
 		listed(removeEntryAction(diagnostic, program, lines)),
+	"duplicate-modifier": ({ diagnostic, lines }) =>
+		listed(mergeModifierAction(diagnostic, lines)),
 	"export-of-variable": ({ diagnostic, program, lines }) =>
 		listed(variableToConstantAction(diagnostic, program, lines)),
 	"fallback-never-used": ({ diagnostic, lines }) =>
@@ -303,6 +312,20 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"unknown-method": (context) => [
 		...namespaceImportActions(context.diagnostic, context.imports),
 		...spellingFix(context),
+	],
+	// NOTE: A Modifier that is not one has two answers and the Diagnostic says
+	// which: a near miss is a misspelling, and anything else is a word that
+	// belongs in the body or nowhere. The spelling stands above the removal
+	// where there is one, since it is what leaves the reader's intent alone.
+	"unknown-modifier": (context) => [
+		...spellingFix(context),
+		...listed(
+			removeModifierAction(
+				context.diagnostic,
+				context.program,
+				context.lines,
+			),
+		),
 	],
 	"unknown-name": importOrSpellingFix,
 	"unknown-protocol": importOrSpellingFix,

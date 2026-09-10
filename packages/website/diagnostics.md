@@ -506,6 +506,11 @@ tests {
 A Modifier is what the runner reads, never what the test does — so anything the
 runner does not know goes in the body, or goes away.
 
+**Quick Fix — "Remove 'x'":** takes the word out, together with any arguments
+the Parser read into it — `retries 3` goes whole. Where the Diagnostic names a
+near miss the spelling fix is offered above it and this one stops being the
+preferred answer, since a typo is the likelier reading.
+
 ### `duplicate-modifier`
 
 One `test` or `suite` carries the same Modifier twice. A Modifier says something
@@ -518,6 +523,12 @@ tests {
 ```
 
 Write every tag on one `tagged`, separated by commas.
+
+**Quick Fix — "Merge into one 'tagged'":** writes the second `tagged`'s names
+onto the first and deletes it, which loses nothing and is why it is preferred.
+Every other Modifier says one thing and has nothing to merge, so its fix is
+"Remove the second 'x'" — never preferred, since which of the two was meant is
+not something the source says.
 
 ### `malformed-modifier`
 
@@ -561,6 +572,10 @@ tests {
 `focused` asks for this one to run and for the rest not to; `skipped` asks for
 it never to run. Which was meant is not something the source says, so neither
 wins — say what you mean.
+
+**Quick Fix — "Remove 'skipped'" and "Remove 'focused'":** two actions, one per
+Modifier, and neither is preferred for exactly the reason above. The skip takes
+its reason String with it.
 
 ### `duplicate-test-name`
 

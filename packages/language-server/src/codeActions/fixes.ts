@@ -9,6 +9,7 @@ import {
 	commaAfter,
 	commaBefore,
 	extendOverLeadingBreak,
+	extendOverLeadingSpace,
 	indentationOf,
 	insertBeforeClosingBrace,
 	keywordBefore,
@@ -500,44 +501,61 @@ export function wrapInHoldingCaseActions(
 	})
 }
 
-// NOTE: The Diagnostic spans exactly the `focused` Modifier, and what has to go
-// is the word and the space in front of it — `test "a" focused {` becomes
-// `test "a" {`. Where nothing but whitespace stands in front of it the word
-// alone goes: the Modifier is on a line of its own, and eating the indentation
-// would join it to the line above.
-export function removeFocusedAction(
+// NOTE: A Modifier taken back out by the word it is written as — the word and
+// the space in front of it, so that `test "a" focused {` becomes `test "a" {`.
+// The word is read back off the buffer and held against what the Diagnostic
+// says stands there, as every edit here is: a Position from a stale analysis
+// pointing at something else would delete that instead.
+//
+// `span` is what actually goes, where the word carries something that goes with
+// it — a Modifier the Parser read arguments into takes them along, or `3` is
+// left standing where `retries 3` was. The word's own span otherwise, which is
+// every Modifier that was written alone.
+export function removeWordAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
+	options: {
+		word: string
+		span?: common.Position
+		title: string
+		isPreferred: boolean
+	},
 ): CodeActionEntry | null {
-	if (sliceOf(lines, diagnostic.position) !== "focused") {
+	if (sliceOf(lines, diagnostic.position) !== options.word) {
 		return null
 	}
 
-	let line = lines[diagnostic.position.start.line - 1] ?? ""
-	let before = line.slice(0, diagnostic.position.start.column - 1)
-	let trimmed = before.replace(/[ \t]+$/, "")
-	let column =
-		trimmed === "" ? diagnostic.position.start.column : trimmed.length + 1
+	let span = options.span ?? diagnostic.position
 
 	return {
-		title: "Remove 'focused'",
+		title: options.title,
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
-		isPreferred: true,
+		isPreferred: options.isPreferred,
 		edits: [
 			{
 				range: {
-					start: {
-						line: diagnostic.position.start.line,
-						column,
-					},
-					end: diagnostic.position.end,
+					start: extendOverLeadingSpace(lines, span.start),
+					end: span.end,
 				},
 				newText: "",
 			},
 		],
 	}
+}
+
+// NOTE: The Diagnostic spans exactly the `focused` Modifier, which takes no
+// arguments — so the word is the whole of what goes.
+export function removeFocusedAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
+): CodeActionEntry | null {
+	return removeWordAction(diagnostic, lines, {
+		word: "focused",
+		title: "Remove 'focused'",
+		isPreferred: true,
+	})
 }
 
 // NOTE: The most mechanical fix the language has: an update written in the
