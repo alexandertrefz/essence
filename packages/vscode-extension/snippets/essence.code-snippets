@@ -26,6 +26,53 @@
 		],
 		"description": "A tests block — written below the implementation, and dropped from every build."
 	},
+	"import": {
+		"prefix": "import",
+		"body": [
+			"import {",
+			"\tfrom \"${1:./Module.es}\" { ${0:Name} }",
+			"}"
+		],
+		"description": "An import block — every name this Module takes from another one."
+	},
+	"export": {
+		"prefix": "export",
+		"body": [
+			"export {",
+			"\t${0:Name}",
+			"}"
+		],
+		"description": "An export block — the names this Module offers; everything else stays private."
+	},
+	"tests-file": {
+		"prefix": "tests-file",
+		"body": [
+			"import {",
+			"\tfrom \"${1:./Module.es}\" { ${2:Name} }",
+			"}",
+			"",
+			"tests {",
+			"\ttest \"${3:what it proves}\" {",
+			"\t\texpect $0",
+			"\t}",
+			"}"
+		],
+		"description": "A file that is nothing but tests — an import block and a tests block, and no implementation."
+	},
+	"from": {
+		"prefix": "from",
+		"body": [
+			"from \"${1:./Module.es}\" { ${0:Name} }"
+		],
+		"description": "One import group — every name taken from one dependency."
+	},
+	"export-from": {
+		"prefix": "export-from",
+		"body": [
+			"from \"${1:./Module.es}\" { ${0:Name} }"
+		],
+		"description": "One export group — a dependency's name forwarded without ever being bound here."
+	},
 	"constant": {
 		"prefix": "constant",
 		"body": [
@@ -101,6 +148,17 @@
 		],
 		"description": "A Record type alias."
 	},
+	"generatable": {
+		"prefix": "generatable",
+		"body": [
+			"namespace ${1:Name} for ${2:Type} is Generatable {",
+			"\tstatic generate(from source: Randomness) -> ${2:Type} {",
+			"\t\t<- $0",
+			"\t}",
+			"}"
+		],
+		"description": "A Generatable conformance — what a property test draws a value of this Type from."
+	},
 	"overload": {
 		"prefix": "overload",
 		"body": [
@@ -120,6 +178,46 @@
 			"}"
 		],
 		"description": "A test — one named body of assertions."
+	},
+	"test-tagged": {
+		"prefix": "test-tagged",
+		"body": [
+			"test \"${1:what it proves}\" tagged ${2:slow} {",
+			"\texpect $0",
+			"}"
+		],
+		"description": "A tagged test — the tags a run selects on, plus every enclosing suite's."
+	},
+	"test-skipped": {
+		"prefix": "test-skipped",
+		"body": [
+			"test \"${1:what it proves}\"",
+			"\tskipped \"${2:why it is skipped}\"",
+			"{",
+			"\texpect $0",
+			"}"
+		],
+		"description": "A skipped test — still compiled and Type-checked, and the reason is mandatory."
+	},
+	"test-focused": {
+		"prefix": "test-focused",
+		"body": [
+			"test \"${1:what it proves}\" focused {",
+			"\texpect $0",
+			"}"
+		],
+		"description": "A focused test — while one exists, only focused tests run, and the run says so."
+	},
+	"test-across": {
+		"prefix": "test-across",
+		"body": [
+			"test \"${1:what it proves}\" across [",
+			"\t{ ${2:member} = ${3:value} },",
+			"] ({ ${2:member} }: ${4:Row}) {",
+			"\texpect $0",
+			"}"
+		],
+		"description": "A table test — one run per row of a written List."
 	},
 	"for any": {
 		"prefix": "for any",
@@ -147,6 +245,41 @@
 			"}"
 		],
 		"description": "A suite — a group of tests sharing a scope."
+	},
+	"expect": {
+		"prefix": "expect",
+		"body": [
+			"expect ${1:value}::is($0)"
+		],
+		"description": "An assertion — it records its result and carries on, so one test can report several failures."
+	},
+	"require": {
+		"prefix": "require",
+		"body": [
+			"require #${1:Value}(${2:binding}) = $0"
+		],
+		"description": "A Case taken apart — a failed require ends the test where it stands."
+	},
+	"require-pattern": {
+		"prefix": "require-pattern",
+		"body": [
+			"require { ${1:member} } as ${2:whole} = $0"
+		],
+		"description": "A Pattern taken apart, with the whole of what it proved named beside its members."
+	},
+	"snapshot": {
+		"prefix": "snapshot",
+		"body": [
+			"expect ${0:value} matches snapshot"
+		],
+		"description": "An inline snapshot — the first run writes the value back here, through the formatter."
+	},
+	"snapshot-from": {
+		"prefix": "snapshot-from",
+		"body": [
+			"expect ${1:value} matches snapshot from \"${0:name}\""
+		],
+		"description": "A named snapshot, kept in `__snapshots__` beside the file — where output too large to read inline belongs."
 	},
 	"record-typed": {
 		"prefix": "record-typed",

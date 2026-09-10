@@ -384,9 +384,13 @@ describe("Completion in the Module sections", () => {
 			)
 			let entries = completions(text, { line: 3, column: 2 })
 
+			// NOTE: The bare `from` last is the snippet, which writes a group
+			// for the Modules a workspace could not offer one for — a file
+			// that is not there yet, and a workspace nobody indexed.
 			expect(entries.map((entry) => entry.label)).toEqual([
 				'from "./Geometry.es"',
 				'from "./math/Math.es"',
+				"from",
 			])
 			expect(entries[0]?.insertText).toBe('from "./Geometry.es" { $0 }')
 			expect(entries[0]?.replaces).toEqual({
@@ -421,6 +425,7 @@ describe("Completion in the Module sections", () => {
 				['from "./Geometry.es"', "module"],
 				['from "./Season.es"', "module"],
 				['from "./math/Math.es"', "module"],
+				["export-from", "snippet"],
 			])
 		})
 

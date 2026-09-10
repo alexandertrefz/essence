@@ -135,6 +135,50 @@ export const snippets: Array<Snippet> = [
 		body: ["tests {", "\t$0", "}"],
 		contexts: ["top"],
 	},
+	{
+		prefix: "import",
+		description:
+			"An import block — every name this Module takes from another one.",
+		body: ["import {", '\tfrom "${1:./Module.es}" { ${0:Name} }', "}"],
+		contexts: ["top"],
+	},
+	{
+		prefix: "export",
+		description:
+			"An export block — the names this Module offers; everything else stays private.",
+		body: ["export {", "\t${0:Name}", "}"],
+		contexts: ["top"],
+	},
+	{
+		prefix: "tests-file",
+		description:
+			"A file that is nothing but tests — an import block and a tests block, and no implementation.",
+		body: [
+			"import {",
+			'\tfrom "${1:./Module.es}" { ${2:Name} }',
+			"}",
+			"",
+			"tests {",
+			'\ttest "${3:what it proves}" {',
+			"\t\texpect $0",
+			"\t}",
+			"}",
+		],
+		contexts: ["top"],
+	},
+	{
+		prefix: "from",
+		description: "One import group — every name taken from one dependency.",
+		body: ['from "${1:./Module.es}" { ${0:Name} }'],
+		contexts: ["import"],
+	},
+	{
+		prefix: "export-from",
+		description:
+			"One export group — a dependency's name forwarded without ever being bound here.",
+		body: ['from "${1:./Module.es}" { ${0:Name} }'],
+		contexts: ["export"],
+	},
 
 	/* Declarations */
 
@@ -214,6 +258,19 @@ export const snippets: Array<Snippet> = [
 		body: ["type ${1:Name} = { ${2:member}: ${0:Type} }"],
 		contexts: ["implementation", "declarations"],
 	},
+	{
+		prefix: "generatable",
+		description:
+			"A Generatable conformance — what a property test draws a value of this Type from.",
+		body: [
+			"namespace ${1:Name} for ${2:Type} is Generatable {",
+			"\tstatic generate(from source: Randomness) -> ${2:Type} {",
+			"\t\t<- $0",
+			"\t}",
+			"}",
+		],
+		contexts: ["implementation"],
+	},
 
 	/* Namespace and Protocol members */
 
@@ -239,6 +296,49 @@ export const snippets: Array<Snippet> = [
 		contexts: ["tests"],
 	},
 	{
+		prefix: "test-tagged",
+		description:
+			"A tagged test — the tags a run selects on, plus every enclosing suite's.",
+		body: [
+			'test "${1:what it proves}" tagged ${2:slow} {',
+			"\texpect $0",
+			"}",
+		],
+		contexts: ["tests"],
+	},
+	{
+		prefix: "test-skipped",
+		description:
+			"A skipped test — still compiled and Type-checked, and the reason is mandatory.",
+		body: [
+			'test "${1:what it proves}"',
+			'\tskipped "${2:why it is skipped}"',
+			"{",
+			"\texpect $0",
+			"}",
+		],
+		contexts: ["tests"],
+	},
+	{
+		prefix: "test-focused",
+		description:
+			"A focused test — while one exists, only focused tests run, and the run says so.",
+		body: ['test "${1:what it proves}" focused {', "\texpect $0", "}"],
+		contexts: ["tests"],
+	},
+	{
+		prefix: "test-across",
+		description: "A table test — one run per row of a written List.",
+		body: [
+			'test "${1:what it proves}" across [',
+			"\t{ ${2:member} = ${3:value} },",
+			"] ({ ${2:member} }: ${4:Row}) {",
+			"\texpect $0",
+			"}",
+		],
+		contexts: ["tests"],
+	},
+	{
 		prefix: "for any",
 		description: "A property test — one body run over generated values.",
 		body: [
@@ -259,6 +359,41 @@ export const snippets: Array<Snippet> = [
 		description: "A suite — a group of tests sharing a scope.",
 		body: ['suite "${1:name}" {', "\t$0", "}"],
 		contexts: ["tests"],
+	},
+	{
+		prefix: "expect",
+		description:
+			"An assertion — it records its result and carries on, so one test can report several failures.",
+		body: ["expect ${1:value}::is($0)"],
+		contexts: ["test"],
+	},
+	{
+		prefix: "require",
+		description:
+			"A Case taken apart — a failed require ends the test where it stands.",
+		body: ["require #${1:Value}(${2:binding}) = $0"],
+		contexts: ["test"],
+	},
+	{
+		prefix: "require-pattern",
+		description:
+			"A Pattern taken apart, with the whole of what it proved named beside its members.",
+		body: ["require { ${1:member} } as ${2:whole} = $0"],
+		contexts: ["test"],
+	},
+	{
+		prefix: "snapshot",
+		description:
+			"An inline snapshot — the first run writes the value back here, through the formatter.",
+		body: ["expect ${0:value} matches snapshot"],
+		contexts: ["test"],
+	},
+	{
+		prefix: "snapshot-from",
+		description:
+			"A named snapshot, kept in `__snapshots__` beside the file — where output too large to read inline belongs.",
+		body: ['expect ${1:value} matches snapshot from "${0:name}"'],
+		contexts: ["test"],
 	},
 
 	/* Values */

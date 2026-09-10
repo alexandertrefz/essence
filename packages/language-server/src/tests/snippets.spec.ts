@@ -207,7 +207,9 @@ describe("Snippet completion", () => {
 		})
 
 		expect(offered).toContain("implementation")
+		expect(offered).toContain("import")
 		expect(offered).toContain("tests")
+		expect(offered).toContain("tests-file")
 		expect(offered).not.toContain("constant")
 		expect(offered).not.toContain("case")
 	})
@@ -296,7 +298,9 @@ describe("Snippet completion", () => {
 
 		expect(offered).toContain("test")
 		expect(offered).toContain("suite")
+		expect(offered).toContain("test-across")
 		expect(offered).toContain("constant")
+		expect(offered).not.toContain("expect")
 		expect(offered).not.toContain("namespace")
 	})
 
@@ -315,9 +319,30 @@ describe("Snippet completion", () => {
 			{ line: 6, column: 3 },
 		)
 
+		expect(offered).toContain("expect")
+		expect(offered).toContain("require")
+		expect(offered).toContain("snapshot")
 		expect(offered).toContain("constant")
 		expect(offered).not.toContain("test")
 		expect(offered).not.toContain("namespace")
+	})
+
+	it("offers a group inside an import block", () => {
+		let offered = snippetsAt(
+			["import {", "\t", "}", "", "implementation {", "}"],
+			{ line: 2, column: 2 },
+		)
+
+		expect(offered).toEqual(["from"])
+	})
+
+	it("offers a forwarding group inside an export block", () => {
+		let offered = snippetsAt(
+			["implementation {", "}", "", "export {", "\t", "}"],
+			{ line: 5, column: 2 },
+		)
+
+		expect(offered).toEqual(["export-from"])
 	})
 
 	it("offers the values of an Expression position", () => {
