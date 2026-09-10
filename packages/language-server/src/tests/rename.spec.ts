@@ -932,6 +932,10 @@ describe("isValidIdentifierName", () => {
 		expect(isValidIdentifierName("match")).toBe(false)
 		expect(isValidIdentifierName("choice")).toBe(false)
 		expect(isValidIdentifierName("true")).toBe(false)
+		// NOTE: `define` opens an Expression, so a Declaration named after it
+		// is read as one: `constant define = 1` is a syntax error, and so is
+		// every line that names it afterwards.
+		expect(isValidIdentifierName("define")).toBe(false)
 	})
 })
 

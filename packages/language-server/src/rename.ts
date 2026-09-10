@@ -268,6 +268,7 @@ const reservedWords = new Set([
 	"match",
 	"case",
 	"with",
+	"define",
 	"namespace",
 	"protocol",
 	"for",
