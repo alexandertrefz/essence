@@ -22,7 +22,10 @@ up.
 Some codes carry a Quick Fix, offered by the Language Server on the underlined
 span and noted below the code it belongs to. There is deliberately no "fix
 all": none of these rewrites is both semantics-preserving and unambiguous, so
-each one is applied by hand and read before it is accepted.
+each one is applied by hand and read before it is accepted. The one exception
+is [`unused-import`](#unused-import), which carries a **Source Action** that
+answers every one of them in the document at once — removing an entry nothing
+reads is both of those things, which is what a bulk action has to be.
 
 A code's action may also be a **Rewrite**, which sits under Refactor rather than
 on the squiggle and is never the preferred action —
@@ -2993,6 +2996,17 @@ call never spells its name: `rect::area()` is what an imported
 all. The check deliberately over-counts elsewhere — a name that only appears as
 a Method name is treated as a use — because a Warning that fires on a name the
 Module does need is worse than one that stays silent.
+
+**Quick Fix — "Remove the unused import of 'X'":** deletes the whole line the
+entry stands on, and the group with it where that entry was the last one left —
+`from "./A.es" {}` imports nothing and says so on two lines. The Warning points
+at the LOCAL name, which is the alias where there is one.
+
+**Source Action — "Remove the unused imports":** the same deletion for every
+`unused-import` in the document at once, offered from the Source Action menu
+rather than on one squiggle. Sorting is not its job: the Formatter orders an
+import block, and a second ordering beside it would be two answers to one
+question.
 
 ### `dependency-has-errors`
 

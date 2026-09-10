@@ -3,13 +3,12 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { type Analysis, analyseDocument, documentFilePath } from "../analyse"
 import { indexProgram, type ProgramIndex } from "../rename"
 import type { Workspace } from "../workspace"
-import { constantActions } from "./constants"
-import { defineActions } from "./defines"
 import {
 	compareWrittenValueAction,
 	matcherBeforeValueAction,
 	requireKeywordAction,
 } from "./assertionFixes"
+import { constantActions } from "./constants"
 import {
 	dropStaticAction,
 	dropWhereClauseAction,
@@ -22,6 +21,7 @@ import {
 	otherwiseArmAction,
 	unreachableDefineArmActions,
 } from "./defineFixes"
+import { defineActions } from "./defines"
 import { documentFunctionActions } from "./documentFunction"
 import {
 	argumentLabelAction,
@@ -61,6 +61,7 @@ import {
 	implementProtocolAction,
 	implementProtocolActions,
 } from "./implementProtocol"
+import { organizeImportActions } from "./imports"
 import {
 	closeStringAction,
 	documentationSeparatorAction,
@@ -196,6 +197,10 @@ export function findCodeActions(
 
 	let lines = documentText.split("\n")
 	let entries: Array<CodeActionEntry> = []
+	// NOTE: What this request answers about — the compile's own Diagnostics and
+	// the ones no compile produced, read as one list. The registry below takes
+	// the ones the requested range touches; a `source.*` action takes them all.
+	let reported = [...diagnostics, ...extra]
 	let imports: ImportContext | null =
 		workspace === undefined || documentPath === undefined
 			? null
@@ -206,7 +211,7 @@ export function findCodeActions(
 					program,
 				}
 
-	for (let diagnostic of [...diagnostics, ...extra]) {
+	for (let diagnostic of reported) {
 		if (
 			diagnostic.position === null ||
 			!overlaps(diagnostic.position, range)
@@ -245,6 +250,7 @@ export function findCodeActions(
 	entries.push(
 		...constantActions(program, () => indexed().index, lines, range),
 	)
+	entries.push(...organizeImportActions(program, lines, reported))
 
 	return entries
 }

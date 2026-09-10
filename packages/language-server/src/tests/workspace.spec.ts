@@ -1706,6 +1706,165 @@ describe("Workspace", () => {
 		})
 	})
 
+	// NOTE: The one SOURCE action this Server offers, and the only bulk rewrite
+	// it will ever offer: removing an entry nothing reads is unambiguous and
+	// leaves the Program's meaning alone, which is what a bulk action has to be.
+	describe("organizing imports", () => {
+		const toolbox = [
+			"implementation {",
+			"",
+			"\ttype Rectangle = { width: Integer, height: Integer }",
+			"",
+			"\tconstant ONE = 1",
+			"",
+			"\tconstant TWO = 2",
+			"}",
+			"",
+			"export {",
+			"\tRectangle",
+			"\tONE",
+			"\tTWO",
+			"}",
+			"",
+		].join("\n")
+
+		let organizeAction = (
+			workspace: Workspace,
+			filePath: string,
+		): CodeActionEntry | undefined =>
+			findCodeActions(
+				workspace.sourceOf(filePath) ?? "",
+				spanOf(workspace.sourceOf(filePath) ?? "", 1, "import"),
+				filePath,
+				workspace,
+			).find((action) => action.kind === "source.organizeImports")
+
+		it("should remove every unused entry of a group at once", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Toolbox.es": toolbox,
+				"Main.es": [
+					"import {",
+					'\tfrom "./Toolbox.es" {',
+					"\t\tRectangle",
+					"\t\tONE",
+					"\t\tTWO",
+					"\t}",
+					"}",
+					"",
+					"implementation {",
+					"\tfunction widthOf(_ shape: Rectangle) -> Integer {",
+					"\t\t<- shape.width",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let action = organizeAction(workspace, mainPath) as CodeActionEntry
+
+			expect(action.title).toBe("Remove the unused imports")
+			expect(action.diagnosticCode).toBeNull()
+			expect(action.isPreferred).toBe(false)
+
+			let result = appliedTo(
+				workspace.sourceOf(mainPath) ?? "",
+				action.edits,
+			)
+
+			expect(result).toBe(
+				[
+					"import {",
+					'\tfrom "./Toolbox.es" {',
+					"\t\tRectangle",
+					"\t}",
+					"}",
+					"",
+					"implementation {",
+					"\tfunction widthOf(_ shape: Rectangle) -> Integer {",
+					"\t\t<- shape.width",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			)
+			expect(
+				analyseDocument(result, mainPath, {
+					host: workspace.host,
+				}).diagnostics.map((diagnostic) => diagnostic.code),
+			).toEqual([])
+		})
+
+		// NOTE: One deletion for the group rather than one per entry — the
+		// lines the entries stand on are the group's own lines too, and two
+		// deletions over them would overlap.
+		it("should take a group that empties with its last entry", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Geometry.es": geometry,
+				"Toolbox.es": toolbox,
+				"Main.es": [
+					"import {",
+					'\tfrom "./Geometry.es" {',
+					"\t\tRectangle",
+					"\t\tRectangleMeasurable",
+					"\t}",
+					'\tfrom "./Toolbox.es" { ONE }',
+					"}",
+					"",
+					"implementation {",
+					"\tconstant width = ONE",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let action = organizeAction(workspace, mainPath) as CodeActionEntry
+			let result = appliedTo(
+				workspace.sourceOf(mainPath) ?? "",
+				action.edits,
+			)
+
+			expect(result).toBe(
+				[
+					"import {",
+					'\tfrom "./Toolbox.es" { ONE }',
+					"}",
+					"",
+					"implementation {",
+					"\tconstant width = ONE",
+					"}",
+					"",
+				].join("\n"),
+			)
+			expect(
+				analyseDocument(result, mainPath, {
+					host: workspace.host,
+				}).diagnostics.map((diagnostic) => diagnostic.code),
+			).toEqual([])
+		})
+
+		it("should offer nothing where every entry is read", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Geometry.es": geometry,
+				"Main.es": [
+					"import {",
+					'\tfrom "./Geometry.es" { Rectangle }',
+					"}",
+					"",
+					"implementation {",
+					"\tfunction widthOf(_ shape: Rectangle) -> Integer {",
+					"\t\t<- shape.width",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			expect(organizeAction(workspace, pathOf("Main.es"))).toBeUndefined()
+		})
+	})
+
 	describe("graph-aware analysis", () => {
 		it("should resolve imported names and report a dependency under its own path", () => {
 			let { workspace, pathOf } = makeWorkspace({
