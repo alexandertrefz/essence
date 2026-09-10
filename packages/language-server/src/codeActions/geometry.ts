@@ -275,6 +275,62 @@ export function commaBefore(
 	}
 }
 
+// NOTE: Where the contents of a braced Literal END — the cursor just past the
+// last thing written inside it, whitespace and line breaks walked back over,
+// and just past the opening brace where nothing is written at all. What a
+// member scaffolded into a Record Literal is written after, so that the
+// Literal's own layout survives: one written on a line takes the new members
+// beside it and one written over several takes them on lines of their own.
+//
+// Null where the span does not read as a braced Literal, as everything here
+// refuses text that is not what the Node said it would be.
+export function endOfContents(
+	lines: Array<string>,
+	position: common.Position,
+): common.Cursor | null {
+	let brace = closingBraceOf(position.end)
+	let opening = {
+		line: position.start.line,
+		column: position.start.column + 1,
+	}
+
+	if (
+		sliceOf(lines, { start: position.start, end: opening }) !== "{" ||
+		sliceOf(lines, { start: brace, end: position.end }) !== "}"
+	) {
+		return null
+	}
+
+	let cursor = brace
+
+	while (cursor.line > position.start.line) {
+		let written = lineAt(lines, cursor.line)
+			.slice(0, cursor.column - 1)
+			.replace(/[ \t]+$/, "")
+
+		if (written !== "") {
+			return { line: cursor.line, column: written.length + 1 }
+		}
+
+		cursor = {
+			line: cursor.line - 1,
+			column: lineAt(lines, cursor.line - 1).length + 1,
+		}
+	}
+
+	// NOTE: Back on the opening brace's own line, where everything to its left
+	// belongs to the Expression the Literal is written in — so the walk stops
+	// at the brace rather than at the first thing it finds.
+	let written = lineAt(lines, position.start.line)
+		.slice(0, cursor.column - 1)
+		.replace(/[ \t]+$/, "")
+
+	return {
+		line: position.start.line,
+		column: Math.max(written.length + 1, opening.column),
+	}
+}
+
 // NOTE: Where the label written immediately in front of a value stands, or null
 // where the text does not read as that label. Whitespace and line breaks are
 // walked through and nothing else is — a Comment between the two, a name the

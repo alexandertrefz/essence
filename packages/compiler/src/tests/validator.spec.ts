@@ -2362,6 +2362,28 @@ describe("Validator", () => {
 	// leaves an Argument out is judged against, and what a signature that
 	// accepts a RANGE of Argument counts says about itself.
 	describe("Default Parameter Values", () => {
+		// NOTE: In the Parameter's declaration order rather than the order the
+		// Argument happened to leave them out in — a scaffold writes them where
+		// it finds them, and members shuffled by a Quick Fix read as though the
+		// Compiler had rearranged the Record.
+		it("should carry the missing members of a partial Argument", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Options = { host: String, port: Integer, retries: Integer }
+
+				function connect(using options: Options = { retries = 3 }) -> Integer {
+					<- options.port
+				}
+
+				constant opened = connect(using { retries = 1 })
+			}`)
+
+			expect(diagnostics[0].code).toBe("incomplete-record-argument")
+			expect(diagnostics[0].data).toEqual({
+				kind: "missing-members",
+				names: ["host", "port"],
+			})
+		})
+
 		it("should accept a call that omits a default", () => {
 			expect(
 				diagnosticsFor(`implementation {

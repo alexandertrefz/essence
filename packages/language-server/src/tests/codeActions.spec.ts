@@ -1199,6 +1199,124 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("incomplete-record-argument", () => {
+		const CONNECT = [
+			"implementation {",
+			"\ttype Options = { host: String, port: Integer, retries: Integer }",
+			"",
+			"\tfunction connect(using options: Options = { retries = 3 }) -> Integer {",
+			"\t\t<- options.port",
+			"\t}",
+			"",
+		]
+
+		// NOTE: `{}` is the hole, and the Argument stays refused until it is
+		// filled — which is why the action is not preferred. `argument-type-
+		// mismatch` is what the reader is left with, and it is what the unit
+		// Type standing where a String and an Integer belong deserves.
+		it("should write the missing members beside the ones written", () => {
+			let lines = [
+				...CONNECT,
+				"\tconstant opened = connect(using { retries = 1 })",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Write the missing members")
+			expect(fix.isPreferred).toBe(false)
+			expect(result[7]).toBe(
+				"\tconstant opened = connect(using { retries = 1, host = {}, port = {} })",
+			)
+
+			expect(codesOf(result)).toEqual(["argument-type-mismatch"])
+		})
+
+		// NOTE: An empty Literal has no member to write a comma after, and the
+		// padding a one-line Literal is written with is what the fix writes
+		// back.
+		it("should pad an empty Literal it fills in", () => {
+			let lines = [
+				...CONNECT,
+				"\tconstant opened = connect(using {})",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result[7]).toBe(
+				"\tconstant opened = connect(using { host = {}, port = {} })",
+			)
+		})
+
+		// NOTE: A Literal written over lines takes a line per member, indented
+		// as the members already there are — the layout the reader chose is
+		// what the fix goes on writing in.
+		it("should take a line per member in a Literal broken over lines", () => {
+			let lines = [
+				...CONNECT,
+				"\tconstant opened = connect(using {",
+				"\t\tretries = 1,",
+				"\t})",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result.slice(7, 12)).toEqual([
+				"\tconstant opened = connect(using {",
+				"\t\tretries = 1,",
+				"\t\thost = {},",
+				"\t\tport = {},",
+				"\t})",
+			])
+
+			expect(codesOf(result)).toEqual(["argument-type-mismatch"])
+		})
+
+		// NOTE: And one whose last member carries no trailing comma is given
+		// the one it needs before anything is written after it.
+		it("should write the comma a last member never had", () => {
+			let lines = [
+				...CONNECT,
+				"\tconstant opened = connect(using {",
+				"\t\tretries = 1",
+				"\t})",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result[8]).toBe("\t\tretries = 1,")
+			expect(result[9]).toBe("\t\thost = {},")
+		})
+
+		// NOTE: A Case's payload is a Record Literal measured against a default
+		// exactly as an Argument is, and it takes the same scaffold.
+		it("should scaffold a Case payload the same way", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Shape {",
+				'\t\tRect { width: Integer, height: Integer, label: String } = { label = "r" },',
+				"\t}",
+				"",
+				"\tconstant boxed = Shape#Rect({ width = 1 })",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Write the missing member 'height'")
+			expect(result[5]).toBe(
+				"\tconstant boxed = Shape#Rect({ width = 1, height = {} })",
+			)
+
+			expect(codesOf(result)).toEqual(["payload-type-mismatch"])
+		})
+	})
+
 	describe("missing-return", () => {
 		it("should add an else branch when the body ends in an If", () => {
 			let lines = [

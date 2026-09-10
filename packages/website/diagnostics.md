@@ -1230,6 +1230,15 @@ in a note.
 Where the Parameter has no default, a Record Argument is measured whole and a
 missing member reports `argument-type-mismatch`.
 
+**Quick Fix — "Write the missing members":** writes one `name = {}` per missing
+member after everything the Literal already holds, keeping its layout — beside
+what is written where the Literal is on one line, a line per member where it is
+broken over several. The values are holes on purpose and the Argument stays
+refused until they are filled in, which is why the fix is not preferred. `{}` is
+what a hole is written as because it always parses and fits nothing: `name = `
+with the value left out fails the whole Literal's reading, and the shorthand
+`{ name }` would quietly pick up a Constant of that name in scope.
+
 ### `argument-label-mismatch`
 
 An Argument carries a label its Parameter does not — a different one, none

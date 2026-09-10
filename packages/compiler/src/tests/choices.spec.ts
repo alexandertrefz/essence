@@ -4902,6 +4902,17 @@ describe("Choices", () => {
 			)
 		})
 
+		// NOTE: The same `data` an Argument's own partial carries — a payload
+		// is a Record Literal measured against a default, and one scaffold
+		// answers both.
+		it("carries those members as data for the scaffold", () => {
+			expect(
+				diagnosticsOf(`implementation { ${fetchChoice}
+					constant call: Fetch = #Get({})
+				}`)[0].data,
+			).toEqual({ kind: "missing-members", names: ["url"] })
+		})
+
 		// NOTE: A member with the wrong Type is not a partial of the payload at
 		// all, so the payload is measured whole and named whole.
 		it("keeps payload-type-mismatch for a member of the wrong Type", () => {

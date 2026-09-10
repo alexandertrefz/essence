@@ -194,6 +194,10 @@ export type DiagnosticData =
 	// Server's reading of it, and there is no fourth pair: two equal labels
 	// are no mismatch.
 	| { kind: "expected-label"; label: string | null; written: string | null }
+	// NOTE: The members a Record Literal has to grow, in the order the
+	// Parameter's Type or the Case declares them, so that a scaffold writes
+	// them in the order the reader would have.
+	| { kind: "missing-members"; names: Array<string> }
 	// NOTE: What a call would write between the angle brackets of
 	// `value::<Name>method(…)` to pick one candidate — a Protocol's name where
 	// the candidate is a Method that Protocol PROVIDES, and the Namespace's

@@ -5,9 +5,11 @@ import { isSamePosition } from "../positions"
 import type { Workspace } from "../workspace"
 import {
 	closingBraceAfter,
+	closingBraceOf,
 	closingBracketEdit,
 	commaAfter,
 	commaBefore,
+	endOfContents,
 	extendOverLeadingBreak,
 	extendOverLeadingSpace,
 	indentationOf,
@@ -832,4 +834,115 @@ export function argumentLabelAction(
 				range: span,
 				newText: label,
 			})
+}
+
+// NOTE: The members the default does not fill in, written into the Literal that
+// left them out — one `name = {}` each, after everything already written there.
+// After, rather than before the closing brace, because that is what keeps the
+// Literal's own layout: one written on a line grows beside what it holds and one
+// written over several grows a line per member, indented as its neighbours are.
+//
+// `{}` is the hole, and it is a hole on purpose. Essence has no spelling for "a
+// value goes here", and the one thing a scaffold must not do is leave text that
+// does not parse: `port = ` fails at the Literal's FIRST `=`, taking the whole
+// Argument's reading with it and reporting a syntax error nowhere near the hole.
+// A shorthand `{ port }` parses, and is worse — it is `port = port`, so a
+// Constant of that name in scope would be picked up silently and the fix would
+// have chosen a value nobody wrote. The unit Type fits nothing but itself, so
+// every hole left here is refused until it is filled.
+//
+// Which is also why this is never preferred: the Argument still does not fit,
+// and an Editor applying it without asking would trade one Diagnostic for
+// another. What it buys is the member names written out in the right order and
+// the right place, which is the tedious half.
+export function missingMembersAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
+): CodeActionEntry | null {
+	if (diagnostic.data?.kind !== "missing-members") {
+		return null
+	}
+
+	let names = diagnostic.data.names
+	let tail = endOfContents(lines, diagnostic.position)
+
+	if (tail === null || names.length === 0) {
+		return null
+	}
+
+	let brace = closingBraceOf(diagnostic.position.end)
+	let written = sliceOf(lines, {
+		start: { line: tail.line, column: tail.column - 1 },
+		end: tail,
+	})
+	// NOTE: A Literal that ends on a member needs the comma that member never
+	// had; one that ends on its own trailing comma, or on the opening brace,
+	// already reads as a list waiting for more.
+	let separator = written === "{" || written === "," ? "" : ","
+
+	return {
+		title:
+			names.length === 1
+				? `Write the missing member '${names[0]}'`
+				: "Write the missing members",
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: false,
+		edits: [
+			{
+				range: { start: tail, end: tail },
+				newText:
+					tail.line === brace.line
+						? oneLineMembers(lines, names, separator, tail, brace)
+						: brokenMembers(
+								lines,
+								names,
+								separator,
+								tail,
+								diagnostic.position,
+							),
+			},
+		],
+	}
+}
+
+// NOTE: A member per line, indented as the members already written are. Where
+// the last of them shares its line with the opening brace there are none to
+// copy — a Literal that opens and closes on different lines and holds nothing
+// yet — and the closing brace's line is the anchor instead, one level in from
+// it, which is where a member of this Literal would have been written by hand.
+function brokenMembers(
+	lines: Array<string>,
+	names: Array<string>,
+	separator: string,
+	tail: common.Cursor,
+	position: common.Position,
+): string {
+	let indentation =
+		tail.line === position.start.line
+			? `${indentationOf(lines, position.end.line)}\t`
+			: indentationOf(lines, tail.line)
+
+	return `${separator}\n${indentation}${names
+		.map((name) => `${name} = {},`)
+		.join(`\n${indentation}`)}`
+}
+
+// NOTE: Members written beside what the Literal already holds, padded as a
+// one-line Literal is padded — a space after the opening brace and one before
+// the closing one. The space in FRONT is written unless a comma already ends the
+// line; the one behind only where the closing brace stands right there, which is
+// the empty `{}` and nothing else.
+function oneLineMembers(
+	lines: Array<string>,
+	names: Array<string>,
+	separator: string,
+	tail: common.Cursor,
+	brace: common.Cursor,
+): string {
+	let written = names.map((name) => `${name} = {}`).join(", ")
+	let padded = sliceOf(lines, { start: tail, end: brace }) === "" ? " " : ""
+
+	return `${separator} ${written}${padded}`
 }

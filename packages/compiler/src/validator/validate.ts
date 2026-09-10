@@ -2403,6 +2403,9 @@ function reportIncompleteCasePayload(
 					: `Its default fills in ${quotedNames(filled)}; every other member must be written.`,
 			],
 			helps: [`Write ${quotedNames(missing)} into this payload.`],
+			// NOTE: As for an Argument — a payload is a Record Literal measured
+			// against a default, and the same scaffold answers both.
+			data: { kind: "missing-members", names: missing },
 		},
 	)
 }
@@ -3377,6 +3380,10 @@ function reportIncompleteRecordArgument(
 					: `Its default fills in ${quotedNames(filled)}; every other member must be written.`,
 			],
 			helps: [`Write ${quotedNames(missing)} into this Record.`],
+			// NOTE: In the Parameter's declaration order, which is the order
+			// the label and the Help name them in — a scaffold that wrote them
+			// in any other reads as though the Compiler shuffled the Record.
+			data: { kind: "missing-members", names: missing },
 		},
 	)
 }

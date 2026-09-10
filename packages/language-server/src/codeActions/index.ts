@@ -27,6 +27,7 @@ import {
 	type ImportContext,
 	importActions,
 	missingCaseAction,
+	missingMembersAction,
 	namespaceImportActions,
 	namespaceSpecifierActions,
 	removeFallbackAction,
@@ -283,6 +284,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(removeFallbackAction(diagnostic, lines)),
 	"focused-tests-remain": ({ diagnostic, lines }) =>
 		listed(removeFocusedAction(diagnostic, lines)),
+	"incomplete-record-argument": ({ diagnostic, lines }) =>
+		listed(missingMembersAction(diagnostic, lines)),
 	"infer-on-applied-parameter": ({ diagnostic, program, lines }) =>
 		listed(removeInferAction(diagnostic, program, lines)),
 	"invalid-escape": ({ diagnostic, lines }) =>
