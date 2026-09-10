@@ -225,6 +225,13 @@ export function insertExportEdit(
 	sourceText: string,
 	program: parser.Program,
 	entry: ExportEntry,
+	// NOTE: An entry the caller takes away in the same breath — the one shape in
+	// which a name the block already publishes is no collision, because the edit
+	// that publishes it a second time is paired with the edit that removes the
+	// first. Its place in the block is left standing all the same: what follows
+	// it is where the new member goes, and the two edits then meet end to end
+	// rather than overlapping.
+	replacing: parser.ExportNode | null = null,
 ): ImportEdit | null {
 	let lines = sourceText.split("\n")
 	let section = program.exports
@@ -249,8 +256,9 @@ export function insertExportEdit(
 	if (
 		section.entries.some(
 			(candidate) =>
+				candidate !== replacing &&
 				(candidate.alias ?? candidate.name).content ===
-				(entry.alias ?? entry.name),
+					(entry.alias ?? entry.name),
 		)
 	) {
 		return null

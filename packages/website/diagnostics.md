@@ -2956,6 +2956,11 @@ implementation declares, and nothing here declares that name. Adding a `from`
 clause turns it into a re-export, which forwards a dependency's name without
 binding it locally.
 
+**Quick Fix — "Forward 'x' from ./B.es":** rewrites the bare entry as a
+`from "./B.es" { x }` group, joining the group already written for that Module
+where there is one. One action per Module in the workspace that publishes the
+name, and none of them preferred where there is more than one.
+
 ### `export-of-variable`
 
 Functions, Constants, Type Aliases, Choices, Protocols and Namespaces can be

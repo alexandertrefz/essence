@@ -2138,6 +2138,169 @@ describe("Workspace", () => {
 			})
 		})
 
+		describe("export-of-unknown-name", () => {
+			it("should rewrite the entry as a group of the Module that declares the name", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"Geometry.es": geometry,
+					"Shapes.es": [
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						"\tRectangle",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let shapesPath = pathOf("Shapes.es")
+				let [fix] = actionsFor(workspace, shapesPath, 5, "Rectangle")
+
+				expect(fix?.title).toBe(
+					"Forward 'Rectangle' from ./Geometry.es",
+				)
+				expect(fix?.diagnosticCode).toBe("export-of-unknown-name")
+				expect(fix?.isPreferred).toBe(true)
+
+				let texts = appliedAcross(workspace, shapesPath, fix)
+
+				expect(texts[shapesPath]).toBe(
+					[
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						'\tfrom "./Geometry.es" { Rectangle }',
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(codesAfter(workspace, texts, shapesPath)).toEqual([])
+			})
+
+			it("should join the group already written for that Module", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"Geometry.es": geometry,
+					"Shapes.es": [
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						"\tRectangle",
+						'\tfrom "./Geometry.es" { RectangleMeasurable }',
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let shapesPath = pathOf("Shapes.es")
+				let [fix] = actionsFor(workspace, shapesPath, 5, "Rectangle")
+				let texts = appliedAcross(workspace, shapesPath, fix)
+
+				expect(texts[shapesPath]).toBe(
+					[
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						'\tfrom "./Geometry.es" {',
+						"\t\tRectangle",
+						"\t\tRectangleMeasurable",
+						"\t}",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(codesAfter(workspace, texts, shapesPath)).toEqual([])
+			})
+
+			// NOTE: What the block publishes must not change under a fix that
+			// only answers where the name comes FROM.
+			it("should keep the 'as' the entry was written with", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"Geometry.es": geometry,
+					"Shapes.es": [
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						"\tRectangle as Rect",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let shapesPath = pathOf("Shapes.es")
+				let [fix] = actionsFor(workspace, shapesPath, 5, "Rectangle")
+				let texts = appliedAcross(workspace, shapesPath, fix)
+
+				expect(texts[shapesPath]?.split("\n")[4]).toBe(
+					'\tfrom "./Geometry.es" { Rectangle as Rect }',
+				)
+				expect(codesAfter(workspace, texts, shapesPath)).toEqual([])
+			})
+
+			// NOTE: Two Modules publishing one name is a real shape — a facade
+			// and the Module behind it — and which of them a block meant is not
+			// something the block says.
+			it("should offer one action per Module publishing the name, none preferred", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"Geometry.es": geometry,
+					"Facade.es": [
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						'\tfrom "./Geometry.es" { Rectangle }',
+						"}",
+						"",
+					].join("\n"),
+					"Shapes.es": [
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						"\tRectangle",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let actions = actionsFor(
+					workspace,
+					pathOf("Shapes.es"),
+					5,
+					"Rectangle",
+				)
+
+				expect(actions.map((action) => action.title).sort()).toEqual([
+					"Forward 'Rectangle' from ./Facade.es",
+					"Forward 'Rectangle' from ./Geometry.es",
+				])
+				expect(
+					actions.every((action) => action.isPreferred === false),
+				).toBe(true)
+			})
+
+			it("should offer nothing for a name no other Module publishes", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"Shapes.es": [
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						"\tnowhere",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				expect(
+					actionsFor(workspace, pathOf("Shapes.es"), 5, "nowhere"),
+				).toEqual([])
+			})
+		})
+
 		describe("insertExportEdit", () => {
 			function edited(
 				lines: Array<string>,

@@ -374,6 +374,32 @@ export function extendOverLeadingSpace(
 		: { line: cursor.line, column: trimmed.length + 1 }
 }
 
+// NOTE: One member of a Module block deleted with the whitespace that carried
+// it: the line break above it where it stands on a line of its own, and the
+// blanks in front of it where it shares its line with the brace that opened the
+// block. Nothing else goes with it — a member list has no delimiters, so what
+// is left behind is a block one line shorter rather than a stray comma.
+export function removeMemberEdit(
+	lines: Array<string>,
+	position: common.Position,
+): CodeActionEdit {
+	let before = lineAt(lines, position.start.line).slice(
+		0,
+		position.start.column - 1,
+	)
+	let start =
+		before.trim() === ""
+			? extendOverLeadingBreak(lines, position.start)
+			: {
+					line: position.start.line,
+					column:
+						position.start.column -
+						(before.length - before.trimEnd().length),
+				}
+
+	return { range: { start, end: position.end }, newText: "" }
+}
+
 // NOTE: The first `}` at or after `cursor`, one past it — the Handler's own
 // closing brace, since everything its body opened is already closed by the
 // time its last Node ends.

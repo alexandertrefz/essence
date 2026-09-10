@@ -28,6 +28,7 @@ import {
 	openingBracketEdit,
 	openingParenthesisAfter,
 	removeLinesEdit,
+	removeMemberEdit,
 	sliceOf,
 	wholeLines,
 } from "./geometry"
@@ -327,6 +328,77 @@ export function exportNameAction(
 		isPreferred: true,
 		edits: [{ ...edit, filePath: targetPath }],
 	}
+}
+
+// NOTE: The other half of the same idea, from the other side: the name is
+// written in this Module's export block and this Module declares nothing under
+// it, so what the block wanted is a re-export. One action per Module that
+// publishes the name, since which of them was meant is not something the block
+// says — and each of them rewrites the bare entry as the group it belongs in,
+// joining the group already written for that Module where there is one.
+//
+// The entry is REPLACED rather than annotated, in two edits: what the block
+// publishes has to keep reading as one list, and a bare name left standing
+// beside its own re-export is the same name published twice.
+export function forwardExportActions(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	imports: ImportContext | null,
+): Array<CodeActionEntry> {
+	if (imports === null) {
+		return []
+	}
+
+	let entry = (imports.program.exports?.entries ?? []).find(
+		(candidate) =>
+			candidate.source === null &&
+			isSamePosition(candidate.name.position, diagnostic.position),
+	)
+
+	if (entry === undefined) {
+		return []
+	}
+
+	let name = entry.name.content
+	let exporters = imports.workspace
+		.exportersOf(name)
+		.filter((exported) => exported.filePath !== imports.filePath)
+
+	return exporters.flatMap((exported) => {
+		let specifier = relativeSpecifier(imports.filePath, exported.filePath)
+		let edit = insertExportEdit(
+			imports.documentText,
+			imports.program,
+			// NOTE: The `as` the entry was written with goes along: what the
+			// block publishes must not change under a fix that only answers
+			// where the name comes from.
+			{ name, alias: entry.alias?.content ?? null, specifier },
+			entry,
+		)
+
+		if (edit === null) {
+			return []
+		}
+
+		return [
+			{
+				title: `Forward '${name}' from ${specifier}`,
+				kind: "quickfix" as const,
+				diagnosticCode: diagnostic.code,
+				diagnosticPosition: diagnostic.position,
+				// NOTE: Preferred only where there is one Module it could be
+				// forwarded from, for the reason an import off an unknown name
+				// is: choosing between two of them is the reader's to do.
+				isPreferred: exporters.length === 1,
+				edits: [
+					removeMemberEdit(
+						imports.documentText.split("\n"),
+						entry.position,
+					),
+					edit,
+				],
+			},
+		]
+	})
 }
 
 // NOTE: The entry of either Module block whose name stands at this Position,

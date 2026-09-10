@@ -1296,7 +1296,7 @@ function reportExportProblems(
 						"An entry with no 'from' clause exports something this Module's implementation declares.",
 					],
 					helps: [
-						`Write '${entry.name.content} from "…"' to forward it from the Module that declares it.`,
+						`Write '${entry.name.content}' in a 'from "…" { … }' group to forward it from the Module that declares it.`,
 					],
 				},
 			)

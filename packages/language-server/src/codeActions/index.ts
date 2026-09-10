@@ -36,6 +36,7 @@ import {
 	documentationLineAction,
 	elseBranchAction,
 	exportNameAction,
+	forwardExportActions,
 	type ImportContext,
 	importActions,
 	missingCaseAction,
@@ -403,6 +404,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(guardEmptyAction(diagnostic, program, lines)),
 	"empty-list-overlap": ({ diagnostic, program, lines }) =>
 		listed(guardEmptyAction(diagnostic, program, lines)),
+	"export-of-unknown-name": ({ diagnostic, imports }) =>
+		forwardExportActions(diagnostic, imports),
 	"export-of-variable": ({ diagnostic, program, lines }) =>
 		listed(variableToConstantAction(diagnostic, program, lines)),
 	"fallback-never-used": ({ diagnostic, lines }) =>
