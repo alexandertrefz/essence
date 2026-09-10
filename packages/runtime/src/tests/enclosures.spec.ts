@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-	decimalExponentOnEnclosure,
-	roundedOnDecimalGrid,
-} from "../Algebraic"
+import { decimalExponentOnEnclosure, roundedOnDecimalGrid } from "../Algebraic"
 import { createCase } from "../type"
 
 // NOTE: The refinement both irrationals hand a reader digits through, driven
@@ -112,9 +109,9 @@ describe("reading a decimal exponent", () => {
 		expect(decimalExponentOnEnclosure(enclosureOf(-7n, 5n).at, null)).toBe(
 			0n,
 		)
-		expect(decimalExponentOnEnclosure(enclosureOf(-1n, 300n).at, null)).toBe(
-			-3n,
-		)
+		expect(
+			decimalExponentOnEnclosure(enclosureOf(-1n, 300n).at, null),
+		).toBe(-3n)
 	})
 
 	// NOTE: A value far below the first enclosure's width encloses zero at

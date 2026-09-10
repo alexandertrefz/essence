@@ -15,7 +15,6 @@ import {
 import * as optional from "@essence-lang/runtime/Optional"
 import * as ordering from "@essence-lang/runtime/Ordering"
 import * as rational from "@essence-lang/runtime/Rational"
-import { createString } from "@essence-lang/runtime/String"
 import {
 	down,
 	nearest,
@@ -23,6 +22,7 @@ import {
 	towardZero,
 	up,
 } from "@essence-lang/runtime/Rounding"
+import { createString } from "@essence-lang/runtime/String"
 import { type AnyType, typeKeySymbol } from "@essence-lang/runtime/type"
 
 import { containsErrors } from "../diagnostics/index"

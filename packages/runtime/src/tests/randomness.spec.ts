@@ -669,9 +669,7 @@ describe("Randomness", () => {
 		// items out of a flat List under the same seed is what says it does.
 		test("draws the same items out of a front-built List", () => {
 			let flat = createList(
-				Array.from({ length: 400 }, (_, index) =>
-					createInteger(index),
-				),
+				Array.from({ length: 400 }, (_, index) => createInteger(index)),
 			)
 			let front = createList<IntegerType>([])
 
