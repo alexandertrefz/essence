@@ -1,0 +1,117 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://essencelang.org/schemas/essence.schema.json",
+	"title": "Essence project file",
+	"description": "The Essence project file.",
+	"type": "object",
+	"properties": {
+		"$schema": {
+			"description": "The JSON Schema this file is checked against. Read by editors, ignored by Essence.",
+			"type": "string"
+		},
+		"exclude": {
+			"description": "Directories under this project that are not its sources: a corpus kept broken on purpose, a vendored copy. Paths relative to this file, not globs. A file named on the command line or open in the editor is still compiled; this narrows the walk.",
+			"type": "array",
+			"items": {
+				"type": "string"
+			},
+			"uniqueItems": true
+		},
+		"test": {
+			"description": "How `essence test` runs this project.",
+			"type": "object",
+			"properties": {
+				"skipTags": {
+					"description": "Tags an everyday `essence test` leaves out. `--tag` brings one back for a run.",
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"uniqueItems": true
+				},
+				"contracts": {
+					"description": "Whether every run also tests what the declarations promise, as `--contracts` does for one run. `--no-contracts` turns it off for a run.",
+					"type": "boolean"
+				},
+				"cases": {
+					"description": "How many values each property test draws. `--cases` overrides it for a run.",
+					"type": "integer",
+					"minimum": 1
+				},
+				"coverage": {
+					"description": "How and where a coverage report is written when a run asks for one.",
+					"type": "object",
+					"properties": {
+						"report": {
+							"description": "The report a `--coverage` run writes, as `--coverage-report` names it.",
+							"type": "string",
+							"enum": ["lcov", "json"]
+						},
+						"out": {
+							"description": "Where a coverage report is written, relative to this file, as `--coverage-out` names it.",
+							"type": "string"
+						}
+					},
+					"additionalProperties": false
+				}
+			},
+			"additionalProperties": false
+		},
+		"build": {
+			"description": "How this project's bundles are made: the flags `build`, `run` and `watch` take, said once.",
+			"type": "object",
+			"properties": {
+				"out": {
+					"description": "Where bundles are written, relative to this file, as `--out` names it.",
+					"type": "string"
+				},
+				"sourcemap": {
+					"description": "Whether a source map is written beside every bundle, as `--sourcemap` asks for one run.",
+					"type": "boolean"
+				},
+				"minify": {
+					"description": "Whether bundles are minified, as `--minify` asks for one run.",
+					"type": "boolean"
+				},
+				"embed": {
+					"description": "Whether every bundle is built for embedding, with its descriptor beside it, as `--embed` asks for one run.",
+					"type": "boolean"
+				},
+				"optimise": {
+					"description": "Whether the Optimiser runs. `false` is what `--no-optimise` says for one run.",
+					"type": "boolean"
+				},
+				"withoutOptimisations": {
+					"description": "Optimiser passes left out, by name, as `--without-optimisation` names them one at a time.",
+					"type": "array",
+					"items": {
+						"type": "string",
+						"enum": [
+							"instrument-coverage",
+							"compile-type-tests",
+							"lower-unit-case-equality",
+							"lower-scalar-operations",
+							"compile-union-dispatch",
+							"devirtualise-witnesses",
+							"lower-matches-to-statements",
+							"unbox-conditions",
+							"inline-loops",
+							"build-lists-in-place",
+							"fold-constants",
+							"prune-dead-match-arms",
+							"elide-final-match-test",
+							"compile-record-members",
+							"eliminate-dead-code",
+							"collapse-construction",
+							"collapse-combinations",
+							"pool-constants"
+						]
+					},
+					"uniqueItems": true
+				}
+			},
+			"additionalProperties": false
+		}
+	},
+	"additionalProperties": false
+}

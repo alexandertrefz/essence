@@ -11,6 +11,7 @@
 	"scripts": {
 		"check": "oxlint --fix && oxfmt",
 		"generate:natives": "bun run --cwd packages/compiler generate:natives",
+		"generate:schema": "bun scripts/generateProjectSchema.ts",
 		"test": "bun test",
 		"typecheck": "tsc --noEmit",
 		"format:essence": "bun packages/formatter/bin/esfmt 'packages/standard-library/sources/*.es' 'packages/fixtures/files/*.es' packages/fixtures/files/modules examples",
@@ -18,13 +19,6 @@
 		"publish:pack": "bun scripts/publishing/stage.ts --pack",
 		"publish:smoke": "bun scripts/publishing/smoke.ts",
 		"publish:packages": "bun scripts/publishing/publish.ts"
-	},
-	"essence": {
-		"exclude": [
-			"packages/fixtures/files/diagnostics",
-			"packages/vscode-extension/server",
-			"packages/client/src/tests/files"
-		]
 	},
 	"keywords": [
 		"language",
