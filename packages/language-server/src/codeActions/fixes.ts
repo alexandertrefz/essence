@@ -17,6 +17,7 @@ import {
 	keywordBefore,
 	labelBefore,
 	openingBracketEdit,
+	openingParenthesisAfter,
 	removeLinesEdit,
 	sliceOf,
 } from "./geometry"
@@ -945,4 +946,101 @@ function oneLineMembers(
 	let padded = sliceOf(lines, { start: tail, end: brace }) === "" ? " " : ""
 
 	return `${separator} ${written}${padded}`
+}
+
+// NOTE: A static Method reached the way an instance Method is, rewritten into
+// the call it was meant to be — `value::make(1)` as `Boxes.make(value, 1)` or as
+// `Boxes.make(1)`. TWO actions, because a static takes no receiver and so the
+// value the call was written on either belongs among the Arguments or does not
+// belong at all: `a::distance(to b)` was reaching a `distance(_ a: Point, to b:
+// Point)` and wants it kept, `p::origin()` was reaching an `origin()` and wants
+// it gone. Nothing in the Diagnostic says which, which is why its own Help
+// hedges — "passing the value as an Argument if it needs one" — and why neither
+// action is preferred: an Editor applies a preferred fix without asking, and one
+// of these two leaves a call with the wrong number of Arguments.
+//
+// The one that KEEPS the value is two edits around the receiver, so that
+// everything the receiver is written as — a call of its own, a Literal spanning
+// lines — is carried across untouched. What the second replaces is the `::name(`
+// between the receiver and the Arguments, with the comma that now separates it
+// from the first of them, or with nothing where the call passes none: the
+// closing bracket is already written and stays where it is. The one that DROPS
+// it is a single edit over both, since the receiver is what it removes.
+//
+// The span between the receiver and the bracket is read back off the buffer
+// first. A Namespace specifier is admitted there and goes with the rest — a
+// specifier picks between Namespaces that declare an INSTANCE Method, and the
+// call this writes names its Namespace outright.
+export function staticCallActions(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+	lines: Array<string>,
+): Array<CodeActionEntry> {
+	if (diagnostic.data?.kind !== "static-owner") {
+		return []
+	}
+
+	let invocation = findMethodInvocation(program, diagnostic.position)
+
+	if (invocation === null) {
+		return []
+	}
+
+	let bracket = openingParenthesisAfter(lines, invocation.member.position.end)
+
+	if (bracket === null) {
+		return []
+	}
+
+	let reached = sliceOf(lines, {
+		start: invocation.base.position.end,
+		end: invocation.member.position.start,
+	})
+	let opened = sliceOf(lines, {
+		start: invocation.member.position.end,
+		end: bracket,
+	})
+
+	if (
+		!/^\s*::\s*(<\s*[A-Za-z0-9_]+\s*>\s*)?$/.test(reached) ||
+		!/^\s*\($/.test(opened)
+	) {
+		return []
+	}
+
+	let { namespace } = diagnostic.data
+	let call = `${namespace}.${invocation.member.content}(`
+	let listed = (title: string, edits: Array<CodeActionEdit>) => ({
+		title,
+		kind: "quickfix" as const,
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: false,
+		edits,
+	})
+
+	return [
+		listed(`Write '${call}…)' passing the value`, [
+			{
+				range: {
+					start: invocation.base.position.start,
+					end: invocation.base.position.start,
+				},
+				newText: call,
+			},
+			{
+				range: { start: invocation.base.position.end, end: bracket },
+				newText: invocation.arguments.length === 0 ? "" : ", ",
+			},
+		]),
+		listed(`Write '${call}…)' without the value`, [
+			{
+				range: {
+					start: invocation.base.position.start,
+					end: bracket,
+				},
+				newText: call,
+			},
+		]),
+	]
 }

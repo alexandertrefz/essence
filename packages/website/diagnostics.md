@@ -1690,6 +1690,14 @@ A static Method was called with instance-call syntax — `value::make(…)`. A
 static Method takes no receiver, so there is nowhere for the value to go; call
 it on the Namespace instead, as `Namespace.make(…)`.
 
+**Quick Fix — "Write 'Namespace.make(…)' passing the value" / "… without the
+value":** both rewrites are offered and neither is preferred. A static takes no
+receiver, so the value the call was written on either belongs among the
+Arguments — `a::distance(to b)` reaching a `distance(_ a: Point, to b: Point)` —
+or does not belong at all, and nothing in the Diagnostic says which. Neither is
+offered where the text between the receiver and the Arguments does not read as
+the `::` and the Method's name.
+
 ### `native-property-without-type`
 
 A static Property in a `declarations { … }` Program declared neither a value

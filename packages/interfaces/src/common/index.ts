@@ -204,6 +204,11 @@ export type DiagnosticData =
 	// own everywhere else. Not the declaration the notes describe: those two
 	// differ for a provided Method, and only this one is a spelling.
 	| { kind: "namespace-candidates"; names: Array<string> }
+	// NOTE: The Namespace a static Method is reached through, so a fix can
+	// write `Namespace.make(value, …)` for a `value::make(…)`. ONE name rather
+	// than every candidate: the Namespace that declares the static is the one
+	// the call has to name, and the Help names that one too.
+	| { kind: "static-owner"; namespace: string }
 
 // NOTE: Every Diagnostic carries one, and `docs/diagnostics.md` documents
 // every one of these — a code with no entry there is a code nobody can look

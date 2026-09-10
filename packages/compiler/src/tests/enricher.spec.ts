@@ -5375,6 +5375,29 @@ describe("Enricher", () => {
 			expect(diagnostics[0].message).toBe("'make' is a static Method")
 		})
 
+		// NOTE: The Namespace the Help names, so the Quick Fix writes the call
+		// the reader was told to write — a static is reached through the
+		// Namespace that declares it and through nothing else.
+		it("should carry the owning Namespace as data", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Maker for Integer {
+					static make(_ base: Integer) -> Integer {
+						<- base
+					}
+				}
+
+				constant made = 5::make(7)
+			}`)
+
+			expect(diagnostics[0].helps).toEqual([
+				"Write 'Maker.make(…)', passing the value as an Argument if it needs one.",
+			])
+			expect(diagnostics[0].data).toEqual({
+				kind: "static-owner",
+				namespace: "Maker",
+			})
+		})
+
 		// NOTE: `Integer.parse` — the Invocation type-checked against the
 		// written Arguments alone while the Simplifier prepended the receiver
 		// anyway, so every runtime Argument landed one place too far right and

@@ -225,18 +225,38 @@ export function extendOverLeadingSpace(
 
 // NOTE: The first `}` at or after `cursor`, one past it — the Handler's own
 // closing brace, since everything its body opened is already closed by the
-// time its last Node ends. Text inside a `§` comment is skipped, which is the
-// one place a brace can appear that no Node accounts for.
+// time its last Node ends.
 export function closingBraceAfter(
 	lines: Array<string>,
 	cursor: common.Cursor,
+): common.Cursor | null {
+	return characterAfter(lines, cursor, "}")
+}
+
+// NOTE: And the `(` an Argument list opens on, which is the one thing between a
+// Method's name and the Arguments it was called with — a call rewritten to
+// reach its Namespace has to know where that bracket stands.
+export function openingParenthesisAfter(
+	lines: Array<string>,
+	cursor: common.Cursor,
+): common.Cursor | null {
+	return characterAfter(lines, cursor, "(")
+}
+
+// NOTE: The first `character` at or after `cursor`, one past it. Text inside a
+// `§` comment is skipped, which is the one place a bracket can appear that no
+// Node accounts for.
+function characterAfter(
+	lines: Array<string>,
+	cursor: common.Cursor,
+	character: string,
 ): common.Cursor | null {
 	for (let line = cursor.line; line <= lines.length; line++) {
 		let text = lineAt(lines, line)
 		let from = line === cursor.line ? cursor.column - 1 : 0
 		let comment = text.indexOf("§", from)
 		let searchable = comment === -1 ? text : text.slice(0, comment)
-		let index = searchable.indexOf("}", from)
+		let index = searchable.indexOf(character, from)
 
 		if (index !== -1) {
 			return { line, column: index + 2 }

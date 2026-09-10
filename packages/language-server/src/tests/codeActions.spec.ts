@@ -2831,6 +2831,92 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("static-method-on-value", () => {
+		const BOXES = [
+			"implementation {",
+			"\ttype Box = { v: Integer }",
+			"",
+			"\tnamespace Boxes for Box {",
+			"\t\tstatic make(_ v: Integer) -> Box {",
+			"\t\t\t<- { v = v }",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tconstant boxed: Box = { v = 1 }",
+		]
+
+		// NOTE: Two actions and neither preferred — a static takes no receiver,
+		// so the value the call was written on either belongs among the
+		// Arguments or does not belong at all, and nothing in the Diagnostic
+		// says which. Its own Help hedges for the same reason.
+		it("should offer the call with the value and without it", () => {
+			let lines = [...BOXES, "\tconstant made = boxed::make(2)", "}"]
+
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Write 'Boxes.make(…)' passing the value",
+				"Write 'Boxes.make(…)' without the value",
+			])
+			expect(fixes.map((entry) => entry.isPreferred)).toEqual([
+				false,
+				false,
+			])
+		})
+
+		it("should pass the value as the first Argument", () => {
+			let lines = [...BOXES, "\tconstant made = boxed::make(2)", "}"]
+
+			expect(applied(lines, quickFixes(lines)[0])[10]).toBe(
+				"\tconstant made = Boxes.make(boxed, 2)",
+			)
+		})
+
+		it("should drop the receiver where the static does not take it", () => {
+			let lines = [...BOXES, "\tconstant made = boxed::make(2)", "}"]
+			let result = applied(lines, quickFixes(lines)[1])
+
+			expect(result[10]).toBe("\tconstant made = Boxes.make(2)")
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A call passing nothing needs no comma written after the value —
+		// the closing bracket the call already carries is what closes it.
+		it("should write no comma for a call with no Arguments", () => {
+			let lines = [
+				"implementation {",
+				"\ttype Box = { v: Integer }",
+				"",
+				"\tnamespace Boxes for Box {",
+				"\t\tstatic describe(_ b: Box) -> Integer {",
+				"\t\t\t<- b.v",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant boxed: Box = { v = 1 }",
+				"\tconstant said = boxed::describe()",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result[10]).toBe("\tconstant said = Boxes.describe(boxed)")
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: The receiver's own text is never retyped — it is the one thing
+		// the two edits are written around.
+		it("should carry a written receiver across untouched", () => {
+			let lines = [...BOXES, "\tconstant made = { v = 9 }::make(2)", "}"]
+
+			expect(applied(lines, quickFixes(lines)[0])[10]).toBe(
+				"\tconstant made = Boxes.make({ v = 9 }, 2)",
+			)
+		})
+	})
+
 	describe("Type annotations", () => {
 		it("should offer the inferred Type of a Constant as an edit", () => {
 			let lines = ["implementation {", '\tconstant name = "Ada"', "}"]

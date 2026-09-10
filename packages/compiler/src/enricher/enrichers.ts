@@ -10915,6 +10915,13 @@ function reportStaticMethodOnValue(
 			helps: [
 				`Write '${namespaceNames[0]}.${node.member.content}(…)', passing the value as an Argument if it needs one.`,
 			],
+			// NOTE: The first Namespace, which is the one the Help writes too —
+			// a static is reached through the Namespace that declares it, and a
+			// call rewritten to name any other would resolve nothing.
+			data: {
+				kind: "static-owner",
+				namespace: namespaceNames[0],
+			},
 		},
 	)
 }
