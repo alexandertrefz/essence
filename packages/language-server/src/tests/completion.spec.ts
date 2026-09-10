@@ -2840,3 +2840,108 @@ describe("Completion inside a define arm", () => {
 		])
 	})
 })
+
+// NOTE: Everything a probe drops. The readings a cursor is explained by are
+// built from the text ABOVE it, closed back into a valid Program — so a
+// declaration written below the line being typed is in none of them, and the
+// document's own Program is no help either: the dangling `Colour.` is what the
+// Parser recovers from, by reading the Keyword under it as the member. What
+// answers these is the reading that carries the document's own tail.
+describe("Completion of a declaration written below the cursor", () => {
+	it("should offer the Case listing of a Choice declared below", () => {
+		let source = [
+			"implementation {",
+			"\tconstant listed = Colour.",
+			"",
+			"\tchoice Colour {",
+			"\t\tRed,",
+			"\t\tGreen,",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(
+			entryFor(source, { line: 2, column: 27 }, "cases"),
+		).toMatchObject({
+			kind: "staticMethod",
+			detail: "() -> NonEmptyList<Colour>",
+		})
+	})
+
+	it("should offer the statics of a Namespace declared below", () => {
+		let source = [
+			"implementation {",
+			"\tconstant best = Colours.",
+			"",
+			"\tnamespace Colours for Integer {",
+			"\t\tstatic favourite() -> Integer {",
+			"\t\t\t<- 1",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 2, column: 26 })).toEqual(["favourite"])
+	})
+
+	it("should offer the members of a Type declared below", () => {
+		let source = [
+			"implementation {",
+			"\tfunction show (_ team: Team) -> String {",
+			"\t\t<- team.",
+			"\t}",
+			"",
+			"\ttype Team = { name: String, points: Integer }",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 3, column: 11 })).toEqual([
+			"name",
+			"points",
+		])
+	})
+
+	// NOTE: A `::` receiver is answered from the same reading, and answered
+	// with exactly what the same call written UNDER the declaration is: a
+	// Function hoists, so the two spellings reach one Type.
+	it("should read a receiver through a Function declared below", () => {
+		let below = [
+			"implementation {",
+			"\tconstant loud = shout()::",
+			"",
+			"\tfunction shout () -> String {",
+			'\t\t<- "hi"',
+			"\t}",
+			"}",
+		].join("\n")
+		let above = [
+			"implementation {",
+			"\tfunction shout () -> String {",
+			'\t\t<- "hi"',
+			"\t}",
+			"",
+			"\tconstant loud = shout()::",
+			"}",
+		].join("\n")
+
+		let labels = labelsOf(below, { line: 2, column: 27 })
+
+		expect(labels).toEqual(labelsOf(above, { line: 6, column: 27 }))
+		expect(labels).toContain("hasCharacters")
+	})
+
+	// NOTE: The tail is the rest of the FILE, so a document that does not
+	// balance leaves this reading unparseable — and the readings that close the
+	// head for themselves are what still answer.
+	it("should still answer where the document does not balance", () => {
+		let source = [
+			"implementation {",
+			"\ttype Team = { name: String }",
+			"",
+			"\tfunction show (_ team: Team) -> String {",
+			"\t\t<- team.",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 5, column: 11 })).toEqual(["name"])
+	})
+})

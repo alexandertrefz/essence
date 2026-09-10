@@ -260,12 +260,6 @@ export function findCompletions(
 			beforeCursor.slice(0, match.index),
 		].join("\n")
 
-		// NOTE: The dotted-KEY reading is tried first, and only where a `.`
-		// triggered this: `{ config with server.<cursor> }` names a member of
-		// the value being UPDATED, and reading `server` as a name in Scope
-		// would answer whatever else happens to be called that. It answers only
-		// where the Enricher really wrote a nested update out, so every other
-		// cursor falls through to the reading it always had.
 		// NOTE: A `::` cursor is probed as a METHOD call and a `.` cursor as a
 		// member Lookup, because a receiver answers a different Type in the two
 		// positions: a written value proves what it can about itself where a
@@ -273,6 +267,17 @@ export function findCompletions(
 		// NonNegativeInteger`'s Methods for that reason. A Lookup probe would
 		// ask the same `4` with nothing in front of it and offer Integer's
 		// alone.
+		let suffix =
+			memberMatch === null
+				? `::${probeMemberName}()`
+				: `.${probeMemberName}`
+
+		// NOTE: The dotted-KEY reading is tried first, and only where a `.`
+		// triggered this: `{ config with server.<cursor> }` names a member of
+		// the value being UPDATED, and reading `server` as a name in Scope
+		// would answer whatever else happens to be called that. It answers only
+		// where the Enricher really wrote a nested update out, so every other
+		// cursor falls through to the reading it always had.
 		let base =
 			(memberMatch === null
 				? null
@@ -280,14 +285,29 @@ export function findCompletions(
 						headText,
 						documentPath,
 						`.${probeKeyName} = 0`,
-					)) ??
-			resolveProbedBase(
-				headText,
-				documentPath,
-				memberMatch === null
-					? `::${probeMemberName}()`
-					: `.${probeMemberName}`,
-			)
+					)) ?? resolveProbedBase(headText, documentPath, suffix)
+
+		// NOTE: And the same probe with the document's own TAIL behind it,
+		// which is the only reading that can see what is declared BELOW the
+		// cursor. Every reading above drops the rest of the file and closes
+		// what is left, so a `namespace` or a `choice` written under the line
+		// being typed is not in the Program they enrich — and the document's
+		// own Program is no help either, since the dangling access is what the
+		// Parser recovers from by reading the Keyword under it as the member.
+		//
+		// Asked only where the readings above came to nothing or to an Error,
+		// which is exactly the state a name they can not see leaves behind: a
+		// cursor over a name they DO see pays nothing for this.
+		if (base === null || base.type.type === "Error") {
+			let tailText = [
+				currentLine.slice(cursor.column - 1),
+				...lines.slice(cursor.line),
+			].join("\n")
+
+			base =
+				probeReading(`${headText}${suffix}${tailText}`, documentPath) ??
+				base
+		}
 
 		// NOTE: And the base that names a TYPE rather than a value — a Choice
 		// nobody wrote a Namespace for, and a Protocol-bounded Type Parameter.
@@ -548,26 +568,39 @@ function resolveProbedBase(
 	suffix: string = `.${probeMemberName}`,
 ): ProbedBase | null {
 	for (let probeSource of probeSourcesFor(headText, suffix)) {
-		try {
-			let { program } = parseDocument(probeSource, documentPath)
-			let { program: enrichedProgram } = enrichDocument(
-				program,
-				documentPath,
-				{ tests: true },
-			)
-			let baseType = findProbeReceiver(typedProgramNodes(enrichedProgram))
+		let reading = probeReading(probeSource, documentPath)
 
-			if (baseType !== null) {
-				return { type: baseType, program: enrichedProgram }
-			}
-		} catch {
-			// NOTE: A reading that does not parse is simply not the reading —
-			// the next one is tried, and a cursor no reading explains answers
-			// with nothing, exactly as it did.
+		if (reading !== null) {
+			return reading
 		}
 	}
 
 	return null
+}
+
+// NOTE: One probe source, enriched, and the Type its invented member was
+// looked up on. Null where the source does not parse or holds no probe at all:
+// a reading that does not explain the cursor is simply not the reading — the
+// next one is tried, and a cursor no reading explains answers with nothing.
+function probeReading(
+	probeSource: string,
+	documentPath: string | undefined,
+): ProbedBase | null {
+	try {
+		let { program } = parseDocument(probeSource, documentPath)
+		let { program: enrichedProgram } = enrichDocument(
+			program,
+			documentPath,
+			{ tests: true },
+		)
+		let baseType = findProbeReceiver(typedProgramNodes(enrichedProgram))
+
+		return baseType === null
+			? null
+			: { type: baseType, program: enrichedProgram }
+	} catch {
+		return null
+	}
 }
 
 // NOTE: The base of a `.` that names a TYPE, resolved from the NAME alone.
