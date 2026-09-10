@@ -5453,6 +5453,114 @@ describe("Code Actions", () => {
 		})
 	})
 
+	// NOTE: The mirror of the `constant-reassignment` fix, on code the Compiler
+	// is happy with. The rename index is what makes it safe: it records every
+	// site that binds a value to the name, so "no write but the declaration" is
+	// a fact rather than a guess.
+	describe("Constant declarations", () => {
+		let constantRefactors = (
+			lines: Array<string>,
+			range?: common.Position,
+		): Array<CodeActionEntry> =>
+			actionsOf(lines, range).filter((entry) =>
+				entry.title.endsWith("as a Constant"),
+			)
+
+		it("should offer the keyword swap on a Variable nothing assigns", () => {
+			let lines = [
+				"implementation {",
+				"\tvariable total = 0",
+				"\tTerminal.print(total::toString())",
+				"}",
+			]
+
+			let [refactor] = constantRefactors(lines)
+
+			expect(refactor.title).toBe("Declare 'total' as a Constant")
+			expect(refactor.kind).toBe("refactor.rewrite")
+			expect(refactor.diagnosticCode).toBeNull()
+			expect(refactor.isPreferred).toBe(false)
+
+			let result = applied(lines, refactor)
+
+			expect(result[1]).toBe("\tconstant total = 0")
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should offer nothing on a Variable something assigns", () => {
+			expect(
+				titles(
+					constantRefactors([
+						"implementation {",
+						"\tvariable total = 0",
+						"\ttotal = 5",
+						"\tTerminal.print(total::toString())",
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: The assignment is written inside a Function literal that
+		// captures the name, which the index records as a write on the very
+		// same Declaration — so a rewrite that only read the enclosing body
+		// would offer a keyword swap the Compiler then refuses.
+		it("should offer nothing where a captured Variable is assigned", () => {
+			expect(
+				titles(
+					constantRefactors([
+						"implementation {",
+						"\tvariable total = 0",
+						"\tconstant bump = () -> Integer {",
+						"\t\ttotal = total::add(1)",
+						"\t\t<- total",
+						"\t}",
+						"\tTerminal.print(bump()::toString())",
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: One Declaration per name per Scope — the inner `total` is
+		// assigned and the outer one is not, and only the outer one is offered.
+		it("should tell two Variables of one name apart", () => {
+			let lines = [
+				"implementation {",
+				"\tvariable total = 0",
+				"\tfunction counted() -> Integer {",
+				"\t\tvariable total = 1",
+				"\t\ttotal = 2",
+				"\t\t<- total",
+				"\t}",
+				"\tTerminal.print(counted()::toString())",
+				"\tTerminal.print(total::toString())",
+				"}",
+			]
+
+			let [refactor, ...rest] = constantRefactors(lines)
+
+			expect(rest).toEqual([])
+			expect(applied(lines, refactor)[1]).toBe("\tconstant total = 0")
+		})
+
+		// NOTE: A Pattern binds several names at once, and `variable` there
+		// stands over the list rather than over one name.
+		it("should offer nothing on a Variable a Pattern declares", () => {
+			expect(
+				titles(
+					constantRefactors([
+						"implementation {",
+						"\tconstant point = { x = 1, y = 2 }",
+						"\tvariable { x, y } = point",
+						"\tTerminal.print(x::add(y)::toString())",
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+	})
+
 	describe("selection", () => {
 		it("should find nothing in a Program with nothing to fix", () => {
 			let lines = [
