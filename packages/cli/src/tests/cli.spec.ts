@@ -2517,23 +2517,46 @@ describe("the project's settings against the flags", () => {
 // `essence build` in a project obeys them — the file is found by walking up
 // from the working directory, and what it says reaches the compile.
 describe("a project's build settings, end to end", () => {
+	// NOTE: Spawned rather than driven in this process, and pointed at the
+	// directory the build should START in. `process.chdir` would say the same
+	// thing and leave a trap behind: the bundler's own child process is started
+	// once per process and keeps the working directory it was started in, so a
+	// compile driven from inside a directory this spec then removes leaves
+	// every later build in this process resolving against a directory that is
+	// no longer there.
+	function build(
+		directory: string,
+		essenceArguments: Array<string>,
+	): { code: number; err: string } {
+		let binary = fileURLToPath(import.meta.resolve("../../bin/essence"))
+		let result = spawnSync(
+			process.execPath,
+			[binary, "build", ...essenceArguments, "--no-color"],
+			{
+				cwd: directory,
+				encoding: "utf-8",
+				env: { ...process.env },
+				timeout: 120_000,
+			},
+		)
+
+		return { code: result.status ?? 1, err: result.stderr }
+	}
+
 	it("writes where the project says, with the map it asked for", async () => {
 		await withModules(
 			{
 				"essence.json": `{ "build": { "out": "dist", "sourcemap": true } }`,
 				"Quiet.es": 'implementation {\n\tTerminal.write("")\n}\n',
 			},
-			async (directory) =>
-				within(directory, async () => {
-					let { code } = await capture(() =>
-						run(["build", "Quiet.es", "--no-color"], "essence"),
-					)
-					let written = path.join(directory, "dist", "Quiet.js")
+			async (directory) => {
+				let { code, err } = build(directory, ["Quiet.es"])
+				let written = path.join(directory, "dist", "Quiet.js")
 
-					expect(code).toBe(EXIT_SUCCESS)
-					expect(existsSync(written)).toBe(true)
-					expect(existsSync(`${written}.map`)).toBe(true)
-				}),
+				expect([code, err]).toEqual([EXIT_SUCCESS, err])
+				expect(existsSync(written)).toBe(true)
+				expect(existsSync(`${written}.map`)).toBe(true)
+			},
 		)
 	})
 
@@ -2545,31 +2568,23 @@ describe("a project's build settings, end to end", () => {
 				"essence.json": `{ "build": { "sourcemap": true } }`,
 				"Quiet.es": 'implementation {\n\tTerminal.write("")\n}\n',
 			},
-			async (directory) =>
-				within(directory, async () => {
-					let { code } = await capture(() =>
-						run(
-							[
-								"build",
-								"Quiet.es",
-								"--no-sourcemap",
-								"--no-color",
-							],
-							"essence",
-						),
-					)
+			async (directory) => {
+				let { code, err } = build(directory, [
+					"Quiet.es",
+					"--no-sourcemap",
+				])
 
-					expect(code).toBe(EXIT_SUCCESS)
-					expect(
-						existsSync(path.join(directory, "Quiet.js.map")),
-					).toBe(false)
-					expect(
-						readFileSync(
-							path.join(directory, "Quiet.js"),
-							"utf8",
-						).includes("sourceMappingURL"),
-					).toBe(false)
-				}),
+				expect([code, err]).toEqual([EXIT_SUCCESS, err])
+				expect(existsSync(path.join(directory, "Quiet.js.map"))).toBe(
+					false,
+				)
+				expect(
+					readFileSync(
+						path.join(directory, "Quiet.js"),
+						"utf8",
+					).includes("sourceMappingURL"),
+				).toBe(false)
+			},
 		)
 	})
 

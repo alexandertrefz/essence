@@ -38,7 +38,7 @@ import {
 	testFailureDiagnostic,
 } from "../testReport"
 import { createPalette, createTheme } from "../theme"
-import { capture, within, withFiles as withProject } from "./harness"
+import { capture, withFiles as withProject } from "./harness"
 
 // NOTE: A bundle cache of this spec's own, and a result cache beside it. They
 // are assigned rather than exported because where a cache lives is read off the
@@ -130,6 +130,45 @@ function runTests(
 			"essence",
 		),
 	)
+}
+
+// NOTE: The same run, spawned rather than driven in this process, and pointed
+// at the directory it should START in — which is the point of it: a project's
+// settings are found by walking up from where the run was started, so a spec
+// about a configured project has to stand in one.
+//
+// NOTE: Spawned rather than driven with `process.chdir`, because a run also
+// COMPILES. The bundler's own child process is started once per process and
+// keeps the working directory it was started in, so a compile driven from
+// inside a directory this spec then removes leaves every later build in this
+// process — including the ones in other spec files — resolving against a
+// directory that is no longer there. A child of its own takes its working
+// directory with it.
+function runTestsIn(
+	directory: string,
+	essenceArguments: Array<string> = [],
+): { code: number; out: string; err: string } {
+	let binary = fileURLToPath(import.meta.resolve("../../bin/essence"))
+	let result = spawnSync(
+		process.execPath,
+		[binary, "test", "--jobs", "1", "--no-color", ...essenceArguments],
+		{
+			cwd: directory,
+			encoding: "utf-8",
+			// NOTE: Carried over rather than inherited: the two caches this
+			// suite names are assigned into `process.env` above, and a child
+			// answering out of the reader's own stores is a child answering
+			// about a project it has never seen.
+			env: { ...process.env },
+			timeout: 120_000,
+		},
+	)
+
+	return {
+		code: result.status ?? 1,
+		out: result.stdout,
+		err: result.stderr,
+	}
 }
 
 const passing = [
@@ -600,19 +639,18 @@ describe("essence test — project configuration", () => {
 				"package.json": `{\n\t"name": "old",\n\t"essence": { "exclude": ["broken"] }\n}`,
 				"Rules.es": passing,
 			},
-			async (directory) =>
-				within(directory, async () => {
-					let { code, err, out } = await runTests(directory)
+			async (directory) => {
+				let { code, err, out } = runTestsIn(directory)
 
-					expect(err).toContain("moved-setting")
-					expect(err).toContain(
-						'The "essence" key of package.json has moved to essence.json',
-					)
-					expect(err).toContain("package.json")
-					expect(out).toContain("1 passed")
-					expect(out).toContain("1 deselected")
-					expect(code).toBe(EXIT_SUCCESS)
-				}),
+				expect(err).toContain("moved-setting")
+				expect(err).toContain(
+					'The "essence" key of package.json has moved to essence.json',
+				)
+				expect(err).toContain("package.json")
+				expect(out).toContain("1 passed")
+				expect(out).toContain("1 deselected")
+				expect(code).toBe(EXIT_SUCCESS)
+			},
 		)
 	})
 
@@ -621,13 +659,12 @@ describe("essence test — project configuration", () => {
 	it("names the file the settings came from under --verbose", async () => {
 		await withFiles(
 			{ "essence.json": `{}`, "Rules.es": passing },
-			async (directory) =>
-				within(directory, async () => {
-					let { err } = await runTests(directory, ["--verbose"])
+			async (directory) => {
+				let { err } = runTestsIn(directory, ["--verbose"])
 
-					expect(err).toContain("settings read from")
-					expect(err).toContain("essence.json")
-				}),
+				expect(err).toContain("settings read from")
+				expect(err).toContain("essence.json")
+			},
 		)
 	})
 })
