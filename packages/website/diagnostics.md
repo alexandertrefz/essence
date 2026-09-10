@@ -2544,6 +2544,14 @@ Neither derive is offered where the Namespace writes the Method itself. A Case
 that carries a payload has no name to print on its own, so `is Printable` there
 still needs a written `toString` and reports this without one.
 
+**Quick Fix — "Implement 'P'":** writes one empty Method per requirement the
+Namespace does not answer, under the Protocol's own signature and with `Self`
+spelled as the target Type was written. It is offered only where a Method is
+MISSING — a signature that disagrees with the Protocol's is a Method to correct
+rather than one to write, and a Method the Protocol provides is already
+answered. The same edit is offered as a refactoring anywhere on the Namespace
+head, where the Diagnostic's own span does not reach.
+
 ### `undeclared-conformance`
 
 A Namespace over a Choice writes a REQUIREMENT of a Protocol that Choice derives

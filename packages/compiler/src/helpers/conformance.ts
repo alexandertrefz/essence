@@ -107,6 +107,40 @@ export function providedMethodProtocol(
 		: null
 }
 
+// NOTE: Every requirement of a Protocol a Namespace has not written, in the
+// order the Protocol declares them. The check below answers with the FIRST one
+// it meets, because one missing Method is enough to refuse a conformance — and
+// a Quick Fix that writes the stubs needs all of them, so it asks here rather
+// than the check growing a list it would throw away on every other path.
+//
+// A PROVIDED Method is not a requirement: the Protocol's own body answers it.
+// `providerOf` is therefore asked the question `computeConformanceMethodMap`
+// asks it, with the same default, so the two can not disagree about what a
+// Namespace owes.
+export function missingRequirements(
+	protocol: common.ProtocolType,
+	namespace: common.NamespaceType,
+	providerOf: (methodName: string) => string | null = (methodName) =>
+		providedMethodProtocol(protocol, methodName),
+): Array<string> {
+	let missing: Array<string> = []
+
+	for (let methodName of Object.keys(protocol.methods)) {
+		// NOTE: `Object.hasOwn`, never a plain index, for the reason spelled
+		// out above.
+		if (
+			providerOf(methodName) !== null ||
+			Object.hasOwn(namespace.methods, methodName)
+		) {
+			continue
+		}
+
+		missing.push(methodName)
+	}
+
+	return missing
+}
+
 export type ConformanceCheckResult =
 	| {
 			kind: "conforms"

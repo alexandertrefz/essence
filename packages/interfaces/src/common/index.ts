@@ -217,6 +217,17 @@ export type DiagnosticData =
 	// Parameter's Type or the Case declares them, so that a scaffold writes
 	// them in the order the reader would have.
 	| { kind: "missing-members"; names: Array<string> }
+	// NOTE: EVERY requirement the Namespace has not written, not the one the
+	// conformance check tripped over — a check stops at the first disagreement
+	// because one is enough to refuse, and a fix that writes the stubs would
+	// otherwise have to be applied once per Method. A Method the Protocol
+	// PROVIDES is not among them: the Protocol's own body answers it, and a
+	// stub would replace a working Method with an empty one.
+	| {
+			kind: "missing-requirements"
+			protocol: string
+			methods: Array<string>
+	  }
 	// NOTE: What a call would write between the angle brackets of
 	// `value::<Name>method(…)` to pick one candidate — a Protocol's name where
 	// the candidate is a Method that Protocol PROVIDES, and the Namespace's

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
+import { format } from "@essence-lang/formatter"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { analyse } from "../analyse"
@@ -154,6 +155,15 @@ function staleDiagnostic(
 		notes: [],
 		helps: [],
 	}
+}
+
+// NOTE: The honesty check a generator gets, over and above the Diagnostics: a
+// fix that SYNTHESIZES code has to write code, and the Formatter is the one
+// reader that refuses outright anything it can not read back as a whole
+// Program. Null is "nothing to say about it", which is what every applied
+// generator below has to leave behind.
+function refusalOf(lines: Array<string>): unknown {
+	return format(lines.join("\n")).refusal
 }
 
 function offsetOf(text: string, cursor: common.Cursor): number {
@@ -3860,6 +3870,276 @@ describe("Code Actions", () => {
 
 			expect(codesOf(lines)).toEqual(["use-before-declaration"])
 			expect(titles(quickFixes(lines))).toEqual([])
+		})
+	})
+
+	// NOTE: The stubs a Namespace owes, carrying the Protocol's own signatures
+	// and nothing in their bodies. Applying one leaves a `missing-return` under
+	// each stub, which is the visible hole this trades a conformance nobody can
+	// see the shape of for.
+	describe("nonconforming-namespace", () => {
+		it("should write a stub for the one requirement a Namespace owes", () => {
+			let lines = [
+				"implementation {",
+				"\ttype Point = { x: Integer }",
+				"",
+				"\tnamespace Point for Point is Printable {",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Implement 'Printable'")
+			expect(fix.diagnosticCode).toBe("nonconforming-namespace")
+			expect(fix.isPreferred).toBe(false)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\ttype Point = { x: Integer }",
+				"",
+				"\tnamespace Point for Point is Printable {",
+				"\t\ttoString() -> String {",
+				"\t\t}",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(result)).not.toContain("nonconforming-namespace")
+			expect(codesOf(result)).not.toContain("syntax-error")
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		// NOTE: `Self` is written back as the target Type was WRITTEN. A Record
+		// Alias resolves to the Record it names and carries the name nowhere,
+		// so a signature printed from the Type would read `-> { side: Integer }`
+		// where the reader wrote `Square`.
+		it("should write every requirement, a static and a Self among them", () => {
+			let lines = [
+				"implementation {",
+				"\tprotocol Shape {",
+				"\t\tarea() -> Integer",
+				"\t\tscaled(by factor: Integer) -> Self",
+				"\t\tstatic blank() -> Self",
+				"\t}",
+				"",
+				"\ttype Square = { side: Integer }",
+				"",
+				"\tnamespace Square for Square is Shape {",
+				"\t\tdescribe() -> String {",
+				'\t\t\t<- "square"',
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Implement 'Shape'")
+
+			// NOTE: A blank line in front of the first stub, because the
+			// Namespace already holds a Method — its members stand a line
+			// apart, and a stub written straight under one reads as part of it.
+			expect(result.slice(9)).toEqual([
+				"\tnamespace Square for Square is Shape {",
+				"\t\tdescribe() -> String {",
+				'\t\t\t<- "square"',
+				"\t\t}",
+				"",
+				"\t\tarea() -> Integer {",
+				"\t\t}",
+				"",
+				"\t\tscaled(by: Integer) -> Square {",
+				"\t\t}",
+				"",
+				"\t\tstatic blank() -> Square {",
+				"\t\t}",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(result)).not.toContain("nonconforming-namespace")
+			expect(codesOf(result)).not.toContain("syntax-error")
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		it("should count the requirements of a Protocol the one named extends", () => {
+			let lines = [
+				"implementation {",
+				"\tprotocol Named {",
+				"\t\tname() -> String",
+				"\t}",
+				"",
+				"\tprotocol Titled is Named {",
+				"\t\ttitle() -> String",
+				"\t}",
+				"",
+				"\ttype Book = { pages: Integer }",
+				"",
+				"\tnamespace Book for Book is Titled {",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Implement 'Titled'")
+			expect(result.slice(11)).toEqual([
+				"\tnamespace Book for Book is Titled {",
+				"\t\tname() -> String {",
+				"\t\t}",
+				"",
+				"\t\ttitle() -> String {",
+				"\t\t}",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(result)).not.toContain("nonconforming-namespace")
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		// NOTE: `Equatable` requires `is` and PROVIDES `isNot`. A stub for the
+		// provided one would replace a working Method with an empty one.
+		it("should leave a Method the Protocol provides alone", () => {
+			let lines = [
+				"implementation {",
+				"\ttype Point = { x: Integer }",
+				"",
+				"\tnamespace Point for Point is Equatable {",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(result.slice(3)).toEqual([
+				"\tnamespace Point for Point is Equatable {",
+				"\t\tis(_: Point) -> Boolean {",
+				"\t\t}",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(result)).not.toContain("nonconforming-namespace")
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		// NOTE: An `overload` requirement is a SET, so the stub is the block
+		// and an entry per Overload — a Namespace fulfilling one entry and not
+		// the others fulfills none of them.
+		it("should write an 'overload' block for an overloaded requirement", () => {
+			let lines = [
+				"implementation {",
+				"\tprotocol Scaled {",
+				"\t\toverload scaled {",
+				"\t\t\t(by factor: Integer) -> Self",
+				"\t\t\t(_ factor: Integer, and offset: Integer) -> Self",
+				"\t\t}",
+				"",
+				"\t\toverload static of {",
+				"\t\t\t(_ side: Integer) -> Self",
+				"\t\t\t() -> Self",
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Square = { side: Integer }",
+				"",
+				"\tnamespace Square for Square is Scaled {",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Implement 'Scaled'")
+			expect(result.slice(15)).toEqual([
+				"\tnamespace Square for Square is Scaled {",
+				"\t\toverload scaled {",
+				"\t\t\t(by: Integer) -> Square {",
+				"\t\t\t}",
+				"",
+				"\t\t\t(_: Integer, and: Integer) -> Square {",
+				"\t\t\t}",
+				"\t\t}",
+				"",
+				"\t\toverload static of {",
+				"\t\t\t(_: Integer) -> Square {",
+				"\t\t\t}",
+				"",
+				"\t\t\t() -> Square {",
+				"\t\t\t}",
+				"\t\t}",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(result)).not.toContain("nonconforming-namespace")
+			expect(codesOf(result)).not.toContain("syntax-error")
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		// NOTE: A Choice derives its own equality, so a Namespace that writes
+		// nothing is right — and there is no Diagnostic to answer.
+		it("should offer nothing where the Choice derives the conformance", () => {
+			expect(
+				titles(
+					actionsOf([
+						"implementation {",
+						"\tchoice Colour { Red, Green, Blue }",
+						"",
+						"\tnamespace Colour for Colour is Equatable {",
+						"\t}",
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: The same edit, offered where the Quick Fix can not reach — the
+		// Diagnostic underlines the clause's Protocol Identifier alone, and a
+		// cursor resting on `namespace` is nowhere near it.
+		it("should offer the same edit as a refactoring on the Namespace head", () => {
+			let lines = [
+				"implementation {",
+				"\ttype Point = { x: Integer }",
+				"",
+				"\tnamespace Point for Point is Printable {",
+				"\t}",
+				"}",
+			]
+
+			let [refactor] = actionsOf(lines, {
+				start: { line: 4, column: 2 },
+				end: { line: 4, column: 11 },
+			})
+
+			expect(refactor.kind).toBe("refactor.rewrite")
+			expect(refactor.title).toBe("Implement 'Printable'")
+			expect(refactor.diagnosticCode).toBeNull()
+			expect(applied(lines, refactor)[4]).toBe(
+				"\t\ttoString() -> String {",
+			)
+		})
+
+		// NOTE: The refactoring stands down on the clause itself rather than
+		// offering the reader one edit under one title twice.
+		it("should not repeat the Quick Fix on the clause it answers", () => {
+			expect(
+				actionsOf([
+					"implementation {",
+					"\ttype Point = { x: Integer }",
+					"",
+					"\tnamespace Point for Point is Printable {",
+					"\t}",
+					"}",
+				]).map((entry) => entry.kind),
+			).toEqual(["quickfix"])
 		})
 	})
 

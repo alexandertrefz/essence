@@ -9,6 +9,7 @@ export {
 	type ConformanceCheckResult,
 	conformanceKey,
 	type ConformanceMethodMap,
+	missingRequirements,
 	providedMethodProtocol,
 } from "./conformance"
 export {

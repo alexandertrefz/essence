@@ -54,6 +54,10 @@ import {
 } from "./fixes"
 import { overlaps } from "./geometry"
 import {
+	implementProtocolAction,
+	implementProtocolActions,
+} from "./implementProtocol"
+import {
 	closeStringAction,
 	documentationSeparatorAction,
 	invalidEscapeActions,
@@ -214,6 +218,9 @@ export function findCodeActions(
 		entries.push(...annotationActions(enrichedProgram, range))
 	}
 
+	entries.push(
+		...implementProtocolActions(program, enrichedProgram, lines, range),
+	)
 	entries.push(...shorthandActions(program, lines, range))
 
 	return entries
@@ -340,6 +347,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(elseBranchAction(diagnostic, program, lines)),
 	"mixed-rational-literal": ({ diagnostic, lines }) =>
 		mixedRationalActions(diagnostic, lines),
+	"nonconforming-namespace": implementProtocolAction,
 	"partial-decimal-literal": ({ diagnostic, lines }) =>
 		partialDecimalActions(diagnostic, lines),
 	"redundant-interpolation-to-string": ({ diagnostic, lines }) =>

@@ -12,6 +12,7 @@ import {
 import {
 	computeConformanceMethodMap,
 	conformanceKey,
+	missingRequirements,
 	providedMethodProtocol,
 } from "../helpers/conformance"
 import { recordDefaultMembers, recordDefaultNesting } from "../helpers/defaults"
@@ -4346,6 +4347,23 @@ export function checkProtocolConformance(
 							`Method '${result.methodName}' is missing`,
 						),
 					],
+					// NOTE: The whole list, where the Label names the one the
+					// check stopped at — a fix that writes the stubs writes
+					// them all at once, and a Namespace that declares a
+					// conformance and writes nothing owes every requirement.
+					// The two clauses that report this code beside it carry
+					// none: a signature that does not MATCH is a Method to
+					// correct rather than one to write, and a missing `where`
+					// is a clause to add to the conformance itself.
+					data: {
+						kind: "missing-requirements",
+						protocol: protocol.name,
+						methods: missingRequirements(
+							protocol,
+							namespaceType,
+							providers,
+						),
+					},
 				},
 			)
 		} else if (result.kind === "mismatched") {
