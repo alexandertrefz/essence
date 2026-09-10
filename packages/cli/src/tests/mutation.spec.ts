@@ -556,6 +556,28 @@ describe("essence test --mutate", () => {
 		})
 	})
 
+	// NOTE: And the same refusal when the PROJECT is what left the pass out,
+	// named where it was written — the reason is the counters rather than which
+	// of the two spelled it, and a refusal naming a flag nobody typed would
+	// send its reader looking through a command line that does not hold it.
+	it("refuses the pass the project leaves out, and says where", async () => {
+		await withFiles(
+			{
+				"Grading.es": WEAK,
+				"essence.json": `{ "build": { "withoutOptimisations": ["instrument-coverage"] } }`,
+			},
+			async (directory) =>
+				within(directory, async () => {
+					let { code, err } = await mutate(directory)
+
+					expect(code).toBe(EXIT_USAGE)
+					expect(err).toContain(
+						'--mutate and "build.withoutOptimisations" naming instrument-coverage contradict',
+					)
+				}),
+		)
+	})
+
 	it("refuses --contracts beside --no-contracts", async () => {
 		await withFiles({ "Grading.es": WEAK }, async (directory) => {
 			let { code, err } = await mutate(directory, [
