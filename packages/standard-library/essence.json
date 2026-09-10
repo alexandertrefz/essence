@@ -1,0 +1,8 @@
+{
+	"$schema": "https://essencelang.org/schemas/essence.schema.json"
+
+	// The library is a project of its own, so that a test run started in it
+	// walks these sources: a walk of a PROJECT never picks the standard library
+	// up — it declares the builtins and is nobody's test — while a walk that
+	// STARTED inside the library is how its `@example` blocks are run.
+}
