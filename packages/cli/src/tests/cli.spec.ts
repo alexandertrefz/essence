@@ -13,20 +13,30 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
+import {
+	defaultConfiguration,
+	type ProjectConfiguration,
+} from "@essence-lang/compiler/configuration"
 import { closestMatch } from "@essence-lang/compiler/helpers"
 import { optimiserPassNames } from "@essence-lang/compiler/optimiser"
 import { testDiagnostic } from "@essence-lang/compiler/tests/diagnosticFactory"
 import { fixturePath } from "@essence-lang/fixtures"
 import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 
-import { EXIT_SUCCESS, runCheck, runRun } from "../actions"
+import { EXIT_SUCCESS, EXIT_USAGE, runCheck, runRun } from "../actions"
 import {
 	optimiserOptionsFor,
 	type OptionValues,
 	parseArguments,
 	UsageError,
 } from "../args"
-import { commands, findCommand, globalOptions, PROGRAM } from "../commands"
+import {
+	commands,
+	type CommandSpec,
+	findCommand,
+	globalOptions,
+	PROGRAM,
+} from "../commands"
 import { colorChoiceFor, createContext, version } from "../context"
 import { runtimeArguments } from "../execute"
 import {
@@ -55,6 +65,7 @@ import {
 	shouldUseWorkers,
 	workerFileName,
 } from "../pool"
+import { resolveProjectOptions } from "../projectOptions"
 import {
 	countDiagnostics,
 	formatBytes,
@@ -72,6 +83,7 @@ import {
 	supportsUnicode,
 	visibleLength,
 } from "../theme"
+import { within } from "./harness"
 
 // NOTE: A directory of this run's own, so that a spec compiling a fixture
 // neither answers out of the user's bundle cache nor fills it. It is set before
@@ -1463,8 +1475,11 @@ function testOptions(overrides: Partial<OptionValues> = {}): OptionValues {
 		execute: false,
 		clear: false,
 		sourcemap: false,
+		noSourcemap: false,
 		minify: false,
+		noMinify: false,
 		embed: false,
+		noEmbed: false,
 		tests: false,
 		noOptimise: false,
 		withoutOptimisation: [],
@@ -2297,6 +2312,275 @@ describe("essence run", () => {
 				expect(result.stderr).toContain("hello from the program")
 				expect(result.status).toBe(EXIT_SUCCESS)
 			},
+		)
+	})
+})
+
+// NOTE: What the project file itself reads is the Compiler's own spec. What is
+// here is the half the command line owns: where a setting meets the flag that
+// says the same thing, and what a run does when both were written.
+describe("the project's settings against the flags", () => {
+	function withSettings(
+		overrides: (configuration: ProjectConfiguration) => void = () => {},
+	): ProjectConfiguration {
+		let configuration = defaultConfiguration()
+
+		configuration.filePath = path.join("/project", "essence.json")
+		configuration.root = "/project"
+		overrides(configuration)
+
+		return configuration
+	}
+
+	function resolve(
+		argv: Array<string>,
+		configuration: ProjectConfiguration = withSettings(),
+	): OptionValues {
+		let invocation = parseArguments(argv, "essence")
+
+		return resolveProjectOptions(
+			invocation.options,
+			configuration,
+			invocation.command,
+		)
+	}
+
+	it("takes the value a flag named, and the project's where none did", () => {
+		let configuration = withSettings((settings) => {
+			settings.test.cases = 250
+			settings.test.coverage.report = "lcov"
+			settings.test.coverage.out = "/project/reports"
+		})
+
+		expect(resolve(["test"], configuration).cases).toBe(250)
+		expect(resolve(["test", "--cases", "10"], configuration).cases).toBe(10)
+		expect(resolve(["test"], configuration).coverageReport).toBe("lcov")
+		expect(
+			resolve(["test", "--coverage-report", "json"], configuration)
+				.coverageReport,
+		).toBe("json")
+		expect(resolve(["test"], configuration).coverageOut).toBe(
+			"/project/reports",
+		)
+		expect(
+			resolve(["test", "--coverage-out", "here"], configuration)
+				.coverageOut,
+		).toBe("here")
+	})
+
+	// NOTE: Collecting coverage compiles the whole project a second way, which
+	// is a choice about a RUN. The format and the directory are facts about the
+	// project, and a project that named one is not a project asking for a
+	// coverage run every time.
+	it("does not turn coverage on because a format was configured", () => {
+		let configuration = withSettings((settings) => {
+			settings.test.coverage.report = "lcov"
+		})
+
+		expect(resolve(["test"], configuration).coverage).toBe(false)
+		expect(resolve(["test", "--coverage"], configuration).coverage).toBe(
+			true,
+		)
+		expect(
+			resolve(["test", "--coverage-report", "json"], configuration)
+				.coverage,
+		).toBe(true)
+	})
+
+	it("turns a switch on where either says so, and --no-… off whatever", () => {
+		let configuration = withSettings((settings) => {
+			settings.build.sourcemap = true
+			settings.build.minify = true
+			settings.build.embed = true
+		})
+
+		expect(resolve(["build", "a.es"], configuration)).toMatchObject({
+			sourcemap: true,
+			minify: true,
+			embed: true,
+		})
+		expect(
+			resolve(
+				[
+					"build",
+					"a.es",
+					"--no-sourcemap",
+					"--no-minify",
+					"--no-embed",
+				],
+				configuration,
+			),
+		).toMatchObject({ sourcemap: false, minify: false, embed: false })
+		expect(
+			resolve(["build", "a.es", "--sourcemap", "--minify", "--embed"]),
+		).toMatchObject({ sourcemap: true, minify: true, embed: true })
+		expect(resolve(["build", "a.es"])).toMatchObject({
+			sourcemap: false,
+			minify: false,
+			embed: false,
+		})
+	})
+
+	it("refuses both twins of a switch", () => {
+		for (let flag of ["sourcemap", "minify", "embed"]) {
+			try {
+				resolve(["build", "a.es", `--${flag}`, `--no-${flag}`])
+				expect.unreachable()
+			} catch (error) {
+				expect(error).toBeInstanceOf(UsageError)
+				expect((error as UsageError).message).toBe(
+					`--${flag} and --no-${flag} contradict each other — say one.`,
+				)
+				expect((error as UsageError).command?.name).toBe("build")
+			}
+		}
+	})
+
+	// NOTE: `--no-embed` is offered where `--embed` is, which `run` is not:
+	// what it spawns is a program, and a bundle for a host to import is not one.
+	it("offers each way out beside the flag it undoes", () => {
+		let named = (name: string) =>
+			(findCommand(name) as CommandSpec).options.map(
+				(option) => option.name,
+			)
+
+		expect(named("build")).toEqual(
+			expect.arrayContaining(["no-sourcemap", "no-minify", "no-embed"]),
+		)
+		expect(named("watch")).toEqual(
+			expect.arrayContaining(["no-sourcemap", "no-minify", "no-embed"]),
+		)
+		expect(named("run")).toEqual(
+			expect.arrayContaining(["no-sourcemap", "no-minify"]),
+		)
+		expect(named("run")).not.toContain("no-embed")
+	})
+
+	it("leaves the Optimiser off where either says so", () => {
+		let configuration = withSettings((settings) => {
+			settings.build.optimise = false
+		})
+
+		expect(resolve(["build", "a.es"], configuration).noOptimise).toBe(true)
+		expect(resolve(["build", "a.es"]).noOptimise).toBe(false)
+		expect(resolve(["build", "a.es", "--no-optimise"]).noOptimise).toBe(
+			true,
+		)
+	})
+
+	it("unions the passes the project leaves out with the flag's", () => {
+		let configuration = withSettings((settings) => {
+			settings.build.withoutOptimisations = [
+				"pool-constants",
+				"fold-constants",
+			]
+		})
+
+		expect(
+			resolve(
+				[
+					"build",
+					"a.es",
+					"--without-optimisation",
+					"fold-constants",
+					"--without-optimisation",
+					"inline-loops",
+				],
+				configuration,
+			).withoutOptimisation,
+		).toEqual(["fold-constants", "inline-loops", "pool-constants"])
+	})
+
+	// NOTE: A configured `out` is a directory, always — a project can not name
+	// one output file for every source it builds — so it arrives spelled the
+	// way `--out` spells a directory. Without the separator a single source and
+	// no `dist` yet would have its bundle written AS `dist`.
+	it("writes bundles where the project says, as a directory", () => {
+		let configuration = withSettings((settings) => {
+			settings.build.out = path.resolve("/project/dist")
+		})
+
+		expect(resolve(["build", "a.es"], configuration).out).toBe(
+			`${path.resolve("/project/dist")}${path.sep}`,
+		)
+		expect(
+			resolve(["build", "a.es", "-o", "out.js"], configuration).out,
+		).toBe("out.js")
+		expect(resolve(["build", "a.es"]).out).toBeUndefined()
+	})
+})
+
+// NOTE: End to end, because the whole point of the settings is that a bare
+// `essence build` in a project obeys them — the file is found by walking up
+// from the working directory, and what it says reaches the compile.
+describe("a project's build settings, end to end", () => {
+	it("writes where the project says, with the map it asked for", async () => {
+		await withModules(
+			{
+				"essence.json": `{ "build": { "out": "dist", "sourcemap": true } }`,
+				"Quiet.es": 'implementation {\n\tTerminal.write("")\n}\n',
+			},
+			async (directory) =>
+				within(directory, async () => {
+					let { code } = await capture(() =>
+						run(["build", "Quiet.es", "--no-color"], "essence"),
+					)
+					let written = path.join(directory, "dist", "Quiet.js")
+
+					expect(code).toBe(EXIT_SUCCESS)
+					expect(existsSync(written)).toBe(true)
+					expect(existsSync(`${written}.map`)).toBe(true)
+				}),
+		)
+	})
+
+	// NOTE: And the way out of each of them is a flag on the run, which is why
+	// the negative twins exist at all.
+	it("lets one run out of what the project configured", async () => {
+		await withModules(
+			{
+				"essence.json": `{ "build": { "sourcemap": true } }`,
+				"Quiet.es": 'implementation {\n\tTerminal.write("")\n}\n',
+			},
+			async (directory) =>
+				within(directory, async () => {
+					let { code } = await capture(() =>
+						run(
+							[
+								"build",
+								"Quiet.es",
+								"--no-sourcemap",
+								"--no-color",
+							],
+							"essence",
+						),
+					)
+
+					expect(code).toBe(EXIT_SUCCESS)
+					expect(
+						existsSync(path.join(directory, "Quiet.js.map")),
+					).toBe(false)
+					expect(
+						readFileSync(
+							path.join(directory, "Quiet.js"),
+							"utf8",
+						).includes("sourceMappingURL"),
+					).toBe(false)
+				}),
+		)
+	})
+
+	it("refuses a run that wrote both twins of a flag", async () => {
+		let { code, err } = await capture(() =>
+			run(
+				["build", "Quiet.es", "--minify", "--no-minify", "--no-color"],
+				"essence",
+			),
+		)
+
+		expect(code).toBe(EXIT_USAGE)
+		expect(err).toContain(
+			"--minify and --no-minify contradict each other — say one.",
 		)
 	})
 })

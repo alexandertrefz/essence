@@ -569,21 +569,29 @@ export function resolveContracts(
 // and use none of this. A watching run already re-runs only what a save
 // reached, out of bundles it is holding, and answering out of a file would be
 // slower than the loop it replaced.
-export function remembersResults(options: {
-	update: boolean
-	coverage: boolean
-	bench: boolean
-	mutate: boolean
-	seed: string | undefined
-	cases: number | null
-}): boolean {
+export function remembersResults(
+	options: {
+		update: boolean
+		coverage: boolean
+		bench: boolean
+		mutate: boolean
+		seed: string | undefined
+		cases: number | null
+	},
+	// NOTE: How many cases the PROJECT draws, where it said so. A run whose
+	// count is the project's own is that project's ordinary run and is
+	// remembered like one — it is `--cases` on the command line that says "this
+	// run is a one-off", and a standing setting that turned the store off for
+	// ever would be a project paying for every run of it twice.
+	configuredCases: number | null = null,
+): boolean {
 	return (
 		!options.update &&
 		!options.coverage &&
 		!options.bench &&
 		!options.mutate &&
 		options.seed === undefined &&
-		options.cases === null
+		(options.cases === null || options.cases === configuredCases)
 	)
 }
 
@@ -1048,7 +1056,10 @@ export async function runTest(
 	// So the replay a failure prints reproduces the run rather than the file.
 	let seed = context.options.seed ?? randomSeed()
 
-	let resultStore = remembersResults(context.options)
+	let resultStore = remembersResults(
+		context.options,
+		configuration.test.cases,
+	)
 		? resultCacheDirectory()
 		: null
 	// NOTE: The entries a result cache could answer for at all — one that would

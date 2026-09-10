@@ -125,10 +125,29 @@ const sourcemapOption: OptionSpec = {
 	summary: "Emit a source map next to the output",
 }
 
+// NOTE: The three flags below are the way out of the settings the three above
+// them mirror — `build.sourcemap`, `build.minify` and `build.embed`, written
+// once in essence.json and in force for every run. A project that always emits
+// a map still needs a build without one on demand, and a flag that could only
+// ever turn a thing ON would leave that project no way to ask. The flag wins
+// over the setting in both directions, and saying both flags at once is refused
+// before anything runs.
+const noSourcemapOption: OptionSpec = {
+	name: "no-sourcemap",
+	type: "boolean",
+	summary: "Emit no source map, whatever the project configured",
+}
+
 const minifyOption: OptionSpec = {
 	name: "minify",
 	type: "boolean",
 	summary: "Minify the emitted JavaScript",
+}
+
+const noMinifyOption: OptionSpec = {
+	name: "no-minify",
+	type: "boolean",
+	summary: "Emit unminified JavaScript, whatever the project configured",
 }
 
 // NOTE: A build compiles what a Program DOES and drops what it proves, which is
@@ -195,6 +214,12 @@ const embedOption: OptionSpec = {
 		"Essence's own values.",
 }
 
+const noEmbedOption: OptionSpec = {
+	name: "no-embed",
+	type: "boolean",
+	summary: "Build a program to run, whatever the project configured",
+}
+
 const jobsOption: OptionSpec = {
 	name: "jobs",
 	short: "j",
@@ -205,7 +230,7 @@ const jobsOption: OptionSpec = {
 		"Compilation of several files is spread across worker threads. Set to " +
 		"1 to compile everything on the main thread, which makes stack traces " +
 		"from Compiler crashes easier to read.",
-	defaultDescription: "one per available CPU core, up to 8",
+	defaultDescription: "one per available CPU core, up to 4",
 }
 
 export const commands: Array<CommandSpec> = [
@@ -246,8 +271,11 @@ export const commands: Array<CommandSpec> = [
 				summary: "Execute the output once the build succeeds",
 			},
 			sourcemapOption,
+			noSourcemapOption,
 			minifyOption,
+			noMinifyOption,
 			embedOption,
+			noEmbedOption,
 			testsOption,
 			noOptimiseOption,
 			withoutOptimisationOption,
@@ -298,7 +326,9 @@ export const commands: Array<CommandSpec> = [
 				defaultDescription: "a temporary directory",
 			},
 			sourcemapOption,
+			noSourcemapOption,
 			minifyOption,
+			noMinifyOption,
 			noOptimiseOption,
 			withoutOptimisationOption,
 		],
@@ -380,8 +410,11 @@ export const commands: Array<CommandSpec> = [
 				summary: "Clear the screen before each rebuild",
 			},
 			sourcemapOption,
+			noSourcemapOption,
 			minifyOption,
+			noMinifyOption,
 			embedOption,
+			noEmbedOption,
 			noOptimiseOption,
 			withoutOptimisationOption,
 			jobsOption,

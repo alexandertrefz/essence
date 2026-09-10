@@ -824,4 +824,13 @@ describe("The result cache", () => {
 		expect(remembersResults(options({ seed: "1234abcd" }))).toBe(false)
 		expect(remembersResults(options({ cases: 10 }))).toBe(false)
 	})
+
+	// NOTE: A project that wrote down how many values a property draws did not
+	// ask for a one-off run — `--cases` is what says that — so its ordinary run
+	// is remembered like anybody else's. A standing setting that turned the
+	// store off for ever would be a project paying for every run of it twice.
+	it("remembers a run whose case count is the project's own", () => {
+		expect(remembersResults(options({ cases: 200 }), 200)).toBe(true)
+		expect(remembersResults(options({ cases: 10 }), 200)).toBe(false)
+	})
 })

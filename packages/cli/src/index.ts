@@ -19,6 +19,7 @@ import { toJSONUsageError } from "./json"
 import {
 	projectConfigurationFor,
 	reportProjectSettings,
+	resolveProjectOptions,
 } from "./projectOptions"
 import { runWatch } from "./watch"
 
@@ -296,8 +297,16 @@ export async function run(
 		// `readsProjectConfiguration`.
 		let configuration = projectConfigurationFor(invocation.command)
 
+		// NOTE: And the flags are resolved against it here as well, so that
+		// what a command reads off its context is the effective answer — the
+		// flag where one was given, the setting where the project said so, and
+		// the default where neither did.
 		context = createContext(
-			invocation.options,
+			resolveProjectOptions(
+				invocation.options,
+				configuration,
+				invocation.command,
+			),
 			programName,
 			undefined,
 			configuration,

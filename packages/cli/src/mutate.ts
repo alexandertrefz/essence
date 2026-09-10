@@ -3,6 +3,7 @@ import { tmpdir } from "node:os"
 import * as path from "node:path"
 import { Worker } from "node:worker_threads"
 
+import type { ProjectConfiguration } from "@essence-lang/compiler/configuration"
 import { canonicalPath } from "@essence-lang/compiler/documents"
 import type { MutationSite } from "@essence-lang/compiler/mutation"
 import { coveragePassName } from "@essence-lang/compiler/optimiser"
@@ -102,7 +103,10 @@ const CONTRADICTIONS: Array<[keyof OptionValues, string, string]> = [
 	],
 ]
 
-function contradiction(options: OptionValues): string | null {
+function contradiction(
+	options: OptionValues,
+	configuration: ProjectConfiguration,
+): string | null {
 	for (let [flag, name, reason] of CONTRADICTIONS) {
 		if (options[flag] === true) {
 			return `--mutate and ${name} contradict each other — ${reason}.`
@@ -124,10 +128,20 @@ function contradiction(options: OptionValues): string | null {
 	// test reaches. Refused rather than warned about, because the report it
 	// would print is a plausible one.
 	if (options.withoutOptimisation.includes(coveragePassName)) {
+		// NOTE: Named where it was written. The pass is left out by a flag or
+		// by the project's own `build.withoutOptimisations`, and a refusal that
+		// named a flag nobody typed would send its reader looking through a
+		// command line that does not hold it.
+		let where = configuration.build.withoutOptimisations.includes(
+			coveragePassName,
+		)
+			? `"build.withoutOptimisations" naming ${coveragePassName}`
+			: `--without-optimisation ${coveragePassName}`
+
 		return (
-			`--mutate and --without-optimisation ${coveragePassName} contradict ` +
-			"each other — the counters are what say which tests reach which " +
-			"site, and without them every site is one no test reaches."
+			`--mutate and ${where} contradict each other — the counters are ` +
+			"what say which tests reach which site, and without them every " +
+			"site is one no test reaches."
 		)
 	}
 
@@ -461,15 +475,14 @@ export async function runMutation(
 	internals: MutationInternals = {},
 ): Promise<number> {
 	let timeoutFor = internals.timeoutFor ?? mutantTimeout
-	let refusal = contradiction(context.options)
+	let { configuration } = context
+	let refusal = contradiction(context.options, configuration)
 
 	if (refusal !== null) {
 		context.terminal.err(refusal)
 
 		return EXIT_USAGE
 	}
-
-	let { configuration } = context
 
 	// NOTE: BOUND before anything redirects it. The baseline is run with stdout
 	// pointed at stderr — a mutated Module's own top-level output belongs to

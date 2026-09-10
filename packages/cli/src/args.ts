@@ -55,11 +55,17 @@ export type OptionValues = {
 	watch: boolean
 	execute: boolean
 	clear: boolean
+	// NOTE: The three flags a project may also write down, each with the way
+	// out of the setting beside it — see `resolveProjectOptions`, which is
+	// where the two meet and where writing both twins is refused.
 	sourcemap: boolean
+	noSourcemap: boolean
 	minify: boolean
+	noMinify: boolean
 	// NOTE: Whether the bundle carries a runtime bridge, with a Descriptor
 	// written beside it — see the Option's own details.
 	embed: boolean
+	noEmbed: boolean
 	// NOTE: Whether `essence build` compiles the tests section into the bundle
 	// rather than dropping it. A debugger is what asks; see the Option.
 	tests: boolean
@@ -138,8 +144,11 @@ export const emptyOptions: OptionValues = {
 	execute: false,
 	clear: false,
 	sourcemap: false,
+	noSourcemap: false,
 	minify: false,
+	noMinify: false,
 	embed: false,
+	noEmbed: false,
 	tests: false,
 	noOptimise: false,
 	withoutOptimisation: [],
@@ -399,24 +408,15 @@ function readMutationLimit(
 // NOTE: The format names are the Compiler's, checked here so that a misspelt
 // one is refused rather than written as the other format under the name that
 // was asked for.
+//
+// NOTE: A place to write with nothing to write there is refused as well, but
+// not here: a project may have named the format in its essence.json, and this
+// reads a command line rather than a project. See `resolveProjectOptions`.
 function readCoverageReport(
 	raw: string | undefined,
-	out: string | undefined,
 	command: CommandSpec,
 ): CoverageReportFormat | null {
 	if (raw === undefined) {
-		// NOTE: A place to write and nothing to write there is a mistake that
-		// costs a whole run to discover — the table appears, the directory
-		// does not, and nothing says why. Refused rather than defaulted: which
-		// format was meant is not something to guess at.
-		if (out !== undefined) {
-			throw new UsageError(
-				"--coverage-out says where to write a report, and no report was asked for.",
-				command,
-				`Add --coverage-report ${coverageReportFormats.join(" or ")}.`,
-			)
-		}
-
 		return null
 	}
 
@@ -544,8 +544,11 @@ export function parseArguments(
 			execute: values.execute === true,
 			clear: values.clear === true,
 			sourcemap: values.sourcemap === true,
+			noSourcemap: values["no-sourcemap"] === true,
 			minify: values.minify === true,
+			noMinify: values["no-minify"] === true,
 			embed: values.embed === true,
+			noEmbed: values["no-embed"] === true,
 			tests: values.tests === true,
 			noOptimise: values["no-optimise"] === true,
 			withoutOptimisation: readDisabledPasses(
@@ -573,7 +576,6 @@ export function parseArguments(
 				values["coverage-report"] !== undefined,
 			coverageReport: readCoverageReport(
 				values["coverage-report"] as string | undefined,
-				values["coverage-out"] as string | undefined,
 				command,
 			),
 			coverageOut: values["coverage-out"] as string | undefined,

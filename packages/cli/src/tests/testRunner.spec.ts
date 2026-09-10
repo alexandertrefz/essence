@@ -13,7 +13,11 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { readProjectConfiguration } from "@essence-lang/compiler/configuration"
+import {
+	defaultConfiguration,
+	type ProjectConfiguration,
+	readProjectConfiguration,
+} from "@essence-lang/compiler/configuration"
 import type { TestEvent } from "@essence-lang/runtime/Testing"
 
 import { EXIT_FAILURE, EXIT_FOCUSED, EXIT_SUCCESS } from "../actions"
@@ -22,6 +26,7 @@ import { findCommand } from "../commands"
 import { createContext } from "../context"
 import { discoverTestFiles, namesTests } from "../discovery"
 import { run } from "../index"
+import { resolveProjectOptions } from "../projectOptions"
 import type { ReportContext } from "../report"
 import { resolveContracts, resolveFilters } from "../test"
 import {
@@ -1838,10 +1843,29 @@ describe("essence test --coverage", () => {
 		)
 	})
 
+	// NOTE: A place to write and nothing to write there costs a whole run to
+	// discover — the table appears, the directory does not, and nothing says
+	// why. It is refused unless the PROJECT named a format, which is what makes
+	// the flag meaningful on its own.
 	it("refuses a place to write with nothing to write there", () => {
-		expect(() =>
-			parseArguments(["test", "--coverage", "--coverage-out", "reports"]),
-		).toThrow(UsageError)
+		let resolve = (configuration: ProjectConfiguration) =>
+			resolveProjectOptions(
+				parseArguments([
+					"test",
+					"--coverage",
+					"--coverage-out",
+					"reports",
+				]).options,
+				configuration,
+			)
+
+		expect(() => resolve(defaultConfiguration())).toThrow(UsageError)
+
+		let configured = defaultConfiguration()
+
+		configured.test.coverage.report = "lcov"
+
+		expect(resolve(configured).coverageOut).toBe("reports")
 	})
 
 	it("refuses a format it does not know", () => {
