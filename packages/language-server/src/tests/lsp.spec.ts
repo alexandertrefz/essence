@@ -21,6 +21,7 @@ import { testDiagnostic } from "@essence-lang/compiler/tests/diagnosticFactory"
 import { fixturePath } from "@essence-lang/fixtures"
 import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 import {
+	type CodeAction,
 	CodeActionKind,
 	CompletionItemKind,
 	type Diagnostic,
@@ -29,6 +30,7 @@ import {
 	InsertTextFormat,
 	TextDocumentSyncKind,
 } from "vscode-languageserver"
+import { CodeActionRequest } from "vscode-languageserver/node"
 
 import { analyse, documentFilePath } from "../analyse"
 import { type CodeActionEntry, findCodeActions } from "../codeActions"
@@ -40,11 +42,17 @@ import { findRenameableOccurrence } from "../rename"
 import { semanticTokenModifiers, semanticTokenTypes } from "../semanticTokens"
 import {
 	ensureTransportArgument,
+	isRequestedKind,
 	serverCapabilities,
 	toLspCodeAction,
 	toLspCompletionItem,
 	uriOf,
 } from "../server"
+import {
+	type LspSession,
+	makeSessionWorkspace,
+	startSession,
+} from "./lspSession"
 
 describe("LSP", () => {
 	describe("analyse", () => {
@@ -743,6 +751,47 @@ describe("LSP", () => {
 		})
 	})
 
+	describe("isRequestedKind", () => {
+		it("should keep every kind for a request that named none", () => {
+			expect(isRequestedKind("quickfix", undefined)).toBe(true)
+			expect(isRequestedKind("refactor.rewrite", undefined)).toBe(true)
+			expect(isRequestedKind("quickfix", [])).toBe(true)
+		})
+
+		// NOTE: The Refactor menu is the request that asks for `refactor`, and
+		// a fix listed in it is a fix the reader went looking for a rewrite in.
+		it("should keep the refactors and drop the fixes for a refactor request", () => {
+			expect(isRequestedKind("refactor.rewrite", ["refactor"])).toBe(true)
+			expect(isRequestedKind("quickfix", ["refactor"])).toBe(false)
+		})
+
+		it("should keep the fixes and drop the refactors for a quickfix request", () => {
+			expect(isRequestedKind("quickfix", ["quickfix"])).toBe(true)
+			expect(isRequestedKind("refactor.rewrite", ["quickfix"])).toBe(
+				false,
+			)
+		})
+
+		// NOTE: A kind matches itself and everything under it, and nothing
+		// above it — an Editor asking for one branch of the menu must not be
+		// handed the whole of `refactor`.
+		it("should read a requested kind as itself and what it holds", () => {
+			expect(
+				isRequestedKind("refactor.rewrite", ["refactor.rewrite"]),
+			).toBe(true)
+			expect(
+				isRequestedKind("refactor.rewrite", ["refactor.extract"]),
+			).toBe(false)
+			expect(isRequestedKind("quickfix", ["quick"])).toBe(false)
+		})
+
+		it("should keep a kind any one of the requested kinds holds", () => {
+			expect(
+				isRequestedKind("refactor.rewrite", ["quickfix", "refactor"]),
+			).toBe(true)
+		})
+	})
+
 	describe("Diagnostic codes", () => {
 		it("should tag an unreachable Match case as unnecessary", () => {
 			let diagnostics = analyse(
@@ -871,6 +920,76 @@ describe("LSP", () => {
 				"6009",
 			])
 		})
+	})
+})
+
+// NOTE: Read off the request as it arrives rather than only out of the pure
+// filter beside it: `context.only` is what an Editor sends, and a handler that
+// never looks at it passes every spec it has while the Refactor menu lists the
+// Quick Fixes.
+describe("Code Actions asked for one kind", () => {
+	const source = [
+		"implementation {",
+		"\ttype Value = Integer | String",
+		"\tconstant something: Value = 42",
+		"\tconstant answer = match something -> String {",
+		'\t\tcase Integer { <- "an Integer" }',
+		"\t}",
+		"}",
+	].join("\n")
+
+	async function kindsFor(
+		session: LspSession,
+		uri: string,
+		only?: Array<string>,
+	): Promise<Array<string | undefined>> {
+		let { result } = await session.request<Array<CodeAction>>(
+			CodeActionRequest.type,
+			{
+				textDocument: { uri },
+				range: {
+					start: { line: 0, character: 0 },
+					end: { line: 6, character: 1 },
+				},
+				context: { diagnostics: [], only },
+			},
+		)
+
+		return result.map((action) => action.kind)
+	}
+
+	it("should answer with nothing but the kinds the request named", async () => {
+		let files = makeSessionWorkspace({ "Test.es": source })
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.open(files.pathOf("Test.es"), source)
+			await session.settle()
+
+			let uri = uriOf(files.pathOf("Test.es"))
+			let everything = await kindsFor(session, uri)
+
+			expect(everything).toContain(CodeActionKind.QuickFix)
+			expect(everything).toContain(CodeActionKind.RefactorRewrite)
+
+			let refactors = await kindsFor(session, uri, [
+				CodeActionKind.Refactor,
+			])
+
+			expect(refactors.length).toBeGreaterThan(0)
+			expect(refactors).toEqual(
+				refactors.map(() => CodeActionKind.RefactorRewrite),
+			)
+
+			let fixes = await kindsFor(session, uri, [CodeActionKind.QuickFix])
+
+			expect(fixes.length).toBeGreaterThan(0)
+			expect(fixes).toEqual(fixes.map(() => CodeActionKind.QuickFix))
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
 	})
 })
 

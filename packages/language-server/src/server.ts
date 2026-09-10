@@ -1839,7 +1839,9 @@ export function startServer(options: { connection?: Connection } = {}) {
 			workspace,
 			analysis,
 			tagDiagnosticsFor(documentFilePath(params.textDocument.uri)),
-		).map((entry) => toLspCodeAction(entry, params))
+		)
+			.filter((entry) => isRequestedKind(entry.kind, params.context.only))
+			.map((entry) => toLspCodeAction(entry, params))
 	})
 
 	connection.onFoldingRanges((params) => {
@@ -2949,6 +2951,27 @@ function toLspCallHierarchyItem(
 		range: toLspRange(item.range),
 		selectionRange: toLspRange(item.selectionRange),
 	}
+}
+
+// NOTE: What the request asked for. An Editor opening its Refactor menu asks
+// for `refactor` and one drawing the lightbulb over a squiggle asks for
+// `quickfix`, and answering both with everything puts the fixes in the
+// Refactor menu and the rewrites under the lightbulb. A kind is a dotted
+// hierarchy: `refactor` asks for `refactor.extract` as well, while
+// `refactor.extract` asks for nothing but itself. Asking for nothing — an
+// absent list, or an empty one — asks for all of them, which is what the
+// Editor sends when the reader opened no menu in particular.
+export function isRequestedKind(
+	kind: CodeActionEntry["kind"],
+	only: Array<string> | undefined,
+): boolean {
+	if (only === undefined || only.length === 0) {
+		return true
+	}
+
+	return only.some(
+		(requested) => kind === requested || kind.startsWith(`${requested}.`),
+	)
 }
 
 // NOTE: The edits were computed on the current buffer, so the client's own
