@@ -3835,6 +3835,15 @@ export function resolveConformances(
 						helps: [
 							`Declare it as '<infer ${binding.name} is ${generic.constraint}>'.`,
 						],
+						// NOTE: The Type Parameter the bound has to be written
+						// on, beside the Protocol it has to be bound by — a
+						// Quick Fix edits the DECLARATION, which is nowhere near
+						// the call this is reported at.
+						data: {
+							kind: "required-protocol",
+							protocol: generic.constraint,
+							parameter: binding.name,
+						},
 					},
 				)
 			}
@@ -3896,6 +3905,17 @@ export function resolveConformances(
 						`No Namespace in scope makes ${describeType(binding)} conform to '${generic.constraint}'.`,
 					],
 					helps: [help],
+					// NOTE: No Parameter, because the Type that failed is a
+					// concrete one — what this asks for is a Namespace declaring
+					// the conformance, which is a Declaration rather than an edit
+					// to a span, and no fix answers it. The Protocol is carried
+					// all the same: it is the fact, and what is done with it is
+					// not this site's to decide.
+					data: {
+						kind: "required-protocol",
+						protocol: generic.constraint,
+						parameter: null,
+					},
 				},
 			)
 		} else {
@@ -4455,6 +4475,13 @@ function reportUndeclaredDerivedConformance(
 				helps: [
 					`Declare the conformance: 'is ${protocolName}' on this Namespace.`,
 				],
+				// NOTE: No Parameter — what carries a conformance here is the
+				// Namespace's own head, which is the Node the fix writes into.
+				data: {
+					kind: "required-protocol",
+					protocol: protocolName,
+					parameter: null,
+				},
 			},
 		)
 	}

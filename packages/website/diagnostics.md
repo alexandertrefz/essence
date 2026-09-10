@@ -2452,6 +2452,15 @@ Case of a Choice — `namespace Reds for Colour#Red is Enumerable` does not pars
 — so the Help names the Choice instead: annotate the value at `Colour`, and the
 bound is satisfied by the Choice the Case belongs to.
 
+**Quick Fix — "Declare it as '<infer T is P>'":** writes the bound onto the Type
+Parameter's own declaration, found by name in the Function, Method or Namespace
+head the call is written under. Offered only where this file declares that
+Parameter and where it carries no bound already — `<infer T is A is P>` is not a
+spelling, and which of two bounds was meant is not something the Diagnostic can
+say. Nothing is offered where the Type that failed is a concrete one: what that
+asks for is a Namespace declaring the conformance, which is a Declaration rather
+than an edit.
+
 ### `interpolation-not-printable`
 
 A `{ … }` hole in a String Literal holds a value that does not conform to
@@ -2514,6 +2523,10 @@ Choice shadows the Choice's own `Colour.cases()` rail, one of any other name
 does not.
 
 Declare the conformance, which is what the Help says.
+
+**Quick Fix — "Declare the conformance: 'is P'":** writes the clause onto the
+Namespace's head — after the target Type where the head declares no conformance
+yet, and after the last one it declares where it does.
 
 Two things are deliberately not in this refusal. `is Printable`, because
 printing derives only where a Namespace declares it — a written `toString`

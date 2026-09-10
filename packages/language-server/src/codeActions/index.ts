@@ -21,7 +21,9 @@ import {
 } from "./defineFixes"
 import {
 	argumentLabelAction,
+	boundParameterAction,
 	choicePrefixActions,
+	declareConformanceAction,
 	constantToVariableAction,
 	elseBranchAction,
 	type ImportContext,
@@ -333,6 +335,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		staticCallActions(diagnostic, program, lines),
 	"unclosed-string": ({ diagnostic, lines }) =>
 		listed(closeStringAction(diagnostic, lines)),
+	"undeclared-conformance": ({ diagnostic, program }) =>
+		listed(declareConformanceAction(diagnostic, program)),
 	"unexpected-payload": ({ diagnostic, program, lines }) =>
 		listed(bareCaseAction(diagnostic, program, lines)),
 	"uninferred-namespace-parameter": ({ diagnostic, program, lines }) =>
@@ -367,6 +371,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(unreachableCaseAction(diagnostic, program, lines)),
 	"unreachable-define-arm": ({ diagnostic, program, lines }) =>
 		unreachableDefineArmActions(diagnostic, program, lines),
+	"unsatisfied-bound": ({ diagnostic, program }) =>
+		listed(boundParameterAction(diagnostic, program)),
 	"unused-import": ({ diagnostic, program, lines }) =>
 		listed(removeImportAction(diagnostic, program, lines)),
 	"value-comment-outside-tests": ({ diagnostic, lines }) =>

@@ -392,6 +392,76 @@ export function findFunctionDefinition(
 	return found
 }
 
+// NOTE: The Namespace a range is written inside, innermost first — what a fix
+// that edits a Namespace's HEAD starts from, since the Diagnostics that ask for
+// one are reported against a Method inside it or a condition on it rather than
+// against the Namespace itself.
+export function enclosingNamespace(
+	program: parser.Program,
+	range: common.Position,
+): parser.NamespaceDefinitionStatementNode | null {
+	let found: parser.NamespaceDefinitionStatementNode | null = null
+
+	walk(program, (node) => {
+		if (
+			node.nodeType === "NamespaceDefinitionStatement" &&
+			containsRange(node.position, range)
+		) {
+			found = node
+		}
+	})
+
+	return found
+}
+
+// NOTE: Where a Type Parameter of that name is DECLARED, looked for in every
+// head a range is written under — a Function's, a Method's, the Namespace
+// around them — because an unsatisfied bound is reported at the CALL and what
+// answers it is an edit to the declaration the call stands inside. Innermost
+// wins, which is the shadowing rule the Enricher resolves the name by; null
+// where nothing in this file declares it, and a bound written in another Module
+// is nothing one file's walk can reach.
+export function findGenericDeclaration(
+	program: parser.Program,
+	name: string,
+	range: common.Position,
+): parser.GenericDeclarationNode | null {
+	let found: parser.GenericDeclarationNode | null = null
+
+	walk(program, (node) => {
+		if (!containsRange(node.position, range)) {
+			return
+		}
+
+		let declared = genericsOf(node).find(
+			(generic) => generic.name.content === name,
+		)
+
+		if (declared !== undefined) {
+			found = declared
+		}
+	})
+
+	return found
+}
+
+// NOTE: The Type Parameters one Node DECLARES. A Namespace's Methods are absent
+// because the walk reaches each of them as a Function value of its own and
+// answers for its own list there.
+function genericsOf(
+	node: parser.ImplementationNode,
+): Array<parser.GenericDeclarationNode> {
+	switch (node.nodeType) {
+		case "FunctionStatement":
+		case "FunctionValue":
+			return node.value.generics
+		case "NamespaceDefinitionStatement":
+			return node.generics
+		default:
+			return []
+	}
+}
+
 // NOTE: The smallest Node whose Position CONTAINS the range, where every
 // finder above matches a Position exactly. A Diagnostic names the Node it was
 // reported against and a SELECTION does not: what a reader drags over is a

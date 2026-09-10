@@ -204,6 +204,15 @@ export type DiagnosticData =
 	// own everywhere else. Not the declaration the notes describe: those two
 	// differ for a provided Method, and only this one is a spelling.
 	| { kind: "namespace-candidates"; names: Array<string> }
+	// NOTE: A Protocol something has to conform to, and the Type Parameter
+	// whose declaration would carry the bound — null where the Diagnostic is
+	// about a Namespace's conformance list or about a concrete Type, neither
+	// of which has a Parameter to bound.
+	| {
+			kind: "required-protocol"
+			protocol: string
+			parameter: string | null
+	  }
 	// NOTE: The Namespace a static Method is reached through, so a fix can
 	// write `Namespace.make(value, …)` for a `value::make(…)`. ONE name rather
 	// than every candidate: the Namespace that declares the static is the one

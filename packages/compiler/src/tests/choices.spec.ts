@@ -1765,6 +1765,38 @@ describe("Choices", () => {
 			])
 		})
 
+		// NOTE: The Parameter beside the Protocol, because the Quick Fix edits
+		// the DECLARATION and the Diagnostic is reported at the use — the name is
+		// the only thing that leads from one to the other.
+		it("carries that Parameter and Protocol as data", () => {
+			expect(
+				diagnosticsOf(`implementation { ${boundedBox}
+					function wrap<Value>(_ value: Value) -> Box<Value> {
+						<- #Full({ value = value })
+					}
+				}`)[0].data,
+			).toEqual({
+				kind: "required-protocol",
+				protocol: "Equatable",
+				parameter: "Value",
+			})
+		})
+
+		// NOTE: And no Parameter where the Type that failed is a concrete one:
+		// what that asks for is a Namespace declaring the conformance, which is a
+		// Declaration rather than an edit to a span.
+		it("names no Parameter for a concrete Type that does not conform", () => {
+			expect(
+				diagnosticsOf(`implementation { ${boundedBox}
+					constant b: Box<(_ x: Integer) -> Integer> = #Empty
+				}`)[0].data,
+			).toEqual({
+				kind: "required-protocol",
+				protocol: "Equatable",
+				parameter: null,
+			})
+		})
+
 		// NOTE: The Type Argument the annotation decides is what answers for the
 		// bound — the payload never decides one, so a construction whose payload
 		// is a Function is a `Box<Function>` only where something said so.
@@ -3278,6 +3310,29 @@ describe("Choices", () => {
 			expect(helpsOf(source)).toEqual([
 				"Declare the conformance: 'is Enumerable' on this Namespace.",
 			])
+		})
+
+		// NOTE: The Protocol alone — what carries a conformance here is the
+		// Namespace's own head, and there is no Type Parameter in the question.
+		it("carries that Protocol as data with no Parameter", () => {
+			expect(
+				diagnosticsOf(`implementation { ${colourChoice}
+					namespace Colours for Colour {
+						§§ The Colours worth offering.
+						§§
+						§§ @returns — one Colour.
+						static cases() -> NonEmptyList<Colour> {
+							<- [#Red]
+						}
+					}
+
+					Terminal.print("x")
+				}`)[0].data,
+			).toEqual({
+				kind: "required-protocol",
+				protocol: "Enumerable",
+				parameter: null,
+			})
 		})
 
 		// NOTE: The guard is by NAME, exactly as the derive's own replacement

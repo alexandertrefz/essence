@@ -24,8 +24,10 @@ import {
 import type { CodeActionEdit, CodeActionEntry } from "./index"
 import {
 	bodyReturns,
+	enclosingNamespace,
 	findConstantDeclaration,
 	findFunctionDefinition,
+	findGenericDeclaration,
 	findHandler,
 	findMatch,
 	findMethodInvocation,
@@ -1043,4 +1045,107 @@ export function staticCallActions(
 			},
 		]),
 	]
+}
+
+// NOTE: A Type Parameter bound to a Protocol it never declared one for, bounded
+// where it was DECLARED — which is nowhere near the call the Diagnostic is
+// reported at. `is P` goes right after the name, ahead of any `= Default`,
+// because that is the order `<infer Item is Comparable = Integer>` is parsed in.
+//
+// Offered only where this file declares the Parameter: an edit into another
+// Module's head is not something a Diagnostic about a call can ask for, and a
+// bound in a Module this one only imports is that Module's decision. Offered
+// only where the Parameter carries NO bound already, too — `<infer T is A is P>`
+// is not a spelling, and which of the two bounds a reader meant to keep is the
+// question this can not answer.
+export function boundParameterAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+): CodeActionEntry | null {
+	if (
+		diagnostic.data?.kind !== "required-protocol" ||
+		diagnostic.data.parameter === null
+	) {
+		return null
+	}
+
+	let { protocol, parameter } = diagnostic.data
+	let declared = findGenericDeclaration(
+		program,
+		parameter,
+		diagnostic.position,
+	)
+
+	if (declared === null || declared.constraint !== null) {
+		return null
+	}
+
+	// NOTE: The declaration as it will READ once the bound is written, which is
+	// not always what the Help shows: the Help spells `infer` because that is the
+	// form nearly every Parameter is declared in, and a Function may still write
+	// `<Value>`. Whether a Parameter is inferred or applied is a second question
+	// and one no Diagnostic about a bound asked, so the fix leaves that half of
+	// the declaration exactly as it stands and the title says so.
+	let written = declared.inferred ? `infer ${parameter}` : parameter
+
+	return {
+		title: `Declare it as '<${written} is ${protocol}>'`,
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [
+			{
+				range: {
+					start: declared.name.position.end,
+					end: declared.name.position.end,
+				},
+				newText: ` is ${protocol}`,
+			},
+		],
+	}
+}
+
+// NOTE: The conformance a Namespace writes a requirement of and never declared,
+// written onto its head. After the last clause where there is one, `, is P` — a
+// conformance list is comma separated — and after the target Type where there is
+// none, which is where the first `is` of a head stands.
+//
+// The Diagnostic is reported against the METHOD that gave the Namespace away, so
+// the head is found by walking out to the Namespace the range sits in.
+export function declareConformanceAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+): CodeActionEntry | null {
+	if (
+		diagnostic.data?.kind !== "required-protocol" ||
+		diagnostic.data.parameter !== null
+	) {
+		return null
+	}
+
+	let namespace = enclosingNamespace(program, diagnostic.position)
+	let last = namespace?.conformsTo.at(-1)
+	let after = last?.position.end ?? namespace?.targetType?.position.end
+
+	if (namespace === null || after === undefined) {
+		return null
+	}
+
+	let { protocol } = diagnostic.data
+
+	return {
+		title: `Declare the conformance: 'is ${protocol}'`,
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [
+			{
+				range: { start: after, end: after },
+				newText:
+					last === undefined ? ` is ${protocol}` : `, is ${protocol}`,
+			},
+		],
+	}
 }

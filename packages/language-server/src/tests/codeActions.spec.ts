@@ -2917,6 +2917,161 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("unsatisfied-bound", () => {
+		const SIZED = [
+			"implementation {",
+			"\tprotocol Sized {",
+			"\t\tsize() -> Integer",
+			"\t}",
+			"",
+			"\tfunction total<infer Item is Sized>(_ items: List<Item>) -> Integer {",
+			"\t\t<- 0",
+			"\t}",
+			"",
+		]
+
+		// NOTE: The Diagnostic is reported at the CALL and the edit lands on the
+		// declaration around it, found by the name the Compiler carried.
+		it("should bound the Type Parameter the call passes", () => {
+			let lines = [
+				...SIZED,
+				"\tfunction wrap<infer Thing>(_ things: List<Thing>) -> Integer {",
+				"\t\t<- total(things)",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Declare it as '<infer Thing is Sized>'")
+			expect(fix.isPreferred).toBe(true)
+			expect(result[9]).toBe(
+				"\tfunction wrap<infer Thing is Sized>(_ things: List<Thing>) -> Integer {",
+			)
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A Method's own list is a head like any other, and the walk
+		// answers with the innermost that declares the name.
+		it("should bound a Method's own Type Parameter", () => {
+			let lines = [
+				...SIZED,
+				"\tnamespace Extras for Integer {",
+				"\t\tcount<infer Thing>(_ things: List<Thing>) -> Integer {",
+				"\t\t\t<- total(things)",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result[10]).toBe(
+				"\t\tcount<infer Thing is Sized>(_ things: List<Thing>) -> Integer {",
+			)
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: `<infer T is A is P>` is not a spelling, and which of the two
+		// bounds a reader meant to keep is not a question a Diagnostic about one
+		// of them can answer.
+		it("should offer nothing where the Parameter is bound already", () => {
+			let lines = [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"\t}",
+				"",
+				"\tprotocol Named {",
+				"\t\tname() -> String",
+				"\t}",
+				"",
+				"\tfunction total<infer Item is Sized>(_ items: List<Item>) -> Integer {",
+				"\t\t<- 0",
+				"\t}",
+				"",
+				"\tfunction wrap<infer Thing is Named>(_ things: List<Thing>) -> Integer {",
+				"\t\t<- total(things)",
+				"\t}",
+				"}",
+			]
+
+			expect(quickFixes(lines)).toEqual([])
+		})
+
+		// NOTE: A concrete Type that conforms to nothing is asking for a
+		// Namespace, which is a Declaration rather than an edit to a span.
+		it("should offer nothing for a concrete Type", () => {
+			let lines = [...SIZED, '\tconstant counted = total(["a"])', "}"]
+
+			expect(quickFixes(lines)).toEqual([])
+		})
+	})
+
+	describe("undeclared-conformance", () => {
+		// NOTE: The Diagnostic is reported against the METHOD that gave the
+		// Namespace away, and the edit lands on the head above it.
+		it("should declare the conformance on the Namespace head", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Colour { Red, Green }",
+				"",
+				"\tnamespace Extras for Colour {",
+				"\t\tis(_ other: Colour) -> Boolean {",
+				"\t\t\t<- true",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Declare the conformance: 'is Equatable'")
+			expect(fix.isPreferred).toBe(true)
+			expect(result[3]).toBe(
+				"\tnamespace Extras for Colour is Equatable {",
+			)
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A conformance list is comma separated, so a head that already
+		// declares one takes the new clause after it rather than beside it.
+		it("should write it after a conformance already declared", () => {
+			let lines = [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"\t}",
+				"",
+				"\tchoice Colour { Red, Green }",
+				"",
+				"\tnamespace Extras for Colour is Sized {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- 1",
+				"\t\t}",
+				"",
+				"\t\tis(_ other: Colour) -> Boolean {",
+				"\t\t\t<- true",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result[7]).toBe(
+				"\tnamespace Extras for Colour is Sized, is Equatable {",
+			)
+
+			expect(codesOf(result)).toEqual([])
+		})
+	})
+
 	describe("Type annotations", () => {
 		it("should offer the inferred Type of a Constant as an edit", () => {
 			let lines = ["implementation {", '\tconstant name = "Ada"', "}"]
