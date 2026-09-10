@@ -1,0 +1,14 @@
+{
+	"$schema": "https://essencelang.org/schemas/essence.schema.json",
+
+	// Directories that hold `.es` files without being this repository's sources:
+	// the corpus of deliberately broken files the Diagnostics are checked against,
+	// the standard library copy bundled into the extension, and the client
+	// package's own test inputs. Excluding them keeps `essence test` at the root
+	// and the editor's Problems panel to what is actually written here.
+	"exclude": [
+		"packages/fixtures/files/diagnostics",
+		"packages/vscode-extension/server",
+		"packages/client/src/tests/files"
+	]
+}
