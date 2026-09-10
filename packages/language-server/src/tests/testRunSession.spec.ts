@@ -333,7 +333,7 @@ describe("The Server's live test session", () => {
 		// its analysis stays cached, and the only thing that changed about it is
 		// what the workspace's other tags now look like.
 		await session.change(pathOf("Main.es"), main("network"))
-		await session.settle(800)
+		await session.settle()
 
 		expect(session.codesFor(pathOf("Season.tests.es"))).toContain(
 			"similar-tags",

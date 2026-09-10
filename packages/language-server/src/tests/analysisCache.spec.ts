@@ -770,6 +770,49 @@ describe("the analysis cache", () => {
 })
 
 describe("the Server's request loop", () => {
+	// NOTE: The contract every other test in this block stands on. `settle` is
+	// the `essence/idle` request, and what it promises is that the answer comes
+	// BEHIND whatever the loop published on its way to having nothing left —
+	// so a test that has the answer has the Diagnostics — and that a Server
+	// with nothing to do answers without doing anything.
+	it("should answer essence/idle behind the publish it waited for, and at once with nothing pending", async () => {
+		let broken = `implementation {\n\tconstant amount: Integer = "two"\n}\n`
+		let files = makeSessionWorkspace({ "Broken.es": broken })
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.open(files.pathOf("Broken.es"), broken)
+			await session.settle()
+
+			expect(session.codesFor(files.pathOf("Broken.es"))).toEqual([
+				"assignment-type-mismatch",
+			])
+
+			let quiet = session.counts()
+			let mark = session.publishMark()
+
+			await session.settle()
+
+			expect(session.tallySince(quiet).total).toBe(0)
+			expect(session.publishesSince(mark)).toEqual([])
+
+			await session.change(
+				files.pathOf("Broken.es"),
+				`implementation {\n\tconstant amount = 2\n}\n`,
+			)
+			await session.settle()
+
+			expect(
+				session.publishesSince(mark).map((entry) => entry.uri),
+			).toEqual([uriFor(files.pathOf("Broken.es"))])
+			expect(session.codesFor(files.pathOf("Broken.es"))).toEqual([])
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
 	it("should compile nothing during a typing burst and once in the debounce window", async () => {
 		let files = makeSessionWorkspace(chain)
 		let session = startSession()
@@ -778,7 +821,7 @@ describe("the Server's request loop", () => {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Middle.es"), middleSource)
 			await session.open(files.pathOf("Top.es"), topSource)
-			await session.settle(600)
+			await session.settle()
 
 			let burst = session.counts()
 
@@ -793,7 +836,7 @@ describe("the Server's request loop", () => {
 
 			let window = session.counts()
 
-			await session.settle(600)
+			await session.settle()
 
 			// NOTE: One link for the component, whichever of the two open
 			// documents' timers happened to fire first — the other reads it.
@@ -818,7 +861,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Middle.es"), middleSource)
-			await session.settle(600)
+			await session.settle()
 			await session.change(
 				files.pathOf("Middle.es"),
 				middleSource.replace("by 2", "by 4"),
@@ -836,7 +879,7 @@ describe("the Server's request loop", () => {
 
 			let settled = session.counts()
 
-			await session.settle(600)
+			await session.settle()
 
 			expect(session.tallySince(settled).links).toBe(0)
 			expect(session.diagnosticsFor(files.pathOf("Middle.es"))).toEqual(
@@ -864,7 +907,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Middle.es"), middleSource)
-			await session.settle(600)
+			await session.settle()
 
 			let counts = session.counts()
 
@@ -875,7 +918,7 @@ describe("the Server's request loop", () => {
 			await session.request(SemanticTokensRequest.type, {
 				textDocument: { uri: uriFor(files.pathOf("Middle.es")) },
 			})
-			await session.settle(600)
+			await session.settle()
 
 			expect(session.tallySince(counts).links).toBe(1)
 		} finally {
@@ -891,7 +934,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Middle.es"), middleSource)
-			await session.settle(600)
+			await session.settle()
 
 			let uri = uriFor(files.pathOf("Middle.es"))
 			let requests = [
@@ -956,7 +999,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Middle.es"), middleSource)
-			await session.settle(600)
+			await session.settle()
 
 			let source = session.cancellationSource()
 			let pending = session.request(
@@ -993,7 +1036,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Middle.es"), middleSource)
-			await session.settle(600)
+			await session.settle()
 
 			let pending = session.request(SemanticTokensRequest.type, {
 				textDocument: { uri: uriFor(files.pathOf("Middle.es")) },
@@ -1024,14 +1067,14 @@ describe("the Server's request loop", () => {
 			await session.open(files.pathOf("Base.es"), baseSource)
 			await session.open(files.pathOf("Middle.es"), middleSource)
 			await session.open(files.pathOf("Top.es"), topSource)
-			await session.settle(800)
+			await session.settle()
 
 			let watched = session.counts()
 
 			await session.watchedFileChanged([
 				{ filePath: files.pathOf("Base.es"), type: 2 },
 			])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.tallySince(watched).links).toBe(1)
 		} finally {
@@ -1051,7 +1094,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Middle.es"), middleSource)
-			await session.settle(600)
+			await session.settle()
 
 			let completion = await session.request<
 				Array<{ label: string; detail?: string }>
@@ -1088,7 +1131,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Importer.es"), importerSource)
-			await session.settle(600)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Importer.es"))).toEqual([
 				"module-not-found",
@@ -1102,7 +1145,7 @@ describe("the Server's request loop", () => {
 			await session.watchedFileChanged([
 				{ filePath: files.pathOf("Base.es"), type: 1 },
 			])
-			await session.settle(600)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Importer.es"))).toEqual([])
 
@@ -1133,19 +1176,27 @@ describe("the Server's request loop", () => {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Alone.es"), apart["Alone.es"])
 			await session.open(files.pathOf("Apart.es"), apart["Apart.es"])
-			await session.settle(600)
+			await session.settle()
 
 			await session.change(
 				files.pathOf("Apart.es"),
 				`implementation {\n\tconstant apart: Integer = "two"\n}\n`,
 			)
 
+			// NOTE: A clock, deliberately, and the one place in this file that
+			// keeps one: a burst is keystrokes arriving FASTER than the window
+			// closes, and the fact under test is that the other document's own
+			// deadline is honoured while the window is re-armed under it. Waiting
+			// for the Server to settle between two of them would let the window
+			// fire, which is exactly what a burst does not do.
 			for (let index = 0; index < 12; index++) {
 				await session.change(
 					files.pathOf("Alone.es"),
 					`implementation {\n\tconstant alone = ${index}\n}\n`,
 				)
-				await session.settle(60)
+				await new Promise<void>((resolve) => {
+					setTimeout(resolve, 60)
+				})
 			}
 
 			// NOTE: Read before the burst is given any time to drain, which is
@@ -1169,7 +1220,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Middle.es"), middleSource)
-			await session.settle(600)
+			await session.settle()
 
 			let mark = session.publishMark()
 
@@ -1182,7 +1233,7 @@ describe("the Server's request loop", () => {
 					"amount::halvedAgain()",
 				),
 			)
-			await session.settle(600)
+			await session.settle()
 
 			let published = session
 				.publishesSince(mark)
@@ -1211,13 +1262,13 @@ describe("the Server's request loop", () => {
 			await session.open(files.pathOf("Base.es"), baseSource)
 			await session.open(files.pathOf("Middle.es"), middleSource)
 			await session.open(files.pathOf("Top.es"), topSource)
-			await session.settle(800)
+			await session.settle()
 
 			let mark = session.publishMark()
 			let counts = session.counts()
 
 			await session.change(files.pathOf("Base.es"), `${baseSource}\n`)
-			await session.settle(800)
+			await session.settle()
 
 			// NOTE: The analysis really ran — this is the send being skipped, not
 			// the work.
@@ -1228,7 +1279,7 @@ describe("the Server's request loop", () => {
 				files.pathOf("Base.es"),
 				baseSource.replace("with 2", 'with "two"'),
 			)
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Base.es"))).not.toEqual([])
 			expect(session.codesFor(files.pathOf("Middle.es"))).toEqual([
@@ -1271,7 +1322,7 @@ describe("the Server's request loop", () => {
 				)
 			}
 
-			await session.settle(1000)
+			await session.settle()
 
 			let counts = session.counts()
 
@@ -1279,7 +1330,7 @@ describe("the Server's request loop", () => {
 				files.pathOf("Root0.es"),
 				`${fanIn["Root0.es"]!}\n`,
 			)
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.tallySince(counts).links).toBe(1)
 
@@ -1290,7 +1341,7 @@ describe("the Server's request loop", () => {
 				files.pathOf("Shared.es"),
 				`implementation {\n\tconstant shared: Integer = "one"\n}\n\nexport {\n\tshared\n}\n`,
 			)
-			await session.settle(1000)
+			await session.settle()
 
 			expect(
 				roots.map((index) =>
@@ -1324,7 +1375,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Root0.es"), fanIn["Root0.es"]!)
-			await session.settle(1000)
+			await session.settle()
 
 			let counts = session.counts()
 
@@ -1332,7 +1383,7 @@ describe("the Server's request loop", () => {
 				files.pathOf("Root0.es"),
 				`${fanIn["Root0.es"]!}\n`,
 			)
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.tallySince(counts).links).toBe(1)
 		} finally {
@@ -1362,7 +1413,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Importer.es"), importer)
-			await session.settle(800)
+			await session.settle()
 
 			// NOTE: The graph's answer holds the first of these and not the
 			// second, so this is the file's own.
@@ -1377,7 +1428,7 @@ describe("the Server's request loop", () => {
 				files.pathOf("Importer.es"),
 				`${importer}\n§ typing\n`,
 			)
-			await session.settle(800)
+			await session.settle()
 
 			expect(
 				session
@@ -1421,7 +1472,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Main.es"), unfinished["Main.es"]!)
-			await session.settle(1200)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Plain0.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -1433,7 +1484,7 @@ describe("the Server's request loop", () => {
 				files.pathOf("Main.es"),
 				`${unfinished["Main.es"]!}\n§ typing\n`,
 			)
-			await session.settle(1200)
+			await session.settle()
 
 			expect(session.tallySince(counts).enrichments).toBe(0)
 			expect(session.tallySince(counts).links).toBe(1)
@@ -1463,16 +1514,16 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Importer.es"), importer)
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Broken.es"))).toEqual([
 				"assignment-type-mismatch",
 			])
 
 			await session.open(files.pathOf("Broken.es"), broken)
-			await session.settle(800)
+			await session.settle()
 			await session.close(files.pathOf("Broken.es"))
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Broken.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -1496,9 +1547,9 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Middle.es"), middleSource)
-			await session.settle(600)
+			await session.settle()
 			await session.open(files.pathOf("Deep.es"), unparseableSource)
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Deep.es"))).toEqual([
 				"internal-error",
@@ -1530,19 +1581,21 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Broken.es"), broken)
-			await session.settle(800)
+			await session.settle()
 
 			let mark = session.publishMark()
 
 			// NOTE: An edit that moves the list, sent inside the window and
 			// followed by the shutdown request — an analysis that did fire would
-			// publish, and there would be a message here to see.
+			// publish, and there would be a message here to see. The settle is
+			// what makes the absence a finding rather than a race: a window the
+			// shutdown failed to clear is a window the settle waits out.
 			await session.change(
 				files.pathOf("Broken.es"),
 				`implementation {\n\tconstant amount = 2\n}\n`,
 			)
 			await session.client.sendRequest(ShutdownRequest.type)
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.publishesSince(mark)).toEqual([])
 		} finally {
@@ -1562,7 +1615,7 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Lonely.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -1597,7 +1650,7 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(800)
+			await session.settle()
 
 			expect(
 				session.diagnosticsFor(files.pathOf("corpus/Wrong.es")),
@@ -1622,9 +1675,9 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(800)
+			await session.settle()
 			await session.open(files.pathOf("corpus/Wrong.es"), lonely)
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("corpus/Wrong.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -1648,7 +1701,7 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(800)
+			await session.settle()
 
 			expect(
 				session.diagnosticsFor(files.pathOf("corpus/Wrong.es")),
@@ -1661,7 +1714,7 @@ describe("the Server's request loop", () => {
 			await session.watchedFileChanged([
 				{ filePath: files.pathOf("essence.json"), type: 2 },
 			])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("corpus/Wrong.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -1687,7 +1740,7 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("corpus/Wrong.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -1697,7 +1750,7 @@ describe("the Server's request loop", () => {
 			await session.watchedFileChanged([
 				{ filePath: files.pathOf("essence.json"), type: 2 },
 			])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("corpus/Wrong.es"))).toEqual(
 				[],
@@ -1721,7 +1774,7 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("essence.json"))).toEqual([
 				"unknown-setting",
@@ -1742,7 +1795,7 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("essence.json"))).toEqual([])
 
@@ -1751,7 +1804,7 @@ describe("the Server's request loop", () => {
 				JSON.stringify({ excludes: ["corpus"] }),
 				"jsonc",
 			)
-			await session.settle(200)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("essence.json"))).toEqual([
 				"unknown-setting",
@@ -1760,7 +1813,7 @@ describe("the Server's request loop", () => {
 			// NOTE: And the file on disk answers again once the buffer is gone
 			// — which is what the walk and the run have been obeying all along.
 			await session.close(files.pathOf("essence.json"))
-			await session.settle(200)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("essence.json"))).toEqual([])
 		} finally {
@@ -1780,7 +1833,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("essence.json"), "{}", "jsonc")
-			await session.settle(400)
+			await session.settle()
 
 			let uri = uriOf(files.pathOf("essence.json"))
 			let tokens = await session.request<{ data: Array<number> }>(
@@ -1818,7 +1871,7 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("package.json"))).toEqual([
 				"moved-setting",
@@ -1842,7 +1895,7 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.diagnosticsFor(files.pathOf("package.json"))).toBe(
 				undefined,
@@ -1857,7 +1910,7 @@ describe("the Server's request loop", () => {
 			await session.watchedFileChanged([
 				{ filePath: files.pathOf("package.json"), type: 1 },
 			])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("package.json"))).toEqual([
 				"moved-setting",
@@ -1884,7 +1937,7 @@ describe("the Server's request loop", () => {
 			let counts = session.counts()
 
 			await session.initialize([files.root])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.tallySince(counts).links).toBe(2)
 		} finally {
@@ -2186,12 +2239,13 @@ describe("the Server's request loop", () => {
 			// before it is counted as coming after.
 			let mark = session.publishMark()
 
-			await session.settle(1500)
+			// NOTE: A queue the shutdown failed to stop is a queue the settle
+			// waits out, and every root it had left would publish on the way.
+			await session.settle()
 
 			expect(session.publishesSince(mark)).toEqual([])
 			// NOTE: And the sweep really was unfinished, or this would assert
-			// that a Server with nothing left to do published nothing. The settle
-			// above is several times what the roots left would have taken.
+			// that a Server with nothing left to do published nothing.
 			expect(session.tallySince(counts).links).toBeLessThan(roots.length)
 		} finally {
 			await session.dispose()
@@ -2215,7 +2269,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Shared.es"), shared)
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.diagnosticsFor(files.pathOf("Reader.es"))).toEqual(
 				[],
@@ -2225,7 +2279,7 @@ describe("the Server's request loop", () => {
 				files.pathOf("Shared.es"),
 				`implementation {\n\tconstant shared: Integer = "one"\n}\n\nexport {\n\tshared\n}\n`,
 			)
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Reader.es"))).toEqual([
 				"dependency-has-errors",
@@ -2254,7 +2308,7 @@ describe("the Server's request loop", () => {
 			await session.initialize([path.join(files.root, "inside")])
 			await session.open(files.pathOf("outside/Outside.es"), outside)
 			await session.open(files.pathOf("inside/Base.es"), base)
-			await session.settle(800)
+			await session.settle()
 
 			expect(
 				session.diagnosticsFor(files.pathOf("outside/Outside.es")),
@@ -2264,7 +2318,7 @@ describe("the Server's request loop", () => {
 				files.pathOf("inside/Base.es"),
 				`implementation {\n\tconstant thing: Integer = "one"\n}\n\nexport {\n\tthing\n}\n`,
 			)
-			await session.settle(800)
+			await session.settle()
 
 			expect(
 				session.codesFor(files.pathOf("outside/Outside.es")),
@@ -2288,14 +2342,14 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Broken.es"), broken)
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Broken.es"))).toEqual([
 				"assignment-type-mismatch",
 			])
 
 			await session.close(files.pathOf("Broken.es"))
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Broken.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -2316,7 +2370,7 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Broken.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -2326,7 +2380,7 @@ describe("the Server's request loop", () => {
 			await session.watchedFileChanged([
 				{ filePath: files.pathOf("Broken.es"), type: 3 },
 			])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.diagnosticsFor(files.pathOf("Broken.es"))).toEqual(
 				[],
@@ -2357,7 +2411,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Top.es"), top)
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Leaf.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -2367,7 +2421,7 @@ describe("the Server's request loop", () => {
 				files.pathOf("Top.es"),
 				`implementation {\n\tconstant top = 1\n}\n`,
 			)
-			await session.settle(800)
+			await session.settle()
 
 			// NOTE: The whole subtree under the dropped edge, not only the file
 			// promoted to a root: Mid is what Leaf's Diagnostics reach the
@@ -2402,7 +2456,7 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Leaf.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -2412,7 +2466,7 @@ describe("the Server's request loop", () => {
 			await session.watchedFileChanged([
 				{ filePath: files.pathOf("Top.es"), type: 3 },
 			])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Leaf.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -2446,7 +2500,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Library.es"), library)
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Library.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -2456,7 +2510,7 @@ describe("the Server's request loop", () => {
 			await session.watchedFileChanged([
 				{ filePath: files.pathOf("Main.es"), type: 3 },
 			])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Library.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -2485,7 +2539,7 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Library.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -2497,7 +2551,7 @@ describe("the Server's request loop", () => {
 			await session.watchedFileChanged([
 				{ filePath: files.pathOf("Main.es"), type: 2 },
 			])
-			await session.settle(800)
+			await session.settle()
 
 			// NOTE: The importer really did become the only root — it has the
 			// Diagnostic that says it imported something broken.
@@ -2539,7 +2593,7 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Library.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -2551,7 +2605,7 @@ describe("the Server's request loop", () => {
 			await session.watchedFileChanged([
 				{ filePath: files.pathOf("Main.es"), type: 2 },
 			])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Library.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -2581,7 +2635,7 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(800)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Loop.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -2606,7 +2660,7 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(1000)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Loop.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -2616,7 +2670,7 @@ describe("the Server's request loop", () => {
 			await session.watchedFileChanged([
 				{ filePath: files.pathOf("Above.es"), type: 3 },
 			])
-			await session.settle(1000)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Loop.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -2644,7 +2698,7 @@ describe("the Server's request loop", () => {
 
 		try {
 			await session.initialize([files.root])
-			await session.settle(1200)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Uses.es"))).toEqual([
 				"internal-error",
@@ -2680,7 +2734,7 @@ describe("the Server's request loop", () => {
 		try {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Typed.es"), source)
-			await session.settle(600)
+			await session.settle()
 
 			expect(session.codesFor(files.pathOf("Typed.es"))).toEqual([
 				"expect-not-boolean",

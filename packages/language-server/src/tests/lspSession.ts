@@ -24,7 +24,7 @@ import {
 } from "vscode-languageserver/node"
 
 import { compilationCounts, resetCompilationCounts } from "../compilation"
-import { uriOf } from "../server"
+import { IDLE_REQUEST, uriOf } from "../server"
 import { startServer } from "../server"
 import {
 	TEST_RUN_NOTIFICATION,
@@ -421,12 +421,22 @@ export function startSession() {
 		resetCounts: resetCompilationCounts,
 		counts: currentTally,
 		tallySince: tallyOf,
-		// NOTE: Long enough for the analysis debounce to have fired and its
-		// Diagnostics to have crossed the pipe — everything after it is a
-		// measurement of a Server that has caught up, which is the state an
-		// Editor spends its time in.
-		settle: (milliseconds = 400) =>
-			new Promise<void>((resolve) => setTimeout(resolve, milliseconds)),
+		// NOTE: Waits for the Server to have CAUGHT UP — the window fired, the
+		// batch or the sweep it fired into run to the end, every Diagnostic it
+		// published across the pipe — which is the state an Editor spends its
+		// time in and the state every measurement here is taken from. Asked of
+		// the Server rather than waited out: the answer is written behind the
+		// last publish, so nothing the Server said is still in flight when it
+		// arrives, and a Server that had nothing to do answers at once. What
+		// this used to be was a sleep of some multiple of the debounce, which
+		// was most of what this file cost and a bet on the machine besides.
+		//
+		// NOTE: Not a way to prove an absence over time — a test that means to
+		// say "and nothing happened for a while" says how long, in its own
+		// sleep, because that is a fact about a clock and this is not.
+		settle: async () => {
+			await client.sendRequest(IDLE_REQUEST)
+		},
 		// NOTE: Every document is closed first, which is what hands each of them
 		// back to disk the way a closing Editor does — and closing SCHEDULES an
 		// analysis rather than cancelling one, since what a file on disk says is

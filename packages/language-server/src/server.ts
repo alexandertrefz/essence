@@ -113,6 +113,18 @@ import {
 
 const analysisDebounceInMilliseconds = 200
 
+// NOTE: `essence/idle`. Answered once the Server has nothing left to do for the
+// workspace — no window armed and no sweep queued — and at once where it
+// already has nothing. The answer is written behind every publish the loop
+// made on its way there, so a client that has it has the Diagnostics too.
+//
+// NOTE: What it is FOR is a client that has to know the difference between a
+// Server that has answered and one that has not started: a test harness that
+// would otherwise sleep for some multiple of the debounce and hope, or an
+// Editor's "analysing…" indicator. It changes nothing about what the loop does
+// or when — a waiter is told, never waited for.
+export const IDLE_REQUEST = "essence/idle"
+
 // NOTE: One turn of the event loop before a request does anything expensive,
 // and it is what makes a Cancellation observable at all: `$/cancelRequest` is a
 // message on the same connection, and a handler that runs straight through from
@@ -311,6 +323,9 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// landed in has to be named to the whole queue or to none of it.
 	let sweepFocus: string | undefined
 	let sweepChunk: ReturnType<typeof setImmediate> | null = null
+	// NOTE: Who asked `essence/idle` while the loop still had work, each to be
+	// answered the moment it has none — see `answerIdle`.
+	let idleWaiters: Array<() => void> = []
 	// NOTE: The file the last keystroke landed in, which is the one a Hover is
 	// about to be asked over — see `annotationsFor`. Deliberately not the first
 	// entry of `pendingChanges`: that is whichever file opened the window, so a
@@ -803,6 +818,46 @@ export function startServer(options: { connection?: Connection } = {}) {
 		}),
 	)
 
+	// NOTE: Idle is the two timers both being clear. A window armed means a
+	// batch or a sweep still to run; a chunk armed means a sweep still to
+	// drain. Nothing is pending without one of them: scheduling anything arms
+	// the window, and the window firing either runs the batch to completion
+	// inside its own callback or arms the first chunk before it returns.
+	function isIdle(): boolean {
+		return analysisTimer === null && sweepChunk === null
+	}
+
+	// NOTE: Called wherever the loop may have just gone quiet — the end of a
+	// window's callback, the end of a sweep, a shutdown — and a no-op wherever
+	// it has not. The waiters are taken before they are told, so that one whose
+	// continuation asks again is queued for the next quiet moment rather than
+	// answered out of the list being drained.
+	function answerIdle(): void {
+		if (!isIdle() || idleWaiters.length === 0) {
+			return
+		}
+
+		let waiters = idleWaiters
+
+		idleWaiters = []
+
+		for (let waiter of waiters) {
+			waiter()
+		}
+	}
+
+	connection.onRequest(IDLE_REQUEST, (): null | Promise<null> => {
+		if (isIdle()) {
+			return null
+		}
+
+		return new Promise((resolve) => {
+			idleWaiters.push(() => {
+				resolve(null)
+			})
+		})
+	})
+
 	connection.onShutdown(() => {
 		// NOTE: The window goes with the client. An analysis is scheduled for
 		// every file a closing Editor hands back to disk, and one that fires
@@ -828,6 +883,10 @@ export function startServer(options: { connection?: Connection } = {}) {
 		sweepReaches = new Map()
 		sweepUncovered.clear()
 		sweepDropped.clear()
+
+		// NOTE: Idle now, with nothing left to become idle FROM — a waiter left
+		// in the list would wait for a callback that was just cancelled.
+		answerIdle()
 
 		void session.dispose()
 	})
@@ -2369,6 +2428,10 @@ export function startServer(options: { connection?: Connection } = {}) {
 			// not: the walk the sweep performed is the walk that setting
 			// narrowed.
 			publishConfiguration()
+			// NOTE: After the last publish, which is what puts the answer
+			// behind it on the wire. A window that came due mid-sweep has its
+			// own timer armed and keeps this a no-op.
+			answerIdle()
 
 			return
 		}
@@ -2623,6 +2686,11 @@ export function startServer(options: { connection?: Connection } = {}) {
 				} else {
 					analyseBatch(entriesFor(changed), focus)
 				}
+
+				// NOTE: A batch ran to completion inside this callback and
+				// published on its way; a sweep only armed its first chunk, and
+				// answers for itself when the queue drains.
+				answerIdle()
 			},
 			Math.max(0, due - Date.now()),
 		)
