@@ -397,6 +397,11 @@ export type DiagnosticCode =
 	| "unreadable-file"
 	| "bundle-failed"
 	| "bundler-warning"
+	// The project file — `essence.json`, read before any source.
+	| "unknown-setting"
+	| "setting-shape"
+	| "moved-setting"
+	| "unreadable-project-file"
 	// Everything else.
 	| "at-outside-method"
 	| "at-in-static-method"

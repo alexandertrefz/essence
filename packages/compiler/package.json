@@ -61,6 +61,7 @@
 		"@essence-lang/runtime": "workspace:*",
 		"@essence-lang/standard-library": "workspace:*",
 		"esbuild": "0.28.1",
+		"jsonc-parser": "3.3.1",
 		"source-map": "0.6.1"
 	},
 	"devDependencies": {

@@ -2733,6 +2733,43 @@ Rewriter only ever emits JavaScript it built itself.
 
 A warning from the JavaScript bundler, passed through unchanged.
 
+## The project file
+
+`essence.json` at the root of a project is read before any source, by every
+tool that walks or builds the project. A mistake in it is a Warning with a span
+rather than a refusal — a project should not fail to run its tests over a key
+it wrote wrongly — and the setting it was about falls back to its default,
+which the Diagnostic's note says out loud. They render in the terminal at the
+head of a run and on the file itself in the editor.
+
+### `unknown-setting`
+
+A key the project file does not have — `"exclusions"`, `"test.skipTag"`. The
+note lists the settings at that level, and a near miss is offered as a Help.
+Nothing is read from the key.
+
+### `setting-shape`
+
+A known setting with a value of the wrong shape — `"skipTags": "slow"` where a
+list was expected, `"cases": 0`, a coverage report format nobody writes. The
+Help spells one right value. For a list, a wrong item is reported on the item
+and left out while the rest of the list is read.
+
+### `moved-setting`
+
+A key that used to be read somewhere else: `"test.exclude"`, which sits at the
+top as `"exclude"` because it narrows the editor's walk as well as the test
+run's; and the `"essence"` key of a `package.json`, which the project file
+replaced. The Help says where it went. Nothing is read from the old place.
+
+### `unreadable-project-file`
+
+`essence.json` does not parse as JSON — a missing brace, an unclosed string.
+The file is JSON with comments and trailing commas allowed, as `tsconfig.json`
+is. Until it reads, every setting is at its default, and what did parse is
+deliberately not read: a setting read out of the half of a file before a
+missing brace is one the author can not predict.
+
 ## Everything else
 
 ### `at-outside-method`
