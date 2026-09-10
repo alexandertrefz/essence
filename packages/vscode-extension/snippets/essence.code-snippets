@@ -1,51 +1,43 @@
 {
 	"implementation": {
 		"prefix": "implementation",
-		"body": ["implementation {", "\t$0", "}"],
+		"body": [
+			"implementation {",
+			"\t$0",
+			"}"
+		],
 		"description": "An implementation block — the body of a Program."
 	},
 	"declarations": {
 		"prefix": "declarations",
-		"body": ["declarations {", "\t$0", "}"],
+		"body": [
+			"declarations {",
+			"\t$0",
+			"}"
+		],
 		"description": "A declarations block — the body of a standard library file."
 	},
 	"tests": {
 		"prefix": "tests",
-		"body": ["tests {", "\t$0", "}"],
-		"description": "A tests block — written below the implementation, and dropped from every build."
-	},
-	"test": {
-		"prefix": "test",
-		"body": ["test \"${1:what it proves}\" {", "\texpect $0", "}"],
-		"description": "A test — one named body of assertions."
-	},
-	"benchmark": {
-		"prefix": "benchmark",
-		"body": ["benchmark \"${1:what it measures}\" {", "\t$0", "}"],
-		"description": "A benchmark — one named body, timed rather than judged."
-	},
-	"suite": {
-		"prefix": "suite",
-		"body": ["suite \"${1:name}\" {", "\t$0", "}"],
-		"description": "A suite — a group of tests sharing a scope."
-	},
-	"property test": {
-		"prefix": "for any",
 		"body": [
-			"test \"${1:what holds}\" for any (${2:value}: ${3:Type}) {",
-			"\texpect $0",
+			"tests {",
+			"\t$0",
 			"}"
 		],
-		"description": "A property test — one body run over generated values."
+		"description": "A tests block — written below the implementation, and dropped from every build."
 	},
 	"constant": {
 		"prefix": "constant",
-		"body": ["constant ${1:name}${2:: ${3:Type}} = ${0:value}"],
+		"body": [
+			"constant ${1:name}${2:: ${3:Type}} = ${0:value}"
+		],
 		"description": "A constant declaration."
 	},
 	"variable": {
 		"prefix": "variable",
-		"body": ["variable ${1:name}${2:: ${3:Type}} = ${0:value}"],
+		"body": [
+			"variable ${1:name}${2:: ${3:Type}} = ${0:value}"
+		],
 		"description": "A variable declaration."
 	},
 	"function": {
@@ -57,25 +49,14 @@
 		],
 		"description": "A function declaration."
 	},
-	"overload": {
-		"prefix": "overload",
-		"body": [
-			"overload ${1:name} {",
-			"\t(${2:_} ${3:parameter}: ${4:Type}) -> ${5:ReturnType} {",
-			"\t\t<- $0",
-			"\t}",
-			"}"
-		],
-		"description": "An overload group of same-named signatures — a namespace member, so this body only parses inside a namespace."
-	},
 	"namespace": {
 		"prefix": "namespace",
 		"body": [
-			"namespace ${1:Name} for ${2:Type} is ${3:Protocol} {",
+			"namespace ${1:Name} for ${2:Type}${3: is ${4:Protocol}} {",
 			"\t$0",
 			"}"
 		],
-		"description": "A namespace conforming a Type to a Protocol."
+		"description": "A namespace of Methods for a Type."
 	},
 	"protocol": {
 		"prefix": "protocol",
@@ -108,18 +89,91 @@
 	},
 	"type": {
 		"prefix": "type",
-		"body": ["type ${1:Name} = ${0:Type}"],
+		"body": [
+			"type ${1:Name} = ${0:Type}"
+		],
 		"description": "A type alias."
 	},
 	"type-record": {
 		"prefix": "type-record",
-		"body": ["type ${1:Name} = { ${2:member}: ${0:Type} }"],
+		"body": [
+			"type ${1:Name} = { ${2:member}: ${0:Type} }"
+		],
 		"description": "A Record type alias."
 	},
-	"record": {
-		"prefix": "record",
-		"body": ["${1:Type} ~> { ${2:member} = ${0:value} }"],
+	"overload": {
+		"prefix": "overload",
+		"body": [
+			"overload ${1:name} {",
+			"\t(${2:_} ${3:parameter}: ${4:Type}) -> ${5:ReturnType} {",
+			"\t\t<- $0",
+			"\t}",
+			"}"
+		],
+		"description": "An overload group of same-named signatures."
+	},
+	"test": {
+		"prefix": "test",
+		"body": [
+			"test \"${1:what it proves}\" {",
+			"\texpect $0",
+			"}"
+		],
+		"description": "A test — one named body of assertions."
+	},
+	"for any": {
+		"prefix": "for any",
+		"body": [
+			"test \"${1:what holds}\" for any (${2:value}: ${3:Type}) {",
+			"\texpect $0",
+			"}"
+		],
+		"description": "A property test — one body run over generated values."
+	},
+	"benchmark": {
+		"prefix": "benchmark",
+		"body": [
+			"benchmark \"${1:what it measures}\" {",
+			"\t$0",
+			"}"
+		],
+		"description": "A benchmark — one named body, timed rather than judged."
+	},
+	"suite": {
+		"prefix": "suite",
+		"body": [
+			"suite \"${1:name}\" {",
+			"\t$0",
+			"}"
+		],
+		"description": "A suite — a group of tests sharing a scope."
+	},
+	"record-typed": {
+		"prefix": "record-typed",
+		"body": [
+			"${1:Type} ~> { ${2:member} = ${0:value} }"
+		],
 		"description": "A typed Record literal."
+	},
+	"if": {
+		"prefix": "if",
+		"body": [
+			"if ${1:condition} {",
+			"\t$0",
+			"}"
+		],
+		"description": "An if statement."
+	},
+	"ifelse": {
+		"prefix": "ifelse",
+		"body": [
+			"if ${1:condition} {",
+			"\t$2",
+			"} else {",
+			"\t$0",
+			"}"
+		],
+		"description": "An if statement with an else branch."
 	},
 	"match": {
 		"prefix": "match",
@@ -133,12 +187,16 @@
 	},
 	"case": {
 		"prefix": "case",
-		"body": ["case ${1:Matcher} { <- ${0:value} }"],
+		"body": [
+			"case ${1:Matcher} { <- ${0:value} }"
+		],
 		"description": "A case handler within a match expression."
 	},
 	"case-where": {
 		"prefix": "case-where",
-		"body": ["case ${1:Matcher} where ${2:condition} { <- ${0:value} }"],
+		"body": [
+			"case ${1:Matcher} where ${2:condition} { <- ${0:value} }"
+		],
 		"description": "A guarded case handler within a match expression."
 	},
 	"define": {
@@ -150,16 +208,6 @@
 			"}"
 		],
 		"description": "A definition by cases."
-	},
-	"if": {
-		"prefix": "if",
-		"body": ["if ${1:condition} {", "\t$0", "}"],
-		"description": "An if statement."
-	},
-	"ifelse": {
-		"prefix": "ifelse",
-		"body": ["if ${1:condition} {", "\t$2", "} else {", "\t$0", "}"],
-		"description": "An if statement with an else branch."
 	},
 	"doc": {
 		"prefix": "doc",
