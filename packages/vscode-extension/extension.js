@@ -281,6 +281,16 @@ async function launch(server) {
 				// loads the standard library itself off its own location on
 				// disk, so a document without a file behind it costs nothing.
 				{ scheme: "untitled", language: "essence" },
+				// NOTE: And the project file, which is not Essence at all. The
+				// server refuses every request over it and reads it with its
+				// own reader — what forwarding it buys is that a setting it
+				// could not read is reported while the line is being typed,
+				// rather than once the file has been saved and obeyed.
+				{
+					scheme: "file",
+					language: "jsonc",
+					pattern: "**/essence.json",
+				},
 			],
 			outputChannel,
 			initializationFailedHandler: (error) => {

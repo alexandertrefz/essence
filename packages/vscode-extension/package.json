@@ -66,6 +66,20 @@
 					"light": "./icons/essence-file-light.svg",
 					"dark": "./icons/essence-file-dark.svg"
 				}
+			},
+			{
+				"id": "jsonc",
+				"filenames": [
+					"essence.json"
+				]
+			}
+		],
+		"jsonValidation": [
+			{
+				"fileMatch": [
+					"essence.json"
+				],
+				"url": "./schemas/essence.schema.json"
 			}
 		],
 		"grammars": [
@@ -140,15 +154,6 @@
 					"type": "boolean",
 					"default": true,
 					"description": "Run the tests of the workspace as you type. Only the tests a change reaches are re-run; failures appear in Problems, and the values a run recorded appear beside the lines that produced them. Turn it off to stop the automatic runs and keep every gesture that asks for one: the Test Explorer, the Run lens and Re-run Failed Tests all still run what you ask them to."
-				},
-				"essence.tests.skipTags": {
-					"type": "array",
-					"items": {
-						"type": "string"
-					},
-					"default": [],
-					"markdownDescription": "Tags no run of the live session selects, as bare names — `slow`, `network`. A test carries its own tags and every enclosing suite's. Tests left out this way are reported as not run rather than as failures, and the Test Explorer still lists them.",
-					"scope": "resource"
 				},
 				"essence.tests.coverage": {
 					"type": "boolean",

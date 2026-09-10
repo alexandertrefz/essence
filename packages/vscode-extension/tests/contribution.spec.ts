@@ -116,16 +116,13 @@ describe("the test session contribution", () => {
 		}
 	})
 
-	// NOTE: The live session runs a project's code on every edit, so what it
+	// NOTE: The live session runs a project's code on every edit, so whether it
 	// runs and how often are settings rather than constants — and each one is
 	// only real because the Server reads it back out of the client.
-	it("offers the settings that say what runs and how often", () => {
-		let properties = manifest.contributes.configuration.properties
+	it("offers the settings that say whether it runs and how often", () => {
+		let properties: Record<string, unknown> =
+			manifest.contributes.configuration.properties
 
-		expect(properties["essence.tests.skipTags"]).toMatchObject({
-			type: "array",
-			default: [],
-		})
 		expect(properties["essence.tests.debounce"]).toMatchObject({
 			type: "number",
 			default: 450,
@@ -136,6 +133,36 @@ describe("the test session contribution", () => {
 		expect(properties["essence.tests.coverage"]).toMatchObject({
 			type: "boolean",
 			default: false,
+		})
+		// NOTE: And WHAT runs is deliberately not among them. Which tags a run
+		// skips is a fact about the project rather than about the reader, so it
+		// lives in the `essence.json` the terminal reads too — a setting here
+		// would be a second list to keep agreeing with that one.
+		expect(properties).not.toHaveProperty("essence.tests.skipTags")
+	})
+
+	// NOTE: The project file. VS Code has no `essence.json` of its own, so the
+	// extension says three things about one: that it is JSON with comments, so
+	// a reason written beside a setting is not red; that the Schema generated
+	// from the reader's catalogue describes it, which is where completion and
+	// hover over a key come from; and — through the Language Client's document
+	// selector — that the Server is to be told about it, which is what puts a
+	// mistake in it on the file rather than nowhere.
+	describe("the project file contribution", () => {
+		it("reads essence.json as JSON with comments", () => {
+			expect(manifest.contributes.languages).toContainEqual({
+				id: "jsonc",
+				filenames: ["essence.json"],
+			})
+		})
+
+		it("validates it against the generated Schema", () => {
+			expect(manifest.contributes.jsonValidation).toEqual([
+				{
+					fileMatch: ["essence.json"],
+					url: "./schemas/essence.schema.json",
+				},
+			])
 		})
 	})
 })

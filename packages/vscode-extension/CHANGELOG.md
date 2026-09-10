@@ -1,5 +1,31 @@
 # Change Log
 
+## [Unreleased]
+
+- A project's settings live in one file at its root, `essence.json`, and the
+  editor reads the same one `essence test` does. `exclude` names the
+  directories that are not its sources — the Problems panel stays out of them
+  — and the NEAREST file wins, so a nested project draws its own boundary and
+  one folder of a multi-root workspace no longer silences a directory in
+  another. `test.skipTags` names the tags no run selects and `test.contracts`
+  asks for the goals a file's declarations promise, each read per project: with
+  `test.contracts`, a file that declares a Namespace is run for its `contracts`
+  suite whether or not it wrote a `tests { … }` block.
+- A mistake in `essence.json` is shown on `essence.json` — an unknown key, a
+  setting of the wrong shape, a file that will not parse — as a warning with a
+  span, on the line that holds it, ending on what is in force meanwhile. While
+  the file is open its unsaved text is what is reported on. A `package.json`
+  that still spells the old `"essence"` key is told so, on the key.
+- `essence.json` reads as JSON with comments, so a reason written beside a
+  setting is not an error, and it is checked against the schema this extension
+  ships: completion over a key, hover for what it does, and a warning where a
+  value is not one the reader accepts.
+- The `essence.tests.skipTags` setting is gone. Which tags a run skips is a
+  fact about the project rather than about the reader, and it is
+  `test.skipTags` in `essence.json` now — one list, obeyed by the editor and
+  the terminal alike. `essence.tests.enabled`, `essence.tests.coverage` and
+  `essence.tests.debounce` stay: those are yours.
+
 ## [0.7.0]
 
 A standard library that answers the everyday questions, and `Result` beside
