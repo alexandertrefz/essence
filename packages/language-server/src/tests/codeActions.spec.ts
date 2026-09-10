@@ -1,9 +1,14 @@
 import { describe, expect, it } from "bun:test"
 
-import type { common } from "@essence-lang/interfaces"
+import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
+import type { common, parser } from "@essence-lang/interfaces"
 
 import { analyse } from "../analyse"
 import { type CodeActionEntry, findCodeActions } from "../codeActions"
+import {
+	enclosingStatementOf,
+	findInnermostNodeContaining,
+} from "../codeActions/lookups"
 
 // NOTE: Fixtures are joined line arrays with literal `\t`, so an assertion on
 // an inserted arm's indentation is an assertion on the exact characters —
@@ -1098,5 +1103,129 @@ describe("Code Actions inside a define arm", () => {
 				title.startsWith("Shorten to"),
 			),
 		).toEqual(["Shorten to 'x'"])
+	})
+})
+
+// NOTE: The two lookups a REFACTORING starts from, which no fix above reaches:
+// a Diagnostic names the Node it was reported against and a selection names
+// nothing, so both of these answer by containment.
+describe("Code Action lookups", () => {
+	const lines = [
+		"implementation {",
+		"\tnamespace Sign for Integer {",
+		"\t\tdescribe() -> String {",
+		'\t\t\tconstant label = "sign"',
+		"\t\t\t<- match @ -> String {",
+		"\t\t\t\tcase Integer {",
+		"\t\t\t\t\t<- label",
+		"\t\t\t\t}",
+		"\t\t\t}",
+		"\t\t}",
+		"\t}",
+		"}",
+	]
+
+	// NOTE: Asserted on rather than only parsed — a fixture the Parser recovered
+	// from has a shape nobody wrote, and every assertion below would be about
+	// that shape instead.
+	function programOf(): parser.Program {
+		let { program, diagnostics } = parseWithDiagnostics(lines.join("\n"))
+
+		expect(diagnostics).toEqual([])
+
+		return program
+	}
+
+	// NOTE: A range spelled as the text it covers, so that a fixture gaining a
+	// line takes no assertion with it.
+	function spanOf(text: string): common.Position {
+		let line = lines.findIndex((candidate) => candidate.includes(text)) + 1
+		let column = (lines[line - 1] as string).indexOf(text) + 1
+
+		return {
+			start: { line, column },
+			end: { line, column: column + text.length },
+		}
+	}
+
+	// NOTE: From the start of one span to the end of another — the selection a
+	// reader drags over several lines.
+	function spanFrom(from: string, to: string): common.Position {
+		return { start: spanOf(from).start, end: spanOf(to).end }
+	}
+
+	describe("findInnermostNodeContaining", () => {
+		it("should answer with the smallest Node the range sits inside", () => {
+			let node = findInnermostNodeContaining(
+				programOf(),
+				spanOf('"sign"'),
+			)
+
+			expect(node?.nodeType).toBe("StringValue")
+			expect(node?.position).toEqual(spanOf('"sign"'))
+		})
+
+		// NOTE: The Return the Match is written in covers the very same lines,
+		// and the Match is the one inside it.
+		it("should answer with the Match a range over its arms sits inside", () => {
+			let node = findInnermostNodeContaining(
+				programOf(),
+				spanFrom("case Integer", "<- label"),
+			)
+
+			expect(node?.nodeType).toBe("Match")
+		})
+
+		it("should answer with nothing for a range no Node holds", () => {
+			expect(
+				findInnermostNodeContaining(
+					programOf(),
+					spanOf("implementation {"),
+				),
+			).toBeNull()
+		})
+	})
+
+	describe("enclosingStatementOf", () => {
+		it("should answer with the Statement and where in its body it stands", () => {
+			let found = enclosingStatementOf(programOf(), spanOf('"sign"'))
+
+			expect(found?.statement.nodeType).toBe(
+				"ConstantDeclarationStatement",
+			)
+			expect(found?.index).toBe(0)
+			expect(found?.body).toHaveLength(2)
+			expect(found?.body[1]?.nodeType).toBe("ReturnStatement")
+		})
+
+		// NOTE: A Handler's body is a body like any other, and the Method body
+		// around it holds the range too — the innermost is the one an inserted
+		// Statement belongs in.
+		it("should answer with the innermost body holding the range", () => {
+			let found = enclosingStatementOf(programOf(), spanOf("<- label"))
+
+			expect(found?.statement.nodeType).toBe("ReturnStatement")
+			expect(found?.body).toHaveLength(1)
+			expect(found?.index).toBe(0)
+		})
+
+		it("should answer with the top level Statement a wider range sits in", () => {
+			let found = enclosingStatementOf(
+				programOf(),
+				spanFrom("namespace Sign", "describe()"),
+			)
+
+			expect(found?.statement.nodeType).toBe(
+				"NamespaceDefinitionStatement",
+			)
+			expect(found?.body).toHaveLength(1)
+			expect(found?.index).toBe(0)
+		})
+
+		it("should answer with nothing for a range no body holds", () => {
+			expect(
+				enclosingStatementOf(programOf(), spanOf("implementation {")),
+			).toBeNull()
+		})
 	})
 })

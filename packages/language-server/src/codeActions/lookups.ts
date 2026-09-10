@@ -11,10 +11,12 @@ import { matcherValueExpressions } from "../matchHandlerChildren"
 import { methodsOf, nativeSignaturesOf } from "../namespaceMembers"
 import { isSamePosition } from "../positions"
 import { programBodies } from "../sections"
+import { containsRange } from "./geometry"
 
-// NOTE: Which Node of the Parser AST stands at a Position — the question every
-// Quick Fix opens with, since a Diagnostic names the Node it was reported
-// against — and the walk each of the answers is written over.
+// NOTE: Which Node of the Parser AST stands at — or around — a Position. The
+// finders a Quick Fix starts from ask the first question, since a Diagnostic
+// names the Node it was reported against; the two a refactoring starts from
+// ask the second, since a selection sits inside what it selects.
 
 export type Handler = parser.MatchNode["handlers"][number]
 
@@ -139,6 +141,104 @@ export function findFunctionDefinition(
 	})
 
 	return found
+}
+
+// NOTE: The smallest Node whose Position CONTAINS the range, where every
+// finder above matches a Position exactly. A Diagnostic names the Node it was
+// reported against and a SELECTION does not: what a reader drags over is a
+// span inside an Expression, or one that covers it and a little whitespace
+// besides, and what an extraction lifts is the Node around it.
+//
+// The last containing Node the walk reaches is the innermost one. A Node is
+// visited before the Nodes it holds, so a container is passed on the way in;
+// everything visited after a Node that is not inside it stands BESIDE it,
+// where a range inside it can not also be. The one range that is inside two
+// such neighbours is one of no width sitting exactly between them, and the
+// later of the two answers for it.
+export function findInnermostNodeContaining(
+	program: parser.Program,
+	range: common.Position,
+): parser.ImplementationNode | null {
+	let found: parser.ImplementationNode | null = null
+
+	walk(program, (node) => {
+		if (containsRange(node.position, range)) {
+			found = node
+		}
+	})
+
+	return found
+}
+
+// NOTE: The Statement a range sits in, and the body it is one of. A refactoring
+// that writes a Statement — a Constant lifted out of an Expression, a Function
+// extracted from a body — has to write it SOMEWHERE, and where is always
+// "beside this one, in the body it stands in". The index is handed over with
+// it so that "above this Statement" is a lookup rather than a second search.
+export type EnclosingStatement = {
+	statement: parser.ImplementationNode
+	body: Array<parser.ImplementationNode>
+	index: number
+}
+
+// NOTE: Innermost, on the same reading of the walk order that
+// `findInnermostNodeContaining` takes: the bodies come outermost first, so the
+// last one holding a Statement over the range is the one no other body of the
+// list is nested in.
+export function enclosingStatementOf(
+	program: parser.Program,
+	range: common.Position,
+): EnclosingStatement | null {
+	let found: EnclosingStatement | null = null
+
+	for (let body of allBodies(program)) {
+		let index = body.findIndex((statement) =>
+			containsRange(statement.position, range),
+		)
+
+		if (index !== -1) {
+			found = { statement: body[index], body, index }
+		}
+	}
+
+	return found
+}
+
+// NOTE: Every body of the Program, outermost first. `programSections` is depth
+// first and in source order, and the walk visits a Node before the Nodes it
+// holds, so a body written inside another is always collected after it.
+function allBodies(
+	program: parser.Program,
+): Array<Array<parser.ImplementationNode>> {
+	let bodies = programBodies(program)
+
+	walk(program, (node) => {
+		bodies.push(...bodiesOf(node))
+	})
+
+	return bodies
+}
+
+// NOTE: The bodies one Node OWNS — a body being the one place a Statement can
+// be written, which an Expression holding other Expressions is not. A
+// Namespace's Methods are absent because the walk reaches each of them as a
+// Function value of its own, and answers for it there.
+function bodiesOf(
+	node: parser.ImplementationNode,
+): Array<Array<parser.ImplementationNode>> {
+	switch (node.nodeType) {
+		case "FunctionStatement":
+		case "FunctionValue":
+			return [node.value.body]
+		case "IfStatement":
+			return [node.body]
+		case "IfElseStatement":
+			return [node.trueBody, node.falseBody]
+		case "Match":
+			return node.handlers.map((handler) => handler.body)
+		default:
+			return []
+	}
 }
 
 // NOTE: Every Node of the Parser AST, in no particular order — the lookups

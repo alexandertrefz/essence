@@ -17,6 +17,20 @@ export function overlaps(
 	)
 }
 
+// NOTE: The other reading of the same pair — `range` lies INSIDE `position`,
+// both edges included. What a Diagnostic's span asks of a request is whether
+// the two touch at all; what a selection asks of a Node is which Nodes hold
+// it, and a cursor resting on a Node's first or last character is held by it.
+export function containsRange(
+	position: common.Position,
+	range: common.Position,
+): boolean {
+	return (
+		!isBefore(range.start, position.start) &&
+		!isBefore(position.end, range.end)
+	)
+}
+
 export function isBefore(a: common.Cursor, b: common.Cursor): boolean {
 	return a.line < b.line || (a.line === b.line && a.column < b.column)
 }
