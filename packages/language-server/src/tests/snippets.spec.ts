@@ -4,6 +4,7 @@ import * as path from "node:path"
 import { parseDocument } from "@essence-lang/compiler/documents"
 import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 
+import { findCompletions } from "../completion"
 import {
 	renderPlaceholders,
 	type SnippetContext,
@@ -186,6 +187,253 @@ describe("every snippet body", () => {
 			})
 		}
 	}
+})
+
+describe("Snippet completion", () => {
+	function snippetsAt(
+		lines: Array<string>,
+		cursor: { line: number; column: number },
+		documentPath?: string,
+	) {
+		return findCompletions(lines.join("\n"), cursor, documentPath)
+			.filter((entry) => entry.kind === "snippet")
+			.map((entry) => entry.label)
+	}
+
+	it("offers the sections above the implementation, and nothing inside one", () => {
+		let offered = snippetsAt(["", "implementation {", "}"], {
+			line: 1,
+			column: 1,
+		})
+
+		expect(offered).toContain("implementation")
+		expect(offered).toContain("tests")
+		expect(offered).not.toContain("constant")
+		expect(offered).not.toContain("case")
+	})
+
+	it("offers the Statements of an implementation body", () => {
+		let offered = snippetsAt(["implementation {", "\t", "}"], {
+			line: 2,
+			column: 2,
+		})
+
+		expect(offered).toContain("constant")
+		expect(offered).toContain("function")
+		expect(offered).not.toContain("overload")
+		expect(offered).not.toContain("test")
+	})
+
+	// NOTE: The Program form the standard library opens with, which is decided
+	// by the document's path and by nothing in the text.
+	it("offers the declarations a standard library file may write", () => {
+		let offered = snippetsAt(
+			["declarations {", "\t", "}"],
+			{ line: 2, column: 2 },
+			path.join(STDLIB_DIRECTORY, "Scratch.es"),
+		)
+
+		expect(offered).toContain("namespace")
+		expect(offered).toContain("type")
+		expect(offered).not.toContain("constant")
+	})
+
+	it("offers the members of a Namespace body", () => {
+		let offered = snippetsAt(
+			[
+				"implementation {",
+				"\tnamespace Name for Integer {",
+				"\t\t",
+				"\t}",
+				"}",
+			],
+			{ line: 3, column: 3 },
+		)
+
+		expect(offered).toContain("overload")
+		expect(offered).toContain("doc")
+		expect(offered).not.toContain("constant")
+		expect(offered).not.toContain("function")
+	})
+
+	// NOTE: A Method's body is a Statement body wherever it is written, so the
+	// Namespace around it is not what the cursor stands in — the Function
+	// literal it opened is.
+	it("reads a Method's own body as a Statement body", () => {
+		let offered = snippetsAt(
+			[
+				"implementation {",
+				"\tnamespace Name for Integer {",
+				"\t\tmethod() -> Integer {",
+				"\t\t\t",
+				"\t\t}",
+				"\t}",
+				"}",
+			],
+			{ line: 4, column: 4 },
+		)
+
+		expect(offered).toContain("constant")
+		expect(offered).not.toContain("overload")
+	})
+
+	it("offers the Methods a Protocol declares", () => {
+		let offered = snippetsAt(
+			["implementation {", "\tprotocol Name {", "\t\t", "\t}", "}"],
+			{ line: 3, column: 3 },
+		)
+
+		expect(offered).toContain("doc")
+		expect(offered).not.toContain("overload")
+		expect(offered).not.toContain("constant")
+	})
+
+	it("offers the items of a tests section", () => {
+		let offered = snippetsAt(
+			["implementation {", "}", "", "tests {", "\t", "}"],
+			{ line: 5, column: 2 },
+		)
+
+		expect(offered).toContain("test")
+		expect(offered).toContain("suite")
+		expect(offered).toContain("constant")
+		expect(offered).not.toContain("namespace")
+	})
+
+	it("offers the assertions of a test body", () => {
+		let offered = snippetsAt(
+			[
+				"implementation {",
+				"}",
+				"",
+				"tests {",
+				'\ttest "what it proves" {',
+				"\t\t",
+				"\t}",
+				"}",
+			],
+			{ line: 6, column: 3 },
+		)
+
+		expect(offered).toContain("constant")
+		expect(offered).not.toContain("test")
+		expect(offered).not.toContain("namespace")
+	})
+
+	it("offers the values of an Expression position", () => {
+		let offered = snippetsAt(
+			["implementation {", "\tconstant value = ", "}"],
+			{ line: 2, column: 19 },
+		)
+
+		expect(offered).toContain("match")
+		expect(offered).toContain("define")
+		expect(offered).toContain("record-typed")
+		expect(offered).not.toContain("function")
+		expect(offered).not.toContain("constant")
+	})
+
+	it("offers the Handlers of a match", () => {
+		let offered = snippetsAt(
+			[
+				"implementation {",
+				"\tconstant value = match subject -> Integer {",
+				"\t\tcase 0 { <- 1 }",
+				"\t\t",
+				"\t}",
+				"}",
+			],
+			{ line: 4, column: 3 },
+		)
+
+		expect(offered).toContain("case")
+		expect(offered).toContain("case-where")
+		expect(offered).not.toContain("constant")
+		expect(offered).not.toContain("match")
+	})
+
+	// NOTE: The context that earns its place by what it refuses. Nothing but
+	// arms may be written between a `define`'s braces, and no body in the table
+	// is one — so the answer there is nothing at all, rather than the
+	// Statements a block that is not one would offer.
+	it("offers nothing between a define's arms", () => {
+		let offered = snippetsAt(
+			[
+				"implementation {",
+				"\tconstant value = define {",
+				"\t\tas 1 if condition",
+				"\t\t",
+				"\t\tas 2 otherwise",
+				"\t}",
+				"}",
+			],
+			{ line: 4, column: 3 },
+		)
+
+		expect(offered).toEqual([])
+	})
+
+	// NOTE: The bodies reach the Editor as snippet text, which is what makes a
+	// tab stop a tab stop rather than four literal characters.
+	it("hands the body over as snippet text, and says what it writes", () => {
+		let entry = findCompletions(
+			["implementation {", "}", "", "tests {", "\t", "}"].join("\n"),
+			{ line: 5, column: 2 },
+		).find((offer) => offer.kind === "snippet" && offer.label === "test")
+
+		expect(entry?.insertText).toBe(
+			['test "${1:what it proves}" {', "\texpect $0", "}"].join("\n"),
+		)
+		expect(entry?.labelDetail).toBe('test "what it proves" {')
+		expect(entry?.detail).toBe("A test — one named body of assertions.")
+	})
+
+	// NOTE: The Keyword and the block that share a label are two entries, and
+	// the kind is the whole of what tells them apart.
+	it("offers a Keyword and its block side by side", () => {
+		let entries = findCompletions(
+			["implementation {", "}", "", "tests {", "\t", "}"].join("\n"),
+			{ line: 5, column: 2 },
+		).filter((entry) => entry.label === "constant")
+
+		expect(entries.map((entry) => entry.kind).sort()).toEqual([
+			"keyword",
+			"snippet",
+		])
+	})
+
+	it("offers no snippet where the language allows only a name", () => {
+		expect(
+			snippetsAt(
+				["implementation {", '\tconstant text = "Hello"::', "}"],
+				{ line: 2, column: 26 },
+			),
+		).toEqual([])
+	})
+
+	// NOTE: No body names a Type, so the Type space offers none — the rule the
+	// Keywords are held to, for the same reason.
+	it("offers no snippet in the Type space", () => {
+		expect(
+			snippetsAt(["implementation {", "\tconstant value: ", "}"], {
+				line: 2,
+				column: 18,
+			}),
+		).toEqual([])
+	})
+
+	// NOTE: Where nothing parses there is no Program to read a block off, and
+	// the text reading is what is left: it still tells a value position from a
+	// Statement one, and the bodies that need to know more are not offered.
+	it("falls back to the text where the document does not parse", () => {
+		let offered = snippetsAt(
+			["implementation {", "\tnamespace Name for {{{", "\t", "}"],
+			{ line: 3, column: 2 },
+		)
+
+		expect(offered).toContain("constant")
+		expect(offered).not.toContain("overload")
+	})
 })
 
 // NOTE: `snippetsFor` is what Completion asks, so a context nobody answers is

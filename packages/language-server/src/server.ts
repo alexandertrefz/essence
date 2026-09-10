@@ -3088,6 +3088,7 @@ const completionItemKinds: Record<CompletionKind, CompletionItemKind> = {
 	case: CompletionItemKind.EnumMember,
 	keyword: CompletionItemKind.Keyword,
 	module: CompletionItemKind.File,
+	snippet: CompletionItemKind.Snippet,
 }
 
 // NOTE: The kinds that are invoked rather than referred to. This is only the

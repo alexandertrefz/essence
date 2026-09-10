@@ -56,6 +56,12 @@ import {
 	type SymbolSpace,
 } from "./rename"
 import { typedProgramBodies, typedProgramNodes } from "./sections"
+import { snippetContextAt } from "./snippetContext"
+import {
+	renderPlaceholders,
+	type SnippetContext,
+	snippetsFor,
+} from "./snippets"
 import type { WorkspaceOffer } from "./workspace"
 
 // NOTE: Completion has three modes, told apart by the text immediately
@@ -76,28 +82,44 @@ import type { WorkspaceOffer } from "./workspace"
 // carries the receiver's Type in `base.type`, at the Scope the cursor is
 // actually in (its enclosing Function's Parameters, `@`, and so on).
 
-// NOTE: Every rename Declaration kind plus `case`, `keyword` and `module` —
-// none is a lexical Declaration (a Case resolves through its Choice, never a
-// Scope; a Keyword is not a name at all; a Module is a file), so none ever
-// appears in the rename index, but all three are offered and need a kind of
-// their own.
-export type CompletionKind = DeclarationKind | "case" | "keyword" | "module"
+// NOTE: Every rename Declaration kind plus `case`, `keyword`, `module` and
+// `snippet` — none is a lexical Declaration (a Case resolves through its
+// Choice, never a Scope; a Keyword is not a name at all; a Module is a file; a
+// snippet is a body rather than a name), so none ever appears in the rename
+// index, but all four are offered and need a kind of their own.
+//
+// NOTE: A snippet and a Keyword deliberately share labels — `test` is both the
+// word and the block written around it — and the kind is what tells them apart
+// in the list, since an Editor draws an icon per kind.
+export type CompletionKind =
+	| DeclarationKind
+	| "case"
+	| "keyword"
+	| "module"
+	| "snippet"
 
 // NOTE: An Editor sorts a Completion list on `sortText` rather than on the
 // order it was handed, so the ranking is carried by every entry: what is
 // nearest the cursor's own Scope first, what is merely part of the language
 // last.
+//
+// NOTE: Single digits, and they have to be: `sortText` is compared as TEXT, so
+// a tenth tier would sort between the first and the second.
 const completionTiers = {
 	local: 1,
 	member: 2,
 	document: 3,
 	builtin: 4,
 	keyword: 5,
+	// NOTE: Under the bare Keyword that shares its label, because the word is
+	// what a reader typing `test` most often means and the block is the second
+	// reading of it.
+	snippet: 6,
 	// NOTE: Last, and by a rule rather than by taste: everything above is
 	// already reachable where the cursor is, while accepting one of these edits
 	// the file's import block as well. An offer that changes two places belongs
 	// below every offer that changes one.
-	workspace: 6,
+	workspace: 7,
 } as const
 
 export type CompletionEntry = {
@@ -236,14 +258,26 @@ export function findCompletions(
 	let sectionCursor = moduleSectionCursor(lines, cursor)
 
 	if (sectionCursor !== null) {
-		return moduleSectionCompletions(
-			sectionCursor,
-			lines,
-			cursor,
-			parseDocument(documentText, documentPath).program,
-			workspace.specifiers ?? [],
-			workspace.offers,
-		)
+		return [
+			...moduleSectionCompletions(
+				sectionCursor,
+				lines,
+				cursor,
+				parseDocument(documentText, documentPath).program,
+				workspace.specifiers ?? [],
+				workspace.offers,
+			),
+			// NOTE: Only where a GROUP is written. Inside a group's braces the
+			// answer is the names that Module exports, and inside a specifier
+			// it is the files of the workspace — a snippet is an answer to
+			// neither, and the block already offers the group of every Module
+			// it can see. What this adds is the group for a Module it can not:
+			// a workspace nobody indexed, and a path being written for a file
+			// that is not there yet.
+			...(sectionCursor.at === "members"
+				? snippetCompletions(sectionCursor.section)
+				: []),
+		]
 	}
 
 	// NOTE: The Workspace holds the document's own analysis for every open file
@@ -423,9 +457,9 @@ export function findCompletions(
 	// the names in Scope — both are valid at those positions, since a member
 	// is written `name = value` and a labelled Argument `label value`.
 	//
-	// NOTE: Keywords are offered here and nowhere else — after a `.`, a `::`
-	// or a `#` the language allows nothing but a name — and only in the value
-	// space, since no Keyword names a Type.
+	// NOTE: Keywords and snippets are offered here and nowhere else — after a
+	// `.`, a `::` or a `#` the language allows nothing but a name — and only in
+	// the value space, since neither a Keyword nor a snippet names a Type.
 	return [
 		...contextualCompletions(
 			lines,
@@ -435,7 +469,20 @@ export function findCompletions(
 			space === "values" ? bindingsInReach(scopeEntries) : new Set(),
 		),
 		...scopeEntries,
-		...(space === "values" ? keywordCompletions(headText) : []),
+		...(space === "values"
+			? [
+					...keywordCompletions(headText),
+					...snippetCompletions(
+						snippetContextOf(
+							documentText,
+							documentPath,
+							document,
+							headText,
+							cursor,
+						),
+					),
+				]
+			: []),
 	]
 }
 
@@ -2373,7 +2420,14 @@ function innermostOpener(text: string): string | null {
 // NOTE: Statement start is read off the text alone — nothing but a block
 // boundary before the cursor on its line. Everything else is inside an
 // Expression: the value half of a declaration, an Argument, a `<-`.
-//
+function isAtStatementStart(headText: string): boolean {
+	let trimmed = lastLineOf(stripNoise(headText))
+		.replace(identifierTail, "")
+		.trimEnd()
+
+	return trimmed === "" || trimmed.endsWith("{") || trimmed.endsWith("}")
+}
+
 // NOTE: No legality analysis happens here. `static` is only meaningful in a
 // Namespace body, `overload` only in a `declarations` Program, `implementation`
 // only at the very top, and none of that is checked. A Keyword offered where it
@@ -2381,20 +2435,57 @@ function innermostOpener(text: string): string | null {
 // alternative is a second, approximate model of where each Keyword may stand,
 // which would be wrong in subtler ways.
 function keywordCompletions(headText: string): Array<CompletionEntry> {
-	let trimmed = lastLineOf(stripNoise(headText))
-		.replace(identifierTail, "")
-		.trimEnd()
-	let atStatementStart =
-		trimmed === "" || trimmed.endsWith("{") || trimmed.endsWith("}")
+	return (
+		isAtStatementStart(headText) ? statementKeywords : expressionKeywords
+	).map((keyword) => ({
+		label: keyword,
+		kind: "keyword" as const,
+		detail: null,
+		tier: completionTiers.keyword,
+	}))
+}
 
-	return (atStatementStart ? statementKeywords : expressionKeywords).map(
-		(keyword) => ({
-			label: keyword,
-			kind: "keyword" as const,
-			detail: null,
-			tier: completionTiers.keyword,
-		}),
-	)
+// NOTE: The snippets do take the analysis the Keywords above decline, and the
+// reason is what being wrong costs: a Keyword offered where it will not parse
+// is one word the reader deletes, while a snippet is four lines of scaffold
+// written into a block that can not hold it. `snippetContextAt` is what answers
+// it — see the NOTE there.
+function snippetCompletions(context: SnippetContext): Array<CompletionEntry> {
+	return snippetsFor(context).map((snippet) => ({
+		label: snippet.prefix,
+		kind: "snippet" as const,
+		detail: snippet.description,
+		// NOTE: The head of the body as it will be written, so that the list
+		// says what a prefix expands to without expanding it — which is the
+		// one thing the label can not carry.
+		labelDetail: renderPlaceholders(snippet.body[0] ?? ""),
+		insertText: snippet.body.join("\n"),
+		tier: completionTiers.snippet,
+	}))
+}
+
+// NOTE: The document's own Program answers this, and it is already in hand
+// wherever the caller holds an analysis. A Program that is no Module carries
+// none — the Workspace only analyses the files it links — so the document is
+// parsed here for the one reading that needs the tree rather than the Types.
+function snippetContextOf(
+	documentText: string,
+	documentPath: string | undefined,
+	document: DocumentAnalysis | null,
+	headText: string,
+	cursor: common.Cursor,
+): SnippetContext {
+	let atStatementStart = isAtStatementStart(headText)
+
+	try {
+		let program =
+			document?.program ??
+			parseDocument(documentText, documentPath).program
+
+		return snippetContextAt(program, cursor, atStatementStart)
+	} catch {
+		return snippetContextAt(null, cursor, atStatementStart)
+	}
 }
 
 function lastLineOf(text: string): string {

@@ -1260,7 +1260,7 @@ describe("Workspace", () => {
 			let offered = entries.find((entry) => entry.label === "Rectangle")
 
 			expect(offered?.detail).toBe("from ./Geometry.es")
-			expect(offered?.tier).toBe(6)
+			expect(offered?.tier).toBe(7)
 			expect(offered?.additionalEdits?.[0]?.newText).toBe(
 				'import {\n\tfrom "./Geometry.es" { Rectangle }\n}\n\n',
 			)
