@@ -16,6 +16,8 @@
 	"ignorePatterns": [
 		"coverage/**/*",
 		"packages/runtime/src/natives.generated.ts",
+		"packages/vscode-extension/schemas/essence.schema.json",
+		"packages/website/public/schemas/essence.schema.json",
 		"packages/escodegen/**",
 		"packages/vscode-extension/snippets/**",
 		"packages/vscode-extension/syntaxes/**",

@@ -45,7 +45,10 @@
 						"report": {
 							"description": "The report a `--coverage` run writes, as `--coverage-report` names it.",
 							"type": "string",
-							"enum": ["lcov", "json"]
+							"enum": [
+								"lcov",
+								"json"
+							]
 						},
 						"out": {
 							"description": "Where a coverage report is written, relative to this file, as `--coverage-out` names it.",
