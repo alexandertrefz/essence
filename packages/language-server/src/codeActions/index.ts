@@ -45,7 +45,18 @@ export type CodeActionEdit = {
 
 export type CodeActionEntry = {
 	title: string
-	kind: "quickfix" | "refactor.rewrite"
+	// NOTE: The LSP kind strings themselves, since these are exactly the kinds
+	// this Server offers and inventing a second spelling for them would only
+	// mean a table to keep in step. What each of them promises is the reason
+	// they are told apart at all: a `quickfix` answers a Diagnostic, a
+	// `refactor.*` is offered on code the Compiler is happy with, and a
+	// `source.*` acts on the whole document rather than on a selection.
+	kind:
+		| "quickfix"
+		| "refactor.rewrite"
+		| "refactor.extract"
+		| "refactor.inline"
+		| "source.organizeImports"
 	// NOTE: Null for an action that answers no Diagnostic — the Type
 	// annotation refactor is offered on correct code. The pair is what lets
 	// the server find the client's own Diagnostic for this action again.

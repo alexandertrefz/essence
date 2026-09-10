@@ -340,6 +340,9 @@ describe("LSP", () => {
 					codeActionKinds: [
 						CodeActionKind.QuickFix,
 						CodeActionKind.RefactorRewrite,
+						CodeActionKind.RefactorExtract,
+						CodeActionKind.RefactorInline,
+						CodeActionKind.SourceOrganizeImports,
 					],
 				},
 				completionProvider: {

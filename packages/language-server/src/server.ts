@@ -169,12 +169,18 @@ export const serverCapabilities: ServerCapabilities = {
 	// computed on the buffer as it is now. Deliberately no `source.fixAll`
 	// either: not one of these fixes is both unambiguous and
 	// semantics-preserving, so applying them in bulk is exactly what a reader
-	// must not be able to ask for. The reasoning is written out under
-	// "Why there is no fix-all" in the Diagnostics reference.
+	// must not be able to ask for. `source.organizeImports` is admitted by
+	// that same rule rather than in spite of it: removing an import nothing
+	// uses is both of those things, which is what a bulk action has to be. The
+	// reasoning is written out under "Why there is no fix-all" in the
+	// Diagnostics reference.
 	codeActionProvider: {
 		codeActionKinds: [
 			CodeActionKind.QuickFix,
 			CodeActionKind.RefactorRewrite,
+			CodeActionKind.RefactorExtract,
+			CodeActionKind.RefactorInline,
+			CodeActionKind.SourceOrganizeImports,
 		],
 	},
 	completionProvider: {
@@ -2974,6 +2980,19 @@ export function isRequestedKind(
 	)
 }
 
+// NOTE: An entry's kinds are spelled as the protocol spells them, so this
+// table reads as an identity — and it is written out all the same, because it
+// is where a kind that is offered and a kind that is announced are made to be
+// the same list. A kind on one side and not the other is a lightbulb an Editor
+// never opens.
+const codeActionKinds: Record<CodeActionEntry["kind"], CodeActionKind> = {
+	quickfix: CodeActionKind.QuickFix,
+	"refactor.rewrite": CodeActionKind.RefactorRewrite,
+	"refactor.extract": CodeActionKind.RefactorExtract,
+	"refactor.inline": CodeActionKind.RefactorInline,
+	"source.organizeImports": CodeActionKind.SourceOrganizeImports,
+}
+
 // NOTE: The edits were computed on the current buffer, so the client's own
 // Diagnostics are used for nothing but attribution — matched by code and
 // overlapping range so the Editor can tie the fix to the squiggle it is
@@ -2986,10 +3005,7 @@ export function toLspCodeAction(
 
 	return {
 		title: entry.title,
-		kind:
-			entry.kind === "quickfix"
-				? CodeActionKind.QuickFix
-				: CodeActionKind.RefactorRewrite,
+		kind: codeActionKinds[entry.kind],
 		isPreferred: entry.isPreferred,
 		diagnostics:
 			position === null
