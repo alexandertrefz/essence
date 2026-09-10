@@ -13,6 +13,10 @@ import {
 import { primary } from "./diagnostics"
 import { closestMatch } from "./helpers/suggest"
 import { optimiserPassNames } from "./optimiser"
+import {
+	type CoverageReportFormat,
+	coverageReportFormats,
+} from "./testing/coverageReports"
 
 // NOTE: A project's settings live in ONE file at its root, `essence.json`, and
 // everything that walks or builds the project reads them there: `essence
@@ -60,13 +64,6 @@ export const skippedDirectories = new Set([
 	"build",
 	".claude",
 ])
-
-export type CoverageReportFormat = "lcov" | "json"
-
-export const coverageReportFormats: ReadonlyArray<CoverageReportFormat> = [
-	"lcov",
-	"json",
-]
 
 export type TestConfiguration = {
 	skipTags: Array<string>
