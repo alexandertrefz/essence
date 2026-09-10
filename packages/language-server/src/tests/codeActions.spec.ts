@@ -1855,6 +1855,170 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("infer-on-applied-parameter", () => {
+		it("should take the marker off and leave the Parameter", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Holder<infer Item> { Bare }",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Remove 'infer'")
+			expect(fix.isPreferred).toBe(true)
+			expect(result[1]).toBe("\tchoice Holder<Item> { Bare }")
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: The Diagnostic spans the whole Type Parameter, bound and all,
+		// and only the Keyword in front of it is the mistake.
+		it("should keep a bound the Parameter carries", () => {
+			let lines = [
+				"implementation {",
+				"\ttype Pair<infer Item is Comparable> = { left: Item, right: Item }",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(result[1]).toBe(
+				"\ttype Pair<Item is Comparable> = { left: Item, right: Item }",
+			)
+
+			expect(codesOf(result)).toEqual([])
+		})
+	})
+
+	describe("uninferred-namespace-parameter", () => {
+		it("should write the marker in front of the Parameter", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Boxes<Item> for { value: Integer } {",
+				"\t\tget () -> Integer { <- @.value }",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Declare it as 'infer Item'")
+			expect(fix.isPreferred).toBe(true)
+			expect(result[1]).toBe(
+				"\tnamespace Boxes<infer Item> for { value: Integer } {",
+			)
+
+			expect(codesOf(result)).toEqual([])
+		})
+	})
+
+	describe("at-in-static-method", () => {
+		it("should drop the Keyword in front of the Method's name", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Counters for { count: Integer } {",
+				"\t\tstatic doubled () -> Integer {",
+				"\t\t\t<- @.count",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Drop 'static'")
+			// NOTE: The other reading is to take the value as a Parameter,
+			// which is a change to the Signature and to every call — so an
+			// Editor must not apply this one without being asked.
+			expect(fix.isPreferred).toBe(false)
+			expect(result[2]).toBe("\t\tdoubled () -> Integer {")
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should reach a Method inside an overload block", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Counters for { count: Integer } {",
+				"\t\toverload static made {",
+				"\t\t\t() -> Integer { <- @.count }",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(applied(lines, fix)[2]).toBe("\t\toverload made {")
+		})
+
+		// NOTE: `keywordBefore` looks along the name's own line, so a Keyword
+		// the Parser read from the line above is one this refuses to touch —
+		// deleting a span that does not read `static ` would eat whatever does
+		// stand there.
+		it("should stay silent where the Keyword opens a line of its own", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Counters for { count: Integer } {",
+				"\t\tstatic",
+				"\t\tdoubled () -> Integer {",
+				"\t\t\t<- @.count",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			expect(titles(quickFixes(lines))).toEqual([])
+		})
+	})
+
+	describe("where-on-protocol-extension", () => {
+		it("should take the whole clause off the extension", () => {
+			let lines = [
+				"implementation {",
+				"\tprotocol Sizeable is Equatable where Item is Comparable {",
+				"\t\tsize () -> Integer",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Drop the 'where' clause")
+			expect(fix.isPreferred).toBe(true)
+			expect(result[1]).toBe("\tprotocol Sizeable is Equatable {")
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: One Diagnostic per condition, and one edit that answers all of
+		// them — a clause with one condition left is the same refusal, so there
+		// is nothing to take out but the clause.
+		it("should answer every condition of the clause with the same edit", () => {
+			let lines = [
+				"implementation {",
+				"\tprotocol Sizeable is Equatable where Item is Comparable, Key is Equatable {",
+				"\t\tsize () -> Integer",
+				"\t}",
+				"}",
+			]
+
+			let fixes = quickFixes(lines)
+			let result = applied(lines, fixes[1])
+
+			expect(fixes.length).toBe(2)
+			expect(result[1]).toBe("\tprotocol Sizeable is Equatable {")
+
+			expect(codesOf(result)).toEqual([])
+		})
+	})
+
 	describe("Type annotations", () => {
 		it("should offer the inferred Type of a Constant as an edit", () => {
 			let lines = ["implementation {", '\tconstant name = "Ada"', "}"]

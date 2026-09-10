@@ -1506,6 +1506,10 @@ either in a Type position (`Holder<Integer>`) or at a construction
 (`Holder<Integer>#Bare`). Drop the `infer`; the bound and the default, if the
 Parameter carries them, stay exactly as written.
 
+**Quick Fix — "Remove 'infer'":** deletes the Keyword and the space behind it.
+The Type Parameter's Position opens on the marker, so the bound and the default
+beside it are untouched — the fix is the front of the span and nothing else.
+
 ### `uninferred-namespace-parameter`
 
 A Namespace declared a Type Parameter without `infer`. A Namespace is the
@@ -1517,6 +1521,10 @@ never bind, so the target Type matches no receiver at all and the Namespace is
 never found — a `namespace Maybe<T> for Maybe<T> is Equatable` was passed over
 in silence, and the derived equality of `choice Maybe<T>` answered `is` instead
 of the Method written right beside it. Write `infer Item`.
+
+**Quick Fix — "Declare it as 'infer T'":** writes the marker in front of the
+Parameter's name. The mirror of the fix above, and the mirror of its span too: a
+Parameter written without the marker opens on its own name.
 
 ### `zero-denominator`
 
@@ -2508,6 +2516,11 @@ and a Protocol declares none — there is nothing for the condition to speak
 about, and nothing at a use site to prove it with. Write `is Comparable` on its
 own, and bound the Type Parameter where the conforming Namespace is declared.
 
+**Quick Fix — "Drop the 'where' clause":** deletes the clause whole, from the
+Protocol's name to its last condition. The Diagnostic is reported once per
+condition and every one of them answers with this same edit, since a clause with
+one condition left over is the same refusal.
+
 ### `unwritable-provided-method`
 
 A `static` or `overload` Protocol Method was given a body. A provided Method is
@@ -2902,6 +2915,11 @@ it to refer to.
 `@` was used inside a static Method. A static Method is called on its
 Namespace rather than on a value, so it has no receiver — take the value as a
 Parameter, or drop `static` to make the Method an instance Method.
+
+**Quick Fix — "Drop 'static'":** deletes the Keyword in front of the Method's
+name, in the `overload` form as well as the plain one. Never preferred: the
+other reading is to take the value as a Parameter, which is a change to the
+Signature and to every call, and nothing in the Diagnostic chooses between them.
 
 ### `internal-error`
 

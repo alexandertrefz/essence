@@ -120,6 +120,111 @@ export function findVariableDeclaration(
 	return found
 }
 
+// NOTE: The NAME of the static Method whose body holds this Position, and null
+// where the Position stands anywhere else. The name is what a fix needs rather
+// than the Method: `static` is written directly in front of it in both forms
+// the Keyword has, the plain one and the `overload` block's.
+//
+// Innermost wins, on the reading `findInnermostNodeContaining` takes — a
+// Namespace written inside a Method is walked after the one holding it.
+export function findStaticMethodName(
+	program: parser.Program,
+	position: common.Position,
+): parser.IdentifierNode | null {
+	let found: parser.IdentifierNode | null = null
+
+	walk(program, (node) => {
+		if (node.nodeType !== "NamespaceDefinitionStatement") {
+			return
+		}
+
+		for (let member of Object.values(node.methods)) {
+			if (
+				member.nodeType !== "StaticMethod" &&
+				member.nodeType !== "OverloadedStaticMethod"
+			) {
+				continue
+			}
+
+			for (let method of methodsOf(member)) {
+				if (containsRange(method.position, position)) {
+					found = member.name
+				}
+			}
+		}
+	})
+
+	return found
+}
+
+// NOTE: The `is X where …` clause one of whose conditions stands at this
+// Position, looked for in Protocols alone — a Namespace's conformance is the
+// one place a `where` belongs, and this answers the Diagnostic that refuses it
+// on the other.
+export function findProtocolExtension(
+	program: parser.Program,
+	conditionPosition: common.Position,
+): parser.ConformanceClauseNode | null {
+	let found: parser.ConformanceClauseNode | null = null
+
+	walk(program, (node) => {
+		if (node.nodeType !== "ProtocolDeclarationStatement") {
+			return
+		}
+
+		for (let clause of node.conformsTo) {
+			if (
+				clause.conditions.some((condition) =>
+					isSamePosition(condition.position, conditionPosition),
+				)
+			) {
+				found = clause
+			}
+		}
+	})
+
+	return found
+}
+
+// NOTE: The Modifier of a test or a suite whose NAME stands at this Position.
+// A test and a suite are no part of `walk` — neither is a Statement, which is
+// what keeps every stage that walks Statements from answering for a form it can
+// never meet — so this walks the tests section itself.
+//
+// Null is a real answer rather than a failure. `tagged slow focussed` is read
+// by the Parser as `tagged` and `slow(focussed)`, and the Enricher takes that
+// pair apart before it reports the typo — so the name it reports about is an
+// ARGUMENT of a Modifier here, and a fix that finds no Modifier deletes the
+// word alone, which is exactly what an argument needs.
+export function findTestModifier(
+	program: parser.Program,
+	namePosition: common.Position,
+): parser.TestModifierNode | null {
+	let found: parser.TestModifierNode | null = null
+
+	let search = (nodes: Array<parser.TestsNode>): void => {
+		for (let node of nodes) {
+			if (node.nodeType !== "Test" && node.nodeType !== "Suite") {
+				continue
+			}
+
+			for (let modifier of node.modifiers) {
+				if (isSamePosition(modifier.name.position, namePosition)) {
+					found = modifier
+				}
+			}
+
+			if (node.nodeType === "Suite") {
+				search(node.nodes)
+			}
+		}
+	}
+
+	search(program.tests?.nodes ?? [])
+
+	return found
+}
+
 // NOTE: The Node standing at exactly this Position — matched by Position rather
 // than by containment, as the finders beside it are, since what a fix reported
 // against one Node needs is that Node and not whatever encloses it. Where two

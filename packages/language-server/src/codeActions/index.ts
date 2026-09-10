@@ -7,6 +7,12 @@ import {
 	matcherBeforeValueAction,
 	requireKeywordAction,
 } from "./assertionFixes"
+import {
+	dropStaticAction,
+	dropWhereClauseAction,
+	inferParameterAction,
+	removeInferAction,
+} from "./declarationFixes"
 import { removeDefaultAction } from "./defaultFixes"
 import {
 	inlineDefineValueAction,
@@ -219,12 +225,14 @@ const importOrSpellingFix: FixProvider = (context) => [
 // NOTE: One provider per Diagnostic code, looked up rather than switched on.
 // A code that has more than one answer keeps a provider that concatenates them,
 // in the order they are offered in. The table is what makes a Quick Fix a
-// self-contained addition: a fix is a function in `./fixes` and a line here,
-// and two of them landing at once meet in a sorted list rather than in the
-// middle of one function.
+// self-contained addition: a fix is a function in one of the `*Fixes` modules
+// beside this one and a line here, and two of them landing at once meet in a
+// sorted list rather than in the middle of one function.
 const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"ambiguous-nesting-level": ({ diagnostic, program }) =>
 		wrapInHoldingCaseActions(diagnostic, program),
+	"at-in-static-method": ({ diagnostic, program, lines }) =>
+		listed(dropStaticAction(diagnostic, program, lines)),
 	"case-default-without-payload": ({ diagnostic, lines }) =>
 		listed(removeDefaultAction(diagnostic, lines)),
 	"constant-reassignment": ({ diagnostic, program, lines }) =>
@@ -245,6 +253,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(removeFallbackAction(diagnostic, lines)),
 	"focused-tests-remain": ({ diagnostic, lines }) =>
 		listed(removeFocusedAction(diagnostic, lines)),
+	"infer-on-applied-parameter": ({ diagnostic, lines }) =>
+		listed(removeInferAction(diagnostic, lines)),
 	"invalid-escape": ({ diagnostic, lines }) =>
 		invalidEscapeActions(diagnostic, lines),
 	"invalid-module-specifier": ({ diagnostic, lines }) =>
@@ -278,6 +288,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"similar-tags": spellingFix,
 	"unclosed-string": ({ diagnostic, lines }) =>
 		listed(closeStringAction(diagnostic, lines)),
+	"uninferred-namespace-parameter": ({ diagnostic, lines }) =>
+		listed(inferParameterAction(diagnostic, lines)),
 	// NOTE: A suggestion is the Case's NAME and the span it is written over is
 	// the whole `#Name`, so the sigil is written back in front of it.
 	"unknown-case": ({ diagnostic }) =>
@@ -298,6 +310,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(removeImportAction(diagnostic, program, lines)),
 	"value-comment-outside-tests": ({ diagnostic, lines }) =>
 		listed(ordinaryCommentAction(diagnostic, lines)),
+	"where-on-protocol-extension": ({ diagnostic, program, lines }) =>
+		listed(dropWhereClauseAction(diagnostic, program, lines)),
 	"wrong-update-brackets": ({ diagnostic, lines }) =>
 		listed(updateBracketsAction(diagnostic, lines)),
 }
