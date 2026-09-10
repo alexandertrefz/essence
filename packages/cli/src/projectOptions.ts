@@ -58,7 +58,17 @@ export function projectConfigurationFor(
 // command that reads the file reports the same thing at the same moment — ahead
 // of the work — and a command that grew a second copy of this loop would be a
 // command whose Warnings appeared somewhere else in the output.
-export function reportProjectSettings(context: CLIContext): void {
+export function reportProjectSettings(
+	context: CLIContext,
+	command: CommandSpec,
+): void {
+	// NOTE: A command that reads no settings says nothing about them, `--verbose`
+	// or not: "no essence.json governs the working directory" from a `check`
+	// that would not have read one is an answer to a question nobody asked.
+	if (!readsProjectConfiguration(command)) {
+		return
+	}
+
 	let { configuration, palette, terminal, theme } = context
 
 	for (let problem of configuration.problems) {

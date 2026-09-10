@@ -352,7 +352,7 @@ export async function run(
 
 	// NOTE: After the two ways out that print instead of running — a version and
 	// a help screen are not a run, and neither is answered out of a project.
-	reportProjectSettings(context)
+	reportProjectSettings(context, invocation.command)
 
 	try {
 		return await dispatch(context, invocation)
