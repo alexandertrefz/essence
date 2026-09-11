@@ -1,157 +1,244 @@
 ---
 /*
- * Everything a type can do, on the type's own page.
+ * Everything a type can do, as one compact index at the top of its page —
+ * grouped as the page is, so the first screen answers "is there a `windows`?"
+ * without a scroll.
  *
- * Built from the collection rather than from a list written here or in
- * frontmatter: a Member's page IS its entry in this index, so the index cannot
- * name a page that does not exist, and a page cannot exist without appearing.
- * The generator writes the pages, `tests/stdlibMembers.spec.ts` checks that the
- * set of them matches the standard library, and this renders whatever is there.
- *
- * Grouped by how a Member is reached, because that is the difference that
- * decides what a reader can type: a Method needs a value in front of it
- * (`2::add(3)`), a static one names the type (`Integer.parse("2")`), and a
- * Property is a value already.
+ * Built from the page's manifest, which the same run wrote as the headings it
+ * links to, so the index cannot name a heading that is not there. A name the
+ * page heads under an earlier group is listed again where it also belongs,
+ * with the receiver that puts it there, and links to its one heading. A member
+ * nobody writes on the Type — provided by a Protocol, or derived for a Choice —
+ * is set in the quieter colour.
  */
 
-import { getCollection } from "astro:content"
-
-import RichText from "../RichText.astro"
-import { parentId } from "../../lib/navigation.ts"
+import { libraryPage } from "./library.ts"
 
 interface Props {
-	/** The type page's collection id — its Members are the pages under it. */
-	parent: string
+	/** The page's slug: `list` for `/docs/library/list`. */
+	page: string
 }
 
-let { parent } = Astro.props
+let { page } = Astro.props
+let manifest = libraryPage(page)
+let anchors = new Set(manifest.anchors)
 
-let members = (await getCollection("docs"))
-	.filter((entry) => parentId(entry.id) === parent)
-	.sort(
-		(a, b) => a.data.order - b.data.order || a.data.title.localeCompare(b.data.title),
-	)
-
-// NOTE: One group until the index reads the page's member manifest, which is
-// where a Member's kind and reader group now live rather than in frontmatter.
-let groups = members.length === 0 ? [] : [{ label: "Members", members }]
-
-/** `Integer::add` → `add`: the type is the page you are on. */
-function shortName(title: string): string {
-	return title.replace(/^.*(::|\.)/, "")
+interface Name {
+	name: string
+	href: string
+	quiet: boolean
+	title?: string
+	note?: string
 }
+
+interface Row {
+	label: string
+	href: string
+	names: Name[]
+}
+
+let headedIn = new Map<string, string>()
+
+for (let group of manifest.groups) {
+	for (let member of group.members) {
+		if (!headedIn.has(member.name)) {
+			headedIn.set(member.name, group.id)
+		}
+	}
+}
+
+let protocols = new Map(
+	manifest.protocols.map((protocol) => [protocol.name, protocol]),
+)
+
+let rows: Row[] = manifest.groups.map((group) => {
+	let names: Name[] = []
+	let seen = new Set<string>()
+
+	for (let member of group.members) {
+		if (seen.has(member.name)) {
+			continue
+		}
+
+		seen.add(member.name)
+
+		let same = group.members.filter(
+			(candidate) => candidate.name === member.name,
+		)
+		let quiet = same.every(
+			(candidate) =>
+				candidate.origin === "provided" || candidate.origin === "derived",
+		)
+		// On the Protocols page a method's address is its Protocol's section,
+		// unless it is one of the few with a heading of its own.
+		let protocol = protocols.get(group.label)
+		let href =
+			protocol === undefined || protocol.headed.includes(member.name)
+				? `#${member.name}`
+				: `#${group.label}`
+
+		names.push({
+			name: member.name,
+			href,
+			quiet: quiet && protocol === undefined,
+			title:
+				quiet && member.protocol !== null
+					? `${member.origin === "derived" ? "derived from" : "provided by"} ${member.protocol}`
+					: undefined,
+			note:
+				headedIn.get(member.name) === group.id
+					? undefined
+					: `on ${member.receiver ?? member.namespace}`,
+		})
+	}
+
+	return { label: group.label, href: `#${group.id}`, names }
+})
+
+let extra = (
+	label: string,
+	section: string,
+	names: string[],
+): Row | undefined =>
+	names.length === 0
+		? undefined
+		: {
+				label,
+				href: anchors.has(section) ? `#${section}` : `#${names[0]}`,
+				names: names.map((name) => ({ name, href: `#${name}`, quiet: false })),
+			}
+
+rows = [
+	...[extra("The tower", "the-tower", manifest.tower.map((alias) => alias.name))],
+	...rows,
+	extra(
+		"Refinements",
+		"refinements",
+		manifest.refinements.map((refinement) => refinement.name),
+	),
+	extra("Modes", "modes", manifest.modes.map((mode) => mode.name)),
+].filter((row): row is Row => row !== undefined)
 ---
 
-{
-	groups.length > 0 && (
-		<section class="members">
-			<h2 class="members__title" id="members">
-				Members
-			</h2>
-
-			{groups.map((group) => (
-				<div class="set">
-					<h3 class="set__label">{group.label}</h3>
-
-					<ul class="rows">
-						{group.members.map((entry) => (
-							<li class="row">
-								<a class="row__name" href={`/docs/${entry.id}`}>
-									{shortName(entry.data.title)}
-								</a>
-								<p class="row__summary">
-									<RichText text={entry.data.description} />
-								</p>
-							</li>
-						))}
-					</ul>
-				</div>
-			))}
-		</section>
-	)
-}
+<nav class="member-index" aria-label={`What ${manifest.title} offers`}>
+	{
+		rows.map((row) => (
+			<div class="member-index__row">
+				<a class="member-index__group" href={row.href}>
+					{row.label}
+				</a>
+				<ul class="member-index__names">
+					{row.names.map((name) => (
+						<li>
+							<a
+								class:list={[
+									"member-index__name",
+									{ "member-index__name--quiet": name.quiet },
+								]}
+								href={name.href}
+								title={name.title}
+							>
+								{name.name}
+							</a>
+							{name.note !== undefined && (
+								<span class="member-index__note">{name.note}</span>
+							)}
+						</li>
+					))}
+				</ul>
+			</div>
+		))
+	}
+</nav>
 
 <style>
-	.members {
-		margin-top: 56px;
+	.member-index {
+		margin-top: 28px;
+		padding: 4px 18px;
+		border: 1px solid var(--hairline-soft);
+		border-radius: 9px;
+		background: var(--surface-raised);
 	}
 
-	.members__title {
-		font-size: 24px;
-		letter-spacing: -0.01em;
-		color: var(--text-heading);
+	.member-index__row {
+		display: grid;
+		grid-template-columns: 176px minmax(0, 1fr);
+		gap: 4px 20px;
+		padding: 11px 0;
 	}
 
-	.set {
-		margin-top: 30px;
-	}
-
-	.set__label {
-		font-family: var(--font-mono);
-		font-weight: 400;
-		font-size: 11px;
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
-		color: var(--text-faintest);
-	}
-
-	.rows {
-		list-style: none;
-		margin-top: 10px;
-		border-top: 1px solid var(--hairline);
+	.member-index__row + .member-index__row {
+		border-top: 1px solid var(--hairline-softest);
 	}
 
 	/*
-	 * Two columns while there is room for the name to have a measure of its own,
-	 * one below the other when there is not. The name column is fixed rather
-	 * than shrink-to-fit so the summaries line up down the page — a ragged left
-	 * edge on the prose is what makes a table like this hard to scan.
+	 * Inside `.prose`, which underlines its links and gives every list the
+	 * article's dash markers and column layout; neither belongs to an index.
 	 */
-	.row {
-		display: grid;
-		grid-template-columns: 220px minmax(0, 1fr);
-		gap: 4px 24px;
-		padding: 14px 0;
-		border-bottom: 1px solid var(--hairline);
-	}
-
-	.row__name {
+	.member-index__group {
+		padding-top: 3px;
 		font-family: var(--font-mono);
-		font-size: 13.5px;
-		color: var(--text-strong);
-		overflow-wrap: anywhere;
+		font-size: 10.5px;
+		line-height: 1.5;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		text-decoration: none;
+		color: var(--text-faint);
 	}
 
-	.row__name:hover {
+	.member-index__group:hover {
 		color: var(--accent);
 	}
 
-	.row__summary {
-		font-size: 15px;
-		line-height: 1.6;
-		color: var(--text-muted);
-		text-wrap: pretty;
+	.member-index__names {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		gap: 2px 16px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
 	}
 
-	.row__summary :global(code) {
+	.member-index__names > li {
+		padding-left: 0;
+	}
+
+	.member-index__names > li::before {
+		content: none;
+	}
+
+	.member-index__name {
 		font-family: var(--font-mono);
-		font-size: 0.88em;
+		font-size: 13.5px;
+		line-height: 1.7;
+		text-decoration: none;
 		color: var(--text-strong);
 	}
 
+	.member-index__name:hover {
+		color: var(--accent);
+	}
+
+	.member-index__name--quiet {
+		color: var(--text-muted);
+	}
+
+	.member-index__note {
+		margin-left: 6px;
+		font-family: var(--font-mono);
+		font-size: 11.5px;
+		color: var(--text-faint);
+	}
+
 	@media (max-width: 800px) {
-		.members {
-			margin-top: 40px;
+		.member-index {
+			padding: 2px 14px;
 		}
 
-		.row {
+		.member-index__row {
 			grid-template-columns: minmax(0, 1fr);
-			gap: 5px;
-			padding: 12px 0;
-		}
-
-		.row__summary {
-			font-size: 14.5px;
+			gap: 4px;
 		}
 	}
 </style>

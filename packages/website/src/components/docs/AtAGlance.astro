@@ -1,0 +1,237 @@
+---
+/*
+ * A type page's declarations in one block: what the type is declared as, what
+ * it conforms to, the refinements and views folded into the page, and the
+ * modes it hosts — each linked to the section that says more.
+ */
+
+import { Code } from "astro:components"
+
+import LibraryProse from "./LibraryProse.astro"
+import { ESSENCE_LANG, ESSENCE_THEMES } from "./essenceLang.ts"
+import { firstSentence, libraryPage } from "./library.ts"
+
+interface Props {
+	/** The page's slug: `list` for `/docs/library/list`. */
+	page: string
+}
+
+let { page } = Astro.props
+let manifest = libraryPage(page)
+let members = manifest.groups.flatMap((group) => group.members)
+let statics = members.every(
+	(member) => member.kind === "static method" || member.kind === "property",
+)
+let groupOf = (namespace: string) =>
+	manifest.groups.find((group) =>
+		group.members.some((member) => member.namespace === namespace),
+	)
+let code = { lang: ESSENCE_LANG, themes: ESSENCE_THEMES, defaultColor: false as const }
+---
+
+<dl class="glance">
+	<div class="glance__row">
+		<dt>Declared</dt>
+		<dd>
+			<Code code={manifest.declaration} {...code} inline />
+			{
+				manifest.kind === "namespace" && statics && (
+					<p class="glance__note">
+						No <code>for</code> type, so every member is a static:{" "}
+						<code>{manifest.title}.{members[0]?.name ?? ""}(…)</code>.
+					</p>
+				)
+			}
+			{
+				manifest.kind === "function family" && (
+					<p class="glance__note">
+						{members.length} entries, told apart by the labels a call writes.
+					</p>
+				)
+			}
+		</dd>
+	</div>
+
+	{
+		manifest.conformsTo.length > 0 && (
+			<div class="glance__row">
+				<dt>Conforms to</dt>
+				<dd>
+					<ul class="glance__list">
+						{manifest.conformsTo.map((clause) => (
+							<li>
+								<a href={`/docs/library/protocols#${clause.protocol}`}>
+									<code>{clause.protocol}</code>
+								</a>
+								{clause.condition !== null && (
+									<>
+										{" "}
+										where <code>{clause.condition}</code>
+									</>
+								)}
+							</li>
+						))}
+					</ul>
+				</dd>
+			</div>
+		)
+	}
+
+	{
+		manifest.refinements.length > 0 && (
+			<div class="glance__row">
+				<dt>Refinements</dt>
+				<dd>
+					<ul class="glance__list">
+						{manifest.refinements.map((refinement) => (
+							<li>
+								<a href={`#${refinement.name}`}>
+									<Code code={refinement.declaration} {...code} inline />
+								</a>
+								<span class="glance__note">
+									<LibraryProse
+										text={firstSentence(refinement.description)}
+										inline
+									/>
+								</span>
+							</li>
+						))}
+					</ul>
+				</dd>
+			</div>
+		)
+	}
+
+	{
+		manifest.views.length > 0 && (
+			<div class="glance__row">
+				<dt>Views</dt>
+				<dd>
+					<ul class="glance__list">
+						{manifest.views.map((view) => {
+							let group = groupOf(view.namespace)
+
+							return (
+								<li>
+									<code>{view.namespace}</code> for{" "}
+									<Code code={view.target} {...code} inline />
+									{group !== undefined && (
+										<span class="glance__note">
+											{" "}
+											in <a href={`#${group.id}`}>{group.label}</a>
+										</span>
+									)}
+								</li>
+							)
+						})}
+					</ul>
+					<p class="glance__note">
+						A value of the type a view is for has the view's methods as its own.
+					</p>
+				</dd>
+			</div>
+		)
+	}
+
+	{
+		manifest.modes.length > 0 && (
+			<div class="glance__row">
+				<dt>Modes</dt>
+				<dd>
+					<ul class="glance__list">
+						{manifest.modes.map((mode) => (
+							<li>
+								<a href={`#${mode.name}`}>
+									<code>{mode.name}</code>
+								</a>
+								<span class="glance__note">
+									<LibraryProse text={firstSentence(mode.description)} inline />
+								</span>
+							</li>
+						))}
+					</ul>
+				</dd>
+			</div>
+		)
+	}
+</dl>
+
+<style>
+	.glance {
+		margin-top: 18px;
+		border-top: 1px solid var(--hairline-soft);
+	}
+
+	.glance__row {
+		display: grid;
+		grid-template-columns: 130px minmax(0, 1fr);
+		gap: 4px 20px;
+		padding: 14px 0;
+		border-bottom: 1px solid var(--hairline-softest);
+	}
+
+	.glance dt {
+		padding-top: 3px;
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-faint);
+	}
+
+	.glance dd {
+		margin: 0;
+		min-width: 0;
+		font-size: 15px;
+		line-height: 1.6;
+		overflow-wrap: anywhere;
+	}
+
+	.glance dd :global(code) {
+		font-family: var(--font-mono);
+		font-size: 13.5px;
+	}
+
+	/* Inside `.prose`: no dash markers and no column gap for these lists. */
+	.glance__list {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.glance__list > li {
+		padding-left: 0;
+	}
+
+	.glance__list > li::before {
+		content: none;
+	}
+
+	.glance__note {
+		color: var(--text-muted);
+	}
+
+	.glance__list .glance__note::before {
+		content: " — ";
+		color: var(--text-faintest);
+	}
+
+	.glance__list .glance__note:has(> a:first-child)::before,
+	.glance__list li > .glance__note:first-child::before {
+		content: none;
+	}
+
+	p.glance__note {
+		margin-top: 6px;
+		font-size: 14px;
+	}
+
+	@media (max-width: 800px) {
+		.glance__row {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+</style>

@@ -1,0 +1,193 @@
+---
+/*
+ * One Protocol, on the Protocols page: what it is (its own `§§`), its
+ * declaration, what a conformer has to write and what it gets for nothing,
+ * what answers it without declaring it, who in the standard library
+ * conforms, and which methods demand it of their arguments.
+ *
+ * A provided method's heading lives on each type page that receives it. One
+ * no Namespace receives has its heading here instead, below this section, and
+ * is linked rather than repeated.
+ */
+
+import EntryList from "./EntryList.astro"
+import LibraryProse from "./LibraryProse.astro"
+import SignatureBlock from "./SignatureBlock.astro"
+import { libraryPage } from "./library.ts"
+
+interface Props {
+	name: string
+}
+
+let { name } = Astro.props
+let manifest = libraryPage("protocols")
+let protocol = manifest.protocols.find((candidate) => candidate.name === name)
+let group = manifest.groups.find((candidate) => candidate.label === name)
+
+if (protocol === undefined || group === undefined) {
+	throw new Error(
+		`library/protocols has a section for ${name}, but its manifest does not list the Protocol.`,
+	)
+}
+
+let requirements = group.members.filter(
+	(member) => member.origin === "requirement",
+)
+let provided = group.members.filter(
+	(member) =>
+		member.origin === "provided" && !protocol.headed.includes(member.name),
+)
+---
+
+<LibraryProse text={protocol.description} />
+
+<SignatureBlock
+	signature={protocol.declaration}
+	variant="compact"
+	label="Declaration"
+	links={manifest.links}
+/>
+
+{
+	protocol.extends.length > 0 && (
+		<p>
+			Extends{" "}
+			{protocol.extends.map((parent, index) => (
+				<>
+					{index > 0 && ", "}
+					<a href={`#${parent}`}>
+						<code>{parent}</code>
+					</a>
+				</>
+			))}
+			: a conformance to <code>{protocol.name}</code> brings everything that
+			protocol provides as well.
+		</p>
+	)
+}
+
+{
+	requirements.length > 0 && (
+		<>
+			<p class="protocol__label">Requires</p>
+			<EntryList members={requirements} links={manifest.links} origins={false} />
+		</>
+	)
+}
+
+{
+	provided.length > 0 && (
+		<>
+			<p class="protocol__label">Provides</p>
+			<EntryList members={provided} links={manifest.links} origins={false} />
+		</>
+	)
+}
+
+{
+	protocol.headed.length > 0 && (
+		<p>
+			Provides{" "}
+			{protocol.headed.map((method, index) => (
+				<>
+					{index > 0 && ", "}
+					<a href={`#${method}`}>
+						<code>{method}</code>
+					</a>
+				</>
+			))}
+			, with {protocol.headed.length === 1 ? "its" : "their"} own entry below.
+		</p>
+	)
+}
+
+{protocol.notes.map((note) => <LibraryProse text={note} />)}
+
+{
+	protocol.derivedFor.length > 0 && (
+		<p class="protocol__row">
+			<span class="protocol__label">Derived for</span>{" "}
+			{protocol.derivedFor.map((link, index) => (
+				<>
+					{index > 0 && ", "}
+					<a href={link.href}>
+						<code>{link.label}</code>
+					</a>
+				</>
+			))}
+		</p>
+	)
+}
+
+{
+	protocol.conformers.length > 0 ? (
+		<p class="protocol__row">
+			<span class="protocol__label">Conforming</span>{" "}
+			{protocol.conformers.map((link, index) => (
+				<>
+					{index > 0 && ", "}
+					<a href={link.href}>
+						<code>{link.label}</code>
+					</a>
+					{link.via !== null && (
+						<>
+							{" "}
+							(through <code>{link.via}</code>)
+						</>
+					)}
+					{link.condition !== null && (
+						<>
+							{" "}
+							where <code>{link.condition}</code>
+						</>
+					)}
+				</>
+			))}
+		</p>
+	) : (
+		protocol.derivedFor.length === 0 && (
+			<p>No namespace in the standard library conforms to it.</p>
+		)
+	)
+}
+
+{
+	protocol.requiredBy.length > 0 && (
+		<p class="protocol__row">
+			<span class="protocol__label">Required by</span>{" "}
+			{protocol.requiredBy.map((link, index) => (
+				<>
+					{index > 0 && ", "}
+					<a href={link.href}>
+						<code>{link.label}</code>
+					</a>
+				</>
+			))}
+		</p>
+	)
+}
+
+<style>
+	.protocol__label {
+		margin-top: 22px;
+		margin-right: 4px;
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-faintest);
+	}
+
+	.protocol__row {
+		font-size: 15px;
+		line-height: 1.75;
+	}
+
+	.protocol__row .protocol__label {
+		margin-top: 0;
+	}
+
+	.protocol__row code {
+		font-size: 13px;
+	}
+</style>

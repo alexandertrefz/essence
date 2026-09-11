@@ -1,0 +1,89 @@
+---
+/*
+ * One checked refinement folded into a type page: its declaration, what it
+ * buys (its own `§§`), the members above that return something tighter on it,
+ * and every method in the library that returns it — so a reader who lands on
+ * `#NonEmptyList` from a diagnostic sees exactly what the proof changes and
+ * where one comes from.
+ */
+
+import LibraryProse from "./LibraryProse.astro"
+import SignatureBlock from "./SignatureBlock.astro"
+import { libraryPage } from "./library.ts"
+
+interface Props {
+	/** The page's slug: `list` for `/docs/library/list`. */
+	page: string
+	name: string
+}
+
+let { page, name } = Astro.props
+let manifest = libraryPage(page)
+let refinement = manifest.refinements.find((candidate) => candidate.name === name)
+
+if (refinement === undefined) {
+	throw new Error(
+		`library/${page} has a heading for the refinement ${name}, but its manifest does not list it.`,
+	)
+}
+---
+
+<SignatureBlock
+	signature={refinement.declaration}
+	variant="compact"
+	links={manifest.links}
+/>
+
+<LibraryProse text={refinement.description} />
+
+{
+	refinement.tightens.length > 0 && (
+		<p class="refinement__row">
+			<span class="refinement__label">Tighter here</span>{" "}
+			{refinement.tightens.map((heading, index) => (
+				<>
+					{index > 0 && ", "}
+					<a href={`#${heading}`}>
+						<code>{heading}</code>
+					</a>
+				</>
+			))}
+		</p>
+	)
+}
+
+{
+	refinement.answeredBy.length > 0 && (
+		<p class="refinement__row">
+			<span class="refinement__label">Returned by</span>{" "}
+			{refinement.answeredBy.map((link, index) => (
+				<>
+					{index > 0 && ", "}
+					<a href={link.href}>
+						<code>{link.label}</code>
+					</a>
+				</>
+			))}
+		</p>
+	)
+}
+
+<style>
+	.refinement__row {
+		font-size: 15px;
+		line-height: 1.75;
+	}
+
+	.refinement__label {
+		margin-right: 4px;
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-faintest);
+	}
+
+	.refinement__row code {
+		font-size: 13px;
+	}
+</style>

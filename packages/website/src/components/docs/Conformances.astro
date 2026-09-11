@@ -7,6 +7,9 @@
  * `Comparable`, and it is the one that explains why sorting a List of Records
  * is a compile error while sorting a List of Integers is not. Flattening the
  * two into one chip would hide exactly the thing worth reading.
+ *
+ * Each Protocol links to its section on the Protocols page, which says what it
+ * requires, what it provides, and who else conforms.
  */
 
 interface Props {
@@ -31,7 +34,12 @@ function split(entry: string): { protocol: string; condition: string | null } {
 			<ul class="chips">
 				{conformsTo.map(split).map(({ protocol, condition }) => (
 					<li class="chip">
-						<span class="chip__protocol">{protocol}</span>
+						<a
+							class="chip__protocol"
+							href={`/docs/library/protocols#${protocol}`}
+						>
+							{protocol}
+						</a>
 						{condition !== null && (
 							<span class="chip__condition">where {condition}</span>
 						)}
@@ -76,8 +84,16 @@ function split(entry: string): { protocol: string; condition: string | null } {
 		font-size: 12px;
 	}
 
+	.chip:hover {
+		border-color: var(--accent-hover-border);
+	}
+
 	.chip__protocol {
 		color: var(--text-strong);
+	}
+
+	.chip__protocol:hover {
+		color: var(--accent);
 	}
 
 	.chip__condition {

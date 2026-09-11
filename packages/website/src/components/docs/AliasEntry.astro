@@ -1,0 +1,34 @@
+---
+/*
+ * One union alias a type page explains — `Number`, `Irrational`, `Scalar` on
+ * the Number page — as its declaration and its own `§§`.
+ */
+
+import LibraryProse from "./LibraryProse.astro"
+import SignatureBlock from "./SignatureBlock.astro"
+import { libraryPage } from "./library.ts"
+
+interface Props {
+	/** The page's slug: `number` for `/docs/library/number`. */
+	page: string
+	name: string
+}
+
+let { page, name } = Astro.props
+let manifest = libraryPage(page)
+let alias = manifest.tower.find((candidate) => candidate.name === name)
+
+if (alias === undefined) {
+	throw new Error(
+		`library/${page} has a heading for the alias ${name}, but its manifest does not list it.`,
+	)
+}
+---
+
+<SignatureBlock
+	signature={alias.declaration}
+	variant="compact"
+	links={manifest.links}
+/>
+
+{alias.description !== "" && <LibraryProse text={alias.description} />}

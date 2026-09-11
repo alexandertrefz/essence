@@ -13,18 +13,25 @@ import { type CollectionEntry, getCollection, render } from "astro:content"
 
 import CodeWindow from "../../components/CodeWindow.astro"
 import RichText from "../../components/RichText.astro"
+import AliasEntry from "../../components/docs/AliasEntry.astro"
+import AtAGlance from "../../components/docs/AtAGlance.astro"
 import Breadcrumbs from "../../components/docs/Breadcrumbs.astro"
 import Conformances from "../../components/docs/Conformances.astro"
+import MemberEntries from "../../components/docs/MemberEntries.astro"
 import MemberIndex from "../../components/docs/MemberIndex.astro"
+import ModeEntry from "../../components/docs/ModeEntry.astro"
 import Note from "../../components/docs/Note.astro"
 import PackageManagers from "../../components/docs/PackageManagers.astro"
 import ParamTable from "../../components/docs/ParamTable.astro"
 import PrevNext from "../../components/docs/PrevNext.astro"
+import ProtocolEntry from "../../components/docs/ProtocolEntry.astro"
+import RefinementEntry from "../../components/docs/RefinementEntry.astro"
 import SeeAlso from "../../components/docs/SeeAlso.astro"
 import SignatureBlock from "../../components/docs/SignatureBlock.astro"
 import StepItem from "../../components/docs/StepItem.astro"
 import Steps from "../../components/docs/Steps.astro"
 import StuckCard from "../../components/docs/StuckCard.astro"
+import { findLibraryPage } from "../../components/docs/library.ts"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import {
 	getCrumbs,
@@ -59,11 +66,16 @@ let toc = getToc(headings, entry.data.tocDepth)
 let isGuide = entry.data.template === "guide"
 let isType = entry.data.template === "type"
 /*
- * A type page wears the reference head — a mono title and its conformances —
- * and then goes on to do something no other template does, which is to publish
- * the index of its own Members. So the head is shared and the tail is not.
+ * A type page wears the reference head — a title and a lede — set in mono,
+ * with the kind of thing it documents beside the title and its conformances
+ * under the lede. Everything below is its generated body: the index, the
+ * groups and the member headings, drawn from the manifest the generator wrote
+ * beside the page.
  */
 let isReference = entry.data.template === "reference" || isType
+let library = isType
+	? findLibraryPage(entry.id.replace(/^library\//, ""))
+	: undefined
 
 // NOTE: `filePath` is relative to this package, which is not the repository
 // root — the blob URL has to put the package back in front of it.
@@ -82,11 +94,20 @@ let guideMeta = [
 ].filter((part) => part !== undefined)
 
 // The vocabulary MDX may use. Everything here is a component the templates own.
+// The library's own — `MemberIndex` through `ProtocolEntry` — draw a generated
+// type page from its manifest; no hand-written page has a manifest to give them.
 let components = {
+	AliasEntry,
+	AtAGlance,
 	CodeWindow,
+	MemberEntries,
+	MemberIndex,
+	ModeEntry,
 	Note,
 	PackageManagers,
 	ParamTable,
+	ProtocolEntry,
+	RefinementEntry,
 	SeeAlso,
 	SignatureBlock,
 	StepItem,
@@ -118,6 +139,9 @@ let components = {
 					<h1 class="ref__title" class:list={{ "ref__title--mono": isType }}>
 						{entry.data.title}
 					</h1>
+					{library !== undefined && (
+						<span class="ref__badge">{library.kind}</span>
+					)}
 					{
 						/*
 						 * `since` is not shown while there has only ever been one
@@ -134,11 +158,11 @@ let components = {
 
 				{isType && <Conformances conformsTo={entry.data.conformsTo} />}
 
-				<article class="prose ref__body">
+				<article
+					class:list={["prose", "ref__body", { "ref__body--type": isType }]}
+				>
 					<Content components={components} />
 				</article>
-
-				{isType && <MemberIndex parent={entry.id} />}
 			</>
 		) : (
 			<article class="prose">
@@ -235,6 +259,51 @@ let components = {
 	 */
 	.ref__body {
 		margin-top: 40px;
+	}
+
+	/*
+	 * A type page's body is a lookup table set as prose. Its groups are ruled
+	 * off from each other, and its member headings are names, so they are
+	 * code. The text of a heading carries the name verbatim in a span of its
+	 * own (`#firstItem`) beside the lowercase id Astro gives the heading
+	 * (`#firstitem`), and the span needs the heading's clearance under the
+	 * sticky header too.
+	 */
+	.ref__body--type {
+		margin-top: 28px;
+	}
+
+	.ref__body--type :global(h2) {
+		margin-top: 64px;
+		padding-top: 26px;
+		border-top: 1px solid var(--hairline-softest);
+	}
+
+	.ref__body--type :global(h3) {
+		margin-top: 48px;
+		font-family: var(--font-mono);
+		font-weight: 600;
+		font-size: 17.5px;
+		letter-spacing: 0;
+		color: var(--text-hero);
+	}
+
+	.ref__body--type :global(h2 + h3) {
+		margin-top: 30px;
+	}
+
+	.ref__body--type :global(:is(h2, h3) span[id]) {
+		scroll-margin-top: calc(var(--header-height-docs) + 24px);
+	}
+
+	@media (max-width: 800px) {
+		.ref__body--type :global(h3) {
+			font-size: 16px;
+		}
+
+		.ref__body--type :global(:is(h2, h3) span[id]) {
+			scroll-margin-top: calc(var(--header-height-mobile) + 40px + 12px);
+		}
 	}
 
 	@media (max-width: 800px) {

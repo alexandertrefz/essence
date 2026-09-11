@@ -1,0 +1,28 @@
+---
+/*
+ * What goes under one member heading of a library page: every entry the page
+ * has for that name, across every Namespace the page folds, in the order the
+ * page lists them — the base Type first, then what answers more tightly.
+ */
+
+import EntryList from "./EntryList.astro"
+import { libraryPage, membersNamed } from "./library.ts"
+
+interface Props {
+	/** The page's slug: `list` for `/docs/library/list`. */
+	page: string
+	name: string
+}
+
+let { page, name } = Astro.props
+let manifest = libraryPage(page)
+let members = membersNamed(manifest, name)
+
+if (members.length === 0) {
+	throw new Error(
+		`library/${page} has a heading for ${name}, but its manifest has no member of that name. Run \`bun run docs:stdlib:sync\` in packages/website.`,
+	)
+}
+---
+
+<EntryList members={members} links={manifest.links} />

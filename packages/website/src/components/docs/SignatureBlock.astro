@@ -1,32 +1,65 @@
 ---
 /*
- * The accent-tinted signature card of screen 1h.
+ * A signature, highlighted with the real grammar rather than hand-coloured —
+ * a signature that stops parsing stops looking right, which is the point.
  *
- * The signature is real essence, so it is highlighted with the real grammar
- * rather than hand-coloured — a signature that stops parsing stops looking
- * right, which is the point.
+ * Three shapes. `card` is screen 1h's accent-tinted block. `compact` is one
+ * entry of a library page, dozens to a page, so it sits on the quieter code
+ * surface instead of the accent. `example` is an `@example` block from the
+ * standard library's sources.
+ *
+ * `links` turns a name in the code into a link to where it is documented — a
+ * refinement, a mode, a Protocol. The token that spells the name is wrapped
+ * rather than replaced, so it keeps the colour the grammar gave it.
  */
 
 import { Code } from "astro:components"
+import type { ShikiTransformer } from "shiki"
 
 import { ESSENCE_LANG, ESSENCE_THEMES } from "./essenceLang.ts"
 
 interface Props {
 	signature: string
 	label?: string
+	variant?: "card" | "compact" | "example"
+	links?: Record<string, string>
 }
 
-let { signature, label = "Signature" } = Astro.props
+let { signature, label, variant = "card", links = {} } = Astro.props
+let heading = label ?? (variant === "card" ? "Signature" : undefined)
+
+let linker: ShikiTransformer = {
+	name: "essence-library-links",
+	span(node) {
+		let text = node.children
+			.map((child) => (child.type === "text" ? child.value : ""))
+			.join("")
+			.trim()
+		let href = Object.hasOwn(links, text) ? links[text] : undefined
+
+		if (href !== undefined) {
+			node.children = [
+				{
+					type: "element",
+					tagName: "a",
+					properties: { href, class: "sig__link" },
+					children: node.children,
+				},
+			]
+		}
+	},
+}
 ---
 
-<div class="sig">
-	<div class="sig__label">{label}</div>
+<div class:list={["sig", `sig--${variant}`]}>
+	{heading !== undefined && <div class="sig__label">{heading}</div>}
 	<div class="sig__code code-bare">
 		<Code
 			code={signature.trim()}
 			lang={ESSENCE_LANG}
 			themes={ESSENCE_THEMES}
 			defaultColor={false}
+			transformers={Object.keys(links).length === 0 ? [] : [linker]}
 		/>
 	</div>
 </div>
@@ -60,6 +93,41 @@ let { signature, label = "Signature" } = Astro.props
 		--code-line-height: 24px;
 	}
 
+	/* An entry among dozens, and an example: the code surface, not the accent. */
+	.sig--compact,
+	.sig--example {
+		margin-top: 12px;
+		border-color: var(--code-border);
+		border-radius: 7px;
+		background: var(--code-bg);
+	}
+
+	.sig--compact .sig__label,
+	.sig--example .sig__label {
+		padding: 6px 14px;
+		border-bottom-color: var(--hairline-softest);
+		font-size: 10.5px;
+		color: var(--text-faint);
+	}
+
+	.sig--compact .sig__code,
+	.sig--example .sig__code {
+		--code-padding: 10px 14px;
+		--code-font-size: 13.5px;
+		--code-line-height: 22px;
+	}
+
+	.sig :global(.sig__link) {
+		color: inherit;
+		text-decoration: underline;
+		text-decoration-color: var(--accent-underline);
+		text-underline-offset: 3px;
+	}
+
+	.sig :global(.sig__link:hover) {
+		text-decoration-color: var(--accent);
+	}
+
 	@media (max-width: 800px) {
 		.sig {
 			margin-top: 20px;
@@ -69,6 +137,13 @@ let { signature, label = "Signature" } = Astro.props
 			--code-padding: 14px 16px;
 			--code-font-size: 13px;
 			--code-line-height: 22px;
+		}
+
+		.sig--compact .sig__code,
+		.sig--example .sig__code {
+			--code-padding: 9px 12px;
+			--code-font-size: 12.5px;
+			--code-line-height: 20px;
 		}
 	}
 </style>

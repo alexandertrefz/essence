@@ -5,16 +5,25 @@
  * A grid rather than a `<table>` so the three columns keep their widths while
  * a description wraps; each type is run through the essence grammar, which is
  * what gives it the same blue a type has everywhere else on the page.
+ *
+ * A Type that is documented somewhere — a mode such as `Rounding`, a
+ * refinement such as `PositiveInteger` — links there, and a default a caller
+ * may leave out follows the Type it defaults.
  */
 
 import { Code } from "astro:components"
 
+import LibraryProse from "./LibraryProse.astro"
 import { ESSENCE_LANG, ESSENCE_THEMES } from "./essenceLang.ts"
 
 export interface Param {
 	name: string
 	type: string
 	description: string
+	/** The `= …` a caller may leave out, as written. */
+	default?: string | null
+	/** Where the Type is documented. */
+	href?: string | null
 }
 
 interface Props {
@@ -35,15 +44,41 @@ let { params } = Astro.props
 			<div class="params__row">
 				<span class="params__name">{param.name}</span>
 				<span class="params__type">
-					<Code
-						code={param.type}
-						lang={ESSENCE_LANG}
-						themes={ESSENCE_THEMES}
-						defaultColor={false}
-						inline
-					/>
+					{param.href != null ? (
+						<a class="params__link" href={param.href}>
+							<Code
+								code={param.type}
+								lang={ESSENCE_LANG}
+								themes={ESSENCE_THEMES}
+								defaultColor={false}
+								inline
+							/>
+						</a>
+					) : (
+						<Code
+							code={param.type}
+							lang={ESSENCE_LANG}
+							themes={ESSENCE_THEMES}
+							defaultColor={false}
+							inline
+						/>
+					)}
+					{param.default != null && (
+						<span class="params__default">
+							{" = "}
+							<Code
+								code={param.default}
+								lang={ESSENCE_LANG}
+								themes={ESSENCE_THEMES}
+								defaultColor={false}
+								inline
+							/>
+						</span>
+					)}
 				</span>
-				<span class="params__description">{param.description}</span>
+				<span class="params__description">
+					<LibraryProse text={param.description} inline />
+				</span>
 			</div>
 		))
 	}
@@ -110,11 +145,32 @@ let { params } = Astro.props
 		color: var(--code-text);
 	}
 
+	/* The link is the Type itself, underlined, in the Type's own colours. */
+	.params__link {
+		text-decoration: underline;
+		text-decoration-color: var(--accent-underline);
+		text-underline-offset: 3px;
+	}
+
+	.params__link:hover {
+		text-decoration-color: var(--accent);
+	}
+
+	.params__default {
+		color: var(--text-faint);
+	}
+
 	.params__description {
 		font-size: 14.5px;
 		line-height: 1.55;
 		color: var(--text-muted);
 		text-wrap: pretty;
+	}
+
+	.params__description :global(code) {
+		font-family: var(--font-mono);
+		font-size: 0.9em;
+		color: var(--text-strong);
 	}
 
 	/*

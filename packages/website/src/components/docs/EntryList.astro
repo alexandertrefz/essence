@@ -1,0 +1,187 @@
+---
+/*
+ * The entries under one heading of a library page, member by member.
+ *
+ * One heading can collect several receivers — `firstItem` on `List<ItemType>`
+ * and, answering more tightly, on `NonEmptyList<ItemType>` — so each member
+ * opens with the receiver it is called on, and with the Protocol it comes
+ * from when nobody wrote it on this Type. Then its `overload` block's own
+ * description, where the set has one, and then every entry: signature, `§§`,
+ * Parameters, what it returns, and its examples.
+ */
+
+import type { ManifestMember } from "../../../scripts/libraryManifest.ts"
+import LibraryProse from "./LibraryProse.astro"
+import ParamTable from "./ParamTable.astro"
+import SignatureBlock from "./SignatureBlock.astro"
+
+interface Props {
+	members: ManifestMember[]
+	/** Names a signature links to where they are documented. */
+	links: Record<string, string>
+	/** Off inside a Protocol's own section, where the Protocol goes without saying. */
+	origins?: boolean
+}
+
+let { members, links, origins = true } = Astro.props
+
+function origin(member: ManifestMember): string | null {
+	if (!origins) {
+		return null
+	}
+
+	switch (member.origin) {
+		case "provided":
+			return "provided by"
+		case "derived":
+			return "derived from"
+		case "requirement":
+			return "required by"
+		default:
+			return null
+	}
+}
+---
+
+{
+	members.map((member) => {
+		let from = origin(member)
+		let protocol = member.protocol ?? ""
+
+		return (
+			<div class="member">
+				{(member.receiver !== null || from !== null) && (
+					<p class="member__on">
+						{member.receiver !== null && (
+							<>
+								on <code>{member.receiver}</code>
+							</>
+						)}
+						{from !== null && (
+							<span class="member__origin">
+								{member.receiver !== null && " · "}
+								{from}{" "}
+								<a href={links[protocol] ?? `/docs/library/protocols#${protocol}`}>
+									{protocol}
+								</a>
+								{member.condition !== null && (
+									<>
+										{" "}
+										where <code>{member.condition}</code>
+									</>
+								)}
+							</span>
+						)}
+					</p>
+				)}
+
+				{member.summary !== null && (
+					<div class="member__lede">
+						<LibraryProse text={member.summary} />
+					</div>
+				)}
+
+				{member.returns !== null && (
+					<p class="entry__returns">
+						<span class="entry__label">Returns</span>{" "}
+						<LibraryProse text={member.returns} inline />
+					</p>
+				)}
+
+				{member.examples.map((example) => (
+					<SignatureBlock
+						signature={example}
+						variant="example"
+						label="Example"
+						links={links}
+					/>
+				))}
+
+				{member.entries.map((entry) => (
+					<div class="entry">
+						<SignatureBlock
+							signature={entry.signature}
+							variant="compact"
+							links={links}
+						/>
+						{entry.summary !== "" && <LibraryProse text={entry.summary} />}
+						{entry.parameters.length > 0 && (
+							<ParamTable params={entry.parameters} />
+						)}
+						{entry.returns !== null && (
+							<p class="entry__returns">
+								<span class="entry__label">Returns</span>{" "}
+								<LibraryProse text={entry.returns} inline />
+							</p>
+						)}
+						{entry.examples.map((example) => (
+							<SignatureBlock
+								signature={example}
+								variant="example"
+								label="Example"
+								links={links}
+							/>
+						))}
+					</div>
+				))}
+			</div>
+		)
+	})
+}
+
+<style>
+	.member {
+		margin-top: 16px;
+	}
+
+	.member + .member {
+		margin-top: 30px;
+	}
+
+	.member__on {
+		margin-top: 0;
+		font-family: var(--font-mono);
+		font-size: 12.5px;
+		line-height: 1.6;
+		color: var(--text-faint);
+	}
+
+	.member__on code {
+		font-size: 1em;
+		color: var(--text-muted);
+	}
+
+	.member__origin a {
+		color: var(--text-muted);
+	}
+
+	.member__lede :global(p) {
+		color: var(--text-body-soft);
+	}
+
+	.entry {
+		margin-top: 14px;
+	}
+
+	.entry + .entry {
+		margin-top: 26px;
+	}
+
+	.entry :global(p) {
+		margin-top: 10px;
+	}
+
+	.entry__returns {
+		font-size: 15px;
+		line-height: 1.6;
+	}
+
+	.entry__label {
+		margin-right: 4px;
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-faintest);
+	}
+</style>

@@ -1,0 +1,73 @@
+---
+/*
+ * `§§` text as a reader sees it: paragraphs, `code` spans and [links](…),
+ * which is all the standard library's doc comments and the generated notes
+ * ever use. Split rather than parsed as Markdown, and nothing is set as HTML.
+ *
+ * `inline` renders one run of text with no paragraph around it, for a table
+ * cell or the end of a sentence the caller started.
+ */
+
+interface Props {
+	text: string
+	inline?: boolean
+}
+
+let { text, inline = false } = Astro.props
+
+type Piece =
+	| { kind: "text"; value: string }
+	| { kind: "code"; value: string }
+	| { kind: "link"; href: string; pieces: Piece[] }
+
+function pieces(run: string): Piece[] {
+	let found: Piece[] = []
+	let last = 0
+
+	// A code span is tried first at every position, so a bracket inside one
+	// stays code.
+	for (let match of run.matchAll(/`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)/g)) {
+		if (match.index > last) {
+			found.push({ kind: "text", value: run.slice(last, match.index) })
+		}
+
+		found.push(
+			match[1] !== undefined
+				? { kind: "code", value: match[1] }
+				: { kind: "link", href: match[3]!, pieces: pieces(match[2]!) },
+		)
+		last = match.index + match[0].length
+	}
+
+	if (last < run.length) {
+		found.push({ kind: "text", value: run.slice(last) })
+	}
+
+	return found
+}
+
+let paragraphs = (inline ? [text.replace(/\s+/g, " ")] : text.split(/\n{2,}/))
+	.map((paragraph) => paragraph.trim())
+	.filter((paragraph) => paragraph !== "")
+	.map(pieces)
+---
+
+{
+	paragraphs.map((run) => {
+		let content = run.map((piece) =>
+			piece.kind === "text" ? (
+				piece.value
+			) : piece.kind === "code" ? (
+				<code>{piece.value}</code>
+			) : (
+				<a href={piece.href}>
+					{piece.pieces.map((inner) =>
+						inner.kind === "code" ? <code>{inner.value}</code> : inner.kind === "text" ? inner.value : null,
+					)}
+				</a>
+			),
+		)
+
+		return inline ? <>{content}</> : <p>{content}</p>
+	})
+}

@@ -1,0 +1,102 @@
+---
+/*
+ * One mode a type page hosts — a Choice a method takes to decide how it works,
+ * such as `Rounding` or `SortOrder`. Its declaration, its cases with its own
+ * `§§` describing them, and every entry in the library that takes it, with the
+ * default each one falls back to.
+ */
+
+import LibraryProse from "./LibraryProse.astro"
+import SignatureBlock from "./SignatureBlock.astro"
+import { libraryPage } from "./library.ts"
+
+interface Props {
+	/** The page's slug: `rational` for `/docs/library/rational`. */
+	page: string
+	name: string
+}
+
+let { page, name } = Astro.props
+let manifest = libraryPage(page)
+let mode = manifest.modes.find((candidate) => candidate.name === name)
+
+if (mode === undefined) {
+	throw new Error(
+		`library/${page} has a heading for the mode ${name}, but its manifest does not list it.`,
+	)
+}
+---
+
+<SignatureBlock
+	signature={mode.declaration}
+	variant="compact"
+	links={manifest.links}
+/>
+
+<LibraryProse text={mode.description} />
+
+<p class="mode__row">
+	<span class="mode__label">Cases</span>{" "}
+	{
+		mode.cases.map((entry, index) => (
+			<>
+				{index > 0 && ", "}
+				<code>
+					#{entry.name}
+					{entry.payload === null ? "" : ` ${entry.payload}`}
+				</code>
+			</>
+		))
+	}
+</p>
+
+{
+	mode.takenBy.length > 0 && (
+		<>
+			<p class="mode__row">
+				<span class="mode__label">Taken by</span>
+			</p>
+			<ul class="mode__taken">
+				{mode.takenBy.map((link) => (
+					<li>
+						<a href={link.href}>
+							<code>{link.label}</code>
+						</a>
+						{link.default !== null && (
+							<>
+								, default <code>{link.default}</code>
+							</>
+						)}
+					</li>
+				))}
+			</ul>
+		</>
+	)
+}
+
+<style>
+	.mode__row {
+		font-size: 15px;
+		line-height: 1.75;
+	}
+
+	.mode__label {
+		margin-right: 4px;
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-faintest);
+	}
+
+	.mode__taken {
+		margin-top: 8px;
+		gap: 4px;
+		font-size: 15px;
+	}
+
+	.mode__taken code,
+	.mode__row code {
+		font-size: 13px;
+	}
+</style>
