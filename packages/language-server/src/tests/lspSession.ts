@@ -269,6 +269,36 @@ export function startSession() {
 
 			return testRuns.filter((run) => run.kind === "end")
 		},
+		// NOTE: The finished run the Server ANSWERED a request with, waited for
+		// by the number it answered with rather than by its ordinal among the
+		// runs the session has seen. A session runs on its own account as well
+		// — an edit, a settings change, a folder arriving — so "the second run
+		// that ended" and "the run this request asked for" are two questions,
+		// and only one of them is what a test asking about a request means.
+		//
+		// The deadline throws, for the reason `waitForTestRuns` above gives.
+		waitForTestRun: async (run: number, timeout = 60_000) => {
+			let deadline = Date.now() + timeout
+			let ended = () =>
+				testRuns.find(
+					(notification) =>
+						notification.kind === "end" && notification.run === run,
+				)
+
+			while (ended() === undefined && Date.now() < deadline) {
+				await new Promise((resolve) => setTimeout(resolve, 25))
+			}
+
+			let found = ended()
+
+			if (found === undefined) {
+				throw new Error(
+					`test run ${run} did not end within ${timeout} ms`,
+				)
+			}
+
+			return found
+		},
 		publishCount: () => publishCount,
 		publishesSince: (mark: number) => publishLog.slice(mark),
 		publishMark: () => publishLog.length,

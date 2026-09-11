@@ -254,13 +254,19 @@ describe("The Server's live test session", () => {
 
 		expect(second?.ids).toHaveLength(1)
 
-		await session.request<{ run: number | null }>(
+		let { result } = await session.request<{ run: number | null }>(
 			{ method: "essence/runTests" },
 			{ ids: second?.ids, files: [pathOf("Season.tests.es")] },
 		)
 
-		let runs = await session.waitForTestRuns(2)
-		let started = (runs[1]?.events ?? []).filter(
+		expect(result.run).not.toBeNull()
+
+		// NOTE: Waited for by the NUMBER the request answered with. The session
+		// runs on its own account too, so a run of its own slipping in between
+		// would make the second run to end somebody else's — and the assertion
+		// below would then be about a batch nobody narrowed.
+		let ended = await session.waitForTestRun(result.run as number)
+		let started = ended.events.filter(
 			(event) => event.kind === "test-start",
 		)
 
