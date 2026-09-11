@@ -299,6 +299,47 @@ export function startSession() {
 
 			return found
 		},
+		// NOTE: The same question asked of a run NOBODY numbered — one an edit
+		// caused rather than one a request answered with an ordinal. A session
+		// defers a cycle it was asked for while another was in flight and arms
+		// it the moment that one ends, so opening a file ends two runs of the
+		// same text: the scan's, and the one the overlay asked for. A test that
+		// waits for "the second run to end" and then asks what the edit it made
+		// in between did is therefore asking about the DEFERRED cycle whenever
+		// the machine is slow enough for that window to fire first — a truth
+		// about the runner rather than about the Server, and one that reads as
+		// a flake.
+		//
+		// So the wait is over what a run SAYS, the way `waitForCodeToClear`
+		// waits over the state rather than over a length of time.
+		//
+		// The deadline throws, for the reason `waitForTestRuns` above gives.
+		waitForTestRunWhere: async (
+			description: string,
+			matches: (run: TestRunNotification) => boolean,
+			timeout = 60_000,
+		) => {
+			let deadline = Date.now() + timeout
+			let ended = () =>
+				testRuns.find(
+					(notification) =>
+						notification.kind === "end" && matches(notification),
+				)
+
+			while (ended() === undefined && Date.now() < deadline) {
+				await new Promise((resolve) => setTimeout(resolve, 25))
+			}
+
+			let found = ended()
+
+			if (found === undefined) {
+				throw new Error(
+					`no test run ${description} ended within ${timeout} ms`,
+				)
+			}
+
+			return found
+		},
 		publishCount: () => publishCount,
 		publishesSince: (mark: number) => publishLog.slice(mark),
 		publishMark: () => publishLog.length,

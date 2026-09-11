@@ -197,9 +197,18 @@ describe("The Server's live test session", () => {
 		await session.waitForTestRuns(1)
 		await session.change(pathOf("Season.tests.es"), failing)
 
-		let runs = await session.waitForTestRuns(2)
+		// NOTE: For the run that SAW the edit rather than for the second run to
+		// end. Opening a file ends two runs of the same text — the scan's, and
+		// the cycle the overlay asked for, which the scan's own run deferred —
+		// so on a machine slow enough for that deferred window to fire before
+		// the edit lands, "the second run" is a run of the text before it. See
+		// `waitForTestRunWhere`.
+		let run = await session.waitForTestRunWhere(
+			"reporting the edit's failure",
+			(ended) => ended.counts.failed > 0,
+		)
 
-		expect(runs[1]).toMatchObject({
+		expect(run).toMatchObject({
 			reason: "change",
 			counts: { failed: 1 },
 		})
