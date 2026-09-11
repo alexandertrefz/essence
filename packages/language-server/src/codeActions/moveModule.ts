@@ -5,10 +5,13 @@ import type { common, parser } from "@essence-lang/interfaces"
 import {
 	insertExportEdit,
 	insertImportEdit,
+	insertImportsEdit,
 	relativeSpecifier,
+	spellNames,
 } from "../autoImport"
 import { isSamePosition } from "../positions"
 import {
+	type Declaration,
 	type DeclarationKind,
 	type ProgramIndex,
 	type RenameIndex,
@@ -23,6 +26,7 @@ import {
 	sliceOf,
 } from "./geometry"
 import type { CodeActionEdit, CodeActionEntry } from "./index"
+import { walk } from "./lookups"
 
 // NOTE: The one refactoring here that edits files the reader never opened —
 // three of them in the ordinary case: the Module the Declaration leaves, the
@@ -89,6 +93,10 @@ type Move = {
 	// it and belongs to it.
 	span: common.Position
 	text: string
+	// NOTE: The names the Statement READS that this Module publishes. They are
+	// in scope where it stands because it is written here; where it lands they
+	// are an import, which is the entry the move writes into the target.
+	needed: Array<string>
 	removal: CodeActionEdit
 	// NOTE: The edit that stops this Module publishing it, and null where this
 	// Module never did — which is also what says whether the Module it lands in
@@ -173,8 +181,9 @@ function movableAt(
 		// request whose range touches a Declaration's name — which a
 		// whole-document request is, for the first Declaration in the file.
 		let { index } = indexed()
+		let needed = readsMovableNames(program, index, span)
 
-		if (!readsMovableNames(program, index, span)) {
+		if (needed === null) {
 			return null
 		}
 
@@ -193,6 +202,7 @@ function movableAt(
 			context,
 			lines,
 			name,
+			needed,
 			span,
 			text: sliceOf(lines, {
 				start: { line: span.start.line, column: 1 },
@@ -240,13 +250,17 @@ function declarationOf(node: parser.ImplementationNode): Declared | null {
 	}
 }
 
-// NOTE: THE refusal. Every name the Statement reads has to mean the same thing
-// in the Module it lands in, and there are exactly four ways it can: it is a
-// builtin, it is something this file imports, it is declared inside the
-// Statement itself, or it is something this file publishes — which the Module it
-// lands in can then import back. A name this file keeps to itself is none of
-// them, and moving the Statement away from it would be moving it away from what
-// it means.
+// NOTE: THE refusal, and what the move OWES the Module it lands in. Every name
+// the Statement reads has to mean the same thing there, and there are exactly
+// four ways it can: it is a builtin, it is something this file imports, it is
+// declared inside the Statement itself, or it is something this file publishes
+// — which the Module it lands in can then import back, and does. A name this
+// file keeps to itself is none of them, and moving the Statement away from it
+// would be moving it away from what it means.
+//
+// Null is the refusal; otherwise the published names the Statement reads, which
+// are the entries the target has to be given. Both come off one walk because
+// they are one question asked of each name.
 //
 // Read off the rename index rather than off the Statement's Nodes, because
 // "what does this name resolve to" is the question the index exists to answer,
@@ -255,36 +269,121 @@ function readsMovableNames(
 	program: parser.Program,
 	index: RenameIndex,
 	span: common.Position,
-): boolean {
+): Array<string> | null {
 	let published = new Set(
 		(program.exports?.entries ?? [])
 			.filter((entry) => entry.source === null)
 			.map((entry) => entry.name.content),
 	)
+	let needed = new Set<string>()
 
-	return index.every((occurrence) => {
+	for (let occurrence of index) {
 		let declaration = occurrence.declaration
 
+		if (!containsRange(span, occurrence.position)) {
+			continue
+		}
+
+		// NOTE: A Method is reached through a TYPE rather than by name, so it
+		// is not one of the names a Statement carries — but the NAMESPACE that
+		// declares it is reached by name, and a Namespace this file keeps to
+		// itself is out of scope where the Statement lands. `n::doubled()`
+		// moved away from a private `namespace IntegerExtras for Integer` is
+		// `unknown-method` in a file the reader never opened.
 		if (
-			!containsRange(span, occurrence.position) ||
-			!isLexical(declaration.kind)
+			declaration.kind === "method" ||
+			declaration.kind === "staticMethod"
 		) {
-			return true
+			let reached = namespaceReach(program, published, span, declaration)
+
+			if (reached === null) {
+				return null
+			}
+
+			if (reached.imported !== null) {
+				needed.add(reached.imported)
+			}
+
+			continue
+		}
+
+		if (!isLexical(declaration.kind)) {
+			continue
 		}
 
 		if (declaration.builtin || declaration.kind === "import") {
-			return true
+			continue
 		}
 
 		if (declaration.definition === null) {
-			return false
+			return null
 		}
 
-		return (
-			containsRange(span, declaration.definition) ||
-			published.has(occurrence.name)
-		)
+		if (containsRange(span, declaration.definition)) {
+			continue
+		}
+
+		if (!published.has(occurrence.name)) {
+			return null
+		}
+
+		needed.add(occurrence.name)
+	}
+
+	return [...needed]
+}
+
+// NOTE: Whether the Namespace a dispatch resolved to is one the Module it lands
+// in can see, and what it costs the target to see it: null to refuse, and
+// otherwise the name the target has to import, or null again where it has
+// nothing to import — a builtin Namespace, or one the Statement takes with it.
+//
+// A Method whose declaration this file does not hold at all — one another
+// Module declares, reached through an import — is left alone: the entry that
+// brought it is a name of its own, and the walk above already asked about it.
+function namespaceReach(
+	program: parser.Program,
+	published: Set<string>,
+	span: common.Position,
+	declaration: Declaration,
+): { imported: string | null } | null {
+	if (declaration.builtin || declaration.definition === null) {
+		return { imported: null }
+	}
+
+	let namespace = namespaceHolding(program, declaration.definition)
+
+	if (namespace === null) {
+		return { imported: null }
+	}
+
+	if (containsRange(span, namespace.position)) {
+		return { imported: null }
+	}
+
+	return published.has(namespace.name.content)
+		? { imported: namespace.name.content }
+		: null
+}
+
+// NOTE: The innermost Namespace written around a Position, or null where none
+// is — a Method declared by an imported Module has no Namespace in this tree.
+function namespaceHolding(
+	program: parser.Program,
+	position: common.Position,
+): parser.NamespaceDefinitionStatementNode | null {
+	let found: parser.NamespaceDefinitionStatementNode | null = null
+
+	walk(program, (node) => {
+		if (
+			node.nodeType === "NamespaceDefinitionStatement" &&
+			containsRange(node.position, position)
+		) {
+			found = node
+		}
 	})
+
+	return found
 }
 
 // NOTE: The kinds a Module binds by NAME, which are the ones a Statement takes
@@ -595,6 +694,21 @@ function landingEdits(
 	let sourceText = target.sourceText
 	let program = target.program
 
+	// NOTE: What the Statement reads and no longer stands beside. Written from
+	// the target back to the Module the Declaration is leaving, which goes on
+	// publishing those names — they are exported by construction, since that is
+	// the only reason the move was offered at all.
+	let broughtAlong =
+		move.needed.length === 0
+			? null
+			: {
+					names: move.needed,
+					specifier: relativeSpecifier(
+						target.filePath,
+						move.context.filePath,
+					),
+				}
+
 	// NOTE: A Module that is not there yet and a file holding nothing but
 	// whitespace are one case: there is no implementation block to append to, so
 	// what lands is a whole Program.
@@ -614,7 +728,7 @@ function landingEdits(
 									column: (lines.at(-1) ?? "").length + 1,
 								},
 				},
-				newText: moduleText(move, publish),
+				newText: moduleText(move, publish, broughtAlong),
 				filePath: target.filePath,
 				...(sourceText === null ? { createFile: true } : {}),
 			},
@@ -673,13 +787,32 @@ function landingEdits(
 		}
 	}
 
+	if (broughtAlong !== null) {
+		let edit = insertImportsEdit(sourceText, program, broughtAlong)
+
+		if (edit !== null) {
+			edits.push({ ...edit, filePath: target.filePath })
+		}
+	}
+
 	return edits
 }
 
-function moduleText(move: Move, publish: boolean): string {
+function moduleText(
+	move: Move,
+	publish: boolean,
+	broughtAlong: { names: Array<string>; specifier: string } | null,
+): string {
 	let exported = publish ? `\nexport {\n\t${move.name}\n}\n` : ""
+	let imported =
+		broughtAlong === null
+			? ""
+			: `import {\n\t${spellNames(
+					broughtAlong.names,
+					broughtAlong.specifier,
+				)}\n}\n\n`
 
-	return `implementation {\n${move.text}\n}\n${exported}`
+	return `${imported}implementation {\n${move.text}\n}\n${exported}`
 }
 
 // NOTE: An entry that named the Declaration in the Module it is leaving, made to

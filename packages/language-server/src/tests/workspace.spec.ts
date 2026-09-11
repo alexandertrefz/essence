@@ -2783,6 +2783,190 @@ describe("Workspace", () => {
 				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
 			})
 
+			// NOTE: A name the Statement reads is in scope where it stands
+			// because this Module declares it; where it LANDS it is an import,
+			// and the move is what has to write it. Without that the target is
+			// left at `unknown-name` in a file the reader never opened.
+			it("should import what the Declaration reads into the Module it lands in", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tconstant STEP = 2",
+						"",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- n::multiply(with STEP)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tSTEP",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					4,
+					"run",
+					"Move 'run' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[pathOf("B.es")]).toBe(
+					[
+						"import {",
+						'\tfrom "./A.es" { STEP }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- n::multiply(with STEP)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
+			})
+
+			// NOTE: A Type is one of those names too, and a Module the file
+			// writes from scratch takes the block with the rest of the Program.
+			it("should import a Type into the Module it writes", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\ttype Crate = { count: Integer }",
+						"",
+						"\tfunction sized(_ crate: Crate) -> Integer {",
+						"\t\t<- crate.count",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tCrate",
+						"\tsized",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					4,
+					"sized",
+					"Move 'sized' to a new Module",
+				)
+				let written = move.edits.find(
+					(edit) => edit.createFile === true,
+				)
+
+				expect(written?.newText).toBe(
+					[
+						"import {",
+						'\tfrom "./A.es" { Crate }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction sized(_ crate: Crate) -> Integer {",
+						"\t\t<- crate.count",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tsized",
+						"}",
+						"",
+					].join("\n"),
+				)
+			})
+
+			// NOTE: A Method is reached through a TYPE, so it is not a name the
+			// Statement carries — but the Namespace that declares it is reached
+			// by name, and one this Module keeps to itself is out of scope where
+			// the Statement lands.
+			it("should refuse a Declaration dispatching into a private Namespace", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tnamespace IntegerExtras for Integer {",
+						"\t\tdoubled() -> Integer {",
+						"\t\t\t<- @::multiply(with 2)",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- n::doubled()",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+				})
+
+				expect(
+					moves(workspace, pathOf("A.es"), 8, "run").map(
+						(action) => action.title,
+					),
+				).toEqual([])
+			})
+
+			// NOTE: And the same Namespace published is one the target can
+			// import, so the move is offered and brings it along.
+			it("should carry a published Namespace along with the Declaration", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tnamespace IntegerExtras for Integer {",
+						"\t\tdoubled() -> Integer {",
+						"\t\t\t<- @::multiply(with 2)",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- n::doubled()",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tIntegerExtras",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					8,
+					"run",
+					"Move 'run' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[pathOf("B.es")]?.split("\n")[1]).toBe(
+					'\tfrom "./A.es" { IntegerExtras }',
+				)
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
+			})
+
 			// NOTE: A member, a property, a Method and an Argument label are
 			// reached through a Type rather than through the Module's own
 			// Scope — what has to travel with the Statement is the NAME beside

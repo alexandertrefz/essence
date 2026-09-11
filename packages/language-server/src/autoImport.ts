@@ -214,6 +214,101 @@ export function insertImportEdit(
 	)
 }
 
+// NOTE: SEVERAL names taken from ONE Module, written in as one edit. A
+// Declaration moved into another Module takes with it every name it reads that
+// the Module it left publishes, and the target has to import all of them — one
+// call per name would compute each insertion against a text none of the others
+// had landed in, and two names sorting into the same slot would be two edits at
+// one Cursor.
+//
+// Names already imported from that Module are left out, as `insertImportEdit`
+// leaves them out: an entry written twice is `duplicate-import`.
+export function insertImportsEdit(
+	sourceText: string,
+	program: parser.Program,
+	request: { names: Array<string>; specifier: string },
+): ImportEdit | null {
+	let lines = sourceText.split("\n")
+	let section = program.imports
+	let wanted = [...new Set(request.names)].sort(compareStrings)
+
+	if (wanted.length === 0) {
+		return null
+	}
+
+	if (section === null) {
+		let line = program.implementation.position.start.line
+		let indentation = indentationOf(lines, line)
+
+		return insertionAt(
+			line,
+			`${indentation}import {\n${indentation}\t${spellNames(
+				wanted,
+				request.specifier,
+			)}\n${indentation}}\n\n`,
+		)
+	}
+
+	let missing = wanted.filter(
+		(name) =>
+			!section.entries.some(
+				(candidate) =>
+					candidate.source.path === request.specifier &&
+					candidate.name.content === name,
+			),
+	)
+
+	if (missing.length === 0) {
+		return null
+	}
+
+	let group = section.groups.find(
+		(candidate) => candidate.source.path === request.specifier,
+	)
+
+	if (group !== undefined) {
+		return insertIntoGroup(
+			lines,
+			group,
+			{
+				name: missing[0] as string,
+				alias: null,
+				specifier: request.specifier,
+			},
+			missing.join(" "),
+		)
+	}
+
+	let spelling = spellNames(missing, request.specifier)
+
+	if (section.groups.length === 0) {
+		return insertIntoEmptyBlock(lines, section, spelling)
+	}
+
+	let successor = section.groups.find(
+		(candidate) =>
+			compareStrings(request.specifier, candidate.source.path) < 0,
+	)
+	let last = section.groups[
+		section.groups.length - 1
+	] as parser.ImportGroupNode
+
+	return insertAmong(
+		lines,
+		spelling,
+		successor?.position ?? null,
+		last.position,
+		section.position.end.line,
+	)
+}
+
+// NOTE: The group a run of names is written as. One name is what the Formatter
+// writes on one line, and so are several — a group is broken over lines by its
+// width, which is the Formatter's to decide and not a fix's.
+export function spellNames(names: Array<string>, specifier: string): string {
+	return `from "${specifier}" { ${names.join(" ")} }`
+}
+
 // NOTE: The `export { … }` block's side of the same builder, and null for the
 // same reason: a name this Module already publishes must not be published a
 // second time, whichever of the two shapes carries it.
@@ -375,10 +470,17 @@ function insertIntoEmptyBlock(
 // line, in order, which is what the Formatter would make of it. A group
 // already written out takes the name on a line of its own at its canonical
 // position, and keeps every Comment it holds.
+// NOTE: `spelling` is what actually goes in, and it is the entry's own name
+// unless the caller is writing SEVERAL at once — a Declaration moved into
+// another Module may take more than one name from the one it left, and each
+// placed on its own would be several edits computed against a text none of the
+// others had landed in. They go in as one run, sorted where the caller sorted
+// them and placed by the first of them.
 function insertIntoGroup(
 	lines: Array<string>,
 	group: parser.ImportGroupNode | parser.ExportGroupNode,
 	entry: ImportEntry,
+	spelling: string = spellName(entry),
 ): ImportEdit {
 	let position = group.position
 
@@ -387,9 +489,12 @@ function insertIntoGroup(
 		group.entries.length === 1
 	) {
 		let indentation = indentationOf(lines, position.start.line)
-		let names = [entryOf(group.entries[0]!, entry.specifier), entry]
-			.sort(compareNames)
-			.map((name) => `${indentation}\t${spellName(name)}`)
+		let written = entryOf(group.entries[0]!, entry.specifier)
+		let names = (
+			compareNames(written, entry) < 0
+				? [spellName(written), spelling]
+				: [spelling, spellName(written)]
+		).map((name) => `${indentation}\t${name}`)
 
 		return {
 			range: position,
@@ -409,7 +514,7 @@ function insertIntoGroup(
 
 	return insertAmong(
 		lines,
-		spellName(entry),
+		spelling,
 		successor?.position ?? null,
 		last.position,
 		position.end.line,
