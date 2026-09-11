@@ -42,6 +42,29 @@ offer it under the lightbulb (`Ctrl+.`):
   Interpolation would have called anyway.
 - `missing-return` adds the `else` a Function needs to return on every path.
 
+### Refactorings
+
+The lightbulb also carries the edits no Diagnostic asks for — offered on code
+the Compiler is happy with, and never preferred, since each is one of two ways
+to spell something rather than a repair:
+
+- **Extract to a Constant** lifts the Expression a selection sits in above its
+  Statement and leaves the Constant's name where it stood. The name is derived
+  from what the Expression is about — the Method a call invokes, the member a
+  lookup reads — and is a placeholder: rename opens on it as soon as the edits
+  land.
+- **Inline 'x'** is the other direction. A local Constant's value is written
+  into every read and the declaration goes, offered from the declaration and
+  from any read of it.
+- **Extract to a Function** writes whole Statements as a Function beside the
+  one they were written in, with the names they read as its Parameters and
+  their Types spelled out. A selection ending in a `<-` becomes a Function
+  answering that Type; one that answers nothing becomes a Function of the unit
+  Type `{}`, called as a Statement.
+- **Write it as a table test** collects a test's repeated
+  `expect f(…)::is(…)` lines into `across [ … ]` rows and leaves one
+  expectation reading them.
+
 Writing out an inferred Type is offered as a refactoring wherever an inlay hint
 sits, and an inlay hint can be double-clicked to the same end.
 

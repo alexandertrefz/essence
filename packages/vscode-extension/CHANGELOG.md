@@ -17,6 +17,15 @@
   documentation block. A Match Guard whose Condition begins with a lowercase
   name — `case { x, y } where x::is(y)` — is lit like every other `where` as
   well, where it used to read as ordinary text.
+- Four refactorings under the lightbulb, on code that already compiles: an
+  Expression lifted out of its Statement as a Constant, a Constant written back
+  into every read and its declaration taken away, whole Statements written as a
+  Function beside the one they were in with the names they read as its
+  Parameters, and a test's repeated `expect f(…)::is(…)` lines collected into
+  `across [ … ]` rows. An extraction has to call what it lifted out something:
+  it derives a name from what the code is about and opens rename on it once the
+  edits have landed, so the placeholder is an invitation rather than a decision
+  made for you.
 - A project's settings live in one file at its root, `essence.json`, and the
   editor reads the same one `essence test` does. `exclude` names the
   directories that are not its sources — the Problems panel stays out of them
