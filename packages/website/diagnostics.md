@@ -111,7 +111,7 @@ escape. A String understands `\"`, `\\`, `\n`, `\t`, `\{` and `\}`; every other
 backslash is an error. The character after it is read as itself so the rest of
 the String still lexes — write `\\` for a literal backslash.
 
-**Quick Fixes — "Write `\\` for a literal backslash" and "Drop the
+**Quick Fixes — "Write '\\' for a literal backslash" and "Drop the
 backslash":** the two readings of what was written, both offered and neither
 preferred. Which was meant is the writer's to say — `"C:\temp"` wants the first
 and a stray backslash wants the second — so an Editor never picks one on its
@@ -651,9 +651,15 @@ rather than by a compile; while iterating, a filter makes the same run say
 nothing about focus.
 
 An editor can refuse nothing, so it says the same thing where the word is
-written: a warning on each `focused` — on the `suite` as well as on the test —
-with a Quick Fix that removes it. A `focused` that is also `skipped` narrows
-nothing and is not reported either way.
+written: a warning on each `focused` — on the `suite` as well as on the test.
+A `focused` that is also `skipped` narrows nothing and is not reported either
+way.
+
+**Quick Fix — "Remove 'focused'":** takes the word out, with the blank in front
+of it, or with its whole line where the Modifier was written on one of its own.
+Preferred: the Modifier is what the Warning is about, and the run it silenced is
+the run the file is meant to have. Not offered where the span does not read as
+the word.
 
 ```
 [focused-tests-remain]
@@ -676,10 +682,14 @@ Error: This test is still focused
 Two tags in the workspace are within two edits of each other — `slwo` beside
 `slow`. A run is narrowed by a tag spelled exactly, so two spellings of one idea
 are two sets and `--tag` answers with half of what was meant. Reported on the
-rarer of the two, which is the one that is probably the mistake, with a Quick Fix
-that renames it to the common one. A workspace-wide question, so only the
-Language Server asks it: a compile sees one Module, and `tagged slwo` is
-perfectly well-formed inside it.
+rarer of the two, which is the one that is probably the mistake. A workspace-wide
+question, so only the Language Server asks it: a compile sees one Module, and
+`tagged slwo` is perfectly well-formed inside it.
+
+**Quick Fix — "Change to 'network'":** writes the common spelling over the rare
+one. Preferred, since the two name one idea and the Warning is about their
+being two. Not offered where the span no longer stands on a whole name — the
+same reading every other suggestion takes.
 
 ```
 [similar-tags]
@@ -1274,7 +1284,8 @@ missing member reports `argument-type-mismatch`.
 **Quick Fix — "Write the missing members":** writes one `name = {}` per missing
 member after everything the Literal already holds, keeping its layout — beside
 what is written where the Literal is on one line, a line per member where it is
-broken over several. The values are holes on purpose and the Argument stays
+broken over several. One member short, it names it: "Write the missing member
+'x'". The values are holes on purpose and the Argument stays
 refused until they are filled in, which is why the fix is not preferred. `{}` is
 what a hole is written as because it always parses and fits nothing: `name = `
 with the value left out fails the whole Literal's reading, and the shorthand
@@ -1517,6 +1528,13 @@ it declares, so an update may only set members it already has; a Dictionary's
 keys are values of its key Type, so an update may set a key it has never held.
 Writing one in the other's brackets is therefore a different form and not a
 different style, and it is refused rather than read as the form it looks like.
+
+**Quick Fix — "Write the update in brackets" / "Write the update in braces":**
+swaps both brackets for the pair the base wants, and the padding with them —
+`{ config with … }` pads and `[ages with … ]` does not. Preferred: which pair
+belongs there is what the base's Type says, so there is nothing for a reader to
+choose. Not offered where the span does not read as an update opening and
+closing on the brackets the Diagnostic named.
 
 ### `duplicate-key`
 
@@ -1905,6 +1923,12 @@ Each reading has a spelling that says which it is, and the Helps offer both:
   `nested::is(outer)`. An Optional of Optionals holds a `#Value` carrying an
   Optional, which no `Optional<Integer>` has, so again only one entry is left.
 
+**Rewrite — "Wrap the Argument in '#Value(…)'":** writes the first of those two
+spellings, one action per Case the carrier holds a value in. Offered as a
+Rewrite rather than as a fix and never preferred: both readings are legal and
+which was meant is the writer's to say, so an Editor must not pick. The other
+reading names a Constant, which no edit can invent.
+
 Writing the Choice in front decides nothing. A Case carries its Type Arguments
 for display and assignability compares its MEMBERS, so a Case with no payload is
 one Type at every level and `Optional<Optional<Integer>>#Empty` reads at both —
@@ -2263,6 +2287,11 @@ grey it out instead of underlining it. A Case an earlier one covers through
 ERASURE rather than through its Type is `erased-case-conflict` below, and an
 Error.
 
+**Quick Fix — "Remove unreachable Case":** deletes the whole Handler, taking
+the line break and the indentation in front of it along. Preferred, since a
+Handler nothing reaches takes nothing away by going. Not offered where the span
+no longer reads as a `case`.
+
 ### `erased-case-conflict`
 
 An earlier `case` answers for every value of this one through something that
@@ -2275,9 +2304,6 @@ way `case _` does, even though it names a Type of its own: Types erase before a
 Match runs, so it narrows nothing and accepts every value that reaches it. It
 can therefore only ever be written last — written above `case String`, it
 answered the String where the Signature promised a `Value`.
-
-**Quick Fix — "Remove unreachable Case":** deletes the whole Handler, taking
-the line break and the indentation before it along.
 
 A Function-typed member erases the same way: a Signature is not a runtime
 question, so `case { fn: (_ n: Integer) -> Integer }` accepts every Record
