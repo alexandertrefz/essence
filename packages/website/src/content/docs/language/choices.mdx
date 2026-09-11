@@ -1,0 +1,357 @@
+---
+title: Choices
+description:
+  A `choice` declares a closed set of named cases, each carrying a payload of
+  its own. Because the set is closed the compiler knows every shape a value can
+  take, and says so the moment a match stops covering them all.
+section: language
+order: 80
+template: article
+---
+
+A record says what a value has. A choice says what a value _is_ — one of a
+fixed, named set of alternatives, each carrying whatever that alternative needs
+and nothing more. It is the declaration to reach for whenever a program has
+been keeping a string or an integer around as a flag.
+
+## Declaring a choice
+
+A `choice` names the type, and then names its cases. A case with fields
+declares them as a record; a case with nothing to carry declares nothing.
+
+<CodeWindow
+	title="routes.es"
+	class="code-bare"
+	compact
+	code={`implementation {
+
+	§ Every page the site can show, and what each one needs to know.
+	choice Route {
+		Home,
+		Article { slug: String },
+		Search { query: String, page: Integer },
+	}
+
+	§ A Case is constructed with \`#\`. A Case with no payload is written on
+	§ its own; the others carry the Record their declaration named.
+	constant landing: Route = #Home
+	constant reading: Route = #Article({ slug = "choices" })
+	constant looking: Route = #Search({ query = "match", page = 2 })
+
+	§ Inside an arm, \`@\` is the Case's payload.
+	function path(_ route: Route) -> String {
+		<- match route -> String {
+			case #Home    { <- "/" }
+			case #Article { <- "/articles/{@.slug}" }
+			case #Search  { <- "/search?q={@.query}&page={@.page}" }
+		}
+	}
+
+	Terminal.print(path(landing)) § /
+	Terminal.print(path(reading)) § /articles/choices
+	Terminal.print(path(looking)) § /search?q=match&page=2
+}`}
+/>
+
+Each case is a nominal record type of its own, and `Route` is the union of
+them. That is why `@.slug` is reachable in the `#Article` arm and nowhere else:
+the arm has narrowed the value to a record that has a `slug`, and the compiler
+will not let a `#Home` be asked for one.
+
+## Constructing and asking
+
+The `#` sigil is how a case is written, both when a value is built and when it
+is matched. Which choice a bare `#Case` belongs to is read off the surrounding
+context — an annotation, the parameter it is being passed to, the return type
+it is being handed back as. Failing all of those, the name is looked up among
+the choices in scope; one declaring it is enough to settle the question, and
+more than one is `ambiguous-case`, which asks for the choice in front of the
+sigil.
+
+```essence
+implementation {
+
+	choice Route {
+		Home,
+		Article { slug: String },
+	}
+
+	§ A Case with exactly one member takes that member on its own.
+	constant reading: Route = #Article("choices")
+
+	§ Writing the Choice in front of the sigil picks it outright — the way
+	§ out when two Choices in scope declare a Case of the same name.
+	constant landing = Route#Home
+
+	§ A Case Matcher names what a one-member Case carries, rather than
+	§ reaching it through `@`.
+	function slugOf(_ route: Route) -> Optional<String> {
+		<- match route -> Optional<String> {
+			case #Article(slug) { <- #Value(slug) }
+			case #Home          { <- #Empty }
+		}
+	}
+
+	Terminal.print(slugOf(reading)::otherwise("none")) § choices
+	Terminal.print(slugOf(landing)::otherwise("none")) § none
+
+	§ A Case can be asked about directly, without taking it apart.
+	Terminal.inspect(reading::is(#Home)) § false
+	Terminal.inspect(reading::isNot(#Home)) § true
+}
+```
+
+<Note>
+	A case matcher binds what a case carries when the case carries exactly one
+	thing. Ask a two-member case like `#Search` to bind and the compiler answers
+	`unbindable-case-payload`, names the members it does have, and points at
+	`@.query` as the way to read them.
+</Note>
+
+Equality comes for free. A choice derives it from the tag and the payload, so
+`#Article("choices")::is(#Article("choices"))` is true and
+`Route#Home::is(#Article("choices"))` is false without a line being written for
+either. Two choices that declare identically shaped cases remain two types, and
+the question of whether one equals the other is never reached: `is` on a
+`Route` takes a `Route`, so handing it another choice's case is refused as
+`no-matching-overload` rather than answered `false`.
+
+## The set is closed
+
+This is the property everything else rests on. `Route` has three cases and can
+never have a fourth by accident — so a match over it either handles all three
+or does not compile.
+
+Adding a case is therefore a deliberate, visible act. Give `Route` an
+`Archive { year: Integer }` and every match that has not been updated stops
+building, naming the case it has not thought about:
+
+<div class="error-output">
+
+```
+[missing-case]
+Error: This Match Expression does not handle every Case
+    ╭─┤ routes.es:19:6 │
+    │
+ 19 │        <- match route -> String {
+    │                 ──┬──
+    │                   ╰──── this is a Route
+    │
+    │ Help: Add 'case Route#Archive', or a 'case _' that covers the rest.
+    │
+    │ Note: Unhandled: 'Route#Archive'.
+────╯
+```
+
+</div>
+
+Breaking every call site is the point, not a cost to be worked around. The
+alternative — a default branch that quietly absorbs the new case — is how a
+feature ships half-finished, and the compiler is the only reviewer that reads
+every site. In an editor the diagnostic carries a Quick Fix that scaffolds the
+missing arm, so the work is to fill in an answer rather than to find the places
+that need one.
+
+## Why not a string
+
+A string flag admits every string there is, so a misspelling is a perfectly
+ordinary value. Nothing in the program has grounds to object; the mistake
+surfaces later, as behaviour:
+
+```essence
+implementation {
+
+	§ A String flag admits every String, so a misspelling is an ordinary value
+	§ the Program has no reason to question — it falls through to the default
+	§ and the mistake shows up as behaviour, not as an error.
+	function pathForFlag(_ kind: String) -> String {
+		if kind::is("home") {
+			<- "/"
+		} else if kind::is("article") {
+			<- "/articles"
+		} else {
+			<- "/not-found"
+		}
+	}
+
+	Terminal.print(pathForFlag("artcle")) § /not-found
+}
+```
+
+The same slip against a choice is caught where it is written, and the compiler
+knows the full set well enough to suggest what was meant:
+
+<div class="error-output">
+
+```
+[unknown-case]
+Error: No Choice in scope declares a Case '#Artcle'
+    ╭─┤ routes.es:13:29 │
+    │
+ 13 │     constant reading: Route = #Artcle({ slug = "choices" })
+    │                                ───┬──
+    │                                   ╰──── no such Case
+    │
+    │ Help: Did you mean '#Article'?
+────╯
+```
+
+</div>
+
+An integer flag is worse again: `2` is a valid `Integer` for every reason
+except the one that matters, and arithmetic on it is legal. A choice has no
+values beyond its cases, and the compiler can enumerate them — which is what
+makes exhaustiveness checking, the Quick Fix and the suggestion above all
+possible from the same declaration.
+
+## A choice is an ordinary type
+
+Nothing about a choice is special-cased. Cases are scoped to the choice that
+declares them, so a second choice may declare its own `Home` and context still
+picks the right one. A choice can be held in a list or a record, and it can
+have a namespace of its own that conforms to protocols on its behalf.
+
+```essence
+implementation {
+
+	choice Route {
+		Home,
+		Article { slug: String },
+	}
+
+	§ A Choice is a Type like any other, so it can have a Namespace of its own
+	§ and conform to a Protocol through it.
+	namespace Route for Route is Printable {
+		toString() -> String {
+			<- match @ -> String {
+				case #Home    { <- "/" }
+				case #Article { <- "/articles/{@.slug}" }
+			}
+		}
+	}
+
+	constant history: List<Route> = [#Home, #Article({ slug = "choices" })]
+
+	§ /
+	§ /articles/choices
+	history::map((route) { <- Terminal.print(route) })
+}
+```
+
+<Note>
+	A choice may not name itself in a payload. Recursive type declarations are
+	not part of the language yet — a declaration is substituted wherever it is
+	named, so one that names itself would never finish resolving. The compiler
+	reports it as `recursive-type-declaration`.
+</Note>
+
+## Generic choices
+
+A choice takes type parameters, and its cases carry them. They are applied at
+every use rather than inferred from one, exactly as a type alias's are — the
+`infer` that belongs on a function's parameters is refused here as
+`infer-on-applied-parameter`.
+
+```essence
+implementation {
+
+	§ A Choice takes Type Parameters, and its Cases carry them.
+	choice Found<Item> {
+		Hit { item: Item, index: Integer },
+		Miss,
+	}
+
+	function found<infer Item is Equatable>(
+		_ needle: Item,
+		in list: List<Item>,
+	) -> Found<Item> {
+		<- match list::firstIndex(of needle) -> Found<Item> {
+			case #Value(index) { <- #Hit({ item = needle, index = index }) }
+			case #Empty        { <- #Miss }
+		}
+	}
+
+	constant words = ["choice", "case", "match"]
+
+	§ 'match' is item 2
+	Terminal.print(match found("match", in words) -> String {
+		case #Hit  { <- "'{@.item}' is item {@.index}" }
+		case #Miss { <- "not in the list" }
+	})
+
+	§ `#Miss` carries nothing, so there is nothing for `Item` to be read from —
+	§ it comes from the annotation, or is written in front of the `#`.
+	constant nothingYet: Found<String> = #Miss
+	constant alsoNothing = Found<String>#Miss
+
+	Terminal.inspect(nothingYet::is(alsoNothing)) § true
+}
+```
+
+A case whose payload mentions the parameter determines it — `#Hit` carrying an
+`Item` is enough for `Found<String>` to be worked out. A case that carries
+nothing determines nothing, so `#Miss` needs either an annotation to read the
+argument from or the explicit application `Found<String>#Miss`. Left with
+neither, the compiler asks for one rather than guessing.
+
+## `Optional` is a choice
+
+The most important choice in the language is one of the smallest, and it is
+declared in the standard library with no privileges the declarations above do
+not have:
+
+```essence
+choice Optional<ItemType> {
+	Value { item: ItemType },
+	Empty,
+}
+```
+
+That is the whole of the language's account of absence. There is no `null`, no
+`undefined`, and no separate `Nothing` type — a value that might not be there
+is an `Optional`, and the only ways through it are a match or one of the
+shorthands `Optional` provides for the shapes worth a name.
+
+```essence
+implementation {
+
+	§ `Optional` is declared exactly the way `Route` and `Found` were —
+	§ two Cases, one carrying a value and one carrying nothing.
+	constant nickname: Optional<String> = #Value("Sandy")
+	constant surname: Optional<String> = #Empty
+
+	Terminal.print(match nickname -> String {
+		case #Value(name) { <- "known as {name}" }
+		case #Empty       { <- "no nickname on file" }
+	}) § known as Sandy
+
+	§ `otherwise` is the shorthand for a Match whose other arm is a fallback.
+	Terminal.print(surname::otherwise("unrecorded")) § unrecorded
+
+	§ Because an Optional is a value and not an absence, it nests: an empty
+	§ Optional inside a full one is not the same as an empty one.
+	constant nested: Optional<Optional<Integer>> = #Value(#Empty)
+
+	Terminal.inspect(nested::is(#Empty)) § false
+	Terminal.inspect(nested::flatten()) § Optional#Empty
+}
+```
+
+Being a nominal choice rather than a union with a null-ish member is what buys
+that last property. `#Value(#Empty)` and `#Empty` are different values, so a
+`List<Optional<Integer>>` can distinguish "the first item is an empty
+`Optional`" from "there is no first item" — a distinction that flattens away in
+any design where absence is a member of a union.
+
+The cost, paid honestly at every site that produces one, is that widening is
+gone: a function answering `Optional<Integer>` writes `<- #Value(0)` rather
+than `<- 0`. That is what it means for the value to say what it is.
+
+## Next
+
+- [Destructuring](/docs/language/destructuring) — taking a payload apart in the
+  arm that matched it, instead of naming it whole.
+- [Generics](/docs/language/generics) — type parameters, bounds, and where
+  `infer` belongs.
+- [Optional](/docs/standard-library/optional) — `otherwise`, `map`, `keep`,
+  `flatten`, and why the payload member is called `item`.

@@ -1,0 +1,37 @@
+---
+title: "List::isNot"
+description: "Checks whether the Lists differ — in any item or in their order. Available whenever the items conform to `Equatable`."
+section: standard-library
+order: 1
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "List"
+member: "isNot"
+signature: |
+  isNot<infer ItemType is Equatable>(_ other: List<ItemType>) -> Boolean
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "other",
+			type: "List<ItemType>",
+			description: "the value to compare with",
+		},
+	]}
+/>
+
+## Returns
+
+`true` when the Lists are not equal.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>

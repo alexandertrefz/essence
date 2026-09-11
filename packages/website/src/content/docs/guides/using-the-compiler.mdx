@@ -1,0 +1,272 @@
+---
+title: Using the Compiler
+description:
+  The compiler's four commands and the flags worth knowing — checking,
+  building, running, watching, and the machine-readable report CI wants.
+section: guides
+order: 10
+template: guide
+steps: 5
+minutes: 8
+---
+
+`essence` is the whole toolchain — the compiler, the formatter and the Language
+Server under one name. Four of its commands compile: `build`, `run`, `check` and
+`watch`. There is no configuration file and no project format; you point them at
+`.es` files and they do the thing the command names. This walks through each one
+on a single program.
+
+Every command below is written as plain `essence`, which is what a global
+install gives you. With the toolchain as a project dependency, put your package
+manager's prefix in front — `npx`, `pnpm`, `yarn` or `bun run` — and inside a
+checkout it is `bun run essence`. The arguments never differ.
+[Installation](/docs/getting-started/installation) covers each way in.
+
+Put this in `greeting.es` to follow along:
+
+<CodeWindow
+	title="greeting.es"
+	class="code-bare"
+	compact
+	code={`implementation {
+
+	§ A greeting, with the name interpolated into the String.
+	constant name = "world"
+
+	Terminal.print("Hello, {name}!")
+}`}
+/>
+
+<Steps>
+
+<StepItem title="Check it">
+
+`essence check` runs the parser, enricher and validator and then stops. No
+JavaScript is generated and nothing is written to disk, which makes it the
+fastest way to ask whether a program is valid.
+
+```sh
+$ essence check greeting.es
+  ✔ greeting.es no errors
+
+    read      0.39 ms  ░
+    parse      1.2 ms  █
+    enrich      35 ms  ████████████████████████
+    validate  0.05 ms  ░
+
+    total   37 ms
+```
+
+The bars are per-stage timings. `enrich` — where types are resolved and
+inference happens — dominates every run; the rest is noise by comparison.
+
+When something does not line up, you get the span and a note rather than a
+line number:
+
+```sh
+$ essence check greeting.es
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'count'
+   ╭─┤ greeting.es:3:28 │
+   │
+ 3 │     constant count: Integer = "twelve"
+   │                               ────┬───
+   │                                   ╰───── this is a String
+   │
+   │ Note: 'count' is declared as Integer.
+───╯
+
+─── 1 error
+  ✖ greeting.es 1 error
+    stopped while validating
+```
+
+`assignment-type-mismatch` is a stable code. It is never reworded away, and
+every code has an entry in the
+[Diagnostics reference](/docs/reference/diagnostics).
+
+<Note>
+	Compilation stops at the first stage that reports an Error, and shows every
+	Diagnostic that stage found — so a run reports all the type errors at once,
+	but will not report type errors in a file that has not parsed yet. Warnings
+	never stop anything.
+</Note>
+
+</StepItem>
+
+<StepItem title="Build it">
+
+`essence build` runs the full pipeline and writes the JavaScript. It is also the
+default command, so the file name alone is enough.
+
+```sh
+$ essence build greeting.es
+  ✔ greeting.es → greeting.js
+
+    read      0.42 ms  ░
+    parse      1.3 ms  █
+    enrich      36 ms  ████████████████████████
+    validate  0.03 ms  ░
+    simplify  0.11 ms  ░
+    optimise  0.01 ms  ░
+    generate    22 ms  ███████████████
+    bundle      13 ms  █████████
+    write     0.37 ms  ░
+
+    output  6.8 kB · 1.6 kB gzipped
+    total   73 ms
+```
+
+The output lands next to the source unless you say otherwise. `-o` takes a
+file when there is one input and a directory when there are several — missing
+parent directories are created either way.
+
+```sh
+essence greeting.es                # same as: essence build greeting.es
+essence build greeting.es -o dist/hello.js
+essence build src/*.es -o dist/
+```
+
+Three flags shape the output rather than where it goes:
+
+- `--minify` — minify the emitted JavaScript.
+- `--sourcemap` — emit a source map next to the output, so a stack trace points
+  back at the `.es` line.
+- `-j, --jobs <count>` — how many files to compile in parallel. Defaults to one
+  per core, up to eight. `-j 1` keeps everything on the main thread, which
+  makes a compiler stack trace readable.
+
+That `greeting.js` is a self-contained ES module. Only the parts of the runtime
+the program actually reaches are bundled into it, so it runs under Bun or Node,
+or in a browser, with nothing installed alongside it — there is no runtime
+package to depend on.
+
+</StepItem>
+
+<StepItem title="Run it">
+
+`essence run` builds to a temporary directory and executes the result, leaving
+no `.js` behind. It is the one to reach for while you are still writing.
+
+```sh
+$ essence run greeting.es
+  ✔ greeting.es → /tmp/essence-M98Q9y/greeting.js
+
+    output  6.8 kB · 1.6 kB gzipped
+    total   79 ms
+
+  ─── program output ───────────────────────────────────────────────────────────
+"Hello, world!"
+  ──────────────────────────────────────────────────────────────────────────────
+
+  ✔ program exited with code 0 after 15 ms
+```
+
+The program's own output is fenced off from the compiler's, and the exit code
+is reported at the end. `essence build -e` is the same execution step but keeps
+the built file.
+
+</StepItem>
+
+<StepItem title="Watch it">
+
+`essence watch` compiles the sources, then stays running and recompiles each one
+as it is saved. Rebuilds reuse warm worker threads, so they are noticeably faster
+than repeated one-shot builds.
+
+```sh
+essence watch src/*.es
+essence build src/*.es --watch    # the same thing
+```
+
+While it is running, three keys work:
+
+- `r` — force a rebuild.
+- `c` — clear the screen.
+- `q`, or `Ctrl+C` — quit.
+
+`--clear` clears the screen before every rebuild instead of on demand, and
+`-e` executes the output after each successful one — which together give you a
+program that re-runs whenever you save it.
+
+</StepItem>
+
+<StepItem title="Wire it into CI">
+
+Every command exits `0` when it succeeded and `1` when it reported an Error, so
+a check step needs nothing more than the command:
+
+```sh
+essence check src/*.es
+```
+
+Two flags exist for when a machine is reading:
+
+- `--quiet` — print diagnostics only. No timing report, no progress.
+- `--json` — emit a machine-readable report on stdout instead of the drawn one.
+
+```sh
+$ essence check greeting.es --json
+{
+  "version": "0.1.0",
+  "command": "check",
+  "ok": true,
+  "errors": 0,
+  "warnings": 0,
+  "durationMs": 37.286,
+  "files": [
+    {
+      "input": "greeting.es",
+      "output": null,
+      "ok": true,
+      "bytes": null,
+      "gzipBytes": null,
+      "durationMs": 36.943,
+      "stages": { "read": 0.386, "parse": 1.156, "enrich": 35.199 }
+    }
+  ]
+}
+```
+
+Each file carries its own `ok`, its stage timings and — for a build — the
+output path and byte counts. Diagnostics come through with their code, so a
+report can be grouped by code without parsing any prose.
+
+`--color` forces colour on when stdout is not a terminal, which is what most CI
+log viewers want.
+
+</StepItem>
+
+</Steps>
+
+## Everything at once
+
+`essence help` lists the commands, and `essence help <command>` documents one of
+them in full — every flag on this page came from there.
+
+| Command  | What it does                                     |
+| -------- | ------------------------------------------------ |
+| `build`  | Compile to JavaScript. The default.              |
+| `run`    | Compile to a temporary file and execute it.      |
+| `check`  | Type-check only. Writes nothing.                 |
+| `watch`  | Recompile on every save.                         |
+| `format` | Format sources in place. Never part of a build.  |
+| `lsp`    | Start the Language Server on stdio. For editors. |
+| `dap`    | Start the Debug Adapter on stdio. For editors.   |
+| `help`   | Help for `essence`, or for a single command.     |
+
+`build` shortens to `b`, `watch` to `w`, and `format` to `fmt`. The original
+executables still exist — `esc`, `esfmt`, `esls` and `esdap` — each reaching the
+same code as the matching subcommand, though a couple take a different route to
+it: `esdap` drives compilation by spawning `essence build`, where `essence dap`
+compiles in process. Only `esc` ships in the same package as `essence`; the
+other three belong to the packages that implement them, so whether an install
+puts them on your path depends on your package manager. The subcommands always
+work.
+
+## What to read next
+
+- [Project layout](/docs/getting-started/project-layout) — what the compiler
+  writes, and what a program is without a manifest.
+- [Diagnostics](/docs/reference/diagnostics) — every code the compiler can
+  report, and the Quick Fix that goes with it.

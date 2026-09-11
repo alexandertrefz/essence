@@ -1,0 +1,25 @@
+---
+title: "NonEmptyList::removeDuplicates"
+description: "A new List keeping only the first occurrence of each item — by the items' own `is` — in the original order. Available whenever the items conform to `Equatable`."
+section: standard-library
+order: 2
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "NonEmptyList"
+member: "removeDuplicates"
+signature: |
+  removeDuplicates<infer ItemType is Equatable>() -> NonEmptyList<ItemType>
+---
+
+## Returns
+
+the List without duplicates, which certainly has something in it.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "NonEmptyList", href: "/docs/standard-library/non-empty-list" },
+	]}
+/>

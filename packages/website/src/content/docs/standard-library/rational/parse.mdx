@@ -1,0 +1,37 @@
+---
+title: "Rational.parse"
+description: "Reads a Rational from its text form — a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`, each with an optional minus sign."
+section: standard-library
+order: 20
+template: reference
+kind: "static method"
+monoTitle: true
+namespace: "Rational"
+member: "parse"
+signature: |
+  static parse(_ text: String) -> Optional<Rational>
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "text",
+			type: "String",
+			description: "the text to read",
+		},
+	]}
+/>
+
+## Returns
+
+the Rational, or nothing when the text has any other shape or divides by zero.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Rational", href: "/docs/standard-library/rational" },
+	]}
+/>

@@ -1,0 +1,37 @@
+---
+title: "List::join"
+description: "Joins the items into one String, each item as its own `toString`, with the given separator between them — the return trip of `String::split(on:)` for a List of Strings."
+section: standard-library
+order: 32
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "List"
+member: "join"
+signature: |
+  join<infer ItemType is Printable>(with separator: String) -> String
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "separator",
+			type: "",
+			description: "the separator to place between the items",
+		},
+	]}
+/>
+
+## Returns
+
+the joined String, or the empty String for the empty List.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>

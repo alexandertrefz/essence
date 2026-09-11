@@ -1,0 +1,37 @@
+---
+title: "Terminal.inspect"
+description: "Prints a value for the Program's AUTHOR — the structural form, with Strings quoted, Cases shown as their tags and Records and Lists laid out. Takes any value, conformance or none, and answers with that same value, so it can wrap any Expression without changing what it evaluates to."
+section: standard-library
+order: 2
+template: reference
+kind: "static method"
+monoTitle: true
+namespace: "Terminal"
+member: "inspect"
+signature: |
+  static inspect<infer Value>(_ value: Value) -> Value
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "value",
+			type: "Value",
+			description: "the value to inspect",
+		},
+	]}
+/>
+
+## Returns
+
+the value it was given, unchanged.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Terminal", href: "/docs/standard-library/terminal" },
+	]}
+/>

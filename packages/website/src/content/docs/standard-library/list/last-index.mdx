@@ -1,0 +1,27 @@
+---
+title: "List::lastIndex"
+description: "The position of the last item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`."
+section: standard-library
+order: 31
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "List"
+member: "lastIndex"
+signature: |
+  lastIndex<infer ItemType is Equatable>(
+  	of item: ItemType,
+  ) -> Optional<Integer>
+---
+
+## Returns
+
+the zero-based position, or nothing when the item is absent.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>

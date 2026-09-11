@@ -1,0 +1,30 @@
+---
+title: "List::sort"
+description: "A new List in order — by the items' own ordering when called with no Argument, available whenever they conform to `Comparable`, or by the given comparison."
+section: standard-library
+order: 24
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "List"
+member: "sort"
+signature: |
+  overload sort {
+  	<infer ItemType is Comparable>() -> List<ItemType>
+  	(
+  		by comparison: (_: ItemType, _: ItemType) -> Ordering,
+  	) -> List<ItemType>
+  }
+---
+
+## Returns
+
+the ordered List.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>

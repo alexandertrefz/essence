@@ -1,0 +1,261 @@
+---
+title: Destructuring
+description:
+  One grammar for naming the parts of a value, and the five positions it is
+  written in — a match arm, a case payload, a parameter, a function literal and
+  a declaration.
+section: language
+order: 85
+template: article
+---
+
+A pattern names the parts of a value. It is the record matcher grammar you have
+already read in [pattern matching](/docs/language/pattern-matching),
+generalised: the same braces mean the same thing wherever a value is taken
+apart, so there is one grammar to learn rather than one per position.
+
+## Three member forms
+
+A member either binds, or constrains, or both. Which it does is what the three
+forms are for.
+
+```essence
+implementation {
+
+	type Click = { x: Integer, y: Integer }
+	type KeyPress = { key: String }
+
+	constant input: Click | KeyPress = { x = 0, y = 7 }
+
+	§ Three member forms. A bare name binds; `name: Type` constrains by Type
+	§ and binds; `name = value` constrains by value and binds nothing, because
+	§ the value is written right there.
+	Terminal.print(match input -> String {
+		case { x = 0, y = 0 } { <- "the origin" }
+		case { x = 0, y }     { <- "the y axis at {y}" }
+		case { x, y }         { <- "{x}, {y}" }
+		case { key }          { <- "the key {key}" }
+	}) § the y axis at 7
+}
+```
+
+`{ x }` is `{ x: Integer }` with the annotation left off — the same relation
+`(item)` has to `(_ item: Integer)` in a function literal. The two differ in
+what they constrain and never in what they bind, which is why the shorthand is
+not a separate feature to remember.
+
+A pattern is not a way of asking a new question. Every member above could be
+written as a longer matcher; what the pattern saves is naming the record and
+then reaching back into it member by member.
+
+## Bindings, guards and `as`
+
+A guard sees the bindings. It is tested after the matcher's own check and behind
+it, so a name in a `where` stands for the member it was bound from — and it is
+safe, because the matcher's check short-circuits in front of it.
+
+```essence
+implementation {
+
+	type Click = { x: Integer, y: Integer }
+	type KeyPress = { key: String }
+
+	constant square: Click | KeyPress = { x = 3, y = 3 }
+
+	§ A guard sees the bindings: it is tested after the Matcher's own check and
+	§ behind it, so a name in it stands for the member it was bound from.
+	Terminal.print(match square -> String {
+		case { x, y } where x::is(y) { <- "the diagonal at {x}" }
+		case { x, y }                { <- "{x}, {y}" }
+		case { key }                 { <- "the key {key}" }
+	}) § the diagonal at 3
+
+	§ A binding shadows an outer name like any other declaration. `as` is how a
+	§ Program declines to.
+	constant x = 99
+
+	Terminal.print(match square -> String {
+		case { x as column, y as row } { <- "{column}/{row}, not {x}" }
+		case _                         { <- "something else" }
+	}) § 3/3, not 99
+}
+```
+
+A binding shadows an outer name exactly as any other declaration does, which is
+occasionally not what you want — `as` gives the member a different name and
+leaves the outer one reachable.
+
+<Note>
+	`as` is a keyword only where a binder can follow it, so a record is still
+	free to have a member called `as`, and `{ as as as }` binds it. That is a
+	curiosity rather than advice.
+</Note>
+
+## Taking a case payload apart
+
+A case matcher's binder names what the *constructor* takes. Write a pattern
+there and it takes the payload apart instead of naming it whole.
+
+```essence
+implementation {
+
+	choice Shape {
+		Rectangle { width: Integer, height: Integer },
+		Circle { radius: Integer },
+		Empty,
+	}
+
+	constant shape: Shape = #Rectangle({ width = 3, height = 4 })
+
+	§ A Case Matcher's binder names what the CONSTRUCTOR takes, so a Pattern
+	§ there takes the payload apart instead of naming it whole.
+	Terminal.print(match shape -> Integer {
+		case #Rectangle({ width, height }) { <- width::multiply(with height) }
+		case #Circle({ radius })           { <- radius::multiply(with radius) }
+		case #Empty                        { <- 0 }
+	}) § 12
+
+	§ `} as name` names the whole payload alongside its parts.
+	Terminal.print(match shape -> Integer {
+		case #Rectangle({ width, height } as box) {
+			<- width::add(height)::add(box.width)
+		}
+		case #Circle({ radius } as dot) { <- radius::add(dot.radius) }
+		case #Empty                     { <- 0 }
+	}) § 10
+}
+```
+
+`} as name` names the whole value alongside its parts. A payload pattern may
+carry one, because what the constructor took is not `@`; a matcher's own pattern
+may not, because `@` already means exactly that.
+
+On a one-member case the constructor takes that member's value, which is what
+makes `case #Value(item)` and `case #Value({ item })` bind the same thing — the
+first is the shorthand you will meet on every `Optional`. Where both readings
+fit, the payload record wins.
+
+A binder is a name or another pattern, and that single rule is the whole of the
+nesting: `case #Going({ state as { index, total } })` reaches two levels in
+without any new syntax.
+
+## Parameters
+
+A function literal takes its parameter apart, which is what the methods
+answering a record are for — Essence has no tuple, so `pair(with:)` gives a
+list of `{ first, second }` and a pattern is how a caller reads one without
+naming that record first.
+
+```essence
+implementation {
+
+	§ A Function literal takes its Parameter apart — which is what the Methods
+	§ answering a Record are for, since Essence has no tuple.
+	Terminal.print(
+		["a", "b"]
+			::pair(with [1, 2, 3])
+			::map(({ first, second }) { <- "{first}{second}" }),
+	) § [ a1, b2 ]
+
+	§ A named Parameter's Pattern stands where the internal name goes, so the
+	§ label — and with it the call site — is untouched by anything it says.
+	function area(
+		of { width, height }: { width: Integer, height: Integer },
+	) -> Integer {
+		<- width::multiply(with height)
+	}
+
+	Terminal.print(area(of { width = 6, height = 7 })) § 42
+}
+```
+
+A named parameter's pattern stands where the internal name goes. The label is
+the external name and is untouched by it, so taking an argument apart inside a
+function changes nothing at any call site — the caller still writes
+`area(of { width = 6, height = 7 })`.
+
+## Declarations
+
+A `constant` or a `variable` takes a value apart the same way.
+
+```essence
+implementation {
+
+	constant numbers = [1, 2, 3, 4]
+
+	§ A Declaration takes a value apart the same way, which is how a Method
+	§ answering two Lists is read without naming the Record it came in.
+	constant { matching, rest } = numbers::partition(where (n) {
+		<- n::isEven()
+	})
+
+	Terminal.print(matching) § [ 2, 4 ]
+	Terminal.print(rest) § [ 1, 3 ]
+
+	§ A binder is a name or another Pattern, and that one rule is all of the
+	§ nesting there is.
+	constant point = { origin = { x = 1, y = 2 }, label = "p" }
+
+	constant { origin as { x as ox, y as oy } } = point
+
+	Terminal.print(ox::add(oy)) § 3
+
+	§ Only the bindings follow the Declaration's keyword, so these are two
+	§ Variables over one value that is held once.
+	variable { index, total } = { index = 1, total = 2 }
+
+	index = index::add(10)
+
+	Terminal.print(index::add(total)) § 13
+}
+```
+
+Only the bindings follow the declaration's own keyword. `variable { index,
+total }` is two variables; the value itself is held once, whatever it was
+written as.
+
+## Where a pattern may not ask a question
+
+Constraining a member by value asks a question, and a question can be answered
+no. A match arm may do that — it falls through to the next arm — but a
+declaration has nowhere to fall through to, so it is refused as
+`refutable-pattern`:
+
+<div class="error-output">
+
+```
+[refutable-pattern]
+Error: A Declaration can not match a value against a Pattern
+   ╭─┤ refutable.es:5:13 │
+   │
+ 5 │     constant { x = 1, y } = point
+   │                ──┬──
+   │                  ╰──── this can decline the value
+   │
+   │ Help: Write only 'x' to bind it, and ask about its value with 'match'.
+   │
+   │ Note: A Matcher may constrain a member by value, because an arm that declines falls through to the next one. A Declaration has nowhere to fall through to.
+───╯
+```
+
+</div>
+
+A parameter is refused for the same reason and under the same code — a call has
+nowhere to fall through to either. A member constrained by *type* is fine in
+both: that is an annotation, and it fails the way annotations fail rather than by
+declining a value.
+
+Two more codes belong to patterns, and both are about writing one where it would
+say nothing. `redundant-pattern-binder` is a matcher's own pattern naming the
+whole value — `case { x, y } as point` — which `@` already means; write `@` and
+the member bindings are untouched. `pattern-without-body` is a pattern in a
+native method signature or a protocol method signature, neither of which has a
+body, so there would be nobody to read the parts it named.
+
+## Next
+
+- [Pattern matching](/docs/language/pattern-matching) — the arms this grammar
+  came from, and exhaustiveness.
+- [Choices](/docs/language/choices) — the payloads a case pattern takes apart.
+- [Diagnostics](/docs/reference/diagnostics) — `refutable-pattern`,
+  `redundant-pattern-binder` and `pattern-without-body` in the index.

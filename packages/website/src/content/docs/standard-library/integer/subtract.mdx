@@ -1,0 +1,26 @@
+---
+title: "Integer::subtract"
+description: "Subtracts a number from this Integer, staying exact for every member of the numeric tower."
+section: standard-library
+order: 3
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "Integer"
+member: "subtract"
+signature: |
+  overload subtract {
+  	(_ other: Integer) -> Integer
+  	(_ other: Rational) -> Rational
+  	(_ other: Algebraic) -> Algebraic
+  	(_ other: Transcendental) -> Transcendental
+  }
+---
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Integer", href: "/docs/standard-library/integer" },
+	]}
+/>

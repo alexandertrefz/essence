@@ -1,0 +1,39 @@
+---
+title: "List::pair"
+description: "Pairs the items of the two Lists position by position. The pairing stops with the shorter List."
+section: standard-library
+order: 34
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "List"
+member: "pair"
+signature: |
+  pair<infer Other>(
+  	with other: List<Other>,
+  ) -> List<{ first: ItemType, second: Other }>
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "other",
+			type: "",
+			description: "the List to pair the items with",
+		},
+	]}
+/>
+
+## Returns
+
+a List of Records, each holding one item of this List under `first` and its counterpart under `second`.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>

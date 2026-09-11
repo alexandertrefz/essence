@@ -1,0 +1,42 @@
+---
+title: "List::slice"
+description: "A new List of the items from one position up to, but not including, another."
+section: standard-library
+order: 22
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "List"
+member: "slice"
+signature: |
+  slice(from: Integer, to: Integer) -> List<ItemType>
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "from",
+			type: "Integer",
+			description: "the first position to include, counting from zero.",
+		},
+		{
+			name: "to",
+			type: "Integer",
+			description: "the position to stop before.",
+		},
+	]}
+/>
+
+## Returns
+
+the List of items in that range.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>

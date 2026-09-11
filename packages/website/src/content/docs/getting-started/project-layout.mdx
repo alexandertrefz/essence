@@ -1,24 +1,21 @@
 ---
 title: Project Layout
 description:
-  A program is an entry file and whatever it imports, and what comes out of
-  the compiler runs on its own. A project that has something to say about
-  itself says it once, in essence.json at its root.
+  There is no manifest and no project file. A program is an entry file and
+  whatever it imports, and what comes out of the compiler runs on its own.
 section: getting-started
 order: 30
 template: article
 ---
 
-A program needs no manifest, no lockfile of its own and nothing to initialise —
-it is a `.es` file, and `essence` is pointed at it directly.
+essence has no project format. There is nothing to initialise, no manifest to
+fill in and no lockfile of its own — a program is a `.es` file, and `essence` is
+pointed at it directly.
 
 A program can still be several files. One file is one module, and an `import`
-block above the implementation names what it takes from another. The imports
-are the file list, and the compiler needs nothing else to build. What a
-_project_ may want to say about itself — which directories are not its sources,
-which tags an everyday test run leaves out — it says once, in an `essence.json`
-at its root, and every tool reads it there. A project with nothing to say needs
-no such file.
+block above the implementation names what it takes from another — see
+[Modules](/docs/language/modules). What there is no format for is the project
+around them: the imports are the file list, and the compiler needs nothing else.
 
 ## Every file opens with one wrapper
 
@@ -72,7 +69,6 @@ complete setup:
 
 ```
 my-app/
-  essence.json   ← optional: what the project says about itself
   src/
     main.es      ← imports report.es
     report.es
@@ -81,7 +77,6 @@ my-app/
 
 ```sh
 essence check src/*.es                     # before committing
-essence test                               # the tests the sources themselves write
 essence build src/main.es -o dist/main.js  # before shipping
 essence watch src/main.es                  # while working
 ```
@@ -96,404 +91,8 @@ imports yet is a module the entry cannot reach — and it is the file most likel
 to be the one you are working on.
 
 Several files given at once are compiled **in parallel**, one worker per core
-up to four, and `--jobs 1` puts everything back on the main thread — which is
+up to eight, and `--jobs 1` puts everything back on the main thread — which is
 what you want when a compiler crash gives you a stack trace to read.
-
-## What a project may configure
-
-Tests are written in the language: a file ends in a `tests { … }` section beside
-its `implementation`, or is a `Foo.tests.es` of nothing but imports and tests.
-`essence test` finds them, compiles them and runs them; every other command
-drops the sections before anything is enriched, so they cost a shipped program
-nothing.
-
-What a project wants to say about itself goes in **`essence.json`** at its
-root. `essence init` writes one to start from:
-
-```jsonc
-{
-	"$schema": "https://essencelang.org/schemas/essence.schema.json",
-
-	// Directories under this project that are not its sources.
-	"exclude": [],
-
-	"test": {
-		// Tags an everyday `essence test` leaves out; `--tag` brings one back.
-		"skipTags": [],
-		// Whether every run also tests what the declarations promise.
-		"contracts": false
-	}
-}
-```
-
-The file is JSON with comments and trailing commas allowed, the way
-`tsconfig.json` is — a project file is where the reason behind a setting gets
-written down. The `$schema` line is for your editor: the VS Code extension
-already knows the filename, and with the line any editor that reads JSON
-Schemas completes and checks the file too.
-
-**Where the file is, is the project root.** `essence test` run anywhere inside
-the project runs the project; a path on the command line narrows it to that
-path. Without a file, the working directory is the root, and every setting is
-at its default — nothing about a project with no file has changed. A nested
-`essence.json` governs the files under it, so a repository may hold several
-projects, each with its own settings.
-
-### Every setting
-
-| Key                           | Says                                                                                                                                | For one run                                     |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `exclude`                     | Directories that are not this project's sources, relative to the file. Paths, not globs.                                             | —                                               |
-| `test.skipTags`               | Tags an everyday run leaves out.                                                                                                     | `--skip-tag`, and `--tag` brings one back       |
-| `test.contracts`              | Whether every run also tests what the declarations promise.                                                                         | `--contracts`, `--no-contracts`                 |
-| `test.cases`                  | How many values each property test draws.                                                                                           | `--cases`                                       |
-| `test.coverage.report`        | The report a coverage run writes: `"lcov"` or `"json"`. Collecting coverage stays a choice about a run.                             | `--coverage-report`                             |
-| `test.coverage.out`           | Where that report is written, relative to the file.                                                                                 | `--coverage-out`                                |
-| `build.out`                   | Where bundles are written, relative to the file.                                                                                    | `--out`                                         |
-| `build.sourcemap`             | Whether a source map is written beside every bundle.                                                                                | `--sourcemap`, `--no-sourcemap`                 |
-| `build.minify`                | Whether bundles are minified.                                                                                                        | `--minify`, `--no-minify`                       |
-| `build.embed`                 | Whether bundles are built for embedding, with a descriptor beside each.                                                             | `--embed`, `--no-embed`                         |
-| `build.optimise`              | Whether the Optimiser runs.                                                                                                          | `--no-optimise`                                 |
-| `build.withoutOptimisations`  | Optimiser passes left out, by name.                                                                                                 | `--without-optimisation`                        |
-
-A flag speaks for one run and the file for every run. Where both speak, the
-flag wins: lists merge, so `--skip-tag` adds to the configured tags and
-`--tag` asks for one back, and every setting the file can turn on has a `--no-`
-twin on the command line, so a project that builds with source maps can be
-built without them once. Writing both twins at once is a usage error.
-
-Three questions decide where a setting lives, and the file only grows by them.
-Is it a fact about the project that every collaborator and every tool should
-share? Then it belongs here. Is it a fact about this machine or this person —
-where `bun` is, how long the editor waits before re-running tests? Then it
-stays in the editor's settings or the environment. Is it a choice about this
-run — `--watch`, `--filter`, `--seed`, `--coverage`, `--mutate`? Then it is a
-flag and nothing else.
-
-### `exclude` narrows the walk, and only the walk
-
-Every project holds `.es` files that are not its own: a corpus of deliberately
-broken files, an example a book quotes, a vendored copy of something else.
-Nothing can tell those from sources by looking at them, so the project says
-which directories they are:
-
-```jsonc
-{
-	"exclude": ["fixtures/broken"]
-}
-```
-
-Every walk of the project asks this same question — `essence test` finding
-tests, and the editor deciding which files its Problems panel speaks for — and
-both read this one list. It narrows the walk and nothing else: a file named on
-the command line was asked about by name and is still compiled and still
-reported, and a file you open in the editor still shows you its Diagnostics.
-`node_modules`, `.git`, `dist` and `build` are never walked, whatever the file
-says.
-
-### Mistakes in the file are Warnings
-
-A key the file does not have, a setting of the wrong shape, a file that does
-not parse: each is reported as a Warning with a span, rendered like every other
-Diagnostic — in the terminal at the head of a run, and on `essence.json` itself
-in the editor — and the run continues with that setting at its default, which
-the Warning's note says out loud. A project should not fail to run its tests
-over a key it wrote wrongly; it should be told, in the place it wrote it. The
-codes are `unknown-setting`, `setting-shape`, `moved-setting` and
-`unreadable-project-file`, each with an entry in the Diagnostics reference.
-
-The settings used to live under an `essence` key of the nearest `package.json`.
-That key is no longer read; a manifest that still spells it gets a
-`moved-setting` Warning on the key, and the same object moved into an
-`essence.json` beside it is the whole migration.
-
-## Properties
-
-A test written `for any (…)` declares typed Parameters, and the runner generates
-a value of each Type once per case — a hundred cases by default. This is where
-the type system pays out: the generator is derived from the Type, structurally.
-A Record is built member by member, a Choice is built Case by Case, a List from
-its item Type, a Dictionary from its key and value Types, and a checked
-refinement is honoured, so a `NonEmptyList` is never empty and a
-`NonZeroInteger` is never zero:
-
-```essence
-test "add commutes" for any (a: Integer, b: Integer) {
-	expect a::add(b)::is(b::add(a))
-}
-
-test "ranking keeps every team" for any (standings: NonEmptyList<Standing>) {
-	constant ranked = Standings.ranked(standings)
-
-	expect ranked::length()::is(standings::length())
-}
-```
-
-A failing case is **shrunk**: the runner keeps trying smaller values that still
-fail, so what a report shows is the smallest counterexample it could reach
-rather than the wall of digits the source happened to draw. Beside it stands the
-seed the values came from, and `essence test --seed <hex>` draws them again —
-each test folds its own identity into the run's seed, so replaying one test with
-`--filter` still draws exactly what it drew. `--cases <count>` runs another
-number of them.
-
-```
-[test-failed]
-Error: 'recording a result never lowers points' failed
-    │ Help: Run it again: essence test --seed 41c37ea3 -f "never lowers points"
-    │
-    │ Note: after 37 cases, shrunk to: standing = { …, points = 0 }  scored = 0  conceded = 1
-```
-
-The value a shrink ended at is also **written down**, in
-`__counterexamples__/<File>.es.json` beside the source — a sibling of the
-snapshots, kept under the same identity everything durable is keyed by, and
-meant to be committed. Every later run replays what that file holds before it
-draws a single case, so a bug the search found once is caught by the run after
-it whether or not a fresh hundred cases would turn it up again:
-
-```
-[test-failed]
-Error: 'recording a result never lowers points' failed
-    │ Note: failed on a stored counterexample (1 re-run): standing = { …, points = 0 }  scored = 0  conceded = 1
-```
-
-A replay draws nothing and is counted apart from the cases — a test that
-re-ran one and then passed reads `(100 cases · 1 replayed)` — so `--seed` goes
-on reproducing the run it names however much the corpus has grown since. A
-stored value is kept once the code is fixed, because what it is worth is that it
-goes on being asked; one the Types no longer fit is dropped by the run that met
-it. A test keeps the ten newest, and a run narrowed by `--filter` or a tag
-leaves what it did not visit alone.
-
-A Type whose values carry an invariant no structure can know about generates
-itself instead. A Namespace conforming to `Generatable` replaces the derived
-generator for the Type it targets:
-
-```essence
-namespace Team for Team is Generatable {
-	static generate(from source: Randomness) -> Team {
-		<- { name = source::pick(from ["Lions", "Tigers", "Bears", "Wolves"]) }
-	}
-}
-```
-
-A `Randomness` is the one value in the language that changes: every Method
-answers a value and advances the source, so asking for a name and then for a
-score never answers the same draw twice.
-
-A generator written this way says how to build a value and nothing about what
-one is made of, which is the whole of what writing one down would need — so a
-property test with such a Parameter keeps no counterexamples, and neither
-shrinks nor replays them.
-
-## The properties a declaration already states
-
-A checked refinement is a property, and a Method that writes one in its return
-Type has already stated the property its answer holds. `essence test --contracts`
-runs it: the receiver and every Argument are generated from the declared Types,
-the Method is called, and the answer is expected to hold each conjunct the
-return Type promises.
-
-```essence
-namespace Standings for NonEmptyList<Standing> {
-	§ Every goal below runs this with a generated receiver and expects the
-	§ answer to be above zero, because that is what the Type says.
-	leaderPoints() -> PositiveInteger {
-		<- @::highestItem(on (standing) { <- standing.points }).points
-	}
-}
-```
-
-A goal that **throws** fails whatever the return Type says, because a signature
-is a promise to answer over the domain it names — so a Method with no refinement
-at all still gets a goal, and totality is what it checks. The goals are reported
-under a `contracts` suite beside the tests the project wrote, named as the Method
-is spelled, and they are ordinary property tests in every other respect: the same
-seeds, the same shrinking, the same stored counterexamples.
-
-Nothing is synthesized for a generic Method — a value drawn for one instantiation
-proves nothing about the rest — nor for one whose Parameters nothing can build a
-value of. Both are named once per Namespace as an `ungeneratable-contract`
-remark, which is a note about what a run is covering rather than a mistake
-anybody made.
-
-A project that wants them every run says so in its `essence.json`:
-
-```jsonc
-{
-	"test": {
-		"contracts": true
-	}
-}
-```
-
-## Tables, snapshots and examples
-
-A test written `across` a List of rows runs once per row, with the row bound to
-the name after it and the test's own name interpolating whatever the row holds
-— so the report says which row failed:
-
-```essence
-test "{scored}–{conceded}" across [
-	{ scored = 2, conceded = 1 },
-	{ scored = 1, conceded = 1 },
-] ({ scored, conceded }: Scoreline) {
-	expect scored::isGreaterThanOrEqualTo(conceded)
-}
-```
-
-The rows are written where the test is, because each of them is a test in its
-own right and carries its row number in the identity everything durable is
-keyed by.
-
-`matches snapshot` compares a value against one a run recorded. Written bare, it
-is recorded **inline**: the first run writes the value back into the source
-through the formatter, and the diff is where it is reviewed. Written
-`from "name"`, it is kept in `__snapshots__/<File>.es.snap` beside the source,
-which is where output too large to read inline belongs:
-
-```essence
-test "renders the table" {
-	expect Table.render(table) matches snapshot from "after-round-7"
-}
-```
-
-A snapshot nothing has recorded is written and the test passes; one that differs
-is a failure with the difference as a note, and `essence test --update` records
-it instead. In an editor, the "Accept snapshot" lens above the test does the
-same for that test alone.
-
-An `@example` block in a `§§` documentation comment is a test as well. It is
-compiled in the file's own scope and reported under a synthetic `examples`
-suite, named after the Method or Function it documents — so an example that
-drifts from the code fails a run rather than quietly lying in hover text:
-
-```essence
-§§ The points a Standing has won per game played.
-§§
-§§ @example
-§§   constant standing = Standings.blank(of lions)::record(scored 2, conceded 0)
-§§
-§§   expect standing::pointsPerGame()::is(3/1)
-§§
-§§ @returns — the points divided by the games played, or 0/1 before any game.
-pointsPerGame() -> Rational {
-```
-
-## Benchmarks
-
-A `benchmark` is a test whose body is **timed** rather than judged. It takes the
-same name, the same Modifiers and the same `across` rows a test takes — what
-differs is what running it means:
-
-```essence
-benchmark "ranks a full division" {
-	expect Standings.ranked(division)::length()::is(20)
-}
-```
-
-Measuring a body takes hundreds of runs of it, so a benchmark is left out of an
-ordinary run and counted as deselected — the tree says `only with --bench` where
-it would have run. `essence test --bench` measures them **as well as** running
-the tests, because a measurement of a body that is wrong is a number about
-nothing: a benchmark whose assertions do not hold is reported as the failure it
-is and never timed.
-
-The body is run in batches until one takes long enough for the clock to have
-something to say, several batches are taken, and the middle one answers. What
-comes out is the time of a single run, and the first measurement is recorded as
-a baseline in `__benchmarks__/<File>.es.bench` beside the source:
-
-```
-benchmark "ranks a full division"
-	1204833 ns
-```
-
-Later runs compare against it. A quarter slower **fails** — a benchmark says
-what a body may cost the way an assertion says what it may answer — and the
-report carries both times and the one command that accepts the new one. A fifth
-faster passes and says so, but does not move the baseline on its own: a fast
-machine would otherwise ratchet the number down for everybody.
-`essence test --bench --update` records what this run measured. A benchmark
-written `across` rows keeps a baseline per row, numbered the way a table test's
-snapshot is.
-
-`for any` is refused here. A measurement is comparable only where every run does
-the same work, and a generated value changes the work every case.
-
-## Mutation testing
-
-Coverage says a line **ran**. Mutation says a bug there would be **caught**.
-`essence test --mutate` asks the second question: it changes the code on
-purpose, one deliberate lie at a time, and runs the tests that reach the line
-to see whether any of them notices.
-
-```sh
-essence test --mutate                 # every module the walk finds
-essence test --mutate src/Standings.es  # one file's own lies
-```
-
-```
- 41 mutants  ·  36 killed  ·  3 survived  ·  2 on lines no test reaches  ·  92% caught
-
- ✗ Standings.es:31  swap ::isGreaterThan for ::isGreaterThanOrEqualTo — every test still passes
-    if scored::isGreaterThan(conceded) {
-    reached by 4 tests
-```
-
-The lies are the compiler's, told on the typed program rather than on the text,
-so every one of them is a program that still typechecks: a comparison rotated a
-single step, `is` against `isNot`, addition against subtraction, a Boolean
-literal flipped, an `if` turned inside out by swapping its two bodies, an
-Integer literal nudged up, down or to zero, and a Case construction swapped for
-a **sibling Case of its own Choice**. That last one is the operator an
-exhaustive language makes possible: the Cases are a closed set, so "no test
-notices this being a `#Draw`" is a complete statement rather than a guess.
-
-A mutant is judged only by the tests that **reach** it. The run compiles once
-with the coverage counters in, runs the tests once with each of them saying
-which lines it touched, and then runs each mutant against that line's own tests
-alone — so the cost is a compile and a handful of tests, not a compile and the
-whole suite. A site no test reaches is reported as its own count and never
-compiled at all: it is the coverage report's finding wearing mutation's hat.
-
-A mutant that **crashes** — one whose bundle will not load, or which throws as
-it runs — counts as killed: a program that comes apart is a program the world
-notices. A mutant whose run never comes back is stopped and counted as **hung**,
-which counts as caught too, because a loop that no longer ends is a failure a
-reader would see as surely as a red test. The wait before a run is given up on
-is ten times what the same tests took when they were green, and never less than
-five seconds. Only a mutant that would not **compile** is left out of the score
-altogether; that is the walker's own shortfall rather than anything the tests
-did.
-
-The whole run draws from one seed, minted once and handed to the baseline and to
-every mutant alike, so a property test in a covering set asks the mutant exactly
-the question it asked the code. Two runs at one seed are the same report.
-
-The baseline is the run **this project's own `essence test` is**: the same
-filters, and the same contract goals where the project asks for them, so a
-generated goal reaches sites and kills mutants exactly as a written test does.
-It has to be green, and it has to be unfocused — a focus silences most of the
-suite, and a mutation run reads what ran to learn what reaches where, so a
-focused baseline would report every site the silenced tests cover as one no test
-reaches. A focused run is refused with exit 2 before a mutant is compiled, and
-`--without-optimisation instrument-coverage` is refused outright: without the
-counters there is no table to read.
-
-`--mutation-limit` caps how many mutants are compiled — a mutant costs a compile
-and a run, so a large project is worth narrowing — and the sites are taken in
-file order, so the same limit answers about the same mutants twice. It caps what
-is **judged** and nothing else: a site no test reaches costs neither a compile
-nor a run, and is reported whatever the limit. The report says where the limit
-stopped and how many sites it left alone, and the `mutation-end` tally still
-counts every site the walker found, so a consumer subtracts to get the rest.
-
-A mutation score is **information**, so the run exits 0 whatever it found.
-`--strict` is what a job that holds a project to its score asks for: a survivor
-exits 1, the way a failing test does. `--json` writes one `mutant` event per
-line and a `mutation-end` tally, exactly as `--json` does for a test run.
 
 ## Conventions worth keeping
 
@@ -508,14 +107,13 @@ None of these are enforced. They are what the repository itself does.
   decision.
 - **`essence check` is the fast gate.** It stops after validation and writes
   nothing, so it is the form meant for editors, pre-commit hooks and CI.
-  `--json` turns it into a diagnostic list another tool can read. It checks the
-  `tests { … }` block as well, which a build never does — a build drops the
-  section, and a gate that said nothing about it would pass a file the next
-  step cannot compile.
+  `--json` turns it into a diagnostic list another tool can read.
 
 ## Next
 
-- [Installation](/docs/getting-started/installation) — every `essence` command,
-  and the four ways to install the toolchain.
-- [Your first program](/docs/getting-started/your-first-program) — four steps,
-  about five minutes.
+- [Using the compiler](/docs/guides/using-the-compiler) — every command, flag
+  and watch-mode key.
+- [Modules](/docs/language/modules) — the `import` and `export` blocks that
+  make a directory of files one program.
+- [Values and constants](/docs/language/values-and-constants) — what goes
+  inside the wrapper.

@@ -1,0 +1,28 @@
+---
+title: "List::removeEvery"
+description: "A new List without every item equal — by the items' own `is` — to the given one, or without every item the given check accepts. The by-value entry is available whenever the items conform to `Equatable`."
+section: standard-library
+order: 12
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "List"
+member: "removeEvery"
+signature: |
+  overload removeEvery {
+  	<infer ItemType is Equatable>(_ item: ItemType) -> List<ItemType>
+  	(where check: (_: ItemType) -> Boolean) -> List<ItemType>
+  }
+---
+
+## Returns
+
+the List of remaining items.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>

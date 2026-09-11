@@ -1,0 +1,28 @@
+---
+title: "List::count"
+description: "How many items equal the given one — by the items' own `is` — or are accepted by the given check. The by-value entry is available whenever the items conform to `Equatable`."
+section: standard-library
+order: 28
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "List"
+member: "count"
+signature: |
+  overload count {
+  	<infer ItemType is Equatable>(of item: ItemType) -> Integer
+  	(where check: (_: ItemType) -> Boolean) -> Integer
+  }
+---
+
+## Returns
+
+the count.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>

@@ -1,0 +1,45 @@
+---
+title: "List.of"
+description: "The Integers from one value through another, both included — counting down when the first is the greater."
+section: standard-library
+order: 37
+template: reference
+kind: "static method"
+monoTitle: true
+namespace: "List"
+member: "of"
+signature: |
+  static of(
+  	integersFrom start: Integer,
+  	through end: Integer,
+  ) -> NonEmptyList<Integer>
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "integersFrom",
+			type: "Integer",
+			description: "the first Integer of the List",
+		},
+		{
+			name: "through",
+			type: "Integer",
+			description: "the last Integer of the List, included",
+		},
+	]}
+/>
+
+## Returns
+
+the List of Integers.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>

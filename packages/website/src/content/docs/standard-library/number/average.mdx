@@ -1,0 +1,29 @@
+---
+title: "Number.average"
+description: "The arithmetic mean of the Numbers in the List — their sum divided by their count, as an exact Rational."
+section: standard-library
+order: 15
+template: reference
+kind: "static method"
+monoTitle: true
+namespace: "Number"
+member: "average"
+signature: |
+  static overload average {
+  	(_ integers: List<Integer>) -> Optional<Rational>
+  	(_ rationals: List<Rational>) -> Optional<Rational>
+  	(_ numbers: List<Integer | Rational>) -> Optional<Rational>
+  }
+---
+
+## Returns
+
+the mean, or nothing for the empty List — no Numbers have no mean.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Number", href: "/docs/standard-library/number" },
+	]}
+/>

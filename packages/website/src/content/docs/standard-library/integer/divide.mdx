@@ -1,0 +1,26 @@
+---
+title: "Integer::divide"
+description: "Divides this Integer by a number, exactly. Dividing by a possibly-zero Integer or Rational is empty for zero; dividing by a NonZeroInteger or an Algebraic can never fail — the one is proven, the other is irrational and so never zero."
+section: standard-library
+order: 4
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "Integer"
+member: "divide"
+signature: |
+  overload divide {
+  	(by other: Integer) -> Optional<Rational>
+  	(by other: Rational) -> Optional<Rational>
+  	(by other: Algebraic) -> Algebraic | Rational
+  	(by other: NonZeroInteger) -> Rational
+  }
+---
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Integer", href: "/docs/standard-library/integer" },
+	]}
+/>

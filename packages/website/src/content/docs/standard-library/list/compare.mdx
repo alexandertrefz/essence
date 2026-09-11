@@ -1,0 +1,39 @@
+---
+title: "List::compare"
+description: "Orders the List against another one lexicographically — the first differing pair of items decides, and on an equal prefix the shorter List comes first. Available whenever the items conform to `Comparable`."
+section: standard-library
+order: 25
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "List"
+member: "compare"
+signature: |
+  compare<infer ItemType is Comparable>(
+  	to other: List<ItemType>,
+  ) -> Ordering
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "other",
+			type: "",
+			description: "the List to compare with",
+		},
+	]}
+/>
+
+## Returns
+
+`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>

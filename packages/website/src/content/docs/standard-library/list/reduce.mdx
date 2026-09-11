@@ -1,0 +1,34 @@
+---
+title: "List::reduce"
+description: "Combines every item into a single value, starting from the given one — folding to the end, or stopping early when the combiner says to."
+section: standard-library
+order: 18
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "List"
+member: "reduce"
+signature: |
+  overload reduce {
+  	<infer Result>(
+  		startingWith initial: Result,
+  		_ combine: (_: Result, _: ItemType) -> Result,
+  	) -> Result
+  	<infer Result>(
+  		startingWith initial: Result,
+  		step combine: (_: Result, _: ItemType) -> Step<Result, Result>,
+  	) -> Result
+  }
+---
+
+## Returns
+
+the combined value.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>

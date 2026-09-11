@@ -1,0 +1,24 @@
+---
+title: "Integer::quotient"
+description: "The whole part of Euclidean division — the count of whole divisors, paired with `remainder` so that `quotient · divisor + remainder` is the original Integer. `(0 - 7)::quotient(dividingBy 3)` is `0 - 3`, since the remainder is never negative."
+section: standard-library
+order: 19
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "Integer"
+member: "quotient"
+signature: |
+  overload quotient {
+  	(dividingBy divisor: Integer) -> Optional<Integer>
+  	(dividingBy divisor: NonZeroInteger) -> Integer
+  }
+---
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Integer", href: "/docs/standard-library/integer" },
+	]}
+/>

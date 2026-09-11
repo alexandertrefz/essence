@@ -1,0 +1,49 @@
+---
+title: "String::pad"
+description: "The String padded with the given String up to the given length — at the front when no end is named, or at the given end."
+section: standard-library
+order: 29
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "String"
+member: "pad"
+signature: |
+  overload pad {
+  	(to length: Integer, with padding: String) -> String
+  	(
+  		to length: Integer,
+  		with padding: String,
+  		at side: Side,
+  	) -> String
+  }
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "to",
+			type: "Integer",
+			description: "the length to reach.",
+		},
+		{
+			name: "with",
+			type: "String",
+			description: "the String to pad with, repeated as needed.",
+		},
+	]}
+/>
+
+## Returns
+
+the padded String; unchanged when it is already that long.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "String", href: "/docs/standard-library/string" },
+	]}
+/>

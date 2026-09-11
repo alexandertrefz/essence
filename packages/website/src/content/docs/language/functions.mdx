@@ -1,0 +1,313 @@
+---
+title: Functions
+description:
+  How a function is declared, how a value leaves one, and why the labels at a
+  call site belong to the function's name rather than decorating it.
+section: language
+order: 40
+template: article
+---
+
+A function is a name, a list of parameters and one type it answers with. There
+is no `return` statement, no default argument, and no way to leave the return
+type off. What there is instead is a left arrow, a labelling scheme that makes a
+call read as a phrase, and an `overload` block for everything one signature can
+not cover.
+
+## Declaring one
+
+```essence
+implementation {
+
+	§ The Type after the arrow is what the Function answers with; the left
+	§ arrow is how a value leaves it.
+	function double(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+
+	Terminal.print(double(21)) § 42
+}
+```
+
+`function` introduces it, the parentheses hold the parameters, and the type
+after `->` is what a call gets back. That type is written even where the body
+would give it away. A signature is the part of a function that everything else
+depends on, and it should not shift because someone edited a body — so leaving
+it out is a syntax error rather than an invitation to infer.
+
+Declaration order does not matter for functions. A `function` declaration is in
+scope throughout the block that holds it, so one may be called above the line
+that declares it, may call itself, and two may call each other with neither
+written first. Other bindings are not hoisted: a `constant` comes into scope on
+its own line, and a function body written above one can not name it.
+
+## Answering with `<-`
+
+`<-` is how a value leaves a function. It answers at once, so nothing after it
+in the block is reached, and a body written as a run of early answers needs no
+nesting to say so.
+
+```essence
+implementation {
+
+	§ `<-` answers at once — nothing after it in the block is reached.
+	function sign(_ value: Integer) -> String {
+		if value::isNegative() {
+			<- "negative"
+		}
+
+		if value::isPositive() {
+			<- "positive"
+		}
+
+		<- "zero"
+	}
+
+	Terminal.print(sign(-3)) § "negative"
+	Terminal.print(sign(0)) § "zero"
+	Terminal.print(sign(7)) § "positive"
+}
+```
+
+What a function may not do is fall off its end. Delete the final `<- "zero"` and
+the compiler says which promise is unkept:
+
+<div class="error-output">
+
+```
+[missing-return]
+Error: Not every path through this Function returns
+    ╭─┤ sign.es:3:2 │
+    │
+  3 │ ╭─▶     function sign(_ value: Integer) -> String {
+    ┆ ┆
+ 11 │ ├─▶     }
+    │ │
+    │ ╰─────────── this path falls off the end
+    │
+    │ Note: The declared return Type is String, so every path must yield one.
+────╯
+```
+
+</div>
+
+Where the branching is over the shape of a value rather than over a condition,
+`<- match … { … }` answers with the whole match, and the exhaustiveness check
+takes over from `missing-return`. That is [pattern
+matching](/docs/language/pattern-matching), and it is the usual shape of a
+function whose parameter is a union.
+
+## Labels
+
+A parameter carries two names — the one a call writes and the one the body reads
+— and there are three ways to settle them.
+
+```essence
+implementation {
+
+	§ One name is both the label and the name the body uses.
+	function greet(subject: String) -> String {
+		<- "Hello, {subject}!"
+	}
+
+	§ Two names: `of` is what a call writes, `text` is what the body reads.
+	function letter(of text: String, at position: Integer) -> String {
+		<- text::character(at position)::otherwise("")
+	}
+
+	§ An underscore drops the label, so the Argument stands on its own.
+	function shout(_ message: String) -> String {
+		<- "{message}!"
+	}
+
+	Terminal.print(greet(subject "World")) § "Hello, World!"
+	Terminal.print(letter(of "Essence", at 0)) § "E"
+	Terminal.print(shout("Look")) § "Look!"
+}
+```
+
+`subject: String` is the short form: one identifier doing both jobs, which suits
+a parameter whose own name already reads well at a call site. `of text: String`
+separates them, so the call can say `of` while the body says `text` — a
+preposition reads as a phrase where it stands and reads as nothing inside a
+body. `_ message: String` drops the label entirely, which is right when the
+argument is the obvious subject of the verb the function is named after.
+
+An argument's label is not optional and the arguments are not shufflable. Write
+the first one bare and the compiler names the label it wanted:
+
+<div class="error-output">
+
+```
+[argument-label-mismatch]
+Error: This Argument is not labelled 'of'
+   ╭─┤ letter.es:7:24 │
+   │
+ 7 │     Terminal.print(letter("Essence", at 0))
+   │                           ────┬────
+   │                               ╰────── this Argument carries no label
+   │
+   │ Help: Write 'of' before the value.
+   │
+   │ Note: The signature takes 2 Arguments: Parameter 'of' is String, Parameter 'at' is Integer.
+───╯
+```
+
+</div>
+
+That strictness is what makes the labels worth anything. Because a call must
+write them, and write them in order, the labels are part of the name: the
+function above is `letter(of:at:)` rather than `letter` plus two anonymous
+positions, and `character(at:)`, `pad(to:with:)`, `split(intoGroupsOf:)` and
+`clamp(between:and:)` throughout the standard library are named the same way. A
+reader meeting `15::clamp(between 1, and 10)` does not have to remember which
+bound comes first, and a reviewer looking at a diff can see that an argument
+changed meaning rather than only that it changed value.
+
+<Note>
+	Doubling the comment sigil turns a private note into documentation. A `§§`
+	block above a function is Markdown, carries `@param` and `@returns` tags, and
+	reaches the editor unchanged — on hover, in signature help, beside a
+	completion.
+</Note>
+
+## Overloads, and the defaults there are not
+
+A parameter can not be given a value to fall back on: writing
+`subject: String = "World"` in a parameter list is a syntax error rather than a
+default. What stands in for one is a second entry under the same name, declared
+in an `overload` block. Entries there are told apart by the whole of their
+signatures — labels included, which is why two of them may differ in nothing
+else — and an entry with no arguments at all is the one that reads as a default.
+
+```essence
+implementation {
+
+	namespace Wrapping for String {
+		§ Overloads share a name and are told apart by their whole signatures,
+		§ labels included. The Argument-less entry is what another language
+		§ would have written as a default.
+		overload wrap {
+			() -> String {
+				<- @::wrap(between "(", and ")")
+			}
+
+			(in fence: String) -> String {
+				<- "{fence}{@}{fence}"
+			}
+
+			(between opening: String, and closing: String) -> String {
+				<- "{opening}{@}{closing}"
+			}
+		}
+	}
+
+	Terminal.print("essence"::wrap()) § "(essence)"
+	Terminal.print("essence"::wrap(in "*")) § "*essence*"
+	Terminal.print("essence"::wrap(between "<", and ">")) § "<essence>"
+}
+```
+
+The standard library is written this way throughout — `trim()` is an entry whose
+body calls `trim(at #BothEnds)`, and `normalize()` one whose body calls
+`normalize(as #ComposedCanonical)`. The cost is a line of declaration; what it
+buys is that the shorter call is a real signature. It appears in completion on
+its own, it carries its own documentation, and the value it stands in for is
+written once in one body rather than in every caller that left an argument out.
+
+Overloading belongs to methods, not to free functions: an `overload` block goes
+inside a [namespace](/docs/language/namespaces-and-methods), and a free function
+in a program carries one signature. Declaring `function describe` twice is a
+`duplicate-variable` error rather than a second entry, and writing
+`overload function` outside the standard library is refused as
+`overload-function-outside-stdlib`, with the namespace form offered as the way
+to say what was meant.
+
+## Functions as values
+
+A function type is a signature with no name attached, so it can be written
+wherever a type can — as a parameter's annotation, as a constant's, or as
+another function's answer. A function literal is that signature with a body
+after it and no `function` keyword in front.
+
+```essence
+implementation {
+
+	§ A Function Type is a signature with no name attached.
+	function applyTwice(
+		_ transform: (_: Integer) -> Integer,
+		to value: Integer,
+	) -> Integer {
+		<- transform(transform(value))
+	}
+
+	§ A Function literal is a signature and a body, without the keyword.
+	constant increment = (_ value: Integer) -> Integer { <- value::add(1) }
+
+	Terminal.print(applyTwice(increment, to 0)) § 2
+
+	§ A declared Function is a value under its own name too.
+	function square(_ value: Integer) -> Integer {
+		<- value::multiply(with value)
+	}
+
+	Terminal.print([1, 2, 3]::map(square)) § [ 1, 4, 9 ]
+	Terminal.print([1, 2, 3, 4]::keepEvery(where (item) {
+		<- item::isEven()
+	})) § [ 2, 4 ]
+}
+```
+
+`(_: Integer) -> Integer` is the shape every callback in the standard library
+takes: a parameter type with neither a label nor a name, since the body that
+supplies the function is the only thing that needs to name it. A function type
+may carry labels — `(value: Integer) -> Integer` is a type whose calls write
+`value` — and the predicates on `List` deliberately do not, so that a literal
+passed to `keepEvery` or `anyItem` can name its item whatever suits the call.
+
+The literal in the last line writes no annotations at all. A function literal
+passed as an argument reads its parameter types, its labels and its return type
+off the parameter it is being passed to, and the inferred types reach the body —
+`item` is an `Integer` there, which is the only reason `isEven` resolves.
+Annotations are still accepted, whole or in part, and a written one has to fit
+the expected signature rather than replace it: a parameter type may be wider
+than the inferred one, but writing `(item: Integer)` where `(_: Integer)` is
+expected declares a label the callback does not have, and the call stops
+resolving. A literal that is not an argument has no expected signature to read
+at all — that is `uninferable-parameter-type`, and such a literal writes its
+signature out in full.
+
+## Generic functions in passing
+
+A function may declare type parameters of its own, each with `infer`, and they
+bind from the arguments at each call.
+
+```essence
+implementation {
+
+	§ A Type Parameter is declared with `infer` and bound by the Arguments.
+	function pairUp<infer Value>(
+		_ first: Value,
+		with second: Value,
+	) -> List<Value> {
+		<- [first, second]
+	}
+
+	Terminal.inspect(pairUp(1, with 2)) § [ 1, 2 ]
+	Terminal.inspect(pairUp("a", with "b")) § [ "a", "b" ]
+}
+```
+
+Two calls, one function, and `Value` is an `Integer` in the first and a `String`
+in the second. Which arguments a type parameter may be read from, what a bound
+does to it and why `infer` is written at all belong to
+[generics](/docs/language/generics).
+
+## Next
+
+- [Namespaces and methods](/docs/language/namespaces-and-methods) — where
+  `overload` blocks live, and how `::` finds the method it calls.
+- [Generics](/docs/language/generics) — type parameters, `infer`, and bounding
+  one by a protocol.
+- [Pattern matching](/docs/language/pattern-matching) — the usual body of a
+  function whose parameter is a union.

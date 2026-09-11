@@ -1,0 +1,25 @@
+---
+title: "Algebraic::divide"
+description: "Divides this Algebraic by a number, exactly — via the conjugate, so dividing by an Algebraic itself can never fail. Dividing by an Integer or Rational is empty only for zero."
+section: standard-library
+order: 6
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "Algebraic"
+member: "divide"
+signature: |
+  overload divide {
+  	(by other: Integer) -> Optional<Algebraic>
+  	(by other: Rational) -> Optional<Algebraic>
+  	(by other: Algebraic) -> Optional<Rational | Algebraic>
+  }
+---
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Algebraic", href: "/docs/standard-library/algebraic" },
+	]}
+/>

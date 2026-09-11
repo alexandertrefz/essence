@@ -1,0 +1,37 @@
+---
+title: "NonZeroInteger::multiply"
+description: "Multiplies this NonZeroInteger with another. The product is never zero either, so the evidence carries through the operation instead of being forgotten at it."
+section: standard-library
+order: 0
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "NonZeroInteger"
+member: "multiply"
+signature: |
+  multiply(with other: NonZeroInteger) -> NonZeroInteger
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "with",
+			type: "NonZeroInteger",
+			description: "the NonZeroInteger to multiply with",
+		},
+	]}
+/>
+
+## Returns
+
+the product, which is not zero.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "NonZeroInteger", href: "/docs/standard-library/non-zero-integer" },
+	]}
+/>

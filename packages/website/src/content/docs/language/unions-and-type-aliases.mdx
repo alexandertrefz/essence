@@ -1,0 +1,316 @@
+---
+title: Unions and Type Aliases
+description:
+  A union lists the shapes a value is allowed to have, and `type` gives any
+  shape a name. Both are structural — a name describes a shape rather than
+  creating a new type of its own.
+section: language
+order: 60
+template: article
+---
+
+Most types describe one shape. A union describes several, and says that a value
+may have any one of them and nothing else. It is the type a `match` exists to
+take apart, and the reason the compiler can promise that taking it apart was
+exhaustive.
+
+## A union is a set of shapes
+
+Members are separated with a pipe. There is no wrapper, no tag and no
+constructor: a value belongs to a union because its own type is one of the
+members.
+
+```essence
+implementation {
+
+	§ A Union lists the shapes a value is allowed to have, and nothing else.
+	constant amount: Integer | Rational = 1/2
+
+	§ Nothing is wrapped — the value stored is the Rational itself.
+	Terminal.print(amount) § 1/2
+
+	§ A Union stands wherever a Type stands, Parameters included.
+	function isBelowFour(_ degrees: Integer | Rational) -> Boolean {
+		<- degrees::isLessThan(4)
+	}
+
+	Terminal.print(isBelowFour(9/2)) § false
+}
+```
+
+Because membership is decided by shape rather than by declaration, a union can
+be formed out of types that know nothing about each other and were never
+written with it in mind. `Integer` was not modified to become part of
+`Integer | Rational`; it did not have to be.
+
+## Naming a shape with `type`
+
+`type` binds a name to a shape — a record, a union, or a generic type with its
+arguments filled in.
+
+```essence
+implementation {
+
+	§ A name for a Record shape …
+	type Point = { x: Integer, y: Integer }
+
+	§ … for a Union …
+	type Greetable = String | Integer
+
+	§ … and for a Generic Type with its Arguments already filled in.
+	type Names = List<String>
+
+	constant here: Point = { x = 3, y = 4 }
+	constant subject: Greetable = 42
+	constant names: Names = ["Ada", "Grace"]
+
+	Terminal.print(here) § { x = 3, y = 4 }
+	Terminal.print(subject::toString()) § 42
+	Terminal.print(names) § [ Ada, Grace ]
+}
+```
+
+The name of a union survives into the compiler's output: hovers, inlay hints
+and diagnostics say `Greetable` rather than spelling `String | Integer` out
+every time. That is display only, and assignability ignores it. A name over a
+record shape is not even kept for display — the compiler prints the shape back,
+because the shape is all there ever was.
+
+## A name, not a new type
+
+Record types are structural. `type Point = …` does not mint a type that values
+have to be converted into; it describes a shape, and everything with that shape
+already fits.
+
+```essence
+implementation {
+
+	type Point = { x: Integer, y: Integer }
+	type Coordinate = { x: Integer, y: Integer }
+
+	function describe(_ point: Point) -> String {
+		<- "{point.x}, {point.y}"
+	}
+
+	constant here: Coordinate = { x = 3, y = 4 }
+
+	§ Two names, one shape — so this is not a conversion; there is nothing
+	§ to convert.
+	Terminal.print(describe(here)) § 3, 4
+
+	§ A Record literal fits the same way, and a field the shape never asked
+	§ for is no obstacle.
+	Terminal.print(describe({ x = 1, y = 1, z = 2 })) § 1, 1
+}
+```
+
+An alias over an existing type behaves the same way, which is worth knowing
+before reaching for one as a unit of measure: `type Meters = Integer` and
+`type Seconds = Integer` are two spellings of `Integer`, so passing a `Seconds`
+where a `Meters` was asked for is accepted, and there is nothing there for the
+compiler to object to. When two things must not be interchangeable, what makes
+them different is a [`choice`](/docs/language/choices) — even one with a single
+case — because a choice is nominal.
+
+## What an un-narrowed union will and will not do
+
+A method call on a union is resolved against every member. When all of them
+have a method of that name that accepts the arguments, the call is allowed and
+the member's own implementation runs — `subject::toString()` on a
+`String | Integer` compiles for that reason. When one member does not, the call
+is refused, and the diagnostic names the member that let the union down:
+
+<div class="error-output">
+
+```
+[unknown-method]
+Error: No Method named 'hasAnyContent' for Integer
+   ╭─┤ greetable.es:7:26 │
+   │
+ 7 │     Terminal.print(subject::hasAnyContent())
+   │                    ───┬───  ──────┬──────  
+   │                       ╰───────────│──────── this is a Greetable
+   │                                   │        
+   │                                   ╰──────── Integer has no Method of this name
+   │ 
+   │ Note: Every member of the Union must provide 'hasAnyContent' — the receiver's Type is only known at runtime.
+───╯
+```
+
+</div>
+
+Field access has no such rule to fall back on. A union of two record shapes is
+not itself a record, so a dot on it is refused outright, whatever fields the
+members happen to have in common:
+
+<div class="error-output">
+
+```
+[type-without-members]
+Error: This value has no members to look up
+   ╭─┤ input.es:8:17 │
+   │
+ 8 │     Terminal.print(input.x)
+   │                    ──┬──  
+   │                      ╰──── this is a { x: Integer, y: Integer } | { key: String }
+   │ 
+   │ Note: Only Records, Cases and Namespaces have members.
+───╯
+```
+
+</div>
+
+Protocol conformance is not inherited either. `String` and `Integer` are both
+`Printable`; `String | Integer` is not, and handing one to `Terminal.print`
+fails with `unsatisfied-bound`, because nothing has said what printing this
+union means. `Integer | Rational` prints without any work only because the
+standard library covers the numeric tower with a namespace that declares the
+conformance on its behalf.
+
+## Narrowing is a match
+
+One construct turns a union into one of its members, and it is `match`. An `if`
+narrows as well, but never this way: a condition that asks a
+[refinement](/docs/language/checked-refinements)'s question narrows the constant
+it asked it of, inside that branch alone, and what it narrows to is a refinement
+of the type that was already there. Ask `isEmpty` of a `String | List<String>`
+and the `else` branch holds a `String | NonEmptyList<String>` — narrower, and
+still a union of two.
+
+```essence
+implementation {
+
+	type Greetable = String | Integer
+
+	§ A match is what proves which member is in hand; inside an arm, `@` is
+	§ the value, narrowed to that member.
+	function greet(_ subject: Greetable) -> String {
+		<- match subject -> String {
+			case String where @::hasAnyContent() { <- "Hello, {@}!" }
+			case String { <- "Hello, whoever you are!" }
+			case Integer { <- "Hello, number {@}!" }
+		}
+	}
+
+	Terminal.print(greet("Ada")) § Hello, Ada!
+	Terminal.print(greet("")) § Hello, whoever you are!
+	Terminal.print(greet(42)) § Hello, number 42!
+}
+```
+
+`@::hasAnyContent()` is legal in the first arm and was not legal a section ago;
+the arm is what changed. Leaving a member unhandled is `missing-case`, and the
+diagnostic names the one that was left: *Unhandled: 'Integer'*.
+
+## Behaviour for the union itself
+
+A namespace can target a union. That moves the narrowing inside one method
+rather than repeating it at every call site, and it is where a conformance for
+the union is declared.
+
+```essence
+implementation {
+
+	type Greetable = String | Integer
+
+	§ A Namespace whose target is the Union narrows once, on the inside, so
+	§ no call site has to. Conformance is declared here too — a Union does
+	§ not inherit one from its members.
+	namespace Greetable for Greetable is Printable {
+		toString() -> String {
+			<- match @ -> String {
+				case String { <- @ }
+				case Integer { <- @::toString() }
+			}
+		}
+
+		greeting() -> String {
+			<- "Hello, {@}!"
+		}
+	}
+
+	constant subject: Greetable = 42
+
+	Terminal.print(subject) § 42
+	Terminal.print("Ada"::greeting()) § Hello, Ada!
+}
+```
+
+This is how `Number` works in the standard library. `Number` is a `type` over
+`Integer | Rational | Irrational`, and the namespace covering it is where
+cross-member arithmetic and comparison live.
+
+## Members are types
+
+A union member has to be a type. `0 | 1` and `"on" | "off"` are not unions of
+literals but syntax errors — *Expected a Type but found '0'*. Literal cases do
+exist, and `case 0` inside a match is one, but a case narrows a type that was
+already there rather than declaring the set of values a type permits. A fixed
+set of alternatives is what a `choice` is for.
+
+## Union or choice
+
+The two look alike and are not interchangeable. A union is structural and open:
+membership is decided by shape, so any value already of a member type belongs,
+and a union can be assembled out of types written independently of it. A choice
+is nominal and closed: it declares its cases, each carries a payload of its own,
+and nothing is a case of it that was not built as one.
+
+The difference is clearest in a union whose members have the same shape.
+
+```essence
+implementation {
+
+	type Celsius = { degrees: Integer }
+	type Fahrenheit = { degrees: Integer }
+
+	constant reading: Celsius | Fahrenheit = { degrees = 20 }
+}
+```
+
+That compiles, but there is no union left in it. Both members describe
+`{ degrees: Integer }`, so the union collapses to that one shape, and matching
+on `reading` is refused as `match-on-non-union` — *this is a
+`{ degrees: Integer }`*. A structural union cannot tell two identical shapes
+apart, because from where it stands there is only one.
+
+A choice keeps them apart by name.
+
+```essence
+implementation {
+
+	§ A Choice keeps the two apart by name, not by shape — the Cases carry
+	§ the same fields and are still different Cases.
+	choice Reading {
+		Celsius { degrees: Integer },
+		Fahrenheit { degrees: Integer },
+	}
+
+	function spelled(_ reading: Reading) -> String {
+		<- match reading -> String {
+			case #Celsius    { <- "{@.degrees} °C" }
+			case #Fahrenheit { <- "{@.degrees} °F" }
+		}
+	}
+
+	Terminal.print(spelled(#Celsius({ degrees = 20 }))) § 20 °C
+	Terminal.print(spelled(#Fahrenheit({ degrees = 20 }))) § 20 °F
+}
+```
+
+<Note>
+	Reach for a union when the alternatives are types that already exist and a
+	value may be several of them at once. Reach for a `choice` when the
+	alternatives are yours to name — when two of them might carry the same
+	fields, or when adding a third later ought to break every match that has not
+	accounted for it.
+</Note>
+
+## Next
+
+- [Pattern matching](/docs/language/pattern-matching) — every way a match takes
+  a union apart, and what exhaustiveness buys.
+- [Choices](/docs/language/choices) — closed, nominal alternatives with
+  payloads, and the `#Case` sigil.
+- [Records and lists](/docs/language/records-and-lists) — the structures these
+  shapes are made of, and why they are structural.

@@ -1,0 +1,39 @@
+---
+title: "Optional::map"
+description: "Transforms the value, if there is one, and leaves an empty Optional empty — `List::map` for the at-most-one case."
+section: standard-library
+order: 4
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "Optional"
+member: "map"
+signature: |
+  map<infer ResultType>(
+  	_ transform: (_: ItemType) -> ResultType,
+  ) -> Optional<ResultType>
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "transform",
+			type: "(_: ItemType) -> ResultType",
+			description: "the step to run on the value",
+		},
+	]}
+/>
+
+## Returns
+
+the transformed value in an Optional, or an empty Optional.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Optional", href: "/docs/standard-library/optional" },
+	]}
+/>

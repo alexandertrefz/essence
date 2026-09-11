@@ -1,0 +1,25 @@
+---
+title: "NonEmptyList::replace"
+description: "A new List with the item at the given position replaced. A negative position counts back from the end: -1 is the last item."
+section: standard-library
+order: 8
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "NonEmptyList"
+member: "replace"
+signature: |
+  replace(_ item: ItemType, at index: Integer) -> NonEmptyList<ItemType>
+---
+
+## Returns
+
+the List with the item replaced, or unchanged when the position is outside it — never empty either way.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "NonEmptyList", href: "/docs/standard-library/non-empty-list" },
+	]}
+/>

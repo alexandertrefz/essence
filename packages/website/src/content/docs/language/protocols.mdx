@@ -1,0 +1,426 @@
+---
+title: Protocols
+description:
+  A protocol names a set of methods a type can promise to have. Conformance is
+  declared by a namespace and checked once, and a conditional conformance lets
+  a promise depend on the type a generic is given.
+section: language
+order: 100
+template: article
+---
+
+A protocol is a name for a set of method signatures. A conformance is a
+namespace's claim to have them, written on the namespace and checked there. Once
+the claim stands, the type can go anywhere the protocol is demanded — as the
+type argument of a bounded function, as a value a string hole can render, as an
+item a list knows how to sort.
+
+## Declaring a protocol
+
+The body of a protocol holds signatures and nothing else. There are no method
+bodies to inherit, no properties to require and no state; a protocol says what
+can be asked, and every answer is written by the namespace that conforms.
+
+```essence
+implementation {
+
+	§§ Anything that can introduce itself to a reader.
+	protocol Describable {
+		describe() -> String
+	}
+
+	type Book = { title: String, pages: Integer }
+
+	§ The `is` clause is the claim; the Method below is what backs it.
+	namespace Books for Book is Describable {
+		describe() -> String {
+			<- "{@.title}, {@.pages} pages"
+		}
+	}
+
+	constant ficciones: Book = { title = "Ficciones", pages = 224 }
+
+	Terminal.print(ficciones::describe()) § "Ficciones, 224 pages"
+}
+```
+
+`namespace Books for Book is Describable` makes two statements at once: these
+methods belong to `Book`, and among them are the ones `Describable` asks for.
+Remove the `is Describable` and the namespace still compiles and
+`ficciones::describe()` still works — what is lost is the claim, and
+everything downstream that needs one.
+
+A namespace can conform to several protocols, each carrying its own `is`:
+`is Equatable, is Printable`. The word is contextual rather than reserved, which
+is why `Equatable`'s own method can be called `is` without any confusion between
+the two.
+
+<Note>
+	A conformance that is claimed and not kept is reported where it is made, as
+	`nonconforming-namespace` — a missing method, or one whose signature does not
+	line up with the protocol's.
+</Note>
+
+### `Self`
+
+A signature can name `Self`, standing for whatever type ends up conforming. It
+is how a protocol talks about two values of the same type without knowing which
+type that is.
+
+```essence
+implementation {
+
+	§§ Anything two of which combine into one.
+	protocol Mergeable {
+		merge(with other: Self) -> Self
+	}
+
+	type Tally = { label: String, count: Integer }
+
+	namespace Tallies for Tally is Mergeable {
+		merge(with other: Tally) -> Tally {
+			<- { label = @.label, count = @.count::add(other.count) }
+		}
+	}
+
+	constant morning: Tally = { label = "sales", count = 3 }
+	constant afternoon: Tally = { label = "sales", count = 12 }
+
+	Terminal.print(morning::merge(with afternoon).count) § 15
+}
+```
+
+Inside the conforming namespace there is nothing abstract left: `Self` is
+`Tally`, and the method is written with `Tally` spelled out. The protocol is
+what generalises over the choice.
+
+## A bound on a generic
+
+The reason to declare a conformance is to be able to demand one. A type
+parameter written `<infer Item is Describable>` accepts only types that conform,
+and in exchange the body may call what the protocol declares.
+
+<CodeWindow
+	title="describable.es"
+	class="code-bare"
+	compact
+	code={`implementation {
+
+	protocol Describable {
+		describe() -> String
+	}
+
+	type Book = { title: String, pages: Integer }
+
+	namespace Books for Book is Describable {
+		describe() -> String { <- "{@.title}, {@.pages} pages" }
+	}
+
+	§ The bound is the whole of what this Function knows about \`Item\`: it
+	§ has a \`describe\`, and nothing else.
+	function announce<infer Item is Describable>(_ item: Item) -> String {
+		<- "Now: {item::describe()}"
+	}
+
+	constant ficciones: Book = { title = "Ficciones", pages = 224 }
+
+	Terminal.print(announce(ficciones)) § "Now: Ficciones, 224 pages"
+}`}
+/>
+
+`announce` knows one thing about `Item` and can do one thing with it. No field
+of the value is reachable, no other method is in scope, and no case analysis
+over which types might arrive is possible — which is also why a type declared in
+another module years later works with `announce` without `announce` being
+touched.
+
+The bound is per type parameter, and each parameter takes at most one:
+`<infer A is Printable, infer B is Printable>` is two bounded parameters,
+while a single parameter bounded twice is a syntax error.
+
+## Conformance is declared, not inferred
+
+Take the sample above and delete only the `is Describable` from the namespace,
+leaving the `describe` method exactly where it is. The call stops compiling:
+
+<div class="error-output">
+
+```
+[unsatisfied-bound]
+Error: { title: String, pages: Integer } does not conform to 'Describable'
+    ╭─┤ describable.es:21:17 │
+    │
+ 21 │     Terminal.print(announce(ficciones)) § "Now: Ficciones, 224 pages"
+    │                    ─────────┬─────────
+    │                             ╰─────────── this binds a Type Parameter bound to 'Describable'
+    │
+    │ Help: Declare a Namespace 'for { title: String, pages: Integer } is Describable'.
+    │
+    │ Note: No Namespace in scope makes { title: String, pages: Integer } conform to 'Describable'.
+────╯
+```
+
+</div>
+
+Having the method is not conforming. A structural rule — anything with a
+`describe() -> String` is `Describable` — would hand out conformances nobody
+asked for, and two methods can share a signature while sharing nothing else: a
+`describe` that renders a book for a catalogue and a `describe` that dumps a
+record for a log are the same shape and different promises. Conformance is a
+statement about meaning, so it is made deliberately, by the author of the
+namespace, in one place.
+
+The consequence worth having is where the checking happens. A declared
+conformance is verified once, against the protocol, at the namespace; a
+structural one would be rechecked at every use site, and a signature drifting
+out of line would be reported far from the code that changed.
+
+## Dispatch over a union
+
+A method call on a union-typed receiver resolves per member. This needs no
+protocol: it is allowed whenever every member of the union resolves the method
+unambiguously, and the result is the union of what the branches answer.
+
+```essence
+implementation {
+
+	protocol Describable {
+		describe() -> String
+	}
+
+	type Book = { title: String, pages: Integer }
+	type Song = { title: String, seconds: Integer }
+	type Work = Book | Song
+
+	namespace Books for Book is Describable {
+		describe() -> String { <- "{@.title}, {@.pages} pages" }
+	}
+
+	namespace Songs for Song is Describable {
+		describe() -> String { <- "{@.title}, {@.seconds} seconds" }
+	}
+
+	constant work: Work = { title = "Blue in Green", seconds = 337 }
+
+	§ Each member resolves `describe` for itself, so the Union does too.
+	Terminal.print(work::describe()) § "Blue in Green, 337 seconds"
+}
+```
+
+What a protocol adds is the union in a bound position. `Work` is a type of its
+own, not one of its members, so it conforms only if some namespace says it
+does — and the namespace that says so is one whose target is the union itself,
+written where the members' common behaviour can be spelled out:
+
+```essence
+implementation {
+
+	protocol Describable {
+		describe() -> String
+	}
+
+	type Book = { title: String, pages: Integer }
+	type Song = { title: String, seconds: Integer }
+	type Work = Book | Song
+
+	namespace Books for Book is Describable {
+		describe() -> String { <- "{@.title}, {@.pages} pages" }
+	}
+
+	namespace Songs for Song is Describable {
+		describe() -> String { <- "{@.title}, {@.seconds} seconds" }
+	}
+
+	§ A Namespace whose target is the Union itself, saying what the two
+	§ members have in common.
+	namespace Works for Work is Describable {
+		describe() -> String {
+			<- match @ -> String {
+				case Book { <- "a book called {@.title}" }
+				case Song { <- "a song called {@.title}" }
+			}
+		}
+	}
+
+	function announce<infer Item is Describable>(_ item: Item) -> String {
+		<- "Now: {item::describe()}"
+	}
+
+	constant work: Work = { title = "Blue in Green", seconds = 337 }
+	constant song: Song = { title = "Blue in Green", seconds = 337 }
+
+	Terminal.print(announce(work)) § "Now: a song called Blue in Green"
+	Terminal.print(announce(song)) § "Now: Blue in Green, 337 seconds"
+}
+```
+
+The last two lines hold the same record and answer differently, which is the
+specificity rule doing its work: a namespace naming the type exactly beats one
+that merely covers it. Where two conformances tie, the compiler reports
+`ambiguous-conformance` rather than choosing one.
+
+This is how the standard library gives `Number` its behaviour, incidentally.
+`Number` is a union — `Integer | Rational | Irrational` — and its covering
+namespace is where the cross-member answers are written by hand. It is why
+`1::is(1/1)` answers `true`: no `Integer` method accepts a `Rational`, so the
+comparison reaches `Number`'s own equality instead.
+
+## Conditional conformance
+
+A generic namespace conforms unconditionally only when its methods need nothing
+from the type it is generic over. As soon as a body wants to call something on
+the item, the conformance has to depend on the item having it, and a `where`
+clause is how that dependency is written.
+
+<CodeWindow
+	title="boxed.es"
+	class="code-bare"
+	compact
+	code={`implementation {
+
+	type Boxed<Item> = { value: Item }
+
+	§ A Box is printable exactly when what it holds is, and orderable
+	§ exactly when what it holds is.
+	namespace Boxes<infer Item> for Boxed<Item>
+		is Printable where Item is Printable,
+		is Comparable where Item is Comparable {
+		toString() -> String {
+			<- "Boxed({@.value})"
+		}
+
+		compare(to other: Boxed<Item>) -> Ordering {
+			<- @.value::compare(to other.value)
+		}
+	}
+
+	constant boxes = [{ value = 3 }, { value = 1 }, { value = 2 }]
+
+	§ Sorting asks whether the items are Comparable; the condition answers.
+	Terminal.print(boxes::sort()) § [ Boxed(1), Boxed(2), Boxed(3) ]
+
+	§ And the conditions compose: a Box of Boxes orders through both.
+	Terminal.print([{ value = { value = 2 } }, { value = { value = 1 } }]::sort())
+	§ [ Boxed(Boxed(1)), Boxed(Boxed(2)) ]
+}`}
+/>
+
+Each conformance carries its own condition, and the conditions are what the
+bodies lean on. Without `where Item is Printable`, the interpolation in
+`toString` has nothing to render `@.value` with and the method does not compile
+at all — `interpolation-not-printable`, naming `Item`. The condition is not
+decoration on a working method; it is the method's premise.
+
+The conditions are also why the bound belongs on the conformance rather than on
+the namespace's type parameters, which the compiler refuses outright
+(`protocol-bound-namespace-generic`). A `Boxed<Boolean>` remains a perfectly
+good type — it is only not a printable or orderable one — and a namespace whose
+parameter demanded `Printable` would have made it unwriteable.
+
+Conditions are solved recursively at the use site, which is what makes the
+second sort work: a list of boxed boxes is `Comparable` because
+`Boxed<Boxed<Integer>>` is, because `Boxed<Integer>` is, because `Integer` is.
+When the chain does not reach the bottom, the compiler prints it as far as it
+got. Swap the integers above for booleans:
+
+<div class="error-output">
+
+```
+[unsatisfied-conformance-condition]
+Error: { value: Boolean } does not conform to 'Comparable'
+    ╭─┤ boxed.es:22:17 │
+    │
+ 22 │     Terminal.print(flags::sort())
+    │                    ──────┬──────
+    │                          ╰──────── this binds a Type Parameter bound to 'Comparable'
+    │
+    │ Help: Declare a Namespace 'for { value: Boolean } is Comparable'.
+    │
+    │ Note 1: { value: Boolean } does not conform to 'Comparable'.
+    │ Note 2: Boolean does not conform to 'Comparable'.
+────╯
+```
+
+</div>
+
+`List` itself is written this way. Its namespace carries three conditional
+clauses — one each for `Printable`, `Equatable` and `Comparable`, every one of
+them conditioned on `ItemType` conforming to the same protocol — so a list is
+printable exactly when its items are, equatable exactly when its items are, and
+sortable exactly when its items are. Nothing about lists is special here: the
+recursion that orders a `List<List<Integer>>` one nesting level at a time is the
+same recursion that ordered the boxes.
+
+## The protocols the standard library declares
+
+There are three, and they are the vocabulary the rest of the library is written
+against.
+
+<div class="table-scroll">
+
+| Protocol | Required methods | What it means |
+| --- | --- | --- |
+| `Equatable` | `is(_ other: Self) -> Boolean`, `isNot(_ other: Self) -> Boolean` | Two values of the type can be compared for equality. |
+| `Printable` | `toString() -> String` | The value can represent itself as a string. |
+| `Comparable` | `compare(to other: Self) -> Ordering` | The type's values carry a total order. |
+
+</div>
+
+Each is demanded somewhere a program reaches for daily. A `{ … }` hole in a
+string literal renders its value through `Printable`, and `Terminal.print` asks
+for a `Printable` for the same reason — while `Terminal.inspect`, which renders
+structure rather than meaning, takes anything at all. `List`'s `contains`,
+`count(of:)` and `removeDuplicates` ask their items for `Equatable`, because
+"the same item" is the item type's own `is` rather than a structural guess.
+`sort()` and `compare(to:)` ask for `Comparable`; `sort(by:)`, given a
+comparison of its own, asks for nothing.
+
+<div class="table-scroll">
+
+| Type | Conformances |
+| --- | --- |
+| `Integer`, `Rational`, `Algebraic`, `Number`, `String` | `Equatable`, `Printable`, `Comparable` |
+| `Transcendental` | `Equatable`, `Printable` — transcendentals order through `Number` rather than among themselves |
+| `Boolean`, any record, `Ordering`, `Case`, `Side`, `NormalizationForm`, `NumberFormat`, `Rounding` | `Equatable`, `Printable` |
+| `List<Item>` | `Printable`, `Equatable` and `Comparable`, each conditional on `Item` |
+| `Optional<Item>` | `Printable` where `Item` is; equality is derived |
+| `Stream`, `Step<State, Result>` | equality alone, derived — neither has a namespace, so neither prints |
+
+</div>
+
+Three things follow that are easy to miss. A `choice` is `Equatable` without
+declaring anything — two values are equal when their tags match and their
+payloads do, which is derivable; `Printable` is never derived, because how a
+value should read is a decision rather than a consequence. A refined type
+conforms through the type it refines, so a `NonEmptyList<Integer>` prints and
+compares as a list does, and a `NonZeroInteger` as an integer does. And a bare
+structural union belongs to no namespace, so `Integer | String` is not
+`Printable` — which is why a list of them can not be printed until some
+namespace covers the union.
+
+## What a protocol is not, yet
+
+Protocols are deliberately small in this first version, and several things that
+work in other languages are refused here rather than half-supported:
+
+- A protocol is not a type. It can not annotate a constant, appear in a union,
+  or be matched on — `protocol-as-type` and `protocol-as-value` name both halves
+  of the restriction. There are no existentials, so a heterogeneous list of
+  conforming values has to be a union.
+- Protocols have no default method bodies, no property requirements and no
+  inheritance from one another; each of the three is a syntax error.
+- A protocol takes no type parameters, and neither does one of its methods.
+- A type parameter carries at most one bound.
+- A function with bounded type parameters can not be passed as a value
+  (`protocol-bound-function-value`); the conformances it receives exist only at
+  a direct call.
+
+## Next
+
+- [Generics](/docs/language/generics) — where a type parameter comes from, and
+  what a bound is bounding.
+- [Namespaces and methods](/docs/language/namespaces-and-methods) — the `for`
+  target that decides which namespace a call reaches.
+- [Diagnostics](/docs/reference/diagnostics) — `unsatisfied-bound`,
+  `nonconforming-namespace`, `unsatisfied-conformance-condition` and the rest of
+  the conformance codes.

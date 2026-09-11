@@ -1,0 +1,28 @@
+---
+title: "List::removeLast"
+description: "A new List without the last item, or without the given number of trailing items."
+section: standard-library
+order: 13
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "List"
+member: "removeLast"
+signature: |
+  overload removeLast {
+  	() -> List<ItemType>
+  	(_ count: Integer) -> List<ItemType>
+  }
+---
+
+## Returns
+
+the shortened List — empty when more items were removed than it had.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>

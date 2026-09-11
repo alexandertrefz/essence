@@ -1,0 +1,295 @@
+---
+title: Strings
+description:
+  How text is written, interpolated and taken apart — and why a String is
+  measured in characters a reader would recognise rather than in bytes or code
+  units.
+section: language
+order: 30
+template: article
+---
+
+Text is one type, `String`, written between double quotes. It carries no
+encoding, no separate character type, and no notion of a byte: everything the
+language has to say about text it says in terms of characters, and a character
+is what someone reading the text would point at.
+
+## The literal
+
+```essence
+implementation {
+
+	§ A String Literal is written between double quotes.
+	constant greeting = "Hello, World"
+
+	§ A backslash escapes a quote, a backslash, or either brace.
+	Terminal.print("she said \"hi\" \\ and wrote \{braces\}")
+
+	§ `\n`, `\r` and `\t` are the three control characters with a spelling.
+	Terminal.print("one\ttwo\nthree")
+
+	Terminal.print(greeting)
+}
+```
+
+```
+she said "hi" \ and wrote {braces}
+one	two
+three
+Hello, World
+```
+
+Those seven — `\"`, `\\`, `\{`, `\}`, `\n`, `\r`, `\t` — are the whole escape
+set. A backslash before anything else is reported as `invalid-escape` rather
+than passed through quietly, so a typo in an escape is a compile error and not a
+character that turns up later in the output. Every other character, an emoji
+included, is written as itself.
+
+## Interpolation
+
+A `{…}` hole inside a literal holds an expression. The value it produces is
+rendered by its own `toString`, so anything `Printable` can go in one.
+
+```essence
+implementation {
+
+	constant name = "World"
+	constant count = 3
+
+	§ A hole holds any Printable value; its `toString` is implied.
+	Terminal.print("Hello, {name}! You have {count} left.")
+
+	§ A hole holds a whole Expression, not only a name.
+	Terminal.print("one plus two is {1::add(2)}") § "one plus two is 3"
+	Terminal.print("upper: {name::uppercase()}") § "upper: WORLD"
+
+	§ An interpolation is an ordinary String Expression — it can be named,
+	§ passed and combined like any other.
+	constant sentence = "{name} has {count} apples"
+
+	Terminal.print(sentence::append(" today")) § "World has 3 apples today"
+}
+```
+
+The hole is not a formatting mini-language; it is an expression position like
+any other, which is why a String literal can appear inside one — `"greeting is {"Hello, {name}"}"` nests as deep as you care to
+take it. The `toString` being implied is the same convenience
+`List::join(with:)` relies on for its items, and it is the only implicit
+conversion in the language.
+
+## Characters, not bytes
+
+Every position, length and slice in the `String` namespace counts Unicode
+grapheme clusters: a base letter and its combining marks, an emoji sequence
+joined by zero-width joiners, a flag's pair of regional indicators — each of
+those is one character, because each is one thing a reader sees.
+
+```essence
+implementation {
+
+	§ A flag is two regional indicators, and an accented letter may be a
+	§ letter and a mark — one character each, the way a reader counts.
+	constant flag = "🇩🇪"
+	constant word = "café"
+
+	Terminal.inspect(flag::length()) § 1
+	Terminal.inspect(word::length()) § 4
+	Terminal.inspect(word::characters()) § [ "c", "a", "f", "é" ]
+	Terminal.inspect(word::reverse()) § "éfac"
+	Terminal.inspect(word::slice(from 0, to 3)) § "caf"
+	Terminal.inspect(word::character(at -1)) § Optional#Value("é")
+}
+```
+
+This is the only view of a String a program can observe. There is no code-unit
+index hiding underneath it to leak through in an edge case, because
+`characters` is defined as `split(on "")` and every position method is written
+on top of that one native split. The consequence worth remembering is that
+`reverse` cannot produce a broken accent and `slice` cannot cut an emoji in
+half — the operations that go wrong in most languages the moment text stops
+being ASCII.
+
+A character is itself a `String` of length one; there is no separate character
+type to convert to and from. `characters()` therefore answers a
+`List<String>`, and everything [lists](/docs/language/records-and-lists) can do
+applies to it.
+
+<Note>
+	Negative positions count back from the end, so `character(at -1)` is the
+	last character and `slice(from 0, to -1)` drops it. Positions outside the
+	String are not an error — `character(at:)` answers an `Optional` and
+	`slice` clamps.
+</Note>
+
+## Equality is about what the text looks like
+
+Unicode can spell the same word more than one way: an accented letter may be a
+single composed character or a plain letter followed by a combining mark. Both
+sides of a comparison are normalised to composed canonical form first, so those
+two spellings count, order and compare as the same String.
+
+```essence
+implementation {
+
+	§ The same word twice: once with a composed accent, once with a plain `e`
+	§ followed by a separate combining mark.
+	constant composed = "café"
+	constant decomposed = "café"
+
+	Terminal.inspect(composed::is(decomposed)) § true
+	Terminal.inspect(decomposed::length()) § 4
+
+	§ `normalize` reaches the other forms by name.
+	Terminal.inspect("ﬁn"::normalize(as #ComposedCompatibility)) § "fin"
+}
+```
+
+`normalize()` with no argument produces composed canonical form — the one the
+rest of the namespace already works in. The `as:` entry names one of the four
+`NormalizationForm` cases when a program needs another: the canonical pair
+preserves the text exactly, while the compatibility pair additionally folds
+ligatures, superscripts and their kin onto plain equivalents, which is what
+turned the single ligature above into two ordinary letters.
+
+## Every method answers a new String
+
+Nothing in Essence can be changed in place, and text is no exception. `trim`
+does not trim the String it was called on; it answers a trimmed one and leaves
+the original exactly as it was.
+
+```essence
+implementation {
+
+	constant path = "  /usr/local/bin  "
+	constant cleaned = path::trim()
+
+	Terminal.inspect(cleaned) § "/usr/local/bin"
+	Terminal.inspect(path) § "  /usr/local/bin  "
+
+	§ `split(on:)` and `join(with:)` are the round trip.
+	constant pieces = cleaned::split(on "/")
+
+	Terminal.inspect(pieces) § [ "", "usr", "local", "bin" ]
+	Terminal.inspect(pieces::join(with " > ")) § " > usr > local > bin"
+
+	§ `words` drops the whitespace between runs; `lines` keeps the empty
+	§ line a trailing break leaves behind.
+	Terminal.inspect("one  two three"::words()) § [ "one", "two", "three" ]
+	Terminal.inspect("first\nsecond\n"::lines()) § [ "first", "second", "" ]
+
+	Terminal.inspect(cleaned::replaceEvery("/", with ".")) § ".usr.local.bin"
+	Terminal.inspect(cleaned::replaceFirst("/", with ".")) § ".usr/local/bin"
+	Terminal.inspect(cleaned::starts(with "/usr")) § true
+	Terminal.inspect(cleaned::contains("local")) § true
+	Terminal.inspect("-"::repeat(times 8)) § "--------"
+}
+```
+
+Because the answer is always new, the methods here are named in the
+imperative — `trim`, `reverse`, `replaceEvery` — rather than the past tense,
+for the reason [every name in the library is](/docs/language/values-and-constants):
+there is no mutating `trim()` for a `trimmed()` to distinguish itself from.
+
+Each of the tests has a negative twin — `doesNotContain`, `doesNotStart`,
+`doesNotEnd`, `isNot` — so a check for absence reads forwards instead of being
+wrapped in a `negate()`. `isEmpty` has one too, `hasAnyContent`, for the same
+reason.
+
+## Modes are choices, not strings
+
+Three small choice types show up as arguments in this namespace: `Side` for
+which end an operation works on, `Case` for whether a comparison folds case,
+and `NormalizationForm` for which Unicode form to produce.
+
+```essence
+implementation {
+
+	Terminal.inspect("  padded  "::trim(at #Start)) § "padded  "
+	Terminal.inspect("7"::pad(to 5, with "0")) § "00007"
+	Terminal.inspect("7"::pad(to 5, with ".", at #End)) § "7...."
+	Terminal.inspect("ok"::pad(to 6, with "-", at #BothEnds)) § "--ok--"
+
+	Terminal.inspect("HELLO"::is("hello")) § false
+	Terminal.inspect("HELLO"::is("hello", comparing #Insensitive)) § true
+}
+```
+
+Each of these could have been a `String` argument or a `Boolean` flag, and
+each would have been worse for the same reason. `trim(at "start")` is a typo
+waiting to happen and cannot be checked; `trim(at #Start)` is a closed set the
+compiler knows every member of. `is(other, ignoringCase true)` asks the reader
+to remember which way round the flag goes, where
+`is(other, comparing #Insensitive)` says it at the call site.
+
+They also collapse families of methods into single ones. `trim` and `pad` each
+cover every end there is, so there is no `trimStart`/`trimEnd`/`trimBoth`
+triple to keep in step — and because a match over a choice must be exhaustive,
+adding a `Side` would be a compile error at every place that handles them
+rather than a silently unhandled case. `Side`, `Case` and `NormalizationForm`
+are ordinary [choices](/docs/language/choices) besides, so a function of your
+own can take one as a parameter and hand it on.
+
+## Where there may be no answer
+
+A search that finds nothing has no position to report, and a position outside
+the String has no character at it. Those methods answer an `Optional`, not a
+sentinel: there is no `-1` convention to remember and no way to use a missing
+result by accident.
+
+```essence
+implementation {
+
+	constant email = "user@example.com"
+
+	Terminal.inspect(email::firstIndex(of "@")) § Optional#Value(4)
+	Terminal.inspect(email::firstIndex(of "!")) § Optional#Empty
+	Terminal.inspect(email::character(at 99)) § Optional#Empty
+
+	§ The Optional is the whole story: there is no -1 to remember.
+	constant domain = match email::firstIndex(of "@") -> String {
+		case #Value(at) {
+			<- email::slice(from at::add(1), to email::length())
+		}
+
+		case #Empty { <- email }
+	}
+
+	Terminal.print(domain) § "example.com"
+}
+```
+
+Reaching straight through one is a compile error:
+
+<div class="error-output">
+
+```
+[unknown-method]
+Error: No Method named 'uppercase' for Optional#Value
+   ╭─┤ bad.es:3:40 │
+   │
+ 3 │     Terminal.print("hi"::character(at 0)::uppercase())
+   │                    ──────────┬──────────  ────┬────  
+   │                              ╰────────────────│────── this is an Optional<String>
+   │                                               │      
+   │                                               ╰────── Optional#Value has no Method of this name
+   │ 
+   │ Note: Every member of the Union must provide 'uppercase' — the receiver's Type is only known at runtime.
+───╯
+```
+
+</div>
+
+The Optional has to be taken apart — by [a match](/docs/language/pattern-matching),
+or by `otherwise` and `map`, which are the shorthands for the two matches you
+write most often. `contains` is the one place where it is folded away for you:
+it is `firstIndex(of:)` asked whether it has a value, kept as its own method
+because a question about presence should read as one.
+
+## Next
+
+- [Pattern matching](/docs/language/pattern-matching) — how `firstIndex` and
+  `character(at:)` are taken apart.
+- [Choices](/docs/language/choices) — the mechanism behind `Side`, `Case` and
+  `NormalizationForm`.
+- [String](/docs/standard-library/string) — every method in the namespace, one
+  page each.

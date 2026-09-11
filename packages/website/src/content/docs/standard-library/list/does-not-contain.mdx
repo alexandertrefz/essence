@@ -1,0 +1,39 @@
+---
+title: "List::doesNotContain"
+description: "Whether no item equal to the given one is in the List. Available whenever the items conform to `Equatable`."
+section: standard-library
+order: 7
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "List"
+member: "doesNotContain"
+signature: |
+  doesNotContain<infer ItemType is Equatable>(
+  	_ item: ItemType,
+  ) -> Boolean
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "item",
+			type: "ItemType",
+			description: "the item to look for",
+		},
+	]}
+/>
+
+## Returns
+
+`true` when the item does not occur.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>

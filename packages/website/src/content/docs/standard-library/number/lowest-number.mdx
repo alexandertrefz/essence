@@ -1,0 +1,41 @@
+---
+title: "Number.lowestNumber"
+description: "The lower of two Numbers, or the lowest in a List of them."
+section: standard-library
+order: 16
+template: reference
+kind: "static method"
+monoTitle: true
+namespace: "Number"
+member: "lowestNumber"
+signature: |
+  static overload lowestNumber {
+  	(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer
+  	(_ firstNumber: Rational, _ secondNumber: Rational) -> Rational
+  	(
+  		_ firstNumber: Integer,
+  		_ secondNumber: Rational,
+  	) -> Integer | Rational
+  	(
+  		_ firstNumber: Rational,
+  		_ secondNumber: Integer,
+  	) -> Integer | Rational
+  	(_ integers: List<Integer>) -> Optional<Integer>
+  	(_ rationals: List<Rational>) -> Optional<Rational>
+  	(
+  		_ numbers: List<Integer | Rational>,
+  	) -> Optional<Integer | Rational>
+  }
+---
+
+## Returns
+
+the lowest Number — nothing for the empty List, which has none.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Number", href: "/docs/standard-library/number" },
+	]}
+/>

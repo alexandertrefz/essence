@@ -1,0 +1,45 @@
+---
+title: "List.repeat"
+description: "A List holding the given item the given number of times. Zero or fewer times gives the empty List."
+section: standard-library
+order: 36
+template: reference
+kind: "static method"
+monoTitle: true
+namespace: "List"
+member: "repeat"
+signature: |
+  static repeat(
+  	_ item: ItemType,
+  	times count: Integer,
+  ) -> List<ItemType>
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "item",
+			type: "ItemType",
+			description: "the item to repeat",
+		},
+		{
+			name: "times",
+			type: "Integer",
+			description: "how many copies the List holds",
+		},
+	]}
+/>
+
+## Returns
+
+the List of repeated items.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>

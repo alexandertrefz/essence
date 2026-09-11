@@ -10,7 +10,9 @@
 		"dev": "astro dev",
 		"build": "astro build",
 		"preview": "astro preview",
-		"sync": "astro sync"
+		"sync": "astro sync",
+		"docs:stdlib": "bun scripts/generateStdlibDocs.ts",
+		"docs:stdlib:sync": "bun scripts/generateStdlibDocs.ts --sync"
 	},
 	"devDependencies": {
 		"@astrojs/mdx": "7.0.3",

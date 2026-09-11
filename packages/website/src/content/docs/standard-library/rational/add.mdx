@@ -1,0 +1,26 @@
+---
+title: "Rational::add"
+description: "Adds a number to this Rational, staying exact for every member of the numeric tower."
+section: standard-library
+order: 3
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "Rational"
+member: "add"
+signature: |
+  overload add {
+  	(_ other: Rational) -> Rational
+  	(_ other: Integer) -> Rational
+  	(_ other: Algebraic) -> Algebraic
+  	(_ other: Transcendental) -> Transcendental
+  }
+---
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Rational", href: "/docs/standard-library/rational" },
+	]}
+/>

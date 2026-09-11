@@ -1,0 +1,188 @@
+---
+title: Records and Lists
+description:
+  The two structures everything else is built from — a record of named fields,
+  a list of items, and the copy-with syntax that stands in for mutation.
+section: language
+order: 20
+template: article
+---
+
+A record groups values under names. A list holds values in order. Both are
+immutable, both are structurally typed, and neither has a constructor to call:
+you write the value you want.
+
+## Records
+
+A record literal binds each field with `=`. Its type is the shape it has, so
+the annotation below adds nothing the compiler did not already know — `type`
+is what makes that shape worth naming.
+
+```essence
+implementation {
+
+	§ A Record literal binds each field with `=`. Its Type is inferred from
+	§ what it holds, so the annotation below is optional.
+	constant origin = { x = 0, y = 0 }
+
+	§ `type` gives that shape a name.
+	type Point = { x: Integer, y: Integer }
+
+	constant here: Point = { x = 3, y = 4 }
+
+	§ Fields are read with a dot, and nest as deep as the Record does.
+	Terminal.print(here.x) § 3
+	Terminal.print(origin) § { x = 0, y = 0 }
+}
+```
+
+Typing is **structural**: `Point` is not a box a value has to be put into, it
+is a description of a shape. Any record with an `Integer` `x` and an `Integer`
+`y` is a `Point`, whether or not anybody said so.
+
+## Changing a record
+
+You do not. `{ record with … }` reads an existing record and produces a new one
+with some fields replaced:
+
+```essence
+implementation {
+
+	type Point = { x: Integer, y: Integer }
+
+	constant here: Point = { x = 3, y = 4 }
+
+	§ `{ record with … }` builds a new Record from an old one. `here` is
+	§ untouched — there is no way to change a Record in place.
+	constant moved = { here with x = here.x::add(10) }
+
+	Terminal.print(here) § { x = 3, y = 4 }
+	Terminal.print(moved) § { x = 13, y = 4 }
+}
+```
+
+## Methods on a record
+
+A `namespace` hangs methods off a type. Inside a body, `@` is the receiver —
+the value the method was called on — and `::` is how a call site reaches it.
+
+```essence
+implementation {
+
+	type Point = { x: Integer, y: Integer }
+
+	§ A Namespace hangs Methods off a Type. Inside a body, `@` is the
+	§ receiver — the value the Method was called on.
+	namespace Point for Point {
+		§§ Moves the Point along the x axis.
+		§§
+		§§ @param distance — how far to move
+		§§ @returns — the moved Point.
+		moveRight(by distance: Integer) -> Point {
+			<- { @ with x = @.x::add(distance) }
+		}
+	}
+
+	constant here: Point = { x = 3, y = 4 }
+
+	Terminal.print(here::moveRight(by 7)) § { x = 10, y = 4 }
+}
+```
+
+Two things in that snippet are worth naming. `<-` is how a body answers — there
+is no `return` keyword. And `by` in `moveRight(by distance: Integer)` is an
+**argument label**: a parameter reached through a preposition carries that
+preposition at the call site, so `here::moveRight(by 7)` reads as a sentence.
+`§§` above the method is a documentation comment, and it is what an editor
+shows on hover.
+
+## Lists
+
+A list literal is comma separated, and every item has the same type. `List<T>`
+is the written form.
+
+```essence
+implementation {
+
+	§ A List literal is comma separated, and every item has the same Type.
+	constant numbers = [3, 1, 2]
+	constant names: List<String> = ["Ada", "Grace"]
+
+	Terminal.print(numbers::length()) § 3
+	Terminal.print(numbers::contains(2)) § true
+	Terminal.print(numbers::sort()) § [ 1, 2, 3 ]
+	Terminal.print(numbers::append(4)) § [ 3, 1, 2, 4 ] — a new List
+	Terminal.print(numbers) § [ 3, 1, 2 ]
+	Terminal.print(names::join(with " and ")) § "Ada and Grace"
+}
+```
+
+`append` answers a new list; `numbers` is exactly as long on the last line as
+it was on the first.
+
+## Transforming a list
+
+The callbacks are contextually typed. You do not annotate the parameter, and
+the result type follows the body.
+
+```essence
+implementation {
+
+	constant numbers = [3, 1, 2, 4]
+
+	§ The callbacks are contextually Typed — the item Type is inferred, and
+	§ the result Type follows the body.
+	Terminal.print(numbers::map((n) { <- n::multiply(with 2) })) § [ 6, 2, 4, 8 ]
+	Terminal.print(numbers::keepEvery(where (n) { <- n::isEven() })) § [ 2, 4 ]
+	Terminal.print(numbers::reduce(startingWith 0, (sum, n) { <- sum::add(n) })) § 10
+	Terminal.print(numbers::anyItem(where (n) { <- n::isGreaterThan(3) })) § true
+	Terminal.print([[1, 2], [3]]::flatten()) § [ 1, 2, 3 ]
+}
+```
+
+`sort()` needs no comparison written out — it asks its items to be `Comparable`
+and reads the ordering they already have. `join(with:)` asks only that each
+item can say what it is, so `[1, 2, 3]::join(with ", ")` is a `String`, not a
+type error.
+
+## Reading past the end
+
+There is no index that throws, and no index that answers `undefined`. Anything
+that might not be there says so in its type.
+
+```essence
+implementation {
+
+	constant numbers = [3, 1, 2]
+
+	§ There is no index that throws. Reading past the end is `#Empty`, and
+	§ the Type says so: `item(at:)` answers `Optional<Integer>`.
+	Terminal.inspect(numbers::item(at 0)) § Optional#Value(3)
+	Terminal.inspect(numbers::item(at 99)) § Optional#Empty
+
+	§ A match takes the Optional apart …
+	constant third = match numbers::item(at 2) -> Integer {
+		case #Value(item) { <- item }
+		case #Empty { <- 0 }
+	}
+
+	§ … and `otherwise` is the shorthand when a fallback is all you want.
+	Terminal.print(third) § 2
+	Terminal.print(numbers::item(at 99)::otherwise(0)) § 0
+}
+```
+
+<Note>
+	`item(at:)`, `firstItem()`, `lastItem()`, `firstIndex(of:)` and every other
+	method that can come up empty answer an `Optional`. This is the whole of
+	the language's story about absence: there is no other kind of missing.
+</Note>
+
+## Next
+
+- [Strings](/docs/language/strings) — the third literal, and the one with the
+  most methods behind it.
+- [Pattern matching](/docs/language/pattern-matching) — everything a `match`
+  can take apart, records included.
+- [Numbers](/docs/standard-library/numbers) — the arithmetic these lists are
+  usually full of.

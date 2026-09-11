@@ -1,0 +1,42 @@
+---
+title: "Number::isBetween"
+description: "Whether this Number lies between the two given ones, both included — across every member of the numeric tower, so `Number.Pi::isBetween(3, and 22/7)` holds. Bounds in the wrong order enclose no Number, so the answer is `false`."
+section: standard-library
+order: 12
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "Number"
+member: "isBetween"
+signature: |
+  isBetween(_ lower: Number, and upper: Number) -> Boolean
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "lower",
+			type: "Number",
+			description: "the lower bound, included",
+		},
+		{
+			name: "and",
+			type: "Number",
+			description: "the upper bound, included",
+		},
+	]}
+/>
+
+## Returns
+
+`true` when the Number is within the bounds.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Number", href: "/docs/standard-library/number" },
+	]}
+/>

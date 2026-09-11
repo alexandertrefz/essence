@@ -1,0 +1,42 @@
+---
+title: "String::slice"
+description: "The characters from one position up to, but not including, another."
+section: standard-library
+order: 26
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "String"
+member: "slice"
+signature: |
+  slice(from: Integer, to: Integer) -> String
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "from",
+			type: "Integer",
+			description: "the first position to include, counting from zero.",
+		},
+		{
+			name: "to",
+			type: "Integer",
+			description: "the position to stop before.",
+		},
+	]}
+/>
+
+## Returns
+
+the String of that range of characters.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "String", href: "/docs/standard-library/string" },
+	]}
+/>

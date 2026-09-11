@@ -1,0 +1,27 @@
+---
+title: "Rational.of"
+description: "Builds the Rational one Integer over another — the way to write a ratio of computed values, where the literal form `3/4` is not available."
+section: standard-library
+order: 0
+template: reference
+kind: "static method"
+monoTitle: true
+namespace: "Rational"
+member: "of"
+signature: |
+  static overload of {
+  	(
+  		_ numerator: Integer,
+  		over denominator: Integer,
+  	) -> Optional<Rational>
+  	(_ numerator: Integer, over denominator: NonZeroInteger) -> Rational
+  }
+---
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Rational", href: "/docs/standard-library/rational" },
+	]}
+/>

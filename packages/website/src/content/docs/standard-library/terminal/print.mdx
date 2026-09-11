@@ -1,0 +1,44 @@
+---
+title: "Terminal.print"
+description: "Prints a value for the Program's reader — its own `toString`, and then a newline. A String prints as its text, without the quotes a Literal is written with. Writes to `#Output` unless a `to` Stream says otherwise."
+section: standard-library
+order: 0
+template: reference
+kind: "static method"
+monoTitle: true
+namespace: "Terminal"
+member: "print"
+signature: |
+  static overload print {
+  	<infer Value is Printable>(_ value: Value) -> {}
+  	<infer Value is Printable>(
+  		_ value: Value,
+  		to stream: Stream,
+  	) -> {}
+  }
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "value",
+			type: "Value",
+			description: "the value to print, rendered by its `Printable` conformance.",
+		},
+		{
+			name: "to",
+			type: "Stream",
+			description: "the Stream the line lands on; `#Output` when it is left out.",
+		},
+	]}
+/>
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Terminal", href: "/docs/standard-library/terminal" },
+	]}
+/>

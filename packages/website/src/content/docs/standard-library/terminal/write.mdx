@@ -1,0 +1,41 @@
+---
+title: "Terminal.write"
+description: "Writes text exactly as given — no newline, no quotes, nothing added. The primitive `print` is built on. Writes to `#Output` unless a `to` Stream says otherwise."
+section: standard-library
+order: 1
+template: reference
+kind: "static method"
+monoTitle: true
+namespace: "Terminal"
+member: "write"
+signature: |
+  static overload write {
+  	(_ text: String) -> {}
+  	(_ text: String, to stream: Stream) -> {}
+  }
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "text",
+			type: "String",
+			description: "the text to write, unchanged.",
+		},
+		{
+			name: "to",
+			type: "Stream",
+			description: "the Stream the text lands on; `#Output` when it is left out.",
+		},
+	]}
+/>
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Terminal", href: "/docs/standard-library/terminal" },
+	]}
+/>

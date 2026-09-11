@@ -1,0 +1,255 @@
+---
+title: Standard Library
+description:
+  What the library holds, how a type page and a member page are laid out, and
+  the naming rules that let you guess a method's name and be right.
+section: standard-library
+order: 1
+template: article
+---
+
+The standard library is what a program can reach before it imports anything:
+the numeric tower, `Boolean` and `String`, `List` and `Record`, `Optional`, a
+handful of small choices that exist to be passed as arguments, and `Terminal`.
+This page is the map. Every type below has a page of its own, and every method,
+static method and property on it has a page under that.
+
+Two things here teach rather than list, and are the better place to begin if
+you are reading rather than looking something up:
+[Numbers](/docs/standard-library/numbers), which is the essay behind the whole
+tower, and the [Language](/docs/language/values-and-constants) section, which is
+where the syntax these signatures are written in is explained.
+
+## The numeric tower
+
+There is no floating point. Four exact types, a refinement of one of them, and
+a name that covers all four.
+
+- [`Number`](/docs/standard-library/number) — the four as one union, and what
+  only a covering type can define: comparison across the members, the
+  aggregates, and the constants `Pi`, `Tau`, `E` and `GoldenRatio`. It brings
+  `Irrational` with it — `Algebraic | Transcendental`, the two names that are
+  irrational by definition — which has no page of its own because no namespace
+  is written for it.
+- [`Integer`](/docs/standard-library/integer) — whole numbers of arbitrary
+  size, with no width to overflow.
+- [`NonZeroInteger`](/docs/standard-library/non-zero-integer) —
+  `Integer where @::isNot(0)`, which is what a divisor has to be.
+- [`Rational`](/docs/standard-library/rational) — exact ratios of two integers,
+  always in lowest terms; `3/4` is a literal, not a division that already
+  happened.
+- [`Algebraic`](/docs/standard-library/algebraic) — numbers of the form
+  `a + b·√d`, so a square root stays a square root.
+- [`Transcendental`](/docs/standard-library/transcendental) — numbers of the
+  form `a + b·π`, carried through arithmetic that would otherwise round them
+  away.
+
+Each of the four exact types carries its own same-kind arithmetic, and the
+ordered ones carry their own comparison; `Number` carries everything that
+reaches across the members. Which of the two a call lands on is decided by the
+receiver's type rather than at runtime.
+
+## Truth and text
+
+- [`Boolean`](/docs/standard-library/boolean) — the two truth values and the
+  logic that combines them. Nothing else in the language is ever true or false.
+- [`String`](/docs/standard-library/string) — text, measured and cut in
+  characters rather than in bytes or code units. A character is a Unicode
+  grapheme cluster, so no index and no slice ever splits one.
+
+## Containers
+
+- [`List`](/docs/standard-library/list) — the ordered sequence. Every method
+  answers with a new list; none of them changes the one it was asked.
+- [`NonEmptyList`](/docs/standard-library/non-empty-list) —
+  `List where @::hasItems()`, which is what lets `firstItem` answer an item
+  rather than an `Optional`.
+- [`Record`](/docs/standard-library/record) — structural data: two records with
+  the same fields are the same type, with nothing to declare first.
+
+## Absence
+
+- [`Optional`](/docs/standard-library/optional) — a choice between `#Value` and
+  `#Empty`. There is no `null` for it to stand in for; a value that might not
+  be there says so in its type, and a match is the way through it.
+
+## The small choices
+
+A fixed set of modes is a `choice` rather than a string, so a misspelt mode is
+a compile error instead of a silent fallback. These are the ones the methods
+above take as arguments, and each is worth a glance mainly for the names of its
+cases.
+
+- [`Ordering`](/docs/standard-library/ordering) — what a comparison answers:
+  `#Less`, `#Equal` or `#Greater`.
+- [`Case`](/docs/standard-library/case) — whether a string comparison treats
+  upper and lower case as the same: `#Sensitive` or `#Insensitive`.
+- [`Side`](/docs/standard-library/side) — which end an operation works from:
+  `#Start`, `#End` or `#BothEnds`.
+- [`NormalizationForm`](/docs/standard-library/normalization-form) — which of
+  the four Unicode normalisation forms `normalize(as:)` produces.
+- [`NumberFormat`](/docs/standard-library/number-format) — `#Fraction` or
+  `#Decimal`, when a number becomes text.
+- [`Rounding`](/docs/standard-library/rounding) — which way a rational goes
+  when it is asked for a whole number: `#Nearest`, `#Down`, `#Up` or
+  `#TowardZero`.
+
+## Output
+
+- [`Terminal`](/docs/standard-library/terminal) — the one namespace here that
+  is a capability rather than a type. It holds three methods, because the
+  audiences are three different things: `print` renders a value through its own
+  `Printable` conformance and ends the line, `inspect` shows a value's
+  structure and answers with the value unchanged, and `write` puts text out
+  exactly as given — no newline, nothing added — which is the primitive
+  `print` is written on top of. `print` and `write` each take the stream they
+  land on under a `to` label, `#Output` or `#Error`, and mean `#Output` when
+  it is left out.
+
+## How to read these pages
+
+A **type page** opens with the type's lede, then the protocols it conforms to
+as a row of chips — a conditional conformance carries its condition, because
+`Comparable where ItemType is Comparable` is a different claim from
+`Comparable`, and it is the one that explains why comparing two lists of
+integers works while comparing two lists of records is an error. Below the
+prose is the member index, grouped by how a member is reached and listed in the
+order the sources declare them rather than alphabetically.
+
+A **member page** is titled the way the member is called: `Integer::add` needs
+a value in front of it, `Integer.parse` names the type. The badge beside the
+title says which, and the signature block below it is the declaration as the
+sources write it — sliced from them rather than printed back from a parse tree,
+so the generic bounds and the argument labels are the real ones. When that
+block is an `overload` set, the method is several entries and which one runs is
+decided at compile time by the argument's type; that choice is also what fixes
+the return type. [`Integer::add`](/docs/standard-library/integer/add) is the
+example worth reading in full.
+
+The ledes, the parameter descriptions and the return notes come from the `§§`
+documentation comment above the declaration, read from the same parse tree the
+language server reads. What the editor shows on hover and what this reference
+publishes are the same text by construction.
+
+<Note>
+	`flatten` is declared on a namespace of its own — `NestedList`, and
+	`NestedOptional` beside it — because no bound can say "the items are
+	themselves lists" and still name the inner item type. That is a fact about
+	what the type system can express rather than a second type to learn, so the
+	two are published on [`List`](/docs/standard-library/list) and
+	[`Optional`](/docs/standard-library/optional), where somebody would look for
+	them.
+</Note>
+
+## The names are meant to be guessable
+
+Four rules decide every name in the library, and the point of them is that
+after a handful of methods you can predict what the next one is called and
+which of its arguments carry a label.
+
+A transforming method is an imperative command — `sort`, `trim`, `round`,
+`negate` — never the past participle. In a language where a method could
+mutate, `sorted()` is how an immutable API warns you; nothing here can mutate,
+so there is no hazard for the name to warn about. A preposition is that
+argument's label and never fuses into the verb. A verb's direct object stays
+positional and bare, and everything reached through a preposition is labelled.
+And a variant of one idea is an overload rather than a second name, with the
+default written as a case of the choice instead of hidden in a body.
+
+```essence
+implementation {
+
+	§ A preposition is the Argument's label; the verb stem stays bare.
+	Terminal.print("one,two,three"::split(on ",")) § [ one, two, three ]
+	Terminal.print("essence"::starts(with "ess")) § true
+	Terminal.print([1, 2, 3]::join(with " · ")) § 1 · 2 · 3
+
+	§ A mode is an Overload over a Choice, and the default is one of its
+	§ Cases rather than a value hidden in a body.
+	Terminal.print(7/2::round()) § 4
+	Terminal.print(7/2::round(toward #Down)) § 3
+}
+```
+
+The `is…`, `has…` and `doesNot…` prefixes are predicate naming rather than
+prepositional arguments, which is why `isGreaterThan`, `isBetween` and
+`doesNotContain` keep their fused word. A predicate argument is always
+labelled `where`. A method that answers an intrinsic part rather than doing
+something to a value takes neither shape: it is a noun or an adjective, with no
+verb forced onto it — `length`, `numerator`, `absolute`, `keys`.
+
+## Written in Essence
+
+The library is written in the language it documents. Two of every three
+declared method entries are also implemented in Essence; the others bind to the
+runtime, and what stays native is a deliberate line rather than a backlog — the
+arithmetic and boolean primitives everything else is composed from, the
+intrinsics the language has no expression for, and the handful of iteration
+primitives the remaining methods are built on.
+
+The consequence worth knowing is about protocols. A conformance you write sits
+beside one the library shipped with, and nothing can tell them apart:
+
+```essence
+implementation {
+
+	type Point = { x: Integer, y: Integer }
+
+	§ A conformance written by the Program, for a Type the Program declared.
+	namespace PointPrintable for Point is Printable {
+		toString() -> String {
+			<- "({@.x}, {@.y})"
+		}
+	}
+
+	§ The bound asks for Printable and nothing else. Which conformances
+	§ shipped and which arrived with this file is not a question it can ask.
+	function label<infer Value is Printable>(_ name: String, _ value: Value) -> String {
+		<- "{name} = {value}"
+	}
+
+	Terminal.print(label("origin", { x = 3, y = 4 })) § origin = (3, 4)
+	Terminal.print(label("answer", 42)) § answer = 42
+	Terminal.print(label("ratio", 3/4)) § ratio = 3/4
+}
+```
+
+`Equatable`, `Printable` and `Comparable` are the three protocols the library
+declares, and they are what the chips at the top of a type page are drawn from:
+between them they say what a generic bound can ask of a shipped type. A
+protocol you declare yourself widens that vocabulary without being second to
+them in any way.
+
+<Note>
+	The reference is organised by namespace, so the `loop` family does not
+	appear in it. Those are free functions rather than methods — a loop is about
+	the state it threads, not about a value it hangs off — and their overloads
+	are picked by the labels they read, exactly as an overloaded method's
+	entries are. The two choices no namespace is written for are absent for the
+	same reason: `Stream`, which `print` and `write` take under `to`, and
+	`Step`, which a `step` callback answers with to say whether to go round
+	again.
+</Note>
+
+## The reference cannot quietly fall behind
+
+Every type page and every member page under this section is generated from the
+standard library's own sources by `scripts/generateStdlibDocs.ts`, and a test
+holds the result to account in both directions: a method with no page fails it,
+and so does a page documenting a method the library no longer declares. A
+published signature that has drifted from the declared one fails it too.
+
+That gate exists because a reference with holes in it is worse than no
+reference — it teaches a reader that a method's absence from the documentation
+means nothing, and from then on they have to read the sources anyway. What the
+generator writes is a floor rather than a ceiling: it creates a page that does
+not exist yet and never rewrites prose somebody has written, so a page can grow
+without the next regeneration undoing it.
+
+## Next
+
+- [Numbers](/docs/standard-library/numbers) — the essay behind the tower, and
+  why `3/4` is not `0.75`.
+- [Namespaces and methods](/docs/language/namespaces-and-methods) — what `::`
+  does, and why a static call is spelled differently.
+- [Protocols](/docs/language/protocols) — writing a conformance of your own.

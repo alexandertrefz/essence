@@ -1,0 +1,25 @@
+---
+title: "Algebraic::add"
+description: "Adds a number to this Algebraic, exactly. Two Algebraics over the same radical stay in the slice; the radical parts may also cancel, leaving a Rational."
+section: standard-library
+order: 3
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "Algebraic"
+member: "add"
+signature: |
+  overload add {
+  	(_ other: Integer) -> Algebraic
+  	(_ other: Rational) -> Algebraic
+  	(_ other: Algebraic) -> Optional<Rational | Algebraic>
+  }
+---
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Algebraic", href: "/docs/standard-library/algebraic" },
+	]}
+/>

@@ -1,0 +1,37 @@
+---
+title: "NonEmptyList::append"
+description: "A new List with the contents of the given List added at the end."
+section: standard-library
+order: 4
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "NonEmptyList"
+member: "append"
+signature: |
+  append(contentsOf other: List<ItemType>) -> NonEmptyList<ItemType>
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "contentsOf",
+			type: "List<ItemType>",
+			description: "the List whose items to add",
+		},
+	]}
+/>
+
+## Returns
+
+the extended List, never empty.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "NonEmptyList", href: "/docs/standard-library/non-empty-list" },
+	]}
+/>

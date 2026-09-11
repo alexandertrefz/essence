@@ -1,0 +1,668 @@
+---
+title: Formatting
+description:
+  One command, nothing to configure — what `essence format` rewrites, what it
+  deliberately leaves as you wrote it, and why a build never touches a source.
+section: guides
+order: 20
+template: guide
+steps: 5
+minutes: 10
+---
+
+`essence format` rewrites Essence sources into one canonical layout: tabs for
+indentation, lines laid out to fit eighty columns, and a few alignments the
+language's own corpus is written with. There is nothing to configure — no
+config file, no style flags, no way to ask for a different answer — so a
+formatted file reads the same way for everyone who opens it.
+
+It is also something you run, never something that happens to you. `build`,
+`run`, `check` and `watch` read your sources and write nothing back; the
+formatter is not even loaded into the process unless the command you typed was
+`format`. [Why a build never formats](#why-a-build-never-formats-a-source)
+below says why that is a position rather than an omission.
+
+Commands are written as plain `essence`, which is what a global install gives
+you; a project dependency takes your package manager's prefix in front, and a
+checkout takes `bun run`.
+[Installation](/docs/getting-started/installation) covers each way in.
+
+Put this in `inventory.es` to follow along. It is deliberately untidy: spaces
+for indentation, one line far past eighty columns, an `if` cascade folded onto
+a single line.
+
+<CodeWindow
+	title="inventory.es"
+	class="code-bare"
+	compact
+	code={`implementation {
+    § A part, and what we know about it.
+    type Part = { name: String, count: Integer }
+
+    choice Level {
+        Empty,
+        Low { count: Integer },
+        Stocked { count: Integer },
+    }
+
+    constant threshold = 12
+    constant restockTarget = 1_000
+        constant parts = [{ name = "bolt", count = 4 }, { name = "washer", count = 30 }, { name = "nut", count = 12 }]
+
+  function levelled(_ part: Part) -> Level {
+        if part.count::isZero() { <- #Empty } else if part.count::isLessThan(threshold) { <- #Low({ count = part.count }) } else { <- #Stocked({ count = part.count }) }
+  }
+
+    function describe(_ part: Part) -> String {
+        constant note = match levelled(part) -> String {
+        case #Empty { <- "none left" }
+        case #Low { <- "only {@.count}" }
+        case #Stocked { <- "{@.count} on hand" }
+        }
+
+        <- "{part.name}: {note}"
+    }
+
+    Terminal.print(parts::map((part) { <- describe(part) })::join(with " / ")) § one line, whatever the count
+    Terminal.inspect(restockTarget)
+}`}
+/>
+
+It compiles and runs as it stands — being unformatted is not an error, and the
+compiler has no opinion about it.
+
+<Steps>
+
+<StepItem title="Ask before you touch anything">
+
+`--check` names every file that is not formatted, writes nothing at all, and
+exits non-zero if there was one.
+
+```sh
+$ essence format --check inventory.es
+inventory.es
+
+1 of 1 files are not formatted.
+```
+
+The file names go to stdout, one per line, so a script can read them. The count
+goes to stderr, so reading the names is not complicated by it. This is the form
+for CI and for a pre-commit hook, and it is worth reaching for first on a file
+you did not write: it tells you whether there is anything to do without doing
+it.
+
+Three exit codes are all there are. `0` means everything was already formatted
+— or, without `--check`, was formatted successfully. `1` means a file was
+unformatted, could not be read, or would not parse, or that nothing matched the
+paths you named. `2` means the arguments did not make sense, and that is the
+whole of it: an unknown flag, no files at all, `--stdin-filepath` with no path
+after it, `--stdin-filepath` without `--stdin`, or `--stdin` handed file
+arguments — it reads one program, so it takes none.
+
+</StepItem>
+
+<StepItem title="Format it">
+
+One argument, one file, rewritten in place.
+
+```sh
+$ essence format inventory.es
+Formatted 1 of 1 file.
+```
+
+<CodeWindow
+	title="inventory.es — formatted"
+	class="code-bare"
+	compact
+	code={`implementation {
+	§ A part, and what we know about it.
+	type Part = { name: String, count: Integer }
+
+	choice Level {
+		Empty,
+		Low { count: Integer },
+		Stocked { count: Integer },
+	}
+
+	constant threshold     = 12
+	constant restockTarget = 1_000
+	constant parts         = [
+		{ name = "bolt", count = 4 },
+		{ name = "washer", count = 30 },
+		{ name = "nut", count = 12 },
+	]
+
+	function levelled(_ part: Part) -> Level {
+		if part.count::isZero() {
+			<- #Empty
+		} else if part.count::isLessThan(threshold) {
+			<- #Low({ count = part.count })
+		} else {
+			<- #Stocked({ count = part.count })
+		}
+	}
+
+	function describe(_ part: Part) -> String {
+		constant note = match levelled(part) -> String {
+			case #Empty   { <- "none left" }
+			case #Low     { <- "only {@.count}" }
+			case #Stocked { <- "{@.count} on hand" }
+		}
+
+		<- "{part.name}: {note}"
+	}
+
+	Terminal.print(
+		parts::map((part) { <- describe(part) })::join(with " / "),
+	) § one line, whatever the count
+	Terminal.inspect(restockTarget)
+}`}
+/>
+
+Six things happened, and each of them is a rule the rest of this page spells
+out. Indentation became tabs. The three adjacent `constant` declarations had
+their `=` written into one column. The List of parts no longer fitted, so it
+broke one item per line and picked up a trailing comma. The folded `if` cascade
+expanded, with `else if` staying one written form rather than becoming a nested
+block. The `match` handlers had their opening braces aligned past the widest
+Matcher. And the last `Terminal.print` gave way at its argument list, with the
+trailing `§` note staying on the line of the statement it annotates rather than
+following the argument inside the parentheses.
+
+`1_000` came through as `1_000`, not `1000`. That is not an accident either.
+
+Ask again and the answer is silence, which is what a formatter having nothing
+to say looks like:
+
+```sh
+$ essence format --check inventory.es
+$ echo $?
+0
+```
+
+The program prints exactly what it printed before:
+
+```sh
+$ essence run inventory.es --quiet
+  ✔ inventory.es → /tmp/essence-yOHCeS/inventory.js
+bolt: only 4 / washer: 30 on hand / nut: 12 on hand
+1000
+```
+
+Nothing the formatter did could have changed that.
+[The gate](#how-comments-stay-put) below is how that is enforced rather than
+hoped for.
+
+</StepItem>
+
+<StepItem title="Hand it something that does not parse">
+
+Formatting rebuilds a file from its syntax tree. A file that did not parse has
+no tree worth rebuilding from — the parser's recovery drops a statement it
+could not read rather than keeping text it could not understand, so printing
+that tree back would delete code. So the formatter refuses.
+
+Put a file with a missing `)` in `sketch.es`:
+
+<CodeWindow
+	title="sketch.es"
+	class="code-bare"
+	compact
+	code={`implementation {
+	constant name = "world"
+
+	Terminal.print("Hello, {name}!"
+}`}
+/>
+
+<div class="error-output">
+
+```sh
+$ essence format sketch.es
+sketch.es:5:1: Expected ')' but found '}'.
+```
+
+</div>
+
+The file is left exactly as it was, byte for byte, and the exit code is `1`.
+The position is the parser's own, reported as `file:line:column` rather than as
+a drawn diagnostic — the formatter is not the compiler and does not pretend to
+be. Run `essence check` on the same file for the full report.
+
+<Note>
+	A refusal never stops the run. In a batch, the file that could not be parsed
+	is named on stderr and every other file is still formatted — but the usual
+	`Formatted n of m files.` line is withheld, because a count of successes
+	printed under a refusal reads like the run went fine. The exit code is `1`
+	because something failed, not because nothing was done.
+</Note>
+
+</StepItem>
+
+<StepItem title="Point it at a tree, or pipe it a buffer">
+
+An argument may be a path, a glob, or a directory. A directory stands for every
+`.es` file underneath it, recursively. A path you name is taken as you named
+it, whatever its extension.
+
+Put these two in a `src/` beside `inventory.es` — a module and something that
+imports from it, with the `import` and `export` blocks in no particular order:
+
+<CodeWindow
+	title="src/Main.es"
+	class="code-bare"
+	compact
+	code={`import {
+	perimeter from "./Shapes.es"
+	§ The Type comes along for the annotation below.
+	Rectangle from "./Shapes.es"
+	area from "./Shapes.es"
+}
+
+implementation {
+	constant box: Rectangle = { width = 3, height = 4 }
+
+	Terminal.inspect(area(box))
+	Terminal.inspect(perimeter(box))
+}`}
+/>
+
+<CodeWindow
+	title="src/Shapes.es"
+	class="code-bare"
+	compact
+	code={`implementation {
+	type Rectangle = { width: Integer, height: Integer }
+
+	function area(_ rectangle: Rectangle) -> Integer {
+		<- rectangle.width::multiply(with rectangle.height)
+	}
+
+	function perimeter(_ rectangle: Rectangle) -> Integer {
+		<- rectangle.width::add(rectangle.height)::multiply(with 2)
+	}
+}
+
+export {
+	perimeter
+	Rectangle
+	area
+}`}
+/>
+
+```sh
+$ essence format src/
+Formatted 2 of 2 files.
+```
+
+Both blocks come out sorted, and `Main.es` gains a column for its `from`:
+
+<CodeWindow
+	title="src/Main.es — formatted"
+	class="code-bare"
+	compact
+	code={`import {
+	§ The Type comes along for the annotation below.
+	Rectangle from "./Shapes.es"
+	area      from "./Shapes.es"
+	perimeter from "./Shapes.es"
+}`}
+/>
+
+The comment travelled with `Rectangle` rather than staying where it was on the
+page. [The style](#the-style-it-enforces) below says why reordering a block is
+the one rearrangement that is safe.
+
+Only the files that needed changing are counted, and only they are written — a
+file already in canonical form is never touched, so its modification time
+survives a run over the whole tree. A glob works the same way, and is the form
+to reach for when a directory holds more than you mean — quote it, so that the
+formatter expands it rather than the shell:
+
+```sh
+$ essence format --check 'src/**/*.es'
+$ echo $?
+0
+```
+
+For an editor, or anything else holding a buffer rather than a file, `--stdin`
+reads one program from standard input and writes the result to standard output:
+
+```sh
+$ printf 'implementation {\n  constant a=1\n constant bb = 2\n}\n' | essence format --stdin
+implementation {
+	constant a  = 1
+	constant bb = 2
+}
+```
+
+`--stdin` composes with `--check`, which then writes nothing and reports only
+the verdict through the exit code.
+
+Some sources are only themselves at a particular path. The standard library's
+`declarations { … }` blocks are the case that exists today: the parser only
+accepts one from a file inside the library. Formatting such a buffer through a
+pipe fails, because standard input has no path — the two runs below are from a
+checkout of the language itself, where that file exists:
+
+<div class="error-output">
+
+```sh
+$ essence format --stdin --check \
+    < packages/standard-library/sources/Boolean.es
+<stdin>:6:1: Only the standard library may open a 'declarations' block
+<stdin>:17:3: Expected '{' but found 'is'.
+```
+
+</div>
+
+`--stdin-filepath` is how the caller says where the buffer lives, and the same
+source goes through:
+
+```sh
+$ essence format --stdin --check \
+    --stdin-filepath packages/standard-library/sources/Boolean.es \
+    < packages/standard-library/sources/Boolean.es
+$ echo $?
+0
+```
+
+</StepItem>
+
+<StepItem title="Let the editor do it">
+
+The Language Server offers whole-document formatting, running the same
+formatter in-process rather than starting a second one. In VS Code that is
+**Format Document**. The extension names itself the default formatter for `.es`
+files, so if you have Format on Save turned on it is this formatter that runs —
+you do not have to pick one. The same defaults switch those files to tabs at a
+width of four, which is what the formatter assumes.
+
+There is no range formatting: the unit is the document. Two of the safety
+rules exist for the editor's sake in particular — a document that does not
+parse yields no edits and no error, so formatting on save while you are still
+typing is quiet rather than noisy; and a document already in canonical form
+yields no edits at all, so a save never marks a clean buffer dirty.
+
+When the formatter does produce edits, it sends one edit spanning the changed
+middle of the document, with the untouched head and tail pared off. A
+format-on-save that fixes one line does not replace the whole buffer under your
+cursor.
+
+[Editor setup](/docs/guides/editor-setup) covers installing the extension and
+pointing other editors at `essence lsp`.
+
+</StepItem>
+
+</Steps>
+
+## Why a build never formats a source
+
+Every command that compiles — `build`, `run`, `check`, `watch` — reads your
+files and writes only what it was asked to write. None of them reformats a
+source on the way through, and there is no flag that would make them. The
+formatter package is imported lazily, at the moment `format` is dispatched, for
+exactly that reason: `essence check` must not pay to load a formatter it will
+never call.
+
+The other design was considered and dropped: a formatting pass on every
+successful compile, which would have kept the language's own sources canonical
+for free. What replaced it is a check. Every source in the standard library and
+every fixture is asserted to be already formatted by the test suite — so the
+repository stays canonical because a test says so, not because the compiler
+writes to anybody's source tree. The deliberately-broken diagnostic showcase
+files are the one exemption; they are shaped for the errors they produce rather
+than for style.
+
+Two things follow from keeping the two jobs apart, and both are worth having:
+
+- **Compiling stays a read.** Once a build can also write to the tree it read
+  from, every invocation carries a risk that has nothing to do with compiling —
+  a source under a partial edit, a buffer with unsaved changes, a read-only
+  checkout — and all of it becomes the compiler's problem to get right.
+- **The two failures stay legible.** A build fails when a program is wrong.
+  Formatting fails when the formatter distrusts its own output, which is a bug
+  in the formatter. Fused, one can mask the other and a non-zero exit stops
+  meaning one thing.
+
+Your project can have the same guarantee in one line of CI:
+
+```sh
+essence format --check src/
+```
+
+## The style it enforces
+
+Everything below is fixed. None of it is configurable, and there is no plan for
+it to be.
+
+**Tabs, and eighty columns.** Indentation is one tab per level. Widths are
+measured in columns with a tab counted as four, and lines are laid out to fit
+eighty of them. The layout engine is a document algebra: the printer describes
+which parts of an expression belong together and where they may give way, and
+the renderer picks the flattest layout that fits. Nothing in the printer asks
+what column it is in.
+
+**One blank line, wherever you left one.** Blank lines are the one piece of
+vertical layout that is preserved rather than derived. A run of two or more
+collapses to one; a place where you left none stays closed up. The formatter
+never invents a blank line, and never removes the one you put between two
+groups of declarations.
+
+**Alignment, in runs.** A stretch of adjacent assignments has its `=` written
+into one column, and a `match` has its handlers' opening braces written into
+one. Both stop where the column would stop meaning anything: an alignment run
+ends at a statement that is not an assignment, at a blank line, between a
+declaration and a bare reassignment, and at a value that lays itself out over
+several lines. A `match` handler that is guarded, or that breaks, is not in a
+run either — a `where` clause is usually the longest thing in the block, and
+padding every sibling out to it pushes the braces right rather than lining them
+up.
+
+A run also splits when the padding would get expensive. No member is padded
+more than twelve columns to reach its block's column, so a wide typed
+declaration among short ones starts a block of its own instead of dragging
+everything across the line:
+
+```essence
+implementation {
+	constant x             = 1
+	constant y             = 2
+	constant label: String = "corner"
+	constant offsets: List<Integer> = [1, 2]
+
+	Terminal.inspect([x, y])
+	Terminal.print(label)
+	Terminal.inspect(offsets)
+}
+```
+
+The first three line up. `offsets` is twenty-one columns wider than `x`, which
+is past the budget, so it starts a new block — and a block of one is left
+unpadded.
+
+**Module sections are sorted.** The entries of an `import { … }` or
+`export { … }` block are written in canonical order rather than in the order
+you typed them, with every `from` in one column. This is the only reordering
+the formatter performs anywhere, and it is safe because the order is already
+defined: dispatch over imported namespaces follows the same sorted order, so
+re-sorting a block can never change which namespace a method call resolves to.
+Comparison is by code unit rather than by locale, so every machine agrees.
+
+In an `export` block, what a module declares comes before what it forwards — a
+re-export names another file rather than anything in this one, so the two read
+as separate lists even though they share a block. A comment written against an
+entry travels with it, as `Main.es` showed above.
+
+**Where things break, and where they cannot.** A List, a Record, an argument
+list and a parameter list all break one item per line and gain a trailing
+comma. A method chain breaks all-or-nothing — either the whole chain fits, or
+every link gets a line of its own:
+
+```essence
+implementation {
+	constant words = "the quick brown fox jumps over the lazy dog"
+		::split(on " ")
+		::map((word) { <- word::uppercase() })
+		::removeDuplicates()
+		::sort()
+		::join(with ", ")
+
+	Terminal.print(words)
+}
+```
+
+The `=` never breaks away from what it assigns: a value begins on the line its
+name is written on and gives way inside itself. Moving the whole value down a
+line buys one indent's worth of room and costs the reader the place they look
+first.
+
+Four things never break at all, because a line break there would change what
+they parse as:
+
+- A type application, `List<Integer>` — a `<` opening the line after its base
+  Type reads as a new declaration.
+- A choice case construction, `#Value(x)` — the `#` has to stay against what
+  follows it for the construction to be recognised.
+- A checked refinement's `where` clause, which the parser reads only when it
+  sits on the refined type's own line.
+- The `~>` of a typed Record, `Point ~> { x = 1, y = 2 }`. It never breaks away
+  from the brace it introduces, because `Point { x = 1 }` re-parses as a
+  constant bound to the Identifier `Point` followed by a bare untyped Record.
+
+A braced block always breaks, with one exception: a `match` handler holding a
+single short statement is offered the one-line shape and takes it if it fits.
+And a parameter carrying a comment of its own forces its list to break whatever
+the width, because `§§` documentation attaches by line adjacency and collapsing
+the list would silently detach it.
+
+A trailing `match`, function literal, Record or List in an argument list keeps
+the call head on one line and lays itself out inside the parentheses, rather
+than the list breaking around it as well — that is what keeps
+`map((n) { <- n::toString() })` from becoming four lines.
+
+## What it will not rewrite
+
+Some things reach the syntax tree in a normalised form, and printing that form
+back would turn what you wrote into something else that means the same. In each
+of these cases the source is sliced and written back verbatim instead. This
+block is the formatter's own output — every literal in it survived the round
+trip:
+
+```essence
+implementation {
+	type Transform = (_ amount: Integer) -> Integer
+
+	constant million = 1_000_000
+	constant third   = 1/3
+	constant tabbed  = "a\tb"
+
+	constant origin   = { x = 0, y = 0 }
+	constant shifted  = { origin with x = 5 }
+	constant rebraced = { origin with { x = 5 } }
+	constant doubled  = [1, 2]::map((n) { <- n::multiply(with 2) })
+	constant tripled  = [1, 2]::map((_ n) { <- n::multiply(with 3) })
+}
+```
+
+- **Number grouping.** `1_000_000` reaches the tree as `1000000`. The digit
+  groups exist in the source and nowhere else.
+- **Rationals.** `1/3` is one literal, and its parts have to stay flush to keep
+  parsing as one.
+- **Strings.** The lexer decodes escapes and strips the quotes, so only the
+  source still holds `"a\tb"` written as an escape rather than as a literal
+  tab character. An interpolated String is the one that is taken apart: the text
+  around each hole is sliced back verbatim, and the expression inside the hole
+  is printed like any other expression — so a `match` interpolated into a
+  String gets its handlers aligned like every other `match`.
+- **Record combination.** `{ a with x = 1 }` and `{ a with { x = 1 } }` produce
+  the same tree. Which one you wrote is only visible in the source.
+- **Parameter spelling.** An unannotated parameter of a contextually typed
+  Function literal — `(n)` — parses identically to `(_ n)`. Both are written
+  back as they were spelled. A function type's parameters go the same way for a
+  different reason: the node keeps only the external name, so the `amount` in
+  `(_ amount: Integer) -> Integer` exists in the source and nowhere else.
+
+Comments are never reflowed, only moved. The corpus contains divider rules and
+hand-wrapped prose that re-wrapping would destroy, so a comment's text is
+copied through with its sigil, exactly as the lexer read it.
+
+## How comments stay put
+
+The parser drops comments before it ever builds a tree, so the formatter reads
+them off the token stream itself and walks them in written order alongside the
+tree. Attachment is two rules and no attachment table:
+
+- A comment with nothing but whitespace before it on its line belongs to
+  whatever comes **below** it.
+- A comment that follows code belongs to the **line it is on**, and is claimed
+  by the outermost node ending on that line — which is why the note in the
+  walkthrough stayed at the end of `Terminal.print(…)` rather than moving
+  inside the parentheses when the argument list broke.
+
+Anything nobody claims is flushed before the closing brace of the block it was
+written in. A comment can be moved; it can never be dropped.
+
+That is the intent. What makes it a guarantee is the gate that runs before
+anything is written. After printing, the formatter checks its own output four
+ways:
+
+1. It parses.
+2. Its syntax tree, with every source position stripped, is identical to the
+   original's — modulo the module sections, which are compared in canonical
+   order because sorting them is the one reordering that is allowed. Attached
+   `§§` documentation is compared rather than stripped, because documentation
+   binds by line adjacency: a blank line wrongly inserted between a `§§` block
+   and what it documents is valid code that silently loses the docs.
+3. Every comment is still in the same place among the tokens around it. This
+   compares anchors, not comments — a block that got split across a `} else {`
+   keeps every comment, in order, and would otherwise read as untouched. Inside
+   a module section the comparison is per entry rather than per token, since
+   the block comes out sorted.
+4. A second pass over the result produces the same text. Formatting is a fixed
+   point or it is a bug.
+
+If any of the four fails, the file is left exactly as it was, and the failure is
+reported against the formatter rather than against your source. The line names
+the file, says which check gave way, and ends `this is a bug in essence format.`
+Through the language server the same message arrives as an editor warning, and
+names the Essence formatter rather than whichever executable you reached it by.
+An unexpected crash in the printer is caught the same way. Nothing is supposed
+to reach any of these, and nothing does: every source in the repository is put
+through the gate by the formatter's own tests, and the tests that exercise a
+failure have to inject one, because no source is known to produce it. They are
+also why this page can make one small promise plainly: `essence format` can
+improve a file or leave it exactly as it found it, and there is no third
+outcome.
+
+## The command, in full
+
+| Invocation                        | What it does                                |
+| --------------------------------- | ------------------------------------------- |
+| `essence format <files…>`         | Format each file in place.                  |
+| `essence format --check <files…>` | Name what is unformatted; write nothing.    |
+| `--stdin`                         | Format standard input onto standard output. |
+| `--stdin-filepath <path>`         | The path standard input should be read as.  |
+| `--version`                       | Print the formatter's version.              |
+| `--help`, `-h`                    | Print help and stop.                        |
+
+That is the whole surface — five options, and no sixth. A file whose name begins
+with `-` is reachable by writing `--` before it, after which every remaining
+argument is a path.
+
+`format` shortens to `fmt`. The formatter's own executable, `esfmt`, runs the
+same code under its own name, with two seams. `essence format --help` is
+answered from `essence`'s own command table, so it prints the same screen as
+`essence help format`, while `esfmt --help` prints the formatter's shorter
+usage. And `--` only reaches the formatter through `essence format`: run as
+`esfmt`, the runtime takes the marker for its own before the formatter sees it,
+and the argument behind it is read as a flag.
+
+## Next
+
+- [Editor setup](/docs/guides/editor-setup) — installing the extension, and
+  wiring Format on Save.
+- [Using the compiler](/docs/guides/using-the-compiler) — the four commands
+  that read your sources and never write to them.
+- [CLI commands](/docs/reference/cli-commands) — every command and flag in one
+  table.

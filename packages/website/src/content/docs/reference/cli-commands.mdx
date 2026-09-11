@@ -1,0 +1,504 @@
+---
+title: CLI Commands
+description:
+  Every command the essence binary accepts, every flag that goes with it, and
+  what each one does when it is left out. A lookup table rather than a
+  walkthrough.
+section: reference
+order: 10
+template: article
+# NOTE: One `##` per command plus the shared sections; the `###` under them are
+# parts of a single command's entry and would double the index.
+tocDepth: 2
+---
+
+`essence` is the whole toolchain under one name: the compiler, the Formatter,
+the Language Server and the Debug Adapter are commands of the same executable.
+This page is the index of them — every command, every flag, and what happens
+when the flag is left out. [Using the compiler](/docs/guides/using-the-compiler)
+walks through the four compiling commands on a real program; this one is for
+looking something up.
+
+Everything below was transcribed from the output of `essence help`, whose
+screens are generated from the same table the arguments are parsed against. For
+every command whose arguments `essence` reads itself, a flag that exists but is
+undocumented — or documented but unparsed — is not possible by construction, so
+the help screens and this page can not drift apart from what the binary does.
+The three [passthrough commands](#format) are described by that table and
+parsed by the tool they hand over to.
+
+## The shape of an invocation
+
+```sh
+essence <command> [file...] [options]
+essence <file.es>              # same as: essence build <file.es>
+```
+
+`build` is the default command, so a first argument that is not a command name
+is taken as a file to compile. An argument that looks like a command name — one
+with no `.`, `/` or `\` in it — and is close enough to one to be a misspelling
+of it is a usage error carrying that suggestion, rather than a file the compiler
+will fail to find:
+
+<div class="error-output">
+
+```
+  ✖ Unknown command "biuld".
+  Did you mean "essence build"?
+
+  Help:  essence help
+```
+
+</div>
+
+A word close to no command at all is read as a file name and looked for on
+disk, so `essence qwerty` fails as a missing file rather than as a mistyped
+command.
+
+A bare `essence` with no arguments has nothing to compile and no command to
+run, so it prints the overview and exits `0` — the arguments are not wrong,
+they are missing. A compiling command named with no file to work on is a usage
+error instead: it said what to do and left out what to do it to.
+
+`-h` or `--help` after any command prints that command's own screen, so
+`essence build --help` and `essence help build` are the same request.
+
+Everything after a bare `--` belongs to the compiled program rather than to
+`essence`, and of the commands whose arguments `essence` reads only
+[`run`](#run) accepts it: `build`, `check`, `watch` and `help` given one say so
+and stop. The passthrough commands never see the rule at all — the token is
+forwarded untouched, and `essence format -- <file>` means to the Formatter what
+it means to any other tool.
+
+### Names the toolchain is installed under
+
+`essence` and `esc` are the one executable under two names: they read the same
+command table, and whichever name was typed is the one the help screens and
+error messages answer as. The tools that predate it are linked beside it and
+start the same Formatter, Server and Adapter the matching command hands over to,
+without going through this argument table at all: `esfmt` is `essence format`,
+`esls` is `essence lsp` and `esdap` is `essence dap`. One thing does differ:
+`essence dap` hands the Adapter its own in-process pipeline to compile with,
+while `esdap` — the Adapter ships in a package that does not depend on the
+Compiler — compiles by running the `essence build` sitting beside it. Both
+compile with the optimiser off, so a debug session steps through the same
+JavaScript either way.
+
+## Commands
+
+<div class="table-scroll">
+
+| Command | Alias | Summary |
+| --- | --- | --- |
+| [`build`](#build) | `b` | Compile Essence sources to JavaScript (default) |
+| [`run`](#run) | | Compile a source file and execute it immediately |
+| [`check`](#check) | | Type-check sources without writing any output |
+| [`watch`](#watch) | `w` | Recompile automatically whenever a source changes |
+| [`format`](#format) | `fmt` | Format Essence sources in place |
+| [`lsp`](#lsp) | | Start the Essence Language Server, speaking over stdio |
+| [`dap`](#dap) | | Start the Essence Debug Adapter, speaking over stdio |
+| [`help`](#help) | | Show help for `essence` or for a single command |
+
+</div>
+
+## Global options
+
+These are accepted by `build`, `run`, `check`, `watch` and `help`. They are
+**not** accepted by `format`, `lsp` or `dap`, whose arguments are read by the
+tool they delegate to — see [passthrough commands](#format).
+
+<div class="table-scroll">
+
+| Flag | What it does |
+| --- | --- |
+| `-h, --help` | Show help for a command and exit |
+| `-v, --version` | Print the compiler version and exit |
+| `--verbose` | Include per-stage timings and resolved paths |
+| `-q, --quiet` | Print only diagnostics — no report, no progress |
+| `--json` | Emit a machine-readable report on stdout |
+| `--color` | Force coloured output |
+| `--no-color` | Disable coloured output. Undocumented in the help screens; it wins over `--color`. |
+
+</div>
+
+<Note>
+	The stage timings `--verbose` names are drawn on every run that is not
+	`--quiet` or `--json`, and no path is resolved differently under it. What
+	the flag adds today is the compiler's own stack trace, printed under a stage
+	that crashed rather than reported.
+</Note>
+
+`--quiet` keeps the verdict and drops everything under it: the stage
+breakdown, the per-file table, the output sizes, the progress spinner, and the
+rule drawn around a program's output. One file leaves the line naming that
+file; several leave the line counting them. Diagnostics are printed in full
+either way.
+
+`--json` writes a single JSON document to stdout and nothing else, and turns
+colour off. Under `run` it is the whole answer — the report is emitted and the
+program is not executed.
+
+## build
+
+Compile Essence sources to JavaScript. Alias `b`, and the command an invocation
+falls back to when none is named.
+
+```sh
+essence build <file...> [options]
+essence <file...> [options]
+```
+
+The output is a self-contained ES module: the parts of the Essence runtime a
+program actually uses are bundled into it, so it can be executed by Bun or
+Node, or loaded in a browser, without further installation. Every module a
+source imports is compiled with it and bundled into the same file, and its
+Diagnostics are reported under its own name.
+
+Compilation stops at the first stage that reports an Error, and every
+Diagnostic that stage found is shown. Warnings never stop a build.
+
+<div class="table-scroll">
+
+| Flag | Default | What it does |
+| --- | --- | --- |
+| `-o, --out <path>` | next to each source file | Where to write the compiled JavaScript. A file with one input, a directory with several; missing parents are created. |
+| `-w, --watch` | off | Rebuild whenever a source file changes — the same thing as [`watch`](#watch). |
+| `-e, --execute` | off | Execute the output once the build succeeds. Refuses more than one input. |
+| `--sourcemap` | off | Emit a source map next to the output |
+| `--minify` | off | Minify the emitted JavaScript |
+| `--no-optimise` | every pass runs | Emit the program as written, running no optimisation pass |
+| `--without-optimisation <pass>` | every pass runs | Turn one optimisation pass off, by name. Repeatable. |
+| `-j, --jobs <count>` | one per available CPU core, up to 8 | How many files to compile in parallel |
+
+</div>
+
+`--no-optimise` turns the whole phase off, for the user program and the
+standard library alike — the shape to compare against when an optimised build
+misbehaves. `--without-optimisation` takes it away one pass at a time, under the name the
+pass is documented by in the
+[Optimisations reference](/docs/reference/optimisations). An unrecognised name is
+a usage error rather than a flag that quietly does nothing: it names the pass you
+probably meant, or lists every pass there is when it is close to none of them.
+No pass depends on another, so any set of them emits a correct program.
+
+`-j 1` compiles everything on the main thread, which makes a stack trace from a
+Compiler crash easier to read. The count has to be a whole number of at least
+`1`. Left out, it is one worker per available core bar one, never more than
+there are files to compile, and never more than eight; a single small file is
+compiled in process either way, because booting a worker costs about what
+compiling it does.
+
+`--execute` runs a single build only: on a batch it would interleave the output
+of several programs with no way to tell them apart, so it is refused with a
+pointer at `essence run`.
+
+## run
+
+Compile a single source file and execute it immediately.
+
+```sh
+essence run <file> [options] [-- <program arguments...>]
+```
+
+Without `--out` the compiled file is scratch work: it goes to a temporary
+directory that is removed once the program has finished, leaving the source
+tree untouched. The program's output is streamed through as it is produced,
+fenced off from the compiler's, and `essence` exits with the program's own exit
+code.
+
+Arguments after a bare `--` are handed to the program rather than read by
+`essence`. More than one source file is a usage error — `build` is the command
+that takes several.
+
+<div class="table-scroll">
+
+| Flag | Default | What it does |
+| --- | --- | --- |
+| `-o, --out <path>` | a temporary directory | Keep the compiled JavaScript at this path |
+| `--sourcemap` | off | Emit a source map next to the output |
+| `--minify` | off | Minify the emitted JavaScript |
+| `--no-optimise` | every pass runs | Emit the program as written, running no optimisation pass |
+| `--without-optimisation <pass>` | every pass runs | Turn one optimisation pass off, by name. Repeatable. |
+
+</div>
+
+There is no `--jobs` here, because there is only ever one file to compile.
+
+<Note>
+	A map asked for by a scratch run rides inside the bundle rather than sitting
+	beside it: the temporary directory is removed the moment the program exits,
+	so a file written next to the bundle would be gone before anyone read a
+	stack trace through it. With `--out` the map is a separate file, as it is
+	for `build`.
+</Note>
+
+## check
+
+Type-check sources without writing any output.
+
+```sh
+essence check <file...> [options]
+```
+
+Runs the parser, enricher and validator, reports every diagnostic they find,
+and stops — no JavaScript is generated and nothing is written to disk. This is
+the fastest way to find out whether a program is valid, and the form intended
+for editors, pre-commit hooks and CI.
+
+Every module a source imports is checked with it. A file given twice over —
+named on the command line and imported by another file that was — is checked
+once and reported once.
+
+<div class="table-scroll">
+
+| Flag | Default | What it does |
+| --- | --- | --- |
+| `-j, --jobs <count>` | one per available CPU core, up to 8 | How many files to compile in parallel |
+
+</div>
+
+Combined with `--json` it produces a diagnostic list another tool can consume,
+each diagnostic under the file it was written in.
+
+## watch
+
+Recompile automatically whenever a source changes. Alias `w`, and the same
+thing as `build --watch`.
+
+```sh
+essence watch <file...> [options]
+essence build <file...> --watch
+```
+
+Compiles the given sources, then stays running and recompiles each one as it is
+saved. Rebuilds reuse warm worker threads, so they are noticeably faster than
+repeated one-shot builds. Every module the sources import is watched as well,
+and saving one rebuilds the sources that import it rather than the module
+itself.
+
+<div class="table-scroll">
+
+| Flag | Default | What it does |
+| --- | --- | --- |
+| `-o, --out <path>` | next to each source file | Where to write the compiled JavaScript |
+| `-e, --execute` | off | Execute the output after every successful rebuild |
+| `--clear` | off | Clear the screen before each rebuild |
+| `--sourcemap` | off | Emit a source map next to the output |
+| `--minify` | off | Minify the emitted JavaScript |
+| `--no-optimise` | every pass runs | Emit the program as written, running no optimisation pass |
+| `--without-optimisation <pass>` | every pass runs | Turn one optimisation pass off, by name. Repeatable. |
+| `-j, --jobs <count>` | one per available CPU core, up to 8 | How many files to compile in parallel |
+
+</div>
+
+`--execute` runs the output of a single watched source; a program still running
+from the last rebuild is killed as the next one starts, and when the session
+quits. Watching several sources at once
+executes none of them: which of the programs was meant is not a question the
+flag can answer, and `build --execute` refuses the same batch outright.
+
+Three keys work while it is running:
+
+<div class="table-scroll">
+
+| Key | What it does |
+| --- | --- |
+| `r` | Force a rebuild |
+| `c` | Clear the screen |
+| `q`, or `Ctrl+C` | Quit |
+
+</div>
+
+## format
+
+Format Essence sources in place. Alias `fmt`.
+
+```sh
+essence format <files...> [options]
+essence format --check <files...>
+```
+
+Rewrites every given source into Essence's one canonical layout: tabs for
+indentation, and lines laid out to fit a fixed measure. There is nothing to
+configure, so a formatted file reads the same way for everyone who opens it.
+
+An argument may be a path, a glob, or a directory — a directory stands for
+every `.es` file under it. A source that does not parse is reported with the
+Diagnostic the parser gave and left untouched; formatting is refused rather
+than guessed at.
+
+<div class="table-scroll">
+
+| Flag | Default | What it does |
+| --- | --- | --- |
+| `--check` | off | Name the files that are not formatted; write nothing |
+| `--stdin` | off | Format standard input onto standard output |
+| `--stdin-filepath <path>` | — | The path standard input should be read as. Only meaningful together with `--stdin`. |
+| `--version` | — | Print the Formatter's version and exit |
+
+</div>
+
+`--check` names every file that would change and exits non-zero if there is
+one, which is the form intended for CI checks and pre-commit hooks. `--stdin`
+reads one program from standard input and therefore takes no file arguments;
+combined with `--check` nothing is written and only the verdict is reported.
+`--stdin-filepath` exists because some sources are only themselves at a
+particular path — the standard library's `declarations` are — so an editor
+formatting an unsaved buffer can say where that buffer lives; given without
+`--stdin` it is a usage error rather than a flag with nothing to name.
+
+<Note label="Passthrough commands">
+	`format`, `lsp` and `dap` hand every argument after the command name to the
+	tool they delegate to, which parses them itself. The global options are not
+	among them: the Formatter has never heard of `--json` or `--quiet` and
+	rejects them. `--help` and `-h` are the one exception, answered from
+	`essence`'s own command table, so that asking a passthrough command for help
+	prints the same screen `essence help` would, and so that asking the Language
+	Server for help can not start a Server nobody is talking to.
+</Note>
+
+`format` has a `--version` of its own for the same reason, and it prints the
+Formatter's version rather than the compiler's.
+
+## lsp
+
+Start the Essence Language Server, speaking over stdio.
+
+```sh
+essence lsp
+```
+
+Serves diagnostics, hovers, completions, definitions, references, renames and
+formatting to an editor over the Language Server protocol, reading requests
+from standard input and writing responses to standard output. It takes no
+options of its own; whatever arguments the editor's client passes are left for
+the Server to read.
+
+This is started by an editor rather than by hand: it prints nothing a person
+would want to read, and stays running until the editor closes the connection.
+[Editor setup](/docs/guides/editor-setup) covers wiring it up.
+
+## dap
+
+Start the Essence Debug Adapter, speaking over stdio.
+
+```sh
+essence dap
+```
+
+Serves breakpoints, stepping, call stacks, variables and evaluation to an
+editor over the Debug Adapter protocol. Programs are compiled with this
+compiler before they are launched, and with the optimiser off — a debug session
+steps through statements and reads bindings back, and half the pass registry
+exists to take exactly those things away. It takes no options of its own.
+
+Like `lsp`, this is started by an editor rather than by hand, and stays running
+until the debug session ends. [Debugging](/docs/guides/debugging) covers the
+rest.
+
+## help
+
+Show help for `essence`, or for a single command.
+
+```sh
+essence help [command]
+```
+
+Without an argument this prints the command overview. With a command name it
+prints that command's full documentation: what it is for, every option it takes
+with the default it falls back to, and the worked examples it carries. An
+unknown name is a usage error.
+
+## Exit codes
+
+Three codes, meaning the same thing under every command.
+
+<div class="table-scroll">
+
+| Code | Meaning |
+| --- | --- |
+| `0` | The command succeeded |
+| `1` | The command ran and failed — an Error was reported, a file could not be read, a source is unformatted under `--check` |
+| `2` | The command line could not be read — an unknown command or option, an invalid value, a pattern that matched nothing, a flag used where it does not apply |
+
+</div>
+
+A glob that matches nothing is a usage error under the compiling commands,
+which resolve their patterns before any work starts and would otherwise report
+success for having compiled nothing. `format` resolves its own arguments, and
+reports the same thing as a failed run rather than as a misread command line.
+
+`run`, and `build --execute`, exit with the compiled program's own exit code
+instead, once the build has succeeded. A program killed by a signal reports
+`128`, and one that could not be started at all reports `1`.
+
+## Colour, and the environment
+
+Colour is decided from stderr rather than stdout, because stderr is where the
+human-facing output goes when stdout is a pipe. The usual conventions are
+honoured, and an explicit flag wins over them. The first row below that applies
+decides:
+
+<div class="table-scroll">
+
+| Setting | Effect |
+| --- | --- |
+| `--json` | No colour — the document is written for a parser |
+| `--no-color` | No colour, whatever else says |
+| `--color` | Colour, whatever the environment says |
+| `NO_COLOR` set to anything non-empty | No colour |
+| `FORCE_COLOR` set to anything but `0` | Colour |
+| `TERM=dumb` | No colour |
+| otherwise | Colour when stderr is a terminal |
+
+</div>
+
+Unicode is resolved the same way and separately: the Braille and box-drawing
+characters in the report fall back to ASCII on consoles that would render them
+as replacement boxes.
+
+## The JSON report
+
+`build`, `run` and `check` write one JSON document to stdout under `--json`.
+Positions are flattened to plain line and column numbers, and every field is
+present on every entry, so a reader never has to distinguish "absent" from "not
+applicable".
+
+<div class="table-scroll">
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `version` | string | The compiler version that produced the report |
+| `command` | string | `build`, `run` or `check` |
+| `ok` | boolean | Whether every file succeeded |
+| `errors`, `warnings` | number | Diagnostic counts across every file |
+| `durationMs` | number | Wall time for the whole run |
+| `files` | array | One entry per compiled file |
+| `files[].input` | string | The source that was compiled |
+| `files[].output` | string, or `null` | Where the JavaScript was written, where any was |
+| `files[].ok` | boolean | Whether this file succeeded |
+| `files[].bytes`, `files[].gzipBytes` | number, or `null` | Output size, plain and gzipped |
+| `files[].durationMs` | number | Wall time for this file |
+| `files[].stages` | object | Milliseconds per compiler stage, keyed by stage name |
+| `files[].diagnostics` | array | `file`, `severity`, `message`, `code`, `line`, `column`, `endLine`, `endColumn` |
+
+</div>
+
+A diagnostic carries the file it was written in, which with modules is
+regularly not the file that was compiled — an editor jumping to `input` for a
+dependency's Error would open the wrong file at a line number that means
+nothing there. A usage error is reported in the same shape, with an added
+`error` field carrying the message.
+
+`watch` accepts `--json`, because it is a global option, but never emits a
+report under it: what the flag does there is turn colour and the progress
+display off.
+
+## Next
+
+- [Using the compiler](/docs/guides/using-the-compiler) — the same commands,
+  walked through on one program.
+- [Diagnostics](/docs/reference/diagnostics) — every code the compiler can
+  report, and the Quick Fix that goes with it.
+- [Optimisations](/docs/reference/optimisations) — every pass, and the name to
+  give `--without-optimisation`.

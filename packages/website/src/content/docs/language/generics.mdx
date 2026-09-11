@@ -1,0 +1,383 @@
+---
+title: Generics
+description:
+  How a declaration takes type parameters, where a type argument is worked out
+  from the use and where it has to be written, and what a protocol bound buys
+  inside a body.
+section: language
+order: 90
+template: article
+---
+
+A type parameter is a hole in a declaration that a type fills in later. The
+interesting question is never how to punch the hole — every language spells
+that about the same way — but where the type that fills it comes from. essence
+answers that with two rules rather than one, and which rule applies is decided
+by what you are declaring.
+
+Functions, methods and namespaces have their parameters **inferred**: each use
+hands over enough for the compiler to work them out, and the declaration says so
+by writing `infer`. Choices and type aliases have their parameters **applied**:
+every mention of the name carries the arguments, and `infer` is refused there.
+
+The two spellings never mean the same thing, and the compiler will not read one
+as the other. On a choice or a type alias, writing `infer` is
+`infer-on-applied-parameter`; on a namespace, leaving it off is
+`uninferred-namespace-parameter`, because such a parameter could never bind and
+the namespace would never be found. On a function or a method the marker is not
+policed at the declaration: a parameter written without it is an ordinary opaque
+type that nothing hands an argument to, so the signature compiles and every call
+to it is what fails.
+
+## A function infers from its arguments
+
+<CodeWindow
+	title="paired.es"
+	class="code-bare"
+	compact
+	code={`implementation {
+
+	§ Both Type Parameters are worked out from the two Arguments, and the
+	§ Record this answers with is built out of both.
+	function paired<infer First, infer Second>(
+		_ first: First,
+		with second: Second,
+	) -> { first: First, second: Second } {
+		<- { first = first, second = second }
+	}
+
+	Terminal.print(paired(1, with "one")) § { first = 1, second = "one" }
+	Terminal.print(paired("half", with 1/2)) § { first = "half", second = 1/2 }
+}`}
+/>
+
+Two calls, one function, and each call binds the parameters afresh. Several may
+bind at once, and a parameter may appear anywhere in the signature — in a
+parameter type, in the return type, inside a record or a list, or in another
+generic type.
+
+What binds them is the arguments, and only the arguments. There is no syntax
+for writing a type argument at a call site: `paired<Integer, String>(1, with
+"one")` is a syntax error, because the grammar has nowhere to put type
+arguments on a call. Nor does the annotation on the destination reach back into
+the call — a function whose parameter appears only in its return type has
+nothing to bind from, and every call to it is reported as
+`uninferable-type-parameter`. A generic function is therefore worth writing
+exactly when its arguments say what it is working over.
+
+## A namespace infers from its receiver
+
+A namespace targets a type, and when that type is generic the namespace takes a
+parameter of its own. Every call supplies it through the receiver, which is what
+makes one written namespace serve every instantiation.
+
+```essence
+implementation {
+
+	§ Written once, and reached by every List — `Item` binds from whatever
+	§ receiver the call is made on.
+	namespace Stack<infer Item> for List<Item> {
+		push(_ item: Item) -> NonEmptyList<Item> {
+			<- @::append(item)
+		}
+
+		pop() -> List<Item> {
+			<- @::removeLast()
+		}
+
+		peek() -> Optional<Item> {
+			<- @::lastItem()
+		}
+	}
+
+	variable history: List<String> = []
+
+	history = history::push("Hello")
+	history = history::push("Hello, World")
+
+	Terminal.print(history::peek()) § Value(Hello, World)
+	Terminal.print([4]::push(2)::pop()::peek()) § Value(4)
+}
+```
+
+Here `infer` is not optional. A namespace parameter has nothing but the receiver
+to work it out from, so one written without the marker can never bind — the
+target type would then match no receiver at all, and the namespace would never
+be found by anything. Rather than let that fail in silence, the compiler reports
+`uninferred-namespace-parameter` on the declaration.
+
+A method may add parameters of its own on top of the namespace's, and the two
+levels bind from different places:
+
+```essence
+implementation {
+
+	§ Two levels at once: `Item` is the Namespace's, bound by the receiver;
+	§ `Target` is the Method's own, bound by the callback that is handed in.
+	namespace Mapper<infer Item> for List<Item> {
+		transformFirst<infer Target>(
+			_ transform: (_ item: Item) -> Target,
+			fallback fallbackValue: Target,
+		) -> Target {
+			<- @::firstItem()::map(transform)::otherwise(fallbackValue)
+		}
+	}
+
+	constant numbers = [1, 2, 3]
+
+	§ The callback's body is all that decides `Target` — a String here …
+	Terminal.print(
+		numbers::transformFirst((item) { <- item::toString() }, fallback "none"),
+	) § 1
+
+	§ … and a Boolean here, from the same Method on the same receiver.
+	Terminal.print(
+		numbers::transformFirst(
+			(item) { <- item::isGreaterThan(0) },
+			fallback false,
+		),
+	) § true
+}
+```
+
+`Item` is fixed by the list the call is made on; `Target` is read off the body
+of the function literal passed in, so the same method on the same receiver
+answers a `String` in one call and a `Boolean` in the next.
+
+## A choice applies, and never infers
+
+A `choice` abstracts over what its cases carry, and its parameters go the other
+way: they are applied at every use, and the payload is checked against them
+rather than choosing them.
+
+```essence
+implementation {
+
+	§ A Choice abstracts over what its Cases carry. `Value` is applied at every
+	§ use of `Box`, never worked out from a payload.
+	choice Box<Value> {
+		Full { value: Value },
+		Empty,
+	}
+
+	§ The annotation is what applies the Argument here …
+	constant packed: Box<String> = #Full("a letter")
+
+	§ … and here the construction applies it itself.
+	constant bare = Box<String>#Empty
+
+	function contents(of box: Box<String>) -> String {
+		<- match box -> String {
+			case #Full  { <- @.value }
+			case #Empty { <- "nothing" }
+		}
+	}
+
+	Terminal.print(contents(of packed)) § "a letter"
+	Terminal.print(contents(of bare)) § "nothing"
+}
+```
+
+The arguments come from one of two places: the position the construction sits
+in — an annotation, a parameter type, a declared return type — or the
+construction itself, written `Box<String>#Full(…)`. A construction with
+neither, such as a bare `Box#Full("a letter")` bound to an unannotated
+constant, is `undecided-type-arguments`, and the diagnostic names both ways
+out. Writing `infer` on a choice's parameter is `infer-on-applied-parameter` —
+the marker has nothing to do there, because no use of `Box` is ever asked to
+work anything out.
+
+<Note>
+	This is the rule most worth keeping straight, because the two halves of the
+	language read alike on the page. `paired(1, with "one")` writes no type
+	arguments and cannot; `Box<String>#Empty` writes them and, without an
+	annotation around it, must.
+</Note>
+
+## Type aliases apply too
+
+`type` takes parameters on the same terms as a choice, and passes them on to
+whatever it names.
+
+```essence
+implementation {
+
+	§ A Type Alias takes Parameters the same way a Choice does, and they are
+	§ applied at every mention of the name.
+	type Pair<FirstType, SecondType> = {
+		first: FirstType,
+		second: SecondType,
+	}
+
+	§ An Alias may hand its own Parameter on to another one.
+	type Table<ValueType> = List<Pair<String, ValueType>>
+
+	constant scores: Table<Integer> = [
+		{ first = "ada", second = 3 },
+		{ first = "grace", second = 5 },
+	]
+
+	function total(of table: Table<Integer>) -> Integer {
+		<- table::reduce(startingWith 0, (sum, entry) {
+			<- sum::add(entry.second)
+		})
+	}
+
+	Terminal.print(total(of scores)) § 8
+}
+```
+
+A parameter survives a refinement as well: the standard library declares
+`NonEmptyList<ItemType>` as `List<ItemType> where @::hasItems()`, one predicate
+serving every item type, because whether a list has items is not a question
+about what it holds. That is described on
+[checked refinements](/docs/language/checked-refinements).
+
+## Bounds
+
+An unbounded type parameter is opaque on purpose. No namespace targets it, so
+its body can do nothing with a value of that type but pass it along —
+`value::toString()` inside a function generic over `Value` is
+`no-namespace-for-value`, and the note says plainly that no namespace in scope
+targets `Value`.
+
+A bound is how a body earns more. It is written `is` followed by a protocol, and
+it is two things at once: a demand on every call, and a permission inside the
+body.
+
+```essence
+implementation {
+
+	§ The bound is a promise made to the caller and a permission taken inside
+	§ the body — the hole below is legal because `Printable` says so.
+	function labelled<infer Value is Printable>(
+		_ value: Value,
+		as name: String,
+	) -> String {
+		<- "{name} = {value}"
+	}
+
+	Terminal.print(labelled(42, as "answer")) § "answer = 42"
+	Terminal.print(labelled(3/4, as "ratio")) § "ratio = 3/4"
+	Terminal.print(labelled([1, 2, 3], as "primes")) § "primes = [ 1, 2, 3 ]"
+
+	§ `Comparable` is what lets a Function order two values whose Type it will
+	§ never see.
+	function smallerOf<infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
+		<- match a::compare(to b) -> Item {
+			case #Greater { <- b }
+			case #Less    { <- a }
+			case #Equal   { <- a }
+		}
+	}
+
+	Terminal.print(smallerOf(5, 3)) § 3
+	Terminal.print(smallerOf("pear", "apple")) § "apple"
+}
+```
+
+`labelled` never learns what it was handed; it knows only that the value has a
+`toString`, which is all an interpolation hole needs. The third call passes a
+`List<Integer>`, whose own `Printable` conformance is conditional on its
+items — so the bound is satisfied by a chain of conformances rather than by a
+single declaration.
+
+A namespace's own parameter may not carry a bound. The diagnostic is
+`protocol-bound-namespace-generic`, and it points at where such a bound belongs
+instead: bounding the whole namespace would put the demand on every method in
+it, including the ones that never need it, whereas a conditional conformance
+puts it on exactly the methods that fulfil the protocol.
+
+```essence
+implementation {
+
+	§ The bound belongs to the conformance rather than to the Parameter — these
+	§ Boxes are orderable exactly when what they hold is.
+	namespace Boxes<infer Item> for { value: Item }
+		is Comparable where Item is Comparable {
+		compare(to other: { value: Item }) -> Ordering {
+			<- @.value::compare(to other.value)
+		}
+	}
+
+	constant boxes = [{ value = 3 }, { value = 1 }, { value = 2 }]
+
+	Terminal.print(boxes::sort()::map((box) { <- box.value })) § [ 1, 2, 3 ]
+}
+```
+
+That form, and how a conformance is proven and handed to a body, belongs to
+[protocols](/docs/language/protocols).
+
+## Types erase, and matching has to know it
+
+A type argument is a compile-time fact. Nothing about it survives into the
+running program, so a `match` cannot ask about one — and a case naming a type
+parameter is therefore a case that accepts everything reaching it.
+
+<div class="error-output">
+
+```
+[erased-case-conflict]
+Error: This Case can never match
+   ╭─┤ unwrap.es:9:9 │
+   │
+ 8 │          case Value { <- @ }
+   │               ──┬──
+   │                 ╰──── this Case runs first
+ 9 │          case String { <- fallbackValue }
+   │               ───┬──
+   │                  ╰──── an earlier Case already answers for every Type this one matches
+   │
+   │ Help: Write this Case above 'case Value', which can only ever be the last one.
+   │
+   │ Note 1: Cases are tried in order, and the first one that fits wins.
+   │ Note 2: Types erase before a Match runs, so the Generic Case 'Value' narrows nothing and accepts every value that reaches it.
+───╯
+```
+
+</div>
+
+This is an error rather than the warning dead code gets, because the program was
+not merely wasting an arm — it was answering with the wrong value. Reordering
+is the fix, and a generic case can only ever be written last:
+
+```essence
+implementation {
+
+	§ The Generic Case accepts everything that reaches it, so it can only ever
+	§ be written last.
+	function unwrap<infer Value>(
+		_ candidate: Value | String,
+		fallback fallbackValue: Value,
+	) -> Value {
+		<- match candidate -> Value {
+			case String { <- fallbackValue }
+			case Value  { <- @ }
+		}
+	}
+
+	Terminal.print(unwrap("missing", fallback 7)) § 7
+	Terminal.print(unwrap(3, fallback 7)) § 3
+}
+```
+
+The same reasoning reaches further than type parameters. A `case List<Integer>`
+written above a `case List<String>` earns `empty-list-overlap`, because a list
+matcher asks about the items the value holds and an empty list holds none — it
+is a value of every list type there is, so the arm above swallows it. That one
+is a warning rather than an error, because the arm below still answers for every
+non-empty `List<String>`; the diagnostic's way out is a `where @::hasItems()`
+guard on both, with a case of its own for the empty list. Erasure is not a
+corner the compiler hopes you avoid; it is a rule the diagnostics enforce, which
+is what makes a generic declaration safe to write without knowing what will be
+substituted into it.
+
+## Next
+
+- [Protocols](/docs/language/protocols) — where a bound comes from, and how a
+  conformance is proven and handed to a body.
+- [Choices](/docs/language/choices) — the declaration whose type parameters
+  are always applied, and the cases a match takes apart.
+- [Checked refinements](/docs/language/checked-refinements) — a type parameter
+  and a predicate on the same declaration, as `NonEmptyList` has.

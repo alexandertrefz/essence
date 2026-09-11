@@ -1,0 +1,27 @@
+---
+title: "List::firstIndex"
+description: "The position of the first item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`."
+section: standard-library
+order: 21
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "List"
+member: "firstIndex"
+signature: |
+  firstIndex<infer ItemType is Equatable>(
+  	of item: ItemType,
+  ) -> Optional<Integer>
+---
+
+## Returns
+
+the zero-based position, or nothing when the item is absent.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>

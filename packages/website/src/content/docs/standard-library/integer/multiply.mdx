@@ -1,0 +1,26 @@
+---
+title: "Integer::multiply"
+description: "Multiplies this Integer with a number, staying exact for every member of the numeric tower."
+section: standard-library
+order: 5
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "Integer"
+member: "multiply"
+signature: |
+  overload multiply {
+  	(with other: Integer) -> Integer
+  	(with other: Rational) -> Rational
+  	(with other: Algebraic) -> Algebraic | Rational
+  	(with other: Transcendental) -> Transcendental | Rational
+  }
+---
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "Integer", href: "/docs/standard-library/integer" },
+	]}
+/>

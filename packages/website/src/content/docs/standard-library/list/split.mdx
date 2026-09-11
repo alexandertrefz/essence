@@ -1,0 +1,37 @@
+---
+title: "List::split"
+description: "Splits the List into groups of the given size, in order. The last group holds whatever remains, so it may be shorter."
+section: standard-library
+order: 35
+template: reference
+kind: "method"
+monoTitle: true
+namespace: "List"
+member: "split"
+signature: |
+  split(intoGroupsOf size: Integer) -> Optional<List<List<ItemType>>>
+---
+
+## Parameters
+
+<ParamTable
+	params={[
+		{
+			name: "intoGroupsOf",
+			type: "Integer",
+			description: "how many items each group holds",
+		},
+	]}
+/>
+
+## Returns
+
+the List of groups, or nothing when the group size is below one.
+
+## See also
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/standard-library/list" },
+	]}
+/>
