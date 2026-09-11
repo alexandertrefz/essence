@@ -1,7 +1,7 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { removeWordAction } from "./fixes"
-import { extendOverLeadingSpace, sliceOf } from "./geometry"
+import { extendOverLeadingSpace, isWordBounded, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { findTestModifierWord } from "./lookups"
 
@@ -131,6 +131,18 @@ export function mergeModifierAction(
 	let earlier = modifierParts.exec(sliceOf(lines, first))
 
 	if (second === null || earlier === null || second[1] !== earlier[1]) {
+		return null
+	}
+
+	// NOTE: And both spans have to stand on whole words. Two spans that slid by
+	// the SAME column read as the same word as readily as two that did not —
+	// `ocused` out of `focused focused`, once the line lost its indentation —
+	// so the agreement above says nothing on its own, and what is asked here is
+	// that neither edge of either span cuts a name in half.
+	if (
+		!isWordBounded(lines, diagnostic.position) ||
+		!isWordBounded(lines, first)
+	) {
 		return null
 	}
 

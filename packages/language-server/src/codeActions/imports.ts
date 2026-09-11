@@ -1,7 +1,7 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { isSamePosition } from "../positions"
-import { removeLinesEdit } from "./geometry"
+import { isBefore, removeLinesEdit } from "./geometry"
 import type { CodeActionEdit, CodeActionEntry } from "./index"
 
 // NOTE: Every `unused-import` in the document answered at once, as the one
@@ -84,7 +84,45 @@ export function organizeImportActions(
 			// between the actions offered on one span, and this one is offered
 			// on none.
 			isPreferred: false,
-			edits,
+			edits: merged(lines, edits),
 		},
 	]
+}
+
+// NOTE: Two entries written on ONE line are two deletions that each take the
+// blanks beside them, and the blanks BETWEEN them belong to both. An Editor
+// refuses a Workspace Edit whose ranges overlap, so ranges that meet are folded
+// into one first — every edit here deletes, so their union deletes exactly what
+// each of them asked for and nothing else.
+function merged(
+	lines: Array<string>,
+	edits: Array<CodeActionEdit>,
+): Array<CodeActionEdit> {
+	let sorted = [...edits].sort((left, right) =>
+		isBefore(left.range.start, right.range.start) ? -1 : 1,
+	)
+	let folded: Array<CodeActionEdit> = []
+
+	for (let edit of sorted) {
+		let last = folded.at(-1)
+
+		if (last === undefined || isBefore(last.range.end, edit.range.start)) {
+			folded.push({ ...edit, range: { ...edit.range } })
+
+			continue
+		}
+
+		if (isBefore(last.range.end, edit.range.end)) {
+			last.range.end = edit.range.end
+		}
+	}
+
+	// NOTE: And a fold that ends up covering everything written on ONE line
+	// takes the line, which is what each of the deletions it is made of would
+	// have done had it stood there on its own.
+	return folded.map((edit) =>
+		edit.range.start.line === edit.range.end.line
+			? removeLinesEdit(lines, edit.range)
+			: edit,
+	)
 }

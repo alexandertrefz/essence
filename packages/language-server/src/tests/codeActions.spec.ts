@@ -17,6 +17,7 @@ import {
 	otherwiseArmAction,
 	unreachableDefineArmActions,
 } from "../codeActions/defineFixes"
+import { missingMembersAction, suggestionAction } from "../codeActions/fixes"
 import {
 	closeStringAction,
 	documentationSeparatorAction,
@@ -39,6 +40,7 @@ import {
 	expandShorthandKeyAction,
 	expandShorthandPathAction,
 } from "../codeActions/shorthandFixes"
+import { mergeModifierAction } from "../codeActions/testFixes"
 
 // NOTE: Fixtures are joined line arrays with literal `\t`, so an assertion on
 // an inserted arm's indentation is an assertion on the exact characters —
@@ -145,6 +147,7 @@ function staleDiagnostic(
 	code: common.DiagnosticCode,
 	position: common.Position,
 	labels: Array<common.DiagnosticLabel> = [],
+	data?: common.DiagnosticData,
 ): common.Diagnostic & { position: common.Position } {
 	return {
 		severity: "error",
@@ -154,6 +157,7 @@ function staleDiagnostic(
 		labels: [{ position, message: "", kind: "primary" }, ...labels],
 		notes: [],
 		helps: [],
+		data,
 	}
 }
 
@@ -677,6 +681,77 @@ describe("Code Actions", () => {
 			]
 
 			expect(unknownCaseFixes(lines)).toEqual([])
+		})
+
+		// NOTE: The one fix eight codes share is preferred, so a span a
+		// keystroke stale is written over without anybody being asked. Each of
+		// these lands on something that is not a whole name — a member step
+		// taken with the `.` in front of it, a Method name with the `(` behind
+		// it, a Case name with its sigil — and each of them used to be written
+		// over regardless.
+		it("should stay silent where the span does not stand on a name", () => {
+			let member = [
+				"implementation {",
+				'\tconstant person = { firstName = "Ada" }',
+				"\tconstant name = person.firstNme",
+				"}",
+			]
+			let method = [
+				"implementation {",
+				'\tconstant size = "Ada"::lenth()',
+				"}",
+			]
+			let holding = [
+				"implementation {",
+				"\tchoice Operation { Add, Subtract }",
+				"\tconstant chosen = Operation#Ad",
+				"}",
+			]
+			let spelled = (
+				lines: Array<string>,
+				line: number,
+				needle: string,
+				suggestion: string,
+			) =>
+				suggestionAction(
+					staleDiagnostic(
+						"unknown-name",
+						spanOf(lines, line, needle),
+						[],
+						{ kind: "suggestion", suggestion },
+					),
+					lines,
+					(written) => written,
+				)
+
+			expect(spelled(member, 3, ".firstNme", "firstName")).toBeNull()
+			expect(spelled(method, 2, "lenth(", "length")).toBeNull()
+			expect(spelled(holding, 3, "#Ad", "Add")).toBeNull()
+		})
+
+		// NOTE: And where the span stands on a name whose NEIGHBOUR is a name
+		// character, which is the shape a span one column short of its Node has.
+		it("should stay silent where the span cuts a name in half", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Counter for Integer is Countble {",
+				"\t\tcount() -> Integer { <- @ }",
+				"\t}",
+				"}",
+			]
+
+			expect(
+				suggestionAction(
+					staleDiagnostic(
+						"unknown-protocol",
+						spanOf(lines, 2, "Countbl"),
+						[],
+						{ kind: "suggestion", suggestion: "Countable" },
+					),
+					lines,
+					(written) => written,
+				),
+			).toBeNull()
 		})
 	})
 
@@ -1534,6 +1609,107 @@ describe("Code Actions", () => {
 			expect(result[9]).toBe("\t\thost = {},")
 		})
 
+		// NOTE: Everything after a `§` is prose, so a member written behind one
+		// is a member the Literal never gets — and the separator in front of it
+		// takes the last REAL member with it. The scaffold goes in front of the
+		// note, which is where a reader adding a member by hand would write it.
+		it("should write in front of a trailing comment rather than into it", () => {
+			let lines = [
+				...CONNECT,
+				"\tconstant opened = connect(using {",
+				"\t\tretries = 1 § keep trying",
+				"\t})",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result.slice(7, 12)).toEqual([
+				"\tconstant opened = connect(using {",
+				"\t\tretries = 1,",
+				"\t\thost = {},",
+				"\t\tport = {}, § keep trying",
+				"\t})",
+			])
+
+			expect(codesOf(result)).toEqual(["argument-type-mismatch"])
+		})
+
+		// NOTE: And a comment standing on its own as the last thing inside the
+		// Literal is not content either — the members go after the member above
+		// it, so the note keeps what it was written about below it.
+		it("should walk back over a comment written on a line of its own", () => {
+			let lines = [
+				...CONNECT,
+				"\tconstant opened = connect(using {",
+				"\t\tretries = 1,",
+				"\t\t§ more to come",
+				"\t})",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result.slice(7, 13)).toEqual([
+				"\tconstant opened = connect(using {",
+				"\t\tretries = 1,",
+				"\t\thost = {},",
+				"\t\tport = {},",
+				"\t\t§ more to come",
+				"\t})",
+			])
+
+			expect(codesOf(result)).toEqual(["argument-type-mismatch"])
+		})
+
+		// NOTE: A `§` inside a String is a character of the String, so the walk
+		// steps over it rather than reading the rest of the line as prose.
+		it("should read a comment sigil inside a String as text", () => {
+			let lines = [
+				"implementation {",
+				"\ttype Options = { host: String, port: Integer, label: String }",
+				"",
+				'\tfunction connect(using options: Options = { label = "a" }) -> Integer {',
+				"\t\t<- options.port",
+				"\t}",
+				"",
+				"\tconstant opened = connect(using {",
+				'\t\tlabel = "a § b",',
+				"\t})",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result.slice(8, 11)).toEqual([
+				'\t\tlabel = "a § b",',
+				"\t\thost = {},",
+				"\t\tport = {},",
+			])
+		})
+
+		// NOTE: And a span that has slid into a comment since it was reported
+		// names a `{` the buffer no longer holds, so nothing is offered.
+		it("should refuse a span that now stands inside a comment", () => {
+			let lines = [
+				...CONNECT,
+				"\tconstant opened = connect(using § { retries = 1 })",
+				"}",
+			]
+
+			expect(
+				missingMembersAction(
+					staleDiagnostic(
+						"incomplete-record-argument",
+						spanOf(lines, 8, "{ retries = 1 }"),
+						[],
+						{ kind: "missing-members", names: ["host", "port"] },
+					),
+					lines,
+				),
+			).toBeNull()
+		})
+
 		// NOTE: A Case's payload is a Record Literal measured against a default
 		// exactly as an Argument is, and it takes the same scaffold.
 		it("should scaffold a Case payload the same way", () => {
@@ -1663,6 +1839,56 @@ describe("Code Actions", () => {
 					lines,
 				),
 			).toBeNull()
+		})
+
+		// NOTE: The quote would be escaped by the backslash in front of it, so
+		// the String the fix promised to close would still be open. There is no
+		// reading of the trailing backslash the source supports, so nothing is
+		// offered rather than an edit that leaves its own Diagnostic standing.
+		it("should stay silent behind an odd run of backslashes", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant greeting = "hello\\',
+				"\tconstant other = 1",
+				"}",
+			]
+
+			expect(titles(quickFixes(lines))).not.toContain(
+				"Add the missing '\"'",
+			)
+		})
+
+		// NOTE: An even run is a WRITTEN backslash, and closes as any other
+		// character does.
+		it("should close a String ending in a written backslash", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant greeting = "hello\\\\',
+				"\tconstant other = 1",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result[1]).toBe('\tconstant greeting = "hello\\\\"')
+			expect(codesOf(result)).not.toContain("unclosed-string")
+		})
+
+		// NOTE: A buffer saved with CRLF endings carries its `\r` at the end of
+		// every line, and the quote goes in FRONT of it — written behind, the
+		// carriage return becomes a character of the String and that line loses
+		// its terminator.
+		it("should write the quote in front of a carriage return", () => {
+			let lines = [
+				"implementation {\r",
+				'\tconstant greeting = "hello\r',
+				"\tconstant other = 1\r",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result[1]).toBe('\tconstant greeting = "hello"\r')
 		})
 	})
 
@@ -2049,6 +2275,87 @@ describe("Code Actions", () => {
 			expect(result[2]).toBe("\t\ttrim(at side: Integer) -> Self")
 			expect(codesOf(result)).not.toContain(
 				"default-on-protocol-requirement",
+			)
+		})
+
+		// NOTE: A tab typed at the head of the line since the analysis. The span
+		// is one column short of the Literal it was reported on, so it reads as
+		// `{ a = 1 ` — a brace opened and never closed — and the deletion would
+		// take the Literal's own `}` with it and leave `Red}`.
+		it("should stay silent where the span no longer closes what it opens", () => {
+			let was = [
+				"implementation {",
+				"\tchoice Colour { Red = { a = 1 }, Green }",
+				"}",
+			]
+			let now = [
+				"implementation {",
+				"\t\tchoice Colour { Red = { a = 1 }, Green }",
+				"}",
+			]
+
+			expect(
+				removeDefaultAction(
+					staleDiagnostic(
+						"case-default-without-payload",
+						spanOf(was, 2, "{ a = 1 }"),
+					),
+					now,
+				),
+			).toBeNull()
+		})
+
+		// NOTE: And the same slip over a value with no brackets in it at all,
+		// where what the span cuts in half is a number.
+		it("should stay silent where the span cuts a name in half", () => {
+			let was = [
+				"implementation {",
+				"\tchoice Colour { Red = 42, Green }",
+				"}",
+			]
+			let now = [
+				"implementation {",
+				"\t\tchoice Colour { Red = 42, Green }",
+				"}",
+			]
+
+			expect(
+				removeDefaultAction(
+					staleDiagnostic(
+						"case-default-without-payload",
+						spanOf(was, 2, "42"),
+					),
+					now,
+				),
+			).toBeNull()
+		})
+
+		// NOTE: A default written over lines may carry a comment, and what goes
+		// with the value goes with it.
+		it("should remove a default whose value carries a comment", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Colour {",
+				"\t\tRed = {",
+				"\t\t\t§ how red",
+				"\t\t\ta = 1,",
+				"\t\t},",
+				"\t\tGreen,",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(result.slice(1, 5)).toEqual([
+				"\tchoice Colour {",
+				"\t\tRed,",
+				"\t\tGreen,",
+				"\t}",
+			])
+			expect(codesOf(result)).not.toContain(
+				"case-default-without-payload",
 			)
 		})
 
@@ -3070,6 +3377,44 @@ describe("Code Actions", () => {
 			expect(result[3]).toBe('\ttest "ranks the table" focused {}')
 
 			expect(testCodesOf(result)).toEqual([])
+		})
+
+		// NOTE: Two spans that slid by the SAME column still read as the same
+		// word, so the agreement between them says nothing — the line lost its
+		// indentation since the analysis and both spans now cover `ocused`.
+		it("should stay silent where both spans have slid off their words", () => {
+			let was = [
+				"implementation {",
+				"}",
+				"tests {",
+				'\t\ttest "ranks the table" focused focused {}',
+				"}",
+			]
+			let now = [
+				"implementation {",
+				"}",
+				"tests {",
+				'\ttest "ranks the table" focused focused {}',
+				"}",
+			]
+			let at = spanOf(was, 4, "focused focused").start.column
+			let word = (column: number): common.Position => ({
+				start: { line: 4, column },
+				end: { line: 4, column: column + "focused".length },
+			})
+
+			expect(
+				mergeModifierAction(
+					staleDiagnostic("duplicate-modifier", word(at + 8), [
+						{
+							position: word(at),
+							message: "",
+							kind: "secondary",
+						},
+					]),
+					now,
+				),
+			).toBeNull()
 		})
 	})
 

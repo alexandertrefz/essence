@@ -1,6 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
-import { defaultEqualsBefore, sliceOf } from "./geometry"
+import { defaultEqualsBefore, readsAsWrittenValue } from "./geometry"
 import type { CodeActionEntry } from "./index"
 
 // NOTE: The three places a `= value` parses and can never fire — a Case with no
@@ -13,9 +13,16 @@ export function removeDefaultAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
 ): CodeActionEntry | null {
-	// NOTE: The span is the default's VALUE, so an empty one says the buffer has
-	// moved on since the Diagnostic was made and there is nothing to delete.
-	if (sliceOf(lines, diagnostic.position).trim() === "") {
+	// NOTE: The span is the default's VALUE, and the Parser drops that value the
+	// moment it reports — a Case left `defaultValue: null`, a Parameter the
+	// same — so there is no Node left to measure the deletion off and the
+	// buffer is the only witness there is. What it is asked is whether the span
+	// still reads as a WHOLE value: a span one keystroke stale reads as
+	// something wherever it lands, and `= { a = 1 ` taken out of `Red = { a = 1
+	// }, Green` leaves `Red}` behind. All three codes this answers are
+	// preferred, so an Editor applies the edit without asking and this is what
+	// stands between a stale span and somebody's Choice.
+	if (!readsAsWrittenValue(lines, diagnostic.position)) {
 		return null
 	}
 

@@ -1,6 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
-import { endOfLine, sliceOf } from "./geometry"
+import { endOfLine, lineAt, sliceOf } from "./geometry"
 import type { CodeActionEdit, CodeActionEntry } from "./index"
 
 // NOTE: The Diagnostics about how a Token was WRITTEN — a String that was never
@@ -34,6 +34,17 @@ export function closeStringAction(
 
 	let end = endOfLine(lines, opening.start.line)
 
+	// NOTE: A quote written behind an ODD run of backslashes is escaped by the
+	// last of them — `"hello\` closed this way reads `"hello\"`, which is a
+	// String still running — so the one edit this offers would leave the very
+	// Diagnostic it answers standing. What the trailing backslash was meant to
+	// be is not something the source says, so nothing is offered rather than
+	// something that does not hold. An EVEN run is `\\`, a written backslash,
+	// and closes as any other character does.
+	if (trailingBackslashes(lineAt(lines, end.line), end.column) % 2 === 1) {
+		return null
+	}
+
 	return {
 		title: "Add the missing '\"'",
 		kind: "quickfix",
@@ -42,6 +53,17 @@ export function closeStringAction(
 		isPreferred: true,
 		edits: [{ range: { start: end, end }, newText: '"' }],
 	}
+}
+
+// NOTE: How many backslashes a line ends in, counted back from `column`.
+function trailingBackslashes(text: string, column: number): number {
+	let count = 0
+
+	while (text[column - 2 - count] === "\\") {
+		count += 1
+	}
+
+	return count
 }
 
 // NOTE: The Diagnostic spans exactly the two characters `\c`, whatever `c` came

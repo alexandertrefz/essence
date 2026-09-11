@@ -1307,6 +1307,90 @@ describe("Workspace", () => {
 			})
 		})
 
+		// NOTE: Nothing separates two entries but the space between them, so
+		// both may be written on one line — and the entry that is still read
+		// is not the removal's to take. What goes is the name and the blank
+		// that carried it.
+		it("should remove an unused entry written beside a used one", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Geometry.es": geometry,
+				"Main.es": [
+					"import {",
+					'\tfrom "./Geometry.es" { Rectangle RectangleMeasurable }',
+					"}",
+					"",
+					"implementation {",
+					"\tfunction widthOf(_ shape: Rectangle) -> Integer {",
+					"\t\t<- shape.width",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let removal = findCodeActions(
+				source,
+				spanOf(source, 2, "RectangleMeasurable"),
+				mainPath,
+				workspace,
+			).find((action) =>
+				action.title.startsWith("Remove the unused import"),
+			) as CodeActionEntry
+			let fixed = appliedTo(source, removal.edits)
+
+			expect(fixed.split("\n")[1]).toBe(
+				'\tfrom "./Geometry.es" { Rectangle }',
+			)
+			expect(
+				analyseDocument(fixed, mainPath, { host: workspace.host })
+					.diagnostics,
+			).toEqual([])
+		})
+
+		// NOTE: And two GROUPS may share a line the same way, which is what
+		// the duplicate fix has to be careful of: the group it drops is the
+		// later one, and the one in front of it stays where it was written.
+		it("should remove a duplicate group written beside another", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Geometry.es": geometry,
+				"Shapes.es": shapes,
+				"Main.es": [
+					"import {",
+					'\tfrom "./Geometry.es" { Rectangle } from "./Shapes.es" { Rectangle }',
+					"}",
+					"",
+					"implementation {",
+					"\tfunction widthOf(_ shape: Rectangle) -> Integer {",
+					"\t\t<- shape.width",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let removal = findCodeActions(
+				source,
+				spanOf(source, 2, '"./Shapes.es" { Rectangle }'),
+				mainPath,
+				workspace,
+			).find(
+				(action) => action.diagnosticCode === "duplicate-import",
+			) as CodeActionEntry
+			let fixed = appliedTo(source, removal.edits)
+
+			expect(fixed.split("\n")[1]).toBe(
+				'\tfrom "./Geometry.es" { Rectangle }',
+			)
+			expect(
+				analyseDocument(fixed, mainPath, { host: workspace.host })
+					.diagnostics,
+			).toEqual([])
+		})
+
 		// NOTE: The Diagnostic points at the entry that was being bound when
 		// the clash was found, which is the LATER of the two — the earlier one
 		// already holds the name.
@@ -1577,6 +1661,34 @@ describe("Workspace", () => {
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
 		})
 
+		// NOTE: A self-import written beside a group that is not one takes the
+		// blanks in front of it and nothing else — the group it shares its line
+		// with is the file's only way of reaching what it names.
+		it("should remove a self-import written beside another group", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Other.es": other,
+				"Main.es": [
+					"import {",
+					'\tfrom "./Other.es" { thing } from "./Main.es" { here }',
+					"}",
+					"",
+					"implementation {",
+					"\tconstant here = 1",
+					"\tconstant used = thing::add(here)",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let [fix] = fixesFor(workspace, mainPath, 2, '"./Main.es"')
+			let result = applied(source, fix)
+
+			expect(result.split("\n")[1]).toBe('\tfrom "./Other.es" { thing }')
+			expect(codesAfter(workspace, mainPath, result)).toEqual([])
+		})
+
 		// NOTE: Dropping a self-EXPORT changes what the Module publishes, which
 		// is not something an Editor may decide on its own.
 		it("should offer the removal of a self-export without preferring it", () => {
@@ -1837,6 +1949,94 @@ describe("Workspace", () => {
 					"",
 					"implementation {",
 					"\tconstant width = ONE",
+					"}",
+					"",
+				].join("\n"),
+			)
+			expect(
+				analyseDocument(result, mainPath, {
+					host: workspace.host,
+				}).diagnostics.map((diagnostic) => diagnostic.code),
+			).toEqual([])
+		})
+
+		// NOTE: Two unused entries on ONE line, with a third beside them that is
+		// read. Whole-line deletions here would each take all three, and two of
+		// them over the same line would overlap besides.
+		it("should remove two unused entries written on one line", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Toolbox.es": toolbox,
+				"Main.es": [
+					"import {",
+					'\tfrom "./Toolbox.es" { ONE TWO Rectangle }',
+					"}",
+					"",
+					"implementation {",
+					"\tconstant width = ONE",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let action = organizeAction(workspace, mainPath) as CodeActionEntry
+			let result = appliedTo(
+				workspace.sourceOf(mainPath) ?? "",
+				action.edits,
+			)
+
+			expect(result).toBe(
+				[
+					"import {",
+					'\tfrom "./Toolbox.es" { ONE }',
+					"}",
+					"",
+					"implementation {",
+					"\tconstant width = ONE",
+					"}",
+					"",
+				].join("\n"),
+			)
+			expect(
+				analyseDocument(result, mainPath, {
+					host: workspace.host,
+				}).diagnostics.map((diagnostic) => diagnostic.code),
+			).toEqual([])
+		})
+
+		// NOTE: And two whole GROUPS on one line, where the blanks between them
+		// are what both deletions reach for — they are folded into one edit, so
+		// what goes out is a range an Editor will apply.
+		it("should remove two unused groups written on one line", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Geometry.es": geometry,
+				"Toolbox.es": toolbox,
+				"Main.es": [
+					"import {",
+					'\tfrom "./Geometry.es" { Rectangle } from "./Toolbox.es" { TWO }',
+					"}",
+					"",
+					"implementation {",
+					"\tconstant width = 1",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let action = organizeAction(workspace, mainPath) as CodeActionEntry
+			let result = appliedTo(
+				workspace.sourceOf(mainPath) ?? "",
+				action.edits,
+			)
+
+			expect(result).toBe(
+				[
+					"import {",
+					"}",
+					"",
+					"implementation {",
+					"\tconstant width = 1",
 					"}",
 					"",
 				].join("\n"),

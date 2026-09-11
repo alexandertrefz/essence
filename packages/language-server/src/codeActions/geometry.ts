@@ -261,8 +261,100 @@ export function keywordBefore(
 
 // NOTE: The Cursor one past the last character of a line — where an insertion
 // that belongs at the END of what was written on it goes.
+//
+// A buffer saved with CRLF line endings is split on the `\n` alone, so each
+// line still carries its `\r`. That carriage return is the line ENDING rather
+// than something written on the line, and an insertion that goes behind it
+// moves it into the middle of the text — a String closed after one takes it in
+// as a character and the file loses that line's terminator besides.
 export function endOfLine(lines: Array<string>, line: number): common.Cursor {
-	return { line, column: lineAt(lines, line).length + 1 }
+	let text = lineAt(lines, line)
+
+	return {
+		line,
+		column: (text.endsWith("\r") ? text.length - 1 : text.length) + 1,
+	}
+}
+
+// NOTE: Whether a span reads as a WHOLE written value: every bracket it opens
+// it closes, every String it opens it ends, and neither edge cuts a name in
+// half. What this is for is the fixes that DELETE what a span covers. A
+// Diagnostic the client echoed back may be a keystroke stale, and a span that
+// has slid by a column still reads as something — `{ a = 1 ` out of `Red = { a
+// = 1 }, Green`, or ` 4` out of `Red = 42` — so a deletion measured off one
+// takes a bracket the value never owned, or half a number, with it.
+//
+// Comments are stepped over rather than refused: a value written over several
+// lines may carry one, and what goes with the value goes with it.
+export function readsAsWrittenValue(
+	lines: Array<string>,
+	position: common.Position,
+): boolean {
+	let text = sliceOf(lines, position)
+
+	if (text.trim() === "" || !isWordBounded(lines, position)) {
+		return false
+	}
+
+	let opened: Array<string> = []
+	let quoted = false
+
+	for (let index = 0; index < text.length; index++) {
+		let character = text[index]
+
+		if (quoted) {
+			if (character === "\\") {
+				index += 1
+			} else if (character === '"') {
+				quoted = false
+			}
+		} else if (character === '"') {
+			quoted = true
+		} else if (character === "§") {
+			let breakAt = text.indexOf("\n", index)
+
+			index = breakAt === -1 ? text.length : breakAt
+		} else if (closerOf[character as string] !== undefined) {
+			opened.push(closerOf[character as string] as string)
+		} else if (character === opened.at(-1)) {
+			opened.pop()
+		} else if (
+			character === ")" ||
+			character === "]" ||
+			character === "}"
+		) {
+			return false
+		}
+	}
+
+	return !quoted && opened.length === 0
+}
+
+const closerOf: Record<string, string> = { "(": ")", "[": "]", "{": "}" }
+
+// NOTE: Whether NEITHER edge of a span stands in the middle of a name. A span
+// that has slid a column since it was reported reads as a word all the same —
+// `ocused` out of `focused focused`, `firstNme` out of `person.firstNme` — and
+// a fix that rewrites or deletes what a span covers has no other way of telling
+// the two apart. Every edge that is not a name character is a boundary: a
+// bracket, a space, a `.`, a `::`, the start of the line.
+export function isWordBounded(
+	lines: Array<string>,
+	position: common.Position,
+): boolean {
+	let opening = lineAt(lines, position.start.line)
+	let closing = lineAt(lines, position.end.line)
+
+	return !(
+		(isNameCharacter(opening[position.start.column - 2]) &&
+			isNameCharacter(opening[position.start.column - 1])) ||
+		(isNameCharacter(closing[position.end.column - 2]) &&
+			isNameCharacter(closing[position.end.column - 1]))
+	)
+}
+
+function isNameCharacter(character: string | undefined): boolean {
+	return character !== undefined && /[A-Za-z0-9_]/.test(character)
 }
 
 // NOTE: Where the `=` that introduces a default stands, with the whitespace in
@@ -307,6 +399,14 @@ export function defaultEqualsBefore(
 // it sat on behind, so the deletion runs from the start of its first line to
 // the start of the line below its last.
 //
+// Only where the Node OWNS those lines, though. The grammar puts no delimiter
+// between two import entries and none between two groups, so nothing stops
+// either from being written beside its neighbours — `from "./A.es" { One Two }`
+// is one line holding two entries, and taking the line takes the entry that is
+// still read. Where the Node shares its line the deletion is the span and the
+// whitespace that separated it from what it was written beside, which leaves
+// the line one entry shorter instead of leaving the block one name short.
+//
 // A Node on the LAST line of the document has no following line to reach into,
 // so the deletion stops at the end of its own — otherwise it would end past the
 // end of the document.
@@ -314,14 +414,59 @@ export function removeLinesEdit(
 	lines: Array<string>,
 	position: common.Position,
 ): CodeActionEdit {
+	if (
+		!opensItsLine(lines, position.start) ||
+		!closesItsLine(lines, position.end)
+	) {
+		return removeFromItsLineEdit(lines, position)
+	}
+
 	let start = { line: position.start.line, column: 1 }
 	let end = { line: position.end.line + 1, column: 1 }
 
 	if (end.line > lines.length) {
-		end = endOfLine(lines, position.end.line)
+		end = {
+			line: position.end.line,
+			column: lineAt(lines, end.line - 1).length + 1,
+		}
 	}
 
 	return { range: { start, end }, newText: "" }
+}
+
+// NOTE: One member of a list written BESIDE its neighbours, taken with the
+// blanks that separated it from them: the ones in FRONT where something was
+// written before it on the line, and the ones BEHIND where it opened the line
+// and something else closes it. One side each way, so that the member that is
+// left keeps the one space it had.
+function removeFromItsLineEdit(
+	lines: Array<string>,
+	position: common.Position,
+): CodeActionEdit {
+	if (!opensItsLine(lines, position.start)) {
+		return {
+			range: {
+				start: extendOverLeadingSpace(lines, position.start),
+				end: position.end,
+			},
+			newText: "",
+		}
+	}
+
+	let after = lineAt(lines, position.end.line).slice(position.end.column - 1)
+
+	return {
+		range: {
+			start: position.start,
+			end: {
+				line: position.end.line,
+				column:
+					position.end.column +
+					(after.length - after.replace(/^[ \t]+/, "").length),
+			},
+		},
+		newText: "",
+	}
 }
 
 // NOTE: Whether the keyword is written AT `cursor` — the other half of
@@ -479,8 +624,17 @@ export function commaBefore(
 // Literal's own layout survives: one written on a line takes the new members
 // beside it and one written over several takes them on lines of their own.
 //
+// A trailing `§` comment is not CONTENT, and it is the one thing on a line that
+// a scaffold must never be written behind: everything after the sigil is prose,
+// so a member and the separator in front of it would both be read as more of
+// somebody's note and the Literal would lose its last member to it. The walk
+// therefore stops where the comment opens, and what it writes lands in front of
+// the note rather than inside it.
+//
 // Null where the span does not read as a braced Literal, as everything here
-// refuses text that is not what the Node said it would be.
+// refuses text that is not what the Node said it would be — and null again
+// where the cursor the walk arrived at stands inside a comment all the same,
+// which is a span that has slid since the Diagnostic was reported.
 export function endOfContents(
 	lines: Array<string>,
 	position: common.Position,
@@ -501,12 +655,13 @@ export function endOfContents(
 	let cursor = brace
 
 	while (cursor.line > position.start.line) {
-		let written = lineAt(lines, cursor.line)
-			.slice(0, cursor.column - 1)
-			.replace(/[ \t]+$/, "")
+		let written = writtenBefore(lines, cursor)
 
 		if (written !== "") {
-			return { line: cursor.line, column: written.length + 1 }
+			return outsideComments(lines, {
+				line: cursor.line,
+				column: written.length + 1,
+			})
 		}
 
 		cursor = {
@@ -518,14 +673,60 @@ export function endOfContents(
 	// NOTE: Back on the opening brace's own line, where everything to its left
 	// belongs to the Expression the Literal is written in — so the walk stops
 	// at the brace rather than at the first thing it finds.
-	let written = lineAt(lines, position.start.line)
-		.slice(0, cursor.column - 1)
-		.replace(/[ \t]+$/, "")
+	let written = writtenBefore(lines, {
+		line: position.start.line,
+		column: cursor.column,
+	})
 
-	return {
+	return outsideComments(lines, {
 		line: position.start.line,
 		column: Math.max(written.length + 1, opening.column),
+	})
+}
+
+// NOTE: What was written on a line in front of a Cursor, with the trailing
+// whitespace and any `§` comment left off — the text an edit is allowed to
+// measure itself against.
+function writtenBefore(lines: Array<string>, cursor: common.Cursor): string {
+	let before = lineAt(lines, cursor.line).slice(0, cursor.column - 1)
+
+	return before.slice(0, commentStart(before)).replace(/[ \t]+$/, "")
+}
+
+// NOTE: The Cursor, or null where a comment opened in front of it on its own
+// line. The walk above already stops short of a comment, so this only ever
+// answers null for a Position that no longer reads as the Node that reported it
+// — a `{` the buffer now has inside a comment, say — and that is exactly the
+// span a fix must not write over.
+function outsideComments(
+	lines: Array<string>,
+	cursor: common.Cursor,
+): common.Cursor | null {
+	let before = lineAt(lines, cursor.line).slice(0, cursor.column - 1)
+
+	return commentStart(before) < before.length ? null : cursor
+}
+
+// NOTE: Where the `§` that opens a comment stands on a line, or the line's
+// length where none does. A `§` written inside a String is a character of the
+// String rather than the start of a comment, so quoted runs are stepped over —
+// `label = "a § b",` ends on the comma rather than in the middle of the String.
+function commentStart(text: string): number {
+	let quoted = false
+
+	for (let index = 0; index < text.length; index++) {
+		let character = text[index]
+
+		if (quoted && character === "\\") {
+			index += 1
+		} else if (character === '"') {
+			quoted = !quoted
+		} else if (character === "§" && !quoted) {
+			return index
+		}
 	}
+
+	return text.length
 }
 
 // NOTE: Where the label written immediately in front of a value stands, or null

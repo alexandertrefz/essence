@@ -350,8 +350,8 @@ export type FixProvider = (context: FixContext) => Array<CodeActionEntry>
 
 // NOTE: A misspelling reads the same wherever it is written, so the codes that
 // carry a `suggestion` share one provider rather than one arm each.
-const spellingFix: FixProvider = ({ diagnostic }) =>
-	listed(suggestionAction(diagnostic, (suggestion) => suggestion))
+const spellingFix: FixProvider = ({ diagnostic, lines }) =>
+	listed(suggestionAction(diagnostic, lines, (suggestion) => suggestion))
 
 // NOTE: An unknown name has two answers and nothing in the Diagnostic chooses
 // between them: it is either misspelled, or spelled right and imported
@@ -366,8 +366,14 @@ const importOrSpellingFix: FixProvider = (context) => [
 // NOTE: A `@param` suggestion is the Parameter's NAME and the span it is
 // written over is that name alone, so the title spells the whole tag back while
 // the edit rewrites only what the tag named.
-const documentationSpellingFix: FixProvider = ({ diagnostic }) =>
-	listed(suggestionAction(diagnostic, (suggestion) => `@param ${suggestion}`))
+const documentationSpellingFix: FixProvider = ({ diagnostic, lines }) =>
+	listed(
+		suggestionAction(
+			diagnostic,
+			lines,
+			(suggestion) => `@param ${suggestion}`,
+		),
+	)
 
 // NOTE: One provider per Diagnostic code, looked up rather than switched on.
 // A code that has more than one answer keeps a provider that concatenates them,
@@ -490,9 +496,18 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"uninferred-namespace-parameter": ({ diagnostic, program, lines }) =>
 		listed(inferParameterAction(diagnostic, program, lines)),
 	// NOTE: A suggestion is the Case's NAME and the span it is written over is
-	// the whole `#Name`, so the sigil is written back in front of it.
-	"unknown-case": ({ diagnostic }) =>
-		listed(suggestionAction(diagnostic, (suggestion) => `#${suggestion}`)),
+	// that name ALONE — every site reports against `caseName.position`, which
+	// is the name with no sigil in front of it. So the `#` is written into the
+	// title, where the reader reads the Case back as they would write it, and
+	// the edit writes the bare name over the bare name.
+	"unknown-case": ({ diagnostic, lines }) =>
+		listed(
+			suggestionAction(
+				diagnostic,
+				lines,
+				(suggestion) => `#${suggestion}`,
+			),
+		),
 	// NOTE: A tag naming nothing is either misspelled or about a Parameter that
 	// is gone, and nothing in the Diagnostic chooses between them. The
 	// suggestion stands above the removal, since keeping the description is the

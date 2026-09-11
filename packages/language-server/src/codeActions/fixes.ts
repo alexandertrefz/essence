@@ -21,6 +21,7 @@ import {
 	extendOverLeadingSpace,
 	indentationOf,
 	insertBeforeClosingBrace,
+	isWordBounded,
 	keywordAt,
 	keywordBefore,
 	labelBefore,
@@ -181,11 +182,35 @@ export function unreachableCaseAction(
 	}
 }
 
+// NOTE: A near miss written back over the name that was misspelled — the one
+// fix eight codes share, since a misspelling reads the same wherever it stands.
+//
+// The span is read off the buffer first, as everything here is. A Diagnostic a
+// client echoed back may be several keystrokes old and a span that has slid by
+// a column still lands on SOMETHING: `person.firstNme` answered on one writes
+// `personfirstNamee`, and `"Ada"::lenth()` writes `"Ada":lengthh()`. So what is
+// asked is that the span stand on a whole NAME — what it covers reads as one,
+// and neither neighbour is a character a name is made of. `_` is admitted at
+// the head of one, since a `@param _` line documents a Parameter with no label.
+//
+// Which is not optional, precisely because this is preferred: an Editor applies
+// a preferred fix without asking, so the only thing between a stale span and
+// somebody's source is the check.
+const writtenName = /^[A-Za-z_][A-Za-z0-9_]*$/
+
 export function suggestionAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
 	render: (suggestion: string) => string,
 ): CodeActionEntry | null {
 	if (diagnostic.data?.kind !== "suggestion") {
+		return null
+	}
+
+	if (
+		!writtenName.test(sliceOf(lines, diagnostic.position)) ||
+		!isWordBounded(lines, diagnostic.position)
+	) {
 		return null
 	}
 
