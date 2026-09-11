@@ -567,6 +567,29 @@ export function enclosingStatementOf(
 	return found
 }
 
+// NOTE: The other end of the question `enclosingStatementOf` answers. A
+// Statement lifted OUT of a Function is written beside that Function, and what
+// says which Function that is, is the Statement of a SECTION's own body the
+// range sits in — the outermost Statement holding it rather than the innermost.
+// Null where the range covers more than one of them, which is a selection no
+// single Statement is the home of.
+export function outermostStatementOf(
+	program: parser.Program,
+	range: common.Position,
+): EnclosingStatement | null {
+	for (let body of programBodies(program)) {
+		let index = body.findIndex((statement) =>
+			containsRange(statement.position, range),
+		)
+
+		if (index !== -1) {
+			return { statement: body[index], body, index }
+		}
+	}
+
+	return null
+}
+
 // NOTE: Every body of the Program, outermost first. `programSections` is depth
 // first and in source order, and the walk visits a Node before the Nodes it
 // holds, so a body written inside another is always collected after it.

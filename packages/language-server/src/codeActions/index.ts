@@ -4,6 +4,7 @@ import { type Analysis, analyseDocument, documentFilePath } from "../analyse"
 import { indexProgram, type ProgramIndex } from "../rename"
 import type { Workspace } from "../workspace"
 import { extractConstantActions } from "./extractConstant"
+import { extractFunctionActions } from "./extractFunction"
 import {
 	compareWrittenValueAction,
 	matcherBeforeValueAction,
@@ -248,6 +249,16 @@ export function findCodeActions(
 
 	entries.push(
 		...extractConstantActions(program, lines, range, indexed, documentPath),
+	)
+	entries.push(
+		...extractFunctionActions(
+			program,
+			enrichedProgram,
+			lines,
+			range,
+			indexed,
+			documentPath,
+		),
 	)
 	entries.push(...inlineConstantActions(program, lines, range, indexed))
 	entries.push(...pathActions(program, () => indexed().scopes, lines, range))

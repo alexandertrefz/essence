@@ -5896,11 +5896,16 @@ describe("Code Action lookups", () => {
 // — an extraction that type-checks is the whole of what makes it an extraction
 // rather than an edit.
 describe("Extract to a Constant", () => {
+	// NOTE: By title rather than by kind alone — the two extractions share a
+	// kind, and a selection that reads as both is a shape either of them may
+	// meet.
 	function extractions(
 		lines: Array<string>,
 		range: common.Position,
 	): Array<CodeActionEntry> {
-		return refactorsOf(lines, range, "refactor.extract")
+		return refactorsOf(lines, range, "refactor.extract").filter(
+			(entry) => entry.title === "Extract to a Constant",
+		)
 	}
 
 	it("lifts the Expression the selection sits in above its Statement", () => {
@@ -6277,5 +6282,333 @@ describe("Inline a Constant", () => {
 		let lines = ["implementation {", "\tconstant unused = 1::add(2)", "}"]
 
 		expect(inlines(lines, rangeOf(lines, "unused"))).toEqual([])
+	})
+})
+
+describe("Extract to a Function", () => {
+	function extractions(
+		lines: Array<string>,
+		range: common.Position,
+	): Array<CodeActionEntry> {
+		return refactorsOf(lines, range, "refactor.extract").filter(
+			(entry) => entry.title === "Extract to a Function",
+		)
+	}
+
+	it("writes a selection ending in a Return as a Function that answers it", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction report(_ scored: Integer, _ conceded: Integer) -> String {",
+			"\t\tconstant total = scored::add(conceded)",
+			"\t\tconstant doubled = total::multiply(with 2)",
+			"",
+			"\t\t<- doubled::toString()",
+			"\t}",
+			"}",
+		]
+
+		let [action] = extractions(
+			lines,
+			rangeFrom(lines, "constant total", "<- doubled::toString()"),
+		)
+		let result = applied(lines, action)
+
+		expect(action.title).toBe("Extract to a Function")
+		expect(action.isPreferred).toBe(false)
+
+		expect(result).toEqual([
+			"implementation {",
+			"\tfunction report(_ scored: Integer, _ conceded: Integer) -> String {",
+			"\t\t<- extracted(scored, conceded)",
+			"\t}",
+			"",
+			"\tfunction extracted(_ scored: Integer, _ conceded: Integer) -> String {",
+			"\t\tconstant total = scored::add(conceded)",
+			"\t\tconstant doubled = total::multiply(with 2)",
+			"",
+			"\t\t<- doubled::toString()",
+			"\t}",
+			"}",
+		])
+
+		expectRefactored(lines, result)
+	})
+
+	// NOTE: The Position is measured against the text the edits produce, not
+	// against the text they were computed from — the call site collapses the
+	// selection onto one line, and the new Function moves up with it.
+	it("carries the command that opens rename on the new Function", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction report(_ scored: Integer, _ conceded: Integer) -> String {",
+			"\t\tconstant total = scored::add(conceded)",
+			"",
+			"\t\t<- total::toString()",
+			"\t}",
+			"}",
+		]
+
+		let [action] = extractions(
+			lines,
+			rangeFrom(lines, "constant total", "<- total::toString()"),
+		)
+
+		expect(action.command).toEqual({
+			title: "Rename",
+			command: "essence.renameAt",
+			arguments: [DOCUMENT, { line: 5, character: 10 }],
+		})
+
+		expect(applied(lines, action)[5]).toBe(
+			"\tfunction extracted(_ scored: Integer, _ conceded: Integer) -> String {",
+		)
+	})
+
+	// NOTE: `{}` is the unit Type, and a Function answering it is called as a
+	// Statement — which is what a selection that answers nothing becomes.
+	it("writes a selection that answers nothing as a Function of unit Type", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction report(_ scored: Integer) -> Integer {",
+			"\t\tTerminal.print(scored::toString())",
+			'\t\tTerminal.print("done")',
+			"",
+			"\t\t<- scored",
+			"\t}",
+			"}",
+		]
+
+		let [action] = extractions(
+			lines,
+			rangeFrom(lines, "Terminal.print(scored", '"done")'),
+		)
+		let result = applied(lines, action)
+
+		expect(result).toEqual([
+			"implementation {",
+			"\tfunction report(_ scored: Integer) -> Integer {",
+			"\t\textracted(scored)",
+			"",
+			"\t\t<- scored",
+			"\t}",
+			"",
+			"\tfunction extracted(_ scored: Integer) -> {} {",
+			"\t\tTerminal.print(scored::toString())",
+			'\t\tTerminal.print("done")',
+			"\t}",
+			"}",
+		])
+
+		expectRefactored(lines, result)
+	})
+
+	it("numbers the name when the Scope already has 'extracted'", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction extracted(_ n: Integer) -> Integer {",
+			"\t\t<- n::add(1)",
+			"\t}",
+			"",
+			"\tfunction report(_ scored: Integer) -> Integer {",
+			"\t\t<- scored::add(2)",
+			"\t}",
+			"}",
+		]
+
+		let [action] = extractions(lines, rangeOf(lines, "<- scored::add(2)"))
+		let result = applied(lines, action)
+
+		expect(result[9]).toBe(
+			"\tfunction extracted2(_ scored: Integer) -> Integer {",
+		)
+		expectRefactored(lines, result)
+	})
+
+	// NOTE: A Match Handler's body is a body like any other, and the `<-` that
+	// ends it is the ARM's value — which is exactly the Type the extracted
+	// Function then answers, so the call reads back into the arm unchanged.
+	it("lifts Statements out of a Match Handler's body", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction describe(_ score: Integer) -> String {",
+			"\t\t<- match score -> String {",
+			"\t\t\tcase 0 {",
+			"\t\t\t\tconstant label = score::toString()",
+			"",
+			"\t\t\t\t<- label",
+			"\t\t\t}",
+			'\t\t\tcase _ { <- "some" }',
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+
+		let [action] = extractions(
+			lines,
+			rangeFrom(lines, "constant label", "<- label"),
+		)
+		let result = applied(lines, action)
+
+		expect(result).toEqual([
+			"implementation {",
+			"\tfunction describe(_ score: Integer) -> String {",
+			"\t\t<- match score -> String {",
+			"\t\t\tcase 0 {",
+			"\t\t\t\t<- extracted(score)",
+			"\t\t\t}",
+			'\t\t\tcase _ { <- "some" }',
+			"\t\t}",
+			"\t}",
+			"",
+			"\tfunction extracted(_ score: Integer) -> String {",
+			"\t\tconstant label = score::toString()",
+			"",
+			"\t\t<- label",
+			"\t}",
+			"}",
+		])
+
+		expectRefactored(lines, result)
+	})
+
+	// NOTE: What the selection declares travels with it, so a name it declares
+	// and the Function goes on reading is a name the Function would lose.
+	it("offers nothing when a name it declares is read after it", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction report(_ scored: Integer) -> String {",
+			"\t\tconstant total = scored::add(1)",
+			"",
+			"\t\t<- total::toString()",
+			"\t}",
+			"}",
+		]
+
+		expect(extractions(lines, rangeOf(lines, "constant total"))).toEqual([])
+	})
+
+	// NOTE: The Function would have to declare the Variable again, under a name
+	// that does not clash with the Parameter carrying its incoming value — which
+	// is a rename nobody asked for. See the note at the top of the file.
+	it("offers nothing when it writes a Variable declared above it", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction report(_ scored: Integer) -> Integer {",
+			"\t\tvariable total = 0",
+			"",
+			"\t\ttotal = total::add(scored)",
+			"\t\ttotal = total::add(1)",
+			"",
+			"\t\t<- total",
+			"\t}",
+			"}",
+		]
+
+		expect(
+			extractions(
+				lines,
+				rangeFrom(lines, "total = total::add(scored)", "total::add(1)"),
+			),
+		).toEqual([])
+	})
+
+	// NOTE: A Return that is not the last Statement answers the FUNCTION, and
+	// inside the extracted one it would answer that instead.
+	it("offers nothing for a Return in the middle of the selection", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction report(_ scored: Integer) -> Integer {",
+			"\t\tif scored::isGreaterThan(0) {",
+			"\t\t\t<- scored",
+			"\t\t}",
+			"",
+			'\t\tTerminal.print("none")',
+			"",
+			"\t\t<- 0",
+			"\t}",
+			"}",
+		]
+
+		expect(
+			extractions(
+				lines,
+				rangeFrom(lines, "if scored", 'Terminal.print("none")'),
+			),
+		).toEqual([])
+	})
+
+	// NOTE: A Method extracted beside a Method has to decide what `@` becomes,
+	// and that decision changes what the extracted code means — so a Namespace
+	// is turned away whether or not the selection reads `@` at all.
+	it("offers nothing inside a Namespace", () => {
+		let lines = [
+			"implementation {",
+			"\tnamespace Doubling for Integer {",
+			"\t\tstatic base() -> Integer {",
+			"\t\t\tconstant twice = 2",
+			"",
+			"\t\t\t<- twice::multiply(with 3)",
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+
+		expect(
+			extractions(
+				lines,
+				rangeFrom(
+					lines,
+					"constant twice",
+					"<- twice::multiply(with 3)",
+				),
+			),
+		).toEqual([])
+	})
+
+	// NOTE: `@` inside a Match Handler is the value the arm caught, and a
+	// Function written beside the Function is about nothing.
+	it("offers nothing for a selection that reads its position", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction describe(_ score: Integer) -> String {",
+			"\t\t<- match score -> String {",
+			"\t\t\tcase 0 {",
+			"\t\t\t\tconstant label = @::toString()",
+			"",
+			"\t\t\t\t<- label",
+			"\t\t\t}",
+			'\t\t\tcase _ { <- "some" }',
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+
+		expect(
+			extractions(lines, rangeFrom(lines, "constant label", "<- label")),
+		).toEqual([])
+	})
+
+	// NOTE: An assertion records against the test that is running, and a
+	// Function called from a test body can not do that — the Enricher refuses
+	// one written in a Function literal for the same reason.
+	it("offers nothing for a selection holding an assertion", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction sum(_ a: Integer, _ b: Integer) -> Integer {",
+			"\t\t<- a::add(b)",
+			"\t}",
+			"}",
+			"",
+			"tests {",
+			"\tfunction check() -> {} {",
+			"\t\texpect sum(1, 2)::is(3)",
+			"\t\texpect sum(2, 3)::is(5)",
+			"\t}",
+			"}",
+		]
+
+		expect(
+			extractions(lines, rangeFrom(lines, "expect sum(1, 2)", "::is(5)")),
+		).toEqual([])
 	})
 })

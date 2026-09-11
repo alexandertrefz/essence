@@ -4,7 +4,6 @@ import {
 	isValidIdentifierName,
 	type ProgramIndex,
 	type RenameIndex,
-	type Scope,
 	scopeAt,
 } from "../rename"
 import {
@@ -17,6 +16,7 @@ import {
 } from "./geometry"
 import type { CodeActionEdit, CodeActionEntry } from "./index"
 import { enclosingStatementOf, findInnermostNodeContaining } from "./lookups"
+import { availableName } from "./names"
 import { renameCommand } from "./renameCommand"
 
 // NOTE: An Expression lifted out of the Statement it was written in, and left
@@ -345,33 +345,4 @@ function headName(node: parser.ExpressionNode): string {
 		default:
 			return "value"
 	}
-}
-
-// NOTE: The derived name with a number after it where it is taken. The Scope
-// chain is walked rather than the one Scope, since shadowing a name that is
-// read further down the same body would silently rebind it.
-function availableName(name: string, scope: Scope): string {
-	if (!isTaken(name, scope)) {
-		return name
-	}
-
-	for (let suffix = 2; ; suffix++) {
-		if (!isTaken(`${name}${suffix}`, scope)) {
-			return `${name}${suffix}`
-		}
-	}
-}
-
-function isTaken(name: string, scope: Scope): boolean {
-	for (
-		let candidate: Scope | null = scope;
-		candidate !== null;
-		candidate = candidate.parent
-	) {
-		if (candidate.values.has(name)) {
-			return true
-		}
-	}
-
-	return false
 }
