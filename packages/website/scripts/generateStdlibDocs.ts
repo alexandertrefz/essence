@@ -1,633 +1,231 @@
 /*
- * Turns the standard library's declared surface into documentation pages.
+ * Writes the standard library reference: one page per type, and the member
+ * manifest beside it.
  *
- *   bun scripts/generateStdlibDocs.ts          create what is missing
- *   bun scripts/generateStdlibDocs.ts --sync   also refresh generated frontmatter
+ *   bun scripts/generateStdlibDocs.ts          write the pages that do not exist yet
+ *   bun scripts/generateStdlibDocs.ts --sync   rewrite every page from the sources
  *
  * ── What it will and will not touch ───────────────────────────────────────
  *
- * It CREATES a page that does not exist yet and otherwise leaves the file
- * alone. Every page here is meant to be written on afterwards — the generated
- * body is a floor, not a ceiling — and a generator that rewrote bodies would
- * make that work disposable.
+ * A library page is generated whole — from `packages/standard-library/sources`
+ * by way of `stdlibSurface.ts`, placed by the rules in `libraryPages.ts` and
+ * grouped by `libraryTable.ts` — except for two things a person writes: the
+ * frontmatter `description` and the "Taught on" line under the lede. The
+ * generator seeds both when it creates a page and never overwrites either.
+ * Everything else on the page is a fact about the library, and has to be able
+ * to travel when the library changes, so `--sync` rewrites it.
  *
- * `--sync` is the exception, and it goes no further than the frontmatter block:
- * a signature that changed in the sources is a fact about the language, not a
- * decision the page's author made, and it has to be able to travel. Prose below
- * the frontmatter is never touched by anything here.
+ * Without `--sync`, a page that exists is left alone. `--sync` also removes a
+ * generated page the library no longer has, told apart from a hand-written one
+ * such as `overview.mdx` by the marker comment every generated body opens
+ * with; a hand-written page standing where a generated one belongs stops it.
  *
  * ── Why generated at all ──────────────────────────────────────────────────
  *
- * Because the alternative is 179 pages that fall out of date one at a time,
+ * Because the alternative is 427 members that fall out of date one at a time,
  * silently, and a reference that lies is worse than no reference. The gate in
- * `tests/stdlibMembers.spec.ts` is the other half: it fails when a Member has no
- * page, so adding a Method to the standard library breaks the build until the
- * page exists — the same bargain `diagnosticCodes.spec.ts` already strikes for
- * Diagnostic codes.
+ * `tests/stdlibMembers.spec.ts` is the other half: it fails when a member has
+ * no place, or a place the library no longer backs, so adding a Method breaks
+ * the build until somebody decides where it goes and runs `--sync`.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { spawnSync } from "node:child_process"
+import {
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs"
 import * as path from "node:path"
 
-import { type Member, type Namespace, readSurface } from "./stdlibSurface.ts"
+import { buildLibrary } from "./libraryPages.ts"
+import { GENERATED_MARKER, readPreserved, renderPage } from "./libraryRender.ts"
+import { readSurface } from "./stdlibSurface.ts"
 
-/*
- * The published types, in the order the sidebar shows them: the numeric tower
- * first, widest last, then the everyday containers, then the small choice types
- * that only exist as arguments to the Methods above.
- *
- * A closed list rather than whatever the sources happen to declare, for the
- * reason `SECTIONS` is one in `navigation.ts` — this is running order, and a
- * Namespace that appears in the standard library without appearing here should
- * stop the build and be given a place, not be appended wherever it landed.
- *
- * `order` leaves gaps so a hand-written page can be slotted between two of
- * these without renumbering the rest.
- */
-interface TypeEntry {
-	namespace: string
-	slug: string
-	order: number
-	/** The type page's own lede. */
-	description: string
+export const LIBRARY_DIRECTORY = path.resolve(
+	import.meta.dirname,
+	"../src/content/docs/library",
+)
+
+const REPOSITORY = path.resolve(import.meta.dirname, "../../..")
+
+/** The manifest as it is written, before the formatter lays it out. */
+export function serializeManifest(manifest: unknown): string {
+	return `${JSON.stringify(manifest, null, "\t")}\n`
 }
 
-const TYPES: TypeEntry[] = [
-	{
-		namespace: "Integer",
-		slug: "integer",
-		order: 10,
-		description:
-			"Whole numbers of arbitrary size, exact and without a width to overflow.",
-	},
-	{
-		namespace: "NonZeroInteger",
-		slug: "non-zero-integer",
-		order: 15,
-		description:
-			"An Integer the compiler has checked is not zero — `Integer where @::isNot(0)`, which is what a divisor has to be.",
-	},
-	{
-		namespace: "Rational",
-		slug: "rational",
-		order: 20,
-		description:
-			"Exact ratios of two Integers, always in lowest terms — a tenth is a tenth.",
-	},
-	{
-		namespace: "Algebraic",
-		slug: "algebraic",
-		order: 30,
-		description:
-			"Numbers of the form a + b·√d, so a square root stays a square root rather than a decimal that is nearly one.",
-	},
-	{
-		namespace: "Transcendental",
-		slug: "transcendental",
-		order: 40,
-		description:
-			"Numbers of the form a + b·π, carried exactly through arithmetic that would otherwise round them away.",
-	},
-	{
-		namespace: "Number",
-		slug: "number",
-		// Before its own cases rather than after them: it is the union they are
-		// cases of, and the rail nests them under it.
-		order: 5,
-		description:
-			"The four exact types as one union, and the arithmetic that spans them — comparison, aggregates, and the constants.",
-	},
-	{
-		namespace: "Boolean",
-		slug: "boolean",
-		order: 60,
-		description:
-			"The two truth values and the logic that combines them. Nothing else is ever true or false.",
-	},
-	{
-		namespace: "String",
-		slug: "string",
-		order: 70,
-		description:
-			"Text, measured and sliced in characters rather than in bytes or code units.",
-	},
-	{
-		namespace: "List",
-		slug: "list",
-		order: 80,
-		description:
-			"The ordered sequence. Every Method answers with a new List; none of them changes the one it was asked.",
-	},
-	{
-		namespace: "NonEmptyList",
-		slug: "non-empty-list",
-		order: 85,
-		description:
-			"A List the compiler has checked has something in it — `List where @::hasItems()`, which is what lets `firstItem` answer an item rather than an Optional.",
-	},
-	{
-		namespace: "Optional",
-		slug: "optional",
-		order: 90,
-		description:
-			"A value that might not be there — a choice between #Value and #Empty rather than a null anybody could forget to check.",
-	},
-	{
-		namespace: "Record",
-		slug: "record",
-		order: 100,
-		description:
-			"Structural data: two Records with the same fields are the same type, with nothing to declare first.",
-	},
-	{
-		namespace: "Ordering",
-		slug: "ordering",
-		order: 120,
-		description: "The answer a comparison gives: before, same, or after.",
-	},
-	{
-		namespace: "Case",
-		slug: "case",
-		order: 130,
-		description:
-			"Whether a String comparison treats upper and lower case as the same.",
-	},
-	{
-		namespace: "Side",
-		slug: "side",
-		order: 140,
-		description: "Which end of a String an operation works from.",
-	},
-	{
-		namespace: "NormalizationForm",
-		slug: "normalization-form",
-		order: 150,
-		description:
-			"Which Unicode normalization form a String is measured or compared in.",
-	},
-	{
-		namespace: "NumberFormat",
-		slug: "number-format",
-		order: 160,
-		description: "How a number is rendered when it becomes text.",
-	},
-	{
-		namespace: "Rounding",
-		slug: "rounding",
-		order: 165,
-		description:
-			"Which way a Rational goes when it is asked for a whole number.",
-	},
-	{
-		namespace: "Terminal",
-		slug: "terminal",
-		// Last, and alone: the one namespace that is a capability rather than a
-		// type — where a program's output goes, not a value it holds.
-		order: 170,
-		description:
-			"Everything a program can put in front of a person: print for the reader, inspect for the author, and write, the exact-text primitive beneath both.",
-	},
-]
+function readIfThere(file: string): string | null {
+	return existsSync(file) ? readFileSync(file, "utf8") : null
+}
 
-/*
- * `NestedList` exists because no bound can say "the items are themselves Lists"
- * and still name the inner item type, so `flatten` had to be declared on a
- * Namespace of its own. That is a fact about what the type system can express,
- * not a second type a reader has to learn, so its Members are published on
- * `List` where somebody would look for them.
- */
-const MERGED_INTO: Record<string, string> = {
-	NestedList: "List",
-	NestedOptional: "Optional",
+/** Whether a manifest on disk says what a new one says, however it is laid out. */
+function sameManifest(existing: string | null, manifest: unknown): boolean {
+	return (
+		existing !== null &&
+		JSON.stringify(JSON.parse(existing)) === JSON.stringify(manifest)
+	)
 }
 
 /*
- * Which type page sits under which, in the sidebar.
- *
- * Read off the standard library's own `type X = A | B` aliases: `Number` is
- * declared as `Integer | Rational | Algebraic | Transcendental`, so those four
- * are its cases and the rail shows them under it. Derived rather than listed
- * here, because the alias is the fact — a tower that grows a case grows the
- * navigation with it, and one that loses a case cannot leave a stale row behind.
- *
- * An alias only counts when every one of its cases has a page of its own.
- * `Irrational` is a union of two published types but has no page to hang them
- * from, so it must not quietly restructure the sidebar.
+ * The manifests are JSON the repository's formatter also reads, so they are
+ * handed to it once written — `bun run check` then leaves a freshly generated
+ * tree alone. Where the formatter is not installed they stay as written, and
+ * nothing that reads them cares: the gate compares what they say.
  */
-function nesting(
-	aliases: Array<{ name: string; cases: string[] }>,
-	published: Set<string>,
-): Map<string, string> {
-	let parents = new Map<string, string>()
+function format(files: string[]): void {
+	let formatter = path.join(REPOSITORY, "node_modules/.bin/oxfmt")
 
-	for (let alias of aliases) {
-		if (
-			!published.has(alias.name) ||
-			alias.cases.length === 0 ||
-			!alias.cases.every((name) => published.has(name))
-		) {
-			continue
-		}
-
-		for (let name of alias.cases) {
-			let existing = parents.get(name)
-
-			if (existing !== undefined && existing !== alias.name) {
-				throw new Error(
-					`${name} is a case of both ${existing} and ${alias.name}; the sidebar can only nest it under one, so which is a decision that has to be written down here.`,
-				)
-			}
-
-			parents.set(name, alias.name)
-		}
+	if (files.length === 0 || !existsSync(formatter)) {
+		return
 	}
 
-	return parents
-}
+	let result = spawnSync(formatter, ["--write", ...files], {
+		cwd: REPOSITORY,
+		encoding: "utf8",
+	})
 
-const DOCS = path.resolve(import.meta.dirname, "../src/content/docs")
-const SECTION = "standard-library"
-
-let sync = process.argv.includes("--sync")
-
-/** `isLessThanOrEqualTo` → `is-less-than-or-equal-to`. */
-function slugify(name: string): string {
-	return name
-		.replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-		.replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2")
-		.toLowerCase()
-}
-
-/*
- * How a Member is written at a call site, which is what a reader is looking for
- * when they scan a list of them: `2::add(3)` for a Method, `Integer.parse("2")`
- * for a static one. The two are not interchangeable in essence, so the title is
- * not either.
- */
-function memberTitle(namespace: string, member: Member): string {
-	return member.kind === "method"
-		? `${namespace}::${member.name}`
-		: `${namespace}.${member.name}`
-}
-
-/** One line, no newlines: this also lands in `<meta>` and in the search index. */
-function oneLine(text: string): string {
-	return text.replace(/\s+/g, " ").trim()
-}
-
-/*
- * A brace outside a code span opens an expression in MDX, and a doc comment
- * that shows a Record — `{ x = 1 }` — would be read as one and fail the build.
- * Inside a span it is already inert, so only the text between spans is escaped.
- */
-function escapeMdx(text: string): string {
-	return text
-		.split(/(`[^`]*`)/)
-		.map((part, index) =>
-			index % 2 === 1 ? part : part.replace(/([{}])/g, "\\$1"),
-		)
-		.join("")
-}
-
-function frontmatter(fields: Array<[string, string]>): string {
-	return `---\n${fields.map(([key, value]) => `${key}: ${value}`).join("\n")}\n---\n`
-}
-
-/** YAML-safe on one line, whatever punctuation the summary happens to carry. */
-function quoted(text: string): string {
-	return JSON.stringify(oneLine(text))
-}
-
-function memberFrontmatter(
-	type: TypeEntry,
-	member: Member,
-	declaringNamespace: string,
-): string {
-	return frontmatter([
-		["title", quoted(memberTitle(declaringNamespace, member))],
-		["description", quoted(member.summary)],
-		["section", SECTION],
-		["order", String(member.order)],
-		["template", "reference"],
-		["kind", quoted(member.kind)],
-		["monoTitle", "true"],
-		["namespace", quoted(declaringNamespace)],
-		["member", quoted(member.name)],
-		[
-			"signature",
-			// A YAML block scalar: two spaces of indentation, and the tabs the
-			// signature itself carries survive inside it untouched.
-			`|\n${member.signature
-				.split("\n")
-				.map((line) => `  ${line}`)
-				.join("\n")}`,
-		],
-	])
-}
-
-function memberBody(type: TypeEntry, member: Member): string {
-	let sections: string[] = []
-
-	if (member.parameters.length > 0) {
-		let rows = member.parameters
-			.map(
-				(parameter) =>
-					`\t\t{\n\t\t\tname: ${JSON.stringify(parameter.name)},\n\t\t\ttype: ${JSON.stringify(parameter.type)},\n\t\t\tdescription: ${JSON.stringify(oneLine(parameter.description))},\n\t\t},`,
-			)
-			.join("\n")
-
-		sections.push(
-			`## Parameters\n\n<ParamTable\n\tparams={[\n${rows}\n\t]}\n/>`,
+	if (result.status !== 0) {
+		throw new Error(
+			`oxfmt could not lay out the manifests:\n${result.stdout}${result.stderr}`,
 		)
 	}
-
-	if (member.returns !== null) {
-		sections.push(`## Returns\n\n${escapeMdx(oneLine(member.returns))}`)
-	}
-
-	sections.push(
-		`## See also\n\n<SeeAlso\n\tlinks={[\n\t\t{ label: ${JSON.stringify(
-			type.namespace,
-		)}, href: "/docs/${SECTION}/${type.slug}" },\n\t]}\n/>`,
-	)
-
-	return `\n${sections.join("\n\n")}\n`
-}
-
-function typeFrontmatter(
-	type: TypeEntry,
-	namespace: Namespace | undefined,
-	nestUnder: TypeEntry | undefined,
-): string {
-	let conformsTo = (namespace?.conformsTo ?? []).map((clause) =>
-		clause.condition === null
-			? clause.protocol
-			: `${clause.protocol} where ${clause.condition}`,
-	)
-
-	return frontmatter([
-		["title", quoted(type.namespace)],
-		["description", quoted(namespace?.summary ?? type.description)],
-		["section", SECTION],
-		["order", String(type.order)],
-		["template", "type"],
-		["kind", '"type"'],
-		["monoTitle", "true"],
-		["namespace", quoted(type.namespace)],
-		...(nestUnder === undefined
-			? []
-			: ([
-					// The union this type is a case of. Only the navigation reads it:
-					// the page keeps its own URL, because being a case of `Number` is
-					// not the same as living inside it.
-					["nestUnder", quoted(`${SECTION}/${nestUnder.slug}`)],
-				] as Array<[string, string]>)),
-		[
-			"conformsTo",
-			conformsTo.length === 0
-				? "[]"
-				: `\n${conformsTo.map((entry) => `  - ${JSON.stringify(entry)}`).join("\n")}`,
-		],
-	])
-}
-
-/*
- * A type page's body starts empty, and that is deliberate.
- *
- * The lede is already the description, and the template draws the conformances
- * and the whole Member index around whatever is here — so an unwritten page is
- * a complete and correct one, not a broken one. Restating the lede as the first
- * paragraph, which is what this did at first, only publishes the same sentence
- * twice and reads as a page that has nothing to say.
- *
- * What belongs here is the part nobody can generate: what the type is for, what
- * it rules out, when to reach for it. It goes in when somebody writes it.
- */
-function typeBody(): string {
-	return "\n"
-}
-
-function write(file: string, contents: string): void {
-	mkdirSync(path.dirname(file), { recursive: true })
-	writeFileSync(file, contents)
-}
-
-/*
- * The fields `--sync` will not touch, and the reason there is such a list.
- *
- * A signature is a fact about the language and has to be able to travel. A lede
- * is not: `Integer::add` was given "the result is always exact — it widens into
- * whichever type can still say the answer, and never rounds", which is better
- * than the one-line summary the `§§` block opens with, and a sync that replaced
- * it would quietly undo somebody's work every time the sources were touched.
- *
- * So the generated value seeds these when the page is created and never
- * overwrites them afterwards. Fields the generator does not write at all — a
- * `since`, a `tocDepth` — are kept for the same reason: not knowing about a
- * field is not a licence to drop it.
- */
-const AUTHORED = new Set(["description"])
-
-/** Frontmatter as ordered `key → raw value`, block scalars and lists included. */
-function parseFrontmatter(block: string): Array<[string, string]> {
-	let fields: Array<[string, string]> = []
-	let lines = block.split("\n")
-
-	for (let index = 0; index < lines.length; index++) {
-		let match = /^([a-zA-Z]+): ?(.*)$/.exec(lines[index]!)
-
-		if (match === null) {
-			continue
-		}
-
-		let value = match[2]!
-
-		// A block scalar or a list runs on until a line that is not indented.
-		while (
-			index + 1 < lines.length &&
-			/^\s+\S/.test(lines[index + 1]!) &&
-			!/^[a-zA-Z]+:/.test(lines[index + 1]!)
-		) {
-			value += `\n${lines[++index]}`
-		}
-
-		fields.push([match[1]!, value])
-	}
-
-	return fields
-}
-
-/**
- * Brings the generated fields forward, keeps the authored ones, and keeps
- * anything the generator has never heard of. Everything below the frontmatter
- * is untouched.
- */
-function syncFrontmatter(file: string, next: string): boolean {
-	let existing = readFileSync(file, "utf8")
-	let match = /^---\n([\s\S]*?)\n---\n/.exec(existing)
-
-	if (match === null) {
-		throw new Error(`${file} has no frontmatter block to sync.`)
-	}
-
-	let current = new Map(parseFrontmatter(match[1]!))
-	let generated = parseFrontmatter(/^---\n([\s\S]*?)\n---\n/.exec(next)![1]!)
-	let written = new Set(generated.map(([key]) => key))
-
-	let merged = [
-		...generated.map(([key, value]): [string, string] =>
-			AUTHORED.has(key) && current.has(key)
-				? [key, current.get(key)!]
-				: [key, value],
-		),
-		...[...current].filter(([key]) => !written.has(key)),
-	]
-
-	let updated =
-		`---\n${merged.map(([key, value]) => `${key}: ${value}`).join("\n")}\n---\n` +
-		existing.slice(match[0].length)
-
-	if (updated === existing) {
-		return false
-	}
-
-	writeFileSync(file, updated)
-
-	return true
 }
 
 function main(): void {
-	let { namespaces, aliases, undocumented } = readSurface()
-	let byName = new Map(
-		namespaces.map((namespace) => [namespace.name, namespace]),
-	)
-	let byNamespace = new Map(TYPES.map((type) => [type.namespace, type]))
-	let parents = nesting(aliases, new Set(byNamespace.keys()))
-	let known = new Set([
-		...TYPES.map((type) => type.namespace),
-		...Object.keys(MERGED_INTO),
-	])
+	let sync = process.argv.includes("--sync")
+	let surface = readSurface()
 
-	let unplaced = namespaces
-		.map((namespace) => namespace.name)
-		.filter((name) => !known.has(name))
-
-	if (unplaced.length > 0) {
-		throw new Error(
-			`The standard library declares ${unplaced.join(", ")}, which no entry in TYPES gives a place. Add it there — where a type sits in the reference is a decision, not a default.`,
-		)
-	}
-
-	if (undocumented.length > 0) {
+	if (surface.undocumented.length > 0) {
 		console.log(
-			`  ${undocumented.length} members carry no §§ block and will have an empty lede:`,
+			`  ${surface.undocumented.length} members carry no §§ block and will be published without a word about them:`,
 		)
 
-		for (let hole of undocumented.slice(0, 10)) {
-			console.log(`    ${hole.namespace}.${hole.member}`)
+		for (let hole of surface.undocumented.slice(0, 10)) {
+			console.log(`    ${hole.namespace}::${hole.member}`)
 		}
 	}
 
 	/*
-	 * Not an error, and not something this can fix: a Method that takes an
-	 * argument nothing has been written about gets a page with no Parameters
-	 * table, because there is nothing to put in one. The `@param` has to be
-	 * written in the standard library, where the editor will show it too. Said
-	 * out loud on every run, because the page it produces looks finished.
+	 * Not an error, and not something this can fix: an entry that takes an
+	 * argument nothing has been written about gets a Parameters row with an
+	 * empty description. The `@param` has to be written in the standard
+	 * library, where the editor will show it too. Said out loud on every run,
+	 * because the page it produces looks finished.
 	 */
-	let undescribed = namespaces.flatMap((namespace) =>
-		namespace.members
-			.filter(
-				(member) =>
-					member.declaredParameters > 0 &&
-					member.parameters.length === 0,
-			)
-			.map((member) => `${namespace.name}::${member.name}`),
+	let undescribed = surface.namespaces.flatMap((namespace) =>
+		namespace.members.flatMap((member) =>
+			member.entries
+				.filter((entry) =>
+					entry.parameters.some(
+						(parameter) => parameter.description === null,
+					),
+				)
+				.map(() => `${namespace.name}::${member.name}`),
+		),
 	)
 
 	if (undescribed.length > 0) {
 		console.log(
-			`  ${undescribed.length} members take arguments that no @param describes, so their pages have no Parameters table:`,
-		)
-		console.log(
-			`    ${undescribed.slice(0, 6).join(", ")}${undescribed.length > 6 ? `, and ${undescribed.length - 6} more` : ""}`,
+			`  ${undescribed.length} entries take an argument no @param describes: ${[
+				...new Set(undescribed),
+			]
+				.slice(0, 6)
+				.join(", ")}`,
 		)
 	}
 
-	let created = 0
-	let synced = 0
-	let members = 0
+	let pages = buildLibrary(surface)
+	let counts = { created: 0, rewritten: 0, unchanged: 0, removed: 0 }
+	let written: string[] = []
 
-	for (let type of TYPES) {
-		let own = byName.get(type.namespace)
-		let merged = Object.entries(MERGED_INTO)
-			.filter(([, target]) => target === type.namespace)
-			.flatMap(([source]) => {
-				let namespace = byName.get(source)
+	mkdirSync(LIBRARY_DIRECTORY, { recursive: true })
 
-				return (namespace?.members ?? []).map((member) => ({
-					// A merged Member's own order counts from zero in the Namespace it
-					// was declared in, which would put it in front of the type's own
-					// first Member. Pushed past them instead: `flatten` is the last
-					// thing on List, not the thing before `is`.
-					member: { ...member, order: member.order + 1000 },
-					declaringNamespace: type.namespace,
-				}))
-			})
-
-		let all = [
-			...(own?.members ?? []).map((member) => ({
-				member,
-				declaringNamespace: type.namespace,
-			})),
-			...merged,
-		]
-
-		let typePage = path.join(DOCS, SECTION, `${type.slug}.mdx`)
-		let head = typeFrontmatter(
-			type,
-			own,
-			byNamespace.get(parents.get(type.namespace) ?? ""),
+	for (let page of pages) {
+		let file = path.join(LIBRARY_DIRECTORY, `${page.manifest.slug}.mdx`)
+		let manifestFile = path.join(
+			LIBRARY_DIRECTORY,
+			`${page.manifest.slug}.json`,
 		)
+		let existing = readIfThere(file)
 
-		if (!existsSync(typePage)) {
-			write(typePage, head + typeBody())
-			created++
-		} else if (sync && syncFrontmatter(typePage, head)) {
-			synced++
+		if (existing !== null && !sync) {
+			counts.unchanged++
+			continue
 		}
 
-		let slugs = new Set<string>()
+		if (existing !== null && !existing.includes(GENERATED_MARKER)) {
+			throw new Error(
+				`${path.relative(process.cwd(), file)} was not written by the generator, and --sync will not write over it. Move it aside, or fold what it says into the sources.`,
+			)
+		}
 
-		for (let { member, declaringNamespace } of all) {
-			let slug = slugify(member.name)
+		let { mdx, manifest } = renderPage(
+			page,
+			existing === null ? {} : readPreserved(existing),
+		)
+		if (existing === null) {
+			counts.created++
+		} else if (
+			existing !== mdx ||
+			!sameManifest(readIfThere(manifestFile), manifest)
+		) {
+			counts.rewritten++
+		} else {
+			counts.unchanged++
+		}
 
-			if (slugs.has(slug)) {
-				throw new Error(
-					`${type.namespace} has two members that slug to "${slug}" — one of them needs a name the URL can tell apart.`,
-				)
+		writeFileSync(file, mdx)
+		writeFileSync(manifestFile, serializeManifest(manifest))
+		written.push(manifestFile)
+	}
+
+	format(written)
+
+	if (sync) {
+		let slugs = new Set(pages.map((page) => page.manifest.slug))
+
+		for (let name of readdirSync(LIBRARY_DIRECTORY)) {
+			let slug = name.replace(/\.(mdx|json)$/, "")
+			let file = path.join(LIBRARY_DIRECTORY, name)
+
+			if (slugs.has(slug) || !/\.(mdx|json)$/.test(name)) {
+				continue
 			}
 
-			slugs.add(slug)
-			members++
+			let page = readIfThere(path.join(LIBRARY_DIRECTORY, `${slug}.mdx`))
+			let generated = name.endsWith(".mdx")
+				? readFileSync(file, "utf8").includes(GENERATED_MARKER)
+				: page === null || page.includes(GENERATED_MARKER)
 
-			let file = path.join(DOCS, SECTION, type.slug, `${slug}.mdx`)
-			let block = memberFrontmatter(type, member, declaringNamespace)
-
-			if (!existsSync(file)) {
-				write(file, block + memberBody(type, member))
-				created++
-			} else if (sync && syncFrontmatter(file, block)) {
-				synced++
+			if (generated) {
+				rmSync(file)
+				counts.removed++
 			}
 		}
 	}
+
+	let members = pages.reduce(
+		(total, page) =>
+			total +
+			page.manifest.groups
+				.flatMap((group) => group.members)
+				.filter(
+					(member) =>
+						member.origin === "declared" &&
+						member.kind !== "function",
+				).length,
+		0,
+	)
 
 	console.log(
-		`  ${TYPES.length} types, ${members} members — ${created} pages created${
-			sync ? `, ${synced} frontmatter blocks refreshed` : ""
-		}.`,
+		`  ${pages.length} pages, ${members} members — ${counts.created} created, ${counts.rewritten} rewritten, ${counts.unchanged} unchanged${
+			counts.removed > 0 ? `, ${counts.removed} files removed` : ""
+		}${sync ? "" : " (run with --sync to rewrite pages that exist)"}.`,
 	)
 }
 
-main()
+if (import.meta.main) {
+	main()
+}

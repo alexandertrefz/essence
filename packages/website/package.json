@@ -19,6 +19,7 @@
 		"@essence-lang/compiler": "workspace:*",
 		"@essence-lang/interfaces": "workspace:*",
 		"@essence-lang/standard-library": "workspace:*",
-		"astro": "7.1.3"
+		"astro": "7.1.3",
+		"github-slugger": "2.0.0"
 	}
 }
