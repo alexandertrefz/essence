@@ -2,6 +2,8 @@
 // place because the version is printed in four different chrome positions and a
 // drifted copy is the kind of wrong nobody notices.
 
+import cliPackage from "../../../cli/package.json" with { type: "json" }
+
 export const SITE_NAME = "essence"
 export const SITE_URL = "https://essencelang.org"
 /**
@@ -22,13 +24,13 @@ export const HERO_SUBLINE =
 	"A language for the web that catches your bugs as you are writing them, fits the stack you already have, and is a joy to use."
 
 /**
- * The version on the npm registry, which the packages carry in lockstep.
- * Nothing displays it at the moment — every version badge came off the site
- * while there was only ever one number to show. Kept here, and kept correct,
- * because putting them back is meant to be a matter of importing it again
- * rather than rediscovering where the number lives.
+ * The version of the toolchain the site documents, read at build time from
+ * the command line's own `package.json` — the packages carry it in lockstep,
+ * and a number typed here drifted from it once already. Nothing displays it
+ * at the moment; a page that names the release imports it rather than
+ * writing the number down.
  */
-export const VERSION = "0.1.0"
+export const VERSION: string = cliPackage.version
 
 export const GITHUB_URL = "https://github.com/alexandertrefz/essence"
 export const GITHUB_ISSUES_URL = `${GITHUB_URL}/issues`
@@ -38,31 +40,21 @@ export const GITHUB_COMMITS_URL = `${GITHUB_URL}/commits/master`
 export const GITHUB_CONTRIBUTING_URL = `${GITHUB_URL}/blob/master/Readme.md`
 
 /**
- * Where the chrome points. Real pages only — nothing here is aspirational.
- *
- * NOTE: Getting Started is the only documentation section published so far. The
- * Language, Standard Library, Guides and Reference sections are written but are
- * being re-verified against the current compiler, and their entries are held
- * out of this table until they are. What each one becomes when it lands:
- *
- *   languageTour     /docs/language/values-and-constants
- *   patternMatching  /docs/language/pattern-matching
- *   recordsAndLists  /docs/language/records-and-lists
- *   standardLibrary  /docs/standard-library/overview
- *   numbers          /docs/standard-library/numbers
- *   compilerGuide    /docs/guides/using-the-compiler
- *   reference        /docs/reference/diagnostics
- *   diagnostics      /docs/reference/diagnostics
- *
- * Until then the chrome sends those readers to the documentation index, which
- * says which sections are published and which are on the way.
+ * Where the chrome points. Real pages only — nothing here is aspirational,
+ * and every documentation slug named here is one the site's page list
+ * carries.
  */
 export const ROUTES = {
 	home: "/",
 	docs: "/docs",
 	principles: "/principles",
 	goals: "/goals",
+	whatEssenceIs: "/docs/getting-started/what-essence-is",
 	getStarted: "/docs/getting-started/installation",
 	firstProgram: "/docs/getting-started/your-first-program",
-	projectLayout: "/docs/getting-started/project-layout",
+	comingFromJavaScript: "/docs/getting-started/coming-from-javascript",
+	projects: "/docs/guides/projects",
+	library: "/docs/library/overview",
+	syntaxGlossary: "/docs/reference/syntax-glossary",
+	diagnostics: "/docs/reference/diagnostics",
 } as const

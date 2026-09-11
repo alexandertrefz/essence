@@ -10,7 +10,7 @@
 export type SectionId =
 	| "getting-started"
 	| "language"
-	| "standard-library"
+	| "library"
 	| "guides"
 	| "reference"
 
@@ -28,18 +28,22 @@ export interface Section {
  * every call site rather than a silently missing group.
  */
 export const SECTIONS: readonly Section[] = [
-	{ id: "getting-started", label: "Getting Started" },
+	{ id: "getting-started", label: "Getting started" },
 	{ id: "language", label: "Language" },
-	{ id: "standard-library", label: "Standard Library" },
+	{ id: "library", label: "Library" },
 	{ id: "guides", label: "Guides" },
 	{ id: "reference", label: "Reference" },
 ]
 
+export type Template = "article" | "guide" | "reference" | "type"
+
 /**
- * The reference is a lookup table, not a chapter, so it is left out of the
- * prev/next chain — nobody reads `Integer::add` and then turns the page.
+ * The templates whose pages are read in order. A `type` page and a `reference`
+ * page are lookup tables — nobody reads `List` and then turns the page to
+ * `Dictionary` — so the chain skips them wherever they sit: it runs through
+ * the library's overview and past its seventeen type pages.
  */
-const UNCHAINED_SECTION: SectionId = "reference"
+const CHAINED_TEMPLATES: ReadonlySet<Template> = new Set(["article", "guide"])
 
 export const DOCS_ROOT = "/docs"
 
@@ -51,8 +55,7 @@ export interface DocEntryLike {
 		description: string
 		section: SectionId
 		order: number
-		/** The id of the page this one is a case of; see `SidebarItem`. */
-		nestUnder?: string | undefined
+		template: Template
 	}
 }
 
@@ -66,34 +69,13 @@ export interface DocLink {
 /**
  * A page in the rail, with whatever is nested under it.
  *
- * Two relations put a page under another, and they answer different questions.
- *
- * The file tree is the first: `standard-library/integer/add` is a child of
- * `standard-library/integer` because that is where it is written, so moving a
- * page is what moves it in the navigation and the two cannot disagree.
- *
- * `nestUnder` is the second, for a relationship the URLs do not have. `Integer`
- * is a case of `Number` — the standard library declares the union — but it does
- * not live inside it, and burying its URL under `number/` would say that it did.
- * So the reading tree says so and the addresses stay flat.
- *
- * Children are themselves items, because both relations can apply at once:
- * Number holds Integer, and Integer holds its own Methods.
+ * The file tree is the only relation that nests: `guides/projects/settings`
+ * would be a child of `guides/projects` because that is where it is written,
+ * so moving a page is what moves it in the navigation and the two cannot
+ * disagree. Nothing published today nests — every section is a flat list.
  */
 export interface SidebarItem extends DocLink {
 	children: SidebarItem[]
-	/**
-	 * Whether this page is a case of the one above it rather than something
-	 * written inside it — `Integer` under `Number`, as against `Integer::add`
-	 * under `Integer`.
-	 *
-	 * The rail treats the two differently, because they are different: the cases
-	 * of a union are how you get around the standard library, and there are four
-	 * of them, so they show whenever their union is on the way to wherever you
-	 * are. A type's Methods are the content, and there are 179 of them, so they
-	 * show only for the type you are actually reading.
-	 */
-	structural: boolean
 }
 
 export interface SidebarSection extends Section {
@@ -161,46 +143,29 @@ function entriesIn(
 		.sort(byOrder)
 }
 
-/**
- * The id of the page an entry is nested under, or null when it stands on its
- * own. `standard-library/integer/add` hangs off `standard-library/integer` by
- * where it is written; `standard-library/integer` hangs off
- * `standard-library/number` because it says so. A `nestUnder` that names a page
- * outside the entry's own section is ignored — the sidebar is built a section at
- * a time, and a branch that crossed between them could not be drawn.
- */
-export function parentOf(
-	entry: DocEntryLike,
-	within: ReadonlySet<string>,
-): string | null {
-	let declared = entry.data.nestUnder
-
-	if (declared !== undefined && within.has(declared)) {
-		return declared
-	}
-
-	let segments = entry.id.split("/")
-	let parent = segments.length > 2 ? segments.slice(0, -1).join("/") : null
-
-	return parent !== null && within.has(parent) ? parent : null
-}
-
-/** The path relation alone — what a breadcrumb follows, since it follows URLs. */
+/** The id of the page an entry is written under, or null when it is not. */
 export function parentId(id: string): string | null {
 	let segments = id.split("/")
 
 	return segments.length > 2 ? segments.slice(0, -1).join("/") : null
 }
 
-/*
- * The pages of a section that hang off nothing — the roots of its tree.
- *
- * `order` only ever sorts a page against its siblings, so a Member's number and
- * a type's are not comparable — `Algebraic::is` is the zeroth Member of its
- * type, and sorting it against the section put it in front of every type page.
- * That is what "the first page of the standard library" resolved to before this,
- * which is a link nobody meant to publish.
+/**
+ * The id of the page an entry hangs off in the sidebar, or null when it stands
+ * on its own. The parent has to be a page of the same section — the sidebar is
+ * built a section at a time, and a branch that crossed between them could not
+ * be drawn.
  */
+export function parentOf(
+	entry: DocEntryLike,
+	within: ReadonlySet<string>,
+): string | null {
+	let parent = parentId(entry.id)
+
+	return parent !== null && within.has(parent) ? parent : null
+}
+
+/** The pages of a section that hang off nothing — the roots of its tree. */
 function topLevelIn(
 	entries: readonly DocEntryLike[],
 	section: SectionId,
@@ -216,8 +181,7 @@ function topLevelIn(
  * section's pages carrying whatever hangs off them, to any depth.
  *
  * A page whose parent does not exist is promoted to the top of its section
- * rather than dropped. It is a mistake either way — the gate in
- * `tests/stdlibMembers.spec.ts` is what names it — but a mistake that leaves a
+ * rather than dropped. It is a mistake either way, but a mistake that leaves a
  * page reachable is the better of the two.
  */
 export function getSidebar(entries: readonly DocEntryLike[]): SidebarSection[] {
@@ -236,28 +200,11 @@ export function getSidebar(entries: readonly DocEntryLike[]): SidebarSection[] {
 			children.set(parent, [...(children.get(parent) ?? []), entry])
 		}
 
-		let isCase = (entry: DocEntryLike) => entry.data.nestUnder !== undefined
-
-		// Depth is bounded by the content — a section, its types, their cases,
-		// their Members — and every id is visited once as somebody's child, so
-		// this cannot run away.
+		// Depth is bounded by the file tree and every id is visited once as
+		// somebody's child, so this cannot run away.
 		let build = (entry: DocEntryLike): SidebarItem => ({
 			...toDocLink(entry),
-			structural: isCase(entry),
-			/*
-			 * Cases first, then Methods. Both are sorted by `order`, and those
-			 * numbers are not comparable across the two — `Number.Pi` is its zeroth
-			 * Member and `Integer` is the tenth type, so left to one list the four
-			 * cases of the tower came out interleaved with the sixteen Methods of
-			 * the union they are cases of.
-			 */
-			children: (children.get(entry.id) ?? [])
-				.slice()
-				.sort(
-					(a, b) =>
-						Number(isCase(b)) - Number(isCase(a)) || byOrder(a, b),
-				)
-				.map(build),
+			children: (children.get(entry.id) ?? []).map(build),
 		})
 
 		let items = topLevelIn(entries, section.id).map(build)
@@ -267,17 +214,17 @@ export function getSidebar(entries: readonly DocEntryLike[]): SidebarSection[] {
 }
 
 /*
- * Every page that is part of the guided path, flattened in reading order.
- *
- * Members are left out along with the whole reference: a type's Methods are a
- * list to look things up in, and turning the page from `Integer::add` to
- * `Integer::subtract` is not something anybody does. Their type pages stay in,
- * so the chain still runs through the standard library.
+ * Every page that is part of the guided path, flattened in reading order:
+ * the sidebar's order, keeping only the templates that are read rather than
+ * looked up. It runs Getting started → Language → the library's overview →
+ * Guides and stops at the last guide; the reference never joins it.
  */
 export function getReadingChain(entries: readonly DocEntryLike[]): DocLink[] {
-	return SECTIONS.filter((section) => section.id !== UNCHAINED_SECTION)
-		.flatMap((section) => topLevelIn(entries, section.id))
-		.map(toDocLink)
+	return SECTIONS.flatMap((section) =>
+		entriesIn(entries, section.id).filter((entry) =>
+			CHAINED_TEMPLATES.has(entry.data.template),
+		),
+	).map(toDocLink)
 }
 
 export function getPrevNext(
@@ -296,7 +243,7 @@ export function getPrevNext(
 
 /**
  * `Docs / Section / Title`, with the section pointing at its first page — and
- * the type in between for a Member, so `Integer::add` says which Integer.
+ * the page in between for one written under another, so it says where it is.
  */
 export function getCrumbs(
 	entries: readonly DocEntryLike[],

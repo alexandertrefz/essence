@@ -18,3 +18,11 @@ from = "/diagnostics"
 to = "/docs/reference/diagnostics"
 status = 301
 force = true
+
+# Project layout left Getting Started and became the Projects guide. The old
+# address was live, so it keeps working.
+[[redirects]]
+from = "/docs/getting-started/project-layout"
+to = "/docs/guides/projects"
+status = 301
+force = true

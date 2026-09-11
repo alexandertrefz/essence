@@ -59,9 +59,9 @@ let toc = getToc(headings, entry.data.tocDepth)
 let isGuide = entry.data.template === "guide"
 let isType = entry.data.template === "type"
 /*
- * A type page wears the reference head — a mono title and a kind badge — and
- * then goes on to do something no other template does, which is to publish the
- * index of its own Members. So the head is shared and the tail is not.
+ * A type page wears the reference head — a mono title and its conformances —
+ * and then goes on to do something no other template does, which is to publish
+ * the index of its own Members. So the head is shared and the tail is not.
  */
 let isReference = entry.data.template === "reference" || isType
 
@@ -114,15 +114,10 @@ let components = {
 		isReference ? (
 			<>
 				<div class="ref__head">
-					<h1
-						class="ref__title"
-						class:list={{ "ref__title--mono": entry.data.monoTitle }}
-					>
+					{/* A type's name is code (`List`), and reads as code. */}
+					<h1 class="ref__title" class:list={{ "ref__title--mono": isType }}>
 						{entry.data.title}
 					</h1>
-					{entry.data.kind !== undefined && (
-						<span class="ref__badge">{entry.data.kind}</span>
-					)}
 					{
 						/*
 						 * `since` is not shown while there has only ever been one
@@ -138,10 +133,6 @@ let components = {
 				</p>
 
 				{isType && <Conformances conformsTo={entry.data.conformsTo} />}
-
-				{entry.data.signature !== undefined && (
-					<SignatureBlock signature={entry.data.signature} />
-				)}
 
 				<article class="prose ref__body">
 					<Content components={components} />

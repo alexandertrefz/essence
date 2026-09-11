@@ -32,17 +32,9 @@ let members = (await getCollection("docs"))
 		(a, b) => a.data.order - b.data.order || a.data.title.localeCompare(b.data.title),
 	)
 
-// The order is the order of increasing distance from a value you are holding.
-const GROUPS = [
-	{ kind: "property", label: "Properties" },
-	{ kind: "method", label: "Methods" },
-	{ kind: "static method", label: "Static methods" },
-]
-
-let groups = GROUPS.map((group) => ({
-	...group,
-	members: members.filter((entry) => entry.data.kind === group.kind),
-})).filter((group) => group.members.length > 0)
+// NOTE: One group until the index reads the page's member manifest, which is
+// where a Member's kind and reader group now live rather than in frontmatter.
+let groups = members.length === 0 ? [] : [{ label: "Members", members }]
 
 /** `Integer::add` → `add`: the type is the page you are on. */
 function shortName(title: string): string {

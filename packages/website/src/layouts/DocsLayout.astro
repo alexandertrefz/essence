@@ -13,6 +13,7 @@ import Toc from "../components/docs/Toc.astro"
 import TocBar from "../components/docs/TocBar.astro"
 import SiteHeader from "../components/SiteHeader.astro"
 import type { SidebarSection, TocItem } from "../lib/navigation.ts"
+import { ROUTES } from "../lib/site.ts"
 import BaseLayout from "./BaseLayout.astro"
 
 interface Props {
@@ -68,12 +69,16 @@ let hasAside =
 	<div class="glow glow--docs" aria-hidden="true"></div>
 
 	<SiteHeader variant="docs">
-		<SidebarNav
-			slot="mobile-tree"
-			sections={sections}
-			activeId={activeId}
-			variant="mobile"
-		/>
+		<Fragment slot="mobile-tree">
+			<SidebarNav sections={sections} activeId={activeId} variant="mobile" />
+			<a
+				class="docs__from-js"
+				data-variant="mobile"
+				href={ROUTES.comingFromJavaScript}
+			>
+				Coming from JavaScript?
+			</a>
+		</Fragment>
 	</SiteHeader>
 
 	<TocBar items={toc} />
@@ -85,6 +90,21 @@ let hasAside =
 	>
 		<div class="docs__rail">
 			<SidebarNav sections={sections} activeId={activeId} />
+			{
+				/*
+				 * Under the tree on every page, not only in Getting started: the
+				 * reader this site is written for arrives with JavaScript habits,
+				 * and the page that names each of them has to be one click away
+				 * from wherever a habit trips them up.
+				 */
+			}
+			<a
+				class="docs__from-js"
+				data-variant="rail"
+				href={ROUTES.comingFromJavaScript}
+			>
+				Coming from JavaScript?
+			</a>
 		</div>
 
 		<main class="docs__main">
@@ -127,6 +147,46 @@ let hasAside =
 	.docs__aside {
 		position: relative;
 		z-index: 1;
+	}
+
+	.docs__rail {
+		display: flex;
+		flex-direction: column;
+	}
+
+	/*
+	 * The rail's footer, on every page. Set like the tree's own rows and
+	 * pulled up into the bottom padding the tree leaves (64px, of which the
+	 * row takes 40), so it reads as the last line of the rail rather than as
+	 * a thing beneath it. The tree's right rule still runs beside it, because
+	 * the row sits inside the tree's box.
+	 */
+	.docs__from-js[data-variant="rail"] {
+		margin: -40px 24px 64px 0;
+		padding: 8px 12px;
+		border-top: 1px solid var(--hairline-softest);
+		border-radius: 0 0 7px 7px;
+		font-family: var(--font-body);
+		font-size: 13.5px;
+		color: var(--text-muted);
+	}
+
+	/* In the mobile menu it is one more touch-sized row under the tree. */
+	.docs__from-js[data-variant="mobile"] {
+		display: block;
+		margin-top: 12px;
+		padding: 11px 12px;
+		border-top: 1px solid var(--hairline-softest);
+		border-radius: 0 0 8px 8px;
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 15px;
+		color: var(--text-muted);
+	}
+
+	.docs__from-js:hover {
+		color: var(--text-hero);
+		background: var(--surface-hover);
 	}
 
 	.docs__main {

@@ -6,7 +6,7 @@
  * sends them where a question actually gets read: the repository's issues.
  */
 
-import { GITHUB_ISSUES_URL } from "../../lib/site.ts"
+import { GITHUB_ISSUES_URL, ROUTES } from "../../lib/site.ts"
 ---
 
 <div class="stuck">
@@ -16,6 +16,11 @@ import { GITHUB_ISSUES_URL } from "../../lib/site.ts"
 		an element is dropped, not collapsed to a space. */}
 		Anything that does not behave the way this page says it does is a bug.{" "}
 		<a href={GITHUB_ISSUES_URL}>Open an issue</a> — it is read.
+	</p>
+	<p class="stuck__body">
+		Something you would have written differently in JavaScript?{" "}
+		<a href={ROUTES.comingFromJavaScript}>Coming from JavaScript</a> names
+		the habit and the error it earns.
 	</p>
 </div>
 
