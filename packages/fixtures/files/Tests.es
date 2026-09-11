@@ -1,8 +1,8 @@
 implementation {
 
 	§ A module has sections — `import`, `implementation`, `export` — and
-	§ testing adds a fourth: `tests`, written below the implementation and above
-	§ the exports. It shares the implementation's scope, so everything this file
+	§ testing adds a fourth: `tests`, written last, below the exports. It
+	§ shares the implementation's scope, so everything this file
 	§ declares is visible inside it whether or not the file exports it, and it
 	§ exists only when the Compiler is asked for it: a build drops the whole
 	§ block before anything is enriched, so a test costs a shipped Program
