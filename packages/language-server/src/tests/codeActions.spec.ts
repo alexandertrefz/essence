@@ -3571,6 +3571,210 @@ describe("Code Actions", () => {
 		})
 	})
 
+	// NOTE: A moved block keeps its text byte for byte — what is adjusted is
+	// the blank line in front of it and the one behind it, so a file spaced the
+	// way its author spaced it stays that way.
+	describe("misplaced sections", () => {
+		it("should move a tests block below the implementation", () => {
+			let lines = [
+				"tests {",
+				'\ttest "counts" { expect true }',
+				"}",
+				"",
+				"implementation {",
+				"\tconstant a = 1",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Move the 'tests { … }' block to the end")
+			expect(fix.diagnosticCode).toBe("misplaced-tests-section")
+			expect(fix.isPreferred).toBe(true)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tconstant a = 1",
+				"}",
+				"",
+				"tests {",
+				'\ttest "counts" { expect true }',
+				"}",
+			])
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: The block goes to the END, which is below whatever the Module
+		// hands out rather than directly below the implementation.
+		it("should move a tests block below the exports", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant a = 1",
+				"}",
+				"",
+				"§ what it proves",
+				"tests {",
+				'\ttest "counts" { expect true }',
+				"}",
+				"",
+				"export {",
+				"\ta",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tconstant a = 1",
+				"}",
+				"",
+				"export {",
+				"\ta",
+				"}",
+				"",
+				"§ what it proves",
+				"tests {",
+				'\ttest "counts" { expect true }',
+				"}",
+			])
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should move an import block above the implementation", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant a = 1",
+				"}",
+				"",
+				"import {",
+				'\tfrom "./Other.es" { thing }',
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe(
+				"Move the 'import { … }' block above the implementation",
+			)
+			expect(fix.diagnosticCode).toBe("misplaced-module-section")
+
+			expect(result).toEqual([
+				"import {",
+				'\tfrom "./Other.es" { thing }',
+				"}",
+				"",
+				"implementation {",
+				"\tconstant a = 1",
+				"}",
+			])
+
+			// NOTE: The specifier names no file here, so the graph is what is
+			// left to complain about rather than the shape of the Program.
+			expect(codesOf(result)).not.toContain("misplaced-module-section")
+		})
+
+		// NOTE: A Comment held off from the block below it is about the FILE,
+		// so an import written back above the implementation goes under it
+		// rather than over it.
+		it("should leave a file's own header above the import block", () => {
+			let lines = [
+				"§ A file about things",
+				"",
+				"implementation {",
+				"\tconstant a = 1",
+				"}",
+				"",
+				"import {",
+				'\tfrom "./Other.es" { thing }',
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(applied(lines, fix)).toEqual([
+				"§ A file about things",
+				"",
+				"import {",
+				'\tfrom "./Other.es" { thing }',
+				"}",
+				"",
+				"implementation {",
+				"\tconstant a = 1",
+				"}",
+			])
+		})
+
+		it("should move an export block below the implementation", () => {
+			let lines = [
+				"export {",
+				"\ta",
+				"}",
+				"",
+				"implementation {",
+				"\tconstant a = 1",
+				"}",
+				"",
+				"tests {",
+				'\ttest "counts" { expect true }',
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe(
+				"Move the 'export { … }' block below the implementation",
+			)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tconstant a = 1",
+				"}",
+				"",
+				"export {",
+				"\ta",
+				"}",
+				"",
+				"tests {",
+				'\ttest "counts" { expect true }',
+				"}",
+			])
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A file that separates nothing with blank lines gets none
+		// invented for it — the move adjusts the spacing the block had, and it
+		// had none.
+		it("should invent no blank line for a file that writes none", () => {
+			let lines = [
+				"export {",
+				"\ta",
+				"}",
+				"implementation {",
+				"\tconstant a = 1",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(applied(lines, fix)).toEqual([
+				"implementation {",
+				"\tconstant a = 1",
+				"}",
+				"export {",
+				"\ta",
+				"}",
+			])
+		})
+	})
+
 	describe("Type annotations", () => {
 		it("should offer the inferred Type of a Constant as an edit", () => {
 			let lines = ["implementation {", '\tconstant name = "Ada"', "}"]

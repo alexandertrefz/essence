@@ -3743,6 +3743,26 @@ export { from "./Geometry.es" { Rectangle } }`,
 				expect(program.imports).toBeNull()
 			})
 
+			// NOTE: The block is DROPPED and the Diagnostic underlines the
+			// Keyword, so its own span is the only record left of where the
+			// text a fix has to move stands.
+			it("should carry the dropped block's own span", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					`implementation { }
+
+import { from "./Geometry.es" { Rectangle } }`,
+				)
+
+				expect(diagnostics[0].data).toEqual({
+					kind: "section-order",
+					section: "import",
+					block: {
+						start: { line: 3, column: 1 },
+						end: { line: 3, column: 46 },
+					},
+				})
+			})
+
 			// NOTE: A block on the wrong side is still parsed where it stands, so
 			// what is inside it is read rather than cascading into the Diagnostics
 			// about the Program's shape.

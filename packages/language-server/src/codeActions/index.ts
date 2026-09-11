@@ -33,6 +33,8 @@ import {
 	importActions,
 	missingCaseAction,
 	missingMembersAction,
+	moveModuleSectionAction,
+	moveTestsSectionAction,
 	namespaceImportActions,
 	namespaceSpecifierActions,
 	removeDocumentationTagAction,
@@ -322,6 +324,10 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"matcher-on-expect": ({ diagnostic, lines }) =>
 		listed(requireKeywordAction(diagnostic, lines)),
 	"misnamed-documentation-parameter": documentationSpellingFix,
+	"misplaced-module-section": ({ diagnostic, program, lines }) =>
+		listed(moveModuleSectionAction(diagnostic, program, lines)),
+	"misplaced-tests-section": ({ diagnostic, program, lines }) =>
+		listed(moveTestsSectionAction(diagnostic, program, lines)),
 	"missing-case": ({ diagnostic, program, lines }) =>
 		listed(missingCaseAction(diagnostic, program, lines)),
 	"missing-documentation-separator": ({ diagnostic, lines }) =>

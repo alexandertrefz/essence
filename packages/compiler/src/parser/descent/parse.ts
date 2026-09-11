@@ -674,6 +674,15 @@ class DescentParser {
 			section.keywordPosition,
 			{
 				code: "misplaced-module-section",
+				// NOTE: The whole block's span, since the Diagnostic underlines
+				// the KEYWORD and the section is dropped rather than carried
+				// along — so a fix that moves the block has nothing else left
+				// to read where its text ends.
+				data: {
+					kind: "section-order",
+					section: isImport ? "import" : "export",
+					block: section.node.position,
+				},
 				labels: [
 					primary(
 						section.keywordPosition,

@@ -303,6 +303,13 @@ is one shared declaration space rather than a graph of Modules: every one of its
 files sees every other, and none of them is importable, so none of them may
 carry either section.
 
+**Quick Fix — "Move the 'import { … }' block above the implementation":** cuts
+the block — a Comment written directly above it included — and writes it back
+byte for byte at the slot it belongs in, adjusting only the blank line in front
+of it and the one behind it. A file that separates its blocks with blank lines
+keeps exactly one; a file that separates them with none gets none invented.
+The `export` block reads the same way, below the implementation.
+
 ## Tests
 
 The `tests { … }` section, the `test` and `suite` items written in it, and the
@@ -316,6 +323,11 @@ it does, what it exports, what it proves. Move the block to the end, below
 `export { … }` — a Module that exports nothing has nothing for it to stand
 after, and a section directly below the implementation block is where it
 belongs.
+
+**Quick Fix — "Move the 'tests { … }' block to the end":** cuts the block — a
+Comment written directly above it included — and writes it back byte for byte
+below the last block the file has, adjusting only the blank line in front of it
+and the one behind it.
 
 ### `test-outside-tests`
 

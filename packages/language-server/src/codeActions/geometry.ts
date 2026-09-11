@@ -43,6 +43,26 @@ export function indentationOf(lines: Array<string>, line: number): string {
 	return lineAt(lines, line).match(/^[ \t]*/)?.[0] ?? ""
 }
 
+// NOTE: Where a block that has to MOVE really begins: a Comment written
+// directly above it travels with it, since a note about a block that stays
+// behind is a note about whatever ends up in its place. A blank line ends the
+// run — a Comment held off from what is below it is about the file rather than
+// about the block.
+export function commentRunAbove(lines: Array<string>, line: number): number {
+	let first = line
+
+	while (
+		first > 1 &&
+		lineAt(lines, first - 1)
+			.trimStart()
+			.startsWith("§")
+	) {
+		first -= 1
+	}
+
+	return first
+}
+
 // NOTE: `first` through `last` as a range that covers WHOLE lines — the break
 // that ends the last of them included, so what a deletion leaves behind is the
 // lines around it rather than the blank line these stood on.
@@ -215,6 +235,19 @@ export function removeLinesEdit(
 	}
 
 	return { range: { start, end }, newText: "" }
+}
+
+// NOTE: Whether the keyword is written AT `cursor` — the other half of
+// `keywordBefore`, for an edit that starts where a Node says a block opens and
+// has to read the buffer back before cutting it out.
+export function keywordAt(
+	lines: Array<string>,
+	cursor: common.Cursor,
+	keyword: string,
+): boolean {
+	let end = { line: cursor.line, column: cursor.column + keyword.length }
+
+	return sliceOf(lines, { start: cursor, end }) === keyword
 }
 
 // NOTE: A deletion that starts at the first non-whitespace of its line takes

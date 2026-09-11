@@ -11,11 +11,13 @@ import {
 	containsRange,
 	commaAfter,
 	commaBefore,
+	commentRunAbove,
 	endOfContents,
 	extendOverLeadingBreak,
 	extendOverLeadingSpace,
 	indentationOf,
 	insertBeforeClosingBrace,
+	keywordAt,
 	keywordBefore,
 	labelBefore,
 	lineAt,
@@ -1558,4 +1560,200 @@ export function splitSnapshotActions(
 			},
 		],
 	}))
+}
+
+// NOTE: Where a moved block lands, said in terms of a line that is STAYING put:
+// under the last line of the block it follows, or over the first line of the
+// block it precedes. Which of the two matters, because the blank line the move
+// carries goes on the side facing the block that is already there.
+type BlockSlot = { below: number } | { above: number }
+
+// NOTE: A block moved WHOLE. The lines it stands on are cut and written back at
+// `slot`, byte for byte — the Comments inside it, the layout of its entries, the
+// indentation of every line — because the only thing wrong with the block is
+// where it stands, and retyping it would be this file inventing a layout for
+// text somebody wrote.
+//
+// The blank line around it travels with it: one is taken out with the cut
+// wherever there was one, and one is written back at the destination, so a file
+// spaced the way its author spaced it stays that way.
+function moveBlockEdits(
+	lines: Array<string>,
+	block: common.Position,
+	slot: BlockSlot,
+): Array<CodeActionEdit> | null {
+	let first = commentRunAbove(lines, block.start.line)
+	let last = block.end.line
+	let cutFirst = first
+	let cutLast = last
+
+	// NOTE: The blank line BELOW where there is one, since that is the side a
+	// block written at the top of a file has. Only one of the two, or the two
+	// blocks left behind would close up against each other.
+	if (last < lines.length && lineAt(lines, last + 1).trim() === "") {
+		cutLast = last + 1
+	} else if (first > 1 && lineAt(lines, first - 1).trim() === "") {
+		cutFirst = first - 1
+	}
+
+	// NOTE: A destination the block already stands at — nothing to move, and an
+	// edit that wrote it back where it came from would overlap its own
+	// deletion.
+	if (
+		"below" in slot
+			? slot.below >= cutFirst - 1 && slot.below <= cutLast
+			: slot.above >= cutFirst && slot.above <= cutLast + 1
+	) {
+		return null
+	}
+
+	let text = lines.slice(first - 1, last).join("\n")
+	let blank = cutFirst !== first || cutLast !== last ? "\n" : ""
+	let removal = { range: wholeLines(lines, cutFirst, cutLast), newText: "" }
+	let cursor: common.Cursor
+	let newText: string
+
+	if ("above" in slot) {
+		cursor = { line: slot.above, column: 1 }
+		newText = `${text}\n${blank}`
+	} else if (slot.below < lines.length) {
+		cursor = { line: slot.below + 1, column: 1 }
+		newText = `${blank}${text}\n`
+	} else {
+		// NOTE: A document that does not end in a break has no line below its
+		// last for an insertion to start at, so the break is written instead.
+		cursor = {
+			line: slot.below,
+			column: lineAt(lines, slot.below).length + 1,
+		}
+		newText = `\n${blank}${text}`
+	}
+
+	let written = { range: { start: cursor, end: cursor }, newText }
+
+	// NOTE: In document order, which is what an Editor applying a list of edits
+	// against one buffer needs of them.
+	return cursor.line < cutFirst ? [written, removal] : [removal, written]
+}
+
+// NOTE: Where each section belongs, as the file itself says it: a Module reads
+// top to bottom — what it imports, what it does, what it exports, what it
+// proves. Each of the four has exactly one slot, so the destination is worked
+// out from the blocks that ARE in place rather than named by the Diagnostic.
+//
+// A file that is nothing but tests carries an implementation section spanning
+// its tests block, which is what puts the export below the tests there — the
+// same rule the Parser holds such a file to.
+function sectionSlot(
+	program: parser.Program,
+	lines: Array<string>,
+	section: "import" | "export" | "tests",
+): BlockSlot {
+	let implementation = program.implementation.position
+	let exports = program.exports?.position ?? null
+
+	if (section === "import") {
+		let starts = [implementation, program.tests?.position ?? null, exports]
+			.filter((position) => position !== null)
+			.map((position) => commentRunAbove(lines, position.start.line))
+
+		return { above: Math.min(...starts) }
+	}
+
+	if (section === "export") {
+		return { below: implementation.end.line }
+	}
+
+	return { below: Math.max(implementation.end.line, exports?.end.line ?? 0) }
+}
+
+// NOTE: The `import { … }` or `export { … }` block written on the wrong side of
+// the implementation, put back on its own. The Parser DROPS such a block, so
+// what the Program holds is a file missing a whole section — which is why this
+// is preferred: moving it is the only reading, and the Program can not compile
+// as it stands either way.
+export function moveModuleSectionAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+	lines: Array<string>,
+): CodeActionEntry | null {
+	if (diagnostic.data?.kind !== "section-order") {
+		return null
+	}
+
+	let section = diagnostic.data.section
+	// NOTE: Read back off the buffer, as every edit here is: a Position from a
+	// stale analysis pointing at anything but the Keyword would cut lines that
+	// are no longer the block.
+	if (sliceOf(lines, diagnostic.position) !== section) {
+		return null
+	}
+
+	let edits = moveBlockEdits(
+		lines,
+		diagnostic.data.block,
+		sectionSlot(program, lines, section),
+	)
+
+	if (edits === null) {
+		return null
+	}
+
+	return {
+		title:
+			section === "import"
+				? "Move the 'import { … }' block above the implementation"
+				: "Move the 'export { … }' block below the implementation",
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits,
+	}
+}
+
+// NOTE: The `tests { … }` block written above the implementation or above what
+// the Module hands out, moved to the end where it belongs. The block is KEPT
+// where it stands rather than dropped, so the Program's own span for it says
+// what to cut.
+//
+// The Diagnostic underlines the Keyword in one of the two shapes and the whole
+// block in the other, and both of them START where the block does — which is
+// what ties the one to the other, and what is read back off the buffer before a
+// block is cut out of it.
+export function moveTestsSectionAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+	lines: Array<string>,
+): CodeActionEntry | null {
+	let tests = program.tests?.position ?? null
+	let start = diagnostic.position.start
+
+	if (
+		tests === null ||
+		tests.start.line !== start.line ||
+		tests.start.column !== start.column ||
+		!keywordAt(lines, tests.start, "tests")
+	) {
+		return null
+	}
+
+	let edits = moveBlockEdits(
+		lines,
+		tests,
+		sectionSlot(program, lines, "tests"),
+	)
+
+	if (edits === null) {
+		return null
+	}
+
+	return {
+		title: "Move the 'tests { … }' block to the end",
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits,
+	}
 }
