@@ -52,7 +52,11 @@ export function findMatch(
 			isSamePosition(node.position, position)
 		) {
 			found = node
+
+			return false
 		}
+
+		return true
 	})
 
 	return found
@@ -66,14 +70,18 @@ export function findHandler(
 
 	walk(program, (node) => {
 		if (node.nodeType !== "Match") {
-			return
+			return true
 		}
 
 		for (let handler of node.handlers) {
 			if (isSamePosition(handler.matcher.position, matcherPosition)) {
 				found = handler
+
+				return false
 			}
 		}
+
+		return true
 	})
 
 	return found
@@ -91,7 +99,11 @@ export function findConstantDeclaration(
 			isSamePosition(node.name.position, namePosition)
 		) {
 			found = node
+
+			return false
 		}
+
+		return true
 	})
 
 	return found
@@ -114,7 +126,11 @@ export function findVariableDeclaration(
 			isSamePosition(node.name.position, namePosition)
 		) {
 			found = node
+
+			return false
 		}
+
+		return true
 	})
 
 	return found
@@ -138,14 +154,18 @@ export function findTypeParameter(
 			node.nodeType !== "ChoiceDeclarationStatement" &&
 			node.nodeType !== "TypeAliasStatement"
 		) {
-			return
+			return true
 		}
 
 		for (let generic of node.generics) {
 			if (isSamePosition(generic.position, position)) {
 				found = generic
+
+				return false
 			}
 		}
+
+		return true
 	})
 
 	return found
@@ -169,7 +189,11 @@ export function findCaseValueOfPayload(
 			isSamePosition(node.value.position, payloadPosition)
 		) {
 			found = node
+
+			return false
 		}
+
+		return true
 	})
 
 	return found
@@ -187,14 +211,18 @@ export function findDictionaryEntry(
 
 	walk(program, (node) => {
 		if (node.nodeType !== "DictionaryValue") {
-			return
+			return true
 		}
 
 		for (let entry of node.entries) {
 			if (isSamePosition(entry.key.position, keyPosition)) {
 				found = entry
+
+				return false
 			}
 		}
+
+		return true
 	})
 
 	return found
@@ -249,7 +277,7 @@ export function findProtocolExtension(
 
 	walk(program, (node) => {
 		if (node.nodeType !== "ProtocolDeclarationStatement") {
-			return
+			return true
 		}
 
 		for (let clause of node.conformsTo) {
@@ -259,8 +287,12 @@ export function findProtocolExtension(
 				)
 			) {
 				found = clause
+
+				return false
 			}
 		}
+
+		return true
 	})
 
 	return found
@@ -328,9 +360,13 @@ export function findNodeAt(
 	let found: parser.ImplementationNode | null = null
 
 	walk(program, (node) => {
-		if (found === null && isSamePosition(node.position, position)) {
-			found = node
+		if (!isSamePosition(node.position, position)) {
+			return true
 		}
+
+		found = node
+
+		return false
 	})
 
 	return found
@@ -351,7 +387,7 @@ export function findMethodInvocation(
 
 	walk(program, (node) => {
 		if (node.nodeType !== "MethodInvocation") {
-			return
+			return true
 		}
 
 		if (
@@ -359,7 +395,11 @@ export function findMethodInvocation(
 			isSamePosition(node.member.position, position)
 		) {
 			found = node
+
+			return false
 		}
+
+		return true
 	})
 
 	return found
@@ -379,7 +419,7 @@ export function findFunctionDefinition(
 
 	walk(program, (node) => {
 		if (!isSamePosition(node.position, position)) {
-			return
+			return true
 		}
 
 		if (node.nodeType === "FunctionStatement") {
@@ -387,6 +427,8 @@ export function findFunctionDefinition(
 		} else if (node.nodeType === "FunctionValue") {
 			found = node.value
 		}
+
+		return found === null
 	})
 
 	return found
@@ -632,192 +674,237 @@ function bodiesOf(
 // shape of the tree helps answer faster. Written over the Parser AST rather
 // than the typed one because a Quick Fix edits text: the typed AST erases
 // annotations and rewrites Nodes the source never wrote.
-export function walk(
-	program: parser.Program,
-	visit: (node: parser.ImplementationNode) => void,
-) {
+//
+// A visitor that answers `false` STOPS the walk where it stands. Most of the
+// lookups above are looking for one Node at one Position and have nothing left
+// to do once they have it, and a Code Action request runs a dozen of them over
+// a Program that may be seven thousand lines: finishing the tree twelve times
+// over to find twelve Nodes already found is the difference between a cursor
+// move costing a millisecond and costing five. Answering nothing walks the
+// whole Program, which is what a collector wants.
+type Visitor = (node: parser.ImplementationNode) => void | boolean
+
+export function walk(program: parser.Program, visit: Visitor) {
 	for (let body of programBodies(program)) {
-		walkBody(body, visit)
+		if (!walkBody(body, visit)) {
+			return
+		}
 	}
 }
 
-function walkBody(
-	nodes: Array<parser.ImplementationNode>,
-	visit: (node: parser.ImplementationNode) => void,
-) {
+function walkBody(nodes: Array<parser.ImplementationNode>, visit: Visitor) {
 	for (let node of nodes) {
-		walkNode(node, visit)
+		if (!walkNode(node, visit)) {
+			return false
+		}
 	}
+
+	return true
 }
 
 // NOTE: A Parameter's `= expression` default holds Expressions the same Quick
 // Fixes apply to as any body's — an unknown name inside one has the same
 // suggestion, an auto-import the same edit. Silently missed otherwise: the walk
 // below descends into bodies, and a default is not one.
-function walkDefaults(
-	parameters: Array<parser.ParameterNode>,
-	visit: (node: parser.ImplementationNode) => void,
-) {
+function walkDefaults(parameters: Array<parser.ParameterNode>, visit: Visitor) {
 	for (let defaultValue of parameterDefaults(parameters)) {
-		walkNode(defaultValue, visit)
+		if (!walkNode(defaultValue, visit)) {
+			return false
+		}
 	}
+
+	return true
 }
 
+// NOTE: True to go on, false to stop — the answer travels back up through every
+// frame, so a visitor that has found what it came for costs nothing more.
 export function walkNode(
 	node: parser.ImplementationNode,
-	visit: (node: parser.ImplementationNode) => void,
-) {
-	visit(node)
+	visit: Visitor,
+): boolean {
+	if (visit(node) === false) {
+		return false
+	}
 
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
-			walkNode(node.value, visit)
-			return
+			return walkNode(node.value, visit)
 		case "FunctionStatement":
-			walkDefaults(node.value.parameters, visit)
-			walkBody(node.value.body, visit)
-			return
+			return (
+				walkDefaults(node.value.parameters, visit) &&
+				walkBody(node.value.body, visit)
+			)
 		case "ChoiceDeclarationStatement":
 			// NOTE: A Case payload's default holds the Expressions the same
 			// Quick Fixes apply to as any body's — an unknown name in one takes
 			// the same suggestion, an auto-import the same edit.
 			for (let defaultValue of caseDefaults(node.cases)) {
-				walkNode(defaultValue, visit)
+				if (!walkNode(defaultValue, visit)) {
+					return false
+				}
 			}
 
-			return
+			return true
 		case "NamespaceDefinitionStatement": {
 			for (let property of Object.values(node.properties)) {
-				if (property.value !== null) {
-					walkNode(property.value, visit)
+				if (
+					property.value !== null &&
+					!walkNode(property.value, visit)
+				) {
+					return false
 				}
 			}
 
 			for (let member of Object.values(node.methods)) {
 				for (let method of methodsOf(member)) {
-					walkNode(method, visit)
+					if (!walkNode(method, visit)) {
+						return false
+					}
 				}
 
 				// NOTE: A native signature has no body, but it may carry a
 				// default, which is Essence written in a `declarations` Program
 				// like any other.
 				for (let signature of nativeSignaturesOf(member)) {
-					walkDefaults(signature.parameters, visit)
+					if (!walkDefaults(signature.parameters, visit)) {
+						return false
+					}
 				}
 			}
 
-			return
+			return true
 		}
 		case "IfStatement":
-			walkNode(node.condition, visit)
-			walkBody(node.body, visit)
-			return
+			return walkNode(node.condition, visit) && walkBody(node.body, visit)
 		case "IfElseStatement":
-			walkNode(node.condition, visit)
-			walkBody(node.trueBody, visit)
-			walkBody(node.falseBody, visit)
-			return
+			return (
+				walkNode(node.condition, visit) &&
+				walkBody(node.trueBody, visit) &&
+				walkBody(node.falseBody, visit)
+			)
 		case "ReturnStatement":
-			walkNode(node.expression, visit)
-			return
+			return walkNode(node.expression, visit)
 		case "ExpectStatement":
 		case "RequireStatement":
 			for (let expression of assertionExpressions(node)) {
-				walkNode(expression, visit)
+				if (!walkNode(expression, visit)) {
+					return false
+				}
 			}
 
-			return
+			return true
 		case "Match":
-			walkNode(node.value, visit)
+			if (!walkNode(node.value, visit)) {
+				return false
+			}
 
 			for (let handler of node.handlers) {
 				for (let value of matcherValueExpressions(handler.matcher)) {
-					walkNode(value, visit)
+					if (!walkNode(value, visit)) {
+						return false
+					}
 				}
 
-				if (handler.guard !== null) {
-					walkNode(handler.guard, visit)
+				if (handler.guard !== null && !walkNode(handler.guard, visit)) {
+					return false
 				}
 
-				walkBody(handler.body, visit)
+				if (!walkBody(handler.body, visit)) {
+					return false
+				}
 			}
 
-			return
+			return true
 		// NOTE: An arm holds the Expressions the same Quick Fixes apply to as
 		// any body's — an unknown name in one takes the same suggestion, an
 		// auto-import the same edit.
 		case "Define":
 			for (let expression of defineExpressions(node)) {
-				walkNode(expression, visit)
-			}
-
-			return
-		case "FunctionValue":
-			walkDefaults(node.value.parameters, visit)
-			walkBody(node.value.body, visit)
-			return
-		case "RecordValue":
-			for (let member of Object.values(node.members)) {
-				walkNode(memberExpression(member), visit)
-			}
-
-			return
-		case "ListValue":
-			for (let value of node.values) {
-				walkNode(value, visit)
-			}
-
-			return
-		case "DictionaryValue":
-			for (let entry of node.entries) {
-				walkNode(entry.key, visit)
-				walkNode(entry.value, visit)
-			}
-
-			return
-		case "InterpolatedStringValue":
-			for (let segment of node.segments) {
-				if (segment.kind === "expression") {
-					walkNode(segment.expression, visit)
+				if (!walkNode(expression, visit)) {
+					return false
 				}
 			}
 
-			return
-		case "MethodInvocation":
-			walkNode(node.base, visit)
-			walkArguments(node.arguments, visit)
-			return
-		case "FunctionInvocation":
-			walkNode(node.name, visit)
-			walkArguments(node.arguments, visit)
-			return
-		case "Combination":
-			walkNode(node.lhs, visit)
-			walkNode(node.rhs, visit)
-			return
-		case "Lookup":
-			walkNode(node.base, visit)
-			return
-		case "CaseValue":
-			if (node.value !== null) {
-				walkNode(node.value, visit)
+			return true
+		case "FunctionValue":
+			return (
+				walkDefaults(node.value.parameters, visit) &&
+				walkBody(node.value.body, visit)
+			)
+		case "RecordValue":
+			for (let member of Object.values(node.members)) {
+				if (!walkNode(memberExpression(member), visit)) {
+					return false
+				}
 			}
 
-			return
+			return true
+		case "ListValue":
+			for (let value of node.values) {
+				if (!walkNode(value, visit)) {
+					return false
+				}
+			}
+
+			return true
+		case "DictionaryValue":
+			for (let entry of node.entries) {
+				if (
+					!walkNode(entry.key, visit) ||
+					!walkNode(entry.value, visit)
+				) {
+					return false
+				}
+			}
+
+			return true
+		case "InterpolatedStringValue":
+			for (let segment of node.segments) {
+				if (
+					segment.kind === "expression" &&
+					!walkNode(segment.expression, visit)
+				) {
+					return false
+				}
+			}
+
+			return true
+		case "MethodInvocation":
+			return (
+				walkNode(node.base, visit) &&
+				walkArguments(node.arguments, visit)
+			)
+		case "FunctionInvocation":
+			return (
+				walkNode(node.name, visit) &&
+				walkArguments(node.arguments, visit)
+			)
+		case "Combination":
+			return walkNode(node.lhs, visit) && walkNode(node.rhs, visit)
+		case "Lookup":
+			return walkNode(node.base, visit)
+		case "CaseValue":
+			return node.value === null ? true : walkNode(node.value, visit)
 		// NOTE: A path holds no Expression of its own — its steps are member
 		// names, and the Function it stands for is the Enricher's.
 		case "MemberPath":
-			return
+			return true
+		default:
+			return true
 	}
 }
 
 function walkArguments(
 	nodeArguments: Array<parser.ArgumentNode>,
-	visit: (node: parser.ImplementationNode) => void,
+	visit: Visitor,
 ) {
 	for (let argument of nodeArguments) {
-		walkNode(argument.value, visit)
+		if (!walkNode(argument.value, visit)) {
+			return false
+		}
 	}
+
+	return true
 }

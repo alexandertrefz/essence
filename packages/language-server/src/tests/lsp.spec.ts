@@ -39,7 +39,11 @@ import {
 } from "vscode-languageserver/node"
 
 import { analyse, documentFilePath } from "../analyse"
-import { type CodeActionEntry, findCodeActions } from "../codeActions"
+import {
+	type CodeActionEntry,
+	findCodeActions,
+	isRequestedKind,
+} from "../codeActions"
 import { type CompletionEntry, findCompletions } from "../completion"
 import { toLspDiagnostic, toLspRange, toRange } from "../conversion"
 import { findHover } from "../hover"
@@ -48,7 +52,6 @@ import { findRenameableOccurrence } from "../rename"
 import { semanticTokenModifiers, semanticTokenTypes } from "../semanticTokens"
 import {
 	ensureTransportArgument,
-	isRequestedKind,
 	serverCapabilities,
 	toLspCodeAction,
 	toLspCompletionItem,

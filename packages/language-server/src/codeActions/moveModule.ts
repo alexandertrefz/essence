@@ -8,7 +8,11 @@ import {
 	relativeSpecifier,
 } from "../autoImport"
 import { isSamePosition } from "../positions"
-import { type DeclarationKind, indexProgram, type RenameIndex } from "../rename"
+import {
+	type DeclarationKind,
+	type ProgramIndex,
+	type RenameIndex,
+} from "../rename"
 import type { ImportContext } from "./fixes"
 import {
 	containsRange,
@@ -100,12 +104,13 @@ export function moveActions(
 	context: ImportContext | null,
 	lines: Array<string>,
 	range: common.Position,
+	indexed: () => ProgramIndex,
 ): Array<CodeActionEntry> {
 	if (context === null) {
 		return []
 	}
 
-	let move = movableAt(context, lines, range)
+	let move = movableAt(context, lines, range, indexed)
 
 	if (move === null) {
 		return []
@@ -125,6 +130,7 @@ function movableAt(
 	context: ImportContext,
 	lines: Array<string>,
 	range: common.Position,
+	indexed: () => ProgramIndex,
 ): Move | null {
 	let program = context.program
 	let block = program.implementation.position
@@ -161,7 +167,12 @@ function movableAt(
 			return null
 		}
 
-		let { index } = indexProgram(program)
+		// NOTE: The request's own index rather than one built here. Indexing a
+		// Program costs what a Rename costs, the Workspace already holds one
+		// per file and version, and this is reached on every Code Action
+		// request whose range touches a Declaration's name — which a
+		// whole-document request is, for the first Declaration in the file.
+		let { index } = indexed()
 
 		if (!readsMovableNames(program, index, span)) {
 			return null

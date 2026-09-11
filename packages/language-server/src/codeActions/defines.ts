@@ -342,7 +342,9 @@ function enclosingFunctions(
 		}
 
 		for (let statement of node.value.body) {
-			walkNode(statement, (inner) => functions.set(inner, node.value))
+			walkNode(statement, (inner) => {
+				functions.set(inner, node.value)
+			})
 		}
 	})
 

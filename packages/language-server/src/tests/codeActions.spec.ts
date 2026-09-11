@@ -4,7 +4,7 @@ import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
 import { format } from "@essence-lang/formatter"
 import type { common, parser } from "@essence-lang/interfaces"
 
-import { analyse } from "../analyse"
+import { analyse, analyseDocument } from "../analyse"
 import { type CodeActionEntry, findCodeActions } from "../codeActions"
 import {
 	compareWrittenValueAction,
@@ -7246,5 +7246,107 @@ describe("Write it as a table test", () => {
 		]
 
 		expect(tables(lines, onTheTest(lines, '"adds up"'))).toEqual([])
+	})
+})
+
+// NOTE: What a request asked for, answered BEFORE the work rather than by
+// filtering what came out of it. `"editor.codeActionsOnSave": {
+// "source.organizeImports": true }` sends one request per save, over the whole
+// document, asking for exactly one kind — and computing every refactoring in
+// the file to drop all of them is most of what a save used to cost.
+//
+// Counted rather than timed: the section's own Statement list is read once by
+// every refactoring that walks the Program, so a Proxy over it says how many of
+// them ran, on any machine and with no budget to pick.
+describe("the kinds a request narrowed itself to", () => {
+	function walksOf(lines: Array<string>, only?: Array<string>): number {
+		let source = lines.join("\n")
+		let analysis = analyseDocument(source, undefined, { tests: true })
+		let program = analysis.program as parser.Program
+		let walks = 0
+		let counted = new Proxy(program.implementation.nodes, {
+			get(target, key, receiver) {
+				if (key === Symbol.iterator) {
+					walks += 1
+				}
+
+				return Reflect.get(target, key, receiver) as unknown
+			},
+		})
+
+		findCodeActions(
+			source,
+			{
+				start: { line: 1, column: 1 },
+				end: {
+					line: lines.length,
+					column: (lines.at(-1) as string).length + 1,
+				},
+			},
+			undefined,
+			undefined,
+			{
+				...analysis,
+				program: {
+					...program,
+					implementation: {
+						...program.implementation,
+						nodes: counted,
+					},
+				},
+			},
+			[],
+			only,
+		)
+
+		return walks
+	}
+
+	const DOCUMENT = [
+		"implementation {",
+		"\ttype Crate = { count: Integer }",
+		"",
+		"\tconstant one = 1",
+		"",
+		"\tfunction sized(_ crate: Crate) -> Integer {",
+		"\t\t<- crate.count",
+		"\t}",
+		"}",
+		"",
+	]
+
+	it("walks the Program for a request that asked for everything", () => {
+		expect(walksOf(DOCUMENT)).toBeGreaterThan(0)
+	})
+
+	it("walks it for nothing where one source kind was asked for", () => {
+		expect(walksOf(DOCUMENT, ["source.organizeImports"])).toBe(0)
+	})
+
+	it("offers only the kind that was asked for", () => {
+		let source = DOCUMENT.join("\n")
+		let range = {
+			start: { line: 1, column: 1 },
+			end: {
+				line: DOCUMENT.length,
+				column: (DOCUMENT.at(-1) as string).length + 1,
+			},
+		}
+		let kinds = (only?: Array<string>) =>
+			new Set(
+				findCodeActions(
+					source,
+					range,
+					undefined,
+					undefined,
+					null,
+					[],
+					only,
+				).map((entry) => entry.kind),
+			)
+
+		expect(kinds()).toContain("refactor.rewrite")
+		expect(kinds(["refactor.extract"])).toEqual(new Set())
+		expect(kinds(["refactor"])).toEqual(kinds())
 	})
 })

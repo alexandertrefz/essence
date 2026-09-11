@@ -50,17 +50,18 @@ export function makeGeneratableAction(
 	}
 
 	let typeName = diagnostic.data.typeName
+	let found = generatablesIn(program)
 	// NOTE: Only a Type THIS file declares. The Namespace is written beside the
 	// declaration, and a Type another Module publishes has no declaration here
 	// to write it beside — nor is a conformance to somebody else's Type
 	// something to offer without being asked.
-	let buildable = buildablesIn(program).find(
+	let buildable = found.buildables.find(
 		(candidate) => candidate.name === typeName,
 	)
 
 	return buildable === undefined
 		? []
-		: entryFor(buildable, program, lines, "quickfix", diagnostic)
+		: entryFor(buildable, found.covered, lines, "quickfix", diagnostic)
 }
 
 export function makeGeneratableActions(
@@ -69,8 +70,9 @@ export function makeGeneratableActions(
 	range: common.Position,
 ): Array<CodeActionEntry> {
 	let entries: Array<CodeActionEntry> = []
+	let found = generatablesIn(program)
 
-	for (let buildable of buildablesIn(program)) {
+	for (let buildable of found.buildables) {
 		let line = buildable.node.name.position.start.line
 		let head = {
 			start: { line, column: 1 },
@@ -82,7 +84,13 @@ export function makeGeneratableActions(
 		}
 
 		entries.push(
-			...entryFor(buildable, program, lines, "refactor.rewrite", null),
+			...entryFor(
+				buildable,
+				found.covered,
+				lines,
+				"refactor.rewrite",
+				null,
+			),
 		)
 	}
 
@@ -91,12 +99,12 @@ export function makeGeneratableActions(
 
 function entryFor(
 	buildable: Buildable,
-	program: parser.Program,
+	covered: Set<string>,
 	lines: Array<string>,
 	kind: "quickfix" | "refactor.rewrite",
 	diagnostic: (common.Diagnostic & { position: common.Position }) | null,
 ): Array<CodeActionEntry> {
-	if (alreadyGeneratable(program, buildable.name)) {
+	if (covered.has(buildable.name)) {
 		return []
 	}
 
@@ -309,50 +317,53 @@ function drawOf(type: parser.TypeDeclarationNode): string | null {
 	return draws[type.type.content] ?? null
 }
 
-function alreadyGeneratable(program: parser.Program, name: string): boolean {
-	let found = false
-
-	walk(program, (node) => {
-		if (node.nodeType !== "NamespaceDefinitionStatement") {
-			return
-		}
-
-		// NOTE: The name this would write is taken, or the conformance it would
-		// declare is already declared. Either way there is nothing to offer:
-		// the second declaration would collide with the first, and a Type that
-		// already conforms draws through what is written.
-		let target = node.targetType
-
-		if (
-			node.name.content === `${name}${GENERATABLE}` ||
-			(target !== null &&
-				target.nodeType === "IdentifierTypeDeclaration" &&
-				target.type.content === name &&
-				node.conformsTo.some(
-					(clause) => clause.protocol.content === GENERATABLE,
-				))
-		) {
-			found = true
-		}
-	})
-
-	return found
-}
-
 // NOTE: The declarations a value is built of, which is a Record Alias and a
-// Choice. A GENERIC one is left out: `generate` is a static taking a source and
+// Choice — and, in the SAME walk, the Types a `Generatable` Namespace already
+// answers for. The two questions are one pass because they were two: every
+// candidate used to ask "is this one already written?" with a walk of its own,
+// so a whole-document request over a file declaring four hundred Types walked
+// the Program four hundred times. One walk, and the answer is a lookup.
+//
+// A GENERIC declaration is left out: `generate` is a static taking a source and
 // nothing else, so a call has no Argument for the Type Parameters to be worked
 // out from — which is what `unreachable-conformance` refuses, and offering to
 // write a conformance the Compiler then refuses would be a fix that breaks the
 // file. A refinement is left out too: its predicate is what a drawn value has to
 // satisfy, and nothing here can hold one.
-function buildablesIn(program: parser.Program): Array<Buildable> {
+function generatablesIn(program: parser.Program): {
+	buildables: Array<Buildable>
+	// NOTE: The names there is nothing left to offer for — either because the
+	// Namespace this would write is already there under that name, or because
+	// the Type already conforms and draws through what is written.
+	covered: Set<string>
+} {
 	let buildables: Array<Buildable> = []
+	let covered = new Set<string>()
 
 	walk(program, (node) => {
 		if (node.nodeType === "ChoiceDeclarationStatement") {
 			if (node.generics.length === 0) {
 				buildables.push({ name: node.name.content, node })
+			}
+
+			return
+		}
+
+		if (node.nodeType === "NamespaceDefinitionStatement") {
+			if (node.name.content.endsWith(GENERATABLE)) {
+				covered.add(node.name.content.slice(0, -GENERATABLE.length))
+			}
+
+			let target = node.targetType
+
+			if (
+				target !== null &&
+				target.nodeType === "IdentifierTypeDeclaration" &&
+				node.conformsTo.some(
+					(clause) => clause.protocol.content === GENERATABLE,
+				)
+			) {
+				covered.add(target.type.content)
 			}
 
 			return
@@ -368,5 +379,5 @@ function buildablesIn(program: parser.Program): Array<Buildable> {
 		}
 	})
 
-	return buildables
+	return { buildables, covered }
 }

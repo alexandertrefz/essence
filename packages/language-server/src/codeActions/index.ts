@@ -188,6 +188,14 @@ export function findCodeActions(
 	// see. Handed in rather than recomputed, so the lightbulb and the squiggle
 	// are offered on the very same Diagnostic.
 	extra: Array<common.Diagnostic> = [],
+	// NOTE: The kinds the request narrowed itself to, as `context.only` spells
+	// them. Answered HERE rather than by filtering what came out: `"editor.
+	// codeActionsOnSave": { "source.organizeImports": true }` sends one request
+	// per save, over the whole document, asking for one kind — and computing
+	// every refactoring in the file to drop all of them is most of what a save
+	// used to cost. Undefined asks for everything, which is what an Editor
+	// drawing a lightbulb sends.
+	only?: Array<string>,
 ): Array<CodeActionEntry> {
 	// NOTE: ONE run of the pipeline per request — the analysis hands back both
 	// the Parser AST an edit is measured against and the enriched Program the
@@ -225,7 +233,11 @@ export function findCodeActions(
 					program,
 				}
 
-	for (let diagnostic of reported) {
+	let wanted = (kind: CodeActionEntry["kind"]) => isRequestedKind(kind, only)
+
+	// NOTE: Every provider in the registry answers a Diagnostic, so the whole
+	// loop stands down where a Quick Fix is not what was asked for.
+	for (let diagnostic of wanted("quickfix") ? reported : []) {
 		if (
 			diagnostic.position === null ||
 			!overlaps(diagnostic.position, range)
@@ -246,18 +258,25 @@ export function findCodeActions(
 		}
 	}
 
-	if (enrichedProgram !== null) {
-		entries.push(...annotationActions(enrichedProgram, range))
+	// NOTE: And each refactoring below is asked for by the kind it offers,
+	// rather than computed and dropped. They are grouped by kind so that a
+	// request naming one walks the Program for that one alone.
+	if (wanted("refactor.rewrite")) {
+		if (enrichedProgram !== null) {
+			entries.push(...annotationActions(enrichedProgram, range))
+		}
+
+		entries.push(...documentFunctionActions(program, lines, range))
+		entries.push(...makeGeneratableActions(program, lines, range))
+		entries.push(...matchOnValueActions(enrichedProgram, lines, range))
+		entries.push(...shorthandActions(program, lines, range))
 	}
 
-	entries.push(
-		...implementProtocolActions(program, enrichedProgram, lines, range),
-	)
-	entries.push(...documentFunctionActions(program, lines, range))
-	entries.push(...makeGeneratableActions(program, lines, range))
-	entries.push(...matchOnValueActions(enrichedProgram, lines, range))
-	entries.push(...shorthandActions(program, lines, range))
-	entries.push(...moveActions(imports, lines, range))
+	if (wanted("quickfix")) {
+		entries.push(
+			...implementProtocolActions(program, enrichedProgram, lines, range),
+		)
+	}
 
 	let indexed = programIndexer(
 		program,
@@ -266,30 +285,76 @@ export function findCodeActions(
 		documentPath,
 	)
 
-	entries.push(
-		...extractConstantActions(program, lines, range, indexed, documentPath),
-	)
-	entries.push(
-		...extractFunctionActions(
-			program,
-			enrichedProgram,
-			lines,
-			range,
-			indexed,
-			documentPath,
-		),
-	)
-	entries.push(...inlineConstantActions(program, lines, range, indexed))
-	entries.push(...tableTestActions(program, enrichedProgram, lines, range))
-	entries.push(...pathActions(program, () => indexed().scopes, lines, range))
-	entries.push(...defineActions(program, lines, range))
-	entries.push(...payloadActions(program, enrichedProgram, lines, range))
-	entries.push(
-		...constantActions(program, () => indexed().index, lines, range),
-	)
-	entries.push(...organizeImportActions(program, lines, reported))
+	if (wanted("refactor.move")) {
+		entries.push(...moveActions(imports, lines, range, indexed))
+	}
+
+	if (wanted("refactor.extract")) {
+		entries.push(
+			...extractConstantActions(
+				program,
+				lines,
+				range,
+				indexed,
+				documentPath,
+			),
+		)
+		entries.push(
+			...extractFunctionActions(
+				program,
+				enrichedProgram,
+				lines,
+				range,
+				indexed,
+				documentPath,
+			),
+		)
+	}
+
+	if (wanted("refactor.inline")) {
+		entries.push(...inlineConstantActions(program, lines, range, indexed))
+	}
+
+	if (wanted("refactor.rewrite")) {
+		entries.push(
+			...tableTestActions(program, enrichedProgram, lines, range),
+		)
+		entries.push(
+			...pathActions(program, () => indexed().scopes, lines, range),
+		)
+		entries.push(...defineActions(program, lines, range))
+		entries.push(...payloadActions(program, enrichedProgram, lines, range))
+		entries.push(
+			...constantActions(program, () => indexed().index, lines, range),
+		)
+	}
+
+	if (wanted("source.organizeImports")) {
+		entries.push(...organizeImportActions(program, lines, reported))
+	}
 
 	return entries
+}
+
+// NOTE: What the request asked for. An Editor opening its Refactor menu asks
+// for `refactor` and one drawing the lightbulb over a squiggle asks for
+// `quickfix`, and answering both with everything puts the fixes in the
+// Refactor menu and the rewrites under the lightbulb. A kind is a dotted
+// hierarchy: `refactor` asks for `refactor.extract` as well, while
+// `refactor.extract` asks for nothing but itself. Asking for nothing — an
+// absent list, or an empty one — asks for all of them, which is what the
+// Editor sends when the reader opened no menu in particular.
+export function isRequestedKind(
+	kind: CodeActionEntry["kind"],
+	only: Array<string> | undefined,
+): boolean {
+	if (only === undefined || only.length === 0) {
+		return true
+	}
+
+	return only.some(
+		(requested) => kind === requested || kind.startsWith(`${requested}.`),
+	)
 }
 
 // NOTE: The rename index, built at most once per request and only where an
