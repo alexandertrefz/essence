@@ -2179,8 +2179,7 @@ class DescentParser {
 				let methods = this.parseStatementList(() =>
 					this.parseMethodBodyOrSignature(),
 				)
-
-				this.parseClosingBrace(leftBrace.position)
+				let closing = this.parseClosingBrace(leftBrace.position)
 
 				return {
 					nodeType: isStatic
@@ -2188,6 +2187,10 @@ class DescentParser {
 						: "OverloadedMethodSignaturesNode",
 					name,
 					methods,
+					position: {
+						start: token.position.start,
+						end: closing.end,
+					},
 					documentation,
 				}
 			}
@@ -2195,14 +2198,18 @@ class DescentParser {
 			let methods = this.parseStatementList(() =>
 				this.parseOptionallyGenericFunctionLiteral(),
 			)
-
-			this.parseClosingBrace(leftBrace.position)
+			let closing = this.parseClosingBrace(leftBrace.position)
+			let position = {
+				start: token.position.start,
+				end: closing.end,
+			}
 
 			if (isStatic) {
 				return {
 					nodeType: "OverloadedStaticMethodNode",
 					name,
 					methods,
+					position,
 					documentation,
 				}
 			}
@@ -2211,6 +2218,7 @@ class DescentParser {
 				nodeType: "OverloadedMethodNode",
 				name,
 				methods,
+				position,
 				documentation,
 			}
 		}
@@ -2428,14 +2436,18 @@ class DescentParser {
 			let signatures = this.parseStatementList(() =>
 				this.parseProtocolMethodSignature(),
 			)
-
-			this.parseClosingBrace(leftBrace.position)
+			let closing = this.parseClosingBrace(leftBrace.position)
+			let position = {
+				start: token.position.start,
+				end: closing.end,
+			}
 
 			if (isStatic) {
 				return {
 					nodeType: "OverloadedStaticProtocolMethod",
 					name,
 					signatures,
+					position,
 					documentation,
 				}
 			}
@@ -2444,6 +2456,7 @@ class DescentParser {
 				nodeType: "OverloadedProtocolMethod",
 				name,
 				signatures,
+				position,
 				documentation,
 			}
 		}

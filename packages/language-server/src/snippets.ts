@@ -19,7 +19,9 @@
 // they REFUSE: a cursor inside a `match` or a `define` is offered the handlers
 // and arms that belong there rather than the `function` and `namespace` a
 // statement position would offer, neither of which parses inside an
-// Expression.
+// Expression. `choice`, `overload` and `parameters` are refusals and nothing
+// else — a Case list, a list of signatures and a Parameter list each take one
+// shape of writing that no snippet here is.
 //
 // `top` is beside the sections rather than inside one — above the imports,
 // between the implementation and the tests, below the exports — which is where
@@ -38,8 +40,27 @@ export type SnippetContext =
 	| "import"
 	| "export"
 	| "expression"
+	| "method"
 	| "match"
 	| "define"
+	| "choice"
+	| "overload"
+	| "parameters"
+
+// NOTE: A context that is a NARROWER reading of another: everything the wider
+// one offers is offered here too, and a snippet that needs the narrower one
+// says so and is offered nowhere else. `method` is a value position inside a
+// Namespace Method or a provided Protocol Method, which is the one place `{ @
+// with … }` means anything — everywhere else it raises `at-outside-method`.
+const widerContext: Partial<Record<SnippetContext, SnippetContext>> = {
+	method: "expression",
+}
+
+// NOTE: The Module sections a file is made of. `implementation` stands for the
+// BODY section under either of its two spellings — a file that opened one has
+// no room for a `declarations { … }` beside it, and none for a second
+// `implementation { … }` either.
+export type ModuleSection = "implementation" | "tests" | "import" | "export"
 
 export type Snippet = {
 	// NOTE: What is typed to reach it, and the name it is written under in the
@@ -48,6 +69,11 @@ export type Snippet = {
 	description: string
 	body: Array<string>
 	contexts: Array<SnippetContext>
+	// NOTE: The sections the body OPENS, for the six that open one. A second
+	// `tests { … }` is a Diagnostic and so is a second implementation section,
+	// so a file that already writes one is not offered the snippet that writes
+	// it again — `tests-file` is the one body that writes two.
+	writes?: Array<ModuleSection>
 }
 
 // NOTE: What a body reads as before anything is typed: every tab stop's
@@ -106,7 +132,13 @@ export function renderPlaceholders(text: string, tabstop = ""): string {
 }
 
 export function snippetsFor(context: SnippetContext): Array<Snippet> {
-	return snippets.filter((snippet) => snippet.contexts.includes(context))
+	let wider = widerContext[context]
+
+	return snippets.filter(
+		(snippet) =>
+			snippet.contexts.includes(context) ||
+			(wider !== undefined && snippet.contexts.includes(wider)),
+	)
 }
 
 // NOTE: Ordered by what each one writes rather than alphabetically — a reader
@@ -120,6 +152,7 @@ export const snippets: Array<Snippet> = [
 		description: "An implementation block — the body of a Program.",
 		body: ["implementation {", "\t$0", "}"],
 		contexts: ["top"],
+		writes: ["implementation"],
 	},
 	{
 		prefix: "declarations",
@@ -127,6 +160,7 @@ export const snippets: Array<Snippet> = [
 			"A declarations block — the body of a standard library file.",
 		body: ["declarations {", "\t$0", "}"],
 		contexts: ["top"],
+		writes: ["implementation"],
 	},
 	{
 		prefix: "tests",
@@ -134,6 +168,7 @@ export const snippets: Array<Snippet> = [
 			"A tests block — written below the implementation, and dropped from every build.",
 		body: ["tests {", "\t$0", "}"],
 		contexts: ["top"],
+		writes: ["tests"],
 	},
 	{
 		prefix: "import",
@@ -141,6 +176,7 @@ export const snippets: Array<Snippet> = [
 			"An import block — every name this Module takes from another one.",
 		body: ["import {", '\tfrom "${1:./Module.es}" { ${0:Name} }', "}"],
 		contexts: ["top"],
+		writes: ["import"],
 	},
 	{
 		prefix: "export",
@@ -148,6 +184,7 @@ export const snippets: Array<Snippet> = [
 			"An export block — the names this Module offers; everything else stays private.",
 		body: ["export {", "\t${0:Name}", "}"],
 		contexts: ["top"],
+		writes: ["export"],
 	},
 	{
 		prefix: "tests-file",
@@ -165,6 +202,7 @@ export const snippets: Array<Snippet> = [
 			"}",
 		],
 		contexts: ["top"],
+		writes: ["import", "tests"],
 	},
 	{
 		prefix: "from",
@@ -339,7 +377,7 @@ export const snippets: Array<Snippet> = [
 		prefix: "type-generic",
 		description:
 			"A generic type alias — the Type Parameter is written at every use.",
-		body: ["type ${1:Name}<${2:Item}> = ${3:List}<${2:Item}>"],
+		body: ["type ${1:Name}<${2:Item}> = ${0:List}<${2:Item}>"],
 		contexts: ["implementation", "declarations"],
 	},
 	{
@@ -552,7 +590,7 @@ export const snippets: Array<Snippet> = [
 		prefix: "with-self",
 		description: "An update of `@`, the value a Method was called on.",
 		body: ["{ @ with ${1:member} = ${0:value} }"],
-		contexts: ["expression"],
+		contexts: ["method"],
 	},
 	{
 		prefix: "with-path",
@@ -656,10 +694,8 @@ export const snippets: Array<Snippet> = [
 			"A refinement doorway — the branch that proved the predicate is the only one reaching the operation demanding it.",
 		body: [
 			"if ${1:value}::${2:isNot}(${3:0}) {",
-			"\t<- ${4:proven}(${1:value})",
+			"\t<- ${0:proven}(${1:value})",
 			"}",
-			"",
-			"<- $0",
 		],
 		contexts: ["implementation"],
 	},

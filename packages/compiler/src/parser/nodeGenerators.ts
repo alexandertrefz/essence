@@ -629,6 +629,7 @@ export function namespaceDefinitionStatement(
 					nodeType: "OverloadedMethod",
 					name: curr.name,
 					methods: curr.methods,
+					position: curr.position,
 					documentation: curr.documentation,
 				}
 			} else if (curr.nodeType === "OverloadedStaticMethodNode") {
@@ -636,6 +637,7 @@ export function namespaceDefinitionStatement(
 					nodeType: "OverloadedStaticMethod",
 					name: curr.name,
 					methods: curr.methods,
+					position: curr.position,
 					documentation: curr.documentation,
 				}
 			} else if (curr.nodeType === "SimpleMethodSignatureNode") {
@@ -655,6 +657,7 @@ export function namespaceDefinitionStatement(
 					nodeType: "OverloadedMethodSignatures",
 					name: curr.name,
 					methods: curr.methods,
+					position: curr.position,
 					documentation: curr.documentation,
 				}
 			} else if (
@@ -664,6 +667,7 @@ export function namespaceDefinitionStatement(
 					nodeType: "OverloadedStaticMethodSignatures",
 					name: curr.name,
 					methods: curr.methods,
+					position: curr.position,
 					documentation: curr.documentation,
 				}
 			}
@@ -1183,6 +1187,7 @@ type OverloadedMethodNode = {
 	nodeType: "OverloadedMethodNode"
 	name: parser.IdentifierNode
 	methods: Array<parser.FunctionValueNode>
+	position: common.Position
 	documentation: common.Documentation | null
 }
 
@@ -1190,6 +1195,7 @@ type OverloadedStaticMethodNode = {
 	nodeType: "OverloadedStaticMethodNode"
 	name: parser.IdentifierNode
 	methods: Array<parser.FunctionValueNode>
+	position: common.Position
 	documentation: common.Documentation | null
 }
 
@@ -1211,6 +1217,7 @@ type OverloadedMethodSignaturesNode = {
 	nodeType: "OverloadedMethodSignaturesNode"
 	name: parser.IdentifierNode
 	methods: Array<parser.FunctionValueNode | parser.NativeMethodSignatureNode>
+	position: common.Position
 	documentation: common.Documentation | null
 }
 
@@ -1218,6 +1225,7 @@ type OverloadedStaticMethodSignaturesNode = {
 	nodeType: "OverloadedStaticMethodSignaturesNode"
 	name: parser.IdentifierNode
 	methods: Array<parser.FunctionValueNode | parser.NativeMethodSignatureNode>
+	position: common.Position
 	documentation: common.Documentation | null
 }
 

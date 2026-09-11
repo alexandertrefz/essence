@@ -755,10 +755,16 @@ export interface StaticMethod {
 	method: FunctionValueNode
 }
 
+// NOTE: The whole `overload name { … }` block, opening keyword through closing
+// brace. An overload group holds signatures and nothing else, so what a reader
+// may write between those braces is a question the Editor has to be able to
+// ask — and the entries alone can not answer it for a group that is still
+// empty.
 export interface OverloadedMethod {
 	nodeType: "OverloadedMethod"
 	name: IdentifierNode
 	methods: Array<FunctionValueNode>
+	position: Position
 	documentation: Documentation | null
 }
 
@@ -766,6 +772,7 @@ export interface OverloadedStaticMethod {
 	nodeType: "OverloadedStaticMethod"
 	name: IdentifierNode
 	methods: Array<FunctionValueNode>
+	position: Position
 	documentation: Documentation | null
 }
 
@@ -802,6 +809,7 @@ export interface OverloadedMethodSignatures {
 	nodeType: "OverloadedMethodSignatures"
 	name: IdentifierNode
 	methods: Array<FunctionValueNode | NativeMethodSignatureNode>
+	position: Position
 	documentation: Documentation | null
 }
 
@@ -809,6 +817,7 @@ export interface OverloadedStaticMethodSignatures {
 	nodeType: "OverloadedStaticMethodSignatures"
 	name: IdentifierNode
 	methods: Array<FunctionValueNode | NativeMethodSignatureNode>
+	position: Position
 	documentation: Documentation | null
 }
 
@@ -895,6 +904,7 @@ export interface OverloadedProtocolMethod {
 	nodeType: "OverloadedProtocolMethod"
 	name: IdentifierNode
 	signatures: Array<ProtocolMethodSignatureNode>
+	position: Position
 	documentation: Documentation | null
 }
 
@@ -902,6 +912,7 @@ export interface OverloadedStaticProtocolMethod {
 	nodeType: "OverloadedStaticProtocolMethod"
 	name: IdentifierNode
 	signatures: Array<ProtocolMethodSignatureNode>
+	position: Position
 	documentation: Documentation | null
 }
 

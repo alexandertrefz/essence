@@ -4,6 +4,7 @@ import * as path from "node:path"
 import { parseDocument } from "@essence-lang/compiler/documents"
 import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 
+import { analyse } from "../analyse"
 import { findCompletions } from "../completion"
 import {
 	renderPlaceholders,
@@ -27,8 +28,19 @@ const contexts: Array<SnippetContext> = [
 	"import",
 	"export",
 	"expression",
+	"method",
 	"match",
 	"define",
+]
+
+// NOTE: The contexts that exist to REFUSE — a Case list, a list of overload
+// signatures and a Parameter list each take one shape of writing, and no
+// snippet here is it. Written out so that a body claiming one fails the test
+// above rather than quietly being offered where nothing parses.
+const refusingContexts: Array<SnippetContext> = [
+	"choice",
+	"overload",
+	"parameters",
 ]
 
 // NOTE: The same walk `renderPlaceholders` takes, kept here rather than
@@ -79,6 +91,32 @@ describe("the snippet table", () => {
 		}
 	})
 
+	it("offers nothing in a context that exists to refuse", () => {
+		for (let context of refusingContexts) {
+			expect([context, snippetsFor(context)]).toEqual([context, []])
+		}
+	})
+
+	// NOTE: `$0` is where the Editor leaves the cursor once every tab stop has
+	// been visited, and a body without one leaves it at the end of what was
+	// written — which for a four-line scaffold is the line below it rather than
+	// the hole it opened. A body that IS a complete value has nothing left to
+	// fill in and says so by carrying none.
+	it("leaves the cursor somewhere in every body that opens a hole", () => {
+		const complete = new Set(["dictionary-empty"])
+
+		for (let snippet of snippets) {
+			let stops = (
+				snippet.body.join("\n").match(/\$(?:\{0[:}]|0(?![0-9]))/g) ?? []
+			).length
+
+			expect([snippet.prefix, stops]).toEqual([
+				snippet.prefix,
+				complete.has(snippet.prefix) ? 0 : 1,
+			])
+		}
+	})
+
 	it("writes well-formed placeholders", () => {
 		for (let snippet of snippets) {
 			let body = snippet.body.join("\n")
@@ -93,6 +131,27 @@ describe("the snippet table", () => {
 			expect([snippet.prefix, renderPlaceholders(body)]).toEqual([
 				snippet.prefix,
 				renderPlaceholders(body).replace(/\$/g, ""),
+			])
+		}
+	})
+
+	// NOTE: `implementation` covers the top of a section as well as a Function
+	// body, and the top of a section has nothing to return FROM. Every body
+	// offered there is held against the whole pipeline rather than against the
+	// Parser alone, because `top-level-return` is the Enricher's to report —
+	// the unknown names the placeholders leave behind are the reader's to fill
+	// in and are not.
+	it("returns from nothing at the top of a section", () => {
+		for (let snippet of snippetsFor("implementation")) {
+			let source = `implementation {\n${renderPlaceholders(
+				snippet.body.join("\n"),
+				"value",
+			)}\n}`
+			let codes = analyse(source).map((diagnostic) => diagnostic.code)
+
+			expect([snippet.prefix, codes]).toEqual([
+				snippet.prefix,
+				expect.not.arrayContaining(["top-level-return"]),
 			])
 		}
 	})
@@ -172,6 +231,17 @@ describe("every snippet body", () => {
 				return `implementation {\n\tconstant value = match subject -> Integer {\n${body}\n\t}\n}`
 			case "define":
 				return `implementation {\n\tconstant value = define {\n${body}\n\t\tas 0 otherwise\n\t}\n}`
+			// NOTE: An Expression inside a Namespace Method, which is the one
+			// place `@` names anything.
+			case "method":
+				return `implementation {\n\tnamespace Name for Integer {\n\t\tmethod() -> Integer {\n\t\t\tconstant value = ${body}\n\n\t\t\t<- 1\n\t\t}\n\t}\n}`
+			// NOTE: The three contexts that exist to REFUSE. No body lists one,
+			// so nothing is ever wrapped in them — a snippet that starts
+			// claiming one has to say here what it parses inside.
+			case "choice":
+			case "overload":
+			case "parameters":
+				throw new Error(`'${context}' offers no snippet to parse`)
 		}
 	}
 
@@ -206,12 +276,52 @@ describe("Snippet completion", () => {
 			column: 1,
 		})
 
-		expect(offered).toContain("implementation")
 		expect(offered).toContain("import")
 		expect(offered).toContain("tests")
 		expect(offered).toContain("tests-file")
 		expect(offered).not.toContain("constant")
 		expect(offered).not.toContain("case")
+	})
+
+	// NOTE: A Module has one of each section, so the snippet that opens one is
+	// an answer only where that section is missing — accepting it otherwise
+	// writes a second, which is a Diagnostic and four lines the reader deletes.
+	it("withholds a section the file already writes", () => {
+		let offered = snippetsAt(
+			["", "implementation {", "}", "", "tests {", "}"],
+			{ line: 1, column: 1 },
+		)
+
+		expect(offered).not.toContain("implementation")
+		expect(offered).not.toContain("declarations")
+		expect(offered).not.toContain("tests")
+		expect(offered).not.toContain("tests-file")
+		expect(offered).toContain("import")
+		expect(offered).toContain("export")
+	})
+
+	// NOTE: A file being started from scratch is the ONE document where the
+	// sections are the whole answer — and the Parser recovers it into a Program
+	// whose implementation section spans nothing, which used to read as a
+	// cursor standing inside a body that is not there.
+	it("offers the sections in a file with nothing in it", () => {
+		for (let lines of [[""], ["\n"], ["i"], ["§ only a comment", ""]]) {
+			let offered = snippetsAt(lines, { line: 1, column: 1 })
+
+			expect([lines, offered]).toEqual([
+				lines,
+				expect.arrayContaining([
+					"implementation",
+					"import",
+					"tests",
+					"tests-file",
+				]),
+			])
+			expect([lines, offered]).toEqual([
+				lines,
+				expect.not.arrayContaining(["constant", "function"]),
+			])
+		}
 	})
 
 	it("offers the Statements of an implementation body", () => {
@@ -410,6 +520,75 @@ describe("Snippet completion", () => {
 		expect(offered).toEqual([])
 	})
 
+	// NOTE: A Handler that has just been opened has written no Statement, so it
+	// spans nothing of its own and the `match` around it used to answer — which
+	// offered the `case` that goes OUTSIDE the Handler to a reader standing
+	// inside it. An empty body is spanned from its Matcher to the next Handler
+	// instead.
+	it("reads an empty match Handler as a Statement body", () => {
+		let offered = snippetsAt(
+			[
+				"implementation {",
+				"\tconstant value = match subject -> Integer {",
+				"\t\tcase 0 {",
+				"\t\t\t",
+				"\t\t}",
+				"\t}",
+				"}",
+			],
+			{ line: 4, column: 4 },
+		)
+
+		expect(offered).toContain("constant")
+		expect(offered).not.toContain("case")
+	})
+
+	// NOTE: And a Choice's body, which takes a list of Cases and nothing else.
+	it("offers nothing between a Choice's Cases", () => {
+		let offered = snippetsAt(
+			["implementation {", "\tchoice Name {", "\t\t", "\t}", "}"],
+			{ line: 3, column: 3 },
+		)
+
+		expect(offered).toEqual([])
+	})
+
+	// NOTE: And an `overload` group, which takes signatures. Every member the
+	// Namespace around it offers is a Parser Diagnostic written between those
+	// braces.
+	it("offers nothing inside an overload group", () => {
+		let offered = snippetsAt(
+			[
+				"implementation {",
+				"\tnamespace Name for Integer {",
+				"\t\toverload thing {",
+				"\t\t\t",
+				"\t\t}",
+				"\t}",
+				"}",
+			],
+			{ line: 4, column: 4 },
+		)
+
+		expect(offered).toEqual([])
+	})
+
+	// NOTE: And a Parameter list, which is neither a Statement position nor a
+	// value one — a name, a Type and a default are the whole of what goes
+	// there. A default IS a value, and keeps the values.
+	it("offers nothing inside a written Parameter list", () => {
+		let signature = [
+			"implementation {",
+			"\tfunction f(a: Integer, b: Integer = 1) -> Integer { <- a }",
+			"}",
+		]
+
+		expect(snippetsAt(signature, { line: 2, column: 14 })).toEqual([])
+		expect(snippetsAt(signature, { line: 2, column: 38 })).toContain(
+			"record",
+		)
+	})
+
 	// NOTE: The bodies reach the Editor as snippet text, which is what makes a
 	// tab stop a tab stop rather than four literal characters.
 	it("hands the body over as snippet text, and says what it writes", () => {
@@ -481,8 +660,26 @@ describe("the contexts", () => {
 	it("answers with only the bodies that named the context", () => {
 		for (let context of contexts) {
 			for (let snippet of snippetsFor(context)) {
-				expect(snippet.contexts).toContain(context)
+				// NOTE: `method` is a narrower reading of `expression`, so it
+				// answers with what a value position answers with besides its
+				// own — see `widerContext`.
+				expect(snippet.contexts).toContain(
+					context === "method" && !snippet.contexts.includes("method")
+						? "expression"
+						: context,
+				)
 			}
 		}
+	})
+
+	// NOTE: And the narrowing itself: everything a value position offers is
+	// offered inside a Method, and `{ @ with … }` is offered nowhere else.
+	it("offers a Method body everything a value position offers", () => {
+		let value = snippetsFor("expression").map((snippet) => snippet.prefix)
+		let method = snippetsFor("method").map((snippet) => snippet.prefix)
+
+		expect(method).toEqual(expect.arrayContaining(value))
+		expect(method).toContain("with-self")
+		expect(value).not.toContain("with-self")
 	})
 })

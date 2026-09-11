@@ -10802,6 +10802,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
               },
             },
             "nodeType": "OverloadedStaticMethod",
+            "position": {
+              "end": {
+                "column": 10,
+                "line": 11,
+              },
+              "start": {
+                "column": 9,
+                "line": 3,
+              },
+            },
           },
         },
         "name": {
@@ -11359,6 +11369,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
               },
             },
             "nodeType": "OverloadedStaticMethod",
+            "position": {
+              "end": {
+                "column": 10,
+                "line": 15,
+              },
+              "start": {
+                "column": 9,
+                "line": 3,
+              },
+            },
           },
         },
         "name": {
@@ -13124,6 +13144,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
               },
             },
             "nodeType": "OverloadedStaticMethod",
+            "position": {
+              "end": {
+                "column": 10,
+                "line": 11,
+              },
+              "start": {
+                "column": 9,
+                "line": 3,
+              },
+            },
           },
         },
         "name": {
@@ -13707,6 +13737,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
               },
             },
             "nodeType": "OverloadedStaticMethod",
+            "position": {
+              "end": {
+                "column": 10,
+                "line": 15,
+              },
+              "start": {
+                "column": 9,
+                "line": 3,
+              },
+            },
           },
         },
         "name": {
@@ -15144,6 +15184,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
               },
             },
             "nodeType": "OverloadedMethod",
+            "position": {
+              "end": {
+                "column": 10,
+                "line": 11,
+              },
+              "start": {
+                "column": 9,
+                "line": 3,
+              },
+            },
           },
         },
         "name": {
@@ -15727,6 +15777,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
               },
             },
             "nodeType": "OverloadedMethod",
+            "position": {
+              "end": {
+                "column": 10,
+                "line": 15,
+              },
+              "start": {
+                "column": 9,
+                "line": 3,
+              },
+            },
           },
         },
         "name": {
@@ -17060,6 +17120,16 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
               },
             },
             "nodeType": "OverloadedProtocolMethod",
+            "position": {
+              "end": {
+                "column": 9,
+                "line": 6,
+              },
+              "start": {
+                "column": 8,
+                "line": 3,
+              },
+            },
             "signatures": [
               {
                 "body": null,
@@ -17390,6 +17460,16 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
               },
             },
             "nodeType": "OverloadedStaticProtocolMethod",
+            "position": {
+              "end": {
+                "column": 9,
+                "line": 6,
+              },
+              "start": {
+                "column": 8,
+                "line": 3,
+              },
+            },
             "signatures": [
               {
                 "body": null,

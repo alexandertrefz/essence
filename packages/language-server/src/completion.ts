@@ -56,8 +56,9 @@ import {
 	type SymbolSpace,
 } from "./rename"
 import { typedProgramBodies, typedProgramNodes } from "./sections"
-import { snippetContextAt } from "./snippetContext"
+import { snippetContextAt, writtenSections } from "./snippetContext"
 import {
+	type ModuleSection,
 	renderPlaceholders,
 	type SnippetContext,
 	snippetsFor,
@@ -275,7 +276,10 @@ export function findCompletions(
 			// a workspace nobody indexed, and a path being written for a file
 			// that is not there yet.
 			...(sectionCursor.at === "members"
-				? snippetCompletions(sectionCursor.section)
+				? snippetCompletions({
+						context: sectionCursor.section,
+						written: new Set<ModuleSection>(),
+					})
 				: []),
 		]
 	}
@@ -2450,18 +2454,28 @@ function keywordCompletions(headText: string): Array<CompletionEntry> {
 // is one word the reader deletes, while a snippet is four lines of scaffold
 // written into a block that can not hold it. `snippetContextAt` is what answers
 // it — see the NOTE there.
-function snippetCompletions(context: SnippetContext): Array<CompletionEntry> {
-	return snippetsFor(context).map((snippet) => ({
-		label: snippet.prefix,
-		kind: "snippet" as const,
-		detail: snippet.description,
-		// NOTE: The head of the body as it will be written, so that the list
-		// says what a prefix expands to without expanding it — which is the
-		// one thing the label can not carry.
-		labelDetail: renderPlaceholders(snippet.body[0] ?? ""),
-		insertText: snippet.body.join("\n"),
-		tier: completionTiers.snippet,
-	}))
+function snippetCompletions(scope: {
+	context: SnippetContext
+	written: Set<ModuleSection>
+}): Array<CompletionEntry> {
+	return snippetsFor(scope.context)
+		.filter(
+			(snippet) =>
+				!(snippet.writes ?? []).some((section) =>
+					scope.written.has(section),
+				),
+		)
+		.map((snippet) => ({
+			label: snippet.prefix,
+			kind: "snippet" as const,
+			detail: snippet.description,
+			// NOTE: The head of the body as it will be written, so that the
+			// list says what a prefix expands to without expanding it — which
+			// is the one thing the label can not carry.
+			labelDetail: renderPlaceholders(snippet.body[0] ?? ""),
+			insertText: snippet.body.join("\n"),
+			tier: completionTiers.snippet,
+		}))
 }
 
 // NOTE: The document's own Program answers this, and it is already in hand
@@ -2474,7 +2488,7 @@ function snippetContextOf(
 	document: DocumentAnalysis | null,
 	headText: string,
 	cursor: common.Cursor,
-): SnippetContext {
+): { context: SnippetContext; written: Set<ModuleSection> } {
 	let atStatementStart = isAtStatementStart(headText)
 
 	try {
@@ -2482,9 +2496,15 @@ function snippetContextOf(
 			document?.program ??
 			parseDocument(documentText, documentPath).program
 
-		return snippetContextAt(program, cursor, atStatementStart)
+		return {
+			context: snippetContextAt(program, cursor, atStatementStart),
+			written: writtenSections(program),
+		}
 	} catch {
-		return snippetContextAt(null, cursor, atStatementStart)
+		return {
+			context: snippetContextAt(null, cursor, atStatementStart),
+			written: writtenSections(null),
+		}
 	}
 }
 

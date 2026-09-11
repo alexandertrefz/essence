@@ -221,7 +221,7 @@
 	"type-generic": {
 		"prefix": "type-generic",
 		"body": [
-			"type ${1:Name}<${2:Item}> = ${3:List}<${2:Item}>"
+			"type ${1:Name}<${2:Item}> = ${0:List}<${2:Item}>"
 		],
 		"description": "A generic type alias — the Type Parameter is written at every use."
 	},
@@ -534,10 +534,8 @@
 		"prefix": "narrow",
 		"body": [
 			"if ${1:value}::${2:isNot}(${3:0}) {",
-			"\t<- ${4:proven}(${1:value})",
-			"}",
-			"",
-			"<- $0"
+			"\t<- ${0:proven}(${1:value})",
+			"}"
 		],
 		"description": "A refinement doorway — the branch that proved the predicate is the only one reaching the operation demanding it."
 	},

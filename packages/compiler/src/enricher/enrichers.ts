@@ -8247,6 +8247,7 @@ function enrichMethods(
 						nodeType,
 						name: memberValue.name,
 						methods: bodied,
+						position: memberValue.position,
 						documentation: memberValue.documentation,
 					},
 					scope,
