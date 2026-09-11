@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+- Every block of the language is a snippet now — seventy-seven of them, where
+  there were twenty-five — and the Language Server offers each one where it
+  parses and nowhere else: `static` and `overload` inside a Namespace body,
+  `expect` and `require` inside a test, `with` and a closure where a value
+  goes, a `case` handler between a `match`'s braces. The Keyword and the block
+  that share a name stand side by side in the list, told apart by their icons,
+  and each entry says what accepting it writes. The bundled `.code-snippets`
+  file is generated from that same table, so what a reader who switches the
+  Server off expands is what it offers.
+- The test vocabulary is lit: the `tagged`, `skipped` and `focused` Modifiers,
+  the `across` of a table test, the `matches snapshot` of an assertion and the
+  `from` of a named one, and `@example` beside `@param` and `@returns` in a
+  documentation block. A Match Guard whose Condition begins with a lowercase
+  name — `case { x, y } where x::is(y)` — is lit like every other `where` as
+  well, where it used to read as ordinary text.
 - A project's settings live in one file at its root, `essence.json`, and the
   editor reads the same one `essence test` does. `exclude` names the
   directories that are not its sources — the Problems panel stays out of them
