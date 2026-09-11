@@ -1093,6 +1093,106 @@ describe("Code Actions asked for one kind", () => {
 	})
 })
 
+// NOTE: What a client can APPLY is not what the Server can compute, and the
+// protocol says both shapes of a Workspace Edit are the client's to allow: an
+// editor that never advertised `documentChanges` silently applies nothing when
+// it is sent one, and one whose `resourceOperations` omit `create` can not be
+// handed an action that writes a file. VS Code advertises both, so none of this
+// is about VS Code — it is about the editors on the roadmap.
+describe("Code Actions for a client that can apply less", () => {
+	const source = [
+		"implementation {",
+		"\tconstant answer = 42",
+		"}",
+		"",
+		"export {",
+		"\tanswer",
+		"}",
+		"",
+	].join("\n")
+
+	async function actionsFor(
+		session: LspSession,
+		uri: string,
+	): Promise<Array<CodeAction>> {
+		let { result } = await session.request<Array<CodeAction>>(
+			CodeActionRequest.type,
+			{
+				textDocument: { uri },
+				range: {
+					start: { line: 1, character: 10 },
+					end: { line: 1, character: 16 },
+				},
+				context: { diagnostics: [] },
+			},
+		)
+
+		return result
+	}
+
+	async function inSession(
+		workspace: object | undefined,
+	): Promise<Array<CodeAction>> {
+		let files = makeSessionWorkspace({ "Main.es": source })
+		let session = startSession()
+
+		try {
+			if (workspace === undefined) {
+				await session.initialize([files.root])
+			} else {
+				await session.initialize([files.root], workspace)
+			}
+
+			await session.open(files.pathOf("Main.es"), source)
+			await session.settle()
+
+			return await actionsFor(session, uriOf(files.pathOf("Main.es")))
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	}
+
+	it("withholds the action that creates a file, and answers changes", async () => {
+		let full = await inSession(undefined)
+		let plain = await inSession({ workspaceFolders: true })
+
+		// NOTE: The move to a NEW Module is the one action in this Server that
+		// writes a file that is not there yet.
+		expect(full.map((action) => action.title)).toContain(
+			"Move 'answer' to a new Module",
+		)
+		expect(plain.map((action) => action.title)).not.toContain(
+			"Move 'answer' to a new Module",
+		)
+
+		// NOTE: And everything that is left reaches such a client in the shape
+		// it does take — a map of files, and no resource operation beside it.
+		expect(plain.length).toBeGreaterThan(0)
+		expect(
+			plain.every(
+				(action) =>
+					action.edit === undefined ||
+					(action.edit.changes !== undefined &&
+						action.edit.documentChanges === undefined),
+			),
+		).toBe(true)
+	})
+
+	// NOTE: `documentChanges` without `create` is the other half: the shape is
+	// allowed, the operation is not.
+	it("withholds the creation from a client that only edits documents", async () => {
+		let edits = await inSession({
+			workspaceFolders: true,
+			workspaceEdit: { documentChanges: true },
+		})
+
+		expect(edits.map((action) => action.title)).not.toContain(
+			"Move 'answer' to a new Module",
+		)
+	})
+})
+
 // NOTE: A list of protocol TextEdits applied to a buffer. The protocol counts
 // lines and characters from zero and requires the edits not to overlap, so they
 // are applied from the back and nothing has to be shifted.

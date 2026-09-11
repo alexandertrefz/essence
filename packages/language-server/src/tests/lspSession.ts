@@ -127,20 +127,31 @@ export function startSession() {
 	})
 	client.listen()
 
-	async function initialize(folders: Array<string>): Promise<void> {
+	// NOTE: The capabilities a client advertises decide what the Server may
+	// send it, so the default here is VS Code's: it takes a Workspace Edit in
+	// either shape and creates the files one asks it to. A test about an editor
+	// that can do LESS says so, by handing its own `workspace` block over — the
+	// whole block, so that what such a client says is written out rather than
+	// merged with a default nobody reads.
+	async function initialize(
+		folders: Array<string>,
+		workspace: object = {
+			workspaceFolders: true,
+			// NOTE: False on purpose: a client that answers no configuration
+			// request is the case the Server has to keep its Inlay Hints under,
+			// and it is one less round trip between a keystroke and a
+			// measurement.
+			configuration: false,
+			workspaceEdit: {
+				documentChanges: true,
+				resourceOperations: ["create", "rename", "delete"],
+			},
+		},
+	): Promise<void> {
 		await client.sendRequest(InitializeRequest.type, {
 			processId: null,
 			rootUri: null,
-			capabilities: {
-				workspace: {
-					workspaceFolders: true,
-					// NOTE: False on purpose: a client that answers no
-					// configuration request is the case the Server has to keep
-					// its Inlay Hints under, and it is one less round trip
-					// between a keystroke and a measurement.
-					configuration: false,
-				},
-			},
+			capabilities: { workspace },
 			workspaceFolders: folders.map((folder) => ({
 				uri: uriOf(folder),
 				name: path.basename(folder),

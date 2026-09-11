@@ -442,6 +442,19 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// had.
 	let inlayHintsEnabled = true
 	let clientSupportsConfiguration = false
+	// NOTE: What the client can APPLY, which is not the same question as what
+	// the Server can compute. A Workspace Edit carries its edits one of two
+	// ways: `changes`, a map of files, which every client takes; and
+	// `documentChanges`, which also carries RESOURCE OPERATIONS — creating a
+	// file, renaming one — and which the protocol allows only where the client
+	// said so. VS Code says yes to both, so nothing here is about VS Code; it
+	// is about the editors on the roadmap, where sending the shape a client
+	// never advertised means it silently applies nothing at all.
+	//
+	// Both default to false, which is what the protocol says an absent
+	// capability means.
+	let clientSupportsDocumentChanges = false
+	let clientCreatesFiles = false
 	// NOTE: The live test session. It compiles and runs in a Worker of its own,
 	// so everything the Server does with it is bookkeeping: which files changed,
 	// what to publish, what to draw. Off by a setting, because running a
@@ -655,6 +668,14 @@ export function startServer(options: { connection?: Connection } = {}) {
 		loadStdlib()
 		clientSupportsConfiguration =
 			params.capabilities.workspace?.configuration === true
+
+		let workspaceEdit = params.capabilities.workspace?.workspaceEdit
+
+		clientSupportsDocumentChanges = workspaceEdit?.documentChanges === true
+		clientCreatesFiles =
+			clientSupportsDocumentChanges &&
+			(workspaceEdit?.resourceOperations ?? []).includes("create")
+
 		workspace.setFolders(
 			params.workspaceFolders?.map((folder) =>
 				documentFilePath(folder.uri),
@@ -1959,8 +1980,20 @@ export function startServer(options: { connection?: Connection } = {}) {
 		params: CodeActionParams,
 	): Array<CodeAction> {
 		return entries
-			.filter((entry) => isRequestedKind(entry.kind, params.context.only))
-			.map((entry) => toLspCodeAction(entry, params))
+			.filter(
+				(entry) =>
+					isRequestedKind(entry.kind, params.context.only) &&
+					// NOTE: An action that writes a file the workspace does not
+					// have yet is withheld from a client that can not create
+					// one. There is no second shape for it — a text edit can
+					// not create the file it edits — so what such a client
+					// would be handed is an offer that quietly does nothing.
+					(clientCreatesFiles ||
+						!entry.edits.some((edit) => edit.createFile === true)),
+			)
+			.map((entry) =>
+				toLspCodeAction(entry, params, clientSupportsDocumentChanges),
+			)
 	}
 
 	connection.onFoldingRanges((params) => {
@@ -3093,6 +3126,11 @@ const codeActionKinds: Record<CodeActionEntry["kind"], CodeActionKind> = {
 export function toLspCodeAction(
 	entry: CodeActionEntry,
 	params: CodeActionParams,
+	// NOTE: What the client said it can apply at `initialize`. False answers
+	// with `changes`, the map of files every client takes. Defaulted to true
+	// for the callers that are not a live session — the specs, which assert on
+	// the richer shape.
+	documentChanges = true,
 ): CodeAction {
 	let position = entry.diagnosticPosition
 
@@ -3111,7 +3149,7 @@ export function toLspCodeAction(
 								toLspRange(position),
 							),
 					),
-		edit: workspaceEditOf(entry, params),
+		edit: workspaceEditOf(entry, params, documentChanges),
 		// NOTE: Handed through untouched. What a command does happens in the
 		// Editor after the edits land — an extraction opens rename on the name
 		// it just invented — and there is no edit that puts a cursor anywhere.
@@ -3130,11 +3168,16 @@ export function toLspCodeAction(
 function workspaceEditOf(
 	entry: CodeActionEntry,
 	params: CodeActionParams,
+	documentChanges: boolean,
 ): WorkspaceEdit {
 	let changes = changesOf(entry, params)
 	let created = entry.edits.filter((edit) => edit.createFile === true)
 
-	if (created.length === 0) {
+	// NOTE: And a client that never advertised `documentChanges` is answered
+	// with `changes` whatever the action is. The only action that NEEDS the
+	// other shape is the one creating a file, and `offered` has already
+	// withheld that from a client that can not create one.
+	if (created.length === 0 || !documentChanges) {
 		return { changes }
 	}
 
