@@ -28,7 +28,8 @@ describe("revealForRename", () => {
 		await revealForRename(URI, { line: 4, character: 9 })
 
 		expect(stub.shownDocuments).toHaveLength(1)
-		expect(stub.shownDocuments[0]!.uri.fsPath).toBe(URI)
+		expect(stub.shownDocuments[0]!.uri.fsPath).toBe("/repo/Season.es")
+		expect(stub.shownDocuments[0]!.uri.toString()).toBe(URI)
 
 		let selection = stub.shownDocuments[0]!.options?.selection as StubRange
 

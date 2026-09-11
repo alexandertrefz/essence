@@ -374,7 +374,21 @@ describe("LSP", () => {
 								},
 								{
 									scheme: "file",
+									pattern: {
+										glob: "**/.*/**/*.es",
+										matches: "file",
+									},
+								},
+								{
+									scheme: "file",
 									pattern: { glob: "**", matches: "folder" },
+								},
+								{
+									scheme: "file",
+									pattern: {
+										glob: "**/.*/**",
+										matches: "folder",
+									},
 								},
 							],
 						},

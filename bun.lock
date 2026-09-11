@@ -173,6 +173,7 @@
         "@essence-lang/language-server": "0.5.0",
         "@essence-lang/standard-library": "0.5.0",
         "@vscode/vsce": "3.9.2",
+        "minimatch": "10.2.5",
         "vscode-languageclient": "9.0.1",
       },
     },

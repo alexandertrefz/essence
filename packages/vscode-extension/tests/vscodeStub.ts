@@ -518,7 +518,29 @@ export function createStub(): Stub {
 		},
 		Uri: {
 			file: uriOf,
-			parse: (value: string) => ({ ...uriOf(value), scheme: "data" }),
+			// NOTE: A URI taken apart the way the real one does, because what a
+			// spec asserts on is `fsPath` — and a stub answering the raw string
+			// there lets an assertion hold for a value VS Code could never
+			// produce. `file:///repo/Season.es` has an `fsPath` of
+			// `/repo/Season.es`; anything else keeps the whole of what it was
+			// handed, which is what a scheme with no path behind it is.
+			parse: (value: string) => {
+				let file = /^file:\/\/[^/]*(\/.*)$/.exec(value)
+
+				if (file === null) {
+					return {
+						fsPath: value,
+						scheme: value.split(":")[0] ?? "",
+						toString: () => value,
+					}
+				}
+
+				return {
+					fsPath: decodeURIComponent(file[1] as string),
+					scheme: "file",
+					toString: () => value,
+				}
+			},
 		},
 		Range: StubRangeValue,
 		Location: class {

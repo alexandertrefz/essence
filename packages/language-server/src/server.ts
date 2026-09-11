@@ -207,10 +207,18 @@ export const serverCapabilities: ServerCapabilities = {
 		// rewritten in one edit with the move rather than repaired after it —
 		// the file is never on disk under a name nothing points at.
 		//
-		// Two filters, because the client only asks about what a filter
+		// Four filters, because the client only asks about what a filter
 		// matches: the sources themselves, and every folder, since renaming a
 		// directory is one request about the directory and not one per file
 		// inside it. A folder holding no Essence answers with nothing.
+		//
+		// And each of the two again for a path with a DOT SEGMENT in it. The
+		// client matches these globs with minimatch's defaults, where `*` and
+		// `**` decline to cross a segment beginning with a `.` — so a project
+		// living under `~/.local/…`, or a source in a `.generated/` folder,
+		// would never be asked about and its dependents' specifiers would go
+		// stale on a rename with nothing said. `FileOperationPatternOptions`
+		// carries only `ignoreCase`, so the glob is what has to say it.
 		fileOperations: {
 			willRename: {
 				filters: [
@@ -220,7 +228,15 @@ export const serverCapabilities: ServerCapabilities = {
 					},
 					{
 						scheme: "file",
+						pattern: { glob: "**/.*/**/*.es", matches: "file" },
+					},
+					{
+						scheme: "file",
 						pattern: { glob: "**", matches: "folder" },
+					},
+					{
+						scheme: "file",
+						pattern: { glob: "**/.*/**", matches: "folder" },
 					},
 				],
 			},
