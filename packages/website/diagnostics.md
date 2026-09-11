@@ -1124,6 +1124,14 @@ subject to it — it exists before any initialiser runs, so a Property's value m
 call one whichever order the two are written in — and neither is a Function
 literal written in an initialiser, whose body runs when it is called.
 
+**Quick Fix — "Move this Statement below 'X'":** cuts the top-level Statement
+the use was written in — its `§§` block included — and writes it back below the
+Namespace's Declaration. Never preferred: a Statement moved past the
+Declarations between the two can no longer see them, and anything below it that
+reads what it declares now reads it too early. Not offered for a Property read
+from another Property's initialiser, where what would move is a member of a
+Namespace and the Parser records no span for one.
+
 ### `unknown-name`
 
 A Variable or Constant that was never declared. The Diagnostic suggests the

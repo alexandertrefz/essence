@@ -3775,6 +3775,94 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("use-before-declaration", () => {
+		it("should move the Statement below the Namespace it names", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant total = Maths.zero",
+				"",
+				"\tnamespace Maths {",
+				"\t\tstatic zero: Integer = 0",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Move this Statement below 'Maths'")
+			expect(fix.diagnosticCode).toBe("use-before-declaration")
+			// NOTE: Moving a Statement changes what it can see and what can see
+			// it, so the reader decides rather than the Editor.
+			expect(fix.isPreferred).toBe(false)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tnamespace Maths {",
+				"\t\tstatic zero: Integer = 0",
+				"\t}",
+				"",
+				"\tconstant total = Maths.zero",
+				"}",
+			])
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A `§§` block is a run of Comments directly above what it
+		// documents, so it travels with the Statement the way any Comment
+		// glued to a block does.
+		it("should take the Statement's documentation along", () => {
+			let lines = [
+				"implementation {",
+				"\t§§ The running total.",
+				"\tconstant total = Maths.zero",
+				"",
+				"\tnamespace Maths {",
+				"\t\tstatic zero: Integer = 0",
+				"\t}",
+				"",
+				"\tconstant other = 2",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tnamespace Maths {",
+				"\t\tstatic zero: Integer = 0",
+				"\t}",
+				"",
+				"\t§§ The running total.",
+				"\tconstant total = Maths.zero",
+				"",
+				"\tconstant other = 2",
+				"}",
+			])
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: The same code covers a Property read from another Property's
+		// initialiser. What would move there is a member of a Namespace, and
+		// the Parser records no span for one.
+		it("should offer nothing for a Property read too early", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Maths {",
+				"\t\tstatic doubled: Integer = Maths.zero",
+				"\t\tstatic zero: Integer = 0",
+				"\t}",
+				"}",
+			]
+
+			expect(codesOf(lines)).toEqual(["use-before-declaration"])
+			expect(titles(quickFixes(lines))).toEqual([])
+		})
+	})
+
 	describe("Type annotations", () => {
 		it("should offer the inferred Type of a Constant as an edit", () => {
 			let lines = ["implementation {", '\tconstant name = "Ada"', "}"]

@@ -8,10 +8,10 @@ import {
 	closingBraceAfter,
 	closingBraceOf,
 	closingBracketEdit,
-	containsRange,
 	commaAfter,
 	commaBefore,
 	commentRunAbove,
+	containsRange,
 	endOfContents,
 	extendOverLeadingBreak,
 	extendOverLeadingSpace,
@@ -1754,6 +1754,71 @@ export function moveTestsSectionAction(
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
 		isPreferred: true,
+		edits,
+	}
+}
+
+// NOTE: The top-level Statement a use was written in, moved below the
+// Declaration it reaches for. Both are top-level: what the Diagnostic is about
+// is the order two of them RUN in, and a Statement nested in another runs when
+// that one does — so what has to move is the one the implementation block
+// holds, whatever the use is buried in.
+//
+// NOT preferred, and this is the fix here where that matters most. A Statement
+// moved past the Declarations between it and its destination can no longer see
+// them, and anything below it that reads what IT declares now reads it too
+// early. The Compiler says so on the next analysis; an Editor applying a
+// preferred fix without asking would have made the change before anybody read
+// it.
+//
+// A Property read from another Property's initialiser carries the same code and
+// gets no action: what would move is a member of a Namespace, and the Parser
+// records no span for one.
+export function moveDeclarationAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+	lines: Array<string>,
+): CodeActionEntry | null {
+	let declared = diagnostic.labels.find(
+		(label) => label.kind === "secondary",
+	)?.position
+
+	if (declared === undefined) {
+		return null
+	}
+
+	let statements = program.implementation.nodes
+	// NOTE: Matched on the buffer as well as on the Position, as every edit
+	// here is: a name that no longer reads the way the Node says it does is a
+	// Position from a stale analysis pointing at other text.
+	let declaration = statements.findIndex(
+		(node) =>
+			node.nodeType === "NamespaceDefinitionStatement" &&
+			isSamePosition(node.name.position, declared) &&
+			sliceOf(lines, declared) === node.name.content,
+	)
+	let use = statements.findIndex((node) =>
+		containsRange(node.position, diagnostic.position),
+	)
+
+	if (declaration === -1 || use === -1 || use > declaration) {
+		return null
+	}
+
+	let edits = moveBlockEdits(lines, statements[use]!.position, {
+		below: statements[declaration]!.position.end.line,
+	})
+
+	if (edits === null) {
+		return null
+	}
+
+	return {
+		title: `Move this Statement below '${sliceOf(lines, declared)}'`,
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: false,
 		edits,
 	}
 }

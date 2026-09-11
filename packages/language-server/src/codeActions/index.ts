@@ -33,6 +33,7 @@ import {
 	importActions,
 	missingCaseAction,
 	missingMembersAction,
+	moveDeclarationAction,
 	moveModuleSectionAction,
 	moveTestsSectionAction,
 	namespaceImportActions,
@@ -411,6 +412,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(boundParameterAction(diagnostic, program)),
 	"unused-import": ({ diagnostic, program, lines }) =>
 		listed(removeImportAction(diagnostic, program, lines)),
+	"use-before-declaration": ({ diagnostic, program, lines }) =>
+		listed(moveDeclarationAction(diagnostic, program, lines)),
 	"value-comment-outside-tests": ({ diagnostic, lines }) =>
 		listed(ordinaryCommentAction(diagnostic, lines)),
 	"where-on-protocol-extension": ({ diagnostic, program, lines }) =>
