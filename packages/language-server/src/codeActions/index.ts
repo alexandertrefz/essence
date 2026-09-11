@@ -3,8 +3,6 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { type Analysis, analyseDocument, documentFilePath } from "../analyse"
 import { indexProgram, type ProgramIndex } from "../rename"
 import type { Workspace } from "../workspace"
-import { extractConstantActions } from "./extractConstant"
-import { extractFunctionActions } from "./extractFunction"
 import {
 	compareWrittenValueAction,
 	matcherBeforeValueAction,
@@ -25,6 +23,8 @@ import {
 } from "./defineFixes"
 import { defineActions } from "./defines"
 import { documentFunctionActions } from "./documentFunction"
+import { extractConstantActions } from "./extractConstant"
+import { extractFunctionActions } from "./extractFunction"
 import {
 	argumentLabelAction,
 	binderToScrutineeAction,
@@ -246,7 +246,12 @@ export function findCodeActions(
 	entries.push(...matchOnValueActions(enrichedProgram, lines, range))
 	entries.push(...shorthandActions(program, lines, range))
 
-	let indexed = programIndexer(program, enrichedProgram)
+	let indexed = programIndexer(
+		program,
+		enrichedProgram,
+		workspace,
+		documentPath,
+	)
 
 	entries.push(
 		...extractConstantActions(program, lines, range, indexed, documentPath),
@@ -283,13 +288,39 @@ export function findCodeActions(
 // A function rather than a `let` beside the call, because a closure over a
 // `let` reads its declared Type: the Program is known not to be null HERE, and
 // a thunk written inline would have to say so again.
+//
+// The Workspace's own is taken where there is one, as Completion and Semantic
+// Tokens take it: it is the same index Document Highlight and Rename read, built
+// once per version of the file. A caller with no Workspace behind it — the
+// tests, an embedder — gets one built here, which is what this always did.
 function programIndexer(
 	program: parser.Program,
 	enrichedProgram: common.typed.Program | null,
+	workspace: Workspace | undefined,
+	documentPath: string | undefined,
 ): () => ProgramIndex {
 	let index: ProgramIndex | null = null
 
-	return () => (index ??= indexProgram(program, enrichedProgram))
+	return () => {
+		if (index === null) {
+			index =
+				heldIndex(workspace, documentPath) ??
+				indexProgram(program, enrichedProgram)
+		}
+
+		return index
+	}
+}
+
+function heldIndex(
+	workspace: Workspace | undefined,
+	documentPath: string | undefined,
+): ProgramIndex | null {
+	if (workspace === undefined || documentPath === undefined) {
+		return null
+	}
+
+	return workspace.indexOf(documentFilePath(documentPath))
 }
 
 // NOTE: Everything a fix is allowed to read: the Diagnostic it answers, the
