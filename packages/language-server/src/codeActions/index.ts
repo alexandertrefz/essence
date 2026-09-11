@@ -63,6 +63,7 @@ import {
 	implementProtocolActions,
 } from "./implementProtocol"
 import { organizeImportActions } from "./imports"
+import { inlineConstantActions } from "./inlineConstant"
 import {
 	closeStringAction,
 	documentationSeparatorAction,
@@ -248,6 +249,7 @@ export function findCodeActions(
 	entries.push(
 		...extractConstantActions(program, lines, range, indexed, documentPath),
 	)
+	entries.push(...inlineConstantActions(program, lines, range, indexed))
 	entries.push(...pathActions(program, () => indexed().scopes, lines, range))
 	entries.push(...defineActions(program, lines, range))
 	entries.push(...payloadActions(program, enrichedProgram, lines, range))

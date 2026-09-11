@@ -6090,3 +6090,192 @@ describe("Extract to a Constant", () => {
 		).toEqual([])
 	})
 })
+
+describe("Inline a Constant", () => {
+	function inlines(
+		lines: Array<string>,
+		range: common.Position,
+	): Array<CodeActionEntry> {
+		return refactorsOf(lines, range, "refactor.inline")
+	}
+
+	it("writes the value into every read and takes the declaration away", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction total(_ scores: List<Integer>) -> Integer {",
+			"\t\tconstant fallback = 0::subtract(1)",
+			"",
+			"\t\t<- scores::highestItem(defaultingTo fallback)",
+			"\t}",
+			"}",
+		]
+
+		let [action] = inlines(lines, rangeOf(lines, "fallback = 0"))
+		let result = applied(lines, action)
+
+		expect(action.title).toBe("Inline 'fallback'")
+		expect(action.isPreferred).toBe(false)
+
+		expect(result).toEqual([
+			"implementation {",
+			"\tfunction total(_ scores: List<Integer>) -> Integer {",
+			"",
+			"\t\t<- scores::highestItem(defaultingTo 0::subtract(1))",
+			"\t}",
+			"}",
+		])
+
+		expectRefactored(lines, result)
+	})
+
+	// NOTE: A compound value is delimited by its own brackets, so it reads as
+	// itself in front of a `::` — the grammar has no precedence for an inline to
+	// get wrong, and no parentheses to write if it had.
+	it("writes a compound value in as it stands", () => {
+		let lines = [
+			"implementation {",
+			'\tconstant base = { port = 1, host = "db" }',
+			"\tconstant updated = { base with port = 2 }",
+			"\tconstant port = updated.port",
+			"}",
+		]
+
+		let [action] = inlines(lines, rangeOf(lines, "updated ="))
+		let result = applied(lines, action)
+
+		expect(result).toEqual([
+			"implementation {",
+			'\tconstant base = { port = 1, host = "db" }',
+			"\tconstant port = { base with port = 2 }.port",
+			"}",
+		])
+
+		expectRefactored(lines, result)
+	})
+
+	it("is offered from a read as well as from the declaration", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant limit: Integer = 10",
+			"\tconstant doubled = limit::add(1)",
+			"\tconstant halved = limit::subtract(1)",
+			"}",
+		]
+
+		let [action] = inlines(lines, rangeOf(lines, "limit::add"))
+
+		expect(applied(lines, action)).toEqual([
+			"implementation {",
+			"\tconstant doubled = 10::add(1)",
+			"\tconstant halved = 10::subtract(1)",
+			"}",
+		])
+	})
+
+	// NOTE: The value moves DOWN into a Scope that declares the name it reads,
+	// which is the one way copying an Expression quietly says something else.
+	it("offers nothing where a read stands under a name that shadows one", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant factor = 2",
+			"\tconstant scaled = factor::multiply(with 3)",
+			"",
+			"\tfunction scale(_ n: Integer) -> Integer {",
+			"\t\tconstant factor = 10",
+			"",
+			"\t\t<- scaled::add(factor)",
+			"\t}",
+			"}",
+		]
+
+		expect(inlines(lines, rangeOf(lines, "scaled ="))).toEqual([])
+	})
+
+	it("offers nothing for an exported Constant", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant limit = 10",
+			"\tconstant doubled = limit::add(1)",
+			"}",
+			"",
+			"export {",
+			"\tlimit",
+			"\tdoubled",
+			"}",
+		]
+
+		expect(inlines(lines, rangeOf(lines, "limit = 10"))).toEqual([])
+	})
+
+	it("offers nothing for a value that reads its position", () => {
+		let lines = [
+			"implementation {",
+			"\tnamespace Doubling for Integer {",
+			"\t\tdoubled() -> Integer {",
+			"\t\t\tconstant twice = @::multiply(with 2)",
+			"",
+			"\t\t\t<- twice",
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+
+		expect(inlines(lines, rangeOf(lines, "twice ="))).toEqual([])
+	})
+
+	it("offers nothing for a bare Case or an empty List", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant missing: Optional<Integer> = #Empty",
+			"\tconstant empty: List<Integer> = []",
+			"\tconstant described = missing::value(defaultingTo 0)",
+			"\tconstant counted = empty::length()",
+			"}",
+		]
+
+		expect(inlines(lines, rangeOf(lines, "missing:"))).toEqual([])
+		expect(inlines(lines, rangeOf(lines, "empty:"))).toEqual([])
+	})
+
+	// NOTE: A hole is inside a String Literal, and the Lexer ends that Literal
+	// at the next `"` — so a value carrying one can not be written into a hole,
+	// while every other value can.
+	it("offers nothing for a value with a quote read inside a hole", () => {
+		let lines = [
+			"implementation {",
+			'\tconstant name = "Ada"',
+			'\tconstant greeting = "hello {name}"',
+			"}",
+		]
+
+		expect(inlines(lines, rangeOf(lines, "name ="))).toEqual([])
+	})
+
+	it("writes a quoteless value into a hole", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant scores = [1, 2, 3]",
+			"\tconstant counted = scores::length()",
+			'\tconstant reported = "there are {counted}"',
+			"}",
+		]
+
+		let [action] = inlines(lines, rangeOf(lines, "counted ="))
+		let result = applied(lines, action)
+
+		expect(result).toEqual([
+			"implementation {",
+			"\tconstant scores = [1, 2, 3]",
+			'\tconstant reported = "there are {scores::length()}"',
+			"}",
+		])
+
+		expectRefactored(lines, result)
+	})
+
+	it("offers nothing for a Constant nothing reads", () => {
+		let lines = ["implementation {", "\tconstant unused = 1::add(2)", "}"]
+
+		expect(inlines(lines, rangeOf(lines, "unused"))).toEqual([])
+	})
+})

@@ -108,6 +108,20 @@ export function opensItsLine(
 	)
 }
 
+// NOTE: The mirror — whether nothing but whitespace follows. A Statement that is
+// DELETED whole takes its line with it, and a line carrying a trailing Comment
+// carries something a deletion has no business taking.
+export function closesItsLine(
+	lines: Array<string>,
+	cursor: common.Cursor,
+): boolean {
+	return (
+		lineAt(lines, cursor.line)
+			.slice(cursor.column - 1)
+			.trim() === ""
+	)
+}
+
 export function lineAt(lines: Array<string>, line: number): string {
 	return lines[line - 1] ?? ""
 }
