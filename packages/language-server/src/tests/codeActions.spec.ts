@@ -28,7 +28,12 @@ import {
 	enclosingStatementOf,
 	findInnermostNodeContaining,
 } from "../codeActions/lookups"
-import { implementationHeaderAction } from "../codeActions/sectionFixes"
+import {
+	implementationHeaderAction,
+	moduleSpecifierActions,
+	removeSelfImportAction,
+	variableToConstantAction,
+} from "../codeActions/sectionFixes"
 import {
 	expandShorthandKeyAction,
 	expandShorthandPathAction,
@@ -1770,6 +1775,80 @@ describe("Code Actions", () => {
 						"value-comment-outside-tests",
 						spanOf(lines, 2, "§ what"),
 					),
+					lines,
+				),
+			).toBeNull()
+		})
+	})
+
+	// NOTE: The Module Diagnostics are reported by the graph, so their fixes are
+	// exercised over a real workspace in `workspace.spec.ts`. What is left to ask
+	// here is what each of them does with a buffer that has moved on, which
+	// needs no graph at all.
+	describe("the Module fixes measured against a stale buffer", () => {
+		it("should stay silent where no group's specifier stands at the span", () => {
+			let lines = [
+				"import {",
+				'\tfrom "./Other.es" { thing }',
+				"}",
+				"",
+				"implementation {",
+				"\tconstant used = thing",
+				"}",
+			]
+
+			let { program } = parseWithDiagnostics(lines.join("\n"))
+
+			expect(
+				removeSelfImportAction(
+					staleDiagnostic("self-import", spanOf(lines, 2, "thing")),
+					program,
+					lines,
+				),
+			).toBeNull()
+		})
+
+		it("should stay silent where the span no longer reads as a specifier", () => {
+			let lines = ["import {", "\tfrom ./Other.es { thing }", "}"]
+
+			expect(
+				moduleSpecifierActions(
+					staleDiagnostic(
+						"invalid-module-specifier",
+						spanOf(lines, 2, "./Other.es"),
+					),
+					lines,
+				),
+			).toEqual([])
+		})
+
+		it("should stay silent where the Declaration is no longer a Variable", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant counter = 1",
+				"}",
+				"",
+				"export {",
+				"\tcounter",
+				"}",
+			]
+
+			let { program } = parseWithDiagnostics(lines.join("\n"))
+
+			expect(
+				variableToConstantAction(
+					staleDiagnostic(
+						"export-of-variable",
+						spanOf(lines, 6, "counter"),
+						[
+							{
+								position: spanOf(lines, 2, "counter"),
+								message: "declared here",
+								kind: "secondary",
+							},
+						],
+					),
+					program,
 					lines,
 				),
 			).toBeNull()

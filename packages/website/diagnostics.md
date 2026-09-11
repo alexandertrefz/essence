@@ -2715,7 +2715,7 @@ A specifier resolves to the file it is written in. Everything a Module declares
 is in scope inside it already, exported or not, so such an entry can only be a
 path that was meant to point elsewhere.
 
-**Quick Fix — "Remove the entry for './Main.es'":** deletes the whole `from`
+**Quick Fix — "Remove the entry for \"./Main.es\"":** deletes the whole `from`
 group, since the specifier is the group's and every name under it names this
 file. Preferred in the import section, where everything the entry asks for is
 in scope anyway; offered without preference in the export section, where
