@@ -73,6 +73,7 @@ import {
 	type DocumentSymbolEntry,
 	findDocumentSymbols,
 } from "./documentSymbols"
+import { importRewrites } from "./fileRename"
 import { findFoldingRanges } from "./foldingRanges"
 import { findFormattingEdits } from "./formatting"
 import { findHover } from "./hover"
@@ -201,6 +202,28 @@ export const serverCapabilities: ServerCapabilities = {
 		workspaceFolders: {
 			supported: true,
 			changeNotifications: true,
+		},
+		// NOTE: Asked BEFORE a file moves, so that the entries naming it are
+		// rewritten in one edit with the move rather than repaired after it —
+		// the file is never on disk under a name nothing points at.
+		//
+		// Two filters, because the client only asks about what a filter
+		// matches: the sources themselves, and every folder, since renaming a
+		// directory is one request about the directory and not one per file
+		// inside it. A folder holding no Essence answers with nothing.
+		fileOperations: {
+			willRename: {
+				filters: [
+					{
+						scheme: "file",
+						pattern: { glob: "**/*.es", matches: "file" },
+					},
+					{
+						scheme: "file",
+						pattern: { glob: "**", matches: "folder" },
+					},
+				],
+			},
 		},
 	},
 	signatureHelpProvider: {
@@ -1020,6 +1043,40 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// analysis fills the cache for every Module of its graph, which the
 		// roots beside it then read.
 		scheduleAnalysis(changed)
+	})
+
+	// NOTE: The one request that is answered with an edit to files nobody asked
+	// about, and the one the client makes before doing something rather than
+	// after: what it wants to know is what has to change for the move to leave
+	// the workspace saying what it said. Answering nothing lets the move happen
+	// untouched, which is what a rename of something no Module names should do.
+	//
+	// The buffers are not consulted, and deliberately: the Workspace answers
+	// from what it holds for each file, which IS the open buffer where there is
+	// one and the file on disk where there is not.
+	connection.workspace.onWillRenameFiles((params) => {
+		let rewrites = importRewrites(
+			workspace,
+			params.files.map((file) => ({
+				oldPath: documentFilePath(file.oldUri),
+				newPath: documentFilePath(file.newUri),
+			})),
+		)
+
+		if (rewrites.length === 0) {
+			return null
+		}
+
+		let changes: Record<string, Array<TextEdit>> = {}
+
+		for (let rewrite of rewrites) {
+			changes[uriOf(rewrite.filePath)] = rewrite.edits.map((edit) => ({
+				range: toLspRange(edit.range),
+				newText: edit.newText,
+			}))
+		}
+
+		return { changes }
 	})
 
 	// NOTE: The open document behind a request, and the ONE place that answers

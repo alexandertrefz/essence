@@ -30,8 +30,13 @@ import {
 	InsertTextFormat,
 	type TextEdit,
 	TextDocumentSyncKind,
+	type WorkspaceEdit,
 } from "vscode-languageserver"
-import { CodeActionRequest, HoverRequest } from "vscode-languageserver/node"
+import {
+	CodeActionRequest,
+	HoverRequest,
+	WillRenameFilesRequest,
+} from "vscode-languageserver/node"
 
 import { analyse, documentFilePath } from "../analyse"
 import { type CodeActionEntry, findCodeActions } from "../codeActions"
@@ -356,6 +361,23 @@ describe("LSP", () => {
 					workspaceFolders: {
 						supported: true,
 						changeNotifications: true,
+					},
+					fileOperations: {
+						willRename: {
+							filters: [
+								{
+									scheme: "file",
+									pattern: {
+										glob: "**/*.es",
+										matches: "file",
+									},
+								},
+								{
+									scheme: "file",
+									pattern: { glob: "**", matches: "folder" },
+								},
+							],
+						},
 					},
 				},
 				signatureHelpProvider: {
@@ -1212,6 +1234,174 @@ describe("Code Actions on the project file", () => {
 			})
 
 			expect(result).toBeNull()
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+})
+
+// NOTE: A specifier is a path written in the source, so a file that moves takes
+// every entry naming it out of step — and takes its own entries out of step too,
+// since they were written from where it used to be. Both are answered before the
+// move happens, in one edit with it.
+describe("A file about to be renamed", () => {
+	const shared = [
+		"implementation {",
+		"\tconstant base = 1",
+		"}",
+		"",
+		"export {",
+		"\tbase",
+		"}",
+		"",
+	].join("\n")
+
+	async function willRename(
+		session: LspSession,
+		moves: Array<{ from: string; to: string }>,
+	): Promise<Record<string, Array<TextEdit>>> {
+		let { result } = await session.request<WorkspaceEdit | null>(
+			WillRenameFilesRequest.type,
+			{
+				files: moves.map((move) => ({
+					oldUri: uriOf(move.from),
+					newUri: uriOf(move.to),
+				})),
+			},
+		)
+
+		return result?.changes ?? {}
+	}
+
+	it("should rewrite the entries naming it and the ones it wrote itself", async () => {
+		let files = makeSessionWorkspace({
+			"Shared.es": shared,
+			"A.es": [
+				"import {",
+				'\tfrom "./Shared.es" { base }',
+				"}",
+				"",
+				"implementation {",
+				"\tconstant doubled = base::multiply(with 2)",
+				"}",
+				"",
+				"export {",
+				"\tdoubled",
+				"}",
+				"",
+			].join("\n"),
+			"Main.es": [
+				"import {",
+				'\tfrom "./A.es" { doubled }',
+				"}",
+				"",
+				"implementation {",
+				"\tTerminal.inspect(doubled::toString())",
+				"}",
+				"",
+			].join("\n"),
+		})
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.settle()
+
+			let changes = await willRename(session, [
+				{ from: files.pathOf("A.es"), to: files.pathOf("lib/A.es") },
+			])
+
+			expect(Object.keys(changes).sort()).toEqual(
+				[
+					uriOf(files.pathOf("A.es")),
+					uriOf(files.pathOf("Main.es")),
+				].sort(),
+			)
+			expect(changes[uriOf(files.pathOf("A.es"))]).toEqual([
+				{
+					range: {
+						start: { line: 1, character: 6 },
+						end: { line: 1, character: 19 },
+					},
+					newText: '"../Shared.es"',
+				},
+			])
+			expect(changes[uriOf(files.pathOf("Main.es"))]).toEqual([
+				{
+					range: {
+						start: { line: 1, character: 6 },
+						end: { line: 1, character: 14 },
+					},
+					newText: '"./lib/A.es"',
+				},
+			])
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
+	// NOTE: A directory is ONE request about the directory rather than one per
+	// file under it, and the client sends it because the Server asked about
+	// folders as well. A folder holding no Essence answers with nothing.
+	it("should answer for every source under a directory that moves", async () => {
+		let files = makeSessionWorkspace({
+			"Shared.es": shared,
+			"lib/Helper.es": [
+				"import {",
+				'\tfrom "../Shared.es" { base }',
+				"}",
+				"",
+				"implementation {",
+				"\tconstant doubled = base::multiply(with 2)",
+				"}",
+				"",
+				"export {",
+				"\tdoubled",
+				"}",
+				"",
+			].join("\n"),
+			"Main.es": [
+				"import {",
+				'\tfrom "./lib/Helper.es" { doubled }',
+				"}",
+				"",
+				"implementation {",
+				"\tTerminal.inspect(doubled::toString())",
+				"}",
+				"",
+			].join("\n"),
+		})
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.settle()
+
+			let changes = await willRename(session, [
+				{ from: files.pathOf("lib"), to: files.pathOf("deep/lib") },
+			])
+
+			expect(
+				changes[uriOf(files.pathOf("lib/Helper.es"))]?.map(
+					(edit) => edit.newText,
+				),
+			).toEqual(['"../../Shared.es"'])
+			expect(
+				changes[uriOf(files.pathOf("Main.es"))]?.map(
+					(edit) => edit.newText,
+				),
+			).toEqual(['"./deep/lib/Helper.es"'])
+
+			expect(
+				await willRename(session, [
+					{
+						from: files.pathOf("elsewhere"),
+						to: files.pathOf("moved"),
+					},
+				]),
+			).toEqual({})
 		} finally {
 			await session.dispose()
 			files.dispose()

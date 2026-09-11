@@ -105,6 +105,11 @@ import entries included. Builtins and the standard library are rejected.
 Editing a name also updates its other occurrences as you type, without
 invoking rename at all.
 
+Renaming or moving a `.es` file — or a directory of them — rewrites the
+specifier of every entry that named it, and of every entry the file itself
+wrote, before the move happens. The edit arrives with the rename, so the file is
+never on disk under a name nothing points at.
+
 ### Completion & signature help
 
 Completion offers the names in lexical Scope, Record members and Namespace
