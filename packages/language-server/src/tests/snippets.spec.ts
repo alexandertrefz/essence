@@ -223,7 +223,7 @@ describe("Snippet completion", () => {
 		expect(offered).toContain("constant")
 		expect(offered).toContain("destructure")
 		expect(offered).toContain("function")
-		expect(offered).not.toContain("overload")
+		expect(offered).not.toContain("static")
 		expect(offered).not.toContain("expect")
 		expect(offered).not.toContain("test")
 	})
@@ -239,7 +239,9 @@ describe("Snippet completion", () => {
 
 		expect(offered).toContain("namespace")
 		expect(offered).toContain("type")
+		expect(offered).toContain("type-refinement")
 		expect(offered).not.toContain("constant")
+		expect(offered).not.toContain("expect")
 	})
 
 	it("offers the members of a Namespace body", () => {
@@ -254,8 +256,10 @@ describe("Snippet completion", () => {
 			{ line: 3, column: 3 },
 		)
 
+		expect(offered).toContain("method")
+		expect(offered).toContain("static")
+		expect(offered).toContain("static-property")
 		expect(offered).toContain("overload")
-		expect(offered).toContain("doc")
 		expect(offered).not.toContain("constant")
 		expect(offered).not.toContain("function")
 	})
@@ -278,7 +282,7 @@ describe("Snippet completion", () => {
 		)
 
 		expect(offered).toContain("constant")
-		expect(offered).not.toContain("overload")
+		expect(offered).not.toContain("static")
 	})
 
 	it("offers the Methods a Protocol declares", () => {
@@ -287,8 +291,9 @@ describe("Snippet completion", () => {
 			{ line: 3, column: 3 },
 		)
 
+		expect(offered).toContain("method")
 		expect(offered).toContain("doc")
-		expect(offered).not.toContain("overload")
+		expect(offered).not.toContain("static")
 		expect(offered).not.toContain("constant")
 	})
 
@@ -462,7 +467,7 @@ describe("Snippet completion", () => {
 		)
 
 		expect(offered).toContain("constant")
-		expect(offered).not.toContain("overload")
+		expect(offered).not.toContain("static")
 	})
 })
 

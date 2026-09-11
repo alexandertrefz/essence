@@ -212,10 +212,63 @@ export const snippets: Array<Snippet> = [
 		contexts: ["implementation", "tests", "test"],
 	},
 	{
+		prefix: "function-generic",
+		description:
+			"A generic function — the Type Parameter is inferred from the Argument.",
+		body: [
+			"function ${1:name}<infer ${2:Item}>(${3:_} ${4:parameter}: ${2:Item}) -> ${5:ReturnType} {",
+			"\t<- $0",
+			"}",
+		],
+		contexts: ["implementation", "tests", "test"],
+	},
+	{
+		prefix: "function-bounded",
+		description:
+			"A generic function whose Type Parameter must conform to a Protocol.",
+		body: [
+			"function ${1:name}<infer ${2:Item} is ${3:Protocol}>(${4:_} ${5:parameter}: ${2:Item}) -> ${6:ReturnType} {",
+			"\t<- $0",
+			"}",
+		],
+		contexts: ["implementation", "tests", "test"],
+	},
+	{
 		prefix: "namespace",
 		description: "A namespace of Methods for a Type.",
 		body: [
 			"namespace ${1:Name} for ${2:Type}${3: is ${4:Protocol}} {",
+			"\t$0",
+			"}",
+		],
+		contexts: ["implementation", "declarations"],
+	},
+	{
+		prefix: "namespace-static",
+		description:
+			"A namespace belonging to no particular value — statics alone.",
+		body: ["namespace ${1:Name} {", "\t$0", "}"],
+		contexts: ["implementation", "declarations"],
+	},
+	{
+		prefix: "namespace-generic",
+		description:
+			"A generic namespace — written once, and bound to an Item by each receiver.",
+		body: [
+			"namespace ${1:Name}<infer ${2:Item}> for ${3:List}<${2:Item}> {",
+			"\t$0",
+			"}",
+		],
+		contexts: ["implementation", "declarations"],
+	},
+	{
+		prefix: "namespace-where",
+		description:
+			"A conditional conformance — the Type conforms only where its Type Parameter does.",
+		body: [
+			"namespace ${1:Name}<infer ${2:Item}> for ${3:Type}",
+			"\tis ${4:Protocol} where ${2:Item} is ${5:Bound}",
+			"{",
 			"\t$0",
 			"}",
 		],
@@ -227,6 +280,17 @@ export const snippets: Array<Snippet> = [
 		body: [
 			"protocol ${1:Name} {",
 			"\t${2:method}(${3:_} ${4:parameter}: ${5:Type}) -> ${0:ReturnType}",
+			"}",
+		],
+		contexts: ["implementation", "declarations"],
+	},
+	{
+		prefix: "protocol-extends",
+		description:
+			"A protocol extending others — conforming to it owes every requirement of theirs too.",
+		body: [
+			"protocol ${1:Name} is ${2:Protocol} {",
+			"\t${3:method}(${4:_} ${5:parameter}: ${6:Type}) -> ${0:ReturnType}",
 			"}",
 		],
 		contexts: ["implementation", "declarations"],
@@ -266,6 +330,26 @@ export const snippets: Array<Snippet> = [
 		contexts: ["implementation", "declarations"],
 	},
 	{
+		prefix: "type-union",
+		description: "A union type alias — a value of either Type.",
+		body: ["type ${1:Name} = ${2:Type} | ${0:OtherType}"],
+		contexts: ["implementation", "declarations"],
+	},
+	{
+		prefix: "type-generic",
+		description:
+			"A generic type alias — the Type Parameter is written at every use.",
+		body: ["type ${1:Name}<${2:Item}> = ${3:List}<${2:Item}>"],
+		contexts: ["implementation", "declarations"],
+	},
+	{
+		prefix: "type-refinement",
+		description:
+			"A checked refinement — a Type carrying the evidence its values satisfy a predicate.",
+		body: ["type ${1:Name} = ${2:Integer} where @::${3:isNot}(${0:0})"],
+		contexts: ["implementation", "declarations"],
+	},
+	{
 		prefix: "generatable",
 		description:
 			"A Generatable conformance — what a property test draws a value of this Type from.",
@@ -282,10 +366,50 @@ export const snippets: Array<Snippet> = [
 	/* Namespace and Protocol members */
 
 	{
+		prefix: "method",
+		description: "A Method — written on `@`, the value it is called on.",
+		body: [
+			"${1:name}(${2:_} ${3:parameter}: ${4:Type}) -> ${5:ReturnType} {",
+			"\t<- $0",
+			"}",
+		],
+		contexts: ["namespace", "protocol"],
+	},
+	{
+		prefix: "static",
+		description:
+			"A static Method — one belonging to the Namespace rather than to a value.",
+		body: [
+			"static ${1:name}(${2:_} ${3:parameter}: ${4:Type}) -> ${5:ReturnType} {",
+			"\t<- $0",
+			"}",
+		],
+		contexts: ["namespace"],
+	},
+	{
+		prefix: "static-property",
+		description:
+			"A static Property — a value belonging to the Namespace itself.",
+		body: ["static ${1:name} = ${0:value}"],
+		contexts: ["namespace"],
+	},
+	{
 		prefix: "overload",
 		description: "An overload group of same-named signatures.",
 		body: [
 			"overload ${1:name} {",
+			"\t(${2:_} ${3:parameter}: ${4:Type}) -> ${5:ReturnType} {",
+			"\t\t<- $0",
+			"\t}",
+			"}",
+		],
+		contexts: ["namespace"],
+	},
+	{
+		prefix: "overload-static",
+		description: "An overload group of static signatures.",
+		body: [
+			"overload static ${1:name} {",
 			"\t(${2:_} ${3:parameter}: ${4:Type}) -> ${5:ReturnType} {",
 			"\t\t<- $0",
 			"\t}",
