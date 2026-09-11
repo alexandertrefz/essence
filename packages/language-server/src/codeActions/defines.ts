@@ -46,13 +46,12 @@ export function defineActions(
 	// Nodes this answers about are rare, and walking every Function of a
 	// Program to find the one a Statement stands in is not work to do on a
 	// request that offers nothing.
-	let functions: Map<
+	let answers: Map<
 		parser.ImplementationNode,
-		parser.FunctionDefinitionNode
+		parser.TypeDeclarationNode | null
 	> | null = null
 	let answeredType = (node: parser.ImplementationNode) =>
-		(functions ??= enclosingFunctions(program)).get(node)?.returnType ??
-		null
+		(answers ??= answeredTypes(program)).get(node) ?? null
 	// NOTE: The `else if`s of a cascade the outermost `if` already answers for.
 	// Every one of them is an if/else of its own and would offer a `define` of
 	// its own — the same rewrite, one arm shorter, under the same title. The
@@ -322,33 +321,52 @@ function chainOf(
 	return [only, ...chainOf(only)]
 }
 
-// NOTE: The Function each Statement of the Program is written in, innermost
-// last — the walk reaches a Function before the Functions written inside it, so
-// the one written closest around a Statement is the one that answers for it.
-function enclosingFunctions(
+// NOTE: What a `<-` written at each Statement of the Program ANSWERS, which is
+// what a `define` standing in for one has to be annotated with. Not the
+// enclosing Function's return Type: a Match Handler's body answers the MATCH,
+// which carries a `-> Type` of its own, and a `define` written there with the
+// Function's Type on it is the wrong Type on every arm. The same reading
+// `matchOnValue` takes of a Handler's body, for the same reason.
+//
+// Innermost last, so the innermost wins: the walk reaches a Function before the
+// Functions and Matches written inside it, and each of those overwrites what it
+// holds.
+function answeredTypes(
 	program: parser.Program,
-): Map<parser.ImplementationNode, parser.FunctionDefinitionNode> {
-	let functions = new Map<
+): Map<parser.ImplementationNode, parser.TypeDeclarationNode | null> {
+	let answers = new Map<
 		parser.ImplementationNode,
-		parser.FunctionDefinitionNode
+		parser.TypeDeclarationNode | null
 	>()
+	let cover = (
+		body: Array<parser.ImplementationNode>,
+		type: parser.TypeDeclarationNode | null,
+	) => {
+		for (let statement of body) {
+			walkNode(statement, (inner) => {
+				answers.set(inner, type)
+			})
+		}
+	}
 
 	walk(program, (node) => {
 		if (
-			node.nodeType !== "FunctionStatement" &&
-			node.nodeType !== "FunctionValue"
+			node.nodeType === "FunctionStatement" ||
+			node.nodeType === "FunctionValue"
 		) {
+			cover(node.value.body, node.value.returnType)
+
 			return
 		}
 
-		for (let statement of node.value.body) {
-			walkNode(statement, (inner) => {
-				functions.set(inner, node.value)
-			})
+		if (node.nodeType === "Match") {
+			for (let handler of node.handlers) {
+				cover(handler.body, node.returnType)
+			}
 		}
 	})
 
-	return functions
+	return answers
 }
 
 function writtenOnOneLine(node: { position: common.Position }): boolean {

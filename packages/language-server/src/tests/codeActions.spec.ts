@@ -4697,6 +4697,31 @@ describe("Code Actions", () => {
 			expect(refusalOf(result)).toBeNull()
 		})
 
+		// NOTE: The hole is per MEMBER rather than per value — a member with no
+		// draw is named in a `§` line and left out, and the members beside it
+		// are written all the same.
+		it("should keep the members it can draw beside the ones it can not", () => {
+			let lines = [
+				"implementation {",
+				"\ttype Crate = { items: List<String>, held: Optional<Integer>, count: Integer }",
+				"}",
+			]
+
+			let [refactor] = generatableActions(lines, 2, 8)
+			let result = applied(lines, refactor)
+
+			expect(result.slice(3, 9)).toEqual([
+				"\tnamespace CrateGeneratable for Crate is Generatable {",
+				"\t\tstatic generate(from source: Randomness) -> Crate {",
+				"\t\t\t§ No draw for 'items' — write one, or the value below is incomplete.",
+				"\t\t\t§ No draw for 'held' — write one, or the value below is incomplete.",
+				"\t\t\t<- { count = source::drawInteger(between 0, and 100) }",
+				"\t\t}",
+			])
+
+			expect(refusalOf(result)).toBeNull()
+		})
+
 		it("should pick a Choice's Case from a written List", () => {
 			let lines = [
 				"implementation {",
@@ -5533,6 +5558,57 @@ describe("Code Actions", () => {
 			expect(codesOf(ladder)).toEqual([])
 			expect(applied(ladder, onlyRefactor(ladder))).toEqual(written)
 			expect(applied(written, onlyRefactor(written))).toEqual(ladder)
+		})
+
+		// NOTE: A `<-` inside a Match Handler answers the MATCH rather than the
+		// Function around it, so the `-> Type` a `define` standing in for one
+		// carries is the Match's. The Function's would be the wrong Type on
+		// every arm, and the round trip would not hand the text back either.
+		it("should answer the Match a Handler's define stands in", () => {
+			let handler = [
+				"implementation {",
+				"\tchoice Colour { Red, Blue }",
+				"",
+				"\tfunction describe(_ colour: Colour, _ n: Integer) -> String {",
+				"\t\tconstant flag = match colour -> Boolean {",
+				"\t\t\tcase #Red {",
+				"\t\t\t\tif n::isGreaterThan(0) {",
+				"\t\t\t\t\t<- true",
+				"\t\t\t\t} else {",
+				"\t\t\t\t\t<- false",
+				"\t\t\t\t}",
+				"\t\t\t}",
+				"\t\t\tcase #Blue { <- false }",
+				"\t\t}",
+				"",
+				"\t\t<- flag::toString()",
+				"\t}",
+				"}",
+			]
+			let asDefine = [
+				"implementation {",
+				"\tchoice Colour { Red, Blue }",
+				"",
+				"\tfunction describe(_ colour: Colour, _ n: Integer) -> String {",
+				"\t\tconstant flag = match colour -> Boolean {",
+				"\t\t\tcase #Red {",
+				"\t\t\t\t<- define -> Boolean {",
+				"\t\t\t\t\tas true if n::isGreaterThan(0)",
+				"\t\t\t\t\tas false otherwise",
+				"\t\t\t\t}",
+				"\t\t\t}",
+				"\t\t\tcase #Blue { <- false }",
+				"\t\t}",
+				"",
+				"\t\t<- flag::toString()",
+				"\t}",
+				"}",
+			]
+
+			expect(codesOf(handler)).toEqual([])
+			expect(applied(handler, onlyRefactor(handler))).toEqual(asDefine)
+			expect(codesOf(asDefine)).toEqual([])
+			expect(applied(asDefine, onlyRefactor(asDefine))).toEqual(handler)
 		})
 
 		// NOTE: One action rather than one per rung — every `else if` of a
@@ -6505,24 +6581,27 @@ describe("Inline a Constant", () => {
 		let lines = [
 			"implementation {",
 			"\tfunction total(_ scores: List<Integer>) -> Integer {",
-			"\t\tconstant fallback = 0::subtract(1)",
+			"\t\tconstant fallback = { holds = 0 }",
 			"",
-			"\t\t<- scores::highestItem(defaultingTo fallback)",
+			"\t\t<- scores::highestItem(defaultingTo fallback.holds)",
 			"\t}",
 			"}",
 		]
 
-		let [action] = inlines(lines, rangeOf(lines, "fallback = 0"))
+		let [action] = inlines(lines, rangeOf(lines, "fallback = {"))
 		let result = applied(lines, action)
 
 		expect(action.title).toBe("Inline 'fallback'")
 		expect(action.isPreferred).toBe(false)
 
+		// NOTE: The line goes with the declaration, break and all — a Constant
+		// with a blank line under it is the ordinary shape, and taking the
+		// break in FRONT of it would leave that blank line standing directly
+		// under the brace the body opened on.
 		expect(result).toEqual([
 			"implementation {",
 			"\tfunction total(_ scores: List<Integer>) -> Integer {",
-			"",
-			"\t\t<- scores::highestItem(defaultingTo 0::subtract(1))",
+			"\t\t<- scores::highestItem(defaultingTo { holds = 0 }.holds)",
 			"\t}",
 			"}",
 		])
@@ -6656,8 +6735,7 @@ describe("Inline a Constant", () => {
 	it("writes a quoteless value into a hole", () => {
 		let lines = [
 			"implementation {",
-			"\tconstant scores = [1, 2, 3]",
-			"\tconstant counted = scores::length()",
+			"\tconstant counted = [1, 2, 3]",
 			'\tconstant reported = "there are {counted}"',
 			"}",
 		]
@@ -6667,8 +6745,7 @@ describe("Inline a Constant", () => {
 
 		expect(result).toEqual([
 			"implementation {",
-			"\tconstant scores = [1, 2, 3]",
-			'\tconstant reported = "there are {scores::length()}"',
+			'\tconstant reported = "there are {[1, 2, 3]}"',
 			"}",
 		])
 
@@ -6679,6 +6756,72 @@ describe("Inline a Constant", () => {
 		let lines = ["implementation {", "\tconstant unused = 1::add(2)", "}"]
 
 		expect(inlines(lines, rangeOf(lines, "unused"))).toEqual([])
+	})
+
+	// NOTE: A value that CALLS something runs once where the Constant stood and
+	// once per read afterwards, so a Program that printed once prints twice.
+	// Nothing here can tell a call that answers a value from one that does
+	// something, so every call is turned away.
+	it("offers nothing for a value that calls anything", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction run() -> Integer {",
+			'\t\tconstant printed = Terminal.print("once")',
+			"",
+			"\t\tTerminal.inspect(printed)",
+			"\t\tTerminal.inspect(printed)",
+			"",
+			"\t\t<- 1",
+			"\t}",
+			"}",
+		]
+
+		expect(inlines(lines, rangeOf(lines, "printed ="))).toEqual([])
+	})
+
+	// NOTE: And a read inside a Function literal is evaluated once per CALL of
+	// that literal. One read is no protection: a body handed to `map` runs once
+	// per item.
+	it("offers nothing for a read inside a Function literal", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction run() -> List<Integer> {",
+			"\t\tconstant held = 7",
+			"",
+			"\t\t<- [1, 2, 3]::map((item) { <- held })",
+			"\t}",
+			"}",
+		]
+
+		expect(inlines(lines, rangeOf(lines, "held ="))).toEqual([])
+	})
+
+	// NOTE: A builtin Type is in no Scope, so the shadowing check answered null
+	// for it and refused every value that NAMED one — which is most of the
+	// one-line values a reader would ever inline.
+	it("offers a value that names a builtin Type", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant flag = true",
+			"\tconstant described = define -> String {",
+			'\t\tas "yes" if flag',
+			'\t\tas "no" otherwise',
+			"\t}",
+			"\tconstant shown = described",
+			"}",
+		]
+		let onOneLine = [
+			"implementation {",
+			"\tconstant flag = true",
+			'\tconstant described = define -> String { as "yes" if flag as "no" otherwise }',
+			"\tconstant shown = described",
+			"}",
+		]
+
+		expect(inlines(lines, rangeOf(lines, "described ="))).toEqual([])
+		expect(
+			titles(inlines(onOneLine, rangeOf(onOneLine, "described ="))),
+		).toEqual(["Inline 'described'"])
 	})
 })
 
@@ -7225,6 +7368,35 @@ describe("Write it as a table test", () => {
 		]
 
 		expect(tables(lines, onTheTest(lines, '"describes"'))).toEqual([])
+	})
+
+	// NOTE: A Case widens to its Choice, and a GENERIC Choice's name is not a
+	// Type on its own — `Optional` written where `Optional<Integer>` belongs is
+	// `wrong-type-argument-count`, which is what the row Parameter used to say.
+	it("writes a generic Choice's column at the Type it was applied at", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction held(_ n: Integer) -> Optional<Integer> {",
+			"\t\t<- #Empty",
+			"\t}",
+			"}",
+			"",
+			"tests {",
+			'\ttest "it answers nothing" {',
+			"\t\texpect held(1)::is(#Empty)",
+			"\t\texpect held(2)::is(#Empty)",
+			"\t}",
+			"}",
+		]
+
+		let [action] = tables(lines, onTheTest(lines, '"it answers nothing"'))
+		let result = applied(lines, action)
+
+		expect(result[10]).toBe(
+			"\t] ({ n, expected }: { n: Integer, expected: Optional<Integer> }) {",
+		)
+
+		expectRefactored(lines, result)
 	})
 
 	it("offers nothing for a test that is already a table", () => {

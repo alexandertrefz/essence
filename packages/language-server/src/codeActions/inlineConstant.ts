@@ -12,10 +12,11 @@ import { scopeAt } from "../rename"
 import {
 	closesItsLine,
 	containsRange,
-	extendOverLeadingBreak,
 	isBefore,
+	lineAt,
 	opensItsLine,
 	overlaps,
+	removeLinesEdit,
 	sliceOf,
 } from "./geometry"
 import type { CodeActionEdit, CodeActionEntry } from "./index"
@@ -107,6 +108,12 @@ export function inlineConstantActions(
 		return []
 	}
 
+	// NOTE: And a read inside a Function literal is evaluated once per call of
+	// that literal rather than once where the Constant stood.
+	if (reads.some(isInsideLiteral(program))) {
+		return []
+	}
+
 	// NOTE: The Statement is deleted with the line break in front of it, which
 	// is what keeps the blank line it stood on from staying behind. Both ends of
 	// its line have to be its own for that: a Constant sharing a line with the
@@ -120,13 +127,7 @@ export function inlineConstantActions(
 	}
 
 	let edits: Array<CodeActionEdit> = [
-		{
-			range: {
-				start: extendOverLeadingBreak(lines, statement.position.start),
-				end: statement.position.end,
-			},
-			newText: "",
-		},
+		removalOf(lines, statement.position),
 		...reads.map((read) => ({ range: read.position, newText: value })),
 	]
 
@@ -146,6 +147,28 @@ export function inlineConstantActions(
 			edits,
 		},
 	]
+}
+
+// NOTE: The Statement's own lines, and the blank line under it where there is
+// one. A Constant is written with a blank line below it as often as not, and a
+// deletion that takes the line alone leaves that blank standing where the
+// Statement was — which, for the first Statement of a body, is directly under
+// the brace the body opened on.
+function removalOf(
+	lines: Array<string>,
+	position: common.Position,
+): CodeActionEdit {
+	let last = position.end.line
+	let below = last + 1
+
+	if (below <= lines.length && lineAt(lines, below).trim() === "") {
+		last = below
+	}
+
+	return removeLinesEdit(lines, {
+		start: position.start,
+		end: { line: last, column: lineAt(lines, last).length + 1 },
+	})
 }
 
 // NOTE: Whether the range rests on a name at all — an Identifier anywhere in an
@@ -202,13 +225,24 @@ function constantAt(
 	return found
 }
 
-// NOTE: The values that mean the same thing wherever they are written. The four
-// turned away do not: a Function literal and a bare `#Case` take their Type
-// from the position they stand in, an empty List or Dictionary takes its item
-// Type from there too, and `@` means whatever the Method or the Match Handler
-// around it is about.
+// NOTE: The values that mean the same thing wherever they are written, AS OFTEN
+// as they were written. The four Types turned away first do not mean the same
+// thing: a Function literal and a bare `#Case` take their Type from the position
+// they stand in, an empty List or Dictionary takes its item Type from there too,
+// and `@` means whatever the Method or the Match Handler around it is about.
+//
+// And a value that CALLS something is not written the same number of times: it
+// runs once where the Constant stood and once per read afterwards, so inlining
+// `constant printed = Terminal.print("once")` read twice prints twice. Nothing
+// here can tell a call that answers a value from one that does something, so
+// every call is turned away — including one written inside a Literal, which is
+// the same hazard one bracket in.
 function isInlinable(value: parser.ExpressionNode): boolean {
 	if (value.nodeType === "FunctionValue" || value.nodeType === "MemberPath") {
+		return false
+	}
+
+	if (calls(value)) {
 		return false
 	}
 
@@ -232,10 +266,54 @@ function readsSelf(value: parser.ExpressionNode): boolean {
 	walkNode(value, (node) => {
 		if (node.nodeType === "Self") {
 			found = true
+
+			return false
 		}
+
+		return true
 	})
 
 	return found
+}
+
+function calls(value: parser.ExpressionNode): boolean {
+	let found = false
+
+	walkNode(value, (node) => {
+		if (
+			node.nodeType === "MethodInvocation" ||
+			node.nodeType === "FunctionInvocation"
+		) {
+			found = true
+
+			return false
+		}
+
+		return true
+	})
+
+	return found
+}
+
+// NOTE: The Function literals of the file, walked once — the same reading
+// `isInterpolated` takes, and for the same reason. A read inside one is
+// evaluated once per CALL of that literal rather than once where it stands, so
+// a value written into it is a value run a number of times nothing in the
+// source says. One read is no protection either: `[1, 2, 3]::map((item) { <-
+// printed })` runs its body three times.
+function isInsideLiteral(
+	program: parser.Program,
+): (occurrence: Occurrence) => boolean {
+	let bodies: Array<common.Position> = []
+
+	walk(program, (node) => {
+		if (node.nodeType === "FunctionValue") {
+			bodies.push(node.position)
+		}
+	})
+
+	return (occurrence) =>
+		bodies.some((body) => containsRange(body, occurrence.position))
 }
 
 // NOTE: An exported name is read by Modules this file can not see, and the
@@ -297,6 +375,15 @@ function readsAgree(
 			!containsRange(value, occurrence.position) ||
 			!isBound(occurrence)
 		) {
+			continue
+		}
+
+		// NOTE: A builtin Type is in no Scope — `String`, `Integer`, a Choice
+		// the standard library declares — so `resolve` answers null for it and
+		// the check below would refuse every value that NAMES one. Skipped for
+		// the reason `extractConstant` skips them: a name nothing declares here
+		// means the same thing wherever it is read.
+		if (occurrence.declaration.builtin) {
 			continue
 		}
 

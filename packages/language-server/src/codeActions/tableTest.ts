@@ -347,7 +347,7 @@ function columnType(
 
 		let spelling =
 			node.type.type === "Case"
-				? node.type.choice
+				? caseSpelling(node.type)
 				: isSpellableType(node.type)
 					? printType(node.type)
 					: null
@@ -360,6 +360,27 @@ function columnType(
 	}
 
 	return written
+}
+
+// NOTE: The Choice a Case widens to, written as a Type. A GENERIC Choice's name
+// is not one on its own — `Optional` where `Optional<Integer>` belongs is
+// `wrong-type-argument-count` — so the Type Arguments the value was applied at
+// are written back with it. A Case that bound none, or one whose Arguments have
+// no spelling, has no column Type to write and the table is not offered: what
+// the rows are of is exactly what a row Parameter has to say.
+function caseSpelling(type: common.CaseType): string | null {
+	let applied = type.typeArguments ?? []
+
+	if (applied.length > 0) {
+		return applied.every(isSpellableType)
+			? `${type.choice}<${applied.map(printType).join(", ")}>`
+			: null
+	}
+
+	// NOTE: A Case of a generic Choice that bound nothing — a bare `#Empty` no
+	// application ever reached — has no spelling at all, since its Choice's
+	// name alone is a Type short of its Arguments.
+	return (type.choiceGenerics ?? []).length === 0 ? type.choice : null
 }
 
 // NOTE: What the callee calls its own Parameters, one per written Argument and
