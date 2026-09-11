@@ -4338,6 +4338,189 @@ describe("Code Actions", () => {
 		})
 	})
 
+	// NOTE: The `§§` block a signature wants, with nothing written in it. The
+	// assertion that matters is the one about the Diagnostics: a `@param` line
+	// documents the Parameter at its own position and names it the way the
+	// signature does, and getting that wrong by hand is what the three Warnings
+	// exist for.
+	describe("Document a Function", () => {
+		const documentationCodes: Array<common.DiagnosticCode> = [
+			"undocumented-parameter",
+			"unknown-documentation-parameter",
+			"misnamed-documentation-parameter",
+			"missing-documentation-separator",
+		]
+
+		let documentActions = (
+			lines: Array<string>,
+			line: number,
+		): Array<CodeActionEntry> =>
+			actionsOf(lines, {
+				start: { line, column: 3 },
+				end: { line, column: 3 },
+			}).filter((entry) => entry.title.startsWith("Document"))
+
+		function expectNoDocumentationCodes(result: Array<string>) {
+			for (let code of documentationCodes) {
+				expect(codesOf(result)).not.toContain(code)
+			}
+		}
+
+		it("should write a line per Parameter, named as the signature names it", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction area (of width: Integer, by height: Integer) -> Integer {",
+				"\t\t<- width::multiply(with height)",
+				"\t}",
+				"}",
+			]
+
+			let [refactor] = documentActions(lines, 2)
+			let result = applied(lines, refactor)
+
+			expect(refactor.title).toBe("Document 'area'")
+			expect(refactor.kind).toBe("refactor.rewrite")
+			expect(refactor.diagnosticCode).toBeNull()
+			expect(refactor.isPreferred).toBe(false)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\t§§",
+				"\t§§",
+				"\t§§ @param of —",
+				"\t§§ @param by —",
+				"\t§§ @returns —",
+				"\tfunction area (of width: Integer, by height: Integer) -> Integer {",
+				"\t\t<- width::multiply(with height)",
+				"\t}",
+				"}",
+			])
+
+			expectNoDocumentationCodes(result)
+			expect(codesOf(result)).not.toContain("syntax-error")
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		// NOTE: The LABEL, never the internal name — a Parameter that carries
+		// no label is `_` to the signature and to the rule alike, whatever the
+		// body reads it under.
+		it("should name a Parameter that carries no label '_'", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction twice (_ value: Integer) -> Integer {",
+				"\t\t<- value::multiply(with 2)",
+				"\t}",
+				"}",
+			]
+
+			let result = applied(lines, documentActions(lines, 2)[0])
+
+			expect(result.slice(1, 4)).toEqual([
+				"\t§§",
+				"\t§§",
+				"\t§§ @param _ —",
+			])
+
+			expectNoDocumentationCodes(result)
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		it("should write no '@returns' for a Function answering the unit Type", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction shout (_ text: String) -> {} {",
+				"\t\tTerminal.print(text)",
+				"\t}",
+				"}",
+			]
+
+			let result = applied(lines, documentActions(lines, 2)[0])
+
+			expect(result.slice(1, 5)).toEqual([
+				"\t§§",
+				"\t§§",
+				"\t§§ @param _ —",
+				"\tfunction shout (_ text: String) -> {} {",
+			])
+
+			expectNoDocumentationCodes(result)
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		it("should reach a Method and indent the block with it", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Sign for Integer {",
+				"\t\tdescribe (as style: String) -> String {",
+				"\t\t\t<- style",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let [refactor] = documentActions(lines, 3)
+			let result = applied(lines, refactor)
+
+			expect(refactor.title).toBe("Document 'describe'")
+			expect(result.slice(2, 6)).toEqual([
+				"\t\t§§",
+				"\t\t§§",
+				"\t\t§§ @param as —",
+				"\t\t§§ @returns —",
+			])
+
+			expectNoDocumentationCodes(result)
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		// NOTE: The `static` keyword stands in front of the name on the same
+		// line, and the block goes above that line rather than between them.
+		it("should write above the 'static' keyword rather than under it", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Sign for Integer {",
+				"\t\tstatic zero () -> Integer {",
+				"\t\t\t<- 0",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let [refactor] = documentActions(lines, 3)
+			let result = applied(lines, refactor)
+
+			expect(refactor.title).toBe("Document 'zero'")
+			expect(result.slice(2, 6)).toEqual([
+				"\t\t§§",
+				"\t\t§§",
+				"\t\t§§ @returns —",
+				"\t\tstatic zero () -> Integer {",
+			])
+
+			expectNoDocumentationCodes(result)
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		it("should offer nothing where a block is already written", () => {
+			expect(
+				documentActions(
+					[
+						"implementation {",
+						"\t§§ Answers the area.",
+						"\t§§",
+						"\t§§ @param of — the width",
+						"\t§§ @returns — the area.",
+						"\tfunction area (of width: Integer) -> Integer {",
+						"\t\t<- width",
+						"\t}",
+						"}",
+					],
+					6,
+				),
+			).toEqual([])
+		})
+	})
+
 	// NOTE: The Formatter refuses to move between the two spellings, so this is
 	// where a reader gets to. Both directions, and neither of them inside an
 	// update's key list, where the two spellings do not mean the same thing.

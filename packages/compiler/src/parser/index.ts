@@ -3,6 +3,7 @@
 // produces a Program — it is the form the compiler driver uses to gate
 // compilation. `parse` is the convenience form for callers that only need
 // the AST.
+export { documentationPrefix } from "./documentation"
 export {
 	type ParseResult,
 	type ParserOptions,

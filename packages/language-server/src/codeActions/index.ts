@@ -2,6 +2,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { type Analysis, analyseDocument, documentFilePath } from "../analyse"
 import type { Workspace } from "../workspace"
+import { documentFunctionActions } from "./documentFunction"
 import {
 	compareWrittenValueAction,
 	matcherBeforeValueAction,
@@ -222,6 +223,7 @@ export function findCodeActions(
 	entries.push(
 		...implementProtocolActions(program, enrichedProgram, lines, range),
 	)
+	entries.push(...documentFunctionActions(program, lines, range))
 	entries.push(...matchOnValueActions(enrichedProgram, lines, range))
 	entries.push(...shorthandActions(program, lines, range))
 
