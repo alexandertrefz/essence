@@ -96,6 +96,7 @@ import {
 	expandShorthandKeyAction,
 	expandShorthandPathAction,
 } from "./shorthandFixes"
+import { tableTestActions } from "./tableTest"
 import {
 	contradictoryModifierActions,
 	mergeModifierAction,
@@ -261,6 +262,7 @@ export function findCodeActions(
 		),
 	)
 	entries.push(...inlineConstantActions(program, lines, range, indexed))
+	entries.push(...tableTestActions(program, enrichedProgram, lines, range))
 	entries.push(...pathActions(program, () => indexed().scopes, lines, range))
 	entries.push(...defineActions(program, lines, range))
 	entries.push(...payloadActions(program, enrichedProgram, lines, range))

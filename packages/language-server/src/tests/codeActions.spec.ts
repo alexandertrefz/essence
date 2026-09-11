@@ -6612,3 +6612,205 @@ describe("Extract to a Function", () => {
 		).toEqual([])
 	})
 })
+
+describe("Write it as a table test", () => {
+	function tables(
+		lines: Array<string>,
+		range: common.Position,
+	): Array<CodeActionEntry> {
+		return refactorsOf(lines, range, "refactor.rewrite").filter(
+			(entry) => entry.title === "Write it as a table test",
+		)
+	}
+
+	// NOTE: The whole test is the target, so a cursor anywhere in it offers
+	// the rewrite — which is what the `test` keyword's own line is here.
+	function onTheTest(lines: Array<string>, name: string): common.Position {
+		let line = lines.findIndex((candidate) => candidate.includes(name)) + 1
+
+		return { start: { line, column: 2 }, end: { line, column: 2 } }
+	}
+
+	it("collects repeated expectations into rows", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction sum(_ a: Integer, _ b: Integer) -> Integer {",
+			"\t\t<- a::add(b)",
+			"\t}",
+			"}",
+			"",
+			"tests {",
+			'\ttest "adds up" {',
+			"\t\texpect sum(1, 2)::is(3)",
+			"\t\texpect sum(2, 3)::is(5)",
+			"\t}",
+			"}",
+		]
+
+		let [action] = tables(lines, onTheTest(lines, '"adds up"'))
+		let result = applied(lines, action)
+
+		expect(action.kind).toBe("refactor.rewrite")
+		expect(action.isPreferred).toBe(false)
+
+		expect(result).toEqual([
+			"implementation {",
+			"\tfunction sum(_ a: Integer, _ b: Integer) -> Integer {",
+			"\t\t<- a::add(b)",
+			"\t}",
+			"}",
+			"",
+			"tests {",
+			'\ttest "adds up" across [',
+			"\t\t{ a = 1, b = 2, expected = 3 },",
+			"\t\t{ a = 2, b = 3, expected = 5 },",
+			"\t] ({ a, b, expected }: { a: Integer, b: Integer, expected: Integer }) {",
+			"\t\texpect sum(a, b)::is(expected)",
+			"\t}",
+			"}",
+		])
+
+		expectRefactored(lines, result)
+	})
+
+	// NOTE: A column takes its name from the Argument's label where there is
+	// one, which is what makes a row read as the call did — at the price of the
+	// label being written twice at the call itself.
+	it("names a column after the label, and widens a Case to its Choice", () => {
+		let lines = [
+			"implementation {",
+			"\tchoice Outcome {",
+			"\t\tWin,",
+			"\t\tLoss,",
+			"\t}",
+			"",
+			"\tfunction outcomeOf(_ scored: Integer, against conceded: Integer) -> Outcome {",
+			"\t\t<- define {",
+			"\t\t\tas #Win if scored::isGreaterThan(conceded)",
+			"\t\t\tas #Loss otherwise",
+			"\t\t}",
+			"\t}",
+			"}",
+			"",
+			"tests {",
+			'\ttest "scores" {',
+			"\t\texpect outcomeOf(2, against 0)::is(#Win)",
+			"\t\texpect outcomeOf(0, against 2)::is(#Loss)",
+			"\t}",
+			"}",
+		]
+
+		let [action] = tables(lines, onTheTest(lines, '"scores"'))
+		let result = applied(lines, action)
+
+		expect(result.slice(15)).toEqual([
+			'\ttest "scores" across [',
+			"\t\t{ a = 2, against = 0, expected = #Win },",
+			"\t\t{ a = 0, against = 2, expected = #Loss },",
+			"\t] ({ a, against, expected }: { a: Integer, against: Integer, expected: Outcome }) {",
+			"\t\texpect outcomeOf(a, against against)::is(expected)",
+			"\t}",
+			"}",
+		])
+
+		expectRefactored(lines, result)
+	})
+
+	it("offers nothing for one expectation, or for two of different calls", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction sum(_ a: Integer, _ b: Integer) -> Integer {",
+			"\t\t<- a::add(b)",
+			"\t}",
+			"",
+			"\tfunction gap(_ a: Integer, _ b: Integer) -> Integer {",
+			"\t\t<- a::subtract(b)",
+			"\t}",
+			"}",
+			"",
+			"tests {",
+			'\ttest "adds up" {',
+			"\t\texpect sum(1, 2)::is(3)",
+			"\t}",
+			"",
+			'\ttest "does both" {',
+			"\t\texpect sum(1, 2)::is(3)",
+			"\t\texpect gap(3, 1)::is(2)",
+			"\t}",
+			"}",
+		]
+
+		expect(tables(lines, onTheTest(lines, '"adds up"'))).toEqual([])
+		expect(tables(lines, onTheTest(lines, '"does both"'))).toEqual([])
+	})
+
+	// NOTE: A row holds a value and nothing else, so an Argument that reads a
+	// name has nowhere to go — and an assertion that is not `::is(…)` says
+	// something a column of expected values can not.
+	it("offers nothing for an Argument that is not written out", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction sum(_ a: Integer, _ b: Integer) -> Integer {",
+			"\t\t<- a::add(b)",
+			"\t}",
+			"}",
+			"",
+			"tests {",
+			"\tconstant one = 1",
+			"",
+			'\ttest "adds up" {',
+			"\t\texpect sum(one, 2)::is(3)",
+			"\t\texpect sum(2, 3)::is(5)",
+			"\t}",
+			"",
+			'\ttest "is bigger" {',
+			"\t\texpect sum(1, 2)::isGreaterThan(1)",
+			"\t\texpect sum(2, 3)::isGreaterThan(2)",
+			"\t}",
+			"}",
+		]
+
+		expect(tables(lines, onTheTest(lines, '"adds up"'))).toEqual([])
+		expect(tables(lines, onTheTest(lines, '"is bigger"'))).toEqual([])
+	})
+
+	it("offers nothing for a column whose values are of two Types", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction describe(_ n: Number) -> String {",
+			"\t\t<- n::toString()",
+			"\t}",
+			"}",
+			"",
+			"tests {",
+			'\ttest "describes" {',
+			'\t\texpect describe(1)::is("1")',
+			'\t\texpect describe(1/2)::is("1/2")',
+			"\t}",
+			"}",
+		]
+
+		expect(tables(lines, onTheTest(lines, '"describes"'))).toEqual([])
+	})
+
+	it("offers nothing for a test that is already a table", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction sum(_ a: Integer, _ b: Integer) -> Integer {",
+			"\t\t<- a::add(b)",
+			"\t}",
+			"}",
+			"",
+			"tests {",
+			'\ttest "adds up" across [',
+			"\t\t{ a = 1, b = 2, expected = 3 },",
+			"\t\t{ a = 2, b = 3, expected = 5 },",
+			"\t] ({ a, b, expected }: { a: Integer, b: Integer, expected: Integer }) {",
+			"\t\texpect sum(a, b)::is(expected)",
+			"\t}",
+			"}",
+		]
+
+		expect(tables(lines, onTheTest(lines, '"adds up"'))).toEqual([])
+	})
+})
