@@ -279,7 +279,7 @@
 					"name": "keyword.other.essence"
 				},
 				{
-					"comment": "The `where` the rule above can not reach: a Guard whose Condition is an ordinary Expression — `case { x, y } where x::is(y)`, `case 0 where count::isNot(1)` — which begins with a lowercase name as often as not, and so says nothing about itself. What stands in FRONT of it is what tells a Guard from the Argument LABEL spelled the same: a label opens its Argument, so a `(`, a comma or the head of the line precedes it, where a Guard follows the Matcher it guards — a Pattern's `}`, a Type's last letter, a Literal's last digit, a `_`. What may follow is where a Condition starts, and the excluded characters are what a value NAMED `where` is followed by instead: `constant where = 3` and `where::length()` both stay unlit. A `where` at the END of its line is left to the line rule below.",
+					"comment": "The `where` the rule above can not reach: a Guard whose Condition is an ordinary Expression — `case { x, y } where x::is(y)`, `case 0 where count::isNot(1)` — which begins with a lowercase name as often as not, and so says nothing about itself. What stands in FRONT of it is what tells a Guard from the Argument LABEL spelled the same: a label opens its Argument, so a `(`, a comma or the head of the line precedes it, where a Guard follows the Matcher it guards — a Pattern's `}`, a Type's last letter, a Literal's last digit, a `_`. What may follow is where a Condition starts, and the excluded characters are what a value NAMED `where` is followed by instead: `constant where = 3` and `where::length()` both stay unlit. A `where` whose Condition is written on the NEXT line is reached by neither this rule nor the one below — this asks for the Condition behind it and that asks for the word at the head of its line — so it goes unlit, which is the side to miss on.",
 					"match": "(?<=[^\\s(,])[ \\t]+(where)\\b(?=[ \\t]+[^\\s=,:)\\]}])",
 					"captures": {
 						"1": {
@@ -288,7 +288,7 @@
 					}
 				},
 				{
-					"comment": "A Guard the Formatter broke onto a line of its own, which the rule above can never light: that one wants the Matcher immediately in front, and a line break and an indent stand there instead. The other line-initial `where` in the corpus is an Argument label in an exploded Argument list — `where check: (…) -> Boolean,` and `where (item) { … },` — and the trailing comma is what tells the two apart, exactly as it does for the `as` of an arm below: the Formatter ends every exploded Argument with one, and a Guard ends in its Condition. A label written last in a list with no comma behind it goes unlit, which is the side to miss on.",
+					"comment": "A Guard the Formatter broke onto a line of its own, which the rule above can never light: that one wants the Matcher immediately in front, and a line break and an indent stand there instead. The other line-initial `where` in the corpus is an Argument label in an exploded Argument list — `where check: (…) -> Boolean,` and `where (item) { … },` — and the trailing comma is what tells the two apart, exactly as it does for the `as` of an arm below: the Formatter ends every exploded Argument with one, and a Guard ends in its Condition. So a label written LAST in such a list, which carries no comma, is lit as though it were a Guard — the one shape the rule reads wrong, and a rarer one than the Guard it is here for.",
 					"match": "^[ \\t]*(where)\\b(?=[ \\t]+[^\\s=,:)\\]}])(?![^\\n]*,[ \\t\\r]*$)",
 					"captures": {
 						"1": {
@@ -317,9 +317,18 @@
 					"name": "storage.modifier.essence"
 				},
 				{
-					"comment": "`focused`, which carries nothing at all — so what follows it is the item's own block, or the end of the line where the Formatter put the Modifier on one of its own. A call and an assignment are what a value spelled this way is followed by, and neither is a brace.",
-					"match": "\\b(focused)\\b(?=[ \\t]*(\\{|$))",
+					"comment": "`focused`, which carries nothing at all — so what follows it is the item's own block. A call and an assignment are what a value spelled this way is followed by, and neither is a brace.",
+					"match": "\\b(focused)\\b(?=[ \\t]*\\{)",
 					"name": "storage.modifier.essence"
+				},
+				{
+					"comment": "And the same Modifier on a line of its OWN, which is where the Formatter puts one under a `test \"…\"` head. Nothing may stand in front of it there, because ending its line is not on its own a fact about a Modifier: `constant enabled = focused` ends one too, and a value spelled this way is not one.",
+					"match": "^[ \\t]*(focused)\\b(?=[ \\t\\r]*$)",
+					"captures": {
+						"1": {
+							"name": "storage.modifier.essence"
+						}
+					}
 				},
 				{
 					"comment": "`across [ … ]` opens a table test. The rows may be any Expression, but the brackets around them are the Parser's own requirement — a row is a test in its own right and has to be countable before anything runs — so the bracket is what scopes the word, and `constant across = 3` stays unlit.",

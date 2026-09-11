@@ -108,7 +108,8 @@ describe("the define grammar", () => {
 describe("the testing grammar", () => {
 	let skipped = contextualKeyword("(skipped)")
 	let tagged = contextualKeyword("(tagged)")
-	let focused = contextualKeyword("(focused)")
+	let focused = contextualKeyword("\\b(focused)")
+	let focusedAlone = contextualKeyword("^[ \\t]*(focused)")
 	let across = contextualKeyword("(across)")
 	let snapshot = contextualKeyword("(matches)")
 	let forAny = contextualKeyword("(any)")
@@ -132,15 +133,25 @@ describe("the testing grammar", () => {
 	})
 
 	// NOTE: A `focused` carries nothing, so the brace of the item's own block is
-	// what follows it — or nothing at all, where the Formatter stood the
-	// Modifier on a line of its own.
+	// what follows it.
 	it("lights a focused test on the block behind it", () => {
 		expect(
 			focused.test('\t\t\ttest "calls a lower score a loss" focused {'),
 		).toBe(true)
-		expect(focused.test("\t\t\tfocused")).toBe(true)
 		expect(focused.test("\tconstant focused = false")).toBe(false)
 		expect(focused.test("\t\t<- focused()")).toBe(false)
+	})
+
+	// NOTE: Or nothing at all, where the Formatter stood the Modifier on a line
+	// of its own — and there NOTHING may stand in front of it, because ending
+	// its line is not on its own a fact about a Modifier. A value read out of a
+	// Constant ends a line the same way.
+	it("lights a focused written on a line of its own, and nothing else", () => {
+		expect(focusedAlone.test("\t\t\tfocused")).toBe(true)
+		expect(focusedAlone.test("\t\tfocused\r")).toBe(true)
+		expect(focusedAlone.test("\tconstant enabled = focused")).toBe(false)
+		expect(focusedAlone.test("\t\t<- focused")).toBe(false)
+		expect(focusedAlone.test('\ttest "a" focused')).toBe(false)
 	})
 
 	it("lights the across of a table test", () => {
