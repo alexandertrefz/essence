@@ -6673,10 +6673,11 @@ describe("Write it as a table test", () => {
 		expectRefactored(lines, result)
 	})
 
-	// NOTE: A column takes its name from the Argument's label where there is
-	// one, which is what makes a row read as the call did — at the price of the
-	// label being written twice at the call itself.
-	it("names a column after the label, and widens a Case to its Choice", () => {
+	// NOTE: A column takes its name from the Parameter the Argument fills, so
+	// the rows read in the callee's own words rather than in the call's. The
+	// label stays where the call writes it — `against conceded` — and is no part
+	// of what the column is called.
+	it("names a column after the Parameter, and widens a Case to its Choice", () => {
 		let lines = [
 			"implementation {",
 			"\tchoice Outcome {",
@@ -6705,10 +6706,46 @@ describe("Write it as a table test", () => {
 
 		expect(result.slice(15)).toEqual([
 			'\ttest "scores" across [',
-			"\t\t{ a = 2, against = 0, expected = #Win },",
-			"\t\t{ a = 0, against = 2, expected = #Loss },",
-			"\t] ({ a, against, expected }: { a: Integer, against: Integer, expected: Outcome }) {",
-			"\t\texpect outcomeOf(a, against against)::is(expected)",
+			"\t\t{ scored = 2, conceded = 0, expected = #Win },",
+			"\t\t{ scored = 0, conceded = 2, expected = #Loss },",
+			"\t] ({ scored, conceded, expected }: { scored: Integer, conceded: Integer, expected: Outcome }) {",
+			"\t\texpect outcomeOf(scored, against conceded)::is(expected)",
+			"\t}",
+			"}",
+		])
+
+		expectRefactored(lines, result)
+	})
+
+	// NOTE: A Parameter with no name of its own — `_: Integer` binds nothing the
+	// body could say — leaves its column to the letters, beside one named after
+	// the Parameter that does have a name.
+	it("falls back to a letter where the Parameter binds no name", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction first(_ a: Integer, _: Integer) -> Integer {",
+			"\t\t<- a",
+			"\t}",
+			"}",
+			"",
+			"tests {",
+			'\ttest "takes the first" {',
+			"\t\texpect first(1, 2)::is(1)",
+			"\t\texpect first(3, 4)::is(3)",
+			"\t}",
+			"}",
+		]
+
+		let [action] = tables(lines, onTheTest(lines, '"takes the first"'))
+		let result = applied(lines, action)
+
+		expect(result.slice(6)).toEqual([
+			"tests {",
+			'\ttest "takes the first" across [',
+			"\t\t{ a = 1, b = 2, expected = 1 },",
+			"\t\t{ a = 3, b = 4, expected = 3 },",
+			"\t] ({ a, b, expected }: { a: Integer, b: Integer, expected: Integer }) {",
+			"\t\texpect first(a, b)::is(expected)",
 			"\t}",
 			"}",
 		])

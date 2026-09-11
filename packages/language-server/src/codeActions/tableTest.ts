@@ -10,6 +10,7 @@ import {
 	sliceOf,
 } from "./geometry"
 import type { CodeActionEntry } from "./index"
+import { walk } from "./lookups"
 import { isSpellableType, typedExpressionAt } from "./typedLookups"
 
 // NOTE: A test that says one thing about several values, written as the table
@@ -56,7 +57,7 @@ export function tableTestActions(
 			continue
 		}
 
-		let entry = tableAction(test, enrichedProgram, lines)
+		let entry = tableAction(test, program, enrichedProgram, lines)
 
 		if (entry !== null) {
 			entries.push(entry)
@@ -68,6 +69,7 @@ export function tableTestActions(
 
 function tableAction(
 	test: parser.TestNode,
+	program: parser.Program,
 	enrichedProgram: common.typed.Program,
 	lines: Array<string>,
 ): CodeActionEntry | null {
@@ -95,7 +97,7 @@ function tableAction(
 		rows.push(expectation)
 	}
 
-	let columns = columnsOf(rows, enrichedProgram, lines)
+	let columns = columnsOf(rows, program, enrichedProgram, lines)
 
 	if (columns === null) {
 		return null
@@ -253,12 +255,14 @@ function isWritable(node: parser.ExpressionNode): boolean {
 // a hole in it rather than a table.
 function columnsOf(
 	rows: Array<Expectation>,
+	program: parser.Program,
 	enrichedProgram: common.typed.Program,
 	lines: Array<string>,
 ): Array<Column> | null {
 	let head = rows[0] as Expectation
 	let columns: Array<Column> = []
 	let taken = new Set<string>()
+	let declared = parameterNamesOf(program, head)
 
 	for (let at = 0; at <= head.written.length; at++) {
 		let cells = rows.map((row) =>
@@ -269,13 +273,16 @@ function columnsOf(
 				? null
 				: (head.written[at]?.label ?? null)
 
-		// NOTE: The columns are named after the Argument LABELS where there are
-		// any, since a row reads better as `{ against = 0 }` than as
-		// `{ b = 0 }`. A labelled Argument then writes its label twice at the
-		// call — `outcomeOf(a, against against)` — which is the price of the
-		// row reading as it does.
+		// NOTE: A column is named as the CALLEE names the Parameter it fills,
+		// where the file declares the callee — the rows then read in the words
+		// the code under test is written in, and `{ conceded = 0 }` says what
+		// `{ b = 0 }` could not. The Argument's label is the next best thing,
+		// since it is at least a word the call site chose, and a letter is what
+		// is left where there is neither.
 		let name =
-			at === head.written.length ? "expected" : (label ?? letterAt(at))
+			at === head.written.length
+				? "expected"
+				: (declared[at] ?? label ?? letterAt(at))
 
 		if (
 			cells.some((cell) => cell === undefined) ||
@@ -355,8 +362,65 @@ function columnType(
 	return written
 }
 
-// NOTE: `a`, `b`, `c` — the names a column takes when the Argument carrying it
-// was written with no label. Past the alphabet there is nothing to fall back
+// NOTE: What the callee calls its own Parameters, one per written Argument and
+// null wherever there is no name to read. The internal name is the one asked
+// for rather than the label: a label is what the CALL writes, so naming a
+// column after one makes the call say it twice — `outcomeOf(a, against
+// against)` — while the internal name is the word the Function's own body uses
+// for the value a row is carrying.
+//
+// Answered only where the file declares EXACTLY ONE Function of that name whose
+// Parameters line up with the call, label for label. A name declared twice, a
+// call that leaves a defaulted Parameter out, a Function this file only imports
+// — each is a callee whose Parameters this can not read off the Program it was
+// handed, and a guess would name a column after the wrong declaration.
+function parameterNamesOf(
+	program: parser.Program,
+	head: Expectation,
+): Array<string | null> {
+	let nothing = head.written.map(() => null)
+	let declared: Array<parser.FunctionDefinitionNode> = []
+
+	walk(program, (node) => {
+		if (
+			node.nodeType === "FunctionStatement" &&
+			node.name.content === head.callee
+		) {
+			declared.push(node.value)
+		}
+	})
+
+	let definition = declared[0]
+
+	if (declared.length !== 1 || definition === undefined) {
+		return nothing
+	}
+
+	let parameters = definition.parameters
+
+	if (
+		parameters.length !== head.written.length ||
+		parameters.some(
+			(parameter, at) =>
+				(parameter.externalName?.content ?? null) !==
+				head.written[at]?.label,
+		)
+	) {
+		return nothing
+	}
+
+	// NOTE: A Parameter that takes its value apart — `of { width, height }` —
+	// and one that binds nothing at all — `_: Integer` — have no single name
+	// between them, so those columns fall back with the rest.
+	return parameters.map((parameter) =>
+		parameter.internalName?.nodeType === "Identifier"
+			? parameter.internalName.content
+			: null,
+	)
+}
+
+// NOTE: `a`, `b`, `c` — the names a column takes when neither the callee nor
+// the Argument carrying it had one to lend. Past the alphabet there is nothing to fall back
 // on, and a call of twenty-seven Arguments is not what this is for.
 function letterAt(at: number): string | null {
 	return at < 26 ? String.fromCharCode("a".charCodeAt(0) + at) : null
