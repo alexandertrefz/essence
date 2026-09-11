@@ -896,6 +896,17 @@ The runner tries the candidates in the order the List holds them, keeps the
 first one that fails as well, and asks that value for its own — so a body whose
 smallest candidate comes first is walked down in one pass.
 
+**Quick Fix — "Make 'T' Generatable":** writes that Namespace under the
+declaration, drawing a Record member by member and picking a Choice's Case from
+a written List. Offered only where the Parameter names a Record Alias or a
+Choice THIS file declares, and never for a generic one, whose conformance
+`unreachable-conformance` refuses. A member it has no draw for — anything but an
+`Integer`, a `String`, a `Boolean` or a `Rational` — is left out of the value
+and named in a `§` line above it, so what is missing is a Diagnostic rather than
+a plausible value nobody wrote. The same edit is offered as a refactoring on the
+declaration itself. It writes no `shrink`: the Protocol PROVIDES one, and a
+second body answering no candidates would say nothing the provided one does not.
+
 ### `unreachable-conformance`
 
 A `Generatable` conformance declared on a GENERIC Namespace, for a Type a

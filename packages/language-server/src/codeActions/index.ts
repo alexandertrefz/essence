@@ -2,7 +2,6 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { type Analysis, analyseDocument, documentFilePath } from "../analyse"
 import type { Workspace } from "../workspace"
-import { documentFunctionActions } from "./documentFunction"
 import {
 	compareWrittenValueAction,
 	matcherBeforeValueAction,
@@ -20,6 +19,7 @@ import {
 	otherwiseArmAction,
 	unreachableDefineArmActions,
 } from "./defineFixes"
+import { documentFunctionActions } from "./documentFunction"
 import {
 	argumentLabelAction,
 	binderToScrutineeAction,
@@ -66,6 +66,10 @@ import {
 	ordinaryCommentAction,
 	partialDecimalActions,
 } from "./literalFixes"
+import {
+	makeGeneratableAction,
+	makeGeneratableActions,
+} from "./makeGeneratable"
 import {
 	catchAllCaseAction,
 	dropGuardAction,
@@ -224,6 +228,7 @@ export function findCodeActions(
 		...implementProtocolActions(program, enrichedProgram, lines, range),
 	)
 	entries.push(...documentFunctionActions(program, lines, range))
+	entries.push(...makeGeneratableActions(program, lines, range))
 	entries.push(...matchOnValueActions(enrichedProgram, lines, range))
 	entries.push(...shorthandActions(program, lines, range))
 
@@ -379,6 +384,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(documentationLineAction(diagnostic, lines)),
 	"unexpected-payload": ({ diagnostic, program, lines }) =>
 		listed(bareCaseAction(diagnostic, program, lines)),
+	"ungeneratable-type": makeGeneratableAction,
 	"uninferred-namespace-parameter": ({ diagnostic, program, lines }) =>
 		listed(inferParameterAction(diagnostic, program, lines)),
 	// NOTE: A suggestion is the Case's NAME and the span it is written over is

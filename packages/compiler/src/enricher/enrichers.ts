@@ -4246,11 +4246,38 @@ function enrichTestProperty(
 		// it generates is never asked for. It is a Boolean rather than nothing
 		// so the Parameter keeps its place, and the body underneath reports
 		// what IT says rather than a cascade about a Parameter that vanished.
-		generator: deriveGenerator(type, scope, parameter.position, []) ?? {
+		generator: deriveGenerator(
+			type,
+			scope,
+			parameter.position,
+			[],
+			conformableTypeName(parameter.type, type),
+		) ?? {
 			kind: "boolean",
 		},
 		position: parameter.position,
 	}
+}
+
+// NOTE: The name a `Generatable` conformance could be declared under, or null
+// where nothing could. A Namespace targets a Type the source can NAME, so the
+// Parameter has to have written one — `for any (h: Handler)` and not
+// `for any (h: { read: (_: String) -> Integer })`, which has no name to write
+// `for` — and the Type it names has to be one a value is BUILT of: a Record to
+// fill member by member, or a Choice to pick a Case of. Everything else has no
+// shape a generator could be written against.
+function conformableTypeName(
+	written: parser.TypeDeclarationNode,
+	type: common.Type,
+): string | null {
+	if (written.nodeType !== "IdentifierTypeDeclaration") {
+		return null
+	}
+
+	let cases = type.type === "UnionType" ? flattenUnionMembers(type) : [type]
+	let isChoice = cases.length > 0 && cases.every((one) => one.type === "Case")
+
+	return type.type === "Record" || isChoice ? written.type.content : null
 }
 
 // NOTE: The Parameter's own name as an Identifier Node rather than as a bare
@@ -4291,6 +4318,12 @@ export function deriveGenerator(
 	scope: enricher.Scope,
 	position: common.Position,
 	enclosing: Array<string>,
+	// NOTE: The Type a `Generatable` conformance would be DECLARED for, which
+	// is the Parameter's own Type as the source wrote it — never the Type the
+	// walk below tripped over, which may be a member three levels inside it.
+	// It rides along unchanged, the way `position` does: what a refusal has to
+	// name is the Type the reader can do something about.
+	declared: string | null = null,
 ): common.typed.TestGenerator | null {
 	let conformance = generatableConformance(type, scope, position)
 
@@ -4313,6 +4346,7 @@ export function deriveGenerator(
 				scope,
 				position,
 				enclosing,
+				declared,
 			)
 
 			return item === null ? null : { kind: "list", item }
@@ -4322,7 +4356,13 @@ export function deriveGenerator(
 		case "GenericList":
 			return { kind: "list", item: anyValueGenerator() }
 		case "Dictionary": {
-			let key = deriveGenerator(type.keyType, scope, position, enclosing)
+			let key = deriveGenerator(
+				type.keyType,
+				scope,
+				position,
+				enclosing,
+				declared,
+			)
 
 			if (key === null) {
 				return null
@@ -4333,6 +4373,7 @@ export function deriveGenerator(
 				scope,
 				position,
 				enclosing,
+				declared,
 			)
 
 			// NOTE: Both slots or nothing — a Dictionary whose values can not be
@@ -4393,6 +4434,7 @@ export function deriveGenerator(
 				scope,
 				position,
 				enclosing,
+				declared,
 			)
 
 			return members === null ? null : { kind: "record", members }
@@ -4403,14 +4445,18 @@ export function deriveGenerator(
 					type,
 					position,
 					`'${displayChoiceName(type.choice)}' names itself in a payload`,
+					declared,
 					"A generator is finite, and a Type that contains itself has no smallest value to build.",
 				)
 			}
 
-			let members = deriveMembers(type.members, scope, position, [
-				...enclosing,
-				type.choice,
-			])
+			let members = deriveMembers(
+				type.members,
+				scope,
+				position,
+				[...enclosing, type.choice],
+				declared,
+			)
 
 			return members === null
 				? null
@@ -4425,6 +4471,7 @@ export function deriveGenerator(
 					scope,
 					position,
 					enclosing,
+					declared,
 				)
 
 				if (generator === null) {
@@ -4437,7 +4484,7 @@ export function deriveGenerator(
 			return members.length === 0 ? null : { kind: "union", members }
 		}
 		case "Refinement":
-			return refinedGenerator(type, scope, position, enclosing)
+			return refinedGenerator(type, scope, position, enclosing, declared)
 		// NOTE: An Error Type has already been reported by whatever produced
 		// it, and a second Diagnostic about the same Parameter would say
 		// nothing further.
@@ -4448,6 +4495,7 @@ export function deriveGenerator(
 				type,
 				position,
 				`nothing knows how to build ${withArticle(printType(type))}`,
+				declared,
 			)
 	}
 }
@@ -4476,11 +4524,18 @@ function deriveMembers(
 	scope: enricher.Scope,
 	position: common.Position,
 	enclosing: Array<string>,
+	declared: string | null,
 ): Array<common.typed.TestGeneratorMember> | null {
 	let derived: Array<common.typed.TestGeneratorMember> = []
 
 	for (let [name, memberType] of Object.entries(members)) {
-		let generator = deriveGenerator(memberType, scope, position, enclosing)
+		let generator = deriveGenerator(
+			memberType,
+			scope,
+			position,
+			enclosing,
+			declared,
+		)
 
 		if (generator === null) {
 			return null
@@ -4503,8 +4558,9 @@ function refinedGenerator(
 	scope: enricher.Scope,
 	position: common.Position,
 	enclosing: Array<string>,
+	declared: string | null,
 ): common.typed.TestGenerator | null {
-	let base = deriveGenerator(type.base, scope, position, enclosing)
+	let base = deriveGenerator(type.base, scope, position, enclosing, declared)
 
 	if (base === null) {
 		return null
@@ -4522,10 +4578,15 @@ function refinedGenerator(
 		let check = predicateCheck(conjunct, type, binding, scope, position)
 
 		if (check === null) {
+			// NOTE: A refinement names ITSELF as what to declare a conformance
+			// for, whatever Parameter it was reached through: the predicate is
+			// the refinement's, and a conformance on the base Type would draw
+			// values the refinement calls impossible.
 			return refuseUngeneratableType(
 				type,
 				position,
 				`nothing knows how to hold '@::${conjunct.methodName}(…)'`,
+				null,
 				`'${type.name}' is a checked refinement, and a generated value has to satisfy its predicate.`,
 				`Declare a 'Generatable' conformance for '${type.name}': 'namespace ${type.name} for ${type.name} is Generatable { … }'.`,
 			)
@@ -5192,6 +5253,12 @@ function refuseUngeneratableType(
 	type: common.Type,
 	position: common.Position,
 	label: string,
+	// NOTE: The Type a conformance would be declared FOR, where there is one to
+	// declare it for — the Parameter's own, which is what a fix writes a
+	// Namespace beside. Null where the Parameter names no such Type: a Function
+	// has no Namespace to hang a conformance off, and a Type Parameter is not a
+	// Type anybody can declare one for.
+	declared: string | null,
 	note = "A property test generates a value of every Parameter's Type, once per case.",
 	help = "Write a Type a value can be built of, or declare a 'Generatable' conformance for this one.",
 ): null {
@@ -5202,6 +5269,14 @@ function refuseUngeneratableType(
 			code: "ungeneratable-type",
 			labels: [primary(position, label)],
 			notes: [note],
+			...(declared === null
+				? {}
+				: {
+						data: {
+							kind: "ungeneratable" as const,
+							typeName: declared,
+						},
+					}),
 			// NOTE: The second help is the half of a conformance nobody thinks
 			// to write. `Generatable` provides a `shrink` answering no
 			// candidates, so a conformance declared for the first help alone

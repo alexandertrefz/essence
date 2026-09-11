@@ -261,6 +261,13 @@ export type DiagnosticData =
 	// never declared — carried as written, since what a fix inserts into the
 	// Generic list is the very name the condition reads.
 	| { kind: "undeclared-parameter"; name: string }
+	// NOTE: The Type a `Generatable` conformance would be DECLARED for, which
+	// is the Parameter's own Type as the source wrote it — never the Type the
+	// derivation tripped over, which may be a member several levels inside it.
+	// Absent where the Parameter names no Type a Namespace could target: a
+	// Function has nothing to hang a conformance off, and a Type Parameter is
+	// not a Type anybody declares one for.
+	| { kind: "ungeneratable"; typeName: string }
 
 // NOTE: Every Diagnostic carries one, and `docs/diagnostics.md` documents
 // every one of these — a code with no entry there is a code nobody can look

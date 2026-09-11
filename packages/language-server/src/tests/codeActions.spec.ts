@@ -4097,7 +4097,7 @@ describe("Code Actions", () => {
 						"\t}",
 						"}",
 					]),
-				),
+				).filter((title) => title.startsWith("Implement")),
 			).toEqual([])
 		})
 
@@ -4138,8 +4138,195 @@ describe("Code Actions", () => {
 					"\tnamespace Point for Point is Printable {",
 					"\t}",
 					"}",
-				]).map((entry) => entry.kind),
+				])
+					.filter((entry) => entry.title.startsWith("Implement"))
+					.map((entry) => entry.kind),
 			).toEqual(["quickfix"])
+		})
+	})
+
+	// NOTE: The conformance a property test asks for, written beside the Type it
+	// is about. What it can not draw it leaves OUT, so the value it builds is
+	// incomplete and says so — a drawn value that was plausible rather than
+	// right would make every property over it a report about the generator.
+	describe("ungeneratable-type", () => {
+		let generatableActions = (
+			lines: Array<string>,
+			line: number,
+			column: number,
+		): Array<CodeActionEntry> =>
+			actionsOf(lines, {
+				start: { line, column },
+				end: { line, column },
+			}).filter((entry) => entry.title.startsWith("Make"))
+
+		it("should write a conformance beside the Type a property test can not build", () => {
+			let lines = [
+				"implementation {",
+				"\ttype Handler = { x: Integer, read: (_: String) -> Integer }",
+				"}",
+				"",
+				"tests {",
+				'\ttest "a property" for any (h: Handler) {',
+				"\t\texpect true",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = generatableActions(lines, 6, 31)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Make 'Handler' Generatable")
+			expect(fix.kind).toBe("quickfix")
+			expect(fix.diagnosticCode).toBe("ungeneratable-type")
+			expect(fix.isPreferred).toBe(false)
+
+			expect(result.slice(0, 10)).toEqual([
+				"implementation {",
+				"\ttype Handler = { x: Integer, read: (_: String) -> Integer }",
+				"",
+				"\tnamespace HandlerGeneratable for Handler is Generatable {",
+				"\t\tstatic generate(from source: Randomness) -> Handler {",
+				"\t\t\t§ No draw for 'read' — write one, or the value below is incomplete.",
+				"\t\t\t<- { x = source::drawInteger(between 0, and 100) }",
+				"\t\t}",
+				"\t}",
+				"}",
+			])
+
+			// NOTE: The conformance replaces the derivation, so the refusal is
+			// answered — and the member it could not draw is a hole the Record
+			// below reports on its own.
+			expect(codesOf(result)).not.toContain("ungeneratable-type")
+			expect(codesOf(result)).not.toContain("syntax-error")
+			expect(codesOf(result)).toContain("return-type-mismatch")
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		it("should draw a Record member by member", () => {
+			let lines = [
+				"implementation {",
+				"\ttype Point = { x: Integer, label: String }",
+				"}",
+			]
+
+			let [refactor] = generatableActions(lines, 2, 8)
+			let result = applied(lines, refactor)
+
+			expect(refactor.kind).toBe("refactor.rewrite")
+			expect(refactor.diagnosticCode).toBeNull()
+
+			expect(result).toEqual([
+				"implementation {",
+				"\ttype Point = { x: Integer, label: String }",
+				"",
+				"\tnamespace PointGeneratable for Point is Generatable {",
+				"\t\tstatic generate(from source: Randomness) -> Point {",
+				"\t\t\t<- {",
+				"\t\t\t\tx = source::drawInteger(between 0, and 100),",
+				"\t\t\t\tlabel = source::drawString(upTo 10),",
+				"\t\t\t}",
+				"\t\t}",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(result)).toEqual([])
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		it("should pick a Choice's Case from a written List", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Colour { Red, Green, Blue }",
+				"}",
+			]
+
+			let result = applied(lines, generatableActions(lines, 2, 10)[0])
+
+			expect(result.slice(3)).toEqual([
+				"\tnamespace ColourGeneratable for Colour is Generatable {",
+				"\t\tstatic generate(from source: Randomness) -> Colour {",
+				"\t\t\t<- source::pick(from [Colour#Red, Colour#Green, Colour#Blue])",
+				"\t\t}",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(result)).toEqual([])
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		// NOTE: A Case carrying a payload is BUILT before it is picked, and the
+		// list breaks where the Formatter would break it — a scaffold laid out
+		// differently would be rewritten the next time the file is saved.
+		it("should build a Case's payload and break the list that does not fit", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Shape {",
+				"\t\tBlank,",
+				"\t\tCircle { radius: Integer },",
+				"\t}",
+				"}",
+			]
+
+			let result = applied(lines, generatableActions(lines, 2, 9)[0])
+
+			expect(result.slice(6)).toEqual([
+				"\tnamespace ShapeGeneratable for Shape is Generatable {",
+				"\t\tstatic generate(from source: Randomness) -> Shape {",
+				"\t\t\t<- source::pick(from [",
+				"\t\t\t\tShape#Blank,",
+				"\t\t\t\tShape#Circle({ radius = source::drawInteger(between 0, and 100) }),",
+				"\t\t\t])",
+				"\t\t}",
+				"\t}",
+				"}",
+			])
+
+			expect(codesOf(result)).toEqual([])
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		it("should offer nothing where the Type already conforms", () => {
+			expect(
+				generatableActions(
+					[
+						"implementation {",
+						"\ttype Point = { x: Integer }",
+						"",
+						"\tnamespace PointGeneratable for Point is Generatable {",
+						"\t\tstatic generate(from source: Randomness) -> Point {",
+						"\t\t\t<- { x = 1 }",
+						"\t\t}",
+						"\t}",
+						"}",
+					],
+					2,
+					8,
+				),
+			).toEqual([])
+		})
+
+		// NOTE: `generate` takes a source and nothing else, so a call has no
+		// Argument for a Type Parameter to be worked out from — which is what
+		// `unreachable-conformance` refuses. Offering to write one would be
+		// offering to break the file.
+		it("should offer nothing for a generic Choice", () => {
+			expect(
+				generatableActions(
+					[
+						"implementation {",
+						"\tchoice Maybe<ItemType> {",
+						"\t\tNone,",
+						"\t\tSome { item: ItemType },",
+						"\t}",
+						"}",
+					],
+					2,
+					9,
+				),
+			).toEqual([])
 		})
 	})
 
