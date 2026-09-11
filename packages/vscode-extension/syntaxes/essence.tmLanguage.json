@@ -118,6 +118,15 @@
 					}
 				},
 				{
+					"comment": "`@example` carries no text on its own line — its assertions are written on the lines below it, and the Compiler compiles and runs them as tests of their own. So there is no separator to scope beside the tag, which is the whole of what tells this rule from the two above it.",
+					"match": "\\G ?(@example)\\b",
+					"captures": {
+						"1": {
+							"name": "keyword.other.documentation.essence"
+						}
+					}
+				},
+				{
 					"match": "`[^`]*`",
 					"name": "markup.inline.raw.string.essence"
 				}
@@ -265,9 +274,27 @@
 			"comment": "The words that are Keywords in one place and ordinary Identifiers everywhere else. None of them can be lit on the word alone, so each rule here is what scopes its own.",
 			"patterns": [
 				{
-					"comment": "`is` is also a Method name — `@::is(other)` — and `where` is also an Argument label — `everyItem(where check:)` — so neither can be lit on the word alone. What follows decides: a conformance bound and a Match guard are followed by a Type or by `@`, a call and a label never are. The known miss is a guard on a bare lowercase name, `case Integer where isNegative()`, which stays unlit.",
+					"comment": "`is` is also a Method name — `@::is(other)` — and `where` is also an Argument label — `everyItem(where check:)` — so neither can be lit on the word alone. What follows decides: a conformance bound and a Match guard are followed by a Type or by `@`, a call and a label never are. That reading answers a `where` wherever it stands, line breaks included, which is why it keeps the word as well as the two rules below.",
 					"match": "\\b(is|where)\\b(?=[ \\t]+(@|[A-Z]))",
 					"name": "keyword.other.essence"
+				},
+				{
+					"comment": "The `where` the rule above can not reach: a Guard whose Condition is an ordinary Expression — `case { x, y } where x::is(y)`, `case 0 where count::isNot(1)` — which begins with a lowercase name as often as not, and so says nothing about itself. What stands in FRONT of it is what tells a Guard from the Argument LABEL spelled the same: a label opens its Argument, so a `(`, a comma or the head of the line precedes it, where a Guard follows the Matcher it guards — a Pattern's `}`, a Type's last letter, a Literal's last digit, a `_`. What may follow is where a Condition starts, and the excluded characters are what a value NAMED `where` is followed by instead: `constant where = 3` and `where::length()` both stay unlit. A `where` at the END of its line is left to the line rule below.",
+					"match": "(?<=[^\\s(,])[ \\t]+(where)\\b(?=[ \\t]+[^\\s=,:)\\]}])",
+					"captures": {
+						"1": {
+							"name": "keyword.other.essence"
+						}
+					}
+				},
+				{
+					"comment": "A Guard the Formatter broke onto a line of its own, which the rule above can never light: that one wants the Matcher immediately in front, and a line break and an indent stand there instead. The other line-initial `where` in the corpus is an Argument label in an exploded Argument list — `where check: (…) -> Boolean,` and `where (item) { … },` — and the trailing comma is what tells the two apart, exactly as it does for the `as` of an arm below: the Formatter ends every exploded Argument with one, and a Guard ends in its Condition. A label written last in a list with no comma behind it goes unlit, which is the side to miss on.",
+					"match": "^[ \\t]*(where)\\b(?=[ \\t]+[^\\s=,:)\\]}])(?![^\\n]*,[ \\t\\r]*$)",
+					"captures": {
+						"1": {
+							"name": "keyword.other.essence"
+						}
+					}
 				},
 				{
 					"comment": "The `tests { … }` section. `tests` is an ordinary Identifier everywhere else, and the Parser tells the two apart exactly the way this does: by the `{` that must follow it.",
@@ -278,6 +305,26 @@
 					"comment": "A `test`, a `suite` or a `benchmark` opens where the String Literal naming it follows — which is the Parser's own rule, and what keeps `constant test = 5` unlit.",
 					"match": "\\b(test|suite|benchmark)\\b(?=[ \\t]+\")",
 					"name": "storage.type.essence"
+				},
+				{
+					"comment": "`skipped \"why\"`, one of the Modifiers a test or a suite carries. The Modifier grammar is deliberately open — a name and the arguments behind it, with the vocabulary left to the stage that knows it — so none of these three is a reserved Keyword, and each is scoped by what follows it the way the item Keywords above are. A skip's reason is mandatory, so a String is always what follows this one.",
+					"match": "\\b(skipped)\\b(?=[ \\t]+\")",
+					"name": "storage.modifier.essence"
+				},
+				{
+					"comment": "`tagged slow, network` — the bare names a run selects on. What follows is a name, so the excluded characters are what a value spelled `tagged` is followed by instead: `constant tagged = …` and `tagged::length()` both stay unlit.",
+					"match": "\\b(tagged)\\b(?=[ \\t]+[^\\s\"§(){}\\[\\]<>|/@,.:=~_#-])",
+					"name": "storage.modifier.essence"
+				},
+				{
+					"comment": "`focused`, which carries nothing at all — so what follows it is the item's own block, or the end of the line where the Formatter put the Modifier on one of its own. A call and an assignment are what a value spelled this way is followed by, and neither is a brace.",
+					"match": "\\b(focused)\\b(?=[ \\t]*(\\{|$))",
+					"name": "storage.modifier.essence"
+				},
+				{
+					"comment": "`across [ … ]` opens a table test. The rows may be any Expression, but the brackets around them are the Parser's own requirement — a row is a test in its own right and has to be countable before anything runs — so the bracket is what scopes the word, and `constant across = 3` stays unlit.",
+					"match": "\\b(across)\\b(?=[ \\t]*\\[)",
+					"name": "keyword.control.essence"
 				},
 				{
 					"comment": "`for any (…)` opens a property test. `for` is lit by the control Keyword rule already, so what this scopes is the `any` behind it — an ordinary Identifier everywhere else.",
@@ -292,6 +339,21 @@
 					"comment": "`expect` and `require` open an assertion where an Expression follows them. The excluded characters are what a name called `expect` is followed by instead — `constant expect = 6`, `expect::is(6)`, `f(expect)`.",
 					"match": "\\b(expect|require)\\b(?=[ \\t]+[^\\s=,:)\\]}])",
 					"name": "keyword.control.essence"
+				},
+				{
+					"comment": "`matches snapshot`, and the `from \"name\"` that makes it one kept beside the file rather than one recorded inline. Neither word means anything alone — the PAIR is what the Parser reads — so the pair is what is matched, and the `from` is scoped with it because it belongs to this form rather than to a Module section.",
+					"match": "\\b(matches)[ \\t]+(snapshot)\\b(?:[ \\t]+(from)\\b)?",
+					"captures": {
+						"1": {
+							"name": "keyword.control.essence"
+						},
+						"2": {
+							"name": "keyword.control.essence"
+						},
+						"3": {
+							"name": "keyword.control.essence"
+						}
+					}
 				},
 				{
 					"comment": "`as` opens a `define` arm — `as \"A\" if score::isAbove(90)` — where the rule below can never light it: that one wants an Identifier character immediately in front, and an arm head has a line break and an indent there instead. An arm reads as an arm, so it is lit as one, and as control flow rather than as a binder. The grammar is regex only and can not see that this line stands inside a `define` block, so line start is what stands in for it. What may follow is where an arm's value starts, which unlike a binder's may be a String or a Case; the excluded characters are what a line beginning with a name spelled `as` is followed by instead. The whitespace turns most of those away on its own — `as::length()` and `as.member` have none — so what is left to exclude is an assignment to a name called `as`. The other line-initial `as` in the corpus is an Argument LABEL in an exploded Argument list — `normalize(` then `as NormalizationForm#DecomposedCanonical,` then `)`, which the Formatter writes itself — and the trailing comma is what tells the two apart: the Formatter ends every exploded Argument with one, and an arm ends in its Condition, in `otherwise`, or in the bracket its value carries on past. An arm broken across lines behind a comma of its own goes unlit, which is the side to miss on: an unlit Keyword reads as text, where a lit label reads as a construct that is not there.",

@@ -22,12 +22,30 @@ let repository = grammar.repository as Record<
 let controlKeyword = new RegExp(repository.controlKeyword!.match!)
 
 // NOTE: Picked out by what it matches rather than by its index, so that a rule
-// added beside it does not silently move the test onto another one.
-let armAs = new RegExp(
-	repository
-		.contextualKeyword!.patterns!.map((pattern) => pattern.match)
-		.find((match) => match.startsWith("^"))!,
-)
+// added beside it does not silently move the test onto another one. The needle
+// is a piece of the rule's own pattern, which is the one thing about it that
+// can not be shared with a neighbour.
+function contextualKeyword(needle: string): RegExp {
+	return new RegExp(
+		repository
+			.contextualKeyword!.patterns!.map((pattern) => pattern.match)
+			.find((match) => match.includes(needle))!,
+	)
+}
+
+// NOTE: `\G` anchors a documentation tag to the head of its line, and it is
+// Oniguruma's alone — JavaScript's own RegExp reads it as a literal `G`. So it
+// is dropped here, and what is left is read the way every other rule is.
+function documentationTag(needle: string): RegExp {
+	return new RegExp(
+		repository
+			.docComment!.patterns!.map((pattern) => pattern.match)
+			.find((match) => match.includes(needle))!
+			.replace("\\G ?", ""),
+	)
+}
+
+let armAs = contextualKeyword("^[ \\t]*(as)")
 
 describe("the define grammar", () => {
 	it("lights both reserved Keywords on the word alone", () => {
@@ -81,6 +99,171 @@ describe("the define grammar", () => {
 		expect(armAs.test("\t\t\tas [1, 2] if flag")).toBe(true)
 		expect(armAs.test("\t\t\tas f(a, b) otherwise")).toBe(true)
 		expect(armAs.test("\t\t\tas define {")).toBe(true)
+	})
+})
+
+// NOTE: The vocabulary a tests section writes, none of it reserved: every one
+// of these words is a valid Identifier, so every rule here is scoped by what
+// stands around it. The subjects are lines out of `Tests.es`.
+describe("the testing grammar", () => {
+	let skipped = contextualKeyword("(skipped)")
+	let tagged = contextualKeyword("(tagged)")
+	let focused = contextualKeyword("(focused)")
+	let across = contextualKeyword("(across)")
+	let snapshot = contextualKeyword("(matches)")
+	let forAny = contextualKeyword("(any)")
+
+	it("lights the reason a skipped test carries", () => {
+		expect(
+			skipped.test('\t\t\tskipped "waiting on the Table redesign"'),
+		).toBe(true)
+		expect(skipped.test("\tconstant skipped = false")).toBe(false)
+		expect(skipped.test("\t\t<- skipped::negate()")).toBe(false)
+	})
+
+	it("lights the names a tagged test selects on", () => {
+		expect(
+			tagged.test(
+				'\t\ttest "sorts ten thousand rows" tagged slow, network {',
+			),
+		).toBe(true)
+		expect(tagged.test("\tconstant tagged = false")).toBe(false)
+		expect(tagged.test("\t\t<- tagged::length()")).toBe(false)
+	})
+
+	// NOTE: A `focused` carries nothing, so the brace of the item's own block is
+	// what follows it — or nothing at all, where the Formatter stood the
+	// Modifier on a line of its own.
+	it("lights a focused test on the block behind it", () => {
+		expect(
+			focused.test('\t\t\ttest "calls a lower score a loss" focused {'),
+		).toBe(true)
+		expect(focused.test("\t\t\tfocused")).toBe(true)
+		expect(focused.test("\tconstant focused = false")).toBe(false)
+		expect(focused.test("\t\t<- focused()")).toBe(false)
+	})
+
+	it("lights the across of a table test", () => {
+		expect(across.test('\ttest "{scored} scores {points}" across [')).toBe(
+			true,
+		)
+		expect(across.test("\tconstant across = 3")).toBe(false)
+		expect(across.test("\t\t<- across(3)")).toBe(false)
+	})
+
+	// NOTE: The pair is the Keyword — neither word means anything alone — and
+	// the `from` of a named snapshot is part of the same form.
+	it("lights matches snapshot as the pair it is", () => {
+		expect(
+			snapshot.test('\t\t\texpect played.team matches snapshot "Lions"'),
+		).toBe(true)
+		expect(snapshot.test("\t\t\texpect table matches everything")).toBe(
+			false,
+		)
+		expect(
+			snapshot.exec(
+				'\t\t\texpect table matches snapshot from "the-table"',
+			)?.[3],
+		).toBe("from")
+	})
+
+	it("lights the any of a property test", () => {
+		expect(
+			forAny.test(
+				'\t\ttest "an outcome is worth what it scores" for any (',
+			),
+		).toBe(true)
+		expect(
+			controlKeyword.test('\t\ttest "a team always has a name" for any'),
+		).toBe(true)
+		expect(forAny.test("\tconstant any = 3")).toBe(false)
+	})
+})
+
+// NOTE: A Guard is `where` written after the Matcher it guards, and the Match
+// grammar could not light one whose Condition begins with a lowercase name —
+// the rule it was left to reads what FOLLOWS the word, to keep the Argument
+// label spelled the same unlit, and a lowercase name says nothing. These two
+// read what stands in FRONT of it instead.
+describe("the where grammar", () => {
+	let whereGuard = contextualKeyword("(?<=[^\\s(,])[ \\t]+(where)")
+	let whereLine = contextualKeyword("^[ \\t]*(where)")
+
+	it("lights a Guard whose Condition is an ordinary Expression", () => {
+		expect(
+			whereGuard.test(
+				'\t\tcase { x, y } where x::is(y) { <- "diagonal" }',
+			),
+		).toBe(true)
+		expect(
+			whereGuard.test('\t\tcase 0 where count::isNot(1) { <- "zero" }'),
+		).toBe(true)
+		expect(
+			whereGuard.test("\t\tcase Integer where isNegative() { <- 0 }"),
+		).toBe(true)
+	})
+
+	it("still lights a refinement and a conformance bound", () => {
+		expect(
+			whereGuard.test(
+				"\ttype Digit = Integer where @::isBetween(0, and 9)",
+			),
+		).toBe(true)
+		expect(
+			whereGuard.test("\t\tis Comparable where Item is Comparable"),
+		).toBe(true)
+	})
+
+	// NOTE: A label opens its Argument, so a `(` or a comma precedes it where a
+	// Guard has the Matcher it guards.
+	it("leaves an Argument label called where unlit", () => {
+		expect(
+			whereGuard.test(
+				"\t\t\t::everyItem(where (item) { <- item::isEven() })",
+			),
+		).toBe(false)
+		expect(whereGuard.test("\t\t<- @::count(of item, where check)")).toBe(
+			false,
+		)
+	})
+
+	it("leaves a value named where unlit", () => {
+		expect(whereGuard.test("\tconstant where = 3")).toBe(false)
+		expect(whereGuard.test("\t\t<- where::length()")).toBe(false)
+		expect(whereGuard.test("\t\t<- where.member")).toBe(false)
+	})
+
+	// NOTE: The other line-initial `where` in the corpus is an exploded
+	// Argument's label, and the trailing comma the Formatter writes is what
+	// tells the two apart — the same test the `as` of an arm is told by.
+	it("lights a Guard the Formatter broke onto its own line", () => {
+		expect(
+			whereLine.test("\t\t\t\t\t\twhere open::and(value::is(tile))"),
+		).toBe(true)
+	})
+
+	it("leaves a line-initial Argument label unlit", () => {
+		expect(
+			whereLine.test(
+				"\t\t\t\twhere (item) { <- check(item)::negate() },",
+			),
+		).toBe(false)
+		expect(
+			whereLine.test("\t\t\t\twhere check: (_: ItemType) -> Boolean,"),
+		).toBe(false)
+	})
+})
+
+describe("the documentation grammar", () => {
+	let example = documentationTag("@example")
+
+	// NOTE: An `@example` tag stands alone on its line — the assertions under
+	// it are the example — so there is no em-dash separator to light beside it,
+	// which is what the two tags above it carry.
+	it("lights an @example tag", () => {
+		expect(example.test("@example")).toBe(true)
+		expect(example.test(" @example")).toBe(true)
+		expect(example.test("@examples")).toBe(false)
 	})
 })
 
