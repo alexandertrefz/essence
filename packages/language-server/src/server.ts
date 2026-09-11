@@ -59,6 +59,7 @@ import {
 } from "./callHierarchy"
 import { escapeSnippet } from "./callSnippets"
 import { type CodeActionEntry, findCodeActions } from "./codeActions"
+import { projectFileActions } from "./codeActions/projectFile"
 import { findTestLenses } from "./codeLenses"
 import { enrichDocument, parseDocument } from "./compilation"
 import {
@@ -1815,6 +1816,27 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return abandoned(token)
 		}
 
+		let filePath = documentFilePath(params.textDocument.uri)
+
+		// NOTE: The one request a project file answers — see
+		// `projectFileActions`. Every other one is refused where it always was:
+		// `sourceDocument` hands back nothing for a file that is not a source,
+		// and this leaves that alone by answering ahead of it.
+		if (isProjectDocument(filePath)) {
+			let buffer = documents.get(params.textDocument.uri)
+
+			return buffer === undefined
+				? null
+				: offered(
+						projectFileActions(
+							buffer.getText(),
+							filePath,
+							toRange(params.range),
+						),
+						params,
+					)
+		}
+
 		let document = sourceDocument(params.textDocument.uri)
 
 		if (document === undefined) {
@@ -1825,10 +1847,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// what a quick fix is an answer to — half of what a Code Action offers
 		// IS a Diagnostic, so reading them from anywhere else would let the
 		// lightbulb disagree with the squiggle it is offered on.
-		let analysis = workspace.analysisOf(
-			documentFilePath(params.textDocument.uri),
-			{ cancellation: token },
-		)
+		let analysis = workspace.analysisOf(filePath, { cancellation: token })
 
 		// NOTE: Checked rather than inferred from the null: `findCodeActions`
 		// runs the pipeline itself when it is handed nothing, which is right for
@@ -1838,17 +1857,31 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return abandoned(token)
 		}
 
-		return findCodeActions(
-			document.getText(),
-			toRange(params.range),
-			params.textDocument.uri,
-			workspace,
-			analysis,
-			tagDiagnosticsFor(documentFilePath(params.textDocument.uri)),
+		return offered(
+			findCodeActions(
+				document.getText(),
+				toRange(params.range),
+				params.textDocument.uri,
+				workspace,
+				analysis,
+				tagDiagnosticsFor(filePath),
+			),
+			params,
 		)
+	})
+
+	// NOTE: What the client asked for, in the protocol's own shape — the kinds
+	// a request narrowed itself to, and each entry turned into a CodeAction.
+	// Shared by the two documents that answer this request at all, so that a
+	// project file's lightbulb obeys the same `only` filter a source's does.
+	function offered(
+		entries: Array<CodeActionEntry>,
+		params: CodeActionParams,
+	): Array<CodeAction> {
+		return entries
 			.filter((entry) => isRequestedKind(entry.kind, params.context.only))
 			.map((entry) => toLspCodeAction(entry, params))
-	})
+	}
 
 	connection.onFoldingRanges((params) => {
 		let program = parsedOf(params.textDocument.uri)

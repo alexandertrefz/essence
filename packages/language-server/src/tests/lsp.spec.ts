@@ -28,9 +28,10 @@ import {
 	DiagnosticSeverity,
 	DiagnosticTag,
 	InsertTextFormat,
+	type TextEdit,
 	TextDocumentSyncKind,
 } from "vscode-languageserver"
-import { CodeActionRequest } from "vscode-languageserver/node"
+import { CodeActionRequest, HoverRequest } from "vscode-languageserver/node"
 
 import { analyse, documentFilePath } from "../analyse"
 import { type CodeActionEntry, findCodeActions } from "../codeActions"
@@ -989,6 +990,171 @@ describe("Code Actions asked for one kind", () => {
 
 			expect(fixes.length).toBeGreaterThan(0)
 			expect(fixes).toEqual(fixes.map(() => CodeActionKind.QuickFix))
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+})
+
+// NOTE: A list of protocol TextEdits applied to a buffer. The protocol counts
+// lines and characters from zero and requires the edits not to overlap, so they
+// are applied from the back and nothing has to be shifted.
+function applyLspEdits(text: string, edits: Array<TextEdit>): string {
+	let lines = text.split("\n")
+	let offsetOf = (position: { line: number; character: number }): number => {
+		let offset = 0
+
+		for (let line = 0; line < position.line; line++) {
+			offset += (lines[line] as string).length + 1
+		}
+
+		return offset + position.character
+	}
+
+	let sorted = [...edits].sort(
+		(a, b) => offsetOf(b.range.start) - offsetOf(a.range.start),
+	)
+	let written = text
+
+	for (let edit of sorted) {
+		written =
+			written.slice(0, offsetOf(edit.range.start)) +
+			edit.newText +
+			written.slice(offsetOf(edit.range.end))
+	}
+
+	return written
+}
+
+// NOTE: `essence.json` reaches this Server because the extension's document
+// selector names it, and every request over it is refused — a project file is
+// not a source. Code Actions are the one exception: a Diagnostic that names its
+// own answer and will not apply it is a squiggle that reads as the editor being
+// broken.
+describe("Code Actions on the project file", () => {
+	async function actionsFor(
+		session: LspSession,
+		uri: string,
+		line: number,
+	): Promise<Array<CodeAction>> {
+		let { result } = await session.request<Array<CodeAction>>(
+			CodeActionRequest.type,
+			{
+				textDocument: { uri },
+				range: {
+					start: { line, character: 0 },
+					end: { line, character: 40 },
+				},
+				context: { diagnostics: [] },
+			},
+		)
+
+		return result
+	}
+
+	it("should offer the spelling a misspelt setting was reaching for", async () => {
+		let project = ["{", '\t"excludes": ["build"]', "}", ""].join("\n")
+		let files = makeSessionWorkspace({ "essence.json": project })
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.open(files.pathOf("essence.json"), project, "jsonc")
+			await session.settle()
+
+			expect(session.codesFor(files.pathOf("essence.json"))).toEqual([
+				"unknown-setting",
+			])
+
+			let [action] = await actionsFor(
+				session,
+				uriOf(files.pathOf("essence.json")),
+				1,
+			)
+
+			expect(action.title).toBe('Change to "exclude"')
+			expect(action.kind).toBe(CodeActionKind.QuickFix)
+			expect(action.isPreferred).toBe(true)
+
+			let edits =
+				action.edit?.changes?.[uriOf(files.pathOf("essence.json"))]
+
+			expect(edits).toEqual([
+				{
+					range: {
+						start: { line: 1, character: 1 },
+						end: { line: 1, character: 11 },
+					},
+					newText: '"exclude"',
+				},
+			])
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
+	it("should offer to move a setting that has moved", async () => {
+		let project = [
+			"{",
+			'\t"test": {',
+			'\t\t"exclude": ["build"]',
+			"\t}",
+			"}",
+			"",
+		].join("\n")
+		let files = makeSessionWorkspace({ "essence.json": project })
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.open(files.pathOf("essence.json"), project, "jsonc")
+			await session.settle()
+
+			let [action] = await actionsFor(
+				session,
+				uriOf(files.pathOf("essence.json")),
+				2,
+			)
+
+			expect(action.title).toBe('Move it to "exclude"')
+
+			let edits =
+				action.edit?.changes?.[uriOf(files.pathOf("essence.json"))] ??
+				[]
+
+			expect(applyLspEdits(project, edits)).toBe(
+				["{", '\t"exclude": [', '\t\t"build"', "\t]", "}", ""].join(
+					"\n",
+				),
+			)
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+
+	// NOTE: Nothing else about a project file changed — the Server still has no
+	// Program to answer a Hover, a Completion or a rename over one.
+	it("should still refuse every other request over a project file", async () => {
+		let project = ["{", '\t"excludes": ["build"]', "}", ""].join("\n")
+		let files = makeSessionWorkspace({ "essence.json": project })
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.open(files.pathOf("essence.json"), project, "jsonc")
+			await session.settle()
+
+			let { result } = await session.request<unknown>(HoverRequest.type, {
+				textDocument: {
+					uri: uriOf(files.pathOf("essence.json")),
+				},
+				position: { line: 1, character: 3 },
+			})
+
+			expect(result).toBeNull()
 		} finally {
 			await session.dispose()
 			files.dispose()

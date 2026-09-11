@@ -3,7 +3,10 @@ import * as path from "node:path"
 
 import type { common } from "@essence-lang/interfaces"
 import {
+	applyEdits,
+	findNodeAtLocation,
 	getNodeValue,
+	modify,
 	type Node as JsonNode,
 	type ParseError,
 	parseTree,
@@ -1053,6 +1056,329 @@ export function parseProjectConfiguration(
 	}
 
 	return configuration
+}
+
+// ---------------------------------------------------------------------------
+// Editing the file
+// ---------------------------------------------------------------------------
+
+// NOTE: What a reader could DO about a setting this file got wrong, as text —
+// the Diagnostic it answers, named by the span that Diagnostic was reported at,
+// and the smallest change to the file that answers it.
+//
+// Computed HERE rather than in the Language Server, which is the only thing that
+// offers these. The shape of the file is this module's to know: which keys have
+// moved and where to, and how a JSONC document is edited without disturbing the
+// Comments and the layout around the change. An Editor that worked that out for
+// itself would be a second reader of the format, kept in step with this one by
+// hand.
+export type SettingEdit = {
+	code: Extract<common.DiagnosticCode, "unknown-setting" | "moved-setting">
+	// NOTE: The Diagnostic this answers, by the span it was reported at — which
+	// is what lets an Editor find its own copy of that Diagnostic again.
+	position: common.Position
+	// NOTE: The span that has to change and what it becomes. One replacement
+	// rather than a list, because a MOVE is two changes at two places in the
+	// file and the text between them has to survive both: the whole run from the
+	// first change to the last is written back, and nothing outside it is
+	// touched.
+	range: common.Position
+	newText: string
+	// NOTE: What the setting is called once the edit has landed, which is what
+	// tells two of these apart in a list.
+	setting: string
+}
+
+export function settingEdits(
+	sourceText: string,
+	filePath: string,
+): Array<SettingEdit> {
+	let tree = parseTree(sourceText, [], {
+		allowTrailingComma: true,
+		disallowComments: false,
+	})
+
+	if (tree === undefined) {
+		return []
+	}
+
+	let cursorAt = cursorsOf(sourceText)
+	let properties = propertiesOf(tree)
+	let edits: Array<SettingEdit> = []
+
+	for (let problem of parseProjectConfiguration(sourceText, filePath)
+		.problems) {
+		for (let diagnostic of problem.diagnostics) {
+			if (diagnostic.position === null) {
+				continue
+			}
+
+			let edit = settingEdit(
+				diagnostic,
+				diagnostic.position,
+				sourceText,
+				tree,
+				properties,
+				cursorAt,
+			)
+
+			if (edit !== null) {
+				edits.push(edit)
+			}
+		}
+	}
+
+	return edits
+}
+
+// NOTE: A property with the key path it stands under, and its two halves
+// already taken apart — a property whose halves can not be read is not one this
+// collects, so nothing below has to ask twice.
+type KeyedProperty = {
+	keyPath: Array<string>
+	property: JsonNode
+	key: JsonNode
+	value: JsonNode
+}
+
+function settingEdit(
+	diagnostic: common.Diagnostic,
+	position: common.Position,
+	sourceText: string,
+	tree: JsonNode,
+	properties: Array<KeyedProperty>,
+	cursorAt: (offset: number) => common.Cursor,
+): SettingEdit | null {
+	// NOTE: A near miss is a rename of the key and nothing else — the value it
+	// was written with is what the reader meant either way. The span is the key
+	// with its quotes, so the quotes are written back with it.
+	if (
+		diagnostic.code === "unknown-setting" &&
+		diagnostic.data?.kind === "suggestion"
+	) {
+		return {
+			code: "unknown-setting",
+			position,
+			range: position,
+			newText: `"${diagnostic.data.suggestion}"`,
+			setting: diagnostic.data.suggestion,
+		}
+	}
+
+	if (diagnostic.code !== "moved-setting") {
+		return null
+	}
+
+	let found = properties.find(({ key }) =>
+		cursorsMatch(cursorAt(key.offset), position.start),
+	)
+
+	if (found === undefined) {
+		return null
+	}
+
+	let movedTo = movedSettings[found.keyPath.join(".")]
+
+	// NOTE: Only the keys this table moved. The `essence` key of a
+	// `package.json` carries the same code and is not one of them — what moved
+	// there is the whole object, into a different FILE, which is no edit to the
+	// file being read at all.
+	if (movedTo === undefined) {
+		return null
+	}
+
+	let destination = movedTo.split(".")
+
+	// NOTE: Withheld where the key it would move to is already written. Both
+	// values are the author's and only one of them can survive the move, so the
+	// choice between them is theirs rather than an Editor's.
+	if (findNodeAtLocation(tree, destination) !== undefined) {
+		return null
+	}
+
+	let value = getNodeValue(found.value)
+	let removed = withoutProperty(
+		sourceText,
+		emptiedBy(sourceText, found) ?? found.property,
+	)
+	let written = applyEdits(
+		removed,
+		modify(removed, destination, value, {
+			formattingOptions: indentationOf(sourceText),
+		}),
+	)
+
+	return {
+		code: "moved-setting",
+		position,
+		...replacement(sourceText, written, cursorAt),
+		setting: movedTo,
+	}
+}
+
+// NOTE: One property taken out of the document, with the comma that separated
+// it from its neighbours and the line it stood on. Hand-written rather than
+// `modify`, which is what writes the other half of a move: jsonc's own removal
+// reaches back to the previous sibling — or to the opening brace where there is
+// none — and takes everything in between, which for a JSONC document means any
+// COMMENT standing above the property. What is written between the braces is the
+// author's, and no fix here may take a sentence away with the key it was about.
+function withoutProperty(sourceText: string, property: JsonNode): string {
+	let start = property.offset
+	let end = property.offset + property.length
+	let following = /^[ \t]*,/.exec(sourceText.slice(end))
+
+	// NOTE: The separator in FRONT is taken only where there is none behind —
+	// the property was written last, and the one before it now is. The break
+	// between the two goes with it, since the comma it follows is the end of the
+	// line the property that keeps it stands on.
+	if (following !== null) {
+		end += following[0].length
+	} else {
+		let preceding = /,\s*$/.exec(sourceText.slice(0, start))
+
+		start -= preceding?.[0].length ?? 0
+	}
+
+	let lineStart = sourceText.lastIndexOf("\n", start - 1) + 1
+	let lineBreak = sourceText.indexOf("\n", end)
+	let lineEnd = lineBreak === -1 ? sourceText.length : lineBreak
+
+	// NOTE: A property that had a line to itself takes the line, since what is
+	// left of it otherwise is an empty one nothing wrote.
+	if (sourceText.slice(lineStart, start).trim() === "") {
+		if (sourceText.slice(end, lineEnd).trim() === "") {
+			start = lineStart
+			end = lineBreak === -1 ? sourceText.length : lineBreak + 1
+		} else {
+			// NOTE: A Comment behind it keeps the indentation the property had,
+			// rather than being pushed one space along by the blank the
+			// separator left.
+			end += /^[ \t]*/.exec(sourceText.slice(end))?.[0].length ?? 0
+		}
+	}
+
+	return sourceText.slice(0, start) + sourceText.slice(end)
+}
+
+// NOTE: The property holding the table this one is the last thing IN, where
+// moving it out would leave `"test": { }` behind — the table goes with it then,
+// rather than staying as an empty pair of braces nothing reads. Null where the
+// table holds anything else, a COMMENT included: a note written beside a setting
+// is about that table, and what survives the move is the reader's to decide.
+//
+// Read off the text between the braces rather than off the tree, because a
+// Comment is exactly what the tree does not hold.
+function emptiedBy(
+	sourceText: string,
+	{ keyPath, property }: KeyedProperty,
+): JsonNode | null {
+	let table = property.parent
+	let owner = table?.parent
+
+	if (
+		keyPath.length < 2 ||
+		table === undefined ||
+		owner === undefined ||
+		owner.type !== "property"
+	) {
+		return null
+	}
+
+	let inside =
+		sourceText.slice(table.offset + 1, property.offset) +
+		sourceText.slice(
+			property.offset + property.length,
+			table.offset + table.length - 1,
+		)
+
+	return /^[\s,]*$/.test(inside) ? owner : null
+}
+
+// NOTE: How the file indents, so that what is written into it indents the same
+// way. Read off the first line that indents at all; a file with none takes the
+// tab every `essence init` writes.
+function indentationOf(sourceText: string): {
+	tabSize: number
+	insertSpaces: boolean
+} {
+	let indented = /\n([ \t]+)\S/.exec(sourceText)?.[1] ?? "\t"
+
+	return indented.startsWith("\t")
+		? { tabSize: 1, insertSpaces: false }
+		: { tabSize: indented.length, insertSpaces: true }
+}
+
+// NOTE: The two rewrites reduced to the one span they disagree over — the run
+// from the first character that differs to the last. Everything a `modify` left
+// alone is identical on both sides and stays out of the edit, so a Comment or a
+// setting far from the change is never rewritten to the text it already holds.
+function replacement(
+	before: string,
+	after: string,
+	cursorAt: (offset: number) => common.Cursor,
+): { range: common.Position; newText: string } {
+	let start = 0
+
+	while (
+		start < before.length &&
+		start < after.length &&
+		before[start] === after[start]
+	) {
+		start += 1
+	}
+
+	let trailing = 0
+
+	while (
+		trailing < before.length - start &&
+		trailing < after.length - start &&
+		before[before.length - 1 - trailing] ===
+			after[after.length - 1 - trailing]
+	) {
+		trailing += 1
+	}
+
+	let end = before.length - trailing
+
+	return {
+		range: { start: cursorAt(start), end: cursorAt(end) },
+		newText: after.slice(start, after.length - trailing),
+	}
+}
+
+// NOTE: Every property of the document with the key path it stands under, which
+// is what a table of moved keys is looked up by. Collected in one walk rather
+// than searched for per Diagnostic: the file is small and the walk is the same
+// one either way.
+function propertiesOf(
+	node: JsonNode,
+	parents: Array<string> = [],
+): Array<KeyedProperty> {
+	if (node.type !== "object") {
+		return []
+	}
+
+	let collected: Array<KeyedProperty> = []
+
+	for (let child of node.children ?? []) {
+		let property = propertyOf(child)
+
+		if (property === null) {
+			continue
+		}
+
+		let keyPath = [...parents, property.key.value as string]
+
+		collected.push({ keyPath, property: child, ...property })
+		collected.push(...propertiesOf(property.value, keyPath))
+	}
+
+	return collected
+}
+
+function cursorsMatch(a: common.Cursor, b: common.Cursor): boolean {
+	return a.line === b.line && a.column === b.column
 }
 
 // ---------------------------------------------------------------------------

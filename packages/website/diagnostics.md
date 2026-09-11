@@ -2852,6 +2852,10 @@ A key the project file does not have — `"exclusions"`, `"test.skipTag"`. The
 note lists the settings at that level, and a near miss is offered as a Help.
 Nothing is read from the key.
 
+**Quick Fix — "Change to \"exclude\"":** renames the key to the near miss,
+leaving the value it was written with alone. Offered only where there is one —
+a key that resembles no setting has nothing to be renamed to.
+
 ### `setting-shape`
 
 A known setting with a value of the wrong shape — `"skipTags": "slow"` where a
@@ -2865,6 +2869,18 @@ A key that used to be read somewhere else: `"test.exclude"`, which sits at the
 top as `"exclude"` because it narrows the editor's walk as well as the test
 run's; and the `"essence"` key of a `package.json`, which the project file
 replaced. The Help says where it went. Nothing is read from the old place.
+
+**Quick Fix — "Move it to \"exclude\"":** writes the key where it is now read,
+with the value it was written with, and takes the table it left behind along
+where the move empties one. Not offered where the new key is already written —
+both values are the author's and only one of them survives the move — and not
+for the `"essence"` key of a `package.json`, which moves into a different file
+rather than to another place in this one. The lines between the two changes are
+re-indented the way the file's own indentation says.
+
+These two are the only requests the Language Server answers over a project
+file: it is not a source, so nothing that answers about a Program is offered on
+one.
 
 ### `unreadable-project-file`
 

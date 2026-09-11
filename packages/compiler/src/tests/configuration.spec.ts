@@ -14,6 +14,7 @@ import {
 	PROJECT_FILE_NAME,
 	projectSchema,
 	readProjectConfiguration,
+	settingEdits,
 } from "../configuration"
 import { optimiserPassNames } from "../optimiser"
 
@@ -323,6 +324,122 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 			path.resolve("/project", PROJECT_FILE_NAME),
 		)
 		expect(configuration.problems[0].sourceText).toBe(`{ "nope": 1 }`)
+	})
+})
+
+// #endregion
+
+// #region Editing the file
+
+// NOTE: The Language Server offers these as Quick Fixes, and it is the only
+// thing that does — but what they change is this file's format, so they are
+// computed and tested here.
+describe("essence.json — what a reader could do about a mistake", () => {
+	function edited(text: string): Array<{ setting: string; text: string }> {
+		return settingEdits(text, path.join("/project", PROJECT_FILE_NAME)).map(
+			(edit) => {
+				let lines = text.split("\n")
+				let offsetOf = (cursor: common.Cursor): number => {
+					let offset = 0
+
+					for (let line = 1; line < cursor.line; line++) {
+						offset += (lines[line - 1] as string).length + 1
+					}
+
+					return offset + cursor.column - 1
+				}
+
+				return {
+					setting: edit.setting,
+					text:
+						text.slice(0, offsetOf(edit.range.start)) +
+						edit.newText +
+						text.slice(offsetOf(edit.range.end)),
+				}
+			},
+		)
+	}
+
+	it("renames a near miss and leaves its value alone", () => {
+		expect(edited(`{\n\t"excludes": ["build"]\n}\n`)).toEqual([
+			{ setting: "exclude", text: `{\n\t"exclude": ["build"]\n}\n` },
+		])
+	})
+
+	it("offers nothing for a key that resembles no setting", () => {
+		expect(edited(`{\n\t"zzzz": 1\n}\n`)).toEqual([])
+	})
+
+	// NOTE: The table it leaves behind goes with it — `"test": { }` is a pair
+	// of braces nothing reads.
+	it("moves a key that has moved, and takes an emptied table along", () => {
+		expect(
+			edited(`{\n\t"test": {\n\t\t"exclude": ["build"]\n\t}\n}\n`),
+		).toEqual([
+			{
+				setting: "exclude",
+				text: `{\n\t"exclude": [\n\t\t"build"\n\t]\n}\n`,
+			},
+		])
+	})
+
+	it("keeps a table that still holds something else", () => {
+		let [moved] = edited(
+			`{\n\t"test": {\n\t\t"exclude": ["build"],\n\t\t"contracts": true\n\t}\n}\n`,
+		)
+
+		expect(moved.text).toContain('"contracts": true')
+		expect(moved.text).toContain('"exclude": [')
+		expect(moved.text).not.toContain('"test": {\n\t}')
+	})
+
+	// NOTE: What is written between the braces is the author's, and a fix that
+	// took a sentence away with the key it was about would be deleting the
+	// reason the key was there.
+	it("keeps a table whose only other content is a Comment", () => {
+		let [moved] = edited(
+			`{\n\t"test": {\n\t\t// why\n\t\t"exclude": ["build"]\n\t}\n}\n`,
+		)
+
+		expect(moved.text).toContain("// why")
+	})
+
+	// NOTE: Both values are the author's and only one of them survives the
+	// move, so the choice between them is theirs.
+	it("offers nothing where the key it would move to is written", () => {
+		expect(
+			edited(
+				`{\n\t"exclude": ["a"],\n\t"test": {\n\t\t"exclude": ["b"]\n\t}\n}\n`,
+			),
+		).toEqual([])
+	})
+
+	// NOTE: jsonc's own property removal reaches back to the previous sibling and
+	// takes everything in between, a Comment included. This one does not.
+	it("keeps a Comment standing beside the key it moves", () => {
+		let [moved] = edited(
+			`{\n\t"test": {\n\t\t"exclude": ["build"], // why\n\t\t"contracts": true\n\t}\n}\n`,
+		)
+
+		expect(moved.text).toContain('\t\t// why\n\t\t"contracts": true')
+	})
+
+	it("leaves no separator behind when the key it moves was written last", () => {
+		let [moved] = edited(
+			`{\n\t"$schema": "x",\n\t"test": {\n\t\t"exclude": ["build"]\n\t}\n}\n`,
+		)
+
+		expect(moved.text).toBe(
+			`{\n\t"$schema": "x",\n\t"exclude": [\n\t\t"build"\n\t]\n}\n`,
+		)
+	})
+
+	it("indents what it writes the way the file indents", () => {
+		let [moved] = edited(
+			`{\n  "test": {\n    "exclude": ["build"]\n  }\n}\n`,
+		)
+
+		expect(moved.text).toBe(`{\n  "exclude": [\n    "build"\n  ]\n}\n`)
 	})
 })
 
