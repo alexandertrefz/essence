@@ -1874,7 +1874,7 @@ describe("Workspace", () => {
 	// asked for and the one it reaches — and then by re-analysing the workspace
 	// with the result written back, which is the only answer to "does this end
 	// the Diagnostic" that is not the fix marking its own homework.
-	describe("cross-Module fixes", () => {
+	describe("cross-Module actions", () => {
 		function actionsFor(
 			workspace: Workspace,
 			filePath: string,
@@ -2297,6 +2297,508 @@ describe("Workspace", () => {
 
 				expect(
 					actionsFor(workspace, pathOf("Shapes.es"), 5, "nowhere"),
+				).toEqual([])
+			})
+		})
+
+		// NOTE: The three-file case is the whole of what a move has to answer
+		// for: the Module the Declaration leaves, the Module it lands in, and a
+		// Module that named it in an entry. Every assertion below is on the text
+		// of all three, and then on what the Compiler makes of them.
+		describe("moving a Declaration to another Module", () => {
+			const declaring = [
+				"implementation {",
+				"\tfunction double(_ value: Integer) -> Integer {",
+				"\t\t<- value::multiply(with 2)",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tdouble",
+				"}",
+				"",
+			].join("\n")
+
+			const target = [
+				"implementation {",
+				"\tconstant one = 1",
+				"}",
+				"",
+				"export {",
+				"\tone",
+				"}",
+				"",
+			].join("\n")
+
+			const dependent = [
+				"import {",
+				'\tfrom "./A.es" { double }',
+				"}",
+				"",
+				"implementation {",
+				"\tTerminal.inspect(double(2)::toString())",
+				"}",
+				"",
+			].join("\n")
+
+			function moves(
+				workspace: Workspace,
+				filePath: string,
+				line: number,
+				needle: string,
+			): Array<CodeActionEntry> {
+				return actionsFor(workspace, filePath, line, needle).filter(
+					(action) => action.kind === "refactor.move",
+				)
+			}
+
+			function moveTo(
+				workspace: Workspace,
+				filePath: string,
+				line: number,
+				needle: string,
+				title: string,
+			): CodeActionEntry {
+				let found = moves(workspace, filePath, line, needle).find(
+					(action) => action.title === title,
+				)
+
+				expect(found).toBeDefined()
+
+				return found as CodeActionEntry
+			}
+
+			it("should carry the Declaration, what publishes it and every entry naming it", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": declaring,
+					"B.es": target,
+					"Main.es": dependent,
+				})
+
+				let declaringPath = pathOf("A.es")
+				let actions = moves(workspace, declaringPath, 2, "double")
+
+				// NOTE: Every `.es` file beside the document, in path order,
+				// and the Module this would write last of all.
+				expect(actions.map((action) => action.title)).toEqual([
+					"Move 'double' to ./B.es",
+					"Move 'double' to ./Main.es",
+					"Move 'double' to a new Module",
+				])
+
+				let move = actions[0] as CodeActionEntry
+
+				expect(move.isPreferred).toBe(false)
+				expect(move.diagnosticCode).toBeNull()
+
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[declaringPath]).toBe(
+					["implementation {", "}", ""].join("\n"),
+				)
+				expect(texts[pathOf("B.es")]).toBe(
+					[
+						"implementation {",
+						"\tconstant one = 1",
+						"",
+						"\tfunction double(_ value: Integer) -> Integer {",
+						"\t\t<- value::multiply(with 2)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tdouble",
+						"\tone",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(texts[pathOf("Main.es")]).toBe(
+					[
+						"import {",
+						'\tfrom "./B.es" { double }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(double(2)::toString())",
+						"}",
+						"",
+					].join("\n"),
+				)
+
+				expect(codesAfter(workspace, texts, pathOf("Main.es"))).toEqual(
+					[],
+				)
+			})
+
+			// NOTE: A file the action WRITES, which no text edit can do on its
+			// own — the Server turns this one into a resource operation.
+			it("should offer a Module named after the Declaration", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": declaring,
+					"Main.es": dependent,
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					2,
+					"double",
+					"Move 'double' to a new Module",
+				)
+				let written = move.edits.find(
+					(edit) => edit.createFile === true,
+				)
+
+				expect(written?.filePath).toBe(pathOf("double.es"))
+				expect(written?.range).toEqual({
+					start: { line: 1, column: 1 },
+					end: { line: 1, column: 1 },
+				})
+				expect(written?.newText).toBe(
+					[
+						"implementation {",
+						"\tfunction double(_ value: Integer) -> Integer {",
+						"\t\t<- value::multiply(with 2)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tdouble",
+						"}",
+						"",
+					].join("\n"),
+				)
+			})
+
+			// NOTE: Moving a helper into the one Module that reads it is the
+			// ordinary reason to move one, and there the entry is not
+			// retargeted but dropped: a Module does not import what it declares.
+			it("should drop the entry of the Module it lands in", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tfunction double(_ value: Integer) -> Integer {",
+						"\t\t<- value::multiply(with 2)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tdouble",
+						"}",
+						"",
+					].join("\n"),
+					"Main.es": dependent,
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					2,
+					"double",
+					"Move 'double' to ./Main.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[pathOf("Main.es")]).toBe(
+					[
+						"implementation {",
+						"\tTerminal.inspect(double(2)::toString())",
+						"",
+						"\tfunction double(_ value: Integer) -> Integer {",
+						"\t\t<- value::multiply(with 2)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tdouble",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(texts[declaringPath]).toBe(
+					["implementation {", "}", ""].join("\n"),
+				)
+				expect(codesAfter(workspace, texts, pathOf("Main.es"))).toEqual(
+					[],
+				)
+			})
+
+			// NOTE: The Module it leaves has to import it back, and the one it
+			// lands in has to publish it — even though nothing published it
+			// before the move.
+			it("should import the Declaration back where this Module still reads it", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tfunction double(_ value: Integer) -> Integer {",
+						"\t\t<- value::multiply(with 2)",
+						"\t}",
+						"",
+						"\tTerminal.inspect(double(2)::toString())",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					2,
+					"double",
+					"Move 'double' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[declaringPath]).toBe(
+					[
+						"import {",
+						'\tfrom "./B.es" { double }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(double(2)::toString())",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(texts[pathOf("B.es")]).toBe(
+					[
+						"implementation {",
+						"\tfunction double(_ value: Integer) -> Integer {",
+						"\t\t<- value::multiply(with 2)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tdouble",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
+			})
+
+			// NOTE: A member, a property, a Method and an Argument label are
+			// reached through a Type rather than through the Module's own
+			// Scope — what has to travel with the Statement is the NAME beside
+			// them, and that one is checked on its own.
+			it("should offer a Declaration writing Record members and Argument labels", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\ttype Point = { x: Integer, y: Integer }",
+						"",
+						"\tfunction scaled(_ value: Integer, by factor: Integer) -> Integer {",
+						"\t\t<- value::multiply(with factor)",
+						"\t}",
+						"",
+						"\tfunction origin(scale: Integer) -> Point {",
+						"\t\t<- { x = scaled(0, by scale), y = 0 }",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tPoint",
+						"\torigin",
+						"\tscaled",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": target,
+				})
+
+				expect(
+					moves(workspace, pathOf("A.es"), 8, "origin").map(
+						(action) => action.title,
+					),
+				).toContain("Move 'origin' to ./B.es")
+			})
+
+			// NOTE: THE refusal — the Statement reads a name this Module keeps
+			// to itself, so there is no Module it could be read in.
+			it("should offer nothing for a Declaration reading a private name", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tconstant factor = 2",
+						"",
+						"\tfunction double(_ value: Integer) -> Integer {",
+						"\t\t<- value::multiply(with factor)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tdouble",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": target,
+				})
+
+				expect(moves(workspace, pathOf("A.es"), 4, "double")).toEqual(
+					[],
+				)
+			})
+
+			it("should offer a Declaration reading a name this Module publishes", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tconstant factor = 2",
+						"",
+						"\tfunction double(_ value: Integer) -> Integer {",
+						"\t\t<- value::multiply(with factor)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tdouble",
+						"\tfactor",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": target,
+				})
+
+				expect(
+					moves(workspace, pathOf("A.es"), 4, "double").map(
+						(action) => action.title,
+					),
+				).toContain("Move 'double' to ./B.es")
+			})
+
+			// NOTE: A Variable can not be exported, so there is nowhere for one
+			// to go — and the cursor has to be on the NAME, since a refactoring
+			// offered on a body would be offered on every Statement of it.
+			it("should offer nothing for a Variable, or for a cursor off the name", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tvariable counter = 0",
+						"",
+						"\tfunction double(_ value: Integer) -> Integer {",
+						"\t\t<- value::multiply(with 2)",
+						"\t}",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": target,
+				})
+
+				expect(moves(workspace, pathOf("A.es"), 2, "counter")).toEqual(
+					[],
+				)
+				expect(moves(workspace, pathOf("A.es"), 5, "value")).toEqual([])
+			})
+
+			// NOTE: The `§§` block documents the Declaration and travels with
+			// it, and the Comment that documented the Statement beside it stays
+			// exactly where it was.
+			it("should carry the documentation block with the Declaration", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\t§§ Twice what it is given.",
+						"\tfunction double(_ value: Integer) -> Integer {",
+						"\t\t<- value::multiply(with 2)",
+						"\t}",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					3,
+					"double",
+					"Move 'double' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[declaringPath]).toBe(
+					["implementation {", "}", ""].join("\n"),
+				)
+				expect(texts[pathOf("B.es")]).toBe(
+					[
+						"implementation {",
+						"\t§§ Twice what it is given.",
+						"\tfunction double(_ value: Integer) -> Integer {",
+						"\t\t<- value::multiply(with 2)",
+						"\t}",
+						"}",
+						"",
+					].join("\n"),
+				)
+			})
+
+			// NOTE: A Module forwarding the name is naming the Module behind
+			// it, and that Module is about to be a different one.
+			it("should retarget a re-export and an entry sharing its group", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tconstant one = 1",
+						"",
+						"\tfunction double(_ value: Integer) -> Integer {",
+						"\t\t<- value::multiply(with 2)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tdouble",
+						"\tone",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+					"Facade.es": [
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						'\tfrom "./A.es" {',
+						"\t\tdouble",
+						"\t\tone",
+						"\t}",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					4,
+					"double",
+					"Move 'double' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[pathOf("Facade.es")]).toBe(
+					[
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						'\tfrom "./A.es" {',
+						"\t\tone",
+						"\t}",
+						'\tfrom "./B.es" { double }',
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(
+					codesAfter(workspace, texts, pathOf("Facade.es")),
 				).toEqual([])
 			})
 		})

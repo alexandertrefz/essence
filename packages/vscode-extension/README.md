@@ -68,6 +68,13 @@ to spell something rather than a repair:
 Writing out an inferred Type is offered as a refactoring wherever an inlay hint
 sits, and an inlay hint can be double-clicked to the same end.
 
+Moving a top-level Declaration to another Module is offered on its name under
+the same lightbulb (`Ctrl+.`): the Declaration travels with its `§§` block into
+a sibling file or into a new one named after it, the Module it left imports it
+back where it still reads it, and every entry in the workspace that named it is
+retargeted. It is refused where the Declaration reads something its Module keeps
+private, since there is nowhere for that name to follow it.
+
 ### Navigation
 
 Go-to-definition (`F12`), Find All References (`Shift+F12`) and document

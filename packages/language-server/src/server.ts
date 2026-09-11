@@ -41,6 +41,7 @@ import {
 	type TextEdit,
 	TextDocumentSyncKind,
 	TextDocuments,
+	type WorkspaceEdit,
 	type WorkspaceSymbol as LspWorkspaceSymbol,
 } from "vscode-languageserver/node"
 
@@ -181,6 +182,7 @@ export const serverCapabilities: ServerCapabilities = {
 			CodeActionKind.RefactorRewrite,
 			CodeActionKind.RefactorExtract,
 			CodeActionKind.RefactorInline,
+			CodeActionKind.RefactorMove,
 			CodeActionKind.SourceOrganizeImports,
 		],
 	},
@@ -3023,6 +3025,7 @@ const codeActionKinds: Record<CodeActionEntry["kind"], CodeActionKind> = {
 	"refactor.rewrite": CodeActionKind.RefactorRewrite,
 	"refactor.extract": CodeActionKind.RefactorExtract,
 	"refactor.inline": CodeActionKind.RefactorInline,
+	"refactor.move": CodeActionKind.RefactorMove,
 	"source.organizeImports": CodeActionKind.SourceOrganizeImports,
 }
 
@@ -3051,11 +3054,48 @@ export function toLspCodeAction(
 								toLspRange(position),
 							),
 					),
-		edit: { changes: changesOf(entry, params) },
+		edit: workspaceEditOf(entry, params),
 		// NOTE: Handed through untouched. What a command does happens in the
 		// Editor after the edits land — an extraction opens rename on the name
 		// it just invented — and there is no edit that puts a cursor anywhere.
 		command: entry.command,
+	}
+}
+
+// NOTE: A map of files against their edits, which is what every action but one
+// needs — and `documentChanges` for the one that writes a file that is not
+// there yet. A text edit can not create the file it edits: creating one is a
+// RESOURCE OPERATION, and the protocol only carries those in the other shape.
+// It is all or nothing per Workspace Edit, so an action that creates a file
+// hands over every one of its edits that way, the creations first: an edit
+// against a file that does not exist yet is applied after the operation that
+// makes it exist.
+function workspaceEditOf(
+	entry: CodeActionEntry,
+	params: CodeActionParams,
+): WorkspaceEdit {
+	let changes = changesOf(entry, params)
+	let created = entry.edits.filter((edit) => edit.createFile === true)
+
+	if (created.length === 0) {
+		return { changes }
+	}
+
+	return {
+		documentChanges: [
+			...created.map((edit) => ({
+				kind: "create" as const,
+				uri: uriOf(edit.filePath as string),
+			})),
+			...Object.entries(changes).map(([uri, edits]) => ({
+				// NOTE: Null rather than the version the Editor is holding: a
+				// file this action creates has no version at all, and a Move
+				// that named one for the others would be refused wholesale the
+				// moment any of them changed while the lightbulb was open.
+				textDocument: { uri, version: null },
+				edits,
+			})),
+		],
 	}
 }
 

@@ -85,6 +85,7 @@ import {
 	guardEmptyAction,
 } from "./matchFixes"
 import { matchOnValueActions } from "./matchOnValue"
+import { moveActions } from "./moveModule"
 import { pathActions } from "./paths"
 import { payloadActions } from "./payloads"
 import { annotationActions, shorthandActions } from "./refactors"
@@ -125,6 +126,11 @@ export type CodeActionEdit = {
 	// file that will need it — names that file by absolute path, and the
 	// Server groups the edits per file on the way out.
 	filePath?: string
+	// NOTE: Set by the one action that writes a file that is not there yet. A
+	// text edit can not create the file it edits — the protocol says creating
+	// one as a resource operation, which is a different shape of Workspace Edit
+	// — so the Server needs to be told, and only this says so.
+	createFile?: boolean
 }
 
 export type CodeActionEntry = {
@@ -140,6 +146,7 @@ export type CodeActionEntry = {
 		| "refactor.rewrite"
 		| "refactor.extract"
 		| "refactor.inline"
+		| "refactor.move"
 		| "source.organizeImports"
 	// NOTE: Null for an action that answers no Diagnostic — the Type
 	// annotation refactor is offered on correct code. The pair is what lets
@@ -247,6 +254,7 @@ export function findCodeActions(
 	entries.push(...makeGeneratableActions(program, lines, range))
 	entries.push(...matchOnValueActions(enrichedProgram, lines, range))
 	entries.push(...shorthandActions(program, lines, range))
+	entries.push(...moveActions(imports, lines, range))
 
 	let indexed = programIndexer(
 		program,

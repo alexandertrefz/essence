@@ -343,6 +343,7 @@ describe("LSP", () => {
 						CodeActionKind.RefactorRewrite,
 						CodeActionKind.RefactorExtract,
 						CodeActionKind.RefactorInline,
+						CodeActionKind.RefactorMove,
 						CodeActionKind.SourceOrganizeImports,
 					],
 				},
@@ -736,6 +737,54 @@ describe("LSP", () => {
 			expect(item.edit?.changes?.[uri]).toHaveLength(2)
 		})
 
+		// NOTE: A text edit can not create the file it edits, so the one action
+		// that writes a Module hands its edits over as `documentChanges` with
+		// the creation in front of them — the shape the protocol says a
+		// resource operation in, and the only one an Editor will apply.
+		it("should ask for a file that does not exist yet to be created", () => {
+			let written = "/Written.es"
+			let item = toLspCodeAction(
+				entryWith({
+					kind: "refactor.move",
+					edits: [
+						{ range: span, newText: "" },
+						{
+							range: {
+								start: { line: 1, column: 1 },
+								end: { line: 1, column: 1 },
+							},
+							newText: "implementation {}\n",
+							filePath: written,
+							createFile: true,
+						},
+					],
+				}),
+				paramsWith([]),
+			)
+
+			expect(item.kind).toBe(CodeActionKind.RefactorMove)
+			expect(item.edit?.changes).toBeUndefined()
+			expect(item.edit?.documentChanges).toEqual([
+				{ kind: "create", uri: uriOf(written) },
+				{
+					textDocument: { uri, version: null },
+					edits: [{ range: toLspRange(span), newText: "" }],
+				},
+				{
+					textDocument: { uri: uriOf(written), version: null },
+					edits: [
+						{
+							range: toLspRange({
+								start: { line: 1, column: 1 },
+								end: { line: 1, column: 1 },
+							}),
+							newText: "implementation {}\n",
+						},
+					],
+				},
+			])
+		})
+
 		it("should hand a client command through untouched", () => {
 			let command = {
 				title: "Rename the extracted Constant",
@@ -981,10 +1030,18 @@ describe("Code Actions asked for one kind", () => {
 				CodeActionKind.Refactor,
 			])
 
+			// NOTE: Every kind the menu lists is one of the refactorings and
+			// none of them is a fix — which is the whole of what `only` asks
+			// for. Spelled as a prefix rather than as one kind, because the
+			// Server offers more than one of them: a Type annotation written
+			// out is a rewrite, a Declaration sent to another Module is a move.
 			expect(refactors.length).toBeGreaterThan(0)
-			expect(refactors).toEqual(
-				refactors.map(() => CodeActionKind.RefactorRewrite),
-			)
+			expect(
+				refactors.every((kind) =>
+					kind?.startsWith(CodeActionKind.Refactor),
+				),
+			).toBe(true)
+			expect(refactors).toContain(CodeActionKind.RefactorMove)
 
 			let fixes = await kindsFor(session, uri, [CodeActionKind.QuickFix])
 
