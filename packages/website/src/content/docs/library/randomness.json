@@ -1,0 +1,443 @@
+{
+	"slug": "randomness",
+	"title": "Randomness",
+	"kind": "type",
+	"declaration": "namespace Randomness for Randomness",
+	"choice": null,
+	"namespaces": ["Randomness"],
+	"conformsTo": [],
+	"groups": [
+		{
+			"label": "Creating a source",
+			"id": "creating-a-source",
+			"members": [
+				{
+					"key": "Randomness::entropy",
+					"namespace": "Randomness",
+					"name": "entropy",
+					"receiver": "Randomness",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static entropy() -> Randomness",
+							"summary": "Answers the host's own source of randomness.\n\nEvery call answers the one source the whole Program draws from. It reads the host at each draw rather than carrying words of its own. So a Constant holding it answers a new value at every draw, and a run that draws from it can not be replayed. Use `seeded(_)` for a run that has to repeat.",
+							"parameters": [],
+							"returns": "the host's source of randomness.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Randomness::seeded",
+					"namespace": "Randomness",
+					"name": "seeded",
+					"receiver": "Randomness",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static seeded(_ seed: String) -> Randomness",
+							"summary": "Answers a source that draws one sequence for one seed.\n\nThe same seed, drawn from by the same calls in the same order, answers the same values. The source carries words that every draw advances, so a caller that wants the sequence again builds a second source from the seed. Any text is a seed, and two seeds that differ anywhere answer two sequences.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the text the sequence is built from",
+									"href": null
+								}
+							],
+							"returns": "a source that replays.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Drawing values",
+			"id": "drawing-values",
+			"members": [
+				{
+					"key": "Randomness::drawBoolean",
+					"namespace": "Randomness",
+					"name": "drawBoolean",
+					"receiver": "Randomness",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers `true` or `false`.\n\nThe entry taking no Argument answers each of the two half the time. A chance of `1/4` answers `true` once in four draws. A chance below zero answers `false` at every draw, and a chance above one answers `true` at every draw.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "drawBoolean() -> Boolean",
+							"summary": "",
+							"parameters": [],
+							"returns": "`true` or `false`, with each equally likely.",
+							"examples": []
+						},
+						{
+							"signature": "drawBoolean(withProbability chance: Rational) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "withProbability",
+									"type": "Rational",
+									"default": null,
+									"description": "how often the answer is `true`, as a part of one",
+									"href": null
+								}
+							],
+							"returns": "`true` that often, and `false` the rest of the time.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Randomness::drawInteger",
+					"namespace": "Randomness",
+					"name": "drawInteger",
+					"receiver": "Randomness",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers a whole number the source draws.\n\nThe two bounds name the same range in either order, and both of them are inside it. The `below:` entry counts from zero, and the bound it is given is outside the range.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "drawInteger(between low: Integer, and high: Integer) -> Integer",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "between",
+									"type": "Integer",
+									"default": null,
+									"description": "one bound of the range.",
+									"href": null
+								},
+								{
+									"name": "and",
+									"type": "Integer",
+									"default": null,
+									"description": "the other bound of the range.",
+									"href": null
+								}
+							],
+							"returns": "a number from the range, with each one equally likely.",
+							"examples": []
+						},
+						{
+							"signature": "drawInteger(below bound: PositiveInteger) -> NonNegativeInteger",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "below",
+									"type": "PositiveInteger",
+									"default": null,
+									"description": "the number the range stops below, proven to be above zero",
+									"href": "/docs/library/integer#PositiveInteger"
+								}
+							],
+							"returns": "a number from zero up to the bound, with each one equally likely.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Randomness::drawRational",
+					"namespace": "Randomness",
+					"name": "drawRational",
+					"receiver": "Randomness",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers an exact fraction between two bounds, with both bounds included.\n\nThe two bounds name the same range in either order. The entry taking no denominator draws off a lattice of twelve small denominators. Those are 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 100 and 1000, and no other denominator is ever answered. A caller that needs one names it with `over:`. A range too narrow to hold a multiple of the denominator answers the lower bound.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "drawRational(between low: Rational, and high: Rational) -> Rational",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "between",
+									"type": "Rational",
+									"default": null,
+									"description": "one bound of the range.",
+									"href": null
+								},
+								{
+									"name": "and",
+									"type": "Rational",
+									"default": null,
+									"description": "the other bound of the range.",
+									"href": null
+								}
+							],
+							"returns": "a fraction from the range, over one of the twelve denominators.",
+							"examples": []
+						},
+						{
+							"signature": "drawRational(\n\tbetween low: Rational,\n\tand high: Rational,\n\tover denominator: PositiveInteger,\n) -> Rational",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "between",
+									"type": "Rational",
+									"default": null,
+									"description": "one bound of the range.",
+									"href": null
+								},
+								{
+									"name": "and",
+									"type": "Rational",
+									"default": null,
+									"description": "the other bound of the range.",
+									"href": null
+								},
+								{
+									"name": "over",
+									"type": "PositiveInteger",
+									"default": null,
+									"description": "the denominator every answer is written over, proven to be above zero",
+									"href": "/docs/library/integer#PositiveInteger"
+								}
+							],
+							"returns": "a fraction from the range, over the given denominator.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Randomness::drawString",
+					"namespace": "Randomness",
+					"name": "drawString",
+					"receiver": "Randomness",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "drawString(upTo length: Integer) -> String",
+							"summary": "Answers a String of the given number of characters or fewer.\n\nThe characters are letters, digits and a space, with four characters that are outside ASCII among them. A bound of zero or less answers the empty String.",
+							"parameters": [
+								{
+									"name": "upTo",
+									"type": "Integer",
+									"default": null,
+									"description": "the greatest number of characters the answer can have.",
+									"href": null
+								}
+							],
+							"returns": "a String of that length or shorter.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Choosing from a List",
+			"id": "choosing-from-a-list",
+			"members": [
+				{
+					"key": "Randomness::pick",
+					"namespace": "Randomness",
+					"name": "pick",
+					"receiver": "Randomness",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers items of the given List, chosen by the source.\n\nThe counted entry draws without replacement, so it never answers one item twice, and a count above the length of the List answers every item. The drawn items stand in the order they were drawn. A weight of zero or less is drawn as zero, and weights that are all zero answer as the unweighted entry does.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "pick<infer ItemType>(from items: NonEmptyList<ItemType>) -> ItemType",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "from",
+									"type": "NonEmptyList<ItemType>",
+									"default": null,
+									"description": "the items to choose from, which certainly has one.",
+									"href": "/docs/library/list#NonEmptyList"
+								}
+							],
+							"returns": "an item of the List, with each item equally likely.",
+							"examples": []
+						},
+						{
+							"signature": "pick<infer ItemType>(\n\t_ count: PositiveInteger,\n\tfrom items: NonEmptyList<ItemType>,\n) -> NonEmptyList<ItemType>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "PositiveInteger",
+									"default": null,
+									"description": "how many items to answer, proven to be above zero",
+									"href": "/docs/library/integer#PositiveInteger"
+								},
+								{
+									"name": "from",
+									"type": "NonEmptyList<ItemType>",
+									"default": null,
+									"description": "the items to choose from, which certainly has one.",
+									"href": "/docs/library/list#NonEmptyList"
+								}
+							],
+							"returns": "the drawn items, which certainly holds one.",
+							"examples": []
+						},
+						{
+							"signature": "pick<infer ItemType>(\n\tfrom items: NonEmptyList<ItemType>,\n\tweightedBy weight: (_: ItemType) -> Rational,\n) -> ItemType",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "from",
+									"type": "NonEmptyList<ItemType>",
+									"default": null,
+									"description": "the items to choose from, which certainly has one.",
+									"href": "/docs/library/list#NonEmptyList"
+								},
+								{
+									"name": "weightedBy",
+									"type": "(_: ItemType) -> Rational",
+									"default": null,
+									"description": "how likely each item is, against the weights of the others",
+									"href": null
+								}
+							],
+							"returns": "an item of the List, as likely as its own weight.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Randomness::shuffle",
+					"namespace": "Randomness",
+					"name": "shuffle",
+					"receiver": "Randomness",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers a new List holding the same items in an order the source draws.\n\nEvery order of the items is equally likely. The List it is given is left as it was.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "shuffle<infer ItemType>(_ items: List<ItemType>) -> List<ItemType>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<ItemType>",
+									"default": null,
+									"description": "the items to reorder",
+									"href": null
+								}
+							],
+							"returns": "the reordered List.",
+							"examples": []
+						},
+						{
+							"signature": "shuffle<infer ItemType>(\n\t_ items: NonEmptyList<ItemType>,\n) -> NonEmptyList<ItemType>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "NonEmptyList<ItemType>",
+									"default": null,
+									"description": "the items to reorder, which certainly has one",
+									"href": "/docs/library/list#NonEmptyList"
+								}
+							],
+							"returns": "the reordered List, which certainly holds one.",
+							"examples": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [],
+	"modes": [],
+	"tower": [],
+	"views": [],
+	"protocols": [],
+	"seeAlso": [
+		{
+			"label": "Generatable",
+			"href": "/docs/library/protocols#Generatable"
+		}
+	],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"creating-a-source",
+		"entropy",
+		"seeded",
+		"drawing-values",
+		"drawboolean",
+		"drawBoolean",
+		"drawinteger",
+		"drawInteger",
+		"drawrational",
+		"drawRational",
+		"drawstring",
+		"drawString",
+		"choosing-from-a-list",
+		"pick",
+		"shuffle",
+		"see-also"
+	]
+}

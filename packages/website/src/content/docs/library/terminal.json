@@ -1,0 +1,318 @@
+{
+	"slug": "terminal",
+	"title": "Terminal",
+	"kind": "namespace",
+	"declaration": "namespace Terminal",
+	"choice": null,
+	"namespaces": ["Terminal", "Stream"],
+	"conformsTo": [],
+	"groups": [
+		{
+			"label": "Writing",
+			"id": "writing",
+			"members": [
+				{
+					"key": "Terminal::print",
+					"namespace": "Terminal",
+					"name": "print",
+					"receiver": "Terminal",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static print<infer Value is Printable>(\n\t_ value: Value,\n\tto stream: Stream = #Output,\n) -> {}",
+							"summary": "Prints a value and a newline, for the reader of the Program.\n\nThe value renders through its own `toString`. A String prints as its text, without the quotes a Literal is written with. The line goes to `#Output` unless `to` names a different Stream.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Value",
+									"default": null,
+									"description": "the value to print, rendered by its `Printable` conformance.",
+									"href": null
+								},
+								{
+									"name": "to",
+									"type": "Stream",
+									"default": "#Output",
+									"description": "the Stream the line lands on; `#Output` when it is left out.",
+									"href": "/docs/library/terminal#Stream"
+								}
+							],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Terminal::write",
+					"namespace": "Terminal",
+					"name": "write",
+					"receiver": "Terminal",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static write(_ text: String, to stream: Stream = #Output) -> {}",
+							"summary": "Writes text exactly as given, with no newline and nothing added.\n\nThis is the primitive `print` is built on. The text goes to `#Output` unless `to` names a different Stream.\n\nIn a browser, where the host has no streams, the text lands on the console as a line instead. A console has no way to continue a line.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the text to write, unchanged.",
+									"href": null
+								},
+								{
+									"name": "to",
+									"type": "Stream",
+									"default": "#Output",
+									"description": "the Stream the text lands on; `#Output` when it is left out.",
+									"href": "/docs/library/terminal#Stream"
+								}
+							],
+							"returns": null,
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Inspecting",
+			"id": "inspecting",
+			"members": [
+				{
+					"key": "Terminal::inspect",
+					"namespace": "Terminal",
+					"name": "inspect",
+					"receiver": "Terminal",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static inspect<infer Value>(_ value: Value) -> Value",
+							"summary": "Prints the structure of a value for the author of the Program, and answers with that value.\n\nStrings print quoted, Cases print as their tags, and Records and Lists are laid out. The value needs no conformance. The answer is the value itself, so a call wraps any Expression without changing what that Expression evaluates to.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Value",
+									"default": null,
+									"description": "the value to inspect",
+									"href": null
+								}
+							],
+							"returns": "the value it was given, unchanged.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Terminal::describe",
+					"namespace": "Terminal",
+					"name": "describe",
+					"receiver": "Terminal",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static describe<infer Value>(_ value: Value) -> String",
+							"summary": "Answers the structure of a value as a String, for the author of the Program.\n\nThis is the rendering `inspect` writes. Strings are quoted, Cases print as their tags, and Records and Lists are laid out. The value needs no conformance.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Value",
+									"default": null,
+									"description": "the value to describe",
+									"href": null
+								}
+							],
+							"returns": "the structural rendering.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Reading input",
+			"id": "reading-input",
+			"members": [
+				{
+					"key": "Terminal::readLine",
+					"namespace": "Terminal",
+					"name": "readLine",
+					"receiver": "Terminal",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static readLine() -> Optional<String>",
+							"summary": "Answers the next line of the Program's input, or nothing at the end of it.\n\nThe line break is not part of the line. A line ends at `\\n`, at `\\r`, or at the `\\r\\n` a Windows host writes. The last line of an input that ends without a break is a line. A host with no input answers nothing, as `write` falls back to the console on a host with no stream.",
+							"parameters": [],
+							"returns": "the next line, or nothing at the end of the input.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Terminal::readAll",
+					"namespace": "Terminal",
+					"name": "readAll",
+					"receiver": "Terminal",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static readAll() -> String",
+							"summary": "Answers everything left in the Program's input, as one String.\n\nThe text is unchanged, so a break at the end of the input is part of the answer. A text that ends with a break has an empty last line when `lines()` splits it, which is what a trailing break means there. A host with no input answers the empty String.",
+							"parameters": [],
+							"returns": "the rest of the input, unchanged.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Terminal::ask",
+					"namespace": "Terminal",
+					"name": "ask",
+					"receiver": "Terminal",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static ask(_ prompt: String) -> Optional<String>",
+							"summary": "Writes a prompt with no newline, then answers the next line of the input.\n\nThe prompt goes to `#Output`. The answer is `readLine`'s, so it is nothing at the end of the input.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the prompt to write before reading",
+									"href": null
+								}
+							],
+							"returns": "the line that follows the prompt, or nothing at the end of the input.",
+							"examples": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [],
+	"modes": [
+		{
+			"name": "Stream",
+			"declaration": "choice Stream {\n\tOutput,\n\tError,\n}",
+			"description": "Where written text lands: `#Output` carries what the Program answers with, and `#Error` what it complains about.\n\n`#Output` is what a call that names no Stream gets.",
+			"cases": [
+				{
+					"name": "Output",
+					"payload": null
+				},
+				{
+					"name": "Error",
+					"payload": null
+				}
+			],
+			"payloadFree": true,
+			"takenBy": [
+				{
+					"label": "Terminal.print(_:to:)",
+					"href": "/docs/library/terminal#print",
+					"default": "#Output"
+				},
+				{
+					"label": "Terminal.write(_:to:)",
+					"href": "/docs/library/terminal#write",
+					"default": "#Output"
+				}
+			]
+		}
+	],
+	"tower": [],
+	"views": [],
+	"protocols": [],
+	"seeAlso": [],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"writing",
+		"print",
+		"write",
+		"inspecting",
+		"inspect",
+		"describe",
+		"reading-input",
+		"readline",
+		"readLine",
+		"readall",
+		"readAll",
+		"ask",
+		"modes",
+		"stream",
+		"Stream"
+	]
+}

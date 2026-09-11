@@ -1,0 +1,575 @@
+{
+	"slug": "optional",
+	"title": "Optional",
+	"kind": "choice",
+	"declaration": "namespace Optional<infer ItemType> for Optional<ItemType>",
+	"choice": "choice Optional<ItemType> {\n\tValue { item: ItemType },\n\tEmpty,\n}",
+	"namespaces": ["Optional", "NestedOptional"],
+	"conformsTo": [
+		{
+			"protocol": "Equatable",
+			"condition": "ItemType is Equatable"
+		},
+		{
+			"protocol": "Printable",
+			"condition": "ItemType is Printable"
+		}
+	],
+	"groups": [
+		{
+			"label": "Equality and printing",
+			"id": "equality-and-printing",
+			"members": [
+				{
+					"key": "Optional::is",
+					"namespace": "Optional",
+					"name": "is",
+					"receiver": "Optional<ItemType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the Optional is the given one, or whether it holds the given bare value.\n\nTwo Optionals are equal when they are the same Case and hold equal values. An empty Optional is never equal to a bare value. An Optional holding an Optional reaches the first entry, so `#Value(#Empty)::is(#Empty)` asks about the receiver and answers `false`. The Method is available whenever the payload conforms to `Equatable`.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "is<infer ItemType is Equatable>(\n\t_ other: Optional<ItemType>,\n) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Optional<ItemType>",
+									"default": null,
+									"description": "the Optional to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when both are empty, or both hold equal values.",
+							"examples": []
+						},
+						{
+							"signature": "is<infer ItemType is Equatable>(_ other: ItemType) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "ItemType",
+									"default": null,
+									"description": "the bare value to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the Optional holds a value equal to it; `false` when it is empty.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Optional::isNot",
+					"namespace": "Optional",
+					"name": "isNot",
+					"receiver": "Optional<ItemType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the Optional differs from the given one, or whether it does not hold the given bare value.\n\nAn empty Optional holds no bare value, so it always differs from one. The Method is available whenever the payload conforms to `Equatable`.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNot<infer ItemType is Equatable>(\n\t_ other: Optional<ItemType>,\n) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Optional<ItemType>",
+									"default": null,
+									"description": "the Optional to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the two differ in Case or in value.",
+							"examples": []
+						},
+						{
+							"signature": "isNot<infer ItemType is Equatable>(_ other: ItemType) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "ItemType",
+									"default": null,
+									"description": "the bare value to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the Optional is empty or holds a different value.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Optional::toString",
+					"namespace": "Optional",
+					"name": "toString",
+					"receiver": "Optional<ItemType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toString<infer ItemType is Printable>() -> String",
+							"summary": "Answers the Optional as a String, written `Value(…)` or `Empty`.\n\nThe payload renders through its own `toString`, and a String payload is quoted: `#Value(\"a\")` answers `Value(\"a\")`. A String prints bare on its own and quoted inside a structure. The Method is available whenever the payload conforms to `Printable`.",
+							"parameters": [],
+							"returns": "the text `Value(…)` around the payload, or `Empty`.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Testing",
+			"id": "testing",
+			"members": [
+				{
+					"key": "Optional::hasValue",
+					"namespace": "Optional",
+					"name": "hasValue",
+					"receiver": "Optional<ItemType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the Optional holds a value, or holds a value the check accepts.",
+					"returns": "`true` when there is a value, or when the check accepts the value.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "hasValue() -> Boolean",
+							"summary": "Answers whether the Optional holds a value.",
+							"parameters": [],
+							"returns": "`true` when there is a value.",
+							"examples": []
+						},
+						{
+							"signature": "hasValue(where check: (_: ItemType) -> Boolean) -> Boolean",
+							"summary": "Answers whether the Optional holds a value the check accepts.\n\nAn empty Optional answers `false`, and the check does not run.",
+							"parameters": [
+								{
+									"name": "where",
+									"type": "(_: ItemType) -> Boolean",
+									"default": null,
+									"description": "the question asked of the value",
+									"href": null
+								}
+							],
+							"returns": "`true` when there is a value and the check accepts it.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Optional::isEmpty",
+					"namespace": "Optional",
+					"name": "isEmpty",
+					"receiver": "Optional<ItemType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isEmpty() -> Boolean",
+							"summary": "Answers whether the Optional holds no value, the opposite of `hasValue`.",
+							"parameters": [],
+							"returns": "`true` when there is no value.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Reading",
+			"id": "reading",
+			"members": [
+				{
+					"key": "Optional::value",
+					"namespace": "Optional",
+					"name": "value",
+					"receiver": "Optional<ItemType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "value(defaultingTo fallback: ItemType) -> ItemType",
+							"summary": "Answers the value, or the given fallback when there is none.\n\nThe call collapses an Optional back to a bare value: `list::firstItem()::value(defaultingTo 0)`.",
+							"parameters": [
+								{
+									"name": "defaultingTo",
+									"type": "ItemType",
+									"default": null,
+									"description": "the value to answer with when there is none",
+									"href": null
+								}
+							],
+							"returns": "the value, or the fallback in its place.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Transforming",
+			"id": "transforming",
+			"members": [
+				{
+					"key": "Optional::map",
+					"namespace": "Optional",
+					"name": "map",
+					"receiver": "Optional<ItemType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "map<infer Other>(\n\t_ transform: (_: ItemType) -> Other,\n) -> Optional<Other>",
+							"summary": "Answers the value transformed, wrapped in an Optional.\n\nAn empty Optional answers empty, and the transform does not run. This is `List::map` for the at-most-one case.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "(_: ItemType) -> Other",
+									"default": null,
+									"description": "the transform to run on the value",
+									"href": null
+								}
+							],
+							"returns": "the transformed value in an Optional, or an empty Optional.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Optional::andThen",
+					"namespace": "Optional",
+					"name": "andThen",
+					"receiver": "Optional<ItemType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "andThen<infer Other>(\n\t_ step: (_: ItemType) -> Optional<Other>,\n) -> Optional<Other>",
+							"summary": "Answers with the Optional the step answers for the value.\n\nThe two Optionals do not nest: the answer has one level. An empty Optional answers empty, and the step does not run.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "(_: ItemType) -> Optional<Other>",
+									"default": null,
+									"description": "the step to run on the value",
+									"href": null
+								}
+							],
+							"returns": "the Optional the step answers, or an empty Optional.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Optional::keep",
+					"namespace": "Optional",
+					"name": "keep",
+					"receiver": "Optional<ItemType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "keep(where check: (_: ItemType) -> Boolean) -> Optional<ItemType>",
+							"summary": "Answers the Optional when its value passes the check, and empty otherwise.\n\nAn empty Optional answers empty, and the check does not run. This is `List::everyItem(where:)` for the at-most-one case.",
+							"parameters": [
+								{
+									"name": "where",
+									"type": "(_: ItemType) -> Boolean",
+									"default": null,
+									"description": "the question asked of the value",
+									"href": null
+								}
+							],
+							"returns": "the Optional unchanged when the value passes, an empty Optional otherwise.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Falling back",
+			"id": "falling-back",
+			"members": [
+				{
+					"key": "Optional::or",
+					"namespace": "Optional",
+					"name": "or",
+					"receiver": "Optional<ItemType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "or(_ other: Optional<ItemType>) -> Optional<ItemType>",
+							"summary": "Answers the Optional when it holds a value, and the given Optional otherwise.\n\nA chain of calls reads as a list of fallbacks, and the first value in it decides the answer. Two empty Optionals answer empty. The Argument is read whether or not the receiver holds a value.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Optional<ItemType>",
+									"default": null,
+									"description": "the Optional to fall back on",
+									"href": null
+								}
+							],
+							"returns": "the receiver when it holds a value, and the Argument in its place otherwise.",
+							"examples": [
+								"constant missing: Optional<Integer> = #Empty\n\nexpect missing::or(#Value(2))::is(2)"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Combining and converting",
+			"id": "combining-and-converting",
+			"members": [
+				{
+					"key": "Optional::pair",
+					"namespace": "Optional",
+					"name": "pair",
+					"receiver": "Optional<ItemType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "pair<infer Other>(\n\twith other: Optional<Other>,\n) -> Optional<{ first: ItemType, second: Other }>",
+							"summary": "Answers the two values in one Record, and empty when either Optional is empty.\n\nThis is `List::pair(with:)` for the at-most-one case. Both values are needed, so one empty Optional answers empty.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Optional<Other>",
+									"default": null,
+									"description": "the Optional to pair the value with",
+									"href": null
+								}
+							],
+							"returns": "a Record holding this value under `first` and the other under `second`, or an empty Optional.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Optional::toList",
+					"namespace": "Optional",
+					"name": "toList",
+					"receiver": "Optional<ItemType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toList() -> List<ItemType>",
+							"summary": "Answers a List holding the value, and the empty List when there is none.\n\nThe answer holds one item at most. It is the bridge to the Methods a List answers, and `OptionalList::values()` is the bridge back.",
+							"parameters": [],
+							"returns": "the List of the value, or the empty List.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Optional::toResult",
+					"namespace": "Optional",
+					"name": "toResult",
+					"receiver": "Optional<ItemType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toResult<infer FailureType>(\n\tfailingWith reason: FailureType,\n) -> Result<ItemType, FailureType>",
+							"summary": "Answers the value as a Result, failing with the given reason where there is none.\n\nAn Optional says that there is no value, and a Result says why. The reason is read whether or not it is used.\n\nThe reason's own Type decides the Result's failure Type. A bare `#NotFound` binds it to that Case alone, and a `Problem#NotFound` written out does the same. The next call in the chain then works on a Result of a Type it does not expect. Bind the reason to a Constant annotated with the Choice to say the Choice.",
+							"parameters": [
+								{
+									"name": "failingWith",
+									"type": "FailureType",
+									"default": null,
+									"description": "the reason to fail with where there is no value",
+									"href": null
+								}
+							],
+							"returns": "the value in a Result, or the reason as a failure.",
+							"examples": [
+								"constant missing: Optional<Integer> = #Empty\n\nexpect missing::toResult(failingWith \"gone\")::is(#Failure(\"gone\"))"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Nested",
+			"id": "nested",
+			"members": [
+				{
+					"key": "NestedOptional::flatten",
+					"namespace": "NestedOptional",
+					"name": "flatten",
+					"receiver": "Optional<Optional<ItemType>>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "flatten() -> Optional<ItemType>",
+							"summary": "Answers the inner Optional, one level down.\n\nAn empty outer Optional answers empty.",
+							"parameters": [],
+							"returns": "the flattened Optional.",
+							"examples": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [],
+	"modes": [],
+	"tower": [],
+	"views": [
+		{
+			"namespace": "NestedOptional",
+			"target": "Optional<Optional<ItemType>>"
+		}
+	],
+	"protocols": [],
+	"seeAlso": [
+		{
+			"label": "List::values",
+			"href": "/docs/library/list#values"
+		},
+		{
+			"label": "List::allValues",
+			"href": "/docs/library/list#allValues"
+		},
+		{
+			"label": "List::firstValue",
+			"href": "/docs/library/list#firstValue"
+		}
+	],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"equality-and-printing",
+		"is",
+		"isnot",
+		"isNot",
+		"tostring",
+		"toString",
+		"testing",
+		"hasvalue",
+		"hasValue",
+		"isempty",
+		"isEmpty",
+		"reading",
+		"value",
+		"transforming",
+		"map",
+		"andthen",
+		"andThen",
+		"keep",
+		"falling-back",
+		"or",
+		"combining-and-converting",
+		"pair",
+		"tolist",
+		"toList",
+		"toresult",
+		"toResult",
+		"nested",
+		"flatten",
+		"see-also"
+	]
+}

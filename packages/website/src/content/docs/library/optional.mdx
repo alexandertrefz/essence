@@ -1,0 +1,106 @@
+---
+title: "Optional"
+description: "A value that is there or is not, and the methods that test, read, transform and fall back from it."
+section: library
+order: 110
+template: type
+tocDepth: 2
+searchDepth: 3
+namespaces:
+  - "Optional"
+  - "NestedOptional"
+aliases: []
+conformsTo:
+  - "Equatable where ItemType is Equatable"
+  - "Printable where ItemType is Printable"
+---
+
+{/* Generated from packages/standard-library/sources by packages/website/scripts/generateStdlibDocs.ts. The description and the Taught on line are this page's own and survive --sync; everything else is rewritten by it. */}
+
+A value that is there or is not: `#Value` holds an item, and `#Empty` holds nothing.
+
+Every Method that can come back empty answers one of these. The Choice nests, so `#Value(#Empty)` is not `#Empty`.
+
+Taught on: [Optional](/docs/language/optional).
+
+<SignatureBlock label="Declaration" signature="choice Optional<ItemType> {\n\tValue { item: ItemType },\n\tEmpty,\n}" />
+
+<MemberIndex page="optional" />
+
+## At a glance
+
+<AtAGlance page="optional" />
+
+## Equality and printing
+
+### is
+
+<MemberEntries page="optional" name="is" />
+
+### <span id="isNot">isNot</span>
+
+<MemberEntries page="optional" name="isNot" />
+
+### <span id="toString">toString</span>
+
+<MemberEntries page="optional" name="toString" />
+
+## Testing
+
+### <span id="hasValue">hasValue</span>
+
+<MemberEntries page="optional" name="hasValue" />
+
+### <span id="isEmpty">isEmpty</span>
+
+<MemberEntries page="optional" name="isEmpty" />
+
+## Reading
+
+### value
+
+<MemberEntries page="optional" name="value" />
+
+## Transforming
+
+### map
+
+<MemberEntries page="optional" name="map" />
+
+### <span id="andThen">andThen</span>
+
+<MemberEntries page="optional" name="andThen" />
+
+### keep
+
+<MemberEntries page="optional" name="keep" />
+
+## Falling back
+
+### or
+
+<MemberEntries page="optional" name="or" />
+
+## Combining and converting
+
+### pair
+
+<MemberEntries page="optional" name="pair" />
+
+### <span id="toList">toList</span>
+
+<MemberEntries page="optional" name="toList" />
+
+### <span id="toResult">toResult</span>
+
+<MemberEntries page="optional" name="toResult" />
+
+## Nested
+
+### flatten
+
+<MemberEntries page="optional" name="flatten" />
+
+## See also
+
+<SeeAlso links={[{"label":"List::values","href":"/docs/library/list#values"},{"label":"List::allValues","href":"/docs/library/list#allValues"},{"label":"List::firstValue","href":"/docs/library/list#firstValue"}]} />

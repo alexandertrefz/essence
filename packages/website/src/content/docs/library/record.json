@@ -1,0 +1,181 @@
+{
+	"slug": "record",
+	"title": "Record",
+	"kind": "type",
+	"declaration": "namespace Record for Record",
+	"choice": null,
+	"namespaces": ["Record"],
+	"conformsTo": [
+		{
+			"protocol": "Equatable",
+			"condition": null
+		},
+		{
+			"protocol": "Printable",
+			"condition": null
+		}
+	],
+	"groups": [
+		{
+			"label": "Equality and printing",
+			"id": "equality-and-printing",
+			"members": [
+				{
+					"key": "Record::is",
+					"namespace": "Record",
+					"name": "is",
+					"receiver": "Record",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "is(_ other: Record) -> Boolean",
+							"summary": "Answers whether the Record has the same members and values as another.\n\nThe order the members stand in does not matter. Each member is compared by the structural equality the language itself defines, and not by an `is` the member's own Namespace writes. So a value whose Namespace writes its own `is` compares one way on its own and another way as a member. A Dictionary keyed by Records finds a key by this same comparison.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Record",
+									"default": null,
+									"description": "the Record to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the Records are equal.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Record::toString",
+					"namespace": "Record",
+					"name": "toString",
+					"receiver": "Record",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toString() -> String",
+							"summary": "Answers the Record and its members as a String.\n\nEach member is written as `name = value`. The value is written the way it prints, so a whole Rational member prints its numerator alone. A String member keeps its quotation marks. A Record too long for one line is written over several lines.",
+							"parameters": [],
+							"returns": "the String representation of the Record.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Record::isNot",
+					"namespace": "Record",
+					"name": "isNot",
+					"receiver": "Record",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Equatable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNot(_ other: Record) -> Boolean",
+							"summary": "Answers whether the values differ.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Record",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the values differ.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Reading",
+			"id": "reading",
+			"members": [
+				{
+					"key": "Record::keys",
+					"namespace": "Record",
+					"name": "keys",
+					"receiver": "Record",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "keys() -> List<String>",
+							"summary": "Answers the names of the Record's members.\n\nThe names are one third of a reflective trio. The other two, `entries` and `values`, answer a value of any Type, and there is no Type to write that with. So a Program can read the names and not what they name.",
+							"parameters": [],
+							"returns": "the member names, as a List of Strings.",
+							"examples": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [],
+	"modes": [],
+	"tower": [],
+	"views": [],
+	"protocols": [],
+	"seeAlso": [],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"equality-and-printing",
+		"is",
+		"tostring",
+		"toString",
+		"isnot",
+		"isNot",
+		"reading",
+		"keys"
+	]
+}

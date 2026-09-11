@@ -1,0 +1,614 @@
+{
+	"slug": "result",
+	"title": "Result",
+	"kind": "choice",
+	"declaration": "namespace Result<infer ValueType, infer FailureType>\n\t\tfor Result<ValueType, FailureType>",
+	"choice": "choice Result<ValueType, FailureType> {\n\tValue { item: ValueType },\n\tFailure { reason: FailureType },\n}",
+	"namespaces": ["Result", "NestedResult"],
+	"conformsTo": [
+		{
+			"protocol": "Equatable",
+			"condition": "ValueType is Equatable, FailureType is Equatable"
+		},
+		{
+			"protocol": "Printable",
+			"condition": "ValueType is Printable, FailureType is Printable"
+		}
+	],
+	"groups": [
+		{
+			"label": "Equality and printing",
+			"id": "equality-and-printing",
+			"members": [
+				{
+					"key": "Result::is",
+					"namespace": "Result",
+					"name": "is",
+					"receiver": "Result<ValueType, FailureType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the Result is the given one, or whether it holds the given bare value.\n\nTwo Results are equal when they are the same Case and hold equal payloads. A failed Result is never equal to a bare value. A Result holding a Result reaches the first entry, so the question is about the receiver. The Method is available whenever both payloads conform to `Equatable`.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "is<infer ValueType is Equatable, infer FailureType is Equatable>(\n\t_ other: Result<ValueType, FailureType>,\n) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Result<ValueType, FailureType>",
+									"default": null,
+									"description": "the Result to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when both are the same Case and hold equal payloads.",
+							"examples": []
+						},
+						{
+							"signature": "is<infer ValueType is Equatable>(_ other: ValueType) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "ValueType",
+									"default": null,
+									"description": "the bare value to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the Result holds a value equal to it; `false` when it failed.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Result::isNot",
+					"namespace": "Result",
+					"name": "isNot",
+					"receiver": "Result<ValueType, FailureType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the Result differs from the given one, or whether it does not hold the given bare value.\n\nA failed Result holds no bare value, so it always differs from one. The Method is available whenever both payloads conform to `Equatable`.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNot<infer ValueType is Equatable, infer FailureType is Equatable>(\n\t_ other: Result<ValueType, FailureType>,\n) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Result<ValueType, FailureType>",
+									"default": null,
+									"description": "the Result to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the two differ in Case or in payload.",
+							"examples": []
+						},
+						{
+							"signature": "isNot<infer ValueType is Equatable>(_ other: ValueType) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "ValueType",
+									"default": null,
+									"description": "the bare value to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the Result failed or holds a different value.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Result::toString",
+					"namespace": "Result",
+					"name": "toString",
+					"receiver": "Result<ValueType, FailureType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toString<infer ValueType is Printable, infer FailureType is Printable>()\n\t-> String",
+							"summary": "Answers the Result as a String, written `Value(…)` or `Failure(…)`.\n\nEach payload renders through its own `toString`, and a String payload is quoted: `#Failure(\"gone\")` answers `Failure(\"gone\")`. A String prints bare on its own and quoted inside a structure. The Method is available whenever both payloads conform to `Printable`.",
+							"parameters": [],
+							"returns": "the text `Value(…)` or `Failure(…)` around the payload.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Testing",
+			"id": "testing",
+			"members": [
+				{
+					"key": "Result::hasValue",
+					"namespace": "Result",
+					"name": "hasValue",
+					"receiver": "Result<ValueType, FailureType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the Result holds a value, or holds a value the check accepts.",
+					"returns": "`true` when there is a value, or when the check accepts the value.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "hasValue() -> Boolean",
+							"summary": "Answers whether the Result holds a value.",
+							"parameters": [],
+							"returns": "`true` when there is a value.",
+							"examples": []
+						},
+						{
+							"signature": "hasValue(where check: (_: ValueType) -> Boolean) -> Boolean",
+							"summary": "Answers whether the Result holds a value the check accepts.\n\nA failed Result answers `false`, and the check does not run.",
+							"parameters": [
+								{
+									"name": "where",
+									"type": "(_: ValueType) -> Boolean",
+									"default": null,
+									"description": "the question asked of the value",
+									"href": null
+								}
+							],
+							"returns": "`true` when there is a value and the check accepts it.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Result::hasFailed",
+					"namespace": "Result",
+					"name": "hasFailed",
+					"receiver": "Result<ValueType, FailureType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "hasFailed() -> Boolean",
+							"summary": "Answers whether the Result failed, the opposite of `hasValue`.",
+							"parameters": [],
+							"returns": "`true` when there is a reason and no value.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Reading",
+			"id": "reading",
+			"members": [
+				{
+					"key": "Result::value",
+					"namespace": "Result",
+					"name": "value",
+					"receiver": "Result<ValueType, FailureType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the value, held in an Optional, or the given fallback in its place.\n\nThe `defaultingTo:` entry answers the given value in place of the failure, and answers a bare value rather than an Optional.",
+					"returns": "the value the Result holds.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "value() -> Optional<ValueType>",
+							"summary": "Answers the value, held in an Optional.\n\nA failed Result answers an empty Optional, and the reason is dropped. `reason()` is the same reading of the other Case.",
+							"parameters": [],
+							"returns": "the value in an Optional, or an empty Optional.",
+							"examples": []
+						},
+						{
+							"signature": "value(defaultingTo fallback: ValueType) -> ValueType",
+							"summary": "Answers the value, or the given fallback where the Result failed.\n\nThe call collapses a Result back to a bare value: `parse(text)::value(defaultingTo 0)`.",
+							"parameters": [
+								{
+									"name": "defaultingTo",
+									"type": "ValueType",
+									"default": null,
+									"description": "the value to answer with where the Result failed",
+									"href": null
+								}
+							],
+							"returns": "the value, or the fallback in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Result::reason",
+					"namespace": "Result",
+					"name": "reason",
+					"receiver": "Result<ValueType, FailureType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "reason() -> Optional<FailureType>",
+							"summary": "Answers the reason the Result failed, held in an Optional.\n\nA Result holding a value answers an empty Optional. Where a List of reasons is wanted, `ResultList::reasons()` answers it.",
+							"parameters": [],
+							"returns": "the reason in an Optional, or an empty Optional.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Transforming",
+			"id": "transforming",
+			"members": [
+				{
+					"key": "Result::map",
+					"namespace": "Result",
+					"name": "map",
+					"receiver": "Result<ValueType, FailureType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "map<infer Other>(\n\t_ transform: (_: ValueType) -> Other,\n) -> Result<Other, FailureType>",
+							"summary": "Answers the value transformed, wrapped in a Result.\n\nA failed Result answers the same failure, and the transform does not run. The reason is carried through unchanged.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "(_: ValueType) -> Other",
+									"default": null,
+									"description": "the transform to run on the value",
+									"href": null
+								}
+							],
+							"returns": "the transformed value in a Result, or the failure unchanged.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Result::andThen",
+					"namespace": "Result",
+					"name": "andThen",
+					"receiver": "Result<ValueType, FailureType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "andThen<infer Other>(\n\t_ step: (_: ValueType) -> Result<Other, FailureType>,\n) -> Result<Other, FailureType>",
+							"summary": "Answers with the Result the step answers for the value.\n\nThe two Results do not nest: the answer has one level. A failed Result answers the same failure, and the step does not run. The step fails with the receiver's own failure Type.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "(_: ValueType) -> Result<Other, FailureType>",
+									"default": null,
+									"description": "the step to run on the value",
+									"href": null
+								}
+							],
+							"returns": "the Result the step answers, or the failure unchanged.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Result::mapFailure",
+					"namespace": "Result",
+					"name": "mapFailure",
+					"receiver": "Result<ValueType, FailureType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "mapFailure<infer Other>(\n\t_ transform: (_: FailureType) -> Other,\n) -> Result<ValueType, Other>",
+							"summary": "Answers the reason transformed, wrapped in a Result.\n\nA Result holding a value answers the same value, and the transform does not run. This is `map` over the other Case.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "(_: FailureType) -> Other",
+									"default": null,
+									"description": "the transform to run on the reason",
+									"href": null
+								}
+							],
+							"returns": "the transformed reason in a Result, or the value unchanged.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Recovering and falling back",
+			"id": "recovering-and-falling-back",
+			"members": [
+				{
+					"key": "Result::recover",
+					"namespace": "Result",
+					"name": "recover",
+					"receiver": "Result<ValueType, FailureType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "recover(with transform: (_: FailureType) -> ValueType) -> ValueType",
+							"summary": "Answers the value, or what the given transform makes of the reason.\n\nA Result holding a value answers it, and the transform does not run. The answer is a bare value, so the failure is gone.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "(_: FailureType) -> ValueType",
+									"default": null,
+									"description": "the transform that answers a value for a reason",
+									"href": null
+								}
+							],
+							"returns": "the value, or the transformed reason in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Result::keep",
+					"namespace": "Result",
+					"name": "keep",
+					"receiver": "Result<ValueType, FailureType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "keep(\n\twhere check: (_: ValueType) -> Boolean,\n\tfailingWith reason: FailureType,\n) -> Result<ValueType, FailureType>",
+							"summary": "Answers the Result when its value passes the check, and the given failure otherwise.\n\nA failed Result answers the same failure, and the check does not run. This is `Optional::keep(where:)` with a reason for the values it drops. The reason is read whether or not the check refuses.",
+							"parameters": [
+								{
+									"name": "where",
+									"type": "(_: ValueType) -> Boolean",
+									"default": null,
+									"description": "the question asked of the value",
+									"href": null
+								},
+								{
+									"name": "failingWith",
+									"type": "FailureType",
+									"default": null,
+									"description": "the reason to fail with where the value does not pass",
+									"href": null
+								}
+							],
+							"returns": "the Result unchanged when the value passes, and a failure otherwise.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Result::or",
+					"namespace": "Result",
+					"name": "or",
+					"receiver": "Result<ValueType, FailureType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "or(\n\t_ other: Result<ValueType, FailureType>,\n) -> Result<ValueType, FailureType>",
+							"summary": "Answers the Result when it holds a value, and the given Result otherwise.\n\nA chain of calls reads as a list of fallbacks, and the first value in it decides the answer. The reason of a receiver that failed is dropped. The Argument is read whether or not the receiver failed.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Result<ValueType, FailureType>",
+									"default": null,
+									"description": "the Result to fall back on",
+									"href": null
+								}
+							],
+							"returns": "the receiver when it holds a value, and the Argument in its place otherwise.",
+							"examples": [
+								"constant failed: Result<Integer, String> = #Failure(\"gone\")\n\nexpect failed::or(#Value(2))::is(2)"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Converting",
+			"id": "converting",
+			"members": [
+				{
+					"key": "Result::toList",
+					"namespace": "Result",
+					"name": "toList",
+					"receiver": "Result<ValueType, FailureType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toList() -> List<ValueType>",
+							"summary": "Answers a List holding the value, and the empty List where the Result failed.\n\nThe answer holds one item at most, and the reason is dropped. It is the bridge to the Methods a List answers, and `ResultList::values()` is the bridge back.",
+							"parameters": [],
+							"returns": "the List of the value, or the empty List.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Nested",
+			"id": "nested",
+			"members": [
+				{
+					"key": "NestedResult::flatten",
+					"namespace": "NestedResult",
+					"name": "flatten",
+					"receiver": "Result<Result<ValueType, FailureType>, FailureType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "flatten() -> Result<ValueType, FailureType>",
+							"summary": "Answers the inner Result, one level down.\n\nA failed outer Result answers that failure. Where the two levels fail with different Types, the answer fails with both of them joined into one Type.",
+							"parameters": [],
+							"returns": "the flattened Result.",
+							"examples": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [],
+	"modes": [],
+	"tower": [],
+	"views": [
+		{
+			"namespace": "NestedResult",
+			"target": "Result<Result<ValueType, FailureType>, FailureType>"
+		}
+	],
+	"protocols": [],
+	"seeAlso": [
+		{
+			"label": "List::values",
+			"href": "/docs/library/list#values"
+		},
+		{
+			"label": "List::reasons",
+			"href": "/docs/library/list#reasons"
+		},
+		{
+			"label": "List::partition",
+			"href": "/docs/library/list#partition"
+		},
+		{
+			"label": "List::allValues",
+			"href": "/docs/library/list#allValues"
+		}
+	],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"equality-and-printing",
+		"is",
+		"isnot",
+		"isNot",
+		"tostring",
+		"toString",
+		"testing",
+		"hasvalue",
+		"hasValue",
+		"hasfailed",
+		"hasFailed",
+		"reading",
+		"value",
+		"reason",
+		"transforming",
+		"map",
+		"andthen",
+		"andThen",
+		"mapfailure",
+		"mapFailure",
+		"recovering-and-falling-back",
+		"recover",
+		"keep",
+		"or",
+		"converting",
+		"tolist",
+		"toList",
+		"nested",
+		"flatten",
+		"see-also"
+	]
+}

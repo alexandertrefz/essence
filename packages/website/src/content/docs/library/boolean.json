@@ -1,0 +1,449 @@
+{
+	"slug": "boolean",
+	"title": "Boolean",
+	"kind": "type",
+	"declaration": "namespace Boolean for Boolean",
+	"choice": null,
+	"namespaces": ["Boolean"],
+	"conformsTo": [
+		{
+			"protocol": "Equatable",
+			"condition": null
+		},
+		{
+			"protocol": "Printable",
+			"condition": null
+		},
+		{
+			"protocol": "Comparable",
+			"condition": null
+		}
+	],
+	"groups": [
+		{
+			"label": "Equality, ordering and printing",
+			"id": "equality-ordering-and-printing",
+			"members": [
+				{
+					"key": "Boolean::is",
+					"namespace": "Boolean",
+					"name": "is",
+					"receiver": "Boolean",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "is(_ other: Boolean) -> Boolean",
+							"summary": "Answers whether the Boolean has the same truth value as another.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Boolean",
+									"default": null,
+									"description": "the Boolean to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when both are equal.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Boolean::compare",
+					"namespace": "Boolean",
+					"name": "compare",
+					"receiver": "Boolean",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "compare(to other: Boolean) -> Ordering",
+							"summary": "Orders the Boolean against another one, with `false` before `true`.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "Boolean",
+									"default": null,
+									"description": "the Boolean to order against",
+									"href": null
+								}
+							],
+							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Boolean::toString",
+					"namespace": "Boolean",
+					"name": "toString",
+					"receiver": "Boolean",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toString() -> String",
+							"summary": "Answers the Boolean as a String: `\"true\"` or `\"false\"`.",
+							"parameters": [],
+							"returns": null,
+							"examples": [
+								"expect true::toString()::is(\"true\")\nexpect false::toString()::is(\"false\")"
+							]
+						}
+					]
+				},
+				{
+					"key": "Boolean::isNot",
+					"namespace": "Boolean",
+					"name": "isNot",
+					"receiver": "Boolean",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Equatable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNot(_ other: Boolean) -> Boolean",
+							"summary": "Answers whether the values differ.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Boolean",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the values differ.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Logic",
+			"id": "logic",
+			"members": [
+				{
+					"key": "Boolean::negate",
+					"namespace": "Boolean",
+					"name": "negate",
+					"receiver": "Boolean",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "negate() -> Boolean",
+							"summary": "Answers the opposite truth value: `false` for `true`, and `true` for `false`.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Boolean::and",
+					"namespace": "Boolean",
+					"name": "and",
+					"receiver": "Boolean",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "and(_ other: Boolean) -> Boolean",
+							"summary": "Answers the logical conjunction: `true` only when both Booleans are `true`.\n\nBoth sides are evaluated. A call reads its Argument before the Method runs, so a `false` receiver does not stop the other side. Where the other side is expensive, write `define { as other if flag as false otherwise }`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Boolean",
+									"default": null,
+									"description": "the other Boolean",
+									"href": null
+								}
+							],
+							"returns": null,
+							"examples": [
+								"expect true::and(true)\nexpect true::and(false)::negate()"
+							]
+						}
+					]
+				},
+				{
+					"key": "Boolean::or",
+					"namespace": "Boolean",
+					"name": "or",
+					"receiver": "Boolean",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "or(_ other: Boolean) -> Boolean",
+							"summary": "Answers the logical disjunction: `true` when either Boolean is `true`.\n\nBoth sides are evaluated, as they are for `and`. Where the other side is expensive, write `define { as true if flag as other otherwise }`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Boolean",
+									"default": null,
+									"description": "the other Boolean",
+									"href": null
+								}
+							],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Boolean::exclusiveOr",
+					"namespace": "Boolean",
+					"name": "exclusiveOr",
+					"receiver": "Boolean",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "exclusiveOr(_ other: Boolean) -> Boolean",
+							"summary": "Answers the exclusive disjunction: `true` when exactly one Boolean is `true`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Boolean",
+									"default": null,
+									"description": "the other Boolean",
+									"href": null
+								}
+							],
+							"returns": null,
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Comparing",
+			"id": "comparing",
+			"members": [
+				{
+					"key": "Boolean::isLessThan",
+					"namespace": "Boolean",
+					"name": "isLessThan",
+					"receiver": "Boolean",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isLessThan(_ other: Boolean) -> Boolean",
+							"summary": "Answers whether the value is strictly below another.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Boolean",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is below the given one.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Boolean::isLessThanOrEqualTo",
+					"namespace": "Boolean",
+					"name": "isLessThanOrEqualTo",
+					"receiver": "Boolean",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isLessThanOrEqualTo(_ other: Boolean) -> Boolean",
+							"summary": "Answers whether the value is below another, or equal to it.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Boolean",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is below the given one or equal to it.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Boolean::isGreaterThan",
+					"namespace": "Boolean",
+					"name": "isGreaterThan",
+					"receiver": "Boolean",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isGreaterThan(_ other: Boolean) -> Boolean",
+							"summary": "Answers whether the value is strictly above another.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Boolean",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is above the given one.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Boolean::isGreaterThanOrEqualTo",
+					"namespace": "Boolean",
+					"name": "isGreaterThanOrEqualTo",
+					"receiver": "Boolean",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isGreaterThanOrEqualTo(_ other: Boolean) -> Boolean",
+							"summary": "Answers whether the value is above another, or equal to it.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Boolean",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is above the given one or equal to it.",
+							"examples": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [],
+	"modes": [],
+	"tower": [],
+	"views": [],
+	"protocols": [],
+	"seeAlso": [],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"equality-ordering-and-printing",
+		"is",
+		"compare",
+		"tostring",
+		"toString",
+		"isnot",
+		"isNot",
+		"logic",
+		"negate",
+		"and",
+		"or",
+		"exclusiveor",
+		"exclusiveOr",
+		"comparing",
+		"islessthan",
+		"isLessThan",
+		"islessthanorequalto",
+		"isLessThanOrEqualTo",
+		"isgreaterthan",
+		"isGreaterThan",
+		"isgreaterthanorequalto",
+		"isGreaterThanOrEqualTo"
+	]
+}

@@ -1,0 +1,1187 @@
+{
+	"slug": "algebraic",
+	"title": "Algebraic",
+	"kind": "type",
+	"declaration": "namespace Algebraic for Algebraic",
+	"choice": null,
+	"namespaces": ["Algebraic"],
+	"conformsTo": [
+		{
+			"protocol": "Equatable",
+			"condition": null
+		},
+		{
+			"protocol": "Printable",
+			"condition": null
+		},
+		{
+			"protocol": "Orderable",
+			"condition": null
+		}
+	],
+	"groups": [
+		{
+			"label": "Equality, ordering and printing",
+			"id": "equality-ordering-and-printing",
+			"members": [
+				{
+					"key": "Algebraic::is",
+					"namespace": "Algebraic",
+					"name": "is",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "is(_ other: Algebraic) -> Boolean",
+							"summary": "Answers whether both Algebraics are the same number.\n\nNormal forms decide the answer exactly. No approximation is consulted.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the numbers are equal.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::compare",
+					"namespace": "Algebraic",
+					"name": "compare",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "compare(to other: Algebraic) -> Ordering",
+							"summary": "Orders the Algebraic against another Algebraic.\n\nThe comparison is symbolic, so it is exact.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to order against",
+									"href": null
+								}
+							],
+							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::toString",
+					"namespace": "Algebraic",
+					"name": "toString",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the Algebraic as a String, in the exact symbolic form or in the named format.\n\nThe form is `√2`, `3·√2` or `1 + √2` when no format is named, and `#Fraction` names that same form. The `#Decimal` format writes the expansion, to at most 80 digits, which is the cap a Rational writes a non-terminating expansion at. A count of places writes exactly that many digits after the point.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toString() -> String",
+							"summary": "Answers the Algebraic as a String, in the exact symbolic form: `√2`, `3·√2` or `1 + √2`.\n\nOne radical has one printed form, with one exception. Normalisation divides out square factors up to 65536, so a radicand `p²·q` with both primes above that is printed as written. The equal `p·√q` prints in the normalised form.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						},
+						{
+							"signature": "toString(as format: NumberFormat) -> String",
+							"summary": "Answers the Algebraic as a decimal, or in the exact symbolic form, in the named format.\n\nThe `#Decimal` format rounds the expansion at the eightieth digit and writes it. An irrational expansion never ends, so the cap is always reached. Trailing zeros the rounding leaves are dropped, as they are for any Rational. The `#Percent` format writes one hundred times that same reading, taken two digits deeper so that eighty still stand after the point. The `#Scientific` format writes eighty digits after the point of the mantissa, and the power of ten after an `e`. The reading is taken at the eightieth digit of the mantissa, wherever the value falls. A value below one is read deeper than eighty places. The `#Fraction` format writes the symbolic form, since no ratio of two Integers is this number.",
+							"parameters": [
+								{
+									"name": "as",
+									"type": "NumberFormat",
+									"default": null,
+									"description": "the form to represent the Algebraic in",
+									"href": "/docs/library/rational#NumberFormat"
+								}
+							],
+							"returns": "the String representation of the Algebraic.",
+							"examples": []
+						},
+						{
+							"signature": "toString(\n\tas format: NumberFormat,\n\ttoPlaces count: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> String",
+							"summary": "Answers the Algebraic as a decimal with exactly that many places.\n\nThe digits are padded with zeroes where the rounded value is shorter. The last digit kept is rounded in the named direction, and `#Nearest` is what a call that names none is given. A count below one rounds to a whole number, and no point is written. The `#Percent` format takes the count the same way, on one hundred times the value. The `#Scientific` format counts the digits of the mantissa after the point, at every magnitude. The value is read as many digits past the count as its own power of ten falls below zero. The `#Fraction` format ignores both the count and the direction, and writes the symbolic form.",
+							"parameters": [
+								{
+									"name": "as",
+									"type": "NumberFormat",
+									"default": null,
+									"description": "the form to represent the Algebraic in",
+									"href": "/docs/library/rational#NumberFormat"
+								},
+								{
+									"name": "toPlaces",
+									"type": "Integer",
+									"default": null,
+									"description": "how many digits to write after the point",
+									"href": null
+								},
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round the last digit in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the String representation of the Algebraic.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::isNot",
+					"namespace": "Algebraic",
+					"name": "isNot",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Equatable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNot(_ other: Algebraic) -> Boolean",
+							"summary": "Answers whether the values differ.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the values differ.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Arithmetic",
+			"id": "arithmetic",
+			"members": [
+				{
+					"key": "Algebraic::add",
+					"namespace": "Algebraic",
+					"name": "add",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the exact sum of the Algebraic and a number.\n\nTwo Algebraics over the same radical stay in the slice. Their radical parts can also cancel, which leaves a Rational. Two roots of different numbers have no sum in this slice, and the answer is empty. The `defaultingTo:` entry answers the given value in place of empty.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "add(_ other: Integer) -> Algebraic",
+							"summary": "Answers the exact sum of the Algebraic and an Integer.\n\nAn Integer shifts the rational part and leaves the radical in place, so the sum is again an Algebraic.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to add",
+									"href": null
+								}
+							],
+							"returns": "the exact sum.",
+							"examples": []
+						},
+						{
+							"signature": "add(_ other: Rational) -> Algebraic",
+							"summary": "Answers the exact sum of the Algebraic and a Rational.\n\nA Rational shifts the rational part and leaves the radical in place, so the sum is again an Algebraic.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to add",
+									"href": null
+								}
+							],
+							"returns": "the exact sum.",
+							"examples": []
+						},
+						{
+							"signature": "add(_ other: Algebraic) -> Optional<Rational | Algebraic>",
+							"summary": "Answers the exact sum of the two Algebraics.\n\nOver the same radical the sum stays in the slice, and can collapse to a Rational. Over different radicals there is no sum yet, and the answer is empty.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to add",
+									"href": null
+								}
+							],
+							"returns": "the sum, or nothing when the radicals differ.",
+							"examples": []
+						},
+						{
+							"signature": "add(\n\t_ other: Algebraic,\n\tdefaultingTo fallback: Rational | Algebraic,\n) -> Rational | Algebraic",
+							"summary": "Answers the exact sum of the two Algebraics.\n\nOver different radicals there is no sum, and the answer is the given value.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to add",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational | Algebraic",
+									"default": null,
+									"description": "the value to answer with when there is no sum",
+									"href": null
+								}
+							],
+							"returns": "the sum, or the given value in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::subtract",
+					"namespace": "Algebraic",
+					"name": "subtract",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the exact difference of the Algebraic and a number.\n\nSubtracting an equal radical part leaves a Rational. Two roots of different numbers have no difference in this slice, and the answer is empty. The `defaultingTo:` entry answers the given value in place of empty.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "subtract(_ other: Integer) -> Algebraic",
+							"summary": "Answers the exact difference of the Algebraic and an Integer.\n\nAn Integer shifts the rational part and leaves the radical in place, so the difference is again an Algebraic.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to subtract",
+									"href": null
+								}
+							],
+							"returns": "the exact difference.",
+							"examples": []
+						},
+						{
+							"signature": "subtract(_ other: Rational) -> Algebraic",
+							"summary": "Answers the exact difference of the Algebraic and a Rational.\n\nA Rational shifts the rational part and leaves the radical in place, so the difference is again an Algebraic.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to subtract",
+									"href": null
+								}
+							],
+							"returns": "the exact difference.",
+							"examples": []
+						},
+						{
+							"signature": "subtract(_ other: Algebraic) -> Optional<Rational | Algebraic>",
+							"summary": "Answers the exact difference of the two Algebraics.\n\nOver the same radical the difference stays in the slice, and can collapse to a Rational. Over different radicals there is no difference, and the answer is empty.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to subtract",
+									"href": null
+								}
+							],
+							"returns": "the difference, or nothing when the radicals differ.",
+							"examples": []
+						},
+						{
+							"signature": "subtract(\n\t_ other: Algebraic,\n\tdefaultingTo fallback: Rational | Algebraic,\n) -> Rational | Algebraic",
+							"summary": "Answers the exact difference of the two Algebraics.\n\nOver different radicals there is no difference, and the answer is the given value.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to subtract",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational | Algebraic",
+									"default": null,
+									"description": "the value to answer with when there is no difference",
+									"href": null
+								}
+							],
+							"returns": "the difference, or the given value in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::multiply",
+					"namespace": "Algebraic",
+					"name": "multiply",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the exact product of the Algebraic and a number.\n\nA radical times itself turns rational: `√2 · √2` is `2`. Multiplying by zero answers zero. Multiplying by a NonZeroInteger or a NonZeroRational keeps the radical, so those entries answer an Algebraic. The `defaultingTo:` entry answers the given value in place of empty.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "multiply(with other: Integer) -> Algebraic | Rational",
+							"summary": "Answers the exact product of the Algebraic and an Integer.\n\nAn Integer scales both parts and leaves the radical in place. A zero factor collapses the product to the Rational zero.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the exact product, an Algebraic or a Rational.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(with other: Rational) -> Algebraic | Rational",
+							"summary": "Answers the exact product of the Algebraic and a Rational.\n\nA Rational scales both parts and leaves the radical in place. A zero factor collapses the product to the Rational zero.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the exact product, an Algebraic or a Rational.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(with other: Algebraic) -> Optional<Rational | Algebraic>",
+							"summary": "Answers the exact product of the two Algebraics.\n\nOver the same radical the product stays exact: `√2 · √2` is `2`. Two pure radicals combine across radicals: `√2 · √3` is `√6`. Anything else is empty.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the product, or nothing when there is none.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(\n\twith other: Algebraic,\n\tdefaultingTo fallback: Rational | Algebraic,\n) -> Rational | Algebraic",
+							"summary": "Answers the exact product of the two Algebraics.\n\nWhere there is no product, the answer is the given value.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to multiply with",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational | Algebraic",
+									"default": null,
+									"description": "the value to answer with when there is no product",
+									"href": null
+								}
+							],
+							"returns": "the product, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(with other: NonZeroInteger) -> Algebraic",
+							"summary": "Answers the exact product of the Algebraic and a factor proven not to be zero.\n\nA non-zero Integer scales both parts and leaves the radical in place. The answer is again an Algebraic rather than a Union.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "NonZeroInteger",
+									"default": null,
+									"description": "the factor, proven not to be zero",
+									"href": "/docs/library/integer#NonZeroInteger"
+								}
+							],
+							"returns": "the exact product.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(with other: NonZeroRational) -> Algebraic",
+							"summary": "Answers the exact product of the Algebraic and a Rational factor proven not to be zero.\n\nA Rational that is not zero scales both parts and leaves the radical in place. The answer is again an Algebraic rather than a Union.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "NonZeroRational",
+									"default": null,
+									"description": "the factor, proven not to be zero",
+									"href": "/docs/library/rational#NonZeroRational"
+								}
+							],
+							"returns": "the exact product.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::divide",
+					"namespace": "Algebraic",
+					"name": "divide",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the exact quotient of the Algebraic and a number.\n\nDividing by an Integer or a Rational is empty only for zero. Dividing by a NonZeroInteger or a NonZeroRational can not fail, because those divisors are proven. Dividing by an Algebraic multiplies by its reciprocal, which the conjugate always gives. That quotient is empty wherever the matching product is empty. The `defaultingTo:` entries answer the given value in place of empty.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "divide(by other: Integer) -> Optional<Algebraic>",
+							"summary": "Answers the exact quotient of the Algebraic and an Integer.\n\nA divisor that is not zero scales both parts and leaves the radical in place. A zero divisor answers empty.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Integer",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								}
+							],
+							"returns": "the exact quotient, or nothing when the divisor is zero.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: Rational) -> Optional<Algebraic>",
+							"summary": "Answers the exact quotient of the Algebraic and a Rational.\n\nA divisor that is not zero scales both parts and leaves the radical in place. A zero divisor answers empty.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Rational",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								}
+							],
+							"returns": "the exact quotient, or nothing when the divisor is zero.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: Algebraic) -> Optional<Rational | Algebraic>",
+							"summary": "Answers the exact quotient of the two Algebraics.\n\nThe divisor's conjugate gives its reciprocal, and the quotient is that product. It is empty wherever the matching product is empty.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or nothing when there is none.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: Integer, defaultingTo fallback: Algebraic) -> Algebraic",
+							"summary": "Answers the exact quotient of the Algebraic and an Integer.\n\nA zero divisor answers the given value.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Integer",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the value to answer with when there is no quotient",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "divide(\n\tby other: Rational,\n\tdefaultingTo fallback: Algebraic,\n) -> Algebraic",
+							"summary": "Answers the exact quotient of the Algebraic and a Rational.\n\nA zero divisor answers the given value.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Rational",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the value to answer with when there is no quotient",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "divide(\n\tby other: Algebraic,\n\tdefaultingTo fallback: Rational | Algebraic,\n) -> Rational | Algebraic",
+							"summary": "Answers the exact quotient of the two Algebraics.\n\nWhere there is no quotient, the answer is the given value.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational | Algebraic",
+									"default": null,
+									"description": "the value to answer with when there is no quotient",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: NonZeroInteger) -> Algebraic",
+							"summary": "Answers the exact quotient of the Algebraic and a divisor proven not to be zero.\n\nThe division can not fail, so the answer is the quotient itself rather than an Optional.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "NonZeroInteger",
+									"default": null,
+									"description": "the divisor, proven not to be zero",
+									"href": "/docs/library/integer#NonZeroInteger"
+								}
+							],
+							"returns": "the exact quotient.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: NonZeroRational) -> Algebraic",
+							"summary": "Answers the exact quotient of the Algebraic and a Rational divisor proven not to be zero.\n\nThe division can not fail, so the answer is the quotient itself rather than an Optional.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "NonZeroRational",
+									"default": null,
+									"description": "the divisor, proven not to be zero",
+									"href": "/docs/library/rational#NonZeroRational"
+								}
+							],
+							"returns": "the exact quotient.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::raise",
+					"namespace": "Algebraic",
+					"name": "raise",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "raise(to exponent: Integer) -> Rational | Algebraic",
+							"summary": "Answers the Algebraic raised to the given power, exactly.\n\nThe slice is closed under Integer powers, so every power is exact. A power can cancel the radical, so `2::squareRoot()` squared is the Rational `2`. A negative exponent answers the power of the reciprocal, which always exists, since an Algebraic is never zero. A zero exponent answers `1`.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "Integer",
+									"default": null,
+									"description": "the exponent",
+									"href": null
+								}
+							],
+							"returns": "the exact power, an Algebraic or a Rational.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Comparing",
+			"id": "comparing",
+			"members": [
+				{
+					"key": "Algebraic::isLessThan",
+					"namespace": "Algebraic",
+					"name": "isLessThan",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isLessThan(_ other: Algebraic) -> Boolean",
+							"summary": "Answers whether the value is strictly below another.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is below the given one.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::isLessThanOrEqualTo",
+					"namespace": "Algebraic",
+					"name": "isLessThanOrEqualTo",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isLessThanOrEqualTo(_ other: Algebraic) -> Boolean",
+							"summary": "Answers whether the value is below another, or equal to it.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is below the given one or equal to it.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::isGreaterThan",
+					"namespace": "Algebraic",
+					"name": "isGreaterThan",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isGreaterThan(_ other: Algebraic) -> Boolean",
+							"summary": "Answers whether the value is strictly above another.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is above the given one.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::isGreaterThanOrEqualTo",
+					"namespace": "Algebraic",
+					"name": "isGreaterThanOrEqualTo",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isGreaterThanOrEqualTo(_ other: Algebraic) -> Boolean",
+							"summary": "Answers whether the value is above another, or equal to it.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is above the given one or equal to it.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::isBetween",
+					"namespace": "Algebraic",
+					"name": "isBetween",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Orderable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isBetween(_ lower: Algebraic, and upper: Algebraic) -> Boolean",
+							"summary": "Answers whether the value lies between the two given ones, both included.\n\nThe two bounds name the same range in either order: `7::isBetween(10, and 1)` is `true`, and `15::isBetween(10, and 1)` is `false`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Algebraic",
+									"default": null,
+									"description": "one bound of the range, included",
+									"href": null
+								},
+								{
+									"name": "and",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the other bound of the range, included",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is within the bounds.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::clamp",
+					"namespace": "Algebraic",
+					"name": "clamp",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Orderable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "clamp(between lowest: Algebraic, and highest: Algebraic) -> Algebraic",
+							"summary": "Answers the value, pulled into the given bounds.\n\nThe answer is the lower bound when the value is below it. It is the upper bound when the value is above it, and the value itself otherwise. The two bounds name the same range in either order: `7::clamp(between 10, and 1)` is `7`, and `15::clamp(between 10, and 1)` is `10`.",
+							"parameters": [
+								{
+									"name": "between",
+									"type": "Algebraic",
+									"default": null,
+									"description": "one bound of the range",
+									"href": null
+								},
+								{
+									"name": "and",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the other bound of the range",
+									"href": null
+								}
+							],
+							"returns": "the clamped value.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Testing",
+			"id": "testing",
+			"members": [
+				{
+					"key": "Algebraic::isPositive",
+					"namespace": "Algebraic",
+					"name": "isPositive",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isPositive() -> Boolean",
+							"summary": "Answers whether the Algebraic is above zero.\n\nThe sign of `a + b·√d` is exactly decidable. No approximation is consulted.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::isNegative",
+					"namespace": "Algebraic",
+					"name": "isNegative",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNegative() -> Boolean",
+							"summary": "Answers whether the Algebraic is below zero.\n\nThe sign of `a + b·√d` is exactly decidable. No approximation is consulted.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::isZero",
+					"namespace": "Algebraic",
+					"name": "isZero",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isZero() -> Boolean",
+							"summary": "Answers whether the Algebraic is exactly zero.\n\nAn Algebraic carries a radical with a coefficient that is not zero, so the answer is always `false`.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::isWholeNumber",
+					"namespace": "Algebraic",
+					"name": "isWholeNumber",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isWholeNumber() -> Boolean",
+							"summary": "Answers whether the Algebraic is a whole number.\n\nAn Algebraic is irrational, so it is never whole and the answer is always `false`.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Sign and rounding",
+			"id": "sign-and-rounding",
+			"members": [
+				{
+					"key": "Algebraic::absolute",
+					"namespace": "Algebraic",
+					"name": "absolute",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "absolute() -> Algebraic",
+							"summary": "Answers the Algebraic without its sign, which is its distance from zero.\n\nThe sign of `a + b·√d` is exactly decidable. No approximation is consulted.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::negate",
+					"namespace": "Algebraic",
+					"name": "negate",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "negate() -> Algebraic",
+							"summary": "Answers the Algebraic with its sign flipped.\n\nNegating an irrational leaves it irrational, so the answer is again an Algebraic.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::approximate",
+					"namespace": "Algebraic",
+					"name": "approximate",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "approximate(\n\ttoPlaces places: NonNegativeInteger,\n\ttoward direction: Rounding = #Nearest,\n) -> Rational",
+							"summary": "Answers the Algebraic as a Rational on a decimal grid of the given width.\n\nFive places answer the value rounded to hundred-thousandths, so `2::squareRoot()` over five places answers `141421/100000`. This Method is where a Program asks for digits in place of the exact value. The answer is exact all the same: it is the step of that grid the value rounds to. A width of no places answers a whole number, as a Rational.",
+							"parameters": [
+								{
+									"name": "toPlaces",
+									"type": "NonNegativeInteger",
+									"default": null,
+									"description": "how many decimal places the grid keeps",
+									"href": "/docs/library/integer#NonNegativeInteger"
+								},
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the value on the grid the width names.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::round",
+					"namespace": "Algebraic",
+					"name": "round",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the Algebraic rounded in the named direction.\n\nThe direction is `#Nearest` when a call names none. An irrational is never exactly halfway between two steps, so `#Nearest` and `#NearestEven` answer alike here. The other directions answer the floor for `#Down`, the ceiling for `#Up`, and the step towards zero for `#TowardZero`. Naming a count of places rounds to a decimal grid of that width instead, and answers a Rational.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "round(toward direction: Rounding = #Nearest) -> Integer",
+							"summary": "Answers the Algebraic as an Integer, rounded in the named direction.",
+							"parameters": [
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the rounded Integer.",
+							"examples": []
+						},
+						{
+							"signature": "round(\n\ttoPlaces places: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> Rational",
+							"summary": "Answers the Algebraic rounded to a decimal grid of the given width.\n\nTwo places round to hundredths. The answer is what `approximate(toPlaces:toward:)` answers, and a count below one rounds to a whole number. The entry stands here so that a Number receiver reaches `round` at every width, whichever kind it holds.",
+							"parameters": [
+								{
+									"name": "toPlaces",
+									"type": "Integer",
+									"default": null,
+									"description": "how many decimal places to keep",
+									"href": null
+								},
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the rounded Rational.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Algebraic::decimalExponent",
+					"namespace": "Algebraic",
+					"name": "decimalExponent",
+					"receiver": "Algebraic",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "decimalExponent() -> Integer",
+							"summary": "Answers the power of ten at or below the Algebraic's distance from zero.\n\nThis is the exponent the `#Scientific` format writes after the `e`. A value between one and ten answers zero, and a value between a tenth and one answers minus one. The enclosure widens until it falls inside one such power of ten. That always happens: an Algebraic is irrational, so it is never a power of ten itself.",
+							"parameters": [],
+							"returns": "the exponent of the power of ten the value falls on.",
+							"examples": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [],
+	"modes": [],
+	"tower": [],
+	"views": [],
+	"protocols": [],
+	"seeAlso": [],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"equality-ordering-and-printing",
+		"is",
+		"compare",
+		"tostring",
+		"toString",
+		"isnot",
+		"isNot",
+		"arithmetic",
+		"add",
+		"subtract",
+		"multiply",
+		"divide",
+		"raise",
+		"comparing",
+		"islessthan",
+		"isLessThan",
+		"islessthanorequalto",
+		"isLessThanOrEqualTo",
+		"isgreaterthan",
+		"isGreaterThan",
+		"isgreaterthanorequalto",
+		"isGreaterThanOrEqualTo",
+		"isbetween",
+		"isBetween",
+		"clamp",
+		"testing",
+		"ispositive",
+		"isPositive",
+		"isnegative",
+		"isNegative",
+		"iszero",
+		"isZero",
+		"iswholenumber",
+		"isWholeNumber",
+		"sign-and-rounding",
+		"absolute",
+		"negate",
+		"approximate",
+		"round",
+		"decimalexponent",
+		"decimalExponent"
+	]
+}

@@ -1,0 +1,1253 @@
+{
+	"slug": "dictionary",
+	"title": "Dictionary",
+	"kind": "type",
+	"declaration": "namespace Dictionary<infer KeyType, infer ValueType>\n\t\tfor Dictionary<KeyType, ValueType>",
+	"choice": null,
+	"namespaces": ["Dictionary", "NonEmptyDictionary"],
+	"conformsTo": [
+		{
+			"protocol": "Equatable",
+			"condition": "KeyType is Equatable, ValueType is Equatable"
+		},
+		{
+			"protocol": "Printable",
+			"condition": "KeyType is Printable, ValueType is Printable"
+		}
+	],
+	"groups": [
+		{
+			"label": "Creating",
+			"id": "creating",
+			"members": [
+				{
+					"key": "Dictionary::of",
+					"namespace": "Dictionary",
+					"name": "of",
+					"receiver": "Dictionary",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers a Dictionary built from a List of entries, or from a List of keys and a Function.\n\nTwo entries with equal keys collapse into one. The later value wins, and the key keeps the place of its first occurrence. Equality is the keys' own `is`.",
+					"returns": "the Dictionary.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static of<infer KeyType is Equatable>(\n\t_ entries: List<{ key: KeyType, value: ValueType }>,\n) -> Dictionary<KeyType, ValueType>",
+							"summary": "Answers a Dictionary built from a List of entries.\n\nTwo entries with equal keys collapse into one. The later value wins, and the key keeps the place of its first occurrence. Equality is the keys' own `is`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<{ key: KeyType, value: ValueType }>",
+									"default": null,
+									"description": "the entries the Dictionary holds",
+									"href": null
+								}
+							],
+							"returns": "the Dictionary of those entries.",
+							"examples": []
+						},
+						{
+							"signature": "static of<infer KeyType is Equatable>(\n\t_ keys: List<KeyType>,\n\tvaluedBy valueOf: (_: KeyType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
+							"summary": "Answers a Dictionary of the given keys, each holding what the Function answers for it.\n\nThe Function is asked once for each key, in the order the keys stand in. A key written down twice keeps the place of its first occurrence and holds what the Function answered the second time. The empty List answers the empty Dictionary.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<KeyType>",
+									"default": null,
+									"description": "the keys the Dictionary holds",
+									"href": null
+								},
+								{
+									"name": "valuedBy",
+									"type": "(_: KeyType) -> ValueType",
+									"default": null,
+									"description": "the Function answering the value of each key",
+									"href": null
+								}
+							],
+							"returns": "the Dictionary of those keys.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Equality and printing",
+			"id": "equality-and-printing",
+			"members": [
+				{
+					"key": "Dictionary::is",
+					"namespace": "Dictionary",
+					"name": "is",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "is<infer KeyType is Equatable, infer ValueType is Equatable>(\n\t_ other: Dictionary<KeyType, ValueType>,\n) -> Boolean",
+							"summary": "Answers whether the two Dictionaries hold the same keys with equal values.\n\nThe order the entries stand in does not matter. Each key is found by the keys' own `is`, and each pair of values is compared by the values' own `is`. The Method is available whenever the keys and the values conform to `Equatable`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Dictionary<KeyType, ValueType>",
+									"default": null,
+									"description": "the Dictionary to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the two hold the same entries.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::toString",
+					"namespace": "Dictionary",
+					"name": "toString",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toString<infer KeyType is Printable, infer ValueType is Printable>()\n\t-> String",
+							"summary": "Answers the Dictionary and its entries as a String, in the form `[\"a\" = 1, \"b\" = 2]`.\n\nEach key and each value is rendered by its own `toString`, and a String is quoted: `[\"a\" = \"b\"]`. The empty Dictionary answers `[=]`. The empty List answers `[]`, so the two are never the same text. The Method is available whenever the keys and the values conform to `Printable`.",
+							"parameters": [],
+							"returns": "the String representation of the Dictionary.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::isNot",
+					"namespace": "Dictionary",
+					"name": "isNot",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Equatable",
+					"condition": "KeyType is Equatable, ValueType is Equatable",
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNot(_ other: Dictionary<KeyType, ValueType>) -> Boolean",
+							"summary": "Answers whether the values differ.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Dictionary<KeyType, ValueType>",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the values differ.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Testing",
+			"id": "testing",
+			"members": [
+				{
+					"key": "Dictionary::isEmpty",
+					"namespace": "Dictionary",
+					"name": "isEmpty",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isEmpty() -> Boolean",
+							"summary": "Answers whether the Dictionary has no entries at all.",
+							"parameters": [],
+							"returns": "`true` for the empty Dictionary.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::hasEntries",
+					"namespace": "Dictionary",
+					"name": "hasEntries",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the Dictionary has an entry, or has an entry the check accepts.",
+					"returns": "`true` when the Dictionary has an entry, or when the check accepts an entry.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "hasEntries() -> Boolean",
+							"summary": "Answers whether the Dictionary has at least one entry.\n\nIt is the opposite of `isEmpty`.",
+							"parameters": [],
+							"returns": "`true` when the Dictionary is not empty.",
+							"examples": []
+						},
+						{
+							"signature": "hasEntries(\n\twhere check: (_: { key: KeyType, value: ValueType }) -> Boolean,\n) -> Boolean",
+							"summary": "Answers whether the check accepts at least one entry.\n\nThe walk stops at the first accepted entry. The empty Dictionary has no entry to accept, so it answers `false`.",
+							"parameters": [
+								{
+									"name": "where",
+									"type": "(_: { key: KeyType, value: ValueType }) -> Boolean",
+									"default": null,
+									"description": "the check each entry is offered to",
+									"href": null
+								}
+							],
+							"returns": "`true` when the check accepts an entry.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::hasKey",
+					"namespace": "Dictionary",
+					"name": "hasKey",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "hasKey<infer KeyType is Equatable>(_ key: KeyType) -> Boolean",
+							"summary": "Answers whether the Dictionary holds a value for the given key.\n\nEquality is the keys' own `is`. The Method is available whenever the keys conform to `Equatable`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "KeyType",
+									"default": null,
+									"description": "the key to look for",
+									"href": null
+								}
+							],
+							"returns": "`true` when the key holds a value.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::hasValue",
+					"namespace": "Dictionary",
+					"name": "hasValue",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "hasValue<infer ValueType is Equatable>(_ value: ValueType) -> Boolean",
+							"summary": "Answers whether an entry of the Dictionary holds the given value.\n\nEquality is the values' own `is`. The Method is available whenever the values conform to `Equatable`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "ValueType",
+									"default": null,
+									"description": "the value to look for",
+									"href": null
+								}
+							],
+							"returns": "`true` when an entry holds the value.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::hasOnlyEntries",
+					"namespace": "Dictionary",
+					"name": "hasOnlyEntries",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "hasOnlyEntries(\n\twhere check: (_: { key: KeyType, value: ValueType }) -> Boolean,\n) -> Boolean",
+							"summary": "Answers whether the check accepts every entry.\n\nThe walk stops at the first entry the check refuses. The empty Dictionary has no entry to fail the check, so it answers `true`.",
+							"parameters": [
+								{
+									"name": "where",
+									"type": "(_: { key: KeyType, value: ValueType }) -> Boolean",
+									"default": null,
+									"description": "the check each entry is offered to",
+									"href": null
+								}
+							],
+							"returns": "`true` when the check accepts every entry.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::hasNoEntries",
+					"namespace": "Dictionary",
+					"name": "hasNoEntries",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "hasNoEntries(\n\twhere check: (_: { key: KeyType, value: ValueType }) -> Boolean,\n) -> Boolean",
+							"summary": "Answers whether the check accepts no entry at all.\n\nThe walk stops at the first accepted entry. The empty Dictionary has no entry to accept, so it answers `true`.",
+							"parameters": [
+								{
+									"name": "where",
+									"type": "(_: { key: KeyType, value: ValueType }) -> Boolean",
+									"default": null,
+									"description": "the check each entry is offered to",
+									"href": null
+								}
+							],
+							"returns": "`true` when the check accepts no entry.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Reading",
+			"id": "reading",
+			"members": [
+				{
+					"key": "Dictionary::length",
+					"namespace": "Dictionary",
+					"name": "length",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "length() -> NonNegativeInteger",
+							"summary": "Answers how many entries the Dictionary has.",
+							"parameters": [],
+							"returns": "the number of entries, which is never negative.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyDictionary::length",
+					"namespace": "NonEmptyDictionary",
+					"name": "length",
+					"receiver": "NonEmptyDictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "length() -> PositiveInteger",
+							"summary": "Answers how many entries the Dictionary has, which is at least one.",
+							"parameters": [],
+							"returns": "the number of entries, which is above zero.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::value",
+					"namespace": "Dictionary",
+					"name": "value",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the value the given key holds.\n\nA key that holds no value answers an empty Optional. The `defaultingTo:` entry answers the given value in its place. Equality is the keys' own `is`.",
+					"returns": "the value the key holds.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "value<infer KeyType is Equatable>(at key: KeyType) -> Optional<ValueType>",
+							"summary": "Answers the value the given key holds.\n\nEquality is the keys' own `is`. The entry is available whenever the keys conform to `Equatable`.",
+							"parameters": [
+								{
+									"name": "at",
+									"type": "KeyType",
+									"default": null,
+									"description": "the key to look for",
+									"href": null
+								}
+							],
+							"returns": "the value in an Optional, or an empty Optional when the key holds no value.",
+							"examples": []
+						},
+						{
+							"signature": "value<infer KeyType is Equatable>(\n\tat key: KeyType,\n\tdefaultingTo fallback: ValueType,\n) -> ValueType",
+							"summary": "Answers the value the given key holds, or the given fallback when the key holds no value.\n\nEquality is the keys' own `is`. The entry is available whenever the keys conform to `Equatable`.",
+							"parameters": [
+								{
+									"name": "at",
+									"type": "KeyType",
+									"default": null,
+									"description": "the key to look for",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "ValueType",
+									"default": null,
+									"description": "the value to answer with when the key holds no value",
+									"href": null
+								}
+							],
+							"returns": "the value, or the fallback in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::keys",
+					"namespace": "Dictionary",
+					"name": "keys",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "keys() -> List<KeyType>",
+							"summary": "Answers the keys, in the order they were first set.",
+							"parameters": [],
+							"returns": "the List of keys.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyDictionary::keys",
+					"namespace": "NonEmptyDictionary",
+					"name": "keys",
+					"receiver": "NonEmptyDictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "keys() -> NonEmptyList<KeyType>",
+							"summary": "Answers the keys, in the order they were first set.",
+							"parameters": [],
+							"returns": "the List of keys, which certainly has something in it.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::values",
+					"namespace": "Dictionary",
+					"name": "values",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "values() -> List<ValueType>",
+							"summary": "Answers the values, in the order their keys were first set.",
+							"parameters": [],
+							"returns": "the List of values.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyDictionary::values",
+					"namespace": "NonEmptyDictionary",
+					"name": "values",
+					"receiver": "NonEmptyDictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "values() -> NonEmptyList<ValueType>",
+							"summary": "Answers the values, in the order their keys were first set.",
+							"parameters": [],
+							"returns": "the List of values, which certainly has something in it.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::entries",
+					"namespace": "Dictionary",
+					"name": "entries",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "entries() -> List<{ key: KeyType, value: ValueType }>",
+							"summary": "Answers the entries, in the order their keys were first set.\n\nEach entry is a Record of a `key` and a `value`, which a Pattern can take apart.",
+							"parameters": [],
+							"returns": "the List of entries.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyDictionary::entries",
+					"namespace": "NonEmptyDictionary",
+					"name": "entries",
+					"receiver": "NonEmptyDictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "entries() -> NonEmptyList<{ key: KeyType, value: ValueType }>",
+							"summary": "Answers the entries, in the order their keys were first set.\n\nEach entry is a Record of a `key` and a `value`, which a Pattern can take apart.",
+							"parameters": [],
+							"returns": "the List of entries, which certainly has something in it.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::firstEntry",
+					"namespace": "Dictionary",
+					"name": "firstEntry",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the first entry, in the order the keys were first set.\n\nThe empty Dictionary has no first entry. The `defaultingTo:` entry answers the given entry in its place.",
+					"returns": "the first entry.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "firstEntry() -> Optional<{ key: KeyType, value: ValueType }>",
+							"summary": "Answers the first entry of the Dictionary.\n\nThe entry is a Record of a `key` and a `value`, which a Pattern can take apart.",
+							"parameters": [],
+							"returns": "the entry in an Optional, or an empty Optional for the empty Dictionary.",
+							"examples": []
+						},
+						{
+							"signature": "firstEntry(\n\tdefaultingTo fallback: { key: KeyType, value: ValueType },\n) -> { key: KeyType, value: ValueType }",
+							"summary": "Answers the first entry of the Dictionary, or the given entry where it has none.",
+							"parameters": [
+								{
+									"name": "defaultingTo",
+									"type": "{ key: KeyType, value: ValueType }",
+									"default": null,
+									"description": "the entry to answer with for the empty Dictionary",
+									"href": null
+								}
+							],
+							"returns": "the entry, or the given one in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyDictionary::firstEntry",
+					"namespace": "NonEmptyDictionary",
+					"name": "firstEntry",
+					"receiver": "NonEmptyDictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "firstEntry() -> { key: KeyType, value: ValueType }",
+							"summary": "Answers the first entry, in the order the keys were first set.\n\nThe entry is a Record of a `key` and a `value`, which a Pattern can take apart.",
+							"parameters": [],
+							"returns": "the entry, which certainly is there.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Changing entries",
+			"id": "changing-entries",
+			"members": [
+				{
+					"key": "Dictionary::set",
+					"namespace": "Dictionary",
+					"name": "set",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "set<infer KeyType is Equatable>(\n\t_ key: KeyType,\n\tto value: ValueType,\n) -> NonEmptyDictionary<KeyType, ValueType>",
+							"summary": "Answers a new Dictionary with the given key holding the given value.\n\nA key that is already there keeps its place and takes the new value. A key that is not there is added at the end. Equality is the keys' own `is`. The answer holds the entry that was set, so it is never empty.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "KeyType",
+									"default": null,
+									"description": "the key to set",
+									"href": null
+								},
+								{
+									"name": "to",
+									"type": "ValueType",
+									"default": null,
+									"description": "the value the key holds",
+									"href": null
+								}
+							],
+							"returns": "the Dictionary with that entry, which certainly has an entry.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::update",
+					"namespace": "Dictionary",
+					"name": "update",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers a new Dictionary with the given key's value transformed.\n\n`update(at:with:)` answers the receiver unchanged when the key holds no value. `update(at:defaultingTo:with:)` transforms the given value in its place.",
+					"returns": "the Dictionary with the transformed value.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "update<infer KeyType is Equatable>(\n\tat key: KeyType,\n\twith transform: (_: ValueType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
+							"summary": "Answers a new Dictionary with the given key's value transformed.\n\nA key that holds no value answers the receiver unchanged, and the transform does not run.",
+							"parameters": [
+								{
+									"name": "at",
+									"type": "KeyType",
+									"default": null,
+									"description": "the key whose value to transform",
+									"href": null
+								},
+								{
+									"name": "with",
+									"type": "(_: ValueType) -> ValueType",
+									"default": null,
+									"description": "the transform the value is handed to",
+									"href": null
+								}
+							],
+							"returns": "the Dictionary with the transformed value.",
+							"examples": []
+						},
+						{
+							"signature": "update<infer KeyType is Equatable>(\n\tat key: KeyType,\n\tdefaultingTo start: ValueType,\n\twith transform: (_: ValueType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
+							"summary": "Answers a new Dictionary with the given key's value transformed, starting from the given value where the key holds no value.\n\nA key that holds no value is set to the transform of the given value.",
+							"parameters": [
+								{
+									"name": "at",
+									"type": "KeyType",
+									"default": null,
+									"description": "the key whose value to transform",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "ValueType",
+									"default": null,
+									"description": "the value to transform when the key holds no value",
+									"href": null
+								},
+								{
+									"name": "with",
+									"type": "(_: ValueType) -> ValueType",
+									"default": null,
+									"description": "the transform the value is handed to",
+									"href": null
+								}
+							],
+							"returns": "the Dictionary with the transformed value.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::remove",
+					"namespace": "Dictionary",
+					"name": "remove",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers a new Dictionary without the given key, or without every key of the given List.\n\nA key that is not there changes nothing. Equality is the keys' own `is`.",
+					"returns": "the Dictionary without those entries.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "remove<infer KeyType is Equatable>(\n\tat key: KeyType,\n) -> Dictionary<KeyType, ValueType>",
+							"summary": "Answers a new Dictionary without the given key.\n\nA key that is not there answers the receiver unchanged. Equality is the keys' own `is`.",
+							"parameters": [
+								{
+									"name": "at",
+									"type": "KeyType",
+									"default": null,
+									"description": "the key to remove",
+									"href": null
+								}
+							],
+							"returns": "the Dictionary without that entry.",
+							"examples": []
+						},
+						{
+							"signature": "remove<infer KeyType is Equatable>(\n\tatEvery keys: List<KeyType>,\n) -> Dictionary<KeyType, ValueType>",
+							"summary": "Answers a new Dictionary without any of the given keys.\n\nA key that is not there changes nothing, and a key written down twice is removed once. The empty List answers the receiver unchanged. The entries that are left keep the order they had. Equality is the keys' own `is`.",
+							"parameters": [
+								{
+									"name": "atEvery",
+									"type": "List<KeyType>",
+									"default": null,
+									"description": "the keys to remove",
+									"href": null
+								}
+							],
+							"returns": "the Dictionary without those entries.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::removeEvery",
+					"namespace": "Dictionary",
+					"name": "removeEvery",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "removeEvery(\n\twhere check: (_: { key: KeyType, value: ValueType }) -> Boolean,\n) -> Dictionary<KeyType, ValueType>",
+							"summary": "Answers a new Dictionary without every entry the check accepts.\n\nEach entry is offered to the check, and the entries it rejects keep their order. A check that accepts every entry answers the empty Dictionary.",
+							"parameters": [
+								{
+									"name": "where",
+									"type": "(_: { key: KeyType, value: ValueType }) -> Boolean",
+									"default": null,
+									"description": "the check each entry is offered to",
+									"href": null
+								}
+							],
+							"returns": "the Dictionary of the entries the check rejects.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Transforming",
+			"id": "transforming",
+			"members": [
+				{
+					"key": "Dictionary::everyEntry",
+					"namespace": "Dictionary",
+					"name": "everyEntry",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "everyEntry(\n\twhere check: (_: { key: KeyType, value: ValueType }) -> Boolean,\n) -> Dictionary<KeyType, ValueType>",
+							"summary": "Answers a new Dictionary of every entry the check accepts.\n\nEach entry is offered to the check, and the accepted entries keep their order. It is named as `List::everyItem(where:)` is.",
+							"parameters": [
+								{
+									"name": "where",
+									"type": "(_: { key: KeyType, value: ValueType }) -> Boolean",
+									"default": null,
+									"description": "the check each entry is offered to",
+									"href": null
+								}
+							],
+							"returns": "the Dictionary of accepted entries.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::map",
+					"namespace": "Dictionary",
+					"name": "map",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "map<infer Other>(\n\t_ transform: (_: { key: KeyType, value: ValueType }) -> Other,\n) -> Dictionary<KeyType, Other>",
+							"summary": "Answers a new Dictionary with the given transform applied to every entry.\n\nThe keys are kept, and what the transform answers becomes the value of the entry it was handed. The answer holds the same keys in the same order.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "(_: { key: KeyType, value: ValueType }) -> Other",
+									"default": null,
+									"description": "the transform each entry is handed to",
+									"href": null
+								}
+							],
+							"returns": "the Dictionary of transformed values.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyDictionary::map",
+					"namespace": "NonEmptyDictionary",
+					"name": "map",
+					"receiver": "NonEmptyDictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "map<infer Other>(\n\t_ transform: (_: { key: KeyType, value: ValueType }) -> Other,\n) -> NonEmptyDictionary<KeyType, Other>",
+							"summary": "Answers a new Dictionary with the given transform applied to every entry.\n\nThe keys are kept, and what the transform answers becomes the value of the entry it was handed. The answer holds the same keys in the same order.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "(_: { key: KeyType, value: ValueType }) -> Other",
+									"default": null,
+									"description": "the transform each entry is handed to",
+									"href": null
+								}
+							],
+							"returns": "the Dictionary of transformed values, which certainly has an entry.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::merge",
+					"namespace": "Dictionary",
+					"name": "merge",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers a new Dictionary holding the entries of both.\n\nOn a key both hold, the given Dictionary's value wins. The `choosing:` entry hands both values to the caller instead.",
+					"returns": "the merged Dictionary.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "merge<infer KeyType is Equatable>(\n\twith other: Dictionary<KeyType, ValueType>,\n) -> Dictionary<KeyType, ValueType>",
+							"summary": "Answers a new Dictionary holding the entries of both, where the given Dictionary wins.\n\nA key both hold takes the given Dictionary's value. A key only the given Dictionary holds is added at the end.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Dictionary<KeyType, ValueType>",
+									"default": null,
+									"description": "the Dictionary whose entries to add",
+									"href": null
+								}
+							],
+							"returns": "the merged Dictionary.",
+							"examples": []
+						},
+						{
+							"signature": "merge<infer KeyType is Equatable>(\n\twith other: Dictionary<KeyType, ValueType>,\n\tchoosing choose: (_: ValueType, _: ValueType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
+							"summary": "Answers a new Dictionary holding the entries of both, asking the given Function for the value of a key both hold.\n\nThe Function is handed the receiver's value and then the given Dictionary's value. A key only one of the two holds is taken as it stands.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Dictionary<KeyType, ValueType>",
+									"default": null,
+									"description": "the Dictionary whose entries to add",
+									"href": null
+								},
+								{
+									"name": "choosing",
+									"type": "(_: ValueType, _: ValueType) -> ValueType",
+									"default": null,
+									"description": "the Function answering the value of a key both hold",
+									"href": null
+								}
+							],
+							"returns": "the merged Dictionary.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::sort",
+					"namespace": "Dictionary",
+					"name": "sort",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers a new Dictionary with its entries ordered by the keys, or by a key read off each entry.\n\nThe sort is stable, so entries the order does not tell apart keep the order they had, in either direction. A direction is read where one is taken, and it is `#Ascending` when a call names none.",
+					"returns": "the ordered Dictionary.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "sort<infer KeyType is Comparable>(\n\tin order: SortOrder = #Ascending,\n) -> Dictionary<KeyType, ValueType>",
+							"summary": "Answers a new Dictionary in the given direction, by the keys' own ordering.\n\nThe sort is stable. The entry is available whenever the keys conform to `Comparable`. The direction is `#Ascending` when a call names none.",
+							"parameters": [
+								{
+									"name": "in",
+									"type": "SortOrder",
+									"default": "#Ascending",
+									"description": "the direction to order in, `#Ascending` when it is left out",
+									"href": "/docs/library/list#SortOrder"
+								}
+							],
+							"returns": "the ordered Dictionary.",
+							"examples": []
+						},
+						{
+							"signature": "sort<infer Key is Comparable>(\n\ton key: (_: { key: KeyType, value: ValueType }) -> Key,\n\tin order: SortOrder = #Ascending,\n) -> Dictionary<KeyType, ValueType>",
+							"summary": "Answers a new Dictionary in the given direction of what the key reads off each entry.\n\nThe key is read once per entry. The sort is stable, so entries whose keys compare equal keep the order they had. The entry is available whenever what the key answers conforms to `Comparable`. The direction is `#Ascending` when a call names none.",
+							"parameters": [
+								{
+									"name": "on",
+									"type": "(_: { key: KeyType, value: ValueType }) -> Key",
+									"default": null,
+									"description": "the key each entry is ordered by",
+									"href": null
+								},
+								{
+									"name": "in",
+									"type": "SortOrder",
+									"default": "#Ascending",
+									"description": "the direction to order in, `#Ascending` when it is left out",
+									"href": "/docs/library/list#SortOrder"
+								}
+							],
+							"returns": "the ordered Dictionary.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyDictionary::sort",
+					"namespace": "NonEmptyDictionary",
+					"name": "sort",
+					"receiver": "NonEmptyDictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers a new Dictionary with its entries ordered by the keys, or by a key read off each entry.\n\nThe sort is stable, so entries the order does not tell apart keep the order they had, in either direction. A direction is read where one is taken, and it is `#Ascending` when a call names none.",
+					"returns": "the ordered Dictionary, which certainly has an entry.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "sort<infer KeyType is Comparable>(\n\tin order: SortOrder = #Ascending,\n) -> NonEmptyDictionary<KeyType, ValueType>",
+							"summary": "Answers a new Dictionary in the given direction, by the keys' own ordering.\n\nThe sort is stable. The entry is available whenever the keys conform to `Comparable`. The direction is `#Ascending` when a call names none.",
+							"parameters": [
+								{
+									"name": "in",
+									"type": "SortOrder",
+									"default": "#Ascending",
+									"description": "the direction to order in, `#Ascending` when it is left out",
+									"href": "/docs/library/list#SortOrder"
+								}
+							],
+							"returns": "the ordered Dictionary, which certainly has an entry.",
+							"examples": []
+						},
+						{
+							"signature": "sort<infer Key is Comparable>(\n\ton key: (_: { key: KeyType, value: ValueType }) -> Key,\n\tin order: SortOrder = #Ascending,\n) -> NonEmptyDictionary<KeyType, ValueType>",
+							"summary": "Answers a new Dictionary in the given direction of what the key reads off each entry.\n\nThe key is read once per entry. The sort is stable, so entries whose keys compare equal keep the order they had. The entry is available whenever what the key answers conforms to `Comparable`. The direction is `#Ascending` when a call names none.",
+							"parameters": [
+								{
+									"name": "on",
+									"type": "(_: { key: KeyType, value: ValueType }) -> Key",
+									"default": null,
+									"description": "the key each entry is ordered by",
+									"href": null
+								},
+								{
+									"name": "in",
+									"type": "SortOrder",
+									"default": "#Ascending",
+									"description": "the direction to order in, `#Ascending` when it is left out",
+									"href": "/docs/library/list#SortOrder"
+								}
+							],
+							"returns": "the ordered Dictionary, which certainly has an entry.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Dictionary::count",
+					"namespace": "Dictionary",
+					"name": "count",
+					"receiver": "Dictionary<KeyType, ValueType>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "count(\n\twhere check: (_: { key: KeyType, value: ValueType }) -> Boolean,\n) -> NonNegativeInteger",
+							"summary": "Answers how many entries the check accepts.",
+							"parameters": [
+								{
+									"name": "where",
+									"type": "(_: { key: KeyType, value: ValueType }) -> Boolean",
+									"default": null,
+									"description": "the check each entry is offered to",
+									"href": null
+								}
+							],
+							"returns": "how many entries the check accepts, which is never negative.",
+							"examples": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [
+		{
+			"name": "NonEmptyDictionary",
+			"written": "NonEmptyDictionary<KeyType, ValueType>",
+			"declaration": "type NonEmptyDictionary<KeyType, ValueType> = Dictionary<KeyType, ValueType>\n\twhere @::hasEntries()",
+			"predicate": "@::hasEntries()",
+			"description": "A Dictionary proven to have an entry in it, as a checked refinement of `Dictionary`.\n\nThe proof is what lets `length` answer above zero, and `keys`, `values` and `entries` answer a List with something in it. A Dictionary written down with an entry in it carries the proof. A Dictionary a Program is handed earns it through an `if` asking `hasEntries`, and `set` answers with this Type whatever it was given.",
+			"tightens": [
+				"length",
+				"keys",
+				"values",
+				"entries",
+				"firstEntry",
+				"map",
+				"sort"
+			],
+			"answeredBy": [
+				{
+					"label": "Dictionary::set(_:to:)",
+					"href": "/docs/library/dictionary#set"
+				},
+				{
+					"label": "NonEmptyDictionary::map(_:)",
+					"href": "/docs/library/dictionary#map"
+				},
+				{
+					"label": "NonEmptyDictionary::sort(in:)",
+					"href": "/docs/library/dictionary#sort"
+				},
+				{
+					"label": "NonEmptyDictionary::sort(on:in:)",
+					"href": "/docs/library/dictionary#sort"
+				},
+				{
+					"label": "GroupedNonEmptyList::group(on:)",
+					"href": "/docs/library/list#group"
+				},
+				{
+					"label": "GroupedNonEmptyList::tally()",
+					"href": "/docs/library/list#tally"
+				},
+				{
+					"label": "GroupedNonEmptyList::index(on:)",
+					"href": "/docs/library/list#index"
+				}
+			]
+		}
+	],
+	"modes": [],
+	"tower": [],
+	"views": [],
+	"protocols": [],
+	"seeAlso": [
+		{
+			"label": "List::group",
+			"href": "/docs/library/list#group"
+		},
+		{
+			"label": "List::tally",
+			"href": "/docs/library/list#tally"
+		},
+		{
+			"label": "List::index",
+			"href": "/docs/library/list#index"
+		}
+	],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"creating",
+		"of",
+		"equality-and-printing",
+		"is",
+		"tostring",
+		"toString",
+		"isnot",
+		"isNot",
+		"testing",
+		"isempty",
+		"isEmpty",
+		"hasentries",
+		"hasEntries",
+		"haskey",
+		"hasKey",
+		"hasvalue",
+		"hasValue",
+		"hasonlyentries",
+		"hasOnlyEntries",
+		"hasnoentries",
+		"hasNoEntries",
+		"reading",
+		"length",
+		"value",
+		"keys",
+		"values",
+		"entries",
+		"firstentry",
+		"firstEntry",
+		"changing-entries",
+		"set",
+		"update",
+		"remove",
+		"removeevery",
+		"removeEvery",
+		"transforming",
+		"everyentry",
+		"everyEntry",
+		"map",
+		"merge",
+		"sort",
+		"count",
+		"refinements",
+		"nonemptydictionary",
+		"NonEmptyDictionary",
+		"see-also"
+	]
+}

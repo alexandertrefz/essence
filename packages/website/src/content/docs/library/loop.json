@@ -1,0 +1,560 @@
+{
+	"slug": "loop",
+	"title": "loop and Step",
+	"kind": "function family",
+	"declaration": "overload function loop",
+	"choice": null,
+	"namespaces": [],
+	"conformsTo": [],
+	"groups": [
+		{
+			"label": "Predicate loops",
+			"id": "predicate-loops",
+			"members": [
+				{
+					"key": "loop::while",
+					"namespace": "loop",
+					"name": "while",
+					"receiver": null,
+					"kind": "function",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "loop<infer State>(\n\tstartingWith state: State,\n\twhile condition: (_: State) -> Boolean,\n\t_ advance: (_: State) -> State,\n) -> State",
+							"summary": "Answers the first State the condition rejects.\n\nThe condition is checked before each step. A condition that is false on the seed answers the seed unchanged, and the loop runs zero times. This entry is one of the family's two natives.",
+							"parameters": [
+								{
+									"name": "startingWith",
+									"type": "State",
+									"default": null,
+									"description": "the State the loop begins from.",
+									"href": null
+								},
+								{
+									"name": "while",
+									"type": "(_: State) -> Boolean",
+									"default": null,
+									"description": "the condition, checked against the State before each step; the loop continues while it is `true`.",
+									"href": null
+								},
+								{
+									"name": "_",
+									"type": "(_: State) -> State",
+									"default": null,
+									"description": "the body, handed the running State and answering with the next.",
+									"href": null
+								}
+							],
+							"returns": "the first State the condition rejects.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "loop::until",
+					"namespace": "loop",
+					"name": "until",
+					"receiver": null,
+					"kind": "function",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "loop<infer State>(\n\tstartingWith state: State,\n\tuntil condition: (_: State) -> Boolean,\n\t_ advance: (_: State) -> State,\n) -> State",
+							"summary": "Answers the first State the condition accepts.\n\nThe condition is checked before each step. A condition already `true` on the seed answers the seed unchanged, and the loop runs zero times.",
+							"parameters": [
+								{
+									"name": "startingWith",
+									"type": "State",
+									"default": null,
+									"description": "the State the loop begins from.",
+									"href": null
+								},
+								{
+									"name": "until",
+									"type": "(_: State) -> Boolean",
+									"default": null,
+									"description": "the condition, checked against the State before each step; the loop continues while it is `false`.",
+									"href": null
+								},
+								{
+									"name": "_",
+									"type": "(_: State) -> State",
+									"default": null,
+									"description": "the body, handed the running State and answering with the next.",
+									"href": null
+								}
+							],
+							"returns": "the first State the condition accepts.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Counted loops",
+			"id": "counted-loops",
+			"members": [
+				{
+					"key": "loop::through",
+					"namespace": "loop",
+					"name": "through",
+					"receiver": null,
+					"kind": "function",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "loop<infer State>(\n\tfrom start: Integer,\n\tthrough end: Integer,\n\tstartingWith state: State,\n\t_ advance: (_: Integer, _: State) -> State,\n) -> State",
+							"summary": "Runs the body once for each Integer from `from` up through `through`, and answers the State after the last step.\n\nBoth endpoints are included and the count only runs up. An end below the start runs the body zero times and answers the seed untouched. That mirrors `List.of(integersFrom:through:)`. To count down, use the `downTo:` entry. The entry always finishes, because the range is fixed before the first step.",
+							"parameters": [
+								{
+									"name": "from",
+									"type": "Integer",
+									"default": null,
+									"description": "the first Integer the body sees.",
+									"href": null
+								},
+								{
+									"name": "through",
+									"type": "Integer",
+									"default": null,
+									"description": "the last Integer the body sees, included.",
+									"href": null
+								},
+								{
+									"name": "startingWith",
+									"type": "State",
+									"default": null,
+									"description": "the State the first step builds on.",
+									"href": null
+								},
+								{
+									"name": "_",
+									"type": "(_: Integer, _: State) -> State",
+									"default": null,
+									"description": "the body, handed each Integer and the running State, answering with the next State.",
+									"href": null
+								}
+							],
+							"returns": "the State after the last step, or the seed when the body never runs.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "loop::upTo",
+					"namespace": "loop",
+					"name": "upTo",
+					"receiver": null,
+					"kind": "function",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "loop<infer State>(\n\tfrom start: Integer,\n\tupTo end: Integer,\n\tstartingWith state: State,\n\t_ advance: (_: Integer, _: State) -> State,\n) -> State",
+							"summary": "Runs the body once for each Integer from `from` up to, but not including, `upTo`, and answers the State after the last step.\n\nThe count only runs up. The body runs zero times when `upTo` is not above `from`, and the seed is answered untouched. That mirrors `List.of(integersFrom:upTo:)`, so a count written from a length is empty rather than inverted.",
+							"parameters": [
+								{
+									"name": "from",
+									"type": "Integer",
+									"default": null,
+									"description": "the first Integer the body sees.",
+									"href": null
+								},
+								{
+									"name": "upTo",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer the count stops before.",
+									"href": null
+								},
+								{
+									"name": "startingWith",
+									"type": "State",
+									"default": null,
+									"description": "the State the first step builds on.",
+									"href": null
+								},
+								{
+									"name": "_",
+									"type": "(_: Integer, _: State) -> State",
+									"default": null,
+									"description": "the body, handed each Integer and the running State, answering with the next State.",
+									"href": null
+								}
+							],
+							"returns": "the State after the last step, or the seed when the body never runs.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "loop::downTo",
+					"namespace": "loop",
+					"name": "downTo",
+					"receiver": null,
+					"kind": "function",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "loop<infer State>(\n\tfrom start: Integer,\n\tdownTo end: Integer,\n\tstartingWith state: State,\n\t_ advance: (_: Integer, _: State) -> State,\n) -> State",
+							"summary": "Runs the body once for each Integer from `from` down through `downTo`, and answers the State after the last step.\n\nBoth endpoints are included and the count only runs down. The first Integer is always seen, so an end above the start runs the body once. That mirrors `List.of(integersFrom:downTo:)`. The entry always finishes, because the range is fixed before the first step.",
+							"parameters": [
+								{
+									"name": "from",
+									"type": "Integer",
+									"default": null,
+									"description": "the first Integer the body sees.",
+									"href": null
+								},
+								{
+									"name": "downTo",
+									"type": "Integer",
+									"default": null,
+									"description": "the last Integer the body sees, included.",
+									"href": null
+								},
+								{
+									"name": "startingWith",
+									"type": "State",
+									"default": null,
+									"description": "the State the first step builds on.",
+									"href": null
+								},
+								{
+									"name": "_",
+									"type": "(_: Integer, _: State) -> State",
+									"default": null,
+									"description": "the body, handed each Integer and the running State, answering with the next State.",
+									"href": null
+								}
+							],
+							"returns": "the State after the last step.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Loops the body can stop",
+			"id": "loops-the-body-can-stop",
+			"members": [
+				{
+					"key": "loop::step",
+					"namespace": "loop",
+					"name": "step",
+					"receiver": null,
+					"kind": "function",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "loop<infer State, infer Answer>(\n\tstartingWith state: State,\n\tstep advance: (_: State) -> Step<State, Answer>,\n) -> Answer",
+							"summary": "Answers the value the first `#Done` carries.\n\nEach step answers with a `Step`. A `#Continue` carries the next State, and the loop goes again. A `#Done` carries the answer, and the loop finishes with it. This entry ends on a decision the State makes, rather than on a count or a fixed predicate. It is the family's other native.",
+							"parameters": [
+								{
+									"name": "startingWith",
+									"type": "State",
+									"default": null,
+									"description": "the State the loop begins from.",
+									"href": null
+								},
+								{
+									"name": "step",
+									"type": "(_: State) -> Step<State, Answer>",
+									"default": null,
+									"description": "the body, handed the running State and answering with a `Step`: `#Continue` to go again, `#Done` to stop.",
+									"href": null
+								}
+							],
+							"returns": "the value the first `#Done` carries.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "loop::through-step",
+					"namespace": "loop",
+					"name": "through-step",
+					"receiver": null,
+					"kind": "function",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "loop<infer State>(\n\tfrom start: Integer,\n\tthrough end: Integer,\n\tstartingWith state: State,\n\tstep advance: (_: Integer, _: State) -> Step<State, State>,\n) -> State",
+							"summary": "Runs the body over the Integers from `from` up through `through`, and lets the body stop before the end.\n\nEach step answers with a `Step`. A `#Continue` carries the next State, and the count goes on. A `#Done` carries the answer, and the loop finishes with it at once. The count running out answers the State the last step carried. An end below the start runs the body zero times and answers the seed.",
+							"parameters": [
+								{
+									"name": "from",
+									"type": "Integer",
+									"default": null,
+									"description": "the first Integer the body sees.",
+									"href": null
+								},
+								{
+									"name": "through",
+									"type": "Integer",
+									"default": null,
+									"description": "the last Integer the body sees, included.",
+									"href": null
+								},
+								{
+									"name": "startingWith",
+									"type": "State",
+									"default": null,
+									"description": "the State the first step builds on.",
+									"href": null
+								},
+								{
+									"name": "step",
+									"type": "(_: Integer, _: State) -> Step<State, State>",
+									"default": null,
+									"description": "the body, handed each Integer and the running State, answering with a `Step`.",
+									"href": null
+								}
+							],
+							"returns": "the State the count ran out on, or the value the first `#Done` carries.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "loop::upTo-step",
+					"namespace": "loop",
+					"name": "upTo-step",
+					"receiver": null,
+					"kind": "function",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "loop<infer State>(\n\tfrom start: Integer,\n\tupTo end: Integer,\n\tstartingWith state: State,\n\tstep advance: (_: Integer, _: State) -> Step<State, State>,\n) -> State",
+							"summary": "Runs the body over the Integers from `from` up to, but not including, `upTo`, and lets the body stop before the end.\n\nEach step answers with a `Step`, as the `through:` entry beside it reads. The body runs zero times when `upTo` is not above `from`, and the seed is answered untouched.",
+							"parameters": [
+								{
+									"name": "from",
+									"type": "Integer",
+									"default": null,
+									"description": "the first Integer the body sees.",
+									"href": null
+								},
+								{
+									"name": "upTo",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer the count stops before.",
+									"href": null
+								},
+								{
+									"name": "startingWith",
+									"type": "State",
+									"default": null,
+									"description": "the State the first step builds on.",
+									"href": null
+								},
+								{
+									"name": "step",
+									"type": "(_: Integer, _: State) -> Step<State, State>",
+									"default": null,
+									"description": "the body, handed each Integer and the running State, answering with a `Step`.",
+									"href": null
+								}
+							],
+							"returns": "the State the count ran out on, or the value the first `#Done` carries.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "loop::downTo-step",
+					"namespace": "loop",
+					"name": "downTo-step",
+					"receiver": null,
+					"kind": "function",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "loop<infer State>(\n\tfrom start: Integer,\n\tdownTo end: Integer,\n\tstartingWith state: State,\n\tstep advance: (_: Integer, _: State) -> Step<State, State>,\n) -> State",
+							"summary": "Runs the body over the Integers from `from` down through `downTo`, and lets the body stop before the end.\n\nEach step answers with a `Step`, as the `through:` entry reads. The first Integer is always seen, so an end above the start runs the body once and answers what that step carried.",
+							"parameters": [
+								{
+									"name": "from",
+									"type": "Integer",
+									"default": null,
+									"description": "the first Integer the body sees.",
+									"href": null
+								},
+								{
+									"name": "downTo",
+									"type": "Integer",
+									"default": null,
+									"description": "the last Integer the body sees, included.",
+									"href": null
+								},
+								{
+									"name": "startingWith",
+									"type": "State",
+									"default": null,
+									"description": "the State the first step builds on.",
+									"href": null
+								},
+								{
+									"name": "step",
+									"type": "(_: Integer, _: State) -> Step<State, State>",
+									"default": null,
+									"description": "the body, handed each Integer and the running State, answering with a `Step`.",
+									"href": null
+								}
+							],
+							"returns": "the State the count ran out on, or the value the first `#Done` carries.",
+							"examples": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [],
+	"modes": [
+		{
+			"name": "Step",
+			"declaration": "choice Step<State, Answer> {\n\tContinue { state: State },\n\tDone { value: Answer },\n}",
+			"description": "What a callback answers to say whether a loop goes round again.\n\n`#Continue` carries the next State, and `#Done` carries the answer the loop finishes with. A `match` checks the two Cases like any other Choice.\n\n`State` is what a loop threads from turn to turn, and `Answer` is what it finishes with. The two are independent. The `loop` family in `Loop.es` and `List::reduce`'s early-stopping entry both read one.",
+			"cases": [
+				{
+					"name": "Continue",
+					"payload": "{ state: State }"
+				},
+				{
+					"name": "Done",
+					"payload": "{ value: Answer }"
+				}
+			],
+			"payloadFree": false,
+			"takenBy": [
+				{
+					"label": "List::reduce(startingWith:step:)",
+					"href": "/docs/library/list#reduce",
+					"default": null
+				},
+				{
+					"label": "loop(startingWith:step:)",
+					"href": "/docs/library/loop#step",
+					"default": null
+				},
+				{
+					"label": "loop(from:through:startingWith:step:)",
+					"href": "/docs/library/loop#through-step",
+					"default": null
+				},
+				{
+					"label": "loop(from:upTo:startingWith:step:)",
+					"href": "/docs/library/loop#upTo-step",
+					"default": null
+				},
+				{
+					"label": "loop(from:downTo:startingWith:step:)",
+					"href": "/docs/library/loop#downTo-step",
+					"default": null
+				}
+			]
+		}
+	],
+	"tower": [],
+	"views": [],
+	"protocols": [],
+	"seeAlso": [],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"predicate-loops",
+		"while",
+		"until",
+		"counted-loops",
+		"through",
+		"upto",
+		"upTo",
+		"downto",
+		"downTo",
+		"loops-the-body-can-stop",
+		"step",
+		"through-step",
+		"upto-step",
+		"upTo-step",
+		"downto-step",
+		"downTo-step",
+		"modes",
+		"step-1",
+		"Step"
+	]
+}

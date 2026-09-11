@@ -1,0 +1,1523 @@
+{
+	"slug": "number",
+	"title": "Number",
+	"kind": "type",
+	"declaration": "namespace Number for Number",
+	"choice": null,
+	"namespaces": ["Number", "Scalar"],
+	"conformsTo": [
+		{
+			"protocol": "Equatable",
+			"condition": null
+		},
+		{
+			"protocol": "Printable",
+			"condition": null
+		},
+		{
+			"protocol": "Orderable",
+			"condition": null
+		}
+	],
+	"groups": [
+		{
+			"label": "Constants",
+			"id": "constants",
+			"members": [
+				{
+					"key": "Number::Pi",
+					"namespace": "Number",
+					"name": "Pi",
+					"receiver": "Number",
+					"kind": "property",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static Pi: Transcendental",
+							"summary": "The ratio of a circle's circumference to its diameter, exactly.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Number::Tau",
+					"namespace": "Number",
+					"name": "Tau",
+					"receiver": "Number",
+					"kind": "property",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static Tau: Transcendental",
+							"summary": "Twice `Pi`, which is the ratio of a circle's circumference to its radius.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Number::E",
+					"namespace": "Number",
+					"name": "E",
+					"receiver": "Number",
+					"kind": "property",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static E: Transcendental",
+							"summary": "Euler's number, the base of the natural logarithm, exactly.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Number::GoldenRatio",
+					"namespace": "Number",
+					"name": "GoldenRatio",
+					"receiver": "Number",
+					"kind": "property",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static GoldenRatio: Algebraic",
+							"summary": "The golden ratio `(1 + √5) / 2`, the positive solution of `x² = x + 1`, exactly.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Aggregates",
+			"id": "aggregates",
+			"members": [
+				{
+					"key": "Number::sum",
+					"namespace": "Number",
+					"name": "sum",
+					"receiver": "Number",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Adds up every Number in the List.\n\nThe empty List sums to zero. A mixed List answers an Integer when its total is whole, and a Rational otherwise.",
+					"returns": "the exact total.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static sum(_ integers: List<Integer>) -> Integer",
+							"summary": "Adds up every Integer in the List.\n\nThe sum is an Integer, since whole numbers add to a whole number. The empty List sums to zero.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Integer>",
+									"default": null,
+									"description": "the Integers to add up",
+									"href": null
+								}
+							],
+							"returns": "the total.",
+							"examples": []
+						},
+						{
+							"signature": "static sum(_ rationals: List<Rational>) -> Rational",
+							"summary": "Adds up every Rational in the List.\n\nThe sum is a Rational, since it need not be whole. A whole total stays a Rational here, so `[1/2, 1/2]::sum()` answers `1/1`. The mixed entry below collapses one to an Integer. The empty List sums to zero.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Rational>",
+									"default": null,
+									"description": "the Rationals to add up",
+									"href": null
+								}
+							],
+							"returns": "the total.",
+							"examples": []
+						},
+						{
+							"signature": "static sum(_ numbers: List<Scalar>) -> Scalar",
+							"summary": "Adds up a List holding both Integers and Rationals.\n\nThe sum is an Integer when the total is whole, and a Rational otherwise. The empty List sums to zero.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Scalar>",
+									"default": null,
+									"description": "the Numbers to add up",
+									"href": null
+								}
+							],
+							"returns": "the total.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Number::product",
+					"namespace": "Number",
+					"name": "product",
+					"receiver": "Number",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Multiplies every Number in the List together.\n\nThe empty List multiplies to one. A mixed List answers an Integer when its product is whole, and a Rational otherwise.",
+					"returns": "the exact product.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static product(_ integers: List<Integer>) -> Integer",
+							"summary": "Multiplies every Integer in the List together.\n\nThe product is an Integer, since whole numbers multiply to a whole number. The empty List multiplies to one.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Integer>",
+									"default": null,
+									"description": "the Integers to multiply",
+									"href": null
+								}
+							],
+							"returns": "the product.",
+							"examples": []
+						},
+						{
+							"signature": "static product(_ rationals: List<Rational>) -> Rational",
+							"summary": "Multiplies every Rational in the List together.\n\nThe product is a Rational, since it need not be whole. A whole product stays a Rational here, as a whole sum does. The mixed entry below collapses one to an Integer. The empty List multiplies to one.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Rational>",
+									"default": null,
+									"description": "the Rationals to multiply",
+									"href": null
+								}
+							],
+							"returns": "the product.",
+							"examples": []
+						},
+						{
+							"signature": "static product(_ numbers: List<Scalar>) -> Scalar",
+							"summary": "Multiplies a List holding both Integers and Rationals together.\n\nThe product is an Integer when it is whole, and a Rational otherwise. The empty List multiplies to one.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Scalar>",
+									"default": null,
+									"description": "the Numbers to multiply",
+									"href": null
+								}
+							],
+							"returns": "the product.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Number::average",
+					"namespace": "Number",
+					"name": "average",
+					"receiver": "Number",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "The arithmetic mean of the Numbers in the List: their sum divided by their count, as an exact Rational.\n\nThe empty List has no mean, and the `defaultingTo:` entries answer the given Rational in place of nothing. A List proven to have an item answers the mean itself.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static average(_ integers: List<Integer>) -> Optional<Rational>",
+							"summary": "The arithmetic mean of the Integers: their sum divided by their count.\n\nThe mean is a Rational, since it need not be whole. The empty List has no mean.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Integer>",
+									"default": null,
+									"description": "the Integers to average",
+									"href": null
+								}
+							],
+							"returns": "the mean, or nothing for the empty List.",
+							"examples": []
+						},
+						{
+							"signature": "static average(_ rationals: List<Rational>) -> Optional<Rational>",
+							"summary": "The arithmetic mean of the Rationals: their sum divided by their count.\n\nThe mean is a Rational. The empty List has no mean.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Rational>",
+									"default": null,
+									"description": "the Rationals to average",
+									"href": null
+								}
+							],
+							"returns": "the mean, or nothing for the empty List.",
+							"examples": []
+						},
+						{
+							"signature": "static average(_ numbers: List<Scalar>) -> Optional<Rational>",
+							"summary": "The arithmetic mean of a List holding both Integers and Rationals.\n\nThe mean is a Rational, since it need not be whole. The empty List has no mean.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Scalar>",
+									"default": null,
+									"description": "the Numbers to average",
+									"href": null
+								}
+							],
+							"returns": "the mean, or nothing for the empty List.",
+							"examples": []
+						},
+						{
+							"signature": "static average(\n\t_ integers: List<Integer>,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
+							"summary": "The arithmetic mean of the Integers, with a value to answer for the empty List.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Integer>",
+									"default": null,
+									"description": "the Integers to average",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational",
+									"default": null,
+									"description": "the value to answer with when there is no mean",
+									"href": null
+								}
+							],
+							"returns": "the mean, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "static average(\n\t_ rationals: List<Rational>,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
+							"summary": "The arithmetic mean of the Rationals, with a value to answer for the empty List.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Rational>",
+									"default": null,
+									"description": "the Rationals to average",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational",
+									"default": null,
+									"description": "the value to answer with when there is no mean",
+									"href": null
+								}
+							],
+							"returns": "the mean, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "static average(\n\t_ numbers: List<Scalar>,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
+							"summary": "The arithmetic mean of the Numbers, with a value to answer for the empty List.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Scalar>",
+									"default": null,
+									"description": "the Numbers to average",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational",
+									"default": null,
+									"description": "the value to answer with when there is no mean",
+									"href": null
+								}
+							],
+							"returns": "the mean, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "static average(_ integers: NonEmptyList<Integer>) -> Rational",
+							"summary": "The arithmetic mean of the Integers in a List proven to have an item.\n\nThe count is above zero, so the answer is the mean itself rather than an Optional.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "NonEmptyList<Integer>",
+									"default": null,
+									"description": "the Integers to average",
+									"href": "/docs/library/list#NonEmptyList"
+								}
+							],
+							"returns": "the mean.",
+							"examples": []
+						},
+						{
+							"signature": "static average(_ rationals: NonEmptyList<Rational>) -> Rational",
+							"summary": "The arithmetic mean of the Rationals in a List proven to have an item.\n\nThe count is above zero, so the answer is the mean itself rather than an Optional.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "NonEmptyList<Rational>",
+									"default": null,
+									"description": "the Rationals to average",
+									"href": "/docs/library/list#NonEmptyList"
+								}
+							],
+							"returns": "the mean.",
+							"examples": []
+						},
+						{
+							"signature": "static average(_ numbers: NonEmptyList<Scalar>) -> Rational",
+							"summary": "The arithmetic mean of the Numbers in a List proven to have an item.\n\nThe count is above zero, so the answer is the mean itself rather than an Optional.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "NonEmptyList<Scalar>",
+									"default": null,
+									"description": "the Numbers to average",
+									"href": "/docs/library/list#NonEmptyList"
+								}
+							],
+							"returns": "the mean.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Number::lowest",
+					"namespace": "Number",
+					"name": "lowest",
+					"receiver": "Number",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "The lower of two Numbers, or the lowest in a List of them.\n\nThe answer for two equal Numbers is the first of them. A List answers the earliest of its lowest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing. A List proven to have an item answers the item itself. A pair the four kind-preserving entries do not fit falls to the widest entry, which answers a Number.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static lowest(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer",
+							"summary": "The lower of two Integers.\n\nThe answer is an Integer. Two equal Integers answer the first of them.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the first Integer to compare",
+									"href": null
+								},
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the second Integer to compare",
+									"href": null
+								}
+							],
+							"returns": "the lower Integer.",
+							"examples": []
+						},
+						{
+							"signature": "static lowest(_ firstNumber: Rational, _ secondNumber: Rational) -> Rational",
+							"summary": "The lower of two Rationals.\n\nThe answer is a Rational. Two equal Rationals answer the first of them.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the first Rational to compare",
+									"href": null
+								},
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the second Rational to compare",
+									"href": null
+								}
+							],
+							"returns": "the lower Rational.",
+							"examples": []
+						},
+						{
+							"signature": "static lowest(_ firstNumber: Integer, _ secondNumber: Rational) -> Scalar",
+							"summary": "The lower of an Integer and a Rational.\n\nThe answer keeps the kind of the Number it picks, so it is an Integer or a Rational. Two equal Numbers answer the Integer.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare",
+									"href": null
+								},
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare",
+									"href": null
+								}
+							],
+							"returns": "the lower Number.",
+							"examples": []
+						},
+						{
+							"signature": "static lowest(_ firstNumber: Rational, _ secondNumber: Integer) -> Scalar",
+							"summary": "The lower of a Rational and an Integer.\n\nThe answer keeps the kind of the Number it picks, so it is an Integer or a Rational. Two equal Numbers answer the Rational.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare",
+									"href": null
+								},
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare",
+									"href": null
+								}
+							],
+							"returns": "the lower Number.",
+							"examples": []
+						},
+						{
+							"signature": "static lowest(_ integers: List<Integer>) -> Optional<Integer>",
+							"summary": "The lowest of the Integers in the List.\n\nThe answer is the earliest of the lowest items. The empty List has none.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Integer>",
+									"default": null,
+									"description": "the Integers to compare",
+									"href": null
+								}
+							],
+							"returns": "the lowest Integer, or nothing for the empty List.",
+							"examples": []
+						},
+						{
+							"signature": "static lowest(_ rationals: List<Rational>) -> Optional<Rational>",
+							"summary": "The lowest of the Rationals in the List.\n\nThe answer is the earliest of the lowest items. The empty List has none.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Rational>",
+									"default": null,
+									"description": "the Rationals to compare",
+									"href": null
+								}
+							],
+							"returns": "the lowest Rational, or nothing for the empty List.",
+							"examples": []
+						},
+						{
+							"signature": "static lowest(_ numbers: List<Scalar>) -> Optional<Scalar>",
+							"summary": "The lowest Number in a List holding both Integers and Rationals.\n\nThe answer keeps the kind of the item it picks, and is the earliest of the lowest items. The empty List has none.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Scalar>",
+									"default": null,
+									"description": "the Numbers to compare",
+									"href": null
+								}
+							],
+							"returns": "the lowest Number, or nothing for the empty List.",
+							"examples": []
+						},
+						{
+							"signature": "static lowest(\n\t_ integers: List<Integer>,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
+							"summary": "The lowest of the Integers, with a value to answer for the empty List.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Integer>",
+									"default": null,
+									"description": "the Integers to compare",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Integer",
+									"default": null,
+									"description": "the value to answer with when there is no lowest",
+									"href": null
+								}
+							],
+							"returns": "the lowest Integer, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "static lowest(\n\t_ rationals: List<Rational>,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
+							"summary": "The lowest of the Rationals, with a value to answer for the empty List.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Rational>",
+									"default": null,
+									"description": "the Rationals to compare",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational",
+									"default": null,
+									"description": "the value to answer with when there is no lowest",
+									"href": null
+								}
+							],
+							"returns": "the lowest Rational, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "static lowest(_ numbers: List<Scalar>, defaultingTo fallback: Scalar) -> Scalar",
+							"summary": "The lowest of the Numbers, with a value to answer for the empty List.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Scalar>",
+									"default": null,
+									"description": "the Numbers to compare",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Scalar",
+									"default": null,
+									"description": "the value to answer with when there is no lowest",
+									"href": null
+								}
+							],
+							"returns": "the lowest Number, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "static lowest(_ integers: NonEmptyList<Integer>) -> Integer",
+							"summary": "The lowest of the Integers in a List proven to have an item.\n\nThe List has a lowest item, so the answer is that item rather than an Optional.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "NonEmptyList<Integer>",
+									"default": null,
+									"description": "the Integers to compare",
+									"href": "/docs/library/list#NonEmptyList"
+								}
+							],
+							"returns": "the lowest Integer.",
+							"examples": []
+						},
+						{
+							"signature": "static lowest(_ rationals: NonEmptyList<Rational>) -> Rational",
+							"summary": "The lowest of the Rationals in a List proven to have an item.\n\nThe List has a lowest item, so the answer is that item rather than an Optional.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "NonEmptyList<Rational>",
+									"default": null,
+									"description": "the Rationals to compare",
+									"href": "/docs/library/list#NonEmptyList"
+								}
+							],
+							"returns": "the lowest Rational.",
+							"examples": []
+						},
+						{
+							"signature": "static lowest(_ numbers: NonEmptyList<Scalar>) -> Scalar",
+							"summary": "The lowest of the Numbers in a List proven to have an item.\n\nThe List has a lowest item, so the answer is that item rather than an Optional.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "NonEmptyList<Scalar>",
+									"default": null,
+									"description": "the Numbers to compare",
+									"href": "/docs/library/list#NonEmptyList"
+								}
+							],
+							"returns": "the lowest Number.",
+							"examples": []
+						},
+						{
+							"signature": "static lowest(_ firstNumber: Number, _ secondNumber: Number) -> Number",
+							"summary": "The lower of two Numbers, of any kind the tower holds.\n\nThe answer is a Number, since the two can be of different kinds. Two equal Numbers answer the first of them.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Number",
+									"default": null,
+									"description": "the first Number to compare",
+									"href": null
+								},
+								{
+									"name": "_",
+									"type": "Number",
+									"default": null,
+									"description": "the second Number to compare",
+									"href": null
+								}
+							],
+							"returns": "the lower Number.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Number::highest",
+					"namespace": "Number",
+					"name": "highest",
+					"receiver": "Number",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "The higher of two Numbers, or the highest in a List of them.\n\nThe answer for two equal Numbers is the first of them. A List answers the earliest of its highest items. The empty List has none, and the `defaultingTo:` entries answer the given Number in place of nothing. A List proven to have an item answers the item itself. A pair the four kind-preserving entries do not fit falls to the widest entry, which answers a Number.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static highest(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer",
+							"summary": "The higher of two Integers.\n\nThe answer is an Integer. Two equal Integers answer the first of them.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the first Integer to compare",
+									"href": null
+								},
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the second Integer to compare",
+									"href": null
+								}
+							],
+							"returns": "the higher Integer.",
+							"examples": []
+						},
+						{
+							"signature": "static highest(_ firstNumber: Rational, _ secondNumber: Rational) -> Rational",
+							"summary": "The higher of two Rationals.\n\nThe answer is a Rational. Two equal Rationals answer the first of them.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the first Rational to compare",
+									"href": null
+								},
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the second Rational to compare",
+									"href": null
+								}
+							],
+							"returns": "the higher Rational.",
+							"examples": []
+						},
+						{
+							"signature": "static highest(_ firstNumber: Integer, _ secondNumber: Rational) -> Scalar",
+							"summary": "The higher of an Integer and a Rational.\n\nThe answer keeps the kind of the Number it picks, so it is an Integer or a Rational. Two equal Numbers answer the Integer.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare",
+									"href": null
+								},
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare",
+									"href": null
+								}
+							],
+							"returns": "the higher Number.",
+							"examples": []
+						},
+						{
+							"signature": "static highest(_ firstNumber: Rational, _ secondNumber: Integer) -> Scalar",
+							"summary": "The higher of a Rational and an Integer.\n\nThe answer keeps the kind of the Number it picks, so it is an Integer or a Rational. Two equal Numbers answer the Rational.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare",
+									"href": null
+								},
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare",
+									"href": null
+								}
+							],
+							"returns": "the higher Number.",
+							"examples": []
+						},
+						{
+							"signature": "static highest(_ integers: List<Integer>) -> Optional<Integer>",
+							"summary": "The highest of the Integers in the List.\n\nThe answer is the earliest of the highest items. The empty List has none.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Integer>",
+									"default": null,
+									"description": "the Integers to compare",
+									"href": null
+								}
+							],
+							"returns": "the highest Integer, or nothing for the empty List.",
+							"examples": []
+						},
+						{
+							"signature": "static highest(_ rationals: List<Rational>) -> Optional<Rational>",
+							"summary": "The highest of the Rationals in the List.\n\nThe answer is the earliest of the highest items. The empty List has none.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Rational>",
+									"default": null,
+									"description": "the Rationals to compare",
+									"href": null
+								}
+							],
+							"returns": "the highest Rational, or nothing for the empty List.",
+							"examples": []
+						},
+						{
+							"signature": "static highest(_ numbers: List<Scalar>) -> Optional<Scalar>",
+							"summary": "The highest Number in a List holding both Integers and Rationals.\n\nThe answer keeps the kind of the item it picks, and is the earliest of the highest items. The empty List has none.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Scalar>",
+									"default": null,
+									"description": "the Numbers to compare",
+									"href": null
+								}
+							],
+							"returns": "the highest Number, or nothing for the empty List.",
+							"examples": []
+						},
+						{
+							"signature": "static highest(\n\t_ integers: List<Integer>,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
+							"summary": "The highest of the Integers, with a value to answer for the empty List.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Integer>",
+									"default": null,
+									"description": "the Integers to compare",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Integer",
+									"default": null,
+									"description": "the value to answer with when there is no highest",
+									"href": null
+								}
+							],
+							"returns": "the highest Integer, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "static highest(\n\t_ rationals: List<Rational>,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
+							"summary": "The highest of the Rationals, with a value to answer for the empty List.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Rational>",
+									"default": null,
+									"description": "the Rationals to compare",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational",
+									"default": null,
+									"description": "the value to answer with when there is no highest",
+									"href": null
+								}
+							],
+							"returns": "the highest Rational, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "static highest(_ numbers: List<Scalar>, defaultingTo fallback: Scalar) -> Scalar",
+							"summary": "The highest of the Numbers, with a value to answer for the empty List.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "List<Scalar>",
+									"default": null,
+									"description": "the Numbers to compare",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Scalar",
+									"default": null,
+									"description": "the value to answer with when there is no highest",
+									"href": null
+								}
+							],
+							"returns": "the highest Number, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "static highest(_ integers: NonEmptyList<Integer>) -> Integer",
+							"summary": "The highest of the Integers in a List proven to have an item.\n\nThe List has a highest item, so the answer is that item rather than an Optional.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "NonEmptyList<Integer>",
+									"default": null,
+									"description": "the Integers to compare",
+									"href": "/docs/library/list#NonEmptyList"
+								}
+							],
+							"returns": "the highest Integer.",
+							"examples": []
+						},
+						{
+							"signature": "static highest(_ rationals: NonEmptyList<Rational>) -> Rational",
+							"summary": "The highest of the Rationals in a List proven to have an item.\n\nThe List has a highest item, so the answer is that item rather than an Optional.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "NonEmptyList<Rational>",
+									"default": null,
+									"description": "the Rationals to compare",
+									"href": "/docs/library/list#NonEmptyList"
+								}
+							],
+							"returns": "the highest Rational.",
+							"examples": []
+						},
+						{
+							"signature": "static highest(_ numbers: NonEmptyList<Scalar>) -> Scalar",
+							"summary": "The highest of the Numbers in a List proven to have an item.\n\nThe List has a highest item, so the answer is that item rather than an Optional.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "NonEmptyList<Scalar>",
+									"default": null,
+									"description": "the Numbers to compare",
+									"href": "/docs/library/list#NonEmptyList"
+								}
+							],
+							"returns": "the highest Number.",
+							"examples": []
+						},
+						{
+							"signature": "static highest(_ firstNumber: Number, _ secondNumber: Number) -> Number",
+							"summary": "The higher of two Numbers, of any kind the tower holds.\n\nThe answer is a Number, since the two can be of different kinds. Two equal Numbers answer the first of them.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Number",
+									"default": null,
+									"description": "the first Number to compare",
+									"href": null
+								},
+								{
+									"name": "_",
+									"type": "Number",
+									"default": null,
+									"description": "the second Number to compare",
+									"href": null
+								}
+							],
+							"returns": "the higher Number.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Creating",
+			"id": "creating",
+			"members": [
+				{
+					"key": "Number::parse",
+					"namespace": "Number",
+					"name": "parse",
+					"receiver": "Number",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Reads a Number from its text form, as an Integer where the text holds one.\n\nThe text form is what `Integer.parse` reads, or what `Rational.parse` reads: a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`. A whole number answers an Integer, and every other shape a Rational. Text of another shape answers empty, and the `defaultingTo:` entry answers the given Number instead.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static parse(_ text: String) -> Optional<Scalar>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the text to read",
+									"href": null
+								}
+							],
+							"returns": "the Number, or nothing when the text has any other shape.",
+							"examples": []
+						},
+						{
+							"signature": "static parse(_ text: String, defaultingTo fallback: Scalar) -> Scalar",
+							"summary": "Reads a Number from its text form, with a value to answer when the text has another shape.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the text to read",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Scalar",
+									"default": null,
+									"description": "the value to answer with when the text is no Number",
+									"href": null
+								}
+							],
+							"returns": "the Number, or the given value in its place.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Cross-kind equality, ordering and printing",
+			"id": "cross-kind-equality-ordering-and-printing",
+			"members": [
+				{
+					"key": "Number::is",
+					"namespace": "Number",
+					"name": "is",
+					"receiver": "Number",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "is(_ other: Number) -> Boolean",
+							"summary": "Answers whether the Number has the same numeric value as another Number.\n\nAn Integer and a Rational are the same Number when their values are equal, so `1 is 1/1` holds. The answer is read off `compare`. So two Transcendentals that both carry π and e can stop the Program at the precision cutoff `compare` names.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Number",
+									"default": null,
+									"description": "the Number to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when both Numbers have the same numeric value.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Number::compare",
+					"namespace": "Number",
+					"name": "compare",
+					"receiver": "Number",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "compare(to other: Number) -> Ordering",
+							"summary": "Orders the Number against another Number by numeric value, across every member of the tower.\n\nEvery pair is ordered exactly, with one exception. A Transcendental carrying both π and e is ordered against another Number by refining enclosures, and the refinement stops at 32768 decimal places. A pair that still agrees there stops the Program with an error, since deciding it exactly is an open problem. The bounded form is `Transcendental::compare(to:withPrecision:)`, which answers empty instead.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "Number",
+									"default": null,
+									"description": "the Number to order against",
+									"href": null
+								}
+							],
+							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Number::toString",
+					"namespace": "Number",
+					"name": "toString",
+					"receiver": "Number",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toString() -> String",
+							"summary": "Answers the Number as a String, in the notation of the member Type it holds.",
+							"parameters": [],
+							"returns": "the String representation of the Number.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Number::isNot",
+					"namespace": "Number",
+					"name": "isNot",
+					"receiver": "Number",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Equatable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNot(_ other: Number) -> Boolean",
+							"summary": "Answers whether the values differ.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Number",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the values differ.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Comparing",
+			"id": "comparing",
+			"members": [
+				{
+					"key": "Number::isLessThan",
+					"namespace": "Number",
+					"name": "isLessThan",
+					"receiver": "Number",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isLessThan(_ other: Number) -> Boolean",
+							"summary": "Answers whether the value is strictly below another.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Number",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is below the given one.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Number::isLessThanOrEqualTo",
+					"namespace": "Number",
+					"name": "isLessThanOrEqualTo",
+					"receiver": "Number",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isLessThanOrEqualTo(_ other: Number) -> Boolean",
+							"summary": "Answers whether the value is below another, or equal to it.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Number",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is below the given one or equal to it.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Number::isGreaterThan",
+					"namespace": "Number",
+					"name": "isGreaterThan",
+					"receiver": "Number",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isGreaterThan(_ other: Number) -> Boolean",
+							"summary": "Answers whether the value is strictly above another.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Number",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is above the given one.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Number::isGreaterThanOrEqualTo",
+					"namespace": "Number",
+					"name": "isGreaterThanOrEqualTo",
+					"receiver": "Number",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isGreaterThanOrEqualTo(_ other: Number) -> Boolean",
+							"summary": "Answers whether the value is above another, or equal to it.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Number",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is above the given one or equal to it.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Number::isBetween",
+					"namespace": "Number",
+					"name": "isBetween",
+					"receiver": "Number",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Orderable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isBetween(_ lower: Number, and upper: Number) -> Boolean",
+							"summary": "Answers whether the value lies between the two given ones, both included.\n\nThe two bounds name the same range in either order: `7::isBetween(10, and 1)` is `true`, and `15::isBetween(10, and 1)` is `false`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Number",
+									"default": null,
+									"description": "one bound of the range, included",
+									"href": null
+								},
+								{
+									"name": "and",
+									"type": "Number",
+									"default": null,
+									"description": "the other bound of the range, included",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is within the bounds.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Number::clamp",
+					"namespace": "Number",
+					"name": "clamp",
+					"receiver": "Number",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Orderable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "clamp(between lowest: Number, and highest: Number) -> Number",
+							"summary": "Answers the value, pulled into the given bounds.\n\nThe answer is the lower bound when the value is below it. It is the upper bound when the value is above it, and the value itself otherwise. The two bounds name the same range in either order: `7::clamp(between 10, and 1)` is `7`, and `15::clamp(between 10, and 1)` is `10`.",
+							"parameters": [
+								{
+									"name": "between",
+									"type": "Number",
+									"default": null,
+									"description": "one bound of the range",
+									"href": null
+								},
+								{
+									"name": "and",
+									"type": "Number",
+									"default": null,
+									"description": "the other bound of the range",
+									"href": null
+								}
+							],
+							"returns": "the clamped value.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Mixed arithmetic",
+			"id": "mixed-arithmetic",
+			"members": [
+				{
+					"key": "Scalar::add",
+					"namespace": "Scalar",
+					"name": "add",
+					"receiver": "Scalar",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "add(_ other: Scalar) -> Scalar",
+							"summary": "Adds two Scalars.\n\nThe answer is an Integer for two Integers, and a Rational for every other pair.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Scalar",
+									"default": null,
+									"description": "the Scalar to add",
+									"href": null
+								}
+							],
+							"returns": "the exact sum.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Scalar::multiply",
+					"namespace": "Scalar",
+					"name": "multiply",
+					"receiver": "Scalar",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "multiply(with other: Scalar) -> Scalar",
+							"summary": "Multiplies two Scalars.\n\nThe answer is an Integer for two Integers, and a Rational for every other pair.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Scalar",
+									"default": null,
+									"description": "the Scalar to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the exact product.",
+							"examples": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [],
+	"modes": [],
+	"tower": [
+		{
+			"name": "Number",
+			"declaration": "type Number = Integer | Rational | Irrational",
+			"description": ""
+		},
+		{
+			"name": "Irrational",
+			"declaration": "type Irrational = Algebraic | Transcendental",
+			"description": "The numbers of the tower that are not ratios of Integers: an Algebraic or a Transcendental.\n\nAlgebraic and Transcendental are complements, since transcendental means not algebraic. The alias covers exactly the irrationals the tower holds."
+		},
+		{
+			"name": "Scalar",
+			"declaration": "type Scalar = Integer | Rational",
+			"description": "An Integer or a Rational: the two numeric kinds a Program computes with exactly.\n\nEvery Number is a Scalar or an Irrational. The two Methods below answer a Scalar for any two Scalars, which is what the mixed aggregates fold on."
+		}
+	],
+	"views": [
+		{
+			"namespace": "Scalar",
+			"target": "Scalar"
+		}
+	],
+	"protocols": [],
+	"seeAlso": [],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"the-tower",
+		"number",
+		"Number",
+		"irrational",
+		"Irrational",
+		"scalar",
+		"Scalar",
+		"constants",
+		"pi",
+		"Pi",
+		"tau",
+		"Tau",
+		"e",
+		"E",
+		"goldenratio",
+		"GoldenRatio",
+		"aggregates",
+		"sum",
+		"product",
+		"average",
+		"lowest",
+		"highest",
+		"creating",
+		"parse",
+		"cross-kind-equality-ordering-and-printing",
+		"is",
+		"compare",
+		"tostring",
+		"toString",
+		"isnot",
+		"isNot",
+		"comparing",
+		"islessthan",
+		"isLessThan",
+		"islessthanorequalto",
+		"isLessThanOrEqualTo",
+		"isgreaterthan",
+		"isGreaterThan",
+		"isgreaterthanorequalto",
+		"isGreaterThanOrEqualTo",
+		"isbetween",
+		"isBetween",
+		"clamp",
+		"mixed-arithmetic",
+		"add",
+		"multiply"
+	]
+}

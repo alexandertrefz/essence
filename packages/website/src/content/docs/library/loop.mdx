@@ -1,0 +1,74 @@
+---
+title: "loop and Step"
+description: "The loop functions: repeat a body over a State while a condition holds, over a range of Integers, or until it stops."
+section: library
+order: 150
+template: type
+tocDepth: 2
+searchDepth: 3
+namespaces: []
+aliases: []
+conformsTo: []
+---
+
+{/* Generated from packages/standard-library/sources by packages/website/scripts/generateStdlibDocs.ts. The description and the Taught on line are this page's own and survive --sync; everything else is rewritten by it. */}
+
+Answers the State the loop settles on, or the answer a step stops with.
+
+A `startingWith` value seeds the State and a body advances it. The entries differ in what ends the loop. The `while` and `until` entries check a predicate before each step. The counted entries run over a range of Integers. A positional body runs the loop to its end. A `step` body answers with a `Step` and can stop the loop early. Pick the entry by the labels it reads, as with an overloaded Method.
+
+Taught on: [Iteration](/docs/language/iteration).
+
+<MemberIndex page="loop" />
+
+## At a glance
+
+<AtAGlance page="loop" />
+
+## Predicate loops
+
+### while
+
+<MemberEntries page="loop" name="while" />
+
+### until
+
+<MemberEntries page="loop" name="until" />
+
+## Counted loops
+
+### through
+
+<MemberEntries page="loop" name="through" />
+
+### <span id="upTo">upTo</span>
+
+<MemberEntries page="loop" name="upTo" />
+
+### <span id="downTo">downTo</span>
+
+<MemberEntries page="loop" name="downTo" />
+
+## Loops the body can stop
+
+### step
+
+<MemberEntries page="loop" name="step" />
+
+### through-step
+
+<MemberEntries page="loop" name="through-step" />
+
+### <span id="upTo-step">upTo-step</span>
+
+<MemberEntries page="loop" name="upTo-step" />
+
+### <span id="downTo-step">downTo-step</span>
+
+<MemberEntries page="loop" name="downTo-step" />
+
+## Modes
+
+### <span id="Step">Step</span>
+
+<ModeEntry page="loop" name="Step" />

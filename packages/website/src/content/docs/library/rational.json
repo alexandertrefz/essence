@@ -1,0 +1,2418 @@
+{
+	"slug": "rational",
+	"title": "Rational",
+	"kind": "type",
+	"declaration": "namespace Rational for Rational",
+	"choice": null,
+	"namespaces": [
+		"Rational",
+		"NonZeroRational",
+		"NonNegativeRational",
+		"PositiveRational",
+		"NumberFormat",
+		"Rounding",
+		"SignStyle"
+	],
+	"conformsTo": [
+		{
+			"protocol": "Equatable",
+			"condition": null
+		},
+		{
+			"protocol": "Printable",
+			"condition": null
+		},
+		{
+			"protocol": "Orderable",
+			"condition": null
+		}
+	],
+	"groups": [
+		{
+			"label": "Creating",
+			"id": "creating",
+			"members": [
+				{
+					"key": "Rational::of",
+					"namespace": "Rational",
+					"name": "of",
+					"receiver": "Rational",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Builds a Rational from one Integer over another.\n\nThis is the way to write a ratio of computed values, where the literal form `3/4` is not available. A zero denominator answers empty, and the `defaultingTo:` entry answers the given Rational instead.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static of(\n\t_ numerator: Integer,\n\tover denominator: Integer,\n) -> Optional<Rational>",
+							"summary": "Builds the Rational from two Integers, with nothing known about either.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the numerator",
+									"href": null
+								},
+								{
+									"name": "over",
+									"type": "Integer",
+									"default": null,
+									"description": "the denominator",
+									"href": null
+								}
+							],
+							"returns": "the Rational, or nothing when the denominator is zero.",
+							"examples": []
+						},
+						{
+							"signature": "static of(_ numerator: Integer, over denominator: NonZeroInteger) -> Rational",
+							"summary": "Builds the Rational over a denominator proven not to be zero.\n\nThere is no failure to report, so the Rational itself is the answer.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the numerator",
+									"href": null
+								},
+								{
+									"name": "over",
+									"type": "NonZeroInteger",
+									"default": null,
+									"description": "the denominator, proven not to be zero",
+									"href": "/docs/library/integer#NonZeroInteger"
+								}
+							],
+							"returns": "the Rational.",
+							"examples": []
+						},
+						{
+							"signature": "static of(\n\t_ numerator: Integer,\n\tover denominator: Integer,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
+							"summary": "Builds the Rational from two Integers, with a value to answer when the denominator is zero.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the numerator",
+									"href": null
+								},
+								{
+									"name": "over",
+									"type": "Integer",
+									"default": null,
+									"description": "the denominator",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational",
+									"default": null,
+									"description": "the value to answer with when there is no Rational",
+									"href": null
+								}
+							],
+							"returns": "the Rational, or the given value in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::parse",
+					"namespace": "Rational",
+					"name": "parse",
+					"receiver": "Rational",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Reads a Rational from its text form.\n\nThe text is a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`. Each form takes an optional sign in front, and an underscore between two digits, which is the notation the language writes. Text of another shape, or a fraction over zero, answers empty, and the `defaultingTo:` entry answers the given Rational instead.",
+					"returns": null,
+					"examples": [
+						"expect Rational.parse(\"+1_000.5\")::is(2001/2)\nexpect Rational.parse(\".5\")::isEmpty()"
+					],
+					"entries": [
+						{
+							"signature": "static parse(_ text: String) -> Optional<Rational>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the text to read",
+									"href": null
+								}
+							],
+							"returns": "the Rational, or nothing when the text has any other shape or divides by zero.",
+							"examples": []
+						},
+						{
+							"signature": "static parse(_ text: String, defaultingTo fallback: Rational) -> Rational",
+							"summary": "Reads a Rational from its text form, with a value to answer when the text has another shape.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the text to read",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational",
+									"default": null,
+									"description": "the value to answer with when the text is no Rational",
+									"href": null
+								}
+							],
+							"returns": "the Rational, or the given value in its place.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Equality, ordering and printing",
+			"id": "equality-ordering-and-printing",
+			"members": [
+				{
+					"key": "Rational::is",
+					"namespace": "Rational",
+					"name": "is",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the Rational has the same value as a number.\n\nThe comparison is in lowest terms, so `1/2` equals `2/4`. A Rational equals an Integer when it is whole and its numerator is that Integer.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "is(_ other: Rational) -> Boolean",
+							"summary": "Answers whether the Rational has the same value as another Rational.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when both are equal.",
+							"examples": []
+						},
+						{
+							"signature": "is(_ other: Integer) -> Boolean",
+							"summary": "Answers whether the Rational has the same value as an Integer.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the Rational is whole and its numerator is that Integer.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::isNot",
+					"namespace": "Rational",
+					"name": "isNot",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the Rational differs from a number.\n\nA Rational that is not whole differs from every Integer.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNot(_ other: Rational) -> Boolean",
+							"summary": "Answers whether the Rational differs from another Rational.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the two differ.",
+							"examples": []
+						},
+						{
+							"signature": "isNot(_ other: Integer) -> Boolean",
+							"summary": "Answers whether the Rational differs from an Integer.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the two differ.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::compare",
+					"namespace": "Rational",
+					"name": "compare",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "compare(to other: Rational) -> Ordering",
+							"summary": "Orders the Rational against another Rational.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to order against",
+									"href": null
+								}
+							],
+							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::toString",
+					"namespace": "Rational",
+					"name": "toString",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the Rational as a String, in lowest terms.\n\nThe form is `3/4` when no format is named, and the named format otherwise. A whole Rational prints its numerator alone, so `1/2::add(1/2)` prints `1` and `10::divide(by 2)` prints `5`. The `Rational.parse` Method reads the fraction form and the decimal form. The fraction form reads back as the same Rational. A decimal form does too when its expansion ends within 80 digits, and reads back as the rounded value otherwise. A count of one or more places writes exactly that many digits after the point.",
+					"returns": "the String representation of the Rational.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toString() -> String",
+							"summary": "Answers the Rational as a fraction, in lowest terms.\n\nThe form is `3/4`. A whole Rational prints its numerator alone, so `1/2::add(1/2)` prints `1`.",
+							"parameters": [],
+							"returns": "the String representation of the Rational.",
+							"examples": []
+						},
+						{
+							"signature": "toString(as format: NumberFormat) -> String",
+							"summary": "Answers the Rational in the named format.\n\nThe `#Decimal` format writes the expansion, to at most 80 digits, and the `#Fraction` format writes `3/4`. A whole Rational prints its numerator alone in either. The `#Percent` format writes that same expansion of one hundred times the value, with a `%` after it. The `#Scientific` format writes one digit before the point and the power of ten as an exponent, so `1234` is `1.234e3` and zero is `0e0`.",
+							"parameters": [
+								{
+									"name": "as",
+									"type": "NumberFormat",
+									"default": null,
+									"description": "the form to represent the Rational in",
+									"href": "/docs/library/rational#NumberFormat"
+								}
+							],
+							"returns": "the String representation of the Rational.",
+							"examples": []
+						},
+						{
+							"signature": "toString(\n\tas format: NumberFormat,\n\ttoPlaces count: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> String",
+							"summary": "Answers the Rational in the named format, with exactly that many places.\n\nThe digits are padded with zeroes where the expansion is shorter, so `1/2` over two places is `0.50`. The last digit kept is rounded in the named direction, and `#Nearest` is what a call that names none is given, so `1/8` is `0.13`. A count below one rounds to a whole number, and no point is written. The count has no ceiling. The `#Percent` and `#Scientific` formats take the count the same way, so `1/8` over one place is `12.5%` and `1234` over two is `1.23e3`. The `#Fraction` format ignores both the count and the direction.",
+							"parameters": [
+								{
+									"name": "as",
+									"type": "NumberFormat",
+									"default": null,
+									"description": "the form to represent the Rational in",
+									"href": "/docs/library/rational#NumberFormat"
+								},
+								{
+									"name": "toPlaces",
+									"type": "Integer",
+									"default": null,
+									"description": "how many digits to write after the point",
+									"href": null
+								},
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round the last digit in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the String representation of the Rational.",
+							"examples": []
+						},
+						{
+							"signature": "toString(as format: NumberFormat, groupingWith separator: String) -> String",
+							"summary": "Answers the Rational in the named format, with a separator between the digit groups.\n\nThe separator goes between every three digits before the point, counted from the right, so `1234567` is `1,234,567` under a comma. The scientific form writes one digit before the point and takes no separator. The fraction form groups the numerator and the denominator alike.",
+							"parameters": [
+								{
+									"name": "as",
+									"type": "NumberFormat",
+									"default": null,
+									"description": "the form to represent the Rational in",
+									"href": "/docs/library/rational#NumberFormat"
+								},
+								{
+									"name": "groupingWith",
+									"type": "String",
+									"default": null,
+									"description": "the text to write between the digit groups",
+									"href": null
+								}
+							],
+							"returns": "the String representation of the Rational.",
+							"examples": []
+						},
+						{
+							"signature": "toString(\n\tas format: NumberFormat,\n\ttoPlaces count: Integer,\n\tgroupingWith separator: String,\n\ttoward direction: Rounding = #Nearest,\n) -> String",
+							"summary": "Answers the Rational in the named format, with that many places and a separator between the digit groups.\n\nThe count and the direction reach the format exactly as they do without a separator, so `1234567/1` over two places is `1,234,567.00` under a comma. Only the digits before the point are grouped.",
+							"parameters": [
+								{
+									"name": "as",
+									"type": "NumberFormat",
+									"default": null,
+									"description": "the form to represent the Rational in",
+									"href": "/docs/library/rational#NumberFormat"
+								},
+								{
+									"name": "toPlaces",
+									"type": "Integer",
+									"default": null,
+									"description": "how many digits to write after the point",
+									"href": null
+								},
+								{
+									"name": "groupingWith",
+									"type": "String",
+									"default": null,
+									"description": "the text to write between the digit groups",
+									"href": null
+								},
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round the last digit in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the String representation of the Rational.",
+							"examples": []
+						},
+						{
+							"signature": "toString(showingSign style: SignStyle) -> String",
+							"summary": "Answers the Rational as a fraction, with its sign written in the named style.\n\nThe `#Always` Case writes a `+` in front of a value that is not negative, so `3/4` is `+3/4` and zero is `+0`. The `#Negative` Case writes what the plain `toString()` writes.",
+							"parameters": [
+								{
+									"name": "showingSign",
+									"type": "SignStyle",
+									"default": null,
+									"description": "whether to write a sign in front of a value that is not negative",
+									"href": "/docs/library/rational#SignStyle"
+								}
+							],
+							"returns": "the String representation of the Rational.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Arithmetic",
+			"id": "arithmetic",
+			"members": [
+				{
+					"key": "Rational::add",
+					"namespace": "Rational",
+					"name": "add",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Adds a number to the Rational, and stays exact for every member of the numeric tower.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "add(_ other: Rational) -> Rational",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to add",
+									"href": null
+								}
+							],
+							"returns": "the sum.",
+							"examples": []
+						},
+						{
+							"signature": "add(_ other: Integer) -> Rational",
+							"summary": "Adds an Integer to the Rational.\n\nThe sum is a Rational, since a whole number added to a fraction need not be whole.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to add",
+									"href": null
+								}
+							],
+							"returns": "the sum, as a Rational.",
+							"examples": []
+						},
+						{
+							"signature": "add(_ other: Algebraic) -> Algebraic",
+							"summary": "Adds an Algebraic to the Rational.\n\nThe sum is an Algebraic, since adding a Rational leaves the radical part in place.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to add",
+									"href": null
+								}
+							],
+							"returns": "the sum, as an Algebraic.",
+							"examples": []
+						},
+						{
+							"signature": "add(_ other: Transcendental) -> Transcendental",
+							"summary": "Adds a Transcendental to the Rational.\n\nThe sum is a Transcendental, since adding a Rational leaves every base term in place.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the Transcendental to add",
+									"href": null
+								}
+							],
+							"returns": "the sum, as a Transcendental.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonNegativeRational::add",
+					"namespace": "NonNegativeRational",
+					"name": "add",
+					"receiver": "NonNegativeRational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Adds a Rational proven not to be negative to this NonNegativeRational.\n\nA sum of two non-negative Rationals is never negative, and a positive summand makes it positive.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "add(_ other: PositiveRational) -> PositiveRational",
+							"summary": "Adds a Rational proven to be positive.\n\nThe receiver is not negative and the other summand is above zero, so the sum is above zero.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "PositiveRational",
+									"default": null,
+									"description": "the PositiveRational to add",
+									"href": "/docs/library/rational#PositiveRational"
+								}
+							],
+							"returns": "the sum, which is above zero.",
+							"examples": []
+						},
+						{
+							"signature": "add(_ other: NonNegativeRational) -> NonNegativeRational",
+							"summary": "Adds a Rational proven not to be negative.\n\nNeither summand is negative, so the sum is not negative either.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "NonNegativeRational",
+									"default": null,
+									"description": "the NonNegativeRational to add",
+									"href": "/docs/library/rational#NonNegativeRational"
+								}
+							],
+							"returns": "the sum, which is never negative.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "PositiveRational::add",
+					"namespace": "PositiveRational",
+					"name": "add",
+					"receiver": "PositiveRational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "add(_ other: NonNegativeRational) -> PositiveRational",
+							"summary": "Adds a Rational proven not to be negative to this PositiveRational.\n\nThe receiver is above zero and the other summand is not below it, so the sum is above zero.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "NonNegativeRational",
+									"default": null,
+									"description": "the NonNegativeRational to add",
+									"href": "/docs/library/rational#NonNegativeRational"
+								}
+							],
+							"returns": "the sum, which is above zero.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::subtract",
+					"namespace": "Rational",
+					"name": "subtract",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Subtracts a number from the Rational, and stays exact for every member of the numeric tower.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "subtract(_ other: Rational) -> Rational",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to subtract",
+									"href": null
+								}
+							],
+							"returns": "the difference.",
+							"examples": []
+						},
+						{
+							"signature": "subtract(_ other: Integer) -> Rational",
+							"summary": "Subtracts an Integer from the Rational.\n\nThe difference is a Rational, since a whole number taken from a fraction need not be whole.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to subtract",
+									"href": null
+								}
+							],
+							"returns": "the difference, as a Rational.",
+							"examples": []
+						},
+						{
+							"signature": "subtract(_ other: Algebraic) -> Algebraic",
+							"summary": "Subtracts an Algebraic from the Rational.\n\nThe difference is an Algebraic, since the radical part stays and only its sign flips.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to subtract",
+									"href": null
+								}
+							],
+							"returns": "the difference, as an Algebraic.",
+							"examples": []
+						},
+						{
+							"signature": "subtract(_ other: Transcendental) -> Transcendental",
+							"summary": "Subtracts a Transcendental from the Rational.\n\nThe difference is a Transcendental, since every base term stays with its sign flipped.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the Transcendental to subtract",
+									"href": null
+								}
+							],
+							"returns": "the difference, as a Transcendental.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::multiply",
+					"namespace": "Rational",
+					"name": "multiply",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Multiplies the Rational with a number, and stays exact for every member of the numeric tower.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "multiply(with other: Rational) -> Rational",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the product.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(with other: Integer) -> Rational",
+							"summary": "Multiplies the Rational with an Integer.\n\nThe product is a Rational, since scaling a fraction by a whole number need not leave a whole number.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the product, as a Rational.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(with other: Algebraic) -> Algebraic | Rational",
+							"summary": "Multiplies the Rational with an Algebraic.\n\nThe product is an Algebraic, since scaling keeps the radical part. A zero receiver answers zero, which is a Rational.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the product, as an Algebraic or a Rational.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(with other: Transcendental) -> Transcendental | Rational",
+							"summary": "Multiplies the Rational with a Transcendental.\n\nThe product is a Transcendental, since scaling keeps every base term. A zero receiver answers zero, which is a Rational.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the Transcendental to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the product, as a Transcendental or a Rational.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonZeroRational::multiply",
+					"namespace": "NonZeroRational",
+					"name": "multiply",
+					"receiver": "NonZeroRational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "multiply(with other: NonZeroRational) -> NonZeroRational",
+							"summary": "Multiplies this NonZeroRational with another.\n\nThe product is never zero, so the answer is a NonZeroRational too.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "NonZeroRational",
+									"default": null,
+									"description": "the NonZeroRational to multiply with",
+									"href": "/docs/library/rational#NonZeroRational"
+								}
+							],
+							"returns": "the product, which is not zero.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonNegativeRational::multiply",
+					"namespace": "NonNegativeRational",
+					"name": "multiply",
+					"receiver": "NonNegativeRational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "multiply(with other: NonNegativeRational) -> NonNegativeRational",
+							"summary": "Multiplies this NonNegativeRational with a Rational proven not to be negative.\n\nNeither factor is negative, so the product is not negative either.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "NonNegativeRational",
+									"default": null,
+									"description": "the NonNegativeRational to multiply with",
+									"href": "/docs/library/rational#NonNegativeRational"
+								}
+							],
+							"returns": "the product, which is never negative.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "PositiveRational::multiply",
+					"namespace": "PositiveRational",
+					"name": "multiply",
+					"receiver": "PositiveRational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "multiply(with other: PositiveRational) -> PositiveRational",
+							"summary": "Multiplies this PositiveRational with another.\n\nBoth factors are above zero, so the product is above zero.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "PositiveRational",
+									"default": null,
+									"description": "the PositiveRational to multiply with",
+									"href": "/docs/library/rational#PositiveRational"
+								}
+							],
+							"returns": "the product, which is above zero.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::divide",
+					"namespace": "Rational",
+					"name": "divide",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Divides the Rational by a number, exactly.\n\nDividing by an Integer or a Rational answers empty for a zero divisor. With `defaultingTo`, the given value stands in place of empty. Dividing by an Algebraic always answers, because an Algebraic is irrational and so never zero. Dividing by an Integer proven not to be zero always answers too. A Rational proven not to be zero answers as well.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "divide(by other: Rational) -> Optional<Rational>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to divide by",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or nothing when the divisor is zero.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: Integer) -> Optional<Rational>",
+							"summary": "Divides the Rational by an Integer.\n\nThe quotient is a Rational. A zero divisor answers empty, and the `defaultingTo:` entry answers the given Rational instead.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to divide by",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or nothing when the divisor is zero.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: Algebraic) -> Algebraic | Rational",
+							"summary": "Divides the Rational by an Algebraic.\n\nAn Algebraic is irrational and so never zero, which is why the quotient itself is the answer. The quotient is an Algebraic, and a zero receiver answers zero, which is a Rational.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to divide by",
+									"href": null
+								}
+							],
+							"returns": "the quotient, as an Algebraic or a Rational.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: Rational, defaultingTo fallback: Rational) -> Rational",
+							"summary": "Divides by a Rational, and answers the given value when the divisor is zero.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Rational",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational",
+									"default": null,
+									"description": "the value to answer with when there is no quotient",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: Integer, defaultingTo fallback: Rational) -> Rational",
+							"summary": "Divides by an Integer, and answers the given value when the divisor is zero.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Integer",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational",
+									"default": null,
+									"description": "the value to answer with when there is no quotient",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: NonZeroInteger) -> Rational",
+							"summary": "Divides by an Integer proven not to be zero.\n\nThere is no failure to report, so the quotient itself is the answer.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "NonZeroInteger",
+									"default": null,
+									"description": "the divisor, proven not to be zero",
+									"href": "/docs/library/integer#NonZeroInteger"
+								}
+							],
+							"returns": "the quotient.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: NonZeroRational) -> Rational",
+							"summary": "Divides by a Rational proven not to be zero.\n\nThere is no failure to report, so the quotient itself is the answer.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "NonZeroRational",
+									"default": null,
+									"description": "the divisor, proven not to be zero",
+									"href": "/docs/library/rational#NonZeroRational"
+								}
+							],
+							"returns": "the quotient.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::remainder",
+					"namespace": "Rational",
+					"name": "remainder",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers what is left over after taking out every whole divisor that fits.\n\nThe division is Euclidean, so the remainder is never negative and always below the divisor's magnitude. For example, `7/2::remainder(dividingBy 1/3)` is `1/6`. A zero divisor answers empty, and the `defaultingTo:` entry answers the given Rational instead.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "remainder(dividingBy divisor: Rational) -> Optional<Rational>",
+							"summary": "Answers the remainder over a divisor nothing is known about.",
+							"parameters": [
+								{
+									"name": "dividingBy",
+									"type": "Rational",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								}
+							],
+							"returns": "the remainder, or nothing when dividing by zero.",
+							"examples": []
+						},
+						{
+							"signature": "remainder(dividingBy divisor: NonZeroRational) -> Rational",
+							"summary": "Answers the remainder over a divisor proven not to be zero.\n\nThe division can not fail, so the answer is the remainder itself rather than an Optional.",
+							"parameters": [
+								{
+									"name": "dividingBy",
+									"type": "NonZeroRational",
+									"default": null,
+									"description": "the divisor, proven not to be zero",
+									"href": "/docs/library/rational#NonZeroRational"
+								}
+							],
+							"returns": "the remainder.",
+							"examples": []
+						},
+						{
+							"signature": "remainder(\n\tdividingBy divisor: Rational,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
+							"summary": "Answers the remainder, with a value to answer when the divisor is zero.",
+							"parameters": [
+								{
+									"name": "dividingBy",
+									"type": "Rational",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational",
+									"default": null,
+									"description": "the value to answer with when there is no remainder",
+									"href": null
+								}
+							],
+							"returns": "the remainder, or the given value in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::quotient",
+					"namespace": "Rational",
+					"name": "quotient",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers how many whole divisors fit.\n\nThis is the other half of the same Euclidean division as `remainder`, and the two agree: `quotient · divisor + remainder` is the original Rational. For example, `7/2::quotient(dividingBy 1/3)` is `10`. A zero divisor answers empty, and the `defaultingTo:` entry answers the given Integer instead.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "quotient(dividingBy divisor: Rational) -> Optional<Integer>",
+							"summary": "Answers the quotient over a divisor nothing is known about.",
+							"parameters": [
+								{
+									"name": "dividingBy",
+									"type": "Rational",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or nothing when dividing by zero.",
+							"examples": []
+						},
+						{
+							"signature": "quotient(dividingBy divisor: NonZeroRational) -> Integer",
+							"summary": "Answers the quotient over a divisor proven not to be zero.\n\nThe division can not fail, so the answer is the quotient itself rather than an Optional.",
+							"parameters": [
+								{
+									"name": "dividingBy",
+									"type": "NonZeroRational",
+									"default": null,
+									"description": "the divisor, proven not to be zero",
+									"href": "/docs/library/rational#NonZeroRational"
+								}
+							],
+							"returns": "the quotient.",
+							"examples": []
+						},
+						{
+							"signature": "quotient(\n\tdividingBy divisor: Rational,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
+							"summary": "Answers the quotient, with a value to answer when the divisor is zero.",
+							"parameters": [
+								{
+									"name": "dividingBy",
+									"type": "Rational",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Integer",
+									"default": null,
+									"description": "the value to answer with when there is no quotient",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or the given value in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::raise",
+					"namespace": "Rational",
+					"name": "raise",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Raises the Rational to the given power.\n\nA negative exponent answers the exact reciprocal power. Zero raised to the power of zero is one. Raising this Rational to an exponent proven not to be negative can not fail. Zero raised to a negative power answers empty, and the `defaultingTo:` entry answers the given Rational instead.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "raise(to exponent: Integer) -> Optional<Rational>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "Integer",
+									"default": null,
+									"description": "the exponent",
+									"href": null
+								}
+							],
+							"returns": "the power, or nothing when raising zero to a negative power.",
+							"examples": []
+						},
+						{
+							"signature": "raise(\n\tto exponent: Integer,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
+							"summary": "Raises the Rational to the given power, and answers the given value when there is no power.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "Integer",
+									"default": null,
+									"description": "the exponent",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational",
+									"default": null,
+									"description": "the value to answer with when there is no power",
+									"href": null
+								}
+							],
+							"returns": "the power, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "raise(to exponent: NonNegativeInteger) -> Rational",
+							"summary": "Raises the Rational to an exponent proven not to be negative.\n\nEvery Rational has such a power, the reciprocal is never taken, and no denominator can reach zero. So the answer is the power itself rather than an Optional.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "NonNegativeInteger",
+									"default": null,
+									"description": "the exponent, proven not to be negative",
+									"href": "/docs/library/integer#NonNegativeInteger"
+								}
+							],
+							"returns": "the power.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::squareRoot",
+					"namespace": "Rational",
+					"name": "squareRoot",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the exact square root of the Rational.\n\nA perfect square answers a Rational. Any other value that is not negative answers an exact Algebraic. A negative Rational answers empty, and the `defaultingTo:` entry answers the given value instead.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "squareRoot() -> Optional<Rational | Algebraic>",
+							"summary": "",
+							"parameters": [],
+							"returns": "the root, or nothing for a negative Rational.",
+							"examples": []
+						},
+						{
+							"signature": "squareRoot(\n\tdefaultingTo fallback: Rational | Algebraic,\n) -> Rational | Algebraic",
+							"summary": "Answers the exact square root, with a value to answer for a negative Rational.",
+							"parameters": [
+								{
+									"name": "defaultingTo",
+									"type": "Rational | Algebraic",
+									"default": null,
+									"description": "the value to answer with when there is no root",
+									"href": null
+								}
+							],
+							"returns": "the root, or the given value in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonNegativeRational::squareRoot",
+					"namespace": "NonNegativeRational",
+					"name": "squareRoot",
+					"receiver": "NonNegativeRational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "squareRoot() -> Rational | Algebraic",
+							"summary": "Answers the exact square root of this NonNegativeRational.\n\nA negative Rational is the one with no real root, and the receiver is proven not to be one. So the answer is the root itself rather than an Optional. A ratio of two perfect squares answers a Rational, and every other value answers an exact Algebraic.",
+							"parameters": [],
+							"returns": "the root.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "PositiveRational::squareRoot",
+					"namespace": "PositiveRational",
+					"name": "squareRoot",
+					"receiver": "PositiveRational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "squareRoot() -> PositiveRational | Algebraic",
+							"summary": "Answers the exact square root of this PositiveRational.\n\nA ratio of two perfect squares above zero has a root above zero, and every other value answers an exact Algebraic.",
+							"parameters": [],
+							"returns": "the root.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Comparing",
+			"id": "comparing",
+			"members": [
+				{
+					"key": "Rational::isLessThan",
+					"namespace": "Rational",
+					"name": "isLessThan",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the Rational is strictly below the given number.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isLessThan(_ other: Rational) -> Boolean",
+							"summary": "Answers whether the Rational is strictly below another Rational.\n\nThe comparison is in lowest terms, so `1/2` is not below `2/4`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the receiver is below the other Rational.",
+							"examples": []
+						},
+						{
+							"signature": "isLessThan(_ other: Integer) -> Boolean",
+							"summary": "Answers whether the Rational is strictly below an Integer.\n\nThe Integer is read as `n/1`, so `1/2` is below `1`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the Rational is below the Integer.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::isLessThanOrEqualTo",
+					"namespace": "Rational",
+					"name": "isLessThanOrEqualTo",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the Rational is below the given number, or equal to it.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isLessThanOrEqualTo(_ other: Rational) -> Boolean",
+							"summary": "Answers whether the Rational is below another Rational, or equal to it.\n\nEqual Rationals answer `true`.\nThe comparison is in lowest terms, so `1/2` answers `true` against `2/4`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the receiver is below the other Rational or equal to it.",
+							"examples": []
+						},
+						{
+							"signature": "isLessThanOrEqualTo(_ other: Integer) -> Boolean",
+							"summary": "Answers whether the Rational is below an Integer, or equal to it.\n\nThe Integer is read as `n/1`, so `2/2` answers `true` against `1`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the Rational is below the Integer or equal to it.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::isGreaterThan",
+					"namespace": "Rational",
+					"name": "isGreaterThan",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the Rational is strictly above the given number.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isGreaterThan(_ other: Rational) -> Boolean",
+							"summary": "Answers whether the Rational is strictly above another Rational.\n\nThe comparison is in lowest terms, so `2/4` is not above `1/2`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the receiver is above the other Rational.",
+							"examples": []
+						},
+						{
+							"signature": "isGreaterThan(_ other: Integer) -> Boolean",
+							"summary": "Answers whether the Rational is strictly above an Integer.\n\nThe Integer is read as `n/1`, so `3/2` is above `1`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the Rational is above the Integer.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::isGreaterThanOrEqualTo",
+					"namespace": "Rational",
+					"name": "isGreaterThanOrEqualTo",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the Rational is above the given number, or equal to it.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isGreaterThanOrEqualTo(_ other: Rational) -> Boolean",
+							"summary": "Answers whether the Rational is above another Rational, or equal to it.\n\nEqual Rationals answer `true`.\nThe comparison is in lowest terms, so `2/4` answers `true` against `1/2`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the receiver is above the other Rational or equal to it.",
+							"examples": []
+						},
+						{
+							"signature": "isGreaterThanOrEqualTo(_ other: Integer) -> Boolean",
+							"summary": "Answers whether the Rational is above an Integer, or equal to it.\n\nThe Integer is read as `n/1`, so `2/2` answers `true` against `1`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the Rational is above the Integer or equal to it.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::isBetween",
+					"namespace": "Rational",
+					"name": "isBetween",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Orderable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isBetween(_ lower: Rational, and upper: Rational) -> Boolean",
+							"summary": "Answers whether the value lies between the two given ones, both included.\n\nThe two bounds name the same range in either order: `7::isBetween(10, and 1)` is `true`, and `15::isBetween(10, and 1)` is `false`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "one bound of the range, included",
+									"href": null
+								},
+								{
+									"name": "and",
+									"type": "Rational",
+									"default": null,
+									"description": "the other bound of the range, included",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is within the bounds.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::clamp",
+					"namespace": "Rational",
+					"name": "clamp",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Orderable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "clamp(between lowest: Rational, and highest: Rational) -> Rational",
+							"summary": "Answers the value, pulled into the given bounds.\n\nThe answer is the lower bound when the value is below it. It is the upper bound when the value is above it, and the value itself otherwise. The two bounds name the same range in either order: `7::clamp(between 10, and 1)` is `7`, and `15::clamp(between 10, and 1)` is `10`.",
+							"parameters": [
+								{
+									"name": "between",
+									"type": "Rational",
+									"default": null,
+									"description": "one bound of the range",
+									"href": null
+								},
+								{
+									"name": "and",
+									"type": "Rational",
+									"default": null,
+									"description": "the other bound of the range",
+									"href": null
+								}
+							],
+							"returns": "the clamped value.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Testing",
+			"id": "testing",
+			"members": [
+				{
+					"key": "Rational::isWholeNumber",
+					"namespace": "Rational",
+					"name": "isWholeNumber",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isWholeNumber() -> Boolean",
+							"summary": "Answers whether the Rational is a whole number.\n\nA whole number has the denominator one in lowest terms.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::isPositive",
+					"namespace": "Rational",
+					"name": "isPositive",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isPositive() -> Boolean",
+							"summary": "Answers whether the Rational is above zero.\n\nZero is neither positive nor negative.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::isNegative",
+					"namespace": "Rational",
+					"name": "isNegative",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNegative() -> Boolean",
+							"summary": "Answers whether the Rational is below zero.\n\nZero is neither positive nor negative.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::isZero",
+					"namespace": "Rational",
+					"name": "isZero",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isZero() -> Boolean",
+							"summary": "Answers whether the Rational is exactly zero.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Parts",
+			"id": "parts",
+			"members": [
+				{
+					"key": "Rational::numerator",
+					"namespace": "Rational",
+					"name": "numerator",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "numerator() -> Integer",
+							"summary": "Answers the numerator of the Rational in lowest terms.\n\nThe numerator carries the sign, because the denominator is always positive.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonZeroRational::numerator",
+					"namespace": "NonZeroRational",
+					"name": "numerator",
+					"receiver": "NonZeroRational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "numerator() -> NonZeroInteger",
+							"summary": "Answers the numerator of this NonZeroRational in lowest terms.\n\nA Rational is zero exactly when its numerator is, and the receiver is proven not to be zero. So the answer is a NonZeroInteger.",
+							"parameters": [],
+							"returns": "the numerator, which is not zero.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::denominator",
+					"namespace": "Rational",
+					"name": "denominator",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "denominator() -> PositiveInteger",
+							"summary": "Answers the denominator of the Rational in lowest terms.\n\nThe denominator is always positive, and never zero. So the answer is a PositiveInteger, which fits every position that asks for a NonZeroInteger or a NonNegativeInteger.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::absolute",
+					"namespace": "Rational",
+					"name": "absolute",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "absolute() -> NonNegativeRational",
+							"summary": "Answers the Rational without its sign, which is its distance from zero.",
+							"parameters": [],
+							"returns": "the distance, which is never negative.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonZeroRational::absolute",
+					"namespace": "NonZeroRational",
+					"name": "absolute",
+					"receiver": "NonZeroRational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "absolute() -> PositiveRational",
+							"summary": "Answers this NonZeroRational without its sign, which is its distance from zero.\n\nThe receiver is not zero, so its distance from zero is above zero. So the answer is a PositiveRational.",
+							"parameters": [],
+							"returns": "the distance, which is above zero.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Sign and rounding",
+			"id": "sign-and-rounding",
+			"members": [
+				{
+					"key": "Rational::negate",
+					"namespace": "Rational",
+					"name": "negate",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "negate() -> Rational",
+							"summary": "Answers the Rational with its sign flipped.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonZeroRational::negate",
+					"namespace": "NonZeroRational",
+					"name": "negate",
+					"receiver": "NonZeroRational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "negate() -> NonZeroRational",
+							"summary": "Answers this NonZeroRational with its sign flipped.\n\nNegation keeps a value away from zero, so the answer is a NonZeroRational too.",
+							"parameters": [],
+							"returns": "the negation, which is not zero.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::reciprocal",
+					"namespace": "Rational",
+					"name": "reciprocal",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the reciprocal of the Rational.\n\nThe reciprocal exchanges the numerator and the denominator. Zero has no reciprocal, and the `defaultingTo:` entry answers the given Rational instead. A receiver proven not to be zero answers the reciprocal itself.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "reciprocal() -> Optional<Rational>",
+							"summary": "",
+							"parameters": [],
+							"returns": "the reciprocal, or nothing for zero.",
+							"examples": []
+						},
+						{
+							"signature": "reciprocal(defaultingTo fallback: Rational) -> Rational",
+							"summary": "Answers the reciprocal, with a value to answer for zero.",
+							"parameters": [
+								{
+									"name": "defaultingTo",
+									"type": "Rational",
+									"default": null,
+									"description": "the value to answer with when there is no reciprocal",
+									"href": null
+								}
+							],
+							"returns": "the reciprocal, or the given value in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonZeroRational::reciprocal",
+					"namespace": "NonZeroRational",
+					"name": "reciprocal",
+					"receiver": "NonZeroRational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "reciprocal() -> NonZeroRational",
+							"summary": "Answers the reciprocal of this NonZeroRational.\n\nZero is the one Rational with no reciprocal, and the receiver is proven not to be one. So the answer is the reciprocal itself rather than an Optional. Exchanging the two parts of a value that is not zero leaves a value that is not zero, so the answer is proven as well.",
+							"parameters": [],
+							"returns": "the reciprocal, which is not zero.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::round",
+					"namespace": "Rational",
+					"name": "round",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the Rational rounded in the named direction.\n\nThe direction is `#Nearest` when a call names none. A value exactly halfway between two steps rounds away from zero, so `1/2` answers `1` and `-1/2` answers `-1`. Under `#NearestEven` a value exactly halfway between two steps reaches the even one, so `1/2` answers `0` and `3/2` answers `2`. The other directions answer the floor for `#Down`, the ceiling for `#Up`, and the value towards zero for `#TowardZero`. Naming a count of places rounds to a decimal grid of that width instead, and answers a Rational.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "round(toward direction: Rounding = #Nearest) -> Integer",
+							"summary": "Answers the Rational as an Integer, rounded in the named direction.",
+							"parameters": [
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the rounded Integer.",
+							"examples": []
+						},
+						{
+							"signature": "round(\n\ttoPlaces places: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> Rational",
+							"summary": "Answers the Rational rounded to a decimal grid of the given width.\n\nTwo places round to hundredths, so `5/3` answers `167/100`. The answer is exact, and it is a Rational rather than text: `toString(as #Decimal, toPlaces 2)` is what writes `1.67`. A count below one rounds to a whole number, answered as a Rational. The count has no ceiling, as it has none on `toString`.",
+							"parameters": [
+								{
+									"name": "toPlaces",
+									"type": "Integer",
+									"default": null,
+									"description": "how many decimal places to keep",
+									"href": null
+								},
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the rounded Rational.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Rational::approximate",
+					"namespace": "Rational",
+					"name": "approximate",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "approximate(\n\ttoPlaces places: NonNegativeInteger,\n\ttoward direction: Rounding = #Nearest,\n) -> Rational",
+							"summary": "Answers the Rational read off a decimal grid of the given width.\n\nA Rational is exact, so the answer is the same one `round(toPlaces:toward:)` gives: two places answer hundredths, and `5/3` answers `167/100`. The entries of this name on `Algebraic` and on `Transcendental` are what make an irrational readable as a number. This one is what lets a `Number` receiver reach the family.",
+							"parameters": [
+								{
+									"name": "toPlaces",
+									"type": "NonNegativeInteger",
+									"default": null,
+									"description": "how many decimal places to keep",
+									"href": "/docs/library/integer#NonNegativeInteger"
+								},
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the Rational on that grid.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Converting",
+			"id": "converting",
+			"members": [
+				{
+					"key": "Rational::toRational",
+					"namespace": "Rational",
+					"name": "toRational",
+					"receiver": "Rational",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toRational() -> Rational",
+							"summary": "Answers the Rational as a Rational.\n\nA Rational is one already, so the answer is the receiver itself. The entry is what lets a `Scalar` receiver reach the crossing that an Integer receiver reaches.",
+							"parameters": [],
+							"returns": "the receiver itself.",
+							"examples": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [
+		{
+			"name": "NonZeroRational",
+			"written": "NonZeroRational",
+			"declaration": "type NonZeroRational = Rational where @::isNot(0/1)",
+			"predicate": "@::isNot(0/1)",
+			"description": "The Rationals that are not zero, as a checked refinement of `Rational`, and the sister of `NonZeroInteger`.\n\nThe proof is what lets `reciprocal` answer a Rational rather than an Optional. The `numerator` is a NonZeroInteger, and `absolute`, `negate` and multiplication answer one of these again.",
+			"tightens": [
+				"multiply",
+				"numerator",
+				"absolute",
+				"negate",
+				"reciprocal"
+			],
+			"answeredBy": [
+				{
+					"label": "NonZeroInteger::divide(by:)",
+					"href": "/docs/library/integer#divide"
+				},
+				{
+					"label": "NonZeroRational::multiply(with:)",
+					"href": "/docs/library/rational#multiply"
+				},
+				{
+					"label": "NonZeroRational::reciprocal()",
+					"href": "/docs/library/rational#reciprocal"
+				},
+				{
+					"label": "NonZeroRational::negate()",
+					"href": "/docs/library/rational#negate"
+				}
+			]
+		},
+		{
+			"name": "NonNegativeRational",
+			"written": "NonNegativeRational",
+			"declaration": "type NonNegativeRational = Rational where @::isGreaterThanOrEqualTo(0/1)",
+			"predicate": "@::isGreaterThanOrEqualTo(0/1)",
+			"description": "The Rationals from zero upward, as a checked refinement of `Rational`.\n\nA receiver proven to be one of these has a real square root, which the bare `squareRoot` answers an Optional for. Addition and multiplication stay within the proof.",
+			"tightens": ["add", "multiply", "squareRoot"],
+			"answeredBy": [
+				{
+					"label": "IntegerList::variance()",
+					"href": "/docs/library/list#variance"
+				},
+				{
+					"label": "IntegerList::variance(defaultingTo:)",
+					"href": "/docs/library/list#variance"
+				},
+				{
+					"label": "RationalList::variance()",
+					"href": "/docs/library/list#variance"
+				},
+				{
+					"label": "RationalList::variance(defaultingTo:)",
+					"href": "/docs/library/list#variance"
+				},
+				{
+					"label": "NumberList::variance()",
+					"href": "/docs/library/list#variance"
+				},
+				{
+					"label": "NumberList::variance(defaultingTo:)",
+					"href": "/docs/library/list#variance"
+				},
+				{
+					"label": "NonEmptyIntegerList::variance()",
+					"href": "/docs/library/list#variance"
+				},
+				{
+					"label": "NonEmptyRationalList::variance()",
+					"href": "/docs/library/list#variance"
+				},
+				{
+					"label": "NonEmptyNumberList::variance()",
+					"href": "/docs/library/list#variance"
+				},
+				{
+					"label": "Rational::absolute()",
+					"href": "/docs/library/rational#absolute"
+				},
+				{
+					"label": "NonNegativeRational::add(_:)",
+					"href": "/docs/library/rational#add"
+				},
+				{
+					"label": "NonNegativeRational::multiply(with:)",
+					"href": "/docs/library/rational#multiply"
+				}
+			]
+		},
+		{
+			"name": "PositiveRational",
+			"written": "PositiveRational",
+			"declaration": "type PositiveRational = Rational where @::isPositive()",
+			"predicate": "@::isPositive()",
+			"description": "The Rationals above zero, as a checked refinement of `Rational`.\n\nA value above zero is neither zero nor below it, so one of these is accepted wherever a NonZeroRational or a NonNegativeRational is wanted. Addition with a value that is not negative, and multiplication with another of these, answer one of these again.",
+			"tightens": ["add", "multiply", "squareRoot"],
+			"answeredBy": [
+				{
+					"label": "NonZeroRational::absolute()",
+					"href": "/docs/library/rational#absolute"
+				},
+				{
+					"label": "NonNegativeRational::add(_:)",
+					"href": "/docs/library/rational#add"
+				},
+				{
+					"label": "PositiveRational::add(_:)",
+					"href": "/docs/library/rational#add"
+				},
+				{
+					"label": "PositiveRational::multiply(with:)",
+					"href": "/docs/library/rational#multiply"
+				},
+				{
+					"label": "PositiveRational::squareRoot()",
+					"href": "/docs/library/rational#squareRoot"
+				}
+			]
+		}
+	],
+	"modes": [
+		{
+			"name": "NumberFormat",
+			"declaration": "choice NumberFormat {\n\tFraction,\n\tDecimal,\n\tPercent,\n\tScientific,\n}",
+			"description": "The forms `Rational::toString` writes: `#Fraction` is `\"3/4\"`, `#Decimal` is `\"0.75\"`, `#Percent` is `\"75%\"` and `#Scientific` is `\"7.5e-1\"`.\n\nThe plain `toString()` entry writes the fraction form, and the `as:` entries name one of the four. The scientific form writes one digit before the point, and the power of ten it took out as `e` and an exponent. Only the fraction form and the decimal form read back through `Rational.parse`.",
+			"cases": [
+				{
+					"name": "Fraction",
+					"payload": null
+				},
+				{
+					"name": "Decimal",
+					"payload": null
+				},
+				{
+					"name": "Percent",
+					"payload": null
+				},
+				{
+					"name": "Scientific",
+					"payload": null
+				}
+			],
+			"payloadFree": true,
+			"takenBy": [
+				{
+					"label": "Algebraic::toString(as:)",
+					"href": "/docs/library/algebraic#toString",
+					"default": null
+				},
+				{
+					"label": "Algebraic::toString(as:toPlaces:toward:)",
+					"href": "/docs/library/algebraic#toString",
+					"default": null
+				},
+				{
+					"label": "Integer::toString(as:)",
+					"href": "/docs/library/integer#toString",
+					"default": null
+				},
+				{
+					"label": "Integer::toString(as:toPlaces:toward:)",
+					"href": "/docs/library/integer#toString",
+					"default": null
+				},
+				{
+					"label": "Integer::toString(as:groupingWith:)",
+					"href": "/docs/library/integer#toString",
+					"default": null
+				},
+				{
+					"label": "Integer::toString(as:toPlaces:groupingWith:toward:)",
+					"href": "/docs/library/integer#toString",
+					"default": null
+				},
+				{
+					"label": "Rational::toString(as:)",
+					"href": "/docs/library/rational#toString",
+					"default": null
+				},
+				{
+					"label": "Rational::toString(as:toPlaces:toward:)",
+					"href": "/docs/library/rational#toString",
+					"default": null
+				},
+				{
+					"label": "Rational::toString(as:groupingWith:)",
+					"href": "/docs/library/rational#toString",
+					"default": null
+				},
+				{
+					"label": "Rational::toString(as:toPlaces:groupingWith:toward:)",
+					"href": "/docs/library/rational#toString",
+					"default": null
+				},
+				{
+					"label": "Transcendental::toString(as:)",
+					"href": "/docs/library/transcendental#toString",
+					"default": null
+				},
+				{
+					"label": "Transcendental::toString(as:toPlaces:toward:)",
+					"href": "/docs/library/transcendental#toString",
+					"default": null
+				}
+			]
+		},
+		{
+			"name": "Rounding",
+			"declaration": "choice Rounding {\n\tNearest,\n\tNearestEven,\n\tDown,\n\tUp,\n\tTowardZero,\n}",
+			"description": "Which step `round` reaches for a value that is not already on one.\n\n`#Nearest` goes to the closest step, and away from zero for a value exactly halfway between two. The `#NearestEven` Case goes to the closest step as well. A value exactly halfway between two steps reaches the even one of them. The `#Down` Case answers the floor, `#Up` the ceiling, and `#TowardZero` the step towards zero. A call that names no rounding gets `#Nearest`.",
+			"cases": [
+				{
+					"name": "Nearest",
+					"payload": null
+				},
+				{
+					"name": "NearestEven",
+					"payload": null
+				},
+				{
+					"name": "Down",
+					"payload": null
+				},
+				{
+					"name": "Up",
+					"payload": null
+				},
+				{
+					"name": "TowardZero",
+					"payload": null
+				}
+			],
+			"payloadFree": true,
+			"takenBy": [
+				{
+					"label": "Algebraic::toString(as:toPlaces:toward:)",
+					"href": "/docs/library/algebraic#toString",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Algebraic::approximate(toPlaces:toward:)",
+					"href": "/docs/library/algebraic#approximate",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Algebraic::round(toward:)",
+					"href": "/docs/library/algebraic#round",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Algebraic::round(toPlaces:toward:)",
+					"href": "/docs/library/algebraic#round",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Integer::toString(as:toPlaces:toward:)",
+					"href": "/docs/library/integer#toString",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Integer::toString(as:toPlaces:groupingWith:toward:)",
+					"href": "/docs/library/integer#toString",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Integer::quotient(dividingBy:toward:)",
+					"href": "/docs/library/integer#quotient",
+					"default": null
+				},
+				{
+					"label": "Integer::round(toward:)",
+					"href": "/docs/library/integer#round",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Integer::round(toPlaces:toward:)",
+					"href": "/docs/library/integer#round",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Integer::approximate(toPlaces:toward:)",
+					"href": "/docs/library/integer#approximate",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Rational::toString(as:toPlaces:toward:)",
+					"href": "/docs/library/rational#toString",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Rational::toString(as:toPlaces:groupingWith:toward:)",
+					"href": "/docs/library/rational#toString",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Rational::round(toward:)",
+					"href": "/docs/library/rational#round",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Rational::round(toPlaces:toward:)",
+					"href": "/docs/library/rational#round",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Rational::approximate(toPlaces:toward:)",
+					"href": "/docs/library/rational#approximate",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Transcendental::toString(as:toPlaces:toward:)",
+					"href": "/docs/library/transcendental#toString",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Transcendental::approximate(toPlaces:toward:)",
+					"href": "/docs/library/transcendental#approximate",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Transcendental::round(toward:)",
+					"href": "/docs/library/transcendental#round",
+					"default": "#Nearest"
+				},
+				{
+					"label": "Transcendental::round(toPlaces:toward:)",
+					"href": "/docs/library/transcendental#round",
+					"default": "#Nearest"
+				}
+			]
+		},
+		{
+			"name": "SignStyle",
+			"declaration": "choice SignStyle {\n\tNegative,\n\tAlways,\n}",
+			"description": "Whether `toString(showingSign:)` writes a sign in front of a value that is not negative.\n\nA negative value is written with its minus sign under both Cases. Under `#Always` a value that is not negative is written with a `+` in front, and zero is `+0`. A call that names `#Negative` gets what the plain `toString()` writes.",
+			"cases": [
+				{
+					"name": "Negative",
+					"payload": null
+				},
+				{
+					"name": "Always",
+					"payload": null
+				}
+			],
+			"payloadFree": true,
+			"takenBy": [
+				{
+					"label": "Integer::toString(showingSign:)",
+					"href": "/docs/library/integer#toString",
+					"default": null
+				},
+				{
+					"label": "Rational::toString(showingSign:)",
+					"href": "/docs/library/rational#toString",
+					"default": null
+				}
+			]
+		}
+	],
+	"tower": [],
+	"views": [],
+	"protocols": [],
+	"seeAlso": [],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"creating",
+		"of",
+		"parse",
+		"equality-ordering-and-printing",
+		"is",
+		"isnot",
+		"isNot",
+		"compare",
+		"tostring",
+		"toString",
+		"arithmetic",
+		"add",
+		"subtract",
+		"multiply",
+		"divide",
+		"remainder",
+		"quotient",
+		"raise",
+		"squareroot",
+		"squareRoot",
+		"comparing",
+		"islessthan",
+		"isLessThan",
+		"islessthanorequalto",
+		"isLessThanOrEqualTo",
+		"isgreaterthan",
+		"isGreaterThan",
+		"isgreaterthanorequalto",
+		"isGreaterThanOrEqualTo",
+		"isbetween",
+		"isBetween",
+		"clamp",
+		"testing",
+		"iswholenumber",
+		"isWholeNumber",
+		"ispositive",
+		"isPositive",
+		"isnegative",
+		"isNegative",
+		"iszero",
+		"isZero",
+		"parts",
+		"numerator",
+		"denominator",
+		"absolute",
+		"sign-and-rounding",
+		"negate",
+		"reciprocal",
+		"round",
+		"approximate",
+		"converting",
+		"torational",
+		"toRational",
+		"refinements",
+		"nonzerorational",
+		"NonZeroRational",
+		"nonnegativerational",
+		"NonNegativeRational",
+		"positiverational",
+		"PositiveRational",
+		"modes",
+		"numberformat",
+		"NumberFormat",
+		"rounding",
+		"Rounding",
+		"signstyle",
+		"SignStyle"
+	]
+}

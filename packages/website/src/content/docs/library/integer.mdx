@@ -1,0 +1,213 @@
+---
+title: "Integer"
+description: "Whole numbers of any size, exact and without a width to overflow: arithmetic, parsing, testing and printing."
+section: library
+order: 20
+template: type
+tocDepth: 2
+searchDepth: 3
+namespaces:
+  - "Integer"
+  - "NonZeroInteger"
+  - "NonNegativeInteger"
+  - "PositiveInteger"
+  - "Division"
+aliases:
+  - "NonZeroInteger"
+  - "NonNegativeInteger"
+  - "PositiveInteger"
+conformsTo:
+  - "Equatable"
+  - "Printable"
+  - "Orderable"
+---
+
+{/* Generated from packages/standard-library/sources by packages/website/scripts/generateStdlibDocs.ts. The description and the Taught on line are this page's own and survive --sync; everything else is rewritten by it. */}
+
+Taught on: [Method calls](/docs/language/method-calls), [Numbers](/docs/language/numbers) and [Checked refinements](/docs/language/checked-refinements).
+
+<MemberIndex page="integer" />
+
+## At a glance
+
+<AtAGlance page="integer" />
+
+## Creating
+
+### parse
+
+<MemberEntries page="integer" name="parse" />
+
+## Equality, ordering and printing
+
+### is
+
+<MemberEntries page="integer" name="is" />
+
+### <span id="isNot">isNot</span>
+
+<MemberEntries page="integer" name="isNot" />
+
+### compare
+
+<MemberEntries page="integer" name="compare" />
+
+### <span id="toString">toString</span>
+
+<MemberEntries page="integer" name="toString" />
+
+## Arithmetic
+
+### add
+
+<MemberEntries page="integer" name="add" />
+
+### subtract
+
+<MemberEntries page="integer" name="subtract" />
+
+### multiply
+
+<MemberEntries page="integer" name="multiply" />
+
+### divide
+
+<MemberEntries page="integer" name="divide" />
+
+### remainder
+
+<MemberEntries page="integer" name="remainder" />
+
+### quotient
+
+<MemberEntries page="integer" name="quotient" />
+
+### raise
+
+<MemberEntries page="integer" name="raise" />
+
+### <span id="squareRoot">squareRoot</span>
+
+<MemberEntries page="integer" name="squareRoot" />
+
+## Comparing
+
+### <span id="isLessThan">isLessThan</span>
+
+<MemberEntries page="integer" name="isLessThan" />
+
+### <span id="isLessThanOrEqualTo">isLessThanOrEqualTo</span>
+
+<MemberEntries page="integer" name="isLessThanOrEqualTo" />
+
+### <span id="isGreaterThan">isGreaterThan</span>
+
+<MemberEntries page="integer" name="isGreaterThan" />
+
+### <span id="isGreaterThanOrEqualTo">isGreaterThanOrEqualTo</span>
+
+<MemberEntries page="integer" name="isGreaterThanOrEqualTo" />
+
+### <span id="isBetween">isBetween</span>
+
+<MemberEntries page="integer" name="isBetween" />
+
+### clamp
+
+<MemberEntries page="integer" name="clamp" />
+
+## Testing
+
+### <span id="isEven">isEven</span>
+
+<MemberEntries page="integer" name="isEven" />
+
+### <span id="isOdd">isOdd</span>
+
+<MemberEntries page="integer" name="isOdd" />
+
+### <span id="isPositive">isPositive</span>
+
+<MemberEntries page="integer" name="isPositive" />
+
+### <span id="isNegative">isNegative</span>
+
+<MemberEntries page="integer" name="isNegative" />
+
+### <span id="isZero">isZero</span>
+
+<MemberEntries page="integer" name="isZero" />
+
+### <span id="isWholeNumber">isWholeNumber</span>
+
+<MemberEntries page="integer" name="isWholeNumber" />
+
+### <span id="isMultiple">isMultiple</span>
+
+<MemberEntries page="integer" name="isMultiple" />
+
+### <span id="isPrime">isPrime</span>
+
+<MemberEntries page="integer" name="isPrime" />
+
+## Sign and rounding
+
+### absolute
+
+<MemberEntries page="integer" name="absolute" />
+
+### negate
+
+<MemberEntries page="integer" name="negate" />
+
+### round
+
+<MemberEntries page="integer" name="round" />
+
+### approximate
+
+<MemberEntries page="integer" name="approximate" />
+
+## Number theory
+
+### <span id="greatestCommonDivisor">greatestCommonDivisor</span>
+
+<MemberEntries page="integer" name="greatestCommonDivisor" />
+
+### <span id="leastCommonMultiple">leastCommonMultiple</span>
+
+<MemberEntries page="integer" name="leastCommonMultiple" />
+
+### factorial
+
+<MemberEntries page="integer" name="factorial" />
+
+## Converting
+
+### <span id="toRational">toRational</span>
+
+<MemberEntries page="integer" name="toRational" />
+
+## Refinements
+
+Each type below is a checked refinement: the compiler holds a value to its condition before the value has the type. [Checked refinements](/docs/language/checked-refinements) shows how a value earns one. Each section lists the methods above that return something tighter on it, and the methods that return it.
+
+### <span id="NonZeroInteger">NonZeroInteger</span>
+
+<RefinementEntry page="integer" name="NonZeroInteger" />
+
+### <span id="NonNegativeInteger">NonNegativeInteger</span>
+
+<RefinementEntry page="integer" name="NonNegativeInteger" />
+
+### <span id="PositiveInteger">PositiveInteger</span>
+
+<RefinementEntry page="integer" name="PositiveInteger" />
+
+## Modes
+
+Each mode below is a choice whose cases carry no payload, passed to a method to pick how it works. Every mode has `is`, `isNot` and `toString`, and its type lists its cases with `cases()`. The sources write none of them: [Protocols](/docs/library/protocols#Enumerable) says where each comes from.
+
+### <span id="Division">Division</span>
+
+<ModeEntry page="integer" name="Division" />

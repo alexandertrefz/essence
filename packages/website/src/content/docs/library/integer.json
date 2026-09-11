@@ -1,0 +1,2501 @@
+{
+	"slug": "integer",
+	"title": "Integer",
+	"kind": "type",
+	"declaration": "namespace Integer for Integer",
+	"choice": null,
+	"namespaces": [
+		"Integer",
+		"NonZeroInteger",
+		"NonNegativeInteger",
+		"PositiveInteger",
+		"Division"
+	],
+	"conformsTo": [
+		{
+			"protocol": "Equatable",
+			"condition": null
+		},
+		{
+			"protocol": "Printable",
+			"condition": null
+		},
+		{
+			"protocol": "Orderable",
+			"condition": null
+		}
+	],
+	"groups": [
+		{
+			"label": "Creating",
+			"id": "creating",
+			"members": [
+				{
+					"key": "Integer::parse",
+					"namespace": "Integer",
+					"name": "parse",
+					"receiver": "Integer",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Reads an Integer from its text form.\n\nThe text form is the notation the language writes an Integer in, and a leading sign in front of it. It is digits, with an optional underscore between two digits. A leading `+` is read for text a Program was handed rather than wrote. Text of any other shape answers empty, and the `defaultingTo:` entry answers the given Integer instead.",
+					"returns": null,
+					"examples": [
+						"expect Integer.parse(\"-42\")::is(-42)\nexpect Integer.parse(\"+1_000\")::is(1000)\nexpect Integer.parse(\"1_\")::isEmpty()"
+					],
+					"entries": [
+						{
+							"signature": "static parse(_ text: String) -> Optional<Integer>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the text to read",
+									"href": null
+								}
+							],
+							"returns": "the Integer, or nothing when the text has any other shape.",
+							"examples": []
+						},
+						{
+							"signature": "static parse(_ text: String, defaultingTo fallback: Integer) -> Integer",
+							"summary": "Reads an Integer from its text form, with a value to answer when the text has another shape.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the text to read",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Integer",
+									"default": null,
+									"description": "the value to answer with when the text is no Integer",
+									"href": null
+								}
+							],
+							"returns": "the Integer, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "static parse(_ text: String, inBase base: Integer) -> Optional<Integer>",
+							"summary": "Reads an Integer from its text form in the given base.\n\nThe text form is the one the entries above read, in digits of that base: a leading sign, and an optional underscore between two digits. A digit above nine is a letter, and a capital letter reads as its lowercase. Text of any other shape answers empty. A base below two is read as two, and a base above thirty-six as thirty-six.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the text to read",
+									"href": null
+								},
+								{
+									"name": "inBase",
+									"type": "Integer",
+									"default": null,
+									"description": "the base the digits are written in",
+									"href": null
+								}
+							],
+							"returns": "the Integer, or nothing when the text has any other shape.",
+							"examples": []
+						},
+						{
+							"signature": "static parse(\n\t_ text: String,\n\tinBase base: Integer,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
+							"summary": "Reads an Integer from its text form in the given base, with a value to answer when the text has another shape.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the text to read",
+									"href": null
+								},
+								{
+									"name": "inBase",
+									"type": "Integer",
+									"default": null,
+									"description": "the base the digits are written in",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Integer",
+									"default": null,
+									"description": "the value to answer with when the text is no Integer",
+									"href": null
+								}
+							],
+							"returns": "the Integer, or the given value in its place.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Equality, ordering and printing",
+			"id": "equality-ordering-and-printing",
+			"members": [
+				{
+					"key": "Integer::is",
+					"namespace": "Integer",
+					"name": "is",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether this Integer has the same value as a number.\n\nAn Integer equals a Rational when that Rational is whole and its numerator is this Integer.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "is(_ other: Integer) -> Boolean",
+							"summary": "Answers whether this Integer has the same value as another Integer.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when both are equal.",
+							"examples": []
+						},
+						{
+							"signature": "is(_ other: Rational) -> Boolean",
+							"summary": "Answers whether this Integer has the same value as a Rational.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when both are equal.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::isNot",
+					"namespace": "Integer",
+					"name": "isNot",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether this Integer differs from a number.\n\nEvery Integer differs from a Rational that is not whole.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNot(_ other: Integer) -> Boolean",
+							"summary": "Answers whether this Integer differs from another Integer.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the two differ.",
+							"examples": []
+						},
+						{
+							"signature": "isNot(_ other: Rational) -> Boolean",
+							"summary": "Answers whether this Integer differs from a Rational.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the two differ.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::compare",
+					"namespace": "Integer",
+					"name": "compare",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "compare(to other: Integer) -> Ordering",
+							"summary": "Orders the Integer against another Integer.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to order against",
+									"href": null
+								}
+							],
+							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::toString",
+					"namespace": "Integer",
+					"name": "toString",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the Integer as a String.\n\nThe plain entry writes the decimal digits, and the `as:` entries write what `Rational` writes for the same value.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toString() -> String",
+							"summary": "Answers the Integer as a String, in decimal digits.",
+							"parameters": [],
+							"returns": "the String representation of the Integer.",
+							"examples": []
+						},
+						{
+							"signature": "toString(as format: NumberFormat) -> String",
+							"summary": "Answers the Integer in the named format.\n\nThe `#Decimal` and `#Fraction` formats both write the digits alone, since an Integer is whole. The `#Percent` format writes one hundred times the value, with a `%` after it. The `#Scientific` format writes one digit before the point, and the power of ten after an `e`.",
+							"parameters": [
+								{
+									"name": "as",
+									"type": "NumberFormat",
+									"default": null,
+									"description": "the form to represent the Integer in",
+									"href": "/docs/library/rational#NumberFormat"
+								}
+							],
+							"returns": "the String representation of the Integer.",
+							"examples": []
+						},
+						{
+							"signature": "toString(\n\tas format: NumberFormat,\n\ttoPlaces count: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> String",
+							"summary": "Answers the Integer in the named format, with exactly that many places.\n\nThe places are written as zeroes for the `#Decimal` format, so `5` over two places is `5.00`. The `#Fraction` format ignores both the count and the direction. The count and the direction reach the other two formats as they reach `Rational`.",
+							"parameters": [
+								{
+									"name": "as",
+									"type": "NumberFormat",
+									"default": null,
+									"description": "the form to represent the Integer in",
+									"href": "/docs/library/rational#NumberFormat"
+								},
+								{
+									"name": "toPlaces",
+									"type": "Integer",
+									"default": null,
+									"description": "how many digits to write after the point",
+									"href": null
+								},
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round the last digit in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the String representation of the Integer.",
+							"examples": []
+						},
+						{
+							"signature": "toString(\n\tas format: NumberFormat,\n\tgroupingWith separator: String,\n) -> String",
+							"summary": "Answers the Integer in the named format, with a separator between the digit groups.\n\nThe separator goes between every three digits, counted from the right, so `1234567` is `1,234,567` under a comma.",
+							"parameters": [
+								{
+									"name": "as",
+									"type": "NumberFormat",
+									"default": null,
+									"description": "the form to represent the Integer in",
+									"href": "/docs/library/rational#NumberFormat"
+								},
+								{
+									"name": "groupingWith",
+									"type": "String",
+									"default": null,
+									"description": "the text to write between the digit groups",
+									"href": null
+								}
+							],
+							"returns": "the String representation of the Integer.",
+							"examples": []
+						},
+						{
+							"signature": "toString(\n\tas format: NumberFormat,\n\ttoPlaces count: Integer,\n\tgroupingWith separator: String,\n\ttoward direction: Rounding = #Nearest,\n) -> String",
+							"summary": "Answers the Integer in the named format, with that many places and a separator between the digit groups.\n\nOnly the digits before the point are grouped, so `1234567` over two places is `1,234,567.00` under a comma.",
+							"parameters": [
+								{
+									"name": "as",
+									"type": "NumberFormat",
+									"default": null,
+									"description": "the form to represent the Integer in",
+									"href": "/docs/library/rational#NumberFormat"
+								},
+								{
+									"name": "toPlaces",
+									"type": "Integer",
+									"default": null,
+									"description": "how many digits to write after the point",
+									"href": null
+								},
+								{
+									"name": "groupingWith",
+									"type": "String",
+									"default": null,
+									"description": "the text to write between the digit groups",
+									"href": null
+								},
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round the last digit in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the String representation of the Integer.",
+							"examples": []
+						},
+						{
+							"signature": "toString(scaledBy places: NonNegativeInteger) -> String",
+							"summary": "Answers the Integer as a decimal scaled down by that many places.\n\nThe receiver is read as a count of the last place, so `1234` scaled by two places is `12.34`. A count of zero writes the digits alone. The sign is written in front, so `-1234` scaled by two places is `-12.34`.",
+							"parameters": [
+								{
+									"name": "scaledBy",
+									"type": "NonNegativeInteger",
+									"default": null,
+									"description": "how many decimal places to scale the Integer down by",
+									"href": "/docs/library/integer#NonNegativeInteger"
+								}
+							],
+							"returns": "the String representation of the scaled Integer.",
+							"examples": []
+						},
+						{
+							"signature": "toString(showingSign style: SignStyle) -> String",
+							"summary": "Answers the Integer with its sign written in the named style.\n\nThe `#Always` Case writes a `+` in front of a value that is not negative, so `3` is `+3` and zero is `+0`. The `#Negative` Case writes what the plain `toString()` writes.",
+							"parameters": [
+								{
+									"name": "showingSign",
+									"type": "SignStyle",
+									"default": null,
+									"description": "whether to write a sign in front of a value that is not negative",
+									"href": "/docs/library/rational#SignStyle"
+								}
+							],
+							"returns": "the String representation of the Integer.",
+							"examples": []
+						},
+						{
+							"signature": "toString(inBase base: Integer) -> String",
+							"summary": "Answers the Integer in the given base.\n\nA digit above nine is written as a lowercase letter, so `255` in base sixteen is `ff`. The sign is written in front. A base below two is read as two, and a base above thirty-six as thirty-six. `Integer.parse(_ , inBase:)` reads back what this writes.",
+							"parameters": [
+								{
+									"name": "inBase",
+									"type": "Integer",
+									"default": null,
+									"description": "the base to write the digits in",
+									"href": null
+								}
+							],
+							"returns": "the String representation of the Integer.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Arithmetic",
+			"id": "arithmetic",
+			"members": [
+				{
+					"key": "Integer::add",
+					"namespace": "Integer",
+					"name": "add",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Adds a number to this Integer.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "add(_ other: Integer) -> Integer",
+							"summary": "Adds an Integer to this Integer.\n\nThe sum is an Integer.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to add",
+									"href": null
+								}
+							],
+							"returns": "the sum.",
+							"examples": []
+						},
+						{
+							"signature": "add(_ other: Rational) -> Rational",
+							"summary": "Adds a Rational to this Integer.\n\nThe sum is a Rational, since it need not be whole.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to add",
+									"href": null
+								}
+							],
+							"returns": "the sum.",
+							"examples": []
+						},
+						{
+							"signature": "add(_ other: Algebraic) -> Algebraic",
+							"summary": "Adds an Algebraic to this Integer.\n\nThe sum stays exact. Shifting the rational part of `a + b·√d` leaves the radical untouched.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to add",
+									"href": null
+								}
+							],
+							"returns": "the exact sum.",
+							"examples": []
+						},
+						{
+							"signature": "add(_ other: Transcendental) -> Transcendental",
+							"summary": "Adds a Transcendental to this Integer.\n\nThe sum stays exact. Shifting the rational part of `a + b·π + c·e` leaves the base terms untouched.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the Transcendental to add",
+									"href": null
+								}
+							],
+							"returns": "the exact sum.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonNegativeInteger::add",
+					"namespace": "NonNegativeInteger",
+					"name": "add",
+					"receiver": "NonNegativeInteger",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Adds an Integer proven not to be negative to this NonNegativeInteger.\n\nA sum of two non-negative Integers is never negative, and a positive summand makes it positive.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "add(_ other: PositiveInteger) -> PositiveInteger",
+							"summary": "Adds an Integer proven to be positive.\n\nThe receiver is not negative and the other summand is above zero, so the sum is above zero.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "PositiveInteger",
+									"default": null,
+									"description": "the PositiveInteger to add",
+									"href": "/docs/library/integer#PositiveInteger"
+								}
+							],
+							"returns": "the sum, which is above zero.",
+							"examples": []
+						},
+						{
+							"signature": "add(_ other: NonNegativeInteger) -> NonNegativeInteger",
+							"summary": "Adds an Integer proven not to be negative.\n\nNeither summand is negative, so the sum is not negative either.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "NonNegativeInteger",
+									"default": null,
+									"description": "the NonNegativeInteger to add",
+									"href": "/docs/library/integer#NonNegativeInteger"
+								}
+							],
+							"returns": "the sum, which is never negative.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "PositiveInteger::add",
+					"namespace": "PositiveInteger",
+					"name": "add",
+					"receiver": "PositiveInteger",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "add(_ other: NonNegativeInteger) -> PositiveInteger",
+							"summary": "Adds an Integer proven not to be negative to this PositiveInteger.\n\nThe receiver is above zero and the other summand is not below it, so the sum is above zero.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "NonNegativeInteger",
+									"default": null,
+									"description": "the NonNegativeInteger to add",
+									"href": "/docs/library/integer#NonNegativeInteger"
+								}
+							],
+							"returns": "the sum, which is above zero.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::subtract",
+					"namespace": "Integer",
+					"name": "subtract",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Subtracts a number from this Integer, staying exact for every member of the numeric tower.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "subtract(_ other: Integer) -> Integer",
+							"summary": "Subtracts an Integer from this Integer.\n\nThe difference is an Integer.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to subtract",
+									"href": null
+								}
+							],
+							"returns": "the difference.",
+							"examples": []
+						},
+						{
+							"signature": "subtract(_ other: Rational) -> Rational",
+							"summary": "Subtracts a Rational from this Integer.\n\nThe difference is a Rational, since it need not be whole.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to subtract",
+									"href": null
+								}
+							],
+							"returns": "the difference.",
+							"examples": []
+						},
+						{
+							"signature": "subtract(_ other: Algebraic) -> Algebraic",
+							"summary": "Subtracts an Algebraic from this Integer.\n\nThe difference stays exact. Negating `a + b·√d` flips both parts and leaves the radical itself in place.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to subtract",
+									"href": null
+								}
+							],
+							"returns": "the exact difference.",
+							"examples": []
+						},
+						{
+							"signature": "subtract(_ other: Transcendental) -> Transcendental",
+							"summary": "Subtracts a Transcendental from this Integer.\n\nThe difference stays exact. Negating `a + b·π + c·e` flips every part and leaves the base terms in place.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the Transcendental to subtract",
+									"href": null
+								}
+							],
+							"returns": "the exact difference.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::multiply",
+					"namespace": "Integer",
+					"name": "multiply",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Multiplies this Integer with a number, staying exact for every member of the numeric tower.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "multiply(with other: Integer) -> Integer",
+							"summary": "Multiplies this Integer with another Integer.\n\nThe product is an Integer.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the product.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(with other: Rational) -> Rational",
+							"summary": "Multiplies this Integer with a Rational.\n\nThe product is a Rational, since it need not be whole.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the product.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(with other: Algebraic) -> Algebraic | Rational",
+							"summary": "Multiplies this Integer with an Algebraic.\n\nThe product stays exact. A zero factor collapses it to the Rational zero, so the answer is a Union of both kinds.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the exact product, an Algebraic or a Rational.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(with other: Transcendental) -> Transcendental | Rational",
+							"summary": "Multiplies this Integer with a Transcendental.\n\nThe product stays exact. A zero factor collapses it to the Rational zero, so the answer is a Union of both kinds.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the Transcendental to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the exact product, a Transcendental or a Rational.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonZeroInteger::multiply",
+					"namespace": "NonZeroInteger",
+					"name": "multiply",
+					"receiver": "NonZeroInteger",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Multiplies this NonZeroInteger with a number.\n\nA product of two non-zero Integers is never zero. An irrational scaled by a non-zero Integer stays irrational, so those two entries answer the irrational kind itself.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "multiply(with other: NonZeroInteger) -> NonZeroInteger",
+							"summary": "Multiplies this NonZeroInteger with another.\n\nThe product is never zero, so the answer is a NonZeroInteger too.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "NonZeroInteger",
+									"default": null,
+									"description": "the NonZeroInteger to multiply with",
+									"href": "/docs/library/integer#NonZeroInteger"
+								}
+							],
+							"returns": "the product, which is not zero.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(with other: Algebraic) -> Algebraic",
+							"summary": "Multiplies this NonZeroInteger with an Algebraic.\n\nThe factor is proven, so the radical survives and the answer is an Algebraic rather than a Union.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the Algebraic to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the exact product.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(with other: Transcendental) -> Transcendental",
+							"summary": "Multiplies this NonZeroInteger with a Transcendental.\n\nThe factor is proven, so every base term survives and the answer is a Transcendental rather than a Union.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the Transcendental to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the exact product.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonNegativeInteger::multiply",
+					"namespace": "NonNegativeInteger",
+					"name": "multiply",
+					"receiver": "NonNegativeInteger",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "multiply(with other: NonNegativeInteger) -> NonNegativeInteger",
+							"summary": "Multiplies this NonNegativeInteger with an Integer proven not to be negative.\n\nNeither factor is negative, so the product is not negative either.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "NonNegativeInteger",
+									"default": null,
+									"description": "the NonNegativeInteger to multiply with",
+									"href": "/docs/library/integer#NonNegativeInteger"
+								}
+							],
+							"returns": "the product, which is never negative.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "PositiveInteger::multiply",
+					"namespace": "PositiveInteger",
+					"name": "multiply",
+					"receiver": "PositiveInteger",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "multiply(with other: PositiveInteger) -> PositiveInteger",
+							"summary": "Multiplies this PositiveInteger with another.\n\nBoth factors are above zero, so the product is above zero.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "PositiveInteger",
+									"default": null,
+									"description": "the PositiveInteger to multiply with",
+									"href": "/docs/library/integer#PositiveInteger"
+								}
+							],
+							"returns": "the product, which is above zero.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::divide",
+					"namespace": "Integer",
+					"name": "divide",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Divides this Integer by a number, exactly.\n\nDividing by an Integer or a Rational answers empty for a zero divisor. Dividing this Integer by a NonZeroInteger, by a NonZeroRational or by an Algebraic can not fail. The first two divisors are proven, and an Algebraic is irrational and so never zero. The `defaultingTo:` entries answer the given value in place of empty.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "divide(by other: Integer) -> Optional<Rational>",
+							"summary": "Divides this Integer by an Integer.\n\nThe quotient is a Rational, since it need not be whole. A zero divisor answers empty.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Integer",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								}
+							],
+							"returns": "the exact quotient, or nothing when the divisor is zero.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: Rational) -> Optional<Rational>",
+							"summary": "Divides this Integer by a Rational.\n\nThe quotient is a Rational, since it need not be whole. A zero divisor answers empty.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Rational",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								}
+							],
+							"returns": "the exact quotient, or nothing when the divisor is zero.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: Algebraic) -> Algebraic | Rational",
+							"summary": "Divides this Integer by an Algebraic.\n\nAn Algebraic is irrational, so it is never zero and the division can not fail. A zero receiver answers the Rational zero.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Algebraic",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								}
+							],
+							"returns": "the exact quotient, an Algebraic or a Rational.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: NonZeroInteger) -> Rational",
+							"summary": "Divides this Integer by a divisor proven not to be zero.\n\nThe division can not fail, so the answer is the quotient itself rather than an Optional.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "NonZeroInteger",
+									"default": null,
+									"description": "the divisor, proven not to be zero",
+									"href": "/docs/library/integer#NonZeroInteger"
+								}
+							],
+							"returns": "the exact quotient.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: Integer, defaultingTo fallback: Rational) -> Rational",
+							"summary": "Divides by an Integer, and answers the given value when the divisor is zero.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Integer",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational",
+									"default": null,
+									"description": "the value to answer with when there is no quotient",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: Rational, defaultingTo fallback: Rational) -> Rational",
+							"summary": "Divides by a Rational, and answers the given value when the divisor is zero.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Rational",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational",
+									"default": null,
+									"description": "the value to answer with when there is no quotient",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: NonZeroRational) -> Rational",
+							"summary": "Divides this Integer by a Rational proven not to be zero.\n\nThe division can not fail, so the answer is the quotient itself rather than an Optional.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "NonZeroRational",
+									"default": null,
+									"description": "the divisor, proven not to be zero",
+									"href": "/docs/library/rational#NonZeroRational"
+								}
+							],
+							"returns": "the exact quotient.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonZeroInteger::divide",
+					"namespace": "NonZeroInteger",
+					"name": "divide",
+					"receiver": "NonZeroInteger",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "divide(by other: NonZeroInteger) -> NonZeroRational",
+							"summary": "Divides this NonZeroInteger by a divisor proven not to be zero.\n\nNeither operand is zero, so the quotient is not zero either. So the answer is a NonZeroRational, and it reaches `reciprocal` without an Optional in between.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "NonZeroInteger",
+									"default": null,
+									"description": "the divisor, proven not to be zero",
+									"href": "/docs/library/integer#NonZeroInteger"
+								}
+							],
+							"returns": "the exact quotient, which is not zero.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::remainder",
+					"namespace": "Integer",
+					"name": "remainder",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers what is left over after taking out every whole divisor that fits.\n\nThe division is Euclidean, so the remainder is never negative and always below the divisor's magnitude. For example, `7::remainder(dividingBy 3)` is `1`, and `-7::remainder(dividingBy 3)` is `2` rather than the `-1` truncating division leaves. A zero divisor answers empty, and the `defaultingTo:` entry answers the given Integer instead.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "remainder(dividingBy divisor: Integer) -> Optional<Integer>",
+							"summary": "Answers the remainder over a divisor nothing is known about.",
+							"parameters": [
+								{
+									"name": "dividingBy",
+									"type": "Integer",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								}
+							],
+							"returns": "the remainder, or nothing when dividing by zero.",
+							"examples": []
+						},
+						{
+							"signature": "remainder(dividingBy divisor: NonZeroInteger) -> Integer",
+							"summary": "Answers the remainder over a divisor proven not to be zero.\n\nThe division can not fail, so the answer is the remainder itself rather than an Optional.",
+							"parameters": [
+								{
+									"name": "dividingBy",
+									"type": "NonZeroInteger",
+									"default": null,
+									"description": "the divisor, proven not to be zero",
+									"href": "/docs/library/integer#NonZeroInteger"
+								}
+							],
+							"returns": "the remainder.",
+							"examples": []
+						},
+						{
+							"signature": "remainder(\n\tdividingBy divisor: Integer,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
+							"summary": "Answers the remainder, with a value to answer when the divisor is zero.",
+							"parameters": [
+								{
+									"name": "dividingBy",
+									"type": "Integer",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Integer",
+									"default": null,
+									"description": "the value to answer with when there is no remainder",
+									"href": null
+								}
+							],
+							"returns": "the remainder, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "remainder(dividingBy divisor: NonZeroInteger, as kind: Division) -> Integer",
+							"summary": "Answers what is left over, paired with the quotient in the named way.\n\nThe entries above answer the `#Euclidean` pairing, which is why this one names no default. The `#Truncating` Case answers a remainder carrying the sign of the dividend, so `-7::remainder(dividingBy 3, as #Truncating)` is `-1` rather than `2`. The two agree wherever the dividend is not negative.",
+							"parameters": [
+								{
+									"name": "dividingBy",
+									"type": "NonZeroInteger",
+									"default": null,
+									"description": "the divisor, proven not to be zero",
+									"href": "/docs/library/integer#NonZeroInteger"
+								},
+								{
+									"name": "as",
+									"type": "Division",
+									"default": null,
+									"description": "the pairing to read the remainder under",
+									"href": "/docs/library/integer#Division"
+								}
+							],
+							"returns": "the remainder.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::quotient",
+					"namespace": "Integer",
+					"name": "quotient",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers how many whole divisors fit.\n\nThis is the other half of the same Euclidean division as `remainder`, and the two agree: `quotient · divisor + remainder` is the original Integer. The remainder is never negative, so the quotient floors towards negative infinity rather than truncating towards zero. For example, `7::quotient(dividingBy 3)` is `2`, and `-7::quotient(dividingBy 3)` is `-3`, leaving a remainder of `2`. A zero divisor answers empty, and the `defaultingTo:` entry answers the given Integer instead.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "quotient(dividingBy divisor: Integer) -> Optional<Integer>",
+							"summary": "Answers the quotient over a divisor nothing is known about.",
+							"parameters": [
+								{
+									"name": "dividingBy",
+									"type": "Integer",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or nothing when dividing by zero.",
+							"examples": []
+						},
+						{
+							"signature": "quotient(dividingBy divisor: NonZeroInteger) -> Integer",
+							"summary": "Answers the quotient over a divisor proven not to be zero.\n\nThe division can not fail, so the answer is the quotient itself rather than an Optional.",
+							"parameters": [
+								{
+									"name": "dividingBy",
+									"type": "NonZeroInteger",
+									"default": null,
+									"description": "the divisor, proven not to be zero",
+									"href": "/docs/library/integer#NonZeroInteger"
+								}
+							],
+							"returns": "the quotient.",
+							"examples": []
+						},
+						{
+							"signature": "quotient(\n\tdividingBy divisor: Integer,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
+							"summary": "Answers the quotient, with a value to answer when the divisor is zero.",
+							"parameters": [
+								{
+									"name": "dividingBy",
+									"type": "Integer",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Integer",
+									"default": null,
+									"description": "the value to answer with when there is no quotient",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "quotient(\n\tdividingBy divisor: NonZeroInteger,\n\ttoward direction: Rounding,\n) -> Integer",
+							"summary": "Answers how many whole divisors fit, rounded in the named direction.\n\nThe answer is the exact quotient rounded in that direction, so `7::quotient(dividingBy 2, toward #Up)` is `4`. The entries above pair their quotient with a remainder that is never negative. That pairing is the floor for a positive divisor and the ceiling for a negative one. So `#Down` answers what they answer for every divisor above zero.",
+							"parameters": [
+								{
+									"name": "dividingBy",
+									"type": "NonZeroInteger",
+									"default": null,
+									"description": "the divisor, proven not to be zero",
+									"href": "/docs/library/integer#NonZeroInteger"
+								},
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": null,
+									"description": "the direction to round the quotient in",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the quotient.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::raise",
+					"namespace": "Integer",
+					"name": "raise",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Raises the Integer to the given power.\n\nA non-negative exponent answers an Integer, and a negative one answers the exact reciprocal as a Rational. Zero to the power of zero is one. Raising this Integer to an exponent proven not to be negative can not fail. A receiver proven not to be zero can not fail either, and answers through `NonZeroInteger`. Zero raised to a negative power answers empty, and the `defaultingTo:` entry answers the given value instead.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "raise(to exponent: Integer) -> Optional<Integer | Rational>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "Integer",
+									"default": null,
+									"description": "the exponent",
+									"href": null
+								}
+							],
+							"returns": "the power, or nothing when raising zero to a negative power.",
+							"examples": []
+						},
+						{
+							"signature": "raise(\n\tto exponent: Integer,\n\tdefaultingTo fallback: Integer | Rational,\n) -> Integer | Rational",
+							"summary": "Raises the Integer to the given power, and answers the given value when there is no power.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "Integer",
+									"default": null,
+									"description": "the exponent",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Integer | Rational",
+									"default": null,
+									"description": "the value to answer with when there is no power",
+									"href": null
+								}
+							],
+							"returns": "the power, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "raise(to exponent: NonNegativeInteger) -> Integer",
+							"summary": "Raises the Integer to an exponent proven not to be negative.\n\nEvery Integer has such a power and every one of them is whole. So the answer is the power itself rather than an Optional, and it is an Integer rather than a Rational.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "NonNegativeInteger",
+									"default": null,
+									"description": "the exponent, proven not to be negative",
+									"href": "/docs/library/integer#NonNegativeInteger"
+								}
+							],
+							"returns": "the power.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonZeroInteger::raise",
+					"namespace": "NonZeroInteger",
+					"name": "raise",
+					"receiver": "NonZeroInteger",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Raises this NonZeroInteger to the given power.\n\nA base that is not zero has every power, so the answer is the power itself rather than an Optional. An exponent proven not to be negative narrows that answer to an Integer.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "raise(to exponent: Integer) -> Integer | Rational",
+							"summary": "Raises this NonZeroInteger to the given power.\n\nA non-negative exponent answers an Integer, and a negative one answers the exact reciprocal as a Rational.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "Integer",
+									"default": null,
+									"description": "the exponent",
+									"href": null
+								}
+							],
+							"returns": "the power.",
+							"examples": []
+						},
+						{
+							"signature": "raise(to exponent: NonNegativeInteger) -> Integer",
+							"summary": "Raises this NonZeroInteger to an exponent proven not to be negative.\n\nEvery such power is whole, so the answer is an Integer rather than a Union. The entry is `Integer`'s own, declared here as well, because a receiver carrying more proof must not answer wider than one carrying none.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "NonNegativeInteger",
+									"default": null,
+									"description": "the exponent, proven not to be negative",
+									"href": "/docs/library/integer#NonNegativeInteger"
+								}
+							],
+							"returns": "the power.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "PositiveInteger::raise",
+					"namespace": "PositiveInteger",
+					"name": "raise",
+					"receiver": "PositiveInteger",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "raise(to exponent: NonNegativeInteger) -> PositiveInteger",
+							"summary": "Raises this PositiveInteger to an exponent proven not to be negative.\n\nEvery such power is whole and above zero. Zero as an exponent answers one.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "NonNegativeInteger",
+									"default": null,
+									"description": "the exponent, proven not to be negative",
+									"href": "/docs/library/integer#NonNegativeInteger"
+								}
+							],
+							"returns": "the power, which is above zero.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::squareRoot",
+					"namespace": "Integer",
+					"name": "squareRoot",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the exact square root.\n\nA perfect square answers an Integer, and any other non-negative Integer answers an exact Algebraic. A negative Integer answers empty, and the `defaultingTo:` entry answers the given value instead. A receiver proven not to be negative answers the root itself, through `NonNegativeInteger`.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "squareRoot() -> Optional<Integer | Algebraic>",
+							"summary": "",
+							"parameters": [],
+							"returns": "the root, or nothing for a negative Integer.",
+							"examples": []
+						},
+						{
+							"signature": "squareRoot(\n\tdefaultingTo fallback: Integer | Algebraic,\n) -> Integer | Algebraic",
+							"summary": "Answers the exact square root, with a value to answer for a negative Integer.",
+							"parameters": [
+								{
+									"name": "defaultingTo",
+									"type": "Integer | Algebraic",
+									"default": null,
+									"description": "the value to answer with when there is no root",
+									"href": null
+								}
+							],
+							"returns": "the root, or the given value in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonNegativeInteger::squareRoot",
+					"namespace": "NonNegativeInteger",
+					"name": "squareRoot",
+					"receiver": "NonNegativeInteger",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "squareRoot() -> Integer | Algebraic",
+							"summary": "Answers the exact square root of this NonNegativeInteger.\n\nA negative Integer is the only one with no real root, and the receiver is proven not to be one. So the answer is the root itself rather than an Optional. A perfect square answers an Integer, and every other value answers an exact Algebraic.",
+							"parameters": [],
+							"returns": "the root.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "PositiveInteger::squareRoot",
+					"namespace": "PositiveInteger",
+					"name": "squareRoot",
+					"receiver": "PositiveInteger",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "squareRoot() -> PositiveInteger | Algebraic",
+							"summary": "Answers the exact square root of this PositiveInteger.\n\nA perfect square above zero has a root above zero, and every other value answers an exact Algebraic.",
+							"parameters": [],
+							"returns": "the root.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Comparing",
+			"id": "comparing",
+			"members": [
+				{
+					"key": "Integer::isLessThan",
+					"namespace": "Integer",
+					"name": "isLessThan",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether this Integer is strictly below the given number.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isLessThan(_ other: Integer) -> Boolean",
+							"summary": "Answers whether this Integer is strictly below another Integer.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when this Integer is below the other.",
+							"examples": []
+						},
+						{
+							"signature": "isLessThan(_ other: Rational) -> Boolean",
+							"summary": "Answers whether this Integer is strictly below a Rational.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when this Integer is below the Rational.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::isLessThanOrEqualTo",
+					"namespace": "Integer",
+					"name": "isLessThanOrEqualTo",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether this Integer is below the given number, or equal to it.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isLessThanOrEqualTo(_ other: Integer) -> Boolean",
+							"summary": "Answers whether this Integer is below another Integer, or equal to it.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when this Integer is not above the other.",
+							"examples": []
+						},
+						{
+							"signature": "isLessThanOrEqualTo(_ other: Rational) -> Boolean",
+							"summary": "Answers whether this Integer is below a Rational, or equal to it.\n\nAn Integer equals a Rational only when that Rational is whole.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when this Integer is not above the Rational.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::isGreaterThan",
+					"namespace": "Integer",
+					"name": "isGreaterThan",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether this Integer is strictly above the given number.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isGreaterThan(_ other: Integer) -> Boolean",
+							"summary": "Answers whether this Integer is strictly above another Integer.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when this Integer is above the other.",
+							"examples": []
+						},
+						{
+							"signature": "isGreaterThan(_ other: Rational) -> Boolean",
+							"summary": "Answers whether this Integer is strictly above a Rational.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when this Integer is above the Rational.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::isGreaterThanOrEqualTo",
+					"namespace": "Integer",
+					"name": "isGreaterThanOrEqualTo",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether this Integer is above the given number, or equal to it.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isGreaterThanOrEqualTo(_ other: Integer) -> Boolean",
+							"summary": "Answers whether this Integer is above another Integer, or equal to it.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when this Integer is not below the other.",
+							"examples": []
+						},
+						{
+							"signature": "isGreaterThanOrEqualTo(_ other: Rational) -> Boolean",
+							"summary": "Answers whether this Integer is above a Rational, or equal to it.\n\nAn Integer equals a Rational only when that Rational is whole.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when this Integer is not below the Rational.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::isBetween",
+					"namespace": "Integer",
+					"name": "isBetween",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Orderable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isBetween(_ lower: Integer, and upper: Integer) -> Boolean",
+							"summary": "Answers whether the value lies between the two given ones, both included.\n\nThe two bounds name the same range in either order: `7::isBetween(10, and 1)` is `true`, and `15::isBetween(10, and 1)` is `false`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "one bound of the range, included",
+									"href": null
+								},
+								{
+									"name": "and",
+									"type": "Integer",
+									"default": null,
+									"description": "the other bound of the range, included",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is within the bounds.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::clamp",
+					"namespace": "Integer",
+					"name": "clamp",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Orderable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "clamp(between lowest: Integer, and highest: Integer) -> Integer",
+							"summary": "Answers the value, pulled into the given bounds.\n\nThe answer is the lower bound when the value is below it. It is the upper bound when the value is above it, and the value itself otherwise. The two bounds name the same range in either order: `7::clamp(between 10, and 1)` is `7`, and `15::clamp(between 10, and 1)` is `10`.",
+							"parameters": [
+								{
+									"name": "between",
+									"type": "Integer",
+									"default": null,
+									"description": "one bound of the range",
+									"href": null
+								},
+								{
+									"name": "and",
+									"type": "Integer",
+									"default": null,
+									"description": "the other bound of the range",
+									"href": null
+								}
+							],
+							"returns": "the clamped value.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Testing",
+			"id": "testing",
+			"members": [
+				{
+					"key": "Integer::isEven",
+					"namespace": "Integer",
+					"name": "isEven",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isEven() -> Boolean",
+							"summary": "Answers whether the Integer is divisible by two.\n\nZero is even.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::isOdd",
+					"namespace": "Integer",
+					"name": "isOdd",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isOdd() -> Boolean",
+							"summary": "Answers whether the Integer is not divisible by two.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::isPositive",
+					"namespace": "Integer",
+					"name": "isPositive",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isPositive() -> Boolean",
+							"summary": "Answers whether the Integer is above zero.\n\nZero is neither positive nor negative.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::isNegative",
+					"namespace": "Integer",
+					"name": "isNegative",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNegative() -> Boolean",
+							"summary": "Answers whether the Integer is below zero.\n\nZero is neither positive nor negative.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::isZero",
+					"namespace": "Integer",
+					"name": "isZero",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isZero() -> Boolean",
+							"summary": "Answers whether the Integer is exactly zero.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::isWholeNumber",
+					"namespace": "Integer",
+					"name": "isWholeNumber",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isWholeNumber() -> Boolean",
+							"summary": "Answers whether the Integer is a whole number.\n\nEvery Integer is whole, so the answer is always `true`.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::isMultiple",
+					"namespace": "Integer",
+					"name": "isMultiple",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isMultiple(of divisor: Integer) -> Boolean",
+							"summary": "Answers whether the Integer is a whole multiple of the given divisor.\n\nZero is a multiple of every Integer. A zero divisor answers `false`: there is no remainder to read, and an empty answer is not zero.",
+							"parameters": [
+								{
+									"name": "of",
+									"type": "Integer",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								}
+							],
+							"returns": "`true` when the division leaves no remainder.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::isPrime",
+					"namespace": "Integer",
+					"name": "isPrime",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isPrime() -> Boolean",
+							"summary": "Answers whether the Integer has exactly two whole divisors above zero.\n\nTwo is the lowest prime. Zero, one and every negative Integer are not prime. The test is a Miller-Rabin test over the first twelve primes as witnesses. It decides every Integer below 3317044064679887385961981 exactly. A larger Integer it accepts is a strong probable prime to those twelve witnesses.",
+							"parameters": [],
+							"returns": "`true` when the Integer is prime.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Sign and rounding",
+			"id": "sign-and-rounding",
+			"members": [
+				{
+					"key": "Integer::absolute",
+					"namespace": "Integer",
+					"name": "absolute",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "absolute() -> NonNegativeInteger",
+							"summary": "Answers the Integer without its sign, which is its distance from zero.",
+							"parameters": [],
+							"returns": "the distance, which is never negative.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonZeroInteger::absolute",
+					"namespace": "NonZeroInteger",
+					"name": "absolute",
+					"receiver": "NonZeroInteger",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "absolute() -> PositiveInteger",
+							"summary": "Answers this NonZeroInteger without its sign, which is its distance from zero.\n\nThe receiver is not zero, so its distance from zero is above zero. So the answer is a PositiveInteger.",
+							"parameters": [],
+							"returns": "the distance, which is above zero.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::negate",
+					"namespace": "Integer",
+					"name": "negate",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "negate() -> Integer",
+							"summary": "Answers the Integer with its sign flipped.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonZeroInteger::negate",
+					"namespace": "NonZeroInteger",
+					"name": "negate",
+					"receiver": "NonZeroInteger",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "negate() -> NonZeroInteger",
+							"summary": "Answers this NonZeroInteger with its sign flipped.\n\nNegation keeps a value away from zero, so the answer is a NonZeroInteger too.",
+							"parameters": [],
+							"returns": "the negation, which is not zero.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::round",
+					"namespace": "Integer",
+					"name": "round",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the Integer, rounded in the named direction.\n\nAn Integer is already whole and is on every decimal grid, so every entry here answers the receiver itself. The direction is `#Nearest` when a call names none.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "round(toward direction: Rounding = #Nearest) -> Integer",
+							"summary": "Answers the Integer, rounded in the named direction.",
+							"parameters": [
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the Integer itself.",
+							"examples": []
+						},
+						{
+							"signature": "round(\n\ttoPlaces places: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> Integer",
+							"summary": "Answers the Integer, rounded to a decimal grid of the given width.",
+							"parameters": [
+								{
+									"name": "toPlaces",
+									"type": "Integer",
+									"default": null,
+									"description": "how many decimal places to keep",
+									"href": null
+								},
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the Integer itself.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::approximate",
+					"namespace": "Integer",
+					"name": "approximate",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "approximate(\n\ttoPlaces places: NonNegativeInteger,\n\ttoward direction: Rounding = #Nearest,\n) -> Rational",
+							"summary": "Answers the Integer read off a decimal grid of the given width.\n\nAn Integer is on every decimal grid, so the answer is the receiver itself as a Rational. The entries of this name on `Algebraic` and on `Transcendental` are what make an irrational readable as a number. This one is what lets a `Number` receiver reach the family.",
+							"parameters": [
+								{
+									"name": "toPlaces",
+									"type": "NonNegativeInteger",
+									"default": null,
+									"description": "how many decimal places to keep",
+									"href": "/docs/library/integer#NonNegativeInteger"
+								},
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the Integer itself, as a Rational.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Number theory",
+			"id": "number-theory",
+			"members": [
+				{
+					"key": "Integer::greatestCommonDivisor",
+					"namespace": "Integer",
+					"name": "greatestCommonDivisor",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "greatestCommonDivisor(with other: Integer) -> NonNegativeInteger",
+							"summary": "Answers the largest Integer that divides both this Integer and the given one.\n\nThe sign of either Integer is ignored, so the answer is never negative. Zero is divided by every Integer, so the divisor of zero and an Integer is that Integer without its sign. The divisor of two zeroes is zero.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to share a divisor with",
+									"href": null
+								}
+							],
+							"returns": "the greatest common divisor, which is never negative.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::leastCommonMultiple",
+					"namespace": "Integer",
+					"name": "leastCommonMultiple",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "leastCommonMultiple(with other: Integer) -> NonNegativeInteger",
+							"summary": "Answers the smallest Integer above zero that both this Integer and the given one divide.\n\nThe sign of either Integer is ignored, so the answer is never negative. Zero has no multiple above zero, so a zero operand answers zero. The product of the two answers holds for every pair: `leastCommonMultiple · greatestCommonDivisor` is the product of the two Integers without its sign.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to share a multiple with",
+									"href": null
+								}
+							],
+							"returns": "the least common multiple, which is never negative.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Integer::factorial",
+					"namespace": "Integer",
+					"name": "factorial",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the product of every Integer from one up to this Integer.\n\nThe factorial of zero is one. A negative Integer has no factorial, and the `defaultingTo:` entry answers the given Integer instead. A receiver proven not to be negative answers the factorial itself, through `NonNegativeInteger`.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "factorial() -> Optional<PositiveInteger>",
+							"summary": "",
+							"parameters": [],
+							"returns": "the factorial, or nothing for a negative Integer.",
+							"examples": []
+						},
+						{
+							"signature": "factorial(defaultingTo fallback: Integer) -> Integer",
+							"summary": "Answers the factorial, with a value to answer for a negative Integer.",
+							"parameters": [
+								{
+									"name": "defaultingTo",
+									"type": "Integer",
+									"default": null,
+									"description": "the value to answer with when there is no factorial",
+									"href": null
+								}
+							],
+							"returns": "the factorial, or the given value in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonNegativeInteger::factorial",
+					"namespace": "NonNegativeInteger",
+					"name": "factorial",
+					"receiver": "NonNegativeInteger",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "factorial() -> PositiveInteger",
+							"summary": "Answers the product of every Integer from one up to this NonNegativeInteger.\n\nA negative Integer is the one receiver with no factorial, and the receiver is proven not to be one. So the answer is the factorial itself rather than an Optional. The factorial of zero is one.",
+							"parameters": [],
+							"returns": "the factorial, which is above zero.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Converting",
+			"id": "converting",
+			"members": [
+				{
+					"key": "Integer::toRational",
+					"namespace": "Integer",
+					"name": "toRational",
+					"receiver": "Integer",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toRational() -> Rational",
+							"summary": "Answers the Integer as a Rational.\n\nEvery Integer is a Rational over one, so the crossing never fails. The Rational is whole, and prints as the digits alone.",
+							"parameters": [],
+							"returns": "the Rational holding this value.",
+							"examples": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [
+		{
+			"name": "NonZeroInteger",
+			"written": "NonZeroInteger",
+			"declaration": "type NonZeroInteger = Integer where @::isNot(0)",
+			"predicate": "@::isNot(0)",
+			"description": "The Integers that are not zero, as a checked refinement of `Integer`.\n\nA value carries a proof of the predicate before it is one of these. The proof is what lets an operation say it can not fail. A division by one of these answers a Rational rather than an Optional, and `negate` and `absolute` stay within the proof.",
+			"tightens": ["multiply", "divide", "raise", "absolute", "negate"],
+			"answeredBy": [
+				{
+					"label": "NonZeroInteger::multiply(with:)",
+					"href": "/docs/library/integer#multiply"
+				},
+				{
+					"label": "NonZeroInteger::negate()",
+					"href": "/docs/library/integer#negate"
+				},
+				{
+					"label": "NonZeroRational::numerator()",
+					"href": "/docs/library/rational#numerator"
+				}
+			]
+		},
+		{
+			"name": "NonNegativeInteger",
+			"written": "NonNegativeInteger",
+			"declaration": "type NonNegativeInteger = Integer where @::isGreaterThanOrEqualTo(0)",
+			"predicate": "@::isGreaterThanOrEqualTo(0)",
+			"description": "The Integers from zero upward, as a checked refinement of `Integer`.\n\nAn exponent proven to be one of these raises any Integer to a whole power. A receiver proven to be one has a real square root. Both operations answer an Optional without the proof.",
+			"tightens": ["add", "multiply", "squareRoot", "factorial"],
+			"answeredBy": [
+				{
+					"label": "Dictionary::length()",
+					"href": "/docs/library/dictionary#length"
+				},
+				{
+					"label": "Dictionary::count(where:)",
+					"href": "/docs/library/dictionary#count"
+				},
+				{
+					"label": "Integer::absolute()",
+					"href": "/docs/library/integer#absolute"
+				},
+				{
+					"label": "Integer::greatestCommonDivisor(with:)",
+					"href": "/docs/library/integer#greatestCommonDivisor"
+				},
+				{
+					"label": "Integer::leastCommonMultiple(with:)",
+					"href": "/docs/library/integer#leastCommonMultiple"
+				},
+				{
+					"label": "NonNegativeInteger::add(_:)",
+					"href": "/docs/library/integer#add"
+				},
+				{
+					"label": "NonNegativeInteger::multiply(with:)",
+					"href": "/docs/library/integer#multiply"
+				},
+				{
+					"label": "List::length()",
+					"href": "/docs/library/list#length"
+				},
+				{
+					"label": "List::count(of:)",
+					"href": "/docs/library/list#count"
+				},
+				{
+					"label": "List::count(where:)",
+					"href": "/docs/library/list#count"
+				},
+				{
+					"label": "Randomness::drawInteger(below:)",
+					"href": "/docs/library/randomness#drawInteger"
+				},
+				{
+					"label": "String::length()",
+					"href": "/docs/library/string#length"
+				},
+				{
+					"label": "String::count(of:)",
+					"href": "/docs/library/string#count"
+				},
+				{
+					"label": "String::count(of:comparing:)",
+					"href": "/docs/library/string#count"
+				}
+			]
+		},
+		{
+			"name": "PositiveInteger",
+			"written": "PositiveInteger",
+			"declaration": "type PositiveInteger = Integer where @::isPositive()",
+			"predicate": "@::isPositive()",
+			"description": "The Integers above zero, as a checked refinement of `Integer`.\n\nA value above zero is neither zero nor below it, so one of these is accepted wherever a NonZeroInteger or a NonNegativeInteger is wanted. Addition, multiplication and `raise` answer one of these again.",
+			"tightens": ["add", "multiply", "raise", "squareRoot"],
+			"answeredBy": [
+				{
+					"label": "NonEmptyDictionary::length()",
+					"href": "/docs/library/dictionary#length"
+				},
+				{
+					"label": "GroupedList::tally()",
+					"href": "/docs/library/list#tally"
+				},
+				{
+					"label": "GroupedNonEmptyList::tally()",
+					"href": "/docs/library/list#tally"
+				},
+				{
+					"label": "Integer::factorial()",
+					"href": "/docs/library/integer#factorial"
+				},
+				{
+					"label": "NonZeroInteger::absolute()",
+					"href": "/docs/library/integer#absolute"
+				},
+				{
+					"label": "NonNegativeInteger::add(_:)",
+					"href": "/docs/library/integer#add"
+				},
+				{
+					"label": "NonNegativeInteger::factorial()",
+					"href": "/docs/library/integer#factorial"
+				},
+				{
+					"label": "PositiveInteger::add(_:)",
+					"href": "/docs/library/integer#add"
+				},
+				{
+					"label": "PositiveInteger::multiply(with:)",
+					"href": "/docs/library/integer#multiply"
+				},
+				{
+					"label": "PositiveInteger::raise(to:)",
+					"href": "/docs/library/integer#raise"
+				},
+				{
+					"label": "PositiveInteger::squareRoot()",
+					"href": "/docs/library/integer#squareRoot"
+				},
+				{
+					"label": "NonEmptyList::length()",
+					"href": "/docs/library/list#length"
+				},
+				{
+					"label": "Rational::denominator()",
+					"href": "/docs/library/rational#denominator"
+				},
+				{
+					"label": "NonEmptyString::length()",
+					"href": "/docs/library/string#length"
+				}
+			]
+		}
+	],
+	"modes": [
+		{
+			"name": "Division",
+			"declaration": "choice Division {\n\tEuclidean,\n\tTruncating,\n}",
+			"description": "How a division pairs its quotient with its remainder.\n\nUnder `#Euclidean` the remainder is never negative, so it is always below the divisor's magnitude. Under `#Truncating` the remainder takes the sign of the dividend, which is what an algorithm ported from another language expects.",
+			"cases": [
+				{
+					"name": "Euclidean",
+					"payload": null
+				},
+				{
+					"name": "Truncating",
+					"payload": null
+				}
+			],
+			"payloadFree": true,
+			"takenBy": [
+				{
+					"label": "Integer::remainder(dividingBy:as:)",
+					"href": "/docs/library/integer#remainder",
+					"default": null
+				}
+			]
+		}
+	],
+	"tower": [],
+	"views": [],
+	"protocols": [],
+	"seeAlso": [],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"creating",
+		"parse",
+		"equality-ordering-and-printing",
+		"is",
+		"isnot",
+		"isNot",
+		"compare",
+		"tostring",
+		"toString",
+		"arithmetic",
+		"add",
+		"subtract",
+		"multiply",
+		"divide",
+		"remainder",
+		"quotient",
+		"raise",
+		"squareroot",
+		"squareRoot",
+		"comparing",
+		"islessthan",
+		"isLessThan",
+		"islessthanorequalto",
+		"isLessThanOrEqualTo",
+		"isgreaterthan",
+		"isGreaterThan",
+		"isgreaterthanorequalto",
+		"isGreaterThanOrEqualTo",
+		"isbetween",
+		"isBetween",
+		"clamp",
+		"testing",
+		"iseven",
+		"isEven",
+		"isodd",
+		"isOdd",
+		"ispositive",
+		"isPositive",
+		"isnegative",
+		"isNegative",
+		"iszero",
+		"isZero",
+		"iswholenumber",
+		"isWholeNumber",
+		"ismultiple",
+		"isMultiple",
+		"isprime",
+		"isPrime",
+		"sign-and-rounding",
+		"absolute",
+		"negate",
+		"round",
+		"approximate",
+		"number-theory",
+		"greatestcommondivisor",
+		"greatestCommonDivisor",
+		"leastcommonmultiple",
+		"leastCommonMultiple",
+		"factorial",
+		"converting",
+		"torational",
+		"toRational",
+		"refinements",
+		"nonzerointeger",
+		"NonZeroInteger",
+		"nonnegativeinteger",
+		"NonNegativeInteger",
+		"positiveinteger",
+		"PositiveInteger",
+		"modes",
+		"division",
+		"Division"
+	]
+}

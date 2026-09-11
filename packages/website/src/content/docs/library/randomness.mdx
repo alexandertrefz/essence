@@ -1,0 +1,71 @@
+---
+title: "Randomness"
+description: "A source of random values: seed one, draw Booleans, Integers, Rationals and Strings, and pick or shuffle."
+section: library
+order: 160
+template: type
+tocDepth: 2
+searchDepth: 3
+namespaces:
+  - "Randomness"
+aliases: []
+conformsTo: []
+---
+
+{/* Generated from packages/standard-library/sources by packages/website/scripts/generateStdlibDocs.ts. The description and the Taught on line are this page's own and survive --sync; everything else is rewritten by it. */}
+
+A source of random values, and the one value in the language that changes.
+
+Every draw answers a value and advances the source, so two draws answer two values. That is what a `Generatable` body needs: asking for a name and then for a score must not answer the same draw twice.
+
+A source is carried by hand. A Method that draws takes one as a Parameter, and its caller passes the same source on. Mapping over a List with one source draws once for each item, in the order the items stand in.
+
+Taught on: [Tests](/docs/language/tests).
+
+<MemberIndex page="randomness" />
+
+## At a glance
+
+<AtAGlance page="randomness" />
+
+## Creating a source
+
+### entropy
+
+<MemberEntries page="randomness" name="entropy" />
+
+### seeded
+
+<MemberEntries page="randomness" name="seeded" />
+
+## Drawing values
+
+### <span id="drawBoolean">drawBoolean</span>
+
+<MemberEntries page="randomness" name="drawBoolean" />
+
+### <span id="drawInteger">drawInteger</span>
+
+<MemberEntries page="randomness" name="drawInteger" />
+
+### <span id="drawRational">drawRational</span>
+
+<MemberEntries page="randomness" name="drawRational" />
+
+### <span id="drawString">drawString</span>
+
+<MemberEntries page="randomness" name="drawString" />
+
+## Choosing from a List
+
+### pick
+
+<MemberEntries page="randomness" name="pick" />
+
+### shuffle
+
+<MemberEntries page="randomness" name="shuffle" />
+
+## See also
+
+<SeeAlso links={[{"label":"Generatable","href":"/docs/library/protocols#Generatable"}]} />

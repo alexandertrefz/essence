@@ -1,0 +1,2670 @@
+{
+	"slug": "string",
+	"title": "String",
+	"kind": "type",
+	"declaration": "namespace String for String",
+	"choice": null,
+	"namespaces": [
+		"String",
+		"NonEmptyString",
+		"Side",
+		"CaseSensitivity",
+		"NormalizationForm"
+	],
+	"conformsTo": [
+		{
+			"protocol": "Equatable",
+			"condition": null
+		},
+		{
+			"protocol": "Printable",
+			"condition": null
+		},
+		{
+			"protocol": "Comparable",
+			"condition": null
+		}
+	],
+	"groups": [
+		{
+			"label": "Creating",
+			"id": "creating",
+			"members": [
+				{
+					"key": "String::of",
+					"namespace": "String",
+					"name": "of",
+					"receiver": "String",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Builds a String out of Unicode code points.\n\nA point that names no character answers nothing. A surrogate names none, and neither does a point past the last one Unicode gives.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static of(codePoint code: NonNegativeInteger) -> Optional<String>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "codePoint",
+									"type": "NonNegativeInteger",
+									"default": null,
+									"description": "the code point to read, proven not to be negative",
+									"href": "/docs/library/integer#NonNegativeInteger"
+								}
+							],
+							"returns": "the String of that one character, or nothing when the point names none.",
+							"examples": [
+								"expect String.of(codePoint 97)::is(\"a\")\nexpect String.of(codePoint 55296)::isEmpty()"
+							]
+						},
+						{
+							"signature": "static of(codePoints codes: List<Integer>) -> Optional<String>",
+							"summary": "Builds a String out of a List of Unicode code points.\n\nOne point that names no character refuses the whole List. A String missing the characters it could not read is a String no caller asked for. An empty List answers the empty String.",
+							"parameters": [
+								{
+									"name": "codePoints",
+									"type": "List<Integer>",
+									"default": null,
+									"description": "the code points to read",
+									"href": null
+								}
+							],
+							"returns": "the String of those characters, or nothing when a point names none.",
+							"examples": [
+								"expect String.of(codePoints [104, 105])::is(\"hi\")\nexpect String.of(codePoints [104, -1])::isEmpty()"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Equality, ordering and printing",
+			"id": "equality-ordering-and-printing",
+			"members": [
+				{
+					"key": "String::is",
+					"namespace": "String",
+					"name": "is",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the String has the same characters as another one.\n\nThe comparison is case-sensitive unless a `CaseSensitivity` says otherwise.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "is(_ other: String) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the String to compare against",
+									"href": null
+								}
+							],
+							"returns": "`true` when the Strings are equal.",
+							"examples": []
+						},
+						{
+							"signature": "is(\n\t_ other: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the String to compare against",
+									"href": null
+								},
+								{
+									"name": "comparing",
+									"type": "CaseSensitivity",
+									"default": null,
+									"description": "whether case is significant",
+									"href": "/docs/library/string#CaseSensitivity"
+								}
+							],
+							"returns": "`true` when the Strings are equal under the given `CaseSensitivity`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::compare",
+					"namespace": "String",
+					"name": "compare",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Orders the String against another one, by character code point.\n\nA `CaseSensitivity` of `#Insensitive` folds the case first.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "compare(to other: String) -> Ordering",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "String",
+									"default": null,
+									"description": "the String to order against",
+									"href": null
+								}
+							],
+							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
+							"examples": []
+						},
+						{
+							"signature": "compare(\n\tto other: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Ordering",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "String",
+									"default": null,
+									"description": "the String to order against",
+									"href": null
+								},
+								{
+									"name": "comparing",
+									"type": "CaseSensitivity",
+									"default": null,
+									"description": "whether case is significant",
+									"href": "/docs/library/string#CaseSensitivity"
+								}
+							],
+							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::toString",
+					"namespace": "String",
+					"name": "toString",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toString() -> String",
+							"summary": "Answers the String itself.",
+							"parameters": [],
+							"returns": "the String, unchanged.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::isNot",
+					"namespace": "String",
+					"name": "isNot",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Equatable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNot(_ other: String) -> Boolean",
+							"summary": "Answers whether the values differ.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the values differ.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Comparing",
+			"id": "comparing",
+			"members": [
+				{
+					"key": "String::isLessThan",
+					"namespace": "String",
+					"name": "isLessThan",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isLessThan(_ other: String) -> Boolean",
+							"summary": "Answers whether the value is strictly below another.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is below the given one.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::isLessThanOrEqualTo",
+					"namespace": "String",
+					"name": "isLessThanOrEqualTo",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isLessThanOrEqualTo(_ other: String) -> Boolean",
+							"summary": "Answers whether the value is below another, or equal to it.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is below the given one or equal to it.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::isGreaterThan",
+					"namespace": "String",
+					"name": "isGreaterThan",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isGreaterThan(_ other: String) -> Boolean",
+							"summary": "Answers whether the value is strictly above another.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is above the given one.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::isGreaterThanOrEqualTo",
+					"namespace": "String",
+					"name": "isGreaterThanOrEqualTo",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isGreaterThanOrEqualTo(_ other: String) -> Boolean",
+							"summary": "Answers whether the value is above another, or equal to it.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is above the given one or equal to it.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Testing content",
+			"id": "testing-content",
+			"members": [
+				{
+					"key": "String::isEmpty",
+					"namespace": "String",
+					"name": "isEmpty",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isEmpty() -> Boolean",
+							"summary": "Answers whether the String has no characters.",
+							"parameters": [],
+							"returns": "`true` for the empty String, and `false` otherwise.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::hasCharacters",
+					"namespace": "String",
+					"name": "hasCharacters",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "hasCharacters() -> Boolean",
+							"summary": "Answers whether the String has at least one character.",
+							"parameters": [],
+							"returns": "`true` when the String is not empty.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::isOneCharacter",
+					"namespace": "String",
+					"name": "isOneCharacter",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isOneCharacter() -> Boolean",
+							"summary": "Answers whether the String is one character long.\n\nThis is the question the `Character` Type is written on. A String proven to answer `true` here goes wherever a Character is wanted.",
+							"parameters": [],
+							"returns": "`true` when the String holds one character.",
+							"examples": [
+								"expect \"a\"::isOneCharacter()\nexpect \"ab\"::isOneCharacter()::negate()"
+							]
+						}
+					]
+				},
+				{
+					"key": "String::hasOnlyDigits",
+					"namespace": "String",
+					"name": "hasOnlyDigits",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "hasOnlyDigits() -> Boolean",
+							"summary": "Answers whether every character of the String is a decimal digit.\n\nA digit is any Unicode decimal digit, which is wider than what `Integer.parse` reads: `Integer.parse` reads the notation the language writes. The empty String answers `true`, because nothing in it is not a digit.",
+							"parameters": [],
+							"returns": "`true` when the String holds decimal digits alone.",
+							"examples": [
+								"expect \"2026\"::hasOnlyDigits()\nexpect \"2026-09\"::hasOnlyDigits()::negate()"
+							]
+						}
+					]
+				},
+				{
+					"key": "String::hasOnlyLetters",
+					"namespace": "String",
+					"name": "hasOnlyLetters",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "hasOnlyLetters() -> Boolean",
+							"summary": "Answers whether every character of the String is a letter.\n\nA combining mark counts as part of the letter before it. A mark standing on its own belongs to no letter and answers `false`. The empty String answers `true`.",
+							"parameters": [],
+							"returns": "`true` when the String holds letters alone.",
+							"examples": [
+								"expect \"Grüße\"::hasOnlyLetters()\nexpect \"Rule 34\"::hasOnlyLetters()::negate()"
+							]
+						}
+					]
+				},
+				{
+					"key": "String::hasOnlyLettersOrDigits",
+					"namespace": "String",
+					"name": "hasOnlyLettersOrDigits",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "hasOnlyLettersOrDigits() -> Boolean",
+							"summary": "Answers whether every character of the String is a letter or a decimal digit.\n\nA combining mark counts as part of the character before it. The empty String answers `true`.",
+							"parameters": [],
+							"returns": "`true` when the String holds letters and digits alone.",
+							"examples": [
+								"expect \"route66\"::hasOnlyLettersOrDigits()\nexpect \"route 66\"::hasOnlyLettersOrDigits()::negate()"
+							]
+						}
+					]
+				},
+				{
+					"key": "String::hasOnlyWhitespace",
+					"namespace": "String",
+					"name": "hasOnlyWhitespace",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "hasOnlyWhitespace() -> Boolean",
+							"summary": "Answers whether every character of the String is whitespace.\n\nWhitespace is what Unicode calls whitespace, which is the rule `trim` and `words` read. The empty String answers `true`.",
+							"parameters": [],
+							"returns": "`true` when the String holds whitespace alone.",
+							"examples": [
+								"expect \"   \"::hasOnlyWhitespace()\nexpect \" x \"::hasOnlyWhitespace()::negate()"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Searching",
+			"id": "searching",
+			"members": [
+				{
+					"key": "String::contains",
+					"namespace": "String",
+					"name": "contains",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the given String occurs anywhere in this one.\n\nThe empty String occurs in every String. The search is case-sensitive unless a `CaseSensitivity` says otherwise.",
+					"returns": null,
+					"examples": [
+						"expect \"Lions\"::contains(\"ion\")\nexpect \"Lions\"::doesNotContain(\"Tiger\")\nexpect \"Lions\"::contains(\"ION\", comparing #Insensitive)"
+					],
+					"entries": [
+						{
+							"signature": "contains(_ other: String) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for",
+									"href": null
+								}
+							],
+							"returns": "`true` when it occurs.",
+							"examples": []
+						},
+						{
+							"signature": "contains(\n\t_ other: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for",
+									"href": null
+								},
+								{
+									"name": "comparing",
+									"type": "CaseSensitivity",
+									"default": null,
+									"description": "whether case is significant",
+									"href": "/docs/library/string#CaseSensitivity"
+								}
+							],
+							"returns": "`true` when it occurs under the given `CaseSensitivity`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::doesNotContain",
+					"namespace": "String",
+					"name": "doesNotContain",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the given String occurs nowhere in this one.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "doesNotContain(_ other: String) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for",
+									"href": null
+								}
+							],
+							"returns": "`true` when it does not occur.",
+							"examples": []
+						},
+						{
+							"signature": "doesNotContain(\n\t_ other: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for",
+									"href": null
+								},
+								{
+									"name": "comparing",
+									"type": "CaseSensitivity",
+									"default": null,
+									"description": "whether case is significant",
+									"href": "/docs/library/string#CaseSensitivity"
+								}
+							],
+							"returns": "`true` when it does not occur under the given `CaseSensitivity`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::starts",
+					"namespace": "String",
+					"name": "starts",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the String begins with the given one.",
+					"returns": null,
+					"examples": [
+						"expect \"Lions\"::starts(with \"Li\")\nexpect \"Lions\"::doesNotStart(with \"Ti\")\nexpect \"Lions\"::starts(with \"li\", comparing #Insensitive)"
+					],
+					"entries": [
+						{
+							"signature": "starts(with prefix: String) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for at the front",
+									"href": null
+								}
+							],
+							"returns": "`true` when the String begins with it.",
+							"examples": []
+						},
+						{
+							"signature": "starts(\n\twith prefix: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for at the front",
+									"href": null
+								},
+								{
+									"name": "comparing",
+									"type": "CaseSensitivity",
+									"default": null,
+									"description": "whether case is significant",
+									"href": "/docs/library/string#CaseSensitivity"
+								}
+							],
+							"returns": "`true` when the String begins with it under the given `CaseSensitivity`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::doesNotStart",
+					"namespace": "String",
+					"name": "doesNotStart",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the String does not begin with the given one.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "doesNotStart(with prefix: String) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for at the front",
+									"href": null
+								}
+							],
+							"returns": "`true` when the String does not begin with it.",
+							"examples": []
+						},
+						{
+							"signature": "doesNotStart(\n\twith prefix: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for at the front",
+									"href": null
+								},
+								{
+									"name": "comparing",
+									"type": "CaseSensitivity",
+									"default": null,
+									"description": "whether case is significant",
+									"href": "/docs/library/string#CaseSensitivity"
+								}
+							],
+							"returns": "`true` when the String does not begin with it under the given `CaseSensitivity`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::ends",
+					"namespace": "String",
+					"name": "ends",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the String ends with the given one.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "ends(with suffix: String) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for at the end",
+									"href": null
+								}
+							],
+							"returns": "`true` when the String ends with it.",
+							"examples": []
+						},
+						{
+							"signature": "ends(\n\twith suffix: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for at the end",
+									"href": null
+								},
+								{
+									"name": "comparing",
+									"type": "CaseSensitivity",
+									"default": null,
+									"description": "whether case is significant",
+									"href": "/docs/library/string#CaseSensitivity"
+								}
+							],
+							"returns": "`true` when the String ends with it under the given `CaseSensitivity`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::doesNotEnd",
+					"namespace": "String",
+					"name": "doesNotEnd",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers whether the String does not end with the given one.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "doesNotEnd(with suffix: String) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for at the end",
+									"href": null
+								}
+							],
+							"returns": "`true` when the String does not end with it.",
+							"examples": []
+						},
+						{
+							"signature": "doesNotEnd(\n\twith suffix: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Boolean",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for at the end",
+									"href": null
+								},
+								{
+									"name": "comparing",
+									"type": "CaseSensitivity",
+									"default": null,
+									"description": "whether case is significant",
+									"href": "/docs/library/string#CaseSensitivity"
+								}
+							],
+							"returns": "`true` when the String does not end with it under the given `CaseSensitivity`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::firstIndex",
+					"namespace": "String",
+					"name": "firstIndex",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the position of the first occurrence of the given String.\n\nThe empty String occurs at position 0. A String that does not occur answers nothing, and the `defaultingTo:` entry answers the given position instead.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "firstIndex(of part: String) -> Optional<Integer>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "of",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for",
+									"href": null
+								}
+							],
+							"returns": "the zero-based position, or nothing when it does not occur.",
+							"examples": []
+						},
+						{
+							"signature": "firstIndex(of part: String, defaultingTo fallback: Integer) -> Integer",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "of",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Integer",
+									"default": null,
+									"description": "the position to answer with when the String does not occur",
+									"href": null
+								}
+							],
+							"returns": "the zero-based position, or the given one in its place.",
+							"examples": []
+						},
+						{
+							"signature": "firstIndex(\n\tof part: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Optional<Integer>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "of",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for",
+									"href": null
+								},
+								{
+									"name": "comparing",
+									"type": "CaseSensitivity",
+									"default": null,
+									"description": "whether case is significant",
+									"href": "/docs/library/string#CaseSensitivity"
+								}
+							],
+							"returns": "the zero-based position, or nothing when it does not occur under the given `CaseSensitivity`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::lastIndex",
+					"namespace": "String",
+					"name": "lastIndex",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the position of the last occurrence of the given String.\n\nThe occurrence can overlap an earlier one: `\"aaa\"::lastIndex(of \"aa\")` is 1. The empty String occurs at the length. A String that does not occur answers nothing, and the `defaultingTo:` entry answers the given position instead.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "lastIndex(of part: String) -> Optional<Integer>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "of",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for",
+									"href": null
+								}
+							],
+							"returns": "the zero-based position, or nothing when it does not occur.",
+							"examples": []
+						},
+						{
+							"signature": "lastIndex(of part: String, defaultingTo fallback: Integer) -> Integer",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "of",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Integer",
+									"default": null,
+									"description": "the position to answer with when the String does not occur",
+									"href": null
+								}
+							],
+							"returns": "the zero-based position, or the given one in its place.",
+							"examples": []
+						},
+						{
+							"signature": "lastIndex(\n\tof part: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Optional<Integer>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "of",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for",
+									"href": null
+								},
+								{
+									"name": "comparing",
+									"type": "CaseSensitivity",
+									"default": null,
+									"description": "whether case is significant",
+									"href": "/docs/library/string#CaseSensitivity"
+								}
+							],
+							"returns": "the zero-based position, or nothing when it does not occur under the given `CaseSensitivity`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::everyIndex",
+					"namespace": "String",
+					"name": "everyIndex",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "everyIndex(of part: String) -> List<Integer>",
+							"summary": "Answers the position of every occurrence of the given String.\n\nThe occurrences do not overlap, which is the rule `count(of:)` counts by. The empty String occurs at no position.",
+							"parameters": [
+								{
+									"name": "of",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for",
+									"href": null
+								}
+							],
+							"returns": "the List of zero-based positions, in the order they occur.",
+							"examples": [
+								"expect \"banana\"::everyIndex(of \"an\")::is([1, 3])"
+							]
+						}
+					]
+				},
+				{
+					"key": "String::count",
+					"namespace": "String",
+					"name": "count",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers how many times the given String occurs in this one.\n\nThe occurrences do not overlap: `\"aaa\"::count(of \"aa\")` is 1. The empty String occurs 0 times.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "count(of part: String) -> NonNegativeInteger",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "of",
+									"type": "String",
+									"default": null,
+									"description": "the String to count",
+									"href": null
+								}
+							],
+							"returns": "the number of occurrences, which is never negative.",
+							"examples": []
+						},
+						{
+							"signature": "count(\n\tof part: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> NonNegativeInteger",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "of",
+									"type": "String",
+									"default": null,
+									"description": "the String to count",
+									"href": null
+								},
+								{
+									"name": "comparing",
+									"type": "CaseSensitivity",
+									"default": null,
+									"description": "whether case is significant",
+									"href": "/docs/library/string#CaseSensitivity"
+								}
+							],
+							"returns": "the number of occurrences under the given `CaseSensitivity`, which is never negative.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Reading",
+			"id": "reading",
+			"members": [
+				{
+					"key": "String::lines",
+					"namespace": "String",
+					"name": "lines",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "lines() -> NonEmptyList<String>",
+							"summary": "Answers the lines of the String, split at every line break.\n\nA line break is `\\n`, `\\r` or `\\r\\n`. A trailing break leaves a final empty line. The empty String is one empty line.",
+							"parameters": [],
+							"returns": "the List of lines, without the line breaks. The List always has a line in it.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::words",
+					"namespace": "String",
+					"name": "words",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "words() -> List<String>",
+							"summary": "Answers the words of the String.\n\nA word is a run of characters that are not whitespace. The whitespace between the words is dropped.",
+							"parameters": [],
+							"returns": "the List of words, empty when the String is only whitespace.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::length",
+					"namespace": "String",
+					"name": "length",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "length() -> NonNegativeInteger",
+							"summary": "Answers how many characters the String has.",
+							"parameters": [],
+							"returns": "the number of characters, which is never negative.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyString::length",
+					"namespace": "NonEmptyString",
+					"name": "length",
+					"receiver": "NonEmptyString",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "length() -> PositiveInteger",
+							"summary": "Answers how many characters the String has, which is at least one.",
+							"parameters": [],
+							"returns": "the number of characters, which is above zero.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::characters",
+					"namespace": "String",
+					"name": "characters",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "characters() -> List<Character>",
+							"summary": "Answers the characters of the String, each as its own String.",
+							"parameters": [],
+							"returns": "the List of characters.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyString::characters",
+					"namespace": "NonEmptyString",
+					"name": "characters",
+					"receiver": "NonEmptyString",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "characters() -> NonEmptyList<Character>",
+							"summary": "Answers the characters of the String, each as its own String.",
+							"parameters": [],
+							"returns": "the List of characters, which always holds at least one.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::character",
+					"namespace": "String",
+					"name": "character",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the character at the given position, counting from zero.\n\nA negative position counts back from the end: -1 is the last character. A position outside the String answers nothing, and the `defaultingTo:` entry answers the given character instead.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "character(at index: Integer) -> Optional<Character>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "at",
+									"type": "Integer",
+									"default": null,
+									"description": "the position to read",
+									"href": null
+								}
+							],
+							"returns": "the character, or nothing when the position is outside the String.",
+							"examples": []
+						},
+						{
+							"signature": "character(at index: Integer, defaultingTo fallback: Character) -> Character",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "at",
+									"type": "Integer",
+									"default": null,
+									"description": "the position to read",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Character",
+									"default": null,
+									"description": "the character to answer with when the position is outside the String",
+									"href": "/docs/library/string#Character"
+								}
+							],
+							"returns": "the character, or the given one in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::firstCharacter",
+					"namespace": "String",
+					"name": "firstCharacter",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the first character of the String.\n\nThe empty String has no first character and answers nothing. The `defaultingTo:` entry answers the given character instead.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "firstCharacter() -> Optional<Character>",
+							"summary": "",
+							"parameters": [],
+							"returns": "the first character, or nothing when the String is empty.",
+							"examples": []
+						},
+						{
+							"signature": "firstCharacter(defaultingTo fallback: Character) -> Character",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "defaultingTo",
+									"type": "Character",
+									"default": null,
+									"description": "the character to answer with when the String is empty",
+									"href": "/docs/library/string#Character"
+								}
+							],
+							"returns": "the first character, or the given one in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyString::firstCharacter",
+					"namespace": "NonEmptyString",
+					"name": "firstCharacter",
+					"receiver": "NonEmptyString",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "firstCharacter() -> Character",
+							"summary": "Answers the first character of the String.\n\nThe String has a character in it, so there is a first one to answer.",
+							"parameters": [],
+							"returns": "the first character.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::lastCharacter",
+					"namespace": "String",
+					"name": "lastCharacter",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the last character of the String.\n\nThe empty String has no last character and answers nothing. The `defaultingTo:` entry answers the given character instead.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "lastCharacter() -> Optional<Character>",
+							"summary": "",
+							"parameters": [],
+							"returns": "the last character, or nothing when the String is empty.",
+							"examples": []
+						},
+						{
+							"signature": "lastCharacter(defaultingTo fallback: Character) -> Character",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "defaultingTo",
+									"type": "Character",
+									"default": null,
+									"description": "the character to answer with when the String is empty",
+									"href": "/docs/library/string#Character"
+								}
+							],
+							"returns": "the last character, or the given one in its place.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyString::lastCharacter",
+					"namespace": "NonEmptyString",
+					"name": "lastCharacter",
+					"receiver": "NonEmptyString",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "lastCharacter() -> Character",
+							"summary": "Answers the last character of the String.\n\nThe String has a character in it, so there is a last one to answer.",
+							"parameters": [],
+							"returns": "the last character.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::codePoints",
+					"namespace": "String",
+					"name": "codePoints",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "codePoints() -> List<Integer>",
+							"summary": "Answers the Unicode code points of the String.\n\nA character is a grapheme cluster and a code point is one point of Unicode. The two counts differ wherever a character is built out of several points. A four-person emoji is one character and seven points.",
+							"parameters": [],
+							"returns": "the List of code points, read off the composed form.",
+							"examples": [
+								"expect \"ab\"::codePoints()::is([97, 98])"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Building",
+			"id": "building",
+			"members": [
+				{
+					"key": "String::prepend",
+					"namespace": "String",
+					"name": "prepend",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "prepend(_ other: String) -> String",
+							"summary": "Joins another String onto the front of this one.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the String to add to the front",
+									"href": null
+								}
+							],
+							"returns": "the two Strings joined together.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::append",
+					"namespace": "String",
+					"name": "append",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "append(_ other: String) -> String",
+							"summary": "Joins another String onto the end of this one.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the String to add to the end",
+									"href": null
+								}
+							],
+							"returns": "the two Strings joined together.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::repeat",
+					"namespace": "String",
+					"name": "repeat",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "repeat(times count: Integer) -> String",
+							"summary": "Answers the String joined to itself the given number of times.",
+							"parameters": [
+								{
+									"name": "times",
+									"type": "Integer",
+									"default": null,
+									"description": "how many copies to join",
+									"href": null
+								}
+							],
+							"returns": "the repeated String. A count below one answers the empty String.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyString::repeat",
+					"namespace": "NonEmptyString",
+					"name": "repeat",
+					"receiver": "NonEmptyString",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "repeat(times count: PositiveInteger) -> NonEmptyString",
+							"summary": "Answers the String joined to itself the given number of times.\n\nThe count is above zero, so the answer holds at least one copy of a String that has a character.",
+							"parameters": [
+								{
+									"name": "times",
+									"type": "PositiveInteger",
+									"default": null,
+									"description": "how many copies to join, proven to be above zero",
+									"href": "/docs/library/integer#PositiveInteger"
+								}
+							],
+							"returns": "the repeated String, which is never empty.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::pad",
+					"namespace": "String",
+					"name": "pad",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "pad(\n\tto length: Integer,\n\twith padding: String = \" \",\n\tat side: Side = #Start,\n) -> String",
+							"summary": "Answers the String padded with the given String up to the given length.\n\nThe padding goes at the front when no end is named. `#BothEnds` centres the String.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "Integer",
+									"default": null,
+									"description": "the length to reach",
+									"href": null
+								},
+								{
+									"name": "with",
+									"type": "String",
+									"default": "\" \"",
+									"description": "the String to pad with, repeated as needed; a space when it is left out.",
+									"href": null
+								},
+								{
+									"name": "at",
+									"type": "Side",
+									"default": "#Start",
+									"description": "the end to pad; `#Start` when it is left out.",
+									"href": "/docs/library/string#Side"
+								}
+							],
+							"returns": "the padded String; unchanged when it is already that long.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::indent",
+					"namespace": "String",
+					"name": "indent",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "indent(by depth: Integer, with unit: String = \"  \") -> String",
+							"summary": "Answers the String with every line moved in by the given depth.\n\nA line that is empty is left as it is, so no line gains whitespace that carries no text. The answer joins the lines with a line feed, whichever line break the String was written with.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Integer",
+									"default": null,
+									"description": "how many units to move each line in by",
+									"href": null
+								},
+								{
+									"name": "with",
+									"type": "String",
+									"default": "\"  \"",
+									"description": "the unit to move by, repeated as needed; two spaces when it is left out",
+									"href": null
+								}
+							],
+							"returns": "the indented String.",
+							"examples": [
+								"expect \"text\"::indent(by 2)::is(\"    text\")"
+							]
+						}
+					]
+				},
+				{
+					"key": "String::separate",
+					"namespace": "String",
+					"name": "separate",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "separate(\n\tevery size: PositiveInteger,\n\twith separator: String,\n\tfrom side: Side = #End,\n) -> String",
+							"summary": "Answers the String with a separator put in every so many characters.\n\nThe separator goes between the groups and never at either end. A String no longer than one group answers itself.",
+							"parameters": [
+								{
+									"name": "every",
+									"type": "PositiveInteger",
+									"default": null,
+									"description": "how many characters a group holds, proven to be above zero",
+									"href": "/docs/library/integer#PositiveInteger"
+								},
+								{
+									"name": "with",
+									"type": "String",
+									"default": null,
+									"description": "the separator to put between the groups",
+									"href": null
+								},
+								{
+									"name": "from",
+									"type": "Side",
+									"default": "#End",
+									"description": "the end to count the groups from; `#End` when it is left out",
+									"href": "/docs/library/string#Side"
+								}
+							],
+							"returns": "the grouped String.",
+							"examples": [
+								"expect \"1234567\"::separate(every 3, with \",\")::is(\"1,234,567\")\nexpect \"1234567\"::separate(every 3, with \",\", from #Start)::is(\"123,456,7\")"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Cutting",
+			"id": "cutting",
+			"members": [
+				{
+					"key": "String::split",
+					"namespace": "String",
+					"name": "split",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Splits the String at every occurrence of the given separator.\n\n`join(with:)` on the answer rebuilds the String. A separator with a character in it always leaves at least one piece, and the entry taking a proven separator answers that.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "split(on separator: String) -> List<String>",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "on",
+									"type": "String",
+									"default": null,
+									"description": "the separator to split at",
+									"href": null
+								}
+							],
+							"returns": "the List of pieces, without the separator.",
+							"examples": []
+						},
+						{
+							"signature": "split(on separator: NonEmptyString) -> NonEmptyList<String>",
+							"summary": "Splits the String at every occurrence of a separator proven to have a character.\n\nSuch a separator cuts between the pieces, and the piece before the first cut is always there. So the answer is never empty.",
+							"parameters": [
+								{
+									"name": "on",
+									"type": "NonEmptyString",
+									"default": null,
+									"description": "the separator to split at, proven to have a character",
+									"href": "/docs/library/string#NonEmptyString"
+								}
+							],
+							"returns": "the List of pieces, which always holds at least one.",
+							"examples": []
+						},
+						{
+							"signature": "split(\n\tonFirst separator: String,\n) -> Optional<{ leading: String, trailing: String }>",
+							"summary": "Splits the String at the first occurrence of the given separator.\n\nThe two pieces are the text before the separator and all the text after it. A separator that does not occur answers nothing. The empty separator occurs at the front, so it answers the empty String and the whole receiver.",
+							"parameters": [
+								{
+									"name": "onFirst",
+									"type": "String",
+									"default": null,
+									"description": "the separator to cut at",
+									"href": null
+								}
+							],
+							"returns": "the text before and after the separator, or nothing when it does not occur.",
+							"examples": [
+								"constant pair = \"key=a=b\"::split(onFirst \"=\")\n\nexpect pair::hasValue(where (halves) { <- halves.trailing::is(\"a=b\") })"
+							]
+						},
+						{
+							"signature": "split(\n\tonLast separator: String,\n) -> Optional<{ leading: String, trailing: String }>",
+							"summary": "Splits the String at the last occurrence of the given separator.\n\nThe two pieces are the text before the separator and all the text after it. A separator that does not occur answers nothing. The empty separator occurs at the end, so it answers the whole receiver and the empty String.",
+							"parameters": [
+								{
+									"name": "onLast",
+									"type": "String",
+									"default": null,
+									"description": "the separator to cut at",
+									"href": null
+								}
+							],
+							"returns": "the text before and after the separator, or nothing when it does not occur.",
+							"examples": []
+						},
+						{
+							"signature": "split(\n\ton separator: NonEmptyString,\n\tatMost count: PositiveInteger,\n) -> NonEmptyList<String>",
+							"summary": "Splits the String at the separator, into no more than the given number of pieces.\n\nThe last piece keeps every separator the split stopped short of. A count of one answers the receiver alone.",
+							"parameters": [
+								{
+									"name": "on",
+									"type": "NonEmptyString",
+									"default": null,
+									"description": "the separator to split at, proven to have a character",
+									"href": "/docs/library/string#NonEmptyString"
+								},
+								{
+									"name": "atMost",
+									"type": "PositiveInteger",
+									"default": null,
+									"description": "how many pieces to answer at the most, proven to be above zero",
+									"href": "/docs/library/integer#PositiveInteger"
+								}
+							],
+							"returns": "the List of pieces, which always holds at least one.",
+							"examples": [
+								"expect \"a=b=c\"::split(on \"=\", atMost 2)::is([\"a\", \"b=c\"])"
+							]
+						}
+					]
+				},
+				{
+					"key": "String::trim",
+					"namespace": "String",
+					"name": "trim",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "trim(at side: Side = #BothEnds) -> String",
+							"summary": "Answers the String without the whitespace around it.\n\nThe whitespace goes from both ends when no end is named.",
+							"parameters": [
+								{
+									"name": "at",
+									"type": "Side",
+									"default": "#BothEnds",
+									"description": "the end to trim; `#BothEnds` when it is left out.",
+									"href": "/docs/library/string#Side"
+								}
+							],
+							"returns": "the trimmed String.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::slice",
+					"namespace": "String",
+					"name": "slice",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "slice(from start: Integer = 0, to end: Integer = @::length()) -> String",
+							"summary": "Answers the characters from one position up to, but not including, another.\n\nA negative position counts back from the end, so `slice(from 0, to -1)` drops the last character. An empty or inverted range answers the empty String.",
+							"parameters": [
+								{
+									"name": "from",
+									"type": "Integer",
+									"default": "0",
+									"description": "the first position to include; zero when it is left out.",
+									"href": null
+								},
+								{
+									"name": "to",
+									"type": "Integer",
+									"default": "@::length()",
+									"description": "the position to stop before; the length when it is left out.",
+									"href": null
+								}
+							],
+							"returns": "the String of that range of characters.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::remove",
+					"namespace": "String",
+					"name": "remove",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the String without the given prefix or suffix.\n\nThe String comes back unchanged when it does not begin or end with the given one. The empty String is a prefix and a suffix of every String, and taking it away changes nothing.",
+					"returns": null,
+					"examples": [
+						"expect \"/api/users\"::remove(prefix \"/api\")::is(\"/users\")\nexpect \"String.es\"::remove(suffix \".es\")::is(\"String\")"
+					],
+					"entries": [
+						{
+							"signature": "remove(prefix part: String) -> String",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "prefix",
+									"type": "String",
+									"default": null,
+									"description": "the String to take off the front",
+									"href": null
+								}
+							],
+							"returns": "the String without that prefix.",
+							"examples": []
+						},
+						{
+							"signature": "remove(suffix part: String) -> String",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "suffix",
+									"type": "String",
+									"default": null,
+									"description": "the String to take off the end",
+									"href": null
+								}
+							],
+							"returns": "the String without that suffix.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::truncate",
+					"namespace": "String",
+					"name": "truncate",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "truncate(to length: Integer, with ellipsis: String = \"…\") -> String",
+							"summary": "Answers the String cut down to the given length, ending with an ellipsis.\n\nThe ellipsis counts toward the length, so the answer is never longer than the length asked for. A String already that short answers itself. A length that leaves no room for the ellipsis answers the ellipsis cut to the length, and a length below one answers the empty String.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "Integer",
+									"default": null,
+									"description": "the length to cut down to",
+									"href": null
+								},
+								{
+									"name": "with",
+									"type": "String",
+									"default": "\"…\"",
+									"description": "the String to end with; a horizontal ellipsis when it is left out",
+									"href": null
+								}
+							],
+							"returns": "the cut String, of that length at the most.",
+							"examples": [
+								"expect \"Hello, World\"::truncate(to 8)::is(\"Hello, …\")\nexpect \"Hello\"::truncate(to 8)::is(\"Hello\")"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Changing case and form",
+			"id": "changing-case-and-form",
+			"members": [
+				{
+					"key": "String::uppercase",
+					"namespace": "String",
+					"name": "uppercase",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "uppercase() -> String",
+							"summary": "Answers the String with every character in upper case.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyString::uppercase",
+					"namespace": "NonEmptyString",
+					"name": "uppercase",
+					"receiver": "NonEmptyString",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "uppercase() -> NonEmptyString",
+							"summary": "Answers the String with every character in upper case.\n\nCase mapping answers a character for every character it is given, so the answer has one too.",
+							"parameters": [],
+							"returns": "the upper-cased String, which is never empty.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::lowercase",
+					"namespace": "String",
+					"name": "lowercase",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "lowercase() -> String",
+							"summary": "Answers the String with every character in lower case.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyString::lowercase",
+					"namespace": "NonEmptyString",
+					"name": "lowercase",
+					"receiver": "NonEmptyString",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "lowercase() -> NonEmptyString",
+							"summary": "Answers the String with every character in lower case.\n\nCase mapping answers a character for every character it is given, so the answer has one too.",
+							"parameters": [],
+							"returns": "the lower-cased String, which is never empty.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::normalize",
+					"namespace": "String",
+					"name": "normalize",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "normalize(as form: NormalizationForm = #ComposedCanonical) -> String",
+							"summary": "Answers the String in the given Unicode normalization form.\n\nTwo Strings that look the same can then compare and read the same. The default form is the one `is` and `compare` already work in.\n\nThe two canonical forms are one text to every other Method here. They differ in the bytes `Terminal.write` emits, so `normalize(as #DecomposedCanonical)::length()` answers what `length()` answered before. The two compatibility forms do change the text.",
+							"parameters": [
+								{
+									"name": "as",
+									"type": "NormalizationForm",
+									"default": "#ComposedCanonical",
+									"description": "the normalization form to produce; `#ComposedCanonical` when it is left out.",
+									"href": "/docs/library/string#NormalizationForm"
+								}
+							],
+							"returns": "the normalized String.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::replaceEvery",
+					"namespace": "String",
+					"name": "replaceEvery",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the String with every occurrence of one part replaced by another.\n\nThe occurrences do not overlap. The empty String matches nowhere, so the String comes back unchanged.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "replaceEvery(_ part: String, with replacement: String) -> String",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for",
+									"href": null
+								},
+								{
+									"name": "with",
+									"type": "String",
+									"default": null,
+									"description": "the String to put in its place",
+									"href": null
+								}
+							],
+							"returns": "the String with the replacements made.",
+							"examples": []
+						},
+						{
+							"signature": "replaceEvery(\n\t_ part: String,\n\twith replacement: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> String",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for",
+									"href": null
+								},
+								{
+									"name": "with",
+									"type": "String",
+									"default": null,
+									"description": "the String to put in its place",
+									"href": null
+								},
+								{
+									"name": "comparing",
+									"type": "CaseSensitivity",
+									"default": null,
+									"description": "whether case is significant",
+									"href": "/docs/library/string#CaseSensitivity"
+								}
+							],
+							"returns": "the String with the replacements made under the given `CaseSensitivity`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::replaceFirst",
+					"namespace": "String",
+					"name": "replaceFirst",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the String with the first occurrence of one part replaced by another.\n\nThe empty String matches nowhere, so it and a part that does not occur leave the String unchanged.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "replaceFirst(_ part: String, with replacement: String) -> String",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for",
+									"href": null
+								},
+								{
+									"name": "with",
+									"type": "String",
+									"default": null,
+									"description": "the String to put in its place",
+									"href": null
+								}
+							],
+							"returns": "the String with the first replacement made.",
+							"examples": []
+						},
+						{
+							"signature": "replaceFirst(\n\t_ part: String,\n\twith replacement: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> String",
+							"summary": "",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the String to look for",
+									"href": null
+								},
+								{
+									"name": "with",
+									"type": "String",
+									"default": null,
+									"description": "the String to put in its place",
+									"href": null
+								},
+								{
+									"name": "comparing",
+									"type": "CaseSensitivity",
+									"default": null,
+									"description": "whether case is significant",
+									"href": "/docs/library/string#CaseSensitivity"
+								}
+							],
+							"returns": "the String with the first replacement made under the given `CaseSensitivity`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::reverse",
+					"namespace": "String",
+					"name": "reverse",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "reverse() -> String",
+							"summary": "Answers the String with its characters in the opposite order.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyString::reverse",
+					"namespace": "NonEmptyString",
+					"name": "reverse",
+					"receiver": "NonEmptyString",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "reverse() -> NonEmptyString",
+							"summary": "Answers the String with its characters in the opposite order.\n\nReversing keeps every character, so the answer has one too.",
+							"parameters": [],
+							"returns": "the reversed String, which is never empty.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "String::capitalize",
+					"namespace": "String",
+					"name": "capitalize",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "capitalize() -> String",
+							"summary": "Answers the String with its first character in upper case.\n\nEvery other character is left as it stands. The empty String answers itself.",
+							"parameters": [],
+							"returns": "the String with an upper-case first character.",
+							"examples": [
+								"expect \"lions\"::capitalize()::is(\"Lions\")"
+							]
+						}
+					]
+				},
+				{
+					"key": "String::quote",
+					"namespace": "String",
+					"name": "quote",
+					"receiver": "String",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "quote() -> String",
+							"summary": "Answers the String as a Program would write it down.\n\nThe text is put in quotes, and anything a String Literal has to escape is escaped. A character with no spelling of its own is written as its code point.",
+							"parameters": [],
+							"returns": "the quoted String.",
+							"examples": [
+								"expect \"ab\"::quote()::is(\"\\\"ab\\\"\")"
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [
+		{
+			"name": "NonEmptyString",
+			"written": "NonEmptyString",
+			"declaration": "type NonEmptyString = String where @::hasCharacters()",
+			"predicate": "@::hasCharacters()",
+			"description": "A String proven to have a character in it, as a checked refinement of `String`.\n\nThe proof is what lets `length` answer above zero, and `firstCharacter` and `lastCharacter` answer a character rather than an Optional. A String written down with a character in it carries the proof. A String a Program is handed earns it through an `if` asking `hasCharacters`, or the `else` of one asking `isEmpty`.\n\n`split(on:)` reads the proof on its separator rather than on the receiver. A separator with a character in it always leaves a piece, so the answer is a NonEmptyList.",
+			"tightens": [
+				"length",
+				"characters",
+				"firstCharacter",
+				"lastCharacter",
+				"repeat",
+				"uppercase",
+				"lowercase",
+				"reverse"
+			],
+			"answeredBy": [
+				{
+					"label": "NonEmptyString::uppercase()",
+					"href": "/docs/library/string#uppercase"
+				},
+				{
+					"label": "NonEmptyString::lowercase()",
+					"href": "/docs/library/string#lowercase"
+				},
+				{
+					"label": "NonEmptyString::reverse()",
+					"href": "/docs/library/string#reverse"
+				},
+				{
+					"label": "NonEmptyString::repeat(times:)",
+					"href": "/docs/library/string#repeat"
+				}
+			]
+		},
+		{
+			"name": "Character",
+			"written": "Character",
+			"declaration": "type Character = String where @::isOneCharacter()",
+			"predicate": "@::isOneCharacter()",
+			"description": "A String of one character, as a checked refinement of `String`.\n\nA character is a Unicode grapheme cluster, which is the unit every position Method here counts. The proof is what lets `characters` and `character(at:)` name what they answer. A String written down with one character in it carries the proof.\n\nA Character is a String, so it answers everything a String answers and goes wherever a String is wanted.",
+			"tightens": [],
+			"answeredBy": [
+				{
+					"label": "String::characters()",
+					"href": "/docs/library/string#characters"
+				},
+				{
+					"label": "String::character(at:)",
+					"href": "/docs/library/string#character"
+				},
+				{
+					"label": "String::character(at:defaultingTo:)",
+					"href": "/docs/library/string#character"
+				},
+				{
+					"label": "String::firstCharacter()",
+					"href": "/docs/library/string#firstCharacter"
+				},
+				{
+					"label": "String::firstCharacter(defaultingTo:)",
+					"href": "/docs/library/string#firstCharacter"
+				},
+				{
+					"label": "String::lastCharacter()",
+					"href": "/docs/library/string#lastCharacter"
+				},
+				{
+					"label": "String::lastCharacter(defaultingTo:)",
+					"href": "/docs/library/string#lastCharacter"
+				},
+				{
+					"label": "NonEmptyString::characters()",
+					"href": "/docs/library/string#characters"
+				},
+				{
+					"label": "NonEmptyString::firstCharacter()",
+					"href": "/docs/library/string#firstCharacter"
+				},
+				{
+					"label": "NonEmptyString::lastCharacter()",
+					"href": "/docs/library/string#lastCharacter"
+				}
+			]
+		}
+	],
+	"modes": [
+		{
+			"name": "Side",
+			"declaration": "choice Side {\n\tStart,\n\tEnd,\n\tBothEnds,\n}",
+			"description": "Which end of a String a Method works on: the start, the end, or both ends.\n\n`trim` works on both ends when a call names no side, and `pad` works on the start.",
+			"cases": [
+				{
+					"name": "Start",
+					"payload": null
+				},
+				{
+					"name": "End",
+					"payload": null
+				},
+				{
+					"name": "BothEnds",
+					"payload": null
+				}
+			],
+			"payloadFree": true,
+			"takenBy": [
+				{
+					"label": "List::pad(to:with:at:)",
+					"href": "/docs/library/list#pad",
+					"default": "#End"
+				},
+				{
+					"label": "String::trim(at:)",
+					"href": "/docs/library/string#trim",
+					"default": "#BothEnds"
+				},
+				{
+					"label": "String::pad(to:with:at:)",
+					"href": "/docs/library/string#pad",
+					"default": "#Start"
+				},
+				{
+					"label": "String::separate(every:with:from:)",
+					"href": "/docs/library/string#separate",
+					"default": "#End"
+				}
+			]
+		},
+		{
+			"name": "CaseSensitivity",
+			"declaration": "choice CaseSensitivity {\n\tSensitive,\n\tInsensitive,\n}",
+			"description": "Whether a String comparison treats upper and lower case as the same.\n\n`#Sensitive` tells the two apart, and `#Insensitive` does not. A comparison that names no sensitivity is sensitive.",
+			"cases": [
+				{
+					"name": "Sensitive",
+					"payload": null
+				},
+				{
+					"name": "Insensitive",
+					"payload": null
+				}
+			],
+			"payloadFree": true,
+			"takenBy": [
+				{
+					"label": "String::is(_:comparing:)",
+					"href": "/docs/library/string#is",
+					"default": null
+				},
+				{
+					"label": "String::compare(to:comparing:)",
+					"href": "/docs/library/string#compare",
+					"default": null
+				},
+				{
+					"label": "String::contains(_:comparing:)",
+					"href": "/docs/library/string#contains",
+					"default": null
+				},
+				{
+					"label": "String::doesNotContain(_:comparing:)",
+					"href": "/docs/library/string#doesNotContain",
+					"default": null
+				},
+				{
+					"label": "String::starts(with:comparing:)",
+					"href": "/docs/library/string#starts",
+					"default": null
+				},
+				{
+					"label": "String::doesNotStart(with:comparing:)",
+					"href": "/docs/library/string#doesNotStart",
+					"default": null
+				},
+				{
+					"label": "String::ends(with:comparing:)",
+					"href": "/docs/library/string#ends",
+					"default": null
+				},
+				{
+					"label": "String::doesNotEnd(with:comparing:)",
+					"href": "/docs/library/string#doesNotEnd",
+					"default": null
+				},
+				{
+					"label": "String::firstIndex(of:comparing:)",
+					"href": "/docs/library/string#firstIndex",
+					"default": null
+				},
+				{
+					"label": "String::lastIndex(of:comparing:)",
+					"href": "/docs/library/string#lastIndex",
+					"default": null
+				},
+				{
+					"label": "String::count(of:comparing:)",
+					"href": "/docs/library/string#count",
+					"default": null
+				},
+				{
+					"label": "String::replaceEvery(_:with:comparing:)",
+					"href": "/docs/library/string#replaceEvery",
+					"default": null
+				},
+				{
+					"label": "String::replaceFirst(_:with:comparing:)",
+					"href": "/docs/library/string#replaceFirst",
+					"default": null
+				}
+			]
+		},
+		{
+			"name": "NormalizationForm",
+			"declaration": "choice NormalizationForm {\n\tComposedCanonical,\n\tDecomposedCanonical,\n\tComposedCompatibility,\n\tDecomposedCompatibility,\n}",
+			"description": "Which Unicode normalization form `normalize(as:)` produces.\n\nThe canonical forms, NFC and NFD, keep the text as it reads. Composed joins a base and its marks, and Decomposed splits them apart. The compatibility forms, NFKC and NFKD, also fold ligatures and superscripts onto plain equivalents, which changes the text.",
+			"cases": [
+				{
+					"name": "ComposedCanonical",
+					"payload": null
+				},
+				{
+					"name": "DecomposedCanonical",
+					"payload": null
+				},
+				{
+					"name": "ComposedCompatibility",
+					"payload": null
+				},
+				{
+					"name": "DecomposedCompatibility",
+					"payload": null
+				}
+			],
+			"payloadFree": true,
+			"takenBy": [
+				{
+					"label": "String::normalize(as:)",
+					"href": "/docs/library/string#normalize",
+					"default": "#ComposedCanonical"
+				}
+			]
+		}
+	],
+	"tower": [],
+	"views": [],
+	"protocols": [],
+	"seeAlso": [],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"creating",
+		"of",
+		"equality-ordering-and-printing",
+		"is",
+		"compare",
+		"tostring",
+		"toString",
+		"isnot",
+		"isNot",
+		"comparing",
+		"islessthan",
+		"isLessThan",
+		"islessthanorequalto",
+		"isLessThanOrEqualTo",
+		"isgreaterthan",
+		"isGreaterThan",
+		"isgreaterthanorequalto",
+		"isGreaterThanOrEqualTo",
+		"testing-content",
+		"isempty",
+		"isEmpty",
+		"hascharacters",
+		"hasCharacters",
+		"isonecharacter",
+		"isOneCharacter",
+		"hasonlydigits",
+		"hasOnlyDigits",
+		"hasonlyletters",
+		"hasOnlyLetters",
+		"hasonlylettersordigits",
+		"hasOnlyLettersOrDigits",
+		"hasonlywhitespace",
+		"hasOnlyWhitespace",
+		"searching",
+		"contains",
+		"doesnotcontain",
+		"doesNotContain",
+		"starts",
+		"doesnotstart",
+		"doesNotStart",
+		"ends",
+		"doesnotend",
+		"doesNotEnd",
+		"firstindex",
+		"firstIndex",
+		"lastindex",
+		"lastIndex",
+		"everyindex",
+		"everyIndex",
+		"count",
+		"reading",
+		"lines",
+		"words",
+		"length",
+		"characters",
+		"character",
+		"firstcharacter",
+		"firstCharacter",
+		"lastcharacter",
+		"lastCharacter",
+		"codepoints",
+		"codePoints",
+		"building",
+		"prepend",
+		"append",
+		"repeat",
+		"pad",
+		"indent",
+		"separate",
+		"cutting",
+		"split",
+		"trim",
+		"slice",
+		"remove",
+		"truncate",
+		"changing-case-and-form",
+		"uppercase",
+		"lowercase",
+		"normalize",
+		"replaceevery",
+		"replaceEvery",
+		"replacefirst",
+		"replaceFirst",
+		"reverse",
+		"capitalize",
+		"quote",
+		"refinements",
+		"nonemptystring",
+		"NonEmptyString",
+		"character-1",
+		"Character",
+		"modes",
+		"side",
+		"Side",
+		"casesensitivity",
+		"CaseSensitivity",
+		"normalizationform",
+		"NormalizationForm"
+	]
+}

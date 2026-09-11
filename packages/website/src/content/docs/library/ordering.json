@@ -1,0 +1,233 @@
+{
+	"slug": "ordering",
+	"title": "Ordering",
+	"kind": "choice",
+	"declaration": "namespace Ordering for Ordering",
+	"choice": "choice Ordering {\n\tLess,\n\tEqual,\n\tGreater,\n}",
+	"namespaces": ["Ordering"],
+	"conformsTo": [
+		{
+			"protocol": "Equatable",
+			"condition": null
+		},
+		{
+			"protocol": "Printable",
+			"condition": null
+		}
+	],
+	"groups": [
+		{
+			"label": "The cases",
+			"id": "the-cases",
+			"members": [
+				{
+					"key": "Ordering::is",
+					"namespace": "Ordering",
+					"name": "is",
+					"receiver": "Ordering",
+					"kind": "method",
+					"origin": "derived",
+					"protocol": "Equatable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "is(_ other: Ordering) -> Boolean",
+							"summary": "Answers whether both values are equal.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Ordering",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the values are equal.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Ordering::toString",
+					"namespace": "Ordering",
+					"name": "toString",
+					"receiver": "Ordering",
+					"kind": "method",
+					"origin": "derived",
+					"protocol": "Printable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toString() -> String",
+							"summary": "Answers the value as a String.",
+							"parameters": [],
+							"returns": "the String representation of the value.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Ordering::cases",
+					"namespace": "Ordering",
+					"name": "cases",
+					"receiver": "Ordering",
+					"kind": "static method",
+					"origin": "derived",
+					"protocol": "Enumerable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static cases() -> NonEmptyList<Ordering>",
+							"summary": "Answers every value of the Type.\n\nThe values stand in the order the Cases are declared in. A Choice has at least one Case, so the answer certainly holds one.",
+							"parameters": [],
+							"returns": "every Case of the Choice, in declaration order.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Ordering::isNot",
+					"namespace": "Ordering",
+					"name": "isNot",
+					"receiver": "Ordering",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Equatable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNot(_ other: Ordering) -> Boolean",
+							"summary": "Answers whether the values differ.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Ordering",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the values differ.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Chaining",
+			"id": "chaining",
+			"members": [
+				{
+					"key": "Ordering::then",
+					"namespace": "Ordering",
+					"name": "then",
+					"receiver": "Ordering",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the ordering, or a second one where the first decides nothing.\n\nChaining the calls is how a sort orders on a second key, and then on a third. Each ordering after the first decides only what the ones before it left equal.",
+					"returns": null,
+					"examples": [
+						"constant people = [\n  { last = \"Ott\", first = \"Zoe\" },\n  { last = \"Ali\", first = \"Bo\" },\n  { last = \"Ott\", first = \"Al\" },\n]\n\nconstant ranked = people::sort(by (a, b) {\n  <- a.last::compare(to b.last)::then(a.first::compare(to b.first))\n})\n\nexpect ranked::map((person) { <- person.first })::join(with \", \")::is(\"Bo, Al, Zoe\")"
+					],
+					"entries": [
+						{
+							"signature": "then(_ next: Ordering) -> Ordering",
+							"summary": "The next ordering is computed before the call, whether or not it is reached.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Ordering",
+									"default": null,
+									"description": "the ordering to answer when this one is `Ordering#Equal`",
+									"href": null
+								}
+							],
+							"returns": "the ordering itself, or the given one in its place.",
+							"examples": [
+								"expect Ordering#Less::then(#Greater)::is(#Less)\nexpect Ordering#Equal::then(#Greater)::is(#Greater)"
+							]
+						},
+						{
+							"signature": "then(computedBy next: () -> Ordering) -> Ordering",
+							"summary": "The Function runs only where the first ordering is `Ordering#Equal`.",
+							"parameters": [
+								{
+									"name": "computedBy",
+									"type": "() -> Ordering",
+									"default": null,
+									"description": "answers the ordering to use when this one is `Ordering#Equal`",
+									"href": null
+								}
+							],
+							"returns": "the ordering itself, or the one the Function answers.",
+							"examples": [
+								"expect Ordering#Less::then(computedBy () -> Ordering { <- #Greater })::is(#Less)"
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [],
+	"modes": [],
+	"tower": [],
+	"views": [],
+	"protocols": [],
+	"seeAlso": [],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"the-cases",
+		"is",
+		"tostring",
+		"toString",
+		"cases",
+		"isnot",
+		"isNot",
+		"chaining",
+		"then"
+	]
+}

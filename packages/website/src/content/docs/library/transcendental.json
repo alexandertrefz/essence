@@ -1,0 +1,866 @@
+{
+	"slug": "transcendental",
+	"title": "Transcendental",
+	"kind": "type",
+	"declaration": "namespace Transcendental for Transcendental",
+	"choice": null,
+	"namespaces": ["Transcendental"],
+	"conformsTo": [
+		{
+			"protocol": "Equatable",
+			"condition": null
+		},
+		{
+			"protocol": "Printable",
+			"condition": null
+		}
+	],
+	"groups": [
+		{
+			"label": "Equality and printing",
+			"id": "equality-and-printing",
+			"members": [
+				{
+					"key": "Transcendental::is",
+					"namespace": "Transcendental",
+					"name": "is",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "is(_ other: Transcendental) -> Boolean",
+							"summary": "Answers whether both Transcendentals have the same canonical form.\n\nEvery component is held reduced, so agreement is structural. On a single base that agreement is exactly numeric equality.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the Transcendental to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the canonical forms agree.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Transcendental::compare",
+					"namespace": "Transcendental",
+					"name": "compare",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "compare(\n\tto other: Transcendental,\n\twithPrecision digits: PositiveInteger,\n) -> Optional<Ordering>",
+							"summary": "Orders the Transcendental against another one, to a given number of decimal places.\n\nThe difference of the two is enclosed in an interval under one unit of the last decimal place wide. The answer is read off that interval. Two values one unit of that place or more apart are always told apart. The answer is empty only for two values closer than that. Two values whose π and e terms cancel differ by a Rational, and compare exactly at any width. No call here reaches the precision cutoff that `Number::compare` can, since nothing is refined past the width given.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the Transcendental to order against",
+									"href": null
+								},
+								{
+									"name": "withPrecision",
+									"type": "PositiveInteger",
+									"default": null,
+									"description": "the number of decimal places the two are told apart to",
+									"href": "/docs/library/integer#PositiveInteger"
+								}
+							],
+							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`, or nothing when the two are not told apart at that width.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Transcendental::toString",
+					"namespace": "Transcendental",
+					"name": "toString",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the Transcendental as a String, in the exact symbolic form or in the named format.\n\nThe form is `π`, `2·π`, `e` or `1 + π + e` when no format is named, and `#Fraction` names that same form. The `#Decimal` format writes the expansion, to at most 80 digits, which is the cap a Rational writes a non-terminating expansion at. A count of places writes exactly that many digits after the point.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toString() -> String",
+							"summary": "Answers the Transcendental as a String, in the exact symbolic form: `π`, `2·π`, `e` or `1 + π + e`.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						},
+						{
+							"signature": "toString(as format: NumberFormat) -> String",
+							"summary": "Answers the Transcendental as a decimal, or in the exact symbolic form, in the named format.\n\nThe `#Decimal` format rounds the expansion at the eightieth digit and writes it. An irrational expansion never ends, so the cap is always reached. Trailing zeros the rounding leaves are dropped, as they are for any Rational. The `#Percent` format writes one hundred times that same reading, taken two digits deeper so that eighty still stand after the point. The `#Scientific` format writes eighty digits after the point of the mantissa, and the power of ten after an `e`. The reading is taken at the eightieth digit of the mantissa, wherever the value falls. A value below one is read deeper than eighty places. The `#Fraction` format writes the symbolic form, since no ratio of two Integers is this number.",
+							"parameters": [
+								{
+									"name": "as",
+									"type": "NumberFormat",
+									"default": null,
+									"description": "the form to represent the Transcendental in",
+									"href": "/docs/library/rational#NumberFormat"
+								}
+							],
+							"returns": "the String representation of the Transcendental.",
+							"examples": []
+						},
+						{
+							"signature": "toString(\n\tas format: NumberFormat,\n\ttoPlaces count: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> String",
+							"summary": "Answers the Transcendental as a decimal with exactly that many places.\n\nThe digits are padded with zeroes where the rounded value is shorter. The last digit kept is rounded in the named direction, and `#Nearest` is what a call that names none is given. A count below one rounds to a whole number, and no point is written. The `#Percent` format takes the count the same way, on one hundred times the value. The `#Scientific` format counts the digits of the mantissa after the point, at every magnitude. The value is read as many digits past the count as its own power of ten falls below zero. The `#Fraction` format ignores both the count and the direction, and writes the symbolic form.",
+							"parameters": [
+								{
+									"name": "as",
+									"type": "NumberFormat",
+									"default": null,
+									"description": "the form to represent the Transcendental in",
+									"href": "/docs/library/rational#NumberFormat"
+								},
+								{
+									"name": "toPlaces",
+									"type": "Integer",
+									"default": null,
+									"description": "how many digits to write after the point",
+									"href": null
+								},
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round the last digit in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the String representation of the Transcendental.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Transcendental::isNot",
+					"namespace": "Transcendental",
+					"name": "isNot",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Equatable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNot(_ other: Transcendental) -> Boolean",
+							"summary": "Answers whether the values differ.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the values differ.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Arithmetic",
+			"id": "arithmetic",
+			"members": [
+				{
+					"key": "Transcendental::add",
+					"namespace": "Transcendental",
+					"name": "add",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the exact sum of the Transcendental and a number.\n\nTwo Transcendentals can cancel their π and e terms, which leaves a Rational.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "add(_ other: Integer) -> Transcendental",
+							"summary": "Adds an Integer to the Transcendental.\n\nThe sum is a Transcendental, since an Integer changes the rational part alone.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to add",
+									"href": null
+								}
+							],
+							"returns": "the sum, as a Transcendental.",
+							"examples": []
+						},
+						{
+							"signature": "add(_ other: Rational) -> Transcendental",
+							"summary": "Adds a Rational to the Transcendental.\n\nThe sum is a Transcendental, since a Rational changes the rational part alone.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to add",
+									"href": null
+								}
+							],
+							"returns": "the sum, as a Transcendental.",
+							"examples": []
+						},
+						{
+							"signature": "add(_ other: Transcendental) -> Rational | Transcendental",
+							"summary": "Answers the exact sum of the two Transcendentals.\n\nThe π and e parts can cancel, which leaves a Rational.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the Transcendental to add",
+									"href": null
+								}
+							],
+							"returns": "the exact sum, a Rational or a Transcendental.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Transcendental::subtract",
+					"namespace": "Transcendental",
+					"name": "subtract",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the exact difference of the Transcendental and a number.\n\nSubtracting equal π and e terms leaves a Rational.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "subtract(_ other: Integer) -> Transcendental",
+							"summary": "Subtracts an Integer from the Transcendental.\n\nThe difference is a Transcendental, since an Integer changes the rational part alone.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to subtract",
+									"href": null
+								}
+							],
+							"returns": "the difference, as a Transcendental.",
+							"examples": []
+						},
+						{
+							"signature": "subtract(_ other: Rational) -> Transcendental",
+							"summary": "Subtracts a Rational from the Transcendental.\n\nThe difference is a Transcendental, since a Rational changes the rational part alone.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to subtract",
+									"href": null
+								}
+							],
+							"returns": "the difference, as a Transcendental.",
+							"examples": []
+						},
+						{
+							"signature": "subtract(_ other: Transcendental) -> Rational | Transcendental",
+							"summary": "Subtracts one Transcendental from another.\n\nEqual π and e terms cancel, which leaves a Rational. Every other difference is a Transcendental.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the Transcendental to subtract",
+									"href": null
+								}
+							],
+							"returns": "the difference, as a Rational or a Transcendental.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Transcendental::multiply",
+					"namespace": "Transcendental",
+					"name": "multiply",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the exact product of the Transcendental and an Integer or a Rational.\n\nMultiplying by zero answers zero. Multiplying by a NonZeroInteger or a NonZeroRational keeps every base term, so those entries answer a Transcendental. Two Transcendentals can not be multiplied: `π·π` and `π·e` leave the linear grammar.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "multiply(with other: Integer) -> Transcendental | Rational",
+							"summary": "Multiplies the Transcendental with an Integer.\n\nThe product is a Transcendental, since an Integer scales the rational part and every base term. A zero factor answers zero, which is a Rational.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the product, as a Transcendental or a Rational.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(with other: Rational) -> Transcendental | Rational",
+							"summary": "Multiplies the Transcendental with a Rational.\n\nThe product is a Transcendental, since a Rational scales the rational part and every base term. A zero factor answers zero, which is a Rational.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to multiply with",
+									"href": null
+								}
+							],
+							"returns": "the product, as a Transcendental or a Rational.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(with other: NonZeroInteger) -> Transcendental",
+							"summary": "Answers the exact product of the Transcendental and a factor proven not to be zero.\n\nA non-zero Integer scales the rational part and every base term, and no coefficient reaches zero. The answer is again a Transcendental rather than a Union.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "NonZeroInteger",
+									"default": null,
+									"description": "the factor, proven not to be zero",
+									"href": "/docs/library/integer#NonZeroInteger"
+								}
+							],
+							"returns": "the exact product.",
+							"examples": []
+						},
+						{
+							"signature": "multiply(with other: NonZeroRational) -> Transcendental",
+							"summary": "Answers the exact product of the Transcendental and a Rational factor proven not to be zero.\n\nA Rational that is not zero scales the rational part and every base term, and no coefficient reaches zero. The answer is again a Transcendental rather than a Union.",
+							"parameters": [
+								{
+									"name": "with",
+									"type": "NonZeroRational",
+									"default": null,
+									"description": "the factor, proven not to be zero",
+									"href": "/docs/library/rational#NonZeroRational"
+								}
+							],
+							"returns": "the exact product.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Transcendental::divide",
+					"namespace": "Transcendental",
+					"name": "divide",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the exact quotient of the Transcendental and a number.\n\nDividing by an Integer or a Rational is empty only for zero. Dividing by a NonZeroInteger or a NonZeroRational can not fail, because those divisors are proven. Dividing by another Transcendental answers a Rational when the two are proportional: `Tau::divide(by Pi)` is `2`. Anything else is empty. The `defaultingTo:` entries answer the given value in place of empty.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "divide(by other: Integer) -> Optional<Transcendental>",
+							"summary": "Divides the Transcendental by an Integer.\n\nThe quotient is a Transcendental, since an Integer scales the rational part and every base term. A zero divisor answers empty, and the `defaultingTo:` entry answers the given value instead.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Integer",
+									"default": null,
+									"description": "the Integer to divide by",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or nothing when the divisor is zero.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: Rational) -> Optional<Transcendental>",
+							"summary": "Divides the Transcendental by a Rational.\n\nThe quotient is a Transcendental, since a Rational scales the rational part and every base term. A zero divisor answers empty, and the `defaultingTo:` entry answers the given value instead.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Rational",
+									"default": null,
+									"description": "the Rational to divide by",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or nothing when the divisor is zero.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: Transcendental) -> Optional<Rational>",
+							"summary": "Answers the exact quotient of the two Transcendentals.\n\nProportional values answer a Rational: `Tau::divide(by Pi)` is `2`. Anything else is empty, including π divided by e.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the Transcendental to divide by",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or nothing when the two are not proportional.",
+							"examples": []
+						},
+						{
+							"signature": "divide(\n\tby other: Integer,\n\tdefaultingTo fallback: Transcendental,\n) -> Transcendental",
+							"summary": "Answers the exact quotient of the Transcendental and an Integer.\n\nA zero divisor answers the given value.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Integer",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the value to answer with when there is no quotient",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "divide(\n\tby other: Rational,\n\tdefaultingTo fallback: Transcendental,\n) -> Transcendental",
+							"summary": "Answers the exact quotient of the Transcendental and a Rational.\n\nA zero divisor answers the given value.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Rational",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the value to answer with when there is no quotient",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "divide(\n\tby other: Transcendental,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
+							"summary": "Answers the exact quotient of the two Transcendentals.\n\nWhere the two are not proportional, the answer is the given value.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "Transcendental",
+									"default": null,
+									"description": "the divisor",
+									"href": null
+								},
+								{
+									"name": "defaultingTo",
+									"type": "Rational",
+									"default": null,
+									"description": "the value to answer with when there is no quotient",
+									"href": null
+								}
+							],
+							"returns": "the quotient, or the given value in its place.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: NonZeroInteger) -> Transcendental",
+							"summary": "Answers the exact quotient of the Transcendental and a divisor proven not to be zero.\n\nThe division can not fail, so the answer is the quotient itself rather than an Optional.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "NonZeroInteger",
+									"default": null,
+									"description": "the divisor, proven not to be zero",
+									"href": "/docs/library/integer#NonZeroInteger"
+								}
+							],
+							"returns": "the exact quotient.",
+							"examples": []
+						},
+						{
+							"signature": "divide(by other: NonZeroRational) -> Transcendental",
+							"summary": "Answers the exact quotient of the Transcendental and a Rational divisor proven not to be zero.\n\nThe division can not fail, so the answer is the quotient itself rather than an Optional.",
+							"parameters": [
+								{
+									"name": "by",
+									"type": "NonZeroRational",
+									"default": null,
+									"description": "the divisor, proven not to be zero",
+									"href": "/docs/library/rational#NonZeroRational"
+								}
+							],
+							"returns": "the exact quotient.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Testing",
+			"id": "testing",
+			"members": [
+				{
+					"key": "Transcendental::isPositive",
+					"namespace": "Transcendental",
+					"name": "isPositive",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isPositive() -> Boolean",
+							"summary": "Answers whether the Transcendental is above zero.\n\nA value over a single base has an exact sign. A value that mixes π and e decides its sign by refining an interval, down to the precision limit `absolute` names.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Transcendental::isNegative",
+					"namespace": "Transcendental",
+					"name": "isNegative",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNegative() -> Boolean",
+							"summary": "Answers whether the Transcendental is below zero.\n\nA Transcendental is never zero, so it is below zero exactly when it is not above it. The sign is decided the way `isPositive` decides it.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Transcendental::isZero",
+					"namespace": "Transcendental",
+					"name": "isZero",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isZero() -> Boolean",
+							"summary": "Answers whether the Transcendental is exactly zero.\n\nAt least one base term keeps a coefficient that is not zero, so the answer is always `false`.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Transcendental::isWholeNumber",
+					"namespace": "Transcendental",
+					"name": "isWholeNumber",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isWholeNumber() -> Boolean",
+							"summary": "Answers whether the Transcendental is a whole number.\n\nA Transcendental is irrational, so it is never whole and the answer is always `false`.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Sign and rounding",
+			"id": "sign-and-rounding",
+			"members": [
+				{
+					"key": "Transcendental::absolute",
+					"namespace": "Transcendental",
+					"name": "absolute",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "absolute() -> Transcendental",
+							"summary": "Answers the Transcendental without its sign, which is its distance from zero.\n\nA value on a single base can never equal a Rational, so its sign is exact. A value that mixes π and e decides its sign by refining an interval, down to a documented precision limit.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Transcendental::negate",
+					"namespace": "Transcendental",
+					"name": "negate",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "negate() -> Transcendental",
+							"summary": "Answers the Transcendental with its sign flipped.\n\nAt least one base term keeps its non-zero coefficient, so the answer is again a Transcendental.",
+							"parameters": [],
+							"returns": null,
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Transcendental::approximate",
+					"namespace": "Transcendental",
+					"name": "approximate",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "approximate(\n\ttoPlaces places: NonNegativeInteger,\n\ttoward direction: Rounding = #Nearest,\n) -> Rational",
+							"summary": "Answers the Transcendental as a Rational on a decimal grid of the given width.\n\nFive places answer the value rounded to hundred-thousandths, so `Number.Pi` over five places answers `314159/100000`. This Method is where a Program asks for digits in place of the exact value. The answer is exact all the same: it is the step of that grid the value rounds to. A width of no places answers a whole number, as a Rational.\n\nA value over a single base is always answered for. A value carrying both π and e can not be shown to miss every step of the grid. Deciding that would settle an open problem. A call on such a value is answered while the enclosure the width needs stays inside the cutoff `Number::compare` names. A width past that cutoff stops the Program.",
+							"parameters": [
+								{
+									"name": "toPlaces",
+									"type": "NonNegativeInteger",
+									"default": null,
+									"description": "how many decimal places the grid keeps",
+									"href": "/docs/library/integer#NonNegativeInteger"
+								},
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the value on the grid the width names.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Transcendental::round",
+					"namespace": "Transcendental",
+					"name": "round",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers the Transcendental rounded in the named direction.\n\nThe direction is `#Nearest` when a call names none. An irrational is never exactly halfway between two steps, so `#Nearest` and `#NearestEven` answer alike here. The other directions answer the floor for `#Down`, the ceiling for `#Up`, and the step towards zero for `#TowardZero`. Naming a count of places rounds to a decimal grid of that width instead, and answers a Rational.",
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "round(toward direction: Rounding = #Nearest) -> Integer",
+							"summary": "Answers the Transcendental as an Integer, rounded in the named direction.",
+							"parameters": [
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the rounded Integer.",
+							"examples": []
+						},
+						{
+							"signature": "round(\n\ttoPlaces places: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> Rational",
+							"summary": "Answers the Transcendental rounded to a decimal grid of the given width.\n\nTwo places round to hundredths. The answer is what `approximate(toPlaces:toward:)` answers, and a count below one rounds to a whole number. The entry stands here so that a Number receiver reaches `round` at every width, whichever kind it holds.",
+							"parameters": [
+								{
+									"name": "toPlaces",
+									"type": "Integer",
+									"default": null,
+									"description": "how many decimal places to keep",
+									"href": null
+								},
+								{
+									"name": "toward",
+									"type": "Rounding",
+									"default": "#Nearest",
+									"description": "the direction to round in, `#Nearest` when it is left out",
+									"href": "/docs/library/rational#Rounding"
+								}
+							],
+							"returns": "the rounded Rational.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Transcendental::decimalExponent",
+					"namespace": "Transcendental",
+					"name": "decimalExponent",
+					"receiver": "Transcendental",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "decimalExponent() -> Integer",
+							"summary": "Answers the power of ten at or below the Transcendental's distance from zero.\n\nThis is the exponent the `#Scientific` format writes after the `e`. A value between one and ten answers zero, and a value between a tenth and one answers minus one. The enclosure widens until it falls inside one such power of ten. A value over a single base always falls inside one, since it is never a power of ten itself. A value carrying both π and e reaches the cutoff `Number::compare` names where it does not, and stops the Program there.",
+							"parameters": [],
+							"returns": "the exponent of the power of ten the value falls on.",
+							"examples": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [],
+	"modes": [],
+	"tower": [],
+	"views": [],
+	"protocols": [],
+	"seeAlso": [],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"equality-and-printing",
+		"is",
+		"compare",
+		"tostring",
+		"toString",
+		"isnot",
+		"isNot",
+		"arithmetic",
+		"add",
+		"subtract",
+		"multiply",
+		"divide",
+		"testing",
+		"ispositive",
+		"isPositive",
+		"isnegative",
+		"isNegative",
+		"iszero",
+		"isZero",
+		"iswholenumber",
+		"isWholeNumber",
+		"sign-and-rounding",
+		"absolute",
+		"negate",
+		"approximate",
+		"round",
+		"decimalexponent",
+		"decimalExponent"
+	]
+}

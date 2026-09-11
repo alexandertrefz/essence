@@ -1,0 +1,55 @@
+---
+title: "Ordering"
+description: "What `compare` returns, less, equal or greater, and `then` for ordering on a second key."
+section: library
+order: 140
+template: type
+tocDepth: 2
+searchDepth: 3
+namespaces:
+  - "Ordering"
+aliases: []
+conformsTo:
+  - "Equatable"
+  - "Printable"
+---
+
+{/* Generated from packages/standard-library/sources by packages/website/scripts/generateStdlibDocs.ts. The description and the Taught on line are this page's own and survive --sync; everything else is rewritten by it. */}
+
+How one value stands against another: below it, equal to it, or above it.
+
+`compare` answers one of the three Cases. They are written `Ordering#Less`, `Ordering#Equal` and `Ordering#Greater`, and matched as `case #Less`. A match over them is checked for exhaustiveness like any other Choice.
+
+Taught on: [Protocols](/docs/language/protocols) and [Lists](/docs/language/lists).
+
+<SignatureBlock label="Declaration" signature="choice Ordering {\n\tLess,\n\tEqual,\n\tGreater,\n}" />
+
+<MemberIndex page="ordering" />
+
+## At a glance
+
+<AtAGlance page="ordering" />
+
+## The cases
+
+### is
+
+<MemberEntries page="ordering" name="is" />
+
+### <span id="toString">toString</span>
+
+<MemberEntries page="ordering" name="toString" />
+
+### cases
+
+<MemberEntries page="ordering" name="cases" />
+
+### <span id="isNot">isNot</span>
+
+<MemberEntries page="ordering" name="isNot" />
+
+## Chaining
+
+### then
+
+<MemberEntries page="ordering" name="then" />

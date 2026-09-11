@@ -1,0 +1,1232 @@
+{
+	"slug": "protocols",
+	"title": "Protocols",
+	"kind": "protocols",
+	"declaration": "",
+	"choice": null,
+	"namespaces": [],
+	"conformsTo": [],
+	"groups": [
+		{
+			"label": "Equatable",
+			"id": "equatable",
+			"members": [
+				{
+					"key": "Equatable::is",
+					"namespace": "Equatable",
+					"name": "is",
+					"receiver": null,
+					"kind": "method",
+					"origin": "requirement",
+					"protocol": "Equatable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "is(_ other: Self) -> Boolean",
+							"summary": "Answers whether both values are equal.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Self",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the values are equal.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Equatable::isNot",
+					"namespace": "Equatable",
+					"name": "isNot",
+					"receiver": null,
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Equatable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isNot(_ other: Self) -> Boolean",
+							"summary": "Answers whether the values differ.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Self",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the values differ.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Printable",
+			"id": "printable",
+			"members": [
+				{
+					"key": "Printable::toString",
+					"namespace": "Printable",
+					"name": "toString",
+					"receiver": null,
+					"kind": "method",
+					"origin": "requirement",
+					"protocol": "Printable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toString() -> String",
+							"summary": "Answers the value as a String.",
+							"parameters": [],
+							"returns": "the String representation of the value.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Comparable",
+			"id": "comparable",
+			"members": [
+				{
+					"key": "Comparable::compare",
+					"namespace": "Comparable",
+					"name": "compare",
+					"receiver": null,
+					"kind": "method",
+					"origin": "requirement",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "compare(to other: Self) -> Ordering",
+							"summary": "Orders the value against another one of the same Type.",
+							"parameters": [
+								{
+									"name": "to",
+									"type": "Self",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Comparable::isLessThan",
+					"namespace": "Comparable",
+					"name": "isLessThan",
+					"receiver": null,
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isLessThan(_ other: Self) -> Boolean",
+							"summary": "Answers whether the value is strictly below another.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Self",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is below the given one.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Comparable::isLessThanOrEqualTo",
+					"namespace": "Comparable",
+					"name": "isLessThanOrEqualTo",
+					"receiver": null,
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isLessThanOrEqualTo(_ other: Self) -> Boolean",
+							"summary": "Answers whether the value is below another, or equal to it.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Self",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is below the given one or equal to it.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Comparable::isGreaterThan",
+					"namespace": "Comparable",
+					"name": "isGreaterThan",
+					"receiver": null,
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isGreaterThan(_ other: Self) -> Boolean",
+							"summary": "Answers whether the value is strictly above another.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Self",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is above the given one.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Comparable::isGreaterThanOrEqualTo",
+					"namespace": "Comparable",
+					"name": "isGreaterThanOrEqualTo",
+					"receiver": null,
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Comparable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isGreaterThanOrEqualTo(_ other: Self) -> Boolean",
+							"summary": "Answers whether the value is above another, or equal to it.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Self",
+									"default": null,
+									"description": "the value to compare with",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is above the given one or equal to it.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Orderable",
+			"id": "orderable",
+			"members": [
+				{
+					"key": "Orderable::isBetween",
+					"namespace": "Orderable",
+					"name": "isBetween",
+					"receiver": null,
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Orderable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isBetween(_ lower: Self, and upper: Self) -> Boolean",
+							"summary": "Answers whether the value lies between the two given ones, both included.\n\nThe two bounds name the same range in either order: `7::isBetween(10, and 1)` is `true`, and `15::isBetween(10, and 1)` is `false`.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Self",
+									"default": null,
+									"description": "one bound of the range, included",
+									"href": null
+								},
+								{
+									"name": "and",
+									"type": "Self",
+									"default": null,
+									"description": "the other bound of the range, included",
+									"href": null
+								}
+							],
+							"returns": "`true` when the value is within the bounds.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Orderable::clamp",
+					"namespace": "Orderable",
+					"name": "clamp",
+					"receiver": null,
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Orderable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "clamp(between lowest: Self, and highest: Self) -> Self",
+							"summary": "Answers the value, pulled into the given bounds.\n\nThe answer is the lower bound when the value is below it. It is the upper bound when the value is above it, and the value itself otherwise. The two bounds name the same range in either order: `7::clamp(between 10, and 1)` is `7`, and `15::clamp(between 10, and 1)` is `10`.",
+							"parameters": [
+								{
+									"name": "between",
+									"type": "Self",
+									"default": null,
+									"description": "one bound of the range",
+									"href": null
+								},
+								{
+									"name": "and",
+									"type": "Self",
+									"default": null,
+									"description": "the other bound of the range",
+									"href": null
+								}
+							],
+							"returns": "the clamped value.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Enumerable",
+			"id": "enumerable",
+			"members": [
+				{
+					"key": "Enumerable::cases",
+					"namespace": "Enumerable",
+					"name": "cases",
+					"receiver": null,
+					"kind": "static method",
+					"origin": "requirement",
+					"protocol": "Enumerable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static cases() -> NonEmptyList<Self>",
+							"summary": "Answers every value of the Type.\n\nThe values stand in the order the Cases are declared in. A Choice has at least one Case, so the answer certainly holds one.",
+							"parameters": [],
+							"returns": "every Case of the Choice, in declaration order.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Generatable",
+			"id": "generatable",
+			"members": [
+				{
+					"key": "Generatable::generate",
+					"namespace": "Generatable",
+					"name": "generate",
+					"receiver": null,
+					"kind": "static method",
+					"origin": "requirement",
+					"protocol": "Generatable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static generate(from source: Randomness) -> Self",
+							"summary": "Answers a value of the conforming Type, built from a source of randomness.\n\nA property test derives a generator from the Type where a Namespace declares no conformance. Declaring one replaces that generator, for a Type whose values carry an invariant the derived one can not know about.",
+							"parameters": [
+								{
+									"name": "from",
+									"type": "Randomness",
+									"default": null,
+									"description": "the source to draw from.",
+									"href": null
+								}
+							],
+							"returns": "a value of the conforming Type.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Generatable::shrink",
+					"namespace": "Generatable",
+					"name": "shrink",
+					"receiver": null,
+					"kind": "method",
+					"origin": "provided",
+					"protocol": "Generatable",
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "shrink() -> List<Self>",
+							"summary": "Answers the smaller values a failing one can be reported as.\n\nA property test that fails asks its counterexample for these candidates, and reports the first one that fails as well. It asks that value for its own, so a body answering one step smaller each time reports the smallest value the property fails on. The runner tries the candidates in the order the List holds them, and skips one that is the failing value itself. The body here answers no candidates, so a Namespace that writes none of its own reports the value the source drew.",
+							"parameters": [],
+							"returns": "the smaller values, smallest first.",
+							"examples": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [],
+	"modes": [],
+	"tower": [],
+	"views": [],
+	"protocols": [
+		{
+			"name": "Equatable",
+			"declaration": "protocol Equatable {\n\tis(_ other: Self) -> Boolean\n\tisNot(_ other: Self) -> Boolean\n}",
+			"extends": [],
+			"description": "Anything that can be compared for equality.",
+			"conformers": [
+				{
+					"label": "Algebraic",
+					"href": "/docs/library/algebraic",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Boolean",
+					"href": "/docs/library/boolean",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Dictionary",
+					"href": "/docs/library/dictionary",
+					"condition": "KeyType is Equatable, ValueType is Equatable",
+					"via": null
+				},
+				{
+					"label": "Division",
+					"href": "/docs/library/integer#Division",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Integer",
+					"href": "/docs/library/integer",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "SortOrder",
+					"href": "/docs/library/list#SortOrder",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "List",
+					"href": "/docs/library/list",
+					"condition": "ItemType is Equatable",
+					"via": null
+				},
+				{
+					"label": "Number",
+					"href": "/docs/library/number",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Optional",
+					"href": "/docs/library/optional",
+					"condition": "ItemType is Equatable",
+					"via": null
+				},
+				{
+					"label": "Ordering",
+					"href": "/docs/library/ordering",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "NumberFormat",
+					"href": "/docs/library/rational#NumberFormat",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Rounding",
+					"href": "/docs/library/rational#Rounding",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "SignStyle",
+					"href": "/docs/library/rational#SignStyle",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Rational",
+					"href": "/docs/library/rational",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Record",
+					"href": "/docs/library/record",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Result",
+					"href": "/docs/library/result",
+					"condition": "ValueType is Equatable, FailureType is Equatable",
+					"via": null
+				},
+				{
+					"label": "Side",
+					"href": "/docs/library/string#Side",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "CaseSensitivity",
+					"href": "/docs/library/string#CaseSensitivity",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "NormalizationForm",
+					"href": "/docs/library/string#NormalizationForm",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "String",
+					"href": "/docs/library/string",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Stream",
+					"href": "/docs/library/terminal#Stream",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Transcendental",
+					"href": "/docs/library/transcendental",
+					"condition": null,
+					"via": null
+				}
+			],
+			"derivedFor": [],
+			"requiredBy": [
+				{
+					"label": "Dictionary.of(_:)",
+					"href": "/docs/library/dictionary#of"
+				},
+				{
+					"label": "Dictionary.of(_:valuedBy:)",
+					"href": "/docs/library/dictionary#of"
+				},
+				{
+					"label": "Dictionary::is(_:)",
+					"href": "/docs/library/dictionary#is"
+				},
+				{
+					"label": "Dictionary::hasKey(_:)",
+					"href": "/docs/library/dictionary#hasKey"
+				},
+				{
+					"label": "Dictionary::hasValue(_:)",
+					"href": "/docs/library/dictionary#hasValue"
+				},
+				{
+					"label": "Dictionary::value(at:)",
+					"href": "/docs/library/dictionary#value"
+				},
+				{
+					"label": "Dictionary::value(at:defaultingTo:)",
+					"href": "/docs/library/dictionary#value"
+				},
+				{
+					"label": "Dictionary::set(_:to:)",
+					"href": "/docs/library/dictionary#set"
+				},
+				{
+					"label": "Dictionary::update(at:with:)",
+					"href": "/docs/library/dictionary#update"
+				},
+				{
+					"label": "Dictionary::update(at:defaultingTo:with:)",
+					"href": "/docs/library/dictionary#update"
+				},
+				{
+					"label": "Dictionary::remove(at:)",
+					"href": "/docs/library/dictionary#remove"
+				},
+				{
+					"label": "Dictionary::remove(atEvery:)",
+					"href": "/docs/library/dictionary#remove"
+				},
+				{
+					"label": "Dictionary::merge(with:)",
+					"href": "/docs/library/dictionary#merge"
+				},
+				{
+					"label": "Dictionary::merge(with:choosing:)",
+					"href": "/docs/library/dictionary#merge"
+				},
+				{
+					"label": "GroupedList::group(on:)",
+					"href": "/docs/library/list#group"
+				},
+				{
+					"label": "GroupedList::tally()",
+					"href": "/docs/library/list#tally"
+				},
+				{
+					"label": "GroupedList::index(on:)",
+					"href": "/docs/library/list#index"
+				},
+				{
+					"label": "GroupedNonEmptyList::group(on:)",
+					"href": "/docs/library/list#group"
+				},
+				{
+					"label": "GroupedNonEmptyList::tally()",
+					"href": "/docs/library/list#tally"
+				},
+				{
+					"label": "GroupedNonEmptyList::index(on:)",
+					"href": "/docs/library/list#index"
+				},
+				{
+					"label": "List::is(_:)",
+					"href": "/docs/library/list#is"
+				},
+				{
+					"label": "List::contains(_:)",
+					"href": "/docs/library/list#contains"
+				},
+				{
+					"label": "List::contains(everyItemOf:)",
+					"href": "/docs/library/list#contains"
+				},
+				{
+					"label": "List::doesNotContain(_:)",
+					"href": "/docs/library/list#doesNotContain"
+				},
+				{
+					"label": "List::hasDuplicates()",
+					"href": "/docs/library/list#hasDuplicates"
+				},
+				{
+					"label": "List::hasDuplicates(on:)",
+					"href": "/docs/library/list#hasDuplicates"
+				},
+				{
+					"label": "List::starts(with:)",
+					"href": "/docs/library/list#starts"
+				},
+				{
+					"label": "List::doesNotStart(with:)",
+					"href": "/docs/library/list#doesNotStart"
+				},
+				{
+					"label": "List::ends(with:)",
+					"href": "/docs/library/list#ends"
+				},
+				{
+					"label": "List::doesNotEnd(with:)",
+					"href": "/docs/library/list#doesNotEnd"
+				},
+				{
+					"label": "List::firstIndex(of:)",
+					"href": "/docs/library/list#firstIndex"
+				},
+				{
+					"label": "List::firstIndex(of:defaultingTo:)",
+					"href": "/docs/library/list#firstIndex"
+				},
+				{
+					"label": "List::lastIndex(of:)",
+					"href": "/docs/library/list#lastIndex"
+				},
+				{
+					"label": "List::lastIndex(of:defaultingTo:)",
+					"href": "/docs/library/list#lastIndex"
+				},
+				{
+					"label": "List::everyIndex(of:)",
+					"href": "/docs/library/list#everyIndex"
+				},
+				{
+					"label": "List::removeEvery(_:)",
+					"href": "/docs/library/list#removeEvery"
+				},
+				{
+					"label": "List::removeEvery(contentsOf:)",
+					"href": "/docs/library/list#removeEvery"
+				},
+				{
+					"label": "List::everyItem(alsoIn:)",
+					"href": "/docs/library/list#everyItem"
+				},
+				{
+					"label": "List::count(of:)",
+					"href": "/docs/library/list#count"
+				},
+				{
+					"label": "List::split(on:)",
+					"href": "/docs/library/list#split"
+				},
+				{
+					"label": "List::removeDuplicates()",
+					"href": "/docs/library/list#removeDuplicates"
+				},
+				{
+					"label": "List::removeDuplicates(on:)",
+					"href": "/docs/library/list#removeDuplicates"
+				},
+				{
+					"label": "NonEmptyList::removeDuplicates()",
+					"href": "/docs/library/list#removeDuplicates"
+				},
+				{
+					"label": "NonEmptyList::removeDuplicates(on:)",
+					"href": "/docs/library/list#removeDuplicates"
+				},
+				{
+					"label": "Optional::is(_:)",
+					"href": "/docs/library/optional#is"
+				},
+				{
+					"label": "Optional::isNot(_:)",
+					"href": "/docs/library/optional#isNot"
+				},
+				{
+					"label": "Result::is(_:)",
+					"href": "/docs/library/result#is"
+				},
+				{
+					"label": "Result::isNot(_:)",
+					"href": "/docs/library/result#isNot"
+				}
+			],
+			"notes": [
+				"Every choice has `is` and `isNot` without declaring `Equatable`. Two of its values are equal when they are the same case with equal payloads."
+			],
+			"headed": []
+		},
+		{
+			"name": "Printable",
+			"declaration": "protocol Printable {\n\ttoString() -> String\n}",
+			"extends": [],
+			"description": "Anything that can represent itself as a String.",
+			"conformers": [
+				{
+					"label": "Algebraic",
+					"href": "/docs/library/algebraic",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Boolean",
+					"href": "/docs/library/boolean",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Dictionary",
+					"href": "/docs/library/dictionary",
+					"condition": "KeyType is Printable, ValueType is Printable",
+					"via": null
+				},
+				{
+					"label": "Division",
+					"href": "/docs/library/integer#Division",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Integer",
+					"href": "/docs/library/integer",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "SortOrder",
+					"href": "/docs/library/list#SortOrder",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "List",
+					"href": "/docs/library/list",
+					"condition": "ItemType is Printable",
+					"via": null
+				},
+				{
+					"label": "Number",
+					"href": "/docs/library/number",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Optional",
+					"href": "/docs/library/optional",
+					"condition": "ItemType is Printable",
+					"via": null
+				},
+				{
+					"label": "Ordering",
+					"href": "/docs/library/ordering",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "NumberFormat",
+					"href": "/docs/library/rational#NumberFormat",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Rounding",
+					"href": "/docs/library/rational#Rounding",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "SignStyle",
+					"href": "/docs/library/rational#SignStyle",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Rational",
+					"href": "/docs/library/rational",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Record",
+					"href": "/docs/library/record",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Result",
+					"href": "/docs/library/result",
+					"condition": "ValueType is Printable, FailureType is Printable",
+					"via": null
+				},
+				{
+					"label": "Side",
+					"href": "/docs/library/string#Side",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "CaseSensitivity",
+					"href": "/docs/library/string#CaseSensitivity",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "NormalizationForm",
+					"href": "/docs/library/string#NormalizationForm",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "String",
+					"href": "/docs/library/string",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Stream",
+					"href": "/docs/library/terminal#Stream",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Transcendental",
+					"href": "/docs/library/transcendental",
+					"condition": null,
+					"via": null
+				}
+			],
+			"derivedFor": [],
+			"requiredBy": [
+				{
+					"label": "Dictionary::toString()",
+					"href": "/docs/library/dictionary#toString"
+				},
+				{
+					"label": "List::toString()",
+					"href": "/docs/library/list#toString"
+				},
+				{
+					"label": "List::join(with:)",
+					"href": "/docs/library/list#join"
+				},
+				{
+					"label": "Optional::toString()",
+					"href": "/docs/library/optional#toString"
+				},
+				{
+					"label": "Result::toString()",
+					"href": "/docs/library/result#toString"
+				},
+				{
+					"label": "Terminal.print(_:to:)",
+					"href": "/docs/library/terminal#print"
+				}
+			],
+			"notes": [
+				"A choice whose cases carry no payload prints its case name once a namespace declares `is Printable` for it, and the namespace body can stay empty: `namespace Side for Side is Equatable, is Printable {}`.",
+				"An interpolation hole in a String needs a `Printable` value. Any other value is the Error [`interpolation-not-printable`](/docs/reference/diagnostics#interpolation-not-printable)."
+			],
+			"headed": []
+		},
+		{
+			"name": "Comparable",
+			"declaration": "protocol Comparable {\n\tcompare(to other: Self) -> Ordering\n\tisLessThan(_ other: Self) -> Boolean\n\tisLessThanOrEqualTo(_ other: Self) -> Boolean\n\tisGreaterThan(_ other: Self) -> Boolean\n\tisGreaterThanOrEqualTo(_ other: Self) -> Boolean\n}",
+			"extends": [],
+			"description": "Anything with a total order among its values.",
+			"conformers": [
+				{
+					"label": "Algebraic",
+					"href": "/docs/library/algebraic",
+					"condition": null,
+					"via": "Orderable"
+				},
+				{
+					"label": "Boolean",
+					"href": "/docs/library/boolean",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Integer",
+					"href": "/docs/library/integer",
+					"condition": null,
+					"via": "Orderable"
+				},
+				{
+					"label": "List",
+					"href": "/docs/library/list",
+					"condition": "ItemType is Comparable",
+					"via": null
+				},
+				{
+					"label": "Number",
+					"href": "/docs/library/number",
+					"condition": null,
+					"via": "Orderable"
+				},
+				{
+					"label": "Rational",
+					"href": "/docs/library/rational",
+					"condition": null,
+					"via": "Orderable"
+				},
+				{
+					"label": "String",
+					"href": "/docs/library/string",
+					"condition": null,
+					"via": null
+				}
+			],
+			"derivedFor": [],
+			"requiredBy": [
+				{
+					"label": "Dictionary::sort(in:)",
+					"href": "/docs/library/dictionary#sort"
+				},
+				{
+					"label": "Dictionary::sort(on:in:)",
+					"href": "/docs/library/dictionary#sort"
+				},
+				{
+					"label": "NonEmptyDictionary::sort(in:)",
+					"href": "/docs/library/dictionary#sort"
+				},
+				{
+					"label": "NonEmptyDictionary::sort(on:in:)",
+					"href": "/docs/library/dictionary#sort"
+				},
+				{
+					"label": "List::compare(to:)",
+					"href": "/docs/library/list#compare"
+				},
+				{
+					"label": "List::isSorted(in:)",
+					"href": "/docs/library/list#isSorted"
+				},
+				{
+					"label": "List::sort(in:)",
+					"href": "/docs/library/list#sort"
+				},
+				{
+					"label": "List::sort(on:in:)",
+					"href": "/docs/library/list#sort"
+				},
+				{
+					"label": "List::lowestItem(on:)",
+					"href": "/docs/library/list#lowestItem"
+				},
+				{
+					"label": "List::lowestItem(on:defaultingTo:)",
+					"href": "/docs/library/list#lowestItem"
+				},
+				{
+					"label": "List::lowestItem()",
+					"href": "/docs/library/list#lowestItem"
+				},
+				{
+					"label": "List::lowestItem(defaultingTo:)",
+					"href": "/docs/library/list#lowestItem"
+				},
+				{
+					"label": "List::highestItem(on:)",
+					"href": "/docs/library/list#highestItem"
+				},
+				{
+					"label": "List::highestItem(on:defaultingTo:)",
+					"href": "/docs/library/list#highestItem"
+				},
+				{
+					"label": "List::highestItem()",
+					"href": "/docs/library/list#highestItem"
+				},
+				{
+					"label": "List::highestItem(defaultingTo:)",
+					"href": "/docs/library/list#highestItem"
+				},
+				{
+					"label": "NonEmptyList::sort(in:)",
+					"href": "/docs/library/list#sort"
+				},
+				{
+					"label": "NonEmptyList::sort(on:in:)",
+					"href": "/docs/library/list#sort"
+				},
+				{
+					"label": "NonEmptyList::lowestItem(on:)",
+					"href": "/docs/library/list#lowestItem"
+				},
+				{
+					"label": "NonEmptyList::lowestItem()",
+					"href": "/docs/library/list#lowestItem"
+				},
+				{
+					"label": "NonEmptyList::highestItem(on:)",
+					"href": "/docs/library/list#highestItem"
+				},
+				{
+					"label": "NonEmptyList::highestItem()",
+					"href": "/docs/library/list#highestItem"
+				}
+			],
+			"notes": [],
+			"headed": []
+		},
+		{
+			"name": "Orderable",
+			"declaration": "protocol Orderable is Comparable {\n\tisBetween(_ lower: Self, and upper: Self) -> Boolean\n\tclamp(between lowest: Self, and highest: Self) -> Self\n}",
+			"extends": ["Comparable"],
+			"description": "Anything on a line, where a value can be between two others or pulled into a range.",
+			"conformers": [
+				{
+					"label": "Algebraic",
+					"href": "/docs/library/algebraic",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Integer",
+					"href": "/docs/library/integer",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Number",
+					"href": "/docs/library/number",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Rational",
+					"href": "/docs/library/rational",
+					"condition": null,
+					"via": null
+				}
+			],
+			"derivedFor": [],
+			"requiredBy": [],
+			"notes": [],
+			"headed": []
+		},
+		{
+			"name": "Enumerable",
+			"declaration": "protocol Enumerable {\n\tstatic cases() -> NonEmptyList<Self>\n}",
+			"extends": [],
+			"description": "Anything whose values can be listed, from a Choice whose Cases carry no payload.",
+			"conformers": [],
+			"derivedFor": [
+				{
+					"label": "Division",
+					"href": "/docs/library/integer#Division"
+				},
+				{
+					"label": "NumberFormat",
+					"href": "/docs/library/rational#NumberFormat"
+				},
+				{
+					"label": "Rounding",
+					"href": "/docs/library/rational#Rounding"
+				},
+				{
+					"label": "SignStyle",
+					"href": "/docs/library/rational#SignStyle"
+				},
+				{
+					"label": "Side",
+					"href": "/docs/library/string#Side"
+				},
+				{
+					"label": "CaseSensitivity",
+					"href": "/docs/library/string#CaseSensitivity"
+				},
+				{
+					"label": "NormalizationForm",
+					"href": "/docs/library/string#NormalizationForm"
+				},
+				{
+					"label": "SortOrder",
+					"href": "/docs/library/list#SortOrder"
+				},
+				{
+					"label": "Ordering",
+					"href": "/docs/library/ordering"
+				},
+				{
+					"label": "Stream",
+					"href": "/docs/library/terminal#Stream"
+				}
+			],
+			"requiredBy": [],
+			"notes": [
+				"Every choice whose cases carry no payload has the static `cases()` without declaring `Enumerable`. It returns the cases in the order they are declared: `Side.cases()` is `[Start, End, BothEnds]`."
+			],
+			"headed": []
+		},
+		{
+			"name": "Generatable",
+			"declaration": "protocol Generatable {\n\tstatic generate(from source: Randomness) -> Self\n\tshrink() -> List<Self>\n}",
+			"extends": [],
+			"description": "Anything a property test can build values of.\n\nA Namespace that declares this conformance replaces the generator a property test derives from the Type. The derived generator also makes a failing value smaller, and a conformance answers `shrink` for that instead. The provided `shrink` answers no candidates, so a Namespace that writes none of its own has its counterexamples reported as they were drawn.",
+			"conformers": [],
+			"derivedFor": [],
+			"requiredBy": [],
+			"notes": [],
+			"headed": ["shrink"]
+		}
+	],
+	"seeAlso": [],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"equatable",
+		"Equatable",
+		"printable",
+		"Printable",
+		"comparable",
+		"Comparable",
+		"orderable",
+		"Orderable",
+		"enumerable",
+		"Enumerable",
+		"generatable",
+		"Generatable",
+		"shrink"
+	]
+}
