@@ -17,7 +17,9 @@ import type { CLIContext } from "./context"
 // what it is for — a starting point rather than an inventory: `essence help
 // test` and `essence help build` document the rest, each beside the flag it
 // mirrors, and a file listing every setting at its default is a file nobody
-// reads twice.
+// reads twice. `test.contracts` used to be the third: it is the switch for an
+// experimental mode, and the first file a project writes should not name a
+// setting the documentation does not explain.
 //
 // NOTE: Written as TEXT rather than stringified from an object, because the
 // comments are half of what makes the file worth writing: a project file is
@@ -33,9 +35,7 @@ function template(): string {
 
 	"test": {
 		// Tags an everyday \`essence test\` leaves out; \`--tag\` brings one back.
-		"skipTags": [],
-		// Whether every run also tests what the declarations promise.
-		"contracts": false
+		"skipTags": []
 	}
 }
 `
