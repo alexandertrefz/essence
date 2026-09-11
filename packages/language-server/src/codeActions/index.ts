@@ -3,6 +3,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { type Analysis, analyseDocument, documentFilePath } from "../analyse"
 import { indexProgram, type ProgramIndex } from "../rename"
 import type { Workspace } from "../workspace"
+import { extractConstantActions } from "./extractConstant"
 import {
 	compareWrittenValueAction,
 	matcherBeforeValueAction,
@@ -244,6 +245,9 @@ export function findCodeActions(
 
 	let indexed = programIndexer(program, enrichedProgram)
 
+	entries.push(
+		...extractConstantActions(program, lines, range, indexed, documentPath),
+	)
 	entries.push(...pathActions(program, () => indexed().scopes, lines, range))
 	entries.push(...defineActions(program, lines, range))
 	entries.push(...payloadActions(program, enrichedProgram, lines, range))

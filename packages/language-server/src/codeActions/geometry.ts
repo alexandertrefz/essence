@@ -35,6 +35,79 @@ export function isBefore(a: common.Cursor, b: common.Cursor): boolean {
 	return a.line < b.line || (a.line === b.line && a.column < b.column)
 }
 
+// NOTE: The range with the whitespace at either end left out — what a reader
+// DRAGGED over rather than what the Editor sent. A selection made by dragging
+// down the left margin starts in the indentation in front of a Statement and
+// ends on the line break after it, and neither is part of what a refactoring
+// lifts out: a Node's Position starts at the Node.
+//
+// Null when nothing but whitespace was selected, which is also what a bare
+// cursor is — every refactoring offered on a SELECTION asks here first, so
+// "there is no selection" and "the selection holds no code" are one answer.
+export function trimmedRange(
+	lines: Array<string>,
+	range: common.Position,
+): common.Position | null {
+	let start = range.start
+	let end = range.end
+
+	while (isBefore(start, end)) {
+		let character = lineAt(lines, start.line)[start.column - 1]
+
+		if (character !== undefined && !isBlank(character)) {
+			break
+		}
+
+		// NOTE: Past the last character of a line is the line break, which is
+		// the one blank that moves the Cursor to another line.
+		start =
+			character === undefined
+				? { line: start.line + 1, column: 1 }
+				: { line: start.line, column: start.column + 1 }
+	}
+
+	while (isBefore(start, end)) {
+		let character =
+			end.column === 1
+				? undefined
+				: lineAt(lines, end.line)[end.column - 2]
+
+		if (character !== undefined && !isBlank(character)) {
+			break
+		}
+
+		end =
+			end.column === 1
+				? {
+						line: end.line - 1,
+						column: lineAt(lines, end.line - 1).length + 1,
+					}
+				: { line: end.line, column: end.column - 1 }
+	}
+
+	return isBefore(start, end) ? { start, end } : null
+}
+
+function isBlank(character: string): boolean {
+	return character === " " || character === "\t"
+}
+
+// NOTE: Whether nothing but indentation stands in front of a Cursor. A
+// Statement written on a line of its own can have another one inserted above it
+// by writing whole lines; one sharing its line with a `case` head or with the
+// Statement before it can not, and the refactorings that write a Statement turn
+// that shape away rather than reflowing somebody's line.
+export function opensItsLine(
+	lines: Array<string>,
+	cursor: common.Cursor,
+): boolean {
+	return (
+		lineAt(lines, cursor.line)
+			.slice(0, cursor.column - 1)
+			.trim() === ""
+	)
+}
+
 export function lineAt(lines: Array<string>, line: number): string {
 	return lines[line - 1] ?? ""
 }

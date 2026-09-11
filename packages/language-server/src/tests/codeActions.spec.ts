@@ -185,6 +185,71 @@ function sliceFrom(text: string, cursor: common.Cursor): string {
 	return text.slice(offsetOf(text, cursor))
 }
 
+// NOTE: The URI a refactoring needs to hand its rename command a document. Any
+// path with no import or export block beside it is analysed on its own, which is
+// what every fixture here is.
+const DOCUMENT = "file:///repo/Sample.es"
+
+// NOTE: The refactorings of one kind, offered on a range and against a document
+// — a Code Action that ends by opening rename has a URI to name, and the
+// helpers above deliberately hand none over.
+function refactorsOf(
+	lines: Array<string>,
+	range: common.Position,
+	kind: CodeActionEntry["kind"],
+): Array<CodeActionEntry> {
+	return findCodeActions(lines.join("\n"), range, DOCUMENT).filter(
+		(entry) => entry.kind === kind,
+	)
+}
+
+// NOTE: A range spelled as the text it covers, so a fixture gaining a line
+// takes no assertion with it. The first line holding the text answers, which is
+// what every fixture below is written to make unambiguous.
+function rangeOf(lines: Array<string>, text: string): common.Position {
+	let line = lines.findIndex((candidate) => candidate.includes(text)) + 1
+	let column = (lines[line - 1] as string).indexOf(text) + 1
+
+	return {
+		start: { line, column },
+		end: { line, column: column + text.length },
+	}
+}
+
+// NOTE: From the start of one span to the end of another — the selection a
+// reader drags over several lines.
+function rangeFrom(
+	lines: Array<string>,
+	from: string,
+	to: string,
+): common.Position {
+	return { start: rangeOf(lines, from).start, end: rangeOf(lines, to).end }
+}
+
+// NOTE: What the Compiler makes of the buffer a refactoring produced, with the
+// tests section enriched — `findCodeActions` reads a file that way, so a
+// refactoring inside a `tests { … }` block has to be measured against the same
+// reading.
+function refactoredCodesOf(lines: Array<string>): Array<common.DiagnosticCode> {
+	return analyse(lines.join("\n"), undefined, { tests: true }).map(
+		(diagnostic) => diagnostic.code,
+	)
+}
+
+// NOTE: The three things every refactoring here promises. The fixture compiles
+// to begin with — a refactoring is offered on code the Compiler has nothing to
+// say about, and one measured against a fixture with a mistake in it would be
+// measured against the wrong baseline. What it produces compiles too, which is
+// the whole of what makes it a refactoring rather than an edit: a quick fix
+// answers a Diagnostic and may leave a hole behind, and this may not. And the
+// Formatter accepts the result, because source the Formatter refuses is source
+// nobody can go on editing.
+function expectRefactored(before: Array<string>, after: Array<string>) {
+	expect(refactoredCodesOf(before)).toEqual([])
+	expect(refactoredCodesOf(after)).toEqual([])
+	expect(format(after.join("\n")).refusal).toBeNull()
+}
+
 describe("Code Actions", () => {
 	describe("missing-case", () => {
 		it("should add an arm per unhandled member of a primitive Union", () => {
@@ -5823,5 +5888,205 @@ describe("Code Action lookups", () => {
 				enclosingStatementOf(programOf(), spanOf("implementation {")),
 			).toBeNull()
 		})
+	})
+})
+
+// NOTE: A refactoring is offered on code the Compiler is happy with, so every
+// case below asserts the applied text against what the Compiler said BEFORE it
+// — an extraction that type-checks is the whole of what makes it an extraction
+// rather than an edit.
+describe("Extract to a Constant", () => {
+	function extractions(
+		lines: Array<string>,
+		range: common.Position,
+	): Array<CodeActionEntry> {
+		return refactorsOf(lines, range, "refactor.extract")
+	}
+
+	it("lifts the Expression the selection sits in above its Statement", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction report(_ order: { price: Integer }) -> String {",
+			"\t\t<- order.price::toString()",
+			"\t}",
+			"}",
+		]
+
+		let [action] = extractions(lines, rangeOf(lines, "order.price"))
+		let result = applied(lines, action)
+
+		expect(action.title).toBe("Extract to a Constant")
+		expect(action.isPreferred).toBe(false)
+
+		expect(result).toEqual([
+			"implementation {",
+			"\tfunction report(_ order: { price: Integer }) -> String {",
+			"\t\tconstant price = order.price",
+			"\t\t<- price::toString()",
+			"\t}",
+			"}",
+		])
+
+		expectRefactored(lines, result)
+	})
+
+	// NOTE: The selection is a character short at either end, which is what
+	// dragging over a name actually produces — the Node it points at is the
+	// same one, and answering with nothing would be answering about the mouse.
+	it("answers with the Expression a partial selection sits inside", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant scores = [1, 2, 3]",
+			"\tconstant highest = scores::highestItem(defaultingTo 0)",
+			"}",
+		]
+
+		let [action] = extractions(lines, rangeOf(lines, "highestItem"))
+
+		expect(applied(lines, action)).toEqual([
+			"implementation {",
+			"\tconstant scores = [1, 2, 3]",
+			"\tconstant highestItem = scores::highestItem(defaultingTo 0)",
+			"\tconstant highest = highestItem",
+			"}",
+		])
+	})
+
+	it("numbers the derived name when the Scope already has it", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant price = 1",
+			"\tconstant order = { price = 2 }",
+			"\tconstant doubled = order.price::multiply(with 2)",
+			"}",
+		]
+
+		let [action] = extractions(lines, rangeOf(lines, "order.price"))
+		let result = applied(lines, action)
+
+		expect(result[3]).toBe("\tconstant price2 = order.price")
+		expectRefactored(lines, result)
+	})
+
+	// NOTE: Both halves of a whole Match travel together — the binder a Handler
+	// introduces is declared inside what is being lifted, so it is in scope
+	// wherever the Constant lands.
+	it("lifts a whole Match, binders and all", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction describe(_ score: Optional<Integer>) -> String {",
+			"\t\t<- match score -> String {",
+			"\t\t\tcase #Value(item) { <- item::toString() }",
+			'\t\t\tcase #Empty { <- "none" }',
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+
+		let [action] = extractions(
+			lines,
+			rangeFrom(lines, "match score", "\t\t}"),
+		)
+		let result = applied(lines, action)
+
+		expect(result).toEqual([
+			"implementation {",
+			"\tfunction describe(_ score: Optional<Integer>) -> String {",
+			"\t\tconstant value = match score -> String {",
+			"\t\t\tcase #Value(item) { <- item::toString() }",
+			'\t\t\tcase #Empty { <- "none" }',
+			"\t\t}",
+			"\t\t<- value",
+			"\t}",
+			"}",
+		])
+
+		expectRefactored(lines, result)
+	})
+
+	it("carries the command that opens rename on the name it invented", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction report(_ order: { price: Integer }) -> String {",
+			"\t\t<- order.price::toString()",
+			"\t}",
+			"}",
+		]
+
+		let [action] = extractions(lines, rangeOf(lines, "order.price"))
+
+		expect(action.command).toEqual({
+			title: "Rename",
+			command: "essence.renameAt",
+			// NOTE: Zero based on both axes, and past the `constant ` the edit
+			// writes in front of the name — the Position of the name as it will
+			// stand once the edits have landed, which is the only Position the
+			// Editor can act on.
+			arguments: [DOCUMENT, { line: 2, character: 11 }],
+		})
+	})
+
+	it("offers nothing for a name or a literal, which are named already", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant score = 1",
+			"\tconstant copied = score",
+			"}",
+		]
+
+		expect(extractions(lines, rangeOf(lines, "1"))).toEqual([])
+		expect(
+			extractions(lines, {
+				start: { line: 3, column: 20 },
+				end: { line: 3, column: 25 },
+			}),
+		).toEqual([])
+	})
+
+	// NOTE: An arm is read only when its Condition holds, and a Constant above
+	// the Statement is read every time — lifting one out of the other changes
+	// what the Program does, which is more than a refactoring may do.
+	it("offers nothing for an Expression only one `define` arm reads", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant score = 1",
+			"\tconstant label = define {",
+			"\t\tas score::toString() if score::isGreaterThan(0)",
+			'\t\tas "none" otherwise',
+			"\t}",
+			"}",
+		]
+
+		expect(extractions(lines, rangeOf(lines, "score::toString()"))).toEqual(
+			[],
+		)
+	})
+
+	it("offers nothing where the Statement does not open its line", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction describe(_ score: Integer) -> String {",
+			"\t\t<- match score -> String {",
+			"\t\t\tcase 0 { <- score::toString() }",
+			'\t\t\tcase _ { <- "some" }',
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+
+		expect(extractions(lines, rangeOf(lines, "score::toString()"))).toEqual(
+			[],
+		)
+	})
+
+	it("offers nothing without a selection", () => {
+		let lines = ["implementation {", "\tconstant total = 1::add(2)", "}"]
+
+		expect(
+			extractions(lines, {
+				start: { line: 2, column: 19 },
+				end: { line: 2, column: 19 },
+			}),
+		).toEqual([])
 	})
 })
