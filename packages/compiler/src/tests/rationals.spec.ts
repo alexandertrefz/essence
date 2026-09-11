@@ -776,34 +776,51 @@ describe("Rationals", () => {
 		// against that same unseparated formatting rather than a time, so a
 		// slow machine moves both figures together: it was 17× before this and
 		// is 1.2× now.
+		//
+		// NOTE: How the two are timed is what keeps this from being a flake,
+		// and all three parts of it are load-bearing. They are run once before
+		// the clock starts, because whichever went first otherwise paid for
+		// warming up the digit conversion they share — measured cold against
+		// warm, the ratio read 1.8× rather than 1.2×. They are timed
+		// INTERLEAVED, one attempt of each, so a collection or a descheduled
+		// window falls on both of them rather than on whichever was being
+		// measured at the time. And the fastest of FIFTEEN attempts is what
+		// each of them is judged on, because the fastest of three is a stall
+		// away from a wrong answer: with the whole machine busy, best of three
+		// crossed the ceiling on one round in five and best of fifteen on none
+		// in a hundred and eighty, where the ratio it read never passed 1.4×.
 		it("writes the separator in one pass over the groups", () => {
 			let value = rational.createRational(BigInt("9".repeat(100_000)), 1n)
 			let comma = createString(",")
-			let best = (run: () => string): number => {
-				let fastest = Number.POSITIVE_INFINITY
+			let runs = [
+				() =>
+					rational.toString__overload$4(value, decimal, comma).value,
+				() => rational.toString__overload$2(value, decimal).value,
+			]
+			let fastest = runs.map(() => Number.POSITIVE_INFINITY)
 
-				for (let attempt = 0; attempt < 3; attempt++) {
+			for (let run of runs) {
+				run()
+			}
+
+			for (let attempt = 0; attempt < 15; attempt++) {
+				for (let [index, run] of runs.entries()) {
 					let start = performance.now()
 					let answer = run()
 
-					fastest = Math.min(fastest, performance.now() - start)
+					fastest[index] = Math.min(
+						fastest[index] as number,
+						performance.now() - start,
+					)
 
 					// NOTE: Read here so that no engine can drop the call as a
 					// value nothing looks at, and so a formatter that answered
 					// nothing is not the fastest run of all.
 					expect(answer.length).toBeGreaterThanOrEqual(100_000)
 				}
-
-				return fastest
 			}
 
-			let grouped = best(
-				() =>
-					rational.toString__overload$4(value, decimal, comma).value,
-			)
-			let plain = best(
-				() => rational.toString__overload$2(value, decimal).value,
-			)
+			let [grouped, plain] = fastest as [number, number]
 
 			expect(grouped).toBeLessThan(plain * 3)
 		})
