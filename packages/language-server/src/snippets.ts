@@ -616,6 +616,13 @@ export const snippets: Array<Snippet> = [
 		body: ["(_ ${1:item}: ${2:Type}) -> ${3:ReturnType} { <- $0 }"],
 		contexts: ["expression"],
 	},
+	{
+		prefix: "method-namespaced",
+		description:
+			"A Method call naming the Namespace that answers it, for where several would fit.",
+		body: ["${1:value}::<${2:Namespace}>${3:method}($0)"],
+		contexts: ["expression"],
+	},
 
 	/* Control flow */
 
@@ -630,6 +637,31 @@ export const snippets: Array<Snippet> = [
 		description: "An if statement with an else branch.",
 		body: ["if ${1:condition} {", "\t$2", "} else {", "\t$0", "}"],
 		contexts: ["implementation", "tests", "test"],
+	},
+	{
+		prefix: "elseif",
+		description: "An if statement with a second condition behind it.",
+		body: [
+			"if ${1:condition} {",
+			"\t$2",
+			"} else if ${3:condition} {",
+			"\t$0",
+			"}",
+		],
+		contexts: ["implementation", "tests", "test"],
+	},
+	{
+		prefix: "narrow",
+		description:
+			"A refinement doorway — the branch that proved the predicate is the only one reaching the operation demanding it.",
+		body: [
+			"if ${1:value}::${2:isNot}(${3:0}) {",
+			"\t<- ${4:proven}(${1:value})",
+			"}",
+			"",
+			"<- $0",
+		],
+		contexts: ["implementation"],
 	},
 	{
 		prefix: "match",
@@ -677,6 +709,60 @@ export const snippets: Array<Snippet> = [
 		],
 		contexts: ["expression"],
 	},
+	{
+		prefix: "define-typed",
+		description:
+			"A definition by cases saying what the whole of it answers.",
+		body: [
+			"define -> ${1:ReturnType} {",
+			"\tas ${2:value} if ${3:condition}",
+			"\tas ${0:value} otherwise",
+			"}",
+		],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "loop",
+		description:
+			"The counted loop — once per Integer from one end to the other, threading a State.",
+		body: [
+			"loop(from ${1:1}, through ${2:10}, startingWith ${3:0}, (${4:index}, ${5:total}) {",
+			"\t<- $0",
+			"})",
+		],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "loop-step",
+		description:
+			"The loop that can leave early — a `step` answers `#Continue` to carry on and `#Done` to stop.",
+		body: [
+			"loop(",
+			"\tstartingWith ${1:state},",
+			"\tstep (${2:current}) {",
+			"\t\tif ${3:condition} {",
+			"\t\t\t<- #Done(${4:result})",
+			"\t\t}",
+			"",
+			"\t\t<- #Continue($0)",
+			"\t},",
+			")",
+		],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "loop-while",
+		description:
+			"The condition-driven loop — it checks before each step, so a predicate already decided answers the seed.",
+		body: [
+			"loop(",
+			"\tstartingWith ${1:1},",
+			"\twhile (${2:value}) { <- ${3:condition} },",
+			"\t(${4:value}) { <- $0 },",
+			")",
+		],
+		contexts: ["expression"],
+	},
 
 	/* Documentation */
 
@@ -689,6 +775,20 @@ export const snippets: Array<Snippet> = [
 			"§§ @param ${2:name} — ${3:what it carries}",
 			"§§ @returns — ${0:what it answers with}",
 		],
+		contexts: ["implementation", "declarations", "namespace", "protocol"],
+	},
+	{
+		prefix: "doc-example",
+		description:
+			"An @example block — its assertions are compiled and run as tests of their own.",
+		body: ["§§ @example", "§§   expect ${1:value}::is(${0:expected})"],
+		contexts: ["implementation", "declarations", "namespace", "protocol"],
+	},
+	{
+		prefix: "doc-param",
+		description:
+			"An @param tag — the em-dash is what separates the name from its description.",
+		body: ["§§ @param ${1:name} — ${0:what it carries}"],
 		contexts: ["implementation", "declarations", "namespace", "protocol"],
 	},
 ]

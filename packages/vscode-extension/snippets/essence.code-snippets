@@ -492,6 +492,13 @@
 		],
 		"description": "A Function literal stating its own Types, for where nothing else does."
 	},
+	"method-namespaced": {
+		"prefix": "method-namespaced",
+		"body": [
+			"${1:value}::<${2:Namespace}>${3:method}($0)"
+		],
+		"description": "A Method call naming the Namespace that answers it, for where several would fit."
+	},
 	"if": {
 		"prefix": "if",
 		"body": [
@@ -511,6 +518,28 @@
 			"}"
 		],
 		"description": "An if statement with an else branch."
+	},
+	"elseif": {
+		"prefix": "elseif",
+		"body": [
+			"if ${1:condition} {",
+			"\t$2",
+			"} else if ${3:condition} {",
+			"\t$0",
+			"}"
+		],
+		"description": "An if statement with a second condition behind it."
+	},
+	"narrow": {
+		"prefix": "narrow",
+		"body": [
+			"if ${1:value}::${2:isNot}(${3:0}) {",
+			"\t<- ${4:proven}(${1:value})",
+			"}",
+			"",
+			"<- $0"
+		],
+		"description": "A refinement doorway — the branch that proved the predicate is the only one reaching the operation demanding it."
 	},
 	"match": {
 		"prefix": "match",
@@ -560,6 +589,52 @@
 		],
 		"description": "A definition by cases."
 	},
+	"define-typed": {
+		"prefix": "define-typed",
+		"body": [
+			"define -> ${1:ReturnType} {",
+			"\tas ${2:value} if ${3:condition}",
+			"\tas ${0:value} otherwise",
+			"}"
+		],
+		"description": "A definition by cases saying what the whole of it answers."
+	},
+	"loop": {
+		"prefix": "loop",
+		"body": [
+			"loop(from ${1:1}, through ${2:10}, startingWith ${3:0}, (${4:index}, ${5:total}) {",
+			"\t<- $0",
+			"})"
+		],
+		"description": "The counted loop — once per Integer from one end to the other, threading a State."
+	},
+	"loop-step": {
+		"prefix": "loop-step",
+		"body": [
+			"loop(",
+			"\tstartingWith ${1:state},",
+			"\tstep (${2:current}) {",
+			"\t\tif ${3:condition} {",
+			"\t\t\t<- #Done(${4:result})",
+			"\t\t}",
+			"",
+			"\t\t<- #Continue($0)",
+			"\t},",
+			")"
+		],
+		"description": "The loop that can leave early — a `step` answers `#Continue` to carry on and `#Done` to stop."
+	},
+	"loop-while": {
+		"prefix": "loop-while",
+		"body": [
+			"loop(",
+			"\tstartingWith ${1:1},",
+			"\twhile (${2:value}) { <- ${3:condition} },",
+			"\t(${4:value}) { <- $0 },",
+			")"
+		],
+		"description": "The condition-driven loop — it checks before each step, so a predicate already decided answers the seed."
+	},
 	"doc": {
 		"prefix": "doc",
 		"body": [
@@ -569,5 +644,20 @@
 			"§§ @returns — ${0:what it answers with}"
 		],
 		"description": "A §§ documentation block."
+	},
+	"doc-example": {
+		"prefix": "doc-example",
+		"body": [
+			"§§ @example",
+			"§§   expect ${1:value}::is(${0:expected})"
+		],
+		"description": "An @example block — its assertions are compiled and run as tests of their own."
+	},
+	"doc-param": {
+		"prefix": "doc-param",
+		"body": [
+			"§§ @param ${1:name} — ${0:what it carries}"
+		],
+		"description": "An @param tag — the em-dash is what separates the name from its description."
 	}
 }

@@ -223,6 +223,7 @@ describe("Snippet completion", () => {
 		expect(offered).toContain("constant")
 		expect(offered).toContain("destructure")
 		expect(offered).toContain("function")
+		expect(offered).toContain("narrow")
 		expect(offered).not.toContain("static")
 		expect(offered).not.toContain("expect")
 		expect(offered).not.toContain("test")
@@ -293,6 +294,7 @@ describe("Snippet completion", () => {
 
 		expect(offered).toContain("method")
 		expect(offered).toContain("doc")
+		expect(offered).toContain("doc-param")
 		expect(offered).not.toContain("static")
 		expect(offered).not.toContain("constant")
 	})
