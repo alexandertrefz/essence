@@ -11,7 +11,7 @@ import { matcherValueExpressions } from "../matchHandlerChildren"
 import { methodsOf, nativeSignaturesOf } from "../namespaceMembers"
 import { isSamePosition } from "../positions"
 import { programBodies } from "../sections"
-import { containsRange } from "./geometry"
+import { containsRange, isBefore } from "./geometry"
 
 // NOTE: Which Node of the Parser AST stands at — or around — a Position. The
 // finders a Quick Fix starts from ask the first question, since a Diagnostic
@@ -390,6 +390,50 @@ export function findFunctionDefinition(
 	})
 
 	return found
+}
+
+// NOTE: The Handler whose Matcher ends in front of this Cursor. A redundant
+// whole-value binder is reported and then DROPPED — the Pattern the Parser kept
+// stops at its closing brace and no Node holds the `as name` the Diagnostic
+// spans — so the arm it belongs to is found by what stands in front of it
+// instead. The last Matcher to end at or before the Cursor is that arm; the
+// caller reads the text between the two back to be sure nothing but whitespace
+// stands there.
+export function findHandlerBefore(
+	program: parser.Program,
+	cursor: common.Cursor,
+): Handler | null {
+	let found: Handler | null = null
+
+	walk(program, (node) => {
+		if (node.nodeType !== "Match") {
+			return
+		}
+
+		for (let handler of node.handlers) {
+			if (!isBefore(cursor, handler.matcher.position.end)) {
+				found = handler
+			}
+		}
+	})
+
+	return found
+}
+
+// NOTE: Every Node written inside a Handler — its guard and its body, which is
+// everything the binder could have been read from. The Handler itself is not one
+// of them: what a fix over an arm rewrites is what the arm HOLDS.
+export function walkHandler(
+	handler: Handler,
+	visit: (node: parser.ImplementationNode) => void,
+) {
+	if (handler.guard !== null) {
+		walkNode(handler.guard, visit)
+	}
+
+	for (let node of handler.body) {
+		walkNode(node, visit)
+	}
 }
 
 // NOTE: The Namespace a range is written inside, innermost first — what a fix

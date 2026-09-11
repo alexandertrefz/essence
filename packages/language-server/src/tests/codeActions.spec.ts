@@ -664,6 +664,173 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("redundant-pattern-binder", () => {
+		// NOTE: A dropped binder leaves every read of its name unresolved, so
+		// the arm reports an `unknown-name` beside it and the fix under test has
+		// to be picked out by its code rather than taken as the first offered.
+		function binderFixes(lines: Array<string>): Array<CodeActionEntry> {
+			return quickFixes(lines).filter(
+				(entry) => entry.diagnosticCode === "redundant-pattern-binder",
+			)
+		}
+
+		const MATCHED = [
+			"implementation {",
+			"\ttype Point = { x: Integer, y: Integer }",
+			"\tconstant p: Point | String = { x = 1, y = 2 }",
+			"",
+		]
+
+		// NOTE: The binder goes and every read of it becomes `@`, which names
+		// the very same value — the Help applied, and the Program compiles.
+		it("should write '@' where the binder was read", () => {
+			let lines = [
+				...MATCHED,
+				"\tconstant found = match p -> Integer {",
+				"\t\tcase { x, y } as point { <- point.x }",
+				"\t\tcase String { <- 0 }",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = binderFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Use '@' instead of 'point'")
+			expect(fix.isPreferred).toBe(true)
+			expect(result[5]).toBe("\t\tcase { x, y } { <- @.x }")
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should rewrite every read in the arm", () => {
+			let lines = [
+				...MATCHED,
+				"\tconstant found = match p -> Integer {",
+				"\t\tcase { x, y } as point {",
+				"\t\t\tconstant across = point.x",
+				"\t\t\t<- across::add(point.y)",
+				"\t\t}",
+				"",
+				"\t\tcase String { <- 0 }",
+				"\t}",
+				"}",
+			]
+
+			let result = applied(lines, binderFixes(lines)[0])
+
+			expect(result.slice(5, 9)).toEqual([
+				"\t\tcase { x, y } {",
+				"\t\t\tconstant across = @.x",
+				"\t\t\t<- across::add(@.y)",
+				"\t\t}",
+			])
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A binder on a line of its own takes the line break and the
+		// indentation with it, or what is left behind is a line of trailing
+		// whitespace.
+		it("should take the whole line a binder stands alone on", () => {
+			let lines = [
+				...MATCHED,
+				"\tconstant found = match p -> Integer {",
+				"\t\tcase { x, y }",
+				"\t\t\tas point",
+				"\t\t{",
+				"\t\t\t<- point.x",
+				"\t\t}",
+				"",
+				"\t\tcase String { <- 0 }",
+				"\t}",
+				"}",
+			]
+
+			let result = applied(lines, binderFixes(lines)[0])
+
+			expect(result.slice(5, 9)).toEqual([
+				"\t\tcase { x, y }",
+				"\t\t{",
+				"\t\t\t<- @.x",
+				"\t\t}",
+			])
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A nested Match rebinds `@` to ITS scrutinee, so a read in one of
+		// its arms would be rewritten into a different value. The whole action
+		// is turned away rather than applied to the reads around it: an arm half
+		// in one spelling and half in the other is worse than none.
+		it("should offer nothing for a read under a nested Match", () => {
+			let lines = [
+				...MATCHED,
+				"\tconstant found = match p -> Integer {",
+				"\t\tcase { x, y } as point {",
+				"\t\t\t<- match p -> Integer {",
+				"\t\t\t\tcase String { <- point.x }",
+				"\t\t\t\tcase _ { <- 0 }",
+				"\t\t\t}",
+				"\t\t}",
+				"",
+				"\t\tcase String { <- 0 }",
+				"\t}",
+				"}",
+			]
+
+			expect(binderFixes(lines)).toEqual([])
+		})
+
+		// NOTE: And a Declaration in the body spelling the same name means the
+		// reads after it are that Declaration's, not the binder's.
+		it("should offer nothing where the body declares the name", () => {
+			let lines = [
+				...MATCHED,
+				"\tconstant found = match p -> Integer {",
+				"\t\tcase { x, y } as point {",
+				"\t\t\tconstant point = 9",
+				"\t\t\t<- point",
+				"\t\t}",
+				"",
+				"\t\tcase String { <- 0 }",
+				"\t}",
+				"}",
+			]
+
+			expect(binderFixes(lines)).toEqual([])
+		})
+
+		// NOTE: A Match the arm is written ON still reads the arm's `@`, so the
+		// scrutinee of a nested Match is rewritten like any other read.
+		it("should rewrite a nested Match's own scrutinee", () => {
+			let lines = [
+				"implementation {",
+				"\ttype Tagged = { tag: Integer | String }",
+				"\tconstant t: Tagged | Boolean = { tag = 1 }",
+				"",
+				"\tconstant found = match t -> Integer {",
+				"\t\tcase { tag } as holder {",
+				"\t\t\t<- match holder.tag -> Integer {",
+				"\t\t\t\tcase Integer { <- @ }",
+				"\t\t\t\tcase String { <- 0 }",
+				"\t\t\t}",
+				"\t\t}",
+				"",
+				"\t\tcase Boolean { <- 0 }",
+				"\t}",
+				"}",
+			]
+
+			let result = applied(lines, binderFixes(lines)[0])
+
+			expect(result[5]).toBe("\t\tcase { tag } {")
+			expect(result[6]).toBe("\t\t\t<- match @.tag -> Integer {")
+
+			expect(codesOf(result)).toEqual([])
+		})
+	})
+
 	describe("redundant-interpolation-to-string", () => {
 		it("should leave the receiver as the whole hole", () => {
 			let lines = [

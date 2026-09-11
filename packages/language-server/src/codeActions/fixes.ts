@@ -1,3 +1,4 @@
+import { patternBindings } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { insertImportEdit, relativeSpecifier } from "../autoImport"
@@ -7,6 +8,7 @@ import {
 	closingBraceAfter,
 	closingBraceOf,
 	closingBracketEdit,
+	containsRange,
 	commaAfter,
 	commaBefore,
 	endOfContents,
@@ -16,6 +18,7 @@ import {
 	insertBeforeClosingBrace,
 	keywordBefore,
 	labelBefore,
+	lineAt,
 	openingBracketEdit,
 	openingParenthesisAfter,
 	removeLinesEdit,
@@ -30,9 +33,12 @@ import {
 	findGenericDeclaration,
 	findHandler,
 	findMatch,
+	findHandlerBefore,
 	findMethodInvocation,
 	findNodeAt,
+	type Handler,
 	handlerBodyEnd,
+	walkHandler,
 } from "./lookups"
 
 // NOTE: One function per Diagnostic a Quick Fix answers, and nothing here
@@ -1191,5 +1197,168 @@ export function declareParameterAction(
 					last === undefined ? `<infer ${name}>` : `, infer ${name}`,
 			},
 		],
+	}
+}
+
+// NOTE: A Pattern's whole-value binder, replaced by the `@` that already names
+// the same value — the Help applied. Every read of the name inside the arm is
+// rewritten and the `as name` goes, which is the whole of what the reader would
+// have done by hand.
+//
+// The reads are found by NAME rather than through the rename index, because the
+// Parser reports this binder and then DROPS it: there is no Declaration for the
+// index to bind them to, and a read of the name is an `unknown-name` of its own
+// until this fix lands. What the index would have given for free has to be
+// checked here instead, which is what the two refusals below are.
+//
+// REFUSED WHOLE, rather than applied to the reads it is sure of. A read standing
+// where `@` means something else — inside a nested Match's arm, inside a
+// Function written in the body — would be rewritten into a different value
+// silently, and a fix that rewrote the rest and left that one would leave an arm
+// half in one spelling and half in the other. So a single read anywhere `@` is
+// not the scrutinee, or a Declaration in the body spelling the same name, turns
+// the whole action away.
+export function binderToScrutineeAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+	lines: Array<string>,
+): CodeActionEntry | null {
+	// NOTE: The name comes off the BUFFER, since the binder the Parser dropped
+	// is nowhere in the AST and the Help that names it is prose this Compiler
+	// reserves the right to reword.
+	let written = /^as[ \t]+(\S+)$/.exec(sliceOf(lines, diagnostic.position))
+	let handler = findHandlerBefore(program, diagnostic.position.start)
+
+	if (written === null || handler === null) {
+		return null
+	}
+
+	let between = sliceOf(lines, {
+		start: handler.matcher.position.end,
+		end: diagnostic.position.start,
+	})
+
+	if (between.trim() !== "") {
+		return null
+	}
+
+	let name = written[1] as string
+	let reads = binderReads(handler, name)
+
+	if (reads === null) {
+		return null
+	}
+
+	// NOTE: The space in front of the `as` goes with it. A binder written on a
+	// line of its OWN takes the line break and the indentation instead, or what
+	// is left behind is a line of trailing whitespace.
+	let before = lineAt(lines, diagnostic.position.start.line)
+		.slice(0, diagnostic.position.start.column - 1)
+		.replace(/[ \t]+$/, "")
+
+	return {
+		title: `Use '@' instead of '${name}'`,
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [
+			{
+				range: {
+					start:
+						before === ""
+							? extendOverLeadingBreak(
+									lines,
+									diagnostic.position.start,
+								)
+							: {
+									line: diagnostic.position.start.line,
+									column: before.length + 1,
+								},
+					end: diagnostic.position.end,
+				},
+				newText: "",
+			},
+			...reads.map((read) => ({ range: read, newText: "@" })),
+		],
+	}
+}
+
+// NOTE: Where the binder's name is read inside its arm, or null where one of
+// those reads can not be rewritten — a Declaration in the body spelling the same
+// name, or a read standing somewhere `@` names something else. The two are one
+// answer because the fix is one edit or none.
+function binderReads(
+	handler: Handler,
+	name: string,
+): Array<common.Position> | null {
+	let reads: Array<common.Position> = []
+	let rebound: Array<common.Position> = []
+	let shadowed = false
+
+	walkHandler(handler, (node) => {
+		if (node.nodeType === "Identifier" && node.content === name) {
+			reads.push(node.position)
+			return
+		}
+
+		if (declaresName(node, name)) {
+			shadowed = true
+			return
+		}
+
+		rebound.push(...reboundRegionsOf(node))
+	})
+
+	if (shadowed) {
+		return null
+	}
+
+	return reads.some((read) =>
+		rebound.some((region) => containsRange(region, read)),
+	)
+		? null
+		: reads
+}
+
+// NOTE: Whether a Statement binds that name — a Declaration written plainly, or
+// one that takes its value apart and binds the name as a member. Either way the
+// name means the Declaration from there on, and `@` is not what it means.
+function declaresName(node: parser.ImplementationNode, name: string): boolean {
+	if (
+		node.nodeType !== "ConstantDeclarationStatement" &&
+		node.nodeType !== "VariableDeclarationStatement"
+	) {
+		return false
+	}
+
+	return node.name.nodeType === "Pattern"
+		? patternBindings(node.name).some(
+				(binding) => binding.name.content === name,
+			)
+		: node.name.content === name
+}
+
+// NOTE: The spans inside one Node where `@` does NOT mean what it means around
+// it. A nested Match rebinds it per arm — from the Matcher's end, so that the
+// guard is covered and the scrutinee the Match is written ON is not: `match name
+// -> …` still reads the outer `@`. A Function written in the body takes its
+// whole span, Parameter defaults included, since none of it is the arm's value
+// any more.
+function reboundRegionsOf(
+	node: parser.ImplementationNode,
+): Array<common.Position> {
+	switch (node.nodeType) {
+		case "Match":
+			return node.handlers.map((handler) => ({
+				start: handler.matcher.position.end,
+				end: handlerBodyEnd(handler),
+			}))
+		case "FunctionStatement":
+		case "FunctionValue":
+		case "NamespaceDefinitionStatement":
+			return [node.position]
+		default:
+			return []
 	}
 }

@@ -2166,6 +2166,14 @@ because what the constructor took is not `@`. There `@` is the Case narrowed to
 `#Rect` and `box` is the payload inside it, so the two name different values and
 an arm has reason to want both.
 
+**Quick Fix — "Use '@' instead of 'name'":** drops the `as name` and writes `@`
+over every read of the name in the arm. It is not offered when one of those
+reads stands somewhere `@` means something else — inside a nested `match`'s arm,
+inside a Function written in the body — or when the body declares the name
+itself: the whole action is turned away rather than applied to the reads around
+it, because an arm left half in one spelling and half in the other is worse than
+none.
+
 ### `pattern-without-body`
 
 A Pattern stands where a Parameter's name would on a native Method signature or

@@ -21,6 +21,7 @@ import {
 } from "./defineFixes"
 import {
 	argumentLabelAction,
+	binderToScrutineeAction,
 	boundParameterAction,
 	choicePrefixActions,
 	declareConformanceAction,
@@ -325,6 +326,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(removeToStringAction(diagnostic, lines)),
 	"redundant-parameter-label": ({ diagnostic, lines }) =>
 		listed(removeLabelAction(diagnostic, lines)),
+	"redundant-pattern-binder": ({ diagnostic, program, lines }) =>
+		listed(binderToScrutineeAction(diagnostic, program, lines)),
 	"self-import": ({ diagnostic, program, lines }) =>
 		listed(removeSelfImportAction(diagnostic, program, lines)),
 	"shorthand-in-combination": ({ diagnostic, program, lines }) =>
