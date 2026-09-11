@@ -1424,6 +1424,49 @@ describe("A file about to be renamed", () => {
 			files.dispose()
 		}
 	})
+
+	// NOTE: A source renamed OUT of the language is not a move to rewrite to.
+	// `"./Shared.txt"` is a specifier the Compiler refuses outright, so writing
+	// it into every dependent would be the Server volunteering text that can
+	// not compile and putting it in the reader's undo stack. The import was
+	// going to dangle either way; what is left is the Diagnostic that says so.
+	//
+	// A DIRECTORY rename is not one of these — its new path is a directory, and
+	// the sources beneath it keep their own names — which the test above, where
+	// `lib` becomes `deep/lib`, is what holds.
+	it("should answer nothing for a rename that leaves the language", async () => {
+		let files = makeSessionWorkspace({
+			"Shared.es": shared,
+			"Main.es": [
+				"import {",
+				'\tfrom "./Shared.es" { base }',
+				"}",
+				"",
+				"implementation {",
+				"\tTerminal.inspect(base::toString())",
+				"}",
+				"",
+			].join("\n"),
+		})
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.settle()
+
+			expect(
+				await willRename(session, [
+					{
+						from: files.pathOf("Shared.es"),
+						to: files.pathOf("Shared.txt"),
+					},
+				]),
+			).toEqual({})
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
 })
 
 // NOTE: A standard library source is an ordinary `.es` file that two rules do

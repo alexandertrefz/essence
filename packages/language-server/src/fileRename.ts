@@ -12,6 +12,8 @@ import type { Workspace } from "./workspace"
 // than a repair: the client applies these to the files as they still are and
 // then moves the file, so nothing is ever on disk in the broken state.
 
+const SOURCE_EXTENSION = ".es"
+
 export type FileRename = {
 	oldPath: string
 	newPath: string
@@ -63,6 +65,15 @@ export function importRewrites(
 // workspace already knows or a directory whose files it knows. A path that is
 // neither moves nothing, which is what a rename of something that is not Essence
 // should do.
+//
+// And a source renamed OUT of the language moves nothing either. `Shared.txt`
+// is not a specifier the Compiler will take — `missing-extension` refuses it —
+// so rewriting every dependent to name it would be the Server volunteering
+// text that can not compile, and putting it in the reader's undo stack. The
+// import was going to dangle whatever happened; answering nothing leaves the
+// reader with the one Diagnostic that says so. A DIRECTORY rename is not one of
+// these: its new path is a directory, and the `.es` files under it keep their
+// own names.
 function movesOf(
 	workspace: Workspace,
 	renames: Array<FileRename>,
@@ -72,7 +83,9 @@ function movesOf(
 
 	for (let rename of renames) {
 		if (known.has(rename.oldPath)) {
-			moves.set(rename.oldPath, rename.newPath)
+			if (rename.newPath.endsWith(SOURCE_EXTENSION)) {
+				moves.set(rename.oldPath, rename.newPath)
+			}
 
 			continue
 		}
