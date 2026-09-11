@@ -1,10 +1,10 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
 import {
-	extendOverLeadingBreak,
 	indentationOf,
 	insertBeforeClosingBrace,
 	lineAt,
+	removeLinesEdit,
 	sliceOf,
 } from "./geometry"
 import type { CodeActionEntry } from "./index"
@@ -43,13 +43,10 @@ export function unreachableDefineArmActions(
 		return []
 	}
 
-	let removal = {
-		range: {
-			start: extendOverLeadingBreak(lines, diagnostic.position.start),
-			end: diagnostic.position.end,
-		},
-		newText: "",
-	}
+	// NOTE: The arm's own line where it stands on one, and the arm with the
+	// blank in front of it where it shares a line — `as 0 otherwise as 2 if
+	// other` deleted without that blank leaves `otherwise  }` behind.
+	let removal = removeLinesEdit(lines, diagnostic.position)
 
 	let entries: Array<CodeActionEntry> = [
 		{

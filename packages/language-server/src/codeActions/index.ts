@@ -1,6 +1,7 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { type Analysis, analyseDocument, documentFilePath } from "../analyse"
+import { isSamePosition } from "../positions"
 import { indexProgram, type ProgramIndex } from "../rename"
 import type { Workspace } from "../workspace"
 import {
@@ -232,15 +233,17 @@ export function findCodeActions(
 			continue
 		}
 
-		entries.push(
-			...actionsFor({
-				diagnostic,
-				program,
-				enrichedProgram,
-				lines,
-				imports,
-			}),
-		)
+		for (let entry of actionsFor({
+			diagnostic,
+			program,
+			enrichedProgram,
+			lines,
+			imports,
+		})) {
+			if (!alreadyOffered(entries, entry)) {
+				entries.push(entry)
+			}
+		}
 	}
 
 	if (enrichedProgram !== null) {
@@ -562,6 +565,36 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 
 function actionsFor(context: FixContext): Array<CodeActionEntry> {
 	return fixesByCode[context.diagnostic.code]?.(context) ?? []
+}
+
+// NOTE: Whether the very same action already stands in the list — the same
+// title writing the same text over the same range. SEVERAL Diagnostics can have
+// one answer: a `where` clause on a Protocol extension is refused once per
+// condition and what goes is the clause, so a request covering two conditions
+// is answered twice with the one edit. Applying either leaves the same buffer,
+// so the lightbulb is offered it once.
+//
+// Only the Diagnostic loop asks. A refactoring answers no Diagnostic and is
+// computed once by construction.
+function alreadyOffered(
+	entries: Array<CodeActionEntry>,
+	entry: CodeActionEntry,
+): boolean {
+	return entries.some(
+		(offered) =>
+			offered.title === entry.title &&
+			offered.kind === entry.kind &&
+			offered.edits.length === entry.edits.length &&
+			offered.edits.every(
+				(edit, index) =>
+					edit.newText === entry.edits[index]?.newText &&
+					edit.filePath === entry.edits[index]?.filePath &&
+					isSamePosition(
+						edit.range,
+						(entry.edits[index] as CodeActionEdit).range,
+					),
+			),
+	)
 }
 
 function listed(entry: CodeActionEntry | null): Array<CodeActionEntry> {

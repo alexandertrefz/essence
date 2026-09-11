@@ -2435,7 +2435,9 @@ describe("Code Actions", () => {
 		})
 
 		// NOTE: The move writes whole lines, and a `define` on one line has no
-		// line above its `otherwise` arm to write into.
+		// line above its `otherwise` arm to write into. The deletion takes the
+		// blank in front of the arm where there is no line to take, so what is
+		// left is `otherwise }` rather than `otherwise  }`.
 		it("should offer the deletion alone for a define written on one line", () => {
 			let lines = [
 				"implementation {",
@@ -2444,7 +2446,12 @@ describe("Code Actions", () => {
 				"}",
 			]
 
+			let [fix] = quickFixes(lines)
+
 			expect(titles(quickFixes(lines))).toEqual(["Remove the arm"])
+			expect(applied(lines, fix)[2]).toBe(
+				"\tconstant grade = define { as 1 if flag as 0 otherwise }",
+			)
 		})
 
 		it("should stay silent where the span no longer opens with 'as'", () => {
@@ -2524,7 +2531,9 @@ describe("Code Actions", () => {
 			expect(fix.diagnosticCode).toBe("define-without-otherwise")
 			expect(fix.isPreferred).toBe(false)
 
-			expect(applied(lines, fix)).toEqual([
+			let result = applied(lines, fix)
+
+			expect(result).toEqual([
 				"implementation {",
 				"\tconstant flag = true",
 				"\tconstant grade = define {",
@@ -2533,6 +2542,15 @@ describe("Code Actions", () => {
 				"\t}",
 				"}",
 			])
+
+			// NOTE: The one scaffold in this file whose hole does not PARSE —
+			// `as  otherwise` has no value in it and `esfmt` refuses the buffer
+			// outright. It is the documented shape of this fix (see the code's
+			// entry in `diagnostics.md`), and what is pinned here is that it
+			// costs exactly the one `syntax-error`: a hole that took a second
+			// Diagnostic with it, or that hid the Diagnostics below it, would
+			// be a different fix and not this one.
+			expect(codesOf(result)).toEqual(["syntax-error"])
 		})
 
 		it("should stay silent where the span no longer reads as a define", () => {
@@ -2951,8 +2969,10 @@ describe("Code Actions", () => {
 
 		// NOTE: One Diagnostic per condition, and one edit that answers all of
 		// them — a clause with one condition left is the same refusal, so there
-		// is nothing to take out but the clause.
-		it("should answer every condition of the clause with the same edit", () => {
+		// is nothing to take out but the clause. Which is also why the lightbulb
+		// is offered it ONCE: two entries with one title writing one range is a
+		// list that asks the reader to choose between a thing and itself.
+		it("should answer every condition of the clause with one offer", () => {
 			let lines = [
 				"implementation {",
 				"\tprotocol Sizeable is Equatable where Item is Comparable, Key is Equatable {",
@@ -2962,9 +2982,9 @@ describe("Code Actions", () => {
 			]
 
 			let fixes = quickFixes(lines)
-			let result = applied(lines, fixes[1])
+			let result = applied(lines, fixes[0])
 
-			expect(fixes.length).toBe(2)
+			expect(titles(fixes)).toEqual(["Drop the 'where' clause"])
 			expect(result[1]).toBe("\tprotocol Sizeable is Equatable {")
 
 			expect(codesOf(result)).toEqual([])
@@ -3256,6 +3276,38 @@ describe("Code Actions", () => {
 
 			expect(fix.title).toBe("Remove 'retries'")
 			expect(result[3]).toBe('\ttest "ranks the table" {}')
+
+			expect(testCodesOf(result)).toEqual([])
+		})
+
+		// NOTE: The Formatter puts a Modifier on a line of its own under a
+		// `test "…"` head, and a word removed from in front of nothing leaves
+		// nothing but the indentation it stood behind. So the line goes with it.
+		it("should take the line a Modifier stood alone on", () => {
+			let lines = [
+				"implementation {",
+				"}",
+				"tests {",
+				'\ttest "ranks the table"',
+				"\t\tslowly",
+				"\t{",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Remove 'slowly'")
+			expect(result).toEqual([
+				"implementation {",
+				"}",
+				"tests {",
+				'\ttest "ranks the table"',
+				"\t{",
+				"\t}",
+				"}",
+			])
 
 			expect(testCodesOf(result)).toEqual([])
 		})

@@ -18,7 +18,6 @@ import {
 	containsRange,
 	endOfContents,
 	extendOverLeadingBreak,
-	extendOverLeadingSpace,
 	indentationOf,
 	insertBeforeClosingBrace,
 	isWordBounded,
@@ -799,6 +798,10 @@ export function wrapInHoldingCaseActions(
 // says stands there, as every edit here is: a Position from a stale analysis
 // pointing at something else would delete that instead.
 //
+// A Modifier written on a LINE of its own, which is where the Formatter puts
+// one under a `test "…"` head, takes that line: a word removed from in front of
+// nothing leaves nothing but the indentation it stood behind.
+//
 // `span` is what actually goes, where the word carries something that goes with
 // it — a Modifier the Parser read arguments into takes them along, or `3` is
 // left standing where `retries 3` was. The word's own span otherwise, which is
@@ -825,15 +828,7 @@ export function removeWordAction(
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
 		isPreferred: options.isPreferred,
-		edits: [
-			{
-				range: {
-					start: extendOverLeadingSpace(lines, span.start),
-					end: span.end,
-				},
-				newText: "",
-			},
-		],
+		edits: [removeLinesEdit(lines, span)],
 	}
 }
 

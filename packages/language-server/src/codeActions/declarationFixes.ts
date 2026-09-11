@@ -146,10 +146,9 @@ export function dropStaticAction(
 
 // NOTE: The whole clause goes, from the Protocol's name to the last condition —
 // a `where` with one condition left is the same refusal, so taking them out one
-// at a time would only report again. That is also why every condition of one
-// clause answers with this same edit: the Diagnostic is reported per condition
-// and the clause is what has to go, so a request that covers two of them is
-// offered the fix twice rather than half of it once.
+// at a time would only report again. Every condition of one clause therefore
+// answers with this same edit, and the registry drops the repeats: two
+// Diagnostics with one answer are one offer in the lightbulb.
 export function dropWhereClauseAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,

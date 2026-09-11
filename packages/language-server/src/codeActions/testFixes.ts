@@ -1,7 +1,7 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { removeWordAction } from "./fixes"
-import { extendOverLeadingSpace, isWordBounded, sliceOf } from "./geometry"
+import { isWordBounded, removeLinesEdit, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { findTestModifierWord } from "./lookups"
 
@@ -79,15 +79,7 @@ export function contradictoryModifierActions(
 			diagnosticCode: diagnostic.code,
 			diagnosticPosition: diagnostic.position,
 			isPreferred: false,
-			edits: [
-				{
-					range: {
-						start: extendOverLeadingSpace(lines, skipped.start),
-						end: skipped.end,
-					},
-					newText: "",
-				},
-			],
+			edits: [removeLinesEdit(lines, skipped)],
 		})
 	}
 
@@ -146,13 +138,7 @@ export function mergeModifierAction(
 		return null
 	}
 
-	let removal = {
-		range: {
-			start: extendOverLeadingSpace(lines, diagnostic.position.start),
-			end: diagnostic.position.end,
-		},
-		newText: "",
-	}
+	let removal = removeLinesEdit(lines, diagnostic.position)
 
 	// NOTE: A `tagged` naming no tags is refused by a Diagnostic of its own, and
 	// merging one in would write `tagged, slow`. So the merge asks that both
