@@ -395,6 +395,11 @@ where it stands, which is what makes the names it introduces safe to read.
 Write `require #Value(first) = table::firstItem()` to take the value apart, or
 compare instead with `expect value::is(…)`.
 
+**Quick Fix — "Take the value apart with 'require'":** swaps the Keyword and
+leaves the Matcher and the value exactly as they were written, which is the
+whole of what is wrong. Offered where the Keyword opens the line the Matcher is
+on.
+
 ### `matcher-after-value`
 
 A Matcher was written after the value, behind an `is`:
@@ -414,6 +419,12 @@ declaring.
 
 Write `require #Value(first) = table::firstItem()`, or compare with
 `::is(value)` where a comparison was what was meant.
+
+**Quick Fix — "Take the value apart with 'require'":** writes the two sides
+around a `require` in the other order. It is preferred because it is the only
+mechanical answer: comparing instead needs a value to compare against, and a
+Matcher is not one. Not offered where either side runs over a line break, since
+the rewrite puts them on one line.
 
 ### `wildcard-in-require`
 
@@ -450,6 +461,10 @@ tests {
 `require MATCHER = EXPR` takes a value apart by its shape — a Case, a Type, a
 Pattern. A written value is not a shape: what it asks is whether the two are
 equal, and that is what `Equatable::is` answers. Write `require points::is(3)`.
+
+**Quick Fix — "Compare it instead: 'points::is(3)'":** writes the two sides
+around the comparison, keeping the Keyword that was written — a comparison is a
+Boolean, and both Keywords judge one.
 
 A Pattern MEMBER constrained by a written value is a different thing and is
 allowed — `require { points = 3 } = standing` asks the question of one member
@@ -1007,6 +1022,11 @@ implementation {
 
 Ask it of a Statement inside the tests section, or write `§` for a comment that
 asks nothing.
+
+**Quick Fix — "Write an ordinary '§' Comment":** drops the `?`, leaving
+whatever was written behind it alone. Asking it of a Statement inside the tests
+section is the other answer, and moving a Statement is not something a span can
+say how to do.
 
 ## Names
 

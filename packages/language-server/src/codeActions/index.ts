@@ -2,6 +2,11 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { type Analysis, analyseDocument, documentFilePath } from "../analyse"
 import type { Workspace } from "../workspace"
+import {
+	compareWrittenValueAction,
+	matcherBeforeValueAction,
+	requireKeywordAction,
+} from "./assertionFixes"
 import { removeDefaultAction } from "./defaultFixes"
 import {
 	inlineDefineValueAction,
@@ -31,6 +36,7 @@ import {
 	documentationSeparatorAction,
 	invalidEscapeActions,
 	mixedRationalActions,
+	ordinaryCommentAction,
 	partialDecimalActions,
 } from "./literalFixes"
 import { annotationActions, shorthandActions } from "./refactors"
@@ -243,6 +249,12 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		invalidEscapeActions(diagnostic, lines),
 	"invalid-module-specifier": ({ diagnostic, lines }) =>
 		moduleSpecifierActions(diagnostic, lines),
+	"literal-in-require": ({ diagnostic, lines }) =>
+		listed(compareWrittenValueAction(diagnostic, lines)),
+	"matcher-after-value": ({ diagnostic, lines }) =>
+		listed(matcherBeforeValueAction(diagnostic, lines)),
+	"matcher-on-expect": ({ diagnostic, lines }) =>
+		listed(requireKeywordAction(diagnostic, lines)),
 	"missing-case": ({ diagnostic, program, lines }) =>
 		listed(missingCaseAction(diagnostic, program, lines)),
 	"missing-documentation-separator": ({ diagnostic, lines }) =>
@@ -284,6 +296,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		unreachableDefineArmActions(diagnostic, program, lines),
 	"unused-import": ({ diagnostic, program, lines }) =>
 		listed(removeImportAction(diagnostic, program, lines)),
+	"value-comment-outside-tests": ({ diagnostic, lines }) =>
+		listed(ordinaryCommentAction(diagnostic, lines)),
 	"wrong-update-brackets": ({ diagnostic, lines }) =>
 		listed(updateBracketsAction(diagnostic, lines)),
 }

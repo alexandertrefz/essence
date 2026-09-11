@@ -29,6 +29,12 @@ export class ParseError {
 	// as opposed to `message`, which is the whole sentence. The renderer puts
 	// them in different places, so they are kept apart here.
 	label: string | null
+	// NOTE: The Labels BESIDE the primary one, in the order they render. Empty
+	// for almost every ParseError — a failed expectation is about one Token and
+	// has nothing to point at twice — and set by the few refusals that are about
+	// a relationship between two spans, where the second is what turns the claim
+	// into an explanation.
+	labels: Array<common.DiagnosticLabel>
 	// NOTE: Almost every ParseError is the generic "expected X, found Y" and
 	// reports as `syntax-error` with nothing to add. The few that are their
 	// own kind of problem carry their code and context here, so the Statement
@@ -51,6 +57,7 @@ export class ParseError {
 		label: string | null = null,
 		details: {
 			code?: common.DiagnosticCode
+			labels?: Array<common.DiagnosticLabel>
 			notes?: Array<string>
 			helps?: Array<string>
 			reported?: boolean
@@ -60,6 +67,7 @@ export class ParseError {
 		this.position = position
 		this.label = label
 		this.code = details.code ?? "syntax-error"
+		this.labels = details.labels ?? []
 		this.notes = details.notes ?? []
 		this.helps = details.helps ?? []
 		this.reported = details.reported ?? false

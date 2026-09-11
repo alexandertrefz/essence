@@ -1962,8 +1962,10 @@ Error: A written value has no parts to name
     ╭─┤ TestsSyntax.es:64:11 │
     │
  64 │        require 3 = lions.points
-    │                ▲  
-    │                ╰── this is a value, not a shape
+    │                ▲   ──────┬─────  
+    │                ╰─────────│─────── this is a value, not a shape
+    │                          │       
+    │                          ╰─────── the value it asks about
     │ 
     │ Help: Compare instead: 'require x::is(3)'.
     │ 

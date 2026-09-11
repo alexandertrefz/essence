@@ -342,3 +342,39 @@ export function documentationSeparatorAction(
 		edits: [{ range: { start, end: start }, newText: `${emDash} ` }],
 	}
 }
+
+// NOTE: A value comment is `§?` written at the end of a Statement, and the
+// Diagnostic spans the whole Comment — the two characters and everything the
+// reader wrote behind them.
+const valueComment = "§?"
+
+// NOTE: The two characters at the front, and nothing else: what a reader wrote
+// behind them is a Comment either way, and is left exactly as it was. Preferred,
+// because the other answer the Help gives — ask it of a Statement inside the
+// `tests { … }` block — is a move rather than an edit, and moving a Statement is
+// not something a span can say how to do.
+export function ordinaryCommentAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
+): CodeActionEntry | null {
+	let sigil = {
+		start: diagnostic.position.start,
+		end: {
+			line: diagnostic.position.start.line,
+			column: diagnostic.position.start.column + valueComment.length,
+		},
+	}
+
+	if (sliceOf(lines, sigil) !== valueComment) {
+		return null
+	}
+
+	return {
+		title: "Write an ordinary '§' Comment",
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [{ range: sigil, newText: "§" }],
+	}
+}

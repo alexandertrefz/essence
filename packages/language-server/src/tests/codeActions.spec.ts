@@ -5,6 +5,11 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { analyse } from "../analyse"
 import { type CodeActionEntry, findCodeActions } from "../codeActions"
+import {
+	compareWrittenValueAction,
+	matcherBeforeValueAction,
+	requireKeywordAction,
+} from "../codeActions/assertionFixes"
 import { removeDefaultAction } from "../codeActions/defaultFixes"
 import {
 	inlineDefineValueAction,
@@ -16,6 +21,7 @@ import {
 	documentationSeparatorAction,
 	invalidEscapeActions,
 	mixedRationalActions,
+	ordinaryCommentAction,
 	partialDecimalActions,
 } from "../codeActions/literalFixes"
 import {
@@ -91,6 +97,17 @@ function applied(lines: Array<string>, entry: CodeActionEntry): Array<string> {
 // is expected and is the reader's to fill in.
 function codesOf(lines: Array<string>): Array<common.DiagnosticCode> {
 	return analyse(lines.join("\n")).map((diagnostic) => diagnostic.code)
+}
+
+// NOTE: The same question asked of a compile that wanted the TESTS, which is
+// what a Code Action request is answered from. A `tests { … }` block is dropped
+// by a build, so the codes reported inside one — and the stray value comment,
+// which only a test compile has anything to answer — are absent from the
+// analysis above and an assertion against it would hold for the wrong reason.
+function testCodesOf(lines: Array<string>): Array<common.DiagnosticCode> {
+	return analyse(lines.join("\n"), undefined, { tests: true }).map(
+		(diagnostic) => diagnostic.code,
+	)
 }
 
 // NOTE: A span by what it points AT rather than by a column counted out by
@@ -1605,6 +1622,153 @@ describe("Code Actions", () => {
 					staleDiagnostic(
 						"declarations-outside-stdlib",
 						spanOf(lines, 1, "implementation"),
+					),
+					lines,
+				),
+			).toBeNull()
+		})
+	})
+
+	describe("assertions written in a shape the language has not", () => {
+		function inTest(...body: Array<string>): Array<string> {
+			return [
+				"implementation {",
+				"}",
+				"",
+				"tests {",
+				'\ttest "a" {',
+				...body,
+				"\t}",
+				"}",
+			]
+		}
+
+		it("should write an 'expect' that takes a value apart as a 'require'", () => {
+			let lines = inTest(
+				"\t\tconstant value = 3",
+				"\t\texpect Integer = value",
+			)
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Take the value apart with 'require'")
+			expect(fix.diagnosticCode).toBe("matcher-on-expect")
+			expect(fix.isPreferred).toBe(true)
+
+			let result = applied(lines, fix)
+
+			expect(result[6]).toBe("\t\trequire Integer = value")
+			expect(testCodesOf(result)).not.toContain("matcher-on-expect")
+		})
+
+		it("should write a Matcher behind the value in front of it", () => {
+			let lines = inTest(
+				"\t\tconstant value = 3",
+				"\t\texpect value is Integer",
+			)
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Take the value apart with 'require'")
+			expect(fix.diagnosticCode).toBe("matcher-after-value")
+			expect(fix.isPreferred).toBe(true)
+
+			let result = applied(lines, fix)
+
+			expect(result[6]).toBe("\t\trequire Integer = value")
+			expect(testCodesOf(result)).not.toContain("matcher-after-value")
+		})
+
+		it("should compare a written value rather than take it apart", () => {
+			let lines = inTest(
+				"\t\tconstant value = 3",
+				"\t\trequire 3 = value",
+			)
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Compare it instead: 'value::is(3)'")
+			expect(fix.diagnosticCode).toBe("literal-in-require")
+			expect(fix.isPreferred).toBe(true)
+
+			let result = applied(lines, fix)
+
+			expect(result[6]).toBe("\t\trequire value::is(3)")
+			expect(testCodesOf(result)).not.toContain("literal-in-require")
+		})
+
+		// NOTE: A backwards search finds the LAST keyword before the cursor, so
+		// the one that matters is the one with nothing but indentation in front
+		// of it.
+		it("should stay silent where no keyword opens the line", () => {
+			let lines = ["implementation {", "\tconstant value = 3", "}"]
+
+			expect(
+				requireKeywordAction(
+					staleDiagnostic("matcher-on-expect", spanOf(lines, 2, "3")),
+					lines,
+				),
+			).toBeNull()
+
+			expect(
+				matcherBeforeValueAction(
+					staleDiagnostic(
+						"matcher-after-value",
+						spanOf(lines, 2, "value = 3"),
+					),
+					lines,
+				),
+			).toBeNull()
+		})
+
+		it("should stay silent where no '=' stands between the two spans", () => {
+			let lines = ["implementation {", "\tconstant value = 3", "}"]
+
+			expect(
+				compareWrittenValueAction(
+					staleDiagnostic(
+						"literal-in-require",
+						spanOf(lines, 2, "constant"),
+						[
+							{
+								position: spanOf(lines, 2, "value"),
+								message: "",
+								kind: "secondary",
+							},
+						],
+					),
+					lines,
+				),
+			).toBeNull()
+		})
+	})
+
+	describe("value-comment-outside-tests", () => {
+		it("should write the sigil of an ordinary Comment", () => {
+			let lines = ["implementation {", "\tconstant one = 1 §? what", "}"]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Write an ordinary '§' Comment")
+			expect(fix.diagnosticCode).toBe("value-comment-outside-tests")
+			expect(fix.isPreferred).toBe(true)
+
+			let result = applied(lines, fix)
+
+			expect(result[1]).toBe("\tconstant one = 1 § what")
+			expect(testCodesOf(result)).not.toContain(
+				"value-comment-outside-tests",
+			)
+		})
+
+		it("should stay silent where the span no longer opens with the sigil", () => {
+			let lines = ["implementation {", "\tconstant one = 1 § what", "}"]
+
+			expect(
+				ordinaryCommentAction(
+					staleDiagnostic(
+						"value-comment-outside-tests",
+						spanOf(lines, 2, "§ what"),
 					),
 					lines,
 				),

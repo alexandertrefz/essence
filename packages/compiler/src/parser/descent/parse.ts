@@ -1322,10 +1322,12 @@ class DescentParser {
 
 		reportError(error.message, error.position, {
 			code: error.code,
-			labels:
+			labels: [
 				error.label === null
-					? [primary(error.position, "here")]
-					: [primary(error.position, error.label)],
+					? primary(error.position, "here")
+					: primary(error.position, error.label),
+				...error.labels,
+			],
 			notes: error.notes,
 			helps: error.helps,
 		})
@@ -2547,7 +2549,7 @@ class DescentParser {
 			}
 
 			this.refuseMatcherOnExpect(keyword, matcher)
-			this.refuseUnusableMatcher(matcher)
+			this.refuseUnusableMatcher(matcher, value)
 
 			let matches = this.tokens.peek()
 
@@ -2649,7 +2651,10 @@ class DescentParser {
 	// other one may stand there, whether it binds or not: `require #Empty = x`
 	// and `require Integer = x` name a shape and bind nothing, which is what a
 	// test asks when the shape is the whole of what it is proving.
-	protected refuseUnusableMatcher(matcher: parser.MatcherNode): void {
+	protected refuseUnusableMatcher(
+		matcher: parser.MatcherNode,
+		value: parser.ExpressionNode,
+	): void {
 		if (matcher.nodeType === "WildcardMatcher") {
 			throw new ParseError(
 				"This 'require' asks nothing of the value",
@@ -2674,6 +2679,15 @@ class DescentParser {
 				"this is a value, not a shape",
 				{
 					code: "literal-in-require",
+					// NOTE: The value the line was written OVER, pointed at so
+					// that both sides of the comparison the Help spells stand on
+					// the report. It is also the only record of where that value
+					// ends: the Statement is dropped whole, so nothing
+					// downstream — an Editor writing the comparison above all —
+					// could work it out from the tree.
+					labels: [
+						secondary(value.position, "the value it asks about"),
+					],
 					notes: [
 						"'require MATCHER = EXPR' takes a value apart by its shape — a Case, a Type, a Pattern. A written value is not a shape: what it asks is whether the two are equal, and that is what 'Equatable::is' answers.",
 					],
