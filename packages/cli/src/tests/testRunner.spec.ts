@@ -18,6 +18,7 @@ import {
 	type ProjectConfiguration,
 	readProjectConfiguration,
 } from "@essence-lang/compiler/configuration"
+import { CORPUS_DIRECTORY } from "@essence-lang/compiler/testing"
 import type { TestEvent } from "@essence-lang/runtime/Testing"
 
 import { EXIT_FAILURE, EXIT_FOCUSED, EXIT_SUCCESS } from "../actions"
@@ -2073,28 +2074,35 @@ describe("essence test — property tests", () => {
 	// NOTE: THE claim `--seed` makes: the command a failure printed reproduces
 	// the failure, filter and all.
 	//
-	// NOTE: A directory each rather than two runs in one. What is claimed here
-	// is that the SEED draws the value — and a run that read the
-	// `__counterexamples__` the run before it wrote would answer the same thing
-	// without drawing anything at all.
+	// NOTE: Two runs in ONE directory, with the corpus removed between them. A
+	// property's seed is the run's folded together with the test's id, and a
+	// test's id opens with the path of the Module it was written in — so the
+	// same file in two different directories draws two different sequences, and
+	// what one run shrinks to the other may draw outright. One directory is also
+	// what the claim is ABOUT: the command a failure printed is typed again in
+	// the project the failure happened in.
+	//
+	// The `__counterexamples__` the first run wrote goes, because a run that
+	// read it would answer the same thing without drawing anything at all.
 	it("draws the same counterexample for the same seed", async () => {
-		let whole = await withFiles(
-			{ "Doubling.es": properties },
-			(directory) => runTests(directory, ["--seed", "deadbeef"]),
-		)
-		let alone = await withFiles(
-			{ "Doubling.es": properties },
-			(directory) =>
-				runTests(directory, [
-					"--seed",
-					"deadbeef",
-					"--filter",
-					"doubling stays small",
-				]),
-		)
+		await withFiles({ "Doubling.es": properties }, async (directory) => {
+			let whole = await runTests(directory, ["--seed", "deadbeef"])
 
-		expect(alone.err).toContain("shrunk to: n = 500")
-		expect(whole.err).toContain("shrunk to: n = 500")
+			rmSync(path.join(directory, CORPUS_DIRECTORY), {
+				recursive: true,
+				force: true,
+			})
+
+			let alone = await runTests(directory, [
+				"--seed",
+				"deadbeef",
+				"--filter",
+				"doubling stays small",
+			])
+
+			expect(alone.err).toContain("shrunk to: n = 500")
+			expect(whole.err).toContain("shrunk to: n = 500")
+		})
 	})
 
 	it("runs as many cases as --cases asks for", async () => {
