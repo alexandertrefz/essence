@@ -8,9 +8,12 @@
   `expect` and `require` inside a test, `with` and a closure where a value
   goes, a `case` handler between a `match`'s braces. The Keyword and the block
   that share a name stand side by side in the list, told apart by their icons,
-  and each entry says what accepting it writes. The bundled `.code-snippets`
-  file is generated from that same table, so what a reader who switches the
-  Server off expands is what it offers.
+  and each entry says what accepting it writes. The extension no longer
+  contributes a `.code-snippets` file of its own: VS Code loads one whenever
+  the language is active rather than only when the Server is off, which would
+  offer every prefix a second time and unscoped. The generated file still
+  ships, as the export other Editors read and as user snippets for anyone who
+  turns the Server off.
 - The test vocabulary is lit: the `tagged`, `skipped` and `focused` Modifiers,
   the `across` of a table test, the `matches snapshot` of an assertion and the
   `from` of a named one, and `@example` beside `@param` and `@returns` in a

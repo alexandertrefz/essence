@@ -229,7 +229,10 @@ Server rather than as a second process. Essence files default to tabs and this
 extension as their formatter, which is what the formatter itself assumes.
 
 Snippets cover the language: `namespace`, `protocol`, `choice`, `overload`,
-`match`, `doc` and the rest.
+`match`, `doc` and the rest. They come from the Language Server, which offers
+each one where it parses and nowhere else. The same set ships as
+`snippets/essence.code-snippets` for other Editors and for anyone running
+without the Server — install it as user snippets.
 
 ### Debugging
 

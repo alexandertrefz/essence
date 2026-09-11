@@ -89,12 +89,6 @@
 				"path": "./syntaxes/essence.tmLanguage.json"
 			}
 		],
-		"snippets": [
-			{
-				"language": "essence",
-				"path": "./snippets/essence.code-snippets"
-			}
-		],
 		"semanticTokenScopes": [
 			{
 				"language": "essence",
