@@ -301,20 +301,18 @@ export function namespaceImportActions(
 // NOTE: The whole lines, and the break that ends them — an entry list has no
 // delimiters, so what is left behind by deleting the name alone is a blank line
 // in the middle of the block. The last name of a group takes the group with
-// it, since `from "./A.es" {}` imports nothing and says so on two lines. The
-// Warning points at the LOCAL name, which is the alias where there is one, so
-// the entry is found by that Position rather than by the name it reads.
-export function removeImportAction(
-	diagnostic: common.Diagnostic & { position: common.Position },
+// it, since `from "./A.es" {}` imports nothing and says so on two lines. A
+// Diagnostic about an entry points at the LOCAL name, which is the alias where
+// there is one, so the entry is found by that Position rather than by the name
+// it reads.
+function importEntryEdit(
 	program: parser.Program,
 	lines: Array<string>,
-): CodeActionEntry | null {
+	local: common.Position,
+): CodeActionEdit | null {
 	let group = (program.imports?.groups ?? []).find((candidate) =>
 		candidate.entries.some((entry) =>
-			isSamePosition(
-				(entry.alias ?? entry.name).position,
-				diagnostic.position,
-			),
+			isSamePosition((entry.alias ?? entry.name).position, local),
 		),
 	)
 
@@ -326,11 +324,22 @@ export function removeImportAction(
 		group.entries.length === 1
 			? group.position
 			: group.entries.find((entry) =>
-					isSamePosition(
-						(entry.alias ?? entry.name).position,
-						diagnostic.position,
-					),
+					isSamePosition((entry.alias ?? entry.name).position, local),
 				)!.position
+
+	return removeLinesEdit(lines, removed)
+}
+
+export function removeImportAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+	lines: Array<string>,
+): CodeActionEntry | null {
+	let edit = importEntryEdit(program, lines, diagnostic.position)
+
+	if (edit === null) {
+		return null
+	}
 
 	return {
 		title: `Remove the unused import of '${sliceOf(lines, diagnostic.position)}'`,
@@ -338,7 +347,53 @@ export function removeImportAction(
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
 		isPreferred: true,
-		edits: [removeLinesEdit(lines, removed)],
+		edits: [edit],
+	}
+}
+
+// NOTE: The later of two entries binding one name, removed. The Diagnostic
+// points at the entry that was being bound when the clash was found, and the
+// one already holding the name is on its second Label — so the later of the two
+// is the one underlined, which is the one to drop.
+//
+// Offered only where what already holds the name is another ENTRY of this
+// file's import block. The same code covers a clash with something the file
+// declares itself and with a builtin, and dropping the entry there leaves the
+// Program saying something else: every use of the name would quietly read that
+// other declaration instead. `as` is the answer to those, which is what the
+// Diagnostic's Help says and what no edit can choose a name for.
+export function removeDuplicateImportAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+	lines: Array<string>,
+): CodeActionEntry | null {
+	let first = diagnostic.labels.find(
+		(label) => label.kind === "secondary",
+	)?.position
+	let entries = program.imports?.entries ?? []
+
+	if (
+		first === undefined ||
+		!entries.some((entry) =>
+			isSamePosition((entry.alias ?? entry.name).position, first),
+		)
+	) {
+		return null
+	}
+
+	let edit = importEntryEdit(program, lines, diagnostic.position)
+
+	if (edit === null) {
+		return null
+	}
+
+	return {
+		title: `Remove the duplicate import of '${sliceOf(lines, diagnostic.position)}'`,
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [edit],
 	}
 }
 

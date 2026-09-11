@@ -2915,6 +2915,13 @@ fix: it renames the entry locally, and leaves the exporting Module untouched.
 The entry is refused rather than allowed to shadow, so whatever already held the
 name still means what it did.
 
+**Quick Fix — "Remove the duplicate import of 'X'":** deletes the entry the
+Diagnostic points at — the later of the two — line and all, taking its group
+with it where it was the group's last name. Offered only where what already
+holds the name is another entry of this block: dropping the entry where the
+name is held by something the file declares, or by a builtin, would leave every
+use of it quietly reading that instead, and `as` is the answer there.
+
 ### `export-of-unknown-name`
 
 An `export { … }` entry with no `from` clause exports something this Module's

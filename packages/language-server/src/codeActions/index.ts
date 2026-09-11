@@ -39,6 +39,7 @@ import {
 	namespaceImportActions,
 	namespaceSpecifierActions,
 	removeDocumentationTagAction,
+	removeDuplicateImportAction,
 	removeFallbackAction,
 	removeFocusedAction,
 	removeImportAction,
@@ -287,6 +288,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(inlineDefineValueAction(diagnostic, program, lines)),
 	"define-without-otherwise": ({ diagnostic, lines }) =>
 		listed(otherwiseArmAction(diagnostic, lines)),
+	"duplicate-import": ({ diagnostic, program, lines }) =>
+		listed(removeDuplicateImportAction(diagnostic, program, lines)),
 	"duplicate-key": ({ diagnostic, program, lines }) =>
 		listed(removeEntryAction(diagnostic, program, lines)),
 	"duplicate-modifier": ({ diagnostic, lines }) =>

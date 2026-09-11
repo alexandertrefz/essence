@@ -8,7 +8,11 @@ import type { common } from "@essence-lang/interfaces"
 
 import { analyseDocument, documentFilePath } from "../analyse"
 import { insertImportEdit, relativeSpecifier } from "../autoImport"
-import { type CodeActionEntry, findCodeActions } from "../codeActions"
+import {
+	type CodeActionEdit,
+	type CodeActionEntry,
+	findCodeActions,
+} from "../codeActions"
 import { findCompletions } from "../completion"
 import { findHover } from "../hover"
 import { uriOf } from "../server"
@@ -116,6 +120,23 @@ function sliceFrom(text: string, cursor: common.Cursor): string {
 	return text.slice(offsetOf(text, cursor))
 }
 
+// NOTE: What a file looks like once an action is applied — an assertion on the
+// resulting text catches an off-by-one in a range that an assertion on the
+// range itself only encodes. Back to front, so that every edit is measured
+// against the text it was computed from.
+function appliedTo(source: string, edits: Array<CodeActionEdit>): string {
+	let text = source
+
+	for (let edit of [...edits].reverse()) {
+		text =
+			text.slice(0, offsetOf(text, edit.range.start)) +
+			edit.newText +
+			text.slice(offsetOf(text, edit.range.end))
+	}
+
+	return text
+}
+
 // NOTE: Applies a workspace rename textually, file by file, so the expectations
 // below can state whole Programs instead of position lists — the same shape
 // `rename.spec.ts` uses for one file.
@@ -194,6 +215,21 @@ const other = [
 	"",
 	"export {",
 	"\tthing",
+	"}",
+	"",
+].join("\n")
+
+// NOTE: A second Module publishing a name `Geometry.es` publishes too, so that
+// one import block can bind a name twice without two of its entries naming one
+// file.
+const shapes = [
+	"implementation {",
+	"",
+	"\ttype Rectangle = { width: Integer, height: Integer }",
+	"}",
+	"",
+	"export {",
+	"\tRectangle",
 	"}",
 	"",
 ].join("\n")
@@ -1265,6 +1301,97 @@ describe("Workspace", () => {
 				start: { line: 2, column: 1 },
 				end: { line: 6, column: 1 },
 			})
+		})
+
+		// NOTE: The Diagnostic points at the entry that was being bound when
+		// the clash was found, which is the LATER of the two — the earlier one
+		// already holds the name.
+		it("should offer to remove the later of two entries binding one name", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Geometry.es": geometry,
+				"Shapes.es": shapes,
+				"Main.es": [
+					"import {",
+					'\tfrom "./Geometry.es" { Rectangle }',
+					'\tfrom "./Shapes.es" { Rectangle }',
+					"}",
+					"",
+					"implementation {",
+					"\tfunction widthOf(_ shape: Rectangle) -> Integer {",
+					"\t\t<- shape.width",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let removal = findCodeActions(
+				source,
+				spanOf(source, 3, "Rectangle"),
+				mainPath,
+				workspace,
+			).find((action) => action.diagnosticCode === "duplicate-import")
+			let fixed = appliedTo(source, removal?.edits ?? [])
+
+			expect(removal?.title).toBe(
+				"Remove the duplicate import of 'Rectangle'",
+			)
+			expect(removal?.isPreferred).toBe(true)
+
+			expect(fixed.split("\n")).toEqual([
+				"import {",
+				'\tfrom "./Geometry.es" { Rectangle }',
+				"}",
+				"",
+				"implementation {",
+				"\tfunction widthOf(_ shape: Rectangle) -> Integer {",
+				"\t\t<- shape.width",
+				"\t}",
+				"}",
+				"",
+			])
+
+			expect(
+				analyseDocument(fixed, mainPath, { host: workspace.host })
+					.diagnostics,
+			).toEqual([])
+		})
+
+		// NOTE: The same code covers a clash with something the file declares
+		// itself. Dropping the entry there would leave every use of the name
+		// reading the local declaration instead, which is a different Program —
+		// so the Help's `as` is the only answer, and no edit can choose a name.
+		it("should offer nothing where a declaration holds the name", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Geometry.es": geometry,
+				"Main.es": [
+					"import {",
+					'\tfrom "./Geometry.es" { Rectangle }',
+					"}",
+					"",
+					"implementation {",
+					"\ttype Rectangle = { width: Integer }",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let actions = findCodeActions(
+				source,
+				spanOf(source, 2, "Rectangle"),
+				mainPath,
+				workspace,
+			)
+
+			expect(
+				actions.filter(
+					(action) => action.diagnosticCode === "duplicate-import",
+				),
+			).toEqual([])
 		})
 
 		it("should offer a workspace export Completion carrying its own entry", () => {
