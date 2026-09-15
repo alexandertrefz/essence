@@ -431,7 +431,7 @@
 		{
 			"name": "Redirects",
 			"declaration": "choice Redirects {\n\tFollow,\n\tManual,\n\tRefuse,\n}",
-			"description": "What a request does with a redirect a host answers with.\n\nUnder `#Follow` the request is made again at the new address, which is what a request that names no Case does. Under `#Manual` the redirect is the answer, and the `location` header holds where it points. Under `#Refuse` a redirect is a failure.",
+			"description": "What a request does with a redirect a host answers with.\n\nUnder `#Follow` the request is made again at the new address, which is what a request that names no Case does. Under `#Manual` the redirect is the answer where the host hands it over. On Node and Bun it carries the status and the `location` header that says where it points. A browser answers an opaque redirect instead, with no status and no headers. Under `#Refuse` a redirect is a `#Failure`, and its reason is `#Unreachable`.",
 			"cases": [
 				{
 					"name": "Follow",
@@ -452,7 +452,7 @@
 		{
 			"name": "HttpFailure",
 			"declaration": "choice HttpFailure {\n\tInvalidUrl { url: String },\n\tUnreachable { reason: String },\n\tInvalidBody { reason: String },\n}",
-			"description": "Why a request answered with no Response.\n\nThe Case `#InvalidUrl` is an address this library can not read. The Case `#Unreachable` is a host that was not reached. It covers a refused connection, a name that does not resolve and a certificate that was not accepted. The Case `#InvalidBody` is an answer whose body could not be read as text.\n\nA status is none of these. A host that answers 404 answered, and 404 is a Response.",
+			"description": "Why a request answered with no Response.\n\nThe Case `#InvalidUrl` is an address this library does not send to. It covers an address that can not be read at all, and one whose scheme is neither `http` nor `https`.\n\nThe Case `#Unreachable` is a host that was not reached. It covers a refused connection, a name that does not resolve and a certificate that was not accepted. It also covers a host with no way to send a request. A redirect a request refused to follow is one. So is a request this library refused to send. A `#Get` or a `#Head` carrying a body is one, and so is a header name HTTP does not allow.\n\nThe Case `#InvalidBody` is an answer whose body could not be read. The answer had been delivered, and reading its bytes failed part way.\n\nA status is none of these. A host that answers 404 answered, and 404 is a Response.",
 			"cases": [
 				{
 					"name": "InvalidUrl",
@@ -480,7 +480,7 @@
 		{
 			"name": "Response",
 			"declaration": "type Response = {\n\tstatus: Integer,\n\theaders: Dictionary<String, String>,\n\tbody: String,\n}",
-			"description": "What a host answered with.\n\nThe header keys are lowercase, which is what makes a Dictionary the right shape for them. HTTP header names do not differ by case, and `header(named:)` reads one under any spelling.\n\nA name a host sent twice is one entry, with its values joined by `, `. That is what a host does to every other header name, and `set-cookie` is joined the same way here. Two cookies joined like that can not be read apart again, because a cookie's `Expires` holds a comma.\n\nThe body is text. A host answering bytes that are not text answers `#InvalidBody` instead of a Response."
+			"description": "What a host answered with.\n\nThe header keys are lowercase, which is what makes a Dictionary the right shape for them. HTTP header names do not differ by case, and `header(named:)` reads one under any spelling.\n\nA name a host sent twice is one entry, with its values joined by `, `. That is what a host does to every other header name, and `set-cookie` is joined the same way here. Two cookies joined like that can not be read apart again, because a cookie's `Expires` holds a comma.\n\nThe body is text, decoded as UTF-8. Bytes that are not text are read as replacement characters, so an answer that is not text is a Response with a lossy body."
 		}
 	],
 	"views": [

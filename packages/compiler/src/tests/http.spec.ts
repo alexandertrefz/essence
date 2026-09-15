@@ -98,6 +98,10 @@ beforeAll(() => {
 				return new Response("gone", { status: 404 })
 			}
 
+			if (url.pathname === "/unchanged") {
+				return new Response(null, { status: 304 })
+			}
+
 			// NOTE: A name sent twice, in both shapes the Fetch standard
 			// distinguishes: `Headers` folds `x-repeated` itself, and exempts
 			// `set-cookie`, which iterates as one pair per cookie.
@@ -336,13 +340,63 @@ describe("Http", () => {
 	it("follows a redirect, hands one back, and refuses one", async () => {
 		let output = await run(
 			program(`	report(complete Http.get("${base}/moved"))
-	report(complete Http.send({ url = "${base}/moved", redirects = #Manual }))
+
+	constant handed = complete Http.send({ url = "${base}/moved", redirects = #Manual })
+
+	report(handed)
+
+	match handed -> {} {
+		case #Value(response) { Terminal.print(response::header(named "location")) }
+		case #Failure(reason) { Terminal.print(reason) }
+	}
+
 	report(complete Http.send({ url = "${base}/moved", redirects = #Refuse }))`),
 		)
 
 		expect(output[0]).toBe("200 hello")
 		expect(output[1]).toBe("302 ")
-		expect(output[2]).toStartWith("Unreachable(")
+		// NOTE: The `location` header is the whole of what `#Manual` is for —
+		// the redirect is the answer, and where it points is what a Program
+		// reads off it. Pinned on the hosts that hand a redirect over at all.
+		expect(output[2]).toBe('Value("/hello")')
+		// NOTE: This library's own sentence, and none of the host library's. A
+		// refused redirect used to arrive as `fetch`'s rejection, which named
+		// `fetch()` and its options in a value an Essence Program prints.
+		expect(output[3]).toBe(
+			'Unreachable("the host answered a redirect, and this request refused to follow one")',
+		)
+	})
+
+	// NOTE: A redirect mode is about redirects, not about a range of numbers:
+	// 304 is a 3xx that carries no `location` and means "what you have is
+	// current", so it is an answer under every mode.
+	it("hands back a 3xx that is no redirect even where redirects are refused", async () => {
+		let output = await run(
+			program(
+				`	report(complete Http.send({ url = "${base}/unchanged", redirects = #Refuse }))`,
+			),
+		)
+
+		expect(output[0]).toBe("304 ")
+	})
+
+	// NOTE: What this library refuses to send at all, in its own words. A host
+	// library refuses both of these too, with a sentence naming `fetch()` and
+	// its options — a Function no Essence Program can reach, in a value a
+	// Program prints.
+	it("refuses a request it can decide about itself, in its own words", async () => {
+		let output = await run(
+			program(`	report(complete Http.send({ url = "${base}/hello", body = Optional<String>#Value("payload") }))
+	report(complete Http.send({ url = "${base}/hello", method = #Head, body = Optional<String>#Value("payload") }))
+	report(complete Http.get("${base}/hello", headers ["bad name" = "x"]))`),
+		)
+
+		expect(output).toEqual([
+			'Unreachable("a GET request carries no body, so this one was not sent")',
+			'Unreachable("a HEAD request carries no body, so this one was not sent")',
+			`Unreachable("'bad name' is not a header name, so this request was not sent")`,
+		])
+		expect(seen.requests).toBe(0)
 	})
 
 	it("sends the method each verb names, and the body the ones that take one", async () => {
@@ -457,7 +511,7 @@ describe("Http", () => {
 		expect(seen.stopped).toBe(1)
 	})
 
-	it("answers #InvalidUrl for an address it can not read", async () => {
+	it("answers #InvalidUrl for an address it does not send to", async () => {
 		let output = await run(
 			program(`	report(complete Http.get("not a url"))
 	report(complete Http.get("file:///etc/hosts"))`),

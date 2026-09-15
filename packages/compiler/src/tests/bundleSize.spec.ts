@@ -288,14 +288,21 @@ describe("Bundle Size", () => {
 		).toBeLessThan(10_450)
 	})
 
-	// NOTE: 20,321 measured, where the same Program completing an
-	// `Async.deferred` instead measures 4,931 — so one `Http.get` costs 15,390
+	// NOTE: 22,358 measured, where the same Program completing an
+	// `Async.deferred` instead measures 5,724 — so one `Http.get` costs 16,634
 	// bytes. Almost all of it is the second container: a request's headers and
 	// an answer's are a `Dictionary<String, String>`, so `Http.ts` reaches the
 	// store, the canonical key encoding and the kind registry, which the
 	// Dictionary ceiling above prices on its own. What is left is `Http.ts`
 	// itself, the three Case constructors beside it, and the asynchrony
 	// `Future.es` already pays for.
+	//
+	// NOTE: It was 20,321, and the 2,037 bytes it rose by are three fixes with
+	// nothing else in them: the abort link that keeps a stop reaching a finished
+	// run's descendants on a host with no `AbortSignal.any` (709), the fold that
+	// stops a second `set-cookie` overwriting the first (243), and the checks
+	// that let this library refuse a request in its own words rather than in
+	// `fetch()`'s (1,085).
 	//
 	// NOTE: The figure is here so that the Namespace which reaches the world is
 	// the one whose weight is a number rather than a surprise, and so that a
@@ -309,7 +316,7 @@ describe("Bundle Size", () => {
 
 	Terminal.print(answered::hasValue())
 }`),
-		).toBeLessThan(21_400)
+		).toBeLessThan(23_400)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far

@@ -49,7 +49,7 @@ declarations {
 
 	§§ What a request does with a redirect a host answers with.
 	§§
-	§§ Under `#Follow` the request is made again at the new address, which is what a request that names no Case does. Under `#Manual` the redirect is the answer, and the `location` header holds where it points. Under `#Refuse` a redirect is a failure.
+	§§ Under `#Follow` the request is made again at the new address, which is what a request that names no Case does. Under `#Manual` the redirect is the answer where the host hands it over. On Node and Bun it carries the status and the `location` header that says where it points. A browser answers an opaque redirect instead, with no status and no headers. Under `#Refuse` a redirect is a `#Failure`, and its reason is `#Unreachable`.
 	choice Redirects {
 		Follow,
 		Manual,
@@ -66,7 +66,11 @@ declarations {
 
 	§§ Why a request answered with no Response.
 	§§
-	§§ The Case `#InvalidUrl` is an address this library can not read. The Case `#Unreachable` is a host that was not reached. It covers a refused connection, a name that does not resolve and a certificate that was not accepted. The Case `#InvalidBody` is an answer whose body could not be read as text.
+	§§ The Case `#InvalidUrl` is an address this library does not send to. It covers an address that can not be read at all, and one whose scheme is neither `http` nor `https`.
+	§§
+	§§ The Case `#Unreachable` is a host that was not reached. It covers a refused connection, a name that does not resolve and a certificate that was not accepted. It also covers a host with no way to send a request. A redirect a request refused to follow is one. So is a request this library refused to send. A `#Get` or a `#Head` carrying a body is one, and so is a header name HTTP does not allow.
+	§§
+	§§ The Case `#InvalidBody` is an answer whose body could not be read. The answer had been delivered, and reading its bytes failed part way.
 	§§
 	§§ A status is none of these. A host that answers 404 answered, and 404 is a Response.
 	choice HttpFailure {
@@ -115,7 +119,7 @@ declarations {
 	§§
 	§§ A name a host sent twice is one entry, with its values joined by `, `. That is what a host does to every other header name, and `set-cookie` is joined the same way here. Two cookies joined like that can not be read apart again, because a cookie's `Expires` holds a comma.
 	§§
-	§§ The body is text. A host answering bytes that are not text answers `#InvalidBody` instead of a Response.
+	§§ The body is text, decoded as UTF-8. Bytes that are not text are read as replacement characters, so an answer that is not text is a Response with a lossy body.
 	type Response = {
 		status: Integer,
 		headers: Dictionary<String, String>,

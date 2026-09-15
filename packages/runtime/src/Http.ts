@@ -77,18 +77,46 @@ const METHOD_NAMES: Record<HttpMethodType[typeof typeKeySymbol], string> = {
 }
 
 // NOTE: And the three redirect modes, under the names `fetch` knows them by.
-// `#Refuse` is `"error"`, which makes `fetch` reject — so a refused redirect
-// arrives at the catch below and is answered as `#Unreachable`, with the reason
-// the host library gave. There is no Case for it, because a redirect a Program
-// refused is a host it decided not to follow to.
+// `#Refuse` is sent as `"manual"` and refused HERE rather than as `"error"`,
+// which would have `fetch` reject: the rejection carries the host library's own
+// sentence, naming `fetch()` and its options in a value an Essence Program
+// prints, and there is no way to tell it apart from a connection that was
+// refused. Sent manually, the redirect comes back as an answer this module can
+// recognise, and the reason a Program reads is this library's own. Nothing is
+// followed either way, which is the whole of what `#Refuse` promises.
 const REDIRECT_MODES: Record<
 	RedirectsType[typeof typeKeySymbol],
-	"follow" | "manual" | "error"
+	"follow" | "manual"
 > = {
 	"Redirects#Follow": "follow",
 	"Redirects#Manual": "manual",
-	"Redirects#Refuse": "error",
+	"Redirects#Refuse": "manual",
 }
+
+// NOTE: The statuses that carry a `location` and mean "ask there instead". 304
+// is not among them: a 3xx that is not a redirect is an answer, and `#Refuse`
+// refuses redirects rather than a range of numbers. `opaqueredirect` is what a
+// browser answers under `"manual"` instead of the redirect itself — no status
+// and no headers — so the Type is read as well as the number.
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
+
+function isRedirect(answered: Response): boolean {
+	return (
+		answered.type === "opaqueredirect" ||
+		REDIRECT_STATUSES.has(answered.status)
+	)
+}
+
+// NOTE: The methods that carry no body. A host library refuses one that does,
+// in its own words — "fetch() request with GET/HEAD method cannot have body." —
+// which names a Function no Essence Program can reach. Refused here instead, in
+// this library's words, before anything is sent.
+const BODILESS_METHODS = new Set(["GET", "HEAD"])
+
+// NOTE: A header name is an HTTP token: these characters and no others. A host
+// library refuses anything else in its own words too, so the same reading
+// applies — what a Program gets back is a sentence about the header it wrote.
+const HEADER_NAME = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/
 
 // NOTE: The schemes this library sends. An address of any other scheme is
 // `#InvalidUrl` rather than a request that fails somewhere further down: `fetch`
@@ -162,12 +190,40 @@ export function send(
 			return createFailure(invalidUrl(address))
 		}
 
+		// NOTE: What this library can decide for itself, decided before a socket
+		// exists. `#Unreachable` is the Case for all three — a host that was not
+		// reached covers one that was never asked — and the reason is this
+		// library's own sentence rather than the host library's.
+		let method = METHOD_NAMES[request.method[typeKeySymbol]]
+		let written = headersOf(request.headers)
+
+		if (
+			BODILESS_METHODS.has(method) &&
+			request.body[typeKeySymbol] === "Optional#Value"
+		) {
+			return createFailure(
+				unreachable(
+					`a ${method} request carries no body, so this one was not sent`,
+				),
+			)
+		}
+
+		for (let [name] of written) {
+			if (!HEADER_NAME.test(name)) {
+				return createFailure(
+					unreachable(
+						`'${name}' is not a header name, so this request was not sent`,
+					),
+				)
+			}
+		}
+
 		let answered: Response
 
 		try {
 			answered = await fetching(target, {
-				method: METHOD_NAMES[request.method[typeKeySymbol]],
-				headers: headersOf(request.headers),
+				method,
+				headers: written,
 				body:
 					request.body[typeKeySymbol] === "Optional#Value"
 						? request.body.item.value
@@ -179,6 +235,17 @@ export function send(
 			return context.signal.aborted
 				? neverAnswers<ResultType<ResponseType, HttpFailureType>>()
 				: createFailure(unreachable(reasonOf(thrown)))
+		}
+
+		if (
+			request.redirects[typeKeySymbol] === "Redirects#Refuse" &&
+			isRedirect(answered)
+		) {
+			return createFailure(
+				unreachable(
+					"the host answered a redirect, and this request refused to follow one",
+				),
+			)
 		}
 
 		let text: string
