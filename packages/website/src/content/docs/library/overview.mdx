@@ -1,0 +1,284 @@
+---
+title: The standard library
+description: Where JavaScript's built-ins went, what is in scope without an import, and how to read a type page, a signature and a name.
+section: library
+order: 10
+template: article
+---
+
+The standard library is every type, method and function a program can use without an import: numbers, text, lists, dictionaries, values that may be missing, randomness and the terminal. It is written mostly in Essence, and this reference is generated from its source files. There is no package to install for any of it.
+
+```essence
+implementation {
+	constant prices = [30, 10, 20]
+	constant stock  = ["pens" = 12, "ink" = 0]
+
+	Terminal.print(prices::sort(in #Descending)) § [30, 20, 10]
+	Terminal.print(prices::sum()) § 60
+	Terminal.print(prices::firstItem()) § Value(30)
+	Terminal.print(stock::value(at "ink")) § Value(0)
+	Terminal.print(Integer.parse("42", defaultingTo 0)) § 42
+	Terminal.print(7/2::round()) § 4
+}
+```
+
+Nothing in this program is imported. [`sort`](/docs/library/list#sort), [`sum`](/docs/library/list#sum) and [`firstItem`](/docs/library/list#firstItem) are methods on lists, and [`value(at:)`](/docs/library/dictionary#value) is a method on dictionaries. [`Integer.parse`](/docs/library/integer#parse) is a [static](/docs/reference/syntax-glossary#static), a function called on the namespace `Integer` rather than on a value. [`round`](/docs/library/rational#round) rounds a fraction to a whole number. `firstItem()` and `value(at:)` can find nothing, so each returns an `Optional`, printed `Value(…)`. [`Terminal.print`](/docs/library/terminal#print) writes a value through its `toString` and [`Terminal.inspect`](/docs/library/terminal#inspect) writes its structure; [Programs and values](/docs/language/programs-and-values) shows both forms.
+
+## Where the JavaScript built-ins went
+
+```essence
+implementation {
+	constant ages = ["ann" = 31, "bob" = 40]
+	constant tags = ["new", "sale", "new"]
+	constant dice = Randomness.seeded("docs")
+
+	Terminal.print(ages::value(at "cat")) § Empty
+	Terminal.print(tags::removeDuplicates()) § ["new", "sale"]
+	Terminal.print(tags::contains("sale")) § true
+	Terminal.print(dice::drawInteger(between 1, and 6)) § 3
+}
+```
+
+```ts
+const ages = new Map([["ann", 31], ["bob", 40]])
+const tags = ["new", "sale", "new"]
+
+console.log(ages.get("cat")) // undefined
+console.log([...new Set(tags)]) // [ 'new', 'sale' ]
+console.log(tags.includes("sale")) // true
+console.log(1 + Math.floor(Math.random() * 6)) // 1 to 6, different on every run
+```
+
+`Map.get` returns `undefined` for a missing key where `value(at:)` returns `#Empty`, and a seeded `Randomness` draws the same numbers on every run. The things a JavaScript engineer reaches for first map like this:
+
+| JavaScript | Essence |
+|---|---|
+| `Map`, or an object used as a dictionary | a `Dictionary`: `["ann" = 31]`, or `[=]` when empty |
+| `Set` | a `List`, with [`removeDuplicates()`](/docs/library/list#removeDuplicates) and [`contains`](/docs/library/list#contains) |
+| `JSON.parse`, `JSON.stringify` | none in the library: the JavaScript host parses JSON and passes the values in, as [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) shows |
+| `Math.random()` | [`Randomness.entropy()`](/docs/library/randomness#entropy), or [`Randomness.seeded("…")`](/docs/library/randomness#seeded) for draws that repeat |
+| `readline`, `process.stdin` | [`Terminal.readLine()`](/docs/library/terminal#readLine), [`Terminal.readAll()`](/docs/library/terminal#readAll), [`Terminal.ask(…)`](/docs/library/terminal#ask) |
+| `console.error(value)` | `Terminal.print(value, to #Error)` |
+| `Math.round(x)`, `Math.abs(x)`, `Math.sqrt(x)` | methods on the number: `x::round()`, which rounds a half away from zero, [`x::absolute()`](/docs/library/integer#absolute), [`x::squareRoot()`](/docs/library/integer#squareRoot) |
+| `Math.PI`, `Math.E` | [`Number.Pi`](/docs/library/number#Pi), [`Number.E`](/docs/library/number#E), exact values rather than 16 digits |
+| `Math.max(a, b)`, `Math.min(a, b)` | [`Number.highest(a, b)`](/docs/library/number#highest), [`Number.lowest(a, b)`](/docs/library/number#lowest) |
+| `n.toFixed(2)` | [`n::toString(as #Decimal, toPlaces 2)`](/docs/library/rational#toString) |
+| `Math.max(...list)`, a summing `reduce` | [`list::highestItem()`](/docs/library/list#highestItem), `list::sum()` |
+| `Object.keys(record)` | [`record::keys()`](/docs/library/record#keys) |
+| a `sort` comparison that falls back to a second key | `list::sort(by …)`, with [`then`](/docs/library/ordering#then) joining two `compare(to:)` results |
+| `for (let i = 0; i < n; i++)` | [`loop(from 0, upTo n, startingWith …, …)`](/docs/library/loop#upTo) |
+| `list.filter(check)` | [`list::everyItem(where check)`](/docs/library/list#everyItem) |
+| `list.some(check)`, `list.every(check)` | [`list::hasItems(where check)`](/docs/library/list#hasItems), [`list::hasOnlyItems(where check)`](/docs/library/list#hasOnlyItems) |
+| `list.toSorted()`, `list.sort()` | `list::sort()`, which returns a new list |
+
+Two of these names mislead a JavaScript reader. `everyItem(where:)` returns the items that pass the check, as `filter` does; JavaScript's `every` is `hasOnlyItems(where:)`. And `sort` never changes the list it is called on. It returns a new one, like `toSorted`. More on [Coming from JavaScript › Collections](/docs/getting-started/coming-from-javascript#collections).
+
+## What is in scope without an import
+
+Every file starts with the names the Prelude exports. The Prelude is `Prelude.es`, a file of the standard library that declares nothing and re-exports 60 names from the others. Those 60 names are the language's surface, grouped here by what they are for. [Modules](/docs/language/modules) covers importing your own files.
+
+**Numbers.** The numbers are exact, and there is no floating-point type. [`Integer`](/docs/library/integer) is a whole number of any size, and [`Rational`](/docs/library/rational) an exact fraction such as `3/4`. Everyday arithmetic, rounding and formatting are on those two pages. [`Number`](/docs/library/number#Number) is the union `Integer | Rational | Irrational`, and its page holds π, e and the methods that work across kinds. [`Scalar`](/docs/library/number#Scalar) is `Integer | Rational`, and [`Irrational`](/docs/library/number#Irrational) is `Algebraic | Transcendental`. [`Algebraic`](/docs/library/algebraic) keeps a square root exact, and [`Transcendental`](/docs/library/transcendental) keeps π and e exact. [Numbers](/docs/language/numbers) explains the tower.
+
+**Truth and text.** [`Boolean`](/docs/library/boolean) is `true` or `false`. [`String`](/docs/library/string) is text, measured in characters as a reader sees them, so `"👨‍👩‍👧"::length()` is `1`. [`Character`](/docs/library/string#Character) is a string of exactly one character, and [`NonEmptyString`](/docs/library/string#NonEmptyString) one of at least one.
+
+**Lists.** [`List`](/docs/library/list) is the ordered sequence, and [`NonEmptyList`](/docs/library/list#NonEmptyList) a list proven to hold an item. Fourteen more names are views: [namespaces](/docs/language/namespaces-and-methods) of methods for one shape of list, all documented on the List page. Each link below opens a method its view declares. [`NestedList`](/docs/library/list#transpose) gives a list of lists `transpose`, and [`NonEmptyNestedList`](/docs/library/list#flatten) gives a non-empty one `flatten`. [`OptionalList`](/docs/library/list#firstValue) gives `firstValue`, and [`ResultList`](/docs/library/list#reasons) gives `reasons`. [`GroupedList`](/docs/library/list#group) and [`GroupedNonEmptyList`](/docs/library/list#tally) turn a list into a dictionary with `group` and `tally`. [`IntegerList`](/docs/library/list#median), [`RationalList`](/docs/library/list#variance) and [`NumberList`](/docs/library/list#runningTotal) give lists of numbers statistics such as `median`, `variance` and `runningTotal`. [`NonEmptyIntegerList`](/docs/library/list#highestNumber), [`NonEmptyRationalList`](/docs/library/list#lowestNumber) and [`NonEmptyNumberList`](/docs/library/list#mode) return `highestNumber`, `lowestNumber` and `mode` without an `Optional`. [`KeyedNumberList`](/docs/library/list#product) and [`NonEmptyKeyedNumberList`](/docs/library/list#average) read a number from each item, as in `product(on:)` and `average(on:)`.
+
+**Dictionaries, absence and order.** [`Dictionary`](/docs/library/dictionary) maps keys to values, and [`NonEmptyDictionary`](/docs/library/dictionary#NonEmptyDictionary) holds at least one entry. [`Optional`](/docs/library/optional) is `#Value` or `#Empty`, a value that may be missing; there is no `null`. [`Result`](/docs/library/result) is `#Value` or `#Failure`, a value or the reason it is missing. [`NestedOptional`](/docs/library/optional#flatten) and [`NestedResult`](/docs/library/result#flatten) flatten one inside another. [`Record`](/docs/library/record) holds the methods every record has, such as `keys`. [`Ordering`](/docs/library/ordering) is what `compare` returns, and its `then` breaks a tie with a second comparison.
+
+**Loops, randomness and the terminal.** [`loop`](/docs/library/loop) is the one free function family, in place of a loop statement. [`Step`](/docs/library/loop#Step) is what a `loop` body labelled `step` returns: `#Continue` to go round again, `#Done` to stop. [`Randomness`](/docs/library/randomness) is a source of random values, and [`Terminal`](/docs/library/terminal) writes output and reads input.
+
+**Modes.** Nine names are modes. A mode is a [choice](/docs/language/choices-and-match) whose cases carry no payload, passed to a method to pick how it works. [`Rounding`](/docs/library/rational#Rounding), [`NumberFormat`](/docs/library/rational#NumberFormat) and [`SignStyle`](/docs/library/rational#SignStyle) shape how numbers round and print. [`Division`](/docs/library/integer#Division) picks how a division pairs its quotient with its remainder, and [`SortOrder`](/docs/library/list#SortOrder) the direction of a sort. [`Side`](/docs/library/string#Side), [`CaseSensitivity`](/docs/library/string#CaseSensitivity) and [`NormalizationForm`](/docs/library/string#NormalizationForm) tune string methods, and [`Stream`](/docs/library/terminal#Stream) says where written text lands. A misspelt mode is the compile error [`unknown-case`](/docs/reference/diagnostics#unknown-case), not a silent fallback.
+
+**Protocols.** Six names are [protocols](/docs/language/protocols): sets of methods a type promises to have. [`Equatable`](/docs/library/protocols#Equatable) covers `is` and `isNot`, [`Printable`](/docs/library/protocols#Printable) covers `toString`, and [`Comparable`](/docs/library/protocols#Comparable) covers `compare(to:)` and the four inequalities built on it. [`Orderable`](/docs/library/protocols#Orderable) adds `isBetween` and `clamp`. [`Enumerable`](/docs/library/protocols#Enumerable) lists a choice's cases, and [`Generatable`](/docs/library/protocols#Generatable) says how a property test draws values of a type.
+
+**Refinements.** Ten names are refinements: a base type with a condition the compiler checks, such as `Integer where @::isNot(0)`. Six refine numbers: [`NonZeroInteger`](/docs/library/integer#NonZeroInteger), [`NonNegativeInteger`](/docs/library/integer#NonNegativeInteger), [`PositiveInteger`](/docs/library/integer#PositiveInteger), [`NonZeroRational`](/docs/library/rational#NonZeroRational), [`NonNegativeRational`](/docs/library/rational#NonNegativeRational) and [`PositiveRational`](/docs/library/rational#PositiveRational). The other four are met above: `NonEmptyString`, `Character`, `NonEmptyList` and `NonEmptyDictionary`.
+
+## How a type page reads
+
+Open the List page beside this section. The library declares 50 namespaces, and with `loop` and the protocols they are published on 17 pages. A namespace is declared `namespace X for T`, and `T` is its target. Each namespace is documented on the page of its target's head type, the name before any `<…>`. `IntegerList`, a namespace for `List<Integer>`, is on the List page. `NonZeroInteger`, a refinement of `Integer`, is on the Integer page. A mode or a union alias goes to the page of the first type its file has a page for: `Division` to Integer, `Stream` to Terminal, `Scalar` to Number.
+
+On its page, a view's methods join the reader groups, the task headings such as Reading and Searching. A refinement gets an entry in the Refinements section, and a mode an entry in the Modes section. The List page holds 17 namespaces this way. `Terminal`, a namespace with no target type, has a page of its own. `loop` has one too, and the six protocols share the Protocols page.
+
+A type page opens with a one-line description and a row of chips naming the protocols the type conforms to. A conditional conformance carries its condition. The List page's chip reads `Comparable where ItemType is Comparable`, so two lists of numbers compare, and two lists of records do not.
+
+Near the top, a line names the language pages that teach the type. Then comes the member index: every name on the page, in the page's groups, so the first screen tells you whether a `windows` exists. A name in a quieter colour is one nobody wrote on the type: a protocol provides it, or the compiler derives it for a choice. The At a glance block lists the declaration, the conformances with their conditions, and the refinements, views and modes the page holds.
+
+Inside a reader group, the members keep the order the sources declare them in. Under each member's heading are all the entries of that name across the page's namespaces, and each member opens with the receiver it is called on. `firstItem` shows the four entries on `List<ItemType>`, then the one on `NonEmptyList<ItemType>`, which returns the item itself. A member that no namespace writes says where it comes from: `isBetween` on `Integer` is marked provided by `Orderable`, and `cases` on `Ordering` derived from `Enumerable`.
+
+After the members, a page that hosts refinements has a Refinements section, and a page that hosts modes has a Modes section. The first lists each refinement with the methods that return something tighter on it and the methods that return it. The second lists each mode with its cases and the methods that take it.
+
+```essence
+implementation {
+	constant divisor = 4
+	constant ratio   = 3/4
+
+	Terminal.print(10::divide(by 4)) § 5/2
+	Terminal.print(10::divide(by divisor)) § Value(5/2)
+	Terminal.print(3/4::reciprocal()) § 4/3
+	Terminal.print(ratio::reciprocal()) § Value(4/3)
+}
+```
+
+<Note>
+A written value is its own proof. `4` is a `NonZeroInteger`, so `10::divide(by 4)` reaches the entry that returns a plain `Rational`. `3/4` is a `NonZeroRational`, so its `reciprocal()` returns a `NonZeroRational` rather than an `Optional`. A constant bound to a literal without an annotation holds the base type, and the same calls return an `Optional`. So when the Refinements section lists an entry, a literal reaches it and an unannotated constant does not. [Checked refinements](/docs/language/checked-refinements) has the whole rule.
+</Note>
+
+Every member has an address: the page, then `#` and the name as the sources spell it, as in `/docs/library/list#firstItem`. The lower-cased `#firstitem` reaches the same heading. Refinements, modes and union aliases are addressed by name too: `/docs/library/integer#PositiveInteger`, `/docs/library/rational#Rounding`, `/docs/library/number#Scalar`. A `loop` entry is addressed by its [labels](/docs/reference/syntax-glossary#labels), as in `/docs/library/loop#upTo-step`, and a protocol by its name on the Protocols page, as in `/docs/library/protocols#Orderable`.
+
+## How to read a signature
+
+A type page shows each entry's signature as the sources write it. These are three entries of `firstItem`, one of `contains` and one of `sort`, all from the List page:
+
+```essence
+§ fragment
+firstItem() -> Optional<ItemType>
+firstItem(where check: (_: ItemType) -> Boolean) -> Optional<ItemType>
+firstItem(defaultingTo fallback: ItemType) -> ItemType
+contains<infer ItemType is Equatable>(_ item: ItemType) -> Boolean
+sort<infer ItemType is Comparable>(
+	in order: SortOrder = #Ascending,
+) -> List<ItemType>
+```
+
+Each one is called like this:
+
+```essence
+implementation {
+	constant prices = [30, 10, 20]
+
+	function isCheap(_ price: Integer) -> Boolean {
+		<- price::isLessThan(15)
+	}
+
+	Terminal.print(prices::firstItem()) § Value(30)
+	Terminal.print(prices::firstItem(where isCheap)) § Value(10)
+	Terminal.print(prices::firstItem(defaultingTo 0)) § 30
+	Terminal.print(prices::contains(10)) § true
+	Terminal.print(prices::sort()) § [10, 20, 30]
+	Terminal.print(List.sort(prices, in #Descending)) § [30, 20, 10]
+}
+```
+
+**Labels.** A parameter is written `label name: Type`. The label is what a call writes, as in `firstItem(defaultingTo 0)`, and the name is what the body calls the value. A label of [`_`](/docs/reference/syntax-glossary#underscore) makes the argument positional, so `contains(10)` writes it bare.
+
+**Defaults.** `= #Ascending` is a default value. A call that leaves the argument out gets `#Ascending`, so `sort()` is `sort(in #Ascending)`. `round` declares `toward direction: Rounding = #Nearest` the same way.
+
+**Bounds.** `<infer ItemType is Comparable>` is a type parameter with a bound. [`infer`](/docs/reference/syntax-glossary#infer) means the compiler works the type out from the call, and `is Comparable` means the entry exists only when that type conforms. So `sort()` on a list of records is refused by the entry's bound, as [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound):
+
+<div class="error-output">
+
+```
+[unsatisfied-bound]
+Error: { id: Integer, price: Integer } does not conform to 'Comparable'
+   ╭─┤ Orders.es:4:17 │
+   │
+ 4 │     Terminal.print(orders::sort())
+   │                    ───────┬──────  
+   │                           ╰──────── this binds a Type Parameter bound to 'Comparable'
+   │ 
+   │ Help: Declare a Namespace 'for { id: Integer, price: Integer } is Comparable'.
+   │ 
+   │ Note: No Namespace in scope makes { id: Integer, price: Integer } conform to 'Comparable'.
+───╯
+```
+
+</div>
+
+**Overload sets.** Several entries under one name are an [overload](/docs/reference/syntax-glossary#overload) set. The call's labels and the types of its arguments pick one entry, and that entry fixes the return type. The type page lists every entry under the one heading.
+
+**An `Optional` result and its twin.** An entry that can find nothing returns an `Optional`. Most such entries have a twin beside them, with the same labels plus `defaultingTo:`. The twin returns the item itself, and falls back to the value given when there is none.
+
+**The static spelling.** Every method is also a static on its namespace that takes the receiver as its first argument, so `List.sort(prices, in #Descending)` is `prices::sort(in #Descending)`. A signature that starts with `static`, as `static parse(_ text: String) -> Optional<Integer>` does, has only that spelling: `Integer.parse("42")`.
+
+## How the names are chosen
+
+```essence
+implementation {
+	§ A preposition is a label, and the verb stays bare.
+	Terminal.print("one,two,three"::split(on ",")) § ["one", "two", "three"]
+	Terminal.print("essence"::starts(with "ess")) § true
+	Terminal.print([1, 2, 3]::join(with " · ")) § 1 · 2 · 3
+
+	§ A variant is an overload, and its default is a case of a choice.
+	Terminal.print(7/2::round()) § 4
+	Terminal.print(7/2::round(toward #Down)) § 3
+}
+```
+
+Four rules decide every name in the library, so that after a few methods you can guess the next one:
+
+1. A method that transforms is an imperative command: `sort`, [`trim`](/docs/library/string#trim), `round`, never `sorted`. No method changes its receiver, so every transform returns a new value under its plain name.
+2. A preposition is the argument's label and never joins the verb: [`split(on ",")`](/docs/library/string#split), [`starts(with "ess")`](/docs/library/string#starts), [`divide(by 4)`](/docs/library/integer#divide), [`item(at 0)`](/docs/library/list#item).
+3. The verb's direct object is positional, and everything reached through a preposition has a label: `contains(10)`, [`insert(5, at 0)`](/docs/library/list#insert), [`pad(to 3, with "0")`](/docs/library/string#pad).
+4. A variant of one idea is an overload, not a second name. A fixed set of modes is a choice, and its default is one of its cases: `round()` is `round(toward #Nearest)`. A quantifier or a position in the name is not a variant, so `firstItem` and [`lastItem`](/docs/library/list#lastItem), [`removeFirst`](/docs/library/list#removeFirst) and [`removeLast`](/docs/library/list#removeLast) keep their names.
+
+```essence
+implementation {
+	constant orders = [{ id = 1, price = 30 }, { id = 2, price = 10 }]
+	constant prices = [30, 10, 30]
+	constant none: List<Integer> = []
+
+	function isDear(_ price: Integer) -> Boolean {
+		<- price::isGreaterThan(25)
+	}
+
+	function highestFirst(_ left: Integer, _ right: Integer) -> Ordering {
+		<- right::compare(to left)
+	}
+
+	§ `where` takes the check, and the name holds the quantifier.
+	Terminal.print(prices::hasItems(where isDear)) § true
+	Terminal.print(none::hasItems(where isDear)) § false
+	Terminal.print(none::hasOnlyItems(where isDear)) § true
+
+	§ `on` reads a key, `by` compares two items, `of` names a value.
+	Terminal.print(orders::sort(on .price)::map(.id)) § [2, 1]
+	Terminal.print(prices::sort(by highestFirst)) § [30, 30, 10]
+	Terminal.print(prices::count(of 30)) § 2
+
+	§ A count that makes no sense is lenient; a missing value is an Optional.
+	Terminal.print(List.repeat("x", times -1)) § []
+	Terminal.print("abc"::character(at 9)) § Empty
+}
+```
+
+The rules produce a handful of conventions, each visible above:
+
+- `where` is always the label of a check, and the quantifier lives in the name: `hasItems(where:)` is JavaScript's `some`, `hasOnlyItems(where:)` its `every`, and [`hasNoItems(where:)`](/docs/library/list#hasNoItems) none. Like `every`, `hasOnlyItems(where:)` is `true` on an empty list, as the program shows.
+- Among labels that take a function, `on` reads a key, as in `sort(on:)`, `group(on:)` and `sum(on:)`, and `by` compares two items, as in `sort(by:)`. `of` means "of this value", as in [`count(of:)`](/docs/library/list#count).
+- Most entries that return an `Optional` have a `defaultingTo:` twin: `firstItem(defaultingTo 0)`, `Integer.parse("42", defaultingTo 0)`, `value(at "ann", defaultingTo 0)`.
+- A count that makes no sense is lenient, and a value that is not there is an `Optional`. [`List.repeat("x", times -1)`](/docs/library/list#repeat) is `[]` and `7::clamp(between 10, and 1)` takes its bounds in either order, but [`"abc"::character(at 9)`](/docs/library/string#character) is `#Empty`.
+- A predicate starts with `is`, `has` or `doesNot`, or is a plain verb such as `contains`. A method that returns a part of a value is a noun or an adjective: `length`, `numerator`, `absolute`.
+
+[Designing a library](/docs/guides/designing-a-library) applies the same rules to your own namespaces.
+
+## Written in Essence
+
+The library is 23 source files written in Essence. Most of its entries have an Essence body, and the rest are native: they bind to the runtime. Its protocols are ordinary protocols, so a conformance you write counts the same as one the library shipped:
+
+```essence
+implementation {
+	type Point = { x: Integer, y: Integer }
+
+	namespace PointPrintable for Point is Printable {
+		toString() -> String {
+			<- "({@.x}, {@.y})"
+		}
+	}
+
+	function label<infer Value is Printable>(
+		_ name: String,
+		_ value: Value,
+	) -> String {
+		<- "{name} = {value}"
+	}
+
+	Terminal.print(label("origin", { x = 3, y = 4 })) § origin = (3, 4)
+	Terminal.print(label("answer", 42)) § answer = 42
+	Terminal.print(label("ratio", 3/4)) § ratio = 3/4
+}
+```
+
+`label` asks for `Printable` and nothing else. `Point`'s conformance, written in this file, and `Integer`'s, shipped with the library, look the same to it.
+
+This reference is generated from the same source files. The generator reads each [`§§` documentation comment](/docs/language/documentation-comments) through the same parser the Language Server uses. So a method's hover text in your editor and its entry here are one text. A test holds the pages to the sources. It fails when a member the library declares has no entry, or when an entry names a member the library no longer declares. It also fails when a published signature differs from the one in the source.
