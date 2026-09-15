@@ -3266,8 +3266,14 @@ function validateDefiniteReturn(
 		reportError("Not every path through this Function returns", position, {
 			code: "missing-return",
 			labels: [primary(position, "this path falls off the end")],
+			// NOTE: A completing body is not described as DECLARING the Type its
+			// `<-` answers with, because it does not: the signature says
+			// `Future<Integer>` and the body answers `Integer`, and a note about
+			// the declaration would name a Type the reader can not find in it.
 			notes: [
-				`The declared return Type is ${describeType(returnType)}, so every path must yield one.`,
+				definition.completing === true
+					? `This body waits, so its '<-' answers with ${describeType(returnType)}; every path must yield one.`
+					: `The declared return Type is ${describeType(returnType)}, so every path must yield one.`,
 			],
 		})
 	}

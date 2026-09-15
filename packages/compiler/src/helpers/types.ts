@@ -35,6 +35,10 @@ export function overloadIndexOf(name: string): number | null {
 //
 // Two stages ask: the Validator lets a body promising it fall off its end, and
 // the Simplifier spells the fall-off out. They must agree, so they ask here.
+export function isUnitType(type: common.Type): boolean {
+	return type.type === "Record" && Object.keys(type.members).length === 0
+}
+
 // NOTE: What a `<-` in a body answers with — the declared Type for every
 // ordinary body, and the INNER Type for a completing one. A body that suspends
 // is written as though it answered the value, and the future is what the
@@ -92,10 +96,6 @@ export function asynchronyMismatch(
 	}
 
 	return null
-}
-
-export function isUnitType(type: common.Type): boolean {
-	return type.type === "Record" && Object.keys(type.members).length === 0
 }
 
 // NOTE: A structural walk over a Type, visiting each object it is built from

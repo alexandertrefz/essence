@@ -562,6 +562,23 @@ ${deferredThree}
 			).toEqual(["return-type-mismatch"])
 		})
 
+		// NOTE: And the note that says so names the Type the `<-` answers with
+		// rather than the one the signature declares — a reader checking the
+		// note against `-> Future<Integer>` would otherwise find the two
+		// disagreeing.
+		it("names the Type a completing body's '<-' answers with", () => {
+			let [diagnostic] = diagnosticsOf(`implementation {
+	function noReturn() -> Future<Integer> {
+		complete Async.sleep(milliseconds 1)
+	}
+}`)
+
+			expect(diagnostic?.code).toBe("missing-return")
+			expect(diagnostic?.notes[0]).toBe(
+				"This body waits, so its '<-' answers with Integer; every path must yield one.",
+			)
+		})
+
 		// NOTE: A body that completes NOTHING is ordinary — it hands back a
 		// future it assembled, and its `<-` answers the future itself.
 		it("holds an ordinary body to the Future it declared", () => {
