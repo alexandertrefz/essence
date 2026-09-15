@@ -262,11 +262,10 @@ export function renderPage(
 	let block = (...lines: string[]) => body.push("", ...lines)
 	let component = (name: string, props: Record<string, unknown>) =>
 		`<${name} ${Object.entries(props)
-			.map(([key, value]) =>
-				typeof value === "string"
-					? `${key}=${JSON.stringify(value)}`
-					: `${key}={${JSON.stringify(value)}}`,
-			)
+			// NOTE: Every prop as an expression, strings included. A quoted MDX
+			// attribute is taken literally, escapes and all, so a declaration that
+			// spans lines rendered its `\n` and `\t` as text.
+			.map(([key, value]) => `${key}={${JSON.stringify(value)}}`)
 			.join(" ")} />`
 
 	if (page.lede !== null) {

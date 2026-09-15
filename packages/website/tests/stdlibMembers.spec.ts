@@ -258,6 +258,18 @@ describe("the standard library reference", () => {
 			).toBe(mdx)
 		}
 	})
+
+	it("hands MDX no quoted prop with an escape in it", () => {
+		// NOTE: A quoted MDX attribute is taken literally, escapes and all. A
+		// declaration that spans lines once rendered its `\n` and `\t` as text on
+		// three pages, and the pages still matched the generator above — so the
+		// shape is held here, where the output is.
+		let escaped = [...pages]
+			.filter(([, mdx]) => /\s\w+="(?:[^"\\]|\\.)*\\[nt]/.test(mdx))
+			.map(([slug]) => slug)
+
+		expect(escaped).toEqual([])
+	})
 })
 
 describe("the library's addresses", () => {
