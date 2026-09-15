@@ -1221,7 +1221,8 @@ export type DispatchChainCase = {
 // `const`s of a block around its body, which is exactly the Scope the closure
 // gave them — the body reads its Parameters and the enclosing Scope through the
 // same names, in the same order, and a Parameter that shadows an outer binding
-// shadows it for exactly the length of the block. See `optimisations.md`.
+// shadows it for exactly the length of the block. See `inline-loops` at
+// `/docs/reference/optimisations`.
 export interface InlineLoopNode extends InlineLoop {
 	nodeType: "Intrinsic"
 	kind: "inline-loop"

@@ -2546,10 +2546,10 @@ describe("Code Actions", () => {
 			// NOTE: The one scaffold in this file whose hole does not PARSE —
 			// `as  otherwise` has no value in it and `esfmt` refuses the buffer
 			// outright. It is the documented shape of this fix (see the code's
-			// entry in `diagnostics.md`), and what is pinned here is that it
-			// costs exactly the one `syntax-error`: a hole that took a second
-			// Diagnostic with it, or that hid the Diagnostics below it, would
-			// be a different fix and not this one.
+			// entry on `/docs/reference/diagnostics`), and what is pinned here
+			// is that it costs exactly the one `syntax-error`: a hole that took
+			// a second Diagnostic with it, or that hid the Diagnostics below
+			// it, would be a different fix and not this one.
 			expect(codesOf(result)).toEqual(["syntax-error"])
 		})
 

@@ -41,10 +41,10 @@ import { rewriteNodes } from "../walk"
 // built, a name a closure captured, a read as innocent as `length`. Declining is
 // always correct, which is what makes a tight fence safe to widen later.
 //
-// NOTE: The two widenings are named in `optimisations.md` under "not done yet":
-// retention summaries for the prelude's own Functions, which would admit a
-// fold's `contains` read of its accumulator, and accumulators one Record member
-// deep.
+// NOTE: So two shapes decline that a wider fence could admit: a fold that reads
+// its accumulator through one of the prelude's own Functions, such as
+// `contains`, because nothing summarises what those Functions retain; and an
+// accumulator one Record member deep.
 
 export const buildListsInPlace: OptimiserPass = {
 	name: "build-lists-in-place",

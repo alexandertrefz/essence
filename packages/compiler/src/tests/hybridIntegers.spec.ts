@@ -591,9 +591,9 @@ describe("what a Program computes across the boundary", () => {
 // leaving the State alone — so the two are one change and are tested as one.
 //
 // NOTE: The first eight `it`s are the eight numbered invariants of the fence, in
-// the order `optimisations.md` states them under `unboxed-loop-state` and under
-// the same numbers — a reviewer reading the page and a reviewer reading this file
-// should find one list, not two. What follows them is not part of the fence: which
+// the order `/docs/reference/optimisations` states them under
+// `unboxed-loop-state` and under the same numbers — a reviewer reading the page
+// and a reviewer reading this file should find one list, not two. What follows them is not part of the fence: which
 // drivers take the swap, and the two shapes where one walk stands inside another.
 describe("a walk's carried State", () => {
 	it("1: is held raw only where its Type is exactly Integer", async () => {

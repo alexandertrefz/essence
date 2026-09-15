@@ -23,7 +23,7 @@ import { unboxConditions } from "./passes/unboxConditions"
 
 // NOTE: The Optimiser is a registry of NAMED passes, run in one fixed order.
 // Every transform the Compiler performs on a simplified Program is one of them,
-// each is documented in `packages/website/optimisations.md` under the name it
+// each is documented at `/docs/reference/optimisations` under the name it
 // is registered with, and each can be turned off on its own from the command
 // line. Nothing here is a hidden rewrite: a Program that behaves differently
 // with a pass off than with it on is a bug in that pass, and the name is what

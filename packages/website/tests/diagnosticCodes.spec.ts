@@ -10,10 +10,29 @@ import { fileURLToPath } from "node:url"
 // read from source because a union of string literals leaves nothing behind
 // at runtime to iterate.
 
-// NOTE: This spec lives in the documentation's own package, beside the file it
-// holds to account — so the page is a sibling rather than something reached for
-// across the repository, and moving the site means moving them together.
-const DIAGNOSTICS_PAGE = path.resolve(import.meta.dirname, "../diagnostics.md")
+// NOTE: This spec lives in the documentation's own package, beside the page it
+// holds to account — the published one, read as a file, so what the gate holds
+// is what a reader who follows a code to `/docs/reference/diagnostics` finds,
+// and moving the site means moving them together.
+const DIAGNOSTICS_PAGE = path.resolve(
+	import.meta.dirname,
+	"../src/content/docs/reference/diagnostics.mdx",
+)
+
+// NOTE: The codes only the experimental test modes report — benchmarks,
+// synthesized contracts, mutation runs. The site documents none of those modes,
+// so it documents none of their codes either: a code here is neither required
+// on the page nor allowed on it. By family where the family has a prefix, and
+// by name where a code of one does not start with it.
+const EXPERIMENTAL_PREFIXES = ["benchmark-", "contract-", "mutation-"]
+const EXPERIMENTAL_CODES = new Set(["ungeneratable-contract"])
+
+function isExperimental(code: string): boolean {
+	return (
+		EXPERIMENTAL_CODES.has(code) ||
+		EXPERIMENTAL_PREFIXES.some((prefix) => code.startsWith(prefix))
+	)
+}
 
 function declaredCodes(): Array<string> {
 	// NOTE: Asked of the module resolver rather than counted out in `../`s.
@@ -47,12 +66,13 @@ describe("Diagnostic Codes", () => {
 		// NOTE: A guard on the parsing above — a regex that silently stops
 		// matching would turn this whole gate into a no-op.
 		expect(declaredCodes().length).toBeGreaterThan(50)
+		expect(documentedCodes().length).toBeGreaterThan(50)
 	})
 
-	it("should document every declared code", () => {
+	it("should document every declared code but the experimental ones", () => {
 		let documented = new Set(documentedCodes())
 		let undocumented = declaredCodes().filter(
-			(code) => !documented.has(code),
+			(code) => !isExperimental(code) && !documented.has(code),
 		)
 
 		expect(undocumented).toEqual([])
@@ -65,8 +85,28 @@ describe("Diagnostic Codes", () => {
 		expect(stale).toEqual([])
 	})
 
+	it("should not document an experimental code", () => {
+		expect(documentedCodes().filter(isExperimental)).toEqual([])
+	})
+
+	it("should allow only codes that exist by name", () => {
+		// NOTE: A named exception outlives the code it excused otherwise, and
+		// then silently excuses whatever is next given that name.
+		let declared = new Set(declaredCodes())
+
+		expect(
+			[...EXPERIMENTAL_CODES].filter((code) => !declared.has(code)),
+		).toEqual([])
+	})
+
 	it("should not declare a code twice", () => {
 		let codes = declaredCodes()
+
+		expect(codes).toEqual([...new Set(codes)])
+	})
+
+	it("should not document a code twice", () => {
+		let codes = documentedCodes()
 
 		expect(codes).toEqual([...new Set(codes)])
 	})

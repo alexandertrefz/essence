@@ -128,7 +128,8 @@ export type Diagnostic = {
 	// NOTE: A stable identifier for the kind of Diagnostic, independent of
 	// the message wording — what a Language Server client keys Quick Fixes
 	// off, and what lets a message be reworded without breaking them. Every
-	// one of them is documented in `docs/diagnostics.md`.
+	// one of them but those only the experimental test modes report is
+	// documented at `/docs/reference/diagnostics`.
 	code: DiagnosticCode
 	// NOTE: Context — why the rule exists, what the alternatives were.
 	notes: Array<string>
@@ -269,10 +270,11 @@ export type DiagnosticData =
 	// not a Type anybody declares one for.
 	| { kind: "ungeneratable"; typeName: string }
 
-// NOTE: Every Diagnostic carries one, and `docs/diagnostics.md` documents
-// every one of these — a code with no entry there is a code nobody can look
-// up. Spellings are stable API: reword a message freely, but renaming a code
-// breaks the Quick Fixes and the suppressions that are keyed off it.
+// NOTE: Every Diagnostic carries one, and `/docs/reference/diagnostics`
+// documents every one of these but those only the experimental test modes
+// report — a code with no entry there is a code nobody can look up. Spellings
+// are stable API: reword a message freely, but renaming a code breaks the Quick
+// Fixes and the suppressions that are keyed off it.
 export type DiagnosticCode =
 	// Syntax — the Lexer and the Parser.
 	| "syntax-error"

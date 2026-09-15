@@ -11,12 +11,13 @@ import { optimiserPassNames } from "@essence-lang/compiler/optimiser"
 // is a value at run time rather than a member of a union that leaves nothing
 // behind.
 
-// NOTE: This spec lives in the documentation's own package, beside the file it
-// holds to account — so the page is a sibling rather than something reached for
-// across the repository, and moving the site means moving them together.
+// NOTE: This spec lives in the documentation's own package, beside the page it
+// holds to account — the published one, read as a file, so what the gate holds
+// is what a reader of `/docs/reference/optimisations` is shown and moving the
+// site means moving them together.
 const OPTIMISATIONS_PAGE = path.resolve(
 	import.meta.dirname,
-	"../optimisations.md",
+	"../src/content/docs/reference/optimisations.mdx",
 )
 
 // NOTE: The headings of ONE section, so that the pass list and the runtime

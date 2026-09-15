@@ -27,12 +27,12 @@ package's own `tsconfig.json` type-checks `src/` for the editor.
 | `astro.config.ts` | site URL, MDX, and the Shiki setup |
 | `src/content.config.ts` | the `docs` collection's schema |
 | `src/content/docs/` | the published documentation pages, by section |
-| `diagnostics.md`, `dictionaries.md`, `optimisations.md`, `protocols.md`, `records.md` | the reference pages the doc gates hold to account, not yet published |
+| `dictionaries.md`, `protocols.md`, `records.md` | drafts the Language pages replace, not published |
 | `src/layouts/`, `src/components/` | the page shells and the design's parts |
 | `src/styles/` | `tokens.css` (both themes), `base.css`, `prose.css`, `shiki.css` |
 | `src/lib/` | navigation, site constants, the two Shiki theme JSONs |
 | `public/fonts/` | every face, self-hosted |
-| `tests/` | the diagnostics doc gate, see below |
+| `tests/` | the doc gates, see below |
 
 **Fonts are self-hosted and there is no CDN request anywhere on the site** —
 General Sans and Supreme (Fontshare, ITF Free Font License), Fira Code (OFL),
@@ -46,30 +46,25 @@ two theme files in `src/lib/shiki/`. They run with `defaultColor: false`, so a
 token carries a CSS variable per theme instead of a colour and
 `src/styles/shiki.css` decides which one applies.
 
-## The doc gate
+## The doc gates
 
-`tests/diagnosticCodes.spec.ts` is the gate that every `DiagnosticCode` the
-compiler can emit has a section in `diagnostics.md`, and that no section
-describes a code that no longer exists. It lives here because the file it holds to account
-lives here — the union it reads is `@essence-lang/interfaces`', resolved through the
-module loader rather than by counting directories. It reads the page as a file
-rather than through `astro:content`, so it runs under plain `bun test`.
+The pages are held to the toolchain they document, under plain `bun test`. Each
+spec reads the pages as files rather than through `astro:content`, which only
+resolves inside an Astro build.
+
+| Spec | Holds |
+|---|---|
+| `diagnosticCodes.spec.ts` | `/docs/reference/diagnostics` has one entry per `DiagnosticCode`, and none for a code that is gone |
+| `optimisationPasses.spec.ts` | `/docs/reference/optimisations` lists every pass, in the order they run |
+| `projectSchema.spec.ts` | the served JSON Schema for `essence.json`, against the catalogue the toolchain reads |
+| `stdlibMembers.spec.ts` | the generated library pages against the standard library, member by member |
+| `navigation.spec.ts` | the sidebar, the reading chain and the on-this-page lists |
 
 A code with no documentation is worse than no code at all: it is printed in
 every terminal report and handed to every Language Server client, and the whole
-point of a stable identifier is that it can be looked up.
-
-## What is published
-
-Getting Started is the only documentation section on the site so far. The
-Language, Standard Library, Guides and Reference sections are written, and are
-being re-verified against the current compiler before they go up — several of
-their samples were written against an older standard library. The routes the
-chrome will point at when they land are listed in `src/lib/site.ts`.
-
-The five markdown pages at the root of this package are the reference the doc
-gates read. They stay where they are, unpublished, until their Astro
-counterparts land, so the gates keep holding.
+point of a stable identifier is that it can be looked up. The codes only the
+experimental test modes report are the one exception: they are documented
+nowhere, and the spec names them in an allowlist.
 
 ## Deploying
 

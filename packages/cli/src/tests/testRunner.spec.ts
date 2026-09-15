@@ -3313,9 +3313,9 @@ describe("the test command's own documentation", () => {
 		expect(testCommand.description.join(" ")).toContain("essence.json")
 	})
 
-	// NOTE: `optimisations.md` documents `--no-optimise --coverage` and turning
-	// `instrument-coverage` off by name, and --coverage is a flag of this
-	// command alone — so both documented combinations have to be spellable
+	// NOTE: `/docs/reference/optimisations` documents `--no-optimise --coverage`
+	// and turning `instrument-coverage` off by name, and --coverage is a flag of
+	// this command alone — so both documented combinations have to be spellable
 	// here.
 	it("takes the two flags that turn the Optimiser down", () => {
 		expect(testCommand.options.map((option) => option.name)).toEqual(
