@@ -350,6 +350,11 @@
 					"name": "keyword.control.essence"
 				},
 				{
+					"comment": "`start` and `complete` are Keywords where an Expression follows them and ordinary Identifiers everywhere else — the Parser's own rule, and the one `expect` and `require` above are scoped by. The excluded characters are what a value called `start` is followed by instead: `constant start = 1`, `start::isAbove(0)`, `{ start = 1 }` and the shorthand `{ start }`. An Argument LABEL spelled either way — `f(start value)` — lights as though it were the Keyword, which is the one shape this reads wrong and the same one the assertion rule above lives with.",
+					"match": "\\b(start|complete)\\b(?=[ \\t]+[^\\s=,:)\\]}])",
+					"name": "keyword.control.essence"
+				},
+				{
 					"comment": "`matches snapshot`, and the `from \"name\"` that makes it one kept beside the file rather than one recorded inline. Neither word means anything alone — the PAIR is what the Parser reads — so the pair is what is matched, and the `from` is scoped with it because it belongs to this form rather than to a Module section.",
 					"match": "\\b(matches)[ \\t]+(snapshot)\\b(?:[ \\t]+(from)\\b)?",
 					"captures": {

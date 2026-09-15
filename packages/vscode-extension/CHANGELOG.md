@@ -2,7 +2,21 @@
 
 ## [Unreleased]
 
-- Every block of the language is a snippet now — seventy-seven of them, where
+- The two words asynchrony is written with are lit, offered and fixed:
+  `complete`, which waits for what a Future or a Started answers with, and
+  `start`, which puts a Future in flight and answers the one run of it. Both
+  are ordinary Identifiers everywhere else, so each is lit exactly where an
+  Expression follows it and a value still called `start` reads as the name it
+  is. Hovering either says what it answers with — the Value waited for, the
+  Started put in flight — and the Completion list offers both where a value
+  goes, beside `complete`, `start` and `function-completing` snippets. The
+  lightbulb answers what the Compiler reports about them: a future whose value
+  goes nowhere is offered both words, a `complete` in a body that declared
+  something else offers to wrap that declaration in `Future<…>`, a word in
+  front of a value that is neither a Future nor a Started offers to take
+  itself away, and a mismatch that is one missing `complete` offers to write
+  it.
+- Every block of the language is a snippet now — eighty of them, where
   there were twenty-five — and the Language Server offers each one where it
   parses and nowhere else: `static` and `overload` inside a Namespace body,
   `expect` and `require` inside a test, `with` and a closure where a value

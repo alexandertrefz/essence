@@ -191,6 +191,50 @@ describe("the testing grammar", () => {
 	})
 })
 
+// NOTE: The two Keywords asynchrony is written with. Both are ordinary
+// Identifiers as well — the Parser reads the Keyword only where an Expression
+// follows on the line — so the rule is scoped by what comes behind the word,
+// exactly as `expect` and `require` are.
+describe("the asynchrony grammar", () => {
+	let asynchrony = contextualKeyword("(start|complete)")
+
+	it("lights both Keywords in front of what they are written about", () => {
+		expect(
+			asynchrony.test(
+				"\t\tconstant held = complete Async.deferred(() { <- value })",
+			),
+		).toBe(true)
+		expect(
+			asynchrony.test("\t\t<- complete headline(url)::retried(times 3)"),
+		).toBe(true)
+		expect(asynchrony.test("\tconstant running = start doubled(21)")).toBe(
+			true,
+		)
+		expect(asynchrony.test("\tstart upload(file)")).toBe(true)
+	})
+
+	// NOTE: Every shape a value NAMED `start` or `complete` is written in — the
+	// names the standard library and the fixtures used before the two words
+	// became Keywords, which is what the contextual reading exists to keep
+	// writable.
+	it("leaves a value named after either of them unlit", () => {
+		expect(asynchrony.test("\tconstant start = 1")).toBe(false)
+		expect(asynchrony.test("\t\tconstant complete = false")).toBe(false)
+		expect(asynchrony.test("\t\t<- start::isAbove(0)")).toBe(false)
+		expect(asynchrony.test("\t\t<- range.start")).toBe(false)
+		expect(asynchrony.test("\t\tf(start, other)")).toBe(false)
+		expect(asynchrony.test("\t\t{ start = 1 }")).toBe(false)
+		expect(asynchrony.test("\t\t{ start }")).toBe(false)
+	})
+
+	// NOTE: `\b` on both ends, so a name that merely opens with one of the words
+	// is a name and nothing else.
+	it("leaves a longer name that opens with one of them unlit", () => {
+		expect(asynchrony.test("\t\tstarting(value)")).toBe(false)
+		expect(asynchrony.test("\t\tcompleted::negate()")).toBe(false)
+	})
+})
+
 // NOTE: A Guard is `where` written after the Matcher it guards, and the Match
 // grammar could not light one whose Condition begins with a lowercase name —
 // the rule it was left to reads what FOLLOWS the word, to keep the Argument
