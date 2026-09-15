@@ -1329,6 +1329,10 @@ function walkNode(
 			// NOTE: The member resolves through the base's Type — skipped.
 			walkNode(node.base, scope, context)
 			return
+		case "Start":
+		case "Complete":
+			walkNode(node.expression, scope, context)
+			return
 		case "CaseValue":
 			// NOTE: The Case's name resolves through the Choice — only the
 			// (optional) Choice prefix is a Type reference of its own, along with
@@ -2686,6 +2690,10 @@ function walkTypedNode(
 			registerPathKeySite(node, context)
 			walkTypedNode(node.lhs, context)
 			walkTypedNode(node.rhs, context)
+			return
+		case "Start":
+		case "Complete":
+			walkTypedNode(node.expression, context)
 			return
 		case "Match":
 			walkTypedNode(node.value, context)

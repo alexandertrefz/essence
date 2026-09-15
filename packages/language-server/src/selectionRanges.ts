@@ -331,6 +331,13 @@ function collectFromNode(
 		case "Lookup":
 			descend(node.base, cursor, chain)
 			return
+		// NOTE: The operand is a span of its own inside the Keyword's, so widening
+		// from inside `complete headline(url)` reaches the call first and the whole
+		// `complete …` after it.
+		case "Start":
+		case "Complete":
+			descend(node.expression, cursor, chain)
+			return
 		case "CaseValue":
 			if (node.value !== null) {
 				descend(node.value, cursor, chain)

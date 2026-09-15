@@ -538,3 +538,32 @@ describe("Document Symbols inside a define", () => {
 		expect(detailOf(detailedSymbolsOf(source), "doubled")).toBe("Integer")
 	})
 })
+
+// NOTE: A Function literal written under `start` is a body like any other, and
+// what it declares belongs in the outline of the Constant holding the work —
+// which a walk with no case for the two Keywords reaches nothing of.
+describe("Document Symbols under start and complete", () => {
+	let source = [
+		"implementation {",
+		"\tconstant running = start Async.deferred(() {",
+		"\t\tconstant inner = 41",
+		"",
+		"\t\t<- inner::add(1)",
+		"\t})",
+		"\tTerminal.inspect(complete running)",
+		"}",
+	].join("\n")
+
+	it("should list what a body written under the Keyword declares", () => {
+		expect(flatten(symbolsOf(source)).map((symbol) => symbol.name)).toEqual(
+			["running", "inner"],
+		)
+	})
+
+	it("should detail the Constant with the work it holds", () => {
+		expect(detailOf(detailedSymbolsOf(source), "running")).toBe(
+			"Started<Integer>",
+		)
+		expect(detailOf(detailedSymbolsOf(source), "inner")).toBe("Integer")
+	})
+})

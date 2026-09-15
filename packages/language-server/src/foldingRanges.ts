@@ -337,6 +337,14 @@ function collectFromNode(
 		case "Lookup":
 			collectFromNode(node.base, ranges)
 			return
+		// NOTE: Neither Keyword opens a block of its own, so neither folds — but
+		// what stands under one folds like anything else, and a walk with no case
+		// here would leave a call written over five lines under a `complete` with
+		// nothing to fold at all.
+		case "Start":
+		case "Complete":
+			collectFromNode(node.expression, ranges)
+			return
 		// NOTE: A path is written on one line and folds nothing, but it has to
 		// be named here all the same — this switch has no `default`, so a
 		// nodeType it does not list is a hole nothing reports.

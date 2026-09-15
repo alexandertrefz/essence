@@ -141,6 +141,13 @@ function isExtractable(
 		case "DictionaryValue":
 		case "InterpolatedStringValue":
 			return true
+		// NOTE: Both are ordinary values — a `Started` and whatever was waited for
+		// — and both read better under a name where a line holds the Keyword and a
+		// chain besides. The Constant lands in the same body, so a `complete`
+		// lifted out of one is a `complete` in the body it already suspended.
+		case "Start":
+		case "Complete":
+			return true
 		case "CaseValue":
 			return node.choice !== null
 		default:
@@ -217,6 +224,10 @@ function collectInto(
 			return
 		case "Lookup":
 			collectInto(node.base, found)
+			return
+		case "Start":
+		case "Complete":
+			collectInto(node.expression, found)
 			return
 		case "CaseValue":
 			if (node.value !== null) {
@@ -334,6 +345,11 @@ function headName(node: parser.ExpressionNode): string {
 			return node.member.content
 		case "FunctionInvocation":
 			return headName(node.name)
+		// NOTE: The name comes from under the Keyword — what `complete
+		// headline(url)` is about is the headline, not the waiting.
+		case "Start":
+		case "Complete":
+			return headName(node.expression)
 		case "Identifier":
 			return node.content
 		case "MemberPath":

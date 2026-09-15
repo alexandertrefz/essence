@@ -172,6 +172,10 @@ function visitNode(
 		case "Lookup":
 			visitNode(node.base, hints)
 			return
+		case "Start":
+		case "Complete":
+			visitNode(node.expression, hints)
+			return
 		case "Combination":
 			visitNode(node.lhs, hints)
 			visitNode(node.rhs, hints)

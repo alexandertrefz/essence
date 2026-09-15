@@ -218,6 +218,13 @@ function visitNode(
 		case "Lookup":
 			visitNode(node.base, null, state)
 			return
+		// NOTE: The operand is a Future or a Started, and no Record shape is
+		// expected of one — what the position around the Keyword asks for says
+		// nothing about what stands under it.
+		case "Start":
+		case "Complete":
+			visitNode(node.expression, null, state)
+			return
 		case "Combination": {
 			visitNode(node.lhs, expected, state)
 

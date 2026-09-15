@@ -1849,6 +1849,14 @@ function analyseCaseProbe(program: common.typed.Program): {
 			case "Lookup":
 				visitNode(node.base, null)
 				return
+			// NOTE: Nothing of the position travels through: what the Keyword
+			// stands under is a Future or a Started, and no Case is either — so a
+			// bare `#` written there is offered nothing rather than the Cases of
+			// what the whole Expression answers with.
+			case "Start":
+			case "Complete":
+				visitNode(node.expression, null)
+				return
 			case "Combination":
 				visitNode(node.lhs, expectedType)
 				visitNode(node.rhs, expectedType)
@@ -2283,6 +2291,10 @@ function describeDeclarations(
 				return
 			case "Lookup":
 				visitNode(node.base)
+				return
+			case "Start":
+			case "Complete":
+				visitNode(node.expression)
 				return
 			case "Combination":
 				visitNode(node.lhs)

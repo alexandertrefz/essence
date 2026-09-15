@@ -399,6 +399,10 @@ function collectItemsFromNode(
 		case "Lookup":
 			collectItemsFromNode(node.base, container, items)
 			return
+		case "Start":
+		case "Complete":
+			collectItemsFromNode(node.expression, container, items)
+			return
 		case "Combination":
 			collectItemsFromNode(node.lhs, container, items)
 			collectItemsFromNode(node.rhs, container, items)
@@ -802,6 +806,13 @@ function visitNode(
 			return
 		case "Lookup":
 			visitNode(node.base, caller, context, sites)
+			return
+		// NOTE: A Function called only under one of the two Keywords — which is
+		// every call that answers work — would be reported as called by nobody by a
+		// walk with no case here.
+		case "Start":
+		case "Complete":
+			visitNode(node.expression, caller, context, sites)
 			return
 		case "Combination":
 			visitNode(node.lhs, caller, context, sites)

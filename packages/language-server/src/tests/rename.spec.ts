@@ -2275,3 +2275,63 @@ describe("Rename inside a define", () => {
 		)
 	})
 })
+
+// NOTE: What a rename has to reach through: a name read under one of the two
+// Keywords is a read like any other, and a walk that stopped at the Keyword
+// would rename the declaration and leave the use behind — a Program that no
+// longer compiles.
+describe("Rename through start and complete", () => {
+	it("should rewrite a name read under either Keyword", () => {
+		let source = [
+			"implementation {",
+			"\tfunction doubled(_ value: Integer) -> Future<Integer> {",
+			"\t\t<- complete Async.deferred(() { <- value })",
+			"\t}",
+			"",
+			"\tconstant answer = complete doubled(21)",
+			"\tconstant running = start doubled(21)",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 11 }, "twice")).toBe(
+			[
+				"implementation {",
+				"\tfunction twice(_ value: Integer) -> Future<Integer> {",
+				"\t\t<- complete Async.deferred(() { <- value })",
+				"\t}",
+				"",
+				"\tconstant answer = complete twice(21)",
+				"\tconstant running = start twice(21)",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	// NOTE: The typed walk as well as the Parser one — a Method resolved through
+	// its receiver's Type is indexed by the second, and renaming a Namespace
+	// member is what asks it. The call sits INSIDE the operand, which is where a
+	// Method call written with a `complete` always sits: the Keyword takes the
+	// whole postfix chain, so `complete x::m()` is the chain completed rather
+	// than a Method called on what was waited for.
+	it("should rewrite a Method called inside the operand", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Doubling for Integer {",
+			"\t\tdoubled() -> Integer {",
+			"\t\t\t<- @::multiply(with 2)",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tfunction held(_ value: Integer) -> Future<Integer> {",
+			"\t\t<- complete Async.deferred(() { <- value })",
+			"\t}",
+			"",
+			"\tTerminal.inspect(complete held(21::doubled()))",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 3, column: 3 }, "twice")).toContain(
+			"\tTerminal.inspect(complete held(21::twice()))",
+		)
+	})
+})

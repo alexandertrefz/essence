@@ -3333,3 +3333,60 @@ describe("Completion in a Module", () => {
 		expect(labelsFor("constant member = red.")).toEqual([])
 	})
 })
+
+// NOTE: An Argument written under one of the two Keywords is an Argument like
+// any other, and the reading that says which Choice a bare `#` there belongs to
+// is a walk over the typed Program — one that answers nothing about anything
+// under a `complete` without a case for it.
+describe("Completion under start and complete", () => {
+	let lines = [
+		"implementation {",
+		"\tchoice Suit { Hearts, Spades }",
+		"\tchoice Colour { Red, Black }",
+		"\tfunction started(_ suit: Suit) -> Future<Integer> {",
+		"\t\t<- complete Async.deferred(() { <- 1 })",
+		"\t}",
+		"",
+		"\tconstant answer = complete started(#)",
+		"}",
+	]
+
+	it("should offer the Cases the Parameter expects inside the operand", () => {
+		expect(labelsOf(lines.join("\n"), { line: 8, column: 38 })).toEqual([
+			"Hearts",
+			"Spades",
+		])
+	})
+
+	// NOTE: What was waited FOR, rather than the future it came out of — the
+	// receiver of a Method written behind a `complete` is the Value.
+	it("should offer the Methods of the value a complete answers with", () => {
+		let source = [
+			"implementation {",
+			"\tfunction doubled(_ value: Integer) -> Future<Integer> {",
+			"\t\t<- complete Async.deferred(() { <- value })",
+			"\t}",
+			"",
+			"\tconstant answer = complete doubled(21)",
+			"\tconstant shown = answer::to",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 7, column: 29 })).toContain("toString")
+	})
+
+	// NOTE: Both Types are builtins, so what this says is that they are in the
+	// table the Type reading offers from — a Program can not declare either.
+	it("should offer Future and Started where a Type is written", () => {
+		let source = [
+			"implementation {",
+			"\tfunction doubled(_ value: Integer) -> Fut",
+			"}",
+		].join("\n")
+
+		let labels = labelsOf(source, { line: 2, column: 42 })
+
+		expect(labels).toContain("Future")
+		expect(labels).toContain("Started")
+	})
+})

@@ -7522,3 +7522,95 @@ describe("the kinds a request narrowed itself to", () => {
 		expect(kinds(["refactor"])).toEqual(kinds())
 	})
 })
+
+// NOTE: What is written UNDER the two Keywords is ordinary code, and every
+// refactoring offered on it is reached by a walk that has to descend through
+// them — the Parser one the fixes share, and the typed one the annotations
+// take.
+describe("Refactorings under start and complete", () => {
+	it("annotates a Constant declared inside a started body", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant running = start Async.deferred(() {",
+			"\t\tconstant inner = 41",
+			"",
+			"\t\t<- inner::add(1)",
+			"\t})",
+			"\tTerminal.inspect(complete running)",
+			"}",
+		]
+
+		expect(titles(actionsOf(lines, spanOf(lines, 3, "inner")))).toContain(
+			"Add explicit Type annotation ': Integer'",
+		)
+	})
+
+	it("scaffolds a Match on a value written under the Keyword", () => {
+		let lines = [
+			"implementation {",
+			"\tchoice Suit { Hearts, Spades }",
+			"\tfunction chosen(_ suit: Suit) -> Future<Suit> {",
+			"\t\t<- complete Async.deferred(() {",
+			"\t\t\t<- suit",
+			"\t\t})",
+			"\t}",
+			"\tconstant answer = complete chosen(#Hearts)",
+			"\tTerminal.inspect(answer::is(#Hearts))",
+			"}",
+		]
+
+		expect(titles(actionsOf(lines, spanOf(lines, 5, "suit")))).toContain(
+			"Match on 'suit'",
+		)
+	})
+
+	// NOTE: Both halves — the call inside the operand, and the whole
+	// Expression the Keyword makes of it. A `complete` lifted into a Constant
+	// stands in the same body, which is a body that already suspends.
+	describe("extracting to a Constant", () => {
+		const LINES = [
+			"implementation {",
+			"\tfunction doubled(_ value: Integer) -> Future<Integer> {",
+			"\t\t<- complete Async.deferred(() { <- value })",
+			"\t}",
+			"\tconstant answer = complete doubled(21)",
+			"\tTerminal.inspect(answer)",
+			"}",
+		]
+
+		it("lifts the future out from under the Keyword", () => {
+			let action = actionsOf(LINES, spanOf(LINES, 5, "doubled(21)")).find(
+				(entry) => entry.kind === "refactor.extract",
+			)
+
+			expect(applied(LINES, action as CodeActionEntry)).toEqual([
+				"implementation {",
+				"\tfunction doubled(_ value: Integer) -> Future<Integer> {",
+				"\t\t<- complete Async.deferred(() { <- value })",
+				"\t}",
+				"\tconstant doubled2 = doubled(21)",
+				"\tconstant answer = complete doubled2",
+				"\tTerminal.inspect(answer)",
+				"}",
+			])
+		})
+
+		it("lifts the whole Expression, Keyword and all", () => {
+			let action = actionsOf(
+				LINES,
+				spanOf(LINES, 5, "complete doubled(21)"),
+			).find((entry) => entry.kind === "refactor.extract")
+
+			expect(applied(LINES, action as CodeActionEntry)).toEqual([
+				"implementation {",
+				"\tfunction doubled(_ value: Integer) -> Future<Integer> {",
+				"\t\t<- complete Async.deferred(() { <- value })",
+				"\t}",
+				"\tconstant doubled2 = complete doubled(21)",
+				"\tconstant answer = doubled2",
+				"\tTerminal.inspect(answer)",
+				"}",
+			])
+		})
+	})
+})

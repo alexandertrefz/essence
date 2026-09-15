@@ -593,6 +593,10 @@ function findEnclosingInvocation(
 				visitNode(node.lhs)
 				visitNode(node.rhs)
 				return
+			case "Start":
+			case "Complete":
+				visitNode(node.expression)
+				return
 			case "Match":
 				visitNode(node.value)
 

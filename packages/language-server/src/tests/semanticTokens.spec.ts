@@ -592,3 +592,42 @@ describe("Semantic Tokens inside a define", () => {
 		expect(tokenAt(source, 9, 16)?.type).toBe("parameter")
 	})
 })
+
+// NOTE: The two Types are builtins like every other, so they colour off the
+// index — what is asserted here is that they REACH it. A Case written under one
+// of the Keywords is the other half: Cases are collected from the Parser AST by
+// a walk of this file's own, which reaches nothing under a `start` without a
+// case for it.
+describe("Semantic Tokens around start and complete", () => {
+	let source = [
+		"implementation {",
+		"\tfunction held(_ value: Optional<Integer>) -> Future<Integer> {",
+		"\t\t<- complete Async.deferred(() { <- value::value(defaultingTo 0) })",
+		"\t}",
+		"",
+		"\tconstant running: Started<Integer> = start held(#Value(1))",
+		"\tTerminal.inspect(complete running)",
+		"}",
+	].join("\n")
+
+	it("should classify Future and Started as standard library Types", () => {
+		expect(tokenAt(source, 2, 47)).toEqual({
+			line: 2,
+			column: 47,
+			length: 6,
+			type: "type",
+			modifiers: ["readonly", "defaultLibrary"],
+		})
+		expect(tokenAt(source, 6, 20)).toEqual({
+			line: 6,
+			column: 20,
+			length: 7,
+			type: "type",
+			modifiers: ["readonly", "defaultLibrary"],
+		})
+	})
+
+	it("should colour a Case written under the Keyword", () => {
+		expect(tokenAt(source, 6, 51)?.type).toBe("enumMember")
+	})
+})

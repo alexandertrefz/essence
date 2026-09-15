@@ -283,3 +283,27 @@ describe("Folding a define", () => {
 		})
 	})
 })
+
+// NOTE: Neither Keyword folds — both are written on the line their operand
+// starts on — but a call written under one folds like any other, which is what
+// the walk's own case for them is for.
+describe("Folding Ranges under start and complete", () => {
+	it("should fold a call written across lines under the Keyword", () => {
+		let source = [
+			"implementation {",
+			"\tfunction doubled(_ value: Integer) -> Future<Integer> {",
+			"\t\t<- complete Async.deferred(() { <- value })",
+			"\t}",
+			"",
+			"\tconstant answer = complete doubled(",
+			"\t\t21,",
+			"\t)",
+			"}",
+		].join("\n")
+
+		expect(foldingRangesOf(source)).toContainEqual({
+			startLine: 6,
+			endLine: 7,
+		})
+	})
+})

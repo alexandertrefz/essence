@@ -256,6 +256,9 @@ function symbolsOfNode(
 			]
 		case "Lookup":
 			return symbolsOfNode(node.base)
+		case "Start":
+		case "Complete":
+			return symbolsOfNode(node.expression)
 		case "Combination":
 			return [...symbolsOfNode(node.lhs), ...symbolsOfNode(node.rhs)]
 		case "RecordValue":
@@ -743,6 +746,10 @@ function collectDetail(
 			return
 		case "Lookup":
 			collectDetail(node.base, details)
+			return
+		case "Start":
+		case "Complete":
+			collectDetail(node.expression, details)
 			return
 		case "Combination":
 			collectDetail(node.lhs, details)

@@ -390,6 +390,10 @@ function collectCasesFromNode(
 		case "Lookup":
 			collectCasesFromNode(node.base, tokens)
 			return
+		case "Start":
+		case "Complete":
+			collectCasesFromNode(node.expression, tokens)
+			return
 		// NOTE: A path holds no Case; its steps colour as members through the
 		// rename index, off the Lookups the Enricher synthesizes for them.
 		case "MemberPath":

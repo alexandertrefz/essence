@@ -253,6 +253,15 @@ function visitNode(
 			visit(node, answers)
 			visitNode(node.base, null, visit)
 			return
+		// NOTE: The operand is walked and the Keyword itself is not offered: a
+		// Match is scaffolded over a name, a member read or a call, and `complete
+		// response` is none of the three — a reader who wants to match on what it
+		// answers with holds it in a Constant first, which is the one spelling
+		// there is for that.
+		case "Start":
+		case "Complete":
+			visitNode(node.expression, null, visit)
+			return
 		case "Identifier":
 			visit(node, answers)
 			return

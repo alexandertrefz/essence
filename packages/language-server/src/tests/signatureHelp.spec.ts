@@ -519,3 +519,38 @@ describe("Signature Help inside a define arm", () => {
 		)
 	})
 })
+
+// NOTE: A call being written under one of the two Keywords is a call being
+// written, and the walk that finds it has to reach through the Keyword to get
+// there.
+describe("Signature Help under start and complete", () => {
+	let source = [
+		"implementation {",
+		"\tfunction doubled(_ value: Integer) -> Future<Integer> {",
+		"\t\t<- complete Async.deferred(() { <- value })",
+		"\t}",
+		"\tconstant answer = complete doubled(",
+		"}",
+	].join("\n")
+
+	it("should show the signature of a call written behind complete", () => {
+		let help = findSignatureHelp(source, { line: 5, column: 37 })
+
+		expect(help?.signatures[0].label).toBe(
+			"doubled(_ Integer) -> Future<Integer>",
+		)
+		expect(help?.activeParameter).toBe(0)
+	})
+
+	it("should show it behind start as well", () => {
+		let started = source.replace(
+			"constant answer = complete doubled(",
+			"constant running = start doubled(",
+		)
+		let help = findSignatureHelp(started, { line: 5, column: 35 })
+
+		expect(help?.signatures[0].label).toBe(
+			"doubled(_ Integer) -> Future<Integer>",
+		)
+	})
+})

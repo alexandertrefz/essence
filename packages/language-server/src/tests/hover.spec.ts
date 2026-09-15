@@ -1701,3 +1701,50 @@ describe("Hover inside a define", () => {
 		expect(hover(source, { line: 5, column: 7 })).toBe("Integer")
 	})
 })
+
+// NOTE: Both Keywords answer with what they PRODUCE, which is the reading a
+// Return's `<-` already takes: `complete` hovers as the Value it waited for and
+// `start` as the `Started` it put in flight. The operand keeps its own Hover —
+// it is the smaller span — so the future and the value it answers with are one
+// cursor apart.
+describe("Hover over start and complete", () => {
+	let source = [
+		"implementation {",
+		"\tfunction doubled(_ value: Integer) -> Future<Integer> {",
+		"\t\tconstant held = complete Async.deferred(() { <- value })",
+		"",
+		"\t\t<- held::add(held)",
+		"\t}",
+		"",
+		"\tconstant answer = complete doubled(21)",
+		"\tconstant running = start doubled(21)",
+		"}",
+	].join("\n")
+
+	it("should answer a complete with the value it waited for", () => {
+		expect(hover(source, { line: 8, column: 20 })).toBe("Integer")
+	})
+
+	it("should answer a start with the Started it put in flight", () => {
+		expect(hover(source, { line: 9, column: 21 })).toBe("Started<Integer>")
+	})
+
+	it("should leave the operand its own answer", () => {
+		expect(hover(source, { line: 8, column: 29 })).toBe(
+			"doubled(_ Integer) -> Future<Integer>",
+		)
+	})
+
+	// NOTE: What the walk is for — a name written inside the operand, which is
+	// answered by nothing at all where the Keyword is not descended into.
+	it("should reach a name written under the Keyword", () => {
+		expect(hover(source, { line: 3, column: 51 })).toBe("value: Integer")
+		expect(hover(source, { line: 3, column: 34 })).toBe(
+			"deferred<Value>(_ () -> Value) -> Future<Value>",
+		)
+	})
+
+	it("should answer the declared Future as the Type it is", () => {
+		expect(hover(source, { line: 2, column: 40 })).toBe("Future<Integer>")
+	})
+})

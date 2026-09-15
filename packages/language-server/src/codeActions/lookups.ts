@@ -885,6 +885,9 @@ export function walkNode(
 			return walkNode(node.lhs, visit) && walkNode(node.rhs, visit)
 		case "Lookup":
 			return walkNode(node.base, visit)
+		case "Start":
+		case "Complete":
+			return walkNode(node.expression, visit)
 		case "CaseValue":
 			return node.value === null ? true : walkNode(node.value, visit)
 		// NOTE: A path holds no Expression of its own — its steps are member

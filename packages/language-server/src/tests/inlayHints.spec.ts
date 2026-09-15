@@ -662,3 +662,35 @@ describe("Inlay Hints inside a define", () => {
 		expect(labels).toContain(" -> Boolean")
 	})
 })
+
+// NOTE: What a Constant holding work is — the difference between `Started<…>`
+// and the value it will answer with is the whole reason to read one — and the
+// Function literal written under the Keyword, which shows its Types nowhere in
+// the source and is reached by nothing where the walk has no case for `start`.
+describe("Inlay Hints around start and complete", () => {
+	let source = [
+		"implementation {",
+		"\tfunction doubled(_ value: Integer) -> Future<Integer> {",
+		"\t\t<- complete Async.deferred(() { <- value })",
+		"\t}",
+		"",
+		"\tconstant answer = complete doubled(21)",
+		"\tconstant running = start doubled(21)",
+		"}",
+	].join("\n")
+
+	it("should annotate what each Keyword answers with", () => {
+		let labels = hintsOf(source).map((hint) => hint.label)
+
+		expect(labels).toContain(": Integer")
+		expect(labels).toContain(": Started<Integer>")
+	})
+
+	it("should annotate a Function literal written under the Keyword", () => {
+		expect(hintsOf(source)).toContainEqual({
+			position: { line: 3, column: 32 },
+			label: " -> Integer",
+			kind: "type",
+		})
+	})
+})

@@ -255,3 +255,50 @@ describe("Selection Ranges inside a define", () => {
 		})
 	})
 })
+
+// NOTE: The operand is a span of its own inside the Keyword's, so a selection
+// widened from inside it reaches the call, then the whole `complete …`, then
+// the Statement — one step per thing written, which is what a walk with no case
+// for the two Keywords would collapse into a jump from the call to the
+// Statement.
+describe("Selection Ranges around start and complete", () => {
+	let source = [
+		"implementation {",
+		"\tfunction doubled(_ value: Integer) -> Future<Integer> {",
+		"\t\t<- complete Async.deferred(() { <- value })",
+		"\t}",
+		"",
+		"\tconstant answer = complete doubled(",
+		"\t\t21,",
+		"\t)",
+		"}",
+	].join("\n")
+
+	it("should step from the call out through the Keyword", () => {
+		let ranges = selectionRangesOf(source, { line: 6, column: 29 })
+
+		expect(ranges.slice(0, 3)).toEqual([
+			{
+				start: { line: 6, column: 29 },
+				end: { line: 6, column: 36 },
+			},
+			{
+				start: { line: 6, column: 29 },
+				end: { line: 8, column: 3 },
+			},
+			{
+				start: { line: 6, column: 20 },
+				end: { line: 8, column: 3 },
+			},
+		])
+	})
+
+	it("should reach an Argument written under the Keyword", () => {
+		let ranges = selectionRangesOf(source, { line: 7, column: 3 })
+
+		expect(ranges[0]).toEqual({
+			start: { line: 7, column: 3 },
+			end: { line: 7, column: 5 },
+		})
+	})
+})

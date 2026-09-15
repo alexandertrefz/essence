@@ -269,6 +269,10 @@ function visitNode(
 		case "Lookup":
 			visitNode(node.base, carried)
 			return
+		case "Start":
+		case "Complete":
+			visitNode(node.expression, carried)
+			return
 		case "Combination":
 			visitNode(node.lhs, carried)
 			visitNode(node.rhs, carried)

@@ -443,3 +443,40 @@ describe("Call Hierarchy inside a define", () => {
 		).toEqual(["passes", "fallback"])
 	})
 })
+
+// NOTE: Every call that answers work is written under one of the two Keywords,
+// so a walk with no case for them reports the Functions asynchrony is written
+// with as called by nobody.
+describe("Call Hierarchy through start and complete", () => {
+	let source = [
+		"implementation {",
+		"\tfunction doubled(_ value: Integer) -> Future<Integer> {",
+		"\t\t<- complete Async.deferred(() { <- value })",
+		"\t}",
+		"",
+		"\tfunction twice(_ value: Integer) -> Future<Integer> {",
+		"\t\t<- complete doubled(value)",
+		"\t}",
+		"",
+		"\tconstant answer = complete twice(21)",
+		"\tconstant running = start twice(21)",
+		"}",
+	].join("\n")
+
+	it("should count a call under either Keyword as an incoming call", () => {
+		expect(summarise(incoming(source, { line: 6, column: 11 }))).toEqual([
+			{
+				name: "implementation",
+				kind: "implementation",
+				container: null,
+				calls: 2,
+			},
+		])
+	})
+
+	it("should see the call a completing body makes under the Keyword", () => {
+		expect(summarise(outgoing(source, { line: 6, column: 11 }))).toEqual([
+			{ name: "doubled", kind: "function", container: null, calls: 1 },
+		])
+	})
+})

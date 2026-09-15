@@ -721,6 +721,16 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			visitNode(node.lhs, state)
 			visitNode(node.rhs, state)
 			return
+		// NOTE: What the Keyword ANSWERS with, the way a `<-` says what the
+		// Statement it opens returns — `complete` reads back as the Value waited
+		// for and `start` as the `Started` it put in flight. The operand is the
+		// smaller span and keeps its own Hover, so the Future and the Value it
+		// answers with are one cursor apart.
+		case "Start":
+		case "Complete":
+			consider(state, node.position, node.type, null)
+			visitNode(node.expression, state)
+			return
 		case "Match":
 			consider(state, node.position, node.type, null)
 			visitNode(node.value, state)
