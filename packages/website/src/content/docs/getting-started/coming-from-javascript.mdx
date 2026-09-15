@@ -377,8 +377,8 @@ Each entry names what stands in its place, where anything does.
 - **Classes and `new`.** A `type` names a shape, a namespace holds its methods, and a literal builds the value.
 - **Recursive type declarations.** A `type` or `choice` cannot name itself, so a tree is not a type you can declare.
 - **Tuples.** A pair is a record with two named members.
-- **File, network or JSON in the standard library.** [`Terminal`](/docs/library/terminal) is the I/O: it prints, writes, inspects, and reads the program's input.
-- **Async.** There is no `async`, `await` or `Promise`; a program's statements run in order.
+- **File or JSON in the standard library.** [`Terminal`](/docs/library/terminal) prints, writes, inspects and reads the program's input, and [`Http`](/docs/library/http) sends a request.
+- **`async`, `await` and `Promise`.** Work that has not run is a [`Future`](/docs/library/future), a value: `complete` waits for what one answers with and `start` puts one in flight. See [Asynchrony](/docs/language/asynchrony).
 - **Floating point.** `Integer` and `Rational` are exact: `0.1::add(0.2)::is(0.3)` is `true`.
 - **Calling JavaScript from Essence.** An import names `.es` files only; a `.js` specifier is an `invalid-module-specifier`. JavaScript calls Essence instead, as [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) shows.
 - **Call-site type arguments.** `identity<Integer>(1)` is a syntax error; every type argument is inferred.

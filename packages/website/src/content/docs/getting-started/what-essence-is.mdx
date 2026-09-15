@@ -126,8 +126,8 @@ Three things in it do not exist in Essence. `Pricing.es` uses an exact [`Integer
 
 ## What Essence does not have
 
-- **No I/O beyond [`Terminal`](/docs/library/terminal).** It has seven functions, each called like `Terminal.print(…)`: `print`, [`write`](/docs/library/terminal#write), [`inspect`](/docs/library/terminal#inspect), [`describe`](/docs/library/terminal#describe), [`readLine`](/docs/library/terminal#readLine), [`readAll`](/docs/library/terminal#readAll) and [`ask`](/docs/library/terminal#ask). There is no HTTP, no JSON, no file, no timer and no environment variable. Beside it, [`Randomness.entropy()`](/docs/library/randomness#entropy) reads random values from the host, the JavaScript runtime that runs the program. `essence run Main.es -- alpha beta` hands `alpha beta` to the process, and nothing in the language reads them.
-- **No async.** There is no `async` and no `await`. A call returns when its body is done, and waiting on a network or a timer is the host's job.
+- **No I/O beyond [`Terminal`](/docs/library/terminal), [`Http`](/docs/library/http) and [`Async`](/docs/library/future).** `Terminal` has seven functions, each called like `Terminal.print(…)`: `print`, [`write`](/docs/library/terminal#write), [`inspect`](/docs/library/terminal#inspect), [`describe`](/docs/library/terminal#describe), [`readLine`](/docs/library/terminal#readLine), [`readAll`](/docs/library/terminal#readAll) and [`ask`](/docs/library/terminal#ask). `Http` sends a request, and `Async` is the timer and the way to describe a computation for later; both answer work rather than blocking on it. There is no JSON, no file and no environment variable. Beside them, [`Randomness.entropy()`](/docs/library/randomness#entropy) reads random values from the host, the JavaScript runtime that runs the program. `essence run Main.es -- alpha beta` hands `alpha beta` to the process, and nothing in the language reads them.
+- **No `async`, `await` or `Promise`.** Work that has not run is a value instead: a [`Future`](/docs/library/future). `complete` waits for what one answers with, `start` puts one in flight, and a function is marked by writing `complete` in its body rather than by a word in front of it. [Asynchrony](/docs/language/asynchrony) has it.
 - **No exceptions.** There is no `throw`, `try` or `catch`. A function that can fail says so in its return type, as `total` does with its `Result`.
 - **No `null` or `undefined`.** A value that may be absent is an `Optional`. The value inside cannot be used until the program says what happens when it is empty.
 - **No mutation of data.** A record, a list or a string never changes. `{ order with quantity = 3 }` is a new record, and `order` keeps its old value. There is no assignment to a member. A `constant` cannot be reassigned, and a `variable` can only be pointed at another value.
@@ -181,11 +181,12 @@ if (answer.$case === "Quote#Rejected") {
 
 ## The example programs
 
-Three programs in the repository show Essence at full size.
+Four programs in the repository show Essence at full size.
 
 - [`examples/league`](https://github.com/alexandertrefz/essence/tree/master/examples/league) is a six-team season as a pure program. The matches are data, and the program works out the standings and prints them with `essence run`.
 - [`examples/quote-server`](https://github.com/alexandertrefz/essence/tree/master/examples/quote-server) is a Bun HTTP API that prices orders. Every rule is Essence, reached through the Bun plugin.
 - [`examples/client-2048`](https://github.com/alexandertrefz/essence/tree/master/examples/client-2048) is the game 2048 in the browser. The board and the moves are Essence, Vite serves them through one plugin line, and undo reads a board that was never overwritten.
+- [`examples/site-check`](https://github.com/alexandertrefz/essence/tree/master/examples/site-check) asks several addresses for their pages at once. The requests, the bound on how many run together and the report are Essence, and a Bun script awaits the one promise the module answers with.
 
 <Note label="Version">
 This site documents Essence {VERSION}, the version `essence --version` prints; the language is pre-1.0, and a release renames things.
