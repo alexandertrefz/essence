@@ -1,0 +1,556 @@
+---
+title: essence.json
+description: Every key of the project file, with its type, its default, the flag it mirrors and the commands that read it.
+section: reference
+order: 30
+template: reference
+tocDepth: 2
+searchDepth: 3
+---
+
+`essence.json` holds a project's settings, the way `tsconfig.json` holds the settings of `tsc`. [`essence build`](/docs/reference/cli#build) and [`essence test`](/docs/reference/cli#test) read it on every run, so the command line does not repeat them. The directory that holds it is the project root. [Projects and essence.json](/docs/guides/projects) walks through setting one up. This file sets every key:
+
+```jsonc
+{
+	"$schema": "https://essencelang.org/schemas/essence.schema.json",
+
+	// A corpus of sources kept broken on purpose.
+	"exclude": ["fixtures/broken"],
+
+	"test": {
+		// The nightly job runs these with --tag slow.
+		"skipTags": ["slow"],
+		"cases": 200,
+		"coverage": {
+			"report": "lcov",
+			"out": "reports/coverage",
+		},
+	},
+
+	"build": {
+		"out": "dist",
+		"sourcemap": true,
+		"minify": false,
+		"embed": false,
+		"optimise": true,
+		"withoutOptimisations": [],
+	},
+}
+```
+
+Every key is optional. A key the file leaves out keeps its default. An empty file is allowed too, and still marks the root.
+
+## Every key
+
+A dotted name on this page is a path into the file: `test.coverage.report` is `report` inside `coverage` inside `test`. A key written with the dots in it, such as `"test.cases"` at the top of the file, is not a setting. Essence reports it with a Warning and reads nothing from it. VS Code's `settings.json` spells keys with dots, and this file nests them.
+
+| Key | Type | Default | Flag | Read by |
+| --- | --- | --- | --- | --- |
+| [`exclude`](/docs/reference/project-file#exclude) | list of paths | `[]` | none | `test`, the Language Server |
+| [`test.skipTags`](/docs/reference/project-file#test-skipTags) | list of tag names | `[]` | [`--skip-tag`](/docs/reference/cli#test--skip-tag) leaves out more, [`--tag`](/docs/reference/cli#test--tag) runs a skipped tag | `test`, the editor's live test session |
+| [`test.cases`](/docs/reference/project-file#test-cases) | whole number, at least 1 | `100` | [`--cases`](/docs/reference/cli#test--cases) | `test` |
+| [`test.coverage.report`](/docs/reference/project-file#test-coverage-report) | `"lcov"` or `"json"` | none | [`--coverage-report`](/docs/reference/cli#test--coverage-report) | `test` |
+| [`test.coverage.out`](/docs/reference/project-file#test-coverage-out) | path | `coverage/` under the working directory | [`--coverage-out`](/docs/reference/cli#test--coverage-out) | `test` |
+| [`build.out`](/docs/reference/project-file#build-out) | path | beside each source | [`--out`](/docs/reference/cli#build--out), `-o` | `build`, [`watch`](/docs/reference/cli#watch), [`run`](/docs/reference/cli#run) |
+| [`build.sourcemap`](/docs/reference/project-file#build-sourcemap) | `true` or `false` | `false` | [`--sourcemap`](/docs/reference/cli#build--sourcemap), `--no-sourcemap` | `build`, `watch`, `run`, `test` |
+| [`build.minify`](/docs/reference/project-file#build-minify) | `true` or `false` | `false` | [`--minify`](/docs/reference/cli#build--minify), `--no-minify` | `build`, `watch`, `run`, `test` |
+| [`build.embed`](/docs/reference/project-file#build-embed) | `true` or `false` | `false` | [`--embed`](/docs/reference/cli#build--embed), `--no-embed` | `build`, `watch`, `run`, `test` |
+| [`build.optimise`](/docs/reference/project-file#build-optimise) | `true` or `false` | `true` | [`--no-optimise`](/docs/reference/cli#build--no-optimise) | `build`, `watch`, `run`, `test` |
+| [`build.withoutOptimisations`](/docs/reference/project-file#build-withoutOptimisations) | list of pass names | `[]` | [`--without-optimisation`](/docs/reference/cli#build--without-optimisation) | `build`, `watch`, `run`, `test` |
+
+Every path in the file is relative to the directory that holds `essence.json`, whichever directory the command runs in.
+
+## How the file is found
+
+```
+shop/
+  essence.json        ← governs shop/ and everything under it
+  src/
+    Main.es
+  packages/
+    payments/
+      essence.json    ← a project of its own
+      Charge.es
+```
+
+A command looks for `essence.json` in the working directory, then in each directory above it, and reads the first one it finds. `essence test` walks that file's directory when it is given no files. Run from `shop/src/`, a command reads `shop/essence.json`.
+
+The search starts at the working directory, not at the file the command is given. Run from the directory that holds `shop/`, `essence build shop/src/Main.es` reads no settings, because no `essence.json` sits at or above that directory. With no file at or above the working directory, every setting keeps its default, and `essence test` walks the working directory.
+
+A project can hold another project, the way a monorepo holds its packages. The nearest file wins entirely. Run from `shop/packages/payments/`, a command reads the inner file, and nothing the outer file says reaches it.
+
+Five commands read the file: `essence build`, `essence run`, `essence watch`, `essence test` and [`essence init`](/docs/reference/cli#init). Each reads it once, when it starts. `essence watch` and `essence test --watch` keep the settings they started with, so restart them to pick up a change to the file. [`essence check`](/docs/reference/cli#check), [`essence format`](/docs/reference/cli#format), [`essence dap`](/docs/reference/cli#dap) and [`essence help`](/docs/reference/cli#help) never read it, and print none of its Warnings.
+
+[`essence lsp`](/docs/reference/cli#lsp) reads nothing when it starts. The Language Server it starts reads the file itself. It finds the nearest `essence.json` at or above each directory it walks, so a nested project governs its own subtree in the editor too. It reads the file again whenever the file changes on disk, with no restart.
+
+[`--verbose`](/docs/reference/cli#global--verbose) opens the report with `settings read from essence.json`, or `no essence.json governs the working directory`. Run from below the root, the path is written in full.
+
+## The file format
+
+The file is JSON with comments and trailing commas allowed, the format `tsconfig.json` uses. The file at the top of this page has both.
+
+The `$schema` key names the JSON Schema for the file, `https://essencelang.org/schemas/essence.schema.json`. An editor that reads it completes the keys, describes each one on hover, and marks a key that is not a setting. Essence reads nothing from `$schema`, and accepts any string there.
+
+The schema is generated from the same list of settings the commands read, so an editor and a command agree about what the file may hold. Every object in the schema refuses a key it does not list. Every list in the schema refuses a repeated entry, which Essence itself reads without a Warning. In the Essence repository, `bun run generate:schema` regenerates it.
+
+The Essence extension for VS Code checks every file named `essence.json` against the same schema, with or without the `$schema` line. [Editor setup](/docs/guides/editor-setup) installs it.
+
+**Compared with `tsconfig.json`.** Naming a file does not skip the settings: `tsc src/index.ts` does not load `tsconfig.json`, but `essence build src/Main.es` still reads `essence.json`. No flag points a command at another file, as `tsc -p` does, so run the command from inside the project. There is no `extends`, so a nested project repeats what it needs. The keys are spelled as the flags are: `out` and `sourcemap`, not `outDir` and `sourceMap`.
+
+## `exclude` and the `test` settings
+
+`exclude` sits at the top of the file. The other four sit inside `"test"` and shape what `essence test` runs and writes.
+
+### `exclude`
+
+```jsonc
+{
+	"exclude": ["fixtures/broken", "vendor"]
+}
+```
+
+The directories under the project that are not its sources, such as a corpus kept broken on purpose or a vendored copy of a library.
+
+- **Type:** a list of paths, relative to `essence.json`
+- **Default:** `[]`, nothing excluded
+- **Flag:** none
+- **Read by:** `essence test` and the Language Server
+
+The walk is how `essence test` without file arguments, and the Language Server, find a project's sources: they visit every directory under the root. `exclude` narrows the walk and nothing else. An excluded directory is skipped with everything under it. Entries compare as paths, so `fixtures/broken` leaves `fixtures/brokenish` beside it in the walk.
+
+A file named on the command line still runs: `essence test fixtures/broken/Broken.tests.es` runs that file although its directory is excluded. So does a file that a glob on the command line matches, as in `essence test "fixtures/broken/*.es"`. A directory named on the command line is still narrowed, so `essence test fixtures/broken` finds no tests in it.
+
+Entries are paths, not globs as in the `exclude` of `tsconfig.json`. `"fix*"` excludes nothing, and no Warning says so.
+
+`essence build` does not read `exclude`. A glob given to `build` compiles every file it matches.
+
+In the editor, the Problems panel leaves excluded directories out. It still reports on an excluded file that a source imports, or that you open.
+
+Five directories are skipped by every walk, whether `exclude` lists them or not: `.git`, `node_modules`, `dist`, `build` and `.claude`. A file in one of them still runs when a command names it. Unlike an excluded directory, one of these named on the command line is searched: `essence test node_modules` runs the tests under it.
+
+### <span id="test-skipTags">`test.skipTags`</span>
+
+```jsonc
+{
+	"test": {
+		"skipTags": ["slow"]
+	}
+}
+```
+
+The tags an everyday `essence test` leaves out. A tag is a name a test carries, written after the test's own name as `tagged slow`. [Tests](/docs/language/tests) covers the form.
+
+- **Type:** a list of tag names
+- **Default:** `[]`, every test runs
+- **Flag:** `--tag slow` runs the tests tagged `slow` for one run, and only those. `--skip-tag other` leaves out the tests tagged `other` as well.
+- **Read by:** `essence test`, and the editor's live test session, which the Language Server runs as you type
+
+A test the list leaves out counts as deselected, and the report says so: `2 passed  1 deselected`. `essence test --tag slow` runs only the `slow` tests, which suits a nightly CI job. [Running tests](/docs/guides/running-tests) covers the other selection flags.
+
+### <span id="test-cases">`test.cases`</span>
+
+```jsonc
+{
+	"test": {
+		"cases": 200
+	}
+}
+```
+
+How many values each property test draws. A property test runs its body once for each generated value, and is written `test "…" for any (n: Integer) { … }`.
+
+- **Type:** a whole number, at least 1
+- **Default:** `100`
+- **Flag:** `--cases <count>`
+- **Read by:** `essence test`
+
+The report prints the count beside each property test, as in `✓ doubling is adding  (200 cases)`.
+
+### <span id="test-coverage-report">`test.coverage.report`</span>
+
+```jsonc
+{
+	"test": {
+		"coverage": {
+			"report": "lcov"
+		}
+	}
+}
+```
+
+The file a coverage run writes: `"lcov"` writes `lcov.info` and `"json"` writes `coverage.json`. A coverage run is [`essence test --coverage`](/docs/reference/cli#test--coverage), which reports the lines, branches, `match` arms and choice cases the tests reached.
+
+- **Type:** `"lcov"` or `"json"`
+- **Default:** none, so a coverage run prints its table and writes no file
+- **Flag:** `--coverage-report lcov` or `--coverage-report json`, which also turns coverage on for that run
+- **Read by:** `essence test`
+
+The setting never turns coverage on by itself. With `"report": "lcov"`, `essence test` writes nothing, and `essence test --coverage` writes `coverage/lcov.info`.
+
+### <span id="test-coverage-out">`test.coverage.out`</span>
+
+```jsonc
+{
+	"test": {
+		"coverage": {
+			"report": "lcov",
+			"out": "reports/coverage"
+		}
+	}
+}
+```
+
+The directory a coverage report is written to.
+
+- **Type:** a path, relative to `essence.json`
+- **Default:** `coverage/` under the working directory
+- **Flag:** `--coverage-out <directory>`
+- **Read by:** `essence test`
+
+The default follows the working directory, not the root: run from `src/`, the report goes to `src/coverage/`. Set `out` to keep it in one place.
+
+With no report format, `out` has nothing to write, and a file that sets it anyway is not a mistake. The flag is stricter. `--coverage-out` with no report format in the file or on the command line is refused before anything runs, with exit code `2`:
+
+<div class="error-output">
+
+```
+  ✖ --coverage-out says where to write a report, and no report was asked for.
+  Add --coverage-report lcov or json.
+
+  Usage: essence test [file...] [options]
+  Help:  essence help test
+```
+
+</div>
+
+## The `build` settings
+
+These six sit inside `"build"`. `essence build`, `essence watch` and `essence run` read all of them. `essence test` reads every one but `out`, because it always writes its bundles to a cache directory.
+
+### <span id="build-out">`build.out`</span>
+
+```jsonc
+{
+	"build": {
+		"out": "dist"
+	}
+}
+```
+
+The directory bundles are written to. A bundle is the one JavaScript file a build writes for an entry file and every module it imports.
+
+- **Type:** a path, relative to `essence.json`
+- **Default:** beside each source, while `essence run` keeps its bundle in a cache directory
+- **Flag:** `--out <path>` or `-o <path>`
+- **Read by:** `essence build`, `essence watch`, `essence run`
+
+`out` names a directory even when there is one source: `essence build src/Main.es` writes `dist/Main.js`. The flag differs here. With one source, `-o dist2` writes a file named `dist2`, unless the path ends in `/` or names an existing directory. `essence run` writes its bundle into `out` too, instead of into its cache.
+
+### <span id="build-sourcemap">`build.sourcemap`</span>
+
+```jsonc
+{
+	"build": {
+		"sourcemap": true
+	}
+}
+```
+
+Whether a source map is written beside every bundle, as `Main.js.map` beside `Main.js`. A source map ties each line of the bundle to the Essence line it came from.
+
+- **Type:** `true` or `false`
+- **Default:** `false`
+- **Flag:** `--sourcemap` turns it on for one run, and `--no-sourcemap` turns it off, on `build`, `watch` and `run`
+- **Read by:** `essence build`, `essence watch`, `essence run`, `essence test`
+
+`essence run` without an output directory inlines the map into the bundle as a `data:` URL, so no file is left beside its cached bundle. `essence test` inlines it the same way.
+
+### <span id="build-minify">`build.minify`</span>
+
+```jsonc
+{
+	"build": {
+		"minify": true
+	}
+}
+```
+
+Whether bundles are minified.
+
+- **Type:** `true` or `false`
+- **Default:** `false`
+- **Flag:** `--minify` turns it on for one run, and `--no-minify` turns it off, on `build`, `watch` and `run`
+- **Read by:** `essence build`, `essence watch`, `essence run`, `essence test`
+
+### <span id="build-embed">`build.embed`</span>
+
+```jsonc
+{
+	"build": {
+		"embed": true
+	}
+}
+```
+
+Whether every bundle is built for embedding: a bundle a JavaScript program loads and calls into, with a descriptor file beside it, `Main.descriptor.json` beside `Main.js`. [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) covers the JavaScript side.
+
+- **Type:** `true` or `false`
+- **Default:** `false`
+- **Flag:** `--embed` turns it on for one run, and `--no-embed` turns it off, on `build` and `watch`
+- **Read by:** `essence build`, `essence watch`, `essence run`, `essence test`
+
+`essence run` and `essence test` take no `--embed` flag. When the file sets `embed`, they build embedding bundles, and `run` still runs the program and `test` still runs the tests.
+
+### <span id="build-optimise">`build.optimise`</span>
+
+```jsonc
+{
+	"build": {
+		"optimise": false
+	}
+}
+```
+
+Whether the Optimiser runs. The Optimiser is the stage of a build between type checking and generating JavaScript. Its passes rewrite the program before it becomes JavaScript, most of them so that the JavaScript runs faster.
+
+- **Type:** `true` or `false`
+- **Default:** `true`
+- **Flag:** `--no-optimise`
+- **Read by:** `essence build`, `essence watch`, `essence run`, `essence test`
+
+`"optimise": false` builds the same bundle `--no-optimise` does. No flag turns the Optimiser back on for one run, because there is no `--optimise`. To optimise again, set the key to `true` or remove it.
+
+A coverage run still counts what ran with the Optimiser off. Only leaving out `instrument-coverage`, in `withoutOptimisations` or with `--without-optimisation`, turns the counting off.
+
+The key is spelled the British way, as are `withoutOptimisations` and the flags. `"optimize": false` is not a setting: its Warning suggests `optimise`, and the Optimiser still runs.
+
+### <span id="build-withoutOptimisations">`build.withoutOptimisations`</span>
+
+```jsonc
+{
+	"build": {
+		"withoutOptimisations": ["pool-constants", "inline-loops"]
+	}
+}
+```
+
+Optimiser passes to leave out, by name. A pass is one rewrite the Optimiser makes. [Optimisations](/docs/reference/optimisations) describes each one.
+
+- **Type:** a list of pass names
+- **Default:** `[]`, every pass runs
+- **Flag:** `--without-optimisation <pass>`, once per pass
+- **Read by:** `essence build`, `essence watch`, `essence run`, `essence test`
+
+The names, in the order the passes run:
+
+- `instrument-coverage`
+- `compile-type-tests`
+- `lower-unit-case-equality`
+- `lower-scalar-operations`
+- `compile-union-dispatch`
+- `devirtualise-witnesses`
+- `lower-matches-to-statements`
+- `unbox-conditions`
+- `inline-loops`
+- `build-lists-in-place`
+- `fold-constants`
+- `prune-dead-match-arms`
+- `elide-final-match-test`
+- `compile-record-members`
+- `eliminate-dead-code`
+- `collapse-construction`
+- `collapse-combinations`
+- `pool-constants`
+
+A name that is not a pass is reported with a Warning, and the rest of the list is still read. The Warning names the closest pass when there is one, and lists every pass. With `instrument-coverage` in the list, `essence test --coverage` prints no table.
+
+## When a flag says otherwise
+
+A flag on the command line meets the file's setting for the run it is on. How the two combine depends on the kind of flag:
+
+| Setting | Flag | For that run |
+| --- | --- | --- |
+| `build.out`, `test.cases`, `test.coverage.report`, `test.coverage.out` | `--out`, `--cases`, `--coverage-report`, `--coverage-out` | The flag's value replaces the setting's. With one source, `--out` names a file unless it ends in `/` or names an existing directory. |
+| `build.sourcemap`, `build.minify`, `build.embed` | `--sourcemap`, `--minify`, `--embed` and their `--no-` forms | The flag turns the setting on and its `--no-` form turns it off, whatever the file says. |
+| `build.optimise` | `--no-optimise` | The Optimiser is off when either says so. |
+| `build.withoutOptimisations` | `--without-optimisation` | The file's passes and the flag's passes are all left out. |
+| `test.skipTags` | `--skip-tag`, `--tag` | `--skip-tag` adds to the file's list. A tag that `--tag` names runs even though the file skips it, and only tests carrying a named tag run. |
+
+A flag and its `--no-` form together are refused before anything runs, with exit code `2`:
+
+<div class="error-output">
+
+```
+  ✖ --minify and --no-minify contradict each other — say one.
+
+  Usage: essence build <file...> [options]
+  Help:  essence help build
+```
+
+</div>
+
+## Mistakes are Warnings
+
+A mistake in `essence.json` never stops a command. The command prints a Warning before it starts work, the setting keeps its default, and the run carries on. The Notes at the foot of a Warning say what the run does instead. Warnings go to stderr, still print under [`--quiet`](/docs/reference/cli#global--quiet), and leave the exit code alone. So a misspelt key never fails a CI run, where `tsc` reports an unknown compiler option as an error. In the editor, the same Warnings appear on the file itself.
+
+| Code | Message | Written when |
+| --- | --- | --- |
+| [`unknown-setting`](/docs/reference/diagnostics#unknown-setting) | `"build.minifyy" is not a setting` | A key is not a setting at that level of the file. |
+| [`setting-shape`](/docs/reference/diagnostics#setting-shape) | `"test.cases" is not a whole number of at least 1` | A setting's value has the wrong shape. |
+| [`moved-setting`](/docs/reference/diagnostics#moved-setting) | `"test.exclude" has moved to "exclude"` | A key is read somewhere else now. |
+| [`unreadable-project-file`](/docs/reference/diagnostics#unreadable-project-file) | `essence.json could not be read as JSON` | The file does not parse. |
+
+**`unknown-setting`.** The Help names the closest setting when there is one. A Note lists every setting at that level:
+
+<div class="error-output">
+
+```
+[unknown-setting]
+Warning: "build.minifyy" is not a setting
+   ╭─┤ essence.json:3:3 │
+   │
+ 3 │        "minifyy": true
+   │        ────┬────
+   │            ╰────── not a setting
+   │
+   │ Help: Did you mean "minify"?
+   │
+   │ Note 1: The settings under "build" are "out", "sourcemap", "minify", "embed", "optimise", "withoutOptimisations".
+   │ Note 2: Nothing was read from this key.
+───╯
+```
+
+</div>
+
+**`setting-shape`.** The message names the shape the setting needs, such as `true or false` or `a list of paths`. The Help writes a value that fits, or names the closest one:
+
+<div class="error-output">
+
+```
+[setting-shape]
+Warning: "test.cases" is not a whole number of at least 1
+   ╭─┤ essence.json:3:12 │
+   │
+ 3 │        "cases": "200"
+   │                 ──┬──
+   │                   ╰──── written as a String
+   │
+   │ Help: Write it as a whole number of at least 1: 200
+   │
+   │ Note: Property tests draw the runner's default number of values.
+───╯
+```
+
+</div>
+
+One wrong item in a list is reported on its own, as `"test.skipTags" holds something that is not one of its tag names` or `"pool-constant" is not an Optimiser pass`. That item is left out, and the rest of the list is read.
+
+**`moved-setting`.** `exclude` sits at the top of the file, not under `test`. The Help writes the key where it is read now:
+
+<div class="error-output">
+
+```
+[moved-setting]
+Warning: "test.exclude" has moved to "exclude"
+   ╭─┤ essence.json:3:3 │
+   │
+ 3 │        "exclude": ["fixtures"]
+   │        ────┬────
+   │            ╰────── no longer read here
+   │
+   │ Help: Move it: "exclude": ["fixtures"]
+   │
+   │ Note 1: "exclude" keeps the editor out of those directories as well as the test walk, so it sits at the top rather than under "test".
+   │ Note 2: Nothing was read from this key.
+───╯
+```
+
+</div>
+
+Essence reads nothing from an `"essence"` key in a `package.json`. One is reported with the same code, as `The "essence" key of package.json has moved to essence.json`, and its Help says to move the object into `essence.json`. Every `package.json` between the working directory and the project root is checked, or up to the filesystem root when no project file governs.
+
+**`unreadable-project-file`.** This file never closes its outer object:
+
+```
+{
+	"test": {
+		"skipTags": ["slow"],
+		"cases": 200
+}
+```
+
+Every setting keeps its default until the file parses, including any written before the mistake:
+
+<div class="error-output">
+
+```
+[unreadable-project-file]
+Warning: essence.json could not be read as JSON
+   ╭─┤ essence.json:5:1 │
+   │
+ 5 │ }
+   │ ▲
+   │ ╰── a '}' was expected here
+   │
+   │ Help: The file is JSON with comments and trailing commas allowed, as tsconfig.json is.
+   │
+   │ Note: Every setting is at its default until the file reads.
+───╯
+```
+
+</div>
+
+## What `essence init` writes
+
+```sh
+$ essence init
+
+  ✔ wrote essence.json
+```
+
+```jsonc
+{
+	"$schema": "https://essencelang.org/schemas/essence.schema.json",
+
+	// Directories under this project that are not its sources.
+	"exclude": [],
+
+	"test": {
+		// Tags an everyday `essence test` leaves out; `--tag` brings one back.
+		"skipTags": []
+	}
+}
+```
+
+`essence init` writes this file into the working directory, which becomes a project root. The file holds `$schema` and two settings at their defaults, each under a comment that says what it is for. Every other key is left for a project to add from this page. The command takes no options of its own.
+
+A directory that already holds an `essence.json` is left alone, and the command exits with `2`:
+
+<div class="error-output">
+
+```
+  ✖ essence.json already exists.
+  Open it — `essence help test` and `essence help build` say what it may hold.
+
+  Usage: essence init
+  Help:  essence help init
+```
+
+</div>
+
+Inside another project, `essence init` writes the file and prints the full path of the outer file, which no longer reaches this directory:
+
+```
+  ✔ wrote essence.json
+  /Users/ada/shop/essence.json governs the directory above; nothing it says reaches this project now
+```
+
+<SeeAlso
+	links={[
+		{ label: "Projects and essence.json", href: "/docs/guides/projects" },
+		{ label: "Command line", href: "/docs/reference/cli" },
+		{ label: "Running tests", href: "/docs/guides/running-tests" },
+		{ label: "Optimisations", href: "/docs/reference/optimisations" },
+		{ label: "Diagnostics", href: "/docs/reference/diagnostics" },
+	]}
+/>

@@ -1,0 +1,1030 @@
+---
+title: Optimisations
+description: Every pass the compiler's optimiser runs, what it changes in the emitted JavaScript, and the name that turns it off.
+section: reference
+order: 50
+template: reference
+tocDepth: 2
+searchDepth: 3
+---
+
+The compiler improves a program after it has checked it and before it writes JavaScript. The part that does this is the optimiser, and every change it makes is a named pass. This page lists every pass under that name. [`--no-optimise`](/docs/reference/cli#build--no-optimise) turns the optimiser off, and [`--without-optimisation`](/docs/reference/cli#build--without-optimisation) turns one pass off. A build that behaves differently with the optimiser off has hit a compiler bug, and turning passes off one at a time names the pass responsible. After the passes, the page lists the shapes the compiler emits and the improvements to the runtime, the support code every build includes. No flag turns those off.
+
+```essence
+implementation {
+	constant secondsPerDay = 60::multiply(with 60)::multiply(with 24)
+
+	Terminal.print(secondsPerDay) § 86400
+}
+```
+
+Save it as `Day.es` and build it three ways:
+
+```sh
+essence build Day.es                                        # every pass on
+essence build Day.es --without-optimisation fold-constants  # one pass off
+essence build Day.es --no-optimise                          # no pass at all
+```
+
+The program prints `86400` every time. What changes is the JavaScript. With every pass on, `fold-constants` works the product out while compiling, and the program holds the result:
+
+```js
+const $pool_0 = Integer.createInteger(86400);
+…
+const secondsPerDay = $pool_0;
+```
+
+With `fold-constants` off, the multiplication happens when the program runs. With `--no-optimise`, the JavaScript makes the two calls the source wrote:
+
+```js
+const secondsPerDay = PositiveInteger.multiply(PositiveInteger.multiply(Integer.createInteger(60), Integer.createInteger(60)), Integer.createInteger(24));
+```
+
+A positive [Integer](/docs/library/integer) literal is proven positive, so `60::multiply(with 60)` calls [`PositiveInteger`](/docs/library/integer#PositiveInteger)'s `multiply`, not `Integer`'s.
+
+<Note>
+The JavaScript on this page is what the compiler writes before it bundles. A bundle from `essence build` holds the same statements with the runtime's names flattened: `Integer.createInteger(86400)` reads `createInteger(86400)` there, `PositiveInteger.multiply` reads `multiply__overload$1`, `const` may read `var`, and `$pool_0` may gain a suffix.
+</Note>
+
+A minifier does not do this work. `essence build Day.es --no-optimise --minify` still multiplies at run time, because every Essence value is an object built by a runtime call, and a minifier cannot see into those calls.
+
+To read the JavaScript on this page:
+
+- Every Essence value other than a function is a JavaScript object with a tag, a hidden key under `$type.typeKeySymbol` that names its kind, such as `"Integer"` or `"Optional#Value"`. An Integer, a [String](/docs/library/string) or a [Boolean](/docs/library/boolean) holds its JavaScript value in `value`.
+- `$type` and `$helpers` are parts of the runtime: `$type` builds and tests types, and `$helpers` holds shared operations such as equality.
+- `$pool_0`, `$pool_1` and so on are constants the compiler built once (see `pool-constants`). `_self` is a method's receiver or the value a [`match`](/docs/language/choices-and-match) is testing. Names that start with `$loop_` or `$match_` are the compiler's own.
+- `…` stands for code left out of a sample.
+
+How the two flags are used:
+
+- [`build`, `run`, `watch` and `test`](/docs/reference/cli#build) all take both. [Using the compiler](/docs/guides/using-the-compiler) walks through the commands themselves.
+- `--without-optimisation` takes the exact name a pass is listed under on this page. It is repeatable, and every pass you do not name keeps running.
+- A project can set the same for every build in `essence.json`. [`build.optimise`](/docs/reference/project-file#build-optimise) set to `false` turns the optimiser off, and [`build.withoutOptimisations`](/docs/reference/project-file#build-withoutOptimisations) lists passes to turn off.
+
+A name that is not a pass is refused before anything compiles, and the command exits with code 2. When a pass name is close, the refusal suggests it:
+
+<div class="error-output">
+
+```
+  ✖ There is no optimisation pass named "collapse-constructions".
+  Did you mean "essence build --without-optimisation collapse-construction"?
+
+  Usage: essence build <file...> [options]
+  Help:  essence help build
+```
+
+</div>
+
+When no name is close, the refusal lists every pass instead.
+
+## The contract
+
+Four rules hold for every pass. Because of them, turning a pass off isolates a bug.
+
+**Any subset of the passes produces a correct program.** No pass depends on another having run. The passes cooperate: one leaves a shape the next can do more with. But each is written against the program as it reaches the optimiser, and each is correct whether or not its neighbours ran.
+
+**A pass never changes what a program does.** It does not change what the program prints, what it computes, or which errors and warnings the compiler reports. The optimiser runs after the compiler has checked the program, so a program that compiles compiles the same way with every pass off. A pass changes only how much work a run does. The one exception is `instrument-coverage`, which adds work: it counts what runs, and only when a coverage run asks for it.
+
+**The standard library is optimised with your program.** The methods it writes in Essence are emitted beside the code that reaches them. The same passes run over them, under the same options. `--no-optimise` turns the optimiser off for the whole build.
+
+**The order is fixed.** The passes run in the order this page lists them. Turning one off never reorders the rest.
+
+## Debugging
+
+`essence dap` builds every debug session with the optimiser off, and that is not configurable. A debugger steps through statements, stops on bindings and reads their values, and several passes remove exactly those. `eliminate-dead-code` drops a constant nothing reads, `prune-dead-match-arms` drops an arm no value reaches, `fold-constants` replaces an operation with its result, and `inline-loops` writes a [loop](/docs/language/iteration) out where it was called. [Debugging](/docs/guides/debugging) covers the sessions themselves.
+
+To find the pass behind a wrong result, build with `--no-optimise` first. If the program then behaves, one of the passes is responsible. Turn them off one at a time with `--without-optimisation` until the wrong result goes away. Two passes give up a check that names a compiler bug: `elide-final-match-test` and `compile-union-dispatch`. When a `match` or a method call on a [union](/docs/language/unions-and-type-aliases) returns the wrong thing, turning those two off puts the check back.
+
+## Passes
+
+The passes run in the order below, and each heading is the name `--without-optimisation` takes. Most sections show the JavaScript with the pass off and on. Each says why the change is safe and what the pass leaves alone.
+
+Where a section gives a timing, it was measured on an Apple M3 Pro with Bun 1.4.2 and Node 24.21.0. Each program was built with every pass on, and again without the pass named. Each build ran twenty-two times in fresh processes on each engine. A figure is the fastest run, less the fastest run of a program that prints one line. Each measured program does little besides the work its pass changes, so its ratio is the ratio for that work alone. A program that spends its time elsewhere gains less.
+
+### `instrument-coverage`
+
+Counts what ran, for `essence test --coverage`.
+
+A coverage run of [`essence test`](/docs/guides/running-tests) compiles the project with this pass on, and every other compile finds it does nothing. It writes a counter in front of every statement you wrote other than a declaration, and one into each branch of an `if` and its `else`. It writes one into each arm of a [`define`](/docs/language/conditions), one into each `match` arm, and one around each case a program constructs. Beside the counters it writes a table of where each one stands and what it counts. The test runtime holds the counts, and the test runner reports them.
+
+It runs first so that its counts describe your source. A counter written before `lower-matches-to-statements` stands in the arm you wrote. One written after it would stand in a statement the compiler made up.
+
+A later pass may remove code a counter stands in. `fold-constants` can fold a conditional whose condition is known, and `prune-dead-match-arms` drops an arm no value can reach. The counter's entry stays in the table with a count of zero, and the report lists it as never taken.
+
+`--no-optimise --coverage` still counts. Turning the optimiser off asks the compiler not to improve the program, and a coverage run with no counters would report nothing. `--without-optimisation instrument-coverage` does turn counting off. The standard library is never instrumented.
+
+### `compile-type-tests`
+
+Decides a `match` arm's type test by reading the value's tag.
+
+Every value carries a tag, a hidden key that names its kind: `"Integer"`, `"List"`, `"Optional#Value"`. With this pass off, an arm such as `case #Value(value)` on an [`Optional<Integer>`](/docs/language/optional) builds a type descriptor at the test and hands it to the runtime, which walks it:
+
+```js
+if ($type.isValueOfType(_self, {
+		type: "Case",
+		choice: "Optional",
+		name: "Value",
+		members: { item: { type: "Integer" } },
+		typeArguments: [{ type: "Integer" }]
+	})) {
+```
+
+With the pass on, the tag decides:
+
+```js
+if (_self[$type.typeKeySymbol] === "Optional#Value") {
+```
+
+For a [list](/docs/language/lists) the difference is one of complexity. A `List<Integer>` descriptor means a list whose every item is an Integer, so the runtime check reads every item. With the pass off, a `case List` over ten thousand items makes ten thousand checks, on every turn of a loop that reaches it.
+
+The tag is used only where the compiler can prove it decides the test. The value's static type says which member types can reach the `match`. The tag is compiled in only where exactly one of them carries the tag in question, and that member passes the matcher's check outright. Where two members share a tag, the full check stays. `List<Alpha>` and `List<Beta>` are both `"List"`, and `Box<Integer>#Holding` and `Box<String>#Holding` are both `"Box#Holding"`. A type parameter among the members keeps the full check too, because a value of one can be anything.
+
+**Records.** A [record](/docs/language/records)'s tag says only that the value is a record. That still decides the test where exactly one member of the union is a record and it passes the matcher. So `case Point` on a `Point | String`, where `Point` is `{ x: Integer, y: Integer }`, compiles to one comparison:
+
+```js
+if (_self[$type.typeKeySymbol] === "Record") {
+```
+
+Two records in one union both carry that tag, so their members decide. That is `compile-record-members`, further down.
+
+A counted loop that does nothing but match a record against `{ x: Integer, y: Integer } | String | Integer` ten million times runs over 20× faster with this pass, on both Bun and Node.
+
+**Literal matchers.** A literal matcher such as `case 0` or `case "beta"` has no type test to replace, because the comparison is its test. With the pass off it calls the runtime's structural equality, `$helpers.anyIs(_self, $pool_1)`. Where the matched value's type and the literal are exactly one scalar kind, the pass writes the comparison instead:
+
+```js
+if (_self.value === $pool_1.value) {         // case 0, on an Integer
+if ($helpers.stringEquals(_self, $pool_4)) { // case "beta", on a String
+```
+
+`$pool_1` and `$pool_4` are the pooled literals `0` and `"beta"`. Integer equality is `===` on the held value, because one Integer has exactly one representation (see `hybrid-integers`). Strings go through `stringEquals`, because two strings are equal when their normalised (NFC) forms are, whichever code points spell them. A value whose type is a union keeps `anyIs`, since a value of any member may arrive. So does every other literal kind: a case, a record or a list literal.
+
+Guards and member literals are joined onto whichever test the matcher produced, so they keep their meaning.
+
+### `lower-unit-case-equality`
+
+Compares a value with a payload-less case by reading its tag.
+
+With this pass off, `a::compare(to b)::is(#Less)` calls the runtime's `choiceIs`, which compares the two values structurally. With it on, the tag is read:
+
+```js
+return Integer.compare(a, b)[$type.typeKeySymbol] === "Ordering#Less" ? Boolean.trueInstance : Boolean.falseInstance;
+```
+
+`isNot` asks `!==` instead of negating the result. Either side may be the case: `#Less::is(ordering)` compiles to the same comparison.
+
+This is safe because a [choice](/docs/language/choices-and-match)'s derived equality decides a case by its tag, and then compares payload members the way a record's equality does. A case with no members has nothing more to compare, so the tag is the whole result. A generic choice compares through a descriptor that lists, for each tag, the payload members to compare. The pass reads that descriptor, and leaves the comparison to the runtime where it lists members for the tag.
+
+Only equality a choice derives is lowered. A [namespace](/docs/language/namespaces-and-methods) that writes its own `is` is called as written.
+
+The pass also runs inside the standard library, where it matters most. [`Comparable`](/docs/library/protocols#Comparable) writes `isLessThan` as `@::compare(to other)::is(Ordering#Less)` and `isGreaterThan` the same way with `#Greater`, so those comparisons end in this shape.
+
+### `lower-scalar-operations`
+
+Writes primitive operations out where they are called.
+
+With this pass off, `a::isLessThan(b)` on two Integers calls a method, which calls `Integer.compare` and compares the result with `#Less`. The two values already hold what one `<` decides, so the pass writes that:
+
+```js
+return a.value < b.value ? Boolean.trueInstance : Boolean.falseInstance;
+```
+
+These calls are lowered, and nothing else:
+
+- **Integer**, where the receiver and the argument are both exactly `Integer`: `isLessThan`, `isGreaterThan`, `isLessThanOrEqualTo`, `isGreaterThanOrEqualTo`, `is`, `isNot`, `add`, `subtract` and `multiply`. The comparisons become JavaScript's operators. The arithmetic becomes the guarded operation shown under `hybrid-integers`.
+- **[NonZeroInteger](/docs/library/integer#NonZeroInteger)**: `multiply`, where both operands are exactly `Integer`. **[NonNegativeInteger](/docs/library/integer#NonNegativeInteger)** and **PositiveInteger**: `add` and `multiply`, under the same condition. `1::add(2)` and `2::multiply(with 3)` reach these, as the first example showed. Each namespace re-exports Integer's own arithmetic, and [checked refinements](/docs/language/checked-refinements) are erased before the first pass runs, so the lowering is the one above. `raise`, `divide`, `quotient`, `remainder`, `absolute`, `negate` and `squareRoot` stay calls.
+- **Boolean**: `negate`, `and` and `or`, which become `!`, `&&` and `||` on the held values.
+- **String**: `is` and `isNot`, which become one call to the runtime's `stringEquals`. Two strings are equal when their NFC forms are, so `é` written as one code point equals `e` followed by a combining accent, where `===` would return `false`.
+
+Mixed kinds stay calls. An Integer beside a [Rational](/docs/library/rational) is a widening the covering `Number` namespace decides by cross-multiplying. An operand typed as a union or a type parameter is not known to be an Integer at all.
+
+This is safe because the types are exact and the values are what the runtime built. Integer arithmetic in Essence is exact at any size and totally ordered. No Integer is unequal to itself the way `NaN` is, so `!(a < b)` can be asked as `a >= b`.
+
+**`and` and `or` keep eager evaluation.** Essence evaluates every argument before the call. JavaScript's `&&` and `||` skip the right side when the left decides. The two agree only when the right side has no effect. So the pass lowers `and` and `or` only when nothing in the whole argument can print, assign, or call a function the compiler cannot name:
+
+```js
+function both(a, b) {
+	return Boolean.and(a, isSmall(b));
+}
+function plain(a, b) {
+	return a.value && b.value < $pool_1.value ? Boolean.trueInstance : Boolean.falseInstance;
+}
+```
+
+`both` is `a::and(isSmall(b))`, where `isSmall` is a function the program wrote that prints, so the call stays. `plain` is `a::and(b::isLessThan(10))`. Names, member reads, literals, values built from those, and a short list of Integer and Boolean methods qualify. A call to a function the program wrote, an interpolated string or a `match` does not. A namespace a program declares inside a block under the name `Integer`, `Boolean` or `String` replaces the built-in one there, so calls on it are never lowered.
+
+The pass also runs inside the standard library, so Integer's `isLessThanOrEqualTo` compiles to `_self.value <= other.value` there. A [protocol](/docs/language/protocols)'s provided bodies stay calls, because their receiver is `Self`, which is no kind in particular until a conformance says so.
+
+A lowered Boolean used as a condition is not built and then read back. That collapse is `unbox-conditions`.
+
+### `compile-union-dispatch`
+
+Decides which method a union receiver calls, where the call is written.
+
+A method called on an `Integer | Boolean` is one of two methods, and the value decides which. With this pass off, the runtime chooses:
+
+```js
+return $type.dispatchMethod(value, [], [
+	[
+		{ type: "Integer" },
+		Integer.toString__overload$1,
+		[]
+	],
+	[
+		{ type: "Boolean" },
+		$es_Boolean_toString,
+		[]
+	]
+]);
+```
+
+That builds an array per call and a tuple and a type descriptor per case, and then searches them. The pass writes out the decision the search would make:
+
+```js
+return value[$type.typeKeySymbol] === "Integer" ? Integer.toString__overload$1(value) : $es_Boolean_toString(value);
+```
+
+Each case's test is the one `compile-type-tests` computes for a `match` arm. A case the tag decides becomes a comparison. Cases whose members share a tag keep `isValueOfType`, against a descriptor `pool-constants` builds once. Cases keep the order the compiler chose, most specific first. A case whose check accepts every value that can arrive ends the chain.
+
+**The receiver and the shared arguments are evaluated once, before any test.** That is where building the search's arrays evaluated them. Where a temporary is needed, the chain is the body of an arrow function called at once. Where the call is a statement's value, `lower-matches-to-statements` turns that into a block of `const`s.
+
+**A branch's own arguments are built only in that branch.** The search built every branch's arguments before choosing one. Those arguments are conformance witnesses, the method maps a protocol-bounded function is handed (see `devirtualise-witnesses`), and function literals, and building either has no effect, so the difference cannot be observed. The pass checks that per case, and leaves the call alone where it does not hold.
+
+**A chain whose every branch is the same call becomes that call.** [`length`](/docs/library/list#length) on a `List<Integer> | List<String>` resolves to `List.length` for both members:
+
+```js
+return List.length(mixed);
+```
+
+The measured program calls a function holding that call ten million times, in a counted loop that does nothing else. It takes about 30 ms on Bun with this pass and over 750 ms without it, and about 55 ms and 600 ms on Node. The bundle falls from 9,419 to 4,450 bytes, because nothing reaches `dispatchMethod` and the descriptor checks any more.
+
+**The last case is the `else`, where its test compares tags.** The compiler emits a dispatch only where every member of the union has a case. A value that reaches the last case has nowhere else to go. The elision gives up `$type.noDispatchCaseMatched()`, a throw that names a compiler bug. It is reached only when a runtime check and a static type disagree. Where the last check needs a descriptor, its test and the throw stay. `--without-optimisation compile-union-dispatch` puts the search and its throw back.
+
+### `devirtualise-witnesses`
+
+Calls the method a witness names, instead of reading it off the witness.
+
+A conformance witness is a method map, such as `{ toString: Integer.toString__overload$1 }`. A function bounded by a protocol is handed one, and reads the method it needs off it. Where a site reads exactly one method off a witness, right there, the compiler already knows which function that read finds. With this pass off, an interpolation hole reads the method off a pooled witness:
+
+```js
+return String.createString("You have " + $pool_0.toString(count).value + " left.");
+```
+
+With the pass on, it calls the method:
+
+```js
+return String.createString("You have " + Integer.toString__overload$1(count).value + " left.");
+```
+
+An interpolation hole is the only such site. Every other witness is passed as an argument, where the callee decides which method to read, so the object has to exist. `pool-constants` builds those once. The two passes never compete for a value: this one takes the witnesses used on the spot, and the pool takes the rest.
+
+A conditional conformance is left alone. Its witness is built by `boundConformance(…)`, which curries further witnesses onto every method, so the function behind `toString` is made by the call and has no name to write. A witness forwarded from the enclosing function's own conformance argument is left alone too, because it is a different value on each call.
+
+The pass saves bytes and one step of indirection, and little time: the hole already read one property off an object the pool built once. A program that interpolates and passes no witness anywhere stops building one at all.
+
+### `lower-matches-to-statements`
+
+Writes a `match` where it stands, instead of inside a function called on the spot.
+
+A `match` is an expression in Essence, and its arms hold statements. The only JavaScript expression that can hold statements is a function call, so with this pass off every `match` compiles to one:
+
+```js
+function describe(count) {
+	return function (_self) {
+		if (_self[$type.typeKeySymbol] === "Optional#Value") {
+			const value = _self.item;
+			return String.createString("" + Integer.toString__overload$1(value).value + " left");
+		} else {
+			return $pool_0;
+		}
+	}(count);
+}
+```
+
+That closure is built and called every time the `match` runs. Where the `match` is itself in a statement position, none of it is needed:
+
+```js
+function describe(count) {
+	{
+		const _self = count;
+		if (_self[$type.typeKeySymbol] === "Optional#Value") {
+			const value = _self.item;
+			return String.createString("" + Integer.toString__overload$1(value).value + " left");
+		} else {
+			return $pool_0;
+		}
+	}
+}
+```
+
+Three positions qualify: a return statement, the value of a declaration or an assignment, and a `match` written for its effects. A `match` anywhere else, such as an argument, a record member or an interpolation hole, keeps its wrapper.
+
+In return position the arms' returns return from the enclosing function, which is what a return does anyway, so the arms are emitted as written. Everywhere else the result is written to where it goes, and an arm that returns before its end leaves the chain through a labelled `break`. Here `constant answer = match count -> String { … }` returns early from its `#Value` arm with `<- "zero"`:
+
+```js
+let answer;
+$match_0: {
+	const _self = count;
+	if (_self[$type.typeKeySymbol] === "Optional#Value") {
+		const value = _self.item;
+		if ($es_Integer_isZero(value).value) {
+			answer = $pool_1;
+			break $match_0;
+		}
+		answer = String.createString("" + Integer.toString__overload$1(value).value + " left");
+	} else {
+		answer = $pool_0;
+	}
+}
+```
+
+**`_self` still means the matched value.** It was a parameter, which is bound outside the scope it declares, and a `const` is not. So `match @ -> …` binds nothing and reads the `_self` already there. A subject that only mentions `_self`, such as `match @.item -> …`, is read in a scope of its own before the block that shadows it.
+
+**An arm can shadow the name the result goes to.** Say an arm declares its own `answer`, and the `match` is the value of `constant answer`. The result is then written to a name of the compiler's own. `answer` is assigned from it once the block has closed.
+
+**A `match` written for its effects drops its arms' final `<- {}`.** The compiler gives every arm a return, and appends `<- {}` where the body has none. The pass removes that return, so no empty record is built only to be dropped. Only an arm's last statement is considered, and a return that holds a call is kept and evaluated.
+
+The pass also lifts a compiled union dispatch that holds operands. Where the dispatch is a statement's value, its names become the `const`s of a block and the arrow function goes.
+
+### `unbox-conditions`
+
+Tests a comparison directly, instead of the Boolean built around it.
+
+Essence has no truthiness: a condition is a Boolean. An Essence Boolean is an object, and every object is truthy in JavaScript, so an `if` tests the `value` the object holds. Where the Boolean is one `lower-scalar-operations` built from a comparison, the two steps cancel. With this pass off:
+
+```js
+if ((a.value < b.value ? Boolean.trueInstance : Boolean.falseInstance).value) {
+```
+
+With it on:
+
+```js
+if (a.value < b.value) {
+```
+
+Each arm of a `define` holds a condition too, and gets the same treatment. `define { as "A" if score::isGreaterThanOrEqualTo(90) as "B" otherwise }` emits:
+
+```js
+return score.value >= $pool_1.value ? $pool_2 : $pool_0;
+```
+
+Only that exact shape is collapsed. Any other condition, such as a method a namespace wrote, a name or a record member, is an Essence value, and JavaScript has to test its `value`. Reading `.value` off a raw JavaScript boolean would give `undefined`, which is falsy, so every such condition would quietly fail.
+
+This is safe because it removes only a Boolean that is built and read back at once. With the pass off, the program asks the same questions and gets the same results, building and reading back one Boolean per condition.
+
+### `inline-loops`
+
+Writes a loop out where it is called, instead of calling a driver that calls callbacks.
+
+Essence has no loop statement. A loop is a call to a driver function with callbacks, such as `loop(startingWith seed, while (n) { … }, (n) { … })`. The driver calls them turn after turn. With this pass off, that is what the JavaScript does:
+
+```js
+return $_.loop__overload$1(seed, function (n) {
+	return n.value < $pool_0.value ? Boolean.trueInstance : Boolean.falseInstance;
+}, function (n) {
+	return …;
+});
+```
+
+With the pass on, the walk, meaning the turns of the loop from its first to its last, is written out at the call. Each callback's body stands where the call to it was:
+
+```js
+let $loop_0_state = seed.value;
+$loop_0:
+	while (true) {
+		{
+			const n = $loop_0_state;
+			if (!(n < $pool_0.value))
+				break $loop_0;
+		}
+		{
+			const n = $loop_0_state;
+			$loop_0_state = …;
+		}
+	}
+return Integer.createInteger($loop_0_state);
+```
+
+The `seed.value` and the final `Integer.createInteger` are the `unboxed-loop-state` shape, described below.
+
+The pass inlines five `loop` entries and four List methods at the call. The loop entries are [`while`](/docs/library/loop#while), [`until`](/docs/library/loop#until), [`through`](/docs/library/loop#through), [`downTo`](/docs/library/loop#downTo) and [`step`](/docs/library/loop#step). The List methods are [`map`](/docs/library/list#map), [`everyItem(where:)`](/docs/library/list#everyItem) and the two [`reduce`](/docs/library/list#reduce) entries. [`NonEmptyList`](/docs/library/list#NonEmptyList) declares a `map` of its own, which is List's `map` re-exported, so a call on a proven non-empty list is inlined the same way.
+
+The `upTo` entry and the three counted entries whose body returns a [`Step`](/docs/library/loop#Step) are not inlined at the call. Each is written in Essence on another entry, so the inlined walk sits inside its body in the standard library. `loop(from 0, upTo count, …)` compiles to a call.
+
+**A callback is inlined only where it is written at the call.** A function-valued name holds whatever was bound to it, which the compiler cannot read. A call that passes one stays a call.
+
+**The parameters are bound, not renamed.** Each callback body is emitted inside a block whose `const`s are its parameters, which is the scope the closure gave it. The names the walk binds itself start with `$loop_` and a number unique in the program, which no Essence name can spell.
+
+**Evaluation order is the call's.** The seed, the bounds and the receiver are evaluated before the walk, in the order the call passes them. `while` and `until` check the predicate before each step, so a predicate decided on the seed returns the seed and the body never runs.
+
+**The counted loops skip their driver entirely.** `through` and `downTo` are written in Essence on the `while` driver. They thread a `{ index, carried }` record through it, which costs a record and an Integer per turn. Inlined, each becomes a `for` over the two bounds. This is `loop(from 1, through count, startingWith 0, (index, total) { <- total::add(index) })`:
+
+```js
+const $loop_0_from = $pool_0.value;
+const $loop_0_to = count.value;
+let $loop_0_state = $pool_1.value;
+const $loop_0_big = typeof $loop_0_from !== "number" || typeof $loop_0_to !== "number";
+const $loop_0_delta = $loop_0_big ? 1n : 1;
+for (let $loop_0_index = $loop_0_big ? BigInt($loop_0_from) : $loop_0_from; $loop_0_index <= $loop_0_to; $loop_0_index += $loop_0_delta) {
+	{
+		const $loop_0_held = $loop_0_big ? Integer.canonical($loop_0_index) : $loop_0_index;
+		const total = $loop_0_state;
+		$loop_0_state = …;
+	}
+}
+return Integer.createInteger($loop_0_state);
+```
+
+The counter counts in numbers wherever both bounds are held as numbers, and in bigints past 2⁵³. The choice is made once, before the first turn. Where both bounds are written as Integer literals a double holds exactly, the choice is made while compiling, and the bigint half is not emitted:
+
+```js
+const $loop_0_delta = 1;
+for (let $loop_0_index = $loop_0_from; $loop_0_index <= $loop_0_to; $loop_0_index += $loop_0_delta) {
+```
+
+**The body gets the raw counter where it only reads its value.** A body that uses the counter only in arithmetic and comparisons reads the number directly. No Integer is built for it per turn. A body that passes the counter on, stores it or shadows its name gets an Integer. When a walk counts in bigints, `Integer.canonical` turns each counter back into a number where it fits. So a value inside the safe range, the integers a double holds exactly, keeps one representation (see `hybrid-integers`).
+
+**A `Step` is read where it is built.** The `step` loop and `reduce`'s stopping entry decide by the case the body returns: `#Done(x)` stops with `x`, and `#Continue(x)` carries `x` on. Where the body's result is such a case, the walk assigns and leaves, and the case is never built:
+
+```js
+if (n > limit.value) {
+	$loop_0_answer = Integer.createInteger(n);
+	break $loop_0;
+}
+$loop_0_state = …;
+```
+
+Where the body returns a `Step` held under a name, or one a method returns, the tag is read at that one site.
+
+**Position decides whether there is a closure.** A loop that is a statement's value is written as statements. A loop anywhere else, such as an argument or an interpolation hole, is wrapped in an arrow function called at once, which is one closure for the whole walk.
+
+**List walks read the list's items once.** `map`, `everyItem` and `reduce` start with two `const`s: the items as one array, and their count, fixed before the first turn. `list-tail-sharing` explains why the count is fixed:
+
+```js
+const $loop_0_items = List.materialise(prices);
+const $loop_0_count = $loop_0_items.length;
+```
+
+**A call that leaves out an argument is not inlined.** The pass writes the callee's body at the call, and reads the argument list the call wrote. A parameter's default would have nowhere to go. None of the nine entries declares a default.
+
+**The standard library's own walks are inlined inside their bodies.** [`firstItem(where:)`](/docs/library/list#firstItem), [`firstIndex(of:)`](/docs/library/list#firstIndex), [`count(where:)`](/docs/library/list#count) and [`removeEvery(where:)`](/docs/library/list#removeEvery) are written on `reduce` or `everyItem` with literal callbacks. A call to one of them stays a call, and what it calls is a `for` loop.
+
+The pass costs text. A walk written at three sites is three walks, where it was three calls to one driver.
+
+What it is worth depends on the driver. Three programs show the range:
+
+- A counted sum over twenty million turns runs about 7× faster than the same build with only this pass off, on both engines. Against a build with every pass off it is about 31× faster on Bun and 20× on Node.
+- A `step` loop threading a record over three million turns gains nothing measurable from this pass. It is still about 4.5× faster than with every pass off on Bun, and 4.8× on Node, and that gain comes from the other passes.
+- An `everyItem(where:)` into a `reduce` over two million items gains between 1.1× and 1.3× on Bun, varying between runs, and nothing measurable on Node. Against every pass off it gains about 2.1× and 1.35×.
+
+This pass removes the driver itself. After it there is no closure, no `Step` and no driver between a loop and the `for` you would have written in JavaScript.
+
+### `build-lists-in-place`
+
+Pushes onto one array where a walk rebuilt a list every turn.
+
+`inline-loops` writes the driver out, but the body still makes the call the program wrote. With this pass off, a counted walk that appends builds a new list every turn:
+
+```js
+let $loop_0_state = {
+	[$type.typeKeySymbol]: "List",
+	value: [$pool_1]
+};
+…
+for (let $loop_0_index = …; $loop_0_index <= $loop_0_to; $loop_0_index += $loop_0_delta) {
+	{
+		const index = Integer.createInteger($loop_0_index);
+		const list = $loop_0_state;
+		$loop_0_state = List.append__overload$1(list, index);
+	}
+}
+return $loop_0_state;
+```
+
+With the pass on, it pushes onto one array and wraps it once at the end:
+
+```js
+const $loop_0_built = [$pool_1];
+…
+for (let $loop_0_index = …; $loop_0_index <= $loop_0_to; $loop_0_index += $loop_0_delta) {
+	{
+		$loop_0_built.push(Integer.createInteger($loop_0_index));
+	}
+}
+return List.createList($loop_0_built);
+```
+
+That is `loop(from 1, through count, startingWith [0], (index, list) { <- list::append(index) })`. It is what the compiler already emits for `map` and `everyItem`, applied to an accumulator the program wrote. The counted walks, the `while` and `until` walks, the `step` walk and both `reduce` entries can be rewritten this way.
+
+The counter is not bound either, where the whole body is that one push: the Integer is built inside the `push` call, as above.
+
+**When it applies.** Pushing onto an array is invisible only while nothing else can see the array, so the previous state has to be dead the moment it is rebuilt. The rule is strict. The accumulator's name may appear only as the receiver at the root of the chain that rebuilds it. A branch that changes nothing may return it bare, and a `#Done` may carry it. Any other mention declines the walk, which then keeps the copying emission. That covers an argument, a member of something built, a name a closure captures, a nested walk over it, and even a read as harmless as `length`. So does `prepend`, which grows the end a build does not push onto. `(index, list) { <- list::append(list::length()) }` reads `list` as an argument, so it keeps `List.append__overload$1(list, List.length(list))`.
+
+That rule costs the `while`, `until` and `step` walks most of their chances. Their predicate or body reads the state too, so they qualify only when they decide by something else. The counted walks and the two `reduce` entries are where the pass pays.
+
+**The seed decides one entry cost.** A seed written as a list literal hands its array over, because nothing else has ever held it. So does a list added by `append(contentsOf:)` that is written as a literal: its items are pushed directly. Any other seed is copied once, on entry, into an array the walk owns, so a list the program held before the walk is never pushed onto. For a list that has never been prepended to, that copy is the same `slice` that `append` makes when it cannot push in place. Without the pass, the first `append` copies nothing where the held list still views its whole array (see `list-tail-sharing`).
+
+What it is worth depends on what is appended:
+
+- Five million appends of the counter run about 1.6× faster with this pass on Bun, and about 1.3× on Node.
+- Five million appends of a constant run about 3.4× faster on Bun, and about 1.1× on Node.
+- Four hundred thousand three-turn walks, each seeded with a list the program held, run about 1.2× faster on both.
+
+One measured program is slower with this pass. It runs three hundred three-turn walks, each seeded with the same held list of a million items. With the pass it takes about 3.3 times as long on Bun, and about 1.2 times as long on Node. Both builds copy the million on nearly every walk, so the gap comes from how the engines run the pass's copy, not from extra copies. Thirty such walks, or thirty thousand walks over ten thousand items, show no slowdown. A program of the slow shape runs faster with `--without-optimisation build-lists-in-place`.
+
+A walk the pass declines is emitted as it was. So are `map`, `everyItem` and every walk that threads something other than a list.
+
+### `fold-constants`
+
+Writes out the result of an operation whose operands are written out.
+
+`60::multiply(with 60)::multiply(with 24)` becomes one Integer, as in the example at the top of this page. `"a count: {7}"` becomes one string instead of a witness and a `toString` call:
+
+```js
+const $pool_0 = Integer.createInteger(86400);
+const $pool_1 = String.createString("a count: 7");
+```
+
+What folds: Integer and Rational `add`, `subtract`, `multiply`, `negate` and `absolute`, and their comparison and equality methods. String `append` and `prepend`. An interpolation hole whose value is a literal and whose `toString` is the standard library's. A written literal resolves to the narrowest refined namespace it proves. `60::multiply(with 60)` is `PositiveInteger`'s product, and `1/2::multiply(with 2/3)` is [`PositiveRational`](/docs/library/rational#PositiveRational)'s. Those fold too, as do `NonZeroInteger`'s and `NonNegativeInteger`'s. [`NonZeroRational`](/docs/library/rational#NonZeroRational)`.reciprocal` stays a call. Where every hole of an interpolated string folds, the string becomes a literal, and `pool-constants` declares it once.
+
+This is safe because the compiler works the result out the way the program would. Essence arithmetic is exact, and the fold runs on bigints, so there is no rounding to disagree about. Each fold carries out the body of the method it replaces. A folded Integer is written in its canonical representation, a number inside the safe range, so it is the literal you would have written by hand.
+
+**A Rational keeps the parts it was built with.** It stores the numerator and denominator it was built from, and reduces only what it returns. `4/2` stores 4 and 2, [`Terminal.inspect`](/docs/library/terminal#inspect) shows it as `2/1`, and its [`numerator()`](/docs/library/rational#numerator) is `2`. So `4/2` folds to `Rational.createRational(4n, 2n)`. Arithmetic between two Rationals returns lowest terms, so `1/2::add(1/4)` folds to `Rational.createRational(3n, 4n)`, the value the unfolded program builds. The fold calls the same core functions the runtime does. An interpolation hole folds to what `toString` returns, so `"{4/2}"` folds to `"2"`.
+
+Only literals fold, never a name bound to a constant. A binding is a place a debugger stops and a name a reader looks for, and `pool-constants` already removes its allocation. Mixed-kind operands, such as an Integer beside a Rational, and operands that are calls stay as written.
+
+**Two things are not folded.** String equality is not, because it compares normalised forms. The JavaScript engine running the compiler may have different Unicode tables from the one running the program. `raise` is not, because its result grows with its exponent's value rather than its length. A folded number is also capped at 4,096 decimal digits.
+
+### `prune-dead-match-arms`
+
+Drops a `match` arm that can never run.
+
+```essence
+implementation {
+	function describe(_ value: Integer | String) -> String {
+		<- match value -> String {
+			case Integer { <- "an Integer" }
+			case Boolean { <- "never" }
+			case String  { <- "a String" }
+		}
+	}
+
+	Terminal.print(describe(1)) § an Integer
+	Terminal.print(describe("one")) § a String
+}
+```
+
+`value` is an `Integer | String`, so no Boolean reaches the `case Boolean` arm. The validator reports it before the optimiser runs:
+
+<div class="error-output">
+
+```
+[unreachable-case]
+Warning: This Case can never match
+   ╭─┤ Describe.es:5:9 │
+   │
+ 3 │        <- match value -> String {
+   │                 ──┬──  
+   │                   ╰──── this is an Integer | String
+   │ 
+ 5 │          case Boolean { <- "never" }
+   │               ───┬───  
+   │                  ╰───── Boolean is not a member of the matched Union
+───╯
+```
+
+</div>
+
+A warning does not stop the build. With this pass off, the program still emits the arm and tests it on every call. With it on, the arm is gone:
+
+```js
+if (_self[$type.typeKeySymbol] === "Integer") {
+	return $pool_1;
+} else {
+	return $pool_0;
+}
+```
+
+This is safe because a matcher is refuted only where its runtime check fails for every member of the subject's type, which happens only where the tags differ. Two types that share a tag are never refuted, as `compile-type-tests` showed for `List<Alpha>` and `List<Beta>`: the empty list passes both.
+
+The surviving arms keep their order. A `match` takes the first arm that matches, so the order decides the result.
+
+The pass is narrower than the warning. [`unreachable-case`](/docs/reference/diagnostics#unreachable-case) also reports an arm that earlier arms already cover, such as `case Integer` written twice or anything below a `case _`. Deciding that needs the order as well as the types, and a kept arm costs only a test.
+
+### `elide-final-match-test`
+
+Emits a `match`'s last arm as the `else` of the chain.
+
+A `match` that compiles is exhaustive. The validator refuses one that leaves a member of its union unhandled, and an arm with a guard never counts toward that. So an unguarded last arm runs when every arm before it declined. Its test has one possible outcome, and the fall-through after it is unreachable. With this pass off:
+
+```js
+const $self_tag = _self[$type.typeKeySymbol];
+if ($self_tag === "Optional#Value") {
+	…
+} else if ($self_tag === "Optional#Empty") {
+	return $pool_0;
+} else {
+	$type.noCaseMatched(_self);
+}
+```
+
+With it on:
+
+```js
+if (_self[$type.typeKeySymbol] === "Optional#Value") {
+	…
+} else {
+	return $pool_0;
+}
+```
+
+The version with the pass off binds `$self_tag` because it has two tag tests left, which is the `tag-binding` shape.
+
+What is given up is `$type.noCaseMatched`. It is reached only when a matcher's runtime check disagrees with the type the compiler gave the value, never through a program's own fault. It throws, naming the value that fell through. With the last test elided, such a value takes the last arm instead. That trade is why this is a pass, and not the way every `match` is emitted. `--without-optimisation elide-final-match-test` puts every test and the throw back.
+
+The test is elided only where the last arm's check reduces to a tag comparison, or asks nothing, as `case _` does. That limits what is lost. The only value the elided test would have caught is one whose tag disagrees with its type. A check that reads into the value keeps its test and the throw.
+
+**A last record arm is elided where one member of the union is a record.** On a `String | Point`, a `match` that ends in `case Point` needs one tag comparison. Its fall-through cannot be reached:
+
+```js
+if (_self[$type.typeKeySymbol] === "String") {
+	return $pool_1;
+} else {
+	return $pool_0;
+}
+```
+
+`--without-optimisation compile-type-tests` does not put that last test back; only this pass's name does. Two records in one union keep both tests and the throw, even after `compile-record-members` rewrites them.
+
+Some arms can decline for reasons exhaustiveness does not cover, and such an arm keeps its test. That is an arm with a guard, a literal matcher such as `case 0`, or member literals such as `case { x = 0 }`.
+
+### `compile-record-members`
+
+Replaces a record matcher's descriptor walk with a tree of member tests.
+
+`compile-type-tests` reduces a record matcher to a tag only where one member of the union is a record. Where two are, their members tell them apart. With this pass off, each test calls the general check against a pooled descriptor, such as `{ type: "Record", members: { radius: { type: "Integer" } } }`:
+
+```js
+if ($type.isValueOfType(_self, $pool_1)) {
+	…
+} else if ($type.isValueOfType(_self, $pool_0)) {
+	…
+} else {
+	$type.noCaseMatched(_self);
+}
+```
+
+That call finds its record arm among the runtime's kind tests, lists the descriptor's members, and asks about each member's type. With the pass on, the members are read instead. This is a `match` over `Circle | Square`, where `Circle` is `{ radius: Integer }` and `Square` is `{ side: Integer }`:
+
+```js
+if (_self.radius?.[$type.typeKeySymbol] === "Integer") {
+	…
+} else if (_self.side?.[$type.typeKeySymbol] === "Integer") {
+	…
+} else {
+	$type.noCaseMatched(_self);
+}
+```
+
+Where the records share a member name and differ in its type, as `{ value: Integer }` and `{ value: String }` do, the member is read directly:
+
+```js
+if (_self.value[$type.typeKeySymbol] === "Integer") {
+```
+
+**Why it is safe.** `isValueOfType` against a record descriptor is a conjunction of independent questions. The value's tag is `"Record"`, and for each member the matcher names, the member is present and its value passes that member's type. A record matcher is open: it names some members, and the value may carry more. Each rule below drops one of those questions, or replaces it with one that gives the same result for every value that can arrive. Where a rule cannot be shown to hold, no tree is written and the descriptor walk stays.
+
+- **The tag** is dropped where every member of the union is a record.
+- **Presence.** Where every arriving record declares a member, the member is there and is read directly. Where one does not, nothing is known about it, and the read goes through `?.`. An absent member reads `undefined`, which holds no tag. Only a requirement one tag comparison can decide is tested this way. One that would need a walk of a value that may not be there refuses the tree.
+- **Which members are tested.** A member whose requirement the static type already settles is not tested.
+- **Type parameters.** As a requirement, a type parameter accepts everything, so a member typed by one is not tested. As something that can arrive, it refuses the tree, because its tag cannot be named.
+- **Refinements.** A refined member is tested as its base type.
+- **Nested records** get the same argument one level down. A test is written only after every test on the path to it, so no member is read before its parent is known to be there.
+- **A matcher whose member types lead back into it** is walked with a guard, because a type can be infinite where a value cannot.
+
+**The order is chosen by cost.** Every test is a property read and a comparison, or a walk of the value. None can fail or observe anything, so their order does not change the result. Tag comparisons come first and walks last, because a walk over a list's items costs a call per item. Among the comparisons, a shorter path comes before a longer one.
+
+**One rule serves three places**: a `match` arm's check, a case matcher's payload requirement, and a compiled union dispatch's case. `compile-type-tests` writes the first two and `compile-union-dispatch` builds the third, so turning either off still leaves the other's.
+
+**The tree does not claim that a tag decides the matcher.** So `elide-final-match-test` and `compile-union-dispatch` keep the last test and its throw.
+
+**A tree is written whole or not at all.** Past eight tests the descriptor walk stays. That is a size rule: the walk is one call against one pooled descriptor, while a tree is written out at every site.
+
+A `match` over five record shapes, run five million times, is about 15× faster with this pass on Bun and 10× on Node. A method called nine million times on a union of three record types is about 14× and 10× faster.
+
+### `eliminate-dead-code`
+
+Drops a constant nothing reads.
+
+```essence
+implementation {
+	constant secondsPerHour = 60::multiply(with 60)
+
+	Terminal.print("done") § done
+}
+```
+
+Nothing reads `secondsPerHour`, so the build emits no `const` for it. Constants like this are rarely written on purpose. Earlier passes leave them behind when they fold an operation or inline a walk.
+
+Two questions decide. **Is the name read anywhere in the program?** The check is by name across the whole program, not by scope, which errs toward keeping. **Could the program tell the value is gone?** That is the same effect check `lower-scalar-operations` uses for `and` and `or`, so a declaration whose value prints stays where it is.
+
+Only constants are removed, because a `variable` can be assigned after it is declared. Everything a [module](/docs/language/modules) exports is kept, whether or not this build can see who reads it.
+
+An interpolated string is weighed like the calls it makes. Each hole calls a `toString`, so the same list of effect-free methods decides it. `constant greeting = "you have {count}"` with nothing reading `greeting` is dropped. A hole whose `toString` a program wrote, and which prints, keeps its declaration.
+
+The pass reads the program once and does not repeat. Take `constant width = 3` followed by `constant doubled = width::multiply(with 2)`, with nothing reading `doubled`. `doubled` goes, and `width` stays, because `doubled` read it when the reads were counted.
+
+A file that declares values and prints nothing bundles to nothing with this pass on. With it off, the bundle still builds those values.
+
+### `collapse-construction`
+
+Builds a record, a list or a case in one allocation.
+
+With this pass off, each literal calls a runtime constructor, which copies what it is given and adds the hidden tag:
+
+```js
+return Record.createRecord({
+	x: x,
+	y: $pool_0
+});
+return List.createList([
+	x,
+	x
+]);
+return $type.createCase("Optional#Value", Record.createRecord({ item: x }));
+```
+
+With the pass on, the compiler writes the objects the constructors would have built:
+
+```js
+return {
+	[$type.typeKeySymbol]: "Record",
+	x: x,
+	y: $pool_0
+};
+return {
+	[$type.typeKeySymbol]: "List",
+	value: [
+		x,
+		x
+	]
+};
+return {
+	[$type.typeKeySymbol]: "Optional#Value",
+	item: x
+};
+```
+
+This is safe because the runtime's constructors build exactly these objects: the same members, in the same order, under the same key, with every argument evaluated where it was. A case payload written as a literal is inlined into the case, which is sound because nothing else holds a fresh literal. Any other payload is spread, so a record the program still holds is copied, as the runtime copied it:
+
+```js
+return {
+	...article,
+	[$type.typeKeySymbol]: "Route#Article"
+};
+```
+
+A case with no payload keeps its constructor. `createCase` hands out one shared instance per tag, rather than a new object per construction.
+
+### `collapse-combinations`
+
+Combines two records with a spread.
+
+With every pass off, `{ base with x = 1 }` builds an empty object and a record that is read once, and copies both into the empty object:
+
+```js
+return Object.assign({}, base, Record.createRecord({ x: Integer.createInteger(1) }));
+```
+
+With this pass on, it is a spread:
+
+```js
+return {
+	...base,
+	x: $pool_1
+};
+```
+
+This is safe because the two do the same thing with Essence values. `Object.assign` copies own enumerable properties, symbol keys included, in order, and a later source overwrites an earlier one. Object spread copies the same set in the same order. Neither reads through a source's prototype. A spread defines each property, while `Object.assign` assigns it, and an assignment can find a setter on the target's prototype chain. Here the target is a fresh object literal in both forms, so there is no setter to find. The hidden tag rides along on the spread of `base`.
+
+### `pool-constants`
+
+Builds each constant value once, instead of at every site.
+
+With this pass off, a literal is built wherever it is written, every time that code runs. Sorting a `List<Integer>` builds its comparison witness at the call:
+
+```js
+return $es_List_sort__overload$1(items, void 0, {
+	compare: Integer.compare,
+	isLessThan: $es_Integer_isLessThan__overload$1,
+	isLessThanOrEqualTo: $es_Integer_isLessThanOrEqualTo__overload$1,
+	isGreaterThan: $es_Integer_isGreaterThan__overload$1,
+	isGreaterThanOrEqualTo: $es_Integer_isGreaterThanOrEqualTo__overload$1
+});
+```
+
+With the pass on, each such value is built once, in a band of `const`s near the top of the module, and read by name:
+
+```js
+const $pool_0 = Integer.createInteger(1);
+const $pool_1 = {
+	compare: Integer.compare,
+	isLessThan: $es_Integer_isLessThan__overload$1,
+	isLessThanOrEqualTo: $es_Integer_isLessThanOrEqualTo__overload$1,
+	isGreaterThan: $es_Integer_isGreaterThan__overload$1,
+	isGreaterThanOrEqualTo: $es_Integer_isGreaterThanOrEqualTo__overload$1
+};
+```
+
+The band sits after the standard library's function `const`s and before its static property values. A pooled witness reads the functions above it, and a property's value may read a pooled constant. Each emitted module has its own band, because a name declared in one module is not in scope in another.
+
+What is pooled: Integer, String and Rational literals, payload-less cases, and the type descriptors a `match` arm's check still needs. Conformance witnesses are pooled too, including the `boundConformance(…)` a conditional one is built with. Two conditional witnesses are different constants when different witnesses are curried onto them.
+
+This is safe because every Essence value is immutable, and the language has no operator that asks whether two values are the same object, only whether they are equal. One shared value cannot be told from twenty equal ones. One built before the first statement cannot be told from one built where it was written. None of these values can fail or observe anything while it is built.
+
+Booleans are not pooled, because a running program already has exactly two Boolean objects.
+
+A witness that names a namespace the program declares stays where it was. Such a namespace is emitted as a `class`, which is not hoisted, so a `const` above it would throw a `ReferenceError` when the module loads. A witness built from a conformance the enclosing function received stays too, because it differs on each call.
+
+## Emitted shapes
+
+These are choices the compiler makes while writing JavaScript, not passes over the program, so no flag turns one off. None of them adds, removes or reorders anything the program does: the same values are read in the same order. They are listed here so that a reader tracing a line of emitted JavaScript finds them next to the passes.
+
+Each holds under any set of passes. Each acts on a shape that a pass produces. Turn that pass off, or the whole optimiser, and there is nothing to act on.
+
+### `tag-binding`
+
+Reads the matched value's tag once when a chain asks about it more than once.
+
+```js
+const $self_tag = _self[$type.typeKeySymbol];
+if ($self_tag === "Integer") {
+	return $pool_2;
+} else if ($self_tag === "String") {
+	return $pool_1;
+} else {
+	return $pool_0;
+}
+```
+
+That is a `match` on an `Integer | String | Boolean`. Without the binding, each test would read `_self[$type.typeKeySymbol]` again.
+
+It applies from two tests up. A two-member union compiles to one test and an `else`, and one read needs no name. Only the matched value's own tag is bound, because a member test reads a different object each time. A `match` nested in an arm binds its own `$self_tag` in its own block.
+
+Where the cases carry different fields, as a choice's payloads do, each value has a shape of its own. The engine then cannot cache the property read. The binding costs one statement per chain.
+
+### `unboxed-loop-state`
+
+Carries a walk's Integer state as the number or bigint it holds, and builds the Integer once, where the walk ends.
+
+The counted walk under `inline-loops` already shows it: `let $loop_0_state = $pool_1.value;` before the walk, and `return Integer.createInteger($loop_0_state);` after it. The line that section left out as `…` is the addition, written into the raw slot:
+
+```js
+$loop_0_state = typeof total === "number" && typeof $loop_0_held === "number" && total + $loop_0_held >= -9007199254740991 && total + $loop_0_held <= 9007199254740991 ? total + $loop_0_held : Integer.sum(total, $loop_0_held).value;
+```
+
+That is `loop(from 1, through count, startingWith 0, (index, total) { <- total::add(index) })`. The state slot holds a number or a bigint. The guarded addition writes its raw result into it, and one Integer is built at the end.
+
+The addition is read through both arms of its guard, which `hybrid-integers` names. The guarded arm writes the plain `+` into the slot without building an Integer. The escaped arm reads `.value` off the Integer that `Integer.sum` built. So no turn builds an Integer only for the slot to read it back.
+
+The state is carried raw only where all of these hold:
+
+1. The state's type is exactly `Integer` in every body it reaches. A record, string or Rational state is untouched. A refinement of Integer is carried, because refinements are erased.
+2. Every mention of the parameter a body reads the state under is a read of its value. Only the operations `lower-scalar-operations` writes out read the value: the arithmetic and the comparisons. A body that asks its accumulator `isEven`, passes it to a function, interpolates it, puts it in a list or shadows its name keeps the box. A member read of the same name anywhere in the body counts as a mention too. The escaped arm of an addition calls `Integer.sum`, so an accumulator named `sum` keeps its box, where the same walk with it named `total` does not.
+3. A driver that hands one state to two bodies, as `while` and `until` do, carries it raw in both or in neither.
+4. The parameter's `const` is still bound each turn, now to the raw value, so a closure that reads it sees that turn's value.
+5. Every write of the state is unboxed: its seed, each assignment, and the state member of a `Step` the compiler could not see being built.
+6. Every exit builds the Integer, through `Integer.createInteger`.
+7. At every turn the slot holds what a canonical Integer holds: a number inside the safe range, a bigint outside it.
+8. Two mentions beyond the value are admitted, and both write the state whole into a slot the walk owns. `<- carried` is unboxed with every other write. `<- #Done(carried)` is boxed where it stands, because a `#Done` leaves the walk.
+
+Every driver that threads a state carries it raw: the `while` and `until` entries, the counted walk, the `step` walk and both `reduce` entries. `map` and `everyItem` thread none. A walk inside a walk carries both slots as one value: the inner walk writes straight into the enclosing slot, with no Integer built between them.
+
+A walk whose every turn is outside the safe range takes the escaped arm on every turn, so a runtime call still builds an Integer each time.
+
+### `unboxed-operand`
+
+Reads an Integer operation through both arms of its guard where the next operation needs only its value, so no Integer is built between them.
+
+```js
+function blend(left, right) {
+	return Integer.difference(Integer.sum(typeof left.value === "number" && typeof right.value === "number" && left.value + right.value >= -9007199254740991 && left.value + right.value <= 9007199254740991 ? left.value + right.value : Integer.sum(left.value, right.value).value, right.value).value, right.value);
+}
+```
+
+That is `left::add(right)::add(right)::subtract(right)`. `lower-scalar-operations` writes the first addition as a guard. The next addition reads only the first one's value, so the guarded arm yields `left.value + right.value` directly, and the escaped arm reads `.value` off the Integer `Integer.sum` built. The outer two operations go to the runtime whole, because an operand that holds a call cannot be read twice (see `hybrid-integers`).
+
+It is `unboxed-loop-state`'s other half, applied where that one does not reach, including programs with no loop at all. A site that takes the Integer itself, such as an argument, a list item or a method that was not lowered, keeps the box.
+
+## Runtime improvements
+
+These change the runtime itself, not the code the compiler emits, so no pass turns them off. They rest on the same properties of the language as the passes. They are listed here so that a reader checking whether an optimisation is sound finds them in one place.
+
+Each is invisible for the reason `pool-constants` is safe: every Essence value is immutable, and nothing asks whether two values are the same object. So nothing can tell a shared value from a fresh one, or a remembered result from a recomputed one.
+
+### `interned-booleans`
+
+There are exactly two Boolean values, so there are exactly two Boolean objects, built once. Every comparison, every `and` and every loop predicate reuses them instead of allocating.
+
+### `interned-unit-cases`
+
+A case with no payload carries only its tag, so every value of it holds the same thing. One instance per tag is built and reused, both for built-in choices and for the ones a program declares. The pool is bounded by how many distinct payload-less cases a program constructs, which depends on its text, not on how long it runs.
+
+### `reflexive-equality-fast-path`
+
+Structural equality returns at once when a value is compared with itself. Equality is reflexive here: there is no `NaN` to be unequal to itself, and functions compare by identity anyway. The check earns its place because identical operands are common. Both Booleans, every payload-less case and every pooled literal are one shared object each.
+
+### `grapheme-caching`
+
+Splitting a string into graphemes, the characters a reader sees, is the most expensive thing a string method does. The position methods ask for the same view of the same string again and again. The view and its count are remembered on the value, under symbol keys. Nothing that reads a value sees them: record equality, printing and the runtime's type checks read with `Object.keys`, `Object.entries` and `Object.hasOwn`, which skip symbol keys. A string is immutable, so a remembered view cannot go stale.
+
+Counting skips the segmenter for ASCII, where each code unit is a character of its own. The one exception is a carriage return, which joins a following line feed, so a string holding one is not treated as ASCII. Whether a string is ASCII is itself remembered.
+
+The NFC form is remembered too, and it is what equality compares. `is` and `compare` decide over the normalised string, so an accent written as one code point equals the same accent written as two. Each string is normalised at most once, and an ASCII string not at all, since it is already its own normal form.
+
+Joining two ASCII strings gives an ASCII string, and it is marked as one, so its character count is the two counts added. Building a string by appending while reading its length each turn is linear, not quadratic.
+
+The segmenter is built on first use, so a program that never segments a string does not pay for loading one.
+
+[`slice`](/docs/library/string#slice), [`character(at:)`](/docs/library/string#character) and [`repeat`](/docs/library/string#repeat) are natives that read the remembered view directly, rather than being written in Essence on top of `characters()`.
+
+### `rational-reduction-caching`
+
+A Rational's lowest-terms form is remembered on the value, under a symbol key. What the value stores does not change: `4/2` still holds 4 and 2, as `fold-constants` showed. Equality cross-multiplies those parts, which is why `4/2::is(2)` is `true`. Every accessor and formatter returns lowest terms, and the cache means that reduction happens once instead of once per question.
+
+`add`, `subtract`, `multiply` and `divide` between two Rationals are natives on the runtime's bigint rational core. Each is one cross-multiplication and one reduction, and the result is built already holding its lowest-terms form. `1/2::add(1/2)::is(1)` is `true`. `fold-constants` folds these four through the same core functions, so a folded result is the one the program builds.
+
+### `hybrid-integers`
+
+An Integer holds a JavaScript number while its value fits a double exactly, which is `|value| ≤ 2⁵³ − 1` (`Number.MAX_SAFE_INTEGER`), and a bigint beyond that. An ordinary Integer costs a double in a field, and a large one stays exact.
+
+**One value has one representation.** A value inside the safe range is always a number, and a value outside it is always a bigint. `Integer.createInteger` enforces that for every value that arrives from elsewhere: a literal, a native, the client bridge, an escaped result. So equality is `===` on the held values, and a number never equals a bigint. Zero is inside the safe range, so it is always held as the number `0`, never `0n`.
+
+**Every emitted operation checks its result.** An emitted `+`, `-` or `*` is a guard around the operation. This is `a::add(b)`:
+
+```js
+return typeof a.value === "number" && typeof b.value === "number" && a.value + b.value >= -9007199254740991 && a.value + b.value <= 9007199254740991 ? {
+	[$type.typeKeySymbol]: "Integer",
+	value: a.value + b.value
+} : Integer.sum(a.value, b.value);
+```
+
+The guard has two arms. The guarded arm is the plain `+`, taken when both operands are numbers and the result is inside the safe range. The escaped arm is the runtime call, `Integer.sum`, taken otherwise. The operands are asked by kind with `typeof`, because JavaScript's `+` throws on a number beside a bigint. The result is asked by range, and that check is exact. IEEE 754 addition, subtraction and multiplication are correctly rounded, rounding is monotone, and 2⁵³ is itself a double. So a true result of magnitude 2⁵³ or more can only round to a double at least that large, which fails the check. A true result inside the range rounds to itself. The check therefore passes exactly when the double is the true result. `94906265::multiply(with 94906265)` fits and stays a number. `94906266::multiply(with 94906266)` does not, and `Integer.product` returns `9007199326062756` exactly.
+
+The escaped arm checks its own result only where that result can still be back inside the safe range, which is a sum or a difference with an escaped operand.
+
+`raise` is not inlined, and stays in bigint. JavaScript's `**` on doubles is `Math.pow`, which the specification only requires to approximate, so its result cannot be checked afterwards.
+
+**An operand that holds a call goes to the runtime whole.** The guard reads each operand twice. So `Integer.sum`, `Integer.difference` or `Integer.product` gets such an operand directly, and decides after evaluating it once.
+
+The rest of the numeric tower does not see the two representations. Rational, Algebraic and Transcendental are written on pairs of bigints, and an Integer is converted at one boundary, so `1::is(1/1)` is `true`.
+
+Going out to a JavaScript host, an Integer is always a bigint, so a value in an [embedding](/docs/guides/calling-from-javascript) does not change type when it crosses 2⁵³. Coming in, a bigint is accepted, and so is a number that is a safe integer. `2 ** 53` as a number is refused, because the double has already lost its exactness.
+
+The representation costs where a program's values are all past 2⁵³, such as 64-bit hashes, ids or nanosecond timestamps. Each small operand then needs converting to a bigint, and each result a range test. The guard also costs text, since it is wider than the call it replaces.
+
+### `list-tail-sharing`
+
+A list is two runs, arrays of items, and a view into each. The back run is stored forward in `value`, the front run is stored reversed in `front`, and a count beside each says how much of that run this list owns. A flat list, one that has never been prepended to, has no front at all, and is an array, its tag and a number. That is why `collapse-construction` can keep writing its literal: no counts means the view is the whole array.
+
+The runs are shared between the lists of one chain. Appending asks one question: does the receiver view all of its back run? If so, it stands at the tip, the item is pushed onto that array, and the result views one more item of the same array. If not, another list has appended there already, so the result gets a run of its own: the receiver's view is copied and the item pushed onto the copy. Prepending asks the same of the front run. A receiver that has never prepended starts a front of its own and keeps its back run. So a list grown at either end costs one push per item, and a list that branches at an end costs one copy at the branch.
+
+**The receiver's count is written before the push.** A list with no count views its whole array. So no list may ever have an item in its array that was pushed for another.
+
+**Everything that wants one array goes through `materialise`.** It returns an array that is exactly the list's view. That is the array itself for a flat list viewing all of it, a trimmed copy where it views less, and a combined array where there are two runs. In the last case the list keeps the combined array, so a list read twice combines once. `reverse`, `sort`, `split` and `pair` ask for one array. Methods that walk read the two runs in turn, and methods that index work out which run holds a position.
+
+**Every walk fixes its count before its first turn.** A callback may append to the list being walked:
+
+```essence
+implementation {
+	constant list = [1, 2, 3]
+
+	constant doubled = list::reduce(startingWith list, (accumulated, item) {
+		<- accumulated::append(item)
+	})
+
+	Terminal.print(doubled) § [1, 2, 3, 1, 2, 3]
+}
+```
+
+The seed is the list being walked, so the first `append` finds it at its tip and pushes onto the very array the walk reads. A walk bounded by that array's live length would walk the items it adds, and never end. It has to return what it would have returned if every append copied: the items the list held when the call began. A count taken on entry is what makes it do so.
+
+**`createList` takes ownership of the array it is given.** It stores the array without copying it, and a later `append` may push onto it. So no caller may keep the array it passed. Every caller in the runtime and in emitted code builds a fresh one. `build-lists-in-place` relies on the same rule, which is why it copies a seed the program already held. A host of the client package builds lists through a second constructor that copies, so an array a host keeps is never one Essence pushes onto.
+
+**Edits share the runs they do not touch.** A sub-list that still contains the seam, the point where the front run ends and the back run begins, can be returned without copying anything. Shrinking the front count drops leading items, and shrinking the back count drops trailing ones. A flat list keeps its seam at the start, so it can share only its prefixes. A `slice` at an end therefore costs a small object and no items, which makes [`removeLast()`](/docs/library/list#removeLast) free, and [`removeFirst()`](/docs/library/list#removeFirst) free on a list that was prepended to. [`remove(at:)`](/docs/library/list#remove) shares at either end the same way. [`replace(_:at:)`](/docs/library/list#replace) copies only the run the position falls in. [`insert(_:at:)`](/docs/library/list#insert) uses `prepend` and `append` at the ends. A window that misses the seam is still a copy, made once from the two runs.
+
+**A shared window is copied when it is first read, and only its own items.** The first read copies the window's items, never the whole parent array, and lets the parent go. `length` reads no items, so it leaves the window shared.
+
+**One runtime change needed the emitted code to change too.** The inlined `map`, `everyItem` and `reduce` walks read the items through `List.materialise`, as `inline-loops` showed. They fix the count before the seed is evaluated, because the seed may append to the receiver. With `inline-loops` off, the walk goes back through the native it was written from, which reads the same two runs.
+
+This is safe because a list always returns exactly the items its view holds. Equality and ordering read both sides through their views, so `[2, 3]::prepend(1)::is([1, 2, 3])` is `true`.
+
+The design costs three things. A list viewing less than its run keeps the whole run alive until something reads it, which trims it once. A positional read of a prepended-to list pays one comparison, to find the run that holds the position. A flat list pays a small view object on each `item(at:)` and `length()`.
+
+With every pass off, so that each call reaches the runtime, a million appends to one list take about 70 ms on Bun and 75 ms on Node. A million prepends take about 69 ms and 96 ms. That is one push per item, not a copy of the list.
+
+<SeeAlso links={[
+	{ label: "Command line: --without-optimisation", href: "/docs/reference/cli#build--without-optimisation" },
+	{ label: "essence.json: build.withoutOptimisations", href: "/docs/reference/project-file#build-withoutOptimisations" },
+	{ label: "Debugging", href: "/docs/guides/debugging" },
+	{ label: "Using the compiler", href: "/docs/guides/using-the-compiler" },
+]} />

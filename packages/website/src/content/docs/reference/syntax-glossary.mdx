@@ -1,0 +1,1913 @@
+---
+title: Syntax glossary
+description: Every sigil, bracket, keyword and block in Essence, with where each is legal, a small program, and the page that teaches it.
+section: reference
+order: 10
+template: reference
+tocDepth: 2
+searchDepth: 3
+---
+
+Essence writes several things with punctuation that other languages spell differently. `§` opens a comment, `::` calls a method, `@` is the receiver (the value a method was called on) and `<-` returns. This page lists every such symbol, keyword and block, each under a fixed anchor. Look one up here when you meet it in code. Each entry says what the form is, where it is legal and what it is not. It then shows a small program and names the page that teaches it.
+
+```essence
+implementation {
+	§ `§` starts a comment. `::` calls a method, `@` is the receiver, `<-` returns.
+	namespace Doubling for Integer {
+		doubled() -> Integer {
+			<- @::multiply(with 2)
+		}
+	}
+
+	§ `#` names a case, `/` writes a fraction, `{ … }` holds a record.
+	constant rounded = 7/2::round(toward #Down)
+	constant point   = { x = 3, y = 4 }
+
+	Terminal.print(21::doubled()) § 42
+	Terminal.print(rounded) § 3
+	Terminal.print(point.x) § 3
+}
+```
+
+[`Terminal.print`](/docs/library/terminal#print) writes a value and a line break, and each `§` comment at the end of a line shows what that line prints. The entries are grouped by kind. Three sections close the page: words that look like keywords but are not, places where spacing changes the meaning, and what has no syntax at all.
+
+## Comments
+
+<h3 id="comment">`§` comment</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A note from `§` to the end of the line. The compiler ignores it. | On a line of its own, or after code on the same line. | A block comment. `//` and `/* */` are syntax errors, and `# note` reads as a case. A comment can not stand inside an [interpolation hole](/docs/reference/syntax-glossary#interpolation) ([`comment-in-hole`](/docs/reference/diagnostics#comment-in-hole)). |
+
+</div>
+
+```essence
+implementation {
+	§ A comment runs to the end of its line.
+	constant price = 12 § It may follow code on the same line.
+
+	Terminal.print(price) § 12
+}
+```
+
+Taught on [Programs and values](/docs/language/programs-and-values).
+
+<h3 id="doc-comment">`§§` documentation comment</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| Documentation for the declaration directly below it. The text is Markdown, and the editor shows it on hover. The tags `@param`, `@returns` and `@example` give it structure. | Directly above the declaration it documents. | Inert text: the lines under an `@example` tag run as a test under `essence test`. |
+
+</div>
+
+```essence
+implementation {
+	§§ Adds a fifth to a price.
+	§§
+	§§ @param _ — the price before tax
+	§§ @returns — the price after tax
+	function withTax(_ price: Integer) -> Integer {
+		<- price::add(price::quotient(dividingBy 5))
+	}
+
+	Terminal.print(withTax(10)) § 12
+}
+```
+
+Taught on [Documentation comments](/docs/language/documentation-comments).
+
+<h3 id="value-comment">`§?` value comment</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A request for the value of the statement it ends. During a test run the editor shows that value beside the line. To a build it is an ordinary comment. | At the end of a statement inside the `tests` block. | Output: the `essence test` report prints nothing for it. Outside the `tests` block, `essence check` and `essence test` report the Warning [`value-comment-outside-tests`](/docs/reference/diagnostics#value-comment-outside-tests). |
+
+</div>
+
+```essence
+implementation {
+	function double(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+}
+
+tests {
+	test "doubles" {
+		constant doubled = double(21) §?
+
+		expect doubled::is(42)
+	}
+}
+```
+
+Taught on [Tests](/docs/language/tests).
+
+## Sigils
+
+A sigil is a symbol with a meaning of its own: a call, a return, a case, a fraction.
+
+<h3 id="at">`@` receiver</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| The current value. In a method it is the receiver, as `this` is in a JavaScript method. In a [match arm](/docs/reference/syntax-glossary#case) it is the matched value, and in a [refinement](/docs/reference/syntax-glossary#type)'s `where` the value under test. | In a method body, including a [protocol](/docs/reference/syntax-glossary#protocol)'s provided methods; in a match arm; in the predicate of a checked refinement. | Available everywhere. A [static method](/docs/reference/syntax-glossary#static) has no `@` ([`at-in-static-method`](/docs/reference/diagnostics#at-in-static-method)), and outside a method, a match arm or a refinement's predicate it is [`at-outside-method`](/docs/reference/diagnostics#at-outside-method). |
+
+</div>
+
+```essence
+implementation {
+	§ in a refinement: the value being tested
+	type Digit = Integer where @::isBetween(0, and 9)
+
+	§ in a method: the receiver
+	namespace Doubling for Integer {
+		doubled() -> Integer {
+			<- @::multiply(with 2)
+		}
+	}
+
+	constant digit: Digit            = 7
+	constant input: Integer | String = "seven"
+
+	§ in a match arm: the matched value, narrowed to the arm
+	constant text = match input -> String {
+		case Integer { <- "a number" }
+		case String  { <- @ }
+	}
+
+	Terminal.print(digit::doubled()) § 14
+	Terminal.print(text) § seven
+}
+```
+
+Taught on [Choices and match](/docs/language/choices-and-match), [Checked refinements](/docs/language/checked-refinements) and [Namespaces and methods](/docs/language/namespaces-and-methods).
+
+<h3 id="method-call">`::` method call</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A method call on the value to its left: `receiver::name(arguments)`. The result can be the receiver of the next call. | After any value, a literal included: [`3/4::numerator()`](/docs/library/rational#numerator). | A member read. `.` reads a member, so `price.add(50)` is [`type-without-members`](/docs/reference/diagnostics#type-without-members). |
+
+</div>
+
+```essence
+implementation {
+	constant price = 250
+
+	Terminal.print(price::add(50)) § 300
+	Terminal.print(price::add(50)::multiply(with 2)) § 600
+	Terminal.print(3/4::numerator()) § 3
+}
+```
+
+Taught on [Method calls](/docs/language/method-calls).
+
+<h3 id="namespace-pick">`::<Name>` namespace pick</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A method call made through the [namespace](/docs/reference/syntax-glossary#namespace) named between the angle brackets. | Wherever a method call is. It is needed when more than one namespace offers the method for the value. | Optional in that case. Leaving it out where two namespaces fit is [`ambiguous-namespace`](/docs/reference/diagnostics#ambiguous-namespace). |
+
+</div>
+
+```essence
+implementation {
+	namespace Euros for Integer {
+		shown() -> String {
+			<- "{@} EUR"
+		}
+	}
+
+	namespace Dollars for Integer {
+		shown() -> String {
+			<- "{@} USD"
+		}
+	}
+
+	Terminal.print(5::<Euros>shown()) § 5 EUR
+	Terminal.print(5::<Dollars>shown()) § 5 USD
+}
+```
+
+Taught on [Namespaces and methods](/docs/language/namespaces-and-methods).
+
+<h3 id="protocol-pick">`::<Protocol>` protocol pick</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A call to a method a protocol provides, made through the protocol's name. The library's protocols provide methods too, as [`Equatable`](/docs/library/protocols#Equatable) does in `5::<Equatable>isNot(3)`. | For a provided method, one that has a body in the protocol. | A way to reach a requirement. A namespace writes the requirement, so `shelf::<Sized>size()` is [`no-namespace-for-value`](/docs/reference/diagnostics#no-namespace-for-value); name the namespace instead. |
+
+</div>
+
+```essence
+implementation {
+	protocol Sized {
+		size() -> Integer
+
+		isEmpty() -> Boolean {
+			<- @::size()::is(0)
+		}
+	}
+
+	type Shelf = { books: Integer }
+
+	namespace Shelves for Shelf is Sized {
+		size() -> Integer {
+			<- @.books
+		}
+	}
+
+	constant shelf: Shelf = { books = 0 }
+
+	Terminal.print(shelf::<Sized>isEmpty()) § true
+	Terminal.print(5::<Equatable>isNot(3)) § true
+}
+```
+
+Taught on [Protocols](/docs/language/protocols).
+
+<h3 id="return">`<-` return</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| Returns a value from the function, method, function literal or match arm it stands in. | In the body of a function, method or function literal, and in a match arm. | `return`, which is an unknown name. At the top level it is [`top-level-return`](/docs/reference/diagnostics#top-level-return). In a match arm it returns from the match, not from the function around it. |
+
+</div>
+
+```essence
+implementation {
+	function sign(_ value: Integer) -> String {
+		if value::isNegative() {
+			<- "negative"
+		}
+
+		<- "not negative"
+	}
+
+	Terminal.print(sign(-3)) § negative
+	Terminal.print(sign(3)) § not negative
+}
+```
+
+Taught on [Functions](/docs/language/functions).
+
+<h3 id="arrow">`->` return type</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| The type something returns. | After the parameters of a function, a method, a protocol requirement or an overload entry, where it is required, and after a function literal's parameters. In a function type such as `(_: Integer) -> Rational`. After `match`, where it is required, and after `define`, where it is optional. | JavaScript's `=>`. A function literal passed as an argument is `(n) { … }`, with no arrow. |
+
+</div>
+
+```essence
+implementation {
+	§ the type a function returns
+	function half(_ value: Integer) -> Rational {
+		<- value::divide(by 2)
+	}
+
+	§ a function type: takes an Integer, returns a Rational
+	constant halve: (_: Integer) -> Rational = half
+	constant amount: Integer | Rational      = halve(3)
+
+	§ the type a match returns
+	constant kind = match amount -> String {
+		case Integer  { <- "whole" }
+		case Rational { <- "a fraction" }
+	}
+
+	Terminal.print(halve(3)) § 3/2
+	Terminal.print(kind) § a fraction
+}
+```
+
+Taught on [Functions](/docs/language/functions).
+
+<h3 id="case-sigil">`#` case</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| The name of a case of a [choice](/docs/reference/syntax-glossary#choice). A bare `#Open` takes its choice from the position around it; `Door#Shut` names the choice itself. | Where a value is built, as an argument ([`round(toward #Up)`](/docs/library/rational#round), `Terminal.print(message, to #Error)`) and as a matcher (`case #Open`). | A comment. Written flush after a label, `toward#Up` reads as the case `Up` of a choice named `toward`. |
+
+</div>
+
+```essence
+implementation {
+	choice Door {
+		Open,
+		Shut,
+	}
+
+	constant front: Door = #Open
+	constant back        = Door#Shut
+
+	Terminal.print(front::is(#Open)) § true
+	Terminal.print(back::is(front)) § false
+	Terminal.print(7/2::round(toward #Up)) § 4
+}
+```
+
+Taught on [Choices and match](/docs/language/choices-and-match).
+
+<h3 id="union">`|` union</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A type that holds a value of either type: `Integer \| String`. | Wherever a type is written, including `type Amount = Integer \| Rational`. | An operator; there is no `\|\|`. A union's members are types, never values: `type Bit = 0 \| 1` is a syntax error. |
+
+</div>
+
+```essence
+implementation {
+	function described(_ value: Integer | String) -> String {
+		<- match value -> String {
+			case Integer { <- "the number {@}" }
+			case String  { <- "the text {@}" }
+		}
+	}
+
+	Terminal.print(described(3)) § the number 3
+	Terminal.print(described("three")) § the text three
+}
+```
+
+Taught on [Unions and type aliases](/docs/language/unions-and-type-aliases).
+
+<h3 id="fraction">`/` fraction</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A [Rational](/docs/library/rational) literal, written as two integers with `/` between them. It is kept in lowest terms, so `6/8` is `3/4`. | Between digits, written flush: `3/4`, `-3/4`. | Division. `3 / 4` with spaces and `3/n` are syntax errors; divide with [`divide(by:)`](/docs/library/integer#divide). `3/0` is [`zero-denominator`](/docs/reference/diagnostics#zero-denominator). |
+
+</div>
+
+```essence
+implementation {
+	constant share = 3/4
+
+	Terminal.print(share) § 3/4
+	Terminal.print(6/8) § 3/4
+	Terminal.print(share::add(1/4)) § 1
+}
+```
+
+Taught on [Programs and values](/docs/language/programs-and-values) and [Numbers](/docs/language/numbers).
+
+<h3 id="underscore">`_` underscore</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| Four things. A parameter without a label, `_ value: Integer`. A digit group, `1_000`. A parameter the body ignores, `(_) { <- 0 }`. The arm for every value left, `case _`. | In those four places. | Part of a name: `constant snake_case = 1` is a syntax error. So are `1__0` and a trailing `1_`. |
+
+</div>
+
+```essence
+implementation {
+	§ no label on a parameter
+	function double(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+
+	§ a digit group
+	constant amount: Integer | String = 1_000
+
+	§ the arm for everything else
+	constant kind = match amount -> String {
+		case String { <- @ }
+		case _      { <- "not text" }
+	}
+
+	Terminal.print(double(21)) § 42
+	Terminal.print([1, 2, 3]::map((_) { <- 0 })) § [0, 0, 0]
+	Terminal.print(kind) § not text
+}
+```
+
+Taught on [Functions](/docs/language/functions) and [Choices and match](/docs/language/choices-and-match).
+
+<h3 id="dot">`.` dot</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A member read (`point.x`), a member of a namespace (`Number.Pi`, `Rational.add`), the start of a member path (`.price`), and the point of a decimal (`0.75`). | After a record or a namespace's name; at the start of an argument where a one-parameter function is expected; between digits. | A call on a value: `::` calls a method on a value, and `.` reads a member or reaches a namespace's member, which `(…)` then calls (`Clock.hours(13)`). |
+
+</div>
+
+```essence
+implementation {
+	constant point = { x = 3, y = 4 }
+	constant items = [{ price = 2 }, { price = 5 }]
+
+	Terminal.print(point.x) § 3
+	Terminal.print(Number.Pi) § π
+	Terminal.print(items::map(.price)) § [2, 5]
+	Terminal.print(0.75) § 3/4
+}
+```
+
+Taught on [Method calls](/docs/language/method-calls) and [Records](/docs/language/records).
+
+<h3 id="minus">`-` minus</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| The sign of a number literal: `-7`, `-3/4`, `-0.5`. | In front of a number literal. | Subtraction or negation. `-balance` is a syntax error; call [`negate()`](/docs/library/integer#negate) or [`subtract(…)`](/docs/library/integer#subtract). `10 - 4` is two statements, `10` and `-4`. |
+
+</div>
+
+```essence
+implementation {
+	constant balance = 250
+
+	Terminal.print(-7) § -7
+	Terminal.print(-7::absolute()) § 7
+	Terminal.print(balance::negate()) § -250
+}
+```
+
+Taught on [Method calls](/docs/language/method-calls).
+
+<h3 id="backslash">`\` escape</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| An escape for the character after it. There are seven: `\"`, `\\`, `\{`, `\}`, `\n`, `\r` and `\t`. `\{` and `\}` exist because a bare `{` opens an interpolation hole. | Inside a string literal. | A Unicode escape. `\u` and every other backslash are [`invalid-escape`](/docs/reference/diagnostics#invalid-escape); write the character itself. |
+
+</div>
+
+```essence
+implementation {
+	Terminal.print("she said \"hi\"") § she said "hi"
+	Terminal.print("a \\ b") § a \ b
+	Terminal.print("\{not a hole\}") § {not a hole}
+	Terminal.print("tab\there"::length()) § 8
+}
+```
+
+Taught on [Programs and values](/docs/language/programs-and-values).
+
+## Brackets and separators
+
+<h3 id="braces">`{ }` braces</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| Six things. A block. A record type, `{ x: Integer }`. A record value, `{ x = 0 }`, where `{ x }` is short for `{ x = x }`. A [pattern](/docs/reference/syntax-glossary#pattern-name), `constant { x } = point`. An update, `{ origin with x = 5 }`. A hole in a string, `"{x}"`. `{}` is the unit value, the empty record. | Wherever a block, a type or a value stands. | A JavaScript object. A record value writes `=`, so `{ x: 0 }` as a value is a syntax error. |
+
+</div>
+
+```essence
+implementation {
+	type Point = { x: Integer, y: Integer }
+
+	constant origin: Point = { x = 0, y = 0 }
+	constant moved         = { origin with x = 5 }
+	constant { x } = moved
+
+	Terminal.print({ x }) § { x = 5 }
+	Terminal.print("moved to {x}") § moved to 5
+}
+```
+
+Taught on [Records](/docs/language/records).
+
+<h3 id="brackets">`[ ]` brackets</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A list (`[2, 3, 5]`), a dictionary (`["ada" = 36]`), the empty dictionary (`[=]`) and a dictionary update (`[ages with "ada" = 37]`). | Where a value stands. | Indexing. `constant first = primes[0]` binds the whole list, and `[0]` becomes a statement of its own; read an item with [`item(at:)`](/docs/library/list#item). `[]` is an empty list, never an empty dictionary. |
+
+</div>
+
+```essence
+implementation {
+	constant primes = [2, 3, 5]
+	constant ages   = ["ada" = 36, "alan" = 41]
+	constant nobody: Dictionary<String, Integer> = [=]
+	constant older = [ages with "ada" = 37]
+
+	Terminal.print(primes) § [2, 3, 5]
+	Terminal.print(older) § ["ada" = 37, "alan" = 41]
+	Terminal.print(nobody) § [=]
+}
+```
+
+Taught on [Programs and values](/docs/language/programs-and-values) and [Dictionaries](/docs/language/dictionaries).
+
+<h3 id="parentheses">`( )` parentheses</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A parameter list, an argument list, a case's payload (`#Value(3)`), a function type (`(_: Integer) -> Integer`) and a function literal's parameters. | After a name that is declared or called, after a case, and where a function type or a function literal starts. | Grouping. A `(` in an expression starts a function literal, so `(1::add(2))` is a syntax error. There are no operators to group. |
+
+</div>
+
+```essence
+implementation {
+	function add(_ a: Integer, _ b: Integer) -> Integer {
+		<- a::add(b)
+	}
+
+	constant double: (_: Integer) -> Integer = (_ n: Integer) -> Integer {
+		<- n::multiply(with 2)
+	}
+	constant found: Optional<Integer>        = #Value(add(1, 2))
+
+	Terminal.print(double(add(1, 2))) § 6
+	Terminal.print(found) § Value(3)
+}
+```
+
+Taught on [Functions](/docs/language/functions) and [Method calls](/docs/language/method-calls).
+
+<h3 id="angle-brackets">`< >` angle brackets</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| Type parameters where they are declared (`<infer Item>`), type arguments where they are applied (`List<String>`, `Optional<String>#Empty`), and a namespace or protocol pick after `::`. | After a type's name; after the name of a function, method or namespace in its declaration; after `::`. | Comparison, which is [`isLessThan(…)`](/docs/library/integer#isLessThan). A call can not write type arguments: `firstOf<String>(names, or "x")` is a syntax error. The `<` stays on the line of the type it applies to. |
+
+</div>
+
+```essence
+implementation {
+	function firstOf<infer Item>(
+		_ items: List<Item>,
+		or fallback: Item,
+	) -> Item {
+		<- items::firstItem(defaultingTo fallback)
+	}
+
+	constant names: List<String> = []
+
+	Terminal.print(firstOf(names, or "nobody")) § nobody
+	Terminal.print(names::firstItem()::is(Optional<String>#Empty)) § true
+}
+```
+
+Taught on [Generics](/docs/language/generics).
+
+<h3 id="colon">`:` colon</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| The start of a type: after a constant's or variable's name, a parameter's name, a member of a record type, or a member of a pattern. | Wherever a type follows. | A label separator (`slice(from: 1)` is a syntax error) or a record value (`{ x: 0 }` is a syntax error). |
+
+</div>
+
+```essence
+implementation {
+	type Point = { x: Integer, y: Integer }
+
+	constant origin: Point = { x = 0, y = 0 }
+
+	function shifted(_ point: Point, by amount: Integer) -> Point {
+		<- { point with x = point.x::add(amount) }
+	}
+
+	Terminal.print(shifted(origin, by 2)) § { x = 2, y = 0 }
+}
+```
+
+Taught on [Programs and values](/docs/language/programs-and-values).
+
+<h3 id="equals">`=` equals</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A binding. It gives a declaration, an assignment, a record member and a dictionary entry their value, and a parameter its default. In a matcher it writes the value to test, `case { x = 0 }`, and in `require` the value to take apart. | In those places. | Comparison. There is no `==`; compare with [`is(…)`](/docs/library/integer#is). |
+
+</div>
+
+```essence
+implementation {
+	variable count = 0
+
+	count = count::add(1)
+
+	function greet(_ name: String, with greeting: String = "Hello") -> String {
+		<- "{greeting}, {name}"
+	}
+
+	Terminal.print(count) § 1
+	Terminal.print(greet("Ada")) § Hello, Ada
+	Terminal.print({ x = 1 }) § { x = 1 }
+	Terminal.print(["ada" = 36]) § ["ada" = 36]
+}
+```
+
+Taught on [Programs and values](/docs/language/programs-and-values).
+
+<h3 id="comma">`,` comma</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A separator between entries: list, dictionary and record entries, arguments, parameters, cases, the keys of a `with`, and conformance clauses. A trailing comma is allowed. | Between the entries of those lists. | A statement separator. A comma is refused between the arms of a `define` and between the names in an import group. |
+
+</div>
+
+```essence
+implementation {
+	constant sides  = [3, 4, 5]
+	constant corner = { x = 1, y = 2 }
+
+	Terminal.print(sides::length()) § 3
+	Terminal.print("essence"::slice(from 1, to 3)) § ss
+	Terminal.print(corner.x) § 1
+}
+```
+
+Taught on [Method calls](/docs/language/method-calls).
+
+## Declaration keywords
+
+<h3 id="implementation">`implementation`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| The block every program is. Its statements run top to bottom. | Once per file, below `import` and above `export` and `tests`. A file with a `tests` block and no `export` block may leave it out and still keep an `import` block. | Optional in a program. A statement above it is a syntax error, and a second `implementation` block is [`unexpected-token`](/docs/reference/diagnostics#unexpected-token). |
+
+</div>
+
+```essence
+implementation {
+	Terminal.print("hello") § hello
+}
+```
+
+Taught on [Programs and values](/docs/language/programs-and-values).
+
+<h3 id="constant">`constant`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A name bound to a value once. `constant answer: Integer = 42` writes the type, which may be left out. | In any block of statements: `implementation`, a function or method body, a branch, a match arm, `tests`. | Reassignable ([`constant-reassignment`](/docs/reference/diagnostics#constant-reassignment)) or hoisted: a constant used above its line is [`unknown-name`](/docs/reference/diagnostics#unknown-name). |
+
+</div>
+
+```essence
+implementation {
+	constant greeting        = "Hello"
+	constant answer: Integer = 42
+
+	Terminal.print(greeting) § Hello
+	Terminal.print(answer) § 42
+}
+```
+
+Taught on [Programs and values](/docs/language/programs-and-values).
+
+<h3 id="variable">`variable`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A name that a later `name = value` may point at another value. Pointing it elsewhere leaves the old value as it was. | In the same blocks as a constant. It takes its first value where it is declared. | Mutation. Nor can it be exported: a variable in an `export` block is [`export-of-variable`](/docs/reference/diagnostics#export-of-variable). |
+
+</div>
+
+```essence
+implementation {
+	variable count = 0
+
+	count = count::add(1)
+	count = count::add(1)
+
+	Terminal.print(count) § 2
+}
+```
+
+Taught on [Programs and values](/docs/language/programs-and-values).
+
+<h3 id="type">`type`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A name for a type: a record shape, a union, an applied generic such as `List<String>`, or a function type. With `where` it declares a checked refinement, a type whose values have passed a check: `type Digit = Integer where @::isBetween(0, and 9)`, which calls [`isBetween`](/docs/library/integer#isBetween). | In any block of statements. | A new, separate type. An alias is structural, so two aliases of one record shape are interchangeable; a `choice` is the nominal kind. A type can not name itself ([`recursive-type-declaration`](/docs/reference/diagnostics#recursive-type-declaration)). |
+
+</div>
+
+```essence
+implementation {
+	type Point = { x: Integer, y: Integer }
+	type Amount = Integer | Rational
+	type Digit = Integer where @::isBetween(0, and 9)
+
+	constant corner: Point = { x = 1, y = 2 }
+	constant price: Amount = 3/2
+	constant seven: Digit  = 7
+
+	Terminal.print(corner.x::add(seven)) § 8
+	Terminal.print(price) § 3/2
+}
+```
+
+Taught on [Unions and type aliases](/docs/language/unions-and-type-aliases) and [Checked refinements](/docs/language/checked-refinements).
+
+<h3 id="choice">`choice`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A type with a fixed set of cases. Each case has a name and, optionally, a payload record. | In any block of statements. | Structural, as a TypeScript union is: two choices with the same cases are different types. A case's payload can not name its own choice. |
+
+</div>
+
+```essence
+implementation {
+	choice Shape {
+		Circle { radius: Integer },
+		Square { side: Integer },
+		Point,
+	}
+
+	constant shape: Shape = #Square({ side = 2 })
+	constant width        = match shape -> Integer {
+		case #Circle { <- @.radius::multiply(with 2) }
+		case #Square { <- @.side }
+		case #Point  { <- 0 }
+	}
+
+	Terminal.print(width) § 2
+}
+```
+
+Taught on [Choices and match](/docs/language/choices-and-match).
+
+<h3 id="protocol">`protocol`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A named set of methods a type can conform to. A signature alone is a requirement. A method with a body is provided to every conforming type. `static` marks a requirement called on the namespace, and `protocol Greeter is Named` extends another protocol. `Self` stands for the conforming type. | In any block of statements. A namespace conforms with `is`. | A type, as a TypeScript interface is: a parameter typed as a protocol is [`protocol-as-type`](/docs/reference/diagnostics#protocol-as-type). A protocol can not require a property, and a requirement can not carry a default value ([`default-on-protocol-requirement`](/docs/reference/diagnostics#default-on-protocol-requirement)). |
+
+</div>
+
+```essence
+implementation {
+	protocol Named {
+		name() -> String
+	}
+
+	protocol Greeter is Named {
+		static blank() -> Self
+
+		greeting() -> String {
+			<- "Hello, {@::name()}"
+		}
+	}
+
+	type Person = { first: String }
+
+	namespace People for Person is Greeter {
+		static blank() -> Person {
+			<- { first = "nobody" }
+		}
+
+		name() -> String {
+			<- @.first
+		}
+	}
+
+	constant ada: Person = { first = "Ada" }
+
+	Terminal.print(ada::greeting()) § Hello, Ada
+	Terminal.print(People.blank()::greeting()) § Hello, nobody
+}
+```
+
+Taught on [Protocols](/docs/language/protocols).
+
+<h3 id="namespace">`namespace`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| The methods and statics for the type named after `for`. `is Printable` declares a conformance, and `where Item is Printable` makes that conformance hold only when the type parameter conforms. | In any block of statements. Any number of namespaces may target one type. A namespace without `for` holds statics only. | A TypeScript `namespace`. With `for`, it adds methods to every value of that type, as a prototype does in JavaScript. Nor is it unrestricted: an instance method in a namespace without `for` is [`untyped-namespace-method`](/docs/reference/diagnostics#untyped-namespace-method), and a namespace's type parameter can not carry a bound ([`protocol-bound-namespace-generic`](/docs/reference/diagnostics#protocol-bound-namespace-generic)). |
+
+</div>
+
+```essence
+implementation {
+	namespace Money for Integer {
+		cents() -> Integer {
+			<- @::multiply(with 100)
+		}
+	}
+
+	type Box<Item> = { value: Item }
+
+	namespace Boxes<infer Item> for Box<Item>
+		is Printable where Item is Printable
+	{
+		toString() -> String {
+			<- "Box({@.value})"
+		}
+	}
+
+	constant box: Box<Integer> = { value = 3 }
+
+	Terminal.print(3::cents()) § 300
+	Terminal.print(box) § Box(3)
+}
+```
+
+Taught on [Namespaces and methods](/docs/language/namespaces-and-methods) and [Protocols](/docs/language/protocols).
+
+<h3 id="function">`function`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A named function: parameters, a required `-> Type`, and a body. A parameter may declare a default value: `with greeting: String = "Hello"`. | In any block of statements. A function declared directly in `implementation` can be called above its line; one declared inside a function's body or another block only below it. | Overloaded: a program's function has one signature ([`overload-function-outside-stdlib`](/docs/reference/diagnostics#overload-function-outside-stdlib)). Its return type is never inferred, and leaving out `->` is a syntax error. |
+
+</div>
+
+```essence
+implementation {
+	function greet(_ name: String, with greeting: String = "Hello") -> String {
+		<- "{greeting}, {name}!"
+	}
+
+	Terminal.print(greet("Ada")) § Hello, Ada!
+	Terminal.print(greet("Ada", with "Hi")) § Hi, Ada!
+}
+```
+
+Taught on [Functions](/docs/language/functions).
+
+<h3 id="static">`static`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A value or method that belongs to a namespace rather than to a value, reached as `Clock.noon`. In a protocol, `static` marks a requirement. | In a namespace or a protocol. | Reachable with `::`: `13::hours()` is [`static-method-on-value`](/docs/reference/diagnostics#static-method-on-value). A static method has no `@`, and a static is not in scope under its bare name, even inside its own namespace. |
+
+</div>
+
+```essence
+implementation {
+	namespace Clock for Integer {
+		static noon = 43_200
+
+		static hours(_ count: Integer) -> Integer {
+			<- count::multiply(with 3_600)
+		}
+
+		isAfterNoon() -> Boolean {
+			<- @::isGreaterThan(Clock.noon)
+		}
+	}
+
+	Terminal.print(Clock.noon) § 43200
+	Terminal.print(Clock.hours(13)::isAfterNoon()) § true
+}
+```
+
+Taught on [Namespaces and methods](/docs/language/namespaces-and-methods).
+
+<h3 id="overload">`overload`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| Several signatures that share one method name, each with its own body, where TypeScript's overload signatures share one. A call's labels and argument types pick one. | In a namespace, as `overload name { … }` or `overload static name { … }`. In a protocol, as signatures without bodies. | A value: `Wrapping.wrapped` is [`overloaded-function-value`](/docs/reference/diagnostics#overloaded-function-value). A program can not overload a function declared with `function`. |
+
+</div>
+
+```essence
+implementation {
+	namespace Wrapping for String {
+		overload wrapped {
+			() -> String {
+				<- "({@})"
+			}
+
+			(in fence: String) -> String {
+				<- "{fence}{@}{fence}"
+			}
+		}
+	}
+
+	Terminal.print("essence"::wrapped()) § (essence)
+	Terminal.print("essence"::wrapped(in "*")) § *essence*
+}
+```
+
+Taught on [Namespaces and methods](/docs/language/namespaces-and-methods).
+
+<h3 id="infer">`infer`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A mark on a type parameter whose type is read from a call's arguments, or from the receiver in a namespace. One `is` bound may follow: `<infer Item is Comparable>`. | In the `< >` of a function, method or namespace. | TypeScript's `infer`, which pulls a type out of a conditional type. Nor is it written at a call: there are no call-site type arguments. A choice's or type alias's parameters are applied, never inferred ([`infer-on-applied-parameter`](/docs/reference/diagnostics#infer-on-applied-parameter)). |
+
+</div>
+
+```essence
+implementation {
+	function pair<infer Item>(_ first: Item, with second: Item) -> List<Item> {
+		<- [first, second]
+	}
+
+	Terminal.print(pair(1, with 2)) § [1, 2]
+	Terminal.print(pair("a", with "b")) § ["a", "b"]
+}
+```
+
+Taught on [Generics](/docs/language/generics).
+
+<h3 id="declarations">`declarations`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| The standard library's own opening block, in place of `implementation`. | In the standard library's sources only. | A block a program can open. Anywhere else it is [`declarations-outside-stdlib`](/docs/reference/diagnostics#declarations-outside-stdlib). |
+
+</div>
+
+No page teaches it, because a program never writes it. A program opens with [`implementation`](/docs/reference/syntax-glossary#implementation).
+
+## Modules
+
+A file holds up to four blocks, in this order: `import`, `implementation`, `export` and `tests`. The entries below import from this file:
+
+```essence
+§ file: Shapes.es
+implementation {
+	type Rectangle = { width: Integer, height: Integer }
+
+	function area(of rectangle: Rectangle) -> Integer {
+		<- rectangle.width::multiply(with rectangle.height)
+	}
+
+	constant unitSide = 1
+}
+
+export {
+	Rectangle
+	area
+	unitSide
+}
+```
+
+<h3 id="import">`import`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| The block above `implementation` that names what this file takes from other files, one `from` group per file. | Once, at the top of a file. | JavaScript's `import { a } from "./a"`. The path comes first and names the `.es` file, and the names are not separated by commas. `import { Rectangle } from "./Shapes.es"` is a syntax error, `Expected 'from' but found 'Rectangle'`. |
+
+</div>
+
+```essence
+§ file: Main.es
+import {
+	from "./Shapes.es" {
+		Rectangle
+		area
+	}
+}
+
+implementation {
+	constant card: Rectangle = { width = 3, height = 4 }
+
+	Terminal.print(area(of card)) § 12
+}
+```
+
+Taught on [Modules](/docs/language/modules).
+
+<h3 id="export">`export`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| The block below `implementation` that names what other files may import: a name this file declares, `name as other`, or a `from` group that passes on another file's export. | Once, below `implementation` and above `tests`. | A marker on a declaration: there is no `export function` and no default export. An imported name is passed on only through a `from` group ([`export-of-unknown-name`](/docs/reference/diagnostics#export-of-unknown-name)). |
+
+</div>
+
+```essence
+§ file: Geometry.es
+import {
+	from "./Shapes.es" { Rectangle }
+}
+
+implementation {
+	constant unit: Rectangle = { width = 1, height = 1 }
+}
+
+export {
+	unit
+	from "./Shapes.es" { area }
+}
+```
+
+Taught on [Modules](/docs/language/modules).
+
+<h3 id="from">`from`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| The start of a group of names taken from one file: `from "./Shapes.es" { Rectangle }`. The path is relative to the file that writes it. | In `import` and `export` blocks. | A package name. `"Shapes"` and `"./Shapes"` are [`invalid-module-specifier`](/docs/reference/diagnostics#invalid-module-specifier); write `"./Shapes.es"`. Outside the two blocks, `from` is an ordinary name. |
+
+</div>
+
+```essence
+§ file: Report.es
+import {
+	from "./Geometry.es" {
+		area
+		unit
+	}
+}
+
+implementation {
+	Terminal.print(area(of unit)) § 1
+}
+```
+
+Taught on [Modules](/docs/language/modules).
+
+<h3 id="as">`as`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A second name. In an import or export entry it renames (`area as surface`). In a [pattern](/docs/reference/syntax-glossary#pattern-as) it renames a member or names the whole value. In a [`define`](/docs/reference/syntax-glossary#define) it starts an arm (`as "pass" if …`). | In those places. | A type cast. Anywhere else, `as` is an ordinary name. |
+
+</div>
+
+```essence
+§ file: Sizes.es
+import {
+	from "./Shapes.es" {
+		area as surface
+		unitSide as side
+	}
+}
+
+implementation {
+	Terminal.print(surface(of { width = side, height = 5 })) § 5
+}
+```
+
+Taught on [Modules](/docs/language/modules) and [Patterns](/docs/language/patterns).
+
+<h3 id="tests-block">`tests` block</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| The block of tests, last in the file. It sees every name the file declares, exported or not. | Once, below `export`. | Part of a build: [`essence build`](/docs/reference/cli#build) drops it, [`essence test`](/docs/reference/cli#test) runs it, and [`essence check`](/docs/reference/cli#check) type-checks it. Above `export` it is [`misplaced-tests-section`](/docs/reference/diagnostics#misplaced-tests-section). |
+
+</div>
+
+```essence
+implementation {
+	function double(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+}
+
+tests {
+	test "doubles a number" {
+		expect double(21)::is(42)
+	}
+}
+```
+
+Taught on [Tests](/docs/language/tests).
+
+## Expressions and control flow
+
+<h3 id="if">`if`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A block that runs when a [Boolean](/docs/library/boolean) holds. `else if` and `else` add branches. | As a statement. | An expression: `constant label = if …` is a syntax error; use `define`. The condition takes no parentheses and must be a Boolean ([`condition-not-boolean`](/docs/reference/diagnostics#condition-not-boolean)). The braces are required. |
+
+</div>
+
+```essence
+implementation {
+	constant count = 5
+
+	if count::isZero() {
+		Terminal.print("none")
+	} else if count::isGreaterThan(3) {
+		Terminal.print("many") § many
+	} else {
+		Terminal.print("a few")
+	}
+}
+```
+
+Taught on [Conditions](/docs/language/conditions).
+
+<h3 id="define">`define`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| An expression that returns the value of its first arm whose condition holds. Each arm is `as value if condition`, and the last is `as value otherwise`. `define -> Type { … }` writes the type it returns. | Wherever a value stands. | A declaration, whatever the name suggests: nothing in it binds a name. It stands where JavaScript writes `c ? a : b`, which is a syntax error here. Its arms are not separated by commas. |
+
+</div>
+
+```essence
+implementation {
+	function grade(_ score: Integer) -> String {
+		<- define {
+			as "pass" if score::isGreaterThanOrEqualTo(50)
+			as "fail" otherwise
+		}
+	}
+
+	Terminal.print(grade(72)) § pass
+	Terminal.print(grade(31)) § fail
+}
+```
+
+Taught on [Conditions](/docs/language/conditions).
+
+<h3 id="otherwise">`otherwise`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| The last arm of a `define`, the one that always holds. | Once, as the last arm. | Optional ([`define-without-otherwise`](/docs/reference/diagnostics#define-without-otherwise)). An arm below it is [`unreachable-define-arm`](/docs/reference/diagnostics#unreachable-define-arm). Outside a `define` it is an ordinary name. |
+
+</div>
+
+```essence
+implementation {
+	constant windy  = false
+	constant jacket = define {
+		as "coat" if windy
+		as "none" otherwise
+	}
+
+	Terminal.print(jacket) § none
+}
+```
+
+Taught on [Conditions](/docs/language/conditions).
+
+<h3 id="match">`match`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| An expression that takes a value apart, with one `case` for each shape the value can have. `-> Type` says what it returns. | On a choice, a union, or an [Integer](/docs/library/integer) or [String](/docs/library/string) compared with written values. `match … -> {}` stands as a statement. | A `switch`: there is no fallthrough, and every case must be handled ([`missing-case`](/docs/reference/diagnostics#missing-case)). A Boolean can not be matched ([`match-on-non-union`](/docs/reference/diagnostics#match-on-non-union)). |
+
+</div>
+
+```essence
+implementation {
+	constant found: Optional<Integer> = [4, 8]::item(at 1)
+	constant item = match found -> Integer {
+		case #Value(item) { <- item }
+		case #Empty       { <- 0 }
+	}
+
+	Terminal.print(item) § 8
+}
+```
+
+Taught on [Choices and match](/docs/language/choices-and-match).
+
+<h3 id="case">`case`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| One arm of a `match`: a matcher, an optional `where` guard, and a block. A matcher is a type (`case Integer`), a written value (`case 0`), a case of a choice (`case #Value(item)`), a record pattern, or `_` for every value left. | Inside a `match`. Arms are tried in order, and the first that fits takes the value. | A list matcher: `case []` is a syntax error. A checked refinement can not be a matcher ([`refinement-as-matcher`](/docs/reference/diagnostics#refinement-as-matcher)). |
+
+</div>
+
+```essence
+implementation {
+	function described(_ value: Integer | String) -> String {
+		<- match value -> String {
+			case 0       { <- "zero" }
+			case Integer { <- "a number" }
+			case "yes"   { <- "agreement" }
+			case _       { <- "some text" }
+		}
+	}
+
+	Terminal.print(described(0)) § zero
+	Terminal.print(described(3)) § a number
+	Terminal.print(described("no")) § some text
+}
+```
+
+Taught on [Choices and match](/docs/language/choices-and-match).
+
+<h3 id="where-guard">`where` guard</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A Boolean after a matcher that must also hold for the arm to take the value. It can read `@` and the names the arm binds. | After a matcher in a `match` arm. A match that takes an Integer or String apart by written values takes no guard on any arm ([`literal-match-shape`](/docs/reference/diagnostics#literal-match-shape)). | A keyword. The same word refines a `type` and makes a namespace's conformance conditional. Anywhere else it is an ordinary name. |
+
+</div>
+
+```essence
+implementation {
+	function described(_ reading: Integer | String) -> String {
+		<- match reading -> String {
+			case Integer where @::isNegative() { <- "below zero" }
+			case Integer { <- "zero or more" }
+			case String  { <- @ }
+		}
+	}
+
+	Terminal.print(described(-4)) § below zero
+	Terminal.print(described(4)) § zero or more
+}
+```
+
+Taught on [Choices and match](/docs/language/choices-and-match).
+
+<h3 id="with">`with`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A copy with changes: `{ server with port = 443 }` is JavaScript's `{ ...server, port: 443 }`. Inside brackets it copies a dictionary with entries set. A key is `name = value`, a path (`tls.enabled = true`) or a braced descend (`tls.{ enabled = true }`). One record after `with` is merged whole. | `{ record with … }` and `[dictionary with …]`. | Mutation: the original is unchanged. Unlike spread, it can not add a member: a key the record does not have is [`partial-type-mismatch`](/docs/reference/diagnostics#partial-type-mismatch). |
+
+</div>
+
+```essence
+implementation {
+	constant server  = {
+		host = "localhost",
+		port = 80,
+		tls = { enabled = false },
+	}
+	constant secured = { server with port = 443, tls.enabled = true }
+	constant local   = { server with tls.{ enabled = true } }
+	constant ages    = ["ada" = 36]
+
+	Terminal.print(secured.port) § 443
+	Terminal.print(local.tls.enabled) § true
+	Terminal.print(server.port) § 80
+	Terminal.print([ages with "alan" = 41]) § ["ada" = 36, "alan" = 41]
+}
+```
+
+Taught on [Records](/docs/language/records) and [Dictionaries](/docs/language/dictionaries).
+
+<h3 id="interpolation">Interpolation `"{…}"`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A hole in a string: `"Hello, {name}!"`. Any expression may stand in it, and the text of its value replaces the hole. | Inside a string literal. | A JavaScript template literal. A hole has no `$`, so `"Hello, ${name}"` compiles and prints `Hello, $Ada`. Nor is it a format language. A value that is not [Printable](/docs/library/protocols#Printable) is [`interpolation-not-printable`](/docs/reference/diagnostics#interpolation-not-printable), and [`"{count::toString()}"`](/docs/library/integer#toString) draws the Warning [`redundant-interpolation-to-string`](/docs/reference/diagnostics#redundant-interpolation-to-string). `\{` writes a brace. |
+
+</div>
+
+```essence
+implementation {
+	constant name  = "Ada"
+	constant count = 3
+
+	Terminal.print("Hello, {name}! You have {count::add(1)} messages.") § Hello, Ada! You have 4 messages.
+}
+```
+
+Taught on [Programs and values](/docs/language/programs-and-values) and [Strings](/docs/language/strings).
+
+<h3 id="literals">Literals</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A value written out in the source. | Wherever a value stands. | A floating-point number. `0.75` is the exact Rational `3/4`. |
+
+</div>
+
+<div class="table-scroll">
+
+| Literal | Written | Prints |
+| --- | --- | --- |
+| Integer | `42`, `1_000`, `-7` | `42`, `1000`, `-7` |
+| Rational, as a fraction | `3/4`, `-3/4`, `6/8` | `3/4`, `-3/4`, `3/4` |
+| Rational, as a decimal | `0.75`, `19.99`, `2.0` | `3/4`, `1999/100`, `2` |
+| String | `"text"`, `"Hi, {name}"` | `text` |
+| Boolean | `true`, `false` | `true` |
+| List | `[1, 2]`, `[]` | `[1, 2]` |
+| Record | `{ x = 1 }`, `{ x }` | `{ x = 1 }` |
+| Dictionary | `["a" = 1]`, `[=]` | `["a" = 1]`, `[=]` |
+| Unit | `{}` | `{}` |
+| Case | `#Empty`, `#Value(3)` | `Empty`, `Value(3)` |
+| Function | `(_ n: Integer) -> Integer { <- n }` | Can not be printed |
+
+</div>
+
+```essence
+implementation {
+	Terminal.print(1_000) § 1000
+	Terminal.print(-3/4) § -3/4
+	Terminal.print(0.75) § 3/4
+	Terminal.print(0.1::add(0.2)::is(0.3)) § true
+	Terminal.print("text") § text
+	Terminal.print(true) § true
+	Terminal.print([1, 2]) § [1, 2]
+	Terminal.print({ x = 1 }) § { x = 1 }
+	Terminal.print(["a" = 1]) § ["a" = 1]
+	Terminal.print({}) § {}
+}
+```
+
+Taught on [Programs and values](/docs/language/programs-and-values), [Numbers](/docs/language/numbers) and [Dictionaries](/docs/language/dictionaries).
+
+<h3 id="labels">Labels</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A word in front of an argument's value that names the parameter it fills: [`clamp(between 1, and 5)`](/docs/library/integer#clamp). A parameter declares one as `label name: Type`, as `name: Type` (the name is the label), or `_ name: Type` for none. | In an argument list, in the order the parameters declare them. An argument with a default value may be left out. | `label: value` or `label = value`, which are syntax errors. A missing or misplaced label is refused ([`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch)). |
+
+</div>
+
+```essence
+implementation {
+	function letter(of text: String, at position: Integer) -> String {
+		<- text::slice(from position, to position::add(1))
+	}
+
+	Terminal.print(letter(of "essence", at 1)) § s
+	Terminal.print(7::clamp(between 1, and 5)) § 5
+}
+```
+
+Taught on [Method calls](/docs/language/method-calls) and [Functions](/docs/language/functions).
+
+<h3 id="function-literal">Function literal</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A function written as a value: parameters in parentheses, then a block. Passed as an argument, it takes its types from the parameter: `(n) { <- n::add(1) }`. Anywhere else it writes every type and its `-> Type`. | Wherever a value stands. | Written with `=>` or `function`. Without types outside an argument it is [`uninferable-parameter-type`](/docs/reference/diagnostics#uninferable-parameter-type), and it can not carry a default value ([`default-on-function-literal`](/docs/reference/diagnostics#default-on-function-literal)). |
+
+</div>
+
+```essence
+implementation {
+	constant double = (_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+
+	Terminal.print([1, 2, 3]::map((n) { <- n::add(1) })) § [2, 3, 4]
+	Terminal.print(double(21)) § 42
+}
+```
+
+Taught on [Functions as values](/docs/language/functions-as-values).
+
+<h3 id="member-path">Member path</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A path that starts with a dot, such as `.price` or `.maker.town`. It stands for a one-parameter function that reads those members off its argument. | As an argument whose parameter is a one-parameter function: [`map(.name)`](/docs/library/list#map), [`sort(on .price)`](/docs/library/list#sort). | A value on its own ([`path-without-context`](/docs/reference/diagnostics#path-without-context)). It reads members and nothing else: `.total::round()` is [`path-is-members-only`](/docs/reference/diagnostics#path-is-members-only). |
+
+</div>
+
+```essence
+implementation {
+	constant products = [
+		{ name = "pen", price = 3 },
+		{ name = "ink", price = 12 },
+	]
+
+	Terminal.print(products::map(.name)) § ["pen", "ink"]
+	Terminal.print(products::sort(on .price, in #Descending)::map(.name)) § ["ink", "pen"]
+}
+```
+
+Taught on [Functions as values](/docs/language/functions-as-values).
+
+## Patterns
+
+A pattern names the parts of a record. One grammar is written in six places: a match arm, a case's payload, a parameter, a function literal's parameter, a declaration, and `require` in a test.
+
+<h3 id="pattern-name">`{ x }` member name</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A member name, which binds that member under the same name. Members the pattern leaves out are ignored. | In all six places. | A rest pattern: there is no `...`. A list pattern, `constant [first, second] = …`, is a syntax error. |
+
+</div>
+
+```essence
+implementation {
+	constant point = { x = 3, y = 4 }
+	constant { x, y } = point
+
+	Terminal.print(x::add(y)) § 7
+}
+```
+
+Taught on [Patterns](/docs/language/patterns).
+
+<h3 id="pattern-type">`{ x: Type }` member type</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A member and a type, which binds the member and constrains its type. In a matcher it is a test; in a declaration or a parameter it is an annotation. | In all six places. | JavaScript's rename. After the colon comes a type, so `constant { x: px } = point` is [`unknown-type`](/docs/reference/diagnostics#unknown-type), `Type 'px' is not declared`; rename with `x as px`. Nor is it a cast: in a declaration, a member of another type is [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch). |
+
+</div>
+
+```essence
+implementation {
+	type Click = { x: Integer, y: Integer }
+	type Key = { key: String }
+
+	constant input: Click | Key = { key = "q" }
+	constant shown = match input -> String {
+		case { key: String } { <- "pressed {key}" }
+		case { x, y }        { <- "clicked {x}, {y}" }
+	}
+
+	Terminal.print(shown) § pressed q
+}
+```
+
+Taught on [Patterns](/docs/language/patterns).
+
+<h3 id="pattern-value">`{ x = value }` member value</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A member and a written value, which constrains the member to that value and binds nothing. | Where a pattern may decline a value: a match arm, a case's payload, and `require`. | A default value, which is what `{ x = 0 }` means in a JavaScript pattern. In a declaration or a parameter it is [`refutable-pattern`](/docs/reference/diagnostics#refutable-pattern), because those have no next arm to fall through to. The value is a literal, never a name. |
+
+</div>
+
+```essence
+implementation {
+	type Click = { x: Integer, y: Integer }
+	type Key = { key: String }
+
+	constant input: Click | Key = { x = 0, y = 7 }
+	constant shown = match input -> String {
+		case { x = 0, y } { <- "on the y axis at {y}" }
+		case { x, y }     { <- "at {x}, {y}" }
+		case { key }      { <- "pressed {key}" }
+	}
+
+	Terminal.print(shown) § on the y axis at 7
+}
+```
+
+Taught on [Patterns](/docs/language/patterns).
+
+<h3 id="pattern-as">`as` in a pattern</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A rename. `member as other` binds the member under another name, and `member as { … }` takes a nested record apart. | In all six places. | A rename of a case's binder: `#Value(item as v)` is a syntax error. |
+
+</div>
+
+```essence
+implementation {
+	constant line = { start = { x = 1, y = 2 }, label = "edge" }
+	constant { start as { x as startX }, label as name } = line
+
+	Terminal.print("{name} starts at {startX}") § edge starts at 1
+}
+```
+
+Taught on [Patterns](/docs/language/patterns).
+
+<h3 id="pattern-whole">`{ … } as whole` whole value</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A name for the whole value beside its parts, written as `as name` after the pattern's closing brace. | A declaration, a parameter, a function literal's parameter, a case's payload (`#Value({ x } as point)`), and `require`. | Allowed on a match arm's own record pattern, where `@` already names the value ([`redundant-pattern-binder`](/docs/reference/diagnostics#redundant-pattern-binder)). In `require`, the whole value has only the members the pattern names. |
+
+</div>
+
+```essence
+implementation {
+	type Size = { width: Integer, height: Integer }
+
+	function area(of { width, height } as size: Size) -> String {
+		<- "{size.width} by {size.height} is {width::multiply(with height)}"
+	}
+
+	Terminal.print(area(of { width = 3, height = 4 })) § 3 by 4 is 12
+}
+```
+
+Taught on [Patterns](/docs/language/patterns).
+
+## Tests
+
+<h3 id="test">`test`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| One test: a name in a string, optional modifiers, and a block of statements and assertions. The name may hold interpolation holes. | In the `tests` block or in a `suite`. | Allowed outside the `tests` block ([`test-outside-tests`](/docs/reference/diagnostics#test-outside-tests)). Two tests of one name in one scope are [`duplicate-test-name`](/docs/reference/diagnostics#duplicate-test-name). |
+
+</div>
+
+```essence
+implementation {
+	function double(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+}
+
+tests {
+	constant input = 21
+
+	test "doubles {input}" {
+		expect double(input)::is(42)
+	}
+}
+```
+
+Taught on [Tests](/docs/language/tests).
+
+<h3 id="suite">`suite`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A named group of tests and suites. Its statements are setup shared by the tests inside it. | In the `tests` block or in another suite. | A place for assertions: an `expect` written directly in a suite is [`expect-outside-test`](/docs/reference/diagnostics#expect-outside-test). |
+
+</div>
+
+```essence
+implementation {
+	constant lions = { team = "Lions", points = 0 }
+}
+
+tests {
+	suite "a win" {
+		constant won = { lions with points = 3 }
+
+		test "adds three points" {
+			expect won.points::is(3)
+		}
+
+		test "leaves the original alone" {
+			expect lions.points::is(0)
+		}
+	}
+}
+```
+
+Taught on [Tests](/docs/language/tests).
+
+<h3 id="expect">`expect`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| An assertion: a Boolean expression. A failing one is recorded and the test carries on, so one test can report several failures. | In a test's body, including its `if` blocks and match arms. | A matcher library. It never binds a name ([`matcher-on-expect`](/docs/reference/diagnostics#matcher-on-expect)), a value that is not a Boolean is [`expect-not-boolean`](/docs/reference/diagnostics#expect-not-boolean), and inside a function literal it is `expect-outside-test`. |
+
+</div>
+
+```essence
+implementation {
+	constant scores = [3, 1, 2]
+}
+
+tests {
+	test "sorts the scores" {
+		expect scores::sort()::is([1, 2, 3])
+		expect scores::length()::is(3)
+	}
+}
+```
+
+Taught on [Tests](/docs/language/tests).
+
+<h3 id="require">`require`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| An assertion that ends the test when it fails. `require MATCHER = EXPR` takes a value apart, and the names it binds stay in scope to the end of the test. | In a test's body. | A match on anything: `require _ = …` is [`wildcard-in-require`](/docs/reference/diagnostics#wildcard-in-require) and `require 3 = …` is [`literal-in-require`](/docs/reference/diagnostics#literal-in-require). |
+
+</div>
+
+```essence
+implementation {
+	constant scores: List<Integer> = [3, 1, 2]
+}
+
+tests {
+	test "reads the first score" {
+		require scores::hasItems()
+		require #Value(first) = scores::firstItem()
+
+		expect first::is(3)
+	}
+}
+```
+
+Taught on [Tests](/docs/language/tests).
+
+<h3 id="across">`across`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A table test: the body runs once for each row of a written list, and each row is a test of its own. The one parameter may be a pattern, and the name's holes are filled for each row. | After a test's name and modifiers. | Rows held in a constant ([`table-not-written`](/docs/reference/diagnostics#table-not-written)), or more than one parameter ([`table-parameters`](/docs/reference/diagnostics#table-parameters)). Outside a test it is an ordinary name. |
+
+</div>
+
+```essence
+implementation {
+	function isWin(_ scored: Integer, against conceded: Integer) -> Boolean {
+		<- scored::isGreaterThan(conceded)
+	}
+}
+
+tests {
+	test "{scored}–{conceded} is a win" across [
+		{ scored = 2, conceded = 0 },
+		{ scored = 3, conceded = 1 },
+	] ({ scored, conceded }: { scored: Integer, conceded: Integer }) {
+		expect isWin(scored, against conceded)
+	}
+}
+```
+
+Taught on [Tests](/docs/language/tests).
+
+<h3 id="for-any">`for any`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A property test: the body runs once for each generated value, 100 by default, drawn from the parameter types. A failure is shrunk to a small value and reported with a seed that replays it. | After a test's name and modifiers. | A loop. Every parameter writes its type ([`property-parameters`](/docs/reference/diagnostics#property-parameters)), and a property test can not record a snapshot ([`snapshot-in-property`](/docs/reference/diagnostics#snapshot-in-property)). |
+
+</div>
+
+```essence
+implementation {
+	function double(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+}
+
+tests {
+	test "a double is even" for any (value: Integer) {
+		expect double(value)::isEven()
+	}
+}
+```
+
+Taught on [Tests](/docs/language/tests).
+
+<h3 id="matches-snapshot">`matches snapshot`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A comparison of a value's text with a recorded one. The first run writes the text into the source after `snapshot`. `matches snapshot from "name"` keeps it in a `__snapshots__` folder beside the file instead. | At the end of `expect EXPR` or `require EXPR`. | Allowed after a `require` that takes a value apart ([`snapshot-after-matcher`](/docs/reference/diagnostics#snapshot-after-matcher)). `matches` and `snapshot` are ordinary names elsewhere. |
+
+</div>
+
+```essence
+implementation {
+	constant scores = [3, 1, 2]
+}
+
+tests {
+	test "sorts the scores" {
+		expect scores::sort() matches snapshot "[1, 2, 3]"
+	}
+}
+```
+
+Taught on [Tests](/docs/language/tests).
+
+<h3 id="modifiers">Modifiers</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| Words after a test's or suite's name. `skipped "reason"` reports the test as skipped with its reason, `focused` runs only the focused tests, and `tagged fast, slow` names tags that [`--tag`](/docs/reference/cli#test--tag) and [`--skip-tag`](/docs/reference/cli#test--skip-tag) select by. | After the name, before `across` or `for any`. On a suite they cover every test inside it. | Free-form: `skipped` needs its reason ([`skipped-without-reason`](/docs/reference/diagnostics#skipped-without-reason)). A `focused` test left in a run that nothing narrowed fails that run with exit code 2 ([`focused-tests-remain`](/docs/reference/diagnostics#focused-tests-remain)). |
+
+</div>
+
+```essence
+implementation {
+	constant limit = 10
+}
+
+tests {
+	test "is quick" tagged fast {
+		expect limit::isPositive()
+	}
+
+	test "waits on a fix" skipped "the parser change" {
+		expect limit::is(0)
+	}
+}
+```
+
+Taught on [Tests](/docs/language/tests).
+
+## Words that are not keywords
+
+Many of the words the forms above are written with are also ordinary names. Only a short list is reserved.
+
+<div class="table-scroll">
+
+| Words | As a name |
+| --- | --- |
+| `if`, `else`, `type`, `variable`, `constant`, `function`, `implementation`, `overload`, `match`, `define`, `namespace`, `protocol`, `for`, `true`, `false` | Reserved. `constant for = 1` is a syntax error, `Expected an Identifier but found 'for'`. |
+| `case`, `otherwise`, `with`, `infer`, `choice`, `import`, `export`, `from`, `as`, `static`, `tests`, `test`, `suite`, `expect`, `require`, `where` | Allowed. Each works as a keyword only where a form expects it. |
+| `is`, `across`, `any`, `matches`, `snapshot`, `declarations` | Allowed. These are ordinary names that a few forms read in position. |
+
+</div>
+
+```essence
+implementation {
+	constant case   = 1
+	constant where  = 2
+	constant across = 3
+	constant trip   = { from = "Oslo", to = "Rome" }
+
+	Terminal.print(case::add(where)::add(across)) § 6
+	Terminal.print(trip.from) § Oslo
+}
+```
+
+A record may therefore have a member named `from` or `test`, and a library method may take a `where` label, as [`everyItem(where:)`](/docs/library/list#everyItem) does. `for` is reserved; it appears in `namespace Name for Type` and in `for any`.
+
+## Where whitespace matters
+
+Most line breaks and all indentation carry no meaning: a statement ends where the grammar says it does, and [`essence format`](/docs/guides/formatting) decides the layout. The six rules below depend on how tokens sit next to each other.
+
+<h3 id="labels-flush">A label sits in front of its value</h3>
+
+A label and its value are separated by a space, never by `:` or `=`. `slice(from: 1, to: 3)` is a syntax error, `Expected an Expression but found ':'`. Inside an argument list, any word followed by a value reads as a label. `Terminal.print(primes[0])` is therefore read as the label `primes` and the list `[0]`, which is `argument-label-mismatch`. The [labels](/docs/reference/syntax-glossary#labels) entry runs the spelling that works.
+
+<h3 id="one-token">A fraction is one token</h3>
+
+Digits, `/` and digits written flush are one Rational literal. The same goes for `_` between digits and for the point of a decimal. `Terminal.print(3 / 4)` is a syntax error, `Expected ')' but found '/'`, and `3/n` is `Expected a Number but found 'n'`. The [`/` fraction](/docs/reference/syntax-glossary#fraction) entry runs it.
+
+<h3 id="broken-chain">`::` leads a broken chain</h3>
+
+```essence
+implementation {
+	constant total = [1, 2, 3, 4]
+		::everyItem(where (n) { <- n::isEven() })
+		::map((n) { <- n::multiply(with n) })
+		::sum()
+
+	Terminal.print(total) § 20
+}
+```
+
+A chain can break before any `::`, and the line that starts with `::` continues the expression above it. A break after the `::` parses too. When `essence format` breaks a chain, it puts each `::` at the start of its line, one step in; a chain that fits is joined onto one line.
+
+<h3 id="paren-after-if">No `(` after `if`</h3>
+
+An `if` condition takes no parentheses. A `(` in an expression starts a function literal's parameter list, so `if (count::isEven()) {` is a syntax error, `Expected a Type but found ':'`. `if (ready) {` is `Expected '{' but found '}'`, and `if (count > 3) {` is `Expected ')' but found '>'`. The [`if`](/docs/reference/syntax-glossary#if) entry runs the spelling without them.
+
+<h3 id="case-after-label">A space between a label and `#`</h3>
+
+`round(toward #Down)` is the label `toward` and the bare case `#Down`. Written flush, `toward#Down` reads as the case `Down` of a choice named `toward`, and the compiler reports two errors: [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload) on the call, then `unknown-type`, `Type 'toward' is not declared`. The flush form is right for naming a case with its choice, `Ordering#Less`. The [`#` case](/docs/reference/syntax-glossary#case-sigil) entry runs both spellings.
+
+<h3 id="minus-before-digit">`-` only before a number</h3>
+
+`-` belongs to a number literal. In front of a name it is a syntax error, `Expected a Number but found 'balance'`. Between two numbers it starts a new statement: `constant difference = 10 - 4` binds `10`, and `-4` becomes a statement of its own, with no error. The [`-` minus](/docs/reference/syntax-glossary#minus) entry runs a signed literal.
+
+## What there is no syntax for
+
+<div class="table-scroll">
+
+| Not in the language | Write instead | What the compiler says |
+| --- | --- | --- |
+| Operators: `+`, `-`, `*`, `/`, `==`, `<`, `&&`, `\|\|`, `!` | Methods: [`a::add(b)`](/docs/library/integer#add), `a::is(b)`, `a::isLessThan(b)`, [`a::and(b)`](/docs/library/boolean#and), `flag::negate()` | `constant total = 1 + 2` reports `'+' is not declared`; inside a call, `Terminal.print(1 + 2)` is a syntax error |
+| A statement separator, `;` | Nothing: statements are separated by whitespace | `1;` is [`invalid-number`](/docs/reference/diagnostics#invalid-number) |
+| Block comments and `//` | A run of `§` lines | A syntax error |
+| `return` | `<-` | `'return' is not declared` |
+| Hexadecimal, binary and exponent numbers: `0xFF`, `0b101`, `1e5` | Decimal digits, grouped with `_` | `invalid-number` |
+| `null` and `undefined` | [`Optional`](/docs/library/optional): `#Value(item)` or `#Empty` | `'null' is not declared` |
+| Loop statements: `for`, `while` | `map`, [`reduce`](/docs/library/list#reduce) and the [`loop`](/docs/library/loop) functions | A syntax error; a `while` whose body happens to parse as a record is `'while' is not declared` instead |
+| Type arguments at a call: `first<Integer>(…)` | Nothing: the arguments decide the type | A syntax error |
+
+</div>
+
+Decimal numbers exist and are exact; see [Literals](/docs/reference/syntax-glossary#literals). A literal can not mix the two spellings: `1/2.5` is [`mixed-rational-literal`](/docs/reference/diagnostics#mixed-rational-literal). A decimal needs digits on both sides of its point, so `1.` and `.5` are [`partial-decimal-literal`](/docs/reference/diagnostics#partial-decimal-literal).
+
+What the compiler prints for each JavaScript habit is on [Coming from JavaScript](/docs/getting-started/coming-from-javascript#if-you-typed-javascript).
+
+<SeeAlso
+	links={[
+		{ label: "Diagnostics", href: "/docs/reference/diagnostics" },
+		{ label: "Coming from JavaScript", href: "/docs/getting-started/coming-from-javascript#if-you-typed-javascript" },
+		{ label: "Formatting", href: "/docs/guides/formatting" },
+	]}
+/>

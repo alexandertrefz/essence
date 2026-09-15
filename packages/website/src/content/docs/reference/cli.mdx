@@ -1,0 +1,835 @@
+---
+title: Command line
+description: Every command and flag of the essence binary, with exit codes, JSON output, caches and environment variables.
+section: reference
+order: 20
+template: reference
+tocDepth: 2
+---
+
+`essence` is the whole Essence toolchain in one binary: the compiler, the test runner, the formatter, the language server and the debug adapter. This page lists every command and every flag, what each one does, and what happens when you leave it out. [Using the compiler](/docs/guides/using-the-compiler) walks through the commands on one program.
+
+The examples run against this file, `greeting.es`:
+
+```essence
+implementation {
+	function greeting(to name: String) -> String {
+		<- "Hello, {name}!"
+	}
+
+	Terminal.print(greeting(to "world")) § Hello, world!
+}
+
+export {
+	greeting
+}
+
+tests {
+	test "greets by name" {
+		expect greeting(to "Ada")::is("Hello, Ada!")
+	}
+}
+```
+
+```sh
+$ essence greeting.es --quiet
+  ✔ greeting.es → greeting.js
+$ node greeting.js
+Hello, world!
+$ essence test greeting.es
+Hello, world!
+
+ greeting.es
+   ✓ greets by name
+
+ 1 passed  ·  0.45 ms
+```
+
+`essence greeting.es` names no command, so it runs `build`, which writes `greeting.js` beside the source. [`--quiet`](/docs/reference/cli#global--quiet) keeps the report to its last line. `essence test` compiles the file's [`tests { … }`](/docs/language/tests) block and runs it. Its first line of output comes from the module's top-level statement, which runs when the module loads.
+
+Every flag below appears in its command's `essence help <command>` screen, except `--no-color`.
+
+## The shape of an invocation
+
+```sh
+essence <command> [file...] [options]
+essence <file.es> [options]
+```
+
+A file argument is a path or a glob. `essence` expands a quoted glob itself, so `essence check "src/**/*.es"` works in any shell. `tsc -p .` and `eslint .` take a directory, but `build`, `run`, `check` and `watch` do not. They report a directory as the Error [`not-a-file`](/docs/reference/diagnostics#not-a-file), and the first three exit with code 1. `test` and `format` take a directory and search every source under it.
+
+A first argument that is not a command's name or alias is a file, and the command is `build`. A first argument close to a command's name, with no `.`, `/` or `\` in it, is refused with a suggestion:
+
+<div class="error-output">
+
+```
+  ✖ Unknown command "biuld".
+  Did you mean "essence build"?
+
+  Help:  essence help
+```
+
+</div>
+
+A word close to no command is taken as a file name. `essence qwerty` fails with [`file-not-found`](/docs/reference/diagnostics#file-not-found) and exit code 1. An option the command does not take is refused the same way, and the message names the closest option when there is one:
+
+<div class="error-output">
+
+```
+  ✖ Unknown option "--minfy" for essence build.
+  Did you mean "--minify"?
+
+  Usage: essence build <file...> [options]
+  Help:  essence help build
+```
+
+</div>
+
+Both refusals exit with code 2. `essence` with no arguments prints the overview, the screen that `essence help` prints, and exits with 0. `build`, `run`, `check` and `watch` need at least one file, so `essence check` alone is refused with exit code 2. `-h` or `--help` after a command prints that command's screen: `essence build --help` and `essence help build` print the same thing.
+
+Everything after a bare `--` belongs to the compiled program, and only `run` passes it on, as `npm run` does. `build`, `check`, `watch`, `test`, `init` and `help` refuse it with exit code 2:
+
+<div class="error-output">
+
+```
+  ✖ essence check does not pass arguments to a program.
+  Only essence run forwards arguments after --.
+
+  Usage: essence check <file...> [options]
+  Help:  essence help check
+```
+
+</div>
+
+A `--` with nothing after it is ignored, so `essence help --` prints the overview. `format`, `lsp` and `dap` pass every argument to the tool they start, `--` included. The formatter reads `--` as the end of its options, so `essence format -- greeting.es` formats the file.
+
+`essence` and `esc` are one program under two names, and `@essence-lang/cli` provides both. The screens and messages use the name you typed: `esc biuld` suggests `esc build`. `esfmt`, `esls` and `esdap` start the formatter, the language server and the debug adapter directly.
+
+## Global options
+
+`build`, `run`, `check`, `watch`, `test`, `init` and `help` take the global options, and every one of their screens lists them under GLOBAL OPTIONS. `format`, `lsp` and `dap` do not take them, because they hand their arguments to another tool. `-h` and `--help` are the exception: `essence` handles them itself for every command, so `essence lsp --help` prints a screen instead of starting a server.
+
+### <span id="global--help">`-h`, `--help`</span>
+
+Prints the screen of the command it follows, or the overview when there is no command, and exits with 0. Nothing else runs: `essence build greeting.es --help` writes no file.
+
+### <span id="global--version">`-v`, `--version`</span>
+
+Prints the compiler's version, such as `0.5.0`, and exits with 0.
+
+### <span id="global--verbose">`--verbose`</span>
+
+Adds detail to the report. Under `build`, `run`, `watch`, `test` and `init`, the report opens with the project file that applies to the run, described under Flags and essence.json. It prints `settings read from essence.json`, or `no essence.json governs the working directory`. Under `test`, each test shows its time, and each test the run left out is listed with its reason: `filtered out`, `left out by tag` or `not focused`. A test that stopped with an error keeps the JavaScript stack trace under it. When the compiler itself crashes, `--verbose` prints its stack trace. The stage timings, described under [`build`](/docs/reference/cli#build), print with or without it.
+
+### <span id="global--quiet">`-q`, `--quiet`</span>
+
+Prints only Diagnostics, the errors and warnings the run reports, and the report's last line. The stage timings, the per-file table, the output sizes and the progress display are left out. One file leaves the line that names it, `✔ greeting.es → greeting.js`. Several files leave the line that counts them, `✔ 2 files checked`. Under `run`, the program's output is printed without the lines around it. Under `test`, only Diagnostics and printed output appear: each failed test with what it printed, and what a module prints when it loads. There is no summary line.
+
+### <span id="global--json">`--json`</span>
+
+Writes a machine-readable document to stdout, and nothing else goes there. Colour turns off. `build`, `run` and `check` write one JSON report, described under The JSON report below. `test` writes one JSON event per line instead, described under The test event stream. `run` and `build --execute` still run the program, and send its output to stderr so that the report stays alone on stdout. `watch`, `init` and `help` write JSON only when the command line is refused, in the JSON report's shape.
+
+### <span id="global--color">`--color`, `--no-color`</span>
+
+`--color` turns colour on. `--no-color` turns it off, and wins when both are given. The help screens list only `--color`. The first row of this table that applies decides:
+
+<div class="table-scroll">
+
+| What applies | Colour |
+| --- | --- |
+| `--json` | Off |
+| `--no-color` | Off |
+| `--color` | On |
+| `NO_COLOR` set to anything but an empty string | Off |
+| `FORCE_COLOR` set to anything but `0` | On |
+| `TERM=dumb` | Off |
+| None of the above | On when stderr is a terminal |
+
+</div>
+
+Colour follows stderr, not stdout. `essence check greeting.es > report.txt` in a terminal still writes colour codes into `report.txt`, so add `--no-color` to keep them out. When the locale is not UTF-8, such as `LC_ALL=C`, the symbols fall back to ASCII and `✔` prints as `+`. On Windows they fall back outside Windows Terminal and the VS Code and JetBrains terminals.
+
+## Flags and essence.json
+
+`build`, `run`, `watch`, `test` and `init` read the project file, `essence.json`. They look for it in the working directory and then in each directory above it. The nearest one applies whole: nothing merges in from a file further up, and there is no `extends` as in `tsconfig.json`. `check`, `format`, `lsp`, `dap` and `help` do not read it.
+
+Most settings mirror a flag, and the flag wins for the run it is given on: `--no-sourcemap` overrides a `build.sourcemap` of `true`. Two settings add to the flags instead. `build.withoutOptimisations` and `--without-optimisation` together turn off every pass either one names. A `build.optimise` of `false` turns the optimiser off, and nothing on the command line turns it back on.
+
+A flag given together with its own negation is refused before anything runs, with exit code 2:
+
+<div class="error-output">
+
+```
+  ✖ --minify and --no-minify contradict each other — say one.
+
+  Usage: essence build <file...> [options]
+  Help:  essence help build
+```
+
+</div>
+
+The same holds for `--sourcemap` with `--no-sourcemap` and `--embed` with `--no-embed`. The `build` settings apply to `build`, `run` and `watch`. `essence test` compiles under them too, apart from `build.out`, because its bundles always go to the cache. The `test` settings apply to `test` only:
+
+<div class="table-scroll">
+
+| Setting | Flags |
+| --- | --- |
+| [`build.out`](/docs/reference/project-file#build-out) | `-o`, `--out` |
+| [`build.sourcemap`](/docs/reference/project-file#build-sourcemap) | `--sourcemap`, `--no-sourcemap` |
+| [`build.minify`](/docs/reference/project-file#build-minify) | `--minify`, `--no-minify` |
+| [`build.embed`](/docs/reference/project-file#build-embed) | `--embed`, `--no-embed` |
+| [`build.optimise`](/docs/reference/project-file#build-optimise) | `--no-optimise`. Nothing on the command line turns `false` back on. |
+| [`build.withoutOptimisations`](/docs/reference/project-file#build-withoutOptimisations) | `--without-optimisation` adds passes to the list, and removes none. |
+| [`exclude`](/docs/reference/project-file#exclude) | None. A file named on the command line is compiled even inside an excluded directory. |
+| [`test.skipTags`](/docs/reference/project-file#test-skipTags) | `--tag` runs a tag the setting leaves out, and `--skip-tag` leaves out more. |
+| [`test.cases`](/docs/reference/project-file#test-cases) | `--cases` |
+| [`test.coverage.report`](/docs/reference/project-file#test-coverage-report) | `--coverage-report` |
+| [`test.coverage.out`](/docs/reference/project-file#test-coverage-out) | `--coverage-out` |
+
+</div>
+
+A key the file does not know is the Warning [`unknown-setting`](/docs/reference/diagnostics#unknown-setting), and the rest of the file still applies. [Projects and essence.json](/docs/guides/projects) walks through setting a project up.
+
+## build
+
+Compile Essence sources to JavaScript. Alias `b`, and the default command.
+
+```sh
+essence build <file...> [options]
+essence <file...> [options]
+```
+
+Each source becomes one self-contained ES module. The parts of Essence's runtime library that the program uses are bundled into it, so Node and Bun run it with nothing installed beside it. Node runs it without a warning when the nearest `package.json` says `"type": "module"`, or when there is none. Under `"type": "commonjs"`, Node fails at the bundle's `export`, so name the output `.mjs` there, as in `essence greeting.es -o greeting.mjs`.
+
+Every module a source imports is compiled into the same file. A module named on the command line as well as imported gets an output of its own.
+
+A build runs nine stages, and the report times each one: `read`, `parse`, `enrich`, `validate`, `simplify`, `optimise`, `generate`, `bundle` and `write`. `enrich` is the stage that infers types. Compilation stops at the first stage that reports an Error, and shows every Diagnostic that stage found. Warnings never stop a build. `build` drops the `tests { … }` block, so an error inside a test does not stop it either; [`check`](/docs/reference/cli#check) reports it.
+
+Building an unchanged source again reuses the bundle it emitted last time, from the cache described under Caches and environment variables. The report then leaves out the rows from `simplify` to `bundle`.
+
+### <span id="build--out">`-o`, `--out <path>`</span>
+
+Where to write the JavaScript. With one input, the path names the output file, unless it ends in `/` or names an existing directory. With several, it names a directory, and each source keeps its own name. A path that looks like a file is refused when there are several inputs:
+
+<div class="error-output">
+
+```
+  ✖ --out must name a directory when compiling several files, but "one.js" looks like a file.
+  Try --out ./
+
+  Usage: essence build <file...> [options]
+  Help:  essence help build
+```
+
+</div>
+
+Missing parent directories are created. Without `--out`, each output is written beside its source, or into the directory that `build.out` names.
+
+### <span id="build--watch">`-w`, `--watch`</span>
+
+Stays running and rebuilds on every save. `essence build greeting.es --watch` starts the same session as `essence watch greeting.es`, described under [`watch`](/docs/reference/cli#watch).
+
+### <span id="build--execute">`-e`, `--execute`</span>
+
+Runs the output once the build succeeds, and exits with the program's exit code. Only one file can run. Given several, `build` compiles all of them and then refuses, with exit code 2:
+
+<div class="error-output">
+
+```
+  ✖ --execute can only run a single file.
+  Compile the files you want, then run one of them with essence run.
+
+  Usage: essence build <file...> [options]
+  Help:  essence help build
+```
+
+</div>
+
+### <span id="build--sourcemap">`--sourcemap`</span>
+
+Writes a source map beside the output, `greeting.js.map`. The last line of `greeting.js` becomes a `sourceMappingURL` comment that points to it.
+
+### <span id="build--no-sourcemap">`--no-sourcemap`</span>
+
+Writes no source map, even when `build.sourcemap` is `true`.
+
+### <span id="build--minify">`--minify`</span>
+
+Minifies the JavaScript. `greeting.js` goes from 2,400 bytes to 1,020.
+
+### <span id="build--no-minify">`--no-minify`</span>
+
+Writes unminified JavaScript, even when `build.minify` is `true`.
+
+### <span id="build--embed">`--embed`</span>
+
+Builds a bundle for a JavaScript program to load and call, instead of a program to run. `essence build greeting.es -o dist/app.js --embed` writes `dist/app.js` and, beside it, `dist/app.descriptor.json`, which records the shape of each export. The bundle also gains a default export. `loadPrebuilt` from `@essence-lang/client` reads the pair and returns the module as JavaScript values. [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) covers the JavaScript side.
+
+### <span id="build--no-embed">`--no-embed`</span>
+
+Builds a program to run, even when `build.embed` is `true`.
+
+### <span id="build--tests">`--tests`</span>
+
+Compiles the `tests { … }` block into the bundle instead of dropping it. The bundle exports the tests as `$tests` and runs none of them, though the module's top-level statements still run when it loads. A debugger needs this to step through a test. [`essence test`](/docs/reference/cli#test) is the command that runs tests.
+
+### <span id="build--no-optimise">`--no-optimise`</span>
+
+Runs no optimisation pass, over your code and the standard library alike. Every pass runs by default. Compare against this output when an optimised build misbehaves.
+
+### <span id="build--without-optimisation">`--without-optimisation <pass>`</span>
+
+Turns one optimisation pass off, by name, and leaves the others on. Repeat the flag to turn off more. [Optimisations](/docs/reference/optimisations) lists the passes. An unknown name is refused with exit code 2. A name close to a pass gets a suggestion, and any other name gets the list of every pass:
+
+<div class="error-output">
+
+```
+  ✖ There is no optimisation pass named "fold-constant".
+  Did you mean "essence build --without-optimisation fold-constants"?
+
+  Usage: essence build <file...> [options]
+  Help:  essence help build
+```
+
+</div>
+
+### <span id="build--jobs">`-j`, `--jobs <count>`</span>
+
+How many files compile in parallel, in worker threads. The count must be a whole number of at least 1, so `-j 0` is refused with exit code 2. `-j 1` compiles everything on the main thread, which makes the stack trace of a compiler crash easier to read. A larger count always uses workers.
+
+Without `-j`, the count is one per CPU core minus one, capped at 4, and never more than the number of files. One file then compiles on the main thread. A batch uses workers from six files when it writes JavaScript, and from 256 KiB of source when it only checks.
+
+## run
+
+Compile one source file and run it.
+
+```sh
+essence run <file> [options] [-- <program arguments...>]
+```
+
+```sh
+$ essence run greeting.es
+  ✔ greeting.es → /Users/ada/Library/Caches/essence/cli/8ccf5d581e1ec5f4e4700d18b577f500693d58bee1a07d743353b68354ab537e.mjs
+
+    read      0.10 ms  ░
+    parse      1.7 ms  ██
+    enrich      20 ms  ███████████████████████
+    validate  0.43 ms  ░
+    simplify  0.30 ms  ░
+    optimise   1.1 ms  █
+    generate    21 ms  ████████████████████████
+    bundle      20 ms  ███████████████████████
+    write      2.5 ms  ███
+
+    output  2.4 kB · 893 B gzipped
+    total   75 ms
+
+  ─── program output ───────────────────────────────────────────────────────────
+Hello, world!
+  ──────────────────────────────────────────────────────────────────────────────
+
+  ✔ program exited with code 0 after 14 ms
+```
+
+`run` takes exactly one file. Two are refused with exit code 2, and `build` is the command for several. Without `--out`, the compiled file goes to the CLI cache and stays there, named by a hash of everything it was compiled from. On macOS that is `~/Library/Caches/essence/cli/<hash>.mjs`. Running the unchanged file again reuses it. `--out` or `build.out` keeps the file at a path you choose instead.
+
+The program runs in a child process, under the same Node or Bun that runs `essence`, and its output streams as it is produced. Without `--quiet` or `--json`, a line marks where the program's output starts and another where it ends. A last line gives its exit code, and `essence` then exits with that code. Under `--json` the program still runs, with its output on stderr.
+
+Arguments after a bare `--` are passed to the program's process, as in `essence run greeting.es -- --port 8080`. No standard-library function reads them.
+
+`run` has no `--jobs`, because it compiles one file.
+
+### <span id="run--out">`-o`, `--out <path>`</span>
+
+Writes the compiled JavaScript to this path, and runs it from there.
+
+### <span id="run--sourcemap">`--sourcemap`</span>
+
+Adds a source map. In the cache, the map is written into the bundle itself as a `data:` URL. With `--out`, it is a separate `.map` file beside the output, as it is for `build`.
+
+### <span id="run--no-sourcemap">`--no-sourcemap`</span>
+
+Adds no source map, even when `build.sourcemap` is `true`.
+
+### <span id="run--minify">`--minify`</span>
+
+Minifies the JavaScript before it runs.
+
+### <span id="run--no-minify">`--no-minify`</span>
+
+Keeps the JavaScript unminified, even when `build.minify` is `true`.
+
+### <span id="run--no-optimise">`--no-optimise`</span>
+
+Runs no optimisation pass, as for `build`.
+
+### <span id="run--without-optimisation">`--without-optimisation <pass>`</span>
+
+Turns one optimisation pass off by name, as for `build`. Repeatable.
+
+## check
+
+Type-check sources without writing anything.
+
+```sh
+essence check <file...> [options]
+```
+
+`check` parses, type-checks and validates each source, reports every Diagnostic, and writes nothing, as `tsc --noEmit` does. Every module a source imports is checked with it. A file named on the command line and also imported by another is checked and reported once. `check` is the command for editors, pre-commit hooks and CI.
+
+`check` also checks the `tests { … }` block, which `build` and `run` drop. Change the test in `greeting.es` to `expect greeting(to "Ada")::is(42)`, and `check` fails:
+
+<div class="error-output">
+
+```
+[no-matching-overload]
+Error: No overload of 'is' accepts these Arguments
+    ╭─┤ greeting.es:15:10 │
+    │
+ 15 │        expect greeting(to "Ada")::is(42)
+    │               ─────────────┬────────────
+    │                            ╰────────────── this call passes 1 Argument
+    │
+    │ Note 1: 'String::is' takes 1 Argument: Parameter 1 is String.
+    │ Note 2: 'String::is' takes 2 Arguments: Parameter 1 is String, Parameter 'comparing' is CaseSensitivity.
+────╯
+
+─── 1 error
+  ✖ greeting.es 1 error
+    stopped while inferring types
+```
+
+</div>
+
+`essence check greeting.es` exits with 1, and `essence build greeting.es` still writes `greeting.js` and exits with 0.
+
+### <span id="check--jobs">`-j`, `--jobs <count>`</span>
+
+How many files check in parallel, as for `build`.
+
+## watch
+
+Recompile whenever a source changes. Alias `w`.
+
+```sh
+essence watch <file...> [options]
+essence build <file...> --watch
+```
+
+`watch` compiles the sources, then stays running. Saving a source rebuilds it. Saving a module that a source imports rebuilds the sources that import it. The `build` settings in `essence.json` apply as they do for `build`. The status line lists the keys, `r rebuild · c clear · q quit`: `r` forces a rebuild, `c` clears the screen, and `q` quits, as does Ctrl+C.
+
+### <span id="watch--out">`-o`, `--out <path>`</span>
+
+Where to write the JavaScript, as for `build`.
+
+### <span id="watch--execute">`-e`, `--execute`</span>
+
+Runs the output after the first build and after each successful rebuild, and stops the program the previous build started, as `node --watch` restarts a script. It runs a build's output only when that build compiled one source. When you watch several sources, the first build runs nothing, and a save that rebuilds one of them runs that one.
+
+### <span id="watch--clear">`--clear`</span>
+
+Clears the screen before each rebuild, when the output is a terminal.
+
+### <span id="watch--sourcemap">`--sourcemap`</span>
+
+Writes a source map beside each output, as for `build`.
+
+### <span id="watch--no-sourcemap">`--no-sourcemap`</span>
+
+Writes no source map, even when `build.sourcemap` is `true`.
+
+### <span id="watch--minify">`--minify`</span>
+
+Minifies the JavaScript, as for `build`.
+
+### <span id="watch--no-minify">`--no-minify`</span>
+
+Writes unminified JavaScript, even when `build.minify` is `true`.
+
+### <span id="watch--embed">`--embed`</span>
+
+Builds a bundle for a JavaScript program to load and call, as for `build`.
+
+### <span id="watch--no-embed">`--no-embed`</span>
+
+Builds a program to run, even when `build.embed` is `true`.
+
+### <span id="watch--no-optimise">`--no-optimise`</span>
+
+Runs no optimisation pass, as for `build`.
+
+### <span id="watch--without-optimisation">`--without-optimisation <pass>`</span>
+
+Turns one optimisation pass off by name, as for `build`. Repeatable.
+
+### <span id="watch--jobs">`-j`, `--jobs <count>`</span>
+
+How many files compile in parallel, as for `build`.
+
+## test
+
+Compile the tests and run them. Alias `t`.
+
+```sh
+essence test [file...] [options]
+```
+
+`test` compiles every module that has a `tests { … }` block or an [`@example`](/docs/language/documentation-comments) in its documentation comments, and every `*.tests.es` file. It runs the tests inside the `essence` process, not in a child process, and prints a report. A module's top-level statements run first, as they do when it loads. Its `@example` blocks run as tests in a suite, Essence's `describe`, named `examples`. [Running tests](/docs/guides/running-tests) walks through a session.
+
+With no file arguments, `test` searches the project. The project is the directory that holds the nearest `essence.json` at or above the working directory, or the working directory when there is none. The search skips `.git`, `node_modules`, `dist`, `build` and `.claude`, and the directories that `exclude` names. Run from a subdirectory, it runs the same tests. With arguments, it runs those files, or every source under a directory you name. A file you name is compiled even inside an excluded directory.
+
+A failed `expect` is reported as a Diagnostic. The expression is underlined, and the value of each part is shown where it was written. Whatever a failing test printed is shown under it. The report ends with a summary line, such as `1 passed  2 failed  1 skipped  ·  1.6 ms`.
+
+`test` exits with 0 when everything that ran passed, including a run whose filter matched no test. It exits with 1 when a test failed, or when a file did not compile or was not found. A `focused` test is Essence's `test.only`. `test` exits with 2 when a run still holds one and nothing narrowed the run with `--filter`, `--tag` or `--skip-tag`. That Error is [`focused-tests-remain`](/docs/reference/diagnostics#focused-tests-remain), and it fails every run nobody narrowed, on your machine as well as in CI.
+
+Each file the run compiles is an entry, with a bundle of its own. An entry whose code and settings have not changed since its last run does not run again. Its results are replayed, and the summary says so with `1 of 1 entry cached`. A replayed entry does not load its module, so its top-level statements print nothing. An entry always runs again when it holds a failed test or a property test, a test written with `for any` that draws new values on every run. It also runs again when it wrote a snapshot, or when a `focused` test narrowed the run. `--coverage`, `--update`, `--seed` and a `--cases` other than `test.cases` run every entry. `ESSENCE_RESULTS_CACHE=off` turns the replay off.
+
+### <span id="test--watch">`-w`, `--watch`</span>
+
+Stays running and runs the tests again on every save. Only the entries whose module graph holds the changed file run again, and the report is cleared and printed whole each time. `r` runs everything again, `c` clears the screen, and `q` or Ctrl+C quits. A `focused` test never fails a watching run.
+
+### <span id="test--filter">`-f`, `--filter <text>`</span>
+
+Runs only the tests whose name contains the text, and counts the rest as deselected. The text is matched as written, case included, and is not a pattern. It is matched against the name the report prints and against the name as written, so `-f "3–1"` picks one row of a table test. A suite's name does not match, where Jest's `-t` also matches the `describe` text. A filter that matches no test prints `⚠ no test name contains "zebra"` and exits with 0.
+
+### <span id="test--tag">`--tag <tag>`</span>
+
+Runs only the tests that carry the tag. A test carries the tags written after its name, as in `test "loads the page" tagged slow { … }`, and the tags of every suite around it. Repeat the flag for more tags, and a test that carries any of them runs. `essence test --tag slow` runs the `slow` tests even when `test.skipTags` leaves them out. A tag is lower-case, so `--tag Slow` is refused with exit code 2 and the suggestion `--tag slow`. A tag that no test carries prints a warning, such as `⚠ no test carries tag "slo"`, and the run goes on.
+
+### <span id="test--skip-tag">`--skip-tag <tag>`</span>
+
+Leaves out the tests that carry the tag, and counts them as deselected. It is repeatable, it wins over `--tag`, and its tag is lower-case too. A tag that no test carries gets the same warning as under `--tag`.
+
+### <span id="test--coverage">`--coverage`</span>
+
+Compiles the tests with counters in them, and prints a table of what ran after the report. For a function `sign` whose `else` branch no test reaches:
+
+```
+ File     Lines  Branches  Cases  Not taken
+ Sign.es  66%    50%       –      sign › else (guarded)
+```
+
+`Lines` and `Branches` are percentages. `Cases` gives the `match` arms that ran out of the total. `Not taken` names each branch or arm that no test reached, with the function it is in. `(guarded)` marks a branch whose condition narrows a type: in the `else` of `if value::isLessThan(0)`, `value` is a `NonNegativeInteger`. Under the table, a line such as `Choice Sign: #Negative never constructed by a test` names each case of a choice that no test built.
+
+### <span id="test--coverage-report">`--coverage-report <lcov|json>`</span>
+
+Also writes the coverage to a file, and implies `--coverage`. `lcov` writes `lcov.info`, the tracefile that coverage viewers read. `json` writes `coverage.json`, in the compiler's own terms. The run ends with the path, such as `coverage written to coverage/lcov.info`. Any other format is refused with exit code 2. Without this flag, a `--coverage` run writes the format that `test.coverage.report` names, if any.
+
+### <span id="test--coverage-out">`--coverage-out <directory>`</span>
+
+Where `--coverage-report` writes. It defaults to the directory that `test.coverage.out` names, and otherwise to `coverage` under the working directory. With no format from `--coverage-report` or `test.coverage.report`, it is refused with exit code 2:
+
+<div class="error-output">
+
+```
+  ✖ --coverage-out says where to write a report, and no report was asked for.
+  Add --coverage-report lcov or json.
+
+  Usage: essence test [file...] [options]
+  Help:  essence help test
+```
+
+</div>
+
+### <span id="test--update">`--update`</span>
+
+Records every snapshot the run produced, as `jest -u` does, replacing any that differ from the recorded one. Without it, a difference is a failure. An inline `matches snapshot "42"` is rewritten in the source, through the formatter. A stored `matches snapshot from "answer"` is written to `__snapshots__/<file>.snap` beside the source, such as `__snapshots__/greeting.es.snap`. A snapshot with nothing recorded is written with or without `--update`, in CI too. So a CI run passes with a snapshot nobody recorded, where `jest --ci` fails it.
+
+### <span id="test--seed">`--seed <hex>`</span>
+
+Draws every property test's values from this seed. A run picks a seed itself, and a property that fails prints the command that replays it, such as `essence test --seed 5358a699 -f "stays below a hundred"`. Each test folds its own identity into the seed, so `--seed` with `--filter` replays the values the whole run drew for that test. The smallest failing value is also stored in `__counterexamples__` beside the source, and later runs try it first.
+
+### <span id="test--cases">`--cases <count>`</span>
+
+How many values each property test runs for: 100 by default, or what `test.cases` says. The count must be a whole number of at least 1, so `--cases 0` is refused with exit code 2. The report shows it beside the test, as in `✓ adds itself  (7 cases)`.
+
+### <span id="test--no-optimise">`--no-optimise`</span>
+
+Runs no optimisation pass, as for `build`. A `--coverage` run still counts what ran.
+
+### <span id="test--without-optimisation">`--without-optimisation <pass>`</span>
+
+Turns one optimisation pass off by name, as for `build`. Repeatable.
+
+### <span id="test--jobs">`-j`, `--jobs <count>`</span>
+
+How many files compile in parallel, as for `build`.
+
+## init
+
+Write the project file.
+
+```sh
+essence init
+```
+
+`init` writes `essence.json` into the working directory, and that directory becomes a project, the root that `essence test` searches. The file is JSON with comments and trailing commas allowed, like `tsconfig.json`. It holds two settings at their defaults, each under a comment:
+
+```jsonc
+{
+	"$schema": "https://essencelang.org/schemas/essence.schema.json",
+
+	// Directories under this project that are not its sources.
+	"exclude": [],
+
+	"test": {
+		// Tags an everyday `essence test` leaves out; `--tag` brings one back.
+		"skipTags": []
+	}
+}
+```
+
+A directory that already holds an `essence.json` is left alone, with exit code 2:
+
+<div class="error-output">
+
+```
+  ✖ essence.json already exists.
+  Open it — `essence help test` and `essence help build` say what it may hold.
+
+  Usage: essence init
+  Help:  essence help init
+```
+
+</div>
+
+An `essence.json` in a directory above does not stop `init`. The new file starts a project of its own. The outer file's settings no longer apply to the new project, and `init` prints the outer file's path to say so. `init` takes no options other than the global ones. The [essence.json reference](/docs/reference/project-file) lists every setting.
+
+## format
+
+Format Essence sources in place. Alias `fmt`.
+
+```sh
+essence format <files...> [options]
+essence format --check <files...>
+```
+
+`format` rewrites each source into Essence's one layout: tabs for indentation, and lines laid out to fit 80 columns. There is nothing to configure. An argument may be a path, a glob or a directory, and a directory means every `.es` file under it. A source that does not parse is reported and left untouched, and the run exits with 1:
+
+<div class="error-output">
+
+```
+src/Broken.es:3:1: Expected ')' but found '}'.
+```
+
+</div>
+
+A glob that matches nothing prints `No files matched.` and exits with 1. With no arguments, the formatter prints its own usage and exits with 2. [Formatting](/docs/guides/formatting) covers the layout.
+
+`format` passes its arguments to the formatter, which reads them itself, so the global options do not apply. `essence format --json` is refused as `Unknown option '--json'.`, with exit code 2.
+
+### <span id="format--check">`--check`</span>
+
+Writes nothing, as `prettier --check` does. It prints the name of each file that is not formatted, then a count, and exits with 1 if there is one:
+
+```
+src/A.es
+
+1 of 2 files are not formatted.
+```
+
+When every file is formatted, it prints nothing and exits with 0. This is the form for CI and pre-commit hooks.
+
+### <span id="format--stdin">`--stdin`</span>
+
+Formats one program read from standard input, and writes it to standard output. It takes no file arguments. With `--check`, it writes nothing, and exits with 1 when the input is not formatted and with 0 when it is.
+
+### <span id="format--stdin-filepath">`--stdin-filepath <path>`</span>
+
+The path that standard input should be read as, so that an editor can format an unsaved buffer under the path it belongs at. A parse error names this path instead of `<stdin>`. It only works with `--stdin`, and alone it is refused with exit code 2.
+
+### <span id="format--version">`--version`</span>
+
+Prints the formatter's version, where `essence --version` prints the compiler's.
+
+## lsp
+
+Start the Essence language server.
+
+```sh
+essence lsp
+```
+
+`lsp` starts the language server, which speaks the Language Server Protocol over standard input and output. An editor starts it. It prints nothing for a person to read, and runs until the editor closes the connection. It takes no options of its own, and leaves any arguments the editor passes to the server. `esls` starts the same server. [Editor setup](/docs/guides/editor-setup) covers connecting an editor.
+
+## dap
+
+Start the Essence debug adapter.
+
+```sh
+essence dap
+```
+
+`dap` starts the debug adapter, which speaks the Debug Adapter Protocol over standard input and output. An editor starts it, and it runs until the debug session ends. It compiles each program before launching it, with the optimiser off, so a session steps through the program as written. It takes no options of its own. `essence dap` compiles without starting another process. `esdap` starts the same adapter, but compiles each program by running `essence build --no-optimise`. [Debugging](/docs/guides/debugging) covers a session.
+
+## help
+
+Show help for `essence` or for one command.
+
+```sh
+essence help [command]
+```
+
+With no command, `help` prints the overview: every command with a one-line summary, the common options and a few examples. With a command's name or alias, it prints that command's screen: a description, and the command's options and examples where it has them. An unknown name is refused with exit code 2:
+
+<div class="error-output">
+
+```
+  ✖ Unknown command "nope".
+  Run "essence help" to see every command.
+
+  Help:  essence help
+```
+
+</div>
+
+## Exit codes
+
+Three codes mean the same thing under every command.
+
+<div class="table-scroll">
+
+| Code | Meaning |
+| --- | --- |
+| `0` | The command succeeded. |
+| `1` | The command ran and failed: an Error was reported, a file was not found, a test failed, or `format --check` found an unformatted file. |
+| `2` | The command line was refused: an unknown command or option, a bad value, a missing file argument, contradictory flags, or a glob that matched nothing. The same holds for `--` given to a command other than `run`, `--execute` with several files, and `init` over an existing `essence.json`. `test` also exits with 2 for a leftover `focused` test. |
+
+</div>
+
+A glob that matches nothing is refused by `build`, `run`, `check`, `watch` and `test`, so a mistyped pattern does not exit with 0. `format` reads its own arguments, and reports the same case as a failure, with 1.
+
+`run` and `build --execute` exit with the program's own exit code once the build succeeds. A program that crashes, for example with a stack overflow, exits with 1. A program killed by a signal makes `essence` exit with 128, whatever the signal. A shell reports 128 plus the signal's number, such as 143 for `SIGTERM`, so a script that checks for 143 or 130 never matches.
+
+## The JSON report
+
+`build`, `run` and `check` write one JSON document to stdout under `--json`. This is `check` on the `greeting.es` whose test compares a String with `42`:
+
+```json
+{
+  "version": "0.5.0",
+  "command": "check",
+  "ok": false,
+  "errors": 1,
+  "warnings": 0,
+  "durationMs": 24.832,
+  "files": [
+    {
+      "input": "greeting.es",
+      "output": null,
+      "ok": false,
+      "bytes": null,
+      "gzipBytes": null,
+      "durationMs": 24.395,
+      "stages": {
+        "read": 0.178,
+        "parse": 1.949,
+        "enrich": 22.056
+      },
+      "diagnostics": [
+        {
+          "file": "greeting.es",
+          "severity": "error",
+          "message": "No overload of 'is' accepts these Arguments",
+          "code": "no-matching-overload",
+          "line": 15,
+          "column": 10,
+          "endLine": 15,
+          "endColumn": 36
+        }
+      ]
+    }
+  ]
+}
+```
+
+<div class="table-scroll">
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `version` | string | The compiler version that wrote the report |
+| `command` | string | `build`, `run` or `check`; for a refused command line, the command, or `essence` |
+| `ok` | boolean | Whether every file succeeded |
+| `errors`, `warnings` | number | Diagnostic counts across every file |
+| `durationMs` | number | Wall time for the whole run |
+| `files` | array | One entry per file compiled |
+| `files[].input` | string | The source that was compiled |
+| `files[].output` | string or `null` | Where the JavaScript was written: the output path for `build`, the cached or `--out` file for `run`, `null` for `check` |
+| `files[].ok` | boolean | Whether this file succeeded |
+| `files[].bytes`, `files[].gzipBytes` | number or `null` | The output's size, plain and gzipped |
+| `files[].durationMs` | number | Wall time for this file |
+| `files[].stages` | object | Milliseconds per stage that ran, keyed by stage name |
+| `files[].diagnostics` | array | Each entry has `file`, `severity`, `message`, `code`, `line`, `column`, `endLine` and `endColumn`. The position fields are `null` for a Diagnostic with no place in a file, such as `file-not-found`. |
+| `error` | string | Only on a refused command line: the message |
+
+</div>
+
+Every file entry has a `diagnostics` array, which is empty when there is nothing to report. A Diagnostic's `file` is the file it is in. For an error in an imported module, that is the module, not the `input` that was compiled.
+
+Every command that takes the global options reports a refused command line in this shape under `--json`, `test` and `help` included. `files` is empty and the message is in `error`. When the command name itself was not recognised, `command` is the name you typed for the program, such as `essence` or `esc`. The exit code is 2:
+
+```json
+{
+  "version": "0.5.0",
+  "command": "check",
+  "ok": false,
+  "errors": 1,
+  "warnings": 0,
+  "durationMs": 0,
+  "files": [],
+  "error": "essence check needs at least one Essence source file."
+}
+```
+
+## The test event stream
+
+`essence test --json` writes one JSON object per line to stdout, and nothing else. Compile Diagnostics still go to stderr, and the exit codes stay the same. Under `--watch`, each run writes its own `run-start` to `run-end`. These are the first and last events for `greeting.es`:
+
+```json
+{"schema":1,"kind":"run-start","tests":1,"focused":false}
+{"schema":1,"kind":"run-end","passed":1,"failed":0,"skipped":0,"deselected":0,"duration":0.49687500000000284,"focused":false}
+```
+
+Every event has `"schema": 1` and a `kind`. Most carry the `id` of their test: its module's absolute path, its suites and its name joined by `/`, with any `/` inside a part written as `\/`. A reader of the stream should skip any kind it does not know.
+
+<div class="table-scroll">
+
+| `kind` | Written when | Fields |
+| --- | --- | --- |
+| `run-start` | The run begins | `tests`, `focused` |
+| `test-start` | A test begins | `id`, `name`, `suitePath`, `module`, `row` |
+| `expect` | An `expect` or `require` was evaluated | `id`, `form`, `passed`, `span`, `values`, `comparison` |
+| `probe` | A `§?` value comment recorded a value | `id`, `point`, `span`, `value` |
+| `output` | A test printed something | `id`, `stream`, `text` |
+| `snapshot` | A snapshot was compared or written | `id`, `module`, `name`, `status`, `span`, `text`, `recorded` |
+| `property` | A property test finished its cases | `id`, `name`, `module`, `key`, `cases`, `requested`, `seed`, `shrinks`, `counterexample`, `replayed`, `stale`, `fromCorpus`, `encoded` |
+| `test-pass` | A test passed | `id`, `name`, `duration`, `expectations` |
+| `test-fail` | A test failed | `id`, `name`, `duration`, `expectations`, `failures`, `error` |
+| `test-skip` | A `skipped` test was reached | `id`, `name`, `suitePath`, `module`, `reason`, `row` |
+| `test-deselected` | A test was left out | `id`, `name`, `suitePath`, `module`, `reason` (`filter`, `tag` or `not-focused`), `row` |
+| `results-cached` | An entry's results are replayed from the result cache | `entry`, `tests` |
+| `coverage` | Under `--coverage`, once per module | `module`, `points`, `choices`, `loaded` |
+| `run-end` | The run ends | `passed`, `failed`, `skipped`, `deselected`, `duration`, `focused` |
+
+</div>
+
+## Caches and environment variables
+
+The toolchain keeps four caches. One variable moves each cache or turns it off:
+
+<div class="table-scroll">
+
+| Variable | What it holds | Can be turned off |
+| --- | --- | --- |
+| `ESSENCE_CLI_CACHE` | The bundles that `build`, `run`, `watch` and `test` emitted | Yes |
+| `ESSENCE_COMPILER_CACHE` | Snapshots of the standard library, so that each process skips rebuilding it | Yes |
+| `ESSENCE_RESULTS_CACHE` | The results of test entries, for replay | Yes |
+| `ESSENCE_CLIENT_CACHE` | The bundles `@essence-lang/client` compiled for a JavaScript program | No |
+
+</div>
+
+`0`, `off`, `false` or `no` turns a cache off. Any other value is the directory to use instead. Without a variable, a cache lives in `$XDG_CACHE_HOME/essence/<area>` when `XDG_CACHE_HOME` is set. Otherwise it lives in `~/Library/Caches/essence/<area>` on macOS, `%LOCALAPPDATA%\essence\<area>\Cache` on Windows, and `~/.cache/essence/<area>` elsewhere. The area is `cli`, `compiler`, `results` or `client`.
+
+The CLI cache keeps the 512 newest bundles, and deletes older ones as it writes new ones. A bundle is named by a hash of its sources, the options and the toolchain, so a change to any of them makes a new file. With `ESSENCE_CLI_CACHE` turned off, `run` still needs a file to run: it writes `<hash>.run.mjs` into the same directory, and replaces it on the next run.
+
+The colour variables, `NO_COLOR`, `FORCE_COLOR` and `TERM`, are described under [`--color`](/docs/reference/cli#global--color).

@@ -1,0 +1,5430 @@
+---
+title: Diagnostics
+description: Every code the compiler reports, what it means, how to fix it, and which page teaches the construct behind it.
+section: reference
+order: 40
+template: reference
+tocDepth: 2
+searchDepth: 3
+---
+
+Every error and warning the Essence compiler reports starts with a code in square brackets, such as `[missing-return]`. This page has one entry per code. Each entry gives the severity, a report the compiler printed, and the fix. Where a page teaches the code, the entry links that section. An entry's address is its code: `/docs/reference/diagnostics#missing-return`.
+
+```essence
+implementation {
+	Terminal.print([3, 1, 2]::firstItem(defaultingTo 0)) § 3
+}
+```
+
+This program runs and prints `3`. `essence check` still reports a warning about it:
+
+<div class="error-output">
+
+```
+[fallback-never-used]
+Warning: This 'defaultingTo' Argument can never be read
+   ╭─┤ First.es:2:38 │
+   │
+ 2 │     Terminal.print([3, 1, 2]::firstItem(defaultingTo 0)) § 3
+   │                                         ───────┬──────  
+   │                                                ╰──────── this fallback can never be read
+   │ 
+   │ Help: Drop the 'defaultingTo' Argument; the call already answers an Integer.
+   │ 
+   │ Note: Without it the call answers an Integer, which is never empty.
+───╯
+```
+
+</div>
+
+A report has four parts:
+
+- `[fallback-never-used]` is the code. This page is keyed by it, and so are your editor's Quick Fixes. A Quick Fix is an edit your editor offers on the underlined span.
+- `Warning` is the severity. The text after it is the message.
+- The box quotes the source. Each label under a line says what the compiler found at that span.
+- A `Help` line suggests a fix. A `Note` line states the rule behind the report.
+
+The severity says what happens next:
+
+- **Error**: the program is refused. `essence check` exits with status 1, `essence run` runs nothing, and `essence build` writes nothing. Unlike `tsc`, the compiler never emits JavaScript for a program with an Error.
+- **Warning**: the program is valid and runs. `essence check` exits with status 0.
+- **Information**: advice that never fails anything. [`lonely-tag`](/docs/reference/diagnostics#lonely-tag) is one.
+
+You cannot silence a code or change its severity. There is no comment like `// @ts-expect-error` or `// eslint-disable-next-line`, and no `essence.json` setting for it.
+
+Where a code has a Quick Fix, its entry gives the title your editor shows. Two entries name a Refactor or a Source Action: the same kind of edit, listed in your editor's Refactor or Source Action menu rather than on the error. The reports below were printed by `essence check`, or by `essence test` for the codes `essence check` does not report. Nine codes have no printed report. The editor alone reports three of them, three come from the bundler or a failure inside the compiler, and ordinary programs do not reach the other three.
+
+## If you typed JavaScript
+
+These twenty JavaScript habits cause most first-hour reports. Each habit links its row on [Coming from JavaScript](/docs/getting-started/coming-from-javascript), which quotes the message and gives the Essence spelling.
+
+- [`1 + 2`](/docs/getting-started/coming-from-javascript#typed-plus): [`unknown-name`](/docs/reference/diagnostics#unknown-name)
+- [`count / 3`](/docs/getting-started/coming-from-javascript#typed-divide): [`syntax-error`](/docs/reference/diagnostics#syntax-error)
+- [`1 === 1`](/docs/getting-started/coming-from-javascript#typed-equals): `syntax-error`
+- [`true && false`](/docs/getting-started/coming-from-javascript#typed-and): `unknown-name`
+- [`!true`](/docs/getting-started/coming-from-javascript#typed-not): `unknown-name`
+- [`if (ready) {`](/docs/getting-started/coming-from-javascript#typed-if-parentheses-name): `syntax-error`
+- [`items[0]`](/docs/getting-started/coming-from-javascript#typed-index): [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch)
+- [`text.length`](/docs/getting-started/coming-from-javascript#typed-length): [`type-without-members`](/docs/reference/diagnostics#type-without-members)
+- [`const total = 1`](/docs/getting-started/coming-from-javascript#typed-const): `unknown-name`
+- [`console.log("hi")`](/docs/getting-started/coming-from-javascript#typed-console-log): `unknown-name`
+- [`constant total = 1;`](/docs/getting-started/coming-from-javascript#typed-semicolon): [`invalid-number`](/docs/reference/diagnostics#invalid-number)
+- [`{ x: 1, y: 2 }`](/docs/getting-started/coming-from-javascript#typed-record-colon): `syntax-error`
+- [`point.x = 2`](/docs/getting-started/coming-from-javascript#typed-member-assignment): `syntax-error`
+- [`return n`](/docs/getting-started/coming-from-javascript#typed-return): `unknown-name`
+- [`(n: Integer) => n`](/docs/getting-started/coming-from-javascript#typed-arrow): `syntax-error`
+- [`(n) { n::add(1) }`](/docs/getting-started/coming-from-javascript#typed-missing-return-arrow): [`uninferable-return-type`](/docs/reference/diagnostics#uninferable-return-type)
+- [`true ? 1 : 2`](/docs/getting-started/coming-from-javascript#typed-ternary): `syntax-error`
+- [`// a comment`](/docs/getting-started/coming-from-javascript#typed-slash-comment): `syntax-error`
+- [`null`](/docs/getting-started/coming-from-javascript#typed-null): `unknown-name`
+- [`number` as a type](/docs/getting-started/coming-from-javascript#typed-number-type): [`unknown-type`](/docs/reference/diagnostics#unknown-type)
+
+## Syntax
+
+The parser reports these. A file with a syntax error stops at the parser, so the file's other errors appear once the syntax error is fixed.
+
+### `syntax-error`
+
+**Error.** The parser expected one thing and found another. The message names both.
+
+<div class="error-output">
+
+```
+[syntax-error]
+Error: Expected '=' but found '42'.
+   ╭─┤ Answer.es:2:18 │
+   │
+ 2 │     constant answer 42
+   │                     ─┐  
+   │                      ╰── expected '='
+───╯
+```
+
+</div>
+
+When the line is a JavaScript habit, the message is the parser's guess, not the fix: `if (ready) {` reports `Expected '{' but found '}'.` Look the line up in the list above. Otherwise, write what the message says was expected.
+
+Taught on: [Programs and values › The shape of a file](/docs/language/programs-and-values#the-shape-of-a-file)
+
+### `unexpected-token`
+
+**Error.** Something follows the end of the program. A stray `}` is the usual cause.
+
+<div class="error-output">
+
+```
+[unexpected-token]
+Error: Unexpected '}' after the end of the Program
+   ╭─┤ Answer.es:4:1 │
+   │
+ 3 │ }
+   │ ▲  
+   │ ╰── the implementation block ends here
+ 4 │ }
+   │ ▲  
+   │ ╰── nothing may follow here
+   │ 
+   │ Note: A Program is one 'implementation { … }' block, framed by an optional 'import { … }' block above it and an optional 'tests { … }' and 'export { … }' block below it.
+───╯
+```
+
+</div>
+
+Delete it. A file holds one `implementation { … }` block, with an optional `import { … }` block above it, and optional `export { … }` and `tests { … }` blocks below it, in that order.
+
+Taught on: [Programs and values › The shape of a file](/docs/language/programs-and-values#the-shape-of-a-file)
+
+### `unclosed-string`
+
+**Error.** A string literal runs to the end of the file without its closing `"`. The report points at the opening quote and at the end of the input. Every string can hold a hole, `{ … }`, with an expression in it, so a `{` in a string opens one. A `"` inside the hole does not close the string: JSON written as `"{\"a\": 1}"` reports this code.
+
+<div class="error-output">
+
+```
+[unclosed-string]
+Error: This String Literal is never closed
+   ╭─┤ Greeting.es:3:2 │
+   │
+ 2 │     constant greeting = "Hello
+   │                         ▲  
+   │                         ╰── opened here
+ 3 │ }
+   │  │ 
+   │  ╰─ the input ends here
+   │ 
+   │ Help: Add the missing '"'.
+───╯
+```
+
+</div>
+
+Add the closing `"`. For a literal brace, write `\{` and `\}`: `"\{\"a\": 1\}"` prints `{"a": 1}`.
+
+Quick Fix: **Add the missing '"'**.
+
+Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
+
+### `unclosed-block`
+
+**Error.** A `{` is never closed. The report points at the brace that opened the block and at the end of the input.
+
+<div class="error-output">
+
+```
+[unclosed-block]
+Error: This block is never closed
+   ╭─┤ Greeting.es:4:2 │
+   │
+ 1 │ implementation {
+   │                ▲  
+   │                ╰── opened here
+   │ 
+ 4 │ }
+   │  │ 
+   │  ╰─ the input ends here
+   │ 
+   │ Help: Add the missing '}'.
+───╯
+```
+
+</div>
+
+Close every open block. Here the function has no `}` of its own, so the last `}` closes the function and `implementation` stays open. Write a `}` after `<- name`.
+
+### `invalid-number`
+
+**Error.** A number literal holds something other than digits. Essence has no hexadecimal, binary or exponent form. A trailing `;` makes the literal `1;`, which is not a number either.
+
+<div class="error-output">
+
+```
+[invalid-number]
+Error: '0xFF' is not a valid Number
+   ╭─┤ Mask.es:2:18 │
+   │
+ 2 │     constant mask = 0xFF
+   │                     ──┬─  
+   │                       ╰─── this is not a Number
+   │ 
+   │ Help: Essence has no hexadecimal, binary or exponent form; write the value in digits.
+   │ 
+   │ Note: A Number is written in the digits '0' through '9', grouped with '_' where that helps, with a fractional part written behind a '.' — 1_000_000, 19.99.
+───╯
+```
+
+</div>
+
+Write the value in the digits `0` to `9`, such as `255` for `0xFF`. Group digits with `_` and write a fraction part after a `.`. Delete a trailing `;`.
+
+Taught on: [Programs and values › Integers](/docs/language/programs-and-values#integers)
+
+### `mixed-rational-literal`
+
+**Error.** A rational literal is written as a fraction and a decimal at once, such as `1.5/2`.
+
+<div class="error-output">
+
+```
+[mixed-rational-literal]
+Error: A Rational Literal is a fraction or a decimal, not both
+   ╭─┤ Half.es:2:19 │
+   │
+ 2 │     constant ratio = 1.5/2
+   │                      ──┬──  
+   │                        ╰──── '/' can not follow a decimal
+   │ 
+   │ Help: Write the fraction — '3/4' — or the decimal — '0.75'.
+   │ 
+   │ Note: A fraction and a decimal are two spellings of one Rational — '3/4' and '0.75' are the same value — so a Literal written both ways says the same thing twice, and leaves it to the reader which parts belong to which.
+───╯
+```
+
+</div>
+
+Write one spelling: `3/4` or `0.75`. Both are the same exact `Rational`, and both print as `3/4`.
+
+Quick Fix: **Write it as '3/4'** or **Write it as '0.75'**, each writing the value in one spelling.
+
+Taught on: [Programs and values › Rationals](/docs/language/programs-and-values#rationals)
+
+### `partial-decimal-literal`
+
+**Error.** A decimal literal has nothing on one side of its point, such as `.5` or `1.`.
+
+<div class="error-output">
+
+```
+[partial-decimal-literal]
+Error: A decimal Literal has digits on both sides of the dot
+   ╭─┤ Half.es:2:18 │
+   │
+ 2 │     constant half = .5
+   │                     ─┐  
+   │                      ╰── nothing stands before the point
+   │ 
+   │ Help: Write the digits before the point: '0.5'.
+   │ 
+   │ Note: A '.' that opens an Expression is a member path — '.price' reads a member off the value it is handed — and digits can not name a member, so this is a decimal missing its whole part rather than a path.
+───╯
+```
+
+</div>
+
+Write digits on both sides: `0.5`, `1.0`. Drop the point instead when you meant a whole number: `1`.
+
+Quick Fix: **Write it as '0.5'**. A trailing point is offered both `1.0` and `1`.
+
+Taught on: [Programs and values › Rationals](/docs/language/programs-and-values#rationals)
+
+### `invalid-escape`
+
+**Error.** A backslash in a string is followed by a character that is not an escape. The escapes are `\"`, `\\`, `\n`, `\r`, `\t`, `\{` and `\}`. `\{` and `\}` write a brace, because every string can hold `{ … }` holes, not only a template literal.
+
+<div class="error-output">
+
+```
+[invalid-escape]
+Error: '\d' is not a valid escape
+   ╭─┤ Path.es:2:23 │
+   │
+ 2 │     constant folder = "C:\data"
+   │                          ─┐  
+   │                           ╰── this escape is not known
+   │ 
+   │ Help: Write '\\' for a literal backslash, or drop the backslash to keep the character as itself.
+   │ 
+   │ Note: A String understands '\"', '\\', '\n', '\r', '\t', '\{' and '\}'; every other backslash is an error.
+───╯
+```
+
+</div>
+
+Write `\\` for a backslash: `"C:\\data"` prints `C:\data`. Drop the backslash if it was a typo.
+
+Quick Fix: **Write '\\\\' for a literal backslash** or **Drop the backslash**.
+
+Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
+
+### `comment-in-hole`
+
+**Error.** A `§` comment is written inside a string's `{ … }` hole. A comment runs to the end of its line, so it would swallow the hole's `}` and the closing `"`.
+
+<div class="error-output">
+
+```
+[comment-in-hole]
+Error: A Comment can not be written inside an interpolation hole
+   ╭─┤ Label.es:2:33 │
+   │
+ 2 │     constant label = "answer: { 42 § the answer }"
+   │                                    ──────┬──────  
+   │                                          ╰──────── this Comment would swallow the rest of the String
+   │ 
+   │ Help: Move the Comment out of the String — behind the closing '"' works.
+   │ 
+   │ Note: A Comment runs to the end of its line — inside a hole it would take the hole's '}' and the String's closing '"' with it.
+───╯
+```
+
+</div>
+
+Move the comment out of the string, for example behind the closing quote: `constant label = "answer: { 42 }" § the answer`.
+
+Taught on: [Programs and values › Comments](/docs/language/programs-and-values#comments)
+
+### `nesting-too-deep`
+
+**Error.** Code nests 1,024 levels deep at one point, for example 1,024 lists inside each other. The parser stops at that depth with this error.
+
+Name the inner values as constants, or the inner types as type aliases, so that no single expression nests that deep.
+
+### `redundant-parameter-label`
+
+**Error.** A parameter of a function literal has two names and no type, such as `(each number)`. A parameter without a type takes its label from the function type it is passed to.
+
+<div class="error-output">
+
+```
+[redundant-parameter-label]
+Error: A Parameter without a Type can not carry a label
+   ╭─┤ Double.es:2:37 │
+   │
+ 2 │     constant doubled = [1, 2, 3]::map((each number) { <- number::multiply(with 2) })
+   │                                        ─────┬─────  
+   │                                             ╰─────── two names, no Type
+   │ 
+   │ Help: Write only 'number'.
+   │ 
+   │ Note: Such a Parameter takes its label from the expected Function Type.
+───╯
+```
+
+</div>
+
+Write only the name: `[1, 2, 3]::map((number) { <- number::multiply(with 2) })`.
+
+Quick Fix: **Remove the label**.
+
+Taught on: [Functions as values › Writing some of a literal's types](/docs/language/functions-as-values#writing-some-of-a-literals-types)
+
+### `shorthand-in-combination`
+
+**Error.** An update's key list holds a bare name, as in `{ base with port, host }`. The shorthand `{ port }` belongs to a record literal. JavaScript's `{ ...base, port }` sets `port` from a variable of that name, but after `with` a bare name is a whole record to merge in.
+
+<div class="error-output">
+
+```
+[shorthand-in-combination]
+Error: A bare member name is not a key in an update
+   ╭─┤ Server.es:5:32 │
+   │
+ 5 │     constant server = { base with port, host }
+   │                                   ──┬─  
+   │                                     ╰─── this names no value to set
+   │ 
+   │ Help 1: Write 'port = port'.
+   │ Help 2: Or merge a whole Record: '{ base with { port } }'.
+   │ 
+   │ Note: An update's key list always spells its values, because a bare name after 'with' is already the value being merged in.
+───╯
+```
+
+</div>
+
+Write each value, `{ base with port = port, host = host }`, or merge a record literal that uses the shorthand: `{ base with { port, host } }`.
+
+Quick Fix: **Write 'port = port'**.
+
+Taught on: [Records › When the compiler refuses a record](/docs/language/records#when-the-compiler-refuses-a-record)
+
+### `dictionary-entry-syntax`
+
+**Error.** A dictionary entry uses a separator other than `=`, such as `["kim": 7]`.
+
+<div class="error-output">
+
+```
+[dictionary-entry-syntax]
+Error: A Dictionary entry is written with '='
+   ╭─┤ Ages.es:2:24 │
+   │
+ 2 │     constant ages = ["kim": 7]
+   │                           ▲  
+   │                           ╰── expected '=' and found ':'
+   │ 
+   │ Help: Write '=' in place of ':'.
+   │ 
+   │ Note: An entry is 'key = value', and a Dictionary is a bracket list of them: '["a" = 1, "b" = 2]'.
+───╯
+```
+
+</div>
+
+Write each entry as `key = value`: `["kim" = 7]`.
+
+Taught on: [Dictionaries › Writing a dictionary](/docs/language/dictionaries#writing-a-dictionary)
+
+### `shorthand-on-path-key`
+
+**Error.** A dotted key in an update's key list has no value, as in `{ config with server.port, name = "cache" }`. A path is not a name in scope, so it cannot stand for its own value.
+
+<div class="error-output">
+
+```
+[shorthand-on-path-key]
+Error: A path key names no binding
+   ╭─┤ Config.es:4:33 │
+   │
+ 4 │     constant moved = { config with server.port, name = "cache" }
+   │                                    ─────┬─────  
+   │                                         ╰─────── this reaches into a value to set
+   │ 
+   │ Help: Write 'server.port = port'.
+   │ 
+   │ Note: A bare name is a member and its own value; a path is neither, because the value it would set is not the name it reaches through.
+───╯
+```
+
+</div>
+
+Write the value: `{ config with server.port = port, name = "cache" }`.
+
+Quick Fix: **Write 'server.port = port'**.
+
+### `empty-path-group`
+
+**Error.** The braces after a path key are empty, as in `{ config with server.{ } }`.
+
+<div class="error-output">
+
+```
+[empty-path-group]
+Error: This descend updates nothing
+   ╭─┤ Config.es:3:32 │
+   │
+ 3 │     constant same = { config with server.{ } }
+   │                                   ─────┬────  
+   │                                        ╰────── no member is written here
+   │ 
+   │ Help: Write the members to update inside it, or drop the key.
+   │ 
+   │ Note: An update writes the members it names, so a descend with none in it says to leave 'server' exactly as it is.
+───╯
+```
+
+</div>
+
+Write the members to change inside the braces, `{ config with server.{ port = 8080 } }`, or remove the key.
+
+Taught on: [Records › When the compiler refuses a record](/docs/language/records#when-the-compiler-refuses-a-record)
+
+### `path-is-members-only`
+
+**Error.** A member path such as `.price` is followed by `::` or `(`. A path reads members and cannot carry a call.
+
+<div class="error-output">
+
+```
+[path-is-members-only]
+Error: A member path reads members and nothing else
+   ╭─┤ Prices.es:2:47 │
+   │
+ 2 │     constant labels = [{ price = 3 }]::map(.price::toString())
+   │                                                  ▲  
+   │                                                  ╰── '::' can not follow a path
+   │ 
+   │ Help: Write the Function literal instead: '(_ item: SomeType) { <- item.price::rounded() }'.
+   │ 
+   │ Note: A path is the Function that reads those members off its Argument, so there is nothing here for a call to be made on.
+───╯
+```
+
+</div>
+
+Write a function literal instead: `[{ price = 3 }]::map((item) { <- item.price::toString() })`.
+
+Taught on: [Functions as values › Member paths](/docs/language/functions-as-values#member-paths)
+
+### `default-on-function-literal`
+
+**Error.** A parameter of a function literal has a default value. A literal is called through its function type, which fixes how many arguments every call passes, so the default could never apply.
+
+<div class="error-output">
+
+```
+[default-on-function-literal]
+Error: A Function literal can not carry a default
+   ╭─┤ Double.es:2:41 │
+   │
+ 2 │     constant double = (_ number: Integer = 1) -> Integer { <- number::multiply(with 2) }
+   │                                            ▲  
+   │                                            ╰── this default
+   │ 
+   │ Help: Write the default on the named Function or Method this value is passed to.
+   │ 
+   │ Note: A Function literal is called through the Function Type it was written for, which fixes how many Arguments every call passes, so a default here could never be reached.
+───╯
+```
+
+</div>
+
+Remove the default. Write it on the named function or method the literal is passed to.
+
+Quick Fix: **Remove the default**.
+
+Taught on: [Functions › Default values](/docs/language/functions#default-values)
+
+### `case-default-without-payload`
+
+**Error.** A case without a payload is given a default, as in `Up = { degrees = 0 }`. A default fills in payload members, and this case has none.
+
+<div class="error-output">
+
+```
+[case-default-without-payload]
+Error: Case '#Up' carries no payload to default
+   ╭─┤ Direction.es:3:8 │
+   │
+ 3 │        Up = { degrees = 0 },
+   │             ───────┬───────  
+   │                    ╰───────── this default
+   │ 
+   │ Help: Give '#Up' a payload shape, or write it on its own.
+   │ 
+   │ Note: A default fills members in for a construction that left them out, and a Case with no payload shape has none.
+───╯
+```
+
+</div>
+
+Give the case a payload shape, `Up { degrees: Integer } = { degrees = 0 }`, or remove the default.
+
+Quick Fix: **Remove the default**.
+
+Taught on: [Choices and `match` › Defaults for a payload](/docs/language/choices-and-match#defaults-for-a-payload)
+
+### `declarations-outside-stdlib`
+
+**Error.** A file opens with `declarations { … }`. That form belongs to the standard library's own sources.
+
+<div class="error-output">
+
+```
+[declarations-outside-stdlib]
+Error: Only the standard library may open a 'declarations' block
+   ╭─┤ Answer.es:1:1 │
+   │
+ 1 │ declarations {
+   │ ──────┬─────  
+   │       ╰─────── 'declarations' is not allowed here
+   │ 
+   │ Help: Open the Program with 'implementation { … }' instead.
+───╯
+```
+
+</div>
+
+Open the file with `implementation { … }`.
+
+Quick Fix: **Open the Program with 'implementation'**.
+
+Taught on: [Modules › The Prelude](/docs/language/modules#the-prelude)
+
+### `overload-function-outside-stdlib`
+
+**Error.** A program writes an `overload function` block. A free function in a program has one signature. Only the standard library declares a free function with overloads, such as `loop`.
+
+<div class="error-output">
+
+```
+[overload-function-outside-stdlib]
+Error: Only the standard library may write an 'overload function' block
+   ╭─┤ Combine.es:2:2 │
+   │
+ 2 │     overload function combine {
+   │     ────┬───  
+   │         ╰───── 'overload function' is not allowed here
+   │ 
+   │ Help: Write the Overloads as an 'overload' Method block inside a Namespace instead.
+   │ 
+   │ Note: Free-Function Overloads are a 'declarations { … }' form — a free Function in a Program carries one signature.
+───╯
+```
+
+</div>
+
+With one signature, write a plain function: `function combine(first value: Integer) -> Integer { <- value }`. For several, write an `overload combine { … }` block inside a namespace.
+
+Taught on: [Namespaces and methods › Overloads](/docs/language/namespaces-and-methods#overloads)
+
+### `misplaced-module-section`
+
+**Error.** A module block is out of order. A file reads `import { … }`, then `implementation { … }`, then `export { … }`.
+
+<div class="error-output">
+
+```
+[misplaced-module-section]
+Error: The 'export { … }' block belongs below the implementation
+   ╭─┤ Answer.es:1:1 │
+   │
+ 1 │     export { answer }
+   │     ───┬──  
+   │        ╰──── this block is written above the implementation
+   │ 
+ 3 │ ╭─▶ implementation {
+   ┆ ┆   
+ 5 │ ├─▶ }
+   │ │       
+   │ ╰─────── the implementation block is here
+   │ 
+   │ Help: Move the 'export { … }' block below 'implementation { … }'.
+   │ 
+   │ Note: A Program reads top to bottom: what it imports, what it does, what it exports.
+───╯
+```
+
+</div>
+
+Move the block to its place.
+
+Quick Fix: **Move the 'export \{ … \}' block below the implementation**, or **Move the 'import \{ … \}' block above the implementation**.
+
+Taught on: [Modules › The four blocks of a file](/docs/language/modules#the-four-blocks-of-a-file)
+
+## Names
+
+A name that is declared twice, never declared, or used where it cannot be.
+
+### `duplicate-variable`
+
+**Error.** A name is declared twice in the same scope. The message says "Variable" for a constant too.
+
+<div class="error-output">
+
+```
+[duplicate-variable]
+Error: Variable 'total' is already declared
+   ╭─┤ Total.es:3:11 │
+   │
+ 2 │     constant total = 1
+   │              ──┬──  
+   │                ╰──── first declared here
+ 3 │     constant total = 2
+   │              ──┬──  
+   │                ╰──── declared a second time here
+───╯
+```
+
+</div>
+
+Rename one of the two. To change a value, declare it once with `variable` and assign to it.
+
+Taught on: [Functions › Scope and hoisting](/docs/language/functions#scope-and-hoisting)
+
+### `duplicate-type`
+
+**Error.** A type name is declared twice.
+
+<div class="error-output">
+
+```
+[duplicate-type]
+Error: Type 'Point' is already declared
+   ╭─┤ Point.es:3:7 │
+   │
+ 3 │     type Point = { x: Integer }
+   │          ──┬──  
+   │            ╰──── declared a second time here
+───╯
+```
+
+</div>
+
+Rename one of them. A name from the standard library is taken too, so `type Step = …` reports this code.
+
+Taught on: [Namespaces and methods › Where a namespace can be used](/docs/language/namespaces-and-methods#where-a-namespace-can-be-used)
+
+### `duplicate-protocol`
+
+**Error.** A protocol name is declared twice.
+
+<div class="error-output">
+
+```
+[duplicate-protocol]
+Error: Protocol 'Sized' is already declared
+   ╭─┤ Sized.es:6:11 │
+   │
+ 6 │     protocol Sized {
+   │              ──┬──  
+   │                ╰──── declared a second time here
+───╯
+```
+
+</div>
+
+Rename one of them, or delete the copy.
+
+Taught on: [Protocols › Declaring a protocol](/docs/language/protocols#declaring-a-protocol)
+
+### `duplicate-case`
+
+**Error.** A choice declares the same case twice.
+
+<div class="error-output">
+
+```
+[duplicate-case]
+Error: Case '#Red' is declared more than once
+   ╭─┤ Colour.es:5:3 │
+   │
+ 5 │        Red,
+   │        ─┬─  
+   │         ╰─── declared a second time here
+───╯
+```
+
+</div>
+
+Remove or rename the second one.
+
+Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
+
+### `duplicate-method`
+
+**Error.** A namespace defines two methods with the same name.
+
+<div class="error-output">
+
+```
+[duplicate-method]
+Error: Method 'shout' is already defined
+   ╭─┤ Loud.es:7:3 │
+   │
+ 3 │        shout() -> String {
+   │        ──┬──  
+   │          ╰──── first defined here
+   │ 
+ 7 │        shout() -> String {
+   │        ──┬──  
+   │          ╰──── defined a second time here
+   │ 
+   │ Help: Write both signatures inside one 'overload' block when both are meant to exist.
+───╯
+```
+
+</div>
+
+Rename one of them. When both are meant to exist, write both signatures in one `overload shout { … }` block.
+
+### `duplicate-property`
+
+**Error.** A namespace declares the same static property twice.
+
+<div class="error-output">
+
+```
+[duplicate-property]
+Error: Property 'retries' is already defined
+   ╭─┤ Defaults.es:4:10 │
+   │
+ 3 │        static retries = 3
+   │               ───┬───  
+   │                  ╰───── first defined here
+ 4 │        static retries = 5
+   │               ───┬───  
+   │                  ╰───── defined a second time here
+───╯
+```
+
+</div>
+
+Rename or remove one of them.
+
+### `duplicate-member`
+
+**Error.** A record names the same member twice, such as `{ x = 1, x = 2 }`. A record holds one value per name.
+
+<div class="error-output">
+
+```
+[duplicate-member]
+Error: Member 'x' is already defined
+   ╭─┤ Point.es:2:28 │
+   │
+ 2 │     constant point = { x = 1, x = 2 }
+   │                        ▲      ▲  
+   │                        ╰──────│── first defined here
+   │                               │  
+   │                               ╰── defined a second time here
+───╯
+```
+
+</div>
+
+Remove one of the two members.
+
+Taught on: [Records › When the compiler refuses a record](/docs/language/records#when-the-compiler-refuses-a-record)
+
+### `reserved-type-name`
+
+**Error.** A declaration takes the name `Self`. Inside a protocol, `Self` names the type that conforms to it, so no declaration may use it.
+
+<div class="error-output">
+
+```
+[reserved-type-name]
+Error: 'Self' is a reserved Type name
+   ╭─┤ Self.es:2:7 │
+   │
+ 2 │     type Self = { name: String }
+   │          ──┬─  
+   │            ╰─── this name is taken
+   │ 
+   │ Note: 'Self' is what a Protocol calls the Type conforming to it, so no declaration may take it.
+───╯
+```
+
+</div>
+
+Choose another name.
+
+### `use-before-declaration`
+
+**Error.** A top-level statement uses a namespace that is declared further down. A namespace exists from the line it is written on.
+
+<div class="error-output">
+
+```
+[use-before-declaration]
+Error: Namespace 'Loud' is used before it is declared
+   ╭─┤ Loud.es:2:26 │
+   │
+ 2 │     Terminal.print("hello"::shout())
+   │                             ──┬──  
+   │                               ╰──── this Method comes from it
+   │ 
+ 4 │     namespace Loud for String {
+   │               ──┬─  
+   │                 ╰─── declared here, below the use
+   │ 
+   │ Help: Move the use below the Declaration.
+   │ 
+   │ Note 1: A Namespace comes into being where it is written, so nothing that runs above it can reach it.
+   │ Note 2: A Function's or a Method's body is not run where it is written, so a body may name a Namespace declared below it.
+───╯
+```
+
+</div>
+
+Move the statement below the namespace. A function or method body may name a namespace declared below it, because a body runs only when it is called.
+
+Quick Fix: **Move this Statement below 'Loud'**.
+
+Taught on: [Namespaces and methods › Where a namespace can be used](/docs/language/namespaces-and-methods#where-a-namespace-can-be-used)
+
+### `unknown-name`
+
+**Error.** A name is used that nothing in scope declares. The Help suggests the closest name when there is one. JavaScript operators and keywords land here too: `+`, `&&`, `const`, `return` and `null` are not names in Essence. So does a word between braces in a string, which is read as a name in a hole: `"use { and } carefully"` reports `'and' is not declared`.
+
+<div class="error-output">
+
+```
+[unknown-name]
+Error: 'nmae' is not declared
+   ╭─┤ Greeting.es:4:17 │
+   │
+ 4 │     Terminal.print(nmae)
+   │                    ──┬─  
+   │                      ╰─── no such Variable or Constant
+   │ 
+   │ Help: Did you mean 'name'?
+───╯
+```
+
+</div>
+
+Fix the spelling, declare the name, or import it.
+
+Quick Fix: **Change to 'name'**. A name that a module in the workspace exports also gets a fix that imports it.
+
+Taught on: [Functions › Scope and hoisting](/docs/language/functions#scope-and-hoisting)
+
+### `default-references-later-parameter`
+
+**Error.** A parameter's default reads a parameter declared after it. A default may read the parameters to its left.
+
+<div class="error-output">
+
+```
+[default-references-later-parameter]
+Error: 'end' is declared after the Parameter whose default reads it
+   ╭─┤ Range.es:2:38 │
+   │
+ 2 │     function span(from start: Integer = end, to end: Integer) -> Integer {
+   │                                         ─┬─     ─┬─  
+   │                                          ╰───────│─── read here
+   │                                                  │   
+   │                                                  ╰─── declared here
+   │ 
+   │ Help: Move 'end' before the Parameter whose default reads it, or write the value out.
+   │ 
+   │ Note: A default may read `@`, the Parameters to its left, and anything the Declaration is written inside.
+───╯
+```
+
+</div>
+
+Move the parameter it reads in front, as in `span(to end: Integer, from start: Integer = end)`, or write the value out.
+
+Taught on: [Functions › Default values](/docs/language/functions#default-values)
+
+### `default-references-own-parameter`
+
+**Error.** A parameter's default reads the parameter it belongs to.
+
+<div class="error-output">
+
+```
+[default-references-own-parameter]
+Error: 'times' is the Parameter its own default is written on
+   ╭─┤ Repeat.es:2:51 │
+   │
+ 2 │     function repeat(_ text: String, times: Integer = times) -> String {
+   │                                     ──┬──            ──┬──  
+   │                                       ╰────────────────│──── this is the Parameter
+   │                                                        │    
+   │                                                        ╰──── read here
+   │ 
+   │ Help: Write the value out, or rename the Parameter so it does not spell what the default reads.
+   │ 
+   │ Note: A Parameter is bound to the value its default works out, so the default can not read it.
+───╯
+```
+
+</div>
+
+Write the value out, `times: Integer = 1`, or rename the parameter.
+
+Taught on: [Functions › Default values](/docs/language/functions#default-values)
+
+### `default-references-pattern-binding`
+
+**Error.** A default reads a name that a pattern in the same parameter list binds. Pattern names are bound when the body starts, and every default is worked out before that.
+
+<div class="error-output">
+
+```
+[default-references-pattern-binding]
+Error: 'width' is bound by a Pattern and can not be read by a default
+   ╭─┤ Area.es:2:92 │
+   │
+ 2 │     function area(of { width, height }: { width: Integer, height: Integer }, scale: Integer = width) -> Integer {
+   │                        ──┬──                                                                  ──┬──  
+   │                          ╰──────────────────────────────────────────────────────────────────────│──── bound by this Pattern
+   │                                                                                                 │    
+   │                                                                                                 ╰──── read here
+   │ 
+   │ Help: Read the member off the Parameter itself, or write the value out.
+   │ 
+   │ Note: A Pattern's bindings are Constants at the head of the body, and every default is worked out before the body runs.
+───╯
+```
+
+</div>
+
+Name the parameter instead of taking it apart with a pattern, the way JavaScript destructures an object, and read the member off it: `area(of size: { width: Integer, height: Integer }, scale: Integer = size.width)`.
+
+Taught on: [Patterns › In a parameter](/docs/language/patterns#in-a-parameter)
+
+### `unknown-type`
+
+**Error.** A type is named that nothing declares. JavaScript's `number` is a common cause; Essence's everyday number types are `Integer`, `Rational` and `Number`.
+
+<div class="error-output">
+
+```
+[unknown-type]
+Error: Type 'number' is not declared
+   ╭─┤ Count.es:2:18 │
+   │
+ 2 │     constant count: number = 1
+   │                     ───┬──  
+   │                        ╰──── no such Type
+   │ 
+   │ Help: Did you mean 'Number'?
+───╯
+```
+
+</div>
+
+Fix the spelling, declare the type, or import it.
+
+Quick Fix: **Change to 'Number'** when a type name is close, or an import from the module that exports it.
+
+Taught on: [Coming from JavaScript › Numbers](/docs/getting-started/coming-from-javascript#numbers)
+
+### `unknown-protocol`
+
+**Error.** A bound or a conformance clause names a protocol that nothing declares.
+
+<div class="error-output">
+
+```
+[unknown-protocol]
+Error: Protocol 'Comparible' is not declared
+   ╭─┤ Largest.es:2:31 │
+   │
+ 2 │     function first<infer Item is Comparible>(_ items: List<Item>) -> Integer {
+   │                                  ─────┬────  
+   │                                       ╰────── no such Protocol
+   │ 
+   │ Help: Did you mean 'Comparable'?
+───╯
+```
+
+</div>
+
+Fix the spelling or import the protocol.
+
+Quick Fix: **Change to 'Comparable'** when a protocol name is close.
+
+Taught on: [Protocols › Declaring a protocol](/docs/language/protocols#declaring-a-protocol)
+
+### `unknown-member`
+
+**Error.** A record or case has no member of that name. The Note lists the members it has.
+
+<div class="error-output">
+
+```
+[unknown-member]
+Error: { x: Integer, y: Integer } has no member 'z'
+   ╭─┤ Point.es:4:23 │
+   │
+ 4 │     Terminal.print(point.z)
+   │                          ▲  
+   │                          ╰── no such member
+   │ 
+   │ Note: { x: Integer, y: Integer } has 'x', 'y'.
+───╯
+```
+
+</div>
+
+Use one of the listed members.
+
+Quick Fix: **Change to 'x'** when a member name is close.
+
+Taught on: [Records › When the compiler refuses a record](/docs/language/records#when-the-compiler-refuses-a-record)
+
+### `type-without-members`
+
+**Error.** A `.` looks up a member on a value that has none. Only records, cases and namespaces have members. Everything else is reached through methods, with `::`.
+
+<div class="error-output">
+
+```
+[type-without-members]
+Error: This value has no members to look up
+   ╭─┤ Length.es:4:17 │
+   │
+ 4 │     Terminal.print(text.length)
+   │                    ──┬─  
+   │                      ╰─── this is a String
+   │ 
+   │ Note: Only Records, Cases and Namespaces have members.
+───╯
+```
+
+</div>
+
+Call the method: `text::length()`.
+
+Taught on: [Method calls › Statics and the dot](/docs/language/method-calls#statics-and-the-dot)
+
+## Types
+
+A value or call that does not fit its type, a function that does not return, and a type written in a way the compiler refuses.
+
+### `assignment-type-mismatch`
+
+**Error.** A value does not fit the declared type of the constant or variable it is assigned to. The report also points at the declaration when it is in the same file.
+
+<div class="error-output">
+
+```
+[assignment-type-mismatch]
+Error: This value does not fit Variable 'count'
+   ╭─┤ Count.es:4:10 │
+   │
+ 2 │     variable count = 0
+   │              ──┬──  
+   │                ╰──── declared as Integer here
+   │ 
+ 4 │     count = "ten"
+   │             ──┬──  
+   │               ╰──── this is a String
+───╯
+```
+
+</div>
+
+Assign a value of the declared type, or change the declaration's type.
+
+Taught on: [Programs and values › Constants and variables](/docs/language/programs-and-values#constants-and-variables)
+
+### `argument-type-mismatch`
+
+**Error.** An argument does not fit its parameter's type. The Note gives the type the parameter takes.
+
+<div class="error-output">
+
+```
+[argument-type-mismatch]
+Error: This Argument does not fit Parameter 1
+   ╭─┤ Greet.es:6:23 │
+   │
+ 6 │     Terminal.print(greet(42))
+   │                          ─┐  
+   │                           ╰── this is an Integer
+   │ 
+   │ Note: Parameter 1 is String.
+───╯
+```
+
+</div>
+
+Pass a value of that type: `greet("Ada")`.
+
+Taught on: [Functions › Labels](/docs/language/functions#labels)
+
+### `incomplete-record-argument`
+
+**Error.** A record argument leaves out a member that the parameter's default does not fill in. A partial default such as `options: Options = { retries = 3 }` lets a call leave out `retries`, and every other member must be written.
+
+<div class="error-output">
+
+```
+[incomplete-record-argument]
+Error: This Argument is missing 1 member the default does not fill in
+   ╭─┤ Connect.es:8:31 │
+   │
+ 8 │     Terminal.print(connect(using { host = "example.com" }))
+   │                                  ────────────┬───────────  
+   │                                              ╰───────────── 'port' not written here
+   │ 
+   │ Help: Write 'port' into this Record.
+   │ 
+   │ Note 1: Parameter 'using' is { host: String, port: Integer, retries: Integer }.
+   │ Note 2: Its default fills in 'retries'; every other member must be written.
+───╯
+```
+
+</div>
+
+Write the missing member: `connect(using { host = "example.com", port = 443 })`.
+
+Quick Fix: **Write the missing member 'port'**, or **Write the missing members** when several are missing.
+
+Taught on: [Records › Record parameters with defaults](/docs/language/records#record-parameters-with-defaults)
+
+### `argument-label-mismatch`
+
+**Error.** An argument's label does not match its parameter: a different label, a missing one, or one where the parameter takes none. JavaScript's `items[0]` lands here, because `Terminal.print(items[0])` reads `items` as a label.
+
+<div class="error-output">
+
+```
+[argument-label-mismatch]
+Error: This Argument is labelled where Parameter 1 takes no label
+   ╭─┤ Greet.es:6:26 │
+   │
+ 6 │     Terminal.print(greet(to "Ada"))
+   │                             ──┬──  
+   │                               ╰──── this is labelled 'to'
+   │ 
+   │ Help: Pass the value with no label.
+   │ 
+   │ Note: The signature takes 1 Argument: Parameter 1 is String.
+───╯
+```
+
+</div>
+
+Write the labels the signature declares, in its order. The Note lists the signature. An item of a list is read with `items::item(at 0)`.
+
+Quick Fix: **Remove the label**. A missing or a different label gets the fix that writes or changes it.
+
+Taught on: [Functions › Labels](/docs/language/functions#labels)
+
+### `argument-count-mismatch`
+
+**Error.** A call passes more or fewer arguments than the signature declares.
+
+<div class="error-output">
+
+```
+[argument-count-mismatch]
+Error: This call passes the wrong number of Arguments
+   ╭─┤ Greet.es:6:17 │
+   │
+ 6 │     Terminal.print(greet("Ada", "Grace"))
+   │                    ──────────┬──────────  
+   │                              ╰──────────── passes 2 Arguments
+   │ 
+   │ Note: The signature takes 1 Argument: Parameter 1 is String.
+───╯
+```
+
+</div>
+
+Pass the arguments the Note lists.
+
+Taught on: [Functions › Labels](/docs/language/functions#labels)
+
+### `default-type-mismatch`
+
+**Error.** A parameter's default is not a value of the parameter's type.
+
+<div class="error-output">
+
+```
+[default-type-mismatch]
+Error: This default does not fit Parameter 'times'
+   ╭─┤ Repeat.es:2:51 │
+   │
+ 2 │     function repeat(_ text: String, times: Integer = "twice") -> String {
+   │                                                      ───┬───  
+   │                                                         ╰───── this is a String
+   │ 
+   │ Help: Write a value of Type Integer.
+   │ 
+   │ Note: Parameter 'times' is Integer.
+───╯
+```
+
+</div>
+
+Write a default of the declared type: `times: Integer = 2`.
+
+Taught on: [Functions › Default values](/docs/language/functions#default-values)
+
+### `return-type-mismatch`
+
+**Error.** A `<-` returns a value that does not fit the declared return type. A `define` arm that does not fit the `define`'s type reports this code too.
+
+<div class="error-output">
+
+```
+[return-type-mismatch]
+Error: This value does not fit the declared return Type
+   ╭─┤ Half.es:3:6 │
+   │
+ 3 │        <- "half"
+   │           ───┬──  
+   │              ╰──── this is a String
+   │ 
+   │ Note: The Function returns Integer.
+───╯
+```
+
+</div>
+
+Return a value of the declared type, or change the declared type.
+
+Taught on: [Functions › Returning with `<-`](/docs/language/functions#returning-with--)
+
+### `condition-not-boolean`
+
+**Error.** An `if` condition or a `define` condition is not a `Boolean`. Essence has no truthiness.
+
+<div class="error-output">
+
+```
+[condition-not-boolean]
+Error: An If Condition has to be a Boolean
+   ╭─┤ Count.es:4:5 │
+   │
+ 4 │     if count {
+   │        ──┬──  
+   │          ╰──── this is an Integer
+   │ 
+   │ Note: Essence has no truthiness — only a Boolean can be a Condition.
+───╯
+```
+
+</div>
+
+Ask a question that returns a `Boolean`: `if count::isGreaterThan(0) { … }`.
+
+Taught on: [Conditions › The condition is a Boolean](/docs/language/conditions#the-condition-is-a-boolean)
+
+### `constant-reassignment`
+
+**Error.** A name declared with `constant` is assigned a new value.
+
+<div class="error-output">
+
+```
+[constant-reassignment]
+Error: 'total' can not be reassigned
+   ╭─┤ Total.es:4:2 │
+   │
+ 2 │     constant total = 1
+   │              ──┬──  
+   │                ╰──── declared as a Constant here
+   │ 
+ 4 │     total = 2
+   │     ──┬──  
+   │       ╰──── assigned to here
+   │ 
+   │ Help: Declare it with 'variable' instead of 'constant' if it needs to change.
+───╯
+```
+
+</div>
+
+Declare it with `variable` if it needs to change, or bind the new value to a new constant.
+
+Quick Fix: **Declare 'total' as a Variable**.
+
+Taught on: [Programs and values › Constants and variables](/docs/language/programs-and-values#constants-and-variables)
+
+### `missing-return`
+
+**Error.** A path through a function with a return type reaches the end without a `<-`. An `if` without an `else` is the usual cause.
+
+<div class="error-output">
+
+```
+[missing-return]
+Error: Not every path through this Function returns
+   ╭─┤ Sign.es:2:2 │
+   │
+ 2 │ ╭─▶     function sign(of number: Integer) -> String {
+   ┆ ┆   
+ 6 │ ├─▶     }
+   │ │           
+   │ ╰─────────── this path falls off the end
+   │ 
+   │ Note: The declared return Type is String, so every path must yield one.
+───╯
+```
+
+</div>
+
+Return on every path, for example with the `else` branch: `if … { <- "negative" } else { <- "not negative" }`.
+
+Quick Fix: **Add an empty else branch**.
+
+Taught on: [Functions › Every path returns](/docs/language/functions#every-path-returns)
+
+### `infinite-recursion`
+
+**Error.** A method returns a call to itself on every path, so it can never return.
+
+<div class="error-output">
+
+```
+[infinite-recursion]
+Error: This Method calls itself on every path, so it can never return
+   ╭─┤ Countdown.es:3:3 │
+   │
+ 3 │        forever() -> Integer {
+   │        ───┬───  
+   │           ╰───── this Method
+ 4 │          <- @::forever()
+   │             ──────┬─────  
+   │                   ╰─────── returns a call to the same Method
+   │ 
+   │ Help: Give it a path that returns without calling itself — a 'match' Case that dispatches to a different Method, or a guard that answers a base value.
+   │ 
+   │ Note: Every returning path hands back another call to it, so there is no base case to stop the recursion.
+───╯
+```
+
+</div>
+
+Give it a path that returns without calling itself, such as `if @::isLessThanOrEqualTo(0) { <- 0 } else { <- @::subtract(1)::toZero() }`.
+
+### `recursive-type-declaration`
+
+**Error.** A type alias or a choice names itself, directly or through other declarations. Recursive type declarations are refused.
+
+<div class="error-output">
+
+```
+[recursive-type-declaration]
+Error: Type 'Node' names itself
+```
+
+</div>
+
+Break the cycle. A `List` does not break it: a member typed `List<Node>` still names `Node`, and reports this code too. To hold a tree, keep its nodes in a list and give each node the positions of its children in that list, as in `type Node = { value: Integer, children: List<Integer> }`. Or key the nodes in a dictionary.
+
+Taught on: [Unions and type aliases › An alias is not a new type](/docs/language/unions-and-type-aliases#an-alias-is-not-a-new-type)
+
+### `top-level-return`
+
+**Error.** A `<-` is written outside every function.
+
+<div class="error-output">
+
+```
+[top-level-return]
+Error: There is nothing here to return from
+   ╭─┤ Answer.es:2:2 │
+   │
+ 2 │     <- 42
+   │     ──┬──  
+   │       ╰──── this is outside any Function
+───╯
+```
+
+</div>
+
+Remove the `<-`, or move the code into a function.
+
+Taught on: [Functions › Returning with `<-`](/docs/language/functions#returning-with--)
+
+### `not-a-function`
+
+**Error.** A call is written on a value that is not a function.
+
+<div class="error-output">
+
+```
+[not-a-function]
+Error: This Expression is not a Function
+   ╭─┤ Total.es:4:17 │
+   │
+ 4 │     Terminal.print(total())
+   │                    ──┬──  
+   │                      ╰──── this is an Integer
+───╯
+```
+
+</div>
+
+Remove the parentheses, or call a function.
+
+Taught on: [Functions as values › Storing and returning functions](/docs/language/functions-as-values#storing-and-returning-functions)
+
+### `record-annotation-not-record`
+
+**Error.** A record literal is given a type that is not a record type. It comes from the typed record literal `Type ~> { … }`, as in `Integer ~> { x = 1 }`. An annotation on a constant, `constant point: Integer = { x = 1 }`, reports [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch) instead.
+
+Write the record with an annotated constant instead: `constant point: Point = { x = 1, y = 2 }`, where `Point` is a `type` alias for a record shape.
+
+### `path-step-not-a-record`
+
+**Error.** A step of a member path reads a member off something that is not a record, such as `.tags.length` where `tags` is a list. Only a record or a case has members a path can step through.
+
+<div class="error-output">
+
+```
+[path-step-not-a-record]
+Error: A member path steps through Records only
+   ╭─┤ Tags.es:2:55 │
+   │
+ 2 │     constant counts = [{ tags = ["a", "b"] }]::map(.tags.length)
+   │                                                          ───┬──  
+   │                                                             ╰──── read off a List<String>
+   │ 
+   │ Help: Write the Function literal instead, and decide the value the way its Type asks to be decided.
+   │ 
+   │ Note: Only a Record or a Case has members a path can step through. An Optional, a Union, a Choice or a List is decided before it is read, and deciding it is a Match rather than a dot.
+───╯
+```
+
+</div>
+
+Write a function literal and call the method there: `(entry) { <- entry.tags::length() }`.
+
+Taught on: [Functions as values › Member paths](/docs/language/functions-as-values#member-paths)
+
+### `path-key-outside-combination`
+
+**Error.** A dotted key is written in a record literal that updates nothing, as in `{ server.port = 8080 }`. A path reaches into a value that is already there.
+
+<div class="error-output">
+
+```
+[path-key-outside-combination]
+Error: A path key reaches into nothing here
+   ╭─┤ Config.es:4:29 │
+   │
+ 4 │     constant blank: Config = { server.port = 8080 }
+   │                                ─────┬─────  
+   │                                     ╰─────── this reaches into a value
+   │ 
+   │ Help 1: Write the whole member: 'server = { … }'.
+   │ Help 2: Or update a value that already has it: '{ original with server.port = … }'.
+   │ 
+   │ Note: A Record Literal writes its members from nothing, so there is no value under this key to reach into. A path key needs one that is already there — the value a 'with' updates, or the value a default fills in for an Argument or a Case payload.
+───╯
+```
+
+</div>
+
+Write the whole member, `{ server = { host = "db", port = 8080 } }`, or update a value that has it: `{ config with server.port = 8080 }`.
+
+Taught on: [Records › When the compiler refuses a record](/docs/language/records#when-the-compiler-refuses-a-record)
+
+### `path-key-without-default`
+
+**Error.** A path key in an argument reaches into a member that the parameter's default does not fill in, so there is nothing under it to merge with.
+
+<div class="error-output">
+
+```
+[path-key-without-default]
+Error: A path key reaches into a member no default fills in
+   ╭─┤ Connect.es:9:33 │
+   │
+ 9 │     Terminal.print(connect(using { server.port = 1 }))
+   │                                    ───┬──  
+   │                                       ╰──── nothing fills in 'server'
+   │ 
+   │ Help: Write the whole member: 'server = { … }'.
+   │ 
+   │ Note 1: Parameter 'using' is { server: { host: String, port: Integer }, retries: Integer }.
+   │ Note 2: Its default fills in 'retries', and 'server' is not one of them — so there is nothing under this key to merge with.
+───╯
+```
+
+</div>
+
+Write the whole member: `connect(using { server = { host = "db", port = 1 } })`.
+
+Taught on: [Records › Record parameters with defaults](/docs/language/records#record-parameters-with-defaults)
+
+### `path-on-computed-value`
+
+**Error.** An update with a dotted key is written on a value computed on the spot, as in `{ load() with server.port = 8080 }`. A path reads its base once per level, so the base must be a name.
+
+<div class="error-output">
+
+```
+[path-on-computed-value]
+Error: A path key updates a value it can name
+   ╭─┤ Config.es:6:22 │
+   │
+ 6 │     constant config = { load() with server.port = 8080 }
+   │                         ───┬──  
+   │                            ╰──── this is worked out here, not named
+   │ 
+   │ Help 1: Bind it to a Constant first, and update the Constant.
+   │ Help 2: Or write the nesting out by hand, so the value is worked out once.
+   │ 
+   │ Note: A path reaches into the value one level at a time, so the value is read once for each level it reaches through. A name, '@', or a chain of member reads over one of those reads the same value every time; anything worked out on the spot would be worked out again for each level.
+───╯
+```
+
+</div>
+
+Bind the value to a constant first, `constant loaded = load()`, and update that: `{ loaded with server.port = 8080 }`.
+
+Taught on: [Records › When the compiler refuses a record](/docs/language/records#when-the-compiler-refuses-a-record)
+
+### `uncombinable-types`
+
+**Error.** A `with` update is written on a value that cannot be updated, such as an `Integer`. The Note lists what can.
+
+<div class="error-output">
+
+```
+[uncombinable-types]
+Error: Integers can not be combined
+   ╭─┤ Answer.es:3:23 │
+   │
+ 3 │     constant changed = { answer with port = 1 }
+   │                          ───┬──  
+   │                             ╰──── this is an Integer
+   │ 
+   │ Note: Only Records, Namespaces and Dictionaries can be combined.
+───╯
+```
+
+</div>
+
+Update a record or a dictionary.
+
+Taught on: [Records › When the compiler refuses a record](/docs/language/records#when-the-compiler-refuses-a-record)
+
+### `wrong-update-brackets`
+
+**Error.** An update uses the wrong brackets for its base. A record is updated in braces, `{ config with port = 2 }`, and a dictionary in brackets, `[ages with "alex" = 40]`.
+
+<div class="error-output">
+
+```
+[wrong-update-brackets]
+Error: A key that is a value belongs to a Dictionary
+   ╭─┤ Ages.es:3:31 │
+   │
+ 3 │     constant older = { ages with "alex" = 40 }
+   │                                  ───┬──  
+   │                                     ╰──── this key is a value, not a member name
+   │ 
+   │ Help 1: Write the update in brackets: '[base with "a" = 1]'.
+   │ Help 2: Or name the member, if a Record is what was meant: '{ base with a = 1 }'.
+   │ 
+   │ Note: Braces update a Record, whose keys are the member names it declares. A key that is a value is a Dictionary's, and a Dictionary is updated in brackets.
+───╯
+```
+
+</div>
+
+Swap the brackets.
+
+Quick Fix: **Write the update in brackets** or **Write the update in braces**, when the report underlines the whole update. `{ ages with more }` on a dictionary gets one, and so does `[point with x = 3]` on a record. A value key in braces, as above, gets none.
+
+Taught on: [Dictionaries › Setting and removing entries](/docs/language/dictionaries#setting-and-removing-entries)
+
+### `duplicate-key`
+
+**Error.** A dictionary literal writes the same key twice. The second entry would replace the first without a trace.
+
+<div class="error-output">
+
+```
+[duplicate-key]
+Error: This key is written twice
+   ╭─┤ Ages.es:2:30 │
+   │
+ 2 │     constant ages = ["kim" = 7, "kim" = 8]
+   │                      ──┬──      ──┬──  
+   │                        ╰──────────│──── first written here
+   │                                   │    
+   │                                   ╰──── written a second time here
+   │ 
+   │ Help: Keep one entry for the key.
+   │ 
+   │ Note: A Dictionary holds one value per key, so the second entry would take the first one's place and nothing would say the first was ever there.
+───╯
+```
+
+</div>
+
+Keep one entry per key.
+
+Quick Fix: **Remove this entry**.
+
+Taught on: [Dictionaries › Writing a dictionary](/docs/language/dictionaries#writing-a-dictionary)
+
+### `partial-type-mismatch`
+
+**Error.** An update sets a member the original does not have, or gives a member a value of another type. A dictionary update is held to its key and value types the same way.
+
+<div class="error-output">
+
+```
+[partial-type-mismatch]
+Error: This is not a Partial of the value it updates
+   ╭─┤ Point.es:3:32 │
+   │
+ 3 │     constant moved = { point with x = "one" }
+   │                        ──┬──      ────┬────  
+   │                          ╰────────────│────── this is a { x: Integer, y: Integer }
+   │                                       │      
+   │                                       ╰────── this is a { x: String }
+   │ 
+   │ Note: An update may only set members the original already has, with the Types it declared for them.
+───╯
+```
+
+</div>
+
+Set only members the original has, with their declared types: `{ point with x = 3 }`.
+
+Taught on: [Records › When the compiler refuses a record](/docs/language/records#when-the-compiler-refuses-a-record)
+
+### `wrong-type-argument-count`
+
+**Error.** A generic type is given the wrong number of type arguments.
+
+<div class="error-output">
+
+```
+[wrong-type-argument-count]
+Error: List takes exactly 1 Type Argument
+   ╭─┤ Items.es:2:18 │
+   │
+ 2 │     constant items: List<Integer, String> = []
+   │                     ──────────┬──────────  
+   │                               ╰──────────── 2 Type Arguments given
+───╯
+```
+
+</div>
+
+Give it as many as it declares: `List<Integer>`.
+
+Taught on: [Generics › A type alias applies its type arguments too](/docs/language/generics#a-type-alias-applies-its-type-arguments-too)
+
+### `type-not-generic`
+
+**Error.** Type arguments are given to a type that takes none.
+
+<div class="error-output">
+
+```
+[type-not-generic]
+Error: This Type takes no Type Arguments
+   ╭─┤ Count.es:2:18 │
+   │
+ 2 │     constant count: Integer<String> = 1
+   │                     ───────┬───────  
+   │                            ╰───────── the Type Arguments have nowhere to go
+───╯
+```
+
+</div>
+
+Remove the type arguments: `Integer`.
+
+Taught on: [Generics › A type alias applies its type arguments too](/docs/language/generics#a-type-alias-applies-its-type-arguments-too)
+
+### `infer-on-applied-parameter`
+
+**Error.** A choice or a type alias marks a type parameter `infer`. Their type arguments are written wherever they are used, so there is nothing to infer.
+
+<div class="error-output">
+
+```
+[infer-on-applied-parameter]
+Error: A Choice's Type Parameters can not be inferred
+   ╭─┤ Holder.es:2:16 │
+   │
+ 2 │     choice Holder<infer Item> {
+   │                   ─────┬────  
+   │                        ╰────── 'infer' has nothing to do here
+   │ 
+   │ Help: Remove the 'infer' before 'Item'.
+   │ 
+   │ Note: A Choice's Type Parameters are applied at every use, never inferred from one.
+───╯
+```
+
+</div>
+
+Remove `infer`: `choice Holder<Item> { … }`.
+
+Quick Fix: **Remove 'infer'**.
+
+Taught on: [Generics › A choice applies its type arguments](/docs/language/generics#a-choice-applies-its-type-arguments)
+
+### `uninferred-namespace-parameter`
+
+**Error.** A namespace declares a type parameter without `infer`. A namespace works its type parameters out from the receiver of each call.
+
+<div class="error-output">
+
+```
+[uninferred-namespace-parameter]
+Error: A Namespace's Type Parameters must be inferred
+   ╭─┤ Boxes.es:2:18 │
+   │
+ 2 │     namespace Boxes<Item> for { value: Item } {
+   │                     ──┬─  
+   │                       ╰─── nothing can ever bind this Parameter
+   │ 
+   │ Help: Declare it as 'infer Item'.
+   │ 
+   │ Note: A Namespace's Type Parameters are worked out from the receiver at every call, which is what 'infer' says.
+───╯
+```
+
+</div>
+
+Write `infer`: `namespace Boxes<infer Item> for { value: Item }`.
+
+Quick Fix: **Declare it as 'infer Item'**.
+
+Taught on: [Generics › A namespace infers from its receiver](/docs/language/generics#a-namespace-infers-from-its-receiver)
+
+### `zero-denominator`
+
+**Error.** A rational literal has a denominator of zero, such as `1/0`.
+
+<div class="error-output">
+
+```
+[zero-denominator]
+Error: A Rational can not have a denominator of zero
+   ╭─┤ Ratio.es:2:19 │
+   │
+ 2 │     constant ratio = 1/0
+   │                      ─┬─  
+   │                       ╰─── this divides by zero
+───╯
+```
+
+</div>
+
+Write a denominator other than zero.
+
+Taught on: [Programs and values › Rationals](/docs/language/programs-and-values#rationals)
+
+### `invalid-refinement-predicate`
+
+**Error.** A checked refinement's `where` clause cannot be checked. Either its base cannot be refined, such as `Boolean`, or the clause asks something other than a method of `@` itself, such as the chained `@::trim()::hasCharacters()`. The bases are `Integer`, `Rational`, `String`, an applied `List` and an applied `Dictionary`.
+
+<div class="error-output">
+
+```
+[invalid-refinement-predicate]
+Error: A 'where' clause can not refine Boolean
+   ╭─┤ Flag.es:2:13 │
+   │
+ 2 │     type Yes = Boolean where @::is(true)
+   │                ───┬───  
+   │                   ╰───── this is Boolean
+   │ 
+   │ Help: Drop the 'where' clause from 'Yes'.
+   │ 
+   │ Note: A checked refinement is written on an Integer, a Rational, a String, an applied List or an applied Dictionary — 'List<String>', never a bare 'List'.
+───╯
+```
+
+</div>
+
+Refine one of those bases with a method called on `@`: `type Small = Integer where @::isLessThan(10)`.
+
+Taught on: [Checked refinements › What the predicate may say](/docs/language/checked-refinements#what-the-predicate-may-say)
+
+### `predicate-not-boolean`
+
+**Error.** A refinement's `where` clause does not return a `Boolean`.
+
+<div class="error-output">
+
+```
+[predicate-not-boolean]
+Error: This predicate is not a Boolean
+   ╭─┤ Small.es:2:29 │
+   │
+ 2 │     type Small = Integer where @::absolute()
+   │                                ──────┬──────  
+   │                                      ╰──────── this is NonNegativeInteger
+   │ 
+   │ Note: A 'where' clause is a question about the value being refined, so it has to answer 'true' or 'false'.
+───╯
+```
+
+</div>
+
+Call a method that returns a `Boolean`: `type Small = Integer where @::isLessThan(10)`.
+
+Taught on: [Checked refinements › What the predicate may say](/docs/language/checked-refinements#what-the-predicate-may-say)
+
+## Dispatch
+
+Which method or overload a call reaches, and what its arguments ask of it.
+
+### `no-matching-overload`
+
+**Error.** The arguments fit none of a method's overloads. Each candidate signature is listed in a Note.
+
+<div class="error-output">
+
+```
+[no-matching-overload]
+Error: No overload of 'add' accepts these Arguments
+   ╭─┤ Add.es:2:17 │
+   │
+ 2 │     Terminal.print(5::add("one"))
+   │                    ──────┬──────  
+   │                          ╰──────── this call passes 1 Argument
+   │ 
+   │ Note 1: 'Integer::add' takes 1 Argument: Parameter 1 is Integer.
+   │ Note 2: 'Integer::add' takes 1 Argument: Parameter 1 is Rational.
+   │ Note 3: 'Integer::add' takes 1 Argument: Parameter 1 is Algebraic.
+   │ Note 4: 'Integer::add' takes 1 Argument: Parameter 1 is Transcendental.
+   │ Note 5: 'NonNegativeInteger::add' takes 1 Argument: Parameter 1 is PositiveInteger.
+   │ Note 6: 'NonNegativeInteger::add' takes 1 Argument: Parameter 1 is NonNegativeInteger.
+   │ Note 7: 'PositiveInteger::add' takes 1 Argument: Parameter 1 is NonNegativeInteger.
+   │ Note 8: 'Scalar::add' takes 1 Argument: Parameter 1 is Scalar.
+───╯
+```
+
+</div>
+
+Pass arguments that one of the listed signatures takes: `5::add(1)`.
+
+Taught on: [Method calls › When a call fails](/docs/language/method-calls#when-a-call-fails)
+
+### `ambiguous-namespace`
+
+**Error.** More than one namespace provides the method for this value, and none of them targets it more closely than the others.
+
+<div class="error-output">
+
+```
+[ambiguous-namespace]
+Error: 'shout' is provided by more than one Namespace
+    ╭─┤ Loud.es:14:17 │
+    │
+ 14 │     Terminal.print("hello"::shout())
+    │                             ──┬──  
+    │                               ╰──── these Arguments match all of them
+    │ 
+    │ Help: Name it at the call, e.g. 'value::<Loud>shout(…)'.
+    │ 
+    │ Note 1: 'Loud' declares 'shout'.
+    │ Note 2: 'Louder' declares 'shout'.
+────╯
+```
+
+</div>
+
+Name the namespace at the call: `"hello"::<Loud>shout()`.
+
+Quick Fix: **Write '::&lt;Loud&gt;' at the call**, one for each candidate.
+
+Taught on: [Namespaces and methods › Choosing between namespaces](/docs/language/namespaces-and-methods#choosing-between-namespaces)
+
+### `undecided-receiver-type`
+
+**Error.** A method is called on a value whose type is not fully known, such as the empty list `[]`, and several namespaces declare that method.
+
+<div class="error-output">
+
+```
+[undecided-receiver-type]
+Error: 'tag' is called on a value whose Type is not fully known here
+    ╭─┤ Tag.es:14:17 │
+    │
+ 14 │     Terminal.print([]::tag())
+    │                    ─┐  ─┬─  
+    │                     ╰───│─── this is a List<Unknown>
+    │                         │   
+    │                         ╰─── 'tag' is looked up in its Namespaces
+    │ 
+    │ Help: Annotate what the receiver comes from — 'constant items: List<Integer> = []' — so its Type is decided before the call.
+    │ 
+    │ Note 1: 'Numbers' declares 'tag'.
+    │ Note 2: 'Words' declares 'tag'.
+    │ Note 3: List<Unknown> is matched by all of them, so which one runs would be decided by a Type nothing has decided.
+────╯
+```
+
+</div>
+
+Annotate the value first, `constant numbers: List<Integer> = []`, and call the method on it: `numbers::tag()`.
+
+### `unknown-method`
+
+**Error.** No namespace in scope declares a method of that name for the value's type. The Note lists the namespaces it searched.
+
+<div class="error-output">
+
+```
+[unknown-method]
+Error: No Method named 'shout' for this value
+   ╭─┤ Shout.es:2:26 │
+   │
+ 2 │     Terminal.print("hello"::shout())
+   │                    ───┬───  ──┬──  
+   │                       ╰───────│──── this is a NonEmptyString
+   │                               │    
+   │                               ╰──── no Method of this name
+   │ 
+   │ Note: Searched Namespaces 'String', 'NonEmptyString'.
+───╯
+```
+
+</div>
+
+Fix the spelling, declare the method in a namespace, or import the namespace that has it.
+
+Quick Fix: **Change to 'name'** when a method name is close, or an import of a namespace another module exports.
+
+Taught on: [Method calls › When a call fails](/docs/language/method-calls#when-a-call-fails)
+
+### `no-namespace-for-value`
+
+**Error.** The value's type has no namespace at all, so it has no methods. An unbounded type parameter is the usual case: nothing is known about `Item`.
+
+<div class="error-output">
+
+```
+[no-namespace-for-value]
+Error: No Namespace provides Methods for this value
+   ╭─┤ Show.es:3:6 │
+   │
+ 3 │        <- item::toString()
+   │           ──┬─  ────┬───  
+   │             ╰───────│───── this is an Item
+   │                     │     
+   │                     ╰───── 'toString' is looked up in its Namespaces
+   │ 
+   │ Note: No Namespace in scope targets Item.
+───╯
+```
+
+</div>
+
+Bound the type parameter by a protocol that has the method: `show<infer Item is Printable>(_ item: Item)`.
+
+Taught on: [Generics › A type parameter is opaque](/docs/language/generics#a-type-parameter-is-opaque)
+
+### `not-a-namespace`
+
+**Error.** The name in a namespace specifier, the `Name` of `value::<Name>method()`, is not a namespace where the call is written.
+
+<div class="error-output">
+
+```
+[not-a-namespace]
+Error: 'total' is not a Namespace
+   ╭─┤ Loud.es:4:27 │
+   │
+ 2 │     constant total = 1
+   │              ──┬──  
+   │                ╰──── declared here
+   │ 
+ 4 │     Terminal.print("hello"::<total>append("!"))
+   │                              ──┬──  
+   │                                ╰──── this is an Integer
+   │ 
+   │ Help: Drop the Namespace specifier, or rename whatever shadows the Namespace.
+   │ 
+   │ Note: A Method can only be looked up in a Namespace, and 'total' names an Integer here.
+───╯
+```
+
+</div>
+
+Drop the specifier, as in `"hello"::append("!")`, or name a namespace there. Where a constant shadows the namespace you meant, rename the constant.
+
+### `undispatchable-method`
+
+**Error.** A method is called on a union whose members cannot be told apart while the program runs, such as a union of two type parameters.
+
+<div class="error-output">
+
+```
+[undispatchable-method]
+Error: 'toString' can not be dispatched on this value
+   ╭─┤ Describe.es:3:6 │
+   │
+ 3 │        <- value::toString()
+   │           ──┬──  
+   │             ╰──── this is a First | Second
+   │ 
+   │ Help: Narrow the value with a Match Expression before calling the Method.
+   │ 
+   │ Note: 2 member Types of the Union are indistinguishable at runtime: First, Second.
+───╯
+```
+
+</div>
+
+Take one type parameter instead of a union of two: `describe<infer Item is Printable>(_ value: Item)`.
+
+### `untyped-namespace-method`
+
+**Error.** A namespace without a target type, one with no `for …`, declares an instance method. Such a namespace holds only static methods.
+
+<div class="error-output">
+
+```
+[untyped-namespace-method]
+Error: A Namespace without a target Type can only hold static Methods
+   ╭─┤ Tools.es:3:8 │
+   │
+ 3 │ ╭─▶        shout() -> String {
+   ┆ ┆   
+ 5 │ ├─▶        }
+   │ │              
+   │ ╰────────────── this Method is not static
+   │ 
+   │ Help: Give the Namespace a target Type with 'for …', or make the Method static.
+───╯
+```
+
+</div>
+
+Give the namespace a target type, `namespace Tools for String`, or mark the method `static`.
+
+Taught on: [Namespaces and methods › Statics and the dot](/docs/language/namespaces-and-methods#statics-and-the-dot)
+
+### `static-method-on-value`
+
+**Error.** A static method is called on a value with `::`. A static method takes no receiver.
+
+<div class="error-output">
+
+```
+[static-method-on-value]
+Error: 'origin' is a static Method
+    ╭─┤ Point.es:12:23 │
+    │
+ 12 │     Terminal.print(here::origin())
+    │                    ──┬─  ───┬──  
+    │                      ╰──────│──── this is a { x: Integer, y: Integer }
+    │                             │    
+    │                             ╰──── a static Method is called on its Namespace, not on a value
+    │ 
+    │ Help: Write 'Points.origin(…)', passing the value as an Argument if it needs one.
+    │ 
+    │ Note: 'Points' declares 'origin' as static.
+────╯
+```
+
+</div>
+
+Call it on its namespace with `.`: `Points.origin()`.
+
+Quick Fix: **Write 'Points.origin(…)' passing the value** or **Write 'Points.origin(…)' without the value**.
+
+Taught on: [Namespaces and methods › Statics and the dot](/docs/language/namespaces-and-methods#statics-and-the-dot)
+
+### `indistinguishable-default-parameter`
+
+**Error.** A parameter with a default is followed by a parameter with the same label, or both have no label. A call that passes one argument could mean either.
+
+<div class="error-output">
+
+```
+[indistinguishable-default-parameter]
+Error: This default could not be told apart from the Parameter after it
+   ╭─┤ Span.es:2:35 │
+   │
+ 2 │     function span(_ start: Integer = 0, _ end: Integer) -> Integer {
+   │                                      ▲  ───────┬──────  
+   │                                      ╰─────────│──────── this default
+   │                                                │        
+   │                                                ╰──────── and this Parameter carries no label either
+   │ 
+   │ Help: Give one of them a label, or move the default to the last of them.
+   │ 
+   │ Note: An Argument is matched to a Parameter by its label before its Type is read, so a call passing one of them could mean either.
+───╯
+```
+
+</div>
+
+Give one of them a label, or move the defaulted one last: `span(_ end: Integer, from start: Integer = 0)`.
+
+Taught on: [Functions › Default values](/docs/language/functions#default-values)
+
+### `ambiguous-overload-default`
+
+**Error.** A default on one entry of an `overload` block lets it accept exactly the calls another entry accepts.
+
+<div class="error-output">
+
+```
+[ambiguous-overload-default]
+Error: This default makes two Overloads accept the same call
+   ╭─┤ Greeting.es:4:28 │
+   │
+ 4 │              (times count: Integer = 1) -> String {
+   │                                      ▲  
+   │                                      ╰── leaving this out takes no Arguments
+   │ 
+ 7 │ ╭─▶          () -> String {
+   ┆ ┆   
+ 9 │ ├─▶          }
+   │ │                
+   │ ╰──────────────── this entry takes no Arguments
+   │ 
+   │ Help: Delete the entry the default already stands for, or give the Parameters labels that tell the two apart.
+   │ 
+   │ Note: An Overload is selected by the Arguments a call writes, so two entries that accept the same ones can not both be reached.
+───╯
+```
+
+</div>
+
+Delete the `() -> String` entry. Without it, `"hi"::greet()` reaches the first entry with `count` at `1`. Or give the parameters labels that tell the entries apart.
+
+Taught on: [Namespaces and methods › Overloads](/docs/language/namespaces-and-methods#overloads)
+
+### `fallback-never-used`
+
+**Warning.** A `defaultingTo` argument can never be used, because the call without it already returns a value that is never empty. A written list proves it has items, so `[3, 1, 2]::firstItem()` returns an `Integer`.
+
+<div class="error-output">
+
+```
+[fallback-never-used]
+Warning: This 'defaultingTo' Argument can never be read
+   ╭─┤ First.es:2:38 │
+   │
+ 2 │     Terminal.print([3, 1, 2]::firstItem(defaultingTo 0))
+   │                                         ───────┬──────  
+   │                                                ╰──────── this fallback can never be read
+   │ 
+   │ Help: Drop the 'defaultingTo' Argument; the call already answers an Integer.
+   │ 
+   │ Note: Without it the call answers an Integer, which is never empty.
+───╯
+```
+
+</div>
+
+Drop the argument. A constant does not keep that fact: after `constant scores = [3, 1, 2]`, the call `scores::firstItem(defaultingTo 0)` gets no warning.
+
+Quick Fix: **Remove the 'defaultingTo' Argument**.
+
+Taught on: [Checked refinements › What a proof changes](/docs/language/checked-refinements#what-a-proof-changes)
+
+### `redundant-key-check`
+
+**Warning.** An `if` guarded by `hasKey` looks the same key up again in its first statement. `hasKey` is a lookup itself, so the key is looked up twice.
+
+<div class="error-output">
+
+```
+[redundant-key-check]
+Warning: This key is looked up twice
+   ╭─┤ Ages.es:4:5 │
+   │
+ 4 │     if ages::hasKey("kim") {
+   │        ─────────┬─────────  
+   │                 ╰─────────── asked here
+ 5 │        constant age = ages::value(at "kim", defaultingTo 0)
+   │                       ──────────────────┬──────────────────  
+   │                                         ╰──────────────────── and answered here
+   │ 
+   │ Help: Ask 'value(at:)' once and match its Optional, or use 'value(at:defaultingTo:)' or 'update(at:with:)'.
+   │ 
+   │ Note: 'hasKey' is a lookup of its own — it asks the Dictionary for the key's value and answers whether it found one.
+───╯
+```
+
+</div>
+
+Look the key up once and match the `Optional`: `match ages::value(at "kim") -> {} { case #Value(age) { … } case #Empty {} }`. Where a fallback is enough, `value(at:defaultingTo:)` needs no `if`.
+
+### `ambiguous-nesting-level`
+
+**Warning.** An argument fits both the receiver's type and the type it holds, so the call has two readings. On an `Optional<Optional<Integer>>`, `nested::is(#Empty)` asks whether `nested` itself is empty.
+
+<div class="error-output">
+
+```
+[ambiguous-nesting-level]
+Warning: This Argument fits the receiver and what it holds
+   ╭─┤ Nested.es:4:28 │
+   │
+ 4 │     Terminal.print(nested::is(#Empty))
+   │                            ─┐ ───┬──  
+   │                             ╰────│──── this takes an Optional<Integer> as well
+   │                                  │    
+   │                                  ╰──── read as an Optional<Optional<Integer>> here
+   │ 
+   │ Help 1: Write '#Value(…)' around the Argument to ask whether the receiver holds it.
+   │ Help 2: Name it in a Constant annotated 'Optional<Optional<Integer>>' to go on asking about the receiver.
+   │ 
+   │ Note: A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.
+───╯
+```
+
+</div>
+
+Say which you mean. `nested::is(#Value(#Empty))` asks whether it holds an empty `Optional`. To ask about the receiver, compare with a constant annotated at the outer level: `constant outer: Optional<Optional<Integer>> = #Empty`, then `nested::is(outer)`.
+
+Refactor: **Wrap the Argument in '#Value(…)'**. It is a refactoring rather than a Quick Fix, because both readings are valid.
+
+Taught on: [Optional › Nested Optionals](/docs/language/optional#nested-optionals)
+
+## Choices
+
+Declaring a choice and building its cases.
+
+### `empty-choice`
+
+**Error.** A `choice` declares no cases.
+
+<div class="error-output">
+
+```
+[empty-choice]
+Error: A Choice must declare at least one Case
+   ╭─┤ Nothing.es:2:2 │
+   │
+ 2 │     choice Nothing {}
+   │     ────────┬────────  
+   │             ╰────────── this Choice declares none
+───╯
+```
+
+</div>
+
+Declare at least one case.
+
+Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
+
+### `unknown-case`
+
+**Error.** No case of that name exists where one was looked for. That place is a named choice, the matched value's type, or, for a bare `#Case`, every choice in scope.
+
+<div class="error-output">
+
+```
+[unknown-case]
+Error: No Choice in scope declares a Case '#Purple'
+   ╭─┤ Colour.es:7:29 │
+   │
+ 7 │     constant colour: Colour = #Purple
+   │                                ───┬──  
+   │                                   ╰──── no such Case
+───╯
+```
+
+</div>
+
+Fix the case name.
+
+Quick Fix: **Change to '#Red'** when a case name is close.
+
+Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
+
+### `ambiguous-case`
+
+**Error.** A bare `#Case` is declared by more than one choice in scope. A bare `#Value` is a common cause, because `Optional` and `Result` both declare it.
+
+<div class="error-output">
+
+```
+[ambiguous-case]
+Error: Case '#Red' is declared by more than one Choice
+    ╭─┤ Colour.es:12:19 │
+    │
+ 12 │     constant stop = #Red
+    │                      ─┬─  
+    │                       ╰─── 2 Choices in scope declare it
+    │ 
+    │ Help 1: Write 'Colour#Red' to pick 'Colour'.
+    │ Help 2: Write 'Signal#Red' to pick 'Signal'.
+    │ 
+    │ Note 1: 'Colour' declares '#Red'.
+    │ Note 2: 'Signal' declares '#Red'.
+────╯
+```
+
+</div>
+
+Prefix the case with its choice: `Colour#Red`.
+
+Quick Fix: **Prefix with 'Colour#'**, one for each choice that declares the case.
+
+Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
+
+### `missing-payload`
+
+**Error.** A case that carries a payload is written without one. A bare `#Case` is only for a case without a payload.
+
+<div class="error-output">
+
+```
+[missing-payload]
+Error: Case '#Circle' requires a payload
+   ╭─┤ Shape.es:7:26 │
+   │
+ 7 │     constant shape: Shape = #Circle
+   │                             ───┬───  
+   │                                ╰───── no payload was given
+   │ 
+   │ Note: '#Circle' carries a { radius: Integer }.
+───╯
+```
+
+</div>
+
+Pass the payload, `#Circle({ radius = 1 })`, or `#Circle(1)` for a payload of one member.
+
+Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
+
+### `unexpected-payload`
+
+**Error.** A case without a payload is given one.
+
+<div class="error-output">
+
+```
+[unexpected-payload]
+Error: Case '#Dot' does not carry a payload
+   ╭─┤ Shape.es:7:31 │
+   │
+ 7 │     constant shape: Shape = #Dot(1)
+   │                                  ▲  
+   │                                  ╰── nothing goes here
+   │ 
+   │ Help: Write '#Dot' on its own.
+───╯
+```
+
+</div>
+
+Write the case on its own: `#Dot`.
+
+Quick Fix: **Write '#Dot' on its own**.
+
+Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
+
+### `payload-type-mismatch`
+
+**Error.** A payload does not fit the shape its case declares.
+
+<div class="error-output">
+
+```
+[payload-type-mismatch]
+Error: This payload does not fit Case '#Circle'
+   ╭─┤ Shape.es:7:34 │
+   │
+ 7 │     constant shape: Shape = #Circle({ radius = "big" })
+   │                                     ─────────┬────────  
+   │                                              ╰────────── this is a { radius: { radius: String } }
+   │ 
+   │ Note: '#Circle' carries a { radius: Integer }.
+───╯
+```
+
+</div>
+
+Write the payload the case declares: `#Circle({ radius = 3 })`.
+
+Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
+
+### `unbindable-case-payload`
+
+**Error.** A case matcher binds one name, as in `case #Rectangle(size)`, for a case whose payload has several members. One name binds a payload of exactly one member.
+
+<div class="error-output">
+
+```
+[unbindable-case-payload]
+Error: 'Shape#Rectangle' has no single value to bind
+   ╭─┤ Shape.es:9:20 │
+   │
+ 9 │          case #Rectangle(size) {
+   │                          ──┬─  
+   │                            ╰─── this Case carries 2 values
+   │ 
+   │ Help: Take the payload apart instead: '#Rectangle({ width, height })'.
+   │ 
+   │ Note: Its values are 'width', 'height'.
+───╯
+```
+
+</div>
+
+Take the payload apart by its members, the way JavaScript destructures an object: `case #Rectangle({ width, height })`.
+
+Taught on: [Patterns › In a case payload](/docs/language/patterns#in-a-case-payload)
+
+### `case-default-not-a-literal`
+
+**Error.** A value in a payload default is computed, such as a function call. A payload default holds written values, or constants of the same module that hold them.
+
+<div class="error-output">
+
+```
+[case-default-not-a-literal]
+Error: This value in a payload default is not a literal
+   ╭─┤ Request.es:7:55 │
+   │
+ 7 │        Get { url: String, retries: Integer } = { retries = standardRetries() },
+   │                                                            ────────┬────────  
+   │                                                                    ╰────────── this is worked out rather than written down
+   │ 
+   │ Help: Write a literal — a Number, a String, a Boolean, or a List, Record or Case value built out of those — or name a Constant of this Module whose value is one.
+   │ 
+   │ Note: A payload default is spliced into every construction of its Case, and a construction may stand in a Module that never named the Choice — so the value travels with the Case Type, and a name read where the Case is built would be a name that is not there.
+───╯
+```
+
+</div>
+
+Write the value, `{ retries = 3 }`, or name a constant of this module: `constant standardRetries = 3`, then `{ retries = standardRetries }`.
+
+Taught on: [Choices and `match` › Defaults for a payload](/docs/language/choices-and-match#defaults-for-a-payload)
+
+### `case-default-on-generic-choice`
+
+**Error.** A case of a generic choice has a payload default. Each use of the choice gives its own type arguments, so one default cannot fit them all.
+
+<div class="error-output">
+
+```
+[case-default-on-generic-choice]
+Error: A generic Choice can not default a payload
+   ╭─┤ Holder.es:3:41 │
+   │
+ 3 │        Full { item: Item, count: Integer } = { count = 1 },
+   │                                              ──────┬──────  
+   │                                                    ╰──────── this default
+   │ 
+   │ Help: Write the member at each construction, or declare a Choice for the Type this default is a value of.
+   │ 
+   │ Note: 'Holder' abstracts over 1 Type Parameter, and a value written here can bind none of them — every use site decides them, and each would want a default of its own.
+───╯
+```
+
+</div>
+
+Write the member at each construction instead.
+
+Taught on: [Choices and `match` › Defaults for a payload](/docs/language/choices-and-match#defaults-for-a-payload)
+
+### `recursive-generic-choice`
+
+**Error.** A generic choice names itself in one of its payloads. Recursive type declarations are refused.
+
+<div class="error-output">
+
+```
+[recursive-generic-choice]
+Error: A generic Choice can not name itself in a payload
+```
+
+</div>
+
+Break the cycle. A `List` does not break it: a payload member typed `List<Tree<Item>>` reports this code too. To hold a tree, keep its nodes in a list and give each node the positions of its children in that list, or key the nodes in a dictionary.
+
+Taught on: [Generics › A choice applies its type arguments](/docs/language/generics#a-choice-applies-its-type-arguments)
+
+### `indistinguishable-union-arms`
+
+**Error.** A payload union has two arms that mention a type parameter, such as `Item | List<Item>`. Two values of the choice are compared where the type arguments are still type parameters, so the arms cannot be told apart at runtime.
+
+<div class="error-output">
+
+```
+[indistinguishable-union-arms]
+Error: This Choice's payload can not be compared here
+   ╭─┤ Val.es:7:6 │
+   │
+ 7 │        <- first::is(second)
+   │           ────────┬────────  
+   │                   ╰────────── two arms of a payload Union are one Type at runtime
+   │ 
+   │ Help: Compare the value where its Type Arguments are known, or write the arms so that something other than a Type Parameter tells them apart.
+   │ 
+   │ Note 1: 'Item | List<Item>' names 2 arms standing for a Type Parameter's values: 'Item', 'List<Item>'.
+   │ Note 2: Type Parameters erase, so which arm a value belongs to is decided by the Type Arguments the receiver was applied to — and here they are Parameters themselves.
+───╯
+```
+
+</div>
+
+Compare where the type arguments are known, for example in a function that takes `Val<Integer>`. Or write the arms so that something other than a type parameter tells them apart.
+
+### `undecided-type-arguments`
+
+**Error.** A case of a generic choice is built where no type arguments are written and none come from its position. A choice's type arguments are written, never inferred from the payload.
+
+<div class="error-output">
+
+```
+[undecided-type-arguments]
+Error: Nothing decides the Type Arguments of 'Holder#Bare'
+```
+
+</div>
+
+Write the type arguments at the case, `Holder<Integer>#Bare`, or annotate the constant: `constant empty: Holder<Integer> = Holder#Bare`. The Help printed with this error writes the choice's own parameter, as in `Holder<Item>`. Write the type you mean in its place.
+
+Taught on: [Generics › A choice applies its type arguments](/docs/language/generics#a-choice-applies-its-type-arguments)
+
+## Match
+
+Taking a value apart with `match`.
+
+### `missing-case`
+
+**Error.** A `match` does not handle every member of the matched type. The Note lists what is not handled.
+
+<div class="error-output">
+
+```
+[missing-case]
+Error: This Match Expression does not handle every Case
+   ╭─┤ Colour.es:9:6 │
+   │
+ 9 │        <- match colour -> String {
+   │                 ───┬──  
+   │                    ╰──── this is a Colour
+   │ 
+   │ Help: Add 'case Colour#Blue', or a 'case _' that covers the rest.
+   │ 
+   │ Note: Unhandled: 'Colour#Blue'.
+───╯
+```
+
+</div>
+
+Add a `case` for each, or a `case _` for the rest.
+
+Quick Fix: **Add missing Cases** writes an empty `case` for each, with a `case _` for any member that cannot be written as a matcher.
+
+Taught on: [Choices and `match` › Guards, order and exhaustiveness](/docs/language/choices-and-match#guards-order-and-exhaustiveness)
+
+### `unreachable-case`
+
+**Warning.** A `case` can never run, because an earlier case already matches all of its values.
+
+<div class="error-output">
+
+```
+[unreachable-case]
+Warning: This Case can never match
+    ╭─┤ Colour.es:15:9 │
+    │
+  9 │          case #Red {
+    │               ──┬─  
+    │                 ╰─── this Case runs first
+    │ 
+ 15 │          case #Red {
+    │               ──┬─  
+    │                 ╰─── an earlier Case already answers for every Type this one matches
+    │ 
+    │ Help: Remove this Case, or write it above the one that covers it.
+    │ 
+    │ Note: Cases are tried in order, and the first one that fits wins.
+────╯
+```
+
+</div>
+
+Delete the second `case #Red`, since the first one already handles `#Red`. When the two cases differ, move the narrower one above the case that covers it.
+
+Quick Fix: **Remove unreachable Case**.
+
+Taught on: [Choices and `match` › Guards, order and exhaustiveness](/docs/language/choices-and-match#guards-order-and-exhaustiveness)
+
+### `erased-case-conflict`
+
+**Error.** An earlier `case` covers this one because types erase before a `match` runs. A generic `case Value` accepts every value that reaches it, so no case below it can run.
+
+<div class="error-output">
+
+```
+[erased-case-conflict]
+Error: This Case can never match
+   ╭─┤ Describe.es:7:9 │
+   │
+ 4 │          case Value {
+   │               ──┬──  
+   │                 ╰──── this Case runs first
+   │ 
+ 7 │          case String {
+   │               ───┬──  
+   │                  ╰──── an earlier Case already answers for every Type this one matches
+   │ 
+   │ Help: Write this Case above 'case Value', which can only ever be the last one.
+   │ 
+   │ Note 1: Cases are tried in order, and the first one that fits wins.
+   │ Note 2: Types erase before a Match runs, so the Generic Case 'Value' narrows nothing and accepts every value that reaches it.
+───╯
+```
+
+</div>
+
+Write the generic case last.
+
+Taught on: [Generics › Types erase before a match](/docs/language/generics#types-erase-before-a-match)
+
+### `empty-list-overlap`
+
+**Warning.** An earlier `case` also matches this one's empty lists. Item types erase before a `match` runs, so an empty list fits every list type.
+
+<div class="error-output">
+
+```
+[empty-list-overlap]
+Warning: This Case never sees an empty List
+   ╭─┤ Describe.es:7:9 │
+   │
+ 4 │          case List<String> {
+   │               ──────┬─────  
+   │                     ╰─────── this Case runs first
+   │ 
+ 7 │          case List<Integer> {
+   │               ──────┬──────  
+   │                     ╰──────── an empty List<Integer> fits the Case above too
+   │ 
+   │ Help: Guard the Cases with 'where @::hasItems()' and answer for the empty List in a Case of its own.
+   │ 
+   │ Note 1: Cases are tried in order, and the first one that fits wins.
+   │ Note 2: Item Types erase before a Match runs, so a List Matcher asks about the items the value holds — and an empty List holds none, which makes it a value of every List Type there is.
+───╯
+```
+
+</div>
+
+Guard the cases with `where @::hasItems()`, and handle the empty list in a case of its own, such as a final `case _`.
+
+Quick Fix: **Guard it with 'where @::hasItems()'**, on the case that runs first.
+
+Taught on: [Generics › Types erase before a match](/docs/language/generics#types-erase-before-a-match)
+
+### `empty-dictionary-overlap`
+
+**Warning.** An earlier `case` also matches this one's empty dictionaries. Key and value types erase before a `match` runs, so an empty dictionary fits every dictionary type.
+
+<div class="error-output">
+
+```
+[empty-dictionary-overlap]
+Warning: This Case never sees an empty Dictionary
+   ╭─┤ Describe.es:7:9 │
+   │
+ 4 │          case Dictionary<String, Integer> {
+   │               ─────────────┬─────────────  
+   │                            ╰─────────────── this Case runs first
+   │ 
+ 7 │          case Dictionary<Integer, String> {
+   │               ─────────────┬─────────────  
+   │                            ╰─────────────── an empty Dictionary<Integer, String> fits the Case above too
+   │ 
+   │ Help: Guard the Cases with 'where @::hasEntries()' and answer for the empty Dictionary in a Case of its own.
+   │ 
+   │ Note 1: Cases are tried in order, and the first one that fits wins.
+   │ Note 2: Key and value Types erase before a Match runs, so a Dictionary Matcher asks about the entries the value holds — and an empty Dictionary holds none, which makes it a value of every Dictionary Type there is.
+───╯
+```
+
+</div>
+
+Guard both cases, as in `case Dictionary<String, Integer> where @::hasEntries() { … }`, and handle the empty dictionary in a final `case _ { … }`.
+
+Quick Fix: **Guard it with 'where @::hasEntries()'**, on the case that runs first.
+
+Taught on: [Generics › Types erase before a match](/docs/language/generics#types-erase-before-a-match)
+
+### `refinement-as-matcher`
+
+**Error.** A `case` tests for a checked refinement, such as `case NonZeroInteger`. The predicate erases before the program runs, so the case could only test the base type.
+
+<div class="error-output">
+
+```
+[refinement-as-matcher]
+Error: A Matcher can not test for 'NonZeroInteger'
+   ╭─┤ Describe.es:4:9 │
+   │
+ 4 │          case NonZeroInteger {
+   │               ───────┬──────  
+   │                      ╰──────── this is a checked refinement
+   │ 
+   │ Help: Match on 'Integer' and prove the predicate inside the arm, the way every 'NonZeroInteger' is proven: an 'if' condition, a Case naming a written value, or a written value.
+   │ 
+   │ Note: A refinement's predicate erases before the Program runs, so the emitted check could only ask about 'Integer' — and the arm would run for values the predicate refuses.
+───╯
+```
+
+</div>
+
+Match the base type and prove the predicate inside the arm: `case Integer { if @::isNot(0) { … } else { … } }`.
+
+Taught on: [Checked refinements › A `match` proves its cases](/docs/language/checked-refinements#a-match-proves-its-cases)
+
+### `match-on-non-union`
+
+**Error.** A `match` is written on a value that is not a union or a choice. `Boolean` is neither: unlike TypeScript's `boolean`, it is not the union `true | false`, so `case true` is refused too. An `Integer` or a `String` can be matched by value instead, under the rules of [`literal-match-shape`](/docs/reference/diagnostics#literal-match-shape).
+
+<div class="error-output">
+
+```
+[match-on-non-union]
+Error: Match Expressions require a Union Type
+   ╭─┤ Ready.es:4:25 │
+   │
+ 4 │     constant label = match ready -> String {
+   │                            ──┬──  
+   │                              ╰──── this is a Boolean
+   │ 
+   │ Note: Matching a Type with only one possible shape has only one outcome.
+───╯
+```
+
+</div>
+
+Use `if` or `define` for a `Boolean`.
+
+Taught on: [Choices and `match` › Matching something other than a choice](/docs/language/choices-and-match#matching-something-other-than-a-choice)
+
+### `literal-match-shape`
+
+**Error.** A `match` on an `Integer` or a `String` breaks a rule of matching by value. Most often it names values and has no last case for the values it did not name. The label points at the case that breaks the rule.
+
+<div class="error-output">
+
+```
+[literal-match-shape]
+Error: This Match has no Case for the rest of the values
+   ╭─┤ Describe.es:3:6 │
+   │
+ 3 │        <- match count -> String {
+   │                 ──┬──  
+   │                   ╰──── this is an Integer
+   │ 
+ 7 │          case 1 {
+   │               ▲  
+   │               ╰── this Case names a value, not the rest of them
+   │ 
+   │ Help: Add a 'case _' below, for every value the Cases above miss.
+   │ 
+   │ Note 1: A Match on an Integer takes the VALUE apart: every Case names a value, and the last one answers for every value the Cases above it did not name.
+   │ Note 2: There are more values of Integer than a Match can write down, so the last Case is what makes it answer for all of them.
+───╯
+```
+
+</div>
+
+End the `match` with `case _`: `case 0 { … } case 1 { … } case _ { … }`.
+
+Quick Fix: **Add a 'case _' for the rest of the values**. A guard on a case that names a value gets **Drop the Guard**.
+
+Taught on: [Choices and `match` › Matching something other than a choice](/docs/language/choices-and-match#matching-something-other-than-a-choice)
+
+## Define
+
+Choosing a value with `define`.
+
+### `define-without-otherwise`
+
+**Error.** Every arm of a `define` has a condition, so nothing is returned when they all fail.
+
+<div class="error-output">
+
+```
+[define-without-otherwise]
+Error: This 'define' has no 'otherwise' arm
+   ╭─┤ Label.es:4:19 │
+   │
+ 4 │ ╭─▶     constant label = define {
+   ┆ ┆   
+ 6 │ ├─▶     }
+   │ │           
+   │ ╰─────────── every value here has a condition on it
+   │ 
+   │ Help: Write the last arm as 'as <value> otherwise'.
+   │ 
+   │ Note: A 'define' answers with a value wherever it stands, so one of its arms has to be the one that always holds.
+───╯
+```
+
+</div>
+
+End it with an `otherwise` arm: `as "wait" otherwise`.
+
+Quick Fix: **Add an empty 'otherwise' arm**.
+
+Taught on: [Conditions › `otherwise` is mandatory](/docs/language/conditions#otherwise-is-mandatory)
+
+### `unreachable-define-arm`
+
+**Error.** An arm is written below the `otherwise` arm. The `otherwise` arm always holds, so nothing below it runs.
+
+<div class="error-output">
+
+```
+[unreachable-define-arm]
+Error: This arm stands below the 'otherwise' arm
+   ╭─┤ Label.es:7:3 │
+   │
+ 7 │        as "stop" if ready::negate()
+   │        ──────────────┬─────────────  
+   │                      ╰─────────────── nothing here can ever be reached
+   │ 
+   │ Help: Move this arm above the 'otherwise' arm, or delete it.
+   │ 
+   │ Note: The 'otherwise' arm is the one that always holds, so a 'define' answers there whenever it gets that far.
+───╯
+```
+
+</div>
+
+Move `as "stop" if ready::negate()` above `as "wait" otherwise`, or delete it.
+
+Quick Fix: **Remove the arm** or **Move the arm above the 'otherwise' arm**.
+
+Taught on: [Conditions › Arms are tried in order](/docs/language/conditions#arms-are-tried-in-order)
+
+### `define-without-answer-type`
+
+**Error.** The compiler cannot tell what type a `define` returns. Here each arm is a case of a generic choice, and no arm gives its type arguments.
+
+<div class="error-output">
+
+```
+[define-without-answer-type]
+Error: Nothing decides what this 'define' answers
+   ╭─┤ Fetched.es:4:21 │
+   │
+ 4 │ ╭─▶     constant fetched = define {
+ 5 │ │          as #Empty    if skipped
+   │ │             ───┬──  
+   │ │                ╰──── this arm has none of its own to lend it
+   ┆ ┆   
+ 7 │ ├─▶     }
+   │ │           
+   │ ╰─────────── this 'define' has no answer Type
+   │ 
+   │ Help 1: Write the answer Type on the 'define' itself: 'define -> Type { … }' — it is pushed into every arm.
+   │ Help 2: Or annotate the Declaration it stands in, where it stands in one. An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.
+   │ 
+   │ Note: A 'define' takes its answer Type from its arrow, from the position it stands in, or from what its arms answer with — and an arm that decides no Type Arguments of its own leaves nothing to take.
+───╯
+```
+
+</div>
+
+Write the type on the `define`, `define -> Optional<Integer> { … }`, or annotate the constant: `constant fetched: Optional<Integer> = define { … }`. A `define` passed directly as an argument needs the arrow, because an argument position passes no type down.
+
+Taught on: [Conditions › What a `define` returns](/docs/language/conditions#what-a-define-returns)
+
+### `define-without-cases`
+
+**Warning.** A `define` has only its `otherwise` arm, so it has nothing to choose between.
+
+<div class="error-output">
+
+```
+[define-without-cases]
+Warning: This 'define' has no cases
+   ╭─┤ Label.es:2:19 │
+   │
+ 2 │ ╭─▶     constant label = define {
+   ┆ ┆   
+ 4 │ ├─▶     }
+   │ │           
+   │ ╰─────────── nothing here is decided by cases
+   │ 
+   │ Help: Write the 'otherwise' value on its own, or add the arms this 'define' was going to ask.
+   │ 
+   │ Note: A 'define' answers with the value of the first arm whose Condition holds — and the 'otherwise' arm is the one that holds when none of them did.
+───╯
+```
+
+</div>
+
+Write the value on its own, or add the arms.
+
+Quick Fix: **Write the value on its own**.
+
+Taught on: [Conditions › `otherwise` is mandatory](/docs/language/conditions#otherwise-is-mandatory)
+
+## Patterns
+
+Naming the parts of a value.
+
+### `refutable-pattern`
+
+**Error.** A pattern in a declaration or a parameter constrains a member by value, such as `{ width = 0, height }`. A declaration has nowhere to go when the value does not match.
+
+<div class="error-output">
+
+```
+[refutable-pattern]
+Error: A Declaration can not match a value against a Pattern
+   ╭─┤ Rectangle.es:3:13 │
+   │
+ 3 │     constant { width = 0, height } = rectangle
+   │                ────┬────  
+   │                    ╰────── this can decline the value
+   │ 
+   │ Help: Write only 'width' to bind it, and ask about its value with 'match'.
+   │ 
+   │ Note: A Matcher may constrain a member by value, because an arm that declines falls through to the next one. A Declaration has nowhere to fall through to.
+───╯
+```
+
+</div>
+
+Bind the member, `constant { width, height } = rectangle`, and ask about its value with `match`.
+
+Taught on: [Patterns › Patterns that cannot decline](/docs/language/patterns#patterns-that-cannot-decline)
+
+### `redundant-pattern-binder`
+
+**Error.** A matcher's own pattern ends in `as name`, as in `case { x, y } as whole`. Inside the arm, `@` already names the matched value.
+
+<div class="error-output">
+
+```
+[redundant-pattern-binder]
+Error: A Matcher's Pattern can not name the whole value
+   ╭─┤ Point.es:4:18 │
+   │
+ 4 │          case { x, y } as whole {
+   │                        ────┬───  
+   │                            ╰───── '@' already names it
+   │ 
+   │ Help: Write '@' where 'whole' was meant.
+   │ 
+   │ Note: Inside an arm, '@' is the scrutinee narrowed to what the Matcher established — which is exactly what this would name a second time.
+───╯
+```
+
+</div>
+
+Write `@` where the name was used: `case { x, y } { <- @.x::add(y) }`. A case payload pattern may still carry `as`: `case #Rectangle({ width, height } as box)` compiles.
+
+Quick Fix: **Use '@' instead of 'whole'**.
+
+Taught on: [Patterns › In a match arm](/docs/language/patterns#in-a-match-arm)
+
+### `pattern-without-body`
+
+**Error.** A pattern is written in a protocol method's signature. A signature has no body to bind the names in.
+
+<div class="error-output">
+
+```
+[pattern-without-body]
+Error: A Protocol Method can not take a Parameter apart
+   ╭─┤ Measurable.es:3:11 │
+   │
+ 3 │        area(of { width, height }: { width: Integer, height: Integer }) -> Integer
+   │                ────────┬────────  
+   │                        ╰────────── no body to bind these in
+   │ 
+   │ Help: Write one name, and take it apart where it is used.
+   │ 
+   │ Note: A Protocol Method declares what a call looks like and nothing about how it is carried out, so a Pattern here would name parts for nobody to read.
+───╯
+```
+
+</div>
+
+Write one parameter name in the signature, and take it apart in the method that fulfils it.
+
+Taught on: [Protocols › What a requirement can be](/docs/language/protocols#what-a-requirement-can-be)
+
+## Inference
+
+What the compiler could not work out on its own.
+
+### `uninferable-type-parameter`
+
+**Error.** The compiler cannot infer a function's type parameter at a call, because no argument gives it the type. A function with no parameters, such as `empty<infer Item>() -> List<Item>`, reports it when called as `empty()`.
+
+<div class="error-output">
+
+```
+[uninferable-type-parameter]
+Error: Type Parameter 'Item' could not be inferred
+```
+
+</div>
+
+The Help printed with this error says to write the type argument. Essence has no syntax for that at a call: `empty<Integer>()` is a `syntax-error`. Annotating the constant does not help either. Give the function a parameter whose type mentions the type parameter, so that the compiler infers it from the argument: `emptyLike<infer Item>(_ sample: List<Item>)`.
+
+Taught on: [Generics › Only the arguments bind](/docs/language/generics#only-the-arguments-bind)
+
+### `uninferable-parameter-type`
+
+**Error.** A function literal's parameter has no type, and the literal is not passed as an argument. Only a literal written directly as an argument takes its types from the call.
+
+<div class="error-output">
+
+```
+[uninferable-parameter-type]
+Error: The Type of Parameter 'number' could not be inferred
+   ╭─┤ Double.es:2:21 │
+   │
+ 2 │     constant double = (number) {
+   │                        ───┬──  
+   │                           ╰──── this Parameter has no Type
+   │ 
+   │ Help: Write the Parameter's Type explicitly.
+   │ 
+   │ Note: Only a Function passed as an Argument takes its Types from the surrounding context.
+───╯
+```
+
+</div>
+
+Write the type: `(_ number: Integer) -> Integer { … }`.
+
+Taught on: [Functions as values › Literals written as arguments](/docs/language/functions-as-values#literals-written-as-arguments)
+
+### `path-without-context`
+
+**Error.** A member path such as `.price` is written where no function of one parameter is expected, so there is no type to read the member from.
+
+<div class="error-output">
+
+```
+[path-without-context]
+Error: A member path stands where no Function is expected
+   ╭─┤ Price.es:2:19 │
+   │
+ 2 │     constant price = .price
+   │                      ───┬──  
+   │                         ╰──── this path names no value
+   │ 
+   │ Help: Write the Function literal instead: '(_ item: SomeType) { <- item.price }'.
+   │ 
+   │ Note 1: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
+   │ Note 2: This position expects no particular Type.
+───╯
+```
+
+</div>
+
+Pass the path where a function is expected, as in `products::map(.price)`, or write a function literal.
+
+Taught on: [Functions as values › Member paths](/docs/language/functions-as-values#member-paths)
+
+### `uninferable-item-type`
+
+**Error.** A function literal captures a variable declared as `[]` before an assignment gives it an item type.
+
+<div class="error-output">
+
+```
+[uninferable-item-type]
+Error: 'items' is captured before its item Type is decided
+   ╭─┤ Items.es:5:6 │
+   │
+ 2 │     variable items = []
+   │              ──┬──  
+   │                ╰──── declared with nothing to say what it holds
+   │ 
+ 5 │        <- items::length()
+   │           ──┬──  
+   │             ╰──── captured here as a List<Unknown>
+   │ 
+   │ Help: Annotate the declaration — 'variable items: List<Integer> = []' — so the Function is checked against the Type it will hold.
+   │ 
+   │ Note: An empty List Literal leaves its item Type unknown until an assignment decides it, and this Function was checked before that happened.
+───╯
+```
+
+</div>
+
+Annotate the variable: `variable items: List<Integer> = []`.
+
+### `uninferable-return-type`
+
+**Error.** A function literal's return type cannot be worked out from its body. A body that forgets `<-` is the usual cause: `(n) { n::add(1) }` returns nothing.
+
+<div class="error-output">
+
+```
+[uninferable-return-type]
+Error: The return Type could not be inferred from the body
+   ╭─┤ Double.es:2:34 │
+   │
+ 2 │     constant doubled = [1, 2]::map((number) {
+   │                                     ───┬──  
+   │                                        ╰──── the body's Type is not determined here
+   │ 
+   │ Help: Give the Function an explicit '-> Type'.
+───╯
+```
+
+</div>
+
+Return the value, `(number) { <- number::multiply(with 2) }`, or write the return type with `->`.
+
+Taught on: [Coming from JavaScript › Functions](/docs/getting-started/coming-from-javascript#functions)
+
+### `missing-return-type`
+
+**Error.** A function literal that is not passed as an argument has no `-> Type`.
+
+<div class="error-output">
+
+```
+[missing-return-type]
+Error: This Function must write its return Type
+   ╭─┤ Double.es:2:20 │
+   │
+ 2 │     constant double = (_ number: Integer) {
+   │                       ─────────┬─────────  
+   │                                ╰─────────── no '-> Type' here
+   │ 
+   │ Note: Only a Function passed as an Argument takes its Types from the surrounding context.
+───╯
+```
+
+</div>
+
+Write the return type: `(_ number: Integer) -> Integer { … }`.
+
+Taught on: [Functions as values › Function literals](/docs/language/functions-as-values#function-literals)
+
+## Protocols
+
+Protocols, bounds and conformances.
+
+### `protocol-as-value`
+
+**Error.** A protocol name is used as a value. A protocol appears only in a bound, `<infer T is Comparable>`, or in a conformance clause, `is Comparable`.
+
+<div class="error-output">
+
+```
+[protocol-as-value]
+Error: Protocol 'Comparable' can not be used as a value
+   ╭─┤ Compare.es:2:22 │
+   │
+ 2 │     constant ordering = Comparable
+   │                         ─────┬────  
+   │                              ╰────── this names a Protocol
+   │ 
+   │ Note: A Protocol is only usable as a Generic bound ('<infer T is Comparable>') or in a conformance clause ('is Comparable').
+───╯
+```
+
+</div>
+
+Use the protocol in a bound or a conformance clause.
+
+Taught on: [Protocols › What a protocol is not](/docs/language/protocols#what-a-protocol-is-not)
+
+### `protocol-as-type`
+
+**Error.** A protocol name is used as a type, for example in an annotation. Unlike a TypeScript interface, a protocol is not a type.
+
+<div class="error-output">
+
+```
+[protocol-as-type]
+Error: Protocol 'Comparable' can not be used as a Type
+   ╭─┤ Compare.es:2:18 │
+   │
+ 2 │     constant count: Comparable = 1
+   │                     ─────┬────  
+   │                          ╰────── this names a Protocol
+   │ 
+   │ Note: A Protocol is only usable as a Generic bound ('<infer T is Comparable>') or in a conformance clause ('is Comparable').
+───╯
+```
+
+</div>
+
+Use a concrete type, or a type parameter bounded by the protocol: `<infer T is Comparable>`.
+
+Taught on: [Protocols › What a protocol is not](/docs/language/protocols#what-a-protocol-is-not)
+
+### `unsatisfied-bound`
+
+**Error.** A type argument does not conform to the protocol its type parameter is bound to.
+
+<div class="error-output">
+
+```
+[unsatisfied-bound]
+Error: { x: Integer } does not conform to 'Comparable'
+   ╭─┤ Largest.es:6:17 │
+   │
+ 6 │     Terminal.print(largest(of [{ x = 1 }, { x = 2 }]))
+   │                    ─────────────────┬────────────────  
+   │                                     ╰────────────────── this binds a Type Parameter bound to 'Comparable'
+   │ 
+   │ Help: Declare a Namespace 'for { x: Integer } is Comparable'.
+   │ 
+   │ Note: No Namespace in scope makes { x: Integer } conform to 'Comparable'.
+───╯
+```
+
+</div>
+
+Pass a type that conforms, or declare a namespace that makes this type conform, as the Help shows.
+
+Quick Fix: **Declare it as '&lt;infer Item is Comparable&gt;'** adds the bound to a type parameter that this file declares.
+
+Taught on: [Protocols › Declared, not structural](/docs/language/protocols#declared-not-structural)
+
+### `interpolation-not-printable`
+
+**Error.** A `{ … }` hole in a string holds a value that does not conform to `Printable`. A union does not take `Printable` from its members, so `Integer | String` is not `Printable` although both members are. A union of number types is the exception.
+
+<div class="error-output">
+
+```
+[interpolation-not-printable]
+Error: Integer | String can not be interpolated into a String
+   ╭─┤ Show.es:3:15 │
+   │
+ 3 │        <- "value: {value}"
+   │                    ──┬──  
+   │                      ╰──── this is Integer | String, which is not Printable
+   │ 
+   │ Help: Interpolate only Printable values; match an Optional or a Union apart first and interpolate each Case.
+   │ 
+   │ Note: Integer | String does not conform to 'Printable'.
+───╯
+```
+
+</div>
+
+Match the value apart and interpolate each case: `case Integer { <- "value: {@}" } case String { <- "value: {@}" }`.
+
+Taught on: [Unions and type aliases › Using a union before a match](/docs/language/unions-and-type-aliases#using-a-union-before-a-match)
+
+### `redundant-interpolation-to-string`
+
+**Warning.** A `{ … }` hole calls `toString()` on a value that is already `Printable`. The hole converts it the same way.
+
+<div class="error-output">
+
+```
+[redundant-interpolation-to-string]
+Warning: A String Interpolation calls 'toString' on its own
+   ╭─┤ Count.es:4:24 │
+   │
+ 4 │     Terminal.print("{count::toString()} items")
+   │                      ──┬────────┬─────  
+   │                        ╰────────│─────── this is Integer, which is Printable
+   │                                 │       
+   │                                 ╰─────── this call is redundant
+   │ 
+   │ Help: Drop the '::toString()' and interpolate the value itself.
+   │ 
+   │ Note: A hole renders its value through its 'Printable' conformance — the same Method this call names.
+───╯
+```
+
+</div>
+
+Interpolate the value itself: `"{count} items"`.
+
+Quick Fix: **Remove the redundant 'toString' call**.
+
+Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
+
+### `ambiguous-conformance`
+
+**Error.** More than one namespace makes the type conform to the protocol, and none of them targets it more closely than the others.
+
+<div class="error-output">
+
+```
+[ambiguous-conformance]
+Error: More than one Namespace makes { x: Integer, y: Integer } conform to 'Printable'
+    ╭─┤ Point.es:18:19 │
+    │
+ 18 │     Terminal.print("{here}")
+    │                      ──┬─  
+    │                        ╰─── the conformance can not be chosen here
+    │ 
+    │ Note 1: 'Plain' conforms to 'Printable'.
+    │ Note 2: 'Fancy' conforms to 'Printable'.
+────╯
+```
+
+</div>
+
+Keep one of the conforming namespaces.
+
+Taught on: [Protocols › Unions in a bound](/docs/language/protocols#unions-in-a-bound)
+
+### `nonconforming-namespace`
+
+**Error.** A namespace declares a conformance but does not provide what the protocol requires. The label names the missing method.
+
+<div class="error-output">
+
+```
+[nonconforming-namespace]
+Error: Namespace 'Points' does not conform to 'Printable'
+   ╭─┤ Point.es:4:32 │
+   │
+ 4 │     namespace Points for Point is Printable {}
+   │                                   ────┬────  
+   │                                       ╰────── Method 'toString' is missing
+───╯
+```
+
+</div>
+
+Write the missing method, here `toString() -> String { … }`. A choice whose cases carry no payload gets `is Printable` without writing a method.
+
+Quick Fix: **Implement 'Printable'** writes an empty method for each missing requirement.
+
+Taught on: [Protocols › Declaring a protocol](/docs/language/protocols#declaring-a-protocol)
+
+### `undeclared-conformance`
+
+**Error.** A namespace over a choice writes a requirement of a protocol that the choice derives, such as `is` for `Equatable`, without declaring the conformance. A call through the protocol would reach the derived method instead of this one.
+
+<div class="error-output">
+
+```
+[undeclared-conformance]
+Error: Namespace 'Colours' writes 'is' without declaring 'is Equatable'
+   ╭─┤ Colour.es:8:3 │
+   │
+ 8 │        is(_ other: Colour) -> Boolean {
+   │        ─┐  
+   │         ╰── Colour derives 'Equatable' unless this Namespace declares it
+   │ 
+   │ Help: Declare the conformance: 'is Equatable' on this Namespace.
+   │ 
+   │ Note: A call naming this Namespace answers what is written here; a call through an 'Equatable' bound answers the derived one.
+───╯
+```
+
+</div>
+
+Declare the conformance: `namespace Colours for Colour is Equatable`.
+
+Quick Fix: **Declare the conformance: 'is Equatable'**.
+
+Taught on: [Protocols › Derived conformances for choices](/docs/language/protocols#derived-conformances-for-choices)
+
+### `conformance-needs-target-type`
+
+**Error.** A namespace without a target type declares a conformance.
+
+<div class="error-output">
+
+```
+[conformance-needs-target-type]
+Error: Only a Namespace with a target Type can conform to a Protocol
+   ╭─┤ Tools.es:2:21 │
+   │
+ 2 │     namespace Tools is Printable {}
+   │                        ────┬────  
+   │                            ╰────── this Namespace has no 'for …'
+   │ 
+   │ Note: A conformance says what a Type can do, so there has to be a Type.
+───╯
+```
+
+</div>
+
+Give the namespace a target type with `for …`, and write the methods the protocol requires.
+
+Taught on: [Protocols › Declaring a protocol](/docs/language/protocols#declaring-a-protocol)
+
+### `default-on-protocol-requirement`
+
+**Error.** A parameter of a protocol requirement has a default. A default belongs to each namespace's method, not to the requirement.
+
+<div class="error-output">
+
+```
+[default-on-protocol-requirement]
+Error: A Protocol requirement can not carry a default
+   ╭─┤ Greeter.es:3:32 │
+   │
+ 3 │        greet(times count: Integer = 1) -> String
+   │                                     ▲  
+   │                                     ╰── this default
+   │ 
+   │ Help: Declare the requirement without the default, and write the default on the fulfilling Method.
+   │ 
+   │ Note: A requirement says which calls a conforming Type must answer; a default is part of how one of them answers, which is each Namespace's own.
+───╯
+```
+
+</div>
+
+Remove the default from the requirement, and write it on the method that fulfils it. That method may carry a default its requirement does not.
+
+Quick Fix: **Remove the default**.
+
+Taught on: [Protocols › What a requirement can be](/docs/language/protocols#what-a-requirement-can-be)
+
+### `protocol-bound-function-value`
+
+**Error.** A function with a protocol-bound type parameter is stored as a value. Such a function can only be called directly.
+
+<div class="error-output">
+
+```
+[protocol-bound-function-value]
+Error: A Function with Protocol-bound Type Parameters can not be used as a value
+   ╭─┤ Largest.es:6:21 │
+   │
+ 6 │     constant measure = largest
+   │                        ───┬───  
+   │                           ╰───── this Function is stored, not called
+   │ 
+   │ Help: Call it directly instead of passing it around.
+   │ 
+   │ Note: A bounded Function carries hidden conformance Parameters that only exist at a direct invocation.
+───╯
+```
+
+</div>
+
+Call it, or wrap the call in a function literal: `(_ items: List<Integer>) -> Integer { <- largest(of items) }`.
+
+Taught on: [Functions as values › Methods and generic functions as values](/docs/language/functions-as-values#methods-and-generic-functions-as-values)
+
+### `overloaded-function-value`
+
+**Error.** An overloaded function, such as `loop`, is used as a value. Its name stands for several signatures, not one function.
+
+<div class="error-output">
+
+```
+[overloaded-function-value]
+Error: An overloaded Function can not be used as a value
+   ╭─┤ Loop.es:2:20 │
+   │
+ 2 │     constant repeat = loop
+   │                       ──┬─  
+   │                         ╰─── this names all 9 overloads at once
+   │ 
+   │ Help: Invoke it, or wrap the overload you mean in a Function literal.
+───╯
+```
+
+</div>
+
+Wrap the overload you mean in a function literal, and store that: `constant sumTo = (_ last: Integer) -> Integer { <- loop(from 1, through last, startingWith 0, (index, sum) { <- sum::add(index) }) }`.
+
+Taught on: [Functions as values › Methods and generic functions as values](/docs/language/functions-as-values#methods-and-generic-functions-as-values)
+
+### `protocol-bound-namespace-generic`
+
+**Error.** A namespace's type parameter carries a protocol bound, as in `namespace Boxes<infer Item is Comparable>`.
+
+<div class="error-output">
+
+```
+[protocol-bound-namespace-generic]
+Error: A Namespace's Type Parameters can not carry Protocol bounds
+   ╭─┤ Boxes.es:2:32 │
+   │
+ 2 │     namespace Boxes<infer Item is Comparable> for List<Item> {
+   │                                   ─────┬────  
+   │                                        ╰────── this bound is not supported here
+   │ 
+   │ Help: Bound it per conformance: 'is Comparable where Item is Comparable'.
+───╯
+```
+
+</div>
+
+Move the bound into a conditional conformance: `namespace Boxes<infer Item> for { value: Item } is Printable where Item is Printable`.
+
+Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
+
+### `unknown-where-generic`
+
+**Error.** A `where` condition names something that is not one of the namespace's type parameters.
+
+<div class="error-output">
+
+```
+[unknown-where-generic]
+Error: 'Other' is not a Type Parameter of this Namespace
+   ╭─┤ Pairs.es:2:64 │
+   │
+ 2 │     namespace Pairs<infer Item> for List<Item> is Printable where Other is Printable {
+   │                                                                   ──┬──  
+   │                                                                     ╰──── no such Type Parameter
+   │ 
+   │ Help: Declare it in the Namespace's Generic list: '<infer Other>'.
+───╯
+```
+
+</div>
+
+Fix the name, or declare the parameter in the namespace's list. The target type must then mention it, or [`unwitnessable-where-condition`](/docs/reference/diagnostics#unwitnessable-where-condition) follows.
+
+Quick Fix: **Declare it as '&lt;infer Other&gt;'**.
+
+Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
+
+### `conflicting-where-condition`
+
+**Error.** A `where` clause binds the same type parameter twice.
+
+<div class="error-output">
+
+```
+[conflicting-where-condition]
+Error: 'Item' is bound twice in this conformance
+   ╭─┤ Wrapper.es:3:43 │
+   │
+ 3 │        is Comparable where Item is Comparable, Item is Equatable
+   │                                                ──┬─  
+   │                                                  ╰─── already bound to 'Comparable'
+   │ 
+   │ Note: 'Item' is already required to conform to 'Comparable'.
+───╯
+```
+
+</div>
+
+Keep one condition for each type parameter.
+
+Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
+
+### `unwitnessable-where-condition`
+
+**Error.** A `where` condition names a type parameter that the namespace's target type never mentions, so no use of the namespace could prove it.
+
+<div class="error-output">
+
+```
+[unwitnessable-where-condition]
+Error: 'Other' does not appear in this Namespace's target Type
+   ╭─┤ Pairs.es:2:77 │
+   │
+ 2 │     namespace Pairs<infer Item, infer Other> for List<Item> is Printable where Other is Printable {
+   │                                                                                ──┬──  
+   │                                                                                  ╰──── not part of the target Type
+   │ 
+   │ Help: Mention 'Other' in the target Type, or drop the condition.
+   │ 
+   │ Note: A condition is proven by the target Type at each use site — a Type Parameter the target never mentions has nothing to prove it with.
+───╯
+```
+
+</div>
+
+Bound a parameter the target type mentions: `namespace Pairs<infer Item> for List<Item> is Printable where Item is Printable`. Or drop the condition.
+
+Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
+
+### `unsatisfied-conformance-condition`
+
+**Error.** A conditional conformance is needed at a call, and its `where` condition does not hold. A list of records is not `Comparable`, because its records are not.
+
+<div class="error-output">
+
+```
+[unsatisfied-conformance-condition]
+Error: List<{ x: Integer }> does not conform to 'Comparable'
+   ╭─┤ Sort.es:2:17 │
+   │
+ 2 │     Terminal.print([[{ x = 1 }], [{ x = 2 }]]::sort())
+   │                    ─────────────────┬────────────────  
+   │                                     ╰────────────────── this binds a Type Parameter bound to 'Comparable'
+   │ 
+   │ Help: Declare a Namespace 'for List<{ x: Integer }> is Comparable'.
+   │ 
+   │ Note 1: List<{ x: Integer }> does not conform to 'Comparable'.
+   │ Note 2: { x: Integer } does not conform to 'Comparable'.
+───╯
+```
+
+</div>
+
+Make the item type conform to the protocol, as the Help shows.
+
+Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
+
+### `where-on-protocol-extension`
+
+**Error.** A protocol extension, such as `protocol Ordered is Comparable`, carries a `where` clause. A protocol declares no type parameters, so the condition has nothing to bound.
+
+<div class="error-output">
+
+```
+[where-on-protocol-extension]
+Error: A Protocol extension can not carry a 'where' clause
+   ╭─┤ Ordered.es:2:39 │
+   │
+ 2 │     protocol Ordered is Comparable where Item is Comparable {
+   │                                          ─────────┬────────  
+   │                                                   ╰────────── this condition has nothing to bound
+   │ 
+   │ Help: Write 'is Comparable' on its own, and bound the Type Parameter where the conforming Namespace is declared.
+   │ 
+   │ Note: A 'where' condition bounds one of the declaring Namespace's Type Parameters, and a Protocol declares none.
+───╯
+```
+
+</div>
+
+Write `is Comparable` on its own.
+
+Quick Fix: **Drop the 'where' clause**.
+
+Taught on: [Protocols › Extending a protocol](/docs/language/protocols#extending-a-protocol)
+
+### `unwritable-provided-method`
+
+**Error.** A `static` method in a protocol has a body. A provided method runs on `@`, the conforming value, and a static method has none.
+
+<div class="error-output">
+
+```
+[unwritable-provided-method]
+Error: A static Protocol Method can not carry a body
+   ╭─┤ Sized.es:5:14 │
+   │
+ 5 │ ╭─▶        static make() -> Integer {
+   ┆ ┆   
+ 7 │ ├─▶        }
+   │ │              
+   │ ╰────────────── this body has no receiver to run on
+   │ 
+   │ Help: Write 'make' as a requirement, and give each conforming Namespace a body of its own.
+   │ 
+   │ Note: A provided Method is written on '@', the conforming value, and a static Method is called on the Namespace instead.
+───╯
+```
+
+</div>
+
+Write it as a requirement without a body, and give each conforming namespace its own.
+
+Taught on: [Protocols › What a provided body can call](/docs/language/protocols#what-a-provided-body-can-call)
+
+### `recursive-protocol`
+
+**Error.** A protocol extends itself, directly or through other protocols.
+
+<div class="error-output">
+
+```
+[recursive-protocol]
+Error: Protocol 'Listed' extends itself through 'Sorted'
+   ╭─┤ Listed.es:2:21 │
+   │
+ 2 │     protocol Listed is Sorted {}
+   │                        ───┬──  
+   │                           ╰──── this leads back to 'Listed'
+   │ 
+   │ Help: Break the cycle — drop one of the extensions.
+   │ 
+   │ Note 1: 'Listed' extends 'Sorted', which extends 'Listed' again.
+   │ Note 2: A Protocol's surface is its own Methods together with every ancestor's, so one that extends itself would never finish resolving.
+───╯
+```
+
+</div>
+
+Drop one of the extensions.
+
+Taught on: [Protocols › Extending a protocol](/docs/language/protocols#extending-a-protocol)
+
+### `method-not-on-protocol`
+
+**Error.** A method is called on a value whose type is a bounded type parameter, and the bounding protocol does not declare that method. Only the protocol's methods are known.
+
+<div class="error-output">
+
+```
+[method-not-on-protocol]
+Error: 'Sized' has no Method named 'toString'
+   ╭─┤ Sized.es:7:12 │
+   │
+ 7 │        <- item::toString()
+   │           ──┬─  ────┬───  
+   │             ╰───────│───── 'Item' is only known to conform to 'Sized'
+   │                     │     
+   │                     ╰───── 'Sized' does not declare this Method
+   │ 
+   │ Help: Declare 'toString' on 'Sized', or bound 'Item' by a Protocol that has it.
+   │ 
+   │ Note: 'Sized' declares 'size'.
+───╯
+```
+
+</div>
+
+Declare the method on the protocol, or bound the parameter by a protocol that has it, such as `<infer Item is Printable>`.
+
+Taught on: [Protocols › One bound per type parameter](/docs/language/protocols#one-bound-per-type-parameter)
+
+### `provided-method-out-of-reach`
+
+**Error.** A provided method's body names something the program declares, such as a constant. A provided method can reach only the standard library.
+
+<div class="error-output">
+
+```
+[provided-method-out-of-reach]
+Error: 'limit' can not be read from a provided Method
+   ╭─┤ Sized.es:8:32 │
+   │
+ 2 │     constant limit = 10
+   │              ──┬──  
+   │                ╰──── 'limit' is declared here
+   │ 
+ 8 │          <- @::size()::isGreaterThan(limit)
+   │                                      ──┬──  
+   │                                        ╰──── this is declared outside the Protocol
+   │ 
+   │ Help: Give 'Sized' a requirement the body calls on '@' instead, and let each conforming Namespace reach 'limit'.
+   │ 
+   │ Note: A provided Method is emitted once, above every Program that reaches 'Sized' — so its body can name the standard library and nothing the Program declares.
+───╯
+```
+
+</div>
+
+Add a requirement that the body calls on `@`, and let each conforming namespace supply the value.
+
+Taught on: [Protocols › What a provided body can call](/docs/language/protocols#what-a-provided-body-can-call)
+
+### `clashing-provided-method`
+
+**Error.** Two modules each declare a protocol of the same name, and both provide a method of the same name.
+
+<div class="error-output">
+
+```
+[clashing-provided-method]
+Error: Two Protocols named 'Sized' provide a Method named 'isEmpty'
+   ╭─┤ Crates.es:2:11 │
+   │
+ 2 │     protocol Sized {
+   │              ──┬──  
+   │                ╰──── this provides 'isEmpty' too
+   │ 
+   │ Help: Declare 'Sized' once and import it where it is needed, or rename one of the two.
+   │ 
+   │ Note 1: A provided Method is emitted once, under the Protocol's name and the Method's, and shared by every conformer — so only one 'Sized' in a compilation may provide 'isEmpty'.
+   │ Note 2: The other 'Sized' is declared in Boxes.es.
+───╯
+```
+
+</div>
+
+Rename one of the two, as in `protocol Measured` in `Crates.es`, and import it under that name. Or declare the protocol once and import it where it is needed.
+
+Taught on: [Protocols › What a provided body can call](/docs/language/protocols#what-a-provided-body-can-call)
+
+## Documentation comments
+
+Warnings about `§§` blocks. The program compiles either way.
+
+### `missing-documentation-separator`
+
+**Warning.** A `@param` or `@returns` tag runs into its text without the em dash that separates them. JSDoc's hyphen, as in `@param _ - the number to double`, does not count as a separator and reports this code too.
+
+<div class="error-output">
+
+```
+[missing-documentation-separator]
+Warning: This '@param' tag is not separated from its text
+   ╭─┤ Double.es:4:14 │
+   │
+ 4 │     §§ @param _ the number to double
+   │                 ──────────┬─────────  
+   │                           ╰─────────── an em-dash belongs here
+   │ 
+   │ Help: Write '@param _ —' before the text.
+   │ 
+   │ Note 1: A tag carrying its text on its own line separates the two with an em-dash — that is where the description begins, and how an Editor renders the tag back. A tag that leaves its text to the lines below it needs no separator.
+   │ Note 2: The text is lifted into the Documentation either way; what is missing is the separator, not the description.
+───╯
+```
+
+</div>
+
+Write ` — ` between the name and the text: `§§ @param _ — the number to double`.
+
+Quick Fix: **Insert the '—' separator**.
+
+Taught on: [Documentation comments › `missing-documentation-separator`](/docs/language/documentation-comments#missing-documentation-separator)
+
+### `unknown-documentation-parameter`
+
+**Warning.** A `@param` line is written where the signature has no parameter, past the last one.
+
+<div class="error-output">
+
+```
+[unknown-documentation-parameter]
+Warning: This '@param' names a Parameter that does not exist
+   ╭─┤ Double.es:5:12 │
+   │
+ 5 │     §§ @param by — how many times
+   │               ─┐  
+   │                ╰── there is no Parameter 2
+   │ 
+   │ Help: Remove the tag — this signature takes 1 Parameter.
+   │ 
+   │ Note 1: A '@param' line documents the Parameter at its own position — the first line the first Parameter — and names it the way the signature does: its label, or '_' where it carries none.
+   │ Note 2: The Parameters are '_', in that order.
+───╯
+```
+
+</div>
+
+Remove the line, or add the parameter it describes.
+
+Quick Fix: **Remove the '@param' line**. Above an `overload` block, a close name gets **Change to '@param x'** as well.
+
+Taught on: [Documentation comments › `unknown-documentation-parameter`](/docs/language/documentation-comments#unknown-documentation-parameter)
+
+### `misnamed-documentation-parameter`
+
+**Warning.** A `@param` line names a different parameter from the one at its position. The lines document parameters in order, and name each by its label, or by `_` when it has none.
+
+<div class="error-output">
+
+```
+[misnamed-documentation-parameter]
+Warning: This '@param' does not name the Parameter at its position
+   ╭─┤ Double.es:4:12 │
+   │
+ 4 │     §§ @param number — the number to double
+   │               ───┬──  
+   │                  ╰──── Parameter 1 is 'number'
+   │ 
+   │ Help: Write '@param _' — Parameter 1 carries no label.
+   │ 
+   │ Note 1: A '@param' line documents the Parameter at its own position — the first line the first Parameter — and names it the way the signature does: its label, or '_' where it carries none.
+   │ Note 2: The Parameters are '_', in that order.
+───╯
+```
+
+</div>
+
+Write the label, or `_`: `§§ @param _ — the number to double`.
+
+Quick Fix: **Change to '@param _'**.
+
+Taught on: [Documentation comments › `misnamed-documentation-parameter`](/docs/language/documentation-comments#misnamed-documentation-parameter)
+
+### `undocumented-parameter`
+
+**Warning.** A block that documents parameters leaves one out.
+
+<div class="error-output">
+
+```
+[undocumented-parameter]
+Warning: This Parameter has no '@param' line
+   ╭─┤ Scale.es:5:36 │
+   │
+ 5 │     function scale(_ number: Integer, by factor: Integer) -> Integer {
+   │                                       ─────────┬────────  
+   │                                                ╰────────── Parameter 2 is undocumented
+   │ 
+   │ Help: Write '@param by — …' as line 2 of the run.
+   │ 
+   │ Note: A '@param' line documents the Parameter at its own position — the first line the first Parameter — and names it the way the signature does: its label, or '_' where it carries none.
+───╯
+```
+
+</div>
+
+Add a line for it: `§§ @param by — the factor to scale it by`.
+
+Quick Fix: **Add a '@param by' line**.
+
+Taught on: [Documentation comments › `undocumented-parameter`](/docs/language/documentation-comments#undocumented-parameter)
+
+## Modules
+
+Importing, exporting, and the graph of files.
+
+### `invalid-module-specifier`
+
+**Error.** A specifier is not a relative path to a `.es` file. It starts with `./` or `../` and includes the extension, so `Geometry.es` and `./Geometry` are both refused.
+
+<div class="error-output">
+
+```
+[invalid-module-specifier]
+Error: Module specifier 'Geometry.es' is not a relative path
+```
+
+</div>
+
+Write the path from this file: `from "./Geometry.es" { area }`.
+
+Quick Fix: **Write './Geometry.es'**.
+
+Taught on: [Modules › Specifiers are relative paths](/docs/language/modules#specifiers-are-relative-paths)
+
+### `module-not-found`
+
+**Error.** Nothing can be read at the path a specifier resolves to. A Note gives the absolute path it tried, here for a project in `/Users/ada/shop`.
+
+<div class="error-output">
+
+```
+[module-not-found]
+Error: No Module was found at './Geometri.es'
+   ╭─┤ Main.es:2:7 │
+   │
+ 2 │     from "./Geometri.es" { area }
+   │          ───────┬───────  
+   │                 ╰───────── nothing could be read here
+   │ 
+   │ Help: Check the spelling of the path, and that the file is saved where it says.
+   │ 
+   │ Note: The specifier resolves to '/Users/ada/shop/Geometri.es'.
+───╯
+```
+
+</div>
+
+Fix the path, or save the file where the path says.
+
+Taught on: [Modules › Specifiers are relative paths](/docs/language/modules#specifiers-are-relative-paths)
+
+### `self-import`
+
+**Error.** A file imports itself. Everything a module declares is already in scope inside it.
+
+<div class="error-output">
+
+```
+[self-import]
+Error: A Module can not import itself
+   ╭─┤ Main.es:2:7 │
+   │
+ 2 │     from "./Main.es" { area }
+   │          ─────┬─────  
+   │               ╰─────── this path names the file it is written in
+   │ 
+   │ Help: Remove the entry, or point it at the Module that declares the name.
+   │ 
+   │ Note: Everything a Module declares is in scope inside it already, whether or not it is exported.
+───╯
+```
+
+</div>
+
+Remove the entry, or point it at the module you meant.
+
+Quick Fix: **Remove the entry for "./Main.es"**.
+
+Taught on: [Modules › Specifiers are relative paths](/docs/language/modules#specifiers-are-relative-paths)
+
+### `not-exported`
+
+**Error.** The module declares the name but does not export it. A name is private unless the `export { … }` block lists it.
+
+<div class="error-output">
+
+```
+[not-exported]
+Error: 'area' is not exported by ./Geometry.es
+   ╭─┤ Main.es:2:25 │
+   │
+ 2 │     from "./Geometry.es" { area }
+   │                            ──┬─  
+   │                              ╰─── declared in that Module, but private
+   │ 
+   │ Help: Add 'area' to the 'export { … }' block of ./Geometry.es.
+   │ 
+   │ Note: A name is private unless the Module's 'export { … }' block lists it.
+───╯
+```
+
+</div>
+
+Add the name to that module's `export { … }` block.
+
+Quick Fix: **Export 'area' from ./Geometry.es**, which edits the other file.
+
+Taught on: [Modules › Importing names](/docs/language/modules#importing-names)
+
+### `unknown-export`
+
+**Error.** The module exports nothing under that name. An import is matched against the names a module exports.
+
+<div class="error-output">
+
+```
+[unknown-export]
+Error: ./Geometry.es declares nothing named 'volume'
+   ╭─┤ Main.es:2:25 │
+   │
+ 2 │     from "./Geometry.es" { volume }
+   │                            ───┬──  
+   │                               ╰──── no such name in that Module
+   │ 
+   │ Help: Check the spelling, and that the specifier names the file you meant.
+   │ 
+   │ Note: The name is matched against what that Module exports, under the names it exports them as — an 'as' on its export entry renames it for everyone.
+───╯
+```
+
+</div>
+
+Fix the name or the path.
+
+Taught on: [Modules › Exporting names](/docs/language/modules#exporting-names)
+
+### `duplicate-import`
+
+**Error.** An import binds a name that is already taken in this module.
+
+<div class="error-output">
+
+```
+[duplicate-import]
+Error: 'area' is already declared here
+   ╭─┤ Main.es:2:25 │
+   │
+ 2 │     from "./Geometry.es" { area }
+   │                            ──┬─  
+   │                              ╰─── this binds 'area' a second time
+   │ 
+ 6 │     constant area = 4
+   │              ──┬─  
+   │                ╰─── first declared here
+   │ 
+   │ Help: Write 'as' on the entry to bind it under another name — 'area as …'.
+   │ 
+   │ Note: An import binds a name in this Module exactly as a declaration does, so two of them can not share one.
+───╯
+```
+
+</div>
+
+Import it under another name: `from "./Geometry.es" { area as tileArea }`.
+
+Quick Fix: **Remove the duplicate import of 'area'**, when the name is imported twice.
+
+Taught on: [Modules › Importing names](/docs/language/modules#importing-names)
+
+### `export-of-unknown-name`
+
+**Error.** An `export { … }` entry names something this module does not declare.
+
+<div class="error-output">
+
+```
+[export-of-unknown-name]
+Error: 'volume' is not declared in this Module
+   ╭─┤ Geometry.es:5:10 │
+   │
+ 5 │ export { volume }
+   │          ───┬──  
+   │             ╰──── nothing here declares this name
+   │ 
+   │ Help: Write 'volume' in a 'from "…" { … }' group to forward it from the Module that declares it.
+   │ 
+   │ Note: An entry with no 'from' clause exports something this Module's implementation declares.
+───╯
+```
+
+</div>
+
+Declare the name, or forward it from the module that declares it with a `from` group inside the export block: `export { from "./Solids.es" { volume } }`.
+
+Quick Fix: **Forward 'volume' from ./Solids.es**, when a module in the workspace exports the name.
+
+Taught on: [Modules › Exporting names](/docs/language/modules#exporting-names)
+
+### `export-of-variable`
+
+**Error.** An `export { … }` entry names a variable. JavaScript's `export let` gives importers a live binding, so another module would read a value that can change under it. Essence refuses the export instead.
+
+<div class="error-output">
+
+```
+[export-of-variable]
+Error: Variable 'count' can not be exported
+   ╭─┤ Counter.es:5:10 │
+   │
+ 2 │     variable count = 0
+   │              ──┬──  
+   │                ╰──── declared here
+   │ 
+ 5 │ export { count }
+   │          ──┬──  
+   │            ╰──── this is a Variable
+   │ 
+   │ Help: Declare it as a Constant, or export a Function that answers with its value.
+   │ 
+   │ Note: A Variable another Module can read is state two files share and neither owns — which of them last wrote it is not something either one states.
+───╯
+```
+
+</div>
+
+Declare it as a constant, `constant count = 0`, or export a function that returns its value: `function currentCount() -> Integer { <- count }` and `export { currentCount }`.
+
+Quick Fix: **Declare 'count' as a Constant**.
+
+Taught on: [Modules › Exporting names](/docs/language/modules#exporting-names)
+
+### `cyclic-constant-import`
+
+**Error.** A constant is imported from a module that imports this one back. Inside a cycle, the order the module bodies run in is not stated, so the constant could be read before its module has run. In JavaScript the same pair of files can throw `ReferenceError: Cannot access 'pong' before initialization`, depending on which file runs first.
+
+<div class="error-output">
+
+```
+[cyclic-constant-import]
+Error: Constant 'pong' is imported across a cycle
+   ╭─┤ Ping.es:2:21 │
+   │
+ 2 │     from "./Pong.es" { pong }
+   │                        ──┬─  
+   │                          ╰─── this Constant is not readable here
+   │ 
+   │ Help: Move the Constant into a Module outside the cycle, or expose it as a Function.
+   │ 
+   │ Note 1: ./Pong.es imports this Module back, directly or through further Modules.
+   │ Note 2: A Function, a Type Alias, a Choice, a Protocol and a Namespace are all hoisted, so a cycle can name any of them. A Constant is not: its value exists only once its Module's body has run, and inside a cycle which body runs first is not something the source states.
+───╯
+```
+
+</div>
+
+Move the constant into a module outside the cycle, or export a function that returns it. Functions, type aliases, choices, protocols and namespaces may cross a cycle.
+
+Taught on: [Modules › Run order and cycles](/docs/language/modules#run-order-and-cycles)
+
+### `cyclic-side-effects`
+
+**Warning.** A module in a cycle runs a statement at its top level, such as a print. Inside a cycle, the order the modules run in is not stated.
+
+<div class="error-output">
+
+```
+[cyclic-side-effects]
+Warning: This Statement runs in an order the cycle does not state
+    ╭─┤ Ping.es:10:2 │
+    │
+ 10 │     Terminal.print(pong())
+    │     ───────────┬──────────  
+    │                ╰──────────── this runs when the Module body runs
+    │ 
+    │ Help: Break the cycle, or move the Statement into a Module outside it.
+    │ 
+    │ Note 1: This Module is in a cycle with ./Pong.es.
+    │ Note 2: A Module body runs once, on first import. Inside a cycle there is no first — whichever Module is reached first runs first, and that is decided by the entry point rather than by any of them.
+────╯
+```
+
+</div>
+
+Move the statement into a module outside the cycle, or break the cycle.
+
+Taught on: [Modules › Run order and cycles](/docs/language/modules#run-order-and-cycles)
+
+### `unused-import`
+
+**Warning.** Nothing in the module reads an imported name. A namespace counts as used when a call runs one of its methods.
+
+<div class="error-output">
+
+```
+[unused-import]
+Warning: 'area' is imported and never used
+   ╭─┤ Main.es:2:25 │
+   │
+ 2 │     from "./Geometry.es" { area }
+   │                            ──┬─  
+   │                              ╰─── nothing reads this name
+   │ 
+   │ Help: Remove the entry.
+   │ 
+   │ Note: A Namespace counts as used when a Method dispatches through it, even where the call never spells its name.
+───╯
+```
+
+</div>
+
+Delete `from "./Geometry.es" { area }`, or read `area` in the file.
+
+Quick Fix: **Remove the unused import of 'area'**. The Source Action **Remove the unused imports** removes every one in the file.
+
+Taught on: [Modules › Importing names](/docs/language/modules#importing-names)
+
+### `dependency-has-errors`
+
+**Error.** An imported module has errors of its own. The editor reports this on the import line, so you see it without opening the other file. The terminal prints the other file's errors instead.
+
+Fix the errors in the imported module.
+
+Taught on: [Editor setup › Errors in closed files, and rename refusals](/docs/guides/editor-setup#errors-in-closed-files-and-rename-refusals)
+
+## Tests
+
+The `tests { … }` block and what runs in it.
+
+### `misplaced-tests-section`
+
+**Error.** The `tests { … }` block is written above `export { … }` or above the implementation. It comes last in a file.
+
+<div class="error-output">
+
+```
+[misplaced-tests-section]
+Error: The 'tests { … }' block belongs below the 'export { … }' block
+    ╭─┤ Double.es:7:1 │
+    │
+  7 │ ╭─▶ tests {
+    ┆ ┆   
+ 11 │ ├─▶ }
+    │ │       
+    │ ╰─────── this block is written above what the Module hands out
+    │ 
+ 13 │     export { double }
+    │     ───┬──  
+    │        ╰──── the export block is here
+    │ 
+    │ Help: Move the 'tests { … }' block below 'export { … }'.
+    │ 
+    │ Note: A Module reads top to bottom: what it imports, what it does, what it exports, what it proves.
+────╯
+```
+
+</div>
+
+Move it below `export { … }`.
+
+Quick Fix: **Move the 'tests \{ … \}' block to the end**.
+
+Taught on: [Tests › The tests block](/docs/language/tests#the-tests-block)
+
+### `test-outside-tests`
+
+**Error.** A `test` or a `suite` is written outside the `tests { … }` block.
+
+<div class="error-output">
+
+```
+[test-outside-tests]
+Error: A 'test' may only be written in the 'tests { … }' section
+   ╭─┤ Double.es:2:2 │
+   │
+ 2 │     test "doubles" {}
+   │     ──┬─  
+   │       ╰─── this 'test' stands outside every tests section
+   │ 
+   │ Help: Move it into the file's 'tests { … }' block, or open one below the implementation.
+   │ 
+   │ Note: The tests section is written below the implementation block, and a 'suite' groups the tests inside it.
+───╯
+```
+
+</div>
+
+Move it into the `tests { … }` block at the end of the file.
+
+Taught on: [Tests › Tests and suites](/docs/language/tests#tests-and-suites)
+
+### `expect-outside-test`
+
+**Error.** An `expect` or a `require` is written where no test is running, such as inside a function literal in a test's body.
+
+<div class="error-output">
+
+```
+[expect-outside-test]
+Error: 'expect' may only be written in a test's body
+    ╭─┤ Double.es:10:4 │
+    │
+ 10 │          expect double(number)::isPositive()
+    │          ───┬──  
+    │             ╰──── this assertion belongs to no test
+    │ 
+    │ Help: Move it into a 'test "…" { … }' block, or return the value and assert on it there.
+    │ 
+    │ Note: An assertion records its result against the test that is running, so it is a Statement of a test's own block and of the blocks nested in it — never of a Function literal written there.
+────╯
+```
+
+</div>
+
+Return the value from the function, and assert on it in the test's own block.
+
+Taught on: [Tests › Tests and suites](/docs/language/tests#tests-and-suites)
+
+### `expect-not-boolean`
+
+**Error.** An `expect` or a `require` asserts a value that is not a `Boolean`.
+
+<div class="error-output">
+
+```
+[expect-not-boolean]
+Error: An assertion has to be a Boolean
+   ╭─┤ Double.es:9:10 │
+   │
+ 9 │        expect double(2)
+   │               ────┬────  
+   │                   ╰────── this is an Integer
+   │ 
+   │ Help 1: Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.
+   │ Help 2: Or take it apart instead: 'require #Value(item) = value'.
+   │ 
+   │ Note: Essence has no truthiness — an assertion is a Boolean Expression, and the standard library's own Methods are the vocabulary it is written in.
+───╯
+```
+
+</div>
+
+Ask a question of the value, `expect double(2)::is(4)`, or take it apart with `require #Value(item) = value`.
+
+Taught on: [Tests › `expect` and `require`](/docs/language/tests#expect-and-require)
+
+### `matcher-on-expect`
+
+**Error.** An `expect` takes a value apart, as in `expect #Value(first) = …`. Only `require` introduces names, because a failed `require` ends the test.
+
+<div class="error-output">
+
+```
+[matcher-on-expect]
+Error: An 'expect' can not take a value apart
+   ╭─┤ Scores.es:7:10 │
+   │
+ 7 │        expect #Value(first) = scores::firstItem()
+   │               ──────┬──────  
+   │                     ╰──────── this would introduce a name
+   │ 
+   │ Help 1: Take the value apart with 'require': 'require #Value(item) = value'.
+   │ Help 2: Or compare instead: 'expect value::is(…)'.
+   │ 
+   │ Note: An 'expect' records its result and the test carries on, so a name it introduced would stand below a line that may never have run. A 'require' ends the test where it stands, which is what makes the names it introduces safe to read.
+───╯
+```
+
+</div>
+
+Write `require #Value(first) = scores::firstItem()`, then assert on `first`.
+
+Quick Fix: **Take the value apart with 'require'**.
+
+Taught on: [Tests › Taking a value apart](/docs/language/tests#taking-a-value-apart)
+
+### `matcher-after-value`
+
+**Error.** A matcher is written after the value, behind `is`, as in `require scores::firstItem() is #Value(first)`. A name is introduced left of `=`.
+
+<div class="error-output">
+
+```
+[matcher-after-value]
+Error: An assertion has no 'is' form
+   ╭─┤ Scores.es:7:31 │
+   │
+ 7 │        require scores::firstItem() is #Value(first)
+   │                                    ────────┬───────  
+   │                                            ╰───────── this Matcher stands after the value
+   │ 
+   │ Help 1: Take the value apart with 'require': 'require #Value(item) = value'.
+   │ Help 2: Or compare instead: 'expect value::is(…)'.
+   │ 
+   │ Note: A name is introduced left of '=', in a Parameter, or in a Handler head — never on the right of anything.
+───╯
+```
+
+</div>
+
+Write `require #Value(first) = scores::firstItem()`.
+
+Quick Fix: **Take the value apart with 'require'**.
+
+Taught on: [Tests › Taking a value apart](/docs/language/tests#taking-a-value-apart)
+
+### `wildcard-in-require`
+
+**Error.** A `require` matches `_`, which every value matches and which binds nothing.
+
+<div class="error-output">
+
+```
+[wildcard-in-require]
+Error: This 'require' asks nothing of the value
+   ╭─┤ Scores.es:7:11 │
+   │
+ 7 │        require _ = scores::firstItem()
+   │                ▲  
+   │                ╰── '_' holds for every value
+   │ 
+   │ Help: Name the shape the value has to have — a Case, a Type, a Pattern — or drop the line.
+   │ 
+   │ Note: A Matcher left of '=' both asks what the value has to be and names its parts, and '_' does neither: every value answers it, and it binds nothing.
+───╯
+```
+
+</div>
+
+Name the shape the value must have, such as `#Value(first)`, or delete the line.
+
+Taught on: [Tests › Taking a value apart](/docs/language/tests#taking-a-value-apart)
+
+### `literal-in-require`
+
+**Error.** A `require` matches a written value, as in `require 3 = points`. A matcher names a shape. Comparing with a value is `is`.
+
+<div class="error-output">
+
+```
+[literal-in-require]
+Error: A written value has no parts to name
+   ╭─┤ Points.es:7:11 │
+   │
+ 7 │        require 3 = points
+   │                ▲   ───┬──  
+   │                ╰──────│──── this is a value, not a shape
+   │                       │    
+   │                       ╰──── the value it asks about
+   │ 
+   │ Help: Compare instead: 'require x::is(3)'.
+   │ 
+   │ Note: 'require MATCHER = EXPR' takes a value apart by its shape — a Case, a Type, a Pattern. A written value is not a shape: what it asks is whether the two are equal, and that is what 'Equatable::is' answers.
+───╯
+```
+
+</div>
+
+Compare instead: `require points::is(3)`.
+
+Quick Fix: **Compare it instead: 'points::is(3)'**.
+
+Taught on: [Tests › Taking a value apart](/docs/language/tests#taking-a-value-apart)
+
+### `snapshot-after-matcher`
+
+**Error.** `matches snapshot` is written on a line that takes a value apart.
+
+<div class="error-output">
+
+```
+[snapshot-after-matcher]
+Error: A snapshot records a value, and this line took one apart
+   ╭─┤ Scores.es:7:47 │
+   │
+ 7 │        require #Value(first) = scores::firstItem() matches snapshot
+   │                                                    ────────┬───────  
+   │                                                            ╰───────── there is no value here to record
+   │ 
+   │ Help 1: Record the name on a line of its own: 'require #Value(item) = value' then 'expect item matches snapshot'.
+   │ Help 2: Or snapshot the value whole, where it is one that prints: 'expect value matches snapshot'.
+   │ 
+   │ Note: A snapshot is of the value an assertion is written over, printed as text. 'require MATCHER = EXPR' is written over a shape instead: it asks what the value has to be and names its parts, so what there is to record is one of those names.
+───╯
+```
+
+</div>
+
+Record the name on a line of its own: `require #Value(first) = scores::firstItem()`, then `expect first matches snapshot`.
+
+Quick Fix: **Record 'first' on a line of its own**.
+
+Taught on: [Tests › Taking a value apart](/docs/language/tests#taking-a-value-apart)
+
+### `unknown-modifier`
+
+**Error.** A `test` or a `suite` carries a word that is not a modifier. The modifiers are `focused`, `skipped` and `tagged`.
+
+<div class="error-output">
+
+```
+[unknown-modifier]
+Error: There is no Modifier 'slowly'
+   ╭─┤ Table.es:6:25 │
+   │
+ 6 │     test "ranks the table" slowly {
+   │                            ───┬──  
+   │                               ╰──── no such Modifier
+   │ 
+   │ Help: Remove it, or move what it was meant to say into the body — a Modifier is what the runner reads, never what the test does.
+   │ 
+   │ Note: A test takes 'focused', 'skipped', 'tagged'.
+───╯
+```
+
+</div>
+
+Remove the word, or fix its spelling.
+
+Quick Fix: **Remove 'slowly'**. A near miss gets **Change to 'focused'** first.
+
+Taught on: [Tests › Modifiers](/docs/language/tests#modifiers)
+
+### `duplicate-modifier`
+
+**Error.** A `test` or a `suite` carries the same modifier twice.
+
+<div class="error-output">
+
+```
+[duplicate-modifier]
+Error: This test is 'tagged' twice
+   ╭─┤ Table.es:6:37 │
+   │
+ 6 │     test "ranks the table" tagged slow tagged network {
+   │                            ─────┬───── ───────┬──────  
+   │                                 ╰─────────────│──────── already written here
+   │                                               │        
+   │                                               ╰──────── written again here
+   │ 
+   │ Help: Write every tag on one 'tagged', separated by commas.
+   │ 
+   │ Note: A Modifier says something about the whole test, so saying it twice can only ever repeat it or contradict it.
+───╯
+```
+
+</div>
+
+Write every tag on one `tagged`, separated by commas: `tagged slow, network`.
+
+Quick Fix: **Merge into one 'tagged'**. Another modifier written twice gets **Remove the second 'focused'**.
+
+Taught on: [Tests › Modifiers](/docs/language/tests#modifiers)
+
+### `malformed-modifier`
+
+**Error.** A modifier has the wrong arguments. `focused` takes none, `skipped` takes one string, and `tagged` takes bare names.
+
+<div class="error-output">
+
+```
+[malformed-modifier]
+Error: 'tagged' takes a bare name
+   ╭─┤ Table.es:6:32 │
+   │
+ 6 │     test "ranks the table" tagged "slow" {
+   │                                   ───┬──  
+   │                                      ╰──── this is not a bare name
+   │ 
+   │ Help: Write a bare name here.
+   │ 
+   │ Note: A tag is written the way it is typed on a command line — 'essence test --tag slow' — so it is a name rather than a value.
+───╯
+```
+
+</div>
+
+Write a tag as a bare name: `tagged slow`.
+
+Taught on: [Tests › Modifiers](/docs/language/tests#modifiers)
+
+### `skipped-without-reason`
+
+**Error.** A `test` or a `suite` is `skipped` with no reason.
+
+<div class="error-output">
+
+```
+[skipped-without-reason]
+Error: This test is skipped for no stated reason
+   ╭─┤ Table.es:6:25 │
+   │
+ 6 │     test "ranks the table" skipped {
+   │                            ───┬───  
+   │                               ╰───── this needs a reason
+   │ 
+   │ Help: Write it as a String: skipped "waiting on the Table redesign".
+   │ 
+   │ Note: A skip with no reason rots silently. A skip with one is a note the report repeats on every run, until somebody acts on it.
+───╯
+```
+
+</div>
+
+Give the reason as a string: `skipped "waiting on the table redesign"`.
+
+Taught on: [Tests › Modifiers](/docs/language/tests#modifiers)
+
+### `contradictory-modifiers`
+
+**Error.** A `test` or a `suite` is both `focused` and `skipped`.
+
+<div class="error-output">
+
+```
+[contradictory-modifiers]
+Error: This test is skipped and focused
+   ╭─┤ Table.es:6:25 │
+   │
+ 6 │     test "ranks the table" focused skipped "flaky" {
+   │                            ───┬─── ───────┬───────  
+   │                               ╰───────────│───────── this asks for it to run, and alone
+   │                                           │         
+   │                                           ╰───────── this asks for it never to run
+   │ 
+   │ Help: Remove whichever one you did not mean.
+   │ 
+   │ Note: Which of the two was meant is not something the source says, and guessing at it is how a test nobody watches stops running.
+───╯
+```
+
+</div>
+
+Remove the one you did not mean, as in `test "ranks the table" skipped "flaky" { … }`.
+
+Quick Fix: **Remove 'skipped'** or **Remove 'focused'**.
+
+Taught on: [Tests › Modifiers](/docs/language/tests#modifiers)
+
+### `duplicate-test-name`
+
+**Error.** Two tests or two suites in one scope have the same name. A test's name, with the suites around it, identifies it to snapshots and to the editor.
+
+<div class="error-output">
+
+```
+[duplicate-test-name]
+Error: There is already a test called 'ranks the table' here
+    ╭─┤ Table.es:10:7 │
+    │
+  6 │     test "ranks the table" {
+    │          ────────┬────────  
+    │                  ╰────────── the other test is here
+    │ 
+ 10 │     test "ranks the table" {
+    │          ────────┬────────  
+    │                  ╰────────── this name is taken
+    │ 
+    │ Help: Say what each of them proves, so that a report names the one that failed.
+    │ 
+    │ Note: What a test is called, together with the suites around it, is what identifies it — to a snapshot, to a stored counterexample, and to the Editor.
+────╯
+```
+
+</div>
+
+Name each test by what it proves.
+
+Taught on: [Tests › Names and identity](/docs/language/tests#names-and-identity)
+
+### `test-failed`
+
+**Error.** An `expect` or a `require` did not hold while the test ran. `essence test` reports this, and so does the editor's test session; a compile does not. The labels show the values the assertion saw.
+
+<div class="error-output">
+
+```
+[test-failed]
+Error: 'doubles' failed
+   ╭─┤ Double.es:9:10 │
+   │
+ 9 │        expect double(3)::is(6)
+   │               ────┬───┬───────  
+   │                   ╰───│───────── 5
+   │                       │         
+   │                       ╰───────── this expect failed
+   │ 
+   │ Note: `is` compared 5 with 6
+───╯
+```
+
+</div>
+
+Fix the program or the test. The values in the labels show which one is wrong.
+
+Taught on: [Tests › `expect` and `require`](/docs/language/tests#expect-and-require)
+
+### `focused-tests-remain`
+
+**Error.** An `essence test` run with no `--filter`, `--tag` or `--skip-tag` finds a `focused` test. `focused` is Essence's `test.only`. The run fails and names each focused test. In the editor, each `focused` gets a Warning.
+
+<div class="error-output">
+
+```
+[focused-tests-remain]
+Error: This test is still focused
+   ╭─┤ Double.es:8:2 │
+   │
+ 8 │     test "doubles" focused {
+   │     ──┬─  
+   │       ╰─── only focused tests ran
+   │ 
+   │ Help: Remove `focused` before this lands, or narrow the run with --filter or --tag while you are iterating.
+   │ 
+   │ Note: A focused test silences every other test of the run, so a run nobody narrowed has not answered the question it was asked.
+───╯
+```
+
+</div>
+
+Remove `focused` before you commit. While you iterate, narrow the run with `--filter` or `--tag` instead.
+
+Quick Fix: **Remove 'focused'**.
+
+Taught on: [Tests › Modifiers](/docs/language/tests#modifiers)
+
+### `similar-tags`
+
+**Warning.** Two tags in the workspace are nearly the same, such as `netwrok` and `network`. `--tag` matches a tag exactly, so the two spellings select two different sets of tests. The editor reports this; a compile does not.
+
+Use one spelling.
+
+Quick Fix: **Change to 'network'**, which writes the common spelling over the rare one.
+
+Taught on: [Running tests](/docs/guides/running-tests)
+
+### `lonely-tag`
+
+**Information.** Exactly one test in the workspace carries a tag. That is allowed, and it is also what a mistyped tag looks like. The editor reports this; a compile does not.
+
+If the tag is meant, leave it. Otherwise fix its spelling.
+
+Taught on: [Running tests](/docs/guides/running-tests)
+
+### `table-not-written`
+
+**Error.** The value after `across` is not a written list. Each row is a test of its own, so the rows must be countable before anything runs.
+
+<div class="error-output">
+
+```
+[table-not-written]
+Error: The rows of a table test have to be written here
+    ╭─┤ Double.es:10:33 │
+    │
+ 10 │     test "doubles {number}" across numbers (number: Integer) {
+    │                                    ───┬───  
+    │                                       ╰───── this is not a written List
+    │ 
+    │ Help: Write the rows as a List: 'across [ … ] (row: Row)'. A row itself can be any Expression.
+    │ 
+    │ Note: Every row is a test of its own — it carries its row number in the identity a stored snapshot and the Editor's own results are keyed by — so the rows have to be countable before anything runs.
+────╯
+```
+
+</div>
+
+Write the rows in the test: `across [1, 2, 3] (number: Integer)`.
+
+Taught on: [Tests › Table tests](/docs/language/tests#table-tests)
+
+### `table-without-rows`
+
+**Error.** The list after `across` is empty, so the table test runs no test and nothing reports it.
+
+<div class="error-output">
+
+```
+[table-without-rows]
+Error: A table test with no rows in it runs no test
+   ╭─┤ Double.es:8:33 │
+   │
+ 8 │     test "doubles {number}" across [] (number: Integer) {
+   │                                    ─┐  
+   │                                     ╰── no rows to run
+   │ 
+   │ Help: Write the rows the test is for, or say why there are none with 'skipped "…"'.
+   │ 
+   │ Note: Every row is a test of its own, so a table test with none is nothing at all: it is reported by no line and counted in no total, and nothing would say it had stopped running.
+───╯
+```
+
+</div>
+
+Write the rows. If there are none for now, mark the test `skipped` with the reason.
+
+Taught on: [Tests › Table tests](/docs/language/tests#table-tests)
+
+### `table-parameters`
+
+**Error.** A table test names its row with more than one parameter. Each row is one value.
+
+<div class="error-output">
+
+```
+[table-parameters]
+Error: A table test takes one row at a time
+   ╭─┤ Add.es:8:40 │
+   │
+ 8 │     test "adds" across [{ a = 1, b = 2 }] (a: Integer, b: Integer) {
+   │                 ───┬──                    ────────────┬───────────  
+   │                    ╰──────────────────────────────────│───────────── the rows are here
+   │                                                       │             
+   │                                                       ╰───────────── 2 Parameters for one row
+   │ 
+   │ Help: Write one Parameter: '(row: Row)', or take the row apart where it is bound: '({ scored, conceded }: Row)'.
+   │ 
+   │ Note: Each item of the List is one row, and one row is one value — a test that wanted several values per row would say so by writing a Record.
+───╯
+```
+
+</div>
+
+Take the row apart in one parameter: `({ a, b }: { a: Integer, b: Integer })`.
+
+Taught on: [Tests › Table tests](/docs/language/tests#table-tests)
+
+### `table-row-type-mismatch`
+
+**Error.** A row is not a value of the row parameter's type.
+
+<div class="error-output">
+
+```
+[table-row-type-mismatch]
+Error: This row does not fit the row Parameter
+   ╭─┤ Double.es:8:37 │
+   │
+ 8 │     test "doubles {number}" across [1, "two"] (number: Integer) {
+   │                                        ──┬──  
+   │                                          ╰──── this is a String
+   │ 
+   │ Help: Write a row of Type Integer, or widen the row Parameter's Type to one this row is a value of.
+   │ 
+   │ Note: The row Parameter is declared as Integer, and that is the Type the body — and an interpolated name — reads every row under.
+───╯
+```
+
+</div>
+
+Write the row as the type says, or widen the parameter's type.
+
+Taught on: [Tests › Table tests](/docs/language/tests#table-tests)
+
+### `snapshot-not-printable`
+
+**Error.** `matches snapshot` records how a value prints, and this value is not `Printable`. A choice is `Printable` only when a namespace declares it.
+
+<div class="error-output">
+
+```
+[snapshot-not-printable]
+Error: Colour can not be recorded as a snapshot
+    ╭─┤ Colour.es:12:10 │
+    │
+ 12 │        expect favourite matches snapshot
+    │               ────┬────  
+    │                   ╰────── this is Colour, which is not Printable
+    │ 
+    │ Help: Render it yourself and snapshot the String, or take it apart and snapshot each Case.
+    │ 
+    │ Note 1: A snapshot records what a value LOOKS like, which is what 'Printable::toString' answers — so a value with no such answer has nothing to record.
+    │ Note 2: Colour does not conform to 'Printable'.
+────╯
+```
+
+</div>
+
+Declare the conformance, `namespace Colours for Colour is Printable {}`, or snapshot a string you build yourself.
+
+Taught on: [Tests › Snapshots](/docs/language/tests#snapshots)
+
+### `inline-snapshot-in-table`
+
+**Error.** An inline `matches snapshot` is written in a table test. Every row would record into the same place in the source.
+
+<div class="error-output">
+
+```
+[inline-snapshot-in-table]
+Error: A snapshot in a table test has to be named
+   ╭─┤ Double.es:9:25 │
+   │
+ 9 │        expect double(number) matches snapshot
+   │                              ────────┬───────  
+   │                                      ╰───────── this records into the source, and every row would record here
+   │ 
+   │ Help: Name it: 'matches snapshot from "…"'. Each row records an entry of its own, numbered by the row it ran for.
+   │ 
+   │ Note: Every row of a table test runs this body, so a snapshot written here holds one value per row — and an inline snapshot is one slot of one line.
+───╯
+```
+
+</div>
+
+Name the snapshot, `matches snapshot from "doubled"`, and each row records an entry of its own.
+
+Taught on: [Tests › Table tests](/docs/language/tests#table-tests)
+
+### `property-parameters`
+
+**Error.** A `for any (…)` parameter does not write both a name and a type. The type says which values to generate.
+
+<div class="error-output">
+
+```
+[property-parameters]
+Error: A generated Parameter has to write its Type
+   ╭─┤ Add.es:8:31 │
+   │
+ 8 │     test "add commutes" for any (a, b: Integer) {
+   │                                  ▲  
+   │                                  ╰── nothing here says what to generate
+   │ 
+   │ Help: Write the Type: 'for any (a: Integer)'.
+   │ 
+   │ Note: The Type is the whole of what a generator is derived from.
+───╯
+```
+
+</div>
+
+Write a type for each parameter: `for any (a: Integer, b: Integer)`.
+
+Taught on: [Tests › Property tests](/docs/language/tests#property-tests)
+
+### `ungeneratable-type`
+
+**Error.** A `for any (…)` parameter has a type that nothing can generate, such as a function type.
+
+<div class="error-output">
+
+```
+[ungeneratable-type]
+Error: Nothing can generate a (_ String) -> Integer
+   ╭─┤ Read.es:8:37 │
+   │
+ 8 │     test "every reader reads" for any (read: (_ text: String) -> Integer) {
+   │                                        ────────────────┬────────────────  
+   │                                                        ╰────────────────── nothing knows how to build a (_ String) -> Integer
+   │ 
+   │ Help 1: Write a Type a value can be built of, or declare a 'Generatable' conformance for this one.
+   │ Help 2: Write 'shrink' in the conformance as well: 'Generatable' provides one that answers no candidates, and a counterexample is otherwise reported as it was drawn.
+   │ 
+   │ Note: A property test generates a value of every Parameter's Type, once per case.
+───╯
+```
+
+</div>
+
+Use a type that can be generated, or declare a `Generatable` conformance for it.
+
+Quick Fix: **Make 'T' Generatable** writes the conformance for a record alias or a choice that this file declares.
+
+Taught on: [Tests › Property tests](/docs/language/tests#property-tests)
+
+### `unreachable-conformance`
+
+**Error.** A property test generates a type whose `Generatable` conformance is declared on a generic namespace. `generate` takes only a `Randomness`, so the compiler has nothing to infer the namespace's type parameter from.
+
+<div class="error-output">
+
+```
+[unreachable-conformance]
+Error: Namespace 'Pairs' is generic, so its 'Generatable' conformance can not be reached
+    ╭─┤ Pair.es:22:35 │
+    │
+ 22 │     test "a pair is marked" for any (pair: Pair<Twin>) {
+    │                                      ────────┬───────  
+    │                                              ╰───────── nothing here binds 'Item' for the draw
+    │ 
+    │ Help: Declare 'Generatable' on a Namespace whose target Type is already applied, rather than on a generic one.
+    │ 
+    │ Note 1: 'generate' is a static taking a 'Randomness' and nothing else, so a call has no Argument to work 'Item' out from — and a call can not be written with a Type Argument.
+    │ Note 2: Passed over, the structural generator would draw and shrink a { held: { first: Integer, second: Integer }, mark: Integer } instead, which is what this conformance was written to replace.
+────╯
+```
+
+</div>
+
+Declare the conformance on a namespace for the applied type: `namespace TwinPairs for Pair<Twin> is Generatable`.
+
+### `reserved-suite-name`
+
+**Error.** A `suite` uses a name that the compiler fills itself, such as `examples` in a file with `@example` blocks.
+
+<div class="error-output">
+
+```
+[reserved-suite-name]
+Error: The suite name 'examples' is taken by this file's '@example' blocks
+    ╭─┤ Double.es:14:8 │
+    │
+ 14 │     suite "examples" {
+    │           ─────┬────  
+    │                ╰────── this names the synthesized suite
+    │ 
+    │ Help: Call this suite something else.
+    │ 
+    │ Note: Under this compile the Enricher fills a suite called 'examples' with this file's '@example' blocks, and two suites of one name share everything their identity anchors — stored counterexamples, seeds, and the Editor's focus.
+────╯
+```
+
+</div>
+
+Rename the suite.
+
+Taught on: [Tests › Names and identity](/docs/language/tests#names-and-identity)
+
+### `contradictory-test-forms`
+
+**Error.** One test writes both `across` and `for any`. A table test runs once per written row, and a property test runs once per generated value.
+
+<div class="error-output">
+
+```
+[contradictory-test-forms]
+Error: A test runs written rows or generated values, not both
+   ╭─┤ Double.es:8:50 │
+   │
+ 8 │     test "doubling" across [1, 2] (number: Integer) for any (other: Integer) {
+   │                     ───┬──                          ─┬─  
+   │                        ╰─────────────────────────────│─── and this runs the rows
+   │                                                      │   
+   │                                                      ╰─── this generates a value for every case
+   │ 
+   │ Help: Keep one of them, or write two tests — one over the rows and one over the generated values.
+   │ 
+   │ Note: A table test runs its body once per row a reader wrote; a property test runs it once per value the runner made up. One body can not do both.
+───╯
+```
+
+</div>
+
+Keep one of them, or write two tests.
+
+Taught on: [Tests › Table tests](/docs/language/tests#table-tests)
+
+### `snapshot-in-property`
+
+**Error.** A property test records a snapshot. It runs once per generated value, so the snapshot would record a different value each time.
+
+<div class="error-output">
+
+```
+[snapshot-in-property]
+Error: A property test can not record a snapshot
+   ╭─┤ Double.es:9:25 │
+   │
+ 9 │        expect double(number) matches snapshot from "doubled"
+   │                              ───────────────┬───────────────  
+   │                                             ╰───────────────── every case would record here
+   │ 
+   │ Help: Assert what holds for every value instead — 'expect …' — and snapshot a value a test WROTE, in a test of its own.
+   │ 
+   │ Note: A property test runs its body once per generated value, so a snapshot written here records a different value every case and only the last of them could ever match.
+───╯
+```
+
+</div>
+
+Assert what holds for every value, and snapshot fixed values in a test of their own.
+
+Taught on: [Tests › Property tests](/docs/language/tests#property-tests)
+
+### `value-comment-outside-tests`
+
+**Warning.** A `§?` value comment is written outside the `tests { … }` block, where nothing records the value.
+
+<div class="error-output">
+
+```
+[value-comment-outside-tests]
+Warning: This value comment is answered by nothing
+   ╭─┤ Rate.es:2:38 │
+   │
+ 2 │     constant rate = 3::multiply(with 2) §?
+   │                                         ─┐  
+   │                                          ╰── no test records the value of this line
+   │ 
+   │ Help: Ask it of a Statement inside the 'tests { … }' block, or write '§' for a Comment that asks nothing.
+   │ 
+   │ Note: A '§?' asks for the value of the Statement it ends, and the points that record one are handed out while a 'tests { … }' block is compiled. Everywhere else it is an ordinary Comment.
+───╯
+```
+
+</div>
+
+Ask it of a statement in the `tests { … }` block, or write `§` for a plain comment.
+
+Quick Fix: **Write an ordinary '§' Comment**.
+
+Taught on: [Tests › Examples and value comments](/docs/language/tests#examples-and-value-comments)
+
+## The project file
+
+Mistakes in `essence.json`. Each is a Warning: the setting falls back to its default and the run goes on. `essence build`, `run`, `watch`, `test` and `init` report them at the head of a run; `essence check` does not.
+
+### `unknown-setting`
+
+**Warning.** `essence.json` has a key that is not a setting. The Note lists the settings at that level. Nothing is read from the key.
+
+<div class="error-output">
+
+```
+[unknown-setting]
+Warning: "exclusions" is not a setting
+   ╭─┤ essence.json:2:2 │
+   │
+ 2 │     "exclusions": ["build"]
+   │     ──────┬─────  
+   │           ╰─────── not a setting
+   │ 
+   │ Note 1: The settings at the top of essence.json are "$schema", "exclude", "test", "build".
+   │ Note 2: Nothing was read from this key.
+───╯
+```
+
+</div>
+
+Fix the key's spelling.
+
+Quick Fix: **Change to "exclude"** when the key is a near miss.
+
+Taught on: [essence.json › Mistakes are Warnings](/docs/reference/project-file#mistakes-are-warnings)
+
+### `setting-shape`
+
+**Warning.** A setting has a value of the wrong shape, such as a string where a list of tags belongs.
+
+<div class="error-output">
+
+```
+[setting-shape]
+Warning: "test.skipTags" is not a list of tag names
+   ╭─┤ essence.json:3:15 │
+   │
+ 3 │        "skipTags": "slow"
+   │                    ───┬──  
+   │                       ╰──── written as a String
+   │ 
+   │ Help: Write it as a list of tag names: ["slow"]
+   │ 
+   │ Note: No tag is skipped by default.
+───╯
+```
+
+</div>
+
+Write the shape the Help shows: `"skipTags": ["slow"]`.
+
+Taught on: [essence.json › Mistakes are Warnings](/docs/reference/project-file#mistakes-are-warnings)
+
+### `moved-setting`
+
+**Warning.** A key is written where its setting used to be read. `test.exclude` is now the top-level `exclude`.
+
+<div class="error-output">
+
+```
+[moved-setting]
+Warning: "test.exclude" has moved to "exclude"
+   ╭─┤ essence.json:3:3 │
+   │
+ 3 │        "exclude": ["fixtures"]
+   │        ────┬────  
+   │            ╰────── no longer read here
+   │ 
+   │ Help: Move it: "exclude": ["fixtures"]
+   │ 
+   │ Note 1: "exclude" keeps the editor out of those directories as well as the test walk, so it sits at the top rather than under "test".
+   │ Note 2: Nothing was read from this key.
+───╯
+```
+
+</div>
+
+Move it to the top of the file: `"exclude": ["fixtures"]`.
+
+Quick Fix: **Move it to "exclude"**.
+
+Taught on: [essence.json › Mistakes are Warnings](/docs/reference/project-file#mistakes-are-warnings)
+
+### `unreadable-project-file`
+
+**Warning.** `essence.json` does not parse. It is JSON with comments and trailing commas allowed. Every setting stays at its default until the file parses.
+
+<div class="error-output">
+
+```
+[unreadable-project-file]
+Warning: essence.json could not be read as JSON
+   ╭─┤ essence.json:2:1 │
+   │
+ 2 │     "exclude": ["build"
+   │ ▲───  
+   │ ╰───── a ']' was expected here
+   │ 
+   │ Help: The file is JSON with comments and trailing commas allowed, as tsconfig.json is.
+   │ 
+   │ Note: Every setting is at its default until the file reads.
+───╯
+```
+
+</div>
+
+Fix the syntax at the place the label points to.
+
+Taught on: [essence.json › Mistakes are Warnings](/docs/reference/project-file#mistakes-are-warnings)
+
+## The compiler as a program
+
+Problems with the run itself rather than with a program. These reports have no source location.
+
+### `file-not-found`
+
+**Error.** A file named on the command line does not exist.
+
+<div class="error-output">
+
+```
+[file-not-found]
+Error: No such file: Missing.es
+```
+
+</div>
+
+Check the path.
+
+Taught on: [Running tests](/docs/guides/running-tests)
+
+### `not-a-file`
+
+**Error.** A directory is named where a source file belongs.
+
+<div class="error-output">
+
+```
+[not-a-file]
+Error: src is a directory. Pass the source files inside it instead, for example src/*.es
+```
+
+</div>
+
+Name the files inside it, for example `src/*.es`.
+
+Taught on: [Command line › The shape of an invocation](/docs/reference/cli#the-shape-of-an-invocation)
+
+### `unreadable-file`
+
+**Error.** The file exists but cannot be read, usually because of its permissions.
+
+<div class="error-output">
+
+```
+[unreadable-file]
+Error: Not allowed to read Locked.es
+```
+
+</div>
+
+Fix the file's permissions.
+
+### `bundle-failed`
+
+**Error.** The generated JavaScript could not be bundled. The message starts with `Could not bundle the generated JavaScript:`. This is a compiler bug.
+
+Report it, with the program that caused it.
+
+### `bundler-warning`
+
+**Warning.** The JavaScript bundler reported a warning. The compiler passes it through unchanged.
+
+Read the bundler's message. Your program still builds.
+
+## Everything else
+
+An `@` written where it names nothing, a standard-library declaration, and a failure inside the compiler.
+
+### `at-outside-method`
+
+**Error.** `@` is used outside a method or a `match` arm, where it names nothing.
+
+<div class="error-output">
+
+```
+[at-outside-method]
+Error: There is no '@' here to refer to
+   ╭─┤ Me.es:2:16 │
+   │
+ 2 │     constant me = @
+   │                   ▲  
+   │                   ╰── this is outside any Method or Handler
+   │ 
+   │ Note: '@' is the receiver of a Method or the value a Match Handler matched.
+───╯
+```
+
+</div>
+
+Use `@` inside a method, for its receiver, or inside a `match` arm, for the matched value.
+
+Taught on: [Namespaces and methods › The receiver, `@`](/docs/language/namespaces-and-methods#the-receiver-)
+
+### `at-in-static-method`
+
+**Error.** `@` is used in a static method, which has no receiver.
+
+<div class="error-output">
+
+```
+[at-in-static-method]
+Error: There is no '@' in a static Method
+   ╭─┤ Point.es:6:7 │
+   │
+ 6 │          <- @
+   │             ▲  
+   │             ╰── this Method is called on the Namespace
+   │ 
+   │ Help: Take the value as a Parameter, or drop 'static' to make this an instance Method.
+   │ 
+   │ Note: '@' is the receiver of an instance Method, and a static Method is called without one.
+───╯
+```
+
+</div>
+
+Take the value as a parameter, or return a value built in the body: `static origin() -> Point { <- { x = 0, y = 0 } }`. Remove `static` instead when the method is meant to run on a value.
+
+Quick Fix: **Drop 'static'**.
+
+Taught on: [Namespaces and methods › The receiver, `@`](/docs/language/namespaces-and-methods#the-receiver-)
+
+### `native-property-without-type`
+
+**Error.** A static property in a `declarations { … }` file has neither a value nor a type. Only the standard library's own sources can hit this, because a program cannot open a `declarations` block (see [`declarations-outside-stdlib`](/docs/reference/diagnostics#declarations-outside-stdlib)).
+
+Annotate the property with its type, as in `static Pi: Transcendental`.
+
+### `internal-error`
+
+**Error.** The compiler failed where it should have reported a problem. Apart from the install problem below, this is a compiler bug.
+
+Report it, with the program that caused it. The one known cause outside the compiler is Yarn's Plug'n'Play install, under which `essence build` stops with this error. Switch the project to a `node_modules` folder.
+
+Taught on: [Installation › Add it to a project](/docs/getting-started/installation#add-it-to-a-project)
