@@ -5,24 +5,24 @@ section: guides
 order: 70
 template: guide
 tocDepth: 2
-steps: 6
-minutes: 20
+steps: 7
+minutes: 24
 ---
 
-The `@essence-lang/client` package loads an [Essence](/docs/getting-started/what-essence-is) module, a `.es` file, and hands you its exports as plain JavaScript. A [record](/docs/language/records) becomes an object, a [list](/docs/language/lists) an array, and a missing value `undefined`. Each value is converted, or marshalled, at the boundary between the two languages. An argument of the wrong shape, such as a string where the module declares an [`Integer`](/docs/library/integer), is refused there, before any Essence code runs. So a request body can go straight to the module's functions, and Step 3 compares that check with Zod. Calls go one way: an Essence module imports only `.es` files, so the only JavaScript it runs is a function you pass it.
+The `@essence-lang/client` package loads an [Essence](/docs/getting-started/what-essence-is) module, a `.es` file, and hands you its exports as plain JavaScript. A [record](/docs/language/records) becomes an object, a [list](/docs/language/lists) an array, and a missing value `undefined`. Each value is converted, or marshalled, at the boundary between the two languages. An argument of the wrong shape, such as a string where the module declares an [`Integer`](/docs/library/integer), is refused there, before any Essence code runs. So a request body can go straight to the module's functions, and Step 4 compares that check with Zod. Calls go one way: an Essence module imports only `.es` files, so the only JavaScript it runs is a function you pass it.
 
 ## Four ways in
 
 | Way in | Compiles | Values you get | Use it for |
 | --- | --- | --- | --- |
-| `loadModule("./Pricing.es")` | When the module loads, so the compiler must be installed | Plain JavaScript | Servers, scripts and tests on Node or Bun |
-| A bundler plugin: `essence()` for Vite, `essenceEsbuild()` for esbuild, `essenceBun()` for Bun | When the bundler builds, or at the import under Bun | Plain JavaScript, and the module's own values under `?raw` | Browser apps, and anything else you bundle |
-| [`essence build --embed`](/docs/reference/cli#build--embed), then `loadPrebuilt("./dist/pricing.js")` | Once, ahead of time | Plain JavaScript | Deploying without compiling at run time |
+| `loadModule("./Pricing.es")` | When the module loads, so the compiler must be installed | Plain JavaScript, and a `Promise` where the module answers work | Servers, scripts and tests on Node or Bun |
+| A bundler plugin: `essence()` for Vite, `essenceEsbuild()` for esbuild, `essenceBun()` for Bun | When the bundler builds, or at the import under Bun | The same, and the module's own values under `?raw` | Browser apps, and anything else you bundle |
+| [`essence build --embed`](/docs/reference/cli#build--embed), then `loadPrebuilt("./dist/pricing.js")` | Once, ahead of time | The same | Deploying without compiling at run time |
 | [`essence build`](/docs/guides/using-the-compiler) | Once, ahead of time | Essence's own values, which JavaScript cannot build | Running a program rather than calling one |
 
-Essence's own values are the objects a compiled module works with. Each data value carries its type on a hidden Symbol, so a plain JavaScript value is never one of them. JavaScript builds one only through the module's `bridge`, which Step 3 uses.
+Essence's own values are the objects a compiled module works with. Each data value carries its type on a hidden Symbol, so a plain JavaScript value is never one of them. JavaScript builds one only through the module's `bridge`, which Step 4 uses.
 
-The first three put the same checks between the two languages. Steps 1 to 4 use `loadModule`, and what they show holds for the plugins and for `loadPrebuilt` too, with one difference for constants, under What does not cross. Step 5 moves the module into a bundler, and Step 6 ships it without the compiler.
+The first three put the same checks between the two languages. Steps 1 to 5 use `loadModule`, and what they show holds for the plugins and for `loadPrebuilt` too, with one difference for constants, under What does not cross. Step 6 moves the module into a bundler, and Step 7 ships it without the compiler.
 
 <Steps>
 
@@ -148,7 +148,7 @@ What the run shows:
 - **An instance method takes its receiver first.** The receiver is the value before `::`. JavaScript has no `::`, so `order::subtotal()` in Essence is `Order.subtotal(order)` here. A static such as `Order.of` reads the same in both languages.
 - **A call is positional, or takes one object of labels.** A label is the name a caller writes before an argument. In `priceAfter(_ discount: Discount, on cents: Integer)`, `on` labels `cents`, and `_` means the first parameter has none. Only a function whose parameters all have labels takes the object form, and its keys are the labels. Every parameter of `Order.of` has a label, so `Order.of(items, discount)` and `Order.of({ items, discount })` are the same call. A misspelled key is refused, not read as a positional argument.
 - **The module's body runs when it loads.** A top-level [`Terminal.print`](/docs/library/terminal#print), Essence's `console.log`, in `Pricing.es` would print during `loadModule`. It runs once per process, as an ES module's top level does. Loading the same file again returns the module without running the body a second time.
-- **Every call is synchronous.** Only loading returns a Promise, so `loadModule` is the one thing the script awaits.
+- **A call returns when the work is described, not when it is done.** Every call here answers at once. A function whose Essence signature answers a [`Future`](/docs/library/future) answers a `Promise` instead, and Step 3 is about those.
 
 **Compared with JavaScript.**
 
@@ -159,7 +159,7 @@ Order.subtotal(order) // 1449n
 
 What `Order.of` returns is a plain object with no methods. The methods live on `Order`, and none of them uses `this`, so `let { subtotal } = Order` works as well. More under [namespaces and protocols](/docs/getting-started/coming-from-javascript#namespaces-and-protocols).
 
-**Loading without a throw.** `loadModule` throws when the source does not compile, and Step 3 shows that error. `attemptLoad` takes the same arguments and returns the error instead. One of `module` and `error` is `null`:
+**Loading without a throw.** `loadModule` throws when the source does not compile, and Step 4 shows that error. `attemptLoad` takes the same arguments and returns the error instead. One of `module` and `error` is `null`:
 
 ```js
 import { attemptLoad } from "@essence-lang/client"
@@ -348,6 +348,73 @@ Every `Integer` arrives as a `bigint`, which `JSON.stringify` refuses, so give i
 
 </StepItem>
 
+<StepItem title="Await work a module describes">
+
+A function whose Essence signature answers a [`Future<T>`](/docs/library/future) answers a `Promise<T>` here, and calling it is what puts the work in flight. A future is a *description* — building one runs nothing at all — so the boundary starts one run per call and hands back the promise of that run.
+
+```essence
+§ file: Reports.es
+implementation {
+	function delayed(_ label: String) -> Future<String> {
+		complete Async.sleep(milliseconds 1)
+
+		<- label
+	}
+
+	function loaded(
+		_ path: String,
+		reading read: (_: String) -> Future<String>,
+	) -> Future<Integer> {
+		constant text = complete read(path)
+
+		<- text::length()
+	}
+}
+
+export {
+	delayed
+	loaded
+}
+```
+
+```js
+import { loadModule } from "@essence-lang/client"
+
+let reports = await loadModule("./Reports.es")
+let { delayed, loaded } = reports.exports
+
+console.log(await delayed("first"))
+console.log(await loaded("/index.html", (path) => Promise.resolve(`<html>${path}</html>`)))
+```
+
+```sh
+$ node reports.js
+first
+24n
+```
+
+A `Started<T>` — one run that is already going — crosses as the promise that run holds, and nothing here starts it again, however many times it is read.
+
+**Work crosses at a call's answer, and nowhere else.** A future inside a value, a record's member or a list's item, is refused in both directions: there is nothing inside a value to say when it should run, so starting it to spell it would run work nobody asked for, and handing the description over unstarted would hand over an object that describes nothing. A constant holding work is refused where it is read, for the same reason. A `Promise` passed *in* is refused too: it is an answer that has not arrived, not a description something can run.
+
+**Work the host does is a callback.** A parameter declared `(_: String) -> Future<String>` takes an ordinary JavaScript function answering a `Promise`, as `loaded` does above. The difference between that and passing a promise is the point: the host's function is called **at every start**. A module that writes `::attempt(times 3)` over such work calls it three times while it fails, and a module that builds the work and never starts it never calls it at all. The callback is not handed a signal; a host that wants to be stopped closes over an `AbortController` of its own.
+
+**Stopping is one signal.** `loadModule`, `bind` and `loadPrebuilt` take a `signal`, and it becomes the **root** of every run the boundary starts rather than a second mechanism beside the one the language has.
+
+```js
+let stopping = new AbortController()
+let reports = await loadModule("./Reports.es", { signal: stopping.signal })
+let answering = reports.exports.delayed("first")
+
+stopping.abort() // `answering` never settles
+```
+
+Everything that call started stops with it: [`Async.sleep`](/docs/library/future#sleep) clears its timer, [`within`](/docs/library/future#within) and [`race`](/docs/library/future#race) stop their losers, and a request [`Http`](/docs/library/http) made is aborted. A stopped run answers **nothing at all** — a future cannot fail, so the promise is left unsettled rather than rejected, which is what cancellation means everywhere else in the language. A `Started` is left alone: one run belongs to whoever started it, and a stop written by one holder may not take the answer away from the others.
+
+[Asynchrony](/docs/language/asynchrony) teaches the Essence side of all of this.
+
+</StepItem>
+
 <StepItem title="Read the refusals">
 
 Five calls that go wrong:
@@ -496,7 +563,7 @@ EssenceCallError: 'Tag.label' is overloaded, and which Overload a call means is 
 sale#3
 ```
 
-`raw` is the module's exports without conversion, and each overload is a function on `raw.Tag`, named `label__overload$1` and `label__overload$2`. It takes the module's own values: `bridge.integer(3)` builds one, and `marshaller.toJS` turns the result back into JavaScript. Step 6 covers all three.
+`raw` is the module's exports without conversion, and each overload is a function on `raw.Tag`, named `label__overload$1` and `label__overload$2`. It takes the module's own values: `bridge.integer(3)` builds one, and `marshaller.toJS` turns the result back into JavaScript. Step 7 covers all three.
 
 **Compared with JavaScript.**
 
@@ -621,9 +688,16 @@ wrong.ts(7,23): error TS2561: Object literal may only specify known properties, 
 wrong.ts(8,29): error TS2322: Type 'string' is not assignable to type 'number | bigint'.
 ```
 
-The bundler plugins in Step 5 write the same file, `<Name>.d.es.ts` beside each `.es` file they compile, while a dev server runs or when you pass `declarations: true`. `examples/quote-server` and [`examples/client-2048`](https://github.com/alexandertrefz/essence/tree/master/examples/client-2048) import their `.es` files from TypeScript this way, with `allowArbitraryExtensions` in their `tsconfig.json`.
+The bundler plugins in Step 6 write the same file, `<Name>.d.es.ts` beside each `.es` file they compile, while a dev server runs or when you pass `declarations: true`. `examples/quote-server` and [`examples/client-2048`](https://github.com/alexandertrefz/essence/tree/master/examples/client-2048) import their `.es` files from TypeScript this way, with `allowArbitraryExtensions` in their `tsconfig.json`.
 
-An argument that cannot cross is declared `never`, with the reason in a comment, and so is an overloaded method as a whole. The one from Step 3:
+Work is a `Promise` in the declarations too, at the positions it crosses at. `Reports.es` from Step 3 declares:
+
+```ts
+export declare function delayed(p0: string): Promise<string>
+export declare function loaded(p0: string, reading: (p0: string) => Promise<string>): Promise<bigint>
+```
+
+An argument that cannot cross is declared `never`, with the reason in a comment, and so is an overloaded method as a whole. The one from Step 4:
 
 ```ts
 export declare const Tag: { label: never /* overloaded — calling it throws */ }
@@ -762,7 +836,7 @@ EssenceMarshalError: argument 1 → [0].cents: expected Integer, got the string 
 EssenceMarshalError: argument 1 → [0].cents: expected , got the string "199".
 ```
 
-**`?raw`.** `import * as raw from "./Pricing.es?raw"` imports the compiled module without the conversion: Essence's own values, under the names the module exports. Vite uses `?raw` for a file's text; here it means the module's unconverted values. Step 6 shows what those look like.
+**`?raw`.** `import * as raw from "./Pricing.es?raw"` imports the compiled module without the conversion: Essence's own values, under the names the module exports. Vite uses `?raw` for a file's text; here it means the module's unconverted values. Step 7 shows what those look like.
 
 </StepItem>
 
@@ -886,14 +960,17 @@ EssenceMarshalError at root
 ```
 
 - **[Generics](/docs/language/generics).** A type parameter has no shape until a call applies it, so an argument in its position is refused. An empty array gets through, because there is nothing in it to build. The generic function still works through `raw`, where nothing is converted.
-- **Overloads.** A call through `exports` is refused, and each overload is a function on `raw`, as Step 3 shows.
+- **Overloads.** A call through `exports` is refused, and each overload is a function on `raw`, as Step 4 shows.
 - **Nested `Optional`s.** `Optional<Optional<Integer>>` would be `undefined` at both levels, and `#Value(#Empty)` is not `#Empty`. It is refused going in and coming out.
 - **Numbers above `Rational`.** An [`Algebraic`](/docs/library/algebraic) or a [`Transcendental`](/docs/library/transcendental), such as `2::squareRoot()`, has no JavaScript form. Under `loadModule` and `loadPrebuilt`, a constant is converted when you read it, so reading `root` throws and the other exports still work. A bundler plugin converts every constant when the module loads, so there `root` fails the whole import.
+- **Work anywhere but a call's answer.** A [`Future`](/docs/library/future) or a `Started` crosses as a `Promise` where a call answers with one, and nowhere else — not inside a record, a list, a case payload or a dictionary, not as an argument, and not at a constant. `Future<Future<T>>` therefore comes back as a promise whose answer is refused. A `Promise` handed *in* is refused wherever it is passed, and named as what it is, so `expected Integer, got a Promise` reads as the mistake it is. Step 3 has the rest.
+- **A signal for the host's own callback.** A callback declared to answer a future is called with its declared arguments and nothing else, so a host that wants to be stopped carries its own `AbortController`. The run's signal stops what the module itself started.
 - **Compiling in a browser.** The compiler reads files and runs esbuild, so it runs on Node or Bun. A browser runs what a bundler plugin built.
 
-Two example projects use this boundary end to end:
+Three example projects use this boundary end to end:
 
 - `examples/quote-server` is an HTTP API on Bun whose pricing rules are Essence, reached through the Bun plugin.
 - `examples/client-2048` is the game 2048 in the browser. The rules are Essence, the page is TypeScript, and Vite serves both.
+- `examples/site-check` asks several addresses for their pages at once, in Essence, and a Bun script awaits the one promise it answers with.
 
 The client package's [README](https://github.com/alexandertrefz/essence/tree/master/packages/client) lists every export and every plugin option.
