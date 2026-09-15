@@ -591,6 +591,61 @@ Quick Fix: **Remove the default**.
 
 Taught on: [Choices and `match` › Defaults for a payload](/docs/language/choices-and-match#defaults-for-a-payload)
 
+### `case-payload-is-one-value`
+
+**Error.** A case's payload ends on a comma. The parentheses of a case hold the single value it carries, not a list, so a separator there has nothing to separate.
+
+<div class="error-output">
+
+```
+[case-payload-is-one-value]
+Error: A Case carries one value
+   ╭─┤ Answer.es:3:5 │
+   │
+ 3 │        42,
+   │          ▲  
+   │          ╰── nothing follows this ','
+   │ 
+   │ Help 1: Drop the ','.
+   │ Help 2: Or carry the values as one Record: '#Rectangle({ width = 2, height = 3 })'.
+   │ 
+   │ Note: The parentheses of a Case hold the single value it carries, not a list.
+───╯
+```
+
+</div>
+
+Drop the comma. Several values are carried as one record: `#Rectangle({ width = 2, height = 3 })`.
+
+Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
+
+### `case-application-across-lines`
+
+**Error.** A case applied to type arguments has its `#` on a line of its own. A construction is written on one line: the bare form `Box#Full` reads as one only where the `#` sits flush against the name, and writing the type arguments in between is not a way around that.
+
+<div class="error-output">
+
+```
+[case-application-across-lines]
+Error: A Case is applied on the line its Type Arguments close on
+   ╭─┤ Applied.es:3:3 │
+   │
+ 3 │        #Value(42)
+   │        ▲  
+   │        ╰── this '#' is on a line of its own
+   │ 
+   │ Help: Write the '#' and its Case on the line the '>' closes on.
+   │ 
+   │ Note: The bare form is held to the same rule: 'Box#Full' is one construction only where the '#' sits against the name.
+───╯
+```
+
+</div>
+
+Write the `#` and its case on the line the `>` closes on.
+
+Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
+
 ### `declarations-outside-stdlib`
 
 **Error.** A file opens with `declarations { … }`. That form belongs to the standard library's own sources.

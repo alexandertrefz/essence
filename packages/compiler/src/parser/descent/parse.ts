@@ -3410,9 +3410,19 @@ class DescentParser {
 					hashToken.position.start.line !==
 						argumentList.position.end.line
 				) {
-					fail(
-						"Expected '#' on the line its Type Arguments close on.",
+					throw new ParseError(
+						"A Case is applied on the line its Type Arguments close on",
 						hashToken.position,
+						"this '#' is on a line of its own",
+						{
+							code: "case-application-across-lines",
+							notes: [
+								"The bare form is held to the same rule: 'Box#Full' is one construction only where the '#' sits against the name.",
+							],
+							helps: [
+								"Write the '#' and its Case on the line the '>' closes on.",
+							],
+						},
 					)
 				}
 
@@ -3431,6 +3441,40 @@ class DescentParser {
 
 			if (this.tokens.peek()?.type !== TokenType.SymbolRightParen) {
 				value = this.parseExpression()
+			}
+
+			// NOTE: A coded refusal rather than the generic one, because this
+			// reading is SPECULATIVE where the Case carries Type Arguments —
+			// only the `#` past the `>` tells `Optional<Integer>#Value(…)` from
+			// a comparison chain — and `speculate` gives a `syntax-error` back
+			// and rewinds. The rewound reading then re-read the Choice as a call
+			// receiver and refused the `#` instead, which named the wrong
+			// character on the wrong line. A code the rewind does not swallow is
+			// what keeps the refusal where the mistake is.
+			//
+			// NOTE: And it is a refusal rather than an allowance because a Case
+			// payload is ONE value: every construct that takes a trailing comma
+			// is a LIST, and a separator with nothing to separate would read as
+			// though a second value could follow. Several values are carried as
+			// one Record.
+			let comma = this.tokens.peek()
+
+			if (comma?.type === TokenType.SymbolComma) {
+				throw new ParseError(
+					"A Case carries one value",
+					comma.position,
+					"nothing follows this ','",
+					{
+						code: "case-payload-is-one-value",
+						notes: [
+							"The parentheses of a Case hold the single value it carries, not a list.",
+						],
+						helps: [
+							"Drop the ','.",
+							"Or carry the values as one Record: '#Rectangle({ width = 2, height = 3 })'.",
+						],
+					},
+				)
 			}
 
 			end = this.tokens.expect(TokenType.SymbolRightParen).position.end

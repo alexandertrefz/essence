@@ -307,6 +307,8 @@ export type DiagnosticCode =
 	| "path-is-members-only"
 	| "default-on-function-literal"
 	| "case-default-without-payload"
+	| "case-payload-is-one-value"
+	| "case-application-across-lines"
 	| "declarations-outside-stdlib"
 	| "overload-function-outside-stdlib"
 	| "misplaced-module-section"

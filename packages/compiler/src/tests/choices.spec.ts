@@ -433,6 +433,28 @@ describe("Choices", () => {
 
 			expect(choice.generics).toEqual([])
 		})
+
+		// NOTE: A Case payload is ONE value — every construct that takes a
+		// trailing comma is a LIST — so the comma is refused. What matters is
+		// WHERE: the applied form is read speculatively, because only the `#`
+		// past the Type Arguments tells it from a comparison chain, and a
+		// generic `syntax-error` is given back and rewound. The rewound reading
+		// then refused the `#` instead, naming the wrong character on the wrong
+		// line. A coded refusal is what the rewind does not swallow.
+		it("refuses a trailing comma in a Case payload where it is written", () => {
+			expect(
+				codesOf(`implementation {
+	constant x = Optional<Integer>#Value(
+		1,
+	)
+}`),
+			).toEqual(["case-payload-is-one-value"])
+			expect(
+				codesOf(`implementation {
+	constant x = Optional#Value(1,)
+}`),
+			).toEqual(["case-payload-is-one-value"])
+		})
 	})
 
 	describe("Enricher", () => {
@@ -2783,6 +2805,10 @@ describe("Choices", () => {
 			// when it sits directly against what precedes it — that is what keeps
 			// `label #Case` readable as a labelled Argument — and an application
 			// standing between the two must not be the way around it.
+			//
+			// NOTE: Under its own code, which is what carries the refusal out of
+			// the speculative reading it is written in. Under the generic one it
+			// was rewound and the message a reader got named the wrong character.
 			it("does not read a '#' that opens the next line", () => {
 				expect(
 					codesOf(`implementation {
@@ -2791,7 +2817,7 @@ describe("Choices", () => {
 						constant b = Box<Integer>
 						#Full(1)
 					}`),
-				).toEqual(["syntax-error"])
+				).toEqual(["case-application-across-lines"])
 			})
 
 			// NOTE: The line the `#` is held to is the one the Arguments CLOSE
