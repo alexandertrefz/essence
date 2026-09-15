@@ -51,6 +51,43 @@ function pause(milliseconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
+const endlessly = () => new Promise<never>(() => {})
+
+// NOTE: The abort listeners a run leaves on the context it was started in,
+// counted by standing in front of the signal's own two Methods. Awaited past a
+// turn of the loop, because a run that settles releases its link in the
+// microtask its promise settles in.
+async function listeners(
+	under: (parent: Context) => void,
+): Promise<{ added: number; removed: number }> {
+	let parent = root()
+	let signal = parent.signal as AbortSignal & {
+		addEventListener: (...args: Array<never>) => void
+		removeEventListener: (...args: Array<never>) => void
+	}
+	let add = signal.addEventListener.bind(signal)
+	let remove = signal.removeEventListener.bind(signal)
+	let added = 0
+	let removed = 0
+
+	signal.addEventListener = (...args: Array<never>) => {
+		added += 1
+
+		return add(...args)
+	}
+	signal.removeEventListener = (...args: Array<never>) => {
+		removed += 1
+
+		return remove(...args)
+	}
+
+	under(parent)
+
+	await pause(0)
+
+	return { added, removed }
+}
+
 const one = () => createInteger(1n)
 
 // NOTE: `Number`, because an Integer is hybrid — a small one holds a `number`
@@ -163,26 +200,73 @@ describe("the context a run belongs to", () => {
 		})
 	})
 
-	// NOTE: The claim the release is FOR. A context outlives the runs started
+	// NOTE: What the link is FOR, and the claim that has to hold on BOTH host
+	// shapes: stopping a context stops everything started under it, including
+	// what a run that has already answered left behind. A finished run can not
+	// be stopped itself — there is nothing left of it — but the work it started
+	// is still going, and the stop reaches that work through the finished run's
+	// own link.
+	test("stops work a finished run left behind", async () => {
+		await onEachHostAsync(async () => {
+			let parent = root()
+			let left: AbortSignal | null = null
+
+			await complete(
+				of((context: Context) => {
+					start(
+						of((inner: Context) => {
+							left = inner.signal
+
+							return new Promise<never>(() => {})
+						}),
+						context,
+					)
+
+					return one()
+				}),
+				parent,
+			)
+
+			expect(left!.aborted).toBe(false)
+
+			parent.controller.abort()
+
+			expect(left!.aborted).toBe(true)
+		})
+	})
+
+	// NOTE: And the bookkeeping that claim is paid for with, on the one path
+	// that has bookkeeping of its own. A context outlives the runs started
 	// under it — a Program's root context lives as long as the Program — so a
-	// link left in place after a run is over is held for the whole of that
-	// life, once per start. A thousand starts under one context would hold a
-	// thousand of them, all for work that finished.
-	test("unlinks a finished run from the context it was started in", async () => {
-		let parent = root()
+	// listener left on it after everything that needed it is over is held for
+	// the whole of that life, once per start. A hundred thousand of those is
+	// tens of megabytes.
+	//
+	// Three cases, and the count is the whole of the rule: a run that settles
+	// no longer needs it, a run stopped on its own never settles and no longer
+	// needs it either, and a run still going does.
+	test("holds a listener on its parent for exactly as long as it needs one", async () => {
 		let host = AbortSignal.any
 
 		// @ts-expect-error — the path with a listener of its own to take off
 		delete AbortSignal.any
 
 		try {
-			let started = start(of(one), parent)
-
-			await complete(started, root())
-
-			parent.controller.abort()
-
-			expect(started.controller.signal.aborted).toBe(false)
+			expect(
+				await listeners((parent) => {
+					start(of(one), parent)
+				}),
+			).toEqual({ added: 1, removed: 1 })
+			expect(
+				await listeners((parent) => {
+					start(of(endlessly), parent).controller.abort()
+				}),
+			).toEqual({ added: 1, removed: 1 })
+			expect(
+				await listeners((parent) => {
+					start(of(endlessly), parent)
+				}),
+			).toEqual({ added: 1, removed: 0 })
 		} finally {
 			AbortSignal.any = host
 		}

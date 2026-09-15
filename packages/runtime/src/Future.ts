@@ -105,11 +105,62 @@ export function root(): Context {
 
 // NOTE: A context that is stopped when its parent is, and separately stoppable
 // on its own — which is what `::within` and `::race` stop their losers through.
-// `release` is what unlinks it from its parent once its own run is over; see
-// `childOf`.
+// `release` says the run this context was made for is over; see `childOf` for
+// what that is and is not enough to unlink.
 type Child = {
 	context: Context
 	release: () => void
+}
+
+// NOTE: The bookkeeping the fallback path below needs and the `AbortSignal.any`
+// path does not: what a linked context still owes its parent. A forwarding
+// listener may come off the parent only once the run it was added for has
+// settled AND every context started UNDER that run has come off in turn —
+// otherwise a stop travelling down would stop a finished run's descendants on
+// one host shape and not on the other, which is the cancellation guarantee
+// going host-dependent.
+//
+// A count rather than a flag, because both reasons are open-ended: one run may
+// start any number of children, and each of them any number again. Held in a
+// WeakMap rather than on the Context, so that the Type a Program's natives read
+// stays the signal and the controller and nothing else.
+type Link = {
+	holds: number
+	unlinked: boolean
+	unlink: () => void
+}
+
+let links = new WeakMap<Context, Link>()
+
+function retain(context: Context): void {
+	let link = links.get(context)
+
+	if (link !== undefined) {
+		link.holds += 1
+	}
+}
+
+function unlink(link: Link): void {
+	if (link.unlinked) {
+		return
+	}
+
+	link.unlinked = true
+	link.unlink()
+}
+
+function releaseOne(context: Context): void {
+	let link = links.get(context)
+
+	if (link === undefined) {
+		return
+	}
+
+	link.holds -= 1
+
+	if (link.holds <= 0) {
+		unlink(link)
+	}
 }
 
 // NOTE: `AbortSignal.any([parent.signal, own.signal])` is exactly this union,
@@ -122,12 +173,20 @@ type Child = {
 // is a side effect esbuild has to keep, and a Program that waits for nothing
 // would pay for it.
 //
-// NOTE: The fallback is one listener, and `release` is what takes it off again.
-// Without that, every start under one context leaves a listener on it that lives
-// as long as the context does — a loop starting a thousand futures under a
-// Program's root context would hold a thousand of them, all for runs that
-// finished. `AbortSignal.any` needs no release, because there is nothing of ours
-// to take off.
+// NOTE: The fallback is one listener on the parent, and what takes it off is a
+// count of what still needs it. A run that has settled needs it no longer — a
+// finished run can not be stopped — but a context started under that run can:
+// stopping a Program's root context stops the work a finished body left behind,
+// and that reaches it through this very listener. So the listener comes off
+// when the run has settled and no child context under it is still open, and
+// also the moment the child aborts on its own, which is the case that never
+// settles at all.
+//
+// Neither half is optional. Taking the listener off at the run's end alone
+// loses a finished run's descendants; leaving it on until the context is
+// collected holds one listener per start on a Program's root for the whole of
+// its life, which a loop of a hundred thousand completes makes into tens of
+// megabytes.
 function childOf(parent: Context): Child {
 	let controller = new AbortController()
 
@@ -150,14 +209,32 @@ function childOf(parent: Context): Child {
 		}
 	}
 
+	let context = { signal: controller.signal, controller }
 	let forward = () => controller.abort(parent.signal.reason)
 
 	parent.signal.addEventListener("abort", forward, { once: true })
 
-	return {
-		context: { signal: controller.signal, controller },
-		release: () => parent.signal.removeEventListener("abort", forward),
+	// NOTE: One hold for the run this context was made for, and one taken on
+	// the PARENT for this context being open under it — which is what keeps a
+	// grandparent's stop reaching down through a body that has already
+	// answered.
+	let link: Link = {
+		holds: 1,
+		unlinked: false,
+		unlink: () => {
+			parent.signal.removeEventListener("abort", forward)
+			releaseOne(parent)
+		},
 	}
+
+	links.set(context, link)
+	retain(parent)
+
+	controller.signal.addEventListener("abort", () => unlink(link), {
+		once: true,
+	})
+
+	return { context, release: () => releaseOne(context) }
 }
 
 // NOTE: One run of a description, under a context of its own, as the promise it
