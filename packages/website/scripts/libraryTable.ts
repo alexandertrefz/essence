@@ -1083,7 +1083,7 @@ export const PAGES: PageDefinition[] = [
 		order: 190,
 		description:
 			"Work that has not run: a description to start, and one run of it to wait for.",
-		taughtOn: [],
+		taughtOn: ["language/asynchrony"],
 		groups: [
 			{
 				label: "Describing work",
@@ -1119,7 +1119,7 @@ export const PAGES: PageDefinition[] = [
 		order: 200,
 		description:
 			"Requests to a host, as work that has not run: what to send, what comes back, and why sometimes nothing does.",
-		taughtOn: [],
+		taughtOn: ["language/asynchrony"],
 		groups: [
 			{
 				label: "Sending a request",

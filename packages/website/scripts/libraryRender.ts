@@ -53,6 +53,7 @@ const LANGUAGE_TITLES: Record<string, string> = {
 	"language/strings": "Strings",
 	"language/protocols": "Protocols",
 	"language/tests": "Tests",
+	"language/asynchrony": "Asynchrony",
 }
 
 /** What a page keeps across `--sync`: the parts a person wrote. */
