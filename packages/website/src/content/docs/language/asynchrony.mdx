@@ -1,0 +1,471 @@
+---
+title: Asynchrony
+description: "Describe work as a value with `Future`, wait for it with `complete`, put it in flight with `start`, and run several at once."
+section: language
+order: 240
+group: Asynchrony
+template: article
+---
+
+A [`Future`](/docs/library/future) is a description of work that will answer with a value. Building one runs nothing at all. [`complete`](/docs/reference/syntax-glossary#complete) waits for what a future answers with, and [`start`](/docs/reference/syntax-glossary#start) puts one in flight and hands back the run. There is no `async` keyword and no `await` keyword: a function whose body writes `complete` says so in its return type, and calling it is an ordinary call.
+
+```essence
+implementation {
+	function greeting(_ name: String) -> Future<String> {
+		complete Async.sleep(milliseconds 1)
+
+		<- "Hello, {name}"
+	}
+
+	constant work = greeting("Ada")
+
+	Terminal.print("nothing has run") § nothing has run
+	Terminal.print(complete work) § Hello, Ada
+	Terminal.print(complete work) § Hello, Ada
+}
+```
+
+`greeting` waits, so it answers a `Future<String>` rather than a `String`. Calling it builds that description and runs none of it, which is why the line after the call prints first. `complete work` runs the work and answers the `String` it was described to answer with. A future can be completed any number of times, and each one is a fresh run: the two lines above waited a millisecond each.
+
+`Future<String>` is an ordinary type. It goes in a constant, in a [record](/docs/language/records), in a [list](/docs/language/lists) and through a [generic](/docs/language/generics) function, the same as any other value. What it cannot do is stand where its value is wanted — that is what `complete` is for.
+
+**Compared with JavaScript.**
+
+```ts
+async function greeting(name: string): Promise<string> {
+  await new Promise((resolve) => setTimeout(resolve, 1))
+  return `Hello, ${name}`
+}
+
+const work = greeting("Ada") // already running
+console.log(await work)
+console.log(await work) // the same answer, not a second run
+```
+
+A `Promise` is a run that has already begun, so `greeting("Ada")` waits whether or not anybody awaits it, and awaiting it twice answers the same value twice. A `Future` is the description instead: nothing runs until something starts it, and each start is another run. The Essence value that matches a `Promise` is a [`Started`](/docs/library/future), further down this page.
+
+There is no `async`. A function is marked by what its body does, not by a word in front of it — writing `complete` in the body is the mark, and the return type is what states it.
+
+## A body that waits
+
+```essence
+implementation {
+	function doubled(_ value: Integer) -> Future<Integer> {
+		<- Async.deferred(() { <- value::multiply(with 2) })
+	}
+
+	constant number = Async.deferred(() { <- 21 })
+
+	Terminal.print(complete number::map((value) { <- value::add(1) })) § 22
+	Terminal.print(complete number::andThen(doubled)) § 42
+}
+```
+
+A body that writes `complete` directly is a **completing body**. It suspends where the `complete` stands, so it hands its caller a future rather than a value, and it must declare `-> Future<…>`. Inside it, [`<-`](/docs/reference/syntax-glossary#return) returns the value the future answers with: `greeting` above returns a `String` from a body declared `-> Future<String>`.
+
+A body that completes nothing is an ordinary body. `doubled` here declares `-> Future<Integer>` and returns a future it built, so its `<-` takes the future itself. The two shapes are told apart by the body, never by the signature: both are called the same way, and both answer a future the caller completes in its turn.
+
+[`Async.deferred`](/docs/library/future#deferred) and [`Async.sleep`](/docs/library/future#sleep) are where a future with nothing behind it comes from — a computation to carry out later, and a length of time to wait. Everything else in the library builds one future from another.
+
+A `complete` in a body that declared something else is [`complete-outside-future`](/docs/reference/diagnostics#complete-outside-future):
+
+```essence
+§ fragment
+function headline(_ url: String) -> String {
+	constant answered = complete Async.deferred(() { <- url })
+
+	<- answered
+}
+```
+
+<div class="error-output">
+
+```
+[complete-outside-future]
+Error: 'complete' waits, and nothing here can wait
+   ╭─┤ headline.es:3:23 │
+   │
+ 3 │        constant answered = complete Async.deferred(() { <- url })
+   │                            ───────────────────┬──────────────────
+   │                                               ╰──────────────────── this Function returns String
+   │
+   │ Help: Declare the return Type 'Future<String>'.
+   │
+   │ Note: A body that writes 'complete' suspends, so it hands back a Future the caller completes in its turn — which is what its declared Type has to say.
+───╯
+```
+
+</div>
+
+Write `-> Future<String>`, and every caller completes what it gets. Your editor offers that edit as the Quick Fix **Declare the return Type 'Future\<String\>'**.
+
+A [function literal](/docs/reference/syntax-glossary#function-literal) takes the same rule and needs nothing written down, because its type is inferred:
+
+```essence
+implementation {
+	constant work = [1, 2]::map((value) {
+		constant waited = complete Async.deferred(() { <- value })
+
+		<- waited::multiply(with 10)
+	})
+
+	Terminal.inspect(complete work::all()) § [ 10, 20 ]
+}
+```
+
+The closure completes something, so its type is `(_: Integer) -> Future<Integer>` and [`map`](/docs/library/list#map) answers a `List<Future<Integer>>`. Only a *direct* `complete` marks a body: the `complete` above belongs to the closure, not to the program around it.
+
+## One run, read many times
+
+```essence
+implementation {
+	function slowly(_ value: Integer) -> Future<Integer> {
+		complete Async.sleep(milliseconds 1)
+
+		<- value
+	}
+
+	constant running = start slowly(7)
+	constant doubled = running::map((value) { <- value::multiply(with 2) })
+
+	Terminal.print(complete doubled) § 14
+	Terminal.inspect(complete running::within(milliseconds 1000)) § Optional#Value(7)
+}
+```
+
+`start` takes a `Future<T>` and answers a `Started<T>`: the work is now in flight, and the line after it runs at once. A `Started` is one run. Completing it waits for that run, from anywhere and as often as you like, and always answers the same value — the work does not happen again. "Run this once, read it many times" is a `Started` held in a constant.
+
+`start` never waits, so it is legal anywhere, including in a body that completes nothing. `complete` suspends, so it is legal only where something can wait.
+
+[`Started::map`](/docs/library/future#map) and [`Started::within`](/docs/library/future#within) read a run that is already going. `within` on a `Started` gives up on the answer without stopping the work: another holder may still be waiting for it. `within` on a `Future` started the run itself, so there it does stop it.
+
+A `start` whose run nobody reads is fire-and-forget. That is a real thing to write, so it is allowed, and the compiler says so once as [`unobserved-started`](/docs/reference/diagnostics#unobserved-started), an Information rather than a complaint.
+
+A `Future` written as a statement is different: it describes work and starts none, so the statement does nothing at all. That is [`unused-future`](/docs/reference/diagnostics#unused-future), an error:
+
+```essence
+§ fragment
+function delayed(_ label: String) -> Future<String> {
+	complete Async.sleep(milliseconds 1)
+
+	<- label
+}
+
+delayed("a")
+```
+
+<div class="error-output">
+
+```
+[unused-future]
+Error: Nothing here runs
+   ╭─┤ report.es:8:2 │
+   │
+ 8 │     delayed("a")
+   │     ──────┬─────
+   │           ╰─────── this is a Future<String>, and its value goes nowhere
+   │
+   │ Help: Did you mean 'complete', to wait for it — or 'start', to put it in flight and carry on?
+   │
+   │ Note: A Future describes work. Building one runs none of it — 'start' puts it in flight and 'complete' waits for what it answers with.
+───╯
+```
+
+</div>
+
+The same mistake in a value position is an ordinary type mismatch, with the missing word in its Help:
+
+```essence
+§ fragment
+constant label: String = delayed("a")
+```
+
+<div class="error-output">
+
+```
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'label'
+   ╭─┤ total.es:8:27 │
+   │
+ 8 │     constant label: String = delayed("a")
+   │                              ──────┬─────
+   │                                    ╰─────── this is a Future<String>
+   │
+   │ Help: This describes work that has not run — add 'complete'.
+   │
+   │ Note: 'label' is declared as String.
+───╯
+```
+
+</div>
+
+## In order, or at once
+
+Word order is the whole of the difference. Where a `complete` stands between two calls, the first run is over before the second begins. Where two `start`s stand together, both runs are in flight before either is waited for.
+
+```essence
+implementation {
+	function delayed(
+		_ label: String,
+		milliseconds pause: Integer,
+	) -> Future<String> {
+		complete Async.sleep(milliseconds pause)
+
+		<- label
+	}
+
+	constant first  = complete delayed("a", milliseconds 20)
+	constant second = complete delayed("b", milliseconds 20)
+
+	constant left  = start delayed("c", milliseconds 20)
+	constant right = start delayed("d", milliseconds 20)
+
+	constant third  = complete left
+	constant fourth = complete right
+
+	Terminal.print("{first}{second}{third}{fourth}") § abcd
+}
+```
+
+`first` and `second` take about forty milliseconds together, because the second wait does not begin until the first is over. `third` and `fourth` take about twenty, because both waits were already running when the first `complete` was written. Nothing about the answers changes: they arrive in the order the program asks for them.
+
+## A list of futures
+
+```essence
+implementation {
+	function doubled(_ value: Integer) -> Future<Integer> {
+		<- Async.deferred(() { <- value::multiply(with 2) })
+	}
+
+	constant work = [1, 2, 3]::map(doubled)
+
+	Terminal.inspect(complete work::all()) § [ 2, 4, 6 ]
+	Terminal.inspect(complete work::inSequence()) § [ 2, 4, 6 ]
+	Terminal.inspect(complete work::all(atMost 2)) § [ 2, 4, 6 ]
+	Terminal.inspect(complete work::race()) § 2
+}
+```
+
+A `List<Future<Value>>` is one description away from a `Future<List<Value>>`, and which method you pick says how the runs overlap:
+
+| Method | What it starts | What it answers |
+| --- | --- | --- |
+| [`all()`](/docs/library/future#all) | every one at once | every value, in the receiver's order |
+| [`all(atMost:)`](/docs/library/future#all) | that many at a time, the next when one finishes | every value, in the receiver's order |
+| [`inSequence()`](/docs/library/future#inSequence) | one, and the next once it has answered | every value, in the receiver's order |
+| [`race()`](/docs/library/future#race) | every one at once | the first value; the rest are stopped |
+| [`firstValue()`](/docs/library/future#firstValue) | every one at once | the first `#Value`; a failure is not an answer |
+
+The order of the answer is always the receiver's, whatever order the runs finish in. `inSequence` is the entry for work that is not independent — a host that refuses a second request at once, or a walk whose order is what the answer means. `all(atMost:)` is the middle: a hundred addresses, four requests in flight.
+
+`race` is declared on a [`NonEmptyList`](/docs/library/list#NonEmptyList), because the first answer of nothing is not an answer. A list written with items in it carries that proof already. `firstValue()` is `race` for work that answers a [`Result`](/docs/language/result): a run that fails is not an answer, and the waiting goes on. It answers an [`Optional`](/docs/language/optional), empty where every run failed.
+
+There is no list family for `Started`. `start [a, b]::all()` is a `Started<List<Value>>` already, which is the same thing one word shorter.
+
+## Deadlines and second attempts
+
+```essence
+implementation {
+	constant slow  = Async.sleep(milliseconds 50)::map((waited) { <- "late" })
+	constant quick = Async.deferred(() { <- "here" })
+
+	constant flaky: Future<Result<Integer, String>> = Async.deferred(() {
+		<- #Failure("busy")
+	})
+
+	Terminal.inspect(complete quick::within(milliseconds 50)) § Optional#Value("here")
+	Terminal.inspect(complete slow::within(milliseconds 1)) § Optional#Empty
+	Terminal.inspect(complete flaky::attempt(times 3)) § Result#Failure("busy")
+}
+```
+
+[`within(milliseconds:)`](/docs/library/future#within) answers an `Optional`: the value, or nothing where the deadline passed first. A deadline is a question the caller asked rather than something that went wrong, which is why it is an `Optional` and not a failure. The run it started is stopped at the deadline, and what it would have answered is never read.
+
+[`attempt(times:)`](/docs/library/future#attempt) is declared on a future answering a `Result`, and runs it again while it fails. The first attempt is one of the count, so `attempt(times 3)` runs the work three times at worst and answers the first value, or the last reason. `attempt(times:, pausingMilliseconds:)` waits between two attempts, never before the first or after the last. Running work again is possible at all because a future is a description: there is nothing to reset between two attempts.
+
+Both are methods on the work itself rather than on whatever made it, so they compose with anything that answers a future, and neither is repeated anywhere else in the library.
+
+## Building on a future
+
+[`map`](/docs/library/future#map) and [`andThen`](/docs/library/future#andThen) build a new description without waiting for anything:
+
+- `map(_ transform)` hands the value to a transform — `Future<Integer>` to `Future<String>`.
+- `andThen(_ next)` takes a function from the value to more work, and answers what that work answers. It is the entry for a step that depends on the one before it.
+- `andThen(_ next: Future<Other>)` takes the next work directly, for a step that does not read what came before.
+
+Inside a completing body, the same two shapes are two statements:
+
+```essence
+§ fragment
+function checked(_ url: String) -> Future<Integer> {
+	constant page   = complete loaded(url)
+	constant length = complete measured(page)
+
+	<- length
+}
+```
+
+Reach for `map` and `andThen` where you are assembling a description to hand somewhere else, and for `complete` where you are writing the steps out. A body reads better; a combinator composes without the enclosing function having to declare a future.
+
+## Requests to a host
+
+[`Http`](/docs/library/http) is the one namespace in the standard library that reaches outside the program. Every entry answers a future, so a request is a description until something starts it.
+
+```essence
+implementation {
+	function status(_ url: String) -> Future<String> {
+		constant answered = complete Http.get(url)::within(milliseconds 5000)
+
+		<- match answered -> String {
+			case #Value(result) {
+				<- match result -> String {
+					case #Value(response) {
+						<- "{url} answered {response.status}"
+					}
+					case #Failure(reason) {
+						<- "{url} did not answer: {reason}"
+					}
+				}
+			}
+			case #Empty { <- "{url} took more than five seconds" }
+		}
+	}
+
+	constant urls    = ["https://essencelang.org", "https://example.com"]
+	constant reports = complete urls::map(status)::all(atMost 2)
+
+	Terminal.print(reports::join(with "\n"))
+}
+```
+
+This sample reaches the network, so nothing is written beside its lines: what it prints depends on two hosts.
+
+There are two levels to the answer, and they say different things. The `Future` is work that has not run. The [`Result`](/docs/library/result) is whether the run reached a host at all: [`#Failure`](/docs/library/http#HttpFailure) is `#InvalidUrl`, `#Unreachable` or `#InvalidBody`, and nothing else. **A status is not a failure.** A host that answered 404 answered, and 404 is a [`Response`](/docs/library/http#Response) whose [`isSuccessful()`](/docs/library/http#isSuccessful) is `false`.
+
+[`Http.send`](/docs/library/http#send) takes the whole [`Request`](/docs/library/http#Request) — `url`, `method`, `headers`, `body` and `redirects` — and every member but the address has a default, so `Http.send({ url = "…" })` is a whole request. The six verbs [`get`](/docs/library/http#get), [`post`](/docs/library/http#post), [`put`](/docs/library/http#put), [`patch`](/docs/library/http#patch), [`delete`](/docs/library/http#delete) and [`head`](/docs/library/http#head) are one call of `send` each, with a `headers:` argument where you want one. There is no `options` verb; `#Options` is reachable through `send`.
+
+A `Response` is `{ status, headers, body }`, its header keys lowercase, and [`header(named:)`](/docs/library/http#header) reads one under any spelling. Bodies are text.
+
+There is no timeout member and no retry member on a request, because [`within(milliseconds:)`](/docs/library/future#within) and [`attempt(times:)`](/docs/library/future#attempt) already say both, on any work at all. That is the whole reason a request is a future rather than a call that blocks.
+
+## Where `complete` may stand
+
+`complete` suspends whatever body it stands in, so it is legal exactly where something can wait for it:
+
+| Position | `complete` | Why |
+| --- | --- | --- |
+| A function or method declared `-> Future<…>` | yes | the caller completes what it gets |
+| A function literal | yes | it becomes a completing body, and its inferred type says so |
+| A program's or module's top level | yes | the module itself waits |
+| A [`test`](/docs/reference/syntax-glossary#test) body | yes | the runner runs one test at a time and waits for each |
+| A test's name | no | the name is worked out before the run |
+| A `benchmark` body | no | the body is timed over many runs |
+| A property body, `for any (…)` | no | it runs once per generated value, under a search that replays what it drew |
+| A parameter's default | no | it is filled in by the function itself, before any of its own asynchrony begins |
+
+```essence
+§ file: Rate.es
+implementation {
+	function rate(_ base: Integer) -> Future<Integer> {
+		complete Async.sleep(milliseconds 1)
+
+		<- base::multiply(with 3)
+	}
+}
+
+export {
+	rate
+}
+
+tests {
+	test "answers three times what it was given" {
+		constant answered = complete rate(7)
+
+		require answered::is(21)
+	}
+
+	test "runs again for every start" {
+		constant work  = rate(2)
+		constant once  = complete work
+		constant twice = complete work
+
+		expect once::is(6)
+		expect twice::is(6)
+	}
+}
+```
+
+Tests run one at a time and each is awaited before the next begins, so what a test writes stays that test's. [Tests](/docs/language/tests) has the rest of the block.
+
+`start` waits for nothing, so no position refuses it: a parameter's default, a `benchmark` body and a property body may each put a run in flight.
+
+## Two words that are also names
+
+`start` and `complete` are keywords only where an expression follows them on the same line. Everywhere else they are ordinary names:
+
+```essence
+implementation {
+	constant start    = 1
+	constant complete = 2
+	constant span     = { start = 3, complete = 4 }
+
+	Terminal.print(start::add(complete)) § 3
+	Terminal.print(span.start::add(span.complete)) § 7
+}
+```
+
+Two things follow from that rule, and both are worth knowing before you meet them:
+
+- A `constant` bound to the bare word swallows the line under it. `constant held = start` followed by an expression on the next line is **one** statement, `start <that expression>`, not two. Nothing reports it. Write the value on the same line.
+- An argument label may not be spelled `start` or `complete`. In `f(start x)` the word opens an expression, so it is read as the keyword and never as a label. Your editor's rename refuses both words on a label for the same reason.
+
+Essence has no grouping parentheses, and both keywords take the whole [postfix chain](/docs/reference/syntax-glossary#method-call) after them. `complete work::all()` is `complete (work::all())`, which is what you want. To call a method on the *completed* value, bind it first:
+
+```essence
+§ fragment
+constant answered = complete work
+
+Terminal.print(answered::toString())
+```
+
+`complete work::toString()` would look for `toString` on the `Future`, and report [`unknown-method`](/docs/reference/diagnostics#unknown-method).
+
+## Concurrency is not parallelism
+
+Everything a program does runs on one thread — the host's, the same one every other statement runs on. Two futures in flight take turns at the points where they wait; they never run at the same instant. What `all()` and `start` save is the *waiting*, not the computing.
+
+Three consequences are worth holding on to:
+
+- **A future with no wait inside it runs to its end the moment it is started.** `Async.deferred(…)` is exactly that: at `start` the computation runs from beginning to end, with nothing in between. That is why `race()` over three deferred computations answers the first of them, every time.
+- **`Async.deferred` does not move work off the thread.** It describes a computation as work rather than carrying one out somewhere else. There is no worker and no thread pool.
+- **Asynchrony is not an effect.** Nothing about `Future` changes what a function may do. [`Terminal.print`](/docs/library/terminal#print) is a plain call inside a completing body, as it is anywhere else.
+
+## What there is not
+
+- **No `async` and no `await`.** The body is the mark, and `complete` is the wait.
+- **No `stop` keyword.** [`within`](/docs/library/future#within) and [`race`](/docs/library/future#race) stop the runs they started, underneath. A stopped run answers nothing at all: a future cannot fail, so there is no cancelled case to handle and nothing is ever read from it.
+- **No `Duration` type.** Every deadline and pause is an `Integer` of milliseconds, written with the label that says so.
+- **No failure in a `Future`.** A future answers exactly what it was described to answer with. Work that can fail answers a `Result`, and that is the level a `#Failure` lives at.
+- **No `reduce` or `loop` over futures.** An [overload](/docs/reference/syntax-glossary#overload) cannot be chosen by what a callback answers, so there is no future-stepping entry in those families. Write `inSequence()`, or recurse.
+- **No list methods for `Started`.** Start the list, not the items.
+
+## Crossing to JavaScript
+
+Work crosses the boundary at one position: a call's answer. An exported function whose Essence signature answers a `Future<T>` answers a `Promise<T>` in JavaScript, and calling it is what puts the work in flight. A module exporting the `status` above reads like this from Node or Bun:
+
+```js
+let reports = await loadModule("./Reports.es")
+
+await reports.exports.status("https://example.com")
+```
+
+A `Future` inside a value — a record's member, a list's item, a case's payload — is refused in both directions, and so is one held by a constant: there is nothing inside a value to say when it should run. A `Promise` handed in is refused too; what crosses the other way is a **callback** declared to answer a future, which the module calls at every start.
+
+`loadModule`, `bind` and `loadPrebuilt` take a `signal`, and it becomes the root of every run the boundary starts. Aborting it stops the sleeps, the requests and the losers of a `race` underneath. [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) walks through it, and the [client package's README](https://github.com/alexandertrefz/essence/tree/master/packages/client) has every rule.
+
+<SeeAlso links={[
+	{ label: "Future in the standard library", href: "/docs/library/future" },
+	{ label: "Http in the standard library", href: "/docs/library/http" },
+	{ label: "Result", href: "/docs/language/result" },
+	{ label: "Calling Essence from JavaScript", href: "/docs/guides/calling-from-javascript" },
+]} />
