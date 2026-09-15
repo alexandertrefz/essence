@@ -1,9 +1,12 @@
 # The website is built by Bun from the workspace root — `packages/website`
 # resolves its dependencies through the root `node_modules`, so the install has
 # to happen here rather than in the package.
+#
+# The link check runs on what the build wrote, so a link or an anchor that
+# resolves to nothing fails the deploy instead of reaching a reader.
 
 [build]
-command = "bun install --frozen-lockfile && bun run --cwd packages/website build"
+command = "bun install --frozen-lockfile && bun run --cwd packages/website build && bun run --cwd packages/website check:links"
 publish = "packages/website/dist"
 
 [build.environment]

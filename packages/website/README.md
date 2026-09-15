@@ -11,6 +11,7 @@ bun run --cwd packages/website dev      # dev server
 bun run --cwd packages/website build    # static build into dist/
 bun run --cwd packages/website preview  # serve the build
 bun run --cwd packages/website sync     # regenerate .astro/ types
+bun run --cwd packages/website check:links  # every link and anchor in dist/
 ```
 
 `sync` is worth knowing about: the content collection's types live in a
@@ -30,6 +31,7 @@ package's own `tsconfig.json` type-checks `src/` for the editor.
 | `src/layouts/`, `src/components/` | the page shells and the design's parts |
 | `src/styles/` | `tokens.css` (both themes), `base.css`, `prose.css`, `shiki.css` |
 | `src/lib/` | navigation, site constants, how a sample is read, the two Shiki theme JSONs |
+| `scripts/` | the standard library reference's generator, and the link check |
 | `public/fonts/` | every face, self-hosted |
 | `tests/` | the doc gates, see below |
 
@@ -73,12 +75,17 @@ point of a stable identifier is that it can be looked up. The experimental test
 modes are the one exception, on every gate: their flags, their setting and
 their codes are documented nowhere, and each spec names them in an allowlist.
 
+The link check runs on the build instead, because an id is only there once the
+build has made it: `bun run check:links` walks `dist/` and fails on any internal
+link or `#anchor` that resolves to nothing.
+
 ## Deploying
 
 Netlify, configured by `netlify.toml` at the repository root — it installs with
 Bun from the root (this package resolves through the workspace's
-`node_modules`), builds here, and publishes `packages/website/dist`.
-`BUN_VERSION` there is kept in lockstep with `.bun-version`.
+`node_modules`), builds here, checks every link in the build, and publishes
+`packages/website/dist`. A broken link fails the deploy. `BUN_VERSION` there is
+kept in lockstep with `.bun-version`.
 
 The old GitHub Pages workflow and the root `docs` symlink are gone. The one URL
 that outlived them, `/diagnostics`, is a 301 in `netlify.toml` to

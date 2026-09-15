@@ -11,6 +11,7 @@
 		"build": "astro build",
 		"preview": "astro preview",
 		"sync": "astro sync",
+		"check:links": "bun scripts/checkLinks.ts dist --redirects ../../netlify.toml",
 		"docs:stdlib": "bun scripts/generateStdlibDocs.ts",
 		"docs:stdlib:sync": "bun scripts/generateStdlibDocs.ts --sync"
 	},
