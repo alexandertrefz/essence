@@ -109,6 +109,92 @@ export function getToc(
 	)
 }
 
+/** The anchor a guide step's title is reached by, unless the step names its own. */
+export function stepAnchor(title: string): string {
+	return title
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "")
+}
+
+const STEP_ITEM = /^<StepItem\s/
+const STEP_TITLE = /\stitle="([^"]*)"/
+const STEP_ID = /\sid="([^"]*)"/
+const HEADING = /^#{1,6}\s/
+const FENCE = /^(`{3,}|~{3,})/
+
+/**
+ * A guide's on-this-page list: its steps and its own headings, in the order the
+ * page takes them.
+ *
+ * NOTE: A step's title is a component's `<h2>`, not Markdown, so it is not
+ * among the `headings` Astro collects — and a guide is read by its steps, so a
+ * list without them would name only what comes before and after the work. The
+ * steps are read off the page's source instead, and the collected headings are
+ * slotted in where their Markdown stands. Where the two readings disagree about
+ * how many headings the page has, the source was read wrong, and the list falls
+ * back to the headings alone rather than put one where it does not stand.
+ */
+export function getGuideToc(
+	body: string,
+	headings: readonly TocItem[],
+	maxDepth: number,
+): TocItem[] {
+	let items: TocItem[] = []
+	let pending = [...headings]
+	let fence: string | undefined
+
+	for (let line of body.split("\n")) {
+		let marker = FENCE.exec(line)?.[1]
+
+		if (fence !== undefined) {
+			if (
+				marker !== undefined &&
+				marker[0] === fence[0] &&
+				marker.length >= fence.length
+			) {
+				fence = undefined
+			}
+
+			continue
+		}
+
+		if (marker !== undefined) {
+			fence = marker
+
+			continue
+		}
+
+		let title = STEP_ITEM.test(line)
+			? STEP_TITLE.exec(line)?.[1]
+			: undefined
+
+		if (title !== undefined) {
+			items.push({
+				depth: 2,
+				slug: STEP_ID.exec(line)?.[1] ?? stepAnchor(title),
+				text: title,
+			})
+
+			continue
+		}
+
+		if (HEADING.test(line)) {
+			let heading = pending.shift()
+
+			if (heading === undefined) {
+				return getToc(headings, maxDepth)
+			}
+
+			if (heading.depth >= 2 && heading.depth <= maxDepth) {
+				items.push(heading)
+			}
+		}
+	}
+
+	return pending.length === 0 ? items : getToc(headings, maxDepth)
+}
+
 export function docHref(id: string): string {
 	return `${DOCS_ROOT}/${id}`
 }

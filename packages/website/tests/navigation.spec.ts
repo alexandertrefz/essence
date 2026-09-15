@@ -3,10 +3,12 @@ import { describe, expect, it } from "bun:test"
 import {
 	type DocEntryLike,
 	getCrumbs,
+	getGuideToc,
 	getPrevNext,
 	getReadingChain,
 	getSidebar,
 	getToc,
+	stepAnchor,
 } from "../src/lib/navigation.ts"
 
 // NOTE: The rules that decide what is a chapter and what is a lookup table,
@@ -86,9 +88,9 @@ describe("the sidebar", () => {
 			"Reference",
 		])
 		expect(
-			sidebar.find((section) => section.id === "library")!.items.map(
-				(item) => [item.id, item.children.length],
-			),
+			sidebar
+				.find((section) => section.id === "library")!
+				.items.map((item) => [item.id, item.children.length]),
 		).toEqual([
 			["library/overview", 0],
 			["library/integer", 0],
@@ -97,7 +99,9 @@ describe("the sidebar", () => {
 	})
 
 	it("omits a section with no pages", () => {
-		let sidebar = getSidebar(entries.filter((e) => e.data.section !== "guides"))
+		let sidebar = getSidebar(
+			entries.filter((e) => e.data.section !== "guides"),
+		)
 
 		expect(sidebar.map((section) => section.id)).not.toContain("guides")
 	})
@@ -125,5 +129,72 @@ describe("breadcrumbs and the on-this-page list", () => {
 			"group",
 			"member",
 		])
+	})
+})
+
+describe("a guide's on-this-page list", () => {
+	let body = [
+		"## Before you start",
+		"",
+		"<Steps>",
+		"",
+		'<StepItem title="Check it">',
+		"",
+		"```sh",
+		"# not a heading",
+		"```",
+		"",
+		"### What it prints",
+		"",
+		"</StepItem>",
+		"",
+		'<StepItem id="ship" title="Wire it into CI">',
+		"",
+		"````md",
+		"```",
+		"## still inside the outer fence",
+		"```",
+		"````",
+		"",
+		"</StepItem>",
+		"",
+		"</Steps>",
+		"",
+		"## Compared with tsc",
+	].join("\n")
+
+	let headings = [
+		{ depth: 2, slug: "before-you-start", text: "Before you start" },
+		{ depth: 3, slug: "what-it-prints", text: "What it prints" },
+		{ depth: 2, slug: "compared-with-tsc", text: "Compared with tsc" },
+	]
+
+	it("lists the steps where they stand among the headings, skipping code", () => {
+		expect(getGuideToc(body, headings, 3).map((item) => item.slug)).toEqual(
+			[
+				"before-you-start",
+				"check-it",
+				"what-it-prints",
+				"ship",
+				"compared-with-tsc",
+			],
+		)
+	})
+
+	it("keeps every step whatever depth the page asks for", () => {
+		expect(getGuideToc(body, headings, 2).map((item) => item.slug)).toEqual(
+			["before-you-start", "check-it", "ship", "compared-with-tsc"],
+		)
+	})
+
+	it("falls back to the headings when the source does not account for them", () => {
+		let more = [...headings, { depth: 2, slug: "extra", text: "Extra" }]
+
+		expect(getGuideToc(body, more, 3)).toEqual(getToc(more, 3))
+	})
+
+	it("reaches a step by the anchor its component gives it", () => {
+		expect(stepAnchor("Compile in a bundler")).toBe("compile-in-a-bundler")
+		expect(stepAnchor("Write hello.es")).toBe("write-hello-es")
 	})
 })

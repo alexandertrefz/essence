@@ -35,6 +35,7 @@ import { findLibraryPage } from "../../components/docs/library.ts"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import {
 	getCrumbs,
+	getGuideToc,
 	getPrevNext,
 	getSidebar,
 	getToc,
@@ -61,9 +62,13 @@ let entries = await getCollection("docs")
 let sections = getSidebar(entries)
 let crumbs = getCrumbs(entries, entry.id)
 let { previous, next } = getPrevNext(entries, entry.id)
-let toc = getToc(headings, entry.data.tocDepth)
-
 let isGuide = entry.data.template === "guide"
+// NOTE: A guide's list carries its steps as well as its headings — see
+// `getGuideToc` — so on every template the rail is what is on the page.
+let toc = isGuide
+	? getGuideToc(entry.body ?? "", headings, entry.data.tocDepth)
+	: getToc(headings, entry.data.tocDepth)
+
 let isType = entry.data.template === "type"
 /*
  * A type page wears the reference head — a title and a lede — set in mono,
@@ -121,9 +126,6 @@ let components = {
 	sections={sections}
 	activeId={entry.id}
 	toc={toc}
-	tocLabel={isGuide && entry.data.steps !== undefined
-		? "Steps"
-		: "On this page"}
 	editUrl={editUrl}
 	issueUrl={issueUrl}
 >

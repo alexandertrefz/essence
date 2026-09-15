@@ -23,8 +23,6 @@ interface Props {
 	/** Collection id of the page being read; unset on the overview. */
 	activeId?: string
 	toc?: TocItem[]
-	/** "On this page" for an article, "Steps" for a guide. */
-	tocLabel?: string
 	editUrl?: string
 	issueUrl?: string
 	/** The overview drops the third column and reads wider. */
@@ -37,7 +35,6 @@ let {
 	sections,
 	activeId,
 	toc = [],
-	tocLabel,
 	editUrl,
 	issueUrl,
 	variant = "entry",
@@ -116,7 +113,6 @@ let hasAside =
 				<aside class="docs__aside">
 					<Toc
 						items={toc}
-						label={tocLabel}
 						editUrl={editUrl}
 						issueUrl={issueUrl}
 					>

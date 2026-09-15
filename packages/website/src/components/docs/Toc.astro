@@ -5,24 +5,24 @@
  * A sticky list of the page's own headings with an accent rail on the active
  * one. The rail is a left box-shadow rather than a border so it lands exactly
  * on the hairline the list hangs from instead of beside it.
+ *
+ * NOTE: One label on every template. A guide's list carries its steps among
+ * its headings (see `getGuideToc`), so "On this page" is what it lists there
+ * too — a list labelled "Steps" that also named the sections after them would
+ * be misnamed either way.
  */
 
 import type { TocItem } from "../../lib/navigation.ts"
 
 interface Props {
 	items: TocItem[]
-	/** "On this page" for articles, "Steps" for a guide. */
-	label?: string
 	editUrl?: string
 	issueUrl?: string
 }
 
-let {
-	items,
-	label = "On this page",
-	editUrl,
-	issueUrl,
-} = Astro.props
+let { items, editUrl, issueUrl } = Astro.props
+
+let label = "On this page"
 
 let hasLinks = editUrl !== undefined || issueUrl !== undefined
 ---

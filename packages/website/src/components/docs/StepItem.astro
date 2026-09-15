@@ -5,9 +5,12 @@
  *
  * NOTE: The title is a real `<h2>` with an id, so it can be linked to and read
  * as structure — but it is JSX, not Markdown, so it is not in the `headings`
- * the on-this-page list is built from. A guide that wants its steps listed
- * there writes Markdown headings instead.
+ * Astro collects. The on-this-page list reads a guide's steps off its source
+ * instead (`getGuideToc`), with the anchor `stepAnchor` gives both of them, so
+ * a title written as a plain string literal is what it can read.
  */
+
+import { stepAnchor } from "../../lib/navigation.ts"
 
 interface Props {
 	title: string
@@ -17,14 +20,7 @@ interface Props {
 
 let { title, id } = Astro.props
 
-function slugify(text: string): string {
-	return text
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-}
-
-let anchor = id ?? slugify(title)
+let anchor = id ?? stepAnchor(title)
 ---
 
 <div class="step">
