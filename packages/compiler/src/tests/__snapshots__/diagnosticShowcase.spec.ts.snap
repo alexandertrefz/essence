@@ -2725,3 +2725,91 @@ Warning: This Argument fits the receiver and what it holds
 ─── 4 warnings
 "
 `;
+
+exports[`Diagnostic Showcase Asynchrony.es should render the same report every time 1`] = `
+"[complete-outside-future]
+Error: 'complete' waits, and nothing here can wait
+    ╭─┤ Asynchrony.es:17:6 │
+    │
+ 17 │        <- complete Async.deferred(() { <- 1 })
+    │           ──────────────────┬─────────────────  
+    │                             ╰─────────────────── this Function returns Integer
+    │ 
+    │ Help: Declare the return Type 'Future<Integer>'.
+    │ 
+    │ Note: A body that writes 'complete' suspends, so it hands back a Future the caller completes in its turn — which is what its declared Type has to say.
+────╯
+
+[complete-outside-future]
+Error: 'complete' waits, and nothing here can wait
+    ╭─┤ Asynchrony.es:23:37 │
+    │
+ 23 │     function padded(_ width: Integer = complete Async.deferred(() { <- 2 })) -> Integer {
+    │                                        ──────────────────┬─────────────────  
+    │                                                          ╰─────────────────── this suspends, and this position can not
+    │ 
+    │ Help: Move the 'complete' into a Function declared '-> Future<…>', or into the Program's top level.
+    │ 
+    │ Note: A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins, and a test's body is a Function the runner does not wait for.
+────╯
+
+[needless-complete]
+Warning: This is not work to wait for
+    ╭─┤ Asynchrony.es:30:20 │
+    │
+ 30 │     constant waited = complete 3
+    │                                ▲  
+    │                                ╰── this is an Integer
+    │ 
+    │ Help: Drop the 'complete'.
+    │ 
+    │ Note: 'complete' waits for what a Future or a Started answers with — a value that is neither is already the answer.
+────╯
+
+[needless-start]
+Warning: This is not a Future, so there is nothing to start
+    ╭─┤ Asynchrony.es:34:21 │
+    │
+ 34 │     constant running = start 4
+    │                              ▲  
+    │                              ╰── this is an Integer
+    │ 
+    │ Help: Drop the 'start'.
+    │ 
+    │ Note: 'start' puts a Future in flight and answers the one run of it — a value that is not a Future describes no work to run.
+────╯
+
+─── 2 errors, 2 warnings
+"
+`;
+
+exports[`Diagnostic Showcase AsynchronyStatements.es should render the same report every time 1`] = `
+"[unused-future]
+Error: Nothing here runs
+    ╭─┤ AsynchronyStatements.es:22:2 │
+    │
+ 22 │     headline()
+    │     ─────┬────  
+    │          ╰────── this is a Future<Integer>, and its value goes nowhere
+    │ 
+    │ Help: Did you mean 'complete', to wait for it — or 'start', to put it in flight and carry on?
+    │ 
+    │ Note: A Future describes work. Building one runs none of it — 'start' puts it in flight and 'complete' waits for what it answers with.
+────╯
+
+[unobserved-started]
+Advice: Nothing waits for this
+    ╭─┤ AsynchronyStatements.es:27:2 │
+    │
+ 27 │     start headline()
+    │     ────────┬───────  
+    │             ╰───────── this runs, and nobody reads its answer
+    │ 
+    │ Help: Hold it in a Constant and 'complete' it where the answer is wanted, if the answer is wanted at all.
+    │ 
+    │ Note: A Started can be completed any number of times, from anywhere — holding it under a name is what makes that possible later.
+────╯
+
+─── 1 error, 1 remark
+"
+`;

@@ -505,3 +505,20 @@ Result#Value(7)
 Result#Failure("NotANumber")
 Result#Value(8)"
 `;
+
+exports[`Fixture Sweep Future.es should print what it printed before 1`] = `
+"described
+counted
+3
+counted
+3
+counted
+started
+3
+3
+42
+7
+0
+10
+2"
+`;
