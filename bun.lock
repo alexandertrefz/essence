@@ -31,6 +31,14 @@
         "@essence-lang/runtime": "workspace:*",
       },
     },
+    "examples/site-check": {
+      "name": "@essence-lang/example-site-check",
+      "version": "0.0.0",
+      "dependencies": {
+        "@essence-lang/client": "workspace:*",
+        "@essence-lang/runtime": "workspace:*",
+      },
+    },
     "packages/ariadne": {
       "name": "@essence-lang/ariadne",
       "version": "0.5.0",
@@ -363,6 +371,8 @@
     "@essence-lang/example-client-2048": ["@essence-lang/example-client-2048@workspace:examples/client-2048"],
 
     "@essence-lang/example-quote-server": ["@essence-lang/example-quote-server@workspace:examples/quote-server"],
+
+    "@essence-lang/example-site-check": ["@essence-lang/example-site-check@workspace:examples/site-check"],
 
     "@essence-lang/fixtures": ["@essence-lang/fixtures@workspace:packages/fixtures"],
 

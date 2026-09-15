@@ -1,0 +1,15 @@
+{
+	"name": "@essence-lang/example-site-check",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "A command that asks several addresses for their pages at once — the requests and the report are Essence.",
+	"scripts": {
+		"start": "bun check.ts",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@essence-lang/client": "workspace:*",
+		"@essence-lang/runtime": "workspace:*"
+	}
+}

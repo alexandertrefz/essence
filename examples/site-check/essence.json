@@ -1,0 +1,7 @@
+{
+	"$schema": "https://essencelang.org/schemas/essence.schema.json"
+
+	// The example is a project of its own: what `essence test` run in this
+	// directory walks is this directory, not the repository it is checked out
+	// inside.
+}

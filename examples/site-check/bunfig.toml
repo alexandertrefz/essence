@@ -1,0 +1,3 @@
+# Registers the Essence plugin before anything runs, so that `check.ts` can
+# `import … from "./survey/Survey.es"`.
+preload = ["./essence.ts"]
