@@ -1358,6 +1358,98 @@ describe("Code Actions on the project file", () => {
 	})
 })
 
+// NOTE: The two Keywords over the wire, on a document an editor opened: what the
+// Server publishes about it, what it says about the words themselves, and what
+// the lightbulb offers where the Compiler has something to say. Every layer
+// between the walks and the client is what this exercises — the analysis, the
+// Hover, the Code Action conversion.
+describe("A document that starts and completes work", () => {
+	const source = [
+		"implementation {",
+		"\tfunction doubled(_ value: Integer) -> Future<Integer> {",
+		"\t\t<- complete Async.deferred(() { <- value })",
+		"\t}",
+		"",
+		"\tconstant answer = complete doubled(21)",
+		"\tconstant running = start doubled(21)",
+		"",
+		"\tTerminal.inspect(answer)",
+		"\tTerminal.inspect(complete running)",
+		"}",
+		"",
+	].join("\n")
+
+	it("should publish nothing, answer the Keywords and fix a dropped future", async () => {
+		let files = makeSessionWorkspace({ "Async.es": source })
+		let session = startSession()
+
+		try {
+			await session.initialize([files.root])
+			await session.open(files.pathOf("Async.es"), source)
+			await session.settle()
+
+			let uri = uriOf(files.pathOf("Async.es"))
+
+			expect(session.diagnosticsFor(files.pathOf("Async.es"))).toEqual([])
+
+			// NOTE: The Hover positions are zero based over the wire — the
+			// `complete` of line 6 and the `start` of line 7.
+			let hoverAt = async (line: number, character: number) => {
+				let { result } = await session.request<{
+					contents: { value: string }
+				}>(HoverRequest.type, {
+					textDocument: { uri },
+					position: { line, character },
+				})
+
+				return result?.contents.value
+			}
+
+			expect(await hoverAt(5, 19)).toContain("Integer")
+			expect(await hoverAt(6, 20)).toContain("Started<Integer>")
+
+			// NOTE: The same document with the future dropped on the floor,
+			// which is the Error the two words answer.
+			let dropped = source
+				.replace(
+					"\tconstant answer = complete doubled(21)",
+					"\tdoubled(21)",
+				)
+				.replace("\tTerminal.inspect(answer)", "\tTerminal.inspect(1)")
+
+			await session.change(files.pathOf("Async.es"), dropped)
+			await session.settle()
+
+			expect(session.codesFor(files.pathOf("Async.es"))).toContain(
+				"unused-future",
+			)
+
+			let { result } = await session.request<Array<CodeAction>>(
+				CodeActionRequest.type,
+				{
+					textDocument: { uri },
+					range: {
+						start: { line: 5, character: 1 },
+						end: { line: 5, character: 12 },
+					},
+					context: {
+						diagnostics: [],
+						only: [CodeActionKind.QuickFix],
+					},
+				},
+			)
+
+			expect(result.map((action) => action.title)).toEqual([
+				"Wait for it with 'complete'",
+				"Put it in flight with 'start'",
+			])
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	})
+})
+
 // NOTE: A specifier is a path written in the source, so a file that moves takes
 // every entry naming it out of step — and takes its own entries out of step too,
 // since they were written from where it used to be. Both are answered before the

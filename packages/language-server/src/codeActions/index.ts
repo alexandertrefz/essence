@@ -61,6 +61,12 @@ import {
 	updateBracketsAction,
 	wrapInHoldingCaseActions,
 } from "./fixes"
+import {
+	declareFutureReturnAction,
+	discardedFutureActions,
+	dropKeywordAction,
+	waitForValueAction,
+} from "./futureFixes"
 import { overlaps } from "./geometry"
 import {
 	implementProtocolAction,
@@ -458,10 +464,17 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		wrapInHoldingCaseActions(diagnostic, program),
 	"argument-label-mismatch": ({ diagnostic, lines }) =>
 		listed(argumentLabelAction(diagnostic, lines)),
+	// NOTE: Every mismatch in the language arrives under these two codes, and
+	// what picks the asynchrony ones out is the Help the Validator wrote —
+	// `waitForValueAction` answers nothing where there is none.
+	"assignment-type-mismatch": ({ diagnostic }) =>
+		listed(waitForValueAction(diagnostic)),
 	"at-in-static-method": ({ diagnostic, program, lines }) =>
 		listed(dropStaticAction(diagnostic, program, lines)),
 	"case-default-without-payload": ({ diagnostic, lines }) =>
 		listed(removeDefaultAction(diagnostic, lines)),
+	"complete-outside-future": ({ diagnostic, program, lines }) =>
+		listed(declareFutureReturnAction(diagnostic, program, lines)),
 	"constant-reassignment": ({ diagnostic, program, lines }) =>
 		listed(constantToVariableAction(diagnostic, program, lines)),
 	"contradictory-modifiers": ({ diagnostic, lines }) =>
@@ -530,6 +543,10 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(elseBranchAction(diagnostic, program, lines)),
 	"mixed-rational-literal": ({ diagnostic, lines }) =>
 		mixedRationalActions(diagnostic, lines),
+	"needless-complete": ({ diagnostic, program, lines }) =>
+		listed(dropKeywordAction(diagnostic, program, lines)),
+	"needless-start": ({ diagnostic, program, lines }) =>
+		listed(dropKeywordAction(diagnostic, program, lines)),
 	"nonconforming-namespace": implementProtocolAction,
 	"not-exported": ({ diagnostic, imports }) =>
 		listed(exportNameAction(diagnostic, imports)),
@@ -541,6 +558,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(removeLabelAction(diagnostic, lines)),
 	"redundant-pattern-binder": ({ diagnostic, program, lines }) =>
 		listed(binderToScrutineeAction(diagnostic, program, lines)),
+	"return-type-mismatch": ({ diagnostic }) =>
+		listed(waitForValueAction(diagnostic)),
 	"self-import": ({ diagnostic, program, lines }) =>
 		listed(removeSelfImportAction(diagnostic, program, lines)),
 	"shorthand-in-combination": ({ diagnostic, program, lines }) =>
@@ -616,6 +635,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		unreachableDefineArmActions(diagnostic, program, lines),
 	"unsatisfied-bound": ({ diagnostic, program }) =>
 		listed(boundParameterAction(diagnostic, program)),
+	"unused-future": ({ diagnostic }) => discardedFutureActions(diagnostic),
 	"unused-import": ({ diagnostic, program, lines }) =>
 		listed(removeImportAction(diagnostic, program, lines)),
 	"use-before-declaration": ({ diagnostic, program, lines }) =>

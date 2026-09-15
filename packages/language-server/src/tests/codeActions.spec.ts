@@ -7523,6 +7523,243 @@ describe("the kinds a request narrowed itself to", () => {
 	})
 })
 
+// NOTE: The Quick Fixes for the Diagnostics asynchrony reports. Each is checked
+// by what the buffer reads as once it is applied and by what the Compiler then
+// makes of it — a fix that writes a word in the wrong column is a fix that
+// writes a different Program.
+describe("Quick Fixes for asynchrony", () => {
+	// NOTE: Two answers and nothing in the source chooses between them, which
+	// is why neither is preferred.
+	describe("a future whose value goes nowhere", () => {
+		const LINES = ["implementation {", "\tAsync.deferred(() { <- 1 })", "}"]
+
+		it("offers both words, and prefers neither", () => {
+			let fixes = quickFixes(LINES).filter(
+				(entry) => entry.diagnosticCode === "unused-future",
+			)
+
+			expect(titles(fixes)).toEqual([
+				"Wait for it with 'complete'",
+				"Put it in flight with 'start'",
+			])
+			expect(fixes.map((entry) => entry.isPreferred)).toEqual([
+				false,
+				false,
+			])
+		})
+
+		it("writes the word in front of what was written", () => {
+			let fixes = quickFixes(LINES).filter(
+				(entry) => entry.diagnosticCode === "unused-future",
+			)
+
+			expect(applied(LINES, fixes[0] as CodeActionEntry)).toEqual([
+				"implementation {",
+				"\tcomplete Async.deferred(() { <- 1 })",
+				"}",
+			])
+			expect(applied(LINES, fixes[1] as CodeActionEntry)).toEqual([
+				"implementation {",
+				"\tstart Async.deferred(() { <- 1 })",
+				"}",
+			])
+		})
+
+		it("leaves a Program the Compiler is happy with", () => {
+			let fixes = quickFixes(LINES).filter(
+				(entry) => entry.diagnosticCode === "unused-future",
+			)
+
+			expect(
+				codesOf(applied(LINES, fixes[0] as CodeActionEntry)),
+			).toEqual([])
+			// NOTE: Fire and forget is legal and is told about, so the second
+			// answer leaves the Information behind — which is the point of it.
+			expect(
+				codesOf(applied(LINES, fixes[1] as CodeActionEntry)),
+			).toEqual(["unobserved-started"])
+		})
+	})
+
+	// NOTE: The body is right and the signature is behind it, so what the
+	// Constant was declared as is wrapped rather than replaced.
+	describe("a complete in a body that declared something else", () => {
+		const LINES = [
+			"implementation {",
+			"\tfunction doubled(_ value: Integer) -> Integer {",
+			"\t\t<- complete Async.deferred(() { <- value })",
+			"\t}",
+			"",
+			"\tTerminal.inspect(complete doubled(2))",
+			"}",
+		]
+
+		it("wraps the declared return Type in a Future", () => {
+			let fix = quickFixes(LINES).find(
+				(entry) => entry.diagnosticCode === "complete-outside-future",
+			) as CodeActionEntry
+
+			expect(fix.title).toBe("Declare the return Type 'Future<Integer>'")
+			expect(fix.isPreferred).toBe(true)
+			expect(applied(LINES, fix)).toEqual([
+				"implementation {",
+				"\tfunction doubled(_ value: Integer) -> Future<Integer> {",
+				"\t\t<- complete Async.deferred(() { <- value })",
+				"\t}",
+				"",
+				"\tTerminal.inspect(complete doubled(2))",
+				"}",
+			])
+			expect(codesOf(applied(LINES, fix))).toEqual([])
+		})
+
+		// NOTE: The other site the code is reported at. A Parameter's default
+		// is filled in before any asynchrony begins and is inside no body at
+		// all, so wrapping the Function's return Type would answer a question
+		// nobody asked.
+		it("offers nothing for a complete written in a Parameter's default", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction doubled(",
+				"\t\t_ value: Integer = complete Async.deferred(() { <- 1 }),",
+				"\t) -> Integer {",
+				"\t\t<- value",
+				"\t}",
+				"",
+				"\tTerminal.inspect(doubled(2))",
+				"}",
+			]
+
+			expect(
+				quickFixes(lines).filter(
+					(entry) =>
+						entry.diagnosticCode === "complete-outside-future",
+				),
+			).toEqual([])
+		})
+	})
+
+	describe("a Keyword in front of a value that is neither", () => {
+		const LINES = [
+			"implementation {",
+			"\tconstant value = complete 3",
+			"\tconstant other = start 4",
+			"\tTerminal.inspect(value)",
+			"\tTerminal.inspect(other)",
+			"}",
+		]
+
+		it("takes the word and the space behind it away", () => {
+			let fixes = quickFixes(LINES).filter((entry) =>
+				["needless-complete", "needless-start"].includes(
+					entry.diagnosticCode as string,
+				),
+			)
+
+			expect(titles(fixes)).toEqual([
+				"Drop the 'complete'",
+				"Drop the 'start'",
+			])
+
+			let applyBoth = fixes.reduce(
+				(lines, fix) => applied(lines, fix),
+				LINES,
+			)
+
+			expect(applyBoth).toEqual([
+				"implementation {",
+				"\tconstant value = 3",
+				"\tconstant other = 4",
+				"\tTerminal.inspect(value)",
+				"\tTerminal.inspect(other)",
+				"}",
+			])
+			expect(codesOf(applyBoth)).toEqual([])
+		})
+	})
+
+	// NOTE: Picked out by the Help rather than by the code — every mismatch in
+	// the language is reported under these two codes, and the Validator is what
+	// decided this one is a missing word.
+	describe("a mismatch that is one missing complete", () => {
+		it("writes the word in front of the value assigned", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant work = Async.deferred(() { <- 1 })",
+				"\tconstant value: Integer = work",
+				"\tTerminal.inspect(value)",
+				"}",
+			]
+
+			let fix = quickFixes(lines).find(
+				(entry) => entry.diagnosticCode === "assignment-type-mismatch",
+			) as CodeActionEntry
+
+			expect(fix.title).toBe("Wait for it with 'complete'")
+			expect(applied(lines, fix)).toEqual([
+				"implementation {",
+				"\tconstant work = Async.deferred(() { <- 1 })",
+				"\tconstant value: Integer = complete work",
+				"\tTerminal.inspect(value)",
+				"}",
+			])
+			expect(codesOf(applied(lines, fix))).toEqual([])
+		})
+
+		it("writes it in front of what a body returns", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction doubled(_ value: Integer) -> Integer {",
+				"\t\t<- Async.deferred(() { <- value })",
+				"\t}",
+				"",
+				"\tTerminal.inspect(doubled(2))",
+				"}",
+			]
+
+			let fix = quickFixes(lines).find(
+				(entry) => entry.diagnosticCode === "return-type-mismatch",
+			) as CodeActionEntry
+
+			expect(applied(lines, fix)[2]).toBe(
+				"\t\t<- complete Async.deferred(() { <- value })",
+			)
+		})
+
+		// NOTE: The codes these arrive under are the ordinary mismatches', so
+		// the fix has to answer nothing where the Validator wrote no Help about
+		// asynchrony.
+		it("offers nothing for a mismatch that is not one", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant value: Integer = "two"',
+				"\tTerminal.inspect(value)",
+				"}",
+			]
+
+			expect(
+				quickFixes(lines).filter(
+					(entry) =>
+						entry.diagnosticCode === "assignment-type-mismatch",
+				),
+			).toEqual([])
+		})
+	})
+
+	// NOTE: And the Information that is offered nothing, deliberately — see the
+	// NOTE at the bottom of `futureFixes.ts`.
+	it("offers nothing for work nobody waits for", () => {
+		let lines = [
+			"implementation {",
+			"\tstart Async.deferred(() { <- 1 })",
+			"}",
+		]
+
+		expect(codesOf(lines)).toEqual(["unobserved-started"])
+		expect(quickFixes(lines)).toEqual([])
+	})
+})
+
 // NOTE: What is written UNDER the two Keywords is ordinary code, and every
 // refactoring offered on it is reached by a walk that has to descend through
 // them — the Parser one the fixes share, and the typed one the annotations
