@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+- Work that has not run is a value. A `Future<Value>` describes work, and
+  building one runs none of it; `start` puts one in flight and answers the
+  `Started<Value>` of that one run; `complete` waits for what either answers
+  with. A Function whose body writes `complete` hands its caller a Future and
+  declares `-> Future<…>`, so there is no `async` and no `await` and no word in
+  front of a Function. `Async.deferred` and `Async.sleep` are where a future
+  with nothing behind it comes from; `map`, `andThen`, `within` and `attempt`
+  build one out of another; and a List of them becomes one description with
+  `inSequence`, `all`, `all(atMost:)`, `race` or `firstValue`. `Http` is the
+  one Namespace that reaches a host at all: `Http.send` and the six verbs
+  answer a Response or the reason there is none — a status is not a failure, so
+  a 404 is a Response — and a deadline is `::within(milliseconds:)` on the work
+  rather than a member of the request. A test may `complete` whatever it likes:
+  the runner drives one test at a time and waits for each.
 - The two words asynchrony is written with are lit, offered and fixed:
   `complete`, which waits for what a Future or a Started answers with, and
   `start`, which puts a Future in flight and answers the one run of it. Both

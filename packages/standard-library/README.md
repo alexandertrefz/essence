@@ -72,9 +72,16 @@ later, or a length of time to wait — and four narrower targets hold the
 combinators. `ResultFuture` is a future answering a Result, `FutureList`
 and `ResultFutureList` are Lists of futures, and `NonEmptyFutureList` is
 the List a race needs (`Future.es`, `Async.es`).
+`Http` is the one Namespace that reaches outside the Program at all, and it
+answers work like everything above: `Http.send` is its one native and the six
+verbs are written on it, `Request` and `Response` are the Records either side
+of a request, `HttpMethod` and `Redirects` are the modes it takes, and
+`HttpFailure` is the three ways a request produces no Response. A deadline and
+a second attempt are `Future`'s `within` and `attempt`, and neither is repeated
+here (`Http.es`).
 
 Three of every five declared Method entries are also IMPLEMENTED here, in
-Essence — 448 of 739 as this is written, counting one entry per Overload and
+Essence — 456 of 750 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
 Eight more are written on a PROTOCOL rather than on a Namespace, once for every
 conformer: `Equatable.isNot`, `Comparable`'s four inequalities, `Orderable`'s

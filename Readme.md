@@ -44,6 +44,7 @@ Essence compiles to modern ECMAScript, allowing execution in Bun, Node.js as wel
 * Arbitrary Precision Numbers
 * First-Class Functions
 * Tests — a module section of its own, run by `essence test`, dropped by every build
+* Asynchrony — work is a value: a `Future` describes it, `start` runs it and `complete` waits for it, with no `async` and no `await`
 
 
 # Example Code
@@ -55,7 +56,7 @@ The standard library is written in Essence and lives in [packages/standard-libra
 [README](packages/standard-library/README.md) is the most substantial writing about the language there is.
 
 # Examples
-Three larger programs, each with a README saying what it shows and a test keeping it honest:
+Four larger programs, each with a README saying what it shows and a test keeping it honest:
 
 * [examples/league](examples/league) — a league table, in pure Essence: a season as data, standings through a
   `Comparable` conformance, exact points-per-game, and a "what if" computed beside the real table.
@@ -66,6 +67,9 @@ Three larger programs, each with a README saying what it shows and a test keepin
 * [examples/client-2048](examples/client-2048) — 2048 in the browser: the game is Essence, the page is
   TypeScript, Vite serves both; undo falls out of immutability, `.d.es.ts` types the import.
   `cd examples/client-2048 && bun run dev`
+* [examples/site-check](examples/site-check) — several addresses asked for their pages at once: `Http.get`
+  answers work, `all(atMost:)` bounds how much of it runs together, and the command awaits the one
+  Promise the Module hands back. `cd examples/site-check && bun check.ts <address>…`
 
 # Modules
 A file is a module. Everything it declares is private until its `export { … }` block lists it, and an
