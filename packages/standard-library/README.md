@@ -65,9 +65,16 @@ it and the `Terminal.ask` that is a prompt and a line (`Terminal.es`).
 `Randomness` is the source a Program draws from, built by
 `Randomness.entropy()` for the host's own randomness or by
 `Randomness.seeded(_)` for a run that replays (`Randomness.es`).
+Work that has not run is a value like any other: `Future` is the
+description of it and `Started` is one run of it, `Async` is where a
+future with nothing behind it comes from — a computation to carry out
+later, or a length of time to wait — and four narrower targets hold the
+combinators. `ResultFuture` is a future answering a Result, `FutureList`
+and `ResultFutureList` are Lists of futures, and `NonEmptyFutureList` is
+the List a race needs (`Future.es`, `Async.es`).
 
 Three of every five declared Method entries are also IMPLEMENTED here, in
-Essence — 443 of 725 as this is written, counting one entry per Overload and
+Essence — 448 of 739 as this is written, counting one entry per Overload and
 `loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
 Eight more are written on a PROTOCOL rather than on a Namespace, once for every
 conformer: `Equatable.isNot`, `Comparable`'s four inequalities, `Orderable`'s

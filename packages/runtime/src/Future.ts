@@ -15,8 +15,8 @@ import { type AnyType, typeKeySymbol } from "./type"
 // NOTE: A FUTURE IS A DESCRIPTION. Building one runs nothing at all: it holds a
 // `run` and nothing else, and `run` is called once per START. That is the whole
 // reason a Future may be started any number of times — each start is a fresh
-// call — and the whole reason `::retried` can be written as a loop over starts
-// rather than as machinery inside the runtime.
+// call — and the whole reason `::attempt` is written in Essence, as a body that
+// completes the receiver again, rather than as machinery inside this module.
 //
 // A STARTED IS ONE RUN of such a description. It holds the promise that run
 // answered with and the controller that stops it, so completing one twice

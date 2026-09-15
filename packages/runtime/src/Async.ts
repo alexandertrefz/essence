@@ -3,12 +3,13 @@ import type { IntegerType } from "./Integer"
 import type { RecordType } from "./Record"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// NOTE: The one native that builds a Future out of a Function. `Future.ts` is
-// where a future IS — what it holds, how a run is started and how one is waited
-// for — and this module is the Namespace a Program reaches that door through.
-// Kept apart from `Future.ts` for the reason the sources keep the two
-// Namespaces apart: `Async` is where a Program says "run this later", and
-// `Future` is what it has once it has said so.
+// NOTE: The two natives that build a Future out of nothing — a computation to
+// carry out later, and a length of time to wait. `Future.ts` is where a future
+// IS — what it holds, how a run is started and how one is waited for — and this
+// module is the Namespace a Program reaches those doors through. Kept apart from
+// `Future.ts` for the reason the sources keep the two Namespaces apart: `Async`
+// is where a Program says "run this later", and `Future` is what it has once it
+// has said so.
 
 // NOTE: The Function is called at every START rather than here, which is what
 // makes the answer a DESCRIPTION: building one runs nothing, and two starts run
