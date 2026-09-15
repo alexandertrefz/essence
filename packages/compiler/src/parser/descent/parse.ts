@@ -96,6 +96,8 @@ const expressionStartTokenTypes = new Set([
 	TokenType.SymbolLeftBrace,
 	TokenType.KeywordMatch,
 	TokenType.KeywordDefine,
+	TokenType.KeywordStart,
+	TokenType.KeywordComplete,
 	TokenType.LiteralString,
 	TokenType.LiteralStringStart,
 	TokenType.LiteralNumber,
@@ -2333,7 +2335,9 @@ class DescentParser {
 		let returnType = this.parseReturnType()
 
 		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
-			let block = this.outsideTestBody(() => this.parseBlock())
+			let { result: block, completes } = this.completingBody(() =>
+				this.outsideTestBody(() => this.parseBlock()),
+			)
 
 			let definition =
 				generics.length > 0
@@ -2344,6 +2348,7 @@ class DescentParser {
 							block.body,
 							parameterList.position,
 							documentation,
+							completes,
 						)
 					: generators.functionDefinition(
 							parameterList.parameters,
@@ -2351,6 +2356,7 @@ class DescentParser {
 							block.body,
 							parameterList.position,
 							documentation,
+							completes,
 						)
 
 			return generators.functionValueNode(definition, {
@@ -2499,7 +2505,9 @@ class DescentParser {
 		let body: parser.FunctionValueNode | null = null
 
 		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
-			let block = this.outsideTestBody(() => this.parseBlock())
+			let { result: block, completes } = this.completingBody(() =>
+				this.outsideTestBody(() => this.parseBlock()),
+			)
 
 			body = generators.functionValueNode(
 				generators.functionDefinition(
@@ -2508,6 +2516,7 @@ class DescentParser {
 					block.body,
 					parameterList.position,
 					documentation,
+					completes,
 				),
 				{
 					start: parameterList.position.start,
@@ -3080,6 +3089,9 @@ class DescentParser {
 				return this.parseMatch()
 			case TokenType.KeywordDefine:
 				return this.parseDefine()
+			case TokenType.KeywordStart:
+			case TokenType.KeywordComplete:
+				return this.parseStartOrComplete(token)
 			case TokenType.SymbolAt:
 				this.tokens.next()
 				return generators.self(token.position)
@@ -3151,6 +3163,56 @@ class DescentParser {
 					token.position,
 				)
 		}
+	}
+
+	// NOTE: `start x` and `complete x`. The operand is read by the FULL
+	// Expression reading rather than by the primary one, so the whole postfix
+	// chain behind the Keyword belongs to it: `complete headline(url)::retried
+	// (times 3)` completes the retried future, and a Method call on what was
+	// waited for has to be written `(complete x)::m()`. That is the same shape a
+	// prefix Keyword takes in every language that has one, and the only reading
+	// that makes the everyday call — a future built by a call and completed —
+	// need no parentheses at all.
+	//
+	// NOTE: Which means the loop in `parseExpressionLevels` has nothing left to
+	// attach when this returns: the recursive reading consumed the chain. So a
+	// `start` reached from there behaves as a primary Expression that happens to
+	// be greedy, and `expressionStartTokenTypes` stays exactly what its NOTE
+	// says it is — the cases this switch answers.
+	protected parseStartOrComplete(
+		keyword: Token,
+	): parser.StartNode | parser.CompleteNode {
+		this.tokens.next()
+
+		if (!startsExpression(this.tokens.peek())) {
+			throw new ParseError(
+				`'${keyword.value}' needs an Expression to ${keyword.value}`,
+				keyword.position,
+				`nothing to ${keyword.value} follows this`,
+				{
+					code: "syntax-error",
+					notes: [
+						`'${keyword.value}' is written in front of the work it is about — '${keyword.value} headline(url)'.`,
+					],
+				},
+			)
+		}
+
+		let expression = this.parseExpression()
+		let position = {
+			start: keyword.position.start,
+			end: expression.position.end,
+		}
+
+		if (keyword.type === TokenType.KeywordStart) {
+			return generators.start(expression, position)
+		}
+
+		// NOTE: Counted for the body being parsed — `start` is not, because it
+		// never waits and so never asks anything of the body it stands in.
+		this.completesSeen += 1
+
+		return generators.complete(expression, position)
 	}
 
 	// NOTE: `.price`, `.address.city` — the whole chain is consumed here rather
@@ -5178,7 +5240,9 @@ class DescentParser {
 		let documentation = ownsDocumentation ? this.documentationHere() : null
 		let parameterList = this.parseParameterList(allowsInferredTypes)
 		let returnType = this.parseOptionalReturnType(allowsInferredTypes)
-		let block = this.outsideTestBody(() => this.parseBlock())
+		let { result: block, completes } = this.completingBody(() =>
+			this.outsideTestBody(() => this.parseBlock()),
+		)
 
 		return generators.functionValueNode(
 			generators.functionDefinition(
@@ -5187,6 +5251,7 @@ class DescentParser {
 				block.body,
 				parameterList.position,
 				documentation,
+				completes,
 			),
 			{
 				start: parameterList.position.start,
@@ -5202,7 +5267,9 @@ class DescentParser {
 		let genericList = this.parseGenericList()
 		let parameterList = this.parseParameterList()
 		let returnType = this.parseReturnType()
-		let block = this.outsideTestBody(() => this.parseBlock())
+		let { result: block, completes } = this.completingBody(() =>
+			this.outsideTestBody(() => this.parseBlock()),
+		)
 
 		return generators.functionValueNode(
 			generators.genericFunctionDefinition(
@@ -5212,6 +5279,7 @@ class DescentParser {
 				block.body,
 				parameterList.position,
 				documentation,
+				completes,
 			),
 			{
 				start: parameterList.position.start,
@@ -6214,6 +6282,35 @@ class DescentParser {
 		}
 	}
 
+	// NOTE: How many `complete`s have been read inside the body being parsed and
+	// not claimed by a body nested in it — which is all a Function needs to know
+	// to say whether it is a COMPLETING body. Every body parse resets the count
+	// and restores the enclosing one behind it, so a `complete` written in a
+	// Function literal is counted by that literal and by nothing around it,
+	// which is exactly where the language draws the line.
+	//
+	// NOTE: A counter rather than a stack of frames, because the only question
+	// asked of it is "was there one?" of the body being closed, and because a
+	// single number is what `speculate` can save and restore — a reading that is
+	// thrown away must leave no mark on the body it was attempted inside.
+	private completesSeen = 0
+
+	protected completingBody<T>(parse: () => T): {
+		result: T
+		completes: boolean
+	} {
+		let outer = this.completesSeen
+		this.completesSeen = 0
+
+		try {
+			let result = parse()
+
+			return { result, completes: this.completesSeen > 0 }
+		} finally {
+			this.completesSeen = outer
+		}
+	}
+
 	protected outsideTestBody<T>(parse: () => T): T {
 		let outerInsideTestBody = this.insideTestBody
 		this.insideTestBody = false
@@ -6321,6 +6418,11 @@ class DescentParser {
 	): T | null {
 		let saved = this.tokens.save()
 		let savedSuppressDiagnostics = this.suppressDiagnostics
+		// NOTE: And the `complete` count with them, for the reason the
+		// Diagnostics are rewound: a reading that is thrown away must not leave
+		// the body around it marked as completing on the strength of a word it
+		// read in a shape the Program was never in.
+		let savedCompletesSeen = this.completesSeen
 		let diagnosticMark = markDiagnostics()
 
 		try {
@@ -6350,6 +6452,7 @@ class DescentParser {
 				}
 
 				this.suppressDiagnostics = savedSuppressDiagnostics
+				this.completesSeen = savedCompletesSeen
 				rewindDiagnostics(diagnosticMark)
 
 				throw error
@@ -6358,6 +6461,7 @@ class DescentParser {
 
 		this.tokens.restore(saved)
 		this.suppressDiagnostics = savedSuppressDiagnostics
+		this.completesSeen = savedCompletesSeen
 		rewindDiagnostics(diagnosticMark)
 
 		return null

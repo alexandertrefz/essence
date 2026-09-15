@@ -251,6 +251,33 @@ export type ExpressionNode =
 	| MatchNode
 	| DefineNode
 	| CaseValueNode
+	| StartNode
+	| CompleteNode
+
+// NOTE: `start expr` and `complete expr` — the two prefix Keywords asynchrony
+// is written with. `start` puts a Future in flight and answers the `Started`
+// that stands for that one run; `complete` waits for what a Future or a
+// `Started` answers with.
+//
+// NOTE: The operand is the WHOLE postfix chain, which is what makes
+// `complete headline(url)::retried(times 3)` read as the retried future
+// completed rather than as `complete headline(url)` with a Method called on the
+// value. A Method call on what was waited for is written `(complete x)::m()`:
+// the parentheses are the only way to say it, and they say it plainly. Both
+// words are full Keywords for the reason `define` is one — an Identifier with an
+// Expression behind it already parses as two Statements, so a contextual reading
+// would quietly turn them into one.
+export interface StartNode {
+	nodeType: "Start"
+	expression: ExpressionNode
+	position: Position
+}
+
+export interface CompleteNode {
+	nodeType: "Complete"
+	expression: ExpressionNode
+	position: Position
+}
 
 // NOTE: `ChoiceName#CaseName` with an optional payload —
 // `CalculatorOperation#Add({ left = 1, right = 1 })` constructs a Case,
@@ -1107,6 +1134,24 @@ export interface FunctionDefinitionNode {
 	// the Parameter list. Carried so that an Inlay Hint for an inferred return
 	// Type has somewhere to sit.
 	parameterListPosition: Position
+	// NOTE: Set where this body writes a `complete` of its OWN — one that is not
+	// inside a Function literal written in it, which has a body and a mark of its
+	// own. Such a body is a COMPLETING body: it suspends, so it has to declare
+	// `-> Future<T>`, its `<-` answers with the inner `T`, and the Rewriter wraps
+	// what it emits in the async closure that context flows through.
+	//
+	// NOTE: Read off the body by the PARSER, which is the one reader that has
+	// already seen it when the answer is needed. The Enricher has to know before
+	// it reads a single Statement — `<-` is checked against the inner Type and a
+	// bare Case resolves against it — so working it out there would mean walking
+	// the whole body twice, once to look for the word and once to type it.
+	// Nothing about the mark is a judgement: it is "this body writes the word",
+	// which is exactly what the Parser was looking at.
+	//
+	// NOTE: Absent rather than `false`, like every other derived flag on a Node
+	// here, so that the Formatter's safety gate sees no key appear on a body that
+	// completes nothing.
+	completing?: true
 }
 
 // NOTE: `internalName` is null for `_: Type`, which binds no name at all —

@@ -461,6 +461,28 @@ export function define(
 	}
 }
 
+export function start(
+	expression: parser.ExpressionNode,
+	position: common.Position,
+): parser.StartNode {
+	return {
+		nodeType: "Start",
+		expression,
+		position,
+	}
+}
+
+export function complete(
+	expression: parser.ExpressionNode,
+	position: common.Position,
+): parser.CompleteNode {
+	return {
+		nodeType: "Complete",
+		expression,
+		position,
+	}
+}
+
 export function wildcardMatcher(
 	position: common.Position,
 ): parser.WildcardMatcherNode {
@@ -1016,6 +1038,7 @@ export function genericFunctionDefinition(
 	body: Array<parser.ImplementationNode>,
 	parameterListPosition: common.Position,
 	documentation: common.Documentation | null = null,
+	completing = false,
 ): parser.FunctionDefinitionNode {
 	return {
 		nodeType: "FunctionDefinition",
@@ -1025,6 +1048,7 @@ export function genericFunctionDefinition(
 		body,
 		documentation,
 		parameterListPosition,
+		...(completing ? { completing: true as const } : {}),
 	}
 }
 
@@ -1034,6 +1058,7 @@ export function functionDefinition(
 	body: Array<parser.ImplementationNode>,
 	parameterListPosition: common.Position,
 	documentation: common.Documentation | null = null,
+	completing = false,
 ): parser.FunctionDefinitionNode {
 	return {
 		nodeType: "FunctionDefinition",
@@ -1043,6 +1068,7 @@ export function functionDefinition(
 		body,
 		documentation,
 		parameterListPosition,
+		...(completing ? { completing: true as const } : {}),
 	}
 }
 

@@ -68,6 +68,8 @@ const keywords = [
 	"benchmark",
 	"expect",
 	"require",
+	"start",
+	"complete",
 ]
 const symbols = [
 	"(",
@@ -227,6 +229,8 @@ const wordTypes = new Map<string, lexer.TokenType>([
 	["benchmark", TokenType.KeywordBenchmark],
 	["expect", TokenType.KeywordExpect],
 	["require", TokenType.KeywordRequire],
+	["start", TokenType.KeywordStart],
+	["complete", TokenType.KeywordComplete],
 	["true", TokenType.LiteralTrue],
 	["false", TokenType.LiteralFalse],
 ])

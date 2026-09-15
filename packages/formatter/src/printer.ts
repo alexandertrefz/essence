@@ -2090,6 +2090,29 @@ export class Printer {
 					this.printArgumentList(node.arguments),
 				])
 
+			// NOTE: One space and nothing else. Both Keywords take the whole
+			// postfix chain behind them, so what stands there is printed as it
+			// stands — and a chain that breaks over lines breaks under the
+			// Keyword exactly as it would anywhere.
+			//
+			// NOTE: No parentheses are ever needed around one, because neither
+			// can stand where a postfix form reads its base: the operand
+			// swallows the chain, and Essence has no grouping parentheses to
+			// stop it with — a `(` in Expression position opens a Function
+			// literal. A Method call on what was waited for is written by
+			// binding it: `constant r = complete …` and then `r::m()`.
+			case "Start":
+				return concat([
+					text("start "),
+					this.printExpression(node.expression),
+				])
+
+			case "Complete":
+				return concat([
+					text("complete "),
+					this.printExpression(node.expression),
+				])
+
 			case "Combination":
 				return this.printCombination(node)
 

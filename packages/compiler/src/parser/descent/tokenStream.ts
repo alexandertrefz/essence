@@ -171,6 +171,8 @@ const tokenTypeLexemes: { [tokenType in lexer.TokenType]?: string } = {
 	[TokenType.KeywordBenchmark]: "benchmark",
 	[TokenType.KeywordExpect]: "expect",
 	[TokenType.KeywordRequire]: "require",
+	[TokenType.KeywordStart]: "start",
+	[TokenType.KeywordComplete]: "complete",
 }
 
 function describeTokenType(tokenType: lexer.TokenType): string {

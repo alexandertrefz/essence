@@ -63,6 +63,8 @@ export enum TokenType {
 	KeywordBenchmark = "KeywordBenchmark",
 	KeywordExpect = "KeywordExpect",
 	KeywordRequire = "KeywordRequire",
+	KeywordStart = "KeywordStart",
+	KeywordComplete = "KeywordComplete",
 	//
 	Identifier = "Identifier",
 	Linebreak = "Linebreak",
