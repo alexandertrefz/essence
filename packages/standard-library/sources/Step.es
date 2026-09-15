@@ -9,7 +9,7 @@ declarations {
 	§§
 	§§ `#Continue` carries the next State, and `#Done` carries the answer the loop finishes with. A `match` checks the two Cases like any other Choice.
 	§§
-	§§ `State` is what a loop threads from turn to turn, and `Answer` is what it finishes with. The two are independent. The `loop` family in `Loop.es` and `List::reduce`'s early-stopping entry both read one.
+	§§ `State` is what a loop threads from turn to turn, and `Answer` is what it finishes with. The two are independent. The `step` entries of `loop` and `List::reduce`'s early-stopping entry both read one.
 	choice Step<State, Answer> {
 		Continue { state: State },
 		Done { value: Answer },

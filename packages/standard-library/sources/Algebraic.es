@@ -190,7 +190,7 @@ declarations {
 
 			§§ Answers the exact sum of the two Algebraics.
 			§§
-			§§ Over the same radical the sum stays in the slice, and can collapse to a Rational. Over different radicals there is no sum yet, and the answer is empty.
+			§§ Over the same radical the sum stays in the slice, and can collapse to a Rational. Over different radicals the sum falls outside what an Algebraic holds, and the answer is empty.
 			§§
 			§§ @param _ — the Algebraic to add
 			§§ @returns — the sum, or nothing when the radicals differ.

@@ -231,7 +231,7 @@
 						},
 						{
 							"signature": "add(_ other: Algebraic) -> Optional<Rational | Algebraic>",
-							"summary": "Answers the exact sum of the two Algebraics.\n\nOver the same radical the sum stays in the slice, and can collapse to a Rational. Over different radicals there is no sum yet, and the answer is empty.",
+							"summary": "Answers the exact sum of the two Algebraics.\n\nOver the same radical the sum stays in the slice, and can collapse to a Rational. Over different radicals the sum falls outside what an Algebraic holds, and the answer is empty.",
 							"parameters": [
 								{
 									"name": "_",

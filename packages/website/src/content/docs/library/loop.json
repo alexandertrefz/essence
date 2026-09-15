@@ -462,7 +462,7 @@
 		{
 			"name": "Step",
 			"declaration": "choice Step<State, Answer> {\n\tContinue { state: State },\n\tDone { value: Answer },\n}",
-			"description": "What a callback answers to say whether a loop goes round again.\n\n`#Continue` carries the next State, and `#Done` carries the answer the loop finishes with. A `match` checks the two Cases like any other Choice.\n\n`State` is what a loop threads from turn to turn, and `Answer` is what it finishes with. The two are independent. The `loop` family in `Loop.es` and `List::reduce`'s early-stopping entry both read one.",
+			"description": "What a callback answers to say whether a loop goes round again.\n\n`#Continue` carries the next State, and `#Done` carries the answer the loop finishes with. A `match` checks the two Cases like any other Choice.\n\n`State` is what a loop threads from turn to turn, and `Answer` is what it finishes with. The two are independent. The `step` entries of `loop` and `List::reduce`'s early-stopping entry both read one.",
 			"cases": [
 				{
 					"name": "Continue",
