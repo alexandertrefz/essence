@@ -1020,6 +1020,79 @@ describe("Test codegen — a test that completes", () => {
 		expect(summary.failed).toBe(0)
 	})
 
+	// NOTE: A test may walk away from a run — `unobserved-started` is an
+	// Information — and what it walks away from is stopped when the test ends.
+	// Without that, the work goes on into the NEXT test: what it prints is
+	// captured under that test's sink and reported against the wrong test, and
+	// the runner stays open for as long as the abandoned work has left to run.
+	it("stops work a test left running when the test ends", async () => {
+		let { events, summary } = await run(`implementation {
+			function late(_ name: String, after milliseconds: Integer) -> Future<{}> {
+				complete Async.sleep(milliseconds milliseconds)
+
+				Terminal.print("{name}: printed late")
+
+				<- {}
+			}
+		}
+
+		tests {
+			test "one" {
+				Terminal.print("one: printed now")
+
+				start late("one", after 10)
+
+				expect true
+			}
+
+			test "two" {
+				Terminal.print("two: printed now")
+
+				constant waited = complete Async.sleep(milliseconds 60)
+
+				expect true
+			}
+		}`)
+
+		expect(summary.passed).toBe(2)
+		expect(
+			eventsOf(events, "output").map((event) =>
+				event.kind === "output" ? [event.id, event.text] : null,
+			),
+		).toEqual([
+			["/one", "one: printed now\n"],
+			["/two", "two: printed now\n"],
+		])
+	})
+
+	it("gives a test body that starts work a context of its own", async () => {
+		let code = generate(`implementation {}
+
+		tests {
+			test "one" {
+				start Async.sleep(milliseconds 3000)
+
+				expect true
+			}
+		}`)
+
+		expect(code).toContain("let $ctx = $future.root()")
+		expect(code).toContain("$ctx.controller.abort()")
+	})
+
+	it("leaves a test that reaches for no context without one", async () => {
+		let code = generate(`implementation {}
+
+		tests {
+			test "one" {
+				expect true
+			}
+		}`)
+
+		expect(code).not.toContain("$future.root()")
+		expect(code).not.toContain("$ctx")
+	})
+
 	it("leaves a test that completes nothing synchronous", async () => {
 		let code = generate(`implementation {}
 

@@ -5289,6 +5289,8 @@ Advice: Nothing waits for this
 
 Leave it where the answer is genuinely not wanted. Otherwise hold the run in a constant and `complete` it where the answer is.
 
+Inside a `test` body, fire and forget lasts as long as the test does: a test runs under a context of its own, and stopping a run stops everything it started, so work the test walked away from is stopped when the test ends. It can not print into the next test's report, and it can not hold `essence test` open.
+
 There is no Quick Fix. Both answers are things only you know: leaving it is no edit at all, and holding it in a constant needs a name for the work.
 
 Taught on: [Asynchrony › One run, read many times](/docs/language/asynchrony#one-run-read-many-times)

@@ -253,6 +253,14 @@ let outputSink: OutputSink | null = null
 // describes is over, would attribute everything a test writes after its first
 // `complete` to whatever came next.
 //
+// NOTE: Which leaves work a test does NOT wait for, and the answer to that is
+// not here. A sink is installed for one test at a time, so anything printed
+// after that test is over is printed under whatever sink is installed then —
+// the next test's, or none. What makes that unreachable is the emission: a test
+// body runs under a context of its own and that context is STOPPED when the
+// body settles, so a run a test walked away from is stopped with it and has
+// nothing left to print. See `testBody` in the Rewriter.
+//
 // NOTE: The promise is recognised rather than awaited, so the synchronous shape
 // — every run that completes nothing — costs exactly the `try`/`finally` it
 // always did and never a turn of the microtask queue.

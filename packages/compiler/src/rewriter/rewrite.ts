@@ -8158,8 +8158,15 @@ function rewriteComplete(
 // there is one, since every one of them binds the same name.
 let completingDepth = 0
 
+// NOTE: Whether the body being rewritten has reached for `$ctx` — read by
+// `testBody`, which binds a context only where one is asked for. Every other
+// caller of `contextArgument` is inside a body that binds the name already.
+let contextTaken = false
+
 function contextArgument(): estree.Expression {
 	if (completingDepth > 0) {
+		contextTaken = true
+
 		return contextIdentifier()
 	}
 
@@ -8791,14 +8798,103 @@ function testName(
 		: rewriteExpression(name)
 }
 
+// NOTE: A test body is a completing body in everything but its Type: it may
+// wait, the runner drives one at a time and awaits each, and what it starts is
+// its own. So it is emitted with a context of ITS OWN, bound here rather than
+// taken from an enclosing body — there is none — and STOPPED when the body
+// settles, however it settles.
+//
+// NOTE: The stop is the point. Without it a `start` a test leaves behind goes on
+// running into the next test: what it prints is captured under that test's sink,
+// which is a report naming the wrong test, and `essence test` stays open for as
+// long as the abandoned work has left to run. Stopping it is the language's own
+// rule — stopping a run stops everything it started — applied at the one edge a
+// test has, and it is what makes `unobserved-started` inside a test mean
+// something: the run is fire-and-forget for the length of the test and no
+// longer.
+//
+// NOTE: Only where the body reaches for the context at all. A test that waits
+// for nothing and starts nothing is emitted exactly as it was before any of this
+// existed, so a Module of such tests neither binds a context nor imports the
+// module it would come from.
 function testBody(
 	body: Array<common.typedSimple.ImplementationNode>,
 ): estree.ArrowFunctionExpression {
+	let enclosing = contextTaken
+
+	contextTaken = false
+	completingDepth += 1
+
+	let block: estree.BlockStatement
+
+	try {
+		block = rewriteBlockStatement(body)
+	} finally {
+		completingDepth -= 1
+	}
+
+	let taken = contextTaken
+
+	contextTaken = enclosing || taken
+
+	if (!taken) {
+		return {
+			type: "ArrowFunctionExpression",
+			expression: false,
+			params: [],
+			body: block,
+		}
+	}
+
 	return {
 		type: "ArrowFunctionExpression",
 		expression: false,
 		params: [],
-		body: rewriteBlockStatement(body),
+		body: {
+			type: "BlockStatement",
+			body: [
+				{
+					type: "VariableDeclaration",
+					kind: "let",
+					declarations: [
+						{
+							type: "VariableDeclarator",
+							id: contextIdentifier(),
+							init: {
+								type: "CallExpression",
+								optional: false,
+								callee: memberRead(futureModule(), "root"),
+								arguments: [],
+							},
+						},
+					],
+				},
+				{
+					type: "TryStatement",
+					block,
+					finalizer: {
+						type: "BlockStatement",
+						body: [
+							{
+								type: "ExpressionStatement",
+								expression: {
+									type: "CallExpression",
+									optional: false,
+									callee: memberRead(
+										memberRead(
+											contextIdentifier(),
+											"controller",
+										),
+										"abort",
+									),
+									arguments: [],
+								},
+							},
+						],
+					},
+				},
+			],
+		},
 	}
 }
 

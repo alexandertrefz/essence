@@ -139,7 +139,7 @@ implementation {
 
 [`Started::map`](/docs/library/future#map) and [`Started::within`](/docs/library/future#within) read a run that is already going. `within` on a `Started` gives up on the answer without stopping the work: another holder may still be waiting for it. `within` on a `Future` started the run itself, so there it does stop it.
 
-A `start` whose run nobody reads is fire-and-forget. That is a real thing to write, so it is allowed, and the compiler says so once as [`unobserved-started`](/docs/reference/diagnostics#unobserved-started), an Information rather than a complaint.
+A `start` whose run nobody reads is fire-and-forget. That is a real thing to write, so it is allowed, and the compiler says so once as [`unobserved-started`](/docs/reference/diagnostics#unobserved-started), an Information rather than a complaint. Inside a `test` body it lasts exactly as long as the test: a test runs under a context of its own, and what a test leaves running is stopped when the test ends.
 
 A `Future` written as a statement is different: it describes work and starts none, so the statement does nothing at all. That is [`unused-future`](/docs/reference/diagnostics#unused-future), an error:
 
