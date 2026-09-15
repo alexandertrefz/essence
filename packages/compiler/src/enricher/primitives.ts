@@ -27,6 +27,29 @@ const transcendentalType: common.TranscendentalType = {
 // `type`, `choice` or `protocol` could say produces a value that carries state
 // only the runtime can read.
 const randomnessType: common.RandomnessType = { type: "Randomness" }
+// NOTE: The two asynchronous containers, and the one pair of tags that holds
+// another Type. A `Future` describes work that will answer with its `valueType`
+// and a `Started` is one execution of such a description already in flight;
+// neither has a declaration anywhere, for the reason the source above has none
+// — nothing a `type`, `choice` or `protocol` could say produces a value the
+// runtime alone can build, run and wait for.
+//
+// NOTE: The BARE spelling is the applied one with its slot left Unknown, rather
+// than a second Type the way `GenericList` is a second Type beside `List`. What
+// `GenericList` exists for is the empty List Literal, which has to be assignable
+// to every List; no Expression builds a Future out of nothing, so there is no
+// such literal here and nothing for a second tag to say. `matchTypes` reads the
+// Unknown slot exactly as it reads a bare `List`: it accepts every Future and
+// promises nothing about one.
+const futureType: common.FutureType = {
+	type: "Future",
+	valueType: { type: "Unknown" },
+}
+const startedType: common.StartedType = {
+	type: "Started",
+	valueType: { type: "Unknown" },
+}
+
 // NOTE: The open Record Type — `{}` members, which every Record is assignable
 // to. It is the receiver Type the Record Namespace targets, and it is also the
 // UNIT Type: a Function that answers nothing useful promises a Record with no
@@ -61,6 +84,8 @@ export const primitiveTypes: Record<string, common.Type> = {
 	Algebraic: algebraicType,
 	Transcendental: transcendentalType,
 	Randomness: randomnessType,
+	Future: futureType,
+	Started: startedType,
 	Record: recordType,
 	List: genericListType,
 	Dictionary: genericDictionaryType,

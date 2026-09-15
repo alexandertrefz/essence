@@ -27,6 +27,8 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	AlgebraicType: "./Algebraic",
 	BooleanType: "./Boolean",
 	DictionaryType: "./Dictionary",
+	FutureType: "./Future",
+	StartedType: "./Started",
 	IntegerType: "./Integer",
 	ListType: "./List",
 	NumberType: "./Number",
@@ -264,6 +266,16 @@ function mapType(
 		case "List":
 			ctx.used.add("ListType")
 			return `ListType<${mapType(type.itemType, ctx, where)}>`
+		// NOTE: One slot each, rendered the way a List's item Type is. A native
+		// that ANSWERS a Future — `Async.sleep`, `Http.send` — is bound to a
+		// runtime Function building one, and the contract is what holds the two
+		// spellings of the answer together.
+		case "Future":
+			ctx.used.add("FutureType")
+			return `FutureType<${mapType(type.valueType, ctx, where)}>`
+		case "Started":
+			ctx.used.add("StartedType")
+			return `StartedType<${mapType(type.valueType, ctx, where)}>`
 		case "Dictionary":
 			ctx.used.add("DictionaryType")
 			return `DictionaryType<${mapType(
@@ -462,6 +474,10 @@ function describeEssenceType(type: common.Type | common.GenericUse): string {
 			return "Randomness"
 		case "List":
 			return `List<${describeEssenceType(type.itemType)}>`
+		case "Future":
+			return `Future<${describeEssenceType(type.valueType)}>`
+		case "Started":
+			return `Started<${describeEssenceType(type.valueType)}>`
 		case "Dictionary":
 			return `Dictionary<${describeEssenceType(
 				type.keyType,

@@ -137,6 +137,10 @@ function describeTypesForCombination(type: common.Type): string {
 			return "Transcendentals"
 		case "Randomness":
 			return "Randomness sources"
+		case "Future":
+			return "Futures"
+		case "Started":
+			return "started work"
 		case "String":
 			return "Strings"
 		case "Unknown":
@@ -1794,6 +1798,11 @@ function typeMentionsGenerics(
 			return generics.has(type.name)
 		case "List":
 			return typeMentionsGenerics(type.itemType, generics)
+		// NOTE: The one slot each, asked exactly as a List's item Type is —
+		// what makes `Future<Value>` bind `Value` off a receiver.
+		case "Future":
+		case "Started":
+			return typeMentionsGenerics(type.valueType, generics)
 		// NOTE: Either slot on its own is enough — a `Dictionary<String, T>`
 		// mentions `T` as much as a `Dictionary<T, String>` does, and both have
 		// to be compared through a witness rather than structurally.
@@ -4822,6 +4831,36 @@ export function applyTypeArguments(
 			type: "List",
 			itemType: resolveType(typeArguments[0], scope),
 		}
+	}
+
+	// NOTE: The two asynchronous containers, applied the way a List is. There is
+	// no unapplied Type to normalise FROM — a bare `Future` already IS
+	// `Future<Unknown>`, which is what `primitiveTypes` hands out — so the base
+	// this reads is the applied shape with its slot still undecided, and the
+	// application decides it.
+	if (baseType.type === "Future" || baseType.type === "Started") {
+		let name = baseType.type
+
+		if (typeArguments.length !== 1) {
+			reportError(`${name} takes exactly 1 Type Argument`, position, {
+				code: "wrong-type-argument-count",
+				labels: [
+					primary(
+						position,
+						`${countOf(typeArguments.length, "Type Argument")} given`,
+					),
+				],
+			})
+		}
+
+		let valueType =
+			typeArguments.length === 1
+				? resolveType(typeArguments[0], scope)
+				: { type: "Error" as const }
+
+		return name === "Future"
+			? { type: "Future", valueType }
+			: { type: "Started", valueType }
 	}
 
 	// NOTE: The same normalisation for the two-slot container, and the same

@@ -442,6 +442,20 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 				Object.hasOwn(instance, name) &&
 				isValueOfType(instance[name], memberType),
 		)
+	} else if (type.type === "Future" || type.type === "Started") {
+		// NOTE: The kind and nothing else. What a Future will ANSWER is not
+		// there to look at — the work has not run, and running it to decide a
+		// Matcher would be the one type test with an effect — so a
+		// `Future<String>` Matcher asks exactly what a bare `Future` one asks.
+		// It degrades the way a generic Case payload degrades to its tag inside
+		// generic code: the check stops where the evidence stops.
+		//
+		// NOTE: The tag is WIDENED to a String rather than compared against the
+		// union above, because neither kind is a member of `AnyType`: both are
+		// registered kinds, answered by `registry.ts` wherever a value is
+		// printed or compared, which is what keeps the cost of asynchrony out of
+		// every Program that never waits for anything.
+		return String(value[typeKeySymbol]) === type.type
 	} else if (type.type === "UnionType") {
 		return type.types.some((memberType) => isValueOfType(value, memberType))
 	} else if (type.type === "Function") {

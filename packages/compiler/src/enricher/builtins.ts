@@ -339,6 +339,15 @@ export const builtinTypeOrder: Array<string> = [
 	// `Generatable::generate` and goes nowhere else. Listing it earlier would
 	// put it in front of Types in every Completion of an annotation.
 	"Randomness",
+	// NOTE: Last, and the two together in the order a Program meets them: a
+	// `Future` is what a completing body declares and what every Method that
+	// answers work hands back, and a `Started` is what `start` turns one into.
+	// They share not one name with anything above — `closestMatch` breaks a tie
+	// on the FIRST candidate and there is no tie here to break — so the position
+	// decides only where an annotation's Completion offers them, which is after
+	// every Type a value is made of.
+	"Future",
+	"Started",
 ]
 
 // NOTE: The third table's order, stated for the same reason as the two above.

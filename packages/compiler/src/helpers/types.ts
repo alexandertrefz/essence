@@ -559,6 +559,24 @@ export function applyGenericBindings(
 				? type
 				: { type: "List", itemType }
 		}
+		// NOTE: The one slot a Future has, substituted exactly as a List's item
+		// Type is — `Future<Value>` is what a `namespace Future<infer Value>`
+		// reads its Parameter off, so a Method of one is resolved by the same
+		// machinery every other container's is.
+		case "Future": {
+			let valueType = applyGenericBindings(type.valueType, bindings)
+
+			return valueType === type.valueType
+				? type
+				: { type: "Future", valueType }
+		}
+		case "Started": {
+			let valueType = applyGenericBindings(type.valueType, bindings)
+
+			return valueType === type.valueType
+				? type
+				: { type: "Started", valueType }
+		}
 		// NOTE: Both slots substituted, and the identity check asks about both:
 		// a `Dictionary<String, T>` comes back as itself while `T` is unbound,
 		// which is what keeps a Type nothing changed comparing by reference for
@@ -1435,6 +1453,14 @@ export function typeContainsUnknown(type: common.Type): boolean {
 			return true
 		case "List":
 			return typeContainsUnknown(type.itemType)
+		// NOTE: And the two asynchronous containers, whose bare spelling IS
+		// `Future<Unknown>` — there is no second Type standing for the
+		// unapplied form, because no Expression builds a Future out of nothing
+		// and so nothing leaves an item slot legitimately open. A Future
+		// nobody decided the answer Type of is undecided, full stop.
+		case "Future":
+		case "Started":
+			return typeContainsUnknown(type.valueType)
 		// NOTE: Either slot undecided leaves the Type undecided — there is one
 		// answer to "is anything here still open?", and two slots to ask it of.
 		// `GenericDictionary` is left out for the reason a bare `List` is: its
@@ -1494,6 +1520,23 @@ export function resolveUnknownSlots(
 				return itemType === stored.itemType
 					? stored
 					: { type: "List", itemType }
+			}
+
+			// NOTE: The one slot each, pinned the way a List's item Type is.
+			if (stored.type === "Future" && value.type === "Future") {
+				let valueType = resolve(stored.valueType, value.valueType)
+
+				return valueType === stored.valueType
+					? stored
+					: { type: "Future", valueType }
+			}
+
+			if (stored.type === "Started" && value.type === "Started") {
+				let valueType = resolve(stored.valueType, value.valueType)
+
+				return valueType === stored.valueType
+					? stored
+					: { type: "Started", valueType }
 			}
 
 			// NOTE: Each slot pinned INDEPENDENTLY, which is the whole of what
@@ -1817,6 +1860,13 @@ function isLessSpecific(left: common.Type, right: common.Type): boolean {
 
 	if (left.type === "List" && right.type === "List") {
 		return isLessSpecific(left.itemType, right.itemType)
+	}
+
+	if (
+		(left.type === "Future" && right.type === "Future") ||
+		(left.type === "Started" && right.type === "Started")
+	) {
+		return isLessSpecific(left.valueType, right.valueType)
 	}
 
 	// NOTE: Slot-wise, and it takes only ONE slot to say less — a
@@ -2201,6 +2251,19 @@ function matchTypes(
 			(rhs.valueType.type === "Unknown" ||
 				matchTypes(lhs.valueType, rhs.valueType, context, NESTED))
 		)
+	}
+
+	// NOTE: Covariant in the one slot, which is the only variance a Future can
+	// have: it is a producer and nothing ever writes a value INTO one. The bare
+	// spelling needs no rule of its own — `Future` is `Future<Unknown>`, and the
+	// Unknown rule above accepts every Future while promising nothing, which is
+	// exactly what a bare `List` does.
+	if (lhs.type === "Future" && rhs.type === "Future") {
+		return matchTypes(lhs.valueType, rhs.valueType, context, NESTED)
+	}
+
+	if (lhs.type === "Started" && rhs.type === "Started") {
+		return matchTypes(lhs.valueType, rhs.valueType, context, NESTED)
 	}
 
 	if (lhs.type === "String" && rhs.type === "String") {

@@ -411,6 +411,20 @@ function describeBody(
 				why: `${shown} is a Namespace rather than a value — there is nothing on the JavaScript side to build one from.`,
 				shown,
 			}
+		// NOTE: Asynchrony has no door yet. A Future is a description of work
+		// and a Started is one run of it, and both carry a context that decides
+		// when the work stops — so crossing one means deciding what a JavaScript
+		// `Promise` handed in is a description OF, and which side owns the
+		// stopping. Refused by name rather than through the fallthrough below,
+		// because that message says a mapping is missing and this one is a
+		// design that has not been taken.
+		case "Future":
+		case "Started":
+			return {
+				kind: "refused",
+				why: `${shown} is asynchronous work, which does not cross the boundary yet — hand the value it answers with over instead.`,
+				shown,
+			}
 		// NOTE: The numeric tower above Rational, for now, and whatever else
 		// arrives before its mapping does.
 		default:

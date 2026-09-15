@@ -543,6 +543,35 @@ export type RandomnessType = {
 	type: "Randomness"
 }
 
+// NOTE: A description of work that will answer with a `Value`, and the first
+// opaque Type of the language that holds another. Building one runs nothing —
+// `start` puts it in flight and `complete` waits for what it answers — so a
+// Future is as inert as the Record it could have been, and nothing a Program
+// writes can read what it describes. It is generic where `Randomness` is bare
+// because what the work ANSWERS is the whole of what a Future is worth saying
+// about; the description itself is the runtime's business.
+//
+// NOTE: An UNAPPLIED `Future` is `Future<Unknown>` and not a container Type of
+// its own, which is the one place it parts from `List`. `GenericList` exists
+// because an empty List Literal has to be assignable to every List, and no
+// Expression builds a Future out of nothing — a bare `Future` is a slot nobody
+// decided, which is what `Unknown` already says. `matchTypes` then answers the
+// bare form exactly as it answers a bare `List`: it accepts every Future and is
+// accepted by none.
+export type FutureType = {
+	type: "Future"
+	valueType: Type
+}
+
+// NOTE: One execution of a Future, already in flight. `start` answers one and
+// `complete` reads it, any number of times and from anywhere, always the same
+// value — so a Started is the "run once, read many" half of the pair, and a
+// Future the "run as often as you like" half.
+export type StartedType = {
+	type: "Started"
+	valueType: Type
+}
+
 export type RecordType = {
 	type: "Record"
 	members: Record<string, Type>
@@ -771,6 +800,8 @@ export type PrimitiveType =
 	| AlgebraicType
 	| TranscendentalType
 	| RandomnessType
+	| FutureType
+	| StartedType
 	| RecordType
 	| CaseType
 	| ListType

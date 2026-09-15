@@ -55,6 +55,14 @@ export function printType(type: common.Type): string {
 			return `List<${printType(type.itemType)}>`
 		case "GenericList":
 			return "List"
+		// NOTE: The bare spelling falls out of the applied one — an unapplied
+		// `Future` is `Future<Unknown>`, and `Unknown` prints as itself
+		// through the fallthrough below, so a Hover over one reads
+		// `Future<Unknown>` and says exactly what is undecided about it.
+		case "Future":
+			return `Future<${printType(type.valueType)}>`
+		case "Started":
+			return `Started<${printType(type.valueType)}>`
 		case "Dictionary":
 			return `Dictionary<${printType(type.keyType)}, ${printType(
 				type.valueType,

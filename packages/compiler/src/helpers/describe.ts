@@ -109,6 +109,10 @@ export function describeType(type: common.Type): string {
 			return `List<${describeType(type.itemType)}>`
 		case "GenericList":
 			return "List"
+		case "Future":
+			return `Future<${describeType(type.valueType)}>`
+		case "Started":
+			return `Started<${describeType(type.valueType)}>`
 		case "Dictionary":
 			return `Dictionary<${describeType(type.keyType)}, ${describeType(
 				type.valueType,

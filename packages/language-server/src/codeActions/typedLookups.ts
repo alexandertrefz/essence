@@ -57,6 +57,9 @@ export function isSpellableType(type: common.Type): boolean {
 			return true
 		case "List":
 			return isSpellableType(type.itemType)
+		case "Future":
+		case "Started":
+			return isSpellableType(type.valueType)
 		case "Dictionary":
 			return (
 				isSpellableType(type.keyType) && isSpellableType(type.valueType)
