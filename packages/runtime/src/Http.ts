@@ -220,16 +220,36 @@ function headersOf(
 // back, which is what makes the lookup case-insensitive without a second
 // vocabulary.
 //
-// NOTE: `Headers` has already folded a name sent twice into one entry, so no
-// key here can repeat. That is what lets this build a Dictionary rather than
-// answer which entry collided.
+// NOTE: `Headers` folds a name sent twice into ONE entry, joined with ", " —
+// for every name but `set-cookie`, which the Fetch standard exempts, so an
+// answer carrying two cookies iterates as two `set-cookie` pairs. A Dictionary
+// has one value per key, so the second would overwrite the first and the first
+// would be gone with nothing said anywhere. Folded here the way the host folds
+// every other name instead: what a Program reads is what it would have read had
+// the host done the folding.
+//
+// NOTE: A joined `set-cookie` is not splittable back — a cookie's `Expires`
+// holds a comma of its own — so what this keeps is the fact that a second
+// cookie was sent, not a way to read the two apart. A reader of its own over
+// `getSetCookie()` is what that would take, and it is not what this answers.
 function answeredHeaders(
 	answered: Response,
 ): DictionaryType<StringType, StringType> {
 	let entries: Array<[StringType, StringType]> = []
+	let seen = new Map<string, number>()
 
 	answered.headers.forEach((value, name) => {
-		entries.push([createString(name.toLowerCase()), createString(value)])
+		let key = name.toLowerCase()
+		let at = seen.get(key)
+
+		if (at === undefined) {
+			seen.set(key, entries.length)
+			entries.push([createString(key), createString(value)])
+
+			return
+		}
+
+		entries[at]![1] = createString(`${entries[at]![1].value}, ${value}`)
 	})
 
 	return createDictionary(entries, headerKeys)

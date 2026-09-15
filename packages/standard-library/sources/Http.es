@@ -113,6 +113,8 @@ declarations {
 	§§
 	§§ The header keys are lowercase, which is what makes a Dictionary the right shape for them. HTTP header names do not differ by case, and `header(named:)` reads one under any spelling.
 	§§
+	§§ A name a host sent twice is one entry, with its values joined by `, `. That is what a host does to every header name on its own, and a `set-cookie` sent twice is joined here the same way — so two cookies can not be read apart again, because a cookie's `Expires` holds a comma of its own.
+	§§
 	§§ The body is text. A host answering bytes that are not text answers `#InvalidBody` instead of a Response.
 	type Response = {
 		status: Integer,

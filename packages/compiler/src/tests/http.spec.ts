@@ -98,6 +98,20 @@ beforeAll(() => {
 				return new Response("gone", { status: 404 })
 			}
 
+			// NOTE: A name sent twice, in both shapes the Fetch standard
+			// distinguishes: `Headers` folds `x-repeated` itself, and exempts
+			// `set-cookie`, which iterates as one pair per cookie.
+			if (url.pathname === "/repeated") {
+				let answer = new Response("repeated", { status: 200 })
+
+				answer.headers.append("set-cookie", "a=1; Path=/")
+				answer.headers.append("set-cookie", "b=2; Path=/")
+				answer.headers.append("x-repeated", "one")
+				answer.headers.append("x-repeated", "two")
+
+				return answer
+			}
+
 			if (url.pathname === "/slow") {
 				await new Promise<void>((resolve) => {
 					let timer = setTimeout(resolve, 30_000)
@@ -278,6 +292,28 @@ describe("Http", () => {
 		])
 		expect(output[4]).toContain("x-custom")
 		expect(output[4]).not.toContain("X-Custom")
+	})
+
+	// NOTE: The one name a host may answer twice on the wire. A Dictionary holds
+	// one value per key, so the second cookie would have overwritten the first
+	// and the first would have been gone with nothing said anywhere.
+	it("folds a header a host sent twice, cookies included", async () => {
+		let output = await run(
+			program(`	constant answered = complete Http.get("${base}/repeated")
+
+	match answered -> {} {
+		case #Value(response) {
+			Terminal.print(response::header(named "set-cookie"))
+			Terminal.print(response::header(named "x-repeated"))
+		}
+		case #Failure(reason) { Terminal.print(reason) }
+	}`),
+		)
+
+		expect(output).toEqual([
+			'Value("a=1; Path=/, b=2; Path=/")',
+			'Value("one, two")',
+		])
 	})
 
 	it("answers a status that failed as a Response rather than a failure", async () => {
