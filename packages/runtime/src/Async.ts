@@ -1,4 +1,4 @@
-import { type Context, type FutureType, of } from "./Future"
+import { type Context, delayOf, type FutureType, of, waitFor } from "./Future"
 import type { IntegerType } from "./Integer"
 import type { RecordType } from "./Record"
 import { type AnyType, typeKeySymbol } from "./type"
@@ -51,16 +51,11 @@ export function sleep(duration: IntegerType): FutureType<RecordType> {
 					return
 				}
 
-				let timer = setTimeout(
-					() => resolve(unit),
-					Number(duration.value),
-				)
+				let finished = waitFor(delayOf(duration), () => resolve(unit))
 
-				context.signal.addEventListener(
-					"abort",
-					() => clearTimeout(timer),
-					{ once: true },
-				)
+				context.signal.addEventListener("abort", finished, {
+					once: true,
+				})
 			}),
 	)
 }

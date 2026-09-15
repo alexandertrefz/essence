@@ -1,4 +1,4 @@
-import type { StartedType } from "./Future"
+import { delayOf, type StartedType, waitFor } from "./Future"
 import type { IntegerType } from "./Integer"
 import type { OptionalType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
@@ -44,18 +44,15 @@ export function within<Value extends AnyType>(
 	limit: IntegerType,
 ): StartedType<OptionalType<Value>> {
 	let promise = new Promise<OptionalType<Value>>((resolve, reject) => {
-		let timer = setTimeout(
-			() => resolve(createEmpty()),
-			Number(limit.value),
-		)
+		let finished = waitFor(delayOf(limit), () => resolve(createEmpty()))
 
 		run.promise.then(
 			(value) => {
-				clearTimeout(timer)
+				finished()
 				resolve(createValue(value))
 			},
 			(thrown) => {
-				clearTimeout(timer)
+				finished()
 				reject(thrown)
 			},
 		)

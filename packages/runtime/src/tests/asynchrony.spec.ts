@@ -1,6 +1,16 @@
 import { describe, expect, test } from "bun:test"
 
-import { complete, type Context, firstValue, of, root, start } from "../Future"
+import {
+	complete,
+	type Context,
+	delayOf,
+	firstValue,
+	of,
+	root,
+	start,
+	waitFor,
+	within,
+} from "../Future"
 import { createInteger, type IntegerType } from "../Integer"
 import { createList } from "../List"
 import { createFailure, createValue } from "../Result"
@@ -217,6 +227,66 @@ describe("completing work", () => {
 			await expect(complete(started, root())).rejects.toThrow(
 				"bug in a native",
 			)
+		})
+	})
+})
+
+describe("a length of time", () => {
+	// NOTE: A host keeps a timer's delay in a 32-bit signed integer and fires an
+	// overflowed one at ONE millisecond. An Essence Integer is unbounded, so the
+	// generous deadline is exactly the one that would arrive at once.
+	test("is spent in slices no longer than a host takes", () => {
+		let armed: Array<number> = []
+		let host = globalThis.setTimeout
+		let answered = 0
+
+		// NOTE: Fired at once rather than waited for — what is under test is
+		// the slicing, and three seconds of real time is not a test.
+		// @ts-expect-error — a stand-in that answers with no handle
+		globalThis.setTimeout = (fire: () => void, delay: number) => {
+			armed.push(delay)
+			fire()
+
+			return 0
+		}
+
+		try {
+			waitFor(3_000_000_000, () => {
+				answered += 1
+			})
+		} finally {
+			globalThis.setTimeout = host
+		}
+
+		expect(armed).toEqual([2147483647, 852516353])
+		expect(answered).toBe(1)
+	})
+
+	test("is no time at all where it is negative, and never where it is past counting", () => {
+		expect(delayOf(createInteger(-5n))).toBe(0)
+		expect(delayOf(createInteger(20n))).toBe(20)
+		expect(delayOf(createInteger(10n ** 30n))).toBe(1e30)
+		expect(delayOf(createInteger(10n ** 400n))).toBe(Infinity)
+	})
+
+	// NOTE: End to end, because the two halves are only worth anything
+	// together: a deadline past what a host takes has to leave the work alone
+	// rather than stop it in the next millisecond.
+	test("leaves a run alone under a deadline longer than a host takes", async () => {
+		await onEachHostAsync(async () => {
+			let answer = await complete(
+				within(
+					of(async () => {
+						await pause(20)
+
+						return createString("answered")
+					}),
+					createInteger(2147483648n),
+				),
+				root(),
+			)
+
+			expect(answer[typeKeySymbol]).toBe("Optional#Value")
 		})
 	})
 })

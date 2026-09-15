@@ -256,6 +256,48 @@ export function complete<Value>(
 	return runUnder(work, childOf(context))
 }
 
+// #region Timers
+
+// NOTE: The longest delay a host timer takes. `setTimeout` keeps its delay in a
+// 32-bit signed integer, so anything past this overflows — and what a host does
+// with an overflowed delay is fire at ONE millisecond, with a warning printed
+// into the Program's own output. An Essence Integer is unbounded and no `@param`
+// here names a ceiling, so a deadline a Program means generously is exactly the
+// one that would arrive at once.
+const LONGEST_DELAY = 2147483647
+
+// NOTE: The milliseconds a limit asks for, as a number a timer can be armed
+// with. An Integer is hybrid — a small one holds a `number` and a large one a
+// `bigint` — and a `bigint` past 2^53 answers `Infinity` through `Number`,
+// which is honest: a wait that long is a wait with no end. A negative length is
+// no time at all rather than a host warning about a negative delay.
+export function delayOf(limit: IntegerType): number {
+	let milliseconds = Number(limit.value)
+
+	return Number.isFinite(milliseconds) ? Math.max(0, milliseconds) : Infinity
+}
+
+// NOTE: A timer armed in chunks no longer than a host takes, re-armed until the
+// time asked for is spent — which is what keeps a long deadline long. `Infinity`
+// never spends, so a wait with no end re-arms forever and answers never, which
+// is what it says. Answers the way to call it off.
+export function waitFor(delay: number, answer: () => void): () => void {
+	let remaining = delay
+	let timer: ReturnType<typeof setTimeout> | undefined
+	let arm = (): void => {
+		let slice = Math.min(remaining, LONGEST_DELAY)
+
+		remaining -= slice
+		timer = setTimeout(remaining > 0 ? arm : answer, slice)
+	}
+
+	arm()
+
+	return () => clearTimeout(timer)
+}
+
+// #endregion
+
 // #region The combinators
 
 // NOTE: `Future::within(milliseconds limit)` — the receiver, run under a
@@ -275,11 +317,10 @@ export function within<Value extends AnyType>(
 		(context) =>
 			new Promise((resolve, reject) => {
 				let started = start(work, context)
-				let timer = setTimeout(() => {
+				let finished = waitFor(delayOf(limit), () => {
 					started.controller.abort()
 					resolve(createEmpty())
-				}, Number(limit.value))
-				let finished = (): void => clearTimeout(timer)
+				})
 
 				// NOTE: And the deadline goes when the run above it does. A
 				// timer left behind holds a host with an event loop open for as
