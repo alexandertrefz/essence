@@ -100,24 +100,97 @@ export function root(): Context {
 
 // NOTE: A context that is stopped when its parent is, and separately stoppable
 // on its own — which is what `::within` and `::race` stop their losers through.
+// `release` is what unlinks it from its parent once its own run is over; see
+// `childOf`.
+type Child = {
+	context: Context
+	release: () => void
+}
+
+// NOTE: `AbortSignal.any([parent.signal, own.signal])` is exactly this union,
+// and it is taken where the host has one: the engine owns the bookkeeping, and a
+// dependent signal nothing holds any more is collected with the run it belonged
+// to. It arrived in Node 20.3, Bun 1.1, Deno 1.39 and Safari 17.4, so a host
+// without one is a host this runtime still has to answer on — hence the
+// fallback below, and hence the probe, which is read PER CALL for the reason
+// `Terminal.ts` probes its streams per write: a read at the top of this module
+// is a side effect esbuild has to keep, and a Program that waits for nothing
+// would pay for it.
 //
-// NOTE: Hand-rolled rather than `AbortSignal.any([parent.signal, own.signal])`,
-// which is not on every host this runtime targets. The linking is one listener,
-// registered `once`, and it is dropped as soon as either side fires.
-function childOf(parent: Context): Context {
+// NOTE: The fallback is one listener, and `release` is what takes it off again.
+// Without that, every start under one context leaves a listener on it that lives
+// as long as the context does — a loop starting a thousand futures under a
+// Program's root context would hold a thousand of them, all for runs that
+// finished. `AbortSignal.any` needs no release, because there is nothing of ours
+// to take off.
+function childOf(parent: Context): Child {
 	let controller = new AbortController()
+
+	if (typeof AbortSignal.any === "function") {
+		return {
+			context: {
+				signal: AbortSignal.any([parent.signal, controller.signal]),
+				controller,
+			},
+			release: () => {},
+		}
+	}
 
 	if (parent.signal.aborted) {
 		controller.abort(parent.signal.reason)
-	} else {
-		parent.signal.addEventListener(
-			"abort",
-			() => controller.abort(parent.signal.reason),
-			{ once: true },
-		)
+
+		return {
+			context: { signal: controller.signal, controller },
+			release: () => {},
+		}
 	}
 
-	return { signal: controller.signal, controller }
+	let forward = () => controller.abort(parent.signal.reason)
+
+	parent.signal.addEventListener("abort", forward, { once: true })
+
+	return {
+		context: { signal: controller.signal, controller },
+		release: () => parent.signal.removeEventListener("abort", forward),
+	}
+}
+
+// NOTE: One run of a description, under a context of its own, as the promise it
+// answers with. The release is what the run is over: a run that finished can no
+// longer be stopped, so holding its link to the parent open would be holding it
+// open for nothing.
+//
+// NOTE: A throw out of `run` is kept ON THE PROMISE rather than raised here. A
+// future can not FAIL — a failure is a value in this language, carried by a
+// Result — so a throw is a bug in the Compiler or in a native, and raising it
+// would surface it at the `start`, which is not where the work is, and would
+// escape a `start` written for its effects entirely.
+function runUnder<Value>(
+	work: FutureType<Value>,
+	child: Child,
+): Promise<Value> {
+	let answered: Value | Promise<Value>
+
+	try {
+		answered = work.run(child.context)
+	} catch (thrown) {
+		child.release()
+
+		return Promise.reject(thrown)
+	}
+
+	return Promise.resolve(answered).then(
+		(value) => {
+			child.release()
+
+			return value
+		},
+		(thrown) => {
+			child.release()
+
+			throw thrown
+		},
+	)
 }
 
 // NOTE: `start x` — the description put in flight under a context of its own,
@@ -147,24 +220,11 @@ export function start<Value>(
 	}
 
 	let child = childOf(context)
-	let promise: Promise<Value>
-
-	try {
-		promise = Promise.resolve(work.run(child))
-	} catch (thrown) {
-		// NOTE: A future can not FAIL — a failure is a value in this language,
-		// carried by a Result — so a throw out of `run` is a bug in the
-		// Compiler or in a native, and it is kept on the promise rather than
-		// raised here. Raised, it would surface at the `start`, which is not
-		// where the work is, and it would escape a `start` written for its
-		// effects entirely.
-		promise = Promise.reject(thrown)
-	}
 
 	return {
 		[typeKeySymbol]: "Started",
-		promise,
-		controller: child.controller,
+		promise: runUnder(work, child),
+		controller: child.context.controller,
 	}
 }
 
@@ -188,5 +248,5 @@ export function complete<Value>(
 
 	registerFutureKinds()
 
-	return work.run(childOf(context))
+	return runUnder(work, childOf(context))
 }
