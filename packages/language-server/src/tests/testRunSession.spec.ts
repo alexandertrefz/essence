@@ -278,20 +278,12 @@ describe("The Server's live test session", () => {
 			return session.waitForTestRun(result.run as number)
 		}
 
-		// NOTE: And asked AGAIN where that number was not this request's. A
-		// request landing while a run is in flight is folded into it: the
-		// session answers with the run already going and remembers the file
-		// without the ids, so the batch that ends is the whole file's. Opening a
-		// file defers a cycle behind the debounce, and that deferred cycle is
-		// the run that can be in flight here — on a machine loaded enough for
-		// the window to pass while the two requests above are in the air. Once
-		// it has ended nothing is running and nothing is armed for another
-		// debounce, so the second ask can not be folded in its turn.
+		// NOTE: Once, however loaded the machine is. A request landing while a
+		// run is in flight used to be folded into it with only its entries
+		// kept, so the batch that ended was the whole file's and this had to
+		// ask a second time — the session now remembers the request whole and
+		// runs the next cycle AS that request.
 		let ended = await ask()
-
-		if (ended.ids.length === 0) {
-			ended = await ask()
-		}
 
 		expect(ended.ids).toHaveLength(1)
 

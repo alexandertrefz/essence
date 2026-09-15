@@ -256,6 +256,163 @@ describe("A session whose run never ends", () => {
 	}, 60_000)
 })
 
+// NOTE: A request that lands while a run is in flight is DEFERRED rather than
+// cancelling it — the compile in flight is nearly always about to answer the
+// same question. What the fold used to keep was the request's entries and
+// nothing else: which tests it named, whether it was an accept, and that it was
+// a request at all were all thrown away. So a Run lens ran the whole file, an
+// accepted snapshot rewrote nothing, and a session switched off dropped the
+// click, because the reason had been downgraded to `change`.
+//
+// NOTE: Each pair of requests below is issued SYNCHRONOUSLY, which is what makes
+// this deterministic rather than a race: `inFlight` is assigned inside `start`
+// before it returns, so the second call of the pair is always the folded one.
+describe("A session asked for one test while a run is in flight", () => {
+	const twoTests = [
+		"tests {",
+		'\ttest "alpha" {',
+		"\t\texpect true",
+		"\t}",
+		"",
+		'\ttest "beta" {',
+		"\t\texpect true",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	function watching(file: string): {
+		session: TestSession
+		ends: () => Array<TestRunNotification>
+		rewrites: Array<{ module: string }>
+		waitFor: (count: number) => Promise<void>
+	} {
+		let notifications: Array<TestRunNotification> = []
+		let rewrites: Array<{ module: string }> = []
+		let session = createTestSession({
+			settingsFor: projectSettings(),
+			testFiles: () => [file],
+			dependentsOf: (filePath) => [filePath],
+			overlays: () => ({}),
+			notify: (notification) => notifications.push(notification),
+			onResults: () => {},
+			onRewrites: (written) => rewrites.push(...written),
+			debounce: 20,
+		})
+		let ends = () =>
+			notifications.filter((notification) => notification.kind === "end")
+
+		return {
+			session,
+			ends,
+			rewrites,
+			waitFor: async (count) => {
+				let until = Date.now() + 30_000
+
+				while (ends().length < count && Date.now() < until) {
+					await new Promise((resolve) => setTimeout(resolve, 25))
+				}
+			},
+		}
+	}
+
+	it("runs the cycle after it as the request it deferred", async () => {
+		let file = path.join(root, "Deferred.tests.es")
+
+		writeFileSync(file, twoTests)
+
+		let { session, ends, waitFor } = watching(file)
+
+		try {
+			session.run({ files: [file] })
+
+			await waitFor(1)
+
+			let beta = session
+				.records()
+				.find((record) => record.name === "beta")?.id
+
+			expect(beta).toBeString()
+
+			session.run({ files: [file] })
+			session.run({ ids: [beta as string], files: [file] })
+
+			await waitFor(3)
+
+			let last = ends().at(-1)
+
+			expect(last?.reason).toBe("request")
+			expect(last?.ids).toEqual([beta as string])
+			expect(last?.counts.passed).toBe(1)
+		} finally {
+			await session.dispose()
+			rmSync(file, { force: true })
+		}
+	}, 60_000)
+
+	it("keeps an accept a deferred request asked for", async () => {
+		let file = path.join(root, "DeferredSnapshot.tests.es")
+
+		writeFileSync(
+			file,
+			[
+				"tests {",
+				'\ttest "renders" {',
+				'\t\texpect "Lions" matches snapshot',
+				"\t}",
+				"}",
+				"",
+			].join("\n"),
+		)
+
+		let { session, rewrites, waitFor } = watching(file)
+
+		try {
+			session.run({ files: [file] })
+			session.run({ files: [file], update: true })
+
+			await waitFor(2)
+
+			let until = Date.now() + 30_000
+
+			while (rewrites.length === 0 && Date.now() < until) {
+				await new Promise((resolve) => setTimeout(resolve, 25))
+			}
+
+			expect(rewrites).toHaveLength(1)
+			expect(rewrites[0]?.module).toBe(file)
+		} finally {
+			await session.dispose()
+			rmSync(file, { force: true })
+		}
+	}, 60_000)
+
+	// NOTE: A switched-off session runs nothing by itself and runs what it is
+	// ASKED for — `enabled` declines the automatic half. A deferred request
+	// whose reason was downgraded to `change` met that very guard and was
+	// dropped, so the second click did nothing at all.
+	it("still answers a deferred request while switched off", async () => {
+		let file = path.join(root, "DeferredOff.tests.es")
+
+		writeFileSync(file, twoTests)
+
+		let { session, ends, waitFor } = watching(file)
+
+		try {
+			session.setEnabled(false)
+			session.run({ files: [file] })
+			session.run({ files: [file] })
+
+			await waitFor(2)
+
+			expect(ends()).toHaveLength(2)
+		} finally {
+			await session.dispose()
+			rmSync(file, { force: true })
+		}
+	}, 60_000)
+})
+
 describe("A session asked to accept a snapshot", () => {
 	const snapshots = [
 		"tests {",

@@ -148,6 +148,27 @@ function defaultWorkerPath(): string {
 		: fileURLToPath(new URL("./testWorker.ts", import.meta.url))
 }
 
+// NOTE: What a deferred request still asks for, folded across however many
+// arrived while one run was in flight. `whole` outranks `ids`: a request for a
+// file and a request for one of its tests together are a request for the file.
+type PendingRequest = {
+	entries: Set<string>
+	ids: Set<string>
+	whole: boolean
+	update: boolean
+	requested: boolean
+}
+
+function freshPending(): PendingRequest {
+	return {
+		entries: new Set(),
+		ids: new Set(),
+		whole: false,
+		update: false,
+		requested: false,
+	}
+}
+
 export function createTestSession(options: TestSessionOptions): TestSession {
 	let workerPath = options.workerPath ?? defaultWorkerPath()
 	let debounce = options.debounce ?? debounceInMilliseconds
@@ -179,6 +200,14 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 	// and a keystroke may not pay for that — the whole point of the debounce is
 	// that a burst costs one answer rather than one per character.
 	let changedFiles = new Set<string>()
+	// NOTE: A REQUEST that arrived while a run was in flight, remembered whole.
+	// Folding one into `dirty` alone kept its entries and threw away everything
+	// else it said: which tests it named, whether it was an accept, and that it
+	// was a request at all. So a Run lens ran the whole file, an accepted
+	// snapshot rewrote nothing, and a session switched off dropped the click —
+	// the reason had been downgraded to `change`, which a switched-off session
+	// declines.
+	let pending = freshPending()
 	let timer: ReturnType<typeof setTimeout> | null = null
 	// NOTE: The run in flight's own clock. Armed with the run and cleared when
 	// it answers, so that a cycle that never answers ends anyway.
@@ -490,11 +519,25 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		if (inFlight !== null) {
 			// NOTE: A run is already going. Cancelling it means terminating the
 			// Worker, which throws away a compile that is nearly always about
-			// to answer the same question — so the entries are remembered and
-			// taken as soon as it is done.
+			// to answer the same question — so the request is remembered and
+			// taken as soon as it is done. WHOLE: its entries reach `dirty`,
+			// which is what the next cycle runs, and everything else it said
+			// reaches `pending`, which is what that cycle is run AS.
 			for (let entry of entries) {
 				dirty.add(entry)
+				pending.entries.add(entry)
 			}
+
+			if (ids.length === 0) {
+				pending.whole = true
+			} else {
+				for (let id of ids) {
+					pending.ids.add(id)
+				}
+			}
+
+			pending.update ||= update
+			pending.requested ||= reason === "request"
 
 			return inFlight.run
 		}
@@ -608,8 +651,10 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 
 			let known = new Set(testFiles())
 			let changed = [...changedFiles]
+			let waiting = pending
 
 			changedFiles.clear()
+			pending = freshPending()
 
 			// NOTE: Whatever was already waiting — an update re-run, entries a
 			// run in flight deferred — is NOT this window's change, and a cycle
@@ -644,7 +689,25 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			let ids =
 				deferred.size === 0 ? narrowingFor(entries, changed) : null
 
-			start(entries, "change", ids ?? [])
+			// NOTE: The request's own narrowing, and only where this cycle is
+			// exactly what the request asked for. An entry that joined for
+			// another reason would otherwise be run narrowed to tests that are
+			// not in it, which is an entry going untested.
+			let asked =
+				waiting.requested &&
+				!waiting.whole &&
+				waiting.ids.size > 0 &&
+				entries.length === waiting.entries.size &&
+				entries.every((entry) => waiting.entries.has(entry))
+					? [...waiting.ids]
+					: null
+
+			start(
+				entries,
+				waiting.requested ? "request" : "change",
+				asked ?? ids ?? [],
+				waiting.update,
+			)
 		}, debounce)
 	}
 
@@ -789,6 +852,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 
 			if (!enabled) {
 				dirty.clear()
+				pending = freshPending()
 
 				if (timer !== null) {
 					clearTimeout(timer)
