@@ -1,8 +1,8 @@
-import { delayOf, type StartedType, waitFor } from "./Future"
+import { delayOf, started, type StartedType, waitFor } from "./Future"
 import type { IntegerType } from "./Integer"
 import type { OptionalType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
-import { type AnyType, typeKeySymbol } from "./type"
+import type { AnyType } from "./type"
 
 // NOTE: `Started` is one RUN of a Future, and everything that builds, starts or
 // waits for one lives in `Future.ts` — the two are one mechanism, and a run has
@@ -22,11 +22,7 @@ export function map<Value extends AnyType, Other extends AnyType>(
 	run: StartedType<Value>,
 	transform: (value: Value) => Other,
 ): StartedType<Other> {
-	return {
-		[typeKeySymbol]: "Started",
-		promise: run.promise.then(transform),
-		controller: run.controller,
-	}
+	return started(run.promise.then(transform), run.controller)
 }
 
 // NOTE: `Started::within(milliseconds limit)` — a deadline on the WAITING, and
@@ -58,9 +54,5 @@ export function within<Value extends AnyType>(
 		)
 	})
 
-	return {
-		[typeKeySymbol]: "Started",
-		promise,
-		controller: run.controller,
-	}
+	return started(promise, run.controller)
 }

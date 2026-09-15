@@ -275,6 +275,29 @@ function runUnder<Value>(
 	)
 }
 
+// NOTE: The one door every Started is built through. A run nobody completes is
+// what `start` in Statement position MEANS — `unobserved-started` is an
+// Information, not a refusal — so a throw out of such a run has no reader, and
+// left alone it reaches the host's unhandled-rejection hook, which on Node
+// raises and ends the Program and on Bun prints a stack and exits 1. A Program
+// that forgets a run on purpose may not take the process with it.
+//
+// Marking the promise read takes nothing away: every later `complete` of this
+// Started awaits the SAME promise and sees the same throw, because a handler
+// attached to a rejected promise is what marks it, not what consumes it.
+//
+// NOTE: Here rather than in `start` alone, because a Started is built at three
+// doors — `start`, `Started::map` and `Started::within` — and the derived
+// promises the last two build are separate promises nothing else marks.
+export function started<Value>(
+	promise: Promise<Value>,
+	controller: AbortController,
+): StartedType<Value> {
+	promise.catch(() => {})
+
+	return { [typeKeySymbol]: "Started", promise, controller }
+}
+
 // NOTE: `start x` — the description put in flight under a context of its own,
 // answering the one run of it. `run` is called SYNCHRONOUSLY, so a future with
 // nothing to wait for inside it is finished before `start` answers; what comes
@@ -303,11 +326,7 @@ export function start<Value>(
 
 	let child = childOf(context)
 
-	return {
-		[typeKeySymbol]: "Started",
-		promise: runUnder(work, child),
-		controller: child.context.controller,
-	}
+	return started(runUnder(work, child), child.context.controller)
 }
 
 // NOTE: `complete x` — what the emission `await`s. A Started is waited for

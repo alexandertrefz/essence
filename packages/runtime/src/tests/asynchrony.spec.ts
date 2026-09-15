@@ -14,6 +14,7 @@ import {
 import { createInteger, type IntegerType } from "../Integer"
 import { createList } from "../List"
 import { createFailure, createValue } from "../Result"
+import { map, within as startedWithin } from "../Started"
 import { createString, type StringType } from "../String"
 import { typeKeySymbol } from "../type"
 
@@ -52,6 +53,10 @@ function pause(milliseconds: number): Promise<void> {
 }
 
 const endlessly = () => new Promise<never>(() => {})
+
+const throwing = (): never => {
+	throw new Error("bug in a native")
+}
 
 // NOTE: The abort listeners a run leaves on the context it was started in,
 // counted by standing in front of the signal's own two Methods. Awaited past a
@@ -372,6 +377,50 @@ describe("a length of time", () => {
 
 			expect(answer[typeKeySymbol]).toBe("Optional#Value")
 		})
+	})
+})
+
+describe("a run nobody completes", () => {
+	// NOTE: A `start` in Statement position is fire-and-forget, which the
+	// Compiler reports once as an Information and allows. So a throw out of such
+	// a run has no reader — and a rejected promise with no reader is what a host
+	// raises on: Node ends the Program where it stands and Bun prints a stack
+	// and exits 1. A Program that forgets a run on purpose may not take the
+	// process with it.
+	//
+	// NOTE: Three doors, because a Started is built at three of them and the two
+	// derived promises are promises of their own that nothing else marks.
+	test("does not reach the host's unhandled-rejection hook", async () => {
+		let unhandled: Array<unknown> = []
+		let seen = (reason: unknown): void => {
+			unhandled.push(reason)
+		}
+
+		process.on("unhandledRejection", seen)
+
+		try {
+			start(of(throwing), root())
+			map(start(of(throwing), root()), (value) => value)
+			startedWithin(start(of(throwing), root()), createInteger(1000n))
+
+			await pause(20)
+		} finally {
+			process.off("unhandledRejection", seen)
+		}
+
+		expect(unhandled).toEqual([])
+	})
+
+	// NOTE: And the mark takes nothing away. A handler attached to a rejected
+	// promise is what marks it read, not what consumes it, so the throw is
+	// still there for whoever completes the run later.
+	test("still throws where it is completed later", async () => {
+		let started = start(of(throwing), root())
+
+		await pause(20)
+		await expect(complete(started, root())).rejects.toThrow(
+			"bug in a native",
+		)
 	})
 })
 

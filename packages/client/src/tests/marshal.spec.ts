@@ -2179,6 +2179,71 @@ describe("Asynchronous work", () => {
 		)
 	})
 
+	// NOTE: A run the Module walked away from. `start` in Statement position is
+	// fire-and-forget, so a host callback that throws, rejects or answers the
+	// wrong Type has nobody on this side to hand the failure to — and the
+	// boundary's own refusal of a host mistake may not become a process the host
+	// can not catch. Node raises on an unhandled rejection and ends there; Bun
+	// prints a stack and exits 1. There is no call for the host to wrap, because
+	// the failing promise is one it never receives.
+	it("keeps a failing run nobody waits for off the host's hook", async () => {
+		await withProject(
+			{
+				"Forget.es": `implementation {
+	function forgotten(
+		_ key: String,
+		using load: (_: String) -> Future<String>,
+	) -> Integer {
+		start load(key)
+
+		<- 1
+	}
+}
+
+export {
+	forgotten
+}
+`,
+			},
+			async (directory) => {
+				let project = await loadModule(
+					path.join(directory, "Forget.es"),
+					{ cacheDirectory },
+				)
+				let forgotten = project.exports.forgotten as (
+					key: string,
+					load: (key: string) => unknown,
+				) => unknown
+				let unhandled: Array<unknown> = []
+				let seen = (reason: unknown): void => {
+					unhandled.push(reason)
+				}
+
+				process.on("unhandledRejection", seen)
+
+				try {
+					expect(
+						forgotten("key", () =>
+							Promise.reject(new Error("gone")),
+						),
+					).toBe(1n)
+					expect(
+						forgotten("key", () => {
+							throw new Error("gone before it began")
+						}),
+					).toBe(1n)
+					expect(forgotten("key", () => 7)).toBe(1n)
+
+					await delay(20)
+				} finally {
+					process.off("unhandledRejection", seen)
+				}
+
+				expect(unhandled).toEqual([])
+			},
+		)
+	})
+
 	// NOTE: A Promise handed where a value was declared, named as what it is.
 	// Every other object with no keys of its own reads as "an empty object",
 	// which says nothing about the one mistake worth naming here.
