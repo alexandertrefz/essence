@@ -53,6 +53,16 @@ let types = entries
 			a.data.order - b.data.order || a.data.title.localeCompare(b.data.title),
 	)
 	.map(toDocLink)
+
+/*
+ * The guides, in the sidebar's order. A reader who came to do one thing —
+ * call Essence from TypeScript, run the tests in CI — looks for it by task, and
+ * the hub is where they look first.
+ */
+let guides = entries
+	.filter((entry) => entry.data.section === "guides")
+	.sort((a, b) => a.data.order - b.data.order)
+	.map(toDocLink)
 ---
 
 <DocsLayout
@@ -126,11 +136,32 @@ let types = entries
 		)
 	}
 
+	{
+		guides.length > 0 && (
+			<section class="types" aria-labelledby="guides">
+				<h2 class="section-label" id="guides">
+					Guides
+				</h2>
+				<ul class="grid grid--wide">
+					{guides.map((guide) => (
+						<li>
+							<a class="tile tile--guide" href={guide.href}>
+								{guide.title}
+							</a>
+						</li>
+					))}
+				</ul>
+			</section>
+		)
+	}
+
 	<section class="start" aria-labelledby="start">
 		<h2 class="section-label" id="start">Start reading</h2>
 		<p class="start__body">
 			The pages run in order from what the language refuses to do, through
 			every construct, to the tools. Each page ends with the next.
+			<a href={ROUTES.getStarted}>Installation</a> puts the
+			<code>essence</code> command on your machine first.
 		</p>
 		<a class="start__link" href={ROUTES.whatEssenceIs}>
 			What Essence is
@@ -316,6 +347,15 @@ let types = entries
 		color: var(--text-strong);
 	}
 
+	.grid--wide {
+		grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+	}
+
+	.tile--guide {
+		font-family: inherit;
+		font-size: 14.5px;
+	}
+
 	.tile:hover {
 		color: var(--text-hero);
 		border-color: var(--accent-hover-border);
@@ -382,6 +422,10 @@ let types = entries
 
 		.grid {
 			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.grid--wide {
+			grid-template-columns: minmax(0, 1fr);
 		}
 	}
 </style>
