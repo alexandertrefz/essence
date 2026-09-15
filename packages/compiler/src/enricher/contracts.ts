@@ -69,7 +69,7 @@ type Synthesis = {
 // remark, let alone the `Generatable` help that could never make it eligible.
 // The others are said out loud, each in its own words.
 type GoalSkip = {
-	skip: "generic" | "generation" | "call" | "conjunct"
+	skip: "generic" | "generation" | "call" | "conjunct" | "asynchronous"
 }
 
 function skipOf(answer: common.typed.TestNode | GoalSkip): GoalSkip | null {
@@ -253,7 +253,9 @@ function namespaceGoals(
 							? "the call it would make does not typecheck"
 							: skip?.skip === "conjunct"
 								? "its return Type's refinement holds a predicate nothing can rebuild as a check"
-								: "its Parameters can not be generated"),
+								: skip?.skip === "asynchronous"
+									? "it answers work rather than a value, and a goal that completed it would run it"
+									: "its Parameters can not be generated"),
 					generation,
 				})
 
@@ -340,6 +342,18 @@ function goalOf(
 
 	if (answer.type.type === "Error") {
 		return { skip: "call" }
+	}
+
+	// NOTE: A Method answering a Future or a Started is skipped rather than
+	// proved. A goal's body is the call as a bare Expression Statement, which is
+	// exactly what `unused-future` names and `unobserved-started` remarks on —
+	// and the Statement is generated, so it has no source position of its own
+	// and the report lands on the whole `implementation` block, where no edit
+	// can answer it. Proving anything here would mean COMPLETING the call, which
+	// for a Method that reaches a host means performing the effect, which is why
+	// the effectful goals were left out in the first place.
+	if (answer.type.type === "Future" || answer.type.type === "Started") {
+		return { skip: "asynchronous" }
 	}
 
 	let body = bodyOf(answer, bodyScope, position)

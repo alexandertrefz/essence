@@ -403,6 +403,42 @@ describe("Contract tests", () => {
 			expect(messages).toEqual(["ungeneratable-contract"])
 		})
 
+		// NOTE: A goal's body is the call as a bare Expression Statement, which
+		// for a Method answering work is exactly what `unused-future` names —
+		// and the Statement is generated, so the report landed on the whole
+		// `implementation` block, where no edit could answer it. The whole file
+		// was refused under `--contracts` and its written tests never ran.
+		it("leaves a Method that answers work alone, and says why", () => {
+			let source =
+				moduleOf(`	function work(_ n: Integer) -> Future<Integer> {
+		<- Async.deferred(() { <- n })
+	}
+
+	namespace Counting for Integer {
+		later() -> Future<Integer> {
+			<- work(@)
+		}
+
+		running() -> Started<Integer> {
+			<- start work(@)
+		}
+
+		up() -> Integer {
+			<- @::add(1)
+		}
+	}`)
+
+			expect(namesOf(source)).toEqual(["Counting::up()"])
+			expect(codesOf(source)).toEqual(["ungeneratable-contract"])
+
+			let [diagnostic] = analyse(source).diagnostics
+
+			expect(diagnostic?.severity).toBe("information")
+			expect(diagnostic?.notes.join(" ")).toContain(
+				"it answers work rather than a value",
+			)
+		})
+
 		// NOTE: Without a remark, deliberately: the rule is documented, and the
 		// only help a remark could offer — a Generatable conformance — could
 		// never make a generic Method eligible.
