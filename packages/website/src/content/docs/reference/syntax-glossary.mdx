@@ -1340,7 +1340,7 @@ Taught on [Records](/docs/language/records) and [Dictionaries](/docs/language/di
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| A word in front of an expression that puts a [`Future<T>`](/docs/library/future) in flight and answers the `Started<T>` of that one run. It takes the whole method chain after it: `start work::map(f)` starts `work::map(f)`. | Wherever a value stands. It never waits, so no body has to allow for it. As a statement it is fire-and-forget, reported once as [`unobserved-started`](/docs/reference/diagnostics#unobserved-started). | A wait: reading the answer is `complete`. A keyword everywhere — it is an ordinary name unless an expression follows it on the line, so `constant start = 1` compiles. An argument label, for that same reason. In front of a value that is no Future it is [`needless-start`](/docs/reference/diagnostics#needless-start). |
+| A word in front of an expression that puts a [`Future<T>`](/docs/library/future) in flight and answers the `Started<T>` of that one run. It takes the whole method chain after it: `start work::map(f)` starts `work::map(f)`. | Wherever a value stands. It never waits, so no body has to allow for it. As a statement it is fire-and-forget, reported once as [`unobserved-started`](/docs/reference/diagnostics#unobserved-started). | A wait: reading the answer is `complete`. A keyword everywhere — it is an ordinary name unless an expression follows it on the same line, so `constant start = 1` compiles. An argument label, for that same reason: a parameter declared with one is [`reserved-parameter-label`](/docs/reference/diagnostics#reserved-parameter-label). In front of a value that is no Future it is [`needless-start`](/docs/reference/diagnostics#needless-start). |
 
 </div>
 
@@ -1892,7 +1892,7 @@ implementation {
 }
 ```
 
-A record may therefore have a member named `from` or `test`, and a library method may take a `where` label, as [`everyItem(where:)`](/docs/library/list#everyItem) does. `for` is reserved; it appears in `namespace Name for Type` and in `for any`. `start` and `complete` are read as keywords only where an expression follows them on the line, which is the rule under [`start` and `complete` read the rest of the line](/docs/reference/syntax-glossary#keyword-before-expression).
+A record may therefore have a member named `from` or `test`, and a library method may take a `where` label, as [`everyItem(where:)`](/docs/library/list#everyItem) does. `for` is reserved; it appears in `namespace Name for Type` and in `for any`. `start` and `complete` are read as keywords only where an expression follows them on the same line, which is the rule under [`start` and `complete` read the rest of the line](/docs/reference/syntax-glossary#keyword-before-expression).
 
 ## Where whitespace matters
 
@@ -1931,7 +1931,7 @@ An `if` condition takes no parentheses. A `(` in an expression starts a function
 
 <h3 id="keyword-before-expression">`start` and `complete` read the rest of the line</h3>
 
-Each is a keyword where an expression follows it, and an ordinary name where none does. `constant start = 1` binds a constant, `span.start` reads a member, and `f(start, other)` passes two names. The cost is that `constant held = start` followed by an expression on the next line is **one** statement — `start` takes what is under it, and nothing reports the constant that was meant. Write the value on the same line. For the same reason an argument label can not be spelled `start` or `complete`: `f(start x)` is the keyword and its operand. The [`start`](/docs/reference/syntax-glossary#start) and [`complete`](/docs/reference/syntax-glossary#complete) entries run both readings.
+Each is a keyword where an expression follows it on the same line, and an ordinary name everywhere else. `constant start = 1` binds a constant, `span.start` reads a member, `f(start, other)` passes two names, and `constant held = start` with a statement under it is two statements, because an operand has to begin on the keyword's own line. Two things cost. An argument label can not be spelled `start` or `complete` — `f(start x)` is the keyword and its operand, and a parameter declared with that label is [`reserved-parameter-label`](/docs/reference/diagnostics#reserved-parameter-label). And a contextual word behind a value of either name is read as the operand: `expect complete matches snapshot` waits for a value called `matches`. The [`start`](/docs/reference/syntax-glossary#start) and [`complete`](/docs/reference/syntax-glossary#complete) entries run both readings.
 
 <h3 id="minus-before-digit">`-` only before a number</h3>
 

@@ -416,8 +416,8 @@ implementation {
 
 Two things follow from that rule, and both are worth knowing before you meet them:
 
-- A `constant` bound to the bare word swallows the line under it. `constant held = start` followed by an expression on the next line is **one** statement, `start <that expression>`, not two. Nothing reports it. Write the value on the same line.
-- An argument label may not be spelled `start` or `complete`. In `f(start x)` the word opens an expression, so it is read as the keyword and never as a label. Your editor's rename refuses both words on a label for the same reason.
+- An argument label may not be spelled `start` or `complete`. In `f(start x)` the word opens an expression, so it is read as the keyword and never as a label — and a parameter declared with that label is refused where it is written, as [`reserved-parameter-label`](/docs/reference/diagnostics#reserved-parameter-label). Your editor's rename refuses both words on a label for the same reason.
+- A contextual word behind a value of either name is read as the operand. `expect complete matches snapshot` waits for a value called `matches`, because a contextual word is an ordinary identifier and an identifier begins an expression. Name the value something else where the two meet.
 
 Essence has no grouping parentheses, and both keywords take the whole [postfix chain](/docs/reference/syntax-glossary#method-call) after them. `complete work::all()` is `complete (work::all())`, which is what you want. To call a method on the *completed* value, bind it first:
 

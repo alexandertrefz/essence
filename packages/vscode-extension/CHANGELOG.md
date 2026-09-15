@@ -14,22 +14,28 @@
   one Namespace that reaches a host at all: `Http.send` and the six verbs
   answer a Response or the reason there is none — a status is not a failure, so
   a 404 is a Response — and a deadline is `::within(milliseconds:)` on the work
-  rather than a member of the request. A test may `complete` whatever it likes:
-  the runner drives one test at a time and waits for each.
+  rather than a member of the request. A test BODY may `complete` whatever it
+  likes: the runner drives one test at a time and waits for each. A test's
+  name, a `benchmark` body and a property body still refuse it, which is what
+  `complete-outside-future` says.
 - The two words asynchrony is written with are lit, offered and fixed:
   `complete`, which waits for what a Future or a Started answers with, and
   `start`, which puts a Future in flight and answers the one run of it. Both
-  are ordinary Identifiers everywhere else, so each is lit exactly where an
-  Expression follows it and a value still called `start` reads as the name it
-  is. Hovering either says what it answers with — the Value waited for, the
-  Started put in flight — and the Completion list offers both where a value
-  goes, beside `complete`, `start` and `function-completing` snippets. The
-  lightbulb answers what the Compiler reports about them: a future whose value
-  goes nowhere is offered both words, a `complete` in a body that declared
-  something else offers to wrap that declaration in `Future<…>`, a word in
-  front of a value that is neither a Future nor a Started offers to take
-  itself away, and a mismatch that is one missing `complete` offers to write
-  it.
+  are ordinary Identifiers everywhere else, so each is lit where an Expression
+  follows it on the same line and a value still called `start` reads as the
+  name it is; Semantic Tokens correct whatever a line-based rule can not see.
+  Hovering either says what it answers with — the Value waited for, the Started
+  put in flight — and the Completion list offers both where a value goes,
+  beside `complete`, `start` and `function-completing` snippets. The
+  lightbulb answers four of the five Diagnostics the Compiler reports about
+  them: a future whose value goes nowhere is offered both words, a `complete`
+  in a body that declared something else offers to wrap that declaration in
+  `Future<…>`, a word in front of a value that is neither a Future nor a
+  Started offers to take itself away, and a mismatch that is one missing
+  `complete` offers to write it. A Started nothing observes is the fifth, and
+  it is a judgement no edit can make. Every walk the Server does reads the two
+  words as well: folding, selection ranges, document symbols, call hierarchy,
+  inlay hints, signature help and rename.
 - Every block of the language is a snippet now — eighty of them, where
   there were twenty-five — and the Language Server offers each one where it
   parses and nowhere else: `static` and `overload` inside a Namespace body,
