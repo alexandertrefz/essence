@@ -29,7 +29,7 @@ package's own `tsconfig.json` type-checks `src/` for the editor.
 | `src/content/docs/` | the published documentation pages, by section |
 | `src/layouts/`, `src/components/` | the page shells and the design's parts |
 | `src/styles/` | `tokens.css` (both themes), `base.css`, `prose.css`, `shiki.css` |
-| `src/lib/` | navigation, site constants, the two Shiki theme JSONs |
+| `src/lib/` | navigation, site constants, how a sample is read, the two Shiki theme JSONs |
 | `public/fonts/` | every face, self-hosted |
 | `tests/` | the doc gates, see below |
 
@@ -45,6 +45,12 @@ two theme files in `src/lib/shiki/`. They run with `defaultColor: false`, so a
 token carries a CSS variable per theme instead of a colour and
 `src/styles/shiki.css` decides which one applies.
 
+**A sample's marker line is hidden.** An Essence block may open with
+`§ fragment` (shown, never compiled) or `§ file: Name.es` (one file of several,
+imported by that name). The Shiki transformer in `astro.config.ts` drops the
+line and turns a file's name into the block's caption. It reads the marker
+through `src/lib/samples.ts`, the module the samples gate reads it through too.
+
 ## The doc gates
 
 The pages are held to the toolchain they document, under plain `bun test`. Each
@@ -53,6 +59,7 @@ resolves inside an Astro build.
 
 | Spec | Holds |
 |---|---|
+| `docsExamples.spec.ts` | every Essence block on every page compiles as `essence check` compiles it, is byte-identical to `essence format`'s output, and prints what its `§ …` comments say |
 | `diagnosticCodes.spec.ts` | `/docs/reference/diagnostics` has one entry per `DiagnosticCode`, and none for a code that is gone |
 | `optimisationPasses.spec.ts` | `/docs/reference/optimisations` lists every pass, in the order they run |
 | `projectSchema.spec.ts` | the served JSON Schema for `essence.json`, against the catalogue the toolchain reads |
