@@ -240,7 +240,21 @@ const statementKeywords = [
 // Both are Identifiers as well, so a cursor that wants the word as a NAME is
 // already answered: it is offered by whatever declared it, the way every other
 // name in Scope is.
-const expressionKeywords = ["match", "define", "true", "false", "nothing"]
+//
+// NOTE: `start` and `complete` are Identifiers as well — they are Keywords
+// exactly where an Expression follows them — and they are offered here all the
+// same, for the reason the list declines to be careful anywhere else: a word
+// offered where it was wanted as a name is one the reader accepts and carries
+// on typing, since accepting it writes the same eight characters either way.
+const expressionKeywords = [
+	"match",
+	"define",
+	"start",
+	"complete",
+	"true",
+	"false",
+	"nothing",
+]
 
 export function findCompletions(
 	documentText: string,

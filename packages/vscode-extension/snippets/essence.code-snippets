@@ -633,6 +633,31 @@
 		],
 		"description": "The condition-driven loop — it checks before each step, so a predicate already decided answers the seed."
 	},
+	"complete": {
+		"prefix": "complete",
+		"body": [
+			"complete ${0:future}"
+		],
+		"description": "Wait for what a Future or a Started answers with — legal in a body that declares one, and at the top of a Program."
+	},
+	"start": {
+		"prefix": "start",
+		"body": [
+			"start ${0:future}"
+		],
+		"description": "Put a Future in flight and answer the one run of it, without waiting for it."
+	},
+	"function-completing": {
+		"prefix": "function-completing",
+		"body": [
+			"function ${1:name}(${2:_} ${3:parameter}: ${4:Type}) -> Future<${5:ReturnType}> {",
+			"\tconstant ${6:value} = complete ${7:future}",
+			"",
+			"\t<- $0",
+			"}"
+		],
+		"description": "A function that waits for something — it answers a Future, and its '<-' answers with the value inside one."
+	},
 	"doc": {
 		"prefix": "doc",
 		"body": [

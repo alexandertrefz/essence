@@ -1667,6 +1667,8 @@ describe("Completion", () => {
 			expect(keywordsOf(source, { line: 2, column: 19 })).toEqual([
 				"match",
 				"define",
+				"start",
+				"complete",
 				"true",
 				"false",
 				"nothing",

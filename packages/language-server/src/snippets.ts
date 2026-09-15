@@ -800,6 +800,36 @@ export const snippets: Array<Snippet> = [
 		contexts: ["expression"],
 	},
 
+	/* Asynchrony */
+
+	{
+		prefix: "complete",
+		description:
+			"Wait for what a Future or a Started answers with — legal in a body that declares one, and at the top of a Program.",
+		body: ["complete ${0:future}"],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "start",
+		description:
+			"Put a Future in flight and answer the one run of it, without waiting for it.",
+		body: ["start ${0:future}"],
+		contexts: ["expression"],
+	},
+	{
+		prefix: "function-completing",
+		description:
+			"A function that waits for something — it answers a Future, and its '<-' answers with the value inside one.",
+		body: [
+			"function ${1:name}(${2:_} ${3:parameter}: ${4:Type}) -> Future<${5:ReturnType}> {",
+			"\tconstant ${6:value} = complete ${7:future}",
+			"",
+			"\t<- $0",
+			"}",
+		],
+		contexts: ["implementation", "tests", "test"],
+	},
+
 	/* Documentation */
 
 	{

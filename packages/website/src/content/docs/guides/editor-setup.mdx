@@ -227,7 +227,7 @@ The Run and Debug code lenses carry the commands `essence.test.run` and `essence
 
 After it starts, the server registers a file watcher for three globs: `**/*.es`, `**/essence.json` and `**/package.json`. A client that supports `workspace/didChangeWatchedFiles` then tells the server about files that change outside the editor, as in a branch switch, and the server's module graph stays current. `package.json` is watched only to report the retired `"essence"` key there.
 
-The 77 snippets the server offers are also kept in the repository as `packages/vscode-extension/snippets/essence.code-snippets`, for other editors and for working without the server.
+The 80 snippets the server offers are also kept in the repository as `packages/vscode-extension/snippets/essence.code-snippets`, for other editors and for working without the server.
 
 No configuration for Neovim, Helix, Zed or any other editor ships with Essence. Syntax highlighting comes from a TextMate grammar inside the VS Code extension, and Essence ships no grammar for any other editor. Outside VS Code, keywords, strings and comments are therefore not coloured. The server's semantic tokens classify each name by what it resolves to. An editor that applies them colours types, type parameters, cases, namespaces, functions, methods, parameters, variables and properties.
 

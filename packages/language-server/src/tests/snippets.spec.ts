@@ -446,6 +446,28 @@ describe("Snippet completion", () => {
 		expect(offered).not.toContain("namespace")
 	})
 
+	// NOTE: The two Keywords are values like any other where they are offered,
+	// and the completing body is a Statement — so the three land on the two
+	// sides of the same line the `closure` and `function` snippets do.
+	it("offers the asynchrony bodies where each of them parses", () => {
+		let value = snippetsAt(
+			["implementation {", "\tconstant value = ", "}"],
+			{ line: 2, column: 19 },
+		)
+
+		expect(value).toContain("complete")
+		expect(value).toContain("start")
+		expect(value).not.toContain("function-completing")
+
+		let statement = snippetsAt(["implementation {", "\t", "}"], {
+			line: 2,
+			column: 2,
+		})
+
+		expect(statement).toContain("function-completing")
+		expect(statement).not.toContain("complete")
+	})
+
 	it("offers a group inside an import block", () => {
 		let offered = snippetsAt(
 			["import {", "\t", "}", "", "implementation {", "}"],
