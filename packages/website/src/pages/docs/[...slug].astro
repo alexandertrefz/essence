@@ -39,6 +39,7 @@ import {
 	getPrevNext,
 	getSidebar,
 	getToc,
+	sectionLabel,
 } from "../../lib/navigation.ts"
 import { GITHUB_ISSUES_URL, GITHUB_URL } from "../../lib/site.ts"
 
@@ -89,8 +90,20 @@ let editUrl =
 		? undefined
 		: `${GITHUB_URL}/blob/master/packages/website/${entry.filePath}`
 
+// NOTE: Optional, Result and Protocols are each a Language page and a Library
+// page. A browser tab, a bookmark and a filed issue carry the title alone, so a
+// title another page also wears takes its section's label there. The heading on
+// the page keeps the bare title: the sidebar and breadcrumbs already say where
+// the reader is.
+let sharesTitle = entries.some(
+	(other) => other.id !== entry.id && other.data.title === entry.data.title,
+)
+let documentTitle = sharesTitle
+	? `${entry.data.title} · ${sectionLabel(entry.data.section)}`
+	: entry.data.title
+
 let issueUrl = `${GITHUB_ISSUES_URL}/new?title=${encodeURIComponent(
-	`Docs: ${entry.data.title}`,
+	`Docs: ${documentTitle}`,
 )}`
 
 let guideMeta = [
@@ -121,7 +134,7 @@ let components = {
 ---
 
 <DocsLayout
-	title={entry.data.title}
+	title={documentTitle}
 	description={entry.data.description}
 	sections={sections}
 	activeId={entry.id}
