@@ -1616,21 +1616,35 @@ Error: This code is nested too deeply
     │ Note: The parser reads nesting by recursion, so there is a depth at which it would run out of call stack mid-read and crash without a report — it refuses at 1024 levels instead, with one.
 ────╯
 
+[reserved-parameter-label]
+Error: A Parameter's label can not be spelled 'start'
+    ╭─┤ Syntax.es:58:19 │
+    │
+ 58 │     function compute(start value: Integer) -> Integer {
+    │                      ──┬──  
+    │                        ╰──── this word opens an Expression
+    │ 
+    │ Help 1: Name the label another word.
+    │ Help 2: Or write '_' in its place, so the Parameter takes no label at all.
+    │ 
+    │ Note: An Argument written 'start value' reads as a 'start' of the value, so no call could pass this Parameter by name.
+────╯
+
 [unclosed-block]
 Error: This block is never closed
-    ╭─┤ Syntax.es:57:10 │
+    ╭─┤ Syntax.es:65:10 │
     │
- 56 │     function greet(_ name: String) -> String {
+ 64 │     function greet(_ name: String) -> String {
     │                                              ▲  
     │                                              ╰── opened here
- 57 │        <- name
+ 65 │        <- name
     │               │ 
     │               ╰─ the input ends here
     │ 
     │ Help: Add the missing '}'.
 ────╯
 
-─── 8 errors
+─── 9 errors
 "
 `;
 

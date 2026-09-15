@@ -288,6 +288,7 @@ export type DiagnosticCode =
 	| "comment-in-hole"
 	| "nesting-too-deep"
 	| "redundant-parameter-label"
+	| "reserved-parameter-label"
 	| "shorthand-in-combination"
 	| "dictionary-entry-syntax"
 	| "shorthand-on-path-key"

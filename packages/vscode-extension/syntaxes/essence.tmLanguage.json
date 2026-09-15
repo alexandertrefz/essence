@@ -350,8 +350,8 @@
 					"name": "keyword.control.essence"
 				},
 				{
-					"comment": "`start` and `complete` are Keywords where an Expression follows them and ordinary Identifiers everywhere else — the Parser's own rule, and the one `expect` and `require` above are scoped by. The excluded characters are what a value called `start` is followed by instead: `constant start = 1`, `start::isAbove(0)`, `{ start = 1 }` and the shorthand `{ start }`. An Argument LABEL spelled either way — `f(start value)` — lights as though it were the Keyword, which is the one shape this reads wrong and the same one the assertion rule above lives with.",
-					"match": "\\b(start|complete)\\b(?=[ \\t]+[^\\s=,:)\\]}])",
+					"comment": "`start` and `complete` are Keywords where an Expression follows them ON THE SAME LINE and ordinary Identifiers everywhere else — the Parser's own rule, and the one `expect` and `require` above are scoped by. The `[ \\t]+` is that line: a word with a line break behind it is a name, which is what the Parser reads too. The excluded characters and words are what a value called `start` is followed by instead — `constant start = 1`, `start::isAbove(0)`, `{ start = 1 }`, `{ start }`, `f(start, other)`, `start (1)` and `1::complete (2)` (a call), `complete .price` (a member off a name), `start § note` (a Comment), `if start {` (a block), `match start -> Integer {` (an answer Type), `{ start with x = 3 }` and `as complete otherwise`. An Argument written `f(start value)` IS a `start` of `value` to the Parser, so lighting it is right.",
+					"match": "\\b(start|complete)\\b(?=[ \\t]+(?!(?:with|otherwise)\\b)[^\\s=,:().§{}\\]-])",
 					"name": "keyword.control.essence"
 				},
 				{

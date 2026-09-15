@@ -367,6 +367,34 @@ Quick Fix: **Remove the label**.
 
 Taught on: [Functions as values › Writing some of a literal's types](/docs/language/functions-as-values#writing-some-of-a-literals-types)
 
+### `reserved-parameter-label`
+
+**Error.** A parameter's label is spelled `start` or `complete`. Both words open an [expression](/docs/language/asynchrony#two-words-that-are-also-names) where a label would stand, so `compute(start 1)` is a `start` of `1` and never an argument labelled `start` — a parameter asking for that label could not be written at a call at all.
+
+<div class="error-output">
+
+```
+[reserved-parameter-label]
+Error: A Parameter's label can not be spelled 'start'
+   ╭─┤ Compute.es:2:19 │
+   │
+ 2 │     function compute(start value: Integer) -> Integer {
+   │                      ──┬──  
+   │                        ╰──── this word opens an Expression
+   │ 
+   │ Help 1: Name the label another word.
+   │ Help 2: Or write '_' in its place, so the Parameter takes no label at all.
+   │ 
+   │ Note: An Argument written 'start value' reads as a 'start' of the value, so no call could pass this Parameter by name.
+───╯
+```
+
+</div>
+
+Name the label another word, or write `_` in its place so the parameter takes none: `function compute(_ value: Integer)`.
+
+Taught on: [Asynchrony › Two words that are also names](/docs/language/asynchrony#two-words-that-are-also-names)
+
 ### `shorthand-in-combination`
 
 **Error.** An update's key list holds a bare name, as in `{ base with port, host }`. The shorthand `{ port }` belongs to a record literal. JavaScript's `{ ...base, port }` sets `port` from a variable of that name, but after `with` a bare name is a whole record to merge in.

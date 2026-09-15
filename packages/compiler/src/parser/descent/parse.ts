@@ -5560,6 +5560,45 @@ class DescentParser {
 		return parameter
 	}
 
+	// NOTE: `start` and `complete` can not be a Parameter's LABEL. A label
+	// stands exactly where the two words open their prefix Expression, so
+	// `compute(start 1)` is a `start` of `1` and never an Argument labelled
+	// `start` — a Parameter asking for one could not be written at a call at
+	// all, and every call would report a label the caller had already written.
+	// Refused here, where the signature is read, so the Declaration is what
+	// answers for it.
+	//
+	// The label is dropped and the Parameter keeps its name, the way a
+	// `redundant-parameter-label` does: one reserved word is no reason to
+	// refuse the whole Declaration and cascade through its body.
+	protected parameterLabel(
+		name: parser.IdentifierNode,
+	): parser.IdentifierNode | null {
+		if (name.content !== "start" && name.content !== "complete") {
+			return name
+		}
+
+		reportError(
+			`A Parameter's label can not be spelled '${name.content}'`,
+			name.position,
+			{
+				code: "reserved-parameter-label",
+				labels: [
+					primary(name.position, "this word opens an Expression"),
+				],
+				notes: [
+					`An Argument written '${name.content} value' reads as a '${name.content}' of the value, so no call could pass this Parameter by name.`,
+				],
+				helps: [
+					"Name the label another word.",
+					"Or write '_' in its place, so the Parameter takes no label at all.",
+				],
+			},
+		)
+
+		return null
+	}
+
 	protected parseParameterHead(
 		allowsInferredTypes = false,
 	): parser.ParameterNode {
@@ -5662,7 +5701,11 @@ class DescentParser {
 		// the internal name goes. The label is what the caller writes, so the
 		// call site is untouched by anything the Pattern says.
 		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
-			return this.parsePatternParameter(name, null, documentation)
+			return this.parsePatternParameter(
+				this.parameterLabel(name),
+				null,
+				documentation,
+			)
 		}
 
 		if (isIdentifierToken(this.tokens.peek())) {
@@ -5710,7 +5753,7 @@ class DescentParser {
 			let type = this.parseType()
 
 			return generators.parameter(
-				name,
+				this.parameterLabel(name),
 				internalName,
 				type,
 				{ start: name.position.start, end: type.position.end },
@@ -5738,7 +5781,7 @@ class DescentParser {
 		let type = this.parseType()
 
 		return generators.parameter(
-			name,
+			this.parameterLabel(name),
 			name,
 			type,
 			{ start: name.position.start, end: type.position.end },
@@ -5917,16 +5960,26 @@ class DescentParser {
 	// that could be a labelled argument's value, and only a parse can tell
 	// which — `parsePrimaryExpression` says the same thing about the same `<`.
 	//
-	// NOTE: `start` and `complete` are the exception the rule above can not
-	// decide: both readings span the argument, because the label reading takes
-	// the word and the value behind it and the Keyword reading takes the word
-	// and the Expression behind it — the same two Tokens. The Keyword wins, so
-	// that `Terminal.print(complete headline(url))` is the wait it reads as, and
-	// an Argument label is the one place neither word may be a name.
+	// NOTE: `start` and `complete` are never read as a label, whichever Token
+	// stands behind them. Where the Keyword form opens, the two readings span
+	// the same two Tokens — the label reading takes the word and the value, the
+	// Keyword reading the word and the Expression — and the Keyword wins, so
+	// that `Terminal.print(complete headline(url))` is the wait it reads as.
+	// Where it does not open, the word is a NAME and what follows is read off
+	// it: `compute(start .price)` is the member path of a value called `start`,
+	// not an Argument labelled with a word no call could write.
+	//
+	// NOTE: The reservation itself is made where the signature is read —
+	// `parseParameterHead` refuses either word as a Parameter's label — so
+	// there is no Declaration left for a label spelled with one to fit.
 	protected argumentIsLabelled(): boolean {
+		let token = this.tokens.peek()!
 		let following = this.tokens.peek(1)
 
-		if (opensAsynchrony(this.tokens.peek()!, following)) {
+		if (
+			token.type === TokenType.KeywordStart ||
+			token.type === TokenType.KeywordComplete
+		) {
 			return false
 		}
 
@@ -5948,10 +6001,7 @@ class DescentParser {
 			following!.type === TokenType.SymbolHash ||
 			following!.type === TokenType.SymbolDot
 		) {
-			return !isAdjacent(
-				this.tokens.peek()!.position,
-				following!.position,
-			)
+			return !isAdjacent(token.position, following!.position)
 		}
 
 		return true

@@ -256,6 +256,68 @@ describe("Asynchrony", () => {
 			expect(node.value.arguments[0]!.value.nodeType).toBe("Start")
 		})
 
+		// NOTE: The other side of that: a Parameter's label may not be spelled
+		// with either word, and the signature is where it is refused. A call
+		// could never satisfy such a label — `compute(start 1)` is a `start` of
+		// `1` — so the Declaration answers for it once rather than every call
+		// site reporting a label the caller had already written.
+		it("refuses either word as a Parameter's label", () => {
+			expect(
+				codesOf(`implementation {
+	function compute(start value: Integer) -> Integer {
+		<- value
+	}
+
+	Terminal.print(compute(1)::toString())
+}`),
+			).toEqual(["reserved-parameter-label"])
+			expect(
+				codesOf(`implementation {
+	function compute(complete value: Integer) -> Integer {
+		<- value
+	}
+
+	Terminal.print(compute(1)::toString())
+}`),
+			).toEqual(["reserved-parameter-label"])
+		})
+
+		// NOTE: A Parameter NAMED with either word behind a label of its own is
+		// untouched — it is the label the caller writes, and the name is the
+		// body's alone.
+		it("reads either word as a Parameter's name behind '_'", () => {
+			expect(
+				codesOf(`implementation {
+	function doubled(_ start: Integer) -> Integer {
+		<- start::multiply(with 2)
+	}
+
+	Terminal.print(doubled(21)::toString())
+}`),
+			).toEqual([])
+		})
+
+		// NOTE: And where the word does NOT open the Keyword form in Argument
+		// position, it is a name and what follows is read off it — never a
+		// label, which nothing could declare.
+		it("reads a member path behind either word as a read off a name", () => {
+			let program = parse(`implementation {
+	constant answer = compute(start .price)
+}`)
+			let node = program.implementation.nodes[0]
+
+			if (node?.nodeType !== "ConstantDeclarationStatement") {
+				throw new Error("expected a Constant Declaration")
+			}
+
+			if (node.value.nodeType !== "FunctionInvocation") {
+				throw new Error("expected a Function Invocation")
+			}
+
+			expect(node.value.arguments[0]!.name).toBeNull()
+			expect(node.value.arguments[0]!.value.nodeType).toBe("Lookup")
+		})
+
 		// NOTE: The line is half the rule. A Statement ending on one of the
 		// words and a Statement opening with an Expression read as TWO, because
 		// the operand of a `start` begins on the `start`'s own line or the word

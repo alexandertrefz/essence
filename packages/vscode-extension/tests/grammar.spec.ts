@@ -193,8 +193,10 @@ describe("the testing grammar", () => {
 
 // NOTE: The two Keywords asynchrony is written with. Both are ordinary
 // Identifiers as well — the Parser reads the Keyword only where an Expression
-// follows on the line — so the rule is scoped by what comes behind the word,
-// exactly as `expect` and `require` are.
+// follows it ON THE SAME LINE and nothing carries the word itself on — so the
+// rule is scoped by what comes behind the word, exactly as `expect` and
+// `require` are. Every case below was read by the Parser first: what the rule
+// lights is what `opensAsynchrony` answers true for, and nothing else.
 describe("the asynchrony grammar", () => {
 	let asynchrony = contextualKeyword("(start|complete)")
 
@@ -232,6 +234,43 @@ describe("the asynchrony grammar", () => {
 	it("leaves a longer name that opens with one of them unlit", () => {
 		expect(asynchrony.test("\t\tstarting(value)")).toBe(false)
 		expect(asynchrony.test("\t\tcompleted::negate()")).toBe(false)
+	})
+
+	// NOTE: The Tokens that carry a name ON rather than opening an Expression
+	// behind it. Each was run through the Parser: `start (1)` is a call of a
+	// Function called `start`, `1::complete (2)` a Method call, `complete
+	// .price` a member read off a name, and a `§` opens a Comment, which is no
+	// operand at all.
+	it("leaves a name the following Token carries on unlit", () => {
+		expect(asynchrony.test("\t\tconstant x = start (1)")).toBe(false)
+		expect(asynchrony.test("\t\tconstant x = 1::complete (2)")).toBe(false)
+		expect(asynchrony.test("\t\tconstant held = complete .price")).toBe(
+			false,
+		)
+		expect(
+			asynchrony.test("\t\tconstant held = start § put it in flight"),
+		).toBe(false)
+	})
+
+	// NOTE: And the Tokens that begin an Expression of their own and yet only
+	// ever stand where one has ENDED, which is the list `opensAsynchrony`
+	// excludes: the value in front of them is the Expression, so the word is a
+	// name.
+	it("leaves a name an ending Token stands behind unlit", () => {
+		expect(asynchrony.test("\t\tif start {")).toBe(false)
+		expect(asynchrony.test("\t\tmatch start -> Integer {")).toBe(false)
+		expect(
+			asynchrony.test("\t\tconstant moved = { start with x = 3 }"),
+		).toBe(false)
+		expect(asynchrony.test("\t\t\tas complete otherwise")).toBe(false)
+	})
+
+	// NOTE: The line, which the Parser reads the same way. A word with nothing
+	// behind it on its line is a name, and the Statement below is a Statement
+	// of its own.
+	it("leaves a word that ends its line unlit", () => {
+		expect(asynchrony.test("\t\tconstant held = start")).toBe(false)
+		expect(asynchrony.test("\t\tconstant held = complete")).toBe(false)
 	})
 })
 
