@@ -26,7 +26,11 @@ import type { CLIContext } from "./context"
 // where the reason behind a setting gets written down, and `JSON.stringify` can
 // not carry one. The `$schema` is first so that an editor validating the file
 // finds it before anything else it holds.
-function template(): string {
+//
+// NOTE: Exported for the website's spec. Two documentation pages show this
+// file as `essence init` writes it, and a copy that drifted from the template
+// would teach a file the command no longer writes.
+export function projectFileTemplate(): string {
 	return `{
 	"$schema": "${PROJECT_SCHEMA_URL}",
 
@@ -68,7 +72,7 @@ export async function runInit(
 	}
 
 	try {
-		await writeFile(target, template(), "utf8")
+		await writeFile(target, projectFileTemplate(), "utf8")
 	} catch (error) {
 		terminal.err("")
 		terminal.err(

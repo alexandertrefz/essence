@@ -62,15 +62,16 @@ resolves inside an Astro build.
 | `docsExamples.spec.ts` | every Essence block on every page compiles as `essence check` compiles it, is byte-identical to `essence format`'s output, and prints what its `§ …` comments say |
 | `diagnosticCodes.spec.ts` | `/docs/reference/diagnostics` has one entry per `DiagnosticCode`, and none for a code that is gone |
 | `optimisationPasses.spec.ts` | `/docs/reference/optimisations` lists every pass, in the order they run |
-| `projectSchema.spec.ts` | the served JSON Schema for `essence.json`, against the catalogue the toolchain reads |
+| `cliHelp.spec.ts` | `/docs/reference/cli` has one entry per flag an `essence help` screen lists, and every address a screen prints is a page |
+| `projectSchema.spec.ts` | the served JSON Schema, one `/docs/reference/project-file` entry per setting, and the file `essence init` writes as two pages show it |
 | `stdlibMembers.spec.ts` | the generated library pages against the standard library, member by member |
 | `navigation.spec.ts` | the sidebar, the reading chain and the on-this-page lists |
 
 A code with no documentation is worse than no code at all: it is printed in
 every terminal report and handed to every Language Server client, and the whole
-point of a stable identifier is that it can be looked up. The codes only the
-experimental test modes report are the one exception: they are documented
-nowhere, and the spec names them in an allowlist.
+point of a stable identifier is that it can be looked up. The experimental test
+modes are the one exception, on every gate: their flags, their setting and
+their codes are documented nowhere, and each spec names them in an allowlist.
 
 ## Deploying
 
