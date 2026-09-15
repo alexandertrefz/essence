@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs"
 import mdx from "@astrojs/mdx"
 import { defineConfig } from "astro/config"
 
+import { readSampleMarker } from "./src/lib/samples.ts"
+
 // NOTE: Read rather than `import … with { type: "json" }` so the grammar stays
 // a plain file read — the TextMate grammar lives in another package and is the
 // editor extension's own, not something this package may re-declare.
@@ -17,6 +19,12 @@ let essenceGrammar = readJson(
 )
 let essenceLight = readJson("./src/lib/shiki/essence-light.json")
 let essenceDark = readJson("./src/lib/shiki/essence-dark.json")
+
+// NOTE: The file a `§ file: Name.es` block names, carried from the hook that
+// reads the marker to the hook that draws the caption. Keyed by the hooks'
+// `meta`, the one object Shiki hands every hook of a single block — the
+// `options` beside it is copied between them.
+let sampleFiles = new WeakMap<object, string>()
 
 export default defineConfig({
 	site: "https://essencelang.org",
@@ -53,6 +61,61 @@ export default defineConfig({
 			// colour at all, which is why both themes set a bare `foreground`.
 			themes: { light: essenceLight, dark: essenceDark },
 			defaultColor: false,
+			// NOTE: A sample's marker line is written for the docs-examples
+			// gate, not for the reader — see `src/lib/samples.ts`, which both
+			// of them read it through. It is dropped before highlighting, and a
+			// file's name becomes the block's caption, so a page that splits a
+			// program into modules still says which block is which file.
+			transformers: [
+				{
+					name: "essence:sample-markers",
+					preprocess(code, options) {
+						if (
+							options.lang !== "essence" &&
+							options.lang !== "es"
+						) {
+							return
+						}
+
+						let marker = readSampleMarker(code)
+
+						if (marker.file !== undefined) {
+							sampleFiles.set(this.meta, marker.file)
+						}
+
+						return marker.code
+					},
+					root(hast) {
+						let file = sampleFiles.get(this.meta)
+						let pre = hast.children[0]
+
+						if (file === undefined || pre?.type !== "element") {
+							return
+						}
+
+						hast.children = [
+							{
+								type: "element",
+								tagName: "figure",
+								properties: { className: ["code-file"] },
+								children: [
+									{
+										type: "element",
+										tagName: "figcaption",
+										properties: {
+											className: ["code-file__name"],
+										},
+										children: [
+											{ type: "text", value: file },
+										],
+									},
+									pre,
+								],
+							},
+						]
+					},
+				},
+			],
 		},
 	},
 })

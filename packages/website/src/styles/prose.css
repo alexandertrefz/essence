@@ -204,6 +204,42 @@
 }
 
 /*
+ * One file of a program the page splits into modules — a sample that opened
+ * with `§ file: Name.es`, which the Shiki transformer in `astro.config.ts`
+ * turns into this caption. The frame is the fence's own box with the code
+ * window's rail on top, so the name reads as the file's tab rather than as a
+ * heading, and the `<pre>` inside gives its border and radius back to it.
+ *
+ * NOTE: `figure.code-file > pre` rather than `.code-file pre`: a guide step
+ * sets its fences' top margin from a scoped selector exactly as specific as
+ * the shorter one, and which of the two won would come down to the order the
+ * stylesheets were bundled in.
+ */
+.prose .code-file {
+	margin: 20px 0 0;
+	border: 1px solid var(--code-border);
+	border-radius: 8px;
+	overflow: hidden;
+	background: var(--code-bg);
+}
+
+.prose .code-file__name {
+	padding: 8px 20px;
+	border-bottom: 1px solid var(--hairline);
+	background: var(--code-chrome-bg);
+	font-family: var(--font-mono);
+	font-size: 12px;
+	line-height: 18px;
+	color: var(--text-muted);
+}
+
+.prose figure.code-file > pre {
+	margin: 0;
+	border: 0;
+	border-radius: 0;
+}
+
+/*
  * Compiler output. Not source — a transcript of a terminal report, so it is
  * set a step smaller on the sunken surface and in the muted ramp, with only
  * the severity word carrying colour.
