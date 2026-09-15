@@ -262,11 +262,16 @@ export type ExpressionNode =
 // NOTE: The operand is the WHOLE postfix chain, which is what makes
 // `complete headline(url)::retried(times 3)` read as the retried future
 // completed rather than as `complete headline(url)` with a Method called on the
-// value. A Method call on what was waited for is written `(complete x)::m()`:
-// the parentheses are the only way to say it, and they say it plainly. Both
-// words are full Keywords for the reason `define` is one — an Identifier with an
-// Expression behind it already parses as two Statements, so a contextual reading
-// would quietly turn them into one.
+// value. A Method call on what was waited for is written by binding first —
+// `constant answer = complete x`, then `answer::m()` — because Essence has no
+// grouping parentheses: `(complete x)` is a syntax error, not a group.
+//
+// NOTE: Both words are CONTEXTUAL Keywords, read as such only where an
+// Expression follows them on the same line and nothing carries the word itself
+// on — `opensAsynchrony` in the Parser's `descent/parse.ts` is the whole rule,
+// and its NOTE says what that reading costs. So `constant start = 1` binds a
+// value called `start`, and every name the standard library and the fixtures
+// gave the two words is still writable.
 export interface StartNode {
 	nodeType: "Start"
 	expression: ExpressionNode

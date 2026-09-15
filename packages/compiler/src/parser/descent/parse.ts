@@ -3263,10 +3263,12 @@ class DescentParser {
 	// Expression reading rather than by the primary one, so the whole postfix
 	// chain behind the Keyword belongs to it: `complete headline(url)::retried
 	// (times 3)` completes the retried future, and a Method call on what was
-	// waited for has to be written `(complete x)::m()`. That is the same shape a
-	// prefix Keyword takes in every language that has one, and the only reading
-	// that makes the everyday call — a future built by a call and completed —
-	// need no parentheses at all.
+	// waited for is written by binding the answer first — `constant answer =
+	// complete x`, then `answer::m()`. Essence has no grouping parentheses, so
+	// `(complete x)` is a syntax error rather than the other way to say it. That
+	// is the same shape a prefix Keyword takes in every language that has one,
+	// and the only reading that makes the everyday call — a future built by a
+	// call and completed — need no parentheses at all.
 	//
 	// NOTE: Which means the loop in `parseExpressionLevels` has nothing left to
 	// attach when this returns: the recursive reading consumed the chain. So a
