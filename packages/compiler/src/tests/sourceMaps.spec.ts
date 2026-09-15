@@ -289,6 +289,65 @@ describe("Source Maps", () => {
 		)
 	})
 
+	// NOTE: A Module whose top level WAITS, which is two claims in one. The
+	// emitted Module is ESM and may `await` at its top level, so a `complete`
+	// written there needs no Function around it; and the `await` it becomes has
+	// to map back to the Keyword rather than to the Statement holding it, which
+	// is what a debugger stepping onto a wait lands on.
+	it("maps a top-level wait back onto the Keyword that wrote it", () => {
+		let filePath = join(tmpdir(), "essence-sourcemaps", "Waiting.es")
+		let source = `implementation {
+	function doubled(_ value: Integer) -> Future<Integer> {
+		constant held = complete Async.deferred(() { <- value })
+
+		<- held::multiply(with 2)
+	}
+
+	constant answered = complete doubled(21)
+
+	Terminal.print(answered)
+}
+`
+		let { text, map } = unoptimisedModule(filePath, source)
+		let lines = text.split("\n")
+		let waitLine =
+			lines.findIndex((line) => line.includes("const answered =")) + 1
+
+		expect(waitLine).toBeGreaterThan(0)
+		expect(lines[waitLine - 1]).toContain("await $future.complete(")
+		// NOTE: The top level's own context, made fresh at the site rather than
+		// taken from a body — there is no body here to take one from.
+		expect(lines[waitLine - 1]).toContain("$future.root()")
+
+		let awaitColumn = lines[waitLine - 1]!.indexOf("await ")
+		let sourceLines = source.split("\n")
+		let sourceLine =
+			sourceLines.findIndex((line) =>
+				line.includes("constant answered ="),
+			) + 1
+		let keywordColumn = sourceLines[sourceLine - 1]!.indexOf("complete")
+		let consumer = new SourceMapConsumer(map)
+		let found: Array<{ line: number; column: number }> = []
+
+		consumer.eachMapping((mapping) => {
+			if (
+				mapping.generatedLine === waitLine &&
+				mapping.generatedColumn === awaitColumn &&
+				mapping.originalLine !== null
+			) {
+				found.push({
+					line: mapping.originalLine,
+					column: mapping.originalColumn,
+				})
+			}
+		})
+
+		expect(found).toContainEqual({
+			line: sourceLine,
+			column: keywordColumn,
+		})
+	})
+
 	it("emits no comment at all when no map was asked for", () => {
 		let { inputs, entryPath } = moduleInputs()
 		let { sources } = rewriteModules(inputs, entryPath)

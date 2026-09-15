@@ -2282,6 +2282,66 @@ describe("essence run", () => {
 		)
 	})
 
+	// NOTE: A Module whose TOP LEVEL waits, and an entry that reads what it
+	// waited for. The emitted Modules are ESM, so a top-level `await` in one of
+	// them is awaited by whatever imported it — which is what makes a Constant
+	// a Module completes readable from another Module at all, rather than a
+	// promise the reader would have to know about.
+	it("waits for a Module whose top level completes before the entry runs", async () => {
+		await withModules(
+			{
+				"Store.es": [
+					"implementation {",
+					"\tconstant loaded = complete Async.deferred(() {",
+					'\t\tTerminal.print("the Module waited")',
+					"",
+					"\t\t<- 7",
+					"\t})",
+					"",
+					"\tfunction held() -> Integer {",
+					"\t\t<- loaded",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\theld",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./Store.es" { held }',
+					"}",
+					"",
+					"implementation {",
+					'\tTerminal.print("the Program starts")',
+					"\tTerminal.print(held()::toString())",
+					"}",
+					"",
+				].join("\n"),
+			},
+			async (directory) => {
+				let binary = fileURLToPath(
+					import.meta.resolve("../../bin/essence"),
+				)
+				let result = spawnSync(
+					process.execPath,
+					[binary, "run", path.join(directory, "Main.es"), "--quiet"],
+					{ encoding: "utf-8", env: { ...process.env } },
+				)
+
+				expect(result.status).toBe(EXIT_SUCCESS)
+				// NOTE: The Program's own three lines, after whatever the
+				// command wrote about what it compiled.
+				expect(
+					result.stdout
+						.split("\n")
+						.filter((line) => !line.startsWith("  ")),
+				).toEqual(["the Module waited", "the Program starts", "7", ""])
+			},
+		)
+	})
+
 	// NOTE: The one assertion the in-process harness can not make — the
 	// program's streams are inherited, so only a real child process shows
 	// where its printing lands. --json promises stdout carries the report as
