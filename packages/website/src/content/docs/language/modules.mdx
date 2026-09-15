@@ -1,0 +1,610 @@
+---
+title: Modules
+description: Split a program across files with import and export blocks, and see which names every file gets without importing.
+section: language
+order: 220
+template: article
+---
+
+A module is one `.es` file. It takes names from other modules in an [`import`](/docs/reference/syntax-glossary#import) block above its [`implementation`](/docs/reference/syntax-glossary#implementation), and offers names in an [`export`](/docs/reference/syntax-glossary#export) block below it. The shape is that of ES modules with named exports. A module names another by the relative path to its file, so there is no package lookup and no search path. A build joins the modules a program uses into one JavaScript file.
+
+```essence
+§ file: Pricing.es
+implementation {
+	constant vatPercent = 19
+
+	function withVat(_ cents: Integer) -> Integer {
+		<- percentOf(cents, 100::add(vatPercent))
+	}
+
+	§ Not listed in the export block, so no other file can name it.
+	function percentOf(_ cents: Integer, _ percent: Integer) -> Integer {
+		<- cents::multiply(with percent)::quotient(dividingBy 100)
+	}
+}
+
+export {
+	vatPercent
+	withVat
+}
+```
+
+```essence
+§ file: Checkout.es
+import {
+	from "./Pricing.es" {
+		vatPercent
+		withVat
+	}
+}
+
+implementation {
+	Terminal.print(withVat(1000)) § 1190
+	Terminal.print("VAT is {vatPercent}%") § VAT is 19%
+}
+```
+
+`Pricing.es` declares a [constant](/docs/language/programs-and-values) and two [functions](/docs/language/functions), and its `export` block lists `vatPercent` and `withVat`. `Checkout.es` asks for those two in its `import` block. Each group in the block names one file: [`from`](/docs/reference/syntax-glossary#from), the path to the file, then the names in braces. Each name in a block is an entry. `percentOf` has no entry in the export block, so it stays private to `Pricing.es`. Everything a module declares is private unless its export block names it.
+
+**Compared with JavaScript.**
+
+```ts
+// pricing.ts
+export const vatPercent = 19
+
+export function withVat(cents: number): number {
+	return percentOf(cents, 100 + vatPercent)
+}
+
+function percentOf(cents: number, percent: number): number {
+	return Math.trunc((cents * percent) / 100)
+}
+
+// checkout.ts
+import { vatPercent, withVat } from "./pricing"
+
+console.log(withVat(1000))
+console.log(`VAT is ${vatPercent}%`)
+```
+
+In Essence, `export` is not written on a declaration; the export block lists the names. `export function withVat` inside the implementation is [`unknown-name`](/docs/reference/diagnostics#unknown-name), "'export' is not declared". In the import block the path comes first, and the `.es` extension is part of it. Names are separated by line breaks or spaces, not commas. There is no default export, no `import * as`, no package name and no `index` file lookup. More on [Coming from JavaScript › Modules](/docs/getting-started/coming-from-javascript#modules).
+
+## The four blocks of a file
+
+A module has up to four blocks, always in this order: `import`, `implementation`, `export`, and the tests block. Only `implementation` is required, and a file that holds only tests may leave even that out. A block on the wrong side of the implementation is [`misplaced-module-section`](/docs/reference/diagnostics#misplaced-module-section): "The 'export \{ … \}' block belongs below the implementation". An `import` block below the implementation is the same error, with the direction reversed. The other rules for a file's shape:
+
+- The fourth block, `tests { … }`, holds the module's tests. It comes last, below `export`, and [Tests](/docs/language/tests) teaches what goes in it. Written above `export`, it is [`misplaced-tests-section`](/docs/reference/diagnostics#misplaced-tests-section).
+- A file of tests alone is a tests block, usually below an `import` block that brings in what it tests. By convention it is named `Name.tests.es`.
+- A file has one implementation. A second `implementation` block is [`unexpected-token`](/docs/reference/diagnostics#unexpected-token): "Unexpected 'implementation' after the end of the Program".
+- Any block may be empty. `import {}`, `implementation {}` and `export {}` all compile.
+
+## Exporting names
+
+The rest of this page follows a small shop program across several files. `Money.es` declares a type and two [namespaces](/docs/language/namespaces-and-methods) for it:
+
+```essence
+§ file: Money.es
+implementation {
+	type Money = { cents: Integer }
+
+	namespace Money for Money {
+		static of(euros: Integer, cents: Integer) -> Money {
+			<- { cents = euros::multiply(with 100)::add(cents) }
+		}
+	}
+
+	namespace MoneyFormatting for Money {
+		format() -> String {
+			constant euros = @.cents::quotient(dividingBy 100)
+			constant cents = @.cents::remainder(dividingBy 100)
+
+			<- "{euros}.{padded(cents)}"
+		}
+	}
+
+	§ Private: the export block does not list it.
+	function padded(_ value: Integer) -> String {
+		<- value::toString()::pad(to 2, with "0", at #Start)
+	}
+}
+
+export {
+	Money
+	MoneyFormatting
+}
+```
+
+The entry `Money` exports the type `Money` and the namespace of the same name together, so an importer that asks for `Money` can call `Money.of`. `MoneyFormatting` is a namespace with a name of its own, so it needs an entry of its own. `padded` has no entry and stays private.
+
+An entry can name a function, a constant, a [type alias](/docs/language/unions-and-type-aliases), a [choice](/docs/language/choices-and-match), a [protocol](/docs/language/protocols) or a namespace. A variable cannot be exported: the compiler reports [`export-of-variable`](/docs/reference/diagnostics#export-of-variable). JavaScript's `export let` gives importers a live binding that changes under them, and Essence has no counterpart. Export a constant instead, or a function that returns the value.
+
+```essence
+§ file: Catalogue.es
+import {
+	from "./Money.es" { Money }
+}
+
+implementation {
+	function discounted(_ price: Money, byPercent percent: Integer) -> Money {
+		constant rate   = 100::subtract(percent)
+		constant scaled = price.cents::multiply(with rate)
+
+		<- { cents = scaled::quotient(dividingBy 100) }
+	}
+}
+
+export {
+	discounted
+	from "./Money.es" {
+		Money
+		MoneyFormatting
+	}
+}
+```
+
+An export block lists the module's own names first, each bare. Then come forwarding groups, one per file, written like import groups. A forwarding group re-exports names from another module without binding them in this one. `Catalogue.es` forwards `MoneyFormatting` without using it. It imports `Money` separately, because its own function signature names the type.
+
+A file that imports `Catalogue.es` now gets all three names from one place. A module whose job is to forward names is a facade, what a JavaScript project calls a barrel file (`index.ts`). A facade that declares nothing still opens an empty `implementation {}`. Without it, the parser reports `Expected 'implementation' but found end of input.`
+
+JavaScript lets a file import `Money` and list it again in `export { Money }`. Essence does not: a bare entry names something this module declares, so listing `Money` on its own in the export block of `Catalogue.es` is [`export-of-unknown-name`](/docs/reference/diagnostics#export-of-unknown-name):
+
+<div class="error-output">
+
+```
+[export-of-unknown-name]
+Error: 'Money' is not declared in this Module
+    ╭─┤ Catalogue.es:15:2 │
+    │
+ 15 │     Money
+    │     ──┬──
+    │       ╰──── nothing here declares this name
+    │
+    │ Help: Write 'Money' in a 'from "…" { … }' group to forward it from the Module that declares it.
+    │
+    │ Note: An entry with no 'from' clause exports something this Module's implementation declares.
+────╯
+```
+
+</div>
+
+The fix is the one the Help gives: keep `Money` in the `from "./Money.es"` group.
+
+[`as`](/docs/reference/syntax-glossary#as) on an export entry renames the name for everyone. If `Pricing.es` exported `withVat as priced`, every importer would ask for `priced`. A forwarding group that names something the other module does not export is [`unknown-export`](/docs/reference/diagnostics#unknown-export), for example `./Money.es declares nothing named 'MoneyFormat'`.
+
+## Importing names
+
+`Report.es` imports straight from `Money.es`:
+
+```essence
+§ file: Report.es
+import {
+	from "./Money.es" {
+		Money
+		MoneyFormatting
+	}
+}
+
+implementation {
+	function summary(of amounts: List<Money>) -> String {
+		constant total: Money = { cents = Number.sum(amounts::map(.cents)) }
+
+		<- "{amounts::length()} items, {total::format()}"
+	}
+}
+
+export {
+	summary
+}
+```
+
+`Shop.es` is the program's entry file, the file you run. It imports from two modules:
+
+```essence
+§ file: Shop.es
+import {
+	from "./Catalogue.es" {
+		Money
+		MoneyFormatting
+		discounted
+	}
+	from "./Report.es" { summary as basketSummary }
+}
+
+implementation {
+	constant basket = [Money.of(euros 4, cents 50), Money.of(euros 12, cents 5)]
+	constant sale   = discounted(Money.of(euros 20, cents 0), byPercent 15)
+
+	Terminal.print(sale::format()) § 17.00
+	Terminal.print(basketSummary(of basket)) § 2 items, 16.55
+}
+```
+
+[`essence format`](/docs/guides/formatting) sorts the groups by path and the names inside each group. It writes each name on its own line and keeps a one-name group on one line. `summary as basketSummary` binds the name `basketSummary` in this file only; `Report.es` is unchanged. `Shop.es` imports `MoneyFormatting` for `sale::format()`, as the next section explains.
+
+Names are separated by line breaks or spaces, never by commas. A comma is a [`syntax-error`](/docs/reference/diagnostics#syntax-error):
+
+<div class="error-output">
+
+```
+[syntax-error]
+Error: Expected an Identifier but found ','.
+   ╭─┤ Checkout.es:2:34 │
+   │
+ 2 │     from "./Pricing.es" { vatPercent, withVat }
+   │                                     ▲
+   │                                     ╰── here
+───╯
+```
+
+</div>
+
+A few more things the block accepts:
+
+- The same path may head more than one group.
+- A `§` comment may sit between the entries of a group.
+- An empty group, `from "./Pricing.es" {}`, compiles and binds no names. Essence has no side-effect import: `import "./Pricing.es"` is a `syntax-error`.
+
+Asking for a name the other module does not export is [`not-exported`](/docs/reference/diagnostics#not-exported). The message says the name exists and is private, rather than that it is missing:
+
+<div class="error-output">
+
+```
+[not-exported]
+Error: 'percentOf' is not exported by ./Pricing.es
+   ╭─┤ Checkout.es:3:3 │
+   │
+ 3 │        percentOf
+   │        ────┬────
+   │            ╰────── declared in that Module, but private
+   │
+   │ Help: Add 'percentOf' to the 'export { … }' block of ./Pricing.es.
+   │
+   │ Note: A name is private unless the Module's 'export { … }' block lists it.
+───╯
+```
+
+</div>
+
+The same error comes back when you ask for the original name of an entry exported under `as`. Once `Pricing.es` exports `withVat as priced`, asking for `withVat` is `not-exported`.
+
+An entry binds its name in this file exactly as a declaration does. If the name is taken already, the entry is [`duplicate-import`](/docs/reference/diagnostics#duplicate-import). The name may be taken by another entry, by a declaration in the file, or by a name the standard library puts in scope, such as `List`. The Help suggests `as`, to bind the name under another one.
+
+An entry that nothing reads is the Warning [`unused-import`](/docs/reference/diagnostics#unused-import), and a Quick Fix in the editor removes it. A namespace counts as used when a call runs one of its methods. `Shop.es` never spells `MoneyFormatting`, but `sale::format()` runs its `format`, so the entry is used.
+
+`Report.es` imports `Money` from `Money.es`, and `Shop.es` imports it through `Catalogue.es`. Both get the same type, because a module is identified by its file, not by the route taken to it. `Money` is a [record](/docs/language/records) type, which would match by shape anyway. For a choice, the file decides. A choice reached through a facade is the one its file declares. A choice with the same cases, declared in another file, is a different type.
+
+## Namespaces are imported by name
+
+Importing a type does not import the namespaces written for it. `Money.of` works in `Shop.es` because the entry `Money` also brings the namespace named `Money`. `format` lives in `MoneyFormatting`, which needs its own entry. Remove the entry from `Shop.es` and the call is [`unknown-method`](/docs/reference/diagnostics#unknown-method):
+
+<div class="error-output">
+
+```
+[unknown-method]
+Error: No Method named 'format' for this value
+    ╭─┤ Shop.es:13:23 │
+    │
+ 13 │     Terminal.print(sale::format())
+    │                    ──┬─  ───┬──
+    │                      ╰──────│──── this is a { cents: Integer }
+    │                             │
+    │                             ╰──── no Method of this name
+    │
+    │ Help: 'MoneyFormatting' in ./Catalogue.es declares 'format' for { cents: Integer } — import it.
+    │
+    │ Note: Searched Namespaces 'Record', 'Money'.
+────╯
+```
+
+</div>
+
+The Help names the namespace that has `format`, and a file this module already imports that exports it. In the editor, a Quick Fix adds the entry.
+
+A method call reaches the namespaces declared in its own file, the ones the file imports by name, and the standard library's. What `::format()` means can therefore be read off the file's own import block. A dependency that gains a namespace cannot change a call in a file that never imported it.
+
+**Compared with JavaScript.**
+
+```ts
+// money.ts
+export class Money {
+	constructor(readonly cents: number) {}
+
+	format(): string {
+		return (this.cents / 100).toFixed(2)
+	}
+}
+
+// shop.ts
+import { Money } from "./money"
+
+console.log(new Money(1700).format()) // format came with the object
+```
+
+A JavaScript method sits on the class's prototype, so it arrives with every object of the class. An Essence namespace is an export of its own, and a file that does not import it cannot call its methods. More on [Coming from JavaScript › Namespaces and protocols](/docs/getting-started/coming-from-javascript#namespaces-and-protocols).
+
+Two imported namespaces can offer the same method for one value. `MoneyPlain.es` declares a second `format` for `Money`:
+
+```essence
+§ file: MoneyPlain.es
+import {
+	from "./Money.es" { Money }
+}
+
+implementation {
+	namespace MoneyPlain for Money {
+		format() -> String {
+			<- "{@.cents} cents"
+		}
+	}
+}
+
+export {
+	MoneyPlain
+}
+```
+
+A file that imports both namespaces and calls `price::format()` gets [`ambiguous-namespace`](/docs/reference/diagnostics#ambiguous-namespace), the error Namespaces and methods showed within one file. The compiler does not pick one by the order of the imports. Until the call names a namespace, both entries are also reported as `unused-import`, because the refused call runs neither. Name the namespace at the call with `::<Name>`, the [namespace pick](/docs/reference/syntax-glossary#namespace-pick):
+
+```essence
+§ file: Receipt.es
+import {
+	from "./Money.es" {
+		Money
+		MoneyFormatting
+	}
+	from "./MoneyPlain.es" { MoneyPlain }
+}
+
+implementation {
+	constant price = Money.of(euros 1, cents 5)
+
+	Terminal.print(price::<MoneyFormatting>format()) § 1.05
+	Terminal.print(price::<MoneyPlain>format()) § 105 cents
+}
+```
+
+## Specifiers are relative paths
+
+A specifier is the path in quotes after `from`. It starts with `./` or `../` and ends in `.es`. It is resolved against the directory of the file it is written in, not the directory you run the compiler from. It is read exactly as written: nothing is appended and no directory is searched. So the extension-less path that JavaScript tooling accepts is [`invalid-module-specifier`](/docs/reference/diagnostics#invalid-module-specifier):
+
+<div class="error-output">
+
+```
+[invalid-module-specifier]
+Error: Module specifier './Pricing' does not name a '.es' file
+   ╭─┤ Checkout.es:2:7 │
+   │
+ 2 │     from "./Pricing" { withVat }
+   │          ─────┬─────
+   │               ╰─────── the extension is part of the path
+   │
+   │ Help: Write './Pricing.es'.
+   │
+   │ Note: A specifier is read exactly as written — no extension is appended and no directory is tried — so what it names is what is read.
+───╯
+```
+
+</div>
+
+The other specifiers the compiler refuses, written in `Checkout.es`:
+
+| Specifier | Error |
+|---|---|
+| `"Pricing"` | `invalid-module-specifier`: Module specifier 'Pricing' is not a relative path |
+| `"./pricing.js"`, a JavaScript file | `invalid-module-specifier`: Module specifier './pricing.js' does not name a '.es' file |
+| `"/Users/ada/shop/Pricing.es"` | `invalid-module-specifier`: Module specifier '/Users/ada/shop/Pricing.es' is an absolute path |
+| a path to one of the standard library's source files | `invalid-module-specifier`: The standard library is not importable |
+| `"./Prices.es"`, where no such file exists | [`module-not-found`](/docs/reference/diagnostics#module-not-found): No Module was found at './Prices.es' |
+| `"./Checkout.es"`, the file's own path | [`self-import`](/docs/reference/diagnostics#self-import): A Module can not import itself |
+
+Essence has no package lookup, so a bare name is refused rather than searched for. An absolute path names a place on one machine, so a checkout that moves would stop compiling. The standard library has nothing to import: every name it offers is in scope in every file already, as the Prelude section below shows. A module that imports itself gains nothing either, since everything it declares is in scope inside it. Code in another directory, even another project, is imported by its relative path, such as `../shared/Money.es`. The other direction, JavaScript calling Essence, is [Calling Essence from JavaScript](/docs/guides/calling-from-javascript).
+
+## The Prelude
+
+Nothing on this page imports from the standard library. Its names reach every file through one file, `Prelude.es`, and play the part of JavaScript's global names such as `Math`, `JSON` and `console`. Below its header comment, the file begins:
+
+```essence
+§ fragment
+declarations {}
+
+export {
+	from "./Algebraic.es" { Algebraic }
+	from "./Boolean.es" { Boolean }
+	…
+}
+```
+
+`Prelude.es` is a facade. Its [`declarations { … }`](/docs/reference/syntax-glossary#declarations) block, the body form of the standard library's own sources, is empty, and its export block only forwards names from the library's other files. In your files a `declarations` block is [`declarations-outside-stdlib`](/docs/reference/diagnostics#declarations-outside-stdlib): "Only the standard library may open a 'declarations' block".
+
+Here is the whole export block, one row per group, with each name linked to its page in the [standard library reference](/docs/library/overview):
+
+| File | Names it forwards |
+|---|---|
+| `Algebraic.es` | [`Algebraic`](/docs/library/algebraic) |
+| `Boolean.es` | [`Boolean`](/docs/library/boolean) |
+| `Comparable.es` | [`Comparable`](/docs/library/protocols#Comparable) |
+| `Dictionary.es` | [`Dictionary`](/docs/library/dictionary), [`GroupedList`](/docs/library/list), [`GroupedNonEmptyList`](/docs/library/list), [`NonEmptyDictionary`](/docs/library/dictionary#NonEmptyDictionary) |
+| `Enumerable.es` | [`Enumerable`](/docs/library/protocols#Enumerable) |
+| `Integer.es` | [`Division`](/docs/library/integer#Division), [`Integer`](/docs/library/integer), [`NonNegativeInteger`](/docs/library/integer#NonNegativeInteger), [`NonZeroInteger`](/docs/library/integer#NonZeroInteger), [`PositiveInteger`](/docs/library/integer#PositiveInteger) |
+| `List.es` | [`List`](/docs/library/list), [`NestedList`](/docs/library/list), [`NonEmptyList`](/docs/library/list#NonEmptyList), [`NonEmptyNestedList`](/docs/library/list), [`OptionalList`](/docs/library/list), [`ResultList`](/docs/library/list), [`SortOrder`](/docs/library/list#SortOrder) |
+| `Loop.es` | [`loop`](/docs/library/loop) |
+| `Number.es` | [`Irrational`](/docs/library/number#Irrational), [`Number`](/docs/library/number), [`Scalar`](/docs/library/number#Scalar) |
+| `NumberList.es` | [`IntegerList`](/docs/library/list), [`KeyedNumberList`](/docs/library/list), [`NonEmptyIntegerList`](/docs/library/list), [`NonEmptyKeyedNumberList`](/docs/library/list), [`NonEmptyNumberList`](/docs/library/list), [`NonEmptyRationalList`](/docs/library/list), [`NumberList`](/docs/library/list), [`RationalList`](/docs/library/list) |
+| `Optional.es` | [`NestedOptional`](/docs/library/optional), [`Optional`](/docs/library/optional) |
+| `Orderable.es` | [`Orderable`](/docs/library/protocols#Orderable) |
+| `Ordering.es` | [`Ordering`](/docs/library/ordering) |
+| `Protocols.es` | [`Equatable`](/docs/library/protocols#Equatable), [`Printable`](/docs/library/protocols#Printable) |
+| `Randomness.es` | [`Generatable`](/docs/library/protocols#Generatable), [`Randomness`](/docs/library/randomness) |
+| `Rational.es` | [`NonNegativeRational`](/docs/library/rational#NonNegativeRational), [`NonZeroRational`](/docs/library/rational#NonZeroRational), [`NumberFormat`](/docs/library/rational#NumberFormat), [`PositiveRational`](/docs/library/rational#PositiveRational), [`Rational`](/docs/library/rational), [`Rounding`](/docs/library/rational#Rounding), [`SignStyle`](/docs/library/rational#SignStyle) |
+| `Record.es` | [`Record`](/docs/library/record) |
+| `Result.es` | [`NestedResult`](/docs/library/result), [`Result`](/docs/library/result) |
+| `Step.es` | [`Step`](/docs/library/loop#Step) |
+| `String.es` | [`CaseSensitivity`](/docs/library/string#CaseSensitivity), [`Character`](/docs/library/string#Character), [`NonEmptyString`](/docs/library/string#NonEmptyString), [`NormalizationForm`](/docs/library/string#NormalizationForm), [`Side`](/docs/library/string#Side), [`String`](/docs/library/string) |
+| `Terminal.es` | [`Stream`](/docs/library/terminal#Stream), [`Terminal`](/docs/library/terminal) |
+| `Transcendental.es` | [`Transcendental`](/docs/library/transcendental) |
+
+## Run order and cycles
+
+A module's body is the statements in its `implementation`. It runs at most once, however many files import it. A module runs before the files that use its names, and the entry file runs last.
+
+```essence
+§ file: Settings.es
+implementation {
+	constant shopName = "Corner Shop"
+
+	Terminal.print("Settings.es runs")
+}
+
+export {
+	shopName
+}
+```
+
+```essence
+§ file: Banner.es
+import {
+	from "./Settings.es" { shopName }
+}
+
+implementation {
+	function banner() -> String {
+		<- "Welcome to {shopName}"
+	}
+
+	Terminal.print("Banner.es runs")
+}
+
+export {
+	banner
+}
+```
+
+```essence
+§ file: Storefront.es
+import {
+	from "./Banner.es" { banner }
+	from "./Settings.es" { shopName }
+}
+
+implementation {
+	Terminal.print("Storefront.es runs")
+	Terminal.print(banner())
+	Terminal.print("{shopName} is open")
+}
+```
+
+Running `Storefront.es` prints:
+
+```
+Settings.es runs
+Banner.es runs
+Storefront.es runs
+Welcome to Corner Shop
+Corner Shop is open
+```
+
+`Banner.es` and `Storefront.es` both use `shopName` from `Settings.es`. `Settings.es` runs once, before either of them.
+
+Two modules may import each other, directly or through others; that is a cycle. Functions, type aliases, choices, protocols and namespaces are hoisted, which means they exist before any module body runs. A cycle that names only those compiles and runs:
+
+```essence
+§ file: Totals.es
+import {
+	from "./Rounding.es" { rounded }
+}
+
+implementation {
+	type Amount = { cents: Integer }
+
+	function withTax(_ amount: Amount) -> Amount {
+		<- rounded({ cents = amount.cents::multiply(with 119) })
+	}
+}
+
+export {
+	Amount
+	withTax
+}
+```
+
+```essence
+§ file: Rounding.es
+import {
+	from "./Totals.es" { Amount }
+}
+
+implementation {
+	function rounded(_ amount: Amount) -> Amount {
+		<- { cents = amount.cents::quotient(dividingBy 100) }
+	}
+}
+
+export {
+	rounded
+}
+```
+
+```essence
+§ file: Invoice.es
+import {
+	from "./Totals.es" { withTax }
+}
+
+implementation {
+	Terminal.print(withTax({ cents = 1000 }).cents) § 1190
+}
+```
+
+`Totals.es` imports the function `rounded`, and `Rounding.es` imports the type `Amount` back. `Invoice.es` runs the program from outside the cycle, because a `Terminal.print` inside `Totals.es` would be the Warning below.
+
+A constant cannot cross a cycle. Its value exists only once its module's body has run. Inside a cycle, which body runs first depends on which module the entry file reaches first, not on the two modules. Suppose `Rounding.es` also exported `constant taxPercent = 119` and `Totals.es` imported it. The compiler refuses the entry with [`cyclic-constant-import`](/docs/reference/diagnostics#cyclic-constant-import):
+
+<div class="error-output">
+
+```
+[cyclic-constant-import]
+Error: Constant 'taxPercent' is imported across a cycle
+   ╭─┤ Totals.es:4:3 │
+   │
+ 4 │        taxPercent
+   │        ─────┬────
+   │             ╰────── this Constant is not readable here
+   │
+   │ Help: Move the Constant into a Module outside the cycle, or expose it as a Function.
+   │
+   │ Note 1: ./Rounding.es imports this Module back, directly or through further Modules.
+   │ Note 2: A Function, a Type Alias, a Choice, a Protocol and a Namespace are all hoisted, so a cycle can name any of them. A Constant is not: its value exists only once its Module's body has run, and inside a cycle which body runs first is not something the source states.
+───╯
+```
+
+</div>
+
+A top-level statement in a module inside a cycle, such as a `Terminal.print` in the body of `Rounding.es`, is the Warning [`cyclic-side-effects`](/docs/reference/diagnostics#cyclic-side-effects). The program compiles. Whether that statement runs before or after the other module's body depends on which module the entry file reaches first.
+
+**Compared with JavaScript.**
+
+```ts
+// totals.ts
+import { rounded } from "./rounding"
+
+export const taxPercent = 119
+
+export function withTax(cents: number): number {
+	return rounded(cents * taxPercent)
+}
+
+// rounding.ts
+import { taxPercent } from "./totals"
+
+export const highestTax = taxPercent * 1_000 // ReferenceError if rounding.ts runs first
+
+export function rounded(cents: number): number {
+	return Math.trunc(cents / 100)
+}
+```
+
+ES modules allow a `const` across a cycle and throw a `ReferenceError` at run time if it is read before its module has run. Essence refuses every constant import across a cycle when it compiles. More on [Coming from JavaScript › Modules](/docs/getting-started/coming-from-javascript#modules).
+
+## Compiling a program of several files
+
+Give the compiler the entry file, and it reads every module that file reaches. [`essence build Shop.es`](/docs/reference/cli#build) writes one self-contained `Shop.js`, holding all four modules and the runtime they need. It has no `import` statements, and no `node_modules` needs to sit beside it. Naming several files compiles each as an entry file of its own, so `essence build Checkout.es Shop.es` writes two bundles. [`essence check src/*.es`](/docs/reference/cli#check) checks every file the pattern matches, including modules nothing imports. A project may also have an `essence.json`, but it holds settings for the commands, not a list of modules or dependencies. [Projects and essence.json](/docs/guides/projects) covers that file, its keys are in the [essence.json reference](/docs/reference/project-file), and [Using the compiler](/docs/guides/using-the-compiler) covers the commands.

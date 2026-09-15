@@ -1,0 +1,557 @@
+---
+title: Generics
+description: "Declare functions, namespaces, choices and aliases over any type, and see where each type argument comes from."
+section: language
+order: 190
+template: article
+---
+
+A type parameter is a name that stands for a type in a declaration, like `ItemType` in [`List<ItemType>`](/docs/library/list). Each use of the declaration fills it with a type argument. Essence has two rules for where that argument comes from, and the kind of declaration picks the rule. [Functions](/docs/language/functions), methods and [namespaces](/docs/language/namespaces-and-methods) infer it from each call, and mark each type parameter with [`infer`](/docs/reference/syntax-glossary#infer). [Choices](/docs/language/choices-and-match) and [type aliases](/docs/language/unions-and-type-aliases) apply it: each use writes it, and a choice's bare case, written without the choice's name, can also take it from where the use stands. Coming from TypeScript, two things differ: `infer` is required on every type parameter a call binds, and a call never writes its type arguments.
+
+```essence
+implementation {
+	function paired<infer First, infer Second>(
+		_ first: First,
+		with second: Second,
+	) -> { first: First, second: Second } {
+		<- { first, second }
+	}
+
+	Terminal.print(paired(1, with "one")) § { first = 1, second = "one" }
+	Terminal.print(paired("half", with 1/2)) § { first = "half", second = 1/2 }
+	Terminal.print(paired(["Ada"], with true)) § { first = ["Ada"], second = true }
+}
+```
+
+`paired` has two type parameters, written in [angle brackets](/docs/reference/syntax-glossary#angle-brackets) between its name and its parameters. The first call binds `First` to [`Integer`](/docs/library/integer) and `Second` to [`String`](/docs/library/string). The second call binds them again, to `String` and [`Rational`](/docs/library/rational). The third binds them to `List<String>` and [`Boolean`](/docs/library/boolean). A type parameter can stand anywhere a type can in the signature: in a parameter, in the return type, inside a [record](/docs/language/records) or a [list](/docs/language/lists).
+
+The two rules side by side:
+
+| Declaration | The type argument comes from | `infer` on the parameter |
+|---|---|---|
+| a function or a method | the arguments of each call | required |
+| a namespace | the receiver of each call, the value before `::` | required |
+| a choice | each use, written out or taken from its position; a bare case's payload can also decide it | refused |
+| a type alias | each use, written out (a default fills one left out) | refused |
+
+**Compared with JavaScript.**
+
+```ts
+function paired<First, Second>(first: First, second: Second) {
+  return { first, second }
+}
+
+paired(1, "one")
+paired<number, string>(1, "one")
+
+function emptied<Item>(): Item[] {
+  return []
+}
+
+const names: string[] = emptied()
+```
+
+TypeScript lets a call write its type arguments, as the second call does. It also infers them from the destination, so `emptied()` returns a `string[]` for `names`. Essence does neither: only the arguments bind a function's type parameters. Essence's `infer` is not the `infer` of TypeScript's conditional types. It marks a parameter that each call binds. More on [Coming from JavaScript › Types](/docs/getting-started/coming-from-javascript#types).
+
+## Only the arguments bind
+
+```essence
+implementation {
+	function twice<infer Value>(_ value: Value) -> List<Value> {
+		<- [value, value]
+	}
+
+	function lastOr<infer Item>(_ items: List<Item>, fallback: Item) -> Item {
+		<- items::lastItem()::value(defaultingTo fallback)
+	}
+
+	Terminal.print(twice("echo")) § ["echo", "echo"]
+	Terminal.print(lastOr([3, 4], fallback 0)) § 4
+	Terminal.print(lastOr([], fallback "none")) § none
+}
+```
+
+`twice` binds `Value` from its one argument. `lastOr` binds `Item` from both arguments together. In `lastOr([], fallback "none")` the empty list says nothing about its items, and `"none"` binds `Item` to `String`. The calls in its body are [`lastItem`](/docs/library/list#lastItem) and [`value(defaultingTo:)`](/docs/library/optional#value).
+
+`infer` is required. In TypeScript you write `<Value>`; here you write `<infer Value>`. A type parameter written without it is not refused where it is declared. No call can bind it, so every call fails, and the error names the argument rather than the missing `infer`. With `function identity<Value>(_ value: Value) -> Value`, the call `identity(1)` is [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch):
+
+<div class="error-output">
+
+```
+[argument-type-mismatch]
+Error: This Argument does not fit Parameter 1
+   ╭─┤ identity.es:6:26 │
+   │
+ 6 │     Terminal.print(identity(1))
+   │                             ▲  
+   │                             ╰── this is an Integer
+   │ 
+   │ Note: Parameter 1 is Value.
+───╯
+```
+
+</div>
+
+There is no syntax for writing type arguments at a call. `paired<Integer, String>(1, with "one")` is a [`syntax-error`](/docs/reference/diagnostics#syntax-error):
+
+<div class="error-output">
+
+```
+[syntax-error]
+Error: Expected an Identifier but found '1'.
+   ╭─┤ paired.es:9:41 │
+   │
+ 9 │     Terminal.print(paired<Integer, String>(1, with "one"))
+   │                                            ▲  
+   │                                            ╰── here
+───╯
+```
+
+</div>
+
+The type of the destination does not reach back into a call either. `function emptied<infer Item>() -> List<Item>` mentions `Item` only in its return type, so no argument can bind it, and the annotation on `names` does not help. The call is [`uninferable-type-parameter`](/docs/reference/diagnostics#uninferable-type-parameter):
+
+<div class="error-output">
+
+```
+[uninferable-type-parameter]
+Error: Type Parameter 'Item' could not be inferred
+   ╭─┤ names.es:6:33 │
+   │
+ 6 │     constant names: List<String> = emptied()
+   │                                    ────┬────  
+   │                                        ╰────── nothing here determines what it binds to
+───╯
+```
+
+</div>
+
+The block leaves out the error's Help, which asks for the type argument to be written at the call. No syntax for that exists. Give `Item` a place among the parameters, so that an argument can bind it, or write the value directly: `constant names: List<String> = []` compiles.
+
+A generic function is a value like any other function, and each call through the value binds its type parameters again:
+
+```essence
+implementation {
+	function identity<infer Value>(_ value: Value) -> Value {
+		<- value
+	}
+
+	constant stored = identity
+	constant twice  = <infer Value>(_ value: Value) -> List<Value> {
+		<- [value, value]
+	}
+
+	Terminal.print(stored(1)::add(1)) § 2
+	Terminal.print(stored("text")) § text
+	Terminal.print(twice(true)) § [true, true]
+	Terminal.print([1, 2]::map((number) { <- identity(number) })) § [1, 2]
+}
+```
+
+`stored` holds `identity`, and its two calls bind `Value` to `Integer` and then to `String`. A [function literal](/docs/language/functions-as-values) can declare type parameters too, in angle brackets before its parameters. `twice` is one, and its call binds `Value` to `Boolean`.
+
+A generic function, declared or written as a literal, does not fit a parameter of function type. Passed straight to [`map`](/docs/library/list#map), it is [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload). Passed to your own parameter of type `(_ value: Integer) -> Integer`, it is `argument-type-mismatch`. A function type has no spelling for type parameters. Pass a function literal that calls the generic function instead, as the last line does.
+
+Two kinds of function cannot be values at all. A bound requires a type parameter's argument to conform to a protocol, Essence's counterpart of an interface, and [Protocols](/docs/language/protocols) teaches bounds. Storing a generic function with a bound is [`protocol-bound-function-value`](/docs/reference/diagnostics#protocol-bound-function-value), and storing an overloaded function is [`overloaded-function-value`](/docs/reference/diagnostics#overloaded-function-value). Overloads are on Namespaces and methods.
+
+## A type parameter is opaque
+
+```essence
+implementation {
+	function swapped<infer First, infer Second>(
+		_ pair: { first: First, second: Second },
+	) -> { first: Second, second: First } {
+		<- { first = pair.second, second = pair.first }
+	}
+
+	Terminal.print(swapped({ first = 1, second = "one" })) § { first = "one", second = 1 }
+}
+```
+
+`swapped` never learns what `First` and `Second` are. Inside the body, a type parameter is opaque. The body can pass a value of that type along, return it, and put it into a record or a list. It cannot call a method on the value. `value::toString()` in a function generic over `Value` is [`no-namespace-for-value`](/docs/reference/diagnostics#no-namespace-for-value), with the note `No Namespace in scope targets Value.`
+
+A hole in a string asks for the same thing. `"value: {value}"` is [`interpolation-not-printable`](/docs/reference/diagnostics#interpolation-not-printable), with the note `Type Parameter 'Value' does not conform to 'Printable'.` TypeScript also refuses `value.toString()` on an unconstrained `T`, but it accepts `` `${value}` ``. Essence refuses both. A bound lifts both limits, as `extends` does on a TypeScript type parameter.
+
+## A namespace infers from its receiver
+
+```essence
+implementation {
+	namespace Stack<infer Item> for List<Item> {
+		push(_ item: Item) -> NonEmptyList<Item> {
+			<- @::append(item)
+		}
+
+		pop() -> List<Item> {
+			<- @::removeLast()
+		}
+
+		peek() -> Optional<Item> {
+			<- @::lastItem()
+		}
+	}
+
+	variable history: List<String> = []
+
+	history = history::push("Hello")
+	history = history::push("Hello, World")
+
+	Terminal.print(history::peek()) § Value("Hello, World")
+	Terminal.print([4]::push(2)::pop()::peek()) § Value(4)
+	Terminal.print(history::pop()::pop()::peek()) § Empty
+}
+```
+
+A namespace can take a type parameter of its own and use it in its target type, the type after `for`. `Stack<infer Item>` targets `List<Item>`, so every list has its methods, whatever it holds. The receiver binds `Item` at each call: `history` binds it to `String`, and `[4]` binds it to `Integer`. The methods use `Item` like any other type. `push` takes one, and `peek` returns an `Optional<Item>`. The calls inside are [`append`](/docs/library/list#append), [`removeLast`](/docs/library/list#removeLast) and `lastItem`.
+
+`infer` is required here too, and the compiler checks it where the namespace is declared. A namespace's type parameter has only the receiver to bind from, so without `infer` nothing ever could. That is [`uninferred-namespace-parameter`](/docs/reference/diagnostics#uninferred-namespace-parameter), and its Help reads `Declare it as 'infer Item'.`
+
+A method can declare type parameters of its own, after its name. The two levels bind from different places:
+
+```essence
+implementation {
+	namespace Mapper<infer Item> for List<Item> {
+		transformFirst<infer Target>(
+			_ transform: (_ item: Item) -> Target,
+			fallback fallbackValue: Target,
+		) -> Target {
+			<- @::firstItem()::map(transform)::value(defaultingTo fallbackValue)
+		}
+	}
+
+	constant numbers  = [1, 2, 3]
+	constant label    = numbers::transformFirst(
+		(number) { <- number::toString() },
+		fallback "none",
+	)
+	constant positive = numbers::transformFirst(
+		(number) { <- number::isGreaterThan(0) },
+		fallback false,
+	)
+
+	Terminal.print(label) § 1
+	Terminal.print(positive) § true
+}
+```
+
+`Item` belongs to `Mapper` and binds from the receiver, here to `Integer`. `Target` belongs to `transformFirst` and binds from the call's arguments. The callback returns a `String` in the first call and a `Boolean` in the second. So the same method on the same receiver returns a different type each time.
+
+An entry of an [`overload`](/docs/reference/syntax-glossary#overload) can declare the namespace's type parameter again, with a bound, so that the entry exists only for some type arguments. The library's [`sort`](/docs/library/list#sort) is declared this way. `[3, 1, 2]::sort()` compiles, and `sort()` on a list of records is refused, because a record is not [`Comparable`](/docs/library/protocols#Comparable). Protocols covers bounds and that error.
+
+## A choice applies its type arguments
+
+```essence
+implementation {
+	choice Box<Value> {
+		Full { value: Value },
+		Empty,
+	}
+
+	constant letter: Box<String> = #Full("a letter")
+	constant parcel = #Full("a parcel")
+	constant crate  = Box<String>#Empty
+
+	function contents(of box: Box<String>) -> String {
+		<- match box -> String {
+			case #Full  { <- @.value }
+			case #Empty { <- "nothing" }
+		}
+	}
+
+	Terminal.print(contents(of letter)) § a letter
+	Terminal.print(contents(of parcel)) § a parcel
+	Terminal.print(contents(of crate)) § nothing
+	Terminal.print(contents(of #Empty)) § nothing
+}
+```
+
+A choice's type arguments are applied: something at each use says what they are. `Box` shows the four places:
+
+- `letter` takes them from its annotation, `Box<String>`.
+- `parcel` takes them from its payload. A bare case whose payload mentions a type parameter decides it, so `#Full("a parcel")` is a `Box<String>`.
+- `crate` writes them on the construction, as `Box<String>#Empty`.
+- `contents(of #Empty)` takes them from the parameter's type. A declared return type does the same.
+
+A bare case passed to one of a call's own type parameters has nothing to decide its choice's type arguments. In `paired(1, with #Empty)`, the compiler finds the choice, [`Optional`](/docs/library/optional), but `Second` is the call's own, so nothing decides the `Optional`'s argument. That is [`undecided-type-arguments`](/docs/reference/diagnostics#undecided-type-arguments). Write `Optional<String>#Empty` instead.
+
+`#Empty` has no payload, so on a constant with no annotation nothing decides `Value`. `constant crate = Box#Empty` is `undecided-type-arguments` too:
+
+<div class="error-output">
+
+```
+[undecided-type-arguments]
+Error: Nothing decides the Type Arguments of 'Box#Empty'
+   ╭─┤ crate.es:7:19 │
+   │
+ 7 │     constant crate = Box#Empty
+   │                      ────┬────  
+   │                          ╰────── no Type Arguments here, and nothing around it decides them
+   │ 
+   │ Help 1: Annotate the declaration: 'constant left: Box<Value> = Box#Empty'.
+   │ Help 2: Or apply the Type Arguments: 'Box<Value>#Empty'.
+   │ 
+   │ Note 1: 'Box' takes 1 Type Parameter: 'Value'.
+   │ Note 2: A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.
+───╯
+```
+
+</div>
+
+The Help names both ways out, with placeholders. It calls the constant `left`, whatever its name, and writes the type parameter `Value` where a type argument goes. Write the type you mean, as in `Box<String>#Empty`.
+
+The payload decides only in the bare spelling. `Box#Full("a letter")` on a constant with no annotation is `undecided-type-arguments` as well. The block's second Note holds for that spelling with the choice's name: the payload is checked against the type arguments, and it decides nothing. A payload also decides only the type parameters its members mention. In a `choice Either<First, Second>`, a bare `#Left(1)` decides `First`, and the error says that nothing decides `Second`.
+
+Writing `infer` on a choice's parameter is [`infer-on-applied-parameter`](/docs/reference/diagnostics#infer-on-applied-parameter), "A Choice's Type Parameters can not be inferred". Its note says why: they are "applied at every use, never inferred from one".
+
+No choice can name itself, generic or not; Choices and match shows the plain case. TypeScript's `type Tree<Item> = { value: Item } | { left: Tree<Item>, right: Tree<Item> }` has no twin here. A generic choice that tries, as `choice Tree<Item> { Leaf { value: Item }, Branch { left: Tree<Item>, right: Tree<Item> } }` does, is [`recursive-generic-choice`](/docs/reference/diagnostics#recursive-generic-choice):
+
+<div class="error-output">
+
+```
+[recursive-generic-choice]
+Error: A generic Choice can not name itself in a payload
+```
+
+</div>
+
+A generic choice's payloads are substituted at each use, so a self-reference would never finish. Choices and match describes how to keep a tree's nodes in a list instead.
+
+## A type alias applies its type arguments too
+
+```essence
+implementation {
+	type Pair<First, Second> = { first: First, second: Second }
+	type Table<Value> = List<Pair<String, Value>>
+
+	constant scores: Table<Integer> = [
+		{ first = "ada", second = 3 },
+		{ first = "grace", second = 5 },
+	]
+
+	function total(of table: Table<Integer>) -> Integer {
+		<- table::reduce(startingWith 0, (sum, entry) {
+			<- sum::add(entry.second)
+		})
+	}
+
+	function firsts<infer First, infer Second>(
+		_ pairs: List<Pair<First, Second>>,
+	) -> List<First> {
+		<- pairs::map((pair) { <- pair.first })
+	}
+
+	Terminal.print(total(of scores)) § 8
+	Terminal.print(firsts(scores)) § ["ada", "grace"]
+}
+```
+
+A [`type`](/docs/reference/syntax-glossary#type) alias takes type parameters the same way a choice does, and each use applies them. `Pair<First, Second>` names a record shape with two members. An alias can pass its own parameter on to another generic type. `Table<Value>` is a `List<Pair<String, Value>>`, so `Table<Integer>` is a list of records whose `second` is an `Integer`. An alias also works inside a signature that infers: `firsts` binds its own `First` and `Second` from the list it receives.
+
+The number of type arguments must match, unless a parameter has a default. A bare `Pair` gives none, `Pair<String>` gives one too few, and `Pair<String, Integer, Boolean>` one too many. All three are [`wrong-type-argument-count`](/docs/reference/diagnostics#wrong-type-argument-count). For `Pair<String>` the label reads `1 Type Argument given`, with the note `'Pair' takes 2 Type Parameters.`
+
+Type arguments on a type that takes none, such as `Integer<String>`, are [`type-not-generic`](/docs/reference/diagnostics#type-not-generic), "This Type takes no Type Arguments". `infer` on an alias's parameter is `infer-on-applied-parameter` again. Its note reads "A Type Alias's Type Parameters are applied at every use, never inferred from one."
+
+A [checked refinement](/docs/language/checked-refinements) is an alias with a `where` clause, and it takes type parameters too:
+
+```essence
+implementation {
+	type NonEmpty<Item> = List<Item> where @::hasItems()
+
+	function firstOf<infer Item>(_ items: NonEmpty<Item>) -> Item {
+		<- items::firstItem()
+	}
+
+	function listed<infer Item>(_ item: Item) -> NonEmptyList<Item> {
+		<- [item]
+	}
+
+	constant colours: NonEmptyList<String> = ["red", "green"]
+
+	Terminal.print(firstOf([5, 6])) § 5
+	Terminal.print(firstOf(colours)) § red
+	Terminal.print(firstOf(listed("only"))) § only
+}
+```
+
+`NonEmpty<Item>` is a list of any item type, proven by [`hasItems()`](/docs/library/list#hasItems) to have an item. `firstOf` applies it to its own inferred `Item`, so each call binds `Item` from the list it is given. In the body, [`firstItem()`](/docs/library/list#firstItem) returns an `Item` rather than an `Optional<Item>`, because the proof says there is one.
+
+All three arguments pass. `[5, 6]` is a written list with items in it. `colours` is a [`NonEmptyList<String>`](/docs/library/list#NonEmptyList), which the library declares as `List<ItemType> where @::hasItems()`. Two refinements that prove the same thing of the same base are one type, so it fits `NonEmpty<String>`. `listed` builds `[item]` from a value whose type it never learns, and the written list still proves it has an item.
+
+A plain `List<String>` does not pass. It is `argument-type-mismatch`, and the Help says to check `@::hasItems()` in an [`if`](/docs/reference/syntax-glossary#if) or a [`match`](/docs/reference/syntax-glossary#match) first. Checked refinements covers those checks.
+
+The standard library's generic types follow the same rules. Each is applied wherever you name it:
+
+| Type | Its type parameters | What it is |
+|---|---|---|
+| `List<ItemType>` | the items | built in |
+| `Optional<ItemType>` | the value | a choice: `#Value` or `#Empty` |
+| [`Result<ValueType, FailureType>`](/docs/library/result) | the value, and the reason it is missing | a choice: `#Value` or `#Failure` |
+| [`Dictionary<KeyType, ValueType>`](/docs/library/dictionary) | the keys, and the values | built in |
+| [`Step<State, Answer>`](/docs/library/loop#Step) | what a loop carries, and what it returns | a choice: `#Continue` or `#Done` |
+| `NonEmptyList<ItemType>` | the items | a refinement: `List<ItemType> where @::hasItems()` |
+
+`Step` is the choice a [`loop`](/docs/library/loop) body labelled `step` returns, as [Iteration](/docs/language/iteration) showed. A wrong count is `wrong-type-argument-count` here too: `Step<Integer>` has the note `'Step' takes 2 Type Parameters.` The library's namespaces infer, the same as `Stack`. Its `List` namespace begins `namespace List<infer ItemType> for List<ItemType>`.
+
+## Defaults for type parameters
+
+```essence
+implementation {
+	type Pair<First, Second = Integer> = { first: First, second: Second }
+
+	choice Box<Value = String> {
+		Full { value: Value },
+		Empty,
+	}
+
+	constant scored: Pair<String>         = { first = "ada", second = 3 }
+	constant graded: Pair<String, String> = { first = "ada", second = "A" }
+	constant parcel: Box = #Full("a letter")
+
+	function contents(of box: Box) -> String {
+		<- match box -> String {
+			case #Full  { <- @.value }
+			case #Empty { <- "nothing" }
+		}
+	}
+
+	Terminal.print(scored) § { first = "ada", second = 3 }
+	Terminal.print(graded) § { first = "ada", second = "A" }
+	Terminal.print(contents(of parcel)) § a letter
+	Terminal.print(contents(of #Empty)) § nothing
+}
+```
+
+A type parameter of an alias or a choice can have a default, written after `=`. A use that leaves the argument out gets the default. `Pair<String>` is a `Pair<String, Integer>`, and `Box` with no type argument is a `Box<String>`. A use can still give every argument, so `Pair<String, String>` and `Box<Integer>` are ordinary types.
+
+The default is checked like a written argument. With `choice Box<Value = String>`, a `Box` holds a `String`, and `#Full(12)` is [`payload-type-mismatch`](/docs/reference/diagnostics#payload-type-mismatch):
+
+<div class="error-output">
+
+```
+[payload-type-mismatch]
+Error: This payload does not fit Case '#Full'
+   ╭─┤ parcel.es:7:31 │
+   │
+ 7 │     constant parcel: Box = #Full(12)
+   │                                  ─┐  
+   │                                   ╰── this is a { value: Integer }
+   │ 
+   │ Note: '#Full' carries a { value: String }.
+───╯
+```
+
+</div>
+
+On a function, the same spelling is accepted and does nothing. `function emptied<infer Item = Integer>() -> List<Item>` still has no argument to bind `Item` from, and a call to it is `uninferable-type-parameter`. When an argument binds the parameter, the argument decides and the default is ignored. TypeScript uses a function's default when nothing infers the parameter. Essence does not.
+
+## Types erase before a match
+
+```essence
+implementation {
+	function unwrap<infer Value>(
+		_ candidate: Value | String,
+		fallback fallbackValue: Value,
+	) -> Value {
+		<- match candidate -> Value {
+			case String { <- fallbackValue }
+			case Value  { <- @ }
+		}
+	}
+
+	Terminal.print(unwrap("missing", fallback 7)) § 7
+	Terminal.print(unwrap(3, fallback 7)) § 3
+}
+```
+
+Types erase: no type argument exists when the program runs. A `match` cannot test for one, so `case Value` narrows nothing and matches every value that reaches it. It must be the last arm. Written first, it is [`erased-case-conflict`](/docs/reference/diagnostics#erased-case-conflict), an Error:
+
+<div class="error-output">
+
+```
+[erased-case-conflict]
+Error: This Case can never match
+   ╭─┤ unwrap.es:8:9 │
+   │
+ 7 │          case Value  { <- @ }
+   │               ──┬──  
+   │                 ╰──── this Case runs first
+ 8 │          case String { <- fallbackValue }
+   │               ───┬──  
+   │                  ╰──── an earlier Case already answers for every Type this one matches
+   │ 
+   │ Help: Write this Case above 'case Value', which can only ever be the last one.
+   │ 
+   │ Note 1: Cases are tried in order, and the first one that fits wins.
+   │ Note 2: Types erase before a Match runs, so the Generic Case 'Value' narrows nothing and accepts every value that reaches it.
+───╯
+```
+
+</div>
+
+An arm that can never match is usually the Warning [`unreachable-case`](/docs/reference/diagnostics#unreachable-case). This one is an Error because the function would return the wrong value: `"missing"` would reach `case Value` and come back where a `Value` is promised.
+
+**Compared with JavaScript.**
+
+```ts
+function unwrap<Value>(candidate: Value | string, fallback: Value): Value {
+  // `candidate instanceof Value` is refused: 'Value' only refers to a type.
+  return typeof candidate === "string" ? fallback : candidate
+}
+```
+
+TypeScript types erase too. TypeScript refuses `candidate instanceof Value`, so the function tests for the other member instead, with `typeof`. Essence accepts `case Value`, and checks that it is the last arm. More on [Coming from JavaScript › Types](/docs/getting-started/coming-from-javascript#types).
+
+Erasure also hides a list's item type. A list matcher, such as `case List<Integer>`, checks the items a list holds, and an empty list holds none, so it fits `List<Integer>` and `List<String>` alike:
+
+```essence
+implementation {
+	function kind(of items: List<Integer> | List<String>) -> String {
+		<- match items -> String {
+			case List<Integer> where @::hasItems() { <- "numbers" }
+			case List<String> where @::hasItems() { <- "words" }
+			case _ { <- "nothing" }
+		}
+	}
+
+	constant none: List<String> = []
+
+	Terminal.print(kind(of [1, 2])) § numbers
+	Terminal.print(kind(of ["a"])) § words
+	Terminal.print(kind(of none)) § nothing
+}
+```
+
+Without the [`where`](/docs/reference/syntax-glossary#where-guard) guards, `case List<Integer>` above `case List<String>` also takes every empty `List<String>`. That is the Warning [`empty-list-overlap`](/docs/reference/diagnostics#empty-list-overlap):
+
+<div class="error-output">
+
+```
+[empty-list-overlap]
+Warning: This Case never sees an empty List
+   ╭─┤ kind.es:5:9 │
+   │
+ 4 │          case List<Integer> { <- "numbers" }
+   │               ──────┬──────  
+   │                     ╰──────── this Case runs first
+ 5 │          case List<String>  { <- "words" }
+   │               ──────┬─────  
+   │                     ╰─────── an empty List<String> fits the Case above too
+   │ 
+   │ Help: Guard the Cases with 'where @::hasItems()' and answer for the empty List in a Case of its own.
+   │ 
+   │ Note 1: Cases are tried in order, and the first one that fits wins.
+   │ Note 2: Item Types erase before a Match runs, so a List Matcher asks about the items the value holds — and an empty List holds none, which makes it a value of every List Type there is.
+───╯
+```
+
+</div>
+
+The fix is the one the Help names, and `kind` above has it. Both arms carry a `where` guard of `@::hasItems()`, and the empty list gets an arm of its own. [`empty-dictionary-overlap`](/docs/reference/diagnostics#empty-dictionary-overlap) is the same Warning for dictionaries, and its guard asks [`hasEntries()`](/docs/library/dictionary#hasEntries): `where @::hasEntries()`.
+
+<SeeAlso
+	links={[
+		{ label: "Protocols", href: "/docs/language/protocols" },
+		{ label: "Checked refinements", href: "/docs/language/checked-refinements" },
+		{ label: "Choices and match", href: "/docs/language/choices-and-match" },
+		{ label: "Diagnostics", href: "/docs/reference/diagnostics" },
+	]}
+/>

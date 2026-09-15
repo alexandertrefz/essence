@@ -1,0 +1,348 @@
+---
+title: Method calls
+description: "Call a method with :: and labelled arguments, and do arithmetic, comparison and logic with methods, because there are no operators."
+section: language
+order: 20
+template: article
+---
+
+A method is called on a value with [`::`](/docs/reference/syntax-glossary#method-call), and a labelled argument carries its label in front of the value: `price::multiply(with 3)`. Essence has no operators, so JavaScript's `+`, `===` and `&&` are the methods [`add`](/docs/library/integer#add), [`is`](/docs/library/integer#is) and [`and`](/docs/library/boolean#and). This page covers the call form, chaining, and the arithmetic, comparison and logic methods every later page uses.
+
+```essence
+implementation {
+	constant price    = 1999
+	constant quantity = 3
+
+	constant subtotal = price::multiply(with quantity)
+
+	Terminal.print(subtotal) § 5997
+	Terminal.print(subtotal::add(500)) § 6497
+	Terminal.print(subtotal::isGreaterThan(5000)) § true
+	Terminal.print(subtotal::clamp(between 0, and 5000)) § 5000
+}
+```
+
+`price` is the receiver: the value the method is called on. [`multiply`](/docs/library/integer#multiply) is the method, and `with quantity` is its one argument, labelled `with`. A call is an expression. It has a value, and that value can be printed, bound to a constant, or handed to the next call.
+
+## Calling a method
+
+A call is `receiver::name(arguments)`. Each argument is either positional or labelled.
+
+```essence
+implementation {
+	constant temperature = 104
+
+	§ one positional argument
+	Terminal.print(temperature::subtract(4)) § 100
+
+	§ one labelled argument: the label stands in front of its value
+	Terminal.print(temperature::multiply(with 2)) § 208
+
+	§ a positional argument, then a labelled one
+	Terminal.print(temperature::isBetween(90, and 110)) § true
+
+	§ two labelled arguments, in the order the method declares them
+	Terminal.print(temperature::clamp(between 0, and 100)) § 100
+}
+```
+
+A [label](/docs/reference/syntax-glossary#labels) is a word written in front of its value, with only a space between them. There is no colon and no `=`. `clamp(between: 0, and: 100)` is a [`syntax-error`](/docs/reference/diagnostics#syntax-error), `Expected an Expression but found ':'.`
+
+Labels are part of a method's signature, and a call must write them. A method can have several overloads, versions that differ in their parameters. A call picks one by its labels first, then by its argument types.
+
+These pages write a method with its labels, as [`clamp(between:and:)`](/docs/library/integer#clamp), [`item(at:)`](/docs/library/list#item) or [`isBetween(_:and:)`](/docs/library/integer#isBetween), where [`_`](/docs/reference/syntax-glossary#underscore) marks a positional parameter. Each library page gives the full signature, as `isBetween(_ lower: Integer, and upper: Integer) -> Boolean`. The parameter of [`subtract`](/docs/library/integer#subtract) is positional, so `temperature::subtract(4)` takes no label.
+
+A call writes each argument's label, in the order the method declares them. A missing, misspelt or reordered label is refused, as the last section of this page shows. A parameter may declare a default value, and then a call can leave that argument out. [`round`](/docs/library/rational#round) has one: `7/2::round()` passes no rounding direction and rounds to the nearest whole number, `4`. [Functions](/docs/language/functions) covers default values.
+
+A trailing [comma](/docs/reference/syntax-glossary#comma) after the last argument is allowed. [`essence format`](/docs/guides/formatting) removes it from a call that fits on one line, and writes one when it breaks a call over lines.
+
+## Chaining calls
+
+A call's result is a value, so it can be the receiver of the next call. A chain reads left to right, one call after another, with no precedence to remember.
+
+```essence
+implementation {
+	constant fahrenheit = 212
+
+	§ each result is the receiver of the next call, left to right
+	Terminal.print(fahrenheit::subtract(32)::multiply(with 5)::divide(by 9)) § 100
+
+	§ a long chain is broken over lines, with `::` leading each line
+	Terminal.print(
+		fahrenheit
+			::subtract(32)
+			::multiply(with 5)
+			::divide(by 9)
+			::clamp(between -40, and 40),
+	) § 40
+}
+```
+
+The first chain reads as `((212 - 32) * 5) / 9`. A chain too long for one line is broken with `::` at the start of each continued line, indented one step under the receiver. That is the layout `essence format` writes.
+
+## Grouping without parentheses
+
+There are no grouping [parentheses](/docs/reference/syntax-glossary#parentheses). An opening parenthesis in expression position always begins the parameter list of a [function literal](/docs/language/functions-as-values), Essence's arrow function. Wrapping a call in parentheses is a syntax error:
+
+<div class="error-output">
+
+```
+[syntax-error]
+Error: Expected an Identifier but found '1'.
+   ╭─┤ grouping.es:2:18 │
+   │
+ 2 │     Terminal.print((1::add(2))::multiply(with 3))
+   │                     ▲  
+   │                     ╰── here
+───╯
+```
+
+</div>
+
+Without precedence, grouping would only decide what is computed first. To do that, nest the part inside an argument, or bind it to a constant and continue from the constant:
+
+```essence
+implementation {
+	constant price   = 80
+	constant taxRate = 1/5
+
+	§ price * (1 + taxRate), with the inner part nested in the argument
+	Terminal.print(price::multiply(with 1::add(taxRate))) § 96
+
+	§ the same, with the inner part bound to a constant first
+	constant taxFactor = 1::add(taxRate)
+
+	Terminal.print(price::multiply(with taxFactor)) § 96
+}
+```
+
+A nested call runs before the call it is an argument of, so `1::add(taxRate)` is computed first in both versions. Pick the constant when the nesting gets hard to read.
+
+## Statics and the dot
+
+[`.`](/docs/reference/syntax-glossary#dot) reaches a static, a member that belongs to a namespace rather than to one value. A namespace is a named group of methods and statics, as `Math` is in JavaScript: [`Number.Pi`](/docs/library/number#Pi) plays the part of `Math.PI`.
+
+```essence
+implementation {
+	§ `Number.Pi` is a static: a member reached on a namespace's name with `.`
+	Terminal.print(Number.Pi) § π
+
+	§ a static that takes arguments is called the same way
+	Terminal.print(Number.highest(3, 9)) § 9
+
+	§ a static's result is a value like any other, so a chain continues with `::`
+	Terminal.print(Number.Pi::isBetween(3, and 22/7)) § true
+}
+```
+
+[`Terminal.print`](/docs/library/terminal#print) is a static too: `Terminal` is a namespace, and `print` is one of its statics. `Number.Pi` is a static that holds a value. It is the exact number, not a float, so it prints as `π`. [`Number.highest`](/docs/library/number#highest) is a static that is called with arguments, positional or labelled like any method's. How a namespace declares its methods and statics is on [Namespaces and methods](/docs/language/namespaces-and-methods).
+
+The same `.` reads a member of a [record](/docs/language/records), Essence's version of a plain JavaScript object, as `order.total`. JavaScript also calls a method with `.`, so `price.multiply(with 3)` is a common slip. It is [`type-without-members`](/docs/reference/diagnostics#type-without-members), `This value has no members to look up`, because an [`Integer`](/docs/library/integer) has no members for `.` to read.
+
+## There are no operators
+
+Essence has no infix or prefix operators: no `+`, `-`, `*`, `/`, `%`, no `==`, `!=`, `<`, `>`, no `&&`, `||`, `!`, and no ternary. Every operation is a method instead:
+
+```essence
+implementation {
+	constant balance = 250
+
+	Terminal.print(balance::add(50)) § 300
+	Terminal.print(balance::is(250)) § true
+	Terminal.print(balance::isGreaterThan(100)::and(balance::isLessThan(500))) § true
+
+	§ `-` is the sign of a number literal, and nothing else
+	Terminal.print(balance::negate()) § -250
+	Terminal.print(-2::raise(to 2)) § 4
+}
+```
+
+`-2::raise(to 2)` is `4`, because the sign belongs to the literal `-2` before [`raise`](/docs/library/integer#raise) applies. To flip the sign of a value, call [`negate`](/docs/library/integer#negate).
+
+**Compared with JavaScript.**
+
+```ts
+const total = (price + shipping) * quantity
+const same = a === b
+const ready = !done && (count > 0 || force)
+```
+
+In Essence the three lines are `price::add(shipping)::multiply(with quantity)`, `a::is(b)` and `done::negate()::and(count::isGreaterThan(0)::or(force))`. One difference in meaning: `&&` and `||` stop at the first operand that decides them, while `and` and [`or`](/docs/library/boolean#or) are calls and evaluate both sides. More on [Coming from JavaScript › Operators](/docs/getting-started/coming-from-javascript#operators).
+
+Write `constant total = 1 + 2` and the compiler reads the number `1`, then a name `+`, then the number `2`:
+
+<div class="error-output">
+
+```
+[unknown-name]
+Error: '+' is not declared
+   ╭─┤ operators.es:2:21 │
+   │
+ 2 │     constant total = 1 + 2
+   │                        ▲  
+   │                        ╰── no such Variable or Constant
+───╯
+```
+
+</div>
+
+`+` is a name character, so the compiler looks it up as a name and reports [`unknown-name`](/docs/reference/diagnostics#unknown-name). So do `*`, `%` and `&&`. Without spaces the whole run is one name: `price+1`, `count++` and `!true` are each reported as not declared. `=`, `<`, `>`, `|` and `/` are not name characters, so `1 == 1`, `3 < 2`, `true || false` and `10 / 4` are syntax errors instead. Inside an argument list, `Terminal.print(1 + 2)` is a syntax error too: `Expected ')' but found '+'.`
+
+Apart from the arrow [`->`](/docs/reference/syntax-glossary#arrow), [`-`](/docs/reference/syntax-glossary#minus) has one job: it is the sign of a number literal. `-250` is a literal. In front of a name it is a syntax error: `Terminal.print(-balance)` is `Expected a Number but found 'balance'.`
+
+Between two numbers it is not refused, and that is a trap. `constant difference = 10 - 4` binds `10`, and `- 4` becomes a statement of its own, the literal `-4`. `essence format` shows this by moving `- 4` onto its own line.
+
+## Arithmetic
+
+The arithmetic methods on `Integer` and [`Rational`](/docs/library/rational), the exact fraction type, are `add`, `subtract`, `multiply(with:)`, [`divide(by:)`](/docs/library/integer#divide), [`quotient(dividingBy:)`](/docs/library/integer#quotient), [`remainder(dividingBy:)`](/docs/library/integer#remainder), `raise(to:)`, `negate()` and [`absolute()`](/docs/library/integer#absolute).
+
+```essence
+implementation {
+	constant cents = 1999
+
+	Terminal.print(cents::add(1)) § 2000
+	Terminal.print(cents::subtract(2000)) § -1
+	Terminal.print(cents::multiply(with 3)) § 5997
+	Terminal.print(cents::divide(by 100)) § 1999/100
+	Terminal.print(cents::quotient(dividingBy 100)) § 19
+	Terminal.print(cents::remainder(dividingBy 100)) § 99
+	Terminal.print(2::raise(to 10)) § 1024
+	Terminal.print(cents::negate()) § -1999
+	Terminal.print(-1999::absolute()) § 1999
+}
+```
+
+Dividing one `Integer` by another never truncates. `divide(by:)` returns an exact `Rational`. `quotient(dividingBy:)` and `remainder(dividingBy:)` split a division into a whole-number quotient and what is left over. Both are Euclidean, so the remainder is never negative.
+
+```essence
+implementation {
+	§ dividing two Integers returns a Rational, never a truncated Integer
+	Terminal.print(10::divide(by 4)) § 5/2
+	Terminal.print(10::divide(by 5)) § 2
+
+	§ quotient and remainder are Euclidean: the remainder is never negative
+	Terminal.print(-7::quotient(dividingBy 3)) § -3
+	Terminal.print(-7::remainder(dividingBy 3)) § 2
+
+	§ `toString` returns a String, which `inspect` shows in quotes
+	Terminal.inspect(10::divide(by 4)::toString()) § "5/2"
+	Terminal.inspect(1999::toString()) § "1999"
+}
+```
+
+`10::divide(by 5)` prints `2`, but it is still a `Rational`, one that happens to be whole. Every divisor on this page is a literal, which the compiler can see is not zero. A divisor it cannot check, such as a constant, might be zero, so `divide(by:)`, `quotient(dividingBy:)` and `remainder(dividingBy:)` then return an [Optional](/docs/language/optional), a value that holds either a result or nothing.
+
+[`toString()`](/docs/library/rational#toString) writes a `Rational` as a fraction in lowest terms, and a whole one bare. Decimal output takes a mode argument, which [Numbers](/docs/language/numbers) covers along with exactness and parsing.
+
+**Compared with JavaScript.**
+
+```ts
+const share = 10 / 4 // 2.5, a float
+const wrapped = -7 % 3 // -1
+```
+
+`10::divide(by 4)` is the exact `5/2`, not a float. `-7::remainder(dividingBy 3)` is `2`, because `remainder` is Euclidean where `%` keeps the sign of the dividend. More on [Coming from JavaScript › Numbers](/docs/getting-started/coming-from-javascript#numbers).
+
+## Equality and ordering
+
+`is` and [`isNot`](/docs/library/integer#isNot) compare values structurally: two values are the same when they have the same content, wherever they came from.
+
+```essence
+implementation {
+	constant stock = 12
+
+	Terminal.print(stock::is(12)) § true
+	Terminal.print(stock::isNot(0)) § true
+	Terminal.print(1::is(1/1)) § true
+	Terminal.print("open"::is("open")) § true
+	Terminal.print([1, 2]::is([1, 2])) § true
+
+	Terminal.print(stock::isLessThan(10)) § false
+	Terminal.print(stock::isLessThanOrEqualTo(12)) § true
+	Terminal.print(stock::isGreaterThan(10)) § true
+	Terminal.print(stock::isGreaterThanOrEqualTo(20)) § false
+	Terminal.print(stock::isBetween(12, and 20)) § true
+	Terminal.print(stock::clamp(between 1, and 10)) § 10
+}
+```
+
+`1::is(1/1)` is `true`: the `Integer` `1` and the `Rational` `1/1` are the same number. Two written lists with the same items are the same list, where JavaScript's `===` compares two references and returns `false`. Comparing values of unrelated types does not compile, as in TypeScript: `1::is("1")` is refused.
+
+Ordering is [`isLessThan`](/docs/library/integer#isLessThan), [`isLessThanOrEqualTo`](/docs/library/integer#isLessThanOrEqualTo), [`isGreaterThan`](/docs/library/integer#isGreaterThan) and [`isGreaterThanOrEqualTo`](/docs/library/integer#isGreaterThanOrEqualTo). `isBetween(_:and:)` returns whether a value lies between two bounds, both included. `clamp(between:and:)` returns the value itself when it lies between them, and the nearer bound when it does not. JavaScript's `Math.max(a, b)` is the static `Number.highest(a, b)` from the section above. The highest item of a whole list is [`highestItem`](/docs/library/list#highestItem), which [Lists](/docs/language/lists) covers.
+
+## Boolean logic
+
+The logic methods on [`Boolean`](/docs/library/boolean) are `and`, `or`, [`negate`](/docs/library/boolean#negate) and [`exclusiveOr`](/docs/library/boolean#exclusiveOr).
+
+```essence
+implementation {
+	constant isOpen   = true
+	constant hasStock = false
+
+	Terminal.print(isOpen::and(hasStock)) § false
+	Terminal.print(isOpen::or(hasStock)) § true
+	Terminal.print(hasStock::negate()) § true
+	Terminal.print(isOpen::exclusiveOr(hasStock)) § true
+
+	§ `and` evaluates its argument even when the receiver is false
+	Terminal.print(hasStock::and(Terminal.inspect(isOpen))) § true
+	§ false
+}
+```
+
+`and` and `or` are ordinary calls, and a call evaluates its argument before the method runs. So `and` evaluates its argument even when the receiver is `false`, unlike `&&`. The last line shows it: `inspect` prints `true` before `and` returns `false`. When the right side must run only if the left side allows it, write a `define` expression instead, Essence's replacement for the ternary, which [Conditions](/docs/language/conditions) covers.
+
+## When a call fails
+
+A method the receiver's type does not have is [`unknown-method`](/docs/reference/diagnostics#unknown-method):
+
+<div class="error-output">
+
+```
+[unknown-method]
+Error: No Method named 'plus' for this value
+   ╭─┤ unknown.es:2:23 │
+   │
+ 2 │     Terminal.print(1999::plus(1))
+   │                    ──┬─  ──┬─  
+   │                      ╰─────│─── this is a PositiveInteger
+   │                            │   
+   │                            ╰─── no Method of this name
+   │ 
+   │ Note: Searched Namespaces 'Integer', 'NonZeroInteger', 'NonNegativeInteger', 'PositiveInteger', 'Scalar', 'Number'.
+───╯
+```
+
+</div>
+
+The note lists where the compiler looked. Every method lives in a namespace, and a call searches every namespace declared for the receiver's type. [`Scalar`](/docs/library/number#Scalar) and `Number` are declared for several number types at once. The label calls `1999` a [`PositiveInteger`](/docs/library/integer#PositiveInteger), not an `Integer`. A written literal proves facts about itself, such as being positive, and the compiler searches the namespaces for those facts too, as [Checked refinements](/docs/language/checked-refinements) explains.
+
+A method that exists, called with arguments it does not take, is [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload). A missing label is a common cause:
+
+<div class="error-output">
+
+```
+[no-matching-overload]
+Error: No overload of 'clamp' accepts these Arguments
+   ╭─┤ overload.es:4:17 │
+   │
+ 4 │     Terminal.print(temperature::clamp(0, and 100))
+   │                    ───────────────┬──────────────  
+   │                                   ╰──────────────── this call passes 2 Arguments
+   │ 
+   │ Note 1: 'Integer::clamp' (provided by Orderable) takes 2 Arguments: Parameter 'between' is Integer, Parameter 'and' is Integer.
+   │ Note 2: 'Number::clamp' (provided by Orderable) takes 2 Arguments: Parameter 'between' is Number, Parameter 'and' is Number.
+───╯
+```
+
+</div>
+
+The notes list every signature the method has, with the label and type of each parameter, so the fix is read off a note: `temperature::clamp(between 0, and 100)`. "Provided by Orderable" means the method's body comes from [`Orderable`](/docs/library/protocols#Orderable), a protocol: a set of methods a type promises to have. A protocol is like a TypeScript interface that can also carry method bodies. [Protocols](/docs/language/protocols) covers them. A misspelt label, a reordered one such as `clamp(and 100, between 0)`, and a wrong argument type such as `cents::add("1")` are reported the same way.
+
+<SeeAlso links={[
+	{ label: "Conditions", href: "/docs/language/conditions" },
+	{ label: "Numbers", href: "/docs/language/numbers" },
+	{ label: "Namespaces and methods", href: "/docs/language/namespaces-and-methods" },
+	{ label: "Integer", href: "/docs/library/integer" },
+	{ label: "Boolean", href: "/docs/library/boolean" },
+]} />

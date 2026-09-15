@@ -1,0 +1,417 @@
+---
+title: Unions and type aliases
+description: "Accept several types in one place with `A | B`, name a type with `type`, and narrow a union by type or by value."
+section: language
+order: 90
+template: article
+---
+
+A union type lists the types a value may have. A [`String | Integer`](/docs/reference/syntax-glossary#union) holds a string or an integer, and nothing else. A type alias gives a type a second name, declared with [`type`](/docs/reference/syntax-glossary#type). Both work the way they do in TypeScript. What differs is how you use a union: a [`match`](/docs/language/choices-and-match) takes it apart, and nothing else narrows it.
+
+```essence
+implementation {
+	type Greetable = String | Integer
+
+	function greet(_ subject: Greetable) -> String {
+		<- match subject -> String {
+			case String where @::hasCharacters() { <- "Hello, {@}!" }
+			case String  { <- "Hello, whoever you are!" }
+			case Integer { <- "Hello, number {@}!" }
+		}
+	}
+
+	Terminal.print(greet("Ada")) § Hello, Ada!
+	Terminal.print(greet("")) § Hello, whoever you are!
+	Terminal.print(greet(42)) § Hello, number 42!
+}
+```
+
+`Greetable` is an alias for the union `String | Integer`. Each type a union lists is a member. The `match` in `greet` narrows the value: it proves which member the value is, and each member has at least one arm. Inside an arm, [`@`](/docs/reference/syntax-glossary#at) is the value narrowed to that arm's member. So `@::hasCharacters()` calls the [`String`](/docs/library/string) method [`hasCharacters`](/docs/library/string#hasCharacters). The guard [`where @::hasCharacters()`](/docs/reference/syntax-glossary#where-guard) turns the empty string away from the first arm, and the second arm takes it.
+
+**Compared with JavaScript.**
+
+```ts
+type Greetable = string | number
+
+function greet(subject: Greetable): string {
+  if (typeof subject === "string") {
+    return subject.length > 0 ? `Hello, ${subject}!` : "Hello, whoever you are!"
+  }
+  return `Hello, number ${subject}!`
+}
+```
+
+`type` and `|` are the same as in TypeScript. Narrowing is not. TypeScript narrows `subject` itself after a `typeof` check. Essence has no `typeof` test, no `in` test, no `as` cast and no truthiness: `constant name = subject as String` is [`unknown-name`](/docs/reference/diagnostics#unknown-name), "'as' is not declared". A union narrows only inside a `match` arm, through `@`. More on [Coming from JavaScript › Types](/docs/getting-started/coming-from-javascript#types).
+
+## A union is a set of types
+
+```essence
+implementation {
+	constant amount: Integer | Rational = 1/2
+
+	Terminal.print(amount) § 1/2
+
+	function isAboveZero(_ degrees: Integer | Rational) -> Boolean {
+		<- degrees::isPositive()
+	}
+
+	Terminal.print(isAboveZero(9/2)) § true
+	Terminal.print(isAboveZero(-3)) § false
+
+	variable total: Integer | Rational = 1
+
+	total = 5/2
+
+	Terminal.print(total) § 5/2
+}
+```
+
+A pipe separates the members. `amount` holds the [`Rational`](/docs/library/rational) `1/2` itself. A union has no wrapper, no tag and no constructor: a value belongs to a union because its own type is one of the members. `amount` prints because the standard library makes every union of its number types printable, as the last section of this page shows. Most unions do not print.
+
+A union stands wherever a type stands: a constant's annotation, a parameter, a return type, an alias. `isAboveZero` accepts either kind of number. Its call `degrees::isPositive()` compiles because both members have [`isPositive`](/docs/library/integer#isPositive); the rule behind that is further down this page.
+
+A `variable` that holds a union needs the union written on it. Without the annotation, the variable takes the type of its first value and keeps it, so assigning a `Rational` later is [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch):
+
+<div class="error-output">
+
+```
+[assignment-type-mismatch]
+Error: This value does not fit Variable 'total'
+   ╭─┤ total.es:4:10 │
+   │
+ 2 │     variable total = 1
+   │              ──┬──  
+   │                ╰──── declared as Integer here
+   │ 
+ 4 │     total = 5/2
+   │             ─┬─  
+   │              ╰─── this is a Rational
+───╯
+```
+
+</div>
+
+There is no intersection type. `&` is a name character, so `type Both = Point & Named` is refused as `unknown-name`. Records are structural, so write the combined shape out: `type Both = { x: Integer, y: Integer, name: String }`.
+
+## Naming a type with `type`
+
+```essence
+implementation {
+	type Point = { x: Integer, y: Integer }
+	type Greetable = String | Integer
+	type Names = List<String>
+	type MaybeName = Optional<String>
+
+	constant here: Point         = { x = 3, y = 4 }
+	constant subject: Greetable  = 42
+	constant names: Names        = ["Ada", "Grace"]
+	constant nickname: MaybeName = #Value("Ada")
+
+	Terminal.print(here) § { x = 3, y = 4 }
+	Terminal.print(subject::toString()) § 42
+	Terminal.print(names) § ["Ada", "Grace"]
+	Terminal.print(nickname) § Value("Ada")
+}
+```
+
+`type Name = …` declares a type alias: a second name for a type. The right side can be any type: a plain type, a record shape, a union, or a generic type with its type arguments filled in. [`List<String>`](/docs/library/list) is one, and so is the [choice](/docs/reference/syntax-glossary#choice) [`Optional<String>`](/docs/library/optional). `subject` prints through [`toString()`](/docs/library/string#toString) because `print` refuses `Greetable`; "Using a union before a match" below explains why that call compiles.
+
+Two more forms have their own pages. An alias for a function type is on [Functions as values](/docs/language/functions-as-values). An alias with type parameters of its own, like `type Pair<A, B = Integer>`, is on [Generics](/docs/language/generics), which also covers its error [`infer-on-applied-parameter`](/docs/reference/diagnostics#infer-on-applied-parameter).
+
+Aliases hoist: a program can use an alias above the line that declares it, the same as in TypeScript.
+
+The name of a union alias shows up in error messages. Assign `1/2` to `subject` and the note reads `'subject' is declared as Greetable.` The name of a record alias does not. Give `here` a wrong value and the note reads `'here' is declared as { x: Integer, y: Integer }.` Either way the name is for display. Whether a value fits is decided by the type.
+
+## An alias is not a new type
+
+```essence
+implementation {
+	type Meters = Integer
+	type Seconds = Integer
+
+	function walk(_ distance: Meters) -> String {
+		<- "{distance} m"
+	}
+
+	constant wait: Seconds = 30
+
+	Terminal.print(walk(wait)) § 30 m
+}
+```
+
+`Meters` and `Seconds` are two spellings of [`Integer`](/docs/library/integer). A `Seconds` passes where a `Meters` is asked for, and the compiler has nothing to object to. [Records](/docs/language/records) work the same way: a record alias names a shape, and every value of that shape fits it.
+
+When two things must not mix, where TypeScript would brand a `number`, declare each as a `choice`, even one with a single case. A choice is nominal: two choices are different types even when their cases have the same shape.
+
+```essence
+implementation {
+	choice Meters {
+		Amount { value: Integer },
+	}
+
+	choice Seconds {
+		Amount { value: Integer },
+	}
+
+	function walk(_ distance: Meters) -> String {
+		<- match distance -> String {
+			case #Amount { <- "{@.value} m" }
+		}
+	}
+
+	Terminal.print(walk(#Amount(30))) § 30 m
+}
+```
+
+Declare `constant wait: Seconds = #Amount(30)` and pass `wait` to `walk`, and the call is [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch):
+
+<div class="error-output">
+
+```
+[argument-type-mismatch]
+Error: This Argument does not fit Parameter 1
+    ╭─┤ walk.es:18:22 │
+    │
+ 18 │     Terminal.print(walk(wait))
+    │                         ──┬─  
+    │                           ╰─── this is a Seconds
+    │ 
+    │ Note: Parameter 1 is Meters.
+────╯
+```
+
+</div>
+
+An alias cannot name itself, directly or through another alias, and neither can a choice, as Choices and `match` shows. `type Node = { value: Integer, next: Node }` is [`recursive-type-declaration`](/docs/reference/diagnostics#recursive-type-declaration):
+
+<div class="error-output">
+
+```
+[recursive-type-declaration]
+Error: Type 'Node' names itself
+```
+
+</div>
+
+## Using a union before a match
+
+```essence
+implementation {
+	type Greetable = String | Integer
+
+	constant subject: Greetable = 42
+
+	Terminal.print(subject::toString()) § 42
+
+	function size(_ text: String | List<String>) -> Integer {
+		<- text::length()
+	}
+
+	Terminal.print(size("Ada")) § 3
+	Terminal.print(size(["Ada", "Grace"])) § 2
+}
+```
+
+A method call on a union is resolved on every member. It compiles when each member has a method of that name that takes those arguments. At run time, the member's own method runs. When a namespace covers the whole union, its method runs instead, as with the library's [`Number`](/docs/library/number) below. `String` and `Integer` both have `toString()`, and `String` and `List` both have [`length()`](/docs/library/string#length).
+
+The call returns the union of what the members' methods return. `text::reverse()` returns a `String | List<String>`, because [`reverse`](/docs/library/string#reverse) on a `String` returns a `String` and on a `List<String>` returns a `List<String>`.
+
+When one member lacks the method, the call is [`unknown-method`](/docs/reference/diagnostics#unknown-method), and the error names that member:
+
+<div class="error-output">
+
+```
+[unknown-method]
+Error: No Method named 'hasCharacters' for Integer
+   ╭─┤ subject.es:6:26 │
+   │
+ 6 │     Terminal.print(subject::hasCharacters())
+   │                    ───┬───  ──────┬──────  
+   │                       ╰───────────│──────── this is a Greetable
+   │                                   │        
+   │                                   ╰──────── Integer has no Method of this name
+   │ 
+   │ Note: Every member of the Union must provide 'hasCharacters' — the receiver's Type is only known at runtime.
+───╯
+```
+
+</div>
+
+Reading a member with `.` is never allowed on a union, even a member that every shape has. A union of two record types is not a record, so this is [`type-without-members`](/docs/reference/diagnostics#type-without-members):
+
+<div class="error-output">
+
+```
+[type-without-members]
+Error: This value has no members to look up
+   ╭─┤ input.es:7:17 │
+   │
+ 7 │     Terminal.print(input.target)
+   │                    ──┬──  
+   │                      ╰──── this is a { x: Integer, y: Integer, target: String } | { key: String, target: String }
+   │ 
+   │ Note: Only Records, Cases and Namespaces have members.
+───╯
+```
+
+</div>
+
+TypeScript accepts `input.target`, because every member of the union has `target`. Essence does not read through a union at all: match it first, and read from `@`.
+
+[`Terminal.print`](/docs/library/terminal#print) takes any value that is [`Printable`](/docs/library/protocols#Printable), the protocol for types that can be written as text. A union does not inherit that from its members. `String` and `Integer` are both `Printable`, but `Greetable` is not, so `Terminal.print(subject)` is [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound). A union of number types, like `amount` above, is the exception.
+
+A [hole](/docs/reference/syntax-glossary#interpolation) in a string literal asks for the same protocol, so `"Hello, {subject}!"` is [`interpolation-not-printable`](/docs/reference/diagnostics#interpolation-not-printable): `Greetable can not be interpolated into a String`. `subject::toString()` works because it is a method call, resolved on every member. The fix is a namespace declared for the whole union that makes it `Printable`; [Namespaces and methods](/docs/language/namespaces-and-methods) and [Protocols](/docs/language/protocols) teach both.
+
+An `if` does not narrow a union. Take [`isEmpty`](/docs/library/list#isEmpty) in `if texts::isEmpty() { … } else { … }` on a `String | List<String>`: the call compiles, but the `else` branch still holds a `String | List<String>`. A `match` there gives a plain `String` and a plain `List<String>`. The same `if` on a `List<String>` alone proves it non-empty, which [Checked refinements](/docs/language/checked-refinements) covers.
+
+## Narrowing with `match`
+
+```essence
+implementation {
+	type Click = { x: Integer, y: Integer }
+	type KeyPress = { key: String }
+
+	function describe(_ event: Click | KeyPress | String) -> String {
+		<- match event -> String {
+			case Click    { <- "click at {@.x}, {@.y}" }
+			case KeyPress { <- "key {@.key}" }
+			case String   { <- "typed {@}" }
+		}
+	}
+
+	Terminal.print(describe({ x = 3, y = 4 })) § click at 3, 4
+	Terminal.print(describe({ key = "Enter" })) § key Enter
+	Terminal.print(describe("hello")) § typed hello
+}
+```
+
+A type matcher names one member: `case String`, `case Click`. A record alias works as a matcher like any other type. Inside the arm, `@` has that member's type, so `@.x` reads the `Click`'s member `x`. Applied types match the same way: `case List<Integer>` and `case Optional<Integer>` pick those members out of an `Optional<Integer> | List<Integer> | String`.
+
+Only `@` is narrowed. The subject's own name keeps the union type in every arm. In `greet`, writing `subject::hasCharacters()` in the guard instead of `@::hasCharacters()` is the `unknown-method` error from the previous section, with its label on `subject`: `this is a Greetable`.
+
+A match must handle every member. Leave `case Integer` out of `greet` and the match is [`missing-case`](/docs/reference/diagnostics#missing-case): `Unhandled: 'Integer'.`
+
+```essence
+implementation {
+	type Click = { x: Integer, y: Integer }
+	type KeyPress = { key: String }
+
+	function describe(_ input: Click | KeyPress) -> String {
+		<- match input -> String {
+			case { x = 0, y = 0 }           { <- "clicked the origin" }
+			case { x = 0, y }               { <- "clicked the y axis at {y}" }
+			case { x: Integer, y: Integer } { <- "clicked at {x}, {y}" }
+			case { key }                    { <- "pressed {key}" }
+		}
+	}
+
+	Terminal.print(describe({ x = 0, y = 0 })) § clicked the origin
+	Terminal.print(describe({ x = 0, y = 7 })) § clicked the y axis at 7
+	Terminal.print(describe({ x = 3, y = 4 })) § clicked at 3, 4
+	Terminal.print(describe({ key = "Enter" })) § pressed Enter
+}
+```
+
+A record matcher matches by the members it names, without naming a type. `x = 0` requires the member to hold that value. `x: Integer` requires the member to have that type, and binds it to a name. A bare name such as `key` requires the member and binds it. Arms are tried in order, so the origin stops at the first arm and never reaches the second. [Patterns](/docs/language/patterns) has the full grammar.
+
+A `match` on a bare `Integer` or `String` takes the value apart instead of the type: `case 0`, `case "yes"`, then a last `case _`. Choices and match teaches that form, which is held to [`literal-match-shape`](/docs/reference/diagnostics#literal-match-shape). A `match` on one type that names no written value has one outcome, and is [`match-on-non-union`](/docs/reference/diagnostics#match-on-non-union).
+
+Types erase before a match runs. So `case List<Integer>` above `case List<String>` also takes an empty `List<String>`, a warning called [`empty-list-overlap`](/docs/reference/diagnostics#empty-list-overlap). A case that names a function's own type parameter must come last, or the match is [`erased-case-conflict`](/docs/reference/diagnostics#erased-case-conflict). Generics explains both.
+
+## Union or choice
+
+The members of a union must be types. TypeScript's literal unions do not exist, so this is a [`syntax-error`](/docs/reference/diagnostics#syntax-error):
+
+<div class="error-output">
+
+```
+[syntax-error]
+Error: Expected a Type but found '"on"'.
+   ╭─┤ switch.es:2:16 │
+   │
+ 2 │     type Switch = "on" | "off"
+   │                   ──┬─  
+   │                     ╰─── here
+───╯
+```
+
+</div>
+
+`0 | 1` fails the same way, with `Expected a Type but found '0'.` A fixed set of named alternatives is a `choice`.
+
+A union also cannot tell apart two members with the same shape:
+
+```essence
+implementation {
+	type Celsius = { degrees: Integer }
+	type Fahrenheit = { degrees: Integer }
+
+	constant reading: Celsius | Fahrenheit = { degrees = 20 }
+}
+```
+
+That compiles, but no union is left in it. Both aliases name `{ degrees: Integer }`, so the union collapses to that one record type. A match over `reading` has one outcome:
+
+<div class="error-output">
+
+```
+[match-on-non-union]
+Error: Match Expressions require a Union Type
+   ╭─┤ reading.es:7:23 │
+   │
+ 7 │     Terminal.print(match reading -> String {
+   │                          ───┬───  
+   │                             ╰───── this is a { degrees: Integer }
+   │ 
+   │ Note: Matching a Type with only one possible shape has only one outcome.
+───╯
+```
+
+</div>
+
+A choice keeps the two apart by name:
+
+```essence
+implementation {
+	choice Reading {
+		Celsius { degrees: Integer },
+		Fahrenheit { degrees: Integer },
+	}
+
+	function spelled(_ reading: Reading) -> String {
+		<- match reading -> String {
+			case #Celsius    { <- "{@.degrees} °C" }
+			case #Fahrenheit { <- "{@.degrees} °F" }
+		}
+	}
+
+	Terminal.print(spelled(#Celsius({ degrees = 20 }))) § 20 °C
+	Terminal.print(spelled(#Fahrenheit({ degrees = 20 }))) § 20 °F
+}
+```
+
+`#Celsius` and `#Fahrenheit` carry the same members and are still different cases, because a choice is nominal.
+
+**Compared with JavaScript.**
+
+```ts
+type Reading =
+  | { kind: "celsius"; degrees: number }
+  | { kind: "fahrenheit"; degrees: number }
+
+function spelled(reading: Reading): string {
+  return reading.kind === "celsius" ? `${reading.degrees} °C` : `${reading.degrees} °F`
+}
+```
+
+TypeScript tells the two shapes apart with a literal `kind` field. Essence has no literal types. The case name does that job, and `match` reads it. More on [Coming from JavaScript › What is not in the language](/docs/getting-started/coming-from-javascript#what-is-not-in-the-language).
+
+<Note>
+Use a union when the members are types that exist on their own, like `String | Integer`. Use a `choice` when the alternatives belong to one idea, or when two of them could have the same shape.
+</Note>
+
+## The standard library's unions
+
+The standard library declares three unions, all in its number tower. `Number` is `Integer | Rational | Irrational`. [`Irrational`](/docs/library/number#Irrational) is [`Algebraic`](/docs/library/algebraic) `|` [`Transcendental`](/docs/library/transcendental). [`Scalar`](/docs/library/number#Scalar) is `Integer | Rational`, the two exact kinds. Namespaces over `Number` and `Scalar` give those unions their methods. That is why an `Integer | Rational` prints without work of your own: the `Number` namespace declares `Printable` for the whole tower, and so for any union of its kinds. [Numbers](/docs/language/numbers) covers the tower.
+
+`Number` is not JavaScript's `number`. It is a union alias, the same kind of declaration as `Greetable`. More on [Coming from JavaScript › Numbers](/docs/getting-started/coming-from-javascript#numbers).

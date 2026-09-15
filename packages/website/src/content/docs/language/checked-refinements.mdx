@@ -1,0 +1,505 @@
+---
+title: Checked refinements
+description: Declare a type whose values are proven to pass a check, get values into it three ways, and use what the proof buys.
+section: language
+order: 100
+template: article
+---
+
+A checked refinement is a type made of a base type and a predicate, a condition every value of the type is proven to meet. A value is proven when it is written down, when an [`if`](/docs/language/conditions) or a [`match`](/docs/language/choices-and-match) has checked it, or when it already has the refined type. The compiler refuses any other value. In return, an operation that had to allow for the bad value no longer does. The library's [`NonZeroInteger`](/docs/library/integer#NonZeroInteger) is `Integer where @::isNot(0)`, and dividing by one returns a [`Rational`](/docs/library/rational), not an [`Optional`](/docs/language/optional). The nearest TypeScript idea is a branded type, but here the compiler derives the type guard from the predicate.
+
+```essence
+implementation {
+	type NonZero = Integer where @::isNot(0)
+
+	function perGuest(_ total: Integer, _ guests: NonZero) -> Rational {
+		<- total::divide(by guests)
+	}
+
+	function split(_ total: Integer, among guests: Integer) -> Rational {
+		if guests::isNot(0) {
+			<- perGuest(total, guests)
+		}
+
+		<- 0/1
+	}
+
+	Terminal.print(perGuest(12, 4)) § 3
+	Terminal.print(split(12, among 5)) § 12/5
+	Terminal.print(split(12, among 0)) § 0
+}
+```
+
+`type NonZero = Integer where @::isNot(0)` declares a refinement. The type before [`where`](/docs/reference/syntax-glossary#type) is the base. The call after it is the predicate, and [`@`](/docs/reference/syntax-glossary#at) stands for the value being refined. Read the line as "an [`Integer`](/docs/library/integer) for which `isNot(0)` returns `true`".
+
+Inside `perGuest`, `guests` is proven not to be zero, so the division cannot fail. [`divide(by:)`](/docs/library/integer#divide) returns an `Optional<Rational>` for an `Integer` divisor, and a plain `Rational` for a proven one. The call `perGuest(12, 4)` compiles because a written `4` is its own proof. `split` receives an `Integer` that nobody has checked, and the `if` proves the predicate inside its branch. You still make the check once, in the `if`, and the division in `perGuest` has no `Optional` to unwrap.
+
+`0/1` is the `Rational` zero. `<- 0` would be refused as [`return-type-mismatch`](/docs/reference/diagnostics#return-type-mismatch): the function returns a `Rational`, and `0` is an `Integer`.
+
+**Compared with JavaScript.**
+
+```ts
+type NonZero = number & { readonly __brand: "NonZero" }
+
+function isNonZero(n: number): n is NonZero {
+  return n !== 0
+}
+
+function perGuest(total: number, guests: NonZero): number {
+  return total / guests
+}
+
+function split(total: number, guests: number): number {
+  if (isNonZero(guests)) {
+    return perGuest(total, guests)
+  }
+  return 0
+}
+
+perGuest(12, 4 as NonZero)
+```
+
+A branded type needs a type guard you write yourself, and TypeScript trusts the guard: if `isNonZero` returned `true` for `0`, nothing would notice. A literal needs a cast. In Essence the `where` clause is the guard, and a written value is checked while compiling. The refinement erases, so at runtime a `NonZero` is an ordinary integer. If you validate with Zod, the nearest thing is `.refine(…).brand()`: your `if` still runs the check at runtime, and the compiler refuses any value that skipped it. More on [Coming from JavaScript › Types](/docs/getting-started/coming-from-javascript#types).
+
+## Declaring a refinement
+
+```essence
+implementation {
+	type Digit = Integer where @::isBetween(0, and 9)
+	type Discount = Rational where @::isGreaterThan(0)::and(@::isLessThan(1))
+	type Answer = String where @::is("yes")
+	type GuestList = List<String> where @::hasItems()
+
+	constant digit: Digit       = 7
+	constant discount: Discount = 1/4
+	constant answer: Answer     = "yes"
+	constant guests: GuestList  = ["Ada", "Grace"]
+
+	Terminal.print(digit) § 7
+	Terminal.print(discount) § 1/4
+	Terminal.print(answer) § yes
+	Terminal.print(guests::firstItem()) § Ada
+}
+```
+
+A refinement is a [type alias](/docs/language/unions-and-type-aliases) with a `where` clause: `type Name = Base where predicate`. Five bases can be refined:
+
+- `Integer`
+- `Rational`
+- [`String`](/docs/library/string)
+- an applied [`List`](/docs/library/list), one with its item type written, such as `List<String>`, never a bare `List`
+- an applied [`Dictionary`](/docs/library/dictionary), such as `Dictionary<String, Integer>`, shown on [Dictionaries](/docs/language/dictionaries)
+
+The first four appear above. [`firstItem()`](/docs/library/list#firstItem) on `guests` prints `Ada`, not `Value("Ada")`: `GuestList` proves the list has items, so there is no `Optional` to unwrap.
+
+Every other base is refused as [`invalid-refinement-predicate`](/docs/reference/diagnostics#invalid-refinement-predicate). That covers a [`Boolean`](/docs/library/boolean), a record, an `Optional`, a bare `List`, and a refinement of another refinement:
+
+<div class="error-output">
+
+```
+[invalid-refinement-predicate]
+Error: A 'where' clause can not refine NonEmptyString
+   ╭─┤ initial.es:2:17 │
+   │
+ 2 │     type Initial = NonEmptyString where @::isOneCharacter()
+   │                    ───────┬──────  
+   │                           ╰──────── this is NonEmptyString
+   │ 
+   │ Help: Drop the 'where' clause from 'Initial'.
+   │ 
+   │ Note: A checked refinement is written on an Integer, a Rational, a String, an applied List or an applied Dictionary — 'List<String>', never a bare 'List'.
+───╯
+```
+
+</div>
+
+Write the predicate on the base instead: `String where @::hasCharacters()::and(@::isOneCharacter())` compiles.
+
+A refinement can take a type parameter, as in `type NonEmpty<Item> = List<Item> where @::hasItems()`. The library's [`NonEmptyList`](/docs/library/list#NonEmptyList) is declared this way, and declaring your own is on [Generics](/docs/language/generics).
+
+## What the predicate may say
+
+The predicate is one method call on `@`, and its arguments are written values: an `Integer`, a `Rational`, a `String` or a `Boolean`. Several calls join with [`::and(…)`](/docs/library/boolean#and), as `Discount` does above. A name in argument position is refused, even the name of a [constant](/docs/reference/syntax-glossary#constant):
+
+<div class="error-output">
+
+```
+[invalid-refinement-predicate]
+Error: This is not a predicate a refinement can be checked by
+   ╭─┤ party.es:4:56 │
+   │
+ 4 │     type PartySize = Integer where @::isLessThanOrEqualTo(largestTable)
+   │                                                           ──────┬─────  
+   │                                                                 ╰─────── this is not a literal value
+   │ 
+   │ Help: Pass a written Integer, Rational, String or Boolean.
+   │ 
+   │ Note: A predicate is one Method call on '@' with literal Arguments, or several of them joined with '::and(…)'.
+───╯
+```
+
+</div>
+
+Written arguments are what let the compiler tell when two refinements prove the same thing.
+
+The receiver of a call is the value before `::`. Three more shapes get the same error, labelled `this is not '@'`. They are a receiver other than `@` (`5::isOdd()`), a chained receiver (`@::trim()::hasCharacters()`), and [`::or(…)`](/docs/library/boolean#or) in place of `::and(…)`. A predicate that returns something other than a `Boolean`, such as `@::absolute()`, is [`predicate-not-boolean`](/docs/reference/diagnostics#predicate-not-boolean).
+
+A predicate can also call a method your program declares, such as `@::isAtLeast(18)`. [Namespaces and methods](/docs/language/namespaces-and-methods) covers declaring one, and which method bodies let a written value pass.
+
+## The ten refinements in the library
+
+Every program can use these ten without an import.
+
+| Refinement | Declared as | What the proof buys |
+|---|---|---|
+| [`NonZeroInteger`](/docs/library/integer#NonZeroInteger) | `Integer where @::isNot(0)` | As a divisor, `divide(by:)`, [`quotient(dividingBy:)`](/docs/library/integer#quotient) and [`remainder(dividingBy:)`](/docs/library/integer#remainder) return a value, not an `Optional` |
+| [`NonNegativeInteger`](/docs/library/integer#NonNegativeInteger) | `Integer where @::isGreaterThanOrEqualTo(0)` | [`squareRoot()`](/docs/library/integer#squareRoot) returns a value, not an `Optional` |
+| [`PositiveInteger`](/docs/library/integer#PositiveInteger) | `Integer where @::isPositive()` | Accepted wherever a `NonZeroInteger` or a `NonNegativeInteger` is wanted |
+| [`NonZeroRational`](/docs/library/rational#NonZeroRational) | `Rational where @::isNot(0/1)` | [`reciprocal()`](/docs/library/rational#reciprocal) returns a value, not an `Optional` |
+| [`NonNegativeRational`](/docs/library/rational#NonNegativeRational) | `Rational where @::isGreaterThanOrEqualTo(0/1)` | [`squareRoot()`](/docs/library/rational#squareRoot) returns a value, not an `Optional` |
+| [`PositiveRational`](/docs/library/rational#PositiveRational) | `Rational where @::isPositive()` | Accepted wherever a `NonZeroRational` or a `NonNegativeRational` is wanted |
+| [`NonEmptyString`](/docs/library/string#NonEmptyString) | `String where @::hasCharacters()` | [`firstCharacter()`](/docs/library/string#firstCharacter) and [`lastCharacter()`](/docs/library/string#lastCharacter) return a `Character`, not an `Optional` |
+| [`Character`](/docs/library/string#Character) | `String where @::isOneCharacter()` | Holds exactly one character, and is accepted wherever a `String` is |
+| [`NonEmptyList<ItemType>`](/docs/library/list#NonEmptyList) | `List<ItemType> where @::hasItems()` | `firstItem()` and [`lastItem()`](/docs/library/list#lastItem) return the item, not an `Optional` |
+| [`NonEmptyDictionary<KeyType, ValueType>`](/docs/library/dictionary#NonEmptyDictionary) | `Dictionary<KeyType, ValueType> where @::hasEntries()` | [`keys()`](/docs/library/dictionary#keys) and [`values()`](/docs/library/dictionary#values) return non-empty lists, and [`length()`](/docs/library/dictionary#length) returns a `PositiveInteger` |
+
+What counts as one character is on [Strings](/docs/language/strings). Which list methods keep the `NonEmptyList` proof, and which lose it, is on [Lists](/docs/language/lists).
+
+## Refinements are compared by what they prove
+
+```essence
+implementation {
+	type NonZero = Integer where @::isNot(0)
+	type SmallOdd = Integer where @::isOdd()::and(@::isLessThan(10))
+	type OddAndSmall = Integer where @::isLessThan(10)::and(@::isOdd())
+	type Odd = Integer where @::isOdd()
+
+	function tripled(_ n: SmallOdd) -> Integer {
+		<- n::multiply(with 3)
+	}
+
+	constant four: NonZero = 4
+	constant fromLibrary: NonZeroInteger = four
+
+	constant seven: OddAndSmall = 7
+	constant odd: Odd           = seven
+
+	Terminal.print(12::quotient(dividingBy four)) § 3
+	Terminal.print(fromLibrary) § 4
+	Terminal.print(tripled(seven)) § 21
+	Terminal.print(odd) § 7
+}
+```
+
+Two refinements are one type when they prove the same thing of the same base. `NonZero` is `NonZeroInteger` under another name. `four` is accepted as a `NonZeroInteger`, and `quotient(dividingBy:)` returns a plain `Integer` for it.
+
+The order of the calls in an `::and(…)` chain does not matter: `SmallOdd` and `OddAndSmall` are one type. A chain proves each call in it, so `seven`, proven odd and less than 10, is accepted as an `Odd`, which requires only one of them.
+
+The library's refinements also imply each other. A `PositiveInteger` is accepted wherever a `NonZeroInteger` or a `NonNegativeInteger` is wanted, and a `PositiveRational` works the same way for the two rational refinements. A refined value has every method its base has, and it is accepted wherever its base is:
+
+```essence
+implementation {
+	function perGuest(_ total: Integer, _ guests: NonZeroInteger) -> Rational {
+		<- total::divide(by guests)
+	}
+
+	function seatsLeft(_ seats: NonNegativeInteger) -> String {
+		<- "{seats} seats left"
+	}
+
+	function doubled(_ count: Integer) -> Integer {
+		<- count::multiply(with 2)
+	}
+
+	constant tableSize: PositiveInteger = 6
+
+	Terminal.print(perGuest(60, tableSize)) § 10
+	Terminal.print(seatsLeft(tableSize)) § 6 seats left
+	Terminal.print(doubled(tableSize)) § 12
+	Terminal.print(tableSize::isEven()) § true
+}
+```
+
+`tableSize` goes into all three functions. [`isEven()`](/docs/library/integer#isEven) is an `Integer` method, and a `PositiveInteger` has it too.
+
+## Getting a value in
+
+Leave the `if` out of `split` from the top of the page, and the call to `perGuest` no longer compiles. The error is [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch):
+
+<div class="error-output">
+
+```
+[argument-type-mismatch]
+Error: This Argument does not fit Parameter 2
+   ╭─┤ split.es:9:22 │
+   │
+ 9 │        <- perGuest(total, guests)
+   │                           ───┬──  
+   │                              ╰──── this is an Integer
+   │ 
+   │ Help: Check '@::isNot(0)' on the value in an 'if' or a 'match', or pass a value that already has Type 'NonZero'.
+   │ 
+   │ Note 1: Parameter 2 is NonZero.
+   │ Note 2: Every value of 'NonZero' has been proven to answer '@::isNot(0)'.
+───╯
+```
+
+</div>
+
+The Help names both ways in: check the predicate on the value in an `if` or a `match`, or pass a value that already has the type. A written value already has it.
+
+### A written value is its own proof
+
+```essence
+implementation {
+	constant share: Rational    = 12::divide(by 4)
+	constant initial: Character = "essence"::firstCharacter()
+	constant first: String      = ["a", "b"]::firstItem()
+
+	Terminal.print(share) § 3
+	Terminal.print(initial) § e
+	Terminal.print(first) § a
+	Terminal.print(9::squareRoot()) § 3
+}
+```
+
+A written value, or literal, is checked while compiling. It counts as proof wherever it stands: as a constant's value, as an argument, as a returned value, and as the receiver of a method call. `4` is not zero, so `12::divide(by 4)` returns a `Rational`. `"essence"` has characters, so `firstCharacter()` returns a `Character`. `["a", "b"]` has items, so `firstItem()` returns a `String`. `9` is not negative, so `squareRoot()` prints `3`, not `Value(3)`. Each annotation above would be refused if its call returned an `Optional`.
+
+The proof belongs to the written value, not to a name. A `constant` bound to a literal without a type annotation holds the base type, and the proof is lost:
+
+```essence
+implementation {
+	constant nine   = 9
+	constant scores = [1, 2]
+	constant proven: NonEmptyList<Integer> = [1, 2]
+
+	Terminal.print(nine::squareRoot()) § Value(3)
+	Terminal.print(scores::firstItem()) § Value(1)
+	Terminal.print(proven::firstItem()) § 1
+}
+```
+
+`nine` is an `Integer` and `scores` is a `List<Integer>`, so both calls return an `Optional`. Annotate the constant with the refinement, as `proven` does, and the literal proves it once, at the annotation. A constant bound to a call keeps the type the call returns: `constant share = 12::divide(by 4)` is a `NonZeroRational`, so `share::reciprocal()` prints `1/3`.
+
+**Compared with JavaScript.**
+
+```ts
+const nine = 9                               // type: 9
+const scores = [1, 2]                        // type: number[]
+const proven: [number, ...number[]] = [1, 2]
+
+scores[0]                                    // number | undefined, under noUncheckedIndexedAccess
+proven[0]                                    // number
+```
+
+TypeScript keeps the literal type of `const nine = 9`, but widens `[1, 2]` to `number[]` unless you write a non-empty tuple type. Essence widens both: an unannotated `constant` holds the base type. More on [Coming from JavaScript › Types](/docs/getting-started/coming-from-javascript#types).
+
+### An `if` or a `define` proves its condition
+
+```essence
+implementation {
+	function exclaimed(_ text: NonEmptyString) -> String {
+		<- text::append("!")
+	}
+
+	function shout(_ text: String) -> String {
+		if text::isEmpty() {
+			<- "…"
+		} else {
+			<- exclaimed(text)
+		}
+	}
+
+	function shareOf(_ total: Integer, over count: Integer) -> Rational {
+		<- define {
+			as total::divide(by count) if count::isNot(0)
+			as 0/1 otherwise
+		}
+	}
+
+	function shared(_ total: Integer, over count: Integer) -> Rational {
+		<- define {
+			as 0/1 if count::isZero()
+			as total::divide(by count) otherwise
+		}
+	}
+
+	Terminal.print(shout("essence")) § essence!
+	Terminal.print(shout("")) § …
+	Terminal.print(shareOf(12, over 4)) § 3
+	Terminal.print(shared(12, over 5)) § 12/5
+	Terminal.print(shared(12, over 0)) § 0
+}
+```
+
+An `if` whose condition checks a refinement's predicate narrows the constant or parameter it checks: inside the branch, the name has the refined type. `split` at the top of the page works this way.
+
+The `else` branch narrows by the complement, the predicate that holds when the condition is `false`. [`isEmpty()`](/docs/library/string#isEmpty) returning `false` means [`hasCharacters()`](/docs/library/string#hasCharacters) is `true`, so in the `else` of `shout`, `text` is a `NonEmptyString`. An `else if` chain narrows the same way, one condition at a time.
+
+A [`define`](/docs/reference/syntax-glossary#define) arm, one `as …` line, reads the same way. Its own condition holds for its value, and the complement of every condition above it holds too. In `shareOf`, `count` is a `NonZeroInteger` in the arm that checks `count::isNot(0)`. In `shared`, the [`otherwise`](/docs/reference/syntax-glossary#otherwise) arm is reached only when `count::isZero()` returned `false`. So `count` is a `NonZeroInteger` there, and `divide(by:)` returns a `Rational`.
+
+A constant bound to the narrowed name inside the branch keeps the proof: inside `if count::isNot(0)`, `constant proven = count` is a `NonZeroInteger`. The proof ends with the branch. An early return does not narrow the lines after it. Write a function `share` that returns `0/1` early when `guests::isZero()`, then returns `total::divide(by guests)`. The division still returns an `Optional`, so that return is refused:
+
+<div class="error-output">
+
+```
+[return-type-mismatch]
+Error: This value does not fit the declared return Type
+   ╭─┤ share.es:7:6 │
+   │
+ 7 │        <- total::divide(by guests)
+   │           ────────────┬───────────  
+   │                       ╰───────────── this is an Optional<Rational>
+   │ 
+   │ Note: The Function returns Rational.
+───╯
+```
+
+</div>
+
+Move the work into the branch, or write a `define` like `shared`.
+
+**Compared with JavaScript.**
+
+```ts
+function share(total: number, guests: number): number {
+  if (!isNonZero(guests)) {
+    return 0
+  }
+  return perGuest(total, guests)
+}
+```
+
+TypeScript narrows `guests` after the early return, and it narrows a `let` the same way. Essence narrows a constant or a parameter inside the branch that checked it, and nowhere else. More on [Coming from JavaScript › Types](/docs/getting-started/coming-from-javascript#types).
+
+A [`variable`](/docs/reference/syntax-glossary#variable) is never narrowed. `if guests::isNot(0)` compiles, and passing `guests` to `perGuest` inside it is the same `argument-type-mismatch` as above. Its Help suggests the `if` you already wrote. Bind the variable to a constant, and check the constant:
+
+```essence
+implementation {
+	function perGuest(_ total: Integer, _ guests: NonZeroInteger) -> Rational {
+		<- total::divide(by guests)
+	}
+
+	variable guests = 3
+
+	guests = guests::add(1)
+
+	constant current = guests
+
+	if current::isNot(0) {
+		Terminal.print(perGuest(12, current)) § 3
+	}
+}
+```
+
+An `if` on a union does not narrow either. After `if value::isEmpty()` on a `String | List<String>`, the `else` branch still holds a `String | List<String>`, and a `case String` there gets a plain `String`, not a `NonEmptyString`.
+
+### A `match` proves its cases
+
+```essence
+implementation {
+	function inverse(_ n: Integer) -> Rational {
+		<- match n -> Rational {
+			case 0 { <- 0/1 }
+			case _ { <- 1::divide(by @) }
+		}
+	}
+
+	function perHead(_ total: Integer, _ size: Optional<Integer>) -> Rational {
+		<- match size -> Rational {
+			case #Value(count) where count::isNot(0) {
+				<- total::divide(by count)
+			}
+			case _ { <- total::toRational() }
+		}
+	}
+
+	Terminal.print(inverse(4)) § 1/4
+	Terminal.print(inverse(0)) § 0
+	Terminal.print(perHead(12, #Value(4))) § 3
+	Terminal.print(perHead(12, #Value(0))) § 12
+	Terminal.print(perHead(12, #Empty)) § 12
+}
+```
+
+Inside a `match` case, `@` is the matched value. A `match` on an `Integer` tries its cases in order, and its cases are proof. `case 0` proves `@::is(0)`. The `case _` below it is reached only by a value that is not `0`, so there `@` is a `NonZeroInteger`, and `1::divide(by @)` returns a `Rational`. A [guard](/docs/reference/syntax-glossary#where-guard), a `where` condition written after a case, proves its condition for its own case: in `perHead`, `count` is a `NonZeroInteger` inside the first case.
+
+The same shape on a `String` proves less. Below `case ""`, `case _` does not prove `NonEmptyString`, and `@::firstCharacter()` there still returns an `Optional`. Check `isEmpty()` in an `if`, as `shout` does.
+
+A refinement cannot be a matcher, the type or value written after `case`. `case NonZeroInteger` is [`refinement-as-matcher`](/docs/reference/diagnostics#refinement-as-matcher), because the predicate erases before the program runs:
+
+<div class="error-output">
+
+```
+[refinement-as-matcher]
+Error: A Matcher can not test for 'NonZeroInteger'
+   ╭─┤ described.es:4:9 │
+   │
+ 4 │          case NonZeroInteger { <- "a party" }
+   │               ───────┬──────  
+   │                      ╰──────── this is a checked refinement
+   │ 
+   │ Help: Match on 'Integer' and prove the predicate inside the arm, the way every 'NonZeroInteger' is proven: an 'if' condition, a Case naming a written value, or a written value.
+   │ 
+   │ Note: A refinement's predicate erases before the Program runs, so the emitted check could only ask about 'Integer' — and the arm would run for values the predicate refuses.
+───╯
+```
+
+</div>
+
+## What a proof changes
+
+```essence
+implementation {
+	constant guests: NonZeroInteger = 4
+	constant seats: NonZeroInteger  = guests::multiply(with 3)
+
+	Terminal.print(seats) § 12
+}
+```
+
+[`multiply(with:)`](/docs/library/integer#multiply) of two `NonZeroInteger`s returns a `NonZeroInteger`, because a product of two non-zero integers is never zero. [`add(_:)`](/docs/library/integer#add) of two returns a plain `Integer`, because `1::add(-1)` is `0`. Returning that sum as a `NonZeroInteger` is a `return-type-mismatch`.
+
+Each library page lists, under Refinements, the methods a proof changes. The [`NonZeroInteger`](/docs/library/integer#NonZeroInteger) entry says:
+
+> A division by one of these answers a Rational rather than an Optional, and `negate` and `absolute` stay within the proof.
+
+The [`NonEmptyString`](/docs/library/string#NonEmptyString) entry says:
+
+> The proof is what lets `length` answer above zero, and `firstCharacter` and `lastCharacter` answer a character rather than an Optional.
+
+Division that can fail, and the rest of the arithmetic, is on [Numbers](/docs/language/numbers).
+
+When a proof makes a fallback unreachable, the compiler warns. `divide(by:defaultingTo:)` exists for a divisor that might be zero. Given a proven divisor, the fallback can never be used, and the warning is [`fallback-never-used`](/docs/reference/diagnostics#fallback-never-used):
+
+<div class="error-output">
+
+```
+[fallback-never-used]
+Warning: This 'defaultingTo' Argument can never be read
+   ╭─┤ bill.es:4:39 │
+   │
+ 4 │     Terminal.print(12::divide(by guests, defaultingTo 0/1))
+   │                                          ────────┬───────  
+   │                                                  ╰───────── this fallback can never be read
+   │ 
+   │ Help: Drop the 'defaultingTo' Argument; the call already answers a NonZeroRational.
+   │ 
+   │ Note: Without it the call answers a NonZeroRational, which is never empty.
+───╯
+```
+
+</div>
+
+The program still compiles and runs. Drop the `defaultingTo` argument, as the Help says.
+
+The compiler checks proofs in Essence code only. Do not count on a refinement to check a value that a JavaScript caller passes in: check it in JavaScript before the call. [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) covers the boundary.
+
+<SeeAlso links={[
+	{ label: "Conditions: if and define", href: "/docs/language/conditions" },
+	{ label: "Numbers", href: "/docs/language/numbers" },
+	{ label: "Lists", href: "/docs/language/lists" },
+	{ label: "Namespaces and methods", href: "/docs/language/namespaces-and-methods" },
+	{ label: "Generics", href: "/docs/language/generics" },
+	{ label: "Diagnostics", href: "/docs/reference/diagnostics" },
+]} />

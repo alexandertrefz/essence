@@ -1,0 +1,722 @@
+---
+title: Namespaces and methods
+description: Declare methods and statics for any type in a namespace, and see how a call picks the namespace and the overload it runs.
+section: language
+order: 180
+template: article
+---
+
+A type in Essence carries no methods. [`Integer`](/docs/library/integer) has none of its own, and neither does a [record](/docs/language/records) type you declare. Every method lives in a [namespace](/docs/reference/syntax-glossary#namespace): a named block that declares methods for a type from the outside. `2::add(3)` works because the standard library's namespaces for integers declare [`add`](/docs/library/integer#add): `namespace Integer for Integer`, and the namespaces for its [refinements](/docs/language/checked-refinements). Your own namespaces work the same way, for any type, including types you did not write.
+
+```essence
+implementation {
+	namespace Currency {
+		static symbol = "EUR"
+	}
+
+	namespace Money for Integer {
+		static of(euros: Integer, and cents: Integer) -> Integer {
+			<- euros::multiply(with 100)::add(cents)
+		}
+
+		euros() -> Integer {
+			<- @::quotient(dividingBy 100)
+		}
+
+		cents() -> Integer {
+			<- @::remainder(dividingBy 100)
+		}
+
+		formatted() -> String {
+			constant paddedCents = @::cents()::toString()::pad(to 2, with "0")
+			<- "{@::euros()}.{paddedCents} {Currency.symbol}"
+		}
+	}
+
+	namespace Invoice for { subtotal: Integer, tax: Integer } {
+		total() -> Integer {
+			<- @.subtotal::add(@.tax)
+		}
+	}
+
+	constant price = Money.of(euros 12, and 5)
+	Terminal.print(price) § 1205
+	Terminal.print(price::euros()) § 12
+	Terminal.print(price::formatted()) § 12.05 EUR
+	Terminal.print({ subtotal = 1_200, tax = 228 }::total()::formatted()) § 14.28 EUR
+	Terminal.print([1_200, 599, 25]::sum()::formatted()) § 18.24 EUR
+}
+```
+
+`namespace Money for Integer` declares methods for every `Integer`. `Money` is not a type. `price` is a plain `Integer`, which is why it prints `1205`, and an annotation `price: Money` is [`unknown-type`](/docs/reference/diagnostics#unknown-type), "Type 'Money' is not declared". Here an amount of money is a count of cents, and `Money` holds the methods that read it that way. Inside a method, [`@`](/docs/reference/syntax-glossary#at) is the receiver: the value in front of `::`. `price::formatted()` runs `formatted` with `price` as `@`, and `formatted` calls the namespace's other methods on `@`.
+
+`Money.of(…)` is a [static](/docs/reference/syntax-glossary#static): it belongs to the namespace rather than to a value, so it is reached with a dot. [`Terminal.print`](/docs/library/terminal#print) is the same form: `Terminal` is a library namespace with no `for`, and `print` is one of its static methods. `Currency` has no `for` either, so it holds statics only. `Invoice` targets a record shape, so any record with those two members has a `total()`. The [standard library](/docs/library/overview)'s methods live in namespaces like these. The last line chains the library's [`sum`](/docs/library/list#sum) into your `formatted`, and the two calls look the same.
+
+**Compared with JavaScript.** The compiler turns a namespace into a class that has only static members. This is what it emits for `Money`, with the bodies left out:
+
+```js
+var Money = class _Money {
+  static of(euros, cents) { /* … */ }
+  static euros(_self) { /* … */ }
+  static cents(_self) { /* … */ }
+  static formatted(_self) { /* … */ }
+}
+```
+
+Each method becomes a static function that takes the receiver first, so `price::euros()` compiles to `Money.euros(price)`. No prototype is patched. If you know C# or Kotlin extension methods or Swift extensions, a namespace is one of those. It is close to a Rust `impl` block too, but it may target any type, not only your own. The difference from all of them is that no type has methods of its own to extend: the library's methods are written this way too. `::` is not the bind operator from JavaScript's Stage 0 proposal. More on [Coming from JavaScript › Types](/docs/getting-started/coming-from-javascript#types).
+
+## Declaring a namespace
+
+```essence
+implementation {
+	namespace Clock for Integer {
+		static noon: Integer = 43_200
+		static midnight      = 0
+
+		static at(hour: Integer, minute: Integer) -> Integer {
+			<- hour::multiply(with 3_600)::add(minute::multiply(with 60))
+		}
+
+		hour() -> Integer {
+			<- @::quotient(dividingBy 3_600)
+		}
+
+		isAfterNoon() -> Boolean {
+			<- @::isGreaterThan(Clock.noon)
+		}
+	}
+
+	constant meeting = Clock.at(hour 14, minute 30)
+	Terminal.print(meeting) § 52200
+	Terminal.print(meeting::hour()) § 14
+	Terminal.print(meeting::isAfterNoon()) § true
+	Terminal.print(Clock.midnight::isAfterNoon()) § false
+}
+```
+
+`Clock` reads an `Integer` as seconds since midnight. A namespace body holds five kinds of member:
+
+| Form | Declares | Reached as |
+|---|---|---|
+| `static midnight = 0`, or `static noon: Integer = 43_200` with a type annotation | a static value | `Clock.noon` |
+| `static at(hour: Integer, minute: Integer) -> Integer { … }` | a static method, with no receiver | `Clock.at(hour 14, minute 30)` |
+| `hour() -> Integer { … }` | a method, whose receiver is `@` | `meeting::hour()` |
+| `overload name { … }` | several methods under one name | `meeting::name(…)` |
+| `overload static name { … }` | several static methods under one name | `Clock.name(…)` |
+
+A method or a static method is declared like a [function](/docs/language/functions) without the `function` keyword. It has [labelled](/docs/reference/syntax-glossary#labels) parameters, optional default values, a return type after `->`, and `<-` to return.
+
+The name in front of `for` is the namespace's own. The type after `for` is its target. The library's namespace for `Integer` is also called `Integer`, but a namespace's name need not match its target: `Clock for Integer` is equally valid. Any number of namespaces may target one type, so `meeting` has `Clock`'s methods and the library's `Integer` methods at once.
+
+A parameter of a method or a static method may be a [pattern](/docs/language/patterns). The pattern stands where the parameter's name would, and takes the argument apart:
+
+```essence
+implementation {
+	type Point = { x: Integer, y: Integer }
+
+	namespace Points for Point {
+		plus(_ { x, y }: Point) -> Point {
+			<- { x = @.x::add(x), y = @.y::add(y) }
+		}
+
+		static gridDistance(to { x, y }: Point = { x = 0, y = 0 }) -> Integer {
+			<- x::absolute()::add(y::absolute())
+		}
+	}
+
+	constant step: Point = { x = 3, y = -4 }
+	Terminal.print({ x = 1, y = 2 }::plus(step)) § { x = 4, y = -2 }
+	Terminal.print(Points.gridDistance(to step)) § 7
+	Terminal.print(Points.gridDistance()) § 0
+}
+```
+
+`plus` takes its argument apart into `x` and `y`, while `@.x` and `@.y` still read the receiver. `gridDistance` is a static method whose parameter is a pattern with a default value. Patterns covers the grammar.
+
+## The receiver, `@`
+
+```essence
+implementation {
+	type Order = { item: String, quantity: Integer, price: Integer }
+
+	namespace Orders for Order {
+		total() -> Integer {
+			<- @.price::multiply(with @.quantity)
+		}
+
+		doubled() -> Order {
+			<- { @ with quantity = @.quantity::multiply(with 2) }
+		}
+
+		summary() -> String {
+			<- "{@.item}: {@.quantity} for {@::total()}"
+		}
+
+		labels(_ names: List<String>) -> List<String> {
+			<- names::map((name) { <- "{name}: {@.item}" })
+		}
+	}
+
+	constant order: Order = { item = "pen", quantity = 3, price = 150 }
+	Terminal.print(order::summary()) § pen: 3 for 450
+	Terminal.print(order::doubled()::summary()) § pen: 6 for 900
+	Terminal.print(order.quantity) § 3
+	Terminal.print(order::labels(["Ada", "Grace"])) § ["Ada: pen", "Grace: pen"]
+}
+```
+
+`@` is the value the method was called on. `@.quantity` reads a member of a record receiver. `@::total()` calls another method on it, from the same namespace or from any other. `{ @ with quantity = … }` returns an updated copy, as [`with`](/docs/reference/syntax-glossary#with) does on any record. The receiver itself never changes, so `order.quantity` is still `3`. A function literal inside a method sees the same `@`: `labels` reads `@.item` inside the literal it passes to `map`.
+
+**Compared with JavaScript.**
+
+```ts
+class Order {
+  constructor(readonly item: string, readonly quantity: number, readonly price: number) {}
+
+  total() {
+    return this.price * this.quantity
+  }
+}
+
+const orders = [new Order("pen", 3, 150), new Order("ink", 1, 400)]
+orders.map((order) => order.total()) // [450, 400]
+orders.map(Order.prototype.total) // TypeError: `this` is undefined inside total()
+```
+
+`this` depends on how a method is called, so a method passed on its own loses it. `@` is fixed by where it is written. A function literal cannot rebind it, and there is no `bind`, `call` or `apply`. A method passed as a value takes its receiver as its first argument, as the next section shows. More on [Coming from JavaScript › Namespaces and protocols](/docs/getting-started/coming-from-javascript#namespaces-and-protocols).
+
+`@` is not a name, so nothing can rebind it. The same sigil appears in two other places. In a `match` arm, `@` is the value the arm matched, as [Choices and match](/docs/language/choices-and-match) showed. Inside a method, that arm's `@` hides the receiver. In an arm of `match @.status`, `@.name` looks for a `name` on the status and is [`unknown-member`](/docs/reference/diagnostics#unknown-member), "Case 'Status#Active' has no member 'name'". Bind the receiver to a constant before the `match` when an arm needs it. In the `where` clause of a checked refinement, `@` is the value being refined, which the last section of this page uses.
+
+A static method has no receiver, so `@` in its body is [`at-in-static-method`](/docs/reference/diagnostics#at-in-static-method), "There is no '@' in a static Method". In a function outside any namespace, `@` is [`at-outside-method`](/docs/reference/diagnostics#at-outside-method), "There is no '@' here to refer to". A namespace has no `Self` type either, the counterpart of TypeScript's `this` type: `doubled() -> Self` is `unknown-type`, "Type 'Self' is not declared". Write the target type out instead.
+
+## Statics and the dot
+
+```essence
+implementation {
+	namespace Shop {
+		static name       = "Corner Shop"
+		static opening    = { hour = 9, minute = 30 }
+		static days       = ["Mon", "Tue", "Wed"]
+		static discounted = (_ price: Integer) -> Integer {
+			<- price::multiply(with 9)::quotient(dividingBy 10)
+		}
+
+		static welcome(_ customer: String) -> String {
+			<- "Welcome to {Shop.name}, {customer}!"
+		}
+	}
+
+	Terminal.print(Shop.welcome("Ada")) § Welcome to Corner Shop, Ada!
+	Terminal.print(Shop.opening.hour) § 9
+	Terminal.print(Shop.days::length()) § 3
+	Terminal.print([1_000, 250]::map(Shop.discounted)) § [900, 225]
+}
+```
+
+A static is reached as `Namespace.name`, with a [dot](/docs/reference/syntax-glossary#dot). That holds inside the namespace too: `welcome` reads `Shop.name`, and a bare `name` there is [`unknown-name`](/docs/reference/diagnostics#unknown-name). A static value may hold any value: a string, a record, a list, a function. A method without `static` in a namespace with no `for`, such as `Shop`, is [`untyped-namespace-method`](/docs/reference/diagnostics#untyped-namespace-method), "A Namespace without a target Type can only hold static Methods".
+
+A static method called on a value with `::` is [`static-method-on-value`](/docs/reference/diagnostics#static-method-on-value), and the Help writes out the call you meant:
+
+<div class="error-output">
+
+```
+[static-method-on-value]
+Error: 'of' is a static Method
+   ╭─┤ dot.es:8:23 │
+   │
+ 8 │     Terminal.print(1205::of(euros 12, and 5))
+   │                    ──┬─  ─┐  
+   │                      ╰────│── this is a PositiveInteger
+   │                           │  
+   │                           ╰── a static Method is called on its Namespace, not on a value
+   │ 
+   │ Help: Write 'Money.of(…)', passing the value as an Argument if it needs one.
+   │ 
+   │ Note: 'Money' declares 'of' as static.
+───╯
+```
+
+</div>
+
+A misspelt static is `unknown-member`: `Money.off(euros 3)` reports "Namespace 'Money' has no member 'off'", with the Help "Did you mean 'of'?". A type is not a namespace. After `type Point = { x: Integer, y: Integer }`, `Point.origin` is `unknown-name`, "'Point' is not declared", because no namespace has that name. A TypeScript `class` is a type and a holder of statics at once. Here you declare the two separately, and they may share the name: with `namespace Point for Point { static origin: Point = { x = 0, y = 0 } }`, `Point.origin` works. A dot on a value that has no members, such as `count.value` on an `Integer`, is [`type-without-members`](/docs/reference/diagnostics#type-without-members), with the note "Only Records, Cases and Namespaces have members."
+
+A method reached on its namespace with a dot is a function. Its first positional parameter is the receiver:
+
+```essence
+implementation {
+	namespace Money for Integer {
+		euros() -> Integer {
+			<- @::quotient(dividingBy 100)
+		}
+
+		scaled(by factor: Integer) -> Integer {
+			<- @::multiply(with factor)
+		}
+	}
+
+	Terminal.print(Money.euros(1234)) § 12
+	Terminal.print(Money.scaled(1234, by 2)) § 2468
+	Terminal.print([100, 250, 1234]::map(Money.euros)) § [1, 2, 12]
+	Terminal.print(["ada", "grace"]::map(String.uppercase)) § ["ADA", "GRACE"]
+	Terminal.print(Integer.isEven(4)) § true
+}
+```
+
+`Money.euros` is a function of one `Integer`, so it can be called directly or passed to `map` like any [function value](/docs/language/functions-as-values). The library's methods work the same way: [`String.uppercase`](/docs/library/string#uppercase) and [`Integer.isEven`](/docs/library/integer#isEven).
+
+An overloaded method is not a value, because a value cannot hold several signatures at once. `constant add = Integer.add` is [`overloaded-function-value`](/docs/reference/diagnostics#overloaded-function-value), and its label reads "this names all 4 overloads at once". Calling it on its namespace works, since the call's arguments pick one: `Integer.add(1, 2)` returns `3`.
+
+Here is every `::` and `.` form in one place:
+
+| You write | What it is | How the compiler finds it |
+|---|---|---|
+| `value::name(…)` | a method call | every namespace whose target covers the value's type, then the arguments |
+| `value::<Money>name(…)` | the same call, with the namespace named | the named namespace only |
+| `Money.name`, `Money.name(…)` | a static value or a static method | the namespace, by its name |
+| `Money.name(value, …)` | a method used as a function, receiver first | the namespace, by its name |
+| `record.member` | a record member | the record's type |
+| `.member` as an argument | a member path, a function of one record | the function type expected there |
+
+## What a namespace can target
+
+```essence
+implementation {
+	choice Light {
+		Red,
+		Amber,
+		Green,
+	}
+
+	namespace Signal for Light {
+		advice() -> String {
+			<- match @ -> String {
+				case #Red   { <- "stop" }
+				case #Amber { <- "wait" }
+				case #Green { <- "go" }
+			}
+		}
+	}
+
+	namespace Headings for NonEmptyString {
+		initial() -> String {
+			<- @::firstCharacter()
+		}
+	}
+
+	namespace Scores for List<Integer> {
+		spread() -> Integer {
+			<- @::highestItem(defaultingTo 0)
+				::subtract(@::lowestItem(defaultingTo 0))
+		}
+	}
+
+	type Celsius = Integer
+
+	namespace Temperatures for Celsius {
+		isFreezing() -> Boolean {
+			<- @::isLessThanOrEqualTo(0)
+		}
+	}
+
+	constant light: Light          = #Green
+	constant scores: List<Integer> = [12, 7, 30]
+	constant today: Celsius        = -3
+	Terminal.print(light::advice()) § go
+	Terminal.print("essence"::initial()) § e
+	Terminal.print(scores::spread()) § 23
+	Terminal.print(today::isFreezing()) § true
+	Terminal.print(5::isFreezing()) § false
+}
+```
+
+A target can be any type:
+
+- **A named type**, such as `Integer`, or a record type you declared, as `Points for Point` above.
+- **A record shape written out**, as `Invoice` at the top of this page. A record with more members than the shape still has the methods, because records are structural.
+- **A choice.** `Signal for Light` gives every `Light` an `advice()`.
+- **A checked refinement.** Only a value proven to be one reaches the namespace. A written `"essence"` is a [`NonEmptyString`](/docs/library/string#NonEmptyString). A constant bound to it keeps that proof only when annotated `NonEmptyString`. Without the annotation it is a plain [`String`](/docs/library/string), and calling `initial()` on it is [`unknown-method`](/docs/reference/diagnostics#unknown-method), with the note "Searched Namespace 'String'."
+- **An applied generic type.** `Scores for List<Integer>` serves lists of integers, and a [`List<String>`](/docs/library/list) does not get `spread()`.
+- **A [union](/docs/language/unions-and-type-aliases).** Every member gets the methods, as `Greetable` below shows.
+- **An alias.** `Celsius` is another name for `Integer`, so `Temperatures` serves every `Integer`, and `5::isFreezing()` compiles.
+
+A namespace can also declare a type parameter of its own, as in `namespace Stack<infer Item> for List<Item>`. That form is on [Generics](/docs/language/generics).
+
+A namespace whose target is a union covers each member of it:
+
+```essence
+implementation {
+	type Greetable = String | Integer
+
+	namespace Greetable for Greetable is Printable {
+		toString() -> String {
+			<- match @ -> String {
+				case String  { <- @ }
+				case Integer { <- @::toString() }
+			}
+		}
+
+		greeting() -> String {
+			<- "Hello, {@}!"
+		}
+	}
+
+	constant subject: Greetable = 42
+	Terminal.print(subject) § 42
+	Terminal.print(subject::greeting()) § Hello, 42!
+	Terminal.print("Ada"::greeting()) § Hello, Ada!
+}
+```
+
+A plain `String` such as `"Ada"` has `greeting()`, because `String` is a member of the target. Inside the namespace, `@` is a `Greetable`, and `match @` narrows it to one member per arm. `is Printable` declares that the namespace makes `Greetable` [`Printable`](/docs/library/protocols#Printable), which is what lets `Terminal.print(subject)` and the string hole `{@}` accept it. A union does not inherit `Printable` from its members, as Unions and type aliases showed, so `Greetable` needs its own. That clause is a protocol conformance, and [Protocols](/docs/language/protocols) covers it.
+
+## Choosing between namespaces
+
+Any number of namespaces may target the same type, so a call can find a method's name in more than one of them. Two rules settle which one runs, in this order. When they leave more than one, you name the namespace at the call.
+
+**The arguments decide.** A namespace whose method does not accept the call's arguments is out:
+
+```essence
+implementation {
+	namespace Whole for Integer {
+		scaled(by factor: Integer) -> Integer {
+			<- @::multiply(with factor)
+		}
+	}
+
+	namespace Exact for Integer {
+		scaled(by factor: Rational) -> Rational {
+			<- @::multiply(with factor)
+		}
+	}
+
+	Terminal.print(1234::scaled(by 2)) § 2468
+	Terminal.print(1234::scaled(by 1/4)) § 617/2
+}
+```
+
+**The narrower target wins.** When several namespaces accept the call, the one whose target is narrower runs:
+
+```essence
+implementation {
+	namespace Amount for Integer | Rational {
+		formatted() -> String {
+			<- "{@} units"
+		}
+	}
+
+	namespace Cents for Integer {
+		formatted() -> String {
+			<- "{@::quotient(dividingBy 100)} EUR"
+		}
+	}
+
+	namespace Named for { name: String } {
+		describe() -> String {
+			<- @.name
+		}
+	}
+
+	namespace Priced for { name: String, price: Integer } {
+		describe() -> String {
+			<- "{@.name} at {@.price}"
+		}
+	}
+
+	namespace Readings for List<Integer> {
+		lastItem() -> Integer {
+			<- @::lastItem(defaultingTo 0)
+		}
+	}
+
+	constant share: Rational     = 3/4
+	constant none: List<Integer> = []
+	Terminal.print(1234::formatted()) § 12 EUR
+	Terminal.print(share::formatted()) § 3/4 units
+	Terminal.print({ name = "pen" }::describe()) § pen
+	Terminal.print({ name = "pen", price = 3 }::describe()) § pen at 3
+	Terminal.print(none::lastItem()) § 0
+}
+```
+
+`Integer` is narrower than `Integer | Rational`, so an `Integer` runs `Cents` and a [`Rational`](/docs/library/rational) runs `Amount`. A record shape with more members is narrower than one with fewer, so a record with a `price` runs `Priced`. `List<Integer>` is narrower than the library's `List<ItemType>`, so `none::lastItem()` runs `Readings` and returns a plain `Integer`, where the library's [`lastItem()`](/docs/library/list#lastItem) returns an `Optional<Integer>`. Inside `Readings`, `@::lastItem(defaultingTo 0)` passes an argument only the library's method accepts, so the first rule sends it there.
+
+**The call names the namespace.** When the arguments and the targets both leave more than one candidate, the call is [`ambiguous-namespace`](/docs/reference/diagnostics#ambiguous-namespace), with one note per namespace:
+
+<div class="error-output">
+
+```
+[ambiguous-namespace]
+Error: 'described' is provided by more than one Namespace
+    ╭─┤ ambiguous.es:14:17 │
+    │
+ 14 │     Terminal.print(1234::described())
+    │                          ────┬────  
+    │                              ╰────── these Arguments match all of them
+    │ 
+    │ Help: Name it at the call, e.g. 'value::<Money>described(…)'.
+    │ 
+    │ Note 1: 'Money' declares 'described'.
+    │ Note 2: 'Accounting' declares 'described'.
+────╯
+```
+
+</div>
+
+Write the namespace between the `::` and the method's name, as [`::<Money>`](/docs/reference/syntax-glossary#namespace-pick):
+
+```essence
+implementation {
+	namespace Money for Integer {
+		described() -> String {
+			<- "{@::quotient(dividingBy 100)} EUR"
+		}
+	}
+
+	namespace Accounting for Integer {
+		described() -> String {
+			if @::isNegative() {
+				<- "({@::absolute()::<Money>described()})"
+			} else {
+				<- @::<Money>described()
+			}
+		}
+	}
+
+	constant refund = 0::subtract(1234)
+	Terminal.print(1234::<Money>described()) § 12 EUR
+	Terminal.print(refund::<Accounting>described()) § (12 EUR)
+}
+```
+
+The form works on `@` inside a body too, as `Accounting` shows. JavaScript has no counterpart to `ambiguous-namespace`, because it never chooses between methods by type. In Essence, adding a namespace can make an existing call ambiguous. A call that names its namespace, such as `refund::<Accounting>described()`, stays unambiguous whatever is added later, so write the name wherever the namespace is the point.
+
+A namespace that targets the whole union, as `Greetable` does, serves a call on a union receiver directly: `subject::greeting()` above runs `Greetable`'s method. Without one, the call is decided while the program runs. The compiler finds each member's method, and the compiled code tests the value's type to pick one. So every member must provide the method. `value::uppercase()` on an `Integer | String` is `unknown-method`, "No Method named 'uppercase' for Integer". Its note reads "Every member of the Union must provide 'uppercase' — the receiver's Type is only known at runtime." `value::toString()` on the same union compiles, because both members have a `toString()`.
+
+When no namespace has the method at all, `unknown-method` lists every namespace it searched. For an `Integer` parameter, the note is "Searched Namespaces 'Integer', 'Scalar', 'Number'." [`Scalar`](/docs/library/number#Scalar) is the library's name for `Integer | Rational`: a type, and the namespace for it, as `Greetable` is above. [`Number`](/docs/library/number) covers every number type, `Integer | Rational | Irrational`, which [Numbers](/docs/language/numbers) calls the numeric tower. For a written literal, the list also names the refinements the literal proves, such as [`NonZeroInteger`](/docs/library/integer#NonZeroInteger) and [`PositiveInteger`](/docs/library/integer#PositiveInteger), as [Method calls](/docs/language/method-calls) showed. A value that no namespace targets at all, such as a function, is [`no-namespace-for-value`](/docs/reference/diagnostics#no-namespace-for-value), "No Namespace provides Methods for this value". Every record has the library's [`Record`](/docs/library/record) namespace, so a record gets `unknown-method` instead.
+
+## Overloads
+
+```essence
+implementation {
+	namespace Wrapping for String {
+		overload wrap {
+			() -> String {
+				<- @::wrap(between "(", and ")")
+			}
+
+			(in fence: String) -> String {
+				<- "{fence}{@}{fence}"
+			}
+
+			(between opening: String, and closing: String) -> String {
+				<- "{opening}{@}{closing}"
+			}
+		}
+
+		overload static of {
+			(_ text: String) -> String {
+				<- text
+			}
+
+			(repeating text: String, times count: Integer) -> String {
+				<- List.repeat(text, times count)::join(with "")
+			}
+		}
+	}
+
+	Terminal.print("essence"::wrap()) § (essence)
+	Terminal.print("essence"::wrap(in "*")) § *essence*
+	Terminal.print("essence"::wrap(between "<", and ">")) § <essence>
+	Terminal.print(Wrapping.of("x")) § x
+	Terminal.print(Wrapping.of(repeating "ab", times 3)) § ababab
+}
+```
+
+[`overload`](/docs/reference/syntax-glossary#overload) `wrap { … }` declares three methods named `wrap`. Each entry is a parameter list, a return type and a body of its own, with no name in front. A call picks the entry by its labels first. `overload static of { … }` does the same for static methods.
+
+**Compared with JavaScript.**
+
+```ts
+function wrap(text: string): string
+function wrap(text: string, fence: string): string
+function wrap(text: string, opening: string, closing: string): string
+function wrap(text: string, first?: string, second?: string): string {
+  if (first === undefined) return `(${text})`
+  if (second === undefined) return `${first}${text}${first}`
+  return `${first}${text}${second}`
+}
+```
+
+TypeScript checks a call against several signatures but runs one body, which sorts the arguments out at run time. In Essence each entry has its own body, and the compiler calls the one the labels and types pick. More on [Coming from JavaScript › Functions](/docs/getting-started/coming-from-javascript#functions).
+
+When labels cannot tell entries apart, the argument types do, and each entry may return a different type:
+
+```essence
+implementation {
+	namespace Scaling for Integer {
+		overload scaled {
+			(by factor: Integer) -> Integer {
+				<- @::multiply(with factor)
+			}
+
+			(by factor: Rational) -> Rational {
+				<- @::multiply(with factor)
+			}
+		}
+	}
+
+	Terminal.print(4::scaled(by 3)) § 12
+	Terminal.print(4::scaled(by 1/8)) § 1/2
+}
+```
+
+This is the `Whole` and `Exact` pair from above, kept under one name in one namespace. The entry is chosen while compiling, and each entry compiles to a JavaScript function of its own. Nothing checks types at run time to pick one. A call that no entry accepts is [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload), with one note per entry:
+
+<div class="error-output">
+
+```
+[no-matching-overload]
+Error: No overload of 'wrap' accepts these Arguments
+    ╭─┤ wrap.es:18:17 │
+    │
+ 18 │     Terminal.print("essence"::wrap(around "*"))
+    │                    ─────────────┬─────────────  
+    │                                 ╰─────────────── this call passes 1 Argument
+    │ 
+    │ Note 1: 'Wrapping::wrap' takes no Arguments.
+    │ Note 2: 'Wrapping::wrap' takes 1 Argument: Parameter 'in' is String.
+    │ Note 3: 'Wrapping::wrap' takes 2 Arguments: Parameter 'between' is String, Parameter 'and' is String.
+────╯
+```
+
+</div>
+
+This error stops the compiler while it infers types. An error elsewhere in the file, such as a function returning the wrong type, is reported only once this one is fixed.
+
+A default value must not make two entries accept the same call. `() -> String` beside `(in fence: String = "*") -> String` is [`ambiguous-overload-default`](/docs/reference/diagnostics#ambiguous-overload-default), "This default makes two Overloads accept the same call". The Help offers both fixes: delete the entry the default already stands for, or give the parameters labels that tell the two apart.
+
+A function declared outside a namespace carries one signature. Declaring `function describe` twice is [`duplicate-variable`](/docs/reference/diagnostics#duplicate-variable), "Variable 'describe' is already declared". Writing `overload function` in a program is [`overload-function-outside-stdlib`](/docs/reference/diagnostics#overload-function-outside-stdlib), whose Help reads "Write the Overloads as an 'overload' Method block inside a Namespace instead." The standard library's one overloaded function is [`loop`](/docs/library/loop), whose labels pick the entry, as [Iteration](/docs/language/iteration) showed.
+
+A `§§` documentation comment may stand above a namespace, above an `overload` block for the whole family, and above each entry for that entry alone. [Documentation comments](/docs/language/documentation-comments) covers them.
+
+## Where a namespace can be used
+
+```essence
+implementation {
+	function quadrupled(_ amount: Integer) -> Integer {
+		<- amount::doubled()::doubled()
+	}
+
+	namespace Doubling for Integer {
+		doubled() -> Integer {
+			<- @::multiply(with 2)
+		}
+	}
+
+	Terminal.print(quadrupled(3)) § 12
+}
+```
+
+A function body runs only when the function is called, so it may use a namespace declared below it. A statement runs where it is written, so it may not: `Terminal.print(21::doubled())` above the namespace is [`use-before-declaration`](/docs/reference/diagnostics#use-before-declaration):
+
+<div class="error-output">
+
+```
+[use-before-declaration]
+Error: Namespace 'Doubling' is used before it is declared
+   ╭─┤ order.es:2:21 │
+   │
+ 2 │     Terminal.print(21::doubled())
+   │                        ───┬───  
+   │                           ╰───── this Method comes from it
+   │ 
+ 4 │     namespace Doubling for Integer {
+   │               ────┬───  
+   │                   ╰───── declared here, below the use
+   │ 
+   │ Help: Move the use below the Declaration.
+   │ 
+   │ Note 1: A Namespace comes into being where it is written, so nothing that runs above it can reach it.
+   │ Note 2: A Function's or a Method's body is not run where it is written, so a body may name a Namespace declared below it.
+───╯
+```
+
+</div>
+
+A statement can use a namespace only below its declaration, the same as a JavaScript `class` declaration.
+
+A namespace may be declared inside a function body. Its methods then exist only inside that body:
+
+```essence
+implementation {
+	function total(of prices: List<Integer>) -> String {
+		namespace Money for Integer {
+			formatted() -> String {
+				<- "{@::quotient(dividingBy 100)} EUR"
+			}
+		}
+
+		<- prices::sum()::formatted()
+	}
+
+	Terminal.print(total(of [1_200, 599, 25])) § 18 EUR
+}
+```
+
+Outside `total`, `1_200::formatted()` is `unknown-method`.
+
+A namespace's name shares one scope with constants and functions, and the standard library's names are in that scope in every program. So `namespace Integer for Integer` in a program is `duplicate-variable`, "Variable 'Integer' is already declared"; name yours something else, as `Money for Integer` does. For the same reason, `type Step = …` is [`duplicate-type`](/docs/reference/diagnostics#duplicate-type), because the library's [`Step`](/docs/library/loop#Step) choice is in scope. A namespace travels to another file by name, through `export` and `import`, which [Modules](/docs/language/modules) covers.
+
+## Your own refinement predicates
+
+```essence
+implementation {
+	namespace Stock for Integer {
+		isAtLeast(_ count: Integer) -> Boolean {
+			<- @::isGreaterThanOrEqualTo(count)
+		}
+
+		isBelow(_ count: Integer) -> Boolean {
+			<- @::isAtLeast(count)::negate()
+		}
+	}
+
+	type Healthy = Integer where @::isAtLeast(5)
+	type Depleted = Integer where @::isBelow(5)
+
+	function refilled(_ units: Depleted) -> Integer {
+		<- units::add(5)
+	}
+
+	function shipped(_ units: Healthy) -> Integer {
+		<- units::subtract(1)
+	}
+
+	function restocked(_ units: Integer) -> Integer {
+		if units::isBelow(5) {
+			<- refilled(units)
+		} else {
+			<- shipped(units)
+		}
+	}
+
+	constant stocked: Healthy = 20
+	Terminal.print(shipped(stocked)) § 19
+	Terminal.print(restocked(12)) § 11
+	Terminal.print(restocked(3)) § 8
+}
+```
+
+A checked refinement's `where` clause is a method call on `@`, and the method may be one your program declares. `isAtLeast` returns a [`Boolean`](/docs/library/boolean), and its whole body is one call on `@`. So `@::isAtLeast(5)` means [`@::isGreaterThanOrEqualTo(5)`](/docs/library/integer#isGreaterThanOrEqualTo), and the compiler checks it the same way: a written `20` is accepted as a `Healthy`. `isBelow` is `isAtLeast` followed by [`::negate()`](/docs/library/boolean#negate), so it holds exactly when `isAtLeast` does not, and `Depleted` is the complement of `Healthy`. Writing `isBelow` as `@::isLessThan(count)` works as well.
+
+In `restocked`, the `if` proves `Depleted` for its block. The `else` proves the complement, `Healthy`, so both calls compile. TypeScript's type guard, `function isHealthy(units: number): units is Healthy`, is trusted whatever its body returns. Here you write no such annotation and register nothing: the compiler reads the method's body.
+
+A predicate whose body is anything other than one call on `@`, or that call followed by `::negate()`, is opaque to the compiler. An `if` that asks it still proves the refinement, but a written value is not accepted. Passing an `Integer` nobody checked is [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch). Its Help names the check to write: "Check '@::isAtLeast(5)' on the value in an 'if' or a 'match', or pass a value that already has Type 'Healthy'."
+
+<SeeAlso links={[
+	{ label: "Checked refinements", href: "/docs/language/checked-refinements" },
+	{ label: "Generics", href: "/docs/language/generics" },
+	{ label: "Protocols", href: "/docs/language/protocols" },
+	{ label: "The standard library", href: "/docs/library/overview" },
+	{ label: "Diagnostics", href: "/docs/reference/diagnostics" },
+]} />

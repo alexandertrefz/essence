@@ -1,0 +1,479 @@
+---
+title: Records
+description: Group named values into one immutable record, name its shape with `type`, and build an updated copy with `with`.
+section: language
+order: 50
+template: article
+---
+
+A record is one value made of named members, such as `{ name = "Ada", born = 1815 }`. There is no class, no `interface` and no constructor to call: you write the value you want. Records are immutable and structurally typed. `type` gives a shape a name, and `with` builds a changed copy.
+
+```essence
+implementation {
+	type Point = { x: Integer, y: Integer }
+
+	constant origin      = { x = 0, y = 0 }
+	constant here: Point = { x = 3, y = 4 }
+	constant moved       = { here with x = here.x::add(10) }
+
+	Terminal.print(here.x) § 3
+	Terminal.print(origin) § { x = 0, y = 0 }
+	Terminal.print(moved) § { x = 13, y = 4 }
+	Terminal.print(here) § { x = 3, y = 4 }
+}
+```
+
+A record literal writes each member as `name = value` between [braces](/docs/reference/syntax-glossary#braces), and [`.x`](/docs/reference/syntax-glossary#dot) reads a member back. [`type`](/docs/reference/syntax-glossary#type) gives the shape `{ x: Integer, y: Integer }` the name `Point`. [`{ here with x = … }`](/docs/reference/syntax-glossary#with) returns a new record with `x` replaced, and `here` is unchanged.
+
+**Compared with JavaScript.**
+
+```ts
+type Point = { x: number; y: number }
+
+const origin = { x: 0, y: 0 }
+const here: Point = { x: 3, y: 4 }
+const moved = { ...here, x: here.x + 10 }
+```
+
+In Essence a [colon](/docs/reference/syntax-glossary#colon) puts a type after a name and an [equals sign](/docs/reference/syntax-glossary#equals) a value, so the object literal `{ x: 0 }` is a syntax error. More on [Coming from JavaScript › Collections](/docs/getting-started/coming-from-javascript#collections).
+
+## Writing a record
+
+```essence
+implementation {
+	constant ada = {
+		name = "Ada",
+		born = 1815,
+		address = { city = "London", country = "England" },
+	}
+
+	Terminal.print(ada.name) § Ada
+	Terminal.print(ada.address.city) § London
+	Terminal.print(ada.born::add(36)) § 1851
+}
+```
+
+Members are separated by commas, and a trailing comma is allowed; `essence format` writes one when it breaks a literal over lines. A member's value is any expression, another record included. `.` reads through as many levels as the record has, as `ada.address.city` does. The literal's type is the shape it has, `{ name: String, born: Integer, address: { city: String, country: String } }`, so `ada` needs no annotation.
+
+Write a member the JavaScript way, with a colon, and the parser stops at the colon with a [`syntax-error`](/docs/reference/diagnostics#syntax-error):
+
+<div class="error-output">
+
+```
+[syntax-error]
+Error: Expected 'with' but found ':'.
+   ╭─┤ ada.es:2:23 │
+   │
+ 2 │     constant ada = { name: "Ada", born: 1815 }
+   │                          ▲
+   │                          ╰── expected 'with'
+───╯
+```
+
+</div>
+
+The message names `with`, but the fix is `=`. A member written twice in one literal is an error too, and so is reading a member the record does not have. Both are in the table under "When the compiler refuses a record" below.
+
+A member written as a bare name takes its value from the name in scope:
+
+```essence
+implementation {
+	constant name = "Ada"
+	constant born = 1815
+
+	constant person  = { name, born }
+	constant renamed = { name = "Ada Lovelace", born }
+
+	Terminal.print(person) § { name = "Ada", born = 1815 }
+	Terminal.print(renamed) § { name = "Ada Lovelace", born = 1815 }
+}
+```
+
+`{ name, born }` is `{ name = name, born = born }`. The name may be a constant, a variable or a parameter, and the two spellings mix in one literal. This shorthand is the same as JavaScript's shorthand properties. `essence format` keeps whichever spelling you wrote. It works in a literal, not after `with`; "Changing a record" below explains why.
+
+## Naming a shape with `type`
+
+```essence
+implementation {
+	type Size = { width: Integer, height: Integer }
+
+	function area(of size: Size) -> Integer {
+		<- size.width::multiply(with size.height)
+	}
+
+	function perimeter(
+		of size: { width: Integer, height: Integer },
+	) -> Integer {
+		<- size.width::add(size.height)::multiply(with 2)
+	}
+
+	constant screen: Size = { width = 1920, height = 1080 }
+
+	Terminal.print(area(of screen)) § 2073600
+	Terminal.print(perimeter(of screen)) § 6000
+	Terminal.print(area(of { width = 3, height = 4 })) § 12
+}
+```
+
+`type Size = { width: Integer, height: Integer }` names a shape. The name is shorter to write than the shape and says what the shape is for, but it does not make a new kind of value. `perimeter` writes the same shape out in full and accepts `screen` all the same. `area(of { width = 3, height = 4 })` passes a literal that was never annotated.
+
+A `type` declared directly in `implementation` may be used above the line that declares it, as a function may. `type` also names other kinds of type, such as the union `Integer | String`; those forms are on [Unions and type aliases](/docs/language/unions-and-type-aliases).
+
+An annotation is checked. Leave `height` out of `screen` and the compiler reports [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch):
+
+<div class="error-output">
+
+```
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'screen'
+   ╭─┤ screen.es:4:26 │
+   │
+ 4 │     constant screen: Size = { width = 1920 }
+   │                             ────────┬───────
+   │                                     ╰───────── this is a { width: Integer }
+   │
+   │ Note: 'screen' is declared as { width: Integer, height: Integer }.
+───╯
+```
+
+</div>
+
+The note spells the shape out and never says `Size`: the compiler does not keep a record type's name for display. A member of the wrong type, `{ width = "wide", height = 1080 }`, is refused with the same code.
+
+TypeScript's optional member has no counterpart. `?` is a name character, as it is in a parameter name on [Functions](/docs/language/functions), so `nickname?: String` declares a required member named `nickname?`. Leaving it out is the same `assignment-type-mismatch`, even though the note prints the shape as `{ name: String, nickname?: String }`. A member that may hold no value is an [`Optional`](/docs/language/optional). A member a call may leave out is one a parameter's default fills in, as "Record parameters with defaults" below shows.
+
+## Structural typing
+
+```essence
+implementation {
+	type Point = { x: Integer, y: Integer }
+	type Coordinate = { x: Integer, y: Integer }
+
+	function describe(_ point: Point) -> String {
+		<- "({point.x}, {point.y})"
+	}
+
+	constant home: Coordinate = { x = 5, y = 6 }
+	constant start: Point     = { x = 1, y = 2, label = "start" }
+
+	Terminal.print(describe(home)) § (5, 6)
+	Terminal.print(describe(start)) § (1, 2)
+	Terminal.print(start) § { x = 1, y = 2, label = "start" }
+}
+```
+
+Typing is structural. `Point` is not a box a value has to be put into but a description of a shape. Any record with an [`Integer`](/docs/library/integer) `x` and an `Integer` `y` is a `Point`, whether or not anybody said so. `Coordinate` names the same shape, so a `Coordinate` passes wherever a `Point` is asked for, and the other way round.
+
+A record may also have more members than the type names. `start` carries a `label` that `Point` does not mention, and the annotation admits it. The extra member is kept, not dropped: `start` prints with its `label`, and a `with` update of `start` keeps it too. It cannot be read through `Point`, though: `start.label` is [`unknown-member`](/docs/reference/diagnostics#unknown-member), because the type names only `x` and `y`. The same holds for the payload of a case, on [Choices and `match`](/docs/language/choices-and-match).
+
+The check goes down through nested records:
+
+```essence
+implementation {
+	type Point = { x: Integer, y: Integer }
+	type Line = { start: Point, end: Point }
+
+	function width(of line: Line) -> Integer {
+		<- line.end.x::subtract(line.start.x)
+	}
+
+	constant stroke = {
+		start = { x = 0, y = 0, z = 0 },
+		end = { x = 3, y = 4, z = 5 },
+		colour = "red",
+	}
+
+	Terminal.print(width(of stroke)) § 3
+	Terminal.print(stroke.end) § { x = 3, y = 4, z = 5 }
+}
+```
+
+`Line` asks for two `Point`s. `stroke`'s points each carry a `z` and `stroke` carries a `colour`, and it is a `Line` all the same.
+
+**Compared with JavaScript.**
+
+```ts
+type Point = { x: number; y: number }
+
+const start: Point = { x: 1, y: 2, label: "start" }
+// error TS2353: Object literal may only specify known properties,
+// and 'label' does not exist in type 'Point'.
+```
+
+If you know TypeScript: its `type` is structural in the same way. Its excess-property check refuses the extra `label` in a literal, where Essence admits the member and keeps it. More on [Coming from JavaScript › Types](/docs/getting-started/coming-from-javascript#types).
+
+## Changing a record
+
+You do not. `{ record with … }` reads an existing record and returns a new one with some members replaced:
+
+```essence
+implementation {
+	type Order = { item: String, quantity: Integer, paid: Boolean }
+
+	constant order: Order = { item = "lamp", quantity = 1, paid = false }
+	constant more         = { order with quantity = order.quantity::add(2) }
+	constant settled      = { order with quantity = 5, paid = true }
+
+	Terminal.print(more) § { item = "lamp", quantity = 3, paid = false }
+	Terminal.print(settled) § { item = "lamp", quantity = 5, paid = true }
+	Terminal.print(order) § { item = "lamp", quantity = 1, paid = false }
+}
+```
+
+`{ order with quantity = 5, paid = true }` copies `order` and sets the members in its key list. The keys are separated by commas; a long key list may break over lines and end in a trailing comma. `order` is untouched, because nothing changes a record in place. Assigning to a member, `order.paid = true`, is a syntax error: `Expected an Expression but found '='.`
+
+After `with` comes either a key list or one expression. An expression is merged whole:
+
+```essence
+implementation {
+	type Server = { host: String, port: Integer }
+
+	constant base: Server = { host = "localhost", port = 80 }
+	constant change       = { port = 8080 }
+	constant host         = "api.example.com"
+
+	Terminal.print({ base with change }) § { host = "localhost", port = 8080 }
+	Terminal.print({ base with { host } }) § { host = "api.example.com", port = 80 }
+}
+```
+
+Each member of `change` replaces the member of the same name in `base`. A literal is an expression too, so `{ base with { host } }` uses the shorthand to merge the constant `host` by name. Only the members `change`'s type names are merged. If `change` holds an extra member its type does not name, that member is left out.
+
+A bare name after `with` is read as a record to merge, not as the shorthand. `{ base with host }` merges the [`String`](/docs/library/string) in `host` and is refused; write `{ base with host = host }` or `{ base with { host } }`. Both errors a bare name after `with` can cause are in the table below.
+
+**Compared with JavaScript.**
+
+```ts
+const settled = { ...order, quantity: 5, paid: true }
+const shipped = { ...order, shipped: true } // spread may add a member
+order.paid = true // allowed, unless the type says readonly
+```
+
+Spread copies and then overrides, as `with` does, and in Essence the copy is the only way. Spread may also add a member, and `with` may not: `{ order with shipped = true }` is [`partial-type-mismatch`](/docs/reference/diagnostics#partial-type-mismatch), so a record with a new member is a new literal. There is no `...` in Essence: `{ ...order }` is a `syntax-error`. More on [Coming from JavaScript › Bindings](/docs/getting-started/coming-from-javascript#bindings).
+
+## Reaching into nested records
+
+```essence
+implementation {
+	type Server = { host: String, port: Integer }
+	type Config = { name: String, server: Server }
+
+	constant config: Config = {
+		name = "api",
+		server = { host = "localhost", port = 80 },
+	}
+
+	constant moved     = { config with server.port = 8080 }
+	constant listening = { config with server.{ host = "0.0.0.0", port = 443 } }
+	constant replaced  = { config with server = { host = "backup", port = 81 } }
+
+	Terminal.print(moved.server) § { host = "localhost", port = 8080 }
+	Terminal.print(listening.server) § { host = "0.0.0.0", port = 443 }
+	Terminal.print(replaced.server) § { host = "backup", port = 81 }
+	Terminal.print(config.server) § { host = "localhost", port = 80 }
+}
+```
+
+A key may be a path. `server.port = 8080` sets `port` inside `server` and keeps `server`'s other members. `{ config with server.port = 8080 }` is the same as `{ config with server = { config.server with port = 8080 } }`. A braced descend, `server.{ … }`, sets several members one level down in one key. `config` is untouched at every level.
+
+`server = { … }` replaces the member and `server.port = …` merges into it, after `with` and in a record argument alike. A replacing literal must therefore be a whole `Server`. `{ config with server = { port = 8080 } }` is refused, because a literal after `server =` is never merged into the `server` already there.
+
+A descend holds a full member list, so it takes path keys, further descends and the shorthand. With a constant `port` in scope, `{ config with server.{ port, host = "0.0.0.0" } }` sets both members. Keys that share a first step may also stand side by side, as in `{ config with server.port = 1, server.host = "api.example.com" }`.
+
+**Compared with JavaScript.**
+
+```ts
+const moved = { ...config, server: { ...config.server, port: 8080 } }
+```
+
+Nested spread writes each level out by hand, where a path key writes the same nesting for you. More on [Coming from JavaScript › Collections](/docs/getting-started/coming-from-javascript#collections).
+
+## When the compiler refuses a record
+
+Every literal, member read and update is checked where it is written, and these are the errors the checks report:
+
+<div class="table-scroll">
+
+| Code | Written | The compiler says |
+| --- | --- | --- |
+| `partial-type-mismatch` | `{ order with shipped = true }`, a member `order` does not have; `{ order with paid = "yes" }`, a member of the wrong type; `{ config with server = { port = 8080 } }`, a replacement that is not a whole `Server` | This is not a Partial of the value it updates |
+| [`duplicate-member`](/docs/reference/diagnostics#duplicate-member) | `{ x = 1, y = 2, x = 3 }`; `{ config with server = fallback, server.port = 3 }` | Member 'x' is already defined; Member 'server.port' and 'server' both write 'server' |
+| `unknown-member` | `here.z`, where `here` is a `Point` | `{ x: Integer, y: Integer }` has no member 'z' |
+| [`uncombinable-types`](/docs/reference/diagnostics#uncombinable-types) | `{ base with host }`, where `host` holds a `String` | Strings can not be combined |
+| [`shorthand-in-combination`](/docs/reference/diagnostics#shorthand-in-combination) | `{ base with host, port = 8080 }` | A bare member name is not a key in an update |
+| [`path-key-outside-combination`](/docs/reference/diagnostics#path-key-outside-combination) | `{ name = "api", server.port = 1 }`, a path in a literal that updates nothing | A path key reaches into nothing here |
+| [`empty-path-group`](/docs/reference/diagnostics#empty-path-group) | `{ config with server.{} }` | This descend updates nothing |
+| [`path-on-computed-value`](/docs/reference/diagnostics#path-on-computed-value) | `{ defaults() with server.port = 8080 }`, a path on a call's result; bind the result to a constant first | A path key updates a value it can name |
+| [`path-step-not-a-record`](/docs/reference/diagnostics#path-step-not-a-record) | `{ config with server.port.digits = 3 }` | A path key steps through Records only |
+| [`wrong-update-brackets`](/docs/reference/diagnostics#wrong-update-brackets) | `[order with paid = true]`; `{ ages with "ada" = 37 }`, where `ages` is a [dictionary](/docs/language/dictionaries) | A Record is updated in braces; A key that is a value belongs to a Dictionary |
+
+</div>
+
+The first is the most common. A Partial, as in TypeScript's `Partial<T>`, is a record with some of the original's members, of the same types. The error's labels show both shapes, so the member at fault can be read off them:
+
+<div class="error-output">
+
+```
+[partial-type-mismatch]
+Error: This is not a Partial of the value it updates
+   ╭─┤ update.es:5:34 │
+   │
+ 5 │     constant shipped = { order with shipped = true }
+   │                          ──┬──      ───────┬──────
+   │                            ╰───────────────│──────── this is a { item: String, quantity: Integer, paid: Boolean }
+   │                                            │
+   │                                            ╰──────── this is a { shipped: Boolean }
+   │
+   │ Note: An update may only set members the original already has, with the Types it declared for them.
+───╯
+```
+
+</div>
+
+`order` has no `shipped` member, and an update only sets members the original already has.
+
+## Record parameters with defaults
+
+Functions showed a parameter's default value, `= expression` after its type. A record parameter's default may leave members out:
+
+```essence
+implementation {
+	type Options = { host: String, retries: Integer, timeout: Integer }
+
+	function connect(
+		_ url: String,
+		using options: Options = { retries = 3, timeout = 30 },
+	) -> String {
+		<- "{url} {options.host} {options.retries} {options.timeout}"
+	}
+
+	Terminal.print(connect("example.com", using { host = "db" })) § example.com db 3 30
+	Terminal.print(connect("example.com", using { host = "db", retries = 5 })) § example.com db 5 30
+}
+```
+
+The default is partial: a record that writes only some of the type's members. The members it writes, `retries` and `timeout`, are the members a call may leave out. Inside the function, `options` holds `{ default with argument }`: the default's members, with the ones the call wrote on top. A member the argument writes replaces the default's member whole, as a key after `with` does.
+
+**Compared with JavaScript.**
+
+```ts
+function connect(
+	url: string,
+	{ host, retries = 3, timeout = 30 }: { host: string; retries?: number; timeout?: number },
+): string {
+	return `${url} ${host} ${retries} ${timeout}`
+}
+
+connect("example.com", { host: "db" }) // "example.com db 3 30"
+```
+
+TypeScript spreads the defaults across a destructuring pattern and an optional-property type, where Essence writes them as one record whose members a call may leave out. More on [Coming from JavaScript › Functions](/docs/getting-started/coming-from-javascript#functions).
+
+The default does not fill in `host`, so every call writes it. Leave the whole argument out and the call is [`argument-count-mismatch`](/docs/reference/diagnostics#argument-count-mismatch). Write it without `host` and the call is [`incomplete-record-argument`](/docs/reference/diagnostics#incomplete-record-argument):
+
+<div class="error-output">
+
+```
+[incomplete-record-argument]
+Error: This Argument is missing 1 member the default does not fill in
+    ╭─┤ connect.es:11:46 │
+    │
+ 11 │     Terminal.print(connect("example.com", using { retries = 5 }))
+    │                                                 ───────┬───────
+    │                                                        ╰───────── 'host' not written here
+    │
+    │ Help: Write 'host' into this Record.
+    │
+    │ Note 1: Parameter 'using' is { host: String, retries: Integer, timeout: Integer }.
+    │ Note 2: Its default fills in 'retries', 'timeout'; every other member must be written.
+────╯
+```
+
+</div>
+
+A member whose type is an `Optional` is no exception: a call must write it unless the default fills it in.
+
+A default that writes every member lets a call leave the whole argument out:
+
+```essence
+implementation {
+	type Options = { host: String, retries: Integer, timeout: Integer }
+
+	function ping(
+		using options: Options = {
+			host = "localhost",
+			retries = 1,
+			timeout = 5,
+		},
+	) -> String {
+		<- "{options.host} {options.retries} {options.timeout}"
+	}
+
+	Terminal.print(ping()) § localhost 1 5
+	Terminal.print(ping(using { retries = 9 })) § localhost 9 5
+}
+```
+
+A written argument may still be partial: `ping(using { retries = 9 })` takes `host` and `timeout` from the default. Only an argument written as a record literal may leave members out. Bind `{ retries = 9 }` to a constant and pass the constant, and the call is [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch). A record passed by name must be a whole `Options`.
+
+An argument is merged into the default, so it takes path keys and descends as `with` does. With a default of `server = { host = "localhost", port = 8080 }`, the argument `{ server.port = 1 }` keeps the default's `host`. A path may reach only into a member the default writes out as a record literal; anything else is [`path-key-without-default`](/docs/reference/diagnostics#path-key-without-default).
+
+## What every record has
+
+```essence
+implementation {
+	type Point = { x: Integer, y: Integer }
+
+	constant here: Point  = { x = 1, y = 2 }
+	constant start: Point = { x = 1, y = 2, label = "start" }
+
+	Terminal.print(here::is({ y = 2, x = 1 })) § true
+	Terminal.print(here::isNot({ x = 2, y = 2 })) § true
+	Terminal.print(here::is(start)) § false
+	Terminal.print(here::toString()) § { x = 1, y = 2 }
+	Terminal.print(start::keys()) § ["x", "y", "label"]
+}
+```
+
+Every record has four methods, listed under [Record](/docs/library/record) in the library: [`is`](/docs/library/record#is), [`isNot`](/docs/library/record#isNot), [`toString`](/docs/library/record#toString) and [`keys`](/docs/library/record#keys). `is` compares structurally. Two records are equal when they have the same members with equal values, in any order. A kept extra member counts, so `start` is not `here`. `toString` returns the text [`Terminal.print`](/docs/library/terminal#print) writes, and `keys()` returns the member names in the order written, like `Object.keys`, extra members included.
+
+**Compared with JavaScript.**
+
+```ts
+const here = { x: 1, y: 2 }
+const again = { x: 1, y: 2 }
+console.log(here === again) // false
+```
+
+`===` compares references, while `is` compares members, and a record has no identity to compare. More on [Coming from JavaScript › Operators](/docs/getting-started/coming-from-javascript#operators).
+
+The smallest record has no members:
+
+```essence
+implementation {
+	function log(_ text: String) -> {} {
+		Terminal.print(text) § saved
+	}
+
+	constant nothing = {}
+	constant result  = log("saved")
+
+	Terminal.inspect(nothing) § {}
+	Terminal.print(result::is(nothing)) § true
+	Terminal.print(nothing::keys()::isEmpty()) § true
+}
+```
+
+`{}` is the record with no members, and its type is written `{}` too. A function with nothing to return is declared `-> {}`, as `log` is, and may end without a `<-`. That makes `{}` the closest thing to `void`. The type names no members, and a record may have more members than its type names, so any record fits it: a `{}` parameter accepts `{ name = "Ada" }`.
+
+A member may also hold a function; function types, and a record member as one of the places they stand, are on [Functions as values](/docs/language/functions-as-values). To give a record a method, write a [namespace](/docs/language/namespaces-and-methods) for its type; to take one apart by member name, use a [pattern](/docs/language/patterns).
+
+<SeeAlso
+	links={[
+		{ label: "Record", href: "/docs/library/record" },
+		{ label: "Choices and match", href: "/docs/language/choices-and-match" },
+		{ label: "Functions as values", href: "/docs/language/functions-as-values" },
+		{ label: "Patterns", href: "/docs/language/patterns" },
+		{ label: "Diagnostics", href: "/docs/reference/diagnostics" },
+	]}
+/>

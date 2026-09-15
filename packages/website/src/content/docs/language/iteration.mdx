@@ -1,0 +1,442 @@
+---
+title: Iteration
+description: "Repeat work without a loop statement: map and reduce a list, call loop, stop early with Step, or recurse."
+section: language
+order: 140
+template: article
+---
+
+Essence has no `for` or `while`. You repeat work by computing a value. [`map`](/docs/library/list#map) and [`reduce`](/docs/library/list#reduce) walk a list. The [`loop`](/docs/library/loop) function runs a body until a condition or a count says stop. A [`Step`](/docs/library/loop#Step) value stops a loop early. A function can also call itself, which is recursion. This page shows each, in the order you reach for them.
+
+```essence
+implementation {
+	constant total = List.of(integersFrom 1, through 10)
+		::reduce(startingWith 0, (sum, n) { <- sum::add(n) })
+
+	Terminal.print(total) § 55
+
+	constant counted = loop(from 1, through 10, startingWith 0, (index, sum) {
+		<- sum::add(index)
+	})
+
+	Terminal.print(counted) § 55
+}
+```
+
+Both constants add up the numbers from 1 to 10. The first builds the list of those numbers with [`List.of(integersFrom:through:)`](/docs/library/list#of) and combines its items with `reduce`. The second calls `loop`, which counts from 1 through 10 and hands its body each number and the sum so far. Each body is a [function literal](/docs/language/functions-as-values), Essence's arrow function, and [`<-`](/docs/reference/syntax-glossary#return) is its `return`. Each body returns the next sum, and each call returns the last one. No variable changes along the way.
+
+**Compared with JavaScript.**
+
+```ts
+let total = 0
+for (let i = 1; i <= 10; i++) {
+  total += i
+}
+console.log(total) // 55
+```
+
+The JavaScript loop changes `total` on every pass. The Essence body returns the next total instead. `i = 1` becomes `from 1`, `i <= 10` becomes `through 10`, and `let total = 0` becomes `startingWith 0`. There is no `i++`: the count always moves by one. More on [Coming from JavaScript › Control flow](/docs/getting-started/coming-from-javascript#control-flow).
+
+## No loop statement
+
+There is no `for`, `while`, `do`, `break` or `continue` in Essence. Write a JavaScript `for…of` loop and the parser stops at its first word with a [`syntax-error`](/docs/reference/diagnostics#syntax-error):
+
+<div class="error-output">
+
+```
+[syntax-error]
+Error: Expected an Expression but found 'for'.
+   ╭─┤ total.es:4:2 │
+   │
+ 4 │     for (const price of [12, 30, 8]) {
+   │     ─┬─  
+   │      ╰─── here
+───╯
+```
+
+</div>
+
+`while`, `do`, `break` and `continue` are not keywords, so the error depends on the code around them. `while n::isLessThan(100) { n = n::multiply(with 2) }` is an [`unknown-name`](/docs/reference/diagnostics#unknown-name) error, `'while' is not declared`, because its braces parse as a record. A body that is not record-shaped, such as `{ Terminal.print(n) }`, is a `syntax-error` instead. Written as JavaScript, `while (n < 100) {` stops the parser at the `100`: `Expected an Identifier but found '100'.`
+
+Iteration is an expression instead. `reduce` and `loop` each take a function and call it once per turn. They pass in the value so far and take the next value back, and the whole call returns the value the last turn produced. `map` calls its function once per item and returns a list of every result.
+
+## Mapping and reducing a list
+
+```essence
+implementation {
+	constant prices = [12, 30, 8]
+
+	constant doubled = prices::map((price) { <- price::multiply(with 2) })
+
+	Terminal.print(doubled) § [24, 60, 16]
+
+	constant total = prices::reduce(startingWith 0, (sum, price) {
+		<- sum::add(price)
+	})
+
+	Terminal.print(total) § 50
+
+	constant receipt = prices::reduce(startingWith "Prices:", (text, price) {
+		<- "{text} {price}"
+	})
+
+	Terminal.print(receipt) § Prices: 12 30 8
+}
+```
+
+`map` calls a function on every item and returns a new list of the results. `reduce` walks the list once with an accumulator: one value that each call replaces. `startingWith` gives its first value. The function receives the accumulator and the next item, in that order, and returns the new accumulator. `reduce` returns what the last call returned. On an empty list it returns the `startingWith` value.
+
+The accumulator can have any type. `receipt` starts from a [`String`](/docs/library/string) and adds each [`Integer`](/docs/library/integer) price to it.
+
+[Lists](/docs/language/lists) covers the other methods that walk a list, such as [`everyItem(where:)`](/docs/library/list#everyItem), which keeps the items a function accepts, as JavaScript's `filter` does.
+
+A range of integers is a list too. `List.of(integersFrom 1, through 5)` returns `[1, 2, 3, 4, 5]`, so `map` over it runs a function once per number:
+
+```essence
+implementation {
+	constant squares = List.of(integersFrom 1, through 5)::map((n) {
+		<- n::multiply(with n)
+	})
+
+	Terminal.print(squares) § [1, 4, 9, 16, 25]
+}
+```
+
+**Compared with JavaScript.**
+
+```ts
+const prices = [12, 30, 8]
+const doubled = prices.map((price) => price * 2)
+const total = prices.reduce((sum, price) => sum + price, 0)
+```
+
+The callback takes the accumulator first and the item second, the same as JavaScript. The start value moves to the front, labelled `startingWith`. JavaScript can leave it out and start from the first item. Essence allows that only on a [`NonEmptyList`](/docs/library/list#NonEmptyList), a list the compiler knows has items, such as a written `[12, 30, 8]`. A constant does not keep that proof ([Checked refinements](/docs/language/checked-refinements) says why), so `prices::reduce` without `startingWith` is [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload). More on [Coming from JavaScript › Same as JavaScript](/docs/getting-started/coming-from-javascript#same-as-javascript).
+
+`map` passes only the item. For the index JavaScript passes second, call [`enumerate()`](/docs/library/list#enumerate) first: each item then arrives as an `{ index, item }` [record](/docs/language/records), counted from 0.
+
+## Doing something for each item
+
+```essence
+implementation {
+	constant names = ["Ada", "Grace", "Linus"]
+
+	Terminal.print(names::join(with "\n")) § Ada
+	§ Grace
+	§ Linus
+}
+```
+
+A list has no `forEach`: `names::forEach(…)` is [`unknown-method`](/docs/reference/diagnostics#unknown-method). To print every item, build the text with [`join(with:)`](/docs/library/list#join) and print it once.
+
+Some Essence code prints each item with `names::map((name) { <- Terminal.print(name) })`. It prints the same three lines: `map` calls the function for every item, and the list of results is thrown away. Prefer the joined string. It is one call, and it builds no list only to discard it.
+
+**Compared with JavaScript.**
+
+```ts
+const names = ["Ada", "Grace", "Linus"]
+names.forEach((name) => console.log(name))
+```
+
+`forEach` runs a function for its effect on each item. Essence builds the whole text first, and the one effect is the single [`Terminal.print`](/docs/library/terminal#print). More on [Coming from JavaScript › Control flow](/docs/getting-started/coming-from-javascript#control-flow).
+
+## Loops that check a condition
+
+```essence
+implementation {
+	constant doubled = loop(
+		startingWith 1,
+		while (n) { <- n::isLessThan(100) },
+		(n) { <- n::multiply(with 2) },
+	)
+
+	Terminal.print(doubled) § 128
+
+	constant tripled = loop(
+		startingWith 1,
+		until (n) { <- n::isGreaterThan(100) },
+		(n) { <- n::multiply(with 3) },
+	)
+
+	Terminal.print(tripled) § 243
+
+	constant unchanged = loop(
+		startingWith 500,
+		while (n) { <- n::isLessThan(100) },
+		(n) { <- n::multiply(with 2) },
+	)
+
+	Terminal.print(unchanged) § 500
+}
+```
+
+`loop` is a function, not a statement. It has nine entries, overloads in TypeScript's terms, and the labels in a call decide which one runs. In a call, `while (n) { … }` is not a statement. It is the label `while` and a function literal, as `from 1` is the label `from` and a number.
+
+Every entry takes `startingWith`, the first state. The state is the one value a loop carries from turn to turn. In the `while` and `until` entries, the last argument is the body: a function that receives the state and returns the next one.
+
+`while` takes a condition, a function from the state to a [`Boolean`](/docs/library/boolean). The loop asks it about the state before each turn and stops at the first state it rejects. That state is what `loop` returns: 128 is the first power of two that is not below 100. `until` reverses the question and stops at the first state the condition accepts.
+
+The condition is asked before the first turn too. A starting state that already stops the loop comes back unchanged, and the body never runs, which is why `unchanged` is 500.
+
+**Compared with JavaScript.**
+
+```ts
+let n = 1
+while (n < 100) {
+  n *= 2
+}
+console.log(n) // 128
+```
+
+As in JavaScript, the condition is checked before every turn, the first one included. The difference is that nothing changes `n`: `loop` returns the first state the condition rejects. More on [Coming from JavaScript › What is not in the language](/docs/getting-started/coming-from-javascript#what-is-not-in-the-language).
+
+## Loops that count
+
+```essence
+implementation {
+	constant throughFour = loop(
+		from 1,
+		through 4,
+		startingWith "",
+		(index, text) { <- "{text}{index}" },
+	)
+
+	Terminal.print(throughFour) § 1234
+
+	constant upToFour = loop(from 1, upTo 4, startingWith "", (index, text) {
+		<- "{text}{index}"
+	})
+
+	Terminal.print(upToFour) § 123
+
+	constant downToOne = loop(from 3, downTo 1, startingWith "", (index, text) {
+		<- "{text}{index}"
+	})
+
+	Terminal.print(downToOne) § 321
+}
+```
+
+The counted entries take `from`, one of three ends, and `startingWith`. The body receives the current number first and the state second, `(index, state)`, and returns the next state. That is the reverse of `reduce`, where the running value comes first. Swapped names can still compile: `(text, index) { <- "{text}{index}" }` builds `4321`, because `text` is then the number.
+
+The count moves by one each turn. To count by two, walk `List.of(integersFrom 0, through 10, by 2)`, which returns `[0, 2, 4, 6, 8, 10]`, with `map` or `reduce`.
+
+- `through` counts up and includes the end.
+- `upTo` counts up and stops before the end.
+- `downTo` counts down and includes the end.
+
+`through` and `upTo` only count up. An end below the start runs the body zero times, and the loop returns the starting state unchanged. `downTo` always runs the body for its first number, even when the end is above the start:
+
+```essence
+implementation {
+	constant backwards = loop(
+		from 3,
+		through 1,
+		startingWith "none",
+		(index, text) { <- "{text}{index}" },
+	)
+
+	Terminal.print(backwards) § none
+
+	constant once = loop(from 1, downTo 3, startingWith "", (index, text) {
+		<- "{text}{index}"
+	})
+
+	Terminal.print(once) § 1
+}
+```
+
+## Stopping early with Step
+
+```essence
+implementation {
+	constant answer = loop(startingWith 1, step (n) {
+		if n::isGreaterThan(50) {
+			<- #Done("the first power of two over 50 is {n}")
+		}
+
+		<- #Continue(n::multiply(with 2))
+	})
+
+	Terminal.print(answer) § the first power of two over 50 is 64
+}
+```
+
+A body labelled `step` returns a `Step` instead of the next state. `Step<State, Answer>` is a [choice](/docs/language/choices-and-match) with two cases. If you know TypeScript's discriminated unions, it is like `{ kind: "continue"; state: State } | { kind: "done"; value: Answer }`. `#Continue` carries the next state, and the loop takes another turn. `#Done` carries the answer, and the loop stops and returns it. This entry has no condition and no count, so a `#Done` is the only way it ends.
+
+The state and the answer can have different types. Here the state is an `Integer` and the answer is a `String`. `Step<Integer, String>` names that pair: a `Step` whose state is an `Integer` and whose answer is a `String`.
+
+Each case carries a record. `#Continue` has a `state` member and `#Done` a `value` member, so `#Done("found")` is short for `#Done({ value = "found" })`. `Step` has no [namespace](/docs/language/namespaces-and-methods) of its own, the declaration that would make it printable, so `Terminal.print` refuses one with [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound). [`Terminal.inspect`](/docs/library/terminal#inspect) shows it:
+
+```essence
+implementation {
+	constant finished: Step<Integer, String> = #Done("found")
+
+	Terminal.inspect(finished) § Step#Done("found")
+
+	constant going: Step<Integer, String> = #Continue(3)
+
+	Terminal.inspect(going) § Step#Continue(3)
+}
+```
+
+### A record as the state
+
+```essence
+implementation {
+	constant answer = loop(startingWith { index = 1, total = 0 }, step (state) {
+		constant next = state.total::add(state.index)
+
+		if next::isGreaterThan(100) {
+			<- #Done("1 to {state.index} adds up to {next}")
+		}
+
+		<- #Continue({ state with index = state.index::add(1), total = next })
+	})
+
+	Terminal.print(answer) § 1 to 14 adds up to 105
+}
+```
+
+The state is a record, `{ index, total }`: the next number to add and the sum so far. Each turn adds the number. If the sum passes 100, the step returns `#Done` with a sentence. Otherwise it returns `#Continue` with a copy of the state, made with [`{ state with … }`](/docs/reference/syntax-glossary#with).
+
+A step can also take the record apart in its parameter list, as in `step ({ index, total } as state) { … }`. That is a pattern, and [Patterns](/docs/language/patterns) teaches it.
+
+### Counted loops that stop
+
+```essence
+implementation {
+	constant firstOver = loop(
+		from 1,
+		through 100,
+		startingWith 0,
+		step (index, total) {
+			constant next = total::add(index)
+
+			if next::isGreaterThan(10) {
+				<- #Done(next)
+			}
+
+			<- #Continue(next)
+		},
+	)
+
+	Terminal.print(firstOver) § 15
+}
+```
+
+The three counted entries take a `step` body too, written `step (index, state)` after `from`, the end and `startingWith`. When the count runs out, the loop returns the state from the last turn. A `#Done` returns earlier. Here the running total first passes 10 when 5 is added, so the loop stops at 15 instead of counting to 100.
+
+In these three entries, `#Done` carries a value of the state's type. The count running out also ends the loop and returns the state, so both endings return one type. Change the step above to return `#Done("passed 10 at {index}")` and the compiler reports [`payload-type-mismatch`](/docs/reference/diagnostics#payload-type-mismatch):
+
+<div class="error-output">
+
+```
+[payload-type-mismatch]
+Error: This payload does not fit Case '#Done'
+    ╭─┤ firstOver.es:10:14 │
+    │
+ 10 │           <- #Done("passed 10 at {index}")
+    │                    ───────────┬──────────  
+    │                               ╰──────────── this is a { value: String }
+    │ 
+    │ Note: '#Done' carries a { value: Integer }.
+────╯
+```
+
+</div>
+
+To stop with a different type, use the entry without a count, `loop(startingWith:, step:)`, and keep the count in a record state.
+
+### Stopping a reduce
+
+```essence
+implementation {
+	function describeBudget(_ prices: List<Integer>, limit: Integer) -> String {
+		constant spent = prices::reduce(startingWith 0, step (total, price) {
+			constant next = total::add(price)
+
+			if next::isGreaterThan(limit) {
+				<- #Done(total)
+			}
+
+			<- #Continue(next)
+		})
+
+		<- "spent {spent} of {limit}"
+	}
+
+	Terminal.print(describeBudget([12, 30, 8, 50], limit 45)) § spent 42 of 45
+}
+```
+
+`reduce` has the same pair of bodies. With a `step` body, each call returns a `Step`. `#Continue` carries the accumulator on to the next item. `#Done` stops the walk, and `reduce` returns its value. As in the counted entries, `#Done` carries a value of the accumulator's type, because running out of items returns the accumulator.
+
+`describeBudget` adds prices until the next one would pass the limit. The `<-` in front of `#Done(total)` returns from the step, not from `describeBudget`. The walk stops at 42, and the function goes on to its own `<-`. Early exit is a value, so `<-` keeps its one meaning.
+
+**Compared with JavaScript.**
+
+```ts
+function describeBudget(prices: number[], limit: number): string {
+  let spent = 0
+  for (const price of prices) {
+    if (spent + price > limit) break
+    spent += price
+  }
+  return `spent ${spent} of ${limit}`
+}
+```
+
+`break` jumps out of the loop around it. `#Done` is a value instead: the step returns it, and `reduce` stops. A `return` inside the loop would leave `describeBudget`, but a `<-` inside a step only leaves the step. More on [Coming from JavaScript › Control flow](/docs/getting-started/coming-from-javascript#control-flow).
+
+## The nine loop entries
+
+The labels a call writes pick the entry. Each row links to its full signature.
+
+| Group | Entry | The body receives | The loop stops | It returns |
+|---|---|---|---|---|
+| Condition | [`loop(startingWith:, while:, _)`](/docs/library/loop#while) | `(state)` | at the first state the condition rejects | that state |
+| Condition | [`loop(startingWith:, until:, _)`](/docs/library/loop#until) | `(state)` | at the first state the condition accepts | that state |
+| Count | [`loop(from:, through:, startingWith:, _)`](/docs/library/loop#through) | `(index, state)` | after the end, which is included | the last state |
+| Count | [`loop(from:, upTo:, startingWith:, _)`](/docs/library/loop#upTo) | `(index, state)` | before the end | the last state |
+| Count | [`loop(from:, downTo:, startingWith:, _)`](/docs/library/loop#downTo) | `(index, state)` | after the end, counting down; the first number always runs | the last state |
+| Step | [`loop(startingWith:, step:)`](/docs/library/loop#step) | `(state)` | at the first `#Done` | the `#Done` value, of any type |
+| Step | [`loop(from:, through:, startingWith:, step:)`](/docs/library/loop#through-step) | `(index, state)` | at a `#Done`, or after the end | the `#Done` value or the last state |
+| Step | [`loop(from:, upTo:, startingWith:, step:)`](/docs/library/loop#upTo-step) | `(index, state)` | at a `#Done`, or before the end | the `#Done` value or the last state |
+| Step | [`loop(from:, downTo:, startingWith:, step:)`](/docs/library/loop#downTo-step) | `(index, state)` | at a `#Done`, or after the end | the `#Done` value or the last state |
+
+`loop` and `Step` belong to the Prelude, the names every program can use without an import ([Modules](/docs/language/modules)). A program that declares its own `function loop` gets [`duplicate-variable`](/docs/reference/diagnostics#duplicate-variable), and one that declares `type Step` gets [`duplicate-type`](/docs/reference/diagnostics#duplicate-type).
+
+## Recursion
+
+```essence
+implementation {
+	function countdown(from start: Integer) -> String {
+		if start::isLessThanOrEqualTo(0) {
+			<- "liftoff"
+		}
+
+		<- "{start} {countdown(from start::subtract(1))}"
+	}
+
+	Terminal.print(countdown(from 3)) § 3 2 1 liftoff
+
+	constant counted = loop(from 3, downTo 1, startingWith "", (index, text) {
+		<- "{text}{index} "
+	})
+
+	Terminal.print("{counted}liftoff") § 3 2 1 liftoff
+}
+```
+
+A function that calls itself repeats work too. It needs a base case, a path that returns without calling itself. `countdown` returns `"liftoff"` at zero, and otherwise puts the number in front of the countdown from one less. The `loop` below it counts the same numbers with `downTo`.
+
+Recursion is the general tool. It fits work that is not a count or a walk over one list. [Functions](/docs/language/functions) are hoisted, so a call may stand above the function it calls, and two functions can call each other.
+
+Every call that has not returned holds a frame on the JavaScript call stack. `countdown` still has work to do after its own call returns, since it puts the result into a string. Called with `from 1000000`, it stops the program with a `RangeError` (`Maximum call stack size exceeded`). A tail call, one that is the last thing a function returns, can give up its frame first. That depends on the JavaScript engine: Bun does, and Node does not. A `loop` runs a million turns on either without growing the stack, so use `loop` when the count can grow large.
+
+<SeeAlso links={[
+	{ label: "loop", href: "/docs/library/loop" },
+	{ label: "List", href: "/docs/library/list" },
+	{ label: "Lists", href: "/docs/language/lists" },
+	{ label: "Patterns", href: "/docs/language/patterns" },
+]} />

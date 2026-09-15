@@ -1,0 +1,568 @@
+---
+title: Functions as values
+description: "Pass, store and return functions: function types, function literals, closures, and member paths like `.price`."
+section: language
+order: 120
+template: article
+---
+
+A function is a value, the same as in JavaScript. You can pass one to another function, store one in a [constant](/docs/reference/syntax-glossary#constant) or a [record](/docs/language/records), and return one from a call. Three things differ. A [label](/docs/reference/syntax-glossary#labels), the name a call writes before an argument, is part of a function's type. A [function literal](/docs/reference/syntax-glossary#function-literal) takes its types from the context only when it is written as an argument. A [member path](/docs/reference/syntax-glossary#member-path) such as `.price` stands in for `(product) => product.price`. Declaring a named function is on [Functions](/docs/language/functions).
+
+```essence
+implementation {
+	function applyTwice(
+		_ transform: (_: Integer) -> Integer,
+		to value: Integer,
+	) -> Integer {
+		<- transform(transform(value))
+	}
+
+	function square(_ value: Integer) -> Integer {
+		<- value::multiply(with value)
+	}
+
+	Terminal.print(applyTwice(square, to 3)) § 81
+	Terminal.print(applyTwice((n) { <- n::add(10) }, to 1)) § 21
+}
+```
+
+`applyTwice` takes a function as its first argument and calls it twice. The type of that parameter, `(_: Integer) -> Integer`, is a function type. It describes a function that takes one [`Integer`](/docs/library/integer) and returns an `Integer`. Inside the body, `transform(value)` calls it like any other function.
+
+The first call passes `square`, a declared function, by its name. The second passes a function literal, `(n) { <- n::add(10) }`: a function with no name, written where it is used. Its parameter `n` has no type written, because a literal written as an argument takes its types from the parameter it is passed to.
+
+## Function types
+
+```essence
+implementation {
+	§ One positional parameter.
+	function adjust(
+		_ price: Integer,
+		using rule: (_: Integer) -> Integer,
+	) -> Integer {
+		<- rule(price)
+	}
+
+	§ One parameter labelled `on`: a call through the type writes the label.
+	function discount(using rule: (on: Integer) -> Integer) -> Integer {
+		<- rule(on 100)
+	}
+
+	§ Two positional parameters.
+	function total(
+		using combine: (_: Integer, _: Integer) -> Integer,
+	) -> Integer {
+		<- combine(30, 12)
+	}
+
+	§ A function that returns nothing.
+	function announce(using report: (_: String) -> {}) -> {} {
+		report("sale starts")
+	}
+
+	Terminal.print(adjust(40, using (price) { <- price::add(5) })) § 45
+	Terminal.print(discount(using (price) { <- price::subtract(10) })) § 90
+	Terminal.print(total(using (first, second) { <- first::add(second) })) § 42
+	announce(using (text) { Terminal.print(text) }) § sale starts
+}
+```
+
+A function type is a parameter list in [parentheses](/docs/reference/syntax-glossary#parentheses), then [`->`](/docs/reference/syntax-glossary#arrow) and the type the function returns. It is a signature with no keyword, no name and no body. Its parameters are spelled as in a declaration: with a label, or with an [underscore](/docs/reference/syntax-glossary#underscore) where there is none.
+
+| Function type | What the function takes | A call through it |
+| --- | --- | --- |
+| `(_: Integer) -> Integer` | one `Integer`, with no label | `rule(price)` |
+| `(on: Integer) -> Integer` | one `Integer`, labelled `on` | `rule(on 100)` |
+| `(_: Integer, _: Integer) -> Integer` | two `Integer`s, with no labels | `combine(30, 12)` |
+| `(_: String) -> {}` | one [`String`](/docs/library/string), and it returns nothing | `report("sale starts")` |
+
+A label is part of the type. `(on: Integer) -> Integer` and `(_: Integer) -> Integer` are different types, and a function of one does not fit where the other is expected. Give `discount` a constant `tenOff` whose type is `(_: Integer) -> Integer`, and the call is [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch):
+
+<div class="error-output">
+
+```
+[argument-type-mismatch]
+Error: This Argument does not fit Parameter 'using'
+   ╭─┤ discount.es:8:32 │
+   │
+ 8 │     Terminal.print(discount(using tenOff))
+   │                                   ───┬──
+   │                                      ╰──── this is a (_: Integer) -> Integer
+   │
+   │ Note: Parameter 'using' is (on: Integer) -> Integer.
+───╯
+```
+
+</div>
+
+A positional parameter, one with no label, may also carry a name, as in `(_ price: Integer) -> Integer`. The name documents the parameter for the reader and changes nothing else. `(_ price: Integer) -> Integer` is the same type as `(_: Integer) -> Integer`, and a call through it writes no label. The standard library writes its function types in the bare form, with `_` alone.
+
+**Compared with JavaScript.**
+
+```ts
+type PriceRule = (price: number) => number
+
+const addShipping: PriceRule = (amount) => amount + 5
+```
+
+In TypeScript, the name in `(price: number) => number` is documentation only. Essence spells that type `(_ price: Integer) -> Integer`. Without the underscore, `(price: Integer) -> Integer` declares a label, and every call through it writes `rule(price 40)`. More on [Coming from JavaScript › Functions](/docs/getting-started/coming-from-javascript#functions).
+
+## Function literals
+
+```essence
+implementation {
+	constant increment = (_ value: Integer) -> Integer { <- value::add(1) }
+
+	constant describe = (_ price: Integer, in currency: String) -> String {
+		if price::isZero() {
+			<- "free"
+		}
+
+		<- "{price} {currency}"
+	}
+
+	Terminal.print(increment(41)) § 42
+	Terminal.print(describe(0, in "CHF")) § free
+	Terminal.print(describe(12, in "CHF")) § 12 CHF
+
+	constant log = (_ text: String) -> {} {
+		Terminal.print("log: {text}") § log: done
+	}
+
+	log("done")
+}
+```
+
+A function literal is a function with no name. It has a parameter list, `->` and a return type, then a body in [braces](/docs/reference/syntax-glossary#braces): a function type with a body added. `increment`, `describe` and `log` are constants that hold one each. A call through `describe` writes the literal's label, `in`.
+
+A standalone literal, one that is not written as an argument, writes every parameter type and its return type. Its body is an ordinary function body: `describe` holds an [`if`](/docs/reference/syntax-glossary#if) and two [`<-`](/docs/reference/syntax-glossary#return). `log` is declared `-> {}`, so its body needs no `<-`, the same as a declared function.
+
+Leave the return type off a standalone literal and it is [`missing-return-type`](/docs/reference/diagnostics#missing-return-type), "This Function must write its return Type". Leave a parameter type off and it is [`uninferable-parameter-type`](/docs/reference/diagnostics#uninferable-parameter-type), shown in the next section.
+
+A literal cannot carry a default value. `(_ value: Integer, by step: Integer = 1) -> Integer { … }` is [`default-on-function-literal`](/docs/reference/diagnostics#default-on-function-literal). A literal is always called through a function type, and that type fixes how many arguments every call passes.
+
+**Compared with JavaScript.**
+
+```ts
+const increment = (value: number) => value + 1
+
+const describe = (price: number, currency: string) => {
+  if (price === 0) {
+    return "free"
+  }
+
+  return `${price} ${currency}`
+}
+```
+
+There is no `=>`. TypeScript infers the return type of each arrow function, while a standalone Essence literal writes it after `->`. Its body is always a block in braces, and a value leaves it only through `<-`. `(value: number)` becomes `(_ value: Integer)`. Without the underscore, `value` is a label, and `increment(41)` is [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch), "This Argument is not labelled 'value'". More on [Coming from JavaScript › Functions](/docs/getting-started/coming-from-javascript#functions).
+
+## Literals written as arguments
+
+```essence
+implementation {
+	function applyTwice(
+		_ transform: (_: Integer) -> Integer,
+		to value: Integer,
+	) -> Integer {
+		<- transform(transform(value))
+	}
+
+	Terminal.print(applyTwice((n) { <- n::multiply(with 10) }, to 1)) § 100
+	Terminal.print([1, 2, 3]::map((n) { <- n::add(1) })) § [2, 3, 4]
+	Terminal.print([1, 2, 3, 4]::everyItem(where (n) { <- n::isEven() })) § [2, 4]
+}
+```
+
+A literal written directly as an argument takes its types from the parameter it is passed to. `applyTwice` expects a `(_: Integer) -> Integer`, so `n` is an `Integer` inside the literal, and the body must return an `Integer`. The body is checked like any other. Return a `String` from it and the literal is [`return-type-mismatch`](/docs/reference/diagnostics#return-type-mismatch), "This value does not fit the declared return Type".
+
+A literal passed after a label works the same way, as `where (n) { … }` shows. [`map`](/docs/library/list#map) and [`everyItem`](/docs/library/list#everyItem) are library methods on lists, and [Lists](/docs/language/lists) covers them.
+
+<Note>
+A literal takes its types from the context only when it is written directly as an argument. Everywhere else it writes them out.
+</Note>
+
+None of these four literals is an argument, so the compiler has no type to read their parameter from:
+
+```essence
+§ fragment
+§ Each literal below is uninferable-parameter-type.
+constant increment = (value) { <- value::add(1) }
+
+constant typed: (_: Integer) -> Integer = (value) { <- value::add(1) }
+
+constant operations = { increment = (value) { <- value::add(1) } }
+
+function adder(of amount: Integer) -> (_: Integer) -> Integer {
+	<- (value) { <- value::add(amount) }
+}
+```
+
+The four places are a constant, a constant with a function type annotation, a record member, and the return of a function declared to return a function. The annotation on `typed` does not reach its literal, and neither does the return type of `adder`. A record type annotation does not reach a member's literal either. Each is `uninferable-parameter-type`:
+
+<div class="error-output">
+
+```
+[uninferable-parameter-type]
+Error: The Type of Parameter 'value' could not be inferred
+   ╭─┤ increment.es:2:24 │
+   │
+ 2 │     constant increment = (value) { <- value::add(1) }
+   │                           ──┬──
+   │                             ╰──── this Parameter has no Type
+   │
+   │ Help: Write the Parameter's Type explicitly.
+   │
+   │ Note: Only a Function passed as an Argument takes its Types from the surrounding context.
+───╯
+```
+
+</div>
+
+The fix in each place is the full literal, `(_ value: Integer) -> Integer { <- value::add(1) }`.
+
+**Compared with JavaScript.**
+
+```ts
+const increment: (value: number) => number = (value) => value + 1
+
+console.log([1, 2, 3].map((n) => n + 1)) // [2, 3, 4]
+```
+
+TypeScript types a literal from the annotation on its constant, or from its function's return type, as well as from the parameter it is passed to. Essence does only the last. `(n) => n + 1` becomes `(n) { <- n::add(1) }` as an argument, and the full literal anywhere else. More on [Coming from JavaScript › Functions](/docs/getting-started/coming-from-javascript#functions).
+
+## Writing some of a literal's types
+
+```essence
+implementation {
+	function applyTwice(
+		_ transform: (_: Integer) -> Integer,
+		to value: Integer,
+	) -> Integer {
+		<- transform(transform(value))
+	}
+
+	§ A type on a positional parameter keeps its underscore.
+	Terminal.print(applyTwice((_ n: Integer) { <- n::add(1) }, to 1)) § 3
+
+	§ A written type may be wider than the one expected.
+	constant labels = [1, 2, 3]::map((_ item: Integer | Rational) {
+		<- item::toString()
+	})
+
+	Terminal.print(labels) § ["1", "2", "3"]
+
+	§ An underscore alone ignores the parameter.
+	Terminal.print([1, 2, 3]::map((_) { <- 0 })) § [0, 0, 0]
+}
+```
+
+A literal written as an argument may still write some of its types, and what it writes has to fit the expected type:
+
+- A type on a positional parameter keeps its underscore: `(_ n: Integer)`. The return type is still taken from the context.
+- A written parameter type may be wider than the expected one. `Integer | Rational` accepts every `Integer` and every [`Rational`](/docs/library/rational), so that literal fits where a function of an `Integer` is expected. [Unions](/docs/language/unions-and-type-aliases) covers `|`.
+- A literal takes exactly as many parameters as its type. TypeScript lets a callback take fewer, as in `.map(() => 0)`. Here, `() { <- 0 }` passed to `applyTwice` is `argument-type-mismatch`. Write `(_) { <- 0 }`: a parameter with no name, which the literal ignores. A second parameter, as in JavaScript's `(item, index)`, is `uninferable-parameter-type`, with "nothing for Parameter 2 to infer from".
+
+Without the underscore, `n: Integer` is the one-name spelling from Functions, where one name is both label and parameter name. So it declares a label `n`. The expected type has no label, so the literal does not fit:
+
+<div class="error-output">
+
+```
+[argument-type-mismatch]
+Error: This Argument does not fit Parameter 1
+   ╭─┤ labelled.es:9:28 │
+   │
+ 9 │     Terminal.print(applyTwice((n: Integer) { <- n::add(1) }, to 1))
+   │                               ──────────────┬──────────────
+   │                                             ╰──────────────── this is a (n: Integer) -> Integer
+   │
+   │ Note: Parameter 1 is (_: Integer) -> Integer.
+───╯
+```
+
+</div>
+
+Passed to `map`, the same literal is [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload), the error a method reports when none of its signatures fits.
+
+When the expected type has a label, the literal takes the label from the type:
+
+```essence
+implementation {
+	function twice(_ rule: (on: Integer) -> Integer) -> Integer {
+		<- rule(on rule(on 1))
+	}
+
+	§ An untyped parameter takes its label from the type.
+	Terminal.print(twice((value) { <- value::add(3) })) § 7
+
+	§ A typed parameter writes the label itself.
+	Terminal.print(twice((on value: Integer) { <- value::add(3) })) § 7
+}
+```
+
+`twice` calls `rule(on 1)`. An untyped parameter, `(value)`, writes no label and receives that argument. A typed parameter writes the label itself, as `(on value: Integer)`. A label with no type, `(on value)`, is [`redundant-parameter-label`](/docs/reference/diagnostics#redundant-parameter-label), "A Parameter without a Type can not carry a label".
+
+A literal's parameter may also be a pattern that takes a record apart. [Patterns](/docs/language/patterns) covers that form.
+
+## Storing and returning functions
+
+```essence
+implementation {
+	§ A type alias. The name `price` documents the parameter.
+	type PriceRule = (_ price: Integer) -> Integer
+
+	constant addShipping: PriceRule = (_ amount: Integer) -> Integer {
+		<- amount::add(5)
+	}
+
+	function takeOff(_ discount: Integer) -> (_: Integer) -> Integer {
+		<- (_ amount: Integer) -> Integer { <- amount::subtract(discount) }
+	}
+
+	type Promotion = { name: String, rule: PriceRule }
+
+	constant summerSale: Promotion = { name = "summer", rule = takeOff(10) }
+
+	constant checkout: List<PriceRule> = [summerSale.rule, addShipping]
+
+	Terminal.print(addShipping(40)) § 45
+	Terminal.print(takeOff(5)(50)) § 45
+	Terminal.print(summerSale.rule(50)) § 40
+	Terminal.print(summerSale.rule(50)::add(5)) § 45
+	Terminal.print(checkout::map((rule) { <- rule(100) })) § [90, 105]
+}
+```
+
+A function type may stand in each of these positions:
+
+- a parameter's type, as in every function above;
+- a type alias, which names the type once, as `PriceRule` does;
+- a constant's annotation, as on `addShipping`;
+- a return type, as on `takeOff`;
+- a record member's type, as `rule` in `Promotion`;
+- a list's item type, as in `List<PriceRule>`.
+
+`takeOff(10)` fits the member `rule`, a `PriceRule`, because a name on a positional parameter changes nothing.
+
+An arrow groups to the right. In `-> (_: Integer) -> Integer`, everything after the first `->` is the return type, so `takeOff` returns a function. As a value, `takeOff` has the type `(_: Integer) -> (_: Integer) -> Integer`. No parentheses are needed around the inner type, and none are allowed. In a type, an opening parenthesis always starts a parameter list, so `-> ((_: Integer) -> Integer)` is a [`syntax-error`](/docs/reference/diagnostics#syntax-error). For the same reason, a function type in a union comes last: `(_: Integer) -> Integer | String` is a function that returns `Integer | String`.
+
+`takeOff(5)(50)` calls the function `takeOff(5)` returns, as in JavaScript. The literal inside `takeOff` is a closure, a function that reads names from the place it was written: it reads `discount`, a parameter of the call that made it.
+
+`summerSale.rule(50)` reads the member `rule` and calls it. The [`.`](/docs/reference/syntax-glossary#dot) that reads a member binds tighter than [`::`](/docs/reference/syntax-glossary#method-call), so `summerSale.rule(50)::add(5)` calls the member first and then [`add`](/docs/library/integer#add) on its result.
+
+Calling a value that is not a function is [`not-a-function`](/docs/reference/diagnostics#not-a-function). `summerSale.name` is a `String`:
+
+<div class="error-output">
+
+```
+[not-a-function]
+Error: This Expression is not a Function
+   ╭─┤ promotion.es:9:17 │
+   │
+ 9 │     Terminal.print(summerSale.name(50))
+   │                    ───────┬───────
+   │                           ╰───────── this is a String
+───╯
+```
+
+</div>
+
+## Declared functions and closures
+
+```essence
+implementation {
+	function greet(_ name: String, with greeting: String = "Hello") -> String {
+		<- "{greeting}, {name}!"
+	}
+
+	constant welcome = greet
+
+	Terminal.print(greet("Ada")) § Hello, Ada!
+	Terminal.print(welcome("Ada", with "Hi")) § Hi, Ada!
+}
+```
+
+A declared function is a value under its own name, as `square` was at the top of this page. `welcome` holds `greet`, and a call through it writes the same labels. It does not keep the default. The type of `welcome` is `(_: String, with: String) -> String`, and a function type carries no defaults. So `welcome("Ada")` is [`argument-count-mismatch`](/docs/reference/diagnostics#argument-count-mismatch), "This call passes the wrong number of Arguments".
+
+**Compared with JavaScript.**
+
+```ts
+function greet(name: string, greeting = "Hello") {
+  return `${greeting}, ${name}!`
+}
+
+const welcome = greet
+
+welcome("Ada") // "Hello, Ada!"
+```
+
+In JavaScript, `welcome` is the same function object as `greet`, so it keeps the default. In Essence, `welcome` holds a value of a function type, and a function type has no defaults.
+
+A literal can also read a variable from the place it was written:
+
+```essence
+implementation {
+	variable taxRate = 8
+
+	constant withTax = (_ price: Integer) -> Integer {
+		<- price::add(price::multiply(with taxRate)::quotient(dividingBy 100))
+	}
+
+	Terminal.print(withTax(100)) § 108
+	taxRate = 20
+	Terminal.print(withTax(100)) § 120
+}
+```
+
+Closures work the same as in JavaScript. `withTax` reads the [variable](/docs/reference/syntax-glossary#variable) `taxRate` each time it runs, so the call after `taxRate = 20` sees 20. `takeOff`, in the section above, keeps the `discount` of the call that made it. More on [Coming from JavaScript › Functions](/docs/getting-started/coming-from-javascript#functions).
+
+## Member paths
+
+```essence
+implementation {
+	type Maker = { town: String }
+
+	type Product = { name: String, price: Integer, maker: Maker }
+
+	constant products: List<Product> = [
+		{ name = "pen", price = 3, maker = { town = "Bern" } },
+		{ name = "ink", price = 12, maker = { town = "Basel" } },
+	]
+
+	Terminal.print(products::map(.price)) § [3, 12]
+	Terminal.print(products::map(.maker.town)) § ["Bern", "Basel"]
+	Terminal.print(products::sort(on .price, in #Descending)::map(.name)) § ["ink", "pen"]
+	Terminal.print(products::map(.name)::join(with ", ")) § pen, ink
+
+	§ The same as the first line, written as a literal.
+	Terminal.print(products::map((product) { <- product.price })) § [3, 12]
+}
+```
+
+A member path is a dot followed by one or more member names, such as `.price` or `.maker.town`. It stands where a function of one unlabelled parameter is expected, and it is that function. The compiler builds it from the type the position expects, so `.price` here is `(product) { <- product.price }`, the literal on the last line. Each step reads one member more: `.maker.town` reads `maker`, then `town`.
+
+[`sort(on:)`](/docs/library/list#sort) also takes a function of one item, so a path fits there too. The `map(.name)` before [`join(with:)`](/docs/library/list#join) is a path as well.
+
+**Compared with JavaScript.**
+
+```ts
+products.map((product) => product.price)
+products.map((product) => product.maker.town)
+products.toSorted((a, b) => b.price - a.price).map((product) => product.name)
+```
+
+JavaScript has no bare path, so it writes the arrow function each time. Its `toSorted` takes a comparator, which is `sort(by:)` here. A path fits `sort(on:)`, which takes a key instead. More on [Coming from JavaScript › Functions](/docs/getting-started/coming-from-javascript#functions).
+
+```essence
+implementation {
+	type Maker = { town: String }
+
+	type Product = { name: String, price: Integer, maker: Maker }
+
+	function describe(
+		_ product: Product,
+		using read: (_: Product) -> String,
+	) -> String {
+		<- "{product.name}: {read(product)}"
+	}
+
+	constant pen: Product = {
+		name = "pen",
+		price = 3,
+		maker = { town = "Bern" },
+	}
+
+	constant townOf: (_: Product) -> String = .maker.town
+
+	Terminal.print(describe(pen, using .maker.town)) § pen: Bern
+	Terminal.print(townOf(pen)) § Bern
+}
+```
+
+A path fits any position that expects a function of one unlabelled parameter, including your own: `describe` takes a `(_: Product) -> String`. An annotated constant gives a path its type too, so `townOf` holds the function `.maker.town` stands for. A literal does not take its types from a constant's annotation, but a path does.
+
+A path needs that expected type to know what it reads. Where there is none, it is [`path-without-context`](/docs/reference/diagnostics#path-without-context). `constant price = .price` is one such place. `sort(by:)` is another: it takes a function of two items that compares them, and a path reads members off one.
+
+<div class="error-output">
+
+```
+[path-without-context]
+Error: A member path stands where no Function is expected
+   ╭─┤ products.es:9:35 │
+   │
+ 9 │     Terminal.print(products::sort(by .price))
+   │                                      ───┬──
+   │                                         ╰──── this path names no value
+   │
+   │ Note 1: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
+   │ Note 2: This position expects no particular Type.
+───╯
+```
+
+</div>
+
+To sort by a key, write `sort(on .price)`.
+
+A path steps through records, and a case counts as one. A member that holds an [`Optional`](/docs/library/optional), a union, a [choice](/docs/language/choices-and-match) or a list must be decided first: matched, or read with a method such as `value(defaultingTo:)`. A path does neither. On the customers in the program below, `[ada, grace]::map(.address.town)` is [`path-step-not-a-record`](/docs/reference/diagnostics#path-step-not-a-record):
+
+<div class="error-output">
+
+```
+[path-step-not-a-record]
+Error: A member path steps through Records only
+    ╭─┤ customers.es:13:44 │
+    │
+ 13 │     Terminal.print([ada, grace]::map(.address.town))
+    │                                               ──┬─
+    │                                                 ╰─── read off an Optional<{ town: String }>
+    │
+    │ Help: Write the Function literal instead, and decide the value the way its Type asks to be decided.
+    │
+    │ Note: Only a Record or a Case has members a path can step through. An Optional, a Union, a Choice or a List is decided before it is read, and deciding it is a Match rather than a dot.
+────╯
+```
+
+</div>
+
+There is no `?.`, as [Optional](/docs/language/optional) showed. Write a literal, and decide the `Optional` inside it. A path still fits the one-parameter function that [`Optional::map`](/docs/library/optional#map) takes:
+
+```essence
+implementation {
+	type Address = { town: String }
+
+	type Customer = { name: String, address: Optional<Address> }
+
+	constant ada: Customer = {
+		name = "Ada",
+		address = #Value({ town = "Bern" }),
+	}
+
+	constant grace: Customer = { name = "Grace", address = #Empty }
+
+	constant towns = [ada, grace]::map((customer) {
+		<- customer.address::map(.town)::value(defaultingTo "unknown")
+	})
+
+	Terminal.print(towns) § ["Bern", "unknown"]
+}
+```
+
+A path reads members and nothing else, so it cannot call a method such as [`uppercase()`](/docs/library/string#uppercase). `.name::uppercase()` is refused as [`path-is-members-only`](/docs/reference/diagnostics#path-is-members-only), "'::' can not follow a path". Write the literal `(product) { <- product.name::uppercase() }` instead.
+
+## Methods and generic functions as values
+
+A method is a value too when you reach it on its [namespace](/docs/language/namespaces-and-methods), the named group of methods for a type, with a dot: `["a", "b"]::map(String.uppercase)` returns `["A", "B"]`.
+
+An overloaded function, one name with several signatures, cannot be a value: `constant add = Integer.add` is [`overloaded-function-value`](/docs/reference/diagnostics#overloaded-function-value), and a literal that calls the overload you mean fixes it.
+
+A generic function whose type parameter must conform to a [protocol](/docs/language/protocols), a bound like TypeScript's `<T extends Printable>`, cannot be a value either: storing one is [`protocol-bound-function-value`](/docs/reference/diagnostics#protocol-bound-function-value).
+
+A [generic](/docs/language/generics) function with no bound, such as an `identity` that returns its argument, can be stored but not passed to `map`: pass `(n) { <- identity(n) }`.
+
+<SeeAlso
+	links={[
+		{ label: "Functions", href: "/docs/language/functions" },
+		{ label: "Lists", href: "/docs/language/lists" },
+		{ label: "Namespaces and methods", href: "/docs/language/namespaces-and-methods" },
+		{ label: "Diagnostics", href: "/docs/reference/diagnostics" },
+	]}
+/>

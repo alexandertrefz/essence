@@ -1,0 +1,548 @@
+---
+title: Patterns
+description: "Take records and case payloads apart by name in match arms, parameters and declarations, with one pattern grammar."
+section: language
+order: 170
+template: article
+---
+
+A pattern takes a value apart by naming its parts. It looks like JavaScript's object destructuring: `constant { x, y } = point` declares a constant for each member it names. The same braces work in a [`match`](/docs/language/choices-and-match) arm, in a case payload (the [record](/docs/language/records) a case carries), in a parameter and in a declaration. What a pattern saves you is naming the record and then reaching back into it, member by member.
+
+```essence
+implementation {
+	constant point = { x = 3, y = 4, label = "corner" }
+
+	constant { x, y as row } = point
+
+	Terminal.print(x) § 3
+	Terminal.print(row) § 4
+}
+```
+
+`{ x, y as row }` stands where the declaration's name would. Each member it names becomes a binding: a name declared from one part of the value. `x` binds the member `x`. [`y as row`](/docs/reference/syntax-glossary#pattern-as) binds the member `y` under the name `row`. The pattern leaves `label` out, and that is allowed: a pattern names only the members it needs.
+
+**Compared with JavaScript.**
+
+```ts
+const point = { x: 3, y: 4, label: "corner" }
+
+const { x, y: row } = point
+```
+
+Three habits mislead here. `x = 0` inside a pattern checks that the member holds `0`. It is not a default, and only a `match` arm or a test's [`require`](/docs/reference/syntax-glossary#require) may check a value. `x: Integer` gives the member's type, not a new name; Essence renames with `as`. And there are no array patterns, so `[first, second]` cannot stand where a name goes. More on [Coming from JavaScript › Bindings](/docs/getting-started/coming-from-javascript#bindings).
+
+A pattern has no defaults, because a record holds every member its type names. A default goes on a parameter, after its type: `_ size: Size = { width = 1, height = 1 }`. A member that may be absent is an [Optional](/docs/language/optional). Bind it, then read it with [`value(defaultingTo:)`](/docs/library/optional#value): `discount::value(defaultingTo 0)` returns the item, or `0` for `#Empty`.
+
+## One grammar
+
+A pattern stands in six positions: a `match` arm's matcher (the part after `case`), a case payload, a function's parameter, a [function literal](/docs/language/functions-as-values)'s parameter, a declaration, and a test's `require`. The members inside a pattern's braces are written the same way in every position.
+
+```essence
+implementation {
+	type Size = { width: Integer, height: Integer }
+
+	function area(of { width, height }: Size) -> Integer {
+		<- width::multiply(with height)
+	}
+
+	constant hall: Size = { width = 3, height = 4 }
+
+	constant { width as across, height } = hall
+
+	constant labels = [hall, { width = 5, height = 2 }]
+		::map(({ width, height } as room) {
+			<- "{width} by {height}, area {area(of room)}"
+		})
+
+	Terminal.print(across) § 3
+	Terminal.print(height) § 4
+	Terminal.print(labels) § ["3 by 4, area 12", "5 by 2, area 10"]
+}
+```
+
+The same `{ width, height }` takes a `Size` apart in `area`'s parameter, in the function literal's parameter and, with a rename, in a declaration. Each member of a pattern is one of these forms:
+
+| Form | Binds | Checks | Example |
+| --- | --- | --- | --- |
+| [`name`](/docs/reference/syntax-glossary#pattern-name) | `name` | nothing | `{ key }` |
+| [`name: Type`](/docs/reference/syntax-glossary#pattern-type) | `name` | the member's type | `{ x: Integer }` |
+| [`name = value`](/docs/reference/syntax-glossary#pattern-value) | nothing | the member's value | `{ x = 0, y }` |
+| `name as other` | `other` | nothing | `{ y as row }` |
+| `name: Type as other` | `other` | the member's type | `{ x: Integer as column }` |
+| `name = value as other` | — | — | a syntax error: `Expected '}' but found 'as'.` |
+| `name as { … }` | what the inner pattern binds | what the inner pattern checks | `{ start as { x, y } }` |
+| [`{ … } as whole`](/docs/reference/syntax-glossary#pattern-whole) | the parts, and the whole value as `whole` | what the parts check | `{ width, height } as size` |
+
+A bare `name` is `name: Type` with the type left off. The two bind the same name and differ only in what they check. In a `match` arm, `name: Type` is a check: the arm runs only when the member has that type. In a declaration or a parameter it is an annotation, which the compiler checks like any other.
+
+`name = value` binds nothing, because the value is written right there. It checks whether the member holds that value. Such a check cannot be renamed either, which is why `x = 0 as zero` is a [`syntax-error`](/docs/reference/diagnostics#syntax-error).
+
+`as` renames. It is not TypeScript's `as` type assertion: it gives a member a new name and changes no type. After a member's name, `as { … }` nests a second pattern for that member's value. The part after `as` is a binder, the thing that receives the value. A binder is a name or another pattern. After a closing brace, `as whole` binds the whole value beside its parts.
+
+Each form is allowed in all six positions, with two exceptions. `name = value` works only in a `match` arm, case payloads included, and in a test's `require`. A `match` arm's own record pattern takes no `as whole`.
+
+A test's `require` is written `require PATTERN = EXPR`, and [Tests](/docs/language/tests) teaches it. A failed `require` ends the test, which is why its pattern may check values.
+
+## In a match arm
+
+```essence
+implementation {
+	type Click = { x: Integer, y: Integer }
+	type KeyPress = { key: String }
+
+	constant x = 99
+
+	function describe(_ input: Click | KeyPress) -> String {
+		<- match input -> String {
+			case { x = 0, y = 0 } { <- "the origin" }
+			case { x, y } where x::is(y) { <- "on the diagonal at {x}" }
+			case { x as column, y as row } {
+				<- "{column}/{row}, and x is still {x}"
+			}
+			case { key } { <- "pressed {key}" }
+		}
+	}
+
+	Terminal.print(describe({ x = 0, y = 0 })) § the origin
+	Terminal.print(describe({ x = 3, y = 3 })) § on the diagonal at 3
+	Terminal.print(describe({ x = 3, y = 4 })) § 3/4, and x is still 99
+	Terminal.print(describe({ key = "Enter" })) § pressed Enter
+}
+```
+
+A record pattern is a matcher: a `case` arm runs when the subject, the value being matched, fits its pattern. The subject here is a [union](/docs/language/unions-and-type-aliases), `Click | KeyPress`. Each pattern picks out one type of the union by the members it names, without naming the type. To take a single record apart, use a declaration.
+
+A [guard](/docs/reference/syntax-glossary#where-guard), the `where` condition after a matcher, sees the bindings. `where x::is(y)` reads the `x` and `y` that the pattern bound.
+
+A binding shadows a name from outside the arm, as `x` in the second arm shadows the constant `x`. `as` binds a member under another name and leaves the outer one readable. That is how the third arm prints `99`.
+
+Inside a record-pattern arm, [`@`](/docs/reference/syntax-glossary#at) is the subject narrowed to the pattern's own shape: the members the pattern named, and no others. An arm whose pattern names only `x` cannot read `@.y`, and the error is [`unknown-member`](/docs/reference/diagnostics#unknown-member):
+
+<div class="error-output">
+
+```
+[unknown-member]
+Error: { x: Integer } has no member 'y'
+   ╭─┤ input.es:7:45 │
+   │
+ 7 │          case { x = 0 } { <- "on the y axis at {@.y}" }
+   │                                                   ▲
+   │                                                   ╰── no such member
+   │
+   │ Note: { x: Integer } has 'x'.
+───╯
+```
+
+</div>
+
+Name `y` in the pattern, `case { x = 0, y }`, and read it as `y`.
+
+`@` already names the whole value, so an arm's own pattern takes no `as whole`. `case { x, y } as click` is [`redundant-pattern-binder`](/docs/reference/diagnostics#redundant-pattern-binder), and its Help says to write `@` where `click` was meant.
+
+A pattern that names a member none of the union's types has can never match. Over a `Click | KeyPress`, the arm `case { kye }` is the Warning [`unreachable-case`](/docs/reference/diagnostics#unreachable-case), labelled `{ kye: Unknown } is not a member of the matched Union`.
+
+## In a case payload
+
+```essence
+implementation {
+	choice Shape {
+		Rectangle { width: Integer, height: Integer },
+		Square { side: Integer },
+		Empty,
+	}
+
+	function area(of shape: Shape) -> Integer {
+		<- match shape -> Integer {
+			case #Rectangle({ width, height }) {
+				<- width::multiply(with height)
+			}
+			case #Square({ side }) { <- side::multiply(with side) }
+			case #Empty            { <- 0 }
+		}
+	}
+
+	function describe(_ shape: Shape) -> String {
+		<- match shape -> String {
+			case #Rectangle({ width = 0 }) { <- "a flat rectangle" }
+			case #Rectangle({ width, height } as box) {
+				<- "{width} by {height}, area {area(of box)}"
+			}
+			case #Square({ side } as square) {
+				<- "side {side}, area {area(of square)}"
+			}
+			case #Empty { <- "nothing" }
+		}
+	}
+
+	Terminal.print(describe(#Rectangle({ width = 3, height = 4 }))) § 3 by 4, area 12
+	Terminal.print(describe(#Rectangle({ width = 0, height = 4 }))) § a flat rectangle
+	Terminal.print(describe(#Square({ side = 2 }))) § side 2, area 4
+}
+```
+
+A case matcher's binder, the part in parentheses after the case name, may be a pattern. `#Rectangle({ width, height })` takes the payload apart and binds its members. A payload pattern is partial and may check values, as in any other matcher: `#Rectangle({ width = 0 })` matches only a rectangle whose `width` is `0`, and binds nothing.
+
+`{ width, height } as box` binds the parts and the whole. For a payload record, the whole is the case value: `box` is a `Shape#Rectangle`, the type `@` has in that arm. It passes where a `Shape` is wanted, as in `area(of box)`. A function that takes `{ width: Integer, height: Integer }` refuses it with [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch), labelled `this is a Shape#Rectangle`. To pass such a function a record, build one from the bindings: `{ width, height }`.
+
+On a case with one member, the binder may be a single name, because the case's constructor takes that member's value:
+
+```essence
+implementation {
+	constant scores = [7, 0, 12]
+
+	function describe(_ score: Optional<Integer>) -> String {
+		<- match score -> String {
+			case #Value({ item = 0 }) { <- "a zero" }
+			case #Value(item)         { <- "a score of {item}" }
+			case #Empty               { <- "no score" }
+		}
+	}
+
+	Terminal.print(describe(scores::firstItem())) § a score of 7
+	Terminal.print(describe(scores::item(at 1))) § a zero
+	Terminal.print(describe(scores::item(at 5))) § no score
+}
+```
+
+A single name binds that member's value under the name you choose. `#Value`'s one member is called `item`, so `#Value(item)` means `#Value({ item })`, and `#Value(score)` means `#Value({ item as score })`. To check the value, spell the member out: `#Value({ item = 0 })`.
+
+When the one member is itself a record, a payload pattern has two readings:
+
+```essence
+implementation {
+	type Tally = { index: Integer, total: Integer }
+
+	choice Progress {
+		Going { state: Tally },
+		Finished { total: Integer },
+	}
+
+	function describe(_ progress: Progress) -> String {
+		<- match progress -> String {
+			case #Going({ index } as tally) {
+				<- "step {index}, {tally.total} so far"
+			}
+			case #Finished(total) { <- "done at {total}" }
+		}
+	}
+
+	function remaining(_ progress: Progress, of goal: Integer) -> Integer {
+		<- match progress -> Integer {
+			case #Going({ state as { total } }) { <- goal::subtract(total) }
+			case #Finished                      { <- 0 }
+		}
+	}
+
+	constant now: Progress = #Going({ state = { index = 2, total = 7 } })
+
+	Terminal.print(describe(now)) § step 2, 7 so far
+	Terminal.print(remaining(now, of 10)) § 3
+}
+```
+
+`#Going({ index } as tally)` reads the member's value, a `Tally`, and takes it apart. `#Going({ state as { total } })` reads the payload record, whose one member is `state`, and nests a pattern for it. When the member's value has a member with the same name as the case's own member, the payload record wins.
+
+The `as` binder follows the reading. `{ index } as tally` reads the member's value, so `tally` is a `Tally`, and `tally.total` reads its total.
+
+A single name works only on a case that carries one value. `#Rectangle` carries two, so `case #Rectangle(box)` is [`unbindable-case-payload`](/docs/reference/diagnostics#unbindable-case-payload):
+
+<div class="error-output">
+
+```
+[unbindable-case-payload]
+Error: 'Shape#Rectangle' has no single value to bind
+    ╭─┤ shapes.es:10:20 │
+    │
+ 10 │          case #Rectangle(box) { <- "a rectangle" }
+    │                          ─┬─
+    │                           ╰─── this Case carries 2 values
+    │
+    │ Help: Take the payload apart instead: '#Rectangle({ width, height })'.
+    │
+    │ Note: Its values are 'width', 'height'.
+────╯
+```
+
+</div>
+
+## In a parameter
+
+```essence
+implementation {
+	type Size = { width: Integer, height: Integer }
+
+	function area(of { width, height }: Size) -> Integer {
+		<- width::multiply(with height)
+	}
+
+	function describe(
+		_ { width, height } as size: Size = { width = 1, height = 1 },
+	) -> String {
+		<- "{width} by {height}, area {area(of size)}"
+	}
+
+	Terminal.print(area(of { width = 6, height = 7 })) § 42
+	Terminal.print(describe({ width = 2, height = 3 })) § 2 by 3, area 6
+	Terminal.print(describe()) § 1 by 1, area 1
+}
+```
+
+A function's parameter takes a pattern where the name the body reads would go. The label stays in front of it. `area` is called `area(of { width = 6, height = 7 })` whatever its body does with the argument. [Functions](/docs/language/functions) covers labels. `describe` has no label, binds the whole as `size`, and carries a default value after its type, which `describe()` uses.
+
+**Compared with JavaScript.**
+
+```ts
+type Size = { width: number; height: number }
+
+function area({ width, height }: Size): number {
+  return width * height
+}
+
+area({ width: 6, height: 7 }) // 42
+```
+
+In both languages the pattern replaces the parameter's name. Essence keeps the label in front of it, so a call does not change when the body starts taking its argument apart. More on [Coming from JavaScript › Functions](/docs/getting-started/coming-from-javascript#functions).
+
+The same pattern works on a method's or a static's parameter, which [Namespaces and methods](/docs/language/namespaces-and-methods) shows.
+
+A default cannot read a name that a pattern binds, even one in an earlier parameter, which JavaScript allows. Such a default is [`default-references-pattern-binding`](/docs/reference/diagnostics#default-references-pattern-binding):
+
+<div class="error-output">
+
+```
+[default-references-pattern-binding]
+Error: 'width' is bound by a Pattern and can not be read by a default
+   ╭─┤ size.es:4:62 │
+   │
+ 4 │     function frame(_ { width, height }: Size, border: Integer = width) -> Integer {
+   │                        ──┬──                                    ──┬──
+   │                          ╰────────────────────────────────────────│──── bound by this Pattern
+   │                                                                   │
+   │                                                                   ╰──── read here
+   │
+   │ Help: Read the member off the Parameter itself, or write the value out.
+   │
+   │ Note: A Pattern's bindings are Constants at the head of the body, and every default is worked out before the body runs.
+───╯
+```
+
+</div>
+
+Give the parameter a plain name, `_ size: Size`, and the default may read `size.width`.
+
+## In a function literal
+
+```essence
+implementation {
+	constant names = ["Ada", "Grace"]
+	constant born  = [1815, 1906]
+
+	constant lines = names
+		::pair(with born)
+		::map(({ first, second }) { <- "{first} ({second})" })
+
+	Terminal.print(lines) § ["Ada (1815)", "Grace (1906)"]
+
+	constant sum = loop(
+		startingWith { index = 1, total = 0 },
+		step ({ index, total } as state) {
+			if index::isGreaterThan(5) {
+				<- #Done(total)
+			}
+
+			<- #Continue({
+				state with
+					index = index::add(1),
+					total = total::add(index),
+			})
+		},
+	)
+
+	Terminal.print(sum) § 15
+}
+```
+
+A function literal's parameter takes a pattern too. [`pair(with:)`](/docs/library/list#pair) returns a list of `{ first, second }` records, and `({ first, second })` reads each one. Essence has no tuples: a method that returns two values returns a record, and a pattern is how you read it.
+
+`step ({ index, total } as state)` takes apart the state that [`loop(startingWith:step:)`](/docs/library/loop#step) passes to each step. It keeps the whole as `state` for the [`with`](/docs/reference/syntax-glossary#with) that builds the next one. [Iteration](/docs/language/iteration) covers `loop`.
+
+A literal that writes its parameter's type puts the type after the pattern, the way a function does: `(_ { width, height }: Size) -> Integer { … }`.
+
+## In a declaration
+
+```essence
+implementation {
+	type Size = { width: Integer, height: Integer }
+
+	constant numbers = [1, 2, 3, 4, 5]
+
+	constant { accepted, refused } = numbers::partition(where (n) {
+		<- n::isEven()
+	})
+
+	Terminal.print(accepted) § [2, 4]
+	Terminal.print(refused) § [1, 3, 5]
+
+	constant line = { start = { x = 1, y = 2 }, end = { x = 4, y = 6 } }
+
+	constant { start as { x as left }, end as { x as right } } = line
+
+	Terminal.print(right::subtract(left)) § 3
+
+	constant { width, height } as size: Size = { width = 2, height = 5 }
+
+	Terminal.print("{width} by {height}: {size}") § 2 by 5: { width = 2, height = 5 }
+
+	variable { index, total } = { index = 1, total = 0 }
+
+	index = index::add(1)
+	total = total::add(index)
+
+	Terminal.print("{index} {total}") § 2 2
+}
+```
+
+A `constant` or `variable` declaration takes a pattern where its name goes. [`partition(where:)`](/docs/library/list#partition) returns `{ accepted, refused }`, and one declaration reads both lists.
+
+`start as { x as left }` nests. It reads `start`, then the `x` inside it, and binds that as `left`. TypeScript nests with a colon, `{ start: { x: left } }`. Here a colon gives a type, so nesting takes `as`.
+
+`as size` binds the whole value beside its parts. An annotation follows the pattern, after `as whole` when there is one: `{ width, height } as size: Size`.
+
+The keyword applies to every binding: `variable { index, total }` declares two variables, and each is assigned on its own.
+
+## Patterns that cannot decline
+
+A pattern that can fail to match is refutable. A value check makes it so: `width = 0` fails on any other width. When a `match` arm's pattern fails, the next arm is tried. A declaration and a parameter have no next arm, so they take only irrefutable patterns, the kind that cannot fail. A value check in either, at any depth, is [`refutable-pattern`](/docs/reference/diagnostics#refutable-pattern):
+
+<div class="error-output">
+
+```
+[refutable-pattern]
+Error: A Declaration can not match a value against a Pattern
+   ╭─┤ size.es:4:13 │
+   │
+ 4 │     constant { width = 0, height } = size
+   │                ────┬────
+   │                    ╰────── this can decline the value
+   │
+   │ Help: Write only 'width' to bind it, and ask about its value with 'match'.
+   │
+   │ Note: A Matcher may constrain a member by value, because an arm that declines falls through to the next one. A Declaration has nowhere to fall through to.
+───╯
+```
+
+</div>
+
+A parameter gets the same code, with `A Parameter can not match a value against a Pattern`. Ask the question in a `match`, and declare from what its arms return. If you meant `width = 0` as a JavaScript default, write `width` alone: a `Size` always holds its `width`.
+
+A type check does not make a pattern refutable. In a declaration, `{ width: String }` is an annotation, and a value that does not fit is a type error. `constant { width: String } = size` is [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch): `This value does not fit the declared Type of Constant 'width'`.
+
+A declaration also cannot take a union apart, even when every type in the union has the member you name. A union has no members to read, so the pattern is [`type-without-members`](/docs/reference/diagnostics#type-without-members). Here both types have an `x`:
+
+<div class="error-output">
+
+```
+[type-without-members]
+Error: This value has no members to look up
+   ╭─┤ input.es:7:13 │
+   │
+ 7 │     constant { x } = input
+   │                ▲
+   │                ╰── this is a { x: Integer, y: Integer } | { x: Integer, delta: Integer }
+   │
+   │ Note: Only Records, Cases and Namespaces have members.
+───╯
+```
+
+</div>
+
+Take a union apart with `match`, where each arm names the members it expects.
+
+Two more errors meet a pattern in a declaration:
+
+| Code | Written | The compiler says |
+| --- | --- | --- |
+| [`duplicate-variable`](/docs/reference/diagnostics#duplicate-variable) | `constant { width as measure, height as measure } = size` | Variable 'measure' is already declared |
+| `unknown-member` | `constant { widht, height } = size` | `{ width: Integer, height: Integer }` has no member 'widht', with the Help "Did you mean 'width'?" |
+
+## What is not a pattern
+
+Three places look like a pattern and are not one.
+
+- **The key list after `with`.** After `with`, a bare name is a record to merge, so `{ base with x }` merges the record `x` into `base`. It is not shorthand for `x = x`. That shorthand lives in a record literal, `{ x, y }`, which builds a record from names the way a pattern takes one apart into names.
+- **A property test's [`for any`](/docs/reference/syntax-glossary#for-any) parameter.** A property test runs its body on generated values, and names them after `for any`. That parameter is a name and a type, never a pattern. `for any ({ team, points }: Standing)` is [`property-parameters`](/docs/reference/diagnostics#property-parameters), whose Help says to name the whole value and take it apart in the body.
+- **A protocol requirement.** A requirement is a signature a protocol asks each conforming type to fill in, with no body of its own. It has nowhere to bind names, so a pattern in its signature is [`pattern-without-body`](/docs/reference/diagnostics#pattern-without-body). [Protocols](/docs/language/protocols) covers requirements.
+
+Several forms from other languages do not exist, and each is a `syntax-error`. The one a JavaScript habit meets first is the array pattern:
+
+<div class="error-output">
+
+```
+[syntax-error]
+Error: Expected an Identifier but found '['.
+   ╭─┤ scores.es:4:11 │
+   │
+ 4 │     constant [first, second] = scores
+   │              ▲
+   │              ╰── here
+───╯
+```
+
+</div>
+
+Take a list apart with its methods, such as [`firstItem()`](/docs/library/list#firstItem) and `partition(at:)`, which [Lists](/docs/language/lists) covers. The other forms:
+
+| Written | The compiler says | Write instead |
+| --- | --- | --- |
+| `case [first, second]` | `Expected a Type but found '['.` | a list method, such as `firstItem()` |
+| `constant { x, ...others } = point` | `Expected an Identifier but found '.'.` | the members you need; the pattern ignores the rest |
+| `constant { start: { x } } = line` | `Expected ':' but found '}'.` | `constant { start as { x } } = line` |
+| `case #Value(_)` | `Expected an Identifier but found '_'.` | `case #Value`, with no binder |
+| `case #Value(0)` | `Expected an Identifier but found '0'.` | `case #Value({ item = 0 })` |
+| `case { item, discount as #Value(amount) }` | `Expected '}' but found 'as'.` | a second `match`, below |
+| `case #Value(item as count)` | `Expected ')' but found 'as'.` | `case #Value(count)` |
+| `case String as text` | `Expected '{' but found 'as'.` | `case String`, reading the value as `@` |
+| `constant { width: Integer = 0, height } = size` | `Expected '}' but found '='.` | a default on a parameter |
+
+A record parameter's default may fill in only some of its members, as the Records page shows.
+
+A case matcher cannot sit inside a record pattern. Bind the member, and match it in the arm:
+
+```essence
+implementation {
+	type Order = { item: String, discount: Optional<Integer> }
+	type Note = { text: String }
+
+	function describe(_ entry: Order | Note) -> String {
+		<- match entry -> String {
+			case { item, discount } {
+				<- match discount -> String {
+					case #Value(amount) { <- "{item}, {amount} off" }
+					case #Empty         { <- item }
+				}
+			}
+			case { text } { <- text }
+		}
+	}
+
+	constant lamp: Order = { item = "lamp", discount = #Value(5) }
+	constant desk: Order = { item = "desk", discount = #Empty }
+
+	Terminal.print(describe(lamp)) § lamp, 5 off
+	Terminal.print(describe(desk)) § desk
+	Terminal.print(describe({ text = "call back" })) § call back
+}
+```
+
+The inner `match` takes `discount` apart, and still sees the `item` the outer arm bound.
+
+<SeeAlso
+	links={[
+		{ label: "Choices and match", href: "/docs/language/choices-and-match" },
+		{ label: "Records", href: "/docs/language/records" },
+		{ label: "Functions as values", href: "/docs/language/functions-as-values" },
+		{ label: "Tests", href: "/docs/language/tests" },
+		{ label: "Syntax glossary", href: "/docs/reference/syntax-glossary" },
+		{ label: "Diagnostics", href: "/docs/reference/diagnostics" },
+	]}
+/>

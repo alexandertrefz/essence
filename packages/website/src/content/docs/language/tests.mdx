@@ -1,0 +1,834 @@
+---
+title: Tests
+description: "Write tests in the file they test: suites, modifiers, expect and require, table and property tests, snapshots and examples."
+section: language
+order: 230
+template: article
+---
+
+A test is a named block of checks that must hold. In Essence, tests live in the file they test, in a [`tests { … }`](/docs/reference/syntax-glossary#tests-block) block below the rest of the module. [`essence test`](/docs/reference/cli#test) runs them. There is no test library to install and no second file to wire up. The block reads the file's private names, and a build leaves it out.
+
+```essence
+§ file: League.es
+implementation {
+	type Standing = { team: String, points: Integer }
+
+	function pointsFor(_ scored: Integer, to conceded: Integer) -> Integer {
+		<- define {
+			as 3 if scored::isGreaterThan(conceded)
+			as 1 if scored::is(conceded)
+			as 0 otherwise
+		}
+	}
+
+	function award(_ points: Integer, to standing: Standing) -> Standing {
+		<- { standing with points = standing.points::add(points) }
+	}
+}
+
+export {
+	Standing
+	award
+}
+
+tests {
+	constant lions = { team = "Lions", points = 0 }
+
+	test "a win is worth three points" {
+		expect pointsFor(2, to 0)::is(3)
+	}
+
+	test "a draw is worth one point" {
+		expect pointsFor(1, to 1)::is(1)
+	}
+
+	test "a win adds three points to a standing" {
+		expect award(pointsFor(2, to 0), to lions).points::is(3)
+	}
+}
+```
+
+```sh
+$ essence test League.es
+
+ League.es
+   ✓ a win is worth three points
+   ✓ a draw is worth one point
+   ✓ a win adds three points to a standing
+
+ 3 passed  ·  0.53 ms
+```
+
+`pointsFor` is not in the `export` block, and the tests call it anyway. Each [`test`](/docs/reference/syntax-glossary#test) has a name, written as a string, and a body. [`expect`](/docs/reference/syntax-glossary#expect) takes a [`Boolean`](/docs/library/boolean) and records whether it held. The report lists each test under its file, with `✓` for a pass, then the count and the time. [Your first test](/docs/getting-started/your-first-test) builds a first test step by step.
+
+**Compared with JavaScript.**
+
+```ts
+import { expect, test } from "vitest"
+import { award, pointsFor } from "./league"
+
+const lions = { team: "Lions", points: 0 }
+
+test("a win is worth three points", () => {
+	expect(pointsFor(2, 0)).toBe(3)
+})
+
+test("a win adds three points to a standing", () => {
+	expect(award(pointsFor(2, 0), lions).points).toBe(3)
+})
+```
+
+A Vitest test file imports a runner and reaches only what `league.ts` exports, so `pointsFor` has to be exported for it. Vitest's in-source tests reach more, behind `import.meta.vitest` and a build define. The Essence tests import nothing and call the private `pointsFor` directly. Each row below maps a Jest, Vitest or fast-check habit to the Essence form this page teaches.
+
+| Jest, Vitest, fast-check | Essence |
+|---|---|
+| a sibling `league.test.ts` | a `tests` block in `League.es`, or a `League.tests.es` file |
+| `describe("…", …)` | `suite "…" { … }` |
+| `test("…", …)` or `it("…", …)` | `test "…" { … }` |
+| `test.skip` | `skipped "why"`, with the reason required |
+| `test.only` | `focused`, and a run that `--filter` or `--tag` did not narrow exits with `2` |
+| `beforeEach`, `afterEach` | none: every test starts from the `constant` and `variable` values of its block |
+| `expect(x).toBe(y)`, `expect(x).toEqual(y)` | `expect x::is(y)`, which compares records and lists by content |
+| `expect(x).toBeGreaterThan(y)` | `expect x::isGreaterThan(y)` |
+| an `assert()` that throws | `require x::is(y)` |
+| `expect(first).toBeDefined()`, then `first!` | `require #Value(first) = list::firstItem()` |
+| a helper function that calls `expect` | a helper that returns a `Boolean`, with the `expect` in the test |
+| `test.each(rows)` | `across [rows] (row: Type)` |
+| `fc.property(fc.integer(), …)` | `for any (n: Integer)` |
+| an `fc.Arbitrary<T>` | a `Generatable` conformance |
+| `toMatchInlineSnapshot()` | `matches snapshot` |
+| `toMatchSnapshot()` | `matches snapshot from "name"`, with a different name for every stored snapshot in the file |
+
+The rest of the toolchain is compared under [Coming from JavaScript › Tooling](/docs/getting-started/coming-from-javascript#tooling).
+
+## The tests block
+
+```essence
+implementation {
+	type Standing = { team: String, points: Integer }
+
+	constant lions: Standing = { team = "Lions", points = 7 }
+
+	Terminal.print("loaded {lions.team}") § loaded Lions
+}
+
+tests {
+	type Fixture = { home: Standing, away: Standing }
+
+	constant derby = { home = lions, away = { team = "Tigers", points = 4 } }
+
+	function leader(of fixture: Fixture) -> Standing {
+		if fixture.home.points::isLessThan(fixture.away.points) {
+			<- fixture.away
+		} else {
+			<- fixture.home
+		}
+	}
+
+	test "the leader has more points" {
+		expect leader(of derby).team::is("Lions")
+	}
+}
+```
+
+```sh
+$ essence test Setup.es
+loaded Lions
+
+ Setup.es
+   ✓ the leader has more points
+
+ 1 passed  ·  0.51 ms
+```
+
+The `tests` block is the last block of a module. The order is `import`, `implementation`, `export`, `tests`, and [Modules](/docs/language/modules) covers the first three. A module with no `export` block puts `tests` right below `implementation`, as this one does. Written above either of them, the block is [`misplaced-tests-section`](/docs/reference/diagnostics#misplaced-tests-section).
+
+The block sees every name the file declares, exported or not. It takes any statement an `implementation` block takes:
+
+- **A [`constant`](/docs/reference/syntax-glossary#constant) or a [`variable`](/docs/reference/syntax-glossary#variable) is setup.** Every test starts from the block's own values. A test that reassigns a `variable` changes it for itself, and the next test sees the first value again.
+- **A [`function`](/docs/reference/syntax-glossary#function), a [`type`](/docs/reference/syntax-glossary#type) or a [`namespace`](/docs/reference/syntax-glossary#namespace) is a helper.** `Fixture` and `leader` exist only for the tests.
+- **There are no hooks.** Essence has no `beforeEach` or `afterEach`. Setup is values.
+
+The statements of the `implementation` block run when the file loads, before the first test. That is why `loaded Lions` prints above the report.
+
+`essence test` compiles the block and runs it. [`essence check`](/docs/reference/cli#check) type-checks it without running it, so a test that compares a number with a string is an error before anything runs. [`essence build`](/docs/reference/cli#build) and [`essence run`](/docs/reference/cli#run) drop the block before they compile. A type error in a test does not stop them, and the built file holds no trace of the tests. `essence build --tests` keeps the block.
+
+A file may also hold a `tests` block and nothing else. Tests that reach across modules go in a module of their own. By convention its name ends in `.tests.es`, as in `League.tests.es`. It is an ordinary module, usually an `import` block and a `tests` block:
+
+```essence
+§ file: League.tests.es
+import {
+	from "./League.es" {
+		Standing
+		award
+	}
+}
+
+tests {
+	test "a standing keeps its team" {
+		constant tigers: Standing = { team = "Tigers", points = 4 }
+
+		expect award(1, to tigers).team::is("Tigers")
+	}
+}
+```
+
+A `.tests.es` file reaches only what the other module exports. Importing `pointsFor` here is [`not-exported`](/docs/reference/diagnostics#not-exported), while the `tests` block inside `League.es` calls it freely.
+
+## Tests and suites
+
+```essence
+implementation {
+	type Standing = { team: String, points: Integer }
+
+	function award(_ points: Integer, to standing: Standing) -> Standing {
+		<- { standing with points = standing.points::add(points) }
+	}
+}
+
+tests {
+	constant lions = { team = "Lions", points = 0 }
+	constant draw  = 1
+
+	suite "award" {
+		suite "a win" {
+			constant won = award(3, to lions)
+
+			test "adds three points" {
+				expect won.points::is(3)
+			}
+
+			test "keeps the team" {
+				expect won.team::is("Lions")
+			}
+		}
+
+		test "a draw adds {draw} point" {
+			expect award(draw, to lions).points::is(1)
+		}
+	}
+}
+```
+
+```sh
+$ essence test Suites.es
+
+ Suites.es
+   award
+     a win
+       ✓ adds three points
+       ✓ keeps the team
+     ✓ a draw adds 1 point
+
+ 3 passed  ·  0.58 ms
+```
+
+A [`suite`](/docs/reference/syntax-glossary#suite) is a named group of tests, and suites nest. The report indents each test under its suites. A `constant` in a suite is setup for the tests inside it: both tests of `a win` read `won`. A test's name is a string, so it can hold interpolation holes. `"a draw adds {draw} point"` is reported as `a draw adds 1 point`.
+
+A `test` or a `suite` outside the `tests` block is [`test-outside-tests`](/docs/reference/diagnostics#test-outside-tests). An assertion is an `expect` or a [`require`](/docs/reference/syntax-glossary#require). It stands in a test's body or in a block nested in it, such as an `if` or a `match` arm. A function's body runs wherever the function is called, so an assertion inside one belongs to no test. That holds for a helper function declared in the `tests` block and for a literal such as `scores::map((score) { expect … })`. Both are [`expect-outside-test`](/docs/reference/diagnostics#expect-outside-test). Have the helper return a `Boolean`, and `expect` it in the test.
+
+### Names and identity
+
+A test is identified by its file, the names of the suites around it and its own name. A row of a table test adds its row number. A stored counterexample, the failing value a property test keeps, is keyed by that identity. Two tests with one name in the same place are [`duplicate-test-name`](/docs/reference/diagnostics#duplicate-test-name). The same name in two different suites is allowed, and a test may share its name with a suite.
+
+One suite name is taken. A file with [`@example`](/docs/language/documentation-comments) blocks gets a suite called `examples` that holds them, as described below. Writing your own `suite "examples"` in that file is [`reserved-suite-name`](/docs/reference/diagnostics#reserved-suite-name).
+
+### Modifiers
+
+```essence
+implementation {
+	type Standing = { team: String, points: Integer }
+
+	function award(_ points: Integer, to standing: Standing) -> Standing {
+		<- { standing with points = standing.points::add(points) }
+	}
+}
+
+tests {
+	constant lions = { team = "Lions", points = 0 }
+
+	suite "award" tagged scoring {
+		test "adds a win" tagged fast {
+			expect award(3, to lions).points::is(3)
+		}
+
+		test "turns a forfeit into a win"
+			skipped "waiting on the forfeit rules"
+		{
+			expect award(3, to lions).points::is(3)
+		}
+
+		test "adds a draw" focused {
+			expect award(1, to lions).points::is(1)
+		}
+	}
+}
+```
+
+A [modifier](/docs/reference/syntax-glossary#modifiers) is a word after a test's name that tells the runner how to treat the test. There are three:
+
+- **`skipped "reason"`** does not run the test. The test is still compiled and type-checked, and the report prints the reason on every run. The reason is required.
+- **`focused`** runs only the focused tests. The rest are counted as `not focused`.
+- **`tagged a, b`** gives the test tags: bare lower-case names, separated by commas. `essence test --tag fast` runs only the tests that carry `fast`.
+
+A modifier on a suite covers every test inside it, so all three tests above carry the tag `scoring`. Modifiers follow the name in any order. Because of `focused`, only one test ran:
+
+<div class="error-output">
+
+```
+ Modifiers.es
+   award
+     – turns a forfeit into a win  skipped: waiting on the forfeit rules
+     ✓ adds a draw
+
+ 1 passed  1 skipped  1 not focused  ·  0.56 ms
+
+
+[focused-tests-remain]
+Error: This test is still focused
+    ╭─┤ Modifiers.es:23:3 │
+    │
+ 23 │        test "adds a draw" focused {
+    │        ──┬─
+    │          ╰─── only focused tests ran
+    │
+    │ Help: Remove `focused` before this lands, or narrow the run with --filter or --tag while you are iterating.
+    │
+    │ Note: A focused test silences every other test of the run, so a run nobody narrowed has not answered the question it was asked.
+────╯
+```
+
+</div>
+
+A run that `--filter` or `--tag` did not narrow exits with `2` and reports [`focused-tests-remain`](/docs/reference/diagnostics#focused-tests-remain), so a forgotten `focused` cannot pass unnoticed. Narrowed with either flag, the same run exits with `0`.
+
+| Written | Error |
+|---|---|
+| `skipped` with no reason | [`skipped-without-reason`](/docs/reference/diagnostics#skipped-without-reason) |
+| `focused skipped "flaky"` | [`contradictory-modifiers`](/docs/reference/diagnostics#contradictory-modifiers) |
+| `focussed` | [`unknown-modifier`](/docs/reference/diagnostics#unknown-modifier), with the Help `Did you mean 'focused'?` |
+| `tagged "slow"` or `tagged Slow` | [`malformed-modifier`](/docs/reference/diagnostics#malformed-modifier) |
+| `tagged slow tagged network` | [`duplicate-modifier`](/docs/reference/diagnostics#duplicate-modifier); write `tagged slow, network` |
+| a modifier after `across (…)` or `for any (…)` | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+
+The last row matters for the two forms below. Modifiers come before [`across`](/docs/reference/syntax-glossary#across) and [`for any`](/docs/reference/syntax-glossary#for-any): `test "adds zero" tagged slow for any (n: Integer) { … }`.
+
+## Assertions
+
+Essence has two assertions, `expect` and `require`, and both take any `Boolean` expression.
+
+### `expect` and `require`
+
+```essence
+implementation {
+	constant lions  = { team = "Lions", points = 4 }
+	constant tigers = { team = "Tigers", points = 1 }
+}
+
+tests {
+	test "the lions lead by two points" {
+		Terminal.print("comparing {lions.team} with {tigers.team}")
+
+		expect lions.points::subtract(tigers.points)::is(2)
+		expect tigers.points::isGreaterThan(lions.points)
+	}
+
+	test "a require ends the test" {
+		require lions.points::isLessThan(tigers.points)
+
+		expect false
+	}
+}
+```
+
+<div class="error-output">
+
+```
+[test-failed]
+Error: 'the lions lead by two points' failed
+    ╭─┤ Assertions.es:10:10 │
+    │
+ 10 │        expect lions.points::subtract(tigers.points)::is(2)
+    │               ──────┬───────────┬───┬──────┬──────────────
+    │                     ╰───────────│───│──────│──────────────── 4
+    │                                 │   │      │
+    │                                 ╰───│──────│──────────────── 3
+    │                                     │      │
+    │                                     ╰──────│──────────────── this expect failed
+    │                                            │
+    │                                            ╰──────────────── 1
+    │
+    │ Note: `is` compared 3 with 2
+────╯
+[test-failed]
+Error: 'the lions lead by two points' failed
+    ╭─┤ Assertions.es:11:10 │
+    │
+ 11 │        expect tigers.points::isGreaterThan(lions.points)
+    │               ──────┬──────────────┬─────────────┬──────
+    │                     ╰──────────────│─────────────│──────── 1
+    │                                    │             │
+    │                                    ╰─────────────│──────── this expect failed
+    │                                                  │
+    │                                                  ╰──────── 4
+────╯
+  output
+    comparing Lions with Tigers
+```
+
+</div>
+
+There is no matcher library. You ask the question with a method, such as `::is(…)`, `::isGreaterThan(…)` or [`::hasItems()`](/docs/library/list#hasItems). `::is(…)` compares [records](/docs/language/records) and [lists](/docs/language/lists) by content, so it does the work of both `toBe` and `toEqual`. A failed `expect` is recorded and the test carries on, so the first test reports two failures.
+
+Each failure is an error with the code [`test-failed`](/docs/reference/diagnostics#test-failed). Its labels are the values the assertion computed on its way to `false`. Every call's result and every member read stands under the place it is written, as in power-assert. `lions.points` was `4`, `tigers.points` was `1`, and `subtract` returned `3`. When the outermost call is `::is(…)`, a Note names both sides: `` `is` compared 3 with 2 ``. What the failing test printed is shown under `output`. A passing test's output is not shown.
+
+An `expect` over a value that is not a `Boolean` is [`expect-not-boolean`](/docs/reference/diagnostics#expect-not-boolean). Here the first `expect` is changed to `expect lions`:
+
+<div class="error-output">
+
+```
+[expect-not-boolean]
+Error: An assertion has to be a Boolean
+    ╭─┤ Assertions.es:10:10 │
+    │
+ 10 │        expect lions
+    │               ──┬──
+    │                 ╰──── this is a { team: String, points: Integer }
+    │
+    │ Help 1: Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.
+    │ Help 2: Or take it apart instead: 'require #Value(item) = value'.
+    │
+    │ Note: Essence has no truthiness — an assertion is a Boolean Expression, and the standard library's own Methods are the vocabulary it is written in.
+────╯
+```
+
+</div>
+
+`require` takes a `Boolean` too, but a failed `require` ends the test. In `a require ends the test` above, `lions.points::isLessThan(tigers.points)` is false. The `expect false` below it never runs, and the report shows only the `require`. Use `require` for a check the rest of the test depends on.
+
+### Taking a value apart
+
+```essence
+implementation {
+	type Standing = { team: String, points: Integer }
+
+	type Entry = Integer | String
+
+	constant table: List<Standing> = [
+		{ team = "Lions", points = 3 },
+		{ team = "Tigers", points = 0 },
+	]
+
+	constant entry: Entry = 5
+}
+
+tests {
+	test "takes values apart" {
+		require #Value(first) = table::firstItem()
+		require Optional#Value(second) = table::item(at 1)
+		require { team: String as name, points = 0 } as standing = second
+		require #Empty = table::item(at 9)
+		require Integer = entry
+
+		expect first.team::is("Lions")
+		expect name::is("Tigers")
+		expect standing.points::is(0)
+	}
+}
+```
+
+`require MATCHER = EXPR` checks the shape of a value and binds names from it. The matcher, the shape the value has to fit, stands left of the `=`, where a `constant` puts its name. It is written like the matcher of a [`match`](/docs/language/choices-and-match) arm, and it is the sixth position a [pattern](/docs/language/patterns) can stand in. The names it binds are visible from that line to the end of the test.
+
+- **A case with a payload.** `table::firstItem()` returns an [`Optional`](/docs/language/optional), and `#Value(first)` binds the standing inside it. `Optional#Value(second)` names the choice as well. The spelling with a type argument, `Optional<Integer>#Value(n)`, does not parse in a `require`.
+- **A record pattern.** `team: String as name` checks the member's type and binds it as `name`. `points = 0` checks the member's value and binds nothing. `as standing` after the braces names the whole record.
+- **A bare case or a bare type.** `#Empty` and [`Integer`](/docs/library/integer) only check. A bare type does not narrow the value: after `require Integer = entry`, `entry` is still an `Entry`, and `entry::add(1)` is [`unknown-method`](/docs/reference/diagnostics#unknown-method). To read it as an `Integer`, take it apart with a `match` in the test.
+
+A `match` has to cover every case, and a `require` does not. A value that does not fit ends the test. The report underlines the whole `require` and shows the value under the expression, such as `Optional#Empty` under `table::item(at 9)`.
+
+Only `require` binds names. A failed `expect` lets the test carry on, so the lines below it could read a name that was never bound. These forms are refused:
+
+| Written | Error | Write instead |
+|---|---|---|
+| `expect #Value(first) = table::firstItem()` | [`matcher-on-expect`](/docs/reference/diagnostics#matcher-on-expect) | `require #Value(first) = table::firstItem()` |
+| `require table::firstItem() is #Value(first)` | [`matcher-after-value`](/docs/reference/diagnostics#matcher-after-value) | the matcher on the left of `=` |
+| `require _ = table::firstItem()` | [`wildcard-in-require`](/docs/reference/diagnostics#wildcard-in-require) | a case, a type or a pattern |
+| `require 3 = first.points` | [`literal-in-require`](/docs/reference/diagnostics#literal-in-require) | `require first.points::is(3)` |
+| `require #Value(first) = table::firstItem() matches snapshot` | [`snapshot-after-matcher`](/docs/reference/diagnostics#snapshot-after-matcher) | `expect first matches snapshot` on a line of its own |
+
+## Table tests
+
+```essence
+implementation {
+	type Scoreline = { scored: Integer, conceded: Integer, points: Integer }
+
+	function pointsFor(_ scored: Integer, to conceded: Integer) -> Integer {
+		<- define {
+			as 3 if scored::isGreaterThan(conceded)
+			as 1 if scored::is(conceded)
+			as 0 otherwise
+		}
+	}
+}
+
+tests {
+	test "{scored}–{conceded} is worth {points}" across [
+		{ scored = 2, conceded = 0, points = 3 },
+		{ scored = 1, conceded = 1, points = 1 },
+		{ scored = 0, conceded = 3, points = 0 },
+	] ({ scored, conceded, points }: Scoreline) {
+		expect pointsFor(scored, to conceded)::is(points)
+	}
+
+	test "a parsed score is never negative" across [
+		Integer.parse("2"),
+		#Empty,
+	] (parsed: Optional<Integer>) {
+		expect parsed::value(defaultingTo 0)::isGreaterThanOrEqualTo(0)
+	}
+}
+```
+
+```sh
+$ essence test Tables.es
+
+ Tables.es
+   {scored}–{conceded} is worth {points}
+     ✓ 2–0 is worth 3
+     ✓ 1–1 is worth 1
+     ✓ 0–3 is worth 0
+   a parsed score is never negative
+     ✓ row 1
+     ✓ row 2
+
+ 5 passed  ·  0.85 ms
+```
+
+A table test runs its body once per row. It is written `across [rows] (row: Type)` after the name, and each row is a test of its own. The name is a template: each hole is filled from the row, and the report groups the rows under the template. A name without holes reports `row 1`, `row 2` and so on.
+
+- **The list of rows is written in place, in brackets.** A row can be any expression, as `Integer.parse("2")` is. A list held in a constant is refused, because the compiler counts the rows before anything runs.
+- **There is one parameter, the whole row.** A record pattern can take it apart, as `({ scored, conceded, points }: Scoreline)` does.
+- **The type annotation may be left out,** except when a row is a bare case such as `#Empty`. Nothing else says which choice it belongs to, so without `Optional<Integer>` the row is [`undecided-type-arguments`](/docs/reference/diagnostics#undecided-type-arguments).
+
+`essence test --filter` matches the filled name and the template: `-f "1–1"` runs one row, and `-f "is worth {points}"` runs all three.
+
+| Written | Error |
+|---|---|
+| `across rows (row: Integer)`, with `rows` a constant | [`table-not-written`](/docs/reference/diagnostics#table-not-written) |
+| `across [] (n: Integer)` | [`table-without-rows`](/docs/reference/diagnostics#table-without-rows) |
+| `across [1, 2] (a: Integer, b: Integer)` | [`table-parameters`](/docs/reference/diagnostics#table-parameters) |
+| `across ["one"] (n: Integer)` | [`table-row-type-mismatch`](/docs/reference/diagnostics#table-row-type-mismatch) |
+| `across [1, 2] (n: Integer) for any (m: Integer)` | [`contradictory-test-forms`](/docs/reference/diagnostics#contradictory-test-forms) |
+| an unnamed `matches snapshot` in a table test | [`inline-snapshot-in-table`](/docs/reference/diagnostics#inline-snapshot-in-table) |
+
+## Property tests
+
+```essence
+implementation {
+	function pointsFor(_ scored: Integer, to conceded: Integer) -> Integer {
+		<- define {
+			as 3 if scored::isGreaterThan(conceded)
+			as 1 if scored::is(conceded)
+			as 0 otherwise
+		}
+	}
+}
+
+tests {
+	test "a result is worth at most three points" for any (
+		scored: Integer,
+		conceded: Integer,
+	) {
+		expect pointsFor(scored, to conceded)::isLessThanOrEqualTo(3)
+	}
+
+	test "a list reversed twice is the list" for any (scores: List<Integer>) {
+		expect scores::reverse()::reverse()::is(scores)
+	}
+
+	test "refinements hold" for any (
+		teams: NonEmptyList<String>,
+		seats: NonZeroInteger,
+	) {
+		expect teams::length()::isGreaterThan(0)
+		expect seats::isNot(0)
+	}
+
+	test "a season has fewer than ten wins" for any (wins: Integer) {
+		expect wins::isLessThan(10)
+	}
+}
+```
+
+<div class="error-output">
+
+```
+ Properties.es
+   ✓ a result is worth at most three points  (100 cases)
+   ✓ a list reversed twice is the list  (100 cases)
+   ✓ refinements hold  (100 cases)
+   ✗ a season has fewer than ten wins  (9 cases)
+
+[test-failed]
+Error: 'a season has fewer than ten wins' failed
+    ╭─┤ Properties.es:32:10 │
+    │
+ 32 │        expect wins::isLessThan(10)
+    │               ──────────┬─────────
+    │                         ╰─────────── this expect failed
+    │
+    │ Help: Run it again: essence test --seed 42947085 -f "a season has fewer than ten wins"
+    │
+    │ Note: after 9 cases, shrunk to: wins = 10
+────╯
+
+ 3 passed  1 failed  ·  3.4 ms
+```
+
+</div>
+
+A property test states something that holds for every value, and the runner checks it against generated ones. It is written `for any (name: Type, …)` after the name and runs its body once per case, 100 cases by default.
+
+Every parameter writes its type, because the type is what the values are generated from. Values of a record, a choice, a list, an `Optional` or a [`Dictionary`](/docs/library/dictionary) can be generated. So can the `Boolean`, `Integer`, [`Rational`](/docs/library/rational) and [`String`](/docs/library/string) values inside them. A [checked refinement](/docs/language/checked-refinements) is honoured: `teams` is a [`NonEmptyList`](/docs/library/list#NonEmptyList) and never empty, and `seats` is a [`NonZeroInteger`](/docs/library/integer#NonZeroInteger) and never zero.
+
+When a case fails, the runner shrinks it: it tries smaller values and reports the smallest one that still fails. `wins = 10` is the smallest `Integer` that is not less than 10. The Help line is the command that runs the same search again from the same seed.
+
+- A parameter with no type, `for any (n)`, and a pattern, `for any ({ team }: Standing)`, are both [`property-parameters`](/docs/reference/diagnostics#property-parameters).
+- A type nothing can generate, such as a function type, is [`ungeneratable-type`](/docs/reference/diagnostics#ungeneratable-type).
+- A snapshot in a property test is [`snapshot-in-property`](/docs/reference/diagnostics#snapshot-in-property), because every case would record a different value.
+
+### Stored counterexamples
+
+A counterexample is a value that made a property fail. The runner stores it in `__counterexamples__/Properties.es.json`, beside the source, and every later run replays it before drawing new values. Until the bug is fixed, the next run fails on it at once. The report says `(0 cases · 1 replayed)`. The Note reads `failed on a stored counterexample (1 re-run): wins = 10`.
+
+The entry stays after the fix, and the test keeps replaying it as a regression case. The report then reads `✓ a season has fewer than ten wins  (100 cases · 1 replayed)`.
+
+<Note>Commit `__counterexamples__` and `__snapshots__` with the source. A stored counterexample keeps a fixed bug fixed, and a stored snapshot is part of what a test asserts.</Note>
+
+### Your own generator
+
+```essence
+implementation {
+	type Score = { goals: Integer }
+
+	namespace Score for Score is Generatable {
+		static generate(from source: Randomness) -> Score {
+			<- { goals = source::drawInteger(between 0, and 12) }
+		}
+
+		shrink() -> List<Score> {
+			if @.goals::is(0) {
+				<- []
+			} else {
+				<- [{ goals = @.goals::subtract(1) }]
+			}
+		}
+	}
+}
+
+tests {
+	test "a score is never negative" for any (score: Score) {
+		expect score.goals::isGreaterThanOrEqualTo(0)
+	}
+
+	test "nobody scores more than seven" for any (score: Score) {
+		expect score.goals::isLessThanOrEqualTo(7)
+	}
+}
+```
+
+<div class="error-output">
+
+```
+[test-failed]
+Error: 'nobody scores more than seven' failed
+    ╭─┤ Generators.es:25:10 │
+    │
+ 25 │        expect score.goals::isLessThanOrEqualTo(7)
+    │               ─────┬───────────┬─────────────────
+    │                    ╰───────────│─────────────────── 8
+    │                                │
+    │                                ╰─────────────────── this expect failed
+    │
+    │ Help: Run it again: essence test --seed f214becd -f "nobody scores more than seven"
+    │
+    │ Note: after 1 case, shrunk to: score = { goals = 8 }
+────╯
+```
+
+</div>
+
+A derived generator knows a type's structure, not its rules: to it, a `Score` is a record holding any `Integer`. A type with a rule of its own conforms to [`Generatable`](/docs/library/protocols#Generatable), a [protocol](/docs/language/protocols) from the standard library. The conformance replaces the derived generator for that type.
+
+- **`static generate(from source: Randomness) -> Self`** is the requirement. It builds one value from a source of randomness.
+- **`shrink()`** returns smaller candidates for a failing value. The runner keeps a candidate that still fails and asks it for its own, which is how `goals` walked down to `8`. `Generatable` provides a `shrink()` that returns no candidates, so without your own a failure is reported as it was drawn.
+
+`source` is a [`Randomness`](/docs/library/randomness): a source of random values. Ordinary code can make one too:
+
+```essence
+implementation {
+	constant dice   = Randomness.seeded("docs")
+	constant replay = Randomness.seeded("docs")
+	constant draft  = Randomness.seeded("draft")
+
+	Terminal.print(dice::drawInteger(between 1, and 6)) § 3
+	Terminal.print(replay::drawInteger(between 1, and 6)) § 3
+	Terminal.print(draft::pick(from ["Lions", "Tigers", "Bears"])) § Tigers
+}
+```
+
+[`Randomness.seeded`](/docs/library/randomness#seeded) returns a source that draws the same values for the same seed, so `dice` and `replay` both draw `3`. [`Randomness.entropy()`](/docs/library/randomness#entropy) returns the host's own source, which differs on every run. A source draws with [`drawBoolean`](/docs/library/randomness#drawBoolean), [`drawInteger(between:and:)`](/docs/library/randomness#drawInteger), [`drawRational(between:and:)`](/docs/library/randomness#drawRational) and [`drawString(upTo:)`](/docs/library/randomness#drawString). It chooses from a list with [`pick(from:)`](/docs/library/randomness#pick) and [`shuffle`](/docs/library/randomness#shuffle).
+
+## Snapshots
+
+```essence
+implementation {
+	type Standing = { team: String, points: Integer }
+
+	constant table: List<Standing> = [
+		{ team = "Lions", points = 7 },
+		{ team = "Tigers", points = 4 },
+	]
+
+	function headline(of table: List<Standing>) -> String {
+		<- match table::firstItem() -> String {
+			case #Value(leader) {
+				<- "{leader.team} lead with {leader.points} points"
+			}
+			case #Empty { <- "no games played" }
+		}
+	}
+}
+
+tests {
+	test "renders the headline" {
+		expect headline(of table) matches snapshot
+	}
+
+	test "renders the whole table" {
+		expect table matches snapshot from "table"
+	}
+
+	test "renders {team}" across ["Lions", "Tigers"] (team: String) {
+		expect team matches snapshot from "team"
+	}
+}
+```
+
+A snapshot compares a value with the value a run recorded for it. It is written [`matches snapshot`](/docs/reference/syntax-glossary#matches-snapshot) after the expression of an `expect`. A snapshot with no recorded value is written by the run that meets it. So the first run of this file passes and reports `4 snapshots written`.
+
+Written bare, the snapshot is inline. The run writes the value into the source file, through the formatter, and the line becomes:
+
+```essence
+§ fragment
+expect headline(of table) matches snapshot "Lions lead with 7 points"
+```
+
+Written `from "table"`, the snapshot is stored in `__snapshots__/Snapshots.es.snap`, beside the source. The file is plain text with `§` comments:
+
+```
+§ Snapshots recorded by `essence test`. They are read back on every run,
+§ so a change here is a change to what the tests assert. Rewrite them with
+§ `essence test --update`.
+
+snapshot "table"
+	[{ team = "Lions", points = 7 }, { team = "Tigers", points = 4 }]
+
+snapshot "team [0]"
+	Lions
+
+snapshot "team [1]"
+	Tigers
+```
+
+A table test runs one line for every row, and an inline snapshot has one place in the source. So a snapshot in a table test must be named, and each row records its own entry: `team [0]` and `team [1]` above.
+
+Give every stored snapshot in a file a name of its own.
+
+Once recorded, a snapshot is compared on every run, and a changed value fails the test with a diff. Change the Lions' points to `8` and run again. Both the inline and the stored snapshot fail, and the stored one reads:
+
+<div class="error-output">
+
+```
+[test-failed]
+Error: 'renders the whole table' failed
+    ╭─┤ Snapshots.es:25:10 │
+    │
+ 25 │        expect table matches snapshot from "table"
+    │               ─────────────────┬─────────────────
+    │                                ╰─────────────────── this expect failed
+    │
+    │ Help: Accept this run with `essence test --update`
+    │
+    │ Note 1: the recorded snapshot and this run differ
+    │ Note 2: the difference, - what it held, + what it was compared with:
+    │         - [{ team = "Lions", points = 7 }, { team = "Tigers", points = 4 }]
+    │         + [{ team = "Lions", points = 8 }, { team = "Tigers", points = 4 }]
+────╯
+```
+
+</div>
+
+`essence test --update` accepts the new values. It rewrites the inline string in the source and the entry in the `.snap` file.
+
+A snapshot records how a value prints, so the value's type must conform to [`Printable`](/docs/library/protocols#Printable). Records, lists, strings and numbers print. A choice with no `Printable` conformance, a [union](/docs/language/unions-and-type-aliases) and a function do not. Snapshotting one is [`snapshot-not-printable`](/docs/reference/diagnostics#snapshot-not-printable).
+
+## Examples and value comments
+
+```essence
+implementation {
+	§§ Returns the points a result is worth.
+	§§
+	§§ @example
+	§§   expect pointsFor(2, to 0)::is(3)
+	§§   expect pointsFor(1, to 1)::is(1)
+	function pointsFor(_ scored: Integer, to conceded: Integer) -> Integer {
+		<- define {
+			as 3 if scored::isGreaterThan(conceded)
+			as 1 if scored::is(conceded)
+			as 0 otherwise
+		}
+	}
+}
+```
+
+```sh
+$ essence test Examples.es
+
+ Examples.es
+   examples
+     ✓ pointsFor example
+
+ 1 passed  ·  0.50 ms
+```
+
+An `@example` block in a documentation comment is a test. Its indented lines are a test body, so they hold `expect`, `require` and `constant` lines. Each block becomes a test in a suite called `examples`, named after what it documents. A second block on one declaration is named `… example 2`. This file has no `tests` block, and its example still runs.
+
+```essence
+implementation {
+	constant lions = { team = "Lions", points = 4 }
+}
+
+tests {
+	test "a win adds three points" {
+		constant played = { lions with points = lions.points::add(3) } §?
+
+		expect played.points::is(7)
+	}
+}
+```
+
+`§?` at the end of a statement in the `tests` block is a [value comment](/docs/reference/syntax-glossary#value-comment): it asks for that statement's value. The editor shows the value beside the line while the tests run. The terminal report shows nothing for it. Outside the `tests` block nothing records the value, and the compiler warns with [`value-comment-outside-tests`](/docs/reference/diagnostics#value-comment-outside-tests).
+
+## Running tests
+
+`essence test` with no arguments runs every test in the project. It finds every file with a `tests` block or `@example` blocks, and every `.tests.es` file, under the directory holding [`essence.json`](/docs/guides/projects). Without one, it searches the working directory. `-f` or `--filter <text>` runs the tests whose names contain the text, and `--tag <tag>` runs the tests that carry the tag. `--watch` stays running and, on every save, runs again the tests the change reaches. The exit code is `0` when everything that ran passed, and `1` when a test failed or a file did not compile. It is `2` when a run that `--filter` or `--tag` did not narrow still holds a `focused` test. [Running tests](/docs/guides/running-tests) covers selection, watching and the rest of the command, and the [command-line reference](/docs/reference/cli) lists every flag.
+
+<SeeAlso
+	links={[
+		{ label: "Running tests", href: "/docs/guides/running-tests" },
+		{ label: "Patterns", href: "/docs/language/patterns" },
+		{ label: "Protocols", href: "/docs/language/protocols" },
+		{ label: "Documentation comments", href: "/docs/language/documentation-comments" },
+		{ label: "Randomness", href: "/docs/library/randomness" },
+	]}
+/>

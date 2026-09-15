@@ -1,0 +1,439 @@
+---
+title: Dictionaries
+description: 'Keep values under keys with `["tea" = 3]`, read and change entries, and turn a list into one with `group`, `tally` and `index`.'
+section: language
+order: 150
+template: article
+---
+
+A [`Dictionary`](/docs/library/dictionary) holds values under keys, like a JavaScript `Map`. `Dictionary<String, Integer>` is a dictionary with [`String`](/docs/library/string) keys and [`Integer`](/docs/library/integer) values. Keys compare by value, so a [record](/docs/language/records) works as a key where a `Map` compares objects by identity. Like every Essence value, a dictionary never changes: an update returns a new dictionary and leaves the old one as it was.
+
+```essence
+implementation {
+	constant prices    = ["tea" = 3, "cake" = 4]
+	constant newPrices = [prices with "tea" = 5]
+
+	Terminal.print(prices) § ["tea" = 3, "cake" = 4]
+	Terminal.print(newPrices) § ["tea" = 5, "cake" = 4]
+	Terminal.print(prices::value(at "cake")) § Value(4)
+	Terminal.print(prices::value(at "soup", defaultingTo 0)) § 0
+	Terminal.print(prices::keys()) § ["tea", "cake"]
+}
+```
+
+`["tea" = 3, "cake" = 4]` writes a dictionary with two entries. An entry is a key and the value it holds, written `key = value`. `[prices with "tea" = 5]` returns a new dictionary with one entry changed. [`value(at:)`](/docs/library/dictionary#value) returns an [Optional](/docs/language/optional), because the key may not be there. `prices::value(at "cake")` is `#Value(4)`, which prints as `Value(4)`, and a missing key returns `#Empty`. `value(at:defaultingTo:)` returns the value, or the fallback when the key is missing. [`keys()`](/docs/library/dictionary#keys) returns the keys as a [list](/docs/language/lists), in the order they were first set.
+
+## Writing a dictionary
+
+```essence
+implementation {
+	constant prices: Dictionary<String, Integer>   = ["tea" = 3, "cake" = 4]
+	constant noPrices: Dictionary<String, Integer> = [=]
+	constant table    = 4
+	constant bookings = [
+		"table {table}" = "Ada",
+		"table {table::add(1)}" = "Grace",
+	]
+
+	Terminal.print(prices) § ["tea" = 3, "cake" = 4]
+	Terminal.print(noPrices) § [=]
+	Terminal.print(bookings) § ["table 4" = "Ada", "table 5" = "Grace"]
+	Terminal.print(["tea", "cake"]) § ["tea", "cake"]
+}
+```
+
+A dictionary is written between [brackets](/docs/reference/syntax-glossary#brackets) as `key = value` entries, separated by commas. A written dictionary with entries decides its key and value types itself, so the annotation on `prices` is optional. A key is an expression, like a value: `bookings` builds its keys with [string holes](/docs/reference/syntax-glossary#interpolation), the `{table}` that JavaScript writes as `${table}`.
+
+`[=]` is the empty dictionary. It says nothing about its types, so write it where something decides them: an annotation, as on `noPrices`, or an argument to a parameter of a dictionary type. Printing a bare `[=]` is refused as [`unsatisfied-conformance-condition`](/docs/reference/diagnostics#unsatisfied-conformance-condition), because nothing says what its keys and values are. `{}` is the empty record, not an empty dictionary: `constant noPrices: Dictionary<String, Integer> = {}` is refused as [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch).
+
+A dictionary uses the same brackets as a list, and the `=` is the whole difference. `["tea", "cake"]` is a list of two strings, and `[]` is the empty list. An entry written with JavaScript's colon is reported as [`dictionary-entry-syntax`](/docs/reference/diagnostics#dictionary-entry-syntax):
+
+<div class="error-output">
+
+```
+[dictionary-entry-syntax]
+Error: A Dictionary entry is written with '='
+   ╭─┤ prices.es:2:26 │
+   │
+ 2 │     constant prices = ["tea": 3]
+   │                             ▲
+   │                             ╰── expected '=' and found ':'
+   │
+   │ Help: Write '=' in place of ':'.
+   │
+   │ Note: An entry is 'key = value', and a Dictionary is a bracket list of them: '["a" = 1, "b" = 2]'.
+───╯
+```
+
+</div>
+
+A key with no value, as in `["tea" = 3, "cake"]`, is the same error. A dictionary holds one value per key, so a literal that writes the same key twice is reported as [`duplicate-key`](/docs/reference/diagnostics#duplicate-key):
+
+<div class="error-output">
+
+```
+[duplicate-key]
+Error: This key is written twice
+   ╭─┤ menu.es:2:42 │
+   │
+ 2 │     constant menu = ["tea" = 3, "cake" = 4, "tea" = 5]
+   │                      ──┬──                  ──┬──
+   │                        ╰──────────────────────│──── first written here
+   │                                               │
+   │                                               ╰──── written a second time here
+   │
+   │ Help: Keep one entry for the key.
+   │
+   │ Note: A Dictionary holds one value per key, so the second entry would take the first one's place and nothing would say the first was ever there.
+───╯
+```
+
+</div>
+
+**Compared with JavaScript.**
+
+```ts
+const prices = new Map([["tea", 3], ["cake", 4]])
+const menu: Record<string, number> = { tea: 3, cake: 4 }
+const noPrices = new Map<string, number>()
+```
+
+In JavaScript you choose between a `Map` and a plain object, typed `Record<string, number>` in TypeScript. Essence has one dictionary type for both jobs. Called from JavaScript, a dictionary crosses as a `Map`, as [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) shows. More on [Coming from JavaScript › Collections](/docs/getting-started/coming-from-javascript#collections).
+
+## What a key can be
+
+```essence
+implementation {
+	constant rooms = [101 = "Ada", 102 = "Grace"]
+	constant seats = [
+		{ row = 1, seat = 2 } = "Ada",
+		{ row = 4, seat = 1 } = "Grace",
+	]
+
+	Terminal.print(rooms::value(at 102)) § Value("Grace")
+	Terminal.print(seats::value(at { row = 4, seat = 1 })) § Value("Grace")
+}
+```
+
+A key can be any [`Equatable`](/docs/library/protocols#Equatable) value: a value that [`is`](/docs/language/method-calls), Essence's equality method, can compare with another value of its type. Strings, numbers, [Booleans](/docs/library/boolean), [cases](/docs/language/choices-and-match) and records all qualify. `seats` uses records as keys. The lookup writes a new record `{ row = 4, seat = 1 }`, and it finds the entry because the two records are equal. [Protocols](/docs/language/protocols) covers `Equatable` itself.
+
+All the keys of one dictionary share a type. Mix a string key with an integer key and the key type is the [union](/docs/language/unions-and-type-aliases) `String | Integer`, which is not `Equatable`. The compiler reports [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound):
+
+<div class="error-output">
+
+```
+[unsatisfied-bound]
+Error: String | Integer does not conform to 'Equatable'
+   ╭─┤ rooms.es:2:19 │
+   │
+ 2 │     constant rooms = ["lobby" = "Ada", 102 = "Grace"]
+   │                      ────────────────┬───────────────
+   │                                      ╰───────────────── this binds a Type Parameter bound to 'Equatable'
+   │
+   │ Help: Declare a Namespace 'for String | Integer is Equatable'.
+   │
+   │ Note: No Namespace in scope makes String | Integer conform to 'Equatable'.
+───╯
+```
+
+</div>
+
+Write every key with the same type, such as `"102"`, or keep the two kinds of key in two dictionaries.
+
+**Compared with JavaScript.**
+
+```ts
+const seats = new Map([[{ row: 1, seat: 2 }, "Ada"]])
+
+seats.get({ row: 1, seat: 2 }) // undefined
+```
+
+A `Map` compares object keys by identity, so a second object with the same members finds nothing. A dictionary compares keys with `is`, so an equal record finds the entry. More on [Coming from JavaScript › Collections](/docs/getting-started/coming-from-javascript#collections).
+
+## Reading a dictionary
+
+```essence
+implementation {
+	constant stock = ["apples" = 4, "pears" = 0]
+
+	Terminal.print(stock::value(at "pears")) § Value(0)
+	Terminal.print(stock::value(at "kiwis")) § Empty
+	Terminal.print(stock::value(at "kiwis", defaultingTo 0)) § 0
+	Terminal.print(stock::keys()) § ["apples", "pears"]
+	Terminal.print(stock::values()) § [4, 0]
+	Terminal.print(stock::entries()) § [{ key = "apples", value = 4 }, { key = "pears", value = 0 }]
+	Terminal.print(stock::firstEntry()) § Value({ key = "apples", value = 4 })
+	Terminal.print(stock::length()) § 2
+	Terminal.print(["apples" = 4]::firstEntry()) § { key = "apples", value = 4 }
+}
+```
+
+Looking up a key that holds `0` returns `#Value(0)`, so a zero is never mistaken for a missing key, as it is by `map.get(key) || 0`. `keys()`, [`values()`](/docs/library/dictionary#values) and [`entries()`](/docs/library/dictionary#entries) return lists. An entry is a record with two members, `key` and `value`. [`firstEntry()`](/docs/library/dictionary#firstEntry) returns the first entry as an Optional, and [`length()`](/docs/library/dictionary#length) counts the entries. A dictionary has no `forEach`. To visit every entry, take `entries()` and use the list methods from [Iteration](/docs/language/iteration).
+
+A dictionary written with at least one entry is a [`NonEmptyDictionary`](/docs/library/dictionary#NonEmptyDictionary), as is the result of [`set(_:to:)`](/docs/library/dictionary#set). Reading one needs no Optional: `["apples" = 4]::firstEntry()` returns the entry itself. `stock` is a constant bound to a literal with no annotation, so it holds a plain `Dictionary` and `stock::firstEntry()` returns an Optional. [Checked refinements](/docs/language/checked-refinements) explains why.
+
+```essence
+implementation {
+	type Entry = { key: String, value: Integer }
+
+	function isSoldOut(_ entry: Entry) -> Boolean {
+		<- entry.value::is(0)
+	}
+
+	constant stock = ["apples" = 4, "pears" = 0]
+
+	Terminal.print(stock::isEmpty()) § false
+	Terminal.print(stock::hasEntries()) § true
+	Terminal.print(stock::hasKey("pears")) § true
+	Terminal.print(stock::hasValue(7)) § false
+	Terminal.print(stock::hasEntries(where isSoldOut)) § true
+	Terminal.print(stock::hasOnlyEntries(where isSoldOut)) § false
+	Terminal.print(stock::hasNoEntries(where isSoldOut)) § false
+}
+```
+
+The `where:` forms take a function that receives an entry, the record `{ key: String, value: Integer }` named `Entry` here, and returns a `Boolean`. [`isEmpty()`](/docs/library/dictionary#isEmpty) and [`hasEntries()`](/docs/library/dictionary#hasEntries) ask whether there is any entry. [`hasKey(_:)`](/docs/library/dictionary#hasKey) and [`hasValue(_:)`](/docs/library/dictionary#hasValue) ask about one key or one value. `hasEntries(where:)` asks whether any entry passes, [`hasOnlyEntries(where:)`](/docs/library/dictionary#hasOnlyEntries) whether every entry passes, and [`hasNoEntries(where:)`](/docs/library/dictionary#hasNoEntries) whether none does.
+
+**Compared with JavaScript.**
+
+```ts
+const stock = new Map([["apples", 4], ["pears", 0]])
+
+const kiwis = stock.get("kiwis") ?? 0
+const pairs = [...stock.entries()] // [["apples", 4], ["pears", 0]]
+```
+
+`get` returns `undefined` for a missing key, and `??` supplies a fallback. `value(at:)` returns an Optional instead, and `value(at:defaultingTo:)` does the job of `??`. `Map.prototype.entries` iterates `[key, value]` pairs, and `Object.entries` lists them for an object. `entries()` returns a list of `{ key, value }` records.
+
+Each `Map` method has an Essence name. `get(key)` is `value(at key)`, `has(key)` is `hasKey(key)`, and `size` is `length()`. `set(key, value)` is `set(key, to value)`, and `delete(key)` is [`remove(at key)`](/docs/library/dictionary#remove).
+
+There is no `stock["kiwis"]` and no `stock.kiwis`. `stock.kiwis` is refused as [`type-without-members`](/docs/reference/diagnostics#type-without-members), and `stock["kiwis"]` inside a call as [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch). On a line of its own, `constant kiwis = stock["kiwis"]` compiles as two statements: `constant kiwis = stock`, then a list `["kiwis"]` that nothing reads. No error says so, and `kiwis` holds the whole dictionary. More on [Coming from JavaScript › Collections](/docs/getting-started/coming-from-javascript#collections).
+
+## Setting and removing entries
+
+```essence
+implementation {
+	constant stock    = ["apples" = 4, "pears" = 0]
+	constant delivery = ["pears" = 12, "plums" = 6]
+
+	Terminal.print([stock with "apples" = 3]) § ["apples" = 3, "pears" = 0]
+	Terminal.print([stock with "apples" = 3, "kiwis" = 9]) § ["apples" = 3, "pears" = 0, "kiwis" = 9]
+	Terminal.print([stock with delivery]) § ["apples" = 4, "pears" = 12, "plums" = 6]
+	Terminal.print(stock) § ["apples" = 4, "pears" = 0]
+}
+```
+
+A [`with`](/docs/reference/syntax-glossary#with) update such as `[stock with "apples" = 3]` returns a new dictionary with the entries after `with` set. Unlike a record update, it may add a key the dictionary never held, like `"kiwis"`. After `with` come either `key = value` entries or one dictionary. A dictionary is merged in whole: `delivery` replaces the value under `"pears"` and adds `"plums"`.
+
+A dictionary is updated in brackets and a record in braces. Write a dictionary update in braces and the compiler reports [`wrong-update-brackets`](/docs/reference/diagnostics#wrong-update-brackets):
+
+<div class="error-output">
+
+```
+[wrong-update-brackets]
+Error: A key that is a value belongs to a Dictionary
+   ╭─┤ stock.es:3:36 │
+   │
+ 3 │     constant restocked = { stock with "pears" = 12 }
+   │                                       ───┬───
+   │                                          ╰───── this key is a value, not a member name
+   │
+   │ Help 1: Write the update in brackets: '[base with "a" = 1]'.
+   │ Help 2: Or name the member, if a Record is what was meant: '{ base with a = 1 }'.
+   │
+   │ Note: Braces update a Record, whose keys are the member names it declares. A key that is a value is a Dictionary's, and a Dictionary is updated in brackets.
+───╯
+```
+
+</div>
+
+The reverse, a record updated in brackets like `[order with paid = true]`, is the same code with the message "A Record is updated in braces".
+
+```essence
+implementation {
+	function addOne(_ count: Integer) -> Integer {
+		<- count::add(1)
+	}
+
+	constant stock = ["apples" = 4, "pears" = 0]
+
+	Terminal.print(stock::set("plums", to 6)) § ["apples" = 4, "pears" = 0, "plums" = 6]
+	Terminal.print(stock::update(at "apples", with addOne)) § ["apples" = 5, "pears" = 0]
+	Terminal.print(stock::update(at "kiwis", with addOne)) § ["apples" = 4, "pears" = 0]
+	Terminal.print(stock::update(at "kiwis", defaultingTo 0, with addOne)) § ["apples" = 4, "pears" = 0, "kiwis" = 1]
+	Terminal.print(stock::remove(at "pears")) § ["apples" = 4]
+	Terminal.print(stock::remove(atEvery ["apples", "pears"])) § [=]
+	Terminal.print(stock::removeEvery(where (entry) { <- entry.value::is(0) })) § ["apples" = 4]
+}
+```
+
+`set(_:to:)` sets one key and gives the same entries as `[stock with "plums" = 6]`. [`update(at:with:)`](/docs/library/dictionary#update) passes the value under a key to a function, and the new dictionary holds what the function returns. When the key is missing, it returns the dictionary unchanged. `update(at:defaultingTo:with:)` starts from the fallback instead, so it adds the key. `remove(at:)` takes one key out, `remove(atEvery:)` takes out every key in a list, and [`removeEvery(where:)`](/docs/library/dictionary#removeEvery) takes out every entry the function accepts. Removing a key that is not there changes nothing. `(entry) { <- … }` is a [function literal](/docs/language/functions-as-values).
+
+**Compared with JavaScript.**
+
+```ts
+const stock = new Map([["apples", 4], ["pears", 0]])
+const delivery = new Map([["pears", 12], ["plums", 6]])
+
+const restocked = new Map([...stock, ...delivery])
+stock.set("plums", 6) // changes stock itself
+```
+
+`Map.prototype.set` changes the map it is called on. `set(_:to:)` returns a new dictionary instead. `[stock with delivery]` is the spread on the `restocked` line: on a key both hold, the later value wins, as it does in an object spread. More on [Coming from JavaScript › Collections](/docs/getting-started/coming-from-javascript#collections).
+
+## Transforming a dictionary
+
+```essence
+implementation {
+	type Entry = { key: String, value: Integer }
+
+	function isCheap(_ entry: Entry) -> Boolean {
+		<- entry.value::isLessThan(5)
+	}
+
+	constant prices = ["tea" = 3, "cake" = 4, "soup" = 6]
+	constant offers = ["cake" = 5, "bread" = 2]
+
+	constant labels = prices::map((entry) { <- "{entry.key}: {entry.value}" })
+	constant lowest = prices::merge(with offers, choosing (price, offer) {
+		<- Number.lowest(price, offer)
+	})
+
+	Terminal.print(prices::everyEntry(where isCheap)) § ["tea" = 3, "cake" = 4]
+	Terminal.print(prices::count(where isCheap)) § 2
+	Terminal.print(labels) § ["tea" = "tea: 3", "cake" = "cake: 4", "soup" = "soup: 6"]
+	Terminal.print(prices::merge(with offers)) § ["tea" = 3, "cake" = 5, "soup" = 6, "bread" = 2]
+	Terminal.print(lowest) § ["tea" = 3, "cake" = 4, "soup" = 6, "bread" = 2]
+	Terminal.print(prices::sort()) § ["cake" = 4, "soup" = 6, "tea" = 3]
+	Terminal.print(prices::sort(on .value, in #Descending)) § ["soup" = 6, "cake" = 4, "tea" = 3]
+}
+```
+
+[`everyEntry(where:)`](/docs/library/dictionary#everyEntry) keeps the entries a function accepts, and [`count(where:)`](/docs/library/dictionary#count) counts them. [`map(_:)`](/docs/library/dictionary#map) passes each entry to a function and keeps the key with what the function returns, so `labels` is a `Dictionary<String, String>`.
+
+[`merge(with:)`](/docs/library/dictionary#merge) is the method form of `[prices with offers]`: on a key both hold, the argument's value wins. `merge(with:choosing:)` asks a function instead, passing the value from `prices` first and the one from `offers` second. A key only one of them holds is kept as it is.
+
+[`sort()`](/docs/library/dictionary#sort) orders the entries by key. `sort(on:)` orders them by what a function reads off each entry. `.value` is a [member path](/docs/reference/syntax-glossary#member-path), a short function that reads the `value` member. `in #Descending` sorts from highest to lowest.
+
+```essence
+implementation {
+	constant rows  = [{ key = "tea", value = 3 }, { key = "cake", value = 4 }]
+	constant names = ["tea", "coffee"]
+
+	Terminal.print(Dictionary.of(rows)) § ["tea" = 3, "cake" = 4]
+	Terminal.print(Dictionary.of(names, valuedBy (name) { <- name::length() })) § ["tea" = 3, "coffee" = 6]
+}
+```
+
+[`Dictionary.of`](/docs/library/dictionary#of) builds a dictionary from a list of entry records, or from a list of keys and a function that returns each key's value. When two entries in the list share a key, the later value wins and the key keeps its first place. It is Essence's `new Map(entries)`, with `{ key, value }` records in place of pairs.
+
+## Order, equality and printing
+
+```essence
+implementation {
+	constant stock = ["apples" = 4, "pears" = 2]
+
+	Terminal.print(stock::set("apples", to 9)) § ["apples" = 9, "pears" = 2]
+	Terminal.print(stock::set("plums", to 1)) § ["apples" = 4, "pears" = 2, "plums" = 1]
+	Terminal.print(stock::remove(at "apples")::set("apples", to 9)) § ["pears" = 2, "apples" = 9]
+	Terminal.print(stock::is(["pears" = 2, "apples" = 4])) § true
+	Terminal.print(stock) § ["apples" = 4, "pears" = 2]
+	Terminal.inspect(stock) § [ "apples" = 4, "pears" = 2 ]
+	Terminal.print("in stock: {stock}") § in stock: ["apples" = 4, "pears" = 2]
+}
+```
+
+A dictionary keeps its entries in the order their keys were first set. Setting a key that is already there keeps its place, and a new key goes at the end. Removing a key and setting it again moves it to the end, because the key is new when it comes back. This is the same as a JavaScript `Map`.
+
+`is` finds two dictionaries equal when they hold the same keys with equal values, in any order. Two JavaScript `Map`s are `===` only when they are the same object.
+
+[`Terminal.print`](/docs/library/terminal#print) writes a dictionary the way you write one, with quotes around strings. [`Terminal.inspect`](/docs/library/terminal#inspect) adds a space inside the brackets, and breaks a long dictionary over lines. A string hole uses the `print` form. An empty dictionary whose types are decided, such as `noPrices`, prints as `[=]`.
+
+## From a list to a dictionary
+
+```essence
+implementation {
+	type Order = { id: Integer, customer: String, total: Integer }
+
+	constant orders: List<Order> = [
+		{ id = 1, customer = "alex", total = 30 },
+		{ id = 2, customer = "sam", total = 12 },
+		{ id = 3, customer = "alex", total = 8 },
+	]
+
+	constant byCustomer  = orders::group(on .customer)
+	constant totals      = byCustomer::map((entry) {
+		<- entry.value::map(.total)::sum()
+	})
+	constant orderCounts = orders::map(.customer)::tally()
+	constant byId        = orders::index(on .id)
+
+	Terminal.print(byCustomer::keys()) § ["alex", "sam"]
+	Terminal.print(totals) § ["alex" = 38, "sam" = 12]
+	Terminal.print(orderCounts) § ["alex" = 2, "sam" = 1]
+	Terminal.print(byId::value(at 2)) § Value({ id = 2, customer = "sam", total = 12 })
+}
+```
+
+[`group(on:)`](/docs/library/list#group) puts each item under the key a function reads off it. `byCustomer` is a `Dictionary<String, NonEmptyList<Order>>`. Every group holds at least one item, so each group is a [`NonEmptyList`](/docs/library/list#NonEmptyList), and [`firstItem()`](/docs/library/list#firstItem) on a group returns an order, not an Optional. `totals` adds up each customer's orders.
+
+[`tally()`](/docs/library/list#tally) counts how often each item occurs. It returns a `Dictionary<String, PositiveInteger>`, because every count is at least one. A [`PositiveInteger`](/docs/library/integer#PositiveInteger) is an `Integer` above zero. [`index(on:)`](/docs/library/list#index) keeps one item per key, for a key that is meant to be unique, like `id`. When two items share a key, the last one wins.
+
+All three put the keys in the order they first appear in the list. On a written list, which is a `NonEmptyList`, they return a `NonEmptyDictionary`.
+
+**Compared with JavaScript.**
+
+```ts
+const byCustomer = Object.groupBy(orders, (order) => order.customer)
+const byCustomerMap = Map.groupBy(orders, (order) => order.customer)
+const customers = [...new Set(orders.map((order) => order.customer))]
+```
+
+`Object.groupBy` returns an object with string keys, and `Map.groupBy` compares object keys by identity. `group(on:)` returns a dictionary whose keys are compared with `is`, and makes each group a `NonEmptyList`. `tally()` and `index(on:)` have no JavaScript built-in; each is a `reduce` there. Essence has no `Set` type. A list with [`removeDuplicates()`](/docs/library/list#removeDuplicates) and [`contains(_:)`](/docs/library/list#contains) does that job: `orders::map(.customer)::removeDuplicates()` returns `["alex", "sam"]`. More on [Coming from JavaScript › Collections](/docs/getting-started/coming-from-javascript#collections).
+
+## Records with Optional members
+
+When the records in an annotated dictionary mix `#Value(…)` and `#Empty`, the dictionary's value type is the union of two record shapes. That union does not fit the annotation, and the compiler reports `assignment-type-mismatch`:
+
+<div class="error-output">
+
+```
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'users'
+   ╭─┤ users.es:4:45 │
+   │
+ 4 │ ╭─▶     constant users: Dictionary<String, User> = [
+   ┆ ┆
+ 7 │ ├─▶     ]
+   │ │
+   │ ╰─────────── this is a Dictionary<String, { name: String, email: Optional#Value } | { name: String, email: Optional#Empty }>
+   │
+   │ Note: 'users' is declared as Dictionary<String, { name: String, email: Optional<String> }>.
+───╯
+```
+
+</div>
+
+The label shows the two shapes: one whose `email` is `#Value` and one whose `email` is `#Empty`. Each alone fits `User`, but a value that may be either does not. Annotate each record instead, then build the dictionary from the annotated constants:
+
+```essence
+implementation {
+	type User = { name: String, email: Optional<String> }
+
+	constant alex: User = { name = "Alex", email = #Value("alex@example.com") }
+	constant sam: User  = { name = "Sam", email = #Empty }
+	constant users: Dictionary<String, User> = ["alex" = alex, "sam" = sam]
+
+	Terminal.print(users::length()) § 2
+}
+```
+
+It happens only when the records mix the two cases. When every record holds `#Value(…)`, or every one holds `#Empty`, the literal compiles. A list literal of such records behaves the same way.
+
+<SeeAlso links={[
+	{ label: "Lists", href: "/docs/language/lists" },
+	{ label: "Records", href: "/docs/language/records" },
+	{ label: "Optional", href: "/docs/language/optional" },
+	{ label: "Dictionary in the library", href: "/docs/library/dictionary" },
+	{ label: "Calling Essence from JavaScript", href: "/docs/guides/calling-from-javascript" },
+]} />

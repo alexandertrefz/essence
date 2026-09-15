@@ -1,0 +1,656 @@
+---
+title: Protocols
+description: "Declare what a type can do, conform to it on a namespace, and write functions that accept any type that conforms."
+section: language
+order: 200
+template: article
+---
+
+A protocol names a set of methods a type can promise to have. It is close to a TypeScript `interface`, with one difference: a type conforms only where a [namespace](/docs/language/namespaces-and-methods) declares it, never because its shape matches. The protocol you meet first is [`Printable`](/docs/library/protocols#Printable). A type that conforms to it can be passed to [`Terminal.print`](/docs/library/terminal#print) and placed in a [string hole](/docs/reference/syntax-glossary#interpolation).
+
+```essence
+implementation {
+	choice Route {
+		Home,
+		Article { slug: String },
+	}
+
+	namespace Route for Route is Printable {
+		toString() -> String {
+			<- match @ -> String {
+				case #Home    { <- "/" }
+				case #Article { <- "/articles/{@.slug}" }
+			}
+		}
+	}
+
+	constant reading: Route = #Article({ slug = "protocols" })
+
+	Terminal.print(reading) § /articles/protocols
+	Terminal.print("You are on {reading}") § You are on /articles/protocols
+}
+```
+
+`Printable` requires one method, `toString()`, which returns a [`String`](/docs/library/string). The line `namespace Route for Route is Printable` does two things. It declares methods for the [choice](/docs/language/choices-and-match) `Route`, and it declares that `Route` conforms to `Printable`. To conform is to have every method a protocol requires, and to say so. `Terminal.print` and the string hole both ask for a `Printable` value, so both accept a `Route`.
+
+Remove the namespace and both lines are refused. `Terminal.print(reading)` is [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound), "Route does not conform to 'Printable'". The hole is [`interpolation-not-printable`](/docs/reference/diagnostics#interpolation-not-printable). JavaScript gives every object a `toString`, so a template literal prints `[object Object]` until you write one. A [record](/docs/language/records) already prints, but a choice has no such fallback.
+
+## Declaring a protocol
+
+```essence
+implementation {
+	protocol Describable {
+		describe() -> String
+	}
+
+	type Book = { title: String, pages: Integer }
+
+	namespace Books for Book is Describable, is Printable {
+		describe() -> String {
+			<- "{@.title}, {@.pages} pages"
+		}
+
+		toString() -> String {
+			<- @.title
+		}
+	}
+
+	constant ficciones: Book = { title = "Ficciones", pages = 224 }
+
+	Terminal.print(ficciones::describe()) § Ficciones, 224 pages
+	Terminal.print(ficciones) § Ficciones
+}
+```
+
+[`protocol`](/docs/reference/syntax-glossary#protocol) declares a name and, in braces, the methods the protocol requires. A method written as a signature alone, with no body, is a requirement. A conformance goes on a namespace: `is` and the protocol's name, after the `for` target. A namespace can conform to several protocols, each with its own `is`, separated by commas. `Books`' `toString` replaces a record's own printing for a `Book`, which is why `ficciones` prints as its title.
+
+The word `is` is also the name of a method, the one [`Equatable`](/docs/library/protocols#Equatable) requires: `5::is(5)`.
+
+The compiler checks a conformance at the namespace, not where it is used. A required method that is missing, or whose signature differs from the protocol's, is [`nonconforming-namespace`](/docs/reference/diagnostics#nonconforming-namespace). Rename `describe` to `summary` and the namespace is refused:
+
+<div class="error-output">
+
+```
+[nonconforming-namespace]
+Error: Namespace 'Books' does not conform to 'Describable'
+   ╭─┤ books.es:8:30 │
+   │
+ 8 │     namespace Books for Book is Describable, is Printable {
+   │                                 ─────┬─────  
+   │                                      ╰─────── Method 'describe' is missing
+───╯
+```
+
+</div>
+
+A changed signature gets the same code, with the label "Method 'describe' does not match the Protocol's signature". An [`overload`](/docs/reference/syntax-glossary#overload) block satisfies a requirement when one of its entries matches. Its other entries are ordinary methods of the namespace.
+
+Only a namespace with a `for` target can conform. `namespace Helpers is Printable` is [`conformance-needs-target-type`](/docs/reference/diagnostics#conformance-needs-target-type). The target can be any type, including one you did not declare. `namespace Describing for Integer is Describable` makes every [`Integer`](/docs/library/integer) describable, and `Integer` itself is untouched.
+
+A conformance that names an undeclared protocol is [`unknown-protocol`](/docs/reference/diagnostics#unknown-protocol). A file that declares the same protocol name twice is [`duplicate-protocol`](/docs/reference/diagnostics#duplicate-protocol).
+
+## Bounds
+
+A type parameter is the placeholder type a generic function declares, such as `Item` in `<infer Item>`, as [Generics](/docs/language/generics) showed. A bound limits it to the types that conform to a protocol.
+
+```essence
+implementation {
+	protocol Describable {
+		describe() -> String
+	}
+
+	type Book = { title: String, pages: Integer }
+
+	namespace Books for Book is Describable {
+		describe() -> String {
+			<- "{@.title}, {@.pages} pages"
+		}
+	}
+
+	function announce<infer Item is Describable>(_ item: Item) -> String {
+		<- "Now: {item::describe()}"
+	}
+
+	constant ficciones: Book = { title = "Ficciones", pages = 224 }
+
+	Terminal.print(announce(ficciones)) § Now: Ficciones, 224 pages
+}
+```
+
+`<infer Item is Describable>` is a bound, and it is two things at once. It is a demand on every call: `announce` accepts only a type that conforms to `Describable`. It is also a permission inside the body: `item::describe()` is allowed because the protocol declares `describe`. The body knows nothing else about `Item`. Without the bound, `item::describe()` is [`no-namespace-for-value`](/docs/reference/diagnostics#no-namespace-for-value), "No Namespace in scope targets Item."
+
+Inside the body, the type parameter can stand where a namespace would. `Item.describe(item)` is the same call as `item::describe()`, with the receiver passed first.
+
+### Declared, not structural
+
+Having the method is not conforming. Delete `is Describable` from the namespace and leave `describe` where it is. `ficciones::describe()` still works. The call to `announce` does not:
+
+<div class="error-output">
+
+```
+[unsatisfied-bound]
+Error: { title: String, pages: Integer } does not conform to 'Describable'
+    ╭─┤ announce.es:20:17 │
+    │
+ 20 │     Terminal.print(announce(ficciones))
+    │                    ─────────┬─────────  
+    │                             ╰─────────── this binds a Type Parameter bound to 'Describable'
+    │ 
+    │ Help: Declare a Namespace 'for { title: String, pages: Integer } is Describable'.
+    │ 
+    │ Note: No Namespace in scope makes { title: String, pages: Integer } conform to 'Describable'.
+────╯
+```
+
+</div>
+
+A `describe` for a catalogue and one for a log share a shape but make different promises. So a namespace states each conformance.
+
+**Compared with JavaScript.**
+
+```ts
+interface Describable {
+  describe(): string
+}
+
+function announce<T extends Describable>(item: T): string {
+  return `Now: ${item.describe()}`
+}
+
+const logEntry = { describe: () => "debug dump" }
+
+announce(logEntry) // accepted: the shape matches
+```
+
+TypeScript accepts `logEntry` because its shape matches. Essence needs a namespace that declares `is Describable`. `implements` becomes `is`, and you can write it for any type, not only a class you own. More on [Coming from JavaScript › Namespaces and protocols](/docs/getting-started/coming-from-javascript#namespaces-and-protocols).
+
+### One bound per type parameter
+
+```essence
+implementation {
+	protocol Shown is Printable, is Equatable {}
+
+	type Label = { text: String }
+
+	namespace Labels for Label is Shown {
+		toString() -> String {
+			<- @.text
+		}
+
+		is(_ other: Label) -> Boolean {
+			<- @.text::is(other.text)
+		}
+	}
+
+	function describeChange<infer Item is Shown>(
+		from before: Item,
+		to after: Item,
+	) -> String {
+		if before::is(after) {
+			<- "still {before}"
+		}
+
+		<- "{before} became {after}"
+	}
+
+	constant draft: Label = { text = "draft" }
+	constant final: Label = { text = "final" }
+
+	Terminal.print(describeChange(from draft, to final)) § draft became final
+	Terminal.print(describeChange(from draft, to draft)) § still draft
+}
+```
+
+A type parameter takes exactly one bound. `<infer Item is Printable, Equatable>` does not bound `Item` twice. The comma starts a second type parameter, named `Equatable`. `Item` is then only `Printable`, so `before::is(after)` is [`method-not-on-protocol`](/docs/reference/diagnostics#method-not-on-protocol), and each call is [`uninferable-type-parameter`](/docs/reference/diagnostics#uninferable-type-parameter). TypeScript's `A & B` has no counterpart: `<infer Item is Printable & Equatable>` is a [`syntax-error`](/docs/reference/diagnostics#syntax-error), `Expected '>' but found '&'.`
+
+To demand two protocols, declare one that extends both, as `Shown` does, and bound by that. Conforming to `Shown` is declared by name like any other. With an empty body, `Labels` is refused, "Method 'toString' is missing", even though every record already prints. An `Integer` prints and compares too, and passing one is still `unsatisfied-bound`. A combined protocol suits the types you declare. A namespace that makes `Integer` conform to `Shown` makes it `Printable` a second time, so `Terminal.print(5)` becomes [`ambiguous-conformance`](/docs/reference/diagnostics#ambiguous-conformance).
+
+### What a protocol is not
+
+- **Not a type.** `constant shown: Printable = 5` and `List<Printable>` are [`protocol-as-type`](/docs/reference/diagnostics#protocol-as-type). A list of values of several types is a list of a [union](/docs/language/unions-and-type-aliases).
+- **Not a value.** `Equatable.isNot(3, 4)` is [`protocol-as-value`](/docs/reference/diagnostics#protocol-as-value). Outside its declaration, a protocol's name goes only after `is`, in a conformance, a bound, a condition or an extension. It also goes in a [protocol pick](/docs/reference/syntax-glossary#protocol-pick) such as `::<Equatable>`, and in an import or export block.
+
+A bounded function is not a value either. `constant say = announce` is [`protocol-bound-function-value`](/docs/reference/diagnostics#protocol-bound-function-value), and passing it, as in `books::map(announce)`, is [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload). Call it inside a function literal instead: `books::map((book) { <- announce(book) })`. The last section of this page says why.
+
+### A bound on one overload entry
+
+```essence
+implementation {
+	namespace Shelves<infer Item> for List<Item> {
+		overload arranged {
+			<infer Item is Comparable>() -> List<Item> {
+				<- @::sort()
+			}
+
+			(by rank: (_ item: Item) -> Integer) -> List<Item> {
+				<- @::sort(by (first, second) {
+					<- rank(first)::compare(to rank(second))
+				})
+			}
+		}
+	}
+
+	constant products = [{ price = 20 }, { price = 5 }]
+
+	Terminal.print([3, 1, 2]::arranged()) § [1, 2, 3]
+	Terminal.print(products::arranged(by .price)::map(.price)) § [5, 20]
+}
+```
+
+An entry of an `overload` block can carry a bound of its own. It declares the namespace's type parameter again, with `is`, before its parameter list. The bound applies to that entry alone, so `products::arranged()` is `unsatisfied-bound`: a record is not [`Comparable`](/docs/library/protocols#Comparable). Generics showed the library's [`sort`](/docs/library/list#sort) declared the same way.
+
+## What a requirement can be
+
+```essence
+implementation {
+	protocol Defaultable {
+		static default() -> Self
+	}
+
+	type Settings = { retries: Integer, verbose: Boolean }
+
+	namespace Settings for Settings is Defaultable {
+		static default() -> Settings {
+			<- { retries = 3, verbose = false }
+		}
+	}
+
+	function reset<infer Item is Defaultable>(_ current: Item) -> Item {
+		<- Item.default()
+	}
+
+	constant custom: Settings = { retries = 9, verbose = true }
+
+	Terminal.print(Settings.default().retries) § 3
+	Terminal.print(reset(custom).retries) § 3
+}
+```
+
+`Self` inside a protocol stands for the conforming type, and the namespace writes that type out: `Settings`. A requirement can be an instance method, a [`static`](/docs/reference/syntax-glossary#static) or an `overload` block of signatures. The static is called on the namespace, `Settings.default()`. Inside the bounded `reset`, it is called on the type parameter, `Item.default()`, the only way to reach a static requirement there.
+
+A protocol cannot declare:
+
+- **A default on a parameter.** `greet(_ name: String = "world") -> String` is [`default-on-protocol-requirement`](/docs/reference/diagnostics#default-on-protocol-requirement). Write the default on the conforming method.
+- **A property.** `size: Integer` in a protocol is a `syntax-error`. A protocol holds methods only. To ask for a member, use a record type: a parameter typed `{ name: String }` accepts any record that has a `name`.
+- **A type parameter.** `protocol Container<Item>` and a requirement `transform<infer Target>(…)` are both syntax errors.
+- **A pattern in a parameter.** `area(of { width, height }: …)` is [`pattern-without-body`](/docs/reference/diagnostics#pattern-without-body). A requirement has no body to bind the names in.
+
+## Provided methods
+
+```essence
+implementation {
+	protocol Measurable {
+		area() -> Integer
+
+		isEmpty() -> Boolean {
+			<- @::area()::is(0)
+		}
+	}
+
+	type Rectangle = { width: Integer, height: Integer }
+	type Square = { side: Integer }
+
+	namespace Rectangles for Rectangle is Measurable {
+		area() -> Integer {
+			<- @.width::multiply(with @.height)
+		}
+	}
+
+	namespace Squares for Square is Measurable {
+		area() -> Integer {
+			<- @.side::multiply(with @.side)
+		}
+
+		isEmpty() -> Boolean {
+			<- @.side::isLessThan(2)
+		}
+	}
+
+	function isBlank<infer Shape is Measurable>(_ shape: Shape) -> Boolean {
+		<- shape::isEmpty()
+	}
+
+	constant line: Rectangle = { width = 0, height = 4 }
+	constant speck: Square   = { side = 1 }
+
+	Terminal.print(line::isEmpty()) § true
+	Terminal.print(isBlank(line)) § true
+	Terminal.print(speck::area()) § 1
+	Terminal.print(isBlank(speck)) § true
+}
+```
+
+A method written with a body inside a protocol is provided. Every conforming type has it without writing anything: `Rectangles` writes `area` only, and `line::isEmpty()` runs the protocol's body. A provided body is written on [`@`](/docs/reference/syntax-glossary#at), the conforming value.
+
+A namespace that writes a method with the provided method's name replaces it, whole. `Squares` writes its own `isEmpty`, and that is what runs, at a direct call and through a bound alike. `isBlank(speck)` returns `true` although `speck`'s area is 1. The replacement cannot call the provided body, and it is held to the provided signature, as a requirement is.
+
+**Compared with JavaScript.**
+
+```ts
+abstract class Measurable {
+  abstract area(): number
+  isEmpty() { return this.area() === 0 }
+}
+
+class Square extends Measurable {
+  constructor(readonly side: number) { super() }
+  area() { return this.side * this.side }
+  isEmpty() { return this.side < 2 || super.isEmpty() }
+}
+```
+
+A TypeScript `interface` cannot carry a body. A provided method is close to a default method on an abstract class, or a default in a Rust trait. Any type can take it by conforming, not only a subclass, and there is no `super.isEmpty()`. More on [Coming from JavaScript › Namespaces and protocols](/docs/getting-started/coming-from-javascript#namespaces-and-protocols).
+
+### What a provided body can call
+
+A provided body knows `@` only as the protocol. It can call:
+
+- the protocol's own methods, required or provided;
+- the methods of every protocol this one extends;
+- methods on what those calls return, such as `@::area()::isGreaterThan(100)`;
+- the standard library, such as [`Number.sum`](/docs/library/number#sum) over `[@::area(), 10]`.
+
+A method outside that set is `method-not-on-protocol`, reported at the protocol: "'Measurable' has no Method named 'toString'". Anything your program declares is [`provided-method-out-of-reach`](/docs/reference/diagnostics#provided-method-out-of-reach), a constant, a function or a namespace alike. A provided method is compiled once, outside the programs that use its protocol, so its body can name the standard library and nothing your program declares. Give the protocol a requirement instead, and let each conforming namespace reach the name.
+
+A `static` or `overload` method in a protocol cannot carry a body, [`unwritable-provided-method`](/docs/reference/diagnostics#unwritable-provided-method). A static has no receiver for `@` to stand for.
+
+A protocol is exported and imported by name, like any declaration, and its provided methods come with it, as [Modules](/docs/language/modules) teaches. Two same-named protocols from two modules that provide a same-named method in one program are [`clashing-provided-method`](/docs/reference/diagnostics#clashing-provided-method). Declare the protocol once and import it.
+
+### Calling a provided method
+
+```essence
+implementation {
+	Terminal.print("pear"::isNot("plum")) § true
+	Terminal.print(String.isNot("pear", "plum")) § true
+	Terminal.print("pear"::<Equatable>isNot("plum")) § true
+	Terminal.print(3::isLessThan(Number.Pi)) § true
+	Terminal.print(5::isBetween(1, and 3/2)) § false
+	Terminal.print(5::isLessThan(3)) § false
+}
+```
+
+`Equatable` provides `isNot`, and the first three lines call it three ways: on a value, on a namespace and through a pick. `String.isNot("pear", "plum")` names the namespace whose conformance offers it and passes the receiver first. `"pear"::<Equatable>isNot("plum")` names the protocol at the call, with the protocol pick `::<Equatable>`. The pick reaches provided methods only. For a requirement, name the namespace instead: `String.is("pear", "plum")`. `Integer` writes its own `isNot`, so on an `Integer` only the pick reaches the provided body.
+
+`Self` in a provided body is the target type of the conforming namespace, not the receiver's type. `Integer` declares its own `isLessThan`, for an `Integer` or a `Rational`. π is neither. So `3::isLessThan(Number.Pi)` runs the `isLessThan` that `Comparable` provides through the [`Number`](/docs/library/number) namespace, which covers every numeric type. There `Self` is `Number`, and the two are compared as numbers. `5::isBetween(1, and 3/2)` runs there too, because `3/2` is not an `Integer`. `5::isLessThan(3)` runs `Integer`'s own method.
+
+The pick is required when two protocols provide the same name. If `Book` conforms to `Titled` and `Priced`, and both provide `label()`, a bare `ficciones::label()` is [`ambiguous-namespace`](/docs/reference/diagnostics#ambiguous-namespace). `ficciones::<Titled>label()` picks one.
+
+## Extending a protocol
+
+```essence
+implementation {
+	protocol Ordered is Comparable {
+		isBefore(_ other: Self) -> Boolean {
+			<- @::compare(to other)::is(Ordering#Less)
+		}
+	}
+
+	type Weight = { grams: Integer }
+
+	namespace Weights for Weight is Ordered {
+		compare(to other: Weight) -> Ordering {
+			<- @.grams::compare(to other.grams)
+		}
+	}
+
+	function lightestOf<infer Item is Ordered>(
+		_ items: List<Item>,
+	) -> Optional<Item> {
+		<- items::sort()::firstItem()
+	}
+
+	constant parcels: List<Weight> = [
+		{ grams = 300 },
+		{ grams = 120 },
+		{ grams = 450 },
+	]
+
+	Terminal.print({ grams = 1 }::isBefore({ grams = 2 })) § true
+	Terminal.print({ grams = 1 }::isLessThan({ grams = 2 })) § true
+	Terminal.print(lightestOf(parcels)::value(defaultingTo { grams = 0 }).grams) § 120
+	Terminal.print(parcels::sort()::map(.grams)) § [120, 300, 450]
+}
+```
+
+`protocol Ordered is Comparable` extends `Comparable`. A protocol extends one or more others with the same `is` list a namespace uses. Extension does two things.
+
+- **Requirements are inherited.** Conforming to `Ordered` owes `Comparable`'s `compare(to:)` too. Without it, `Weights` is `nonconforming-namespace`, "Method 'compare' is missing".
+- **Conformance is granted down the chain.** A namespace that declares `is Ordered` is also `Comparable`. `sort()` asks for `Comparable` and accepts a list of weights, and `isLessThan`, which `Comparable` provides, works on a weight.
+
+A protocol can give its own body for a method that a protocol it extends provides. That body then runs, at a call and through a bound on the extended protocol alike. A protocol that extends itself, directly or through others, is [`recursive-protocol`](/docs/reference/diagnostics#recursive-protocol). The `where` condition of the next section bounds a namespace's type parameter, and a protocol has none, so an extension with one is [`where-on-protocol-extension`](/docs/reference/diagnostics#where-on-protocol-extension).
+
+`protocol Ordered is Comparable` reads like TypeScript's `interface Ordered extends Comparable`. The difference is what comes along: `Comparable`'s provided methods arrive with the conformance.
+
+## Conditional conformance
+
+```essence
+implementation {
+	type Boxed<Item> = { value: Item }
+
+	namespace Boxes<infer Item> for Boxed<Item>
+		is Printable where Item is Printable,
+		is Comparable where Item is Comparable
+	{
+		toString() -> String {
+			<- "Boxed({@.value})"
+		}
+
+		compare(to other: Boxed<Item>) -> Ordering {
+			<- @.value::compare(to other.value)
+		}
+	}
+
+	constant boxes: List<Boxed<Integer>> = [
+		{ value = 3 },
+		{ value = 1 },
+		{ value = 2 },
+	]
+	constant nested = [{ value = { value = 2 } }, { value = { value = 1 } }]
+
+	Terminal.print(boxes::sort()) § [Boxed(1), Boxed(2), Boxed(3)]
+	Terminal.print(nested::sort()) § [Boxed(Boxed(1)), Boxed(Boxed(2))]
+	Terminal.print({ value = "pear" }::isLessThan({ value = "plum" })) § true
+}
+```
+
+A [`List`](/docs/library/list) prints when its items print, because its namespace declares `Printable`, `Equatable` and `Comparable` on that condition. `Boxes` does the same: a box is printable when what it holds is, and comparable when what it holds is. Each conformance carries its own condition, written `where Item is Printable` after the protocol. Several conditions in one clause are separated by commas: `where Left is Printable, Right is Printable`. TypeScript has no counterpart. In Rust, this is `impl<T: Display> Display for Box<T>`.
+
+The body relies on the condition. Without `where Item is Printable`, the hole in `toString` cannot print `@.value`, and the namespace is refused with `interpolation-not-printable`, "Type Parameter 'Item' does not conform to 'Printable'".
+
+The compiler solves conditions at each call, one level at a time. `nested` sorts because `Boxed<Boxed<Integer>>` is `Comparable`, because `Boxed<Integer>` is, because `Integer` is. When the chain breaks, the error prints it as far as it got. Records are not `Comparable`. Add `constant weights = [{ value = { grams = 300 } }]` to the program, and `weights::sort()` is refused as [`unsatisfied-conformance-condition`](/docs/reference/diagnostics#unsatisfied-conformance-condition):
+
+<div class="error-output">
+
+```
+[unsatisfied-conformance-condition]
+Error: { value: { grams: Integer } } does not conform to 'Comparable'
+    ╭─┤ boxes.es:30:17 │
+    │
+ 30 │     Terminal.print(weights::sort())
+    │                    ───────┬───────  
+    │                           ╰───────── this binds a Type Parameter bound to 'Comparable'
+    │ 
+    │ Help: Declare a Namespace 'for { value: { grams: Integer } } is Comparable'.
+    │ 
+    │ Note 1: { value: { grams: Integer } } does not conform to 'Comparable'.
+    │ Note 2: { grams: Integer } does not conform to 'Comparable'.
+────╯
+```
+
+</div>
+
+A few conditions are refused:
+
+- A bound on the namespace's own type parameter, `namespace Boxes<infer Item is Printable>`, is [`protocol-bound-namespace-generic`](/docs/reference/diagnostics#protocol-bound-namespace-generic). Bound it per conformance instead: `is Printable where Item is Printable`.
+- A condition on a type parameter the namespace does not declare is [`unknown-where-generic`](/docs/reference/diagnostics#unknown-where-generic).
+- The same type parameter bound twice in one clause is [`conflicting-where-condition`](/docs/reference/diagnostics#conflicting-where-condition).
+- A condition on a type parameter the target type never mentions is [`unwitnessable-where-condition`](/docs/reference/diagnostics#unwitnessable-where-condition). The target type is what proves the condition at each call.
+
+## Unions in a bound
+
+```essence
+implementation {
+	protocol Describable {
+		describe() -> String
+	}
+
+	type Book = { title: String, pages: Integer }
+	type Song = { title: String, seconds: Integer }
+	type Work = Book | Song
+
+	namespace Books for Book is Describable {
+		describe() -> String {
+			<- "{@.title}, {@.pages} pages"
+		}
+	}
+
+	namespace Songs for Song is Describable {
+		describe() -> String {
+			<- "{@.title}, {@.seconds} seconds"
+		}
+	}
+
+	namespace Works for Work is Describable {
+		describe() -> String {
+			<- match @ -> String {
+				case Book { <- "a book called {@.title}" }
+				case Song { <- "a song called {@.title}" }
+			}
+		}
+	}
+
+	function announce<infer Item is Describable>(_ item: Item) -> String {
+		<- "Now: {item::describe()}"
+	}
+
+	constant work: Work = { title = "Blue in Green", seconds = 337 }
+	constant song: Song = { title = "Blue in Green", seconds = 337 }
+
+	Terminal.print(announce(work)) § Now: a song called Blue in Green
+	Terminal.print(announce(song)) § Now: Blue in Green, 337 seconds
+}
+```
+
+A method call on a union needs no protocol. Without `Works`, `work::describe()` still runs: each member finds `describe` in its own namespace. A bound is different. `Work` is a type of its own, so it conforms only if a namespace says so, where TypeScript accepts a union whose members all fit. Without `Works`, `announce(work)` is `unsatisfied-bound`, "Work does not conform to 'Describable'". `Works` targets the union itself, and writes what the members have in common.
+
+The last two lines hold the same record and print different text. The type the compiler knows picks the namespace, not the value at run time, and a direct `work::describe()` runs `Works` too. A namespace that names the type exactly is more specific than one that covers it, so `Songs` handles a `Song`. When two namespaces conform the same type to the same protocol, a bounded call is `ambiguous-conformance`.
+
+## Derived conformances for choices
+
+A derived conformance is one the compiler writes for a choice itself.
+
+| Protocol | Choice whose cases carry nothing | Choice with a payload |
+|---|---|---|
+| `Equatable` | derived | derived |
+| [`Enumerable`](/docs/library/protocols#Enumerable) | derived | written: `static cases() -> NonEmptyList<Self>` under `is Enumerable` |
+| `Printable` | derived once a namespace declares `is Printable`, even with an empty body | written: `toString()` under `is Printable` |
+
+```essence
+implementation {
+	choice Colour {
+		Red,
+		Green,
+		Blue,
+	}
+
+	choice Shape {
+		Circle { radius: Integer },
+		Dot,
+	}
+
+	namespace Colour for Colour is Printable {}
+
+	namespace Shapes for Shape is Printable, is Enumerable {
+		toString() -> String {
+			<- match @ -> String {
+				case #Circle { <- "circle of {@.radius}" }
+				case #Dot    { <- "dot" }
+			}
+		}
+
+		static cases() -> NonEmptyList<Shape> {
+			<- [#Dot, #Circle({ radius = 1 })]
+		}
+	}
+
+	function countOptions<infer Mode is Enumerable>(
+		_ example: Mode,
+	) -> Integer {
+		<- Mode.cases()::length()
+	}
+
+	constant chosen: Colour = #Green
+	constant drawn: Shape   = #Circle({ radius = 2 })
+
+	Terminal.print(chosen) § Green
+	Terminal.print(Colour.cases()) § [Red, Green, Blue]
+	Terminal.print(countOptions(chosen)) § 3
+	Terminal.print(drawn) § circle of 2
+	Terminal.print(Shape.cases()) § [dot, circle of 1]
+	Terminal.print(countOptions(drawn)) § 2
+	Terminal.print(drawn::is(#Dot)) § false
+}
+```
+
+`Colour`'s cases carry nothing, so it derives all three, printing through its empty namespace. If you know Rust, this is `#[derive]` done for you, with printing opt-in.
+
+A choice with a payload derives neither `Printable` nor `Enumerable`, so `Shapes` writes both. Without `Shapes`, `Shape.cases()` is [`unknown-name`](/docs/reference/diagnostics#unknown-name). A choice's name reaches `cases()`, derived or written, and no other static: a `static default()` in `Shapes` is called `Shapes.default()`, and `Shape.default()` is `unknown-name`.
+
+A bare case, written without its choice's name, binds a type parameter to that one case, not to the choice. `countOptions(#Red)` is refused, because one case has no cases to list:
+
+<div class="error-output">
+
+```
+[unsatisfied-bound]
+Error: Colour#Red does not conform to 'Enumerable'
+    ╭─┤ colours.es:44:17 │
+    │
+ 44 │     Terminal.print(countOptions(#Red))
+    │                    ─────────┬────────  
+    │                             ╰────────── this binds a Type Parameter bound to 'Enumerable'
+    │ 
+    │ Help: Annotate the value at 'Colour': a bare Case binds the Case, not the Choice.
+    │ 
+    │ Note: No Namespace in scope makes Colour#Red conform to 'Enumerable'.
+────╯
+```
+
+</div>
+
+`countOptions(Colour#Red)` is refused the same way. Annotate the value at the choice, as `chosen` is.
+
+A namespace that writes `is` for a choice must declare `is Equatable`, and one that writes `cases` for a choice whose cases carry nothing must declare `is Enumerable`. Otherwise it is [`undeclared-conformance`](/docs/reference/diagnostics#undeclared-conformance). Those two are derived, so a call naming the namespace would run the written method, and a call through a bound the derived one.
+
+## The six standard-library protocols
+
+| Protocol | Requires | Provides | Extends |
+|---|---|---|---|
+| `Equatable` | `is(_ other: Self) -> Boolean` | `isNot(_ other: Self) -> Boolean` | — |
+| `Printable` | `toString() -> String` | — | — |
+| `Comparable` | `compare(to other: Self) -> Ordering` | `isLessThan`, `isLessThanOrEqualTo`, `isGreaterThan`, `isGreaterThanOrEqualTo` | — |
+| [`Orderable`](/docs/library/protocols#Orderable) | — | `isBetween(_ lower: Self, and upper: Self) -> Boolean`, `clamp(between lowest: Self, and highest: Self) -> Self` | `Comparable` |
+| `Enumerable` | `static cases() -> NonEmptyList<Self>` | — | — |
+| [`Generatable`](/docs/library/protocols#Generatable) | `static generate(from source: Randomness) -> Self` | `shrink() -> List<Self>` | — |
+
+`compare` returns an [`Ordering`](/docs/library/ordering). [`Terminal.inspect`](/docs/library/terminal#inspect) takes any value, conforming or not. Property tests build values through `Generatable`, which [Tests](/docs/language/tests) teaches. The library's [Protocols](/docs/library/protocols) page lists every member and the types that conform to each.
+
+## How protocols compile
+
+A protocol declaration compiles to nothing. What reaches the JavaScript is witnesses and provided methods. A witness is a plain object that maps each method name to the function that implements it. A bounded function takes one witness per bounded type parameter, as hidden last arguments, where TypeScript's `T extends P` passes nothing. A provided method is compiled once, as one top-level function that takes the witness last. Here are `isBefore` and `lightestOf` from the extension example, built without minifying or optimising:
+
+```js
+var $es_Ordered__isBefore = function(_self, other, Self__conformance) {
+  return choiceIs(Self__conformance.compare(_self, other), createCase("Ordering#Less"));
+};
+function lightestOf(items, Item__conformance) {
+  return $es_List_firstItem__overload$1($es_List_sort__overload$1(items, void 0, Item__conformance));
+}
+```
+
+The witness exists only at a direct call. That is why a bounded function cannot be stored in a constant or passed as a value.
+
+<SeeAlso links={[
+	{ label: "Protocols in the library", href: "/docs/library/protocols" },
+	{ label: "Generics", href: "/docs/language/generics" },
+	{ label: "Diagnostics", href: "/docs/reference/diagnostics" },
+]} />

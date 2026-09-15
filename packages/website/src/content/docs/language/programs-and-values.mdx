@@ -1,0 +1,483 @@
+---
+title: Programs and values
+description: "Write an Essence program: comments, printing, `constant` and `variable`, the literals, and data that never changes."
+section: language
+order: 10
+template: article
+---
+
+An Essence program is one `implementation` block of statements. It is built from comments, printing, names bound with `constant` or `variable`, and literals for numbers, text, Booleans and lists. Data never changes: a name can move to a new value, but a number, a string or a list stays as it was.
+
+```essence
+implementation {
+	constant greeting = "Hello"
+	variable count    = 0
+
+	count = count::add(1)
+	count = count::add(1)
+
+	Terminal.print(greeting) § Hello
+	Terminal.print("{greeting}, you have {count} messages.") § Hello, you have 2 messages.
+}
+```
+
+`constant` binds a name once. `variable` binds a name that a later `=` may point at another value. [`count::add(1)`](/docs/library/integer#add) is a method call: it returns a new [`Integer`](/docs/library/integer) and leaves `count` as it was, so the assignment is what moves the name. There are no operators, so there is no `count + 1`; [Method calls](/docs/language/method-calls) explains the `::` spelling. [`Terminal.print`](/docs/library/terminal#print) writes a value and a newline. `"{greeting}, …"` is a string with holes, and a hole takes any expression.
+
+## The shape of a file
+
+```essence
+implementation {
+	constant width  = 3
+	constant height = 4
+
+	width::multiply(with height)
+
+	Terminal.print(width::multiply(with height)) § 12
+}
+```
+
+A file holds one [`implementation { … }`](/docs/reference/syntax-glossary#implementation) block, and the statements inside it run top to bottom. `implementation {}` with nothing inside is a valid program. A file may add an `import` block above the implementation, and `export` and `tests` blocks below it. Those belong to [Modules](/docs/language/modules) and [Tests](/docs/language/tests).
+
+Statements are separated by whitespace. There is no semicolon: `constant count = 1;` is refused as [`invalid-number`](/docs/reference/diagnostics#invalid-number), because `1;` is not a number. Two statements on one line are legal, and indentation carries no meaning. `essence format` rewrites every file to one layout, indented with tabs; see [Formatting](/docs/guides/formatting).
+
+Any expression may stand on its own as a statement. The first [`width::multiply(with height)`](/docs/library/integer#multiply) above is one: its result is dropped, and nothing reports it. A bare `42` on a line of its own is not reported either.
+
+A statement above the block is a [`syntax-error`](/docs/reference/diagnostics#syntax-error): `Expected 'implementation' but found 'constant'.` Any other code after the block, or after its `export` and `tests` blocks, is [`unexpected-token`](/docs/reference/diagnostics#unexpected-token), a second `implementation` block included.
+
+## Comments
+
+```essence
+§ A comment runs from the sign to the end of its line.
+
+implementation {
+	§§ Documents the declaration below it.
+	constant greeting = "Hello"
+
+	Terminal.print(greeting) § Hello
+}
+```
+
+[`§`](/docs/reference/syntax-glossary#comment) starts a comment that runs to the end of the line. It may stand on a line of its own, above the program or inside it, or after code. The character is U+00A7, the section sign. Every code sample on this site writes a program's output after `§`, on the line that prints it. [`§§`](/docs/reference/syntax-glossary#doc-comment) starts a documentation comment for the declaration below it; [Documentation comments](/docs/language/documentation-comments) covers what goes in one.
+
+There is no `//` and no `/* … */`. Both are a `syntax-error` at the first `/`. Write `§` where JavaScript writes `//`. A comment cannot stand inside a hole either, because it would run to the end of the line and take the closing quote with it. That is [`comment-in-hole`](/docs/reference/diagnostics#comment-in-hole).
+
+## Names
+
+```essence
+implementation {
+	constant orderTotal = 12
+	constant größe      = 3
+	constant ready?     = true
+	constant case       = "a contextual word is a fine name"
+
+	Terminal.print(orderTotal) § 12
+	Terminal.print(größe) § 3
+	Terminal.print(ready?) § true
+	Terminal.print(case) § a contextual word is a fine name
+}
+```
+
+A name is any run of characters except whitespace, `"`, `§` and the symbols the language uses. Those symbols are `( ) { } [ ] | / , . : = - > < _ # ~ @`. A name may use letters outside ASCII, and `$`, `+`, `!` and `?` too. A name cannot start with a digit: `2nd` is an `invalid-number`.
+
+`_` is not a name character. It is a symbol of its own, which later pages use for a parameter without a label and for a pattern that matches any value. So `order_total` and `MAX_RETRIES` do not parse; write `orderTotal` and `maxRetries`:
+
+<div class="error-output">
+
+```
+[syntax-error]
+Error: Expected '=' but found '_'.
+   ╭─┤ order.es:2:16 │
+   │
+ 2 │     constant order_total = 12
+   │                   ▲
+   │                   ╰── expected '='
+───╯
+```
+
+</div>
+
+Fifteen words are reserved and cannot be names: `if`, `else`, `type`, `variable`, `constant`, `function`, `implementation`, `overload`, `match`, `define`, `namespace`, `protocol`, `for`, and the literals `true` and `false`. Words that mean something only in one position, such as `case`, `with`, `as` and `test`, can still be used as names. The [Syntax glossary](/docs/reference/syntax-glossary) lists both sets.
+
+## Printing a value
+
+```essence
+implementation {
+	constant names = ["Ada", "Grace"]
+
+	Terminal.print("Ada") § Ada
+	Terminal.inspect("Ada") § "Ada"
+	Terminal.print(names) § ["Ada", "Grace"]
+	Terminal.inspect(names) § [ "Ada", "Grace" ]
+	Terminal.print(4/2) § 2
+	Terminal.inspect(4/2) § 2/1
+	Terminal.print(Terminal.describe(names)) § [ "Ada", "Grace" ]
+}
+```
+
+`Terminal.print` is for the reader of the program. It renders a value the way the value's [`toString()`](/docs/library/list#toString) method does: a string bare, a list as `[1, 2]` rather than JavaScript's `1,2`, and a whole fraction without its denominator. `4/2` is not a division. It is a fraction literal, a [`Rational`](/docs/library/rational), explained under Rationals below.
+
+[`Terminal.inspect`](/docs/library/terminal#inspect) writes the structure of a value, for the author of the program. It quotes strings, puts a space inside a list's brackets and writes a whole `Rational` as `2/1`. It breaks a long value over several lines, and it returns the value it was given. [`Terminal.describe`](/docs/library/terminal#describe) returns the text `inspect` would write, as a [`String`](/docs/library/string). `Terminal` groups these calls and `.` reaches one of them; Method calls explains `.` beside `::`.
+
+**Compared with JavaScript.**
+
+```ts
+import { inspect } from "node:util"
+
+console.log("Ada") // Ada
+console.log(["Ada", "Grace"]) // [ 'Ada', 'Grace' ]
+console.log(inspect("Ada")) // 'Ada'
+```
+
+`console.log` writes a string bare and everything else in its inspected form. Here the two are separate calls, and `print` renders every value through its `toString`. `print` takes one value, so `Terminal.print("total:", total)` is refused as [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch). Put both in one string: `Terminal.print("total: {total}")`. More on [Coming from JavaScript › Tooling](/docs/getting-started/coming-from-javascript#tooling).
+
+Every value has both renderings, and every output on this site uses them. Most of these values have their own page later.
+
+<div class="table-scroll">
+
+| Value | `Terminal.print` | `Terminal.inspect` |
+| --- | --- | --- |
+| `"text"` | `text` | `"text"` |
+| `42` | `42` | `42` |
+| `3/4` or `0.75` | `3/4` | `3/4` |
+| `4/2`, a whole `Rational` | `2` | `2/1` |
+| `true` | `true` | `true` |
+| `[1, 2]` | `[1, 2]` | `[ 1, 2 ]` |
+| `["Ada", "Grace"]` | `["Ada", "Grace"]` | `[ "Ada", "Grace" ]` |
+| an empty `List<Integer>` | `[]` | `[]` |
+| a [record](/docs/language/records) `{ x = 1, name = "a" }` | `{ x = 1, name = "a" }` | `{ x = 1, name = "a" }` |
+| the empty record `{}` | `{}` | `{}` |
+| a [dictionary](/docs/language/dictionaries) `["Ada" = 36, "Grace" = 45]` | `["Ada" = 36, "Grace" = 45]` | `[ "Ada" = 36, "Grace" = 45 ]` |
+| an [`Optional`](/docs/language/optional) holding `3` | `Value(3)` | `Optional#Value(3)` |
+| an empty `Optional` | `Empty` | `Optional#Empty` |
+| a [`Result`](/docs/language/result) that failed with `"gone"` | `Failure("gone")` | `Result#Failure("gone")` |
+| a [function](/docs/language/functions) | refused | `Function` |
+| a [union](/docs/language/unions-and-type-aliases) such as `Integer \| String` | refused | the member's form, such as `"one"` |
+
+</div>
+
+`print` takes only a value that knows how to print. A function does not. Neither does a union such as `Integer | String`, even though both members print. Both are refused as [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound), and Unions and type aliases shows how to take a union apart first. `inspect` takes anything.
+
+[`Terminal.write`](/docs/library/terminal#write) writes text exactly as given, with no newline. Both `write` and `print` take a [`Stream`](/docs/library/terminal#Stream) argument, `to #Error`, that sends the text to the error stream. `#Error` is a case, taught on [Choices and `match`](/docs/language/choices-and-match).
+
+## Constants and variables
+
+```essence
+implementation {
+	constant name: String          = "essence"
+	constant answer: Integer       = 42
+	constant ratio: Rational       = 3/4
+	constant ready: Boolean        = true
+	constant primes: List<Integer> = [2, 3, 5, 7]
+
+	Terminal.print(primes) § [2, 3, 5, 7]
+	Terminal.print(name) § essence
+}
+```
+
+The forms are [`constant NAME = EXPR`](/docs/reference/syntax-glossary#constant), [`variable NAME = EXPR`](/docs/reference/syntax-glossary#variable), and the reassignment `NAME = EXPR`. The initial value is mandatory in both declarations: `variable total: Integer` on its own is a `syntax-error`, so there is no declare-now-assign-later.
+
+A type goes after the name, behind a colon. It is optional wherever the value already decides it. [`List<Integer>`](/docs/library/list) is a type with a type argument in angle brackets: a list whose items are `Integer`. Every applied type on this site reads the same way, so `Optional<String>` is an `Optional` of `String`.
+
+**Compared with JavaScript.**
+
+```js
+const greeting = "Hello"
+let count = 0
+count = count + 1
+count = "one" // JavaScript allows this; TypeScript refuses it
+```
+
+`const` is `constant` and `let` is `variable`. A `variable` keeps its type, as a TypeScript `let` does. In JavaScript, `const` stops reassignment but not `push`. In Essence data cannot change, so neither keyword is about mutation, and there is no `Object.freeze` to forget. More on [Coming from JavaScript › Bindings](/docs/getting-started/coming-from-javascript#bindings).
+
+Assigning to a constant is [`constant-reassignment`](/docs/reference/diagnostics#constant-reassignment), and the editor offers a Quick Fix that rewrites `constant` to `variable`:
+
+<div class="error-output">
+
+```
+[constant-reassignment]
+Error: 'greeting' can not be reassigned
+   ╭─┤ farewell.es:4:2 │
+   │
+ 2 │     constant greeting = "Hello"
+   │              ────┬───
+   │                  ╰───── declared as a Constant here
+   │
+ 4 │     greeting = "Goodbye"
+   │     ────┬───
+   │         ╰───── assigned to here
+   │
+   │ Help: Declare it with 'variable' instead of 'constant' if it needs to change.
+───╯
+```
+
+</div>
+
+A variable keeps the type it was declared with. Pointing it at a value of another type is refused as [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch):
+
+<div class="error-output">
+
+```
+[assignment-type-mismatch]
+Error: This value does not fit Variable 'count'
+   ╭─┤ counter.es:4:10 │
+   │
+ 2 │     variable count = 0
+   │              ──┬──
+   │                ╰──── declared as Integer here
+   │
+ 4 │     count = "one"
+   │             ──┬──
+   │               ╰──── this is a String
+───╯
+```
+
+</div>
+
+Declaring a name twice in the same block is [`duplicate-variable`](/docs/reference/diagnostics#duplicate-variable), whether the two are constants or variables. A constant is visible from its own line on, not before it. Using one above its declaration is [`unknown-name`](/docs/reference/diagnostics#unknown-name), the rule JavaScript's `const` has, reported by the compiler. Nothing warns about a constant that is never read or a variable that is never reassigned.
+
+In the editor, hovering a name shows its type; see [Editor setup](/docs/guides/editor-setup). Without an editor, `assignment-type-mismatch` shows it too. Annotate the constant with a type it cannot have, and the label names the real one:
+
+<div class="error-output">
+
+```
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'primes'
+   ╭─┤ primes.es:2:29 │
+   │
+ 2 │     constant primes: Boolean = [2, 3, 5, 7]
+   │                                ──────┬─────
+   │                                      ╰─────── this is a List<Integer>
+   │
+   │ Note: 'primes' is declared as Boolean.
+───╯
+```
+
+</div>
+
+A block is a scope, as in JavaScript, and a nested block may shadow an outer name. [Conditions](/docs/language/conditions) shows both with `if`.
+
+## The literals
+
+Five kinds of value have a literal spelling on this page: `Integer`, `Rational`, `String`, [`Boolean`](/docs/library/boolean) and `List`. A record, a case, a function and a dictionary have literals too, each on its own page: Records, Choices and `match`, [Functions as values](/docs/language/functions-as-values) and Dictionaries.
+
+### Integers
+
+```essence
+implementation {
+	constant answer       = 42
+	constant population   = 1_000_000
+	constant debt         = -42
+	constant beyondDouble = 9_007_199_254_740_993
+
+	Terminal.print(population) § 1000000
+	Terminal.print(debt) § -42
+	Terminal.print(beyondDouble::add(1)) § 9007199254740994
+	Terminal.print(-2::raise(to 2)) § 4
+}
+```
+
+An `Integer` is written in digits, grouped with `_` where that helps. There is no upper limit. `9_007_199_254_740_993` is 2⁵³ + 1, the first whole number a JavaScript `number` cannot hold, and adding one to it is exact. A leading `-` is part of the literal, so [`-2::raise(to 2)`](/docs/library/integer#raise) squares negative two and prints `4`. The sign belongs to literals only: `-balance` on a name is a `syntax-error`, and a value is negated with [`negate()`](/docs/library/integer#negate).
+
+There is no hexadecimal, binary or exponent form:
+
+<div class="error-output">
+
+```
+[invalid-number]
+Error: '0xFF' is not a valid Number
+   ╭─┤ mask.es:2:18 │
+   │
+ 2 │     constant mask = 0xFF
+   │                     ──┬─
+   │                       ╰─── this is not a Number
+   │
+   │ Help: Essence has no hexadecimal, binary or exponent form; write the value in digits.
+   │
+   │ Note: A Number is written in the digits '0' through '9', grouped with '_' where that helps, with a fractional part written behind a '.' — 1_000_000, 19.99.
+───╯
+```
+
+</div>
+
+### Rationals
+
+```essence
+implementation {
+	constant threeQuarters = 3/4
+	constant sixEighths    = 6/8
+	constant whole         = 4/2
+	constant price         = 19.99
+	constant sum           = 0.1::add(0.2)
+
+	Terminal.print(threeQuarters) § 3/4
+	Terminal.print(sixEighths) § 3/4
+	Terminal.print(whole) § 2
+	Terminal.inspect(whole) § 2/1
+	Terminal.print(price) § 1999/100
+	Terminal.print(0.75::is(3/4)) § true
+	Terminal.print(sum::is(0.3)) § true
+}
+```
+
+A `Rational` is an exact fraction. [`3/4`](/docs/reference/syntax-glossary#fraction) is one token, written flush: `3 / 4` with spaces is a `syntax-error`, and a denominator of zero is [`zero-denominator`](/docs/reference/diagnostics#zero-denominator). The value is kept in lowest terms, so `6/8` prints `3/4`. A whole `Rational` such as `4/2` is still a `Rational`: `print` shows it as `2` and `inspect` as `2/1`.
+
+`0.75` is a second spelling of the same value, not a different type. It prints as `3/4`, and `0.1::add(0.2)` is exactly `0.3`. A decimal is always a `Rational`, even a whole one: `2.0` is `2/1`, so `constant total: Integer = 2.0` is an `assignment-type-mismatch`. Digits are required on both sides of the point: `1.` and `.5` are [`partial-decimal-literal`](/docs/reference/diagnostics#partial-decimal-literal). Writing both spellings at once, as in `1.5/2`, is [`mixed-rational-literal`](/docs/reference/diagnostics#mixed-rational-literal).
+
+What the numbers can do, and how to print a `Rational` as a decimal again, is on [Numbers](/docs/language/numbers).
+
+**Compared with JavaScript.**
+
+```ts
+const population = 1_000_000 // the same
+console.log(0.1 + 0.2 === 0.3) // false
+console.log(9007199254740993) // 9007199254740992
+```
+
+`1_000_000` is the same as JavaScript. A decimal is not, because there is no floating point: `0.1` is an exact `Rational`. An `Integer` has no largest value, like a `BigInt` without the `n` suffix. More on [Coming from JavaScript › Numbers](/docs/getting-started/coming-from-javascript#numbers).
+
+### Strings
+
+```essence
+implementation {
+	constant name  = "Ada"
+	constant count = 3
+	constant poem  = "Roses are red,
+Violets are blue."
+
+	Terminal.print("Hello, {name}! You have {count} messages.") § Hello, Ada! You have 3 messages.
+	Terminal.print("Two more makes {count::add(2)}.") § Two more makes 5.
+	Terminal.print("A list in a hole: {[1, 2]}") § A list in a hole: [1, 2]
+	Terminal.print("A string in a hole: {"Hi, {name}"}") § A string in a hole: Hi, Ada
+	Terminal.print("She said \"hi\" and wrote \{braces\} and a backslash \\") § She said "hi" and wrote {braces} and a backslash \
+	Terminal.print("An umlaut ä and an emoji 😀 are written as themselves") § An umlaut ä and an emoji 😀 are written as themselves
+	Terminal.inspect("quoted when inspected") § "quoted when inspected"
+	Terminal.inspect(poem) § "Roses are red,\nViolets are blue."
+	Terminal.print(poem) § Roses are red,
+	§ Violets are blue.
+}
+```
+
+Output that runs over two lines continues on a comment line of its own, as the last `print` shows.
+
+A `String` is written between double quotes, and only double quotes: `'Ada'` is read as a name and fails as `unknown-name`. A literal may span lines, and the line breaks are part of it; `inspect` writes them as `\n`. A literal that is never closed is [`unclosed-string`](/docs/reference/diagnostics#unclosed-string).
+
+[`{…}`](/docs/reference/syntax-glossary#interpolation) inside a string is a hole. It takes any expression: a method call, a list, or another string literal with holes of its own. The hole renders its value the way `print` does. Only a value that knows how to print may stand in a hole, so a union such as `Integer | String` is refused there as [`interpolation-not-printable`](/docs/reference/diagnostics#interpolation-not-printable). Calling `toString()` inside a hole is redundant, and the compiler warns about it as [`redundant-interpolation-to-string`](/docs/reference/diagnostics#redundant-interpolation-to-string).
+
+A [backslash](/docs/reference/syntax-glossary#backslash) escapes exactly seven characters: `\"`, `\\`, `\n`, `\r`, `\t`, `\{` and `\}`. The last two exist because a bare `{` opens a hole. There is no `\u` escape; write the character itself. Every other backslash is [`invalid-escape`](/docs/reference/diagnostics#invalid-escape):
+
+<div class="error-output">
+
+```
+[invalid-escape]
+Error: '\u' is not a valid escape
+   ╭─┤ cafe.es:2:21 │
+   │
+ 2 │     Terminal.print("caf\u00e9")
+   │                        ─┐
+   │                         ╰── this escape is not known
+   │
+   │ Help: Write '\\' for a literal backslash, or drop the backslash to keep the character as itself.
+   │
+   │ Note: A String understands '\"', '\\', '\n', '\r', '\t', '\{' and '\}'; every other backslash is an error.
+───╯
+```
+
+</div>
+
+Working with text, from characters to searching and cutting, is on [Strings](/docs/language/strings).
+
+**Compared with JavaScript.**
+
+```ts
+const name = "Ada"
+console.log(`Hello, ${name}!`)
+console.log('single quotes work too')
+```
+
+Every `"…"` literal interpolates, so there is no separate template literal. A `$` before a hole is not an error but text: `"Hello, ${name}!"` prints `Hello, $Ada!`. Single quotes and backticks do not exist, so `` `Hello` `` is read as a name, like `'Ada'`. More on [Coming from JavaScript › Strings](/docs/getting-started/coming-from-javascript#strings).
+
+### Booleans
+
+```essence
+implementation {
+	constant ready = true
+	constant done  = false
+
+	Terminal.print(ready) § true
+	Terminal.print(done) § false
+}
+```
+
+A `Boolean` is `true` or `false`, and both words are reserved. No other value stands in for one. There is no truthiness, which Conditions states where a condition is written.
+
+### Lists
+
+```essence
+implementation {
+	constant primes = [2, 3, 5, 7]
+	constant names  = ["Ada", "Grace"]
+	constant grid   = [[1, 2], [3, 4]]
+	constant nothingYet: List<Integer> = []
+	constant weekdays = [
+		"Monday",
+		"Tuesday",
+		"Wednesday",
+		"Thursday",
+		"Friday",
+		"Saturday",
+		"Sunday",
+	]
+
+	Terminal.print(primes) § [2, 3, 5, 7]
+	Terminal.inspect(primes) § [ 2, 3, 5, 7 ]
+	Terminal.print(grid) § [[1, 2], [3, 4]]
+	Terminal.print(nothingYet) § []
+	Terminal.print(weekdays) § ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+	Terminal.print("The primes are {primes}.") § The primes are [2, 3, 5, 7].
+}
+```
+
+A `List` literal is items between [square brackets](/docs/reference/syntax-glossary#brackets), separated by commas. A trailing comma is allowed, and `essence format` writes one when it breaks a list over lines. Lists nest. The type of `[2, 3, 5, 7]` is `List<Integer>`.
+
+`[]` is a list with no items that says nothing about what they would be. Its type is `List<Unknown>`, and `print` refuses it as [`unsatisfied-conformance-condition`](/docs/reference/diagnostics#unsatisfied-conformance-condition) until an annotation such as `List<Integer>` decides. Items need not share a type, but a list is not a tuple: `["Ada", 36]` is a `List<String | Integer>`, and `print` refuses it the same way. A record is the way to group values of different types.
+
+A list is a value like any other: bind it, print it, put it in a hole. What you can do with one is on [Lists](/docs/language/lists): reading an item, adding, mapping, sorting, and why a written list is known to have items.
+
+## Data never changes
+
+```essence
+implementation {
+	variable scores   = [1, 2, 3]
+	constant original = scores
+
+	scores = scores::append(4)
+
+	Terminal.print(original) § [1, 2, 3]
+	Terminal.print(scores) § [1, 2, 3, 4]
+}
+```
+
+A list is immutable, and so is every number and string. [`append`](/docs/library/list#append) does not add to the list `scores` holds. It returns a new list with the extra item, and the assignment points `scores` at that one. `original` was bound to the first list and still is.
+
+Every method in the library returns something and leaves what it was called on as it was. So [`sort`](/docs/library/list#sort) and [`reverse`](/docs/library/list#reverse) return a new list, like JavaScript's `toSorted()` and `toReversed()`, and no method sorts in place. Only a [`Randomness`](/docs/library/randomness) source breaks the rule: it moves on each time it draws a random value.
+
+**Compared with JavaScript.**
+
+```ts
+let scores = [1, 2, 3]
+const original = scores
+scores.push(4)
+console.log(original) // [ 1, 2, 3, 4 ]
+```
+
+`push` changes the array both names share. No list method changes the list it is called on, so `original` still holds `[1, 2, 3]`. More on [Coming from JavaScript › Collections](/docs/getting-started/coming-from-javascript#collections).
+
+<SeeAlso
+	links={[
+		{ label: "Method calls", href: "/docs/language/method-calls" },
+		{ label: "Lists", href: "/docs/language/lists" },
+		{ label: "Syntax glossary", href: "/docs/reference/syntax-glossary" },
+		{ label: "Terminal", href: "/docs/library/terminal" },
+		{ label: "Coming from JavaScript", href: "/docs/getting-started/coming-from-javascript" },
+	]}
+/>

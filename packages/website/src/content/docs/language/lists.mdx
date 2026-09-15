@@ -1,0 +1,519 @@
+---
+title: Lists
+description: Build, read, transform and sort a list without indexing or mutation, and use the proof that a list written with items is never empty.
+section: language
+order: 130
+template: article
+---
+
+A [`List`](/docs/library/list) holds values in order. You read it through methods that return an [`Optional`](/docs/language/optional) where an item might be missing: `#Value` holding the item, or `#Empty`. You change it by asking for a new list. There is no indexing and no mutation. A list written with items in it is proven non-empty, so its first item needs no fallback.
+
+```essence
+implementation {
+	constant basket = [
+		{ name = "tea", price = 3 },
+		{ name = "cake", price = 5 },
+		{ name = "jam", price = 4 },
+	]
+
+	constant withMilk = basket::append({ name = "milk", price = 2 })
+
+	Terminal.print(withMilk::sort(on .price)::map(.name)) § ["milk", "tea", "jam", "cake"]
+	Terminal.print(withMilk::map(.price)::sum()) § 14
+	Terminal.print(basket::length()) § 3
+	Terminal.print(basket::item(at 5)) § Empty
+	Terminal.print([3, 1, 2]::firstItem()) § 3
+}
+```
+
+[`append`](/docs/library/list#append) returns a new list with one more item and leaves `basket` as it was, so `basket` still has three items. [`sort(on .price)`](/docs/library/list#sort) orders the items by their price, and [`map(.name)`](/docs/library/list#map) turns every item into its name. `.price` is a [member path](/docs/reference/syntax-glossary#member-path): a function that reads one member, taught on [Functions as values](/docs/language/functions-as-values). [`sum()`](/docs/library/list#sum) adds up a list of numbers. [`item(at 5)`](/docs/library/list#item) returns an `Optional`, and there is no sixth item, so it prints `Empty`. The last line prints a bare `3`. A written list with items in it has a first item, so [`firstItem()`](/docs/library/list#firstItem) returns that item instead of an `Optional`.
+
+**Compared with JavaScript.**
+
+```ts
+const basket = [
+	{ name: "tea", price: 3 },
+	{ name: "cake", price: 5 },
+	{ name: "jam", price: 4 },
+]
+
+basket.push({ name: "milk", price: 2 }) // changes basket
+basket.sort((a, b) => a.price - b.price) // changes it again
+console.log(basket.map((item) => item.name)) // [ 'milk', 'tea', 'jam', 'cake' ]
+console.log(basket[5]) // undefined
+console.log([10, 9, 1].sort()) // [ 1, 10, 9 ]
+```
+
+`push` and `sort` change the array in place, and `sort()` without a comparison orders items as strings. In Essence no method changes a list: each returns a new one, as spread and `toSorted` do. `sort()` uses the items' own order, and a missing item is an `Optional`, never `undefined`. The `Array` methods you know go by these names:
+
+<div class="table-scroll">
+
+| JavaScript | Essence |
+| --- | --- |
+| `items[0]`, `items.at(-1)` | `items::item(at 0)`, `items::item(at -1)`: an `Optional` |
+| `items.length` | [`items::length()`](/docs/library/list#length): a method, with the parentheses |
+| `items.push(x)`, `[...items, x]`, `items.concat(more)` | `items::append(x)`, `items::append(contentsOf more)`: a new list; spread is a [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `items.pop()`, `items.shift()` | [`items::lastItem()`](/docs/library/list#lastItem) to read the item, then [`items::removeLast()`](/docs/library/list#removeLast) for the rest; `firstItem()` and [`removeFirst()`](/docs/library/list#removeFirst) at the front |
+| `items.map(f)` | `items::map(f)` |
+| `items.map((x, i) => …)` | [`items::enumerate()::map((entry) { … })`](/docs/library/list#enumerate), reading `entry.index` and `entry.item` |
+| `items.forEach(f)` | no `forEach`: build the text with `join(with:)` and print it once, as [Iteration](/docs/language/iteration) shows |
+| `items.filter(p)` | [`items::everyItem(where p)`](/docs/library/list#everyItem) |
+| `items.some(p)`, `items.every(p)` | [`items::hasItems(where p)`](/docs/library/list#hasItems), [`items::hasOnlyItems(where p)`](/docs/library/list#hasOnlyItems) |
+| `items.includes(x)` | [`items::contains(x)`](/docs/library/list#contains) |
+| `items.indexOf(x)` | [`items::firstIndex(of x)`](/docs/library/list#firstIndex): an `Optional`, never `-1` |
+| `items.find(p)`, `items.findIndex(p)` | `items::firstItem(where p)`, `items::firstIndex(where p)`: an `Optional` |
+| `items.slice(1, 3)` | [`items::slice(from 1, to 3)`](/docs/library/list#slice) |
+| `items.join(", ")` | [`items::join(with ", ")`](/docs/library/list#join) |
+| `items.flat()` | [`items::flatten()`](/docs/library/list#flatten) |
+| `items.reduce((total, x) => …, 0)` | [`items::reduce(startingWith 0, (total, x) { … })`](/docs/library/list#reduce): the starting value first; the function takes the total, then the item, as in JavaScript |
+| `items.sort()`, `items.toSorted()` | `items::sort()`: by the items' own order, always a new list |
+| `items.sort((a, b) => a - b)` | `items::sort(by (a, b) { <- a::compare(to b) })`: the function returns an [`Ordering`](/docs/library/ordering), not a number |
+| `items.reverse()` | [`items::reverse()`](/docs/library/list#reverse): a new list |
+| `names.map((name, i) => [name, prices[i]])` | [`names::pair(with prices)`](/docs/library/list#pair): `{ first, second }` [records](/docs/language/records), values with fixed named members, stopping at the shorter list |
+| `const [first, second] = items` | no list pattern: `items::item(at 0)`, `items::firstItem()` |
+
+</div>
+
+The compiler does not know these JavaScript names, and its suggestions can mislead. `items::indexOf(2)` gets "Did you mean 'index'?", but [`index(on:)`](/docs/library/list#index) builds a [dictionary](/docs/language/dictionaries), a value that maps keys to values; you want `firstIndex(of:)`. A wrong name passed a [function literal](/docs/reference/syntax-glossary#function-literal) also reports [`uninferable-parameter-type`](/docs/reference/diagnostics#uninferable-parameter-type), and fixing the name clears both.
+
+More on [Coming from JavaScript › Collections](/docs/getting-started/coming-from-javascript#collections).
+
+## Writing a list and reading a position
+
+```essence
+implementation {
+	constant scores = [3, 1, 2]
+	constant labels = [1, "two", 3]
+
+	Terminal.print(scores) § [3, 1, 2]
+	Terminal.inspect(scores) § [ 3, 1, 2 ]
+	Terminal.inspect(labels) § [ 1, "two", 3 ]
+	Terminal.print(scores::item(at 0)) § Value(3)
+	Terminal.print(scores::item(at -1)) § Value(2)
+	Terminal.print(scores::item(at 3)) § Empty
+}
+```
+
+The literal is on [Programs and values](/docs/language/programs-and-values): items go in square brackets, the type is written `List<Integer>`, and an empty `[]` needs a type annotation. The items need not share a type. `labels` is a `List<Integer | String>`: each item is an [`Integer`](/docs/library/integer) or a [`String`](/docs/library/string), a [union](/docs/language/unions-and-type-aliases) of the two types.
+
+`Terminal.print(labels)` is refused as [`unsatisfied-conformance-condition`](/docs/reference/diagnostics#unsatisfied-conformance-condition): [`print`](/docs/library/terminal#print) needs items that are [`Printable`](/docs/library/protocols#Printable), and a union is not. [`inspect`](/docs/library/terminal#inspect) prints any value. `print` writes `[3, 1, 2]`. `inspect` writes `[ 3, 1, 2 ]`, with spaces inside the brackets, as Node's `console.log` spaces an array. Both quote the strings in a list. Only a bare string differs: `print("two")` writes `two`, and `inspect("two")` writes `"two"`.
+
+There is no indexing. `item(at:)` reads a position, counting from 0, and a negative position counts from the end. `item(at 0)` prints `Value(3)`, the `#Value` case without its `#`. Inside a call, `scores[0]` is not a read. The name before the brackets is taken as an argument [label](/docs/reference/syntax-glossary#labels), the word that names an argument, like `at` in `item(at 0)`. `[0]` is taken as a list. The compiler refuses it as [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch):
+
+<div class="error-output">
+
+```
+[argument-label-mismatch]
+Error: This Argument is labelled where Parameter 1 takes no label
+   ╭─┤ podium.es:4:23 │
+   │
+ 4 │     Terminal.print(scores[0])
+   │                          ─┬─
+   │                           ╰─── this is labelled 'scores'
+   │
+   │ Help: Pass the value with no label.
+   │
+   │ Note: The signature takes 1 or 2 Arguments: Parameter 1 is Value, Parameter 'to' is Stream, which may be left out.
+───╯
+```
+
+</div>
+
+On a line of its own, `constant first = scores[0]` compiles as two statements: a [constant](/docs/reference/syntax-glossary#constant) bound to the whole list, and a list `[0]` that nothing reads.
+
+A list is not a pattern either. `case []` in a [`match`](/docs/language/choices-and-match) is a `syntax-error`, `Expected a Type but found '['.` Nor is `constant [first, second] = scores`: it is a `syntax-error` too. To branch on whether a list is empty, check `hasItems()` in an [`if`](/docs/reference/syntax-glossary#if), or match on what `firstItem()` returns.
+
+## A written list with items is never empty
+
+```essence
+implementation {
+	constant scores = [3, 1, 2]
+	constant podium: NonEmptyList<Integer> = [3, 1, 2]
+
+	Terminal.print([3, 1, 2]::firstItem()) § 3
+	Terminal.print(scores::firstItem()) § Value(3)
+	Terminal.print(podium::firstItem()) § 3
+	Terminal.print(podium::lastItem()) § 2
+}
+```
+
+A list written with at least one item is a [`NonEmptyList`](/docs/library/list#NonEmptyList): a `List` proven to have an item. The proof is a [checked refinement](/docs/language/checked-refinements), a type whose values are known to pass a check, and it changes what reading returns. On a proven list, `firstItem()` and `lastItem()` return the item itself, and `length()` returns a [`PositiveInteger`](/docs/library/integer#PositiveInteger) instead of a [`NonNegativeInteger`](/docs/library/integer#NonNegativeInteger). If you know TypeScript, a `NonEmptyList<Integer>` is like the tuple type `[number, ...number[]]`. It is still a `List`, so it passes wherever a `List` is taken.
+
+A constant bound to a written list has the type `List`, not `NonEmptyList`. `scores` holds the same three items, but its type is `List<Integer>`, so `scores::firstItem()` returns an `Optional<Integer>`. Annotate the constant as `NonEmptyList<Integer>` to keep the proof, as `podium` does. An `if` that checks `hasItems()` proves it too; Checked refinements lists every way a value is proven.
+
+```essence
+implementation {
+	constant podium: NonEmptyList<Integer> = [3, 1, 2]
+	constant noScores: List<Integer>       = []
+
+	Terminal.print(podium::sort()::firstItem()) § 1
+	Terminal.print(podium::map((score) { <- score::add(1) })::lastItem()) § 3
+	Terminal.print(noScores::append(4)::firstItem()) § 4
+	Terminal.print(podium::removeFirst()::firstItem()) § Value(1)
+
+	constant odd = podium::everyItem(where (score) { <- score::isOdd() })
+
+	Terminal.print(odd::firstItem()) § Value(3)
+}
+```
+
+What a method returns on a proven list decides whether the proof survives. `sort()` and `map` return a `NonEmptyList` there, so `firstItem()` or `lastItem()` after them is bare. `append` with one item returns a `NonEmptyList` from any list, even an empty one, because adding an item makes a list with an item in it. `removeFirst()` and `everyItem(where:)` might leave nothing, so they return a plain `List`, and `firstItem()` after them is an `Optional` again. The return type decides, not whether the method could empty the list: [`pad(to:with:)`](/docs/library/list#pad) cannot empty a list, but it returns a plain `List`. The `NonEmptyList` entry in the List reference lists every method that returns one, under Returned by.
+
+On a proven list, `firstItem()`, `lastItem()` and the number statistics can never use a fallback. A `defaultingTo:` twin is the form of a reading method that takes one, such as `firstItem(defaultingTo:)`, `lastItem(defaultingTo:)` or [`average(defaultingTo:)`](/docs/library/list#average). Given a fallback anyway, the compiler warns with [`fallback-never-used`](/docs/reference/diagnostics#fallback-never-used):
+
+<div class="error-output">
+
+```
+[fallback-never-used]
+Warning: This 'defaultingTo' Argument can never be read
+   ╭─┤ winner.es:2:38 │
+   │
+ 2 │     Terminal.print([3, 1, 2]::firstItem(defaultingTo 0))
+   │                                         ───────┬──────
+   │                                                ╰──────── this fallback can never be read
+   │
+   │ Help: Drop the 'defaultingTo' Argument; the call already answers an Integer.
+   │
+   │ Note: Without it the call answers an Integer, which is never empty.
+───╯
+```
+
+</div>
+
+A twin that can still miss keeps its fallback. `[3, 1, 2]::item(at 9, defaultingTo 0)` and `[3, 1, 2]::onlyItem(defaultingTo 0)` both return `0`, with no Warning.
+
+## Methods by family
+
+Each family below shows the members you reach for first; the List reference lists every member with its signature.
+
+### Creating
+
+```essence
+implementation {
+	Terminal.print(List.of(integersFrom 1, through 5)) § [1, 2, 3, 4, 5]
+	Terminal.print(List.of(integersFrom 1, upTo 5)) § [1, 2, 3, 4]
+	Terminal.print(List.of(integersFrom 0, through 10, by 5)) § [0, 5, 10]
+	Terminal.print(List.of(integersFrom 5, downTo 1)) § [5, 4, 3, 2, 1]
+	Terminal.print(List.of(integersFrom 5, through 1)) § []
+	Terminal.print(List.of(integersFrom 1, downTo 5)) § [1]
+	Terminal.print(List.repeat("-", times 3)) § ["-", "-", "-"]
+}
+```
+
+[`List.of`](/docs/library/list#of) counts through a range of integers: `through` includes the end, `upTo` stops before it, and `by:` sets a step. `List.of(integersFrom 1, through 5)` is what JavaScript writes as `Array.from({ length: 5 }, (_, i) => i + 1)`. [`List.repeat`](/docs/library/list#repeat) repeats one item a number of times. `List.of(integersFrom:downTo:)` always includes its first number, so it returns a `NonEmptyList`. Counting `through` a lower number gives nothing, so `List.of(integersFrom:through:)` returns a plain `List`.
+
+### Reading
+
+```essence
+implementation {
+	constant scores   = [3, 1, 2, 2]
+	constant products = [
+		{ name = "tea", price = 3 },
+		{ name = "cake", price = 5 },
+	]
+
+	Terminal.print(scores::length()) § 4
+	Terminal.print(scores::firstItem()) § Value(3)
+	Terminal.print(scores::lastItem(defaultingTo 0)) § 2
+	Terminal.print(scores::item(at 9, defaultingTo 0)) § 0
+	Terminal.print(scores::onlyItem()) § Empty
+	Terminal.print(scores::indices()) § [0, 1, 2, 3]
+	Terminal.print(scores::firstItems(2)) § [3, 1]
+	Terminal.print(scores::lastItems(2)) § [2, 2]
+	Terminal.print(products::highestItem(on .price)) § Value({ name = "cake", price = 5 })
+	Terminal.print(["tea", "jam"]::enumerate()) § [{ index = 0, item = "tea" }, { index = 1, item = "jam" }]
+}
+```
+
+`length()` returns a `NonNegativeInteger`. `firstItem()` and `lastItem()` return an `Optional`, and each has a `defaultingTo:` twin that returns the item or the fallback; `item(at:)` has one too. [`onlyItem()`](/docs/library/list#onlyItem) returns the item of a one-item list as `#Value`, and `#Empty` for any other length. [`indices()`](/docs/library/list#indices) returns the positions, and `enumerate()` pairs every item with its position in an `{ index, item }` record. [`lowestItem(on:)`](/docs/library/list#lowestItem) and [`highestItem(on:)`](/docs/library/list#highestItem) return the item with the lowest or highest key, as an `Optional` on a plain list. A key is the value a function such as `.price` reads off each item. [`firstItems`](/docs/library/list#firstItems) and [`lastItems`](/docs/library/list#lastItems) take up to a count of items from either end.
+
+### Testing
+
+```essence
+implementation {
+	constant scores = [3, 1, 2, 2]
+
+	Terminal.print(scores::hasItems()) § true
+	Terminal.print(scores::isEmpty()) § false
+	Terminal.print(scores::hasItems(where (score) { <- score::isEven() })) § true
+	Terminal.print(scores::hasOnlyItems(where (score) { <- score::isEven() })) § false
+	Terminal.print(scores::hasNoItems(where (score) { <- score::is(0) })) § true
+	Terminal.print(scores::hasDuplicates()) § true
+	Terminal.print(scores::isSorted()) § false
+}
+```
+
+`hasItems()` and [`isEmpty()`](/docs/library/list#isEmpty) tell whether there is anything in the list. A check is a function that takes an item and returns a [`Boolean`](/docs/library/boolean). Given one, `hasItems(where:)` tells whether any item passes, `hasOnlyItems(where:)` whether every item does, and [`hasNoItems(where:)`](/docs/library/list#hasNoItems) whether none does. [`hasDuplicates()`](/docs/library/list#hasDuplicates) needs items that can be compared for equality, and [`isSorted()`](/docs/library/list#isSorted) items that have an order.
+
+### Searching
+
+```essence
+implementation {
+	constant scores = [3, 1, 2, 2]
+
+	Terminal.print(scores::contains(2)) § true
+	Terminal.print(scores::doesNotContain(9)) § true
+	Terminal.print(scores::firstIndex(of 2)) § Value(2)
+	Terminal.print(scores::lastIndex(of 2)) § Value(3)
+	Terminal.print(scores::everyIndex(of 2)) § [2, 3]
+	Terminal.print(scores::count(of 2)) § 2
+	Terminal.print(scores::starts(with [3, 1])) § true
+	Terminal.print(scores::ends(with [2])) § true
+}
+```
+
+`contains` and [`doesNotContain`](/docs/library/list#doesNotContain) look for an equal item, so they need items that are [`Equatable`](/docs/library/protocols#Equatable). `firstIndex(of:)` and [`lastIndex(of:)`](/docs/library/list#lastIndex) return an `Optional<Integer>`. [`everyIndex(of:)`](/docs/library/list#everyIndex) returns every position of an item, and [`count(of:)`](/docs/library/list#count) how many there are. [`starts(with:)`](/docs/library/list#starts) and [`ends(with:)`](/docs/library/list#ends) compare a run of items at either end.
+
+### Adding and replacing
+
+```essence
+implementation {
+	constant queue = ["Ada", "Grace"]
+
+	Terminal.print(queue::append("Linus")) § ["Ada", "Grace", "Linus"]
+	Terminal.print(queue::prepend("Barbara")) § ["Barbara", "Ada", "Grace"]
+	Terminal.print(queue::append(contentsOf ["Linus", "Ken"])) § ["Ada", "Grace", "Linus", "Ken"]
+	Terminal.print(queue::insert("Edsger", at 1)) § ["Ada", "Edsger", "Grace"]
+	Terminal.print(queue::replace("Alan", at 0)) § ["Alan", "Grace"]
+	Terminal.print(queue::replace("Alan", at 9)) § ["Ada", "Grace"]
+	Terminal.print(queue::pad(to 4, with "-")) § ["Ada", "Grace", "-", "-"]
+	Terminal.print(queue) § ["Ada", "Grace"]
+}
+```
+
+`append` and [`prepend`](/docs/library/list#prepend) add an item at either end, or a whole list with `contentsOf:`. [`insert(_:at:)`](/docs/library/list#insert) puts an item before a position, and [`replace(_:at:)`](/docs/library/list#replace) puts one in place of the item at a position. `pad(to:with:)` fills the list up to a length. A position past the end is not an error: `replace` returns the list unchanged, and `insert` adds the item at the end.
+
+### Removing
+
+```essence
+implementation {
+	constant scores = [3, 1, 2, 2, 5]
+
+	Terminal.print(scores::removeFirst()) § [1, 2, 2, 5]
+	Terminal.print(scores::removeFirst(2)) § [2, 2, 5]
+	Terminal.print(scores::removeLast()) § [3, 1, 2, 2]
+	Terminal.print(scores::remove(at 1)) § [3, 2, 2, 5]
+	Terminal.print(scores::removeEvery(2)) § [3, 1, 5]
+	Terminal.print(scores::removeEvery(where (score) { <- score::isOdd() })) § [2, 2]
+	Terminal.print(scores::removeDuplicates()) § [3, 1, 2, 5]
+}
+```
+
+`removeFirst` and `removeLast` drop one item from either end, or a count of items. [`remove(at:)`](/docs/library/list#remove) drops the item at a position, and returns the list unchanged for a position past the end. [`removeEvery`](/docs/library/list#removeEvery) drops every item equal to the one given, or every item a check accepts. [`removeDuplicates()`](/docs/library/list#removeDuplicates) keeps the first of each item.
+
+### Transforming
+
+```essence
+implementation {
+	constant prices = [4, 1, 3]
+	constant typed  = ["4", "x", "3"]
+
+	function addUp(_ total: Integer, _ price: Integer) -> Integer {
+		<- total::add(price)
+	}
+
+	Terminal.print(prices::map((price) { <- price::multiply(with 2) })) § [8, 2, 6]
+	Terminal.print(prices::everyItem(where (price) { <- price::isOdd() })) § [1, 3]
+	Terminal.print(prices::reduce(startingWith 0, addUp)) § 8
+	Terminal.print(prices::accumulate(startingWith 0, addUp)) § [0, 4, 5, 8]
+	Terminal.print(typed::everyValue(from (text) { <- Integer.parse(text) })) § [4, 3]
+}
+```
+
+`map` calls a function on every item and returns the results. `everyItem(where:)` is the filter: it keeps every item the check accepts. `reduce(startingWith:_:)` folds the items into one value, passing the running value first and the item second, as `addUp` takes them. [`accumulate`](/docs/library/list#accumulate) returns every running value, the starting one included. [`everyValue(from:)`](/docs/library/list#everyValue) turns each item into an `Optional` and keeps the values, so a string that [`Integer.parse`](/docs/library/integer#parse) cannot read drops out.
+
+There is no `forEach`. To print every item, build the text with `join(with:)` and print it once; Iteration shows it. Iteration also teaches `reduce(startingWith:step:)`, whose function returns `#Continue` to go on or `#Done` to stop before the end.
+
+### Ordering
+
+```essence
+implementation {
+	constant scores    = [3, 1, 2]
+	constant standings = [
+		{ team = "Rovers", points = 7 },
+		{ team = "United", points = 9 },
+		{ team = "City", points = 7 },
+	]
+
+	Terminal.print(scores::sort()) § [1, 2, 3]
+	Terminal.print(scores::sort(in #Descending)) § [3, 2, 1]
+	Terminal.print(scores::sort(by (a, b) { <- b::compare(to a) })) § [3, 2, 1]
+	Terminal.print(scores::reverse()) § [2, 1, 3]
+	Terminal.print(standings::sort(on .points, in #Descending)::map(.team)) § ["United", "Rovers", "City"]
+}
+```
+
+`sort()` uses the order the items already have, so it needs items that are [`Comparable`](/docs/library/protocols#Comparable), such as numbers, strings and Booleans. [Protocols](/docs/language/protocols) explains what that means. `in #Descending` turns the direction round; the two directions are the cases of [`SortOrder`](/docs/library/list#SortOrder).
+
+`sort(by:)` takes a comparison that returns an `Ordering`: `#Less`, `#Equal` or `#Greater`. A JavaScript comparator returns a number; here `a::subtract(b)` is refused as [`return-type-mismatch`](/docs/reference/diagnostics#return-type-mismatch). [`compare(to:)`](/docs/library/integer#compare) returns the `Ordering`, and comparing `b` with `a` sorts in descending order. `sort(on:)` orders by a key that a function reads off each item. Items with equal keys keep the order they had, in either direction, so Rovers stays ahead of City. `reverse()` turns the list round without sorting it.
+
+A record has no order of its own, so `sort()` on a list of records is refused as [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound):
+
+<div class="error-output">
+
+```
+[unsatisfied-bound]
+Error: { name: String, price: Integer } does not conform to 'Comparable'
+   ╭─┤ cheapest.es:7:17 │
+   │
+ 7 │     Terminal.print(products::sort())
+   │                    ────────┬───────
+   │                            ╰───────── this binds a Type Parameter bound to 'Comparable'
+   │
+   │ Help: Declare a Namespace 'for { name: String, price: Integer } is Comparable'.
+   │
+   │ Note: No Namespace in scope makes { name: String, price: Integer } conform to 'Comparable'.
+───╯
+```
+
+</div>
+
+Following the Help makes the record type `Comparable`, which Protocols covers. Sorting by a key needs no declaration: `products::sort(on .price)`.
+
+### Slicing and splitting
+
+```essence
+implementation {
+	constant scores = [3, 1, 2, 2, 5]
+	constant evens  = scores::partition(where (score) { <- score::isEven() })
+
+	Terminal.print(scores::slice(from 1, to 3)) § [1, 2]
+	Terminal.print(scores::slice(from 3)) § [2, 5]
+	Terminal.print(evens) § { accepted = [2, 2], refused = [3, 1, 5] }
+	Terminal.print(evens.refused) § [3, 1, 5]
+	Terminal.print(scores::partition(while (score) { <- score::isOdd() })) § { leading = [3, 1], trailing = [2, 2, 5] }
+	Terminal.print(scores::partition(at 2)) § { leading = [3, 1], trailing = [2, 2, 5] }
+	Terminal.print(scores::split(intoGroupsOf 2)) § [[3, 1], [2, 2], [5]]
+	Terminal.print(scores::windows(of 2)) § [[3, 1], [1, 2], [2, 2], [2, 5]]
+	Terminal.print(scores::runs(where (score) { <- score::isEven() })) § [[2, 2]]
+}
+```
+
+`slice(from:to:)` takes the items from one position up to, but not including, another, and either label may be left out. [`partition(where:)`](/docs/library/list#partition) splits the list by a check and returns a record, `{ accepted, refused }`, whose halves you read with `.accepted` and `.refused`. `partition(while:)` splits at the end of the leading run a check accepts, and `partition(at:)` at a position; both return `{ leading, trailing }`. [`split(intoGroupsOf:)`](/docs/library/list#split) cuts the list into groups of a size. [`windows(of:)`](/docs/library/list#windows) returns every stretch of a size, one position at a time. [`runs(where:)`](/docs/library/list#runs) returns the stretches of neighbouring items a check accepts.
+
+### Combining
+
+```essence
+implementation {
+	constant names  = ["tea", "cake", "jam"]
+	constant prices = [3, 5]
+
+	Terminal.print(prices::join(with ", ")) § 3, 5
+	Terminal.print(names::pair(with prices)) § [{ first = "tea", second = 3 }, { first = "cake", second = 5 }]
+}
+```
+
+`join(with:)` writes every item as text, with the separator between them, so it needs items that are `Printable`. A list of `Integer | String` is refused there as `unsatisfied-bound`, because a union is not `Printable`. `pair(with:)` walks two lists side by side and returns a list of `{ first, second }` records, stopping at the end of the shorter list. There are no tuples, so a pair is a record with two named members.
+
+### Nested lists
+
+```essence
+implementation {
+	constant grid = [[1, 2], [3, 4]]
+
+	Terminal.print(grid::flatten()) § [1, 2, 3, 4]
+	Terminal.print(grid::transpose()) § [[1, 3], [2, 4]]
+}
+```
+
+`flatten()` removes one level of nesting, and [`transpose()`](/docs/library/list#transpose) turns rows into columns. Both are methods of a list of lists. On a flat list, `flatten()` is an [`unknown-method`](/docs/reference/diagnostics#unknown-method).
+
+## Lists of numbers
+
+```essence
+implementation {
+	constant scores = [4, 1, 3]
+	constant noScores: List<Integer> = []
+
+	Terminal.print([4, 1, 3]::sum()) § 8
+	Terminal.print([4, 1, 3]::product()) § 12
+	Terminal.print([4, 1, 3]::average()) § 8/3
+	Terminal.print([4, 1, 3]::median()) § 3
+	Terminal.print([4, 1, 3]::lowestNumber()) § 1
+	Terminal.print([4, 1, 3]::highestNumber()) § 4
+	Terminal.print(scores::average()) § Value(8/3)
+	Terminal.print(scores::highestNumber()) § Value(4)
+	Terminal.print(noScores::sum()) § 0
+	Terminal.print(noScores::average()) § Empty
+	Terminal.print([1, 1/2]::sum()) § 3/2
+	Terminal.print(Number.sum([1, 1/2])) § 3/2
+}
+```
+
+A list of numbers has totals and statistics. `sum()` and [`product()`](/docs/library/list#product) return a number for any list, `0` and `1` for an empty one. `average()`, [`median()`](/docs/library/list#median), [`lowestNumber()`](/docs/library/list#lowestNumber) and [`highestNumber()`](/docs/library/list#highestNumber) return the number on a written or proven non-empty list. On a plain `List<Integer>` they return an `Optional`, which is `#Empty` for an empty list, where JavaScript's `Math.max(...[])` is `-Infinity`. An average or a median is an exact [`Rational`](/docs/library/rational), as [Numbers](/docs/language/numbers) explains. The average of `[4, 1, 3]` is `8/3`, where JavaScript computes `2.6666666666666665`.
+
+A list mixing the two kinds, such as `[1, 1/2]`, is a `List<Integer | Rational>`. Its sum is a [`Scalar`](/docs/library/number#Scalar): the type of a number that is an `Integer` or a `Rational`. [`Number.sum(…)`](/docs/library/number#sum) is the same sum written as a static, with the list as its argument.
+
+## Lists of Optionals and Results
+
+```essence
+implementation {
+	constant typed   = ["36", "x", "45", "y"]
+	constant numbers = typed::map((text) { <- Integer.parse(text) })
+	constant ages    = typed::map((text) {
+		<- Integer.parse(text)::toResult(failingWith text)
+	})
+
+	Terminal.print(numbers::values()) § [36, 45]
+	Terminal.print(numbers::firstValue()) § Value(36)
+	Terminal.print(numbers::allValues()) § Empty
+	Terminal.print(ages::values()) § [36, 45]
+	Terminal.print(ages::reasons()) § ["x", "y"]
+	Terminal.print(ages::partition()) § { values = [36, 45], reasons = ["x", "y"] }
+	Terminal.print(ages::allValues()) § Failure(["x", "y"])
+}
+```
+
+`numbers` is a `List<Optional<Integer>>`, and three methods collapse it. [`values()`](/docs/library/list#values) keeps the values and drops the empties. [`firstValue()`](/docs/library/list#firstValue) returns the first value, as an `Optional`. [`allValues()`](/docs/library/list#allValues) returns every value when no `Optional` is empty, and `#Empty` otherwise.
+
+`ages` is a list of [Results](/docs/language/result), a `List<Result<Integer, String>>`, built with [`toResult(failingWith:)`](/docs/library/optional#toResult). It has the same `values()`, plus [`reasons()`](/docs/library/list#reasons) for the failures and `partition()` for both at once, as `{ values, reasons }`. Its `allValues()` returns `#Value` with every value when nothing failed. Otherwise it returns `#Failure` with every reason, not only the first.
+
+## Equality, order and grouping
+
+```essence
+implementation {
+	Terminal.print([1, 2]::is([1, 2])) § true
+	Terminal.print([1, 2]::is([2, 1])) § false
+	Terminal.print([{ name = "tea" }]::contains({ name = "tea" })) § true
+	Terminal.print([1, 2]::isLessThan([1, 3])) § true
+	Terminal.print([1, 2]::isLessThan([1, 2, 0])) § true
+	Terminal.print([[2, 1], [1, 5], [1, 2]]::sort()) § [[1, 2], [1, 5], [2, 1]]
+}
+```
+
+Equality is structural: two lists are equal when they hold equal items in the same order. A list is `Printable`, `Equatable` and `Comparable` when its items are. Two lists compare lexicographically, item by item from the front, and when one is the start of the other, the shorter comes first. That is why `sort()` works on a list of lists.
+
+**Compared with JavaScript.**
+
+```ts
+console.log([1, 2] === [1, 2]) // false
+console.log([{ name: "tea" }].includes({ name: "tea" })) // false
+```
+
+JavaScript compares arrays and objects by identity. `is`, `contains`, `firstIndex(of:)` and `removeDuplicates()` compare by value, so an equal record is found.
+
+```essence
+implementation {
+	constant orders = [
+		{ customer = "Ada", total = 12 },
+		{ customer = "Grace", total = 5 },
+		{ customer = "Ada", total = 7 },
+	]
+
+	Terminal.print(orders::map(.customer)::tally()) § ["Ada" = 2, "Grace" = 1]
+	Terminal.print(orders::index(on .customer)) § ["Ada" = { customer = "Ada", total = 7 }, "Grace" = { customer = "Grace", total = 5 }]
+	Terminal.print(orders::group(on .customer)) § ["Ada" = [{ customer = "Ada", total = 12 }, { customer = "Ada", total = 7 }], "Grace" = [{ customer = "Grace", total = 5 }]]
+}
+```
+
+Three methods turn a list into a dictionary. [`tally()`](/docs/library/list#tally) counts each item. [`group(on:)`](/docs/library/list#group) collects the items under the key a function reads off each one. `index(on:)` keeps one item per key, the last one met. Dictionaries covers what you can do with the result.
+
+<SeeAlso
+	links={[
+		{ label: "List", href: "/docs/library/list" },
+		{ label: "Checked refinements", href: "/docs/language/checked-refinements" },
+		{ label: "Iteration", href: "/docs/language/iteration" },
+		{ label: "Dictionaries", href: "/docs/language/dictionaries" },
+		{ label: "Coming from JavaScript", href: "/docs/getting-started/coming-from-javascript" },
+	]}
+/>

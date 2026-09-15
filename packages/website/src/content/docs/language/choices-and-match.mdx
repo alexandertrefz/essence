@@ -1,0 +1,677 @@
+---
+title: "Choices and match"
+description: "Declare a closed set of cases, each with an optional payload, and take a value apart with an exhaustive `match`."
+section: language
+order: 60
+template: article
+---
+
+A [`choice`](/docs/reference/syntax-glossary#choice) is a type with a fixed set of cases. Each case has a name and, optionally, a payload: a [record](/docs/language/records) the case carries. A [`match`](/docs/reference/syntax-glossary#match) takes a value apart with one arm, `case #Name { … }`, per case, and the compiler checks that no case is left out. Reach for a choice wherever a JavaScript program keeps a string flag or a `kind` field.
+
+```essence
+implementation {
+	choice Route {
+		Home,
+		Article { slug: String },
+		Search { query: String, page: Integer },
+	}
+
+	function path(_ route: Route) -> String {
+		<- match route -> String {
+			case #Home    { <- "/" }
+			case #Article { <- "/articles/{@.slug}" }
+			case #Search  { <- "/search?q={@.query}&page={@.page}" }
+		}
+	}
+
+	constant landing: Route = #Home
+	constant reading: Route = #Article({ slug = "choices" })
+	constant looking: Route = #Search({ query = "match", page = 2 })
+
+	Terminal.print(path(landing)) § /
+	Terminal.print(path(reading)) § /articles/choices
+	Terminal.print(path(looking)) § /search?q=match&page=2
+}
+```
+
+`Route` has three cases. `Home` carries nothing. `Article` carries a record with a `slug`, and `Search` a record with a `query` and a `page`. The [`#` sigil](/docs/reference/syntax-glossary#case-sigil) names a case, both to build a value and to match one. `path` has one [`case`](/docs/reference/syntax-glossary#case) arm per case of `Route`. `match route -> String` says the match returns a [`String`](/docs/library/string). Each arm's [`<-`](/docs/reference/syntax-glossary#return) gives the match its value, and the `<-` in front of `match` returns that value from `path`. Inside an arm, [`@`](/docs/reference/syntax-glossary#at) is the value being matched, narrowed to that arm's case. That is why `@.slug` can be read in the `#Article` arm and nowhere else.
+
+Each case is a type of its own that carries its payload's members, and `Route` is the [union](/docs/language/unions-and-type-aliases) of the three. A choice is nominal: two choices that declare the same cases are two different types, and a value of one is never a value of the other.
+
+**Compared with JavaScript.**
+
+```ts
+type Route =
+  | { kind: "home" }
+  | { kind: "article"; slug: string }
+  | { kind: "search"; query: string; page: number }
+
+function path(route: Route): string {
+  switch (route.kind) {
+    case "home":
+      return "/"
+    case "article":
+      return `/articles/${route.slug}`
+    case "search":
+      return `/search?q=${route.query}&page=${route.page}`
+  }
+}
+```
+
+If you know TypeScript's discriminated unions, a choice is one with the tag built in. There is no `kind` field to spell, and two choices with the same cases never mix. TypeScript reports a missing case only in a `switch` that returns from a function with a declared return type, or through a `never` check. Essence checks every `match`. More on [Coming from JavaScript › Types](/docs/getting-started/coming-from-javascript#types).
+
+Unlike a TypeScript union, a choice cannot name itself, directly or through another type. `choice Tree { Leaf, Node { left: Tree, right: Tree } }` is refused as [`recursive-type-declaration`](/docs/reference/diagnostics#recursive-type-declaration):
+
+<div class="error-output">
+
+```
+[recursive-type-declaration]
+Error: Choice 'Tree' names itself
+```
+
+</div>
+
+A [generic](/docs/language/generics) choice that names itself in a payload is [`recursive-generic-choice`](/docs/reference/diagnostics#recursive-generic-choice). To hold a tree, keep its nodes in a [list](/docs/language/lists). Give each node the indexes of its children, or key the nodes in a [dictionary](/docs/language/dictionaries).
+
+## Building a case
+
+```essence
+implementation {
+	choice Route {
+		Home,
+		Article { slug: String },
+		Search { query: String, page: Integer },
+	}
+
+	function describe(_ route: Route) -> String {
+		<- match route -> String {
+			case #Home    { <- "home" }
+			case #Article { <- "article {@.slug}" }
+			case #Search  { <- "search for {@.query}, page {@.page}" }
+		}
+	}
+
+	function start() -> Route {
+		<- #Home
+	}
+
+	constant full: Route  = #Article({ slug = "choices" })
+	constant short: Route = #Article("choices")
+	constant named        = Route#Search({ query = "match", page = 2 })
+
+	Terminal.print(describe(full)) § article choices
+	Terminal.print(describe(short)) § article choices
+	Terminal.print(describe(named)) § search for match, page 2
+	Terminal.print(describe(start())) § home
+	Terminal.print(describe(#Article("direct"))) § article direct
+}
+```
+
+A case that carries nothing is written alone: `#Home`. A case with a payload takes its record in parentheses: `#Article({ slug = "choices" })`. When the record has exactly one member, that member's value can stand in for the whole record, so `#Article("choices")` builds the same value. Writing the choice in front of the sigil, `Route#Search(…)`, names the choice outright. A payload may carry more members than its case declares, as a record may: `#Article({ slug = "choices", draft = true })` compiles, where TypeScript's excess-property check would refuse it. [`Terminal.inspect`](/docs/library/terminal#inspect) shows the `draft`, but an arm cannot read it: `@.draft` is [`unknown-member`](/docs/reference/diagnostics#unknown-member).
+
+A bare `#Case` takes its choice from the position it stands in. Three positions decide it. The first is the annotation on a [constant](/docs/language/programs-and-values) (`full`, `short`). The second is the declared return type of a [function](/docs/language/functions) (`start`). The third is the parameter a direct argument is passed to (`describe(#Article("direct"))`). Where no position decides, the compiler looks the name up among the choices in scope, and one choice declaring it is enough.
+
+When two choices in scope declare the same case name, the lookup cannot pick one, and only a position decides. A record or list literal written as an argument is not such a position:
+
+```essence
+implementation {
+	choice Route {
+		Home,
+		Article { slug: String },
+	}
+
+	choice Tab {
+		Home,
+		Settings,
+	}
+
+	type Visit = { route: Route, count: Integer }
+
+	function describe(_ visit: Visit) -> String {
+		<- match visit.route -> String {
+			case #Home    { <- "home, {visit.count} times" }
+			case #Article { <- "{@.slug}, {visit.count} times" }
+		}
+	}
+
+	function total(_ routes: List<Route>) -> Integer {
+		<- routes::length()
+	}
+
+	constant visit: Visit = { route = #Home, count = 2 }
+
+	Terminal.print(describe(visit)) § home, 2 times
+	Terminal.print(describe({ route = Route#Home, count = 3 })) § home, 3 times
+	Terminal.print(total([Route#Home])) § 1
+}
+```
+
+The annotation on `visit` reaches into its record literal, so `#Home` there is a `Route`. The second call writes its record literal as the argument, and a literal in that position passes nothing on to the cases inside it. Write `#Home` there instead of `Route#Home`, and the call is [`ambiguous-case`](/docs/reference/diagnostics#ambiguous-case); its help offers `Route#Home` and `Tab#Home`.
+
+A list literal written as an argument behaves the same way: `total([#Home])` is `ambiguous-case` too. The same holds for an argument to a generic function whose parameter type the call works out, a form Generics teaches. You meet this first with `#Value`, which both [Optional](/docs/language/optional) and [Result](/docs/language/result) declare. Result states the rule in full.
+
+A name that no choice in scope declares is [`unknown-case`](/docs/reference/diagnostics#unknown-case), with the nearest name the compiler knows. Here the first program misspells `#Article`:
+
+<div class="error-output">
+
+```
+[unknown-case]
+Error: No Choice in scope declares a Case '#Artcle'
+    ╭─┤ routes.es:17:29 │
+    │
+ 17 │     constant reading: Route = #Artcle({ slug = "choices" })
+    │                                ───┬──
+    │                                   ╰──── no such Case
+    │
+    │ Help: Did you mean '#Article'?
+────╯
+```
+
+</div>
+
+A case value has the type of its case, not of its choice. On its own, `Route#Home` has the type `Route#Home`, and errors use that name. It still fits wherever a `Route` is wanted. It matters where nothing else decides the type, as for a [variable](/docs/reference/syntax-glossary#variable) declared from a case. TypeScript widens `let c = Colour.Red` to `Colour`, and Essence keeps the case type. Assigning another case to it is [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch):
+
+<div class="error-output">
+
+```
+[assignment-type-mismatch]
+Error: This value does not fit Variable 'current'
+   ╭─┤ routes.es:9:12 │
+   │
+ 7 │     variable current = Route#Home
+   │              ───┬───
+   │                 ╰───── declared as Route#Home here
+   │
+ 9 │     current = #Article("choices")
+   │               ─────────┬─────────
+   │                        ╰─────────── this is a Route#Article
+───╯
+```
+
+</div>
+
+Annotate the variable, `variable current: Route = #Home`, and it holds any `Route`.
+
+The payload has to fit the case. Each of these is refused:
+
+| Written | Error |
+|---|---|
+| `#Article` | [`missing-payload`](/docs/reference/diagnostics#missing-payload): Case '#Article' requires a payload |
+| `#Home({ slug = "x" })` | [`unexpected-payload`](/docs/reference/diagnostics#unexpected-payload): Case '#Home' does not carry a payload |
+| `#Article(3)` | [`payload-type-mismatch`](/docs/reference/diagnostics#payload-type-mismatch): This payload does not fit Case '#Article' |
+| `#Search("match")` | `payload-type-mismatch`, with the help "The one-member shorthand '#Case(value)' only applies to single-member Cases." |
+| `choice Nothing {}` | [`empty-choice`](/docs/reference/diagnostics#empty-choice): A Choice must declare at least one Case |
+| `Home` declared twice | [`duplicate-case`](/docs/reference/diagnostics#duplicate-case): Case '#Home' is declared more than once |
+
+A choice can also take type parameters, as a `Box<Item>` holding one item might. Its type arguments are applied: something at each use says what they are, such as an annotation or the prefix in `Box<String>#Empty`. Generics covers declaring one and every place that decides them.
+
+## Defaults for a payload
+
+```essence
+implementation {
+	choice Route {
+		Home,
+		Article { slug: String },
+		Search { query: String, page: Integer } = { page = 1 },
+	}
+
+	function path(_ route: Route) -> String {
+		<- match route -> String {
+			case #Home    { <- "/" }
+			case #Article { <- "/articles/{@.slug}" }
+			case #Search  { <- "/search?q={@.query}&page={@.page}" }
+		}
+	}
+
+	Terminal.print(path(#Search({ query = "match" }))) § /search?q=match&page=1
+	Terminal.print(path(#Search({ query = "match", page = 3 }))) § /search?q=match&page=3
+}
+```
+
+A payload's default is one record, written after the payload's shape with `=`. It may fill in some members or all of them. A construction may leave out the members the default fills in, and must write every other one. `#Search({ page = 2 })` leaves out `query`, and is [`incomplete-record-argument`](/docs/reference/diagnostics#incomplete-record-argument). A single member takes no default of its own: `page: Integer = 1` inside the shape is a [`syntax-error`](/docs/reference/diagnostics#syntax-error).
+
+A case whose default fills in every member is still built with a payload, the empty record. With `Blank { text: String } = { text = "" }`, the construction is `#Blank({})`. A bare `#Blank` is `missing-payload`, and its help names the `#Blank({})` spelling.
+
+The default travels with the case type, so it has to be data the compiler can read without running the program. That means numbers, strings without `{…}` holes, booleans, and lists, records and cases built from those. A value in it may also name a constant declared above the choice in the same [module](/docs/language/modules). That constant's value must be written out the same way, and it may name another such constant.
+
+```essence
+implementation {
+	constant firstPage = 1
+
+	type Paging = { page: Integer, size: Integer }
+
+	choice Route {
+		Home,
+		Search { query: String, paging: Paging } = {
+			paging = { page = firstPage, size = 20 },
+		},
+	}
+
+	function path(_ route: Route) -> String {
+		<- match route -> String {
+			case #Home { <- "/" }
+			case #Search {
+				<- "/search?q={@.query}&page={@.paging.page}&size={@.paging.size}"
+			}
+		}
+	}
+
+	Terminal.print(path(#Search({ query = "match" }))) § /search?q=match&page=1&size=20
+	Terminal.print(path(#Search({ query = "match", paging.page = 3 }))) § /search?q=match&page=3&size=20
+}
+```
+
+`paging.page = 3` is a path key, as [`with`](/docs/reference/syntax-glossary#with) takes one on records: it changes `page` and keeps the default's `size`. It reaches only into a member the default writes as a record literal. If the default fills that member from a named constant, the path key is [`path-key-without-default`](/docs/reference/diagnostics#path-key-without-default).
+
+The defaults the compiler refuses:
+
+| Written | Error |
+|---|---|
+| a constant holding a worked-out value, a `variable`, an imported constant, a string with a hole | [`case-default-not-a-literal`](/docs/reference/diagnostics#case-default-not-a-literal) |
+| `= standard`, a name for the whole default instead of a written record | `case-default-not-a-literal` |
+| a constant declared below the choice | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| a member the payload does not declare, or a value of the wrong type | [`default-type-mismatch`](/docs/reference/diagnostics#default-type-mismatch) |
+| `Home = { page = 1 }`, a default on a case with no payload | [`case-default-without-payload`](/docs/reference/diagnostics#case-default-without-payload) |
+| a default in a choice with type parameters | [`case-default-on-generic-choice`](/docs/reference/diagnostics#case-default-on-generic-choice) |
+
+## Taking a choice apart with `match`
+
+```essence
+implementation {
+	choice Route {
+		Home,
+		Article { slug: String },
+		Search { query: String, page: Integer },
+	}
+
+	function title(_ route: Route) -> String {
+		<- match route -> String {
+			case Route#Home               { <- "Home" }
+			case #Article(slug)           { <- slug }
+			case #Search({ query, page }) { <- "{query}, page {page}" }
+		}
+	}
+
+	Terminal.print(title(#Home)) § Home
+	Terminal.print(title(#Article("choices"))) § choices
+	Terminal.print(title(#Search({ query = "match", page = 2 }))) § match, page 2
+}
+```
+
+A `match` is the keyword, the subject, an [arrow](/docs/reference/syntax-glossary#arrow) with the type the match returns, and a block of arms. The arrow and its type are required: `match route {` is a `syntax-error`, `Expected '-' but found '{'.` Each arm is `case`, a matcher, and a block that returns a value with `<-`. `title` uses three matchers:
+
+- `case Route#Home` matches one case, with the choice written in front. `case #Home` is the same arm. The qualified spelling is the one construction uses. Write it where the subject can be either of two choices that share a case name: on a subject that is an `Optional` or a `Result`, `case Optional#Value(n)`. A subject of one choice decides the case itself, even with another choice in scope that declares the same name.
+- `case #Article(slug)` binds what a one-member case carries to a name. On a case with two or more members there is no single value to bind, and the matcher is [`unbindable-case-payload`](/docs/reference/diagnostics#unbindable-case-payload). Its help points at the next form.
+- `case #Search({ query, page })` takes the payload apart and binds its members by name. This is the minimum of [Patterns](/docs/language/patterns), which teaches the whole pattern grammar.
+
+In a case arm, `@` has the case type, `Route#Article`, and reads the payload's members with `.`, as in `@.slug`. It is a case value, not the payload record: passing it to a function that takes `{ slug: String }` is [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch). To pass a payload on, take it apart and write the record again: `case #Search({ query, page }) { <- show({ query, page }) }`. Only `@` is narrowed. The subject's own name keeps the choice type, so `route.slug` in the `#Article` arm of `path` is [`type-without-members`](/docs/reference/diagnostics#type-without-members):
+
+<div class="error-output">
+
+```
+[type-without-members]
+Error: This value has no members to look up
+    ╭─┤ routes.es:11:35 │
+    │
+ 11 │          case #Article { <- "/articles/{route.slug}" }
+    │                                         ──┬──
+    │                                           ╰──── this is a Route
+    │
+    │ Note: Only Records, Cases and Namespaces have members.
+────╯
+```
+
+</div>
+
+**Compared with JavaScript.**
+
+```ts
+function title(route: Route): string {
+  switch (route.kind) {
+    case "home":
+      return "Home"
+    case "article":
+      return route.slug
+    case "search":
+      return `${route.query}, page ${route.page}`
+  }
+}
+```
+
+A `match` is an expression, where a `switch` is a statement. An arm never falls through to the next, so there is no `break`, and a matcher binds names where a `switch` reads them off `route`. `@` is the subject, narrowed, without you naming it. `<-` in an arm returns from the match, where `return` in a `case` leaves the function. The `<-` in front of `match` is the one that returns from `title`. An arm takes one matcher: `case #Home | #Search` is a `syntax-error`, so two cases that share a result take two arms or a [`case _`](/docs/reference/syntax-glossary#underscore). More on [Coming from JavaScript › Control flow](/docs/getting-started/coming-from-javascript#control-flow).
+
+## Where a `match` can stand
+
+```essence
+implementation {
+	choice Route {
+		Home,
+		Article { slug: String },
+	}
+
+	constant reading: Route = #Article("choices")
+
+	constant heading = match reading -> String {
+		case #Home    { <- "Welcome" }
+		case #Article { <- "Reading {@.slug}" }
+	}
+
+	Terminal.print(heading) § Reading choices
+
+	match reading -> {} {
+		case #Home { Terminal.print("at home") }
+		case #Article {
+			Terminal.print("reading {@.slug}") § reading choices
+		}
+	}
+
+	Terminal.print(match reading -> Integer {
+		case #Home    { <- 0 }
+		case #Article { <- @.slug::length() }
+	}) § 7
+}
+```
+
+A `match` returns a value, so it stands wherever a value does: in a `constant`, as an argument, and after `<-`, as `path` has it. A match used only for its effect declares the empty record type, `-> {}`, and its arms need no `<-`.
+
+A function whose body ends in a `match` without `<-` in front of it returns nothing, and is [`missing-return`](/docs/reference/diagnostics#missing-return). Here `path` has lost its `<-`:
+
+<div class="error-output">
+
+```
+[missing-return]
+Error: Not every path through this Function returns
+    ╭─┤ routes.es:8:2 │
+    │
+  8 │ ╭─▶     function path(_ route: Route) -> String {
+    ┆ ┆
+ 14 │ ├─▶     }
+    │ │
+    │ ╰─────────── this path falls off the end
+    │
+    │ Note: The declared return Type is String, so every path must yield one.
+────╯
+```
+
+</div>
+
+## Guards, order and exhaustiveness
+
+```essence
+implementation {
+	choice Route {
+		Home,
+		Article { slug: String },
+		Search { query: String, page: Integer },
+	}
+
+	function title(_ route: Route) -> String {
+		<- match route -> String {
+			case #Home { <- "Home" }
+			case #Article(slug) where slug::isEmpty() { <- "Untitled" }
+			case #Article(slug) { <- slug }
+			case #Search where @.page::isGreaterThan(1) {
+				<- "{@.query}, page {@.page}"
+			}
+			case _ { <- @.query }
+		}
+	}
+
+	Terminal.print(title(#Article(""))) § Untitled
+	Terminal.print(title(#Article("choices"))) § choices
+	Terminal.print(title(#Search({ query = "match", page = 2 }))) § match, page 2
+	Terminal.print(title(#Search({ query = "match", page = 1 }))) § match
+}
+```
+
+A [guard](/docs/reference/syntax-glossary#where-guard) is `where` and a [`Boolean`](/docs/library/boolean) expression after the matcher. It sees `@` and the names the matcher bound. When the guard is `false`, the match moves on to the next arm. Arms are tried in order, and the first one that fits wins, so the guarded `#Article` arm sits above the plain one. Swap them, and the guarded arm can never run. The compiler reports that as the warning [`unreachable-case`](/docs/reference/diagnostics#unreachable-case):
+
+<div class="error-output">
+
+```
+[unreachable-case]
+Warning: This Case can never match
+    ╭─┤ routes.es:12:9 │
+    │
+ 11 │          case #Article(slug) { <- slug }
+    │               ───────┬──────
+    │                      ╰──────── this Case runs first
+ 12 │          case #Article(slug) where slug::isEmpty() { <- "Untitled" }
+    │               ───────┬──────
+    │                      ╰──────── an earlier Case already answers for every Type this one matches
+    │
+    │ Help: Remove this Case, or write it above the one that covers it.
+    │
+    │ Note: Cases are tried in order, and the first one that fits wins.
+────╯
+```
+
+</div>
+
+A match handles every case of its subject. Give `Route` in the first program a fourth case, `Archive { year: Integer }`, and `path` stops compiling with [`missing-case`](/docs/reference/diagnostics#missing-case):
+
+<div class="error-output">
+
+```
+[missing-case]
+Error: This Match Expression does not handle every Case
+    ╭─┤ routes.es:10:6 │
+    │
+ 10 │        <- match route -> String {
+    │                 ──┬──
+    │                   ╰──── this is a Route
+    │
+    │ Help: Add 'case Route#Archive', or a 'case _' that covers the rest.
+    │
+    │ Note: Unhandled: 'Route#Archive'.
+────╯
+```
+
+</div>
+
+Every match that has not been updated fails the same way, so adding a case shows you each place that has to decide what the case means. In an editor, the error carries a Quick Fix, "Add missing Cases", that writes an empty arm for each missing case.
+
+`case _` matches whatever the arms above it did not. It is JavaScript's `default`, and `default` itself is a `syntax-error`. Under it, `@` has the type of the cases left over: below `case #Home` alone, it is a `Route#Article | Route#Search`. It is the right arm when every remaining case gets the same value. A `case _` needs a case left to match. Under arms that already handle every case it is an error, so it replaces arms rather than guarding against new ones. Its cost: when a `case _` takes the place of `path`'s `#Search` arm, a new `#Archive` goes to that arm silently, and `missing-case` never fires.
+
+Case patterns do not nest. `case #Opened(#Home)` is a `syntax-error`: `Expected an Identifier but found '#'.` Bind the inner value and match it in the arm:
+
+```essence
+implementation {
+	choice Route {
+		Home,
+		Article { slug: String },
+	}
+
+	choice Event {
+		Opened { route: Route },
+		Closed,
+	}
+
+	function describe(_ event: Event) -> String {
+		<- match event -> String {
+			case #Opened(route) {
+				<- match route -> String {
+					case #Home    { <- "opened home" }
+					case #Article { <- "opened {@.slug}" }
+				}
+			}
+			case #Closed { <- "closed" }
+		}
+	}
+
+	Terminal.print(describe(#Opened(#Article("choices")))) § opened choices
+	Terminal.print(describe(#Closed)) § closed
+}
+```
+
+A record pattern never matches a case. On a `Route` subject, `case { slug }` is `unreachable-case`, and the warning says that `{ slug: String }` is not a member of the matched union.
+
+## Matching something other than a choice
+
+```essence
+implementation {
+	function share(_ bill: Integer, among people: Integer) -> String {
+		<- match people -> String {
+			case 0 { <- "nobody to share with" }
+			case 1 { <- "{bill} for one" }
+			case _ {
+				constant each: Rational = bill::divide(by @)
+				<- "{each::toString(as #Decimal, toPlaces 2)} each"
+			}
+		}
+	}
+
+	function agrees(_ reply: String) -> Boolean {
+		<- match reply -> Boolean {
+			case "yes" { <- true }
+			case "y"   { <- true }
+			case _     { <- false }
+		}
+	}
+
+	Terminal.print(share(10, among 4)) § 2.50 each
+	Terminal.print(share(10, among 1)) § 10 for one
+	Terminal.print(share(10, among 0)) § nobody to share with
+	Terminal.inspect(agrees("y")) § true
+	Terminal.inspect(agrees("no")) § false
+}
+```
+
+A match can also compare a bare [`Integer`](/docs/library/integer) or `String` with written values. Every arm but the last names a written value, and no arm has a guard. The last arm covers every other value, as `case _` or as the subject's own type, `case Integer` or `case String`. It is the form a JavaScript `switch (people) { case 0: … default: … }` becomes. Any other arrangement is [`literal-match-shape`](/docs/reference/diagnostics#literal-match-shape):
+
+| Written | Error |
+|---|---|
+| no last arm for the rest | This Match has no Case for the rest of the values |
+| `case Integer` above the last arm | This Case does not name a value |
+| `case 0 where bill::isZero()` | This Case names a value and can still decline it |
+
+Under `case _` below `case 0`, `@` is a [`NonZeroInteger`](/docs/library/integer#NonZeroInteger), so [`divide(by:)`](/docs/library/integer#divide) returns a [`Rational`](/docs/library/rational) rather than an `Optional`. [Checked refinements](/docs/language/checked-refinements) explains why.
+
+Apart from those two literal shapes, a match needs a choice or a union as its subject. Anything else is [`match-on-non-union`](/docs/reference/diagnostics#match-on-non-union): a `Boolean`, a `Rational`, a single record shape, a list, or an `Integer` matched only by `case Integer`. A match on `true` and `false` would be an `if` written the long way, so ask a `Boolean` with [`if` or `define`](/docs/language/conditions):
+
+<div class="error-output">
+
+```
+[match-on-non-union]
+Error: Match Expressions require a Union Type
+   ╭─┤ paid.es:4:23 │
+   │
+ 4 │     Terminal.print(match paid -> String {
+   │                          ──┬─
+   │                            ╰─── this is a Boolean
+   │
+   │ Note: Matching a Type with only one possible shape has only one outcome.
+───╯
+```
+
+</div>
+
+Two more matchers pick a member out of a subject that is a union: a type matcher, beyond the last arm of a value match, and a record pattern.
+
+```essence
+§ fragment
+case Integer      { <- "a number: {@}" }
+case { x = 0, y } { <- "on the y axis at {y}" }
+```
+
+Their full programs are on Unions and type aliases, and on Patterns.
+
+## What every choice gets
+
+```essence
+§ file: routes.es
+implementation {
+	choice Route {
+		Home,
+		Article { slug: String },
+	}
+
+	choice Colour {
+		Red,
+		Green,
+		Blue,
+	}
+
+	constant reading: Route = #Article("choices")
+	constant chosen: Colour = #Green
+
+	Terminal.inspect(reading::is(#Article("choices"))) § true
+	Terminal.inspect(reading::isNot(#Home)) § true
+	Terminal.inspect(chosen::is(#Red)) § false
+	Terminal.print(Colour.cases()::length()) § 3
+	Terminal.inspect(Colour.cases()::firstItem()) § ./routes.es#Colour#Red
+	Terminal.inspect(reading) § ./routes.es#Route#Article("choices")
+}
+```
+
+Every choice is [`Equatable`](/docs/library/protocols#Equatable) without a line written for it. `is` compares the case and the payload, and `isNot` is its opposite. `is` takes a value of the same choice. Passing it a case of another choice is [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload), never `false`.
+
+A choice whose cases all carry nothing is also [`Enumerable`](/docs/library/protocols#Enumerable). `Colour.cases()` returns every case, in declaration order, as a non-empty list. A choice with a payload in any case is not, and `Route.cases()` is `unknown-name`.
+
+A choice you declare does not print on its own. Passing `chosen` to [`Terminal.print`](/docs/library/terminal#print) is [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound). A choice whose cases all carry nothing prints its case names once a namespace declares it [`Printable`](/docs/library/protocols#Printable) with an empty body, `namespace Colour for Colour is Printable {}`. With that line, `Terminal.print(chosen)` prints `Green`. [Namespaces and methods](/docs/language/namespaces-and-methods) teaches namespaces. A choice with a payload writes its own `toString` in that namespace, which [Protocols](/docs/language/protocols) shows. If a namespace for a choice writes its own `is`, it must also say `is Equatable`, or the compiler reports [`undeclared-conformance`](/docs/reference/diagnostics#undeclared-conformance).
+
+`Terminal.inspect` takes any value. It writes a case with a tag that names the file, the choice and the case: `./routes.es#Route#Article("choices")`. A case from the standard library has no file in its tag, as `Ordering#Less` below shows. That tag is for you, not for the people using your program. To show them a case, print it through a `match` or a `toString`.
+
+**Compared with JavaScript.**
+
+```ts
+enum Colour {
+  Red = "Red",
+  Green = "Green",
+  Blue = "Blue",
+}
+
+const chosen = Colour.Green
+
+console.log(chosen === Colour.Red) // false
+console.log(Object.values(Colour).length) // 3
+```
+
+A choice whose cases carry nothing replaces an `enum`, or a union of string literals such as `"red" | "green"`, which Essence does not have. No number or string stands behind a case, so `chosen::is("Green")` does not compile, and `cases()` lists the cases without reading them off an object. For a case with a payload, `is` compares the payload too, where `===` compares two objects by reference. More on [Coming from JavaScript › Types](/docs/getting-started/coming-from-javascript#types).
+
+## Choices in the standard library
+
+```essence
+implementation {
+	constant share = 10/3
+	constant half  = 5/2
+	constant debt  = -7
+
+	Terminal.print(share::toString(as #Decimal, toPlaces 2)) § 3.33
+	Terminal.print(half::round(toward #NearestEven)) § 2
+	Terminal.print(half::round()) § 3
+	Terminal.inspect("  padded  "::trim(at #Start)) § "padded  "
+	Terminal.print(debt::remainder(dividingBy 3, as #Truncating)) § -1
+	Terminal.print(debt::remainder(dividingBy 3, as #Euclidean)) § 2
+}
+```
+
+A mode is a choice passed as an argument. `#Decimal` is a case of [`NumberFormat`](/docs/library/rational#NumberFormat), `#NearestEven` of [`Rounding`](/docs/library/rational#Rounding), `#Start` of [`Side`](/docs/library/string#Side) and `#Truncating` of [`Division`](/docs/library/integer#Division). Each is a direct argument, so the parameter's type decides the choice and no prefix is needed. JavaScript picks a mode by method name, as `trimStart()` does, or by a string option, as `roundingMode: "halfEven"` does. Its `%` is `#Truncating`. A mode with a default is a defaulted parameter: `half::round()` rounds `toward #Nearest`. The calls are [`toString`](/docs/library/rational#toString), [`round`](/docs/library/rational#round), [`trim`](/docs/library/string#trim) and [`remainder`](/docs/library/integer#remainder).
+
+A misspelt mode is `unknown-case`, and `#Strat` gets "Did you mean '#Start'?". A mode is never a string, so a typo cannot slip through: `trim(at "start")` is `no-matching-overload`, because `at` takes a `Side`. Each mode's cases are listed on the page of the type whose methods take it, as `Rounding`, `NumberFormat`, `Side` and `Division` are above. [`SortOrder`](/docs/library/list#SortOrder), for one, is on List.
+
+[`Ordering`](/docs/library/ordering), what [`compare`](/docs/library/integer#compare) returns, and [`Step`](/docs/library/loop#Step), what a `loop` step returns, are ordinary choices too. A `match` takes them apart like any other:
+
+```essence
+implementation {
+	constant order = 3::compare(to 5)
+
+	constant word = match order -> String {
+		case #Less    { <- "below" }
+		case #Equal   { <- "level" }
+		case #Greater { <- "above" }
+	}
+
+	Terminal.inspect(order) § Ordering#Less
+	Terminal.print(word) § below
+}
+```
+
+`Step<State, Answer>` is a choice with type parameters, like `Box<Item>` above.
+
+<SeeAlso links={[
+	{ label: "Optional", href: "/docs/language/optional" },
+	{ label: "Result", href: "/docs/language/result" },
+	{ label: "Unions and type aliases", href: "/docs/language/unions-and-type-aliases" },
+	{ label: "Patterns", href: "/docs/language/patterns" },
+]} />

@@ -1,0 +1,444 @@
+---
+title: Numbers
+description: Compute exactly with integers and fractions, divide safely, format numbers as text and read them back.
+section: language
+order: 110
+template: article
+---
+
+Essence has no floating point. An [`Integer`](/docs/library/integer) is a whole number of any size, and a [`Rational`](/docs/library/rational) is an exact fraction. A decimal such as `0.1` is a `Rational`, so `0.1::add(0.2)::is(0.3)` is `true`.
+
+```essence
+implementation {
+	constant price    = 19.99
+	constant quantity = 3
+
+	constant total = price::multiply(with quantity)
+
+	Terminal.print(total) § 5997/100
+	Terminal.print(total::toString(as #Decimal, toPlaces 2)) § 59.97
+	Terminal.print(0.1::add(0.2)::is(0.3)) § true
+	Terminal.print(10::divide(by 4)) § 5/2
+	Terminal.print(2::raise(to 64)) § 18446744073709551616
+}
+```
+
+`19.99` is a `Rational`, the fraction `1999/100`, so three of them are exactly `5997/100`. A `Rational` prints as a fraction. [`toString(as #Decimal, toPlaces 2)`](/docs/library/rational#toString) writes it with two decimal places, the way a receipt does. `#Decimal` is a case of a [choice](/docs/language/choices-and-match), one of four number formats. Dividing one `Integer` by another returns the exact `Rational` `5/2`, not the float `2.5`. An `Integer` never overflows, so [`2::raise(to 64)`](/docs/library/integer#raise) is exact.
+
+## Integers and rationals
+
+```essence
+implementation {
+	constant third = 1/3
+
+	Terminal.print(6/8) § 3/4
+	Terminal.print(3/-4) § -3/4
+	Terminal.print(0.75::is(3/4)) § true
+	Terminal.print(1.50::is(1.5)) § true
+	Terminal.print(third::add(third)::add(third)) § 1
+}
+```
+
+An `Integer` has arbitrary precision: it holds as many digits as the value needs. A `Rational` is a numerator over a denominator, kept in lowest terms, so `6/8` is `3/4`. The sign sits on the numerator and the denominator is always positive, so `3/-4` is `-3/4`.
+
+A [fraction literal](/docs/reference/syntax-glossary#fraction) such as `3/4` and a decimal literal such as `0.75` are two spellings of one `Rational`, not two types. No count of decimal places is kept, so `1.50` and `1.5` are the same value. Three thirds add up to exactly `1`, which prints bare because a whole `Rational` is printed without its denominator. [Programs and values](/docs/language/programs-and-values) covers both spellings, and how [`Terminal.inspect`](/docs/library/terminal#inspect) shows the same value as `1/1`.
+
+`1::is(1/1)` is `true`, because the two are the same number. They are still two types, and neither is a subtype of the other: an `Integer` is refused where a `Rational` is declared. That is [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch):
+
+<div class="error-output">
+
+```
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'price'
+   ╭─┤ price.es:2:29 │
+   │
+ 2 │     constant price: Rational = 20
+   │                                ─┐  
+   │                                 ╰── this is an Integer
+   │ 
+   │ Note: 'price' is declared as Rational.
+───╯
+```
+
+</div>
+
+Write the value as a `Rational` instead, or convert an `Integer` you already have with [`toRational()`](/docs/library/integer#toRational):
+
+```essence
+implementation {
+	constant seats = 20
+
+	constant price: Rational    = 20/1
+	constant discount: Rational = 0.0
+	constant capacity: Rational = seats::toRational()
+
+	Terminal.print(price) § 20
+	Terminal.print(discount) § 0
+	Terminal.print(capacity::is(seats)) § true
+	Terminal.print(price::add(1)) § 21
+}
+```
+
+Arithmetic mixes the two freely: `price::add(1)` adds an `Integer` to a `Rational`. Only a place declared `Rational` refuses an `Integer`, such as an annotation or a parameter. A parameter reports [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch).
+
+**Compared with JavaScript.**
+
+```ts
+console.log(0.1 + 0.2) // 0.30000000000000004
+console.log(2 ** 100) // 1.2676506002282294e+30
+console.log(2n ** 100n) // 1267650600228229401496703205376n
+console.log(10 / 4) // 2.5
+console.log(10n / 4n) // 2n
+console.log(1n + 0.5) // TypeError
+```
+
+A JavaScript `number` is a binary float, and neither Essence type is one. An `Integer` is closest to a `bigint` without the `n`, with two differences. Dividing two of them returns the exact `5/2`, where `10n / 4n` truncates to `2n`. An `Integer` also mixes with a `Rational`, where `1n + 0.5` throws a `TypeError`. A `Rational` has no JavaScript counterpart. More on [Coming from JavaScript › Numbers](/docs/getting-started/coming-from-javascript#numbers).
+
+## The numeric tower
+
+```essence
+implementation {
+	§ a result outside the receiver's kind moves to a kind that can hold it
+	Terminal.print(10::divide(by 4)) § 5/2
+	Terminal.print(2::squareRoot()) § √2
+	Terminal.print(1::add(Number.Pi)) § 1 + π
+
+	§ a result that fits a narrower kind is held in that kind
+	Terminal.print(9::squareRoot()) § 3
+	Terminal.print(Number.Pi::subtract(Number.Pi)) § 0
+}
+```
+
+Every number belongs to one of four kinds, the types in the first four rows of the table below. Together they are the numeric tower: each kind after `Integer` holds results the kinds before it cannot. The receiver of a call is the value before `::`. An operation whose result leaves the receiver's kind widens to a kind that holds the result exactly, where the tower has one. Dividing integers gives a `Rational`, the square root of `2` gives an [`Algebraic`](/docs/library/algebraic), and adding [π](/docs/library/number#Pi) gives a [`Transcendental`](/docs/library/transcendental).
+
+Where the result can be of more than one kind, the method's return type is a [union](/docs/language/unions-and-type-aliases) of them. [`9::squareRoot()`](/docs/library/integer#squareRoot) returns `PositiveInteger | Algebraic`, where [`PositiveInteger`](/docs/library/integer#PositiveInteger) is an `Integer` proven above zero. π minus π returns `Rational | Transcendental`. The value is the narrowest kind that holds it: the `Integer` `3` and the `Rational` `0`.
+
+<div class="table-scroll">
+
+| Type | Holds | Made by | Prints as |
+| --- | --- | --- | --- |
+| `Integer` | whole numbers of any size | `42`, `-7`, `1_000_000` | `42` |
+| `Rational` | exact fractions in lowest terms | `3/4`, `0.75`, `10::divide(by 4)` | `3/4`, and a whole one as `2` |
+| `Algebraic` | a + b·√d, kept symbolic | `2::squareRoot()`, `Number.GoldenRatio` | `√2`, `2·√2`, `1/2 + 1/2·√5` |
+| `Transcendental` | a rational plus rational multiples of π and e | `Number.Pi`, `1::add(Number.Pi)` | `π`, `2·π`, `1 + π`, `π + e` |
+| [`Scalar`](/docs/library/number#Scalar) | `Integer \| Rational` | `constant share: Scalar = 1/2` | the form of the member it holds |
+| [`Irrational`](/docs/library/number#Irrational) | `Algebraic \| Transcendental` | `constant angle: Irrational = Number.Pi` | the form of the member it holds |
+| [`Number`](/docs/library/number) | `Integer \| Rational \| Irrational` | `constant ratio: Number = 3/2` | the form of the member it holds |
+
+</div>
+
+The last three rows are unions named by the standard library. `Scalar` is another name for `Integer | Rational`, a number that may be either. `Irrational` holds the two kinds that are not fractions, which have a section of their own below. `Number` holds every kind. It is not JavaScript's `number`, a float, but the union of the exact kinds, and its equality and ordering work across them.
+
+To work with the member a union holds, [`match`](/docs/language/choices-and-match) on its types:
+
+```essence
+implementation {
+	function described(_ text: String) -> String {
+		<- match Number.parse(text, defaultingTo 0/1) -> String {
+			case Integer  { <- "a whole number: {@}" }
+			case Rational { <- "a fraction: {@}" }
+		}
+	}
+
+	Terminal.print(described("42")) § a whole number: 42
+	Terminal.print(described("2.5")) § a fraction: 5/2
+}
+```
+
+[`Number.parse(_:defaultingTo:)`](/docs/library/number#parse) reads a number from text and returns a `Scalar`, or the fallback when the text is not a number. `"42"` is written as an integer, so the value is the `Integer` `42` and the first case matches. In a case, `@` is the matched value.
+
+## Division that can fail
+
+```essence
+implementation {
+	constant bill   = 90
+	constant guests = 4
+
+	§ a divisor written as a literal is proven not to be zero
+	Terminal.print(bill::divide(by 4)) § 45/2
+
+	§ a constant is a plain Integer, so the result is an Optional
+	Terminal.print(bill::divide(by guests)) § Value(45/2)
+	Terminal.print(bill::divide(by 0)) § Empty
+
+	§ the defaultingTo: twin returns the fallback for a zero divisor
+	Terminal.print(bill::divide(by guests, defaultingTo 0/1)) § 45/2
+}
+```
+
+[`divide(by:)`](/docs/library/integer#divide) returns an [`Optional<Rational>`](/docs/language/optional): `#Value` holding the quotient, or `#Empty` when the divisor is zero. When the compiler can prove the divisor is not zero, it returns a plain `Rational` instead.
+
+A written literal proves it. The `4` in `divide(by 4)` is a [`NonZeroInteger`](/docs/library/integer#NonZeroInteger), the refinement `Integer where @::isNot(0)`, in which `@` is the value being checked. That is the rule for written values on [Checked refinements](/docs/language/checked-refinements). A constant does not keep its literal's proof. In TypeScript, `const guests = 4` keeps the literal type `4`. Here `guests` is a plain `Integer`, so `bill::divide(by guests)` returns an `Optional`.
+
+The twin `divide(by:defaultingTo:)` returns its fallback in place of `#Empty`. The fallback is a `Rational`, so it is written `0/1`. `defaultingTo 0` is [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload), because no version of `divide` takes an `Integer` fallback.
+
+An `Optional` is not a number, so binding `bill::divide(by guests)` to a `Rational` is refused:
+
+<div class="error-output">
+
+```
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'share'
+   ╭─┤ share.es:5:29 │
+   │
+ 5 │     constant share: Rational = bill::divide(by guests)
+   │                                ───────────┬───────────  
+   │                                           ╰───────────── this is an Optional<Rational>
+   │ 
+   │ Note: 'share' is declared as Rational.
+───╯
+```
+
+</div>
+
+Take the `Optional` apart with `match` or [`value(defaultingTo:)`](/docs/library/optional#value), or prove the divisor first. An [`if`](/docs/language/conditions) that checks [`isNot(0)`](/docs/library/integer#isNot) proves it inside its block. A constant annotated `NonZeroInteger` keeps the proof of the literal it is bound to:
+
+```essence
+implementation {
+	function share(of bill: Integer, among guests: Integer) -> Rational {
+		if guests::isNot(0) {
+			<- bill::divide(by guests)
+		}
+
+		<- 0/1
+	}
+
+	constant tables: NonZeroInteger = 4
+
+	Terminal.print(share(of 90, among 4)) § 45/2
+	Terminal.print(share(of 90, among 0)) § 0
+	Terminal.print(90::divide(by tables)) § 45/2
+}
+```
+
+Inside the `if`, `guests` is a `NonZeroInteger`, so `divide(by:)` returns a plain `Rational` and no `Optional` appears. This is the pattern for a divisor that arrives from outside.
+
+```essence
+implementation {
+	constant slices = 8
+
+	Terminal.print(Rational.of(3, over 8)) § 3/8
+	Terminal.print(Rational.of(3, over slices)) § Value(3/8)
+	Terminal.print(Rational.of(3, over slices, defaultingTo 0/1)) § 3/8
+}
+```
+
+[`Rational.of(_:over:)`](/docs/library/rational#of) builds a `Rational` from two integers you have computed. An entry is one version of a method, told apart by its labels and argument types. Its three entries follow the same rule: a proven denominator returns a `Rational`, an unproven one an `Optional<Rational>`, and the `defaultingTo:` entry a `Rational`. `Rational.of(3, over slices)` returns what `3::divide(by slices)` returns. It reads better where the two integers are a numerator and a denominator.
+
+**Compared with JavaScript.**
+
+```ts
+const bill = 90
+console.log(bill / 0) // Infinity
+console.log(0 / 0) // NaN
+```
+
+JavaScript divides by zero and carries on with `Infinity` or `NaN`; Essence has neither value, so a zero divisor is an `#Empty` the program handles. More on [Coming from JavaScript › Operators](/docs/getting-started/coming-from-javascript#operators).
+
+## Quotient and remainder
+
+```essence
+implementation {
+	Terminal.print(-7::quotient(dividingBy 3)) § -3
+	Terminal.print(-7::remainder(dividingBy 3)) § 2
+	Terminal.print(7::remainder(dividingBy -3)) § 1
+
+	§ the day before day 0 of a seven-day week
+	Terminal.print(-1::remainder(dividingBy 7)) § 6
+
+	§ what JavaScript's `%` and `Math.trunc` return
+	Terminal.print(-7::remainder(dividingBy 3, as #Truncating)) § -1
+	Terminal.print(-7::quotient(dividingBy 3, toward #TowardZero)) § -2
+}
+```
+
+[`quotient(dividingBy:)`](/docs/library/integer#quotient) and [`remainder(dividingBy:)`](/docs/library/integer#remainder) split a division into whole parts. The `-` belongs to the literal, so `-7::remainder(dividingBy 3)` divides `-7` by `3`. Both are Euclidean: the remainder is never negative, whatever the signs. The quotient is the whole number for which `quotient × divisor + remainder` is the dividend. That is the remainder that wrapping an index needs: one day before day `0` of a week is day `6`.
+
+`as #Truncating` gives the remainder JavaScript's `%` gives, with the sign of the dividend. `#Truncating` is a case of the [`Division`](/docs/library/integer#Division) choice. Every mode argument on this page, an argument that picks how a method works, is a choice like it. For the quotient, `toward #TowardZero` truncates the same way. Like `divide(by:)`, both methods return an `Optional` unless the divisor is proven, and both have a `defaultingTo:` twin. The `as` and `toward` entries take a proven divisor only.
+
+## Powers and roots
+
+```essence
+implementation {
+	constant stock    = 0
+	constant exponent = -1
+
+	Terminal.print(2::raise(to 10)) § 1024
+	Terminal.print(stock::raise(to 2)) § 0
+	Terminal.print(stock::raise(to exponent)) § Empty
+	Terminal.print(2::raise(to -2)) § 1/4
+}
+```
+
+`raise(to:)` returns an `Integer` when the exponent is proven not to be negative, as the literal `10` is. A negative exponent makes a fraction, and zero has no negative power. So a plain `Integer` raised to an unproven exponent returns an `Optional<Integer | Rational>`. A receiver proven not to be zero, such as the literal `2`, always has a result: `2::raise(to -2)` is `1/4`, and the call returns `Integer | Rational`, with no `Optional`.
+
+```essence
+implementation {
+	constant area    = 9
+	constant debt    = -4
+	constant rootTwo = 2::squareRoot()
+
+	Terminal.print(9::squareRoot()) § 3
+	Terminal.print(8::squareRoot()) § 2·√2
+	Terminal.print(area::squareRoot()) § Value(3)
+	Terminal.print(debt::squareRoot()) § Empty
+	Terminal.print(rootTwo) § √2
+	Terminal.print(rootTwo::raise(to 2)) § 2
+}
+```
+
+`squareRoot()` is exact. A perfect square returns its whole root, and any other root stays symbolic: `√2`, never `1.4142…`. The literal `9` is proven positive, so `9::squareRoot()` returns `PositiveInteger | Algebraic` directly. A constant is a plain `Integer`, which may be negative, so `area::squareRoot()` returns an `Optional`, and the root of `-4` is `#Empty`.
+
+`rootTwo` is a `PositiveInteger | Algebraic` holding `√2`, and `rootTwo::raise(to 2)` is exactly `2`. The call works because both members of the union have `raise`. In JavaScript, `Math.sqrt(2) ** 2` is `2.0000000000000004`.
+
+```essence
+implementation {
+	Terminal.print(Number.Pi) § π
+	Terminal.print(Number.Tau) § 2·π
+	Terminal.print(Number.E) § e
+	Terminal.print(Number.GoldenRatio) § 1/2 + 1/2·√5
+
+	Terminal.print(Number.Pi::isBetween(3, and 22/7)) § true
+	Terminal.print(Number.Pi::isLessThan(3.1416)) § true
+	Terminal.print(Number.Pi::toString(as #Decimal, toPlaces 5)) § 3.14159
+}
+```
+
+`Number.Pi`, [`Number.Tau`](/docs/library/number#Tau), [`Number.E`](/docs/library/number#E) and [`Number.GoldenRatio`](/docs/library/number#GoldenRatio) are exact values, not 16-digit approximations such as `Math.PI`'s `3.141592653589793`. Comparing one with a rational is exact as well, so [`Number.Pi::isBetween(3, and 22/7)`](/docs/library/number#isBetween) is decided without rounding either side. `toString(as #Decimal, toPlaces 5)` writes the digits when a reader needs them.
+
+## Beyond rationals
+
+`squareRoot` and the constants lead out of the rationals into the two kinds the table calls `Algebraic` and `Transcendental`. Arithmetic with an `Integer` or a `Rational` keeps them exact: `1::add(Number.Pi)` is `1 + π`, not `4.141592653589793`. To see digits, write one with `toString(as #Decimal, toPlaces:)`, as π is above, or turn it into a `Rational` with [`approximate(toPlaces:)`](/docs/library/rational#approximate), below. The library pages for [Algebraic](/docs/library/algebraic) and [Transcendental](/docs/library/transcendental) cover the rest.
+
+## Formatting numbers as text
+
+```essence
+implementation {
+	constant third = 1/3
+
+	Terminal.print(third::toString()) § 1/3
+	Terminal.print(third::toString(as #Decimal)) § 0.33333333333333333333333333333333333333333333333333333333333333333333333333333333
+	Terminal.print(third::toString(as #Decimal, toPlaces 4)) § 0.3333
+	Terminal.print(27531/100::toString(as #Decimal, toPlaces 2)) § 275.31
+	Terminal.print(2/3::toString(as #Decimal, toPlaces 2, toward #Down)) § 0.66
+	Terminal.print(1234567/100::toString(as #Decimal, groupingWith ",")) § 12,345.67
+	Terminal.print(3/4::toString(as #Percent)) § 75%
+	Terminal.print(1234::toString(as #Scientific)) § 1.234e3
+	Terminal.print(42::toString(showingSign #Always)) § +42
+	Terminal.print(255::toString(inBase 16)) § ff
+	Terminal.print(27531::toString(scaledBy 2)) § 275.31
+}
+```
+
+`toString()` writes a `Rational` as a fraction in lowest terms. The `as` argument picks another form, one of the four cases of [`NumberFormat`](/docs/library/rational#NumberFormat). A decimal that does not end is written to 80 places, so `toPlaces` usually comes with it. It rounds to that many places and pads with zeros: `5::toString(as #Decimal, toPlaces 2)` is `5.00`.
+
+`toward` takes a [`Rounding`](/docs/library/rational#Rounding) case and defaults to `#Nearest`. `groupingWith` puts a separator between groups of three digits. `showingSign #Always`, a [`SignStyle`](/docs/library/rational#SignStyle) case, writes a `+` in front of a value that is not negative, zero included. On an `Integer`, `inBase` writes the digits in another base, and `scaledBy 2` reads the whole number as hundredths, which suits an amount kept in cents.
+
+<div class="table-scroll">
+
+| Choice | Cases | Taken by |
+| --- | --- | --- |
+| `NumberFormat` | `#Fraction`, `#Decimal`, `#Percent`, `#Scientific` | `toString(as:)` |
+| `Rounding` | `#Nearest`, `#NearestEven`, `#Down`, `#Up`, `#TowardZero` | every `toward` argument |
+| `SignStyle` | `#Negative`, `#Always` | `toString(showingSign:)` |
+
+</div>
+
+JavaScript's `(1.005).toFixed(2)` returns `"1.00"`, because the float stored for `1.005` is slightly below it. `1.005::toString(as #Decimal, toPlaces 2)` returns `1.01`.
+
+```essence
+implementation {
+	Terminal.print(7/2::round()) § 4
+	Terminal.print(-7/2::round()) § -4
+	Terminal.print(5/2::round(toward #NearestEven)) § 2
+	Terminal.print(7/2::round(toward #Down)) § 3
+	Terminal.print(-7/2::round(toward #Up)) § -3
+	Terminal.print(-7/2::round(toward #TowardZero)) § -3
+
+	Terminal.print(2/3::round(toPlaces 2)) § 67/100
+	Terminal.print(Number.Pi::approximate(toPlaces 4)) § 3927/1250
+}
+```
+
+[`round(toward:)`](/docs/library/rational#round) returns an `Integer`, and `round()` rounds toward `#Nearest`. `#Nearest` rounds a half away from zero, and `#NearestEven` rounds it to the even neighbour. `#Down` and `#Up` go to the lower and the higher whole number, and `#TowardZero` drops the fraction.
+
+`round(toPlaces:)` returns a `Rational` rounded to that many decimal places instead: `67/100` is `0.67`, still exact, and printed as a fraction until it is formatted. `round(toPlaces:)` and `approximate(toPlaces:)` are on every kind. `approximate` returns the same value, and its name says what the call does to an irrational: `Number.Pi::approximate(toPlaces 4)` is `3927/1250`, which is `3.1416`.
+
+**Compared with JavaScript.**
+
+```ts
+Math.round(-3.5) // -3
+Math.floor(-3.5) // -4
+Math.ceil(-3.5) // -3
+Math.trunc(-3.5) // -3
+```
+
+`#Down`, `#Up` and `#TowardZero` are `Math.floor`, `Math.ceil` and `Math.trunc`. `#Nearest` is not `Math.round`, which moves a half up: `Math.round(-3.5)` is `-3`, and `-7/2::round()` is `-4`. More on [Coming from JavaScript › Numbers](/docs/getting-started/coming-from-javascript#numbers).
+
+## Reading numbers from text
+
+```essence
+implementation {
+	Terminal.print(Integer.parse("42")) § Value(42)
+	Terminal.print(Integer.parse("12abc")) § Empty
+	Terminal.print(Integer.parse(" 42")) § Empty
+	Terminal.print(Integer.parse("ff", inBase 16)) § Value(255)
+	Terminal.print(Rational.parse("0.75")) § Value(3/4)
+	Terminal.print(Rational.parse("3/4")) § Value(3/4)
+	Terminal.print(Number.parse("1.25")) § Value(5/4)
+	Terminal.print(Integer.parse("nope", defaultingTo 0)) § 0
+}
+```
+
+[`Integer.parse`](/docs/library/integer#parse), [`Rational.parse`](/docs/library/rational#parse) and `Number.parse` return an `Optional`: `#Value` when the whole text is a number of that kind, `#Empty` when it is not. Nothing is skipped, so a leading space or a trailing letter makes the text fail. `Rational.parse` reads both the fraction and the decimal spelling. `Number.parse` returns an `Optional<Scalar>`. It holds an `Integer` when the text is written as an integer, such as `"42"`, and `"2.0"` and `"4/2"` hold the `Rational` `2`.
+
+`inBase` reads an `Integer` written in another base, the reverse of `toString(inBase:)`. Each of the three has a `defaultingTo:` twin that returns the fallback in place of `#Empty`.
+
+**Compared with JavaScript.**
+
+```ts
+parseInt("12abc") // 12
+parseInt(" 42") // 42
+Number("") // 0
+parseInt("nope") // NaN
+```
+
+JavaScript reads a prefix, skips spaces, turns empty text into `0` and returns `NaN` for the rest. Here, text that is not entirely a number is `#Empty`, and there is no `NaN`. More on [Coming from JavaScript › Numbers](/docs/getting-started/coming-from-javascript#numbers).
+
+## Predicates, bounds and totals
+
+```essence
+implementation {
+	constant score = 97
+
+	Terminal.print(score::isOdd()) § true
+	Terminal.print(score::isEven()) § false
+	Terminal.print(score::isPrime()) § true
+	Terminal.print(score::isMultiple(of 3)) § false
+	Terminal.print(score::isPositive()) § true
+	Terminal.print(-3/4::isNegative()) § true
+	Terminal.print(0::isZero()) § true
+	Terminal.print(4/2::isWholeNumber()) § true
+
+	Terminal.print(score::isBetween(100, and 90)) § true
+	Terminal.print(score::clamp(between 0, and 90)) § 90
+	Terminal.print(-5::absolute()) § 5
+	Terminal.print(score::negate()) § -97
+
+	Terminal.print([1, 2, 3]::sum()) § 6
+}
+```
+
+[`isEven()`](/docs/library/integer#isEven), [`isOdd()`](/docs/library/integer#isOdd), [`isMultiple(of:)`](/docs/library/integer#isMultiple) and [`isPrime()`](/docs/library/integer#isPrime) are on `Integer`. [`isPositive()`](/docs/library/integer#isPositive), [`isNegative()`](/docs/library/integer#isNegative), [`isZero()`](/docs/library/integer#isZero) and [`isWholeNumber()`](/docs/library/integer#isWholeNumber) are on every kind.
+
+[`isBetween(_:and:)`](/docs/library/integer#isBetween) includes both bounds. It and [`clamp(between:and:)`](/docs/library/integer#clamp) take the bounds in either order, so `score::isBetween(100, and 90)` is `true`. [`absolute()`](/docs/library/integer#absolute) drops the sign and [`negate()`](/docs/library/integer#negate) flips it.
+
+[`[1, 2, 3]::sum()`](/docs/library/list#sum) is `6`. Totals over a list, such as `sum()`, `product()`, `average()` and `highestNumber()`, and the static `Number.sum`, called on the name `Number`, are on [Lists](/docs/language/lists). For two values, [`Number.lowest(a, b)`](/docs/library/number#lowest) and [`Number.highest(a, b)`](/docs/library/number#highest) are JavaScript's `Math.min` and `Math.max`.
+
+<SeeAlso links={[
+	{ label: "Checked refinements", href: "/docs/language/checked-refinements" },
+	{ label: "Optional", href: "/docs/language/optional" },
+	{ label: "Integer", href: "/docs/library/integer" },
+	{ label: "Rational", href: "/docs/library/rational" },
+	{ label: "Number", href: "/docs/library/number" },
+]} />

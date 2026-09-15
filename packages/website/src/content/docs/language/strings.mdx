@@ -1,0 +1,418 @@
+---
+title: Strings
+description: "Work with text in characters, not bytes: `Character`, searching, cutting, building, accent-aware equality and the string modes."
+section: language
+order: 160
+template: article
+---
+
+A [`String`](/docs/library/string) is text. Essence has one string type. Every length, position and slice counts characters the way a reader sees them. An accented letter, an emoji and a flag are one character each. There are no bytes and no encoding to manage. Two strings that spell the same text with different code points, such as an accent written as one code point or two, are equal. Writing a string literal, with its [holes](/docs/reference/syntax-glossary#interpolation) and escapes, is on [Programs and values](/docs/language/programs-and-values).
+
+```essence
+implementation {
+	constant flag = "🇩🇪"
+	constant word = "café"
+
+	Terminal.inspect(flag::length()) § 1
+	Terminal.inspect(word::length()) § 4
+	Terminal.inspect(word::characters()) § [ "c", "a", "f", "é" ]
+	Terminal.inspect(word::reverse()) § "éfac"
+	Terminal.inspect(word::slice(from 0, to 3)) § "caf"
+	Terminal.inspect(word::character(at -1)) § Optional#Value("é")
+}
+```
+
+A character here is a grapheme cluster: what Unicode counts as one visible character. A code point is one number in the Unicode table. The flag is two code points, and `é` can be written as one code point or two, but each is one character. [`length()`](/docs/library/string#length) counts characters, and [`characters()`](/docs/library/string#characters) lists them. [`reverse()`](/docs/library/string#reverse) keeps every accent on its letter, and [`slice(from:to:)`](/docs/library/string#slice) cannot cut an emoji in half, because both work in whole characters. [`character(at:)`](/docs/library/string#character) reads one character, counting from zero; `-1` is the last. Nothing in `String` counts bytes or UTF-16 units.
+
+**Compared with JavaScript.**
+
+```ts
+const flag = "🇩🇪"
+const word = "cafe\u0301"
+
+console.log(flag.length) // 4
+console.log(flag.slice(0, 1)) // "\ud83c", half of the first code point
+console.log(word.split("").reverse().join("")) // "\u0301efac", the accent comes first
+```
+
+JavaScript's `length`, `slice` and `split("")` count UTF-16 units, so a flag is four long and an accent can come loose from its letter. Essence counts characters. More on [Coming from JavaScript › Strings](/docs/getting-started/coming-from-javascript#strings).
+
+Essence has no regular expressions. `/\d+/` is a [`syntax-error`](/docs/reference/diagnostics#syntax-error). String methods do the jobs a pattern does in JavaScript. [`hasOnlyDigits()`](/docs/library/string#hasOnlyDigits) and its siblings test what a string holds. [`contains`](/docs/library/string#contains), [`firstIndex(of:)`](/docs/library/string#firstIndex) and [`count(of:)`](/docs/library/string#count) find a part. [`words()`](/docs/library/string#words), [`lines()`](/docs/library/string#lines) and [`split(on:)`](/docs/library/string#split) cut a string up. [`replaceEvery`](/docs/library/string#replaceEvery) swaps every occurrence of a part for another. The last section of this page maps JavaScript's string methods to Essence's.
+
+## `Character` and `NonEmptyString`
+
+```essence
+implementation {
+	constant word = "café"
+	constant letters: List<Character>   = word::characters()
+	constant first: Optional<Character> = word::character(at 0)
+
+	Terminal.inspect(letters) § [ "c", "a", "f", "é" ]
+	Terminal.inspect(first) § Optional#Value("c")
+	Terminal.inspect(word::character(at -2)) § Optional#Value("f")
+	Terminal.inspect(word::character(at 9)) § Optional#Empty
+	Terminal.inspect(word::character(at 9, defaultingTo "?")) § "?"
+	Terminal.inspect(word::character(at 0, defaultingTo "?")::append("!")) § "c!"
+}
+```
+
+A [`Character`](/docs/library/string#Character) is a string of exactly one character. It is a [checked refinement](/docs/language/checked-refinements) of `String`, a type whose values are proven to meet a condition. Its declaration is `type Character = String where @::isOneCharacter()`. A `Character` is a `String`. It has every string method and goes wherever a string is wanted. `append` on it returns an ordinary `String`.
+
+`characters()` returns a [`List`](/docs/library/list)`<Character>`. `character(at:)` returns an [`Optional`](/docs/language/optional)`<Character>`: `#Value` with the character, or `#Empty` when the position is outside the string. A negative position counts back from the end, so `-2` is the second to last. The `defaultingTo:` form returns a bare `Character`, with the fallback in place of `#Empty`.
+
+The fallback has to be one character too. `""` has none, so the call is [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload):
+
+<div class="error-output">
+
+```
+[no-matching-overload]
+Error: No overload of 'character' accepts these Arguments
+   ╭─┤ fallback.es:4:17 │
+   │
+ 4 │     Terminal.print(word::character(at 9, defaultingTo ""))
+   │                    ───────────────────┬──────────────────
+   │                                       ╰──────────────────── this call passes 2 Arguments
+   │
+   │ Note 1: 'String::character' takes 1 Argument: Parameter 'at' is Integer.
+   │ Note 2: 'String::character' takes 2 Arguments: Parameter 'at' is Integer, Parameter 'defaultingTo' is Character.
+───╯
+```
+
+</div>
+
+Note 2 names the type the fallback needs. Write a one-character fallback such as `"?"`, or take the `Optional` apart with a [`match`](/docs/language/choices-and-match).
+
+```essence
+implementation {
+	function initial(of name: String) -> String {
+		if name::hasCharacters() {
+			<- name::firstCharacter()::uppercase()
+		}
+
+		<- "?"
+	}
+
+	constant city = "lisbon"
+
+	Terminal.inspect("lisbon"::firstCharacter()) § "l"
+	Terminal.inspect("lisbon"::lastCharacter()) § "n"
+	Terminal.inspect(city::firstCharacter()) § Optional#Value("l")
+	Terminal.print(initial(of city)) § L
+	Terminal.print(initial(of "")) § ?
+}
+```
+
+[`NonEmptyString`](/docs/library/string#NonEmptyString) is `String where @::hasCharacters()`. On one, [`firstCharacter()`](/docs/library/string#firstCharacter) and [`lastCharacter()`](/docs/library/string#lastCharacter) return a `Character`. On any other string they return an `Optional<Character>`, because the empty string has neither. A written literal with characters is proven non-empty. So is a string inside an `if` that asks [`hasCharacters()`](/docs/library/string#hasCharacters), as in `initial`, or in the `else` of one that asks [`isEmpty()`](/docs/library/string#isEmpty). A constant bound to a literal with no annotation holds a plain `String`, so `city::firstCharacter()` returns an `Optional`; Checked refinements covers the rules. On a `NonEmptyString`, `length()` is a [`PositiveInteger`](/docs/library/integer#PositiveInteger) and `characters()` a [`NonEmptyList`](/docs/library/list#NonEmptyList)`<Character>`.
+
+**Compared with JavaScript.**
+
+```ts
+const word = "café"
+
+console.log(word.at(-1)) // "é"
+console.log(word[9]) // undefined
+console.log(word.charAt(9)) // ""
+```
+
+`at(-1)` counts from the end the same way. Past the end, JavaScript returns `undefined` or `""`, and every position counts UTF-16 units. `character(at:)` counts characters, and its `Optional` makes you decide what a missing character means. More on [Coming from JavaScript › Strings](/docs/getting-started/coming-from-javascript#strings).
+
+## Code points
+
+```essence
+implementation {
+	constant family = "👨‍👩‍👧‍👦"
+
+	Terminal.inspect(family::length()) § 1
+	Terminal.inspect(family::codePoints()::length()) § 7
+	Terminal.inspect("é"::codePoints()) § [ 233 ]
+	Terminal.inspect(String.of(codePoint 233)) § Optional#Value("é")
+	Terminal.inspect(String.of(codePoints [127465, 127466])) § Optional#Value("🇩🇪")
+	Terminal.inspect(String.of(codePoint 55296)) § Optional#Empty
+}
+```
+
+A character can take several code points. The family emoji is four people joined by three invisible joiners: seven code points, one character. [`codePoints()`](/docs/library/string#codePoints) returns the code points of the string's composed form, as a `List<`[`Integer`](/docs/library/integer)`>`. The next section explains the composed form.
+
+[`String.of`](/docs/library/string#of) goes the other way. `String.of(codePoint:)` takes one code point and `String.of(codePoints:)` takes a list. Both return an `Optional<String>`, because not every number names a character. 55296 is a surrogate, half of a UTF-16 pair, and names none. One such number in the list makes the whole result `#Empty`. A string literal has no `\u` escape, so `String.of` is how a program writes a character by its number. `String.of(codePoint:)` is JavaScript's `String.fromCodePoint`, except that 55296 returns `#Empty` where JavaScript returns a lone surrogate.
+
+## Equality and order
+
+```essence
+implementation {
+	constant composed   = "café"
+	constant decomposed = String.of(codePoints [99, 97, 102, 101, 769])
+		::value(defaultingTo "")
+
+	Terminal.inspect(composed::is(decomposed)) § true
+	Terminal.inspect(decomposed::length()) § 4
+	Terminal.inspect(decomposed::codePoints()) § [ 99, 97, 102, 233 ]
+	Terminal.inspect("ﬁn"::is("fin")) § false
+	Terminal.inspect("ﬁn"::normalize(as #ComposedCompatibility)) § "fin"
+	Terminal.inspect("x²"::normalize(as #ComposedCompatibility)) § "x2"
+}
+```
+
+Unicode has two spellings of `é`: the single code point 233, or `e` (101) followed by a combining accent (769). `composed` uses the first and `decomposed` the second. Every string method reads the composed form, where the accent is one code point. So the two spellings are equal under [`is`](/docs/library/string#is), have the same length and return the same code points.
+
+[`normalize(as:)`](/docs/library/string#normalize) returns the string in one of the four forms of [`NormalizationForm`](/docs/library/string#NormalizationForm): `#ComposedCanonical` (NFC, the default), `#DecomposedCanonical` (NFD), `#ComposedCompatibility` (NFKC) and `#DecomposedCompatibility` (NFKD). The two canonical forms keep the text as it reads, and every other string method treats them as the same text. The decomposed forms matter when text leaves the program: [`Terminal.print`](/docs/library/terminal#print) writes a decomposed string's code points as they are. The two compatibility forms also fold a ligature such as `ﬁ` and a superscript such as `²` onto plain letters and digits. That changes the text, so `is` does not do it: `"ﬁn"` is not `"fin"` until you normalize it.
+
+**Compared with JavaScript.**
+
+```ts
+const composed = "café"
+const decomposed = "cafe\u0301"
+
+console.log(composed === decomposed) // false
+console.log(decomposed.length) // 5
+console.log(composed.normalize() === decomposed.normalize()) // true
+```
+
+JavaScript compares UTF-16 units, so the two spellings differ until you call `normalize()` on both. Essence compares the composed forms. More on [Coming from JavaScript › Strings](/docs/getting-started/coming-from-javascript#strings).
+
+```essence
+implementation {
+	Terminal.inspect("apple"::compare(to "banana")) § Ordering#Less
+	Terminal.inspect("Zebra"::compare(to "apple")) § Ordering#Less
+	Terminal.inspect("apple"::isLessThan("banana")) § true
+	Terminal.inspect(["pear", "Apple", "fig"]::sort()) § [ "Apple", "fig", "pear" ]
+}
+```
+
+[`compare(to:)`](/docs/library/string#compare) returns an [`Ordering`](/docs/library/ordering): `#Less`, `#Equal` or `#Greater`. It orders by code point, so every capital ASCII letter comes before every lower-case one, and `"Zebra"` comes before `"apple"`. `String` is [`Comparable`](/docs/library/protocols#Comparable), a [protocol](/docs/language/protocols): a set of methods a type promises to have. So it also has [`isLessThan`](/docs/library/string#isLessThan), [`isLessThanOrEqualTo`](/docs/library/string#isLessThanOrEqualTo), [`isGreaterThan`](/docs/library/string#isGreaterThan) and [`isGreaterThanOrEqualTo`](/docs/library/string#isGreaterThanOrEqualTo). A list of strings sorts with [`sort()`](/docs/library/list#sort).
+
+`String` is not [`Orderable`](/docs/library/protocols#Orderable), the protocol that adds `isBetween` and `clamp`, so it has neither. The call is [`unknown-method`](/docs/reference/diagnostics#unknown-method):
+
+<div class="error-output">
+
+```
+[unknown-method]
+Error: No Method named 'isBetween' for this value
+   ╭─┤ range.es:4:24 │
+   │
+ 4 │     Terminal.print(fruit::isBetween("apple", and "pear"))
+   │                    ──┬──  ────┬────
+   │                      ╰────────│────── this is a String
+   │                               │
+   │                               ╰────── no Method of this name
+   │
+   │ Note: Searched Namespace 'String'.
+───╯
+```
+
+</div>
+
+Ask two questions and join them with [`and`](/docs/library/boolean#and): `fruit::isGreaterThanOrEqualTo("apple")::and(fruit::isLessThanOrEqualTo("pear"))`.
+
+**Compared with JavaScript.**
+
+```ts
+console.log("Zebra" < "apple") // true
+console.log("Zebra".localeCompare("apple")) // 1
+```
+
+`<` compares UTF-16 units, which puts capitals first as `compare(to:)` does. `localeCompare` follows a language's alphabet, and `String` has no method that does. More on [Coming from JavaScript › Strings](/docs/getting-started/coming-from-javascript#strings).
+
+## Testing and searching
+
+```essence
+implementation {
+	Terminal.inspect(""::isEmpty()) § true
+	Terminal.inspect("ok"::hasCharacters()) § true
+	Terminal.inspect("é"::isOneCharacter()) § true
+	Terminal.inspect("2026"::hasOnlyDigits()) § true
+	Terminal.inspect("Grüße"::hasOnlyLetters()) § true
+	Terminal.inspect("route66"::hasOnlyLettersOrDigits()) § true
+	Terminal.inspect("route 66"::hasOnlyLettersOrDigits()) § false
+	Terminal.inspect(" \t"::hasOnlyWhitespace()) § true
+	Terminal.inspect(""::hasOnlyDigits()) § true
+}
+```
+
+The library groups these as *Testing content*: each returns a [`Boolean`](/docs/library/boolean) about what the string holds. `isEmpty()` and `hasCharacters()` are the pair from above. [`isOneCharacter()`](/docs/library/string#isOneCharacter) is the question `Character` is written on. The four `hasOnly…` methods ask Unicode about every character: `hasOnlyDigits()`, [`hasOnlyLetters()`](/docs/library/string#hasOnlyLetters), [`hasOnlyLettersOrDigits()`](/docs/library/string#hasOnlyLettersOrDigits) and [`hasOnlyWhitespace()`](/docs/library/string#hasOnlyWhitespace). A letter is any Unicode letter, so `ü` and `ß` count. All four return `true` for the empty string, because nothing in it breaks the rule. JavaScript's `/^\d+$/.test("")` is `false`, so a check ported from it needs `hasCharacters()` too: `input::hasOnlyDigits()::and(input::hasCharacters())`.
+
+```essence
+implementation {
+	constant file = "report-2026-final.pdf"
+
+	Terminal.inspect(file::contains("2026")) § true
+	Terminal.inspect(file::starts(with "report")) § true
+	Terminal.inspect(file::ends(with ".pdf")) § true
+	Terminal.inspect(file::doesNotContain("draft")) § true
+	Terminal.inspect(file::firstIndex(of "-")) § Optional#Value(6)
+	Terminal.inspect(file::lastIndex(of "-")) § Optional#Value(11)
+	Terminal.inspect(file::firstIndex(of "draft")) § Optional#Empty
+	Terminal.inspect(file::everyIndex(of "-")) § [ 6, 11 ]
+	Terminal.inspect(file::count(of "-")) § 2
+}
+```
+
+*Searching* looks for one string inside another. `contains`, [`starts(with:)`](/docs/library/string#starts) and [`ends(with:)`](/docs/library/string#ends) return a `Boolean`. Each has a twin that asks the opposite, so a test for absence reads forwards: [`doesNotContain`](/docs/library/string#doesNotContain), [`doesNotStart(with:)`](/docs/library/string#doesNotStart) and [`doesNotEnd(with:)`](/docs/library/string#doesNotEnd). `firstIndex(of:)` and [`lastIndex(of:)`](/docs/library/string#lastIndex) return an `Optional<Integer>`, which is `#Empty` when the part does not occur. [`everyIndex(of:)`](/docs/library/string#everyIndex) returns every position and `count(of:)` the number of occurrences. Neither counts overlapping ones, so `"aaa"::count(of "aa")` is `1`.
+
+```essence
+implementation {
+	function domain(of email: String) -> String {
+		<- match email::firstIndex(of "@") -> String {
+			case #Value(position) { <- email::slice(from position::add(1)) }
+			case #Empty           { <- "" }
+		}
+	}
+
+	Terminal.print(domain(of "ada@example.com")) § example.com
+	Terminal.inspect(domain(of "no address")) § ""
+}
+```
+
+`firstIndex(of "@")` is where the `@` is, if there is one. The `match` takes the `Optional` apart. With a position, the domain is the slice after it; without one, the result is `""`. There is no `-1` to forget to check, as there is with JavaScript's `indexOf`.
+
+## Reading and cutting
+
+```essence
+implementation {
+	constant note = "Buy milk\nCall  Ada\n"
+
+	Terminal.inspect(note::length()) § 19
+	Terminal.inspect(note::words()) § [ "Buy", "milk", "Call", "Ada" ]
+	Terminal.inspect(note::lines()) § [ "Buy milk", "Call  Ada", "" ]
+	Terminal.inspect(""::lines()) § [ "" ]
+}
+```
+
+*Reading* returns what a string is made of: `length()`, `characters()` and `codePoints()` from above, and `words()` and `lines()`. `words()` splits at every run of whitespace and drops it. `lines()` splits at `\n`, `\r` and `\r\n`, and keeps the empty line a trailing break leaves behind. It returns a `NonEmptyList<String>`, since even the empty string is one empty line.
+
+```essence
+implementation {
+	constant path            = "  /api/users/42  "
+	constant cleaned         = path::trim()
+	constant version: String = "2.4.1"::split(on ".")::firstItem()
+
+	Terminal.inspect(cleaned) § "/api/users/42"
+	Terminal.inspect(path) § "  /api/users/42  "
+	Terminal.inspect(path::trim(at #End)) § "  /api/users/42"
+	Terminal.inspect(cleaned::split(on "/")) § [ "", "api", "users", "42" ]
+	Terminal.inspect(version) § "2"
+	Terminal.inspect("🇩🇪"::split(on "")) § [ "🇩🇪" ]
+	Terminal.inspect(cleaned::slice(from 5)) § "users/42"
+	Terminal.inspect(cleaned::slice(to 4)) § "/api"
+	Terminal.inspect(cleaned::slice(from -2)) § "42"
+	Terminal.inspect(cleaned::remove(prefix "/api")) § "/users/42"
+	Terminal.inspect("Hello, World"::truncate(to 8)) § "Hello, …"
+}
+```
+
+*Cutting* returns part of a string. None of these methods changes the string it was called on, so `path` keeps its spaces. [`trim`](/docs/library/string#trim) removes whitespace from both ends, or from the end a [`Side`](/docs/library/string#Side) names. `split(on:)` cuts at every occurrence of a separator, and splitting on `""` cuts between characters. `slice(from:to:)` returns the characters from one position up to, but not including, another. `from` defaults to `0` and `to` to the length, and a negative position counts back from the end. [`remove(prefix:)`](/docs/library/string#remove) and `remove(suffix:)` take off a prefix or a suffix when it is there. [`truncate(to:)`](/docs/library/string#truncate) cuts a string down to a length and ends it with `…`, which counts toward the length.
+
+`split(on:)` with a `NonEmptyString` separator returns a `NonEmptyList<String>`, because such a separator always leaves at least one piece. A written separator carries that proof, so `"2.4.1"::split(on ".")::firstItem()` returns a bare `String`. [`firstItem()`](/docs/library/list#firstItem) on a list that may be empty returns an `Optional`; [Lists](/docs/language/lists) covers the proof.
+
+**Compared with JavaScript.**
+
+```ts
+console.log("abc".split("")) // ["a", "b", "c"]
+console.log("🇩🇪".split("")) // 4 pieces, none of them a character
+console.log("".split("\n")) // [""]
+console.log("first\nsecond\n".split("\n")) // ["first", "second", ""]
+```
+
+`split` works the same as JavaScript's, `[""]` for an empty string included. The difference is `split(on "")`, which cuts between characters, so a flag stays whole. More on [Coming from JavaScript › Strings](/docs/getting-started/coming-from-javascript#strings).
+
+## Building and changing
+
+```essence
+implementation {
+	constant first = "Ada"
+	constant last  = "Lovelace"
+
+	Terminal.inspect(first::append(" ")::append(last)) § "Ada Lovelace"
+	Terminal.inspect("{first} {last}") § "Ada Lovelace"
+	Terminal.inspect(last::prepend("Countess ")) § "Countess Lovelace"
+	Terminal.inspect("-"::repeat(times 8)) § "--------"
+	Terminal.inspect("7"::pad(to 3, with "0")) § "007"
+	Terminal.inspect("1234567"::separate(every 3, with ",")) § "1,234,567"
+	Terminal.inspect("name\nemail"::indent(by 1)) § "  name\n  email"
+}
+```
+
+*Building* makes a longer string. There is no `+`. `constant name = "Ada" + " Lovelace"` stops with [`unknown-name`](/docs/reference/diagnostics#unknown-name), `'+' is not declared`, and inside a call's parentheses the `+` is a `syntax-error`. [Method calls](/docs/language/method-calls) explains both. Join strings with [`append`](/docs/library/string#append) and [`prepend`](/docs/library/string#prepend), or put them in holes. [`repeat(times:)`](/docs/library/string#repeat) joins copies of a string. [`pad(to:with:at:)`](/docs/library/string#pad) fills a string up to a length, at the start unless a `Side` says otherwise. [`separate(every:with:)`](/docs/library/string#separate) puts a separator between groups of characters, counted from the end. [`indent(by:)`](/docs/library/string#indent) moves every line in, two spaces per level unless `with:` names another unit.
+
+```essence
+implementation {
+	Terminal.inspect("Straße"::uppercase()) § "STRASSE"
+	Terminal.inspect("ÉCLAIR"::lowercase()) § "éclair"
+	Terminal.inspect("éclair"::capitalize()) § "Éclair"
+	Terminal.inspect("a.b.c"::replaceEvery(".", with "/")) § "a/b/c"
+	Terminal.inspect("a.b.c"::replaceFirst(".", with "/")) § "a/b.c"
+	Terminal.inspect("stressed"::reverse()) § "desserts"
+	Terminal.print("say \"hi\""::quote()) § "say \"hi\""
+}
+```
+
+*Changing case and form* returns the text with its case, its parts, its order or its form changed. [`uppercase()`](/docs/library/string#uppercase), [`lowercase()`](/docs/library/string#lowercase) and [`capitalize()`](/docs/library/string#capitalize) follow Unicode's case rules, so `ß` upper-cases to `SS`. `replaceEvery` and [`replaceFirst`](/docs/library/string#replaceFirst) swap one part for another. `reverse()` turns the characters round. [`quote()`](/docs/library/string#quote) returns the string the way a program writes it, in quotes and with its escapes. That is how [`Terminal.inspect`](/docs/library/terminal#inspect) shows a string. `normalize(as:)` is covered above.
+
+**Compared with JavaScript.**
+
+```ts
+const first = "Ada"
+const last = "Lovelace"
+
+console.log(first + " " + last) // "Ada Lovelace"
+console.log(`${first} ${last}`) // "Ada Lovelace"
+```
+
+Essence has neither `+` nor a separate template literal. `append` joins two strings, and every `"…"` literal takes holes. More on [Coming from JavaScript › Strings](/docs/getting-started/coming-from-javascript#strings).
+
+## String modes
+
+```essence
+implementation {
+	Terminal.inspect("  padded  "::trim(at #Start)) § "padded  "
+	Terminal.inspect("ok"::pad(to 6, with "-", at #BothEnds)) § "--ok--"
+	Terminal.inspect("1234567"::separate(every 3, with ",", from #Start)) § "123,456,7"
+	Terminal.inspect("HELLO"::is("hello")) § false
+	Terminal.inspect("HELLO"::is("hello", comparing #Insensitive)) § true
+	Terminal.inspect("Zebra"::compare(to "apple", comparing #Insensitive)) § Ordering#Greater
+	Terminal.inspect("Report.PDF"::ends(with ".pdf", comparing #Insensitive)) § true
+}
+```
+
+A mode is a choice passed as an argument, as Choices and `match` shows. Three belong to strings. `Side` has `#Start`, `#End` and `#BothEnds`. `trim` defaults to `#BothEnds`, `pad` to `#Start`, and `separate` counts `from #End`. [`CaseSensitivity`](/docs/library/string#CaseSensitivity) has `#Sensitive` and `#Insensitive`. These methods take it as `comparing:`: `is`, `compare`, `contains`, `starts`, `ends`, their `doesNot…` twins, `firstIndex`, `lastIndex`, `count`, `replaceEvery` and `replaceFirst`. A call without one is case-sensitive. `NormalizationForm` has the four forms `normalize(as:)` produces.
+
+A mode is checked like any other argument. `trim(at "start")` is `no-matching-overload`, because `at` takes a `Side`, not a `String`.
+
+## JavaScript's string methods
+
+Each row takes a JavaScript string method or habit and gives the Essence call that does the same job. Positions and lengths in the Essence calls count characters.
+
+| JavaScript | Essence | The difference |
+|---|---|---|
+| `s.length` | `s::length()` | Counts characters, not UTF-16 units. |
+| `s.at(i)`, `s.charAt(i)`, `s[i]` | `s::character(at i)` | Returns an `Optional`. |
+| `[...s]` | `s::characters()` | JavaScript splits a flag in two; Essence keeps it whole. |
+| `String.fromCodePoint(n)` | `String.of(codePoint n)` | Returns an `Optional`. |
+| `s.includes(part)` | `s::contains(part)` | |
+| `s.startsWith(part)`, `s.endsWith(part)` | `s::starts(with part)`, `s::ends(with part)` | |
+| `s.indexOf(part)`, `s.lastIndexOf(part)` | `s::firstIndex(of part)`, `s::lastIndex(of part)` | `#Empty` in place of `-1`. |
+| `s.slice(a, b)`, `s.substring(a, b)` | `s::slice(from a, to b)` | A negative position counts back from the end, as JavaScript's `slice` does and `substring` does not. |
+| `s.split(separator)` | `s::split(on separator)` | Splitting on `""` cuts between characters. |
+| `s.trim().split(/\s+/)` | `s::words()` | The empty string has no words. |
+| `s.split(/\r?\n/)` | `s::lines()` | A lone `\r` is a line break too. |
+| `s.trim()`, `s.trimStart()`, `s.trimEnd()` | `s::trim()`, `s::trim(at #Start)`, `s::trim(at #End)` | |
+| `s.padStart(3, "0")`, `s.padEnd(3, "0")` | `s::pad(to 3, with "0")`, `s::pad(to 3, with "0", at #End)` | |
+| `s.repeat(3)` | `s::repeat(times 3)` | |
+| `s + t`, `s.concat(t)`, `` `${s}${t}` `` | `s::append(t)`, `"{s}{t}"` | |
+| `s.toUpperCase()`, `s.toLowerCase()` | `s::uppercase()`, `s::lowercase()` | |
+| `s.replace(part, other)` | `s::replaceFirst(part, with other)` | |
+| `s.replaceAll(part, other)` | `s::replaceEvery(part, with other)` | |
+| `s.normalize("NFD")` | `s::normalize(as #DecomposedCanonical)` | |
+| `s === t` | `s::is(t)` | Two spellings of an accent are equal. |
+| `s.toLowerCase() === t.toLowerCase()` | `s::is(t, comparing #Insensitive)` | |
+| `/^\d+$/.test(s)` | `s::hasOnlyDigits()::and(s::hasCharacters())` | Any Unicode digit counts, such as `٤`. |
+| `s.localeCompare(t)` | none | `s::compare(to t)` orders by code point. |
+
+The JavaScript names are not aliases: `file::includes("2026")` is `unknown-method`.
+
+<SeeAlso
+	links={[
+		{ label: "String in the library", href: "/docs/library/string" },
+		{ label: "Lists", href: "/docs/language/lists" },
+		{ label: "Checked refinements", href: "/docs/language/checked-refinements" },
+	]}
+/>

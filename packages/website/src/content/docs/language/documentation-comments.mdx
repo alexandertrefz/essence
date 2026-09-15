@@ -1,0 +1,472 @@
+---
+title: Documentation comments
+description: "Document a declaration with `§§`, name each parameter by its label, and write examples that run as tests."
+section: language
+order: 210
+template: article
+---
+
+A documentation comment is a block of [`§§`](/docs/reference/syntax-glossary#doc-comment) lines directly above a declaration, doing the job JSDoc's `/** */` does in TypeScript. Its text is Markdown, and an editor shows it on hover, in signature help and beside a completion. Tags inside the block document each parameter and the return value. An `@example` tag holds code that runs as a test.
+
+```essence
+implementation {
+	§§ Builds a greeting for a subject.
+	§§
+	§§ The greeting is **one line** and ends in an exclamation mark.
+	§§
+	§§ @param _ — who to greet
+	§§ @param with — the word to greet them with
+	§§ @returns — the finished greeting
+	function greet(
+		_ subject: String,
+		with greeting: String = "Hello",
+	) -> String {
+		<- "{greeting}, {subject}!"
+	}
+
+	Terminal.print(greet("World")) § Hello, World!
+	Terminal.print(greet("Ada", with "Hi")) § Hi, Ada!
+}
+```
+
+The block documents `greet`. Its first lines are the description, and `**one line**` stays Markdown all the way to the editor. `@param _` documents the first parameter, `@param with` the second, and `@returns` the value the function returns. When you hover `greet`, the editor shows the signature `function greet(_ String, with?: String) -> String` and renders this Markdown under it:
+
+```
+Builds a greeting for a subject.
+
+The greeting is **one line** and ends in an exclamation mark.
+
+**subject** — who to greet
+
+**with** — the word to greet them with
+
+**Returns** — the finished greeting
+```
+
+The `?` in `with?:` marks a parameter a call may leave out, because it has a default value. The first parameter has no [label](/docs/reference/syntax-glossary#labels), the word a call writes before an argument, so the hover shows it under `subject`, its parameter name. The second shows under its label, `with`.
+
+## Where a block goes
+
+```essence
+implementation {
+	§§ A price in whole cents.
+	type Cents = Integer
+
+	§§ The shipping charge added to every order.
+	constant shipping: Cents = 495
+
+	§§ How far an order has got on its way to the customer.
+	choice OrderState {
+		Placed,
+		Shipped,
+		Delivered,
+	}
+
+	§§ A value that can describe itself to a customer.
+	protocol Describable {
+		§§ A few words that say what this value is.
+		describe() -> String
+
+		§§ The description, with an exclamation mark after it.
+		announce() -> String {
+			<- @::describe()::append("!")
+		}
+	}
+
+	§§ What an order's state means to a customer.
+	namespace OrderState for OrderState is Describable {
+		§§ The state every new order starts in.
+		static initial = OrderState#Placed
+
+		§§ Says where the order is.
+		describe() -> String {
+			<- match @ -> String {
+				case #Placed    { <- "placed" }
+				case #Shipped   { <- "on its way" }
+				case #Delivered { <- "delivered" }
+			}
+		}
+	}
+
+	Terminal.print(shipping) § 495
+	Terminal.print(OrderState.initial::describe()) § placed
+	Terminal.print(OrderState#Shipped::announce()) § on its way!
+}
+```
+
+A `§§` block documents the declaration directly below it. Every line of the block starts with `§§`, and a line holding only `§§` separates two paragraphs. The program above documents a declaration of each of these kinds:
+
+- the [type alias](/docs/language/unions-and-type-aliases) `Cents`;
+- the [constant](/docs/reference/syntax-glossary#constant) `shipping`;
+- the [choice](/docs/language/choices-and-match) `OrderState`;
+- the [protocol](/docs/language/protocols) `Describable`, and each of its two methods;
+- the [namespace](/docs/language/namespaces-and-methods) `OrderState`, its [static](/docs/reference/syntax-glossary#static) `initial` and its method `describe`.
+
+A [function](/docs/language/functions) carries a block the same way, as `greet` showed. An `overload` set carries blocks too, which the section on overload sets below covers.
+
+A blank line between the block and the declaration detaches the block, and it then documents nothing. No warning says so. A [`§` comment](/docs/language/programs-and-values) is never documentation, and no editor shows it.
+
+## Documenting parameters
+
+```essence
+implementation {
+	§§ The price of several items at one price, in cents.
+	§§
+	§§ @param of — the price of one item
+	§§ @param times — how many were bought
+	§§ @returns — the price of them all
+	function total(of price: Integer, times quantity: Integer) -> Integer {
+		<- price::multiply(with quantity)
+	}
+
+	Terminal.print(total(of 250, times 3)) § 750
+}
+```
+
+`@param` lines document parameters by position. The first `@param` line documents the first parameter, the second line the second, and so on. Each line names its parameter the way a call writes it: by its label, or `_` where the parameter has none. A call to `total` is written `total(of 250, times 3)`, so the lines are `@param of` and `@param times`. The parameter names `price` and `quantity`, which the body uses, do not go on the line.
+
+Once a block has one `@param` line, it needs one for every parameter, in order. JSDoc lets you document only some. A block with no `@param` lines documents the declaration as a whole. The compiler checks each line's name against its position, with the warnings at the end of this page.
+
+The text follows the name after an em-dash, `—`, not a hyphen. `@returns —` documents the value the function returns, and names nothing. Your editor can type the dash for you. On a function or method that has no block, the refactoring **Document 'total'** writes the tag lines with their dashes. The Quick Fix **Insert the '—' separator** adds a missing one. [Editor setup](/docs/guides/editor-setup) covers Quick Fixes and refactorings.
+
+Only `@param`, `@returns` and `@example` are tags. Every other line belongs to what stands above it: the description before the first tag, or the text of the tag it follows. So write the description first. JSDoc's `@return`, without the `s`, is not a tag. Written below the `@param` lines, it becomes part of the last parameter's text, and no warning says so.
+
+**Compared with JavaScript.**
+
+```ts
+/**
+ * The price of several items at one price, in cents.
+ *
+ * @param price - the price of one item
+ * @param quantity - how many were bought
+ * @returns the price of them all
+ */
+function total(price: number, quantity: number): number {
+  return price * quantity
+}
+```
+
+JSDoc's `@param` names the parameter by the name the function body uses. Here a line's position decides which parameter it documents, and the name it writes is the label a call uses. The hyphen in the TypeScript block is an em-dash here, and a hyphen draws a warning. More on [Coming from JavaScript › Bindings](/docs/getting-started/coming-from-javascript#bindings).
+
+### Text on the lines below a tag
+
+```essence
+implementation {
+	§§ Describes when a parcel can arrive.
+	§§
+	§§ @param from
+	§§ the earliest day the parcel can arrive,
+	§§ counted from the day of the order
+	§§ @param to
+	§§ the latest day it can arrive
+	§§ @returns
+	§§ a sentence a customer can read
+	function deliveryWindow(
+		from earliest: Integer,
+		to latest: Integer,
+	) -> String {
+		<- "Arrives in {earliest} to {latest} days"
+	}
+
+	Terminal.print(deliveryWindow(from 2, to 5)) § Arrives in 2 to 5 days
+}
+```
+
+A tag may leave its text to the lines below it. The text then runs on until the next tag or the end of the block, and needs no em-dash. The hover shows it the same way as text written after an em-dash. Text written after an em-dash may continue on the lines below it in the same way.
+
+### A block on the parameter's own line
+
+```essence
+implementation {
+	§§ Describes when a parcel can arrive.
+	function deliveryWindow(
+		§§ the earliest day the parcel can arrive, counted from the day of the order
+		from earliest: Integer,
+		§§ the latest day it can arrive
+		to latest: Integer,
+	) -> String {
+		<- "Arrives in {earliest} to {latest} days"
+	}
+
+	Terminal.print(deliveryWindow(from 2, to 5)) § Arrives in 2 to 5 days
+}
+```
+
+A parameter written on a line of its own may carry its own `§§` block, directly above it. Signature help shows that text next to the parameter while you type the arguments. The function's block keeps the description, and the hover over `deliveryWindow` shows only that description. With several parameters, a block beside each one can read better than a run of `@param` lines.
+
+## Overload sets
+
+```essence
+implementation {
+	§§ Charges added to an amount in cents.
+	namespace Charges for Integer {
+		§§ Adds fees to this amount.
+		§§
+		§§ Each fee is in cents.
+		§§
+		§§ @param fee — a fee to add
+		§§ @param other — a second fee to add
+		overload withFees {
+			§§ Adds one fee.
+			§§
+			§§ @param _ — the fee to add
+			(_ fee: Integer) -> Integer {
+				<- @::add(fee)
+			}
+
+			(_ fee: Integer, _ other: Integer) -> Integer {
+				<- @::add(fee)::add(other)
+			}
+		}
+	}
+
+	Terminal.print(250::withFees(50)) § 300
+	Terminal.print(250::withFees(50, 25)) § 325
+}
+```
+
+An [`overload`](/docs/reference/syntax-glossary#overload) set is one method name with several entries, each with its own signature and body. A `§§` block above `overload` documents the whole set, and each entry may carry a block of its own. In a hover and in signature help, an entry with its own block shows that block, and an entry without one shows the set's block instead. So hovering `250::withFees(50)` shows the entry's block, "Adds one fee." with its `@param` line, and hovering `250::withFees(50, 25)` shows the set's block.
+
+Inside an entry's block, `@param` lines go by position, as before. The set's block has no single signature, so its lines go by name instead: a label, or a parameter name. `_` is not a name there, and draws [`unknown-documentation-parameter`](/docs/reference/diagnostics#unknown-documentation-parameter). That is why the set's block above writes `fee` and `other`, the entries' parameter names.
+
+## Examples that run
+
+```essence
+implementation {
+	§§ The price of several items at one price, in cents.
+	§§
+	§§ @example
+	§§   constant order = total(of 250, times 3)
+	§§   require order::isGreaterThan(0)
+	§§   expect order::is(750)
+	§§ @example
+	§§   expect total(of 250, times 0)::is(0)
+	§§
+	§§ @param of — the price of one item
+	§§ @param times — how many were bought
+	§§ @returns — the price of them all
+	function total(of price: Integer, times quantity: Integer) -> Integer {
+		<- price::multiply(with quantity)
+	}
+
+	§§ Prices written for a person to read.
+	namespace Price for Integer {
+		§§ Writes this amount of cents with a dollar sign in front.
+		§§
+		§§ @example
+		§§   expect 250::dollars()::is("$250")
+		dollars() -> String {
+			<- "${@}"
+		}
+	}
+
+	Terminal.print(total(of 250, times 3)::dollars()) § $750
+}
+```
+
+`@example` starts an example. The lines under it, up to the next tag or the end of the block, are Essence code. [`essence test`](/docs/guides/running-tests) runs each example as a test, in a suite named `examples`:
+
+```
+   examples
+     ✓ total example
+     ✓ total example 2
+     ✓ Price::dollars example
+```
+
+A test is named after the declaration it documents. A function's example is `total example`. A method's is written with its namespace, as in `Price::dollars example`, and so is a static method's. A static value's uses a dot, as in `Price.zero example`. A second example on the same declaration is `total example 2`.
+
+JSDoc has `@example` too, but nothing runs it. Here each example is a test, and the hover leaves it out. The nearest relatives are the doctests of Python and Rust.
+
+An example is the body of a test. It may declare constants, and it checks results with [`expect` and `require`](/docs/language/tests). It runs in the file's own scope, so it can call anything the file declares, whether or not it is [exported](/docs/language/modules). A file needs no `tests` block for its examples to run. Tests covers suites and both assertions.
+
+The lines are usually indented two spaces, which sets them apart from the prose. The compiler reads every line up to the next tag either way.
+
+When an example fails, the report points at the line inside the comment:
+
+```essence
+implementation {
+	§§ The price of several items at one price, in cents.
+	§§
+	§§ @example
+	§§   expect total(of 250, times 3)::is(700)
+	function total(of price: Integer, times quantity: Integer) -> Integer {
+		<- price::multiply(with quantity)
+	}
+
+	Terminal.print(total(of 250, times 3)) § 750
+}
+```
+
+<div class="error-output">
+
+```
+[test-failed]
+Error: 'examples › total example' failed
+   ╭─┤ order.es:5:14 │
+   │
+ 5 │     §§   expect total(of 250, times 3)::is(700)
+   │                 ───────────┬───┬───────────────  
+   │                            ╰───│───────────────── 750
+   │                                │                 
+   │                                ╰───────────────── this expect failed
+   │ 
+   │ Note: `is` compared 750 with 700
+───╯
+```
+
+</div>
+
+The failure is [`test-failed`](/docs/reference/diagnostics#test-failed), and `essence test` exits with code 1.
+
+## Warnings on tag lines
+
+```essence
+implementation {
+	§§ Adds a fee to a price, in cents.
+	§§
+	§§ @param _ the price before the fee
+	§§ @param plus — the fee to add
+	function charged(_ price: Integer, plus fee: Integer) -> Integer {
+		<- price::add(fee)
+	}
+
+	§§ The price of several items at one price, in cents.
+	§§
+	§§ @param price — the price of one item
+	§§ @param times — how many were bought
+	function total(of price: Integer, times quantity: Integer) -> Integer {
+		<- price::multiply(with quantity)
+	}
+
+	§§ Takes a discount off a price, in cents.
+	§§
+	§§ @param _ — the full price
+	function discounted(_ price: Integer, by discount: Integer) -> Integer {
+		<- price::subtract(discount)
+	}
+
+	§§ Doubles a price, in cents.
+	§§
+	§§ @param _ — the price to double
+	§§ @param by — how many times to double it
+	function doubled(_ price: Integer) -> Integer {
+		<- price::multiply(with 2)
+	}
+
+	Terminal.print(charged(250, plus 50)) § 300
+	Terminal.print(total(of 250, times 3)) § 750
+	Terminal.print(discounted(250, by 50)) § 200
+	Terminal.print(doubled(250)) § 500
+}
+```
+
+Four warnings check a block's tag lines. Three compare the `@param` lines with the signature below, and one checks the separator. The program above has one of each. A warning does not stop `essence check` or `essence run`: this program still runs and prints its four lines.
+
+### `missing-documentation-separator`
+
+<div class="error-output">
+
+```
+[missing-documentation-separator]
+Warning: This '@param' tag is not separated from its text
+   ╭─┤ pricing.es:4:14 │
+   │
+ 4 │     §§ @param _ the price before the fee
+   │                 ────────────┬───────────  
+   │                             ╰───────────── an em-dash belongs here
+   │ 
+   │ Help: Write '@param _ —' before the text.
+   │ 
+   │ Note 1: A tag carrying its text on its own line separates the two with an em-dash — that is where the description begins, and how an Editor renders the tag back. A tag that leaves its text to the lines below it needs no separator.
+   │ Note 2: The text is lifted into the Documentation either way; what is missing is the separator, not the description.
+───╯
+```
+
+</div>
+
+[`missing-documentation-separator`](/docs/reference/diagnostics#missing-documentation-separator) means the text on a tag's own line does not start with an em-dash. A hyphen does not count. The text still reaches the hover. The same rule applies to `@returns`.
+
+### `misnamed-documentation-parameter`
+
+<div class="error-output">
+
+```
+[misnamed-documentation-parameter]
+Warning: This '@param' does not name the Parameter at its position
+    ╭─┤ pricing.es:12:12 │
+    │
+ 12 │     §§ @param price — the price of one item
+    │               ──┬──  
+    │                 ╰──── Parameter 1 is 'of'
+    │ 
+    │ Help: Write '@param of'.
+    │ 
+    │ Note 1: A '@param' line documents the Parameter at its own position — the first line the first Parameter — and names it the way the signature does: its label, or '_' where it carries none.
+    │ Note 2: The Parameters are 'of', 'times', in that order.
+────╯
+```
+
+</div>
+
+[`misnamed-documentation-parameter`](/docs/reference/diagnostics#misnamed-documentation-parameter) means a line names a parameter other than the one at its position. The line at position 1 names `price`, the parameter name, but a call writes `of`. The line still documents the parameter at its position, whatever name it writes.
+
+### `undocumented-parameter`
+
+<div class="error-output">
+
+```
+[undocumented-parameter]
+Warning: This Parameter has no '@param' line
+    ╭─┤ pricing.es:21:40 │
+    │
+ 21 │     function discounted(_ price: Integer, by discount: Integer) -> Integer {
+    │                                           ──────────┬─────────  
+    │                                                     ╰─────────── Parameter 2 is undocumented
+    │ 
+    │ Help: Write '@param by — …' as line 2 of the run.
+    │ 
+    │ Note: A '@param' line documents the Parameter at its own position — the first line the first Parameter — and names it the way the signature does: its label, or '_' where it carries none.
+────╯
+```
+
+</div>
+
+[`undocumented-parameter`](/docs/reference/diagnostics#undocumented-parameter) means a block has `@param` lines, but not one for every parameter.
+
+### `unknown-documentation-parameter`
+
+<div class="error-output">
+
+```
+[unknown-documentation-parameter]
+Warning: This '@param' names a Parameter that does not exist
+    ╭─┤ pricing.es:28:12 │
+    │
+ 28 │     §§ @param by — how many times to double it
+    │               ─┐  
+    │                ╰── there is no Parameter 2
+    │ 
+    │ Help: Remove the tag — this signature takes 1 Parameter.
+    │ 
+    │ Note 1: A '@param' line documents the Parameter at its own position — the first line the first Parameter — and names it the way the signature does: its label, or '_' where it carries none.
+    │ Note 2: The Parameters are '_', in that order.
+────╯
+```
+
+</div>
+
+`unknown-documentation-parameter` means a `@param` line stands where the signature has no parameter. A line past the last parameter is often left behind when a parameter is removed. The same warning covers a `@param` above a declaration that takes no parameters, and a name that no entry has above an `overload` set.
+
+## Where the text shows
+
+An editor shows a block in three places:
+
+- **Hover.** The block without its examples, with each `@param` under its parameter's name and `@returns` under **Returns**. Hovering a call shows the block of the declaration the call reaches. For an overload, that is the entry it reaches.
+- **Signature help.** The description with the signature, and each parameter's text beside that parameter. An overload entry without its own block gets the set's description, and the set's `@param` lines show only in the hover.
+- **Completion.** The description beside the suggested name. For an overload, every entry shows the set's description.
+
+Hovering a provided method, one whose body the protocol writes, shows the protocol's block and the line "Provided by `Describable`.", as `announce()` does in `OrderState#Shipped::announce()`. Hovering `describe()` in `OrderState.initial::describe()` shows the namespace's own block instead. A requirement's block shows on a call made through a bound, the protocol a type parameter must conform to, like TypeScript's `T extends Describable`.
+
+The standard library is documented with the same blocks. Its reference pages are generated from the `§§` blocks in its sources, so a hover and the reference show one text. Hovering `append` in `"Hello, "::append("World")` shows "Joins another String onto the end of this one.", and so does the entry for [`append`](/docs/library/string#append) in the reference. How the reference is organised is on [The standard library](/docs/library/overview).
+
+`§?` at the end of a line is not documentation. It is a [value comment](/docs/reference/syntax-glossary#value-comment), which asks a test for the value of its line. Tests covers it.

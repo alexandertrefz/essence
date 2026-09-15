@@ -1,0 +1,556 @@
+---
+title: Result
+description: "Return a failure with a reason, take a Result apart with `match`, chain steps that can fail with `andThen`, and recover."
+section: language
+order: 80
+template: article
+---
+
+A [`Result`](/docs/library/result) is what a function returns when it can fail and has a reason to give. It is a [choice](/docs/language/choices-and-match), a type with a fixed set of cases: `#Value` holds the value, and `#Failure` holds the reason there is no value. Essence has no exceptions: a failure is a return value like any other, and the caller takes it apart. A `Result` is an [`Optional`](/docs/language/optional) with a reason.
+
+```essence
+implementation {
+	choice Problem {
+		NotANumber,
+		TooBig,
+	}
+
+	function parse(_ text: String) -> Result<Integer, Problem> {
+		<- match Integer.parse(text) -> Result<Integer, Problem> {
+			case #Value(number) {
+				if number::isGreaterThan(100) {
+					<- #Failure(#TooBig)
+				}
+
+				<- #Value(number)
+			}
+			case #Empty { <- #Failure(#NotANumber) }
+		}
+	}
+
+	function describe(_ problem: Problem) -> String {
+		<- match problem -> String {
+			case #NotANumber { <- "not a number" }
+			case #TooBig     { <- "more than 100" }
+		}
+	}
+
+	function report(_ text: String) -> String {
+		<- match parse(text) -> String {
+			case #Value(number)   { <- "got {number}" }
+			case #Failure(reason) { <- "{text}: {describe(reason)}" }
+		}
+	}
+
+	Terminal.print(report("42")) § got 42
+	Terminal.print(report("x")) § x: not a number
+	Terminal.print(report("500")) § 500: more than 100
+}
+```
+
+`Problem` is a choice too, and its cases are the ways `parse` can fail. `Result<Integer, Problem>` is a type with two type arguments: the type of the value, then the type of the reason. [`Integer.parse`](/docs/library/integer#parse) returns an `Optional<Integer>`, which can say only that there is no number. `parse` turns its `#Empty` into `#Failure(#NotANumber)` and adds a check of its own. `report` takes the `Result` apart with [`match`](/docs/reference/syntax-glossary#match), the same `match` as for any choice: `case #Value(number)` binds the value, and `case #Failure(reason)` binds the reason.
+
+**Compared with JavaScript.**
+
+```ts
+class NotANumber extends Error {}
+class TooBig extends Error {}
+
+function parse(text: string): number {
+  const number = Number.parseInt(text, 10)
+  if (Number.isNaN(number)) throw new NotANumber()
+  if (number > 100) throw new TooBig()
+  return number
+}
+
+function report(text: string): string {
+  try {
+    return `got ${parse(text)}`
+  } catch (error) {
+    if (error instanceof NotANumber) return `${text}: not a number`
+    if (error instanceof TooBig) return `${text}: more than 100`
+    throw error
+  }
+}
+```
+
+The TypeScript signature hides the failure; the Essence signature carries it in the return type, so a caller cannot reach the number without handling it. More on [Coming from JavaScript › Absence](/docs/getting-started/coming-from-javascript#absence).
+
+If you know TypeScript's discriminated unions, a `Result` is `{ ok: true; value: T } | { ok: false; error: E }`, declared once in the standard library. Its cases are the tags, and a `match` must handle both.
+
+## Returning a failure
+
+```essence
+§ fragment
+choice Result<ValueType, FailureType> {
+	Value { item: ValueType },
+	Failure { reason: FailureType },
+}
+```
+
+This is the declaration from the standard library, and every program has it in scope. `ValueType` and `FailureType` are its type parameters, and `Result<Integer, Problem>` fills them with [`Integer`](/docs/library/integer) and `Problem`. Declaring a choice with type parameters of your own is on [Generics](/docs/language/generics). `#Value` holds the value in a member named `item`, spelled exactly as in `Optional`. `#Failure` holds the reason in a member named `reason`. Where an `Optional` has `#Empty`, which says there is nothing, a `Result` has `#Failure`, which says why.
+
+```essence
+implementation {
+	function checkAge(_ age: Integer) -> Result<Integer, String> {
+		if age::isNegative() {
+			<- #Failure("an age can not be negative")
+		}
+
+		<- #Value(age)
+	}
+
+	Terminal.print(checkAge(36)) § Value(36)
+	Terminal.print(checkAge(-1)) § Failure("an age can not be negative")
+}
+```
+
+A function that can fail declares a `Result` return type and returns one of the two cases with [`<-`](/docs/reference/syntax-glossary#return). Where JavaScript would `throw`, Essence returns `#Failure(…)`. `#Value(36)` is the one-member shorthand for `#Value({ item = 36 })`, and both spellings compile. The reason can be any type. A [`String`](/docs/library/string) is quick to write. A choice of your own, like `Problem`, lets a `match` check that every reason is handled.
+
+There is no `throw` and no `try`. `throw` is read as a name and reported as [`unknown-name`](/docs/reference/diagnostics#unknown-name), and `try { … }` is a [`syntax-error`](/docs/reference/diagnostics#syntax-error).
+
+A `match` cannot skip the failure. One that handles `#Value` and not `#Failure` is [`missing-case`](/docs/reference/diagnostics#missing-case):
+
+```essence
+§ fragment
+function report(_ age: Integer) -> String {
+	<- match checkAge(age) -> String {
+		case #Value(checked) { <- "{checked} years" }
+	}
+}
+```
+
+<div class="error-output">
+
+```
+[missing-case]
+Error: This Match Expression does not handle every Case
+    ╭─┤ report.es:11:6 │
+    │
+ 11 │        <- match checkAge(age) -> String {
+    │                 ──────┬──────
+    │                       ╰──────── this is a Result<Integer, String>
+    │
+    │ Help: Add 'case Result#Failure', or a 'case _' that covers the rest.
+    │
+    │ Note: Unhandled: 'Result#Failure'.
+────╯
+```
+
+</div>
+
+## Which choice a bare `#Value` belongs to
+
+```essence
+implementation {
+	type Reading = { label: String, value: Result<Integer, String> }
+
+	function first() -> Result<Integer, String> {
+		<- #Value(1)
+	}
+
+	function show(_ result: Result<Integer, String>) -> String {
+		<- result::toString()
+	}
+
+	constant annotated: Result<Integer, String> = #Value(2)
+	constant reading: Reading = { label = "kitchen", value = #Value(3) }
+	constant results: List<Result<Integer, String>> = [
+		#Value(4),
+		#Failure("gone"),
+	]
+	constant qualified = Result<Integer, String>#Value(5)
+	constant nickname  = Optional<String>#Value("Sandy")
+
+	Terminal.inspect(first()) § Result#Value(1)
+	Terminal.inspect(annotated) § Result#Value(2)
+	Terminal.inspect(reading.value) § Result#Value(3)
+	Terminal.inspect(results) § [ Result#Value(4), Result#Failure("gone") ]
+	Terminal.inspect(qualified) § Result#Value(5)
+	Terminal.inspect(nickname) § Optional#Value("Sandy")
+	Terminal.print(show(#Value(6))) § Value(6)
+}
+```
+
+`Optional` and `Result` both declare a case named `Value`, and both are in every program's scope. A bare `#Value(…)` therefore takes its choice from a position that carries a type. An annotation is one, and it reaches into a record or list literal under it. A declared return type and a direct argument to a parameter whose type is written out are two more. The program above uses those three, and the table below lists every position.
+
+Where nothing decides, the case is [`ambiguous-case`](/docs/reference/diagnostics#ambiguous-case):
+
+```essence
+§ fragment
+constant answer = #Value(42)
+```
+
+<div class="error-output">
+
+```
+[ambiguous-case]
+Error: Case '#Value' is declared by more than one Choice
+   ╭─┤ answer.es:2:21 │
+   │
+ 2 │     constant answer = #Value(42)
+   │                        ──┬──
+   │                          ╰──── 2 Choices in scope declare it
+   │
+   │ Help 1: Write 'Optional<…>#Value' with its Type Arguments to pick 'Optional'.
+   │ Help 2: Write 'Result<…>#Value' with its Type Arguments to pick 'Result'.
+   │
+   │ Note 1: 'Optional' declares '#Value'.
+   │ Note 2: 'Result' declares '#Value'.
+───╯
+```
+
+</div>
+
+Every position side by side:
+
+| Position | Decides the choice | Does not |
+| --- | --- | --- |
+| A constant | `constant answer: Result<Integer, String> = #Value(42)` | `constant answer = #Value(42)` |
+| A record literal | under an annotated constant, as `reading` above, or under a declared return type | written directly as a function's argument |
+| A list literal | under an annotated constant, as `results` above | written directly as a function's argument |
+| A return | `<- #Value(1)` in a function declared `-> Result<Integer, String>` | — |
+| An argument | a direct argument to a parameter whose type is written out, as `show(#Value(6))` | an argument to a generic function's parameter typed `Result<T, String>` |
+| A method argument | `found::or(#Value(1))`, where the receiver's type decides the parameter's | a parameter whose type the method works out from the argument, as in an `Optional`'s `pair(with #Value(1))` |
+| A parameter default | `_ result: Result<Integer, String> = #Value(1)` | — |
+| A `match` or `define` arm | an arm under `-> Result<Integer, String>` | — |
+| An update | `{ base with value = #Value(7) }`, where `base` has a declared type | — |
+| A reassignment | `held = #Value(3)`, where `held` is declared `Result<Integer, String>` | — |
+
+Where no position decides, write the choice and its type arguments in front of the case: `Result<Integer, String>#Value(5)` or `Optional<String>#Value("Sandy")`. The name alone is not enough. `Result#Value(1)` settles the choice, and then nothing decides its type arguments, which is [`undecided-type-arguments`](/docs/reference/diagnostics#undecided-type-arguments). A bare `#Failure("gone")` is never ambiguous, because only `Result` declares `#Failure`. It is `undecided-type-arguments` on its own all the same: `"gone"` decides the type of the reason, and nothing decides the type of the value.
+
+[`inspect`](/docs/library/terminal#inspect) always names the choice, and for `#Value` that is the only way to tell the two apart:
+
+```essence
+implementation {
+	constant fromResult: Result<Integer, String> = #Value(1)
+	constant fromOptional: Optional<Integer>     = #Value(1)
+
+	Terminal.print(fromResult) § Value(1)
+	Terminal.print(fromOptional) § Value(1)
+	Terminal.inspect(fromResult) § Result#Value(1)
+	Terminal.inspect(fromOptional) § Optional#Value(1)
+}
+```
+
+[`Terminal.print`](/docs/library/terminal#print) writes the case alone, so the two values look the same. `Terminal.inspect` writes the structure of a value, with the choice's name in front of the case.
+
+The JavaScript boundary uses the same tag. A `Result` crosses as `{ $case: "Result#Value", item }` or `{ $case: "Result#Failure", reason }`. An `Optional` crosses as its value or `undefined`. [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) has the full mapping.
+
+## Reading a Result
+
+```essence
+implementation {
+	function isSmall(_ number: Integer) -> Boolean {
+		<- number::isLessThanOrEqualTo(100)
+	}
+
+	constant found: Result<Integer, String>  = #Value(42)
+	constant failed: Result<Integer, String> = #Failure("not a number")
+
+	Terminal.inspect(found::is(42)) § true
+	Terminal.inspect(failed::is(42)) § false
+	Terminal.inspect(failed::is(#Failure("not a number"))) § true
+	Terminal.inspect(failed::reason()::is("not a number")) § true
+	Terminal.inspect(found::hasValue()) § true
+	Terminal.inspect(found::hasValue(where isSmall)) § true
+	Terminal.inspect(failed::hasFailed()) § true
+	Terminal.inspect(found::value()) § Optional#Value(42)
+	Terminal.inspect(failed::value()) § Optional#Empty
+	Terminal.inspect(failed::value(defaultingTo 0)) § 0
+	Terminal.inspect(failed::reason()) § Optional#Value("not a number")
+	Terminal.inspect(found::toList()) § [ 42 ]
+	Terminal.inspect(failed::toList()) § []
+}
+```
+
+[`is`](/docs/library/result#is) compares at two levels. Given a bare value, it asks whether the `Result` holds that value, so `found::is(42)` is `true` and a failed `Result` never equals a bare value. Given another `Result`, it compares the case and its payload, the value the case holds. To compare reasons, read the reason first: `failed::reason()::is("not a number")`. [`isNot`](/docs/library/result#isNot) is the opposite of `is`.
+
+[`hasValue()`](/docs/library/result#hasValue) and [`hasFailed()`](/docs/library/result#hasFailed) return a [`Boolean`](/docs/library/boolean) and nothing more. Unlike TypeScript's `if (result.ok)`, they do not narrow: inside `if found::hasValue() { … }`, `found` is still a `Result`, the same rule Optional has. Take the value out with `match`, `value(defaultingTo:)` or `recover(with:)`. `hasValue(where:)` also asks the value a question. Here the question is `isSmall`, a declared function passed by name; the inline spelling, a function literal, is on [Functions as values](/docs/language/functions-as-values).
+
+[`value()`](/docs/library/result#value) returns the value as an `Optional` and drops the reason. [`reason()`](/docs/library/result#reason) returns the reason as an `Optional` and drops the value. `value(defaultingTo:)` returns a bare value, with the fallback in place of a failure. [`toList()`](/docs/library/result#toList) returns a list of at most one item.
+
+A list of Results has methods of its own:
+
+```essence
+implementation {
+	constant results: List<Result<Integer, String>> = [
+		#Value(1),
+		#Failure("a"),
+		#Failure("b"),
+	]
+
+	Terminal.inspect(results::allValues()) § Result#Failure([ "a", "b" ])
+}
+```
+
+[`allValues()`](/docs/library/list#allValues) returns every value when nothing failed, and every reason when anything did. [`values()`](/docs/library/list#values) and [`reasons()`](/docs/library/list#reasons) keep one side of the list, and [`partition()`](/docs/library/list#partition) returns both sides. [Lists](/docs/language/lists) covers all four.
+
+## From an Optional to a Result
+
+```essence
+implementation {
+	choice Problem {
+		NotANumber,
+		TooBig,
+	}
+
+	function isSmall(_ number: Integer) -> Boolean {
+		<- number::isLessThanOrEqualTo(100)
+	}
+
+	function readNumber(_ text: String) -> Result<Integer, Problem> {
+		<- Integer.parse(text)::toResult(failingWith #NotANumber)
+	}
+
+	function parse(_ text: String) -> Result<Integer, Problem> {
+		<- readNumber(text)::keep(where isSmall, failingWith #TooBig)
+	}
+
+	Terminal.inspect(readNumber("42")) § Result#Value(42)
+	Terminal.inspect(readNumber("x")::reason()::is(#NotANumber)) § true
+	Terminal.inspect(parse("42")) § Result#Value(42)
+	Terminal.inspect(parse("500")::reason()::is(#TooBig)) § true
+}
+```
+
+[`toResult(failingWith:)`](/docs/library/optional#toResult) is the bridge from `Optional` to `Result`. A `#Value` stays a `#Value`, and an `#Empty` becomes a `#Failure` holding the reason you give. `readNumber` is the first half of `parse` from the top of this page, with no `match`.
+
+[`keep(where:failingWith:)`](/docs/library/result#keep) is the second half. It keeps the value when the check accepts it, and fails with the given reason when the check refuses it. A `Result` that has already failed keeps its own reason, and the check does not run. It is `Optional`'s [`keep(where:)`](/docs/library/optional#keep) with a reason for the value it drops.
+
+The type of the reason comes from the argument of `toResult`. A case written on its own has the type of that case, not of its choice. So `Integer.parse("42")::toResult(failingWith #NotANumber)`, with nothing around it, is a `Result` whose failure type is `Problem#NotANumber`, and a later `#TooBig` does not fit. The call is [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload):
+
+```essence
+§ fragment
+constant parsed = Integer.parse("42")::toResult(failingWith #NotANumber)
+
+Terminal.inspect(parsed::keep(where isSmall, failingWith #TooBig))
+```
+
+<div class="error-output">
+
+```
+[no-matching-overload]
+Error: No overload of 'keep' accepts these Arguments
+    ╭─┤ chain.es:13:19 │
+    │
+ 13 │     Terminal.inspect(parsed::keep(where isSmall, failingWith #TooBig))
+    │                      ────────────────────────┬───────────────────────
+    │                                              ╰───────────────────────── this call passes 2 Arguments
+    │
+    │ Note: 'Result::keep' takes 2 Arguments: Parameter 'where' is (_: Integer) -> Boolean, Parameter 'failingWith' is Problem#NotANumber.
+────╯
+```
+
+</div>
+
+Give the `Result` its full type before you chain onto it. Return it from a function declared `-> Result<Integer, Problem>`, as `readNumber` does, or bind it to a constant annotated `Result<Integer, Problem>`.
+
+## Transforming and recovering
+
+```essence
+implementation {
+	choice Problem {
+		NotANumber,
+		TooBig,
+	}
+
+	function double(_ number: Integer) -> Integer {
+		<- number::multiply(with 2)
+	}
+
+	function describe(_ problem: Problem) -> String {
+		<- match problem -> String {
+			case #NotANumber { <- "not a number" }
+			case #TooBig     { <- "more than 100" }
+		}
+	}
+
+	function fallbackFor(_ problem: Problem) -> Integer {
+		<- match problem -> Integer {
+			case #NotANumber { <- 0 }
+			case #TooBig     { <- 100 }
+		}
+	}
+
+	constant found: Result<Integer, Problem>   = #Value(42)
+	constant missing: Result<Integer, Problem> = #Failure(#NotANumber)
+	constant tooBig: Result<Integer, Problem>  = #Failure(#TooBig)
+
+	Terminal.inspect(found::map(double)) § Result#Value(84)
+	Terminal.inspect(missing::mapFailure(describe)) § Result#Failure("not a number")
+	Terminal.print(missing::map(double)::mapFailure(describe)) § Failure("not a number")
+	Terminal.inspect(found::recover(with fallbackFor)) § 42
+	Terminal.inspect(missing::recover(with fallbackFor)) § 0
+	Terminal.inspect(tooBig::recover(with fallbackFor)) § 100
+	Terminal.inspect(missing::or(found)) § Result#Value(42)
+}
+```
+
+[`map`](/docs/library/result#map) runs a function on the value and wraps what it returns in a `Result`. A failure passes through unchanged, and the function does not run. [`mapFailure`](/docs/library/result#mapFailure) is `map` for the other case: here it turns a `Problem` into a `String`, and a value passes through unchanged. With the reason a `String`, `print` can write the whole `Result`.
+
+[`recover(with:)`](/docs/library/result#recover) returns a plain value: the value, or what the function makes of the reason. So `fallbackFor` can pick a different fallback for each problem. Where the fallback does not depend on the reason, `value(defaultingTo:)` is shorter.
+
+[`or`](/docs/library/result#or) returns this `Result` if it holds a value, and the `Result` it is given otherwise, as `missing::or(found)` does. Like [`and`](/docs/library/boolean#and) and `or` on a `Boolean`, it evaluates its argument either way: in `found::or(parse("7"))`, the parse runs even though `found` holds a value.
+
+## Chaining steps that can fail
+
+```essence
+implementation {
+	choice SeatProblem {
+		NotANumber,
+		NoSuchSeat,
+	}
+
+	constant seats = ["1A", "1B", "2A"]
+
+	function readNumber(_ text: String) -> Result<Integer, SeatProblem> {
+		<- Integer.parse(text)::toResult(failingWith #NotANumber)
+	}
+
+	function seat(_ index: Integer) -> Result<String, SeatProblem> {
+		<- seats::item(at index)::toResult(failingWith #NoSuchSeat)
+	}
+
+	function pickSeat(_ text: String) -> Result<String, SeatProblem> {
+		<- readNumber(text)::andThen(seat)
+	}
+
+	function describe(_ problem: SeatProblem) -> String {
+		<- match problem -> String {
+			case #NotANumber { <- "not a number" }
+			case #NoSuchSeat { <- "no such seat" }
+		}
+	}
+
+	Terminal.inspect(pickSeat("1")) § Result#Value("1B")
+	Terminal.inspect(pickSeat("x")::mapFailure(describe)) § Result#Failure("not a number")
+	Terminal.inspect(pickSeat("9")::mapFailure(describe)) § Result#Failure("no such seat")
+	Terminal.inspect(readNumber("1")::map(seat)) § Result#Value(Result#Value("1B"))
+	Terminal.inspect(readNumber("1")::map(seat)::flatten()) § Result#Value("1B")
+}
+```
+
+`pickSeat` has two steps, and each can fail. `readNumber` reads a seat number, and `seat` looks it up. [`andThen`](/docs/library/result#andThen) runs the next step on the value when there is one, and returns the `Result` that step returns. A failure passes through, and the step does not run. The first failure ends the chain, and its reason is the one the caller sees. The value's type may change on the way: `pickSeat` starts from a `String`, reads an `Integer`, and ends with a `String`.
+
+`andThen` is `map` followed by `flatten`. `map(seat)` would wrap `seat`'s `Result` in another one, a `Result<Result<String, SeatProblem>, SeatProblem>`. [`flatten()`](/docs/library/result#flatten) takes a `Result` holding a `Result` down one level.
+
+Every step in a chain fails with the same type. `andThen` takes a step that fails with the same failure type as the `Result` it is called on, so a `seat` that fails with a `String` is refused as [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload):
+
+```essence
+§ fragment
+function seat(_ index: Integer) -> Result<String, String> {
+	<- seats::item(at index)::toResult(failingWith "no such seat")
+}
+
+Terminal.inspect(readNumber("1")::andThen(seat))
+```
+
+<div class="error-output">
+
+```
+[no-matching-overload]
+Error: No overload of 'andThen' accepts these Arguments
+    ╭─┤ steps.es:17:19 │
+    │
+ 17 │     Terminal.inspect(readNumber("1")::andThen(seat))
+    │                      ───────────────┬──────────────
+    │                                     ╰──────────────── this call passes 1 Argument
+    │
+    │ Note: 'Result::andThen' takes 1 Argument: Parameter 1 is (_: Integer) -> Result<Other, SeatProblem>.
+────╯
+```
+
+</div>
+
+Bring the reasons to one type first. `readNumber("1")::mapFailure(describe)::andThen(seat)` turns the first step's reason into a `String` before the second step runs.
+
+**Compared with JavaScript.**
+
+```ts
+fetchUser(id).then(loadOrders) // skips loadOrders when fetchUser rejects
+```
+
+`andThen` is `.then` for a step that can fail: after a failure, the next step does not run. A Promise can reject with anything, where every `Result` in the chain names its failure type. On an array, the same shape is `flatMap`. More on [Coming from JavaScript › Absence](/docs/getting-started/coming-from-javascript#absence).
+
+## Printing a Result
+
+```essence
+implementation {
+	constant found: Result<Integer, String>  = #Value(42)
+	constant failed: Result<Integer, String> = #Failure("gone")
+
+	Terminal.print(found) § Value(42)
+	Terminal.print(failed) § Failure("gone")
+	Terminal.inspect(failed) § Result#Failure("gone")
+}
+```
+
+`print` writes a `Result` as `Value(…)` or `Failure(…)` around its payload, and a `String` payload keeps its quotes. `inspect` puts the choice's name in front.
+
+`print` needs both payloads to be printable. A choice you declare is not printable until it conforms to the [`Printable`](/docs/library/protocols#Printable) protocol, so printing a `Result<Integer, Problem>` is [`unsatisfied-conformance-condition`](/docs/reference/diagnostics#unsatisfied-conformance-condition):
+
+```essence
+§ fragment
+Terminal.print(readNumber("42"))
+```
+
+<div class="error-output">
+
+```
+[unsatisfied-conformance-condition]
+Error: Result<Integer, Problem> does not conform to 'Printable'
+    ╭─┤ print.es:11:2 │
+    │
+ 11 │     Terminal.print(readNumber("42"))
+    │     ────────────────┬───────────────
+    │                     ╰───────────────── this binds a Type Parameter bound to 'Printable'
+    │
+    │ Note 1: Result<Integer, Problem> does not conform to 'Printable'.
+    │ Note 2: Problem does not conform to 'Printable'.
+────╯
+```
+
+</div>
+
+[Protocols](/docs/language/protocols) shows how a choice such as `Problem` becomes printable, and after that `print` writes `Failure(NotANumber)`. Without that, turn the reason into something printable first. `mapFailure(describe)` turns it into a `String`, as the `print` line under "Transforming and recovering" shows. A `match` can turn the whole `Result` into one, as `report` did at the top of this page.
+
+`inspect` takes any `Result`. A case of your own choice is written with the file that declares it, such as `Result#Failure(./parse.es#Problem#NotANumber)`.
+
+## What Result shares with Optional
+
+Most methods an `Optional` has for its item, a `Result` has for its value. These eleven match, name and labels:
+
+| Name | On an `Optional` | On a `Result` |
+| --- | --- | --- |
+| `is` | another `Optional`, or a bare item | another `Result`, or a bare value |
+| `isNot` | the opposite of `is` | the opposite of `is` |
+| [`toString`](/docs/library/result#toString) | `Value(…)` or `Empty` | `Value(…)` or `Failure(…)` |
+| `hasValue()` | whether there is an item | whether there is a value |
+| `hasValue(where:)` | whether the check accepts the item | whether the check accepts the value |
+| `value(defaultingTo:)` | the item, or the fallback | the value, or the fallback |
+| `map` | transforms the item | transforms the value; a failure passes through |
+| `andThen` | the step returns an `Optional` | the step returns a `Result` with the same failure type |
+| `or` | this one if it holds an item, otherwise the one given | this one if it holds a value, otherwise the one given |
+| `toList` | a list of at most one item | a list of at most one item |
+| `flatten` | on an `Optional` holding an `Optional` | on a `Result` holding a `Result` with the same failure type |
+
+Where the two differ:
+
+| On an `Optional` | On a `Result` |
+| --- | --- |
+| [`isEmpty()`](/docs/library/optional#isEmpty) | `hasFailed()` |
+| `keep(where:)` | `keep(where:failingWith:)`, which needs a reason for the value it drops |
+| no `value()` without a label | `value()`, the value as an `Optional` |
+| [`pair(with:)`](/docs/library/optional#pair) | no `pair(with:)` |
+| `toResult(failingWith:)` | `value()` goes the other way |
+| — | `reason()`, `mapFailure`, `recover(with:)` |
+
+There is no `unwrap`: a `Result` is taken apart with `match`, or collapsed with `value(defaultingTo:)` or `recover(with:)`. There is no `mapError`, because the case is `#Failure`, and there is no `Either` type.
+
+<SeeAlso links={[
+	{ label: "Result in the standard library", href: "/docs/library/result" },
+	{ label: "Optional", href: "/docs/language/optional" },
+	{ label: "Lists", href: "/docs/language/lists" },
+	{ label: "Calling Essence from JavaScript", href: "/docs/guides/calling-from-javascript" },
+]} />

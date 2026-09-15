@@ -1,0 +1,545 @@
+---
+title: Functions
+description: "Declare a function with labelled parameters and default values, return with `<-`, and call a function above its declaration."
+section: language
+order: 40
+template: article
+---
+
+A function is declared with [`function`](/docs/reference/syntax-glossary#function): a name, its parameters, and the type it returns after [`->`](/docs/reference/syntax-glossary#arrow). [`<-`](/docs/reference/syntax-glossary#return) returns a value, and the return type is always written. A parameter may carry a [label](/docs/reference/syntax-glossary#labels), a word the call writes in front of the argument. A call then says what each argument is for: `greet("World", with "Hi")`, where JavaScript writes `greet("World", "Hi")`. A function written as a value, where JavaScript would use an arrow function, is on [Functions as values](/docs/language/functions-as-values).
+
+```essence
+implementation {
+	function greet(_ name: String, with greeting: String = "Hello") -> String {
+		<- "{greeting}, {name}!"
+	}
+
+	Terminal.print(greet("World")) § Hello, World!
+	Terminal.print(greet("World", with "Hi")) § Hi, World!
+}
+```
+
+`greet` takes a name with no label and a greeting labelled `with`. The greeting has a default value, `"Hello"`, so a call may leave it out.
+
+**Compared with JavaScript.**
+
+```ts
+function greet(name: string, greeting = "Hello") {
+  return `${greeting}, ${name}!`
+}
+
+console.log(greet("World")) // Hello, World!
+console.log(greet("World", "Hi")) // Hi, World!
+```
+
+Three things differ: the call writes the label `with`, the return type cannot be left off, and `<-` stands where `return` would. The default value works the same as in JavaScript. More on [Coming from JavaScript › Functions](/docs/getting-started/coming-from-javascript#functions).
+
+## Declaring a function
+
+```essence
+implementation {
+	function double(_ value: Integer) -> Integer {
+		<- value::multiply(with 2)
+	}
+
+	function letter(of text: String, at position: Integer) -> String {
+		<- text::character(at position, defaultingTo "?")
+	}
+
+	Terminal.print(double(21)) § 42
+	Terminal.print(letter(of "Essence", at 0)) § E
+	Terminal.print(letter(of "Essence", at 9)) § ?
+}
+```
+
+`function` starts a declaration. `of text` gives one parameter two names: the label `of`, which a call writes, and the name `text`, which the body reads. The `_` in `_ value` means no label, and the Labels section below covers all three spellings. The parentheses hold the parameters, each with a type after a colon: `double` takes an [`Integer`](/docs/library/integer), and `letter` takes a [`String`](/docs/library/string) and an `Integer`. The type after `->` is what a call returns, and the braces hold the body. In `letter`, [`text::character(at position, defaultingTo "?")`](/docs/library/string#character) returns the character at `position`, or `"?"` when `position` is outside the text.
+
+A parameter is a [constant](/docs/reference/syntax-glossary#constant) inside the body, where a JavaScript parameter can be reassigned. `value` and `text` can be read but not reassigned: assigning to `value` inside `double` is [`constant-reassignment`](/docs/reference/diagnostics#constant-reassignment).
+
+The return type is always written, even where the body would give it away. The signature, a function's name, parameters and return type, is what a call is checked against, so an edit to the body never changes it. Leave `-> Integer` off `double` and the parser stops at the brace with a [`syntax-error`](/docs/reference/diagnostics#syntax-error):
+
+<div class="error-output">
+
+```
+[syntax-error]
+Error: Expected '-' but found '{'.
+   ╭─┤ double.es:2:36 │
+   │
+ 2 │     function double(_ value: Integer) {
+   │                                       ▲
+   │                                       ╰── expected '-'
+───╯
+```
+
+</div>
+
+The message names `-`, the first character of the `->` the parser expected after the parameter list.
+
+## Returning with `<-`
+
+```essence
+implementation {
+	function sign(_ value: Integer) -> String {
+		if value::isNegative() {
+			<- "negative"
+		}
+
+		if value::isPositive() {
+			<- "positive"
+		}
+
+		<- "zero"
+	}
+
+	Terminal.print(sign(-3)) § negative
+	Terminal.print(sign(0)) § zero
+	Terminal.print(sign(7)) § positive
+}
+```
+
+`<-` returns the value on its right and leaves the function at once. A `<-` inside an [`if`](/docs/language/conditions) block leaves the whole function, not only the block, so `sign` reads as a run of early returns with no nesting. A statement written after a `<-` in the same block never runs, and the compiler does not warn about it.
+
+Apart from a `-> {}` body that runs to its closing brace, `<-` is the only way a value leaves a function. There is no `return` keyword. In `return value`, `return` is read as a name, so the line is [`unknown-name`](/docs/reference/diagnostics#unknown-name): "'return' is not declared". A `<-` outside any function is [`top-level-return`](/docs/reference/diagnostics#top-level-return), "There is nothing here to return from".
+
+The value must fit the declared type. Declare `double` as `-> String` and its body no longer fits, which is [`return-type-mismatch`](/docs/reference/diagnostics#return-type-mismatch):
+
+<div class="error-output">
+
+```
+[return-type-mismatch]
+Error: This value does not fit the declared return Type
+   ╭─┤ wrong.es:3:6 │
+   │
+ 3 │        <- value::multiply(with 2)
+   │           ───────────┬───────────
+   │                      ╰───────────── this is an Integer
+   │
+   │ Note: The Function returns String.
+───╯
+```
+
+</div>
+
+## Every path returns
+
+```essence
+implementation {
+	function sign(_ value: Integer) -> String {
+		if value::isNegative() {
+			<- "negative"
+		} else if value::isZero() {
+			<- "zero"
+		} else {
+			<- "positive"
+		}
+	}
+
+	Terminal.print(sign(-3)) § negative
+	Terminal.print(sign(0)) § zero
+	Terminal.print(sign(7)) § positive
+}
+```
+
+An `if` whose every branch returns, down to a final `else`, is a complete body. Nothing has to follow it.
+
+A function that returns a value may not fall off its end, and the compiler checks every path through the body. An `if` without an `else` leaves a path open. Drop the `else` branch, and a positive `value` has no path that returns a `String`, which is [`missing-return`](/docs/reference/diagnostics#missing-return):
+
+```essence
+§ fragment
+function sign(_ value: Integer) -> String {
+	if value::isNegative() {
+		<- "negative"
+	} else if value::isZero() {
+		<- "zero"
+	}
+}
+```
+
+<div class="error-output">
+
+```
+[missing-return]
+Error: Not every path through this Function returns
+   ╭─┤ branches.es:2:2 │
+   │
+ 2 │ ╭─▶     function sign(_ value: Integer) -> String {
+   ┆ ┆
+ 8 │ ├─▶     }
+   │ │
+   │ ╰─────────── this path falls off the end
+   │
+   │ Note: The declared return Type is String, so every path must yield one.
+───╯
+```
+
+</div>
+
+Delete the final `<- "zero"` from the first `sign` and the error is the same: its two `if` blocks have no `else`, so a zero `value` falls off the end.
+
+## A function that returns nothing
+
+```essence
+implementation {
+	function announce(_ text: String) -> {} {
+		Terminal.print("== {text} ==") § == Start ==
+		<- {}
+	}
+
+	function log(_ text: String) -> {} {
+		Terminal.print(text) § done
+	}
+
+	announce("Start")
+	constant returned = log("done")
+	Terminal.inspect(returned) § {}
+}
+```
+
+A function called for what it does, such as printing, is declared `-> {}`. `{}` is a type with no members, and `{}` is also the value such a function returns. The `<- {}` at the end may be left out, as in `log`: a function declared `-> {}` is the one kind whose body may run to its closing brace. [`Terminal.print`](/docs/library/terminal#print) is declared `-> {}` itself.
+
+Where TypeScript writes `: void`, Essence writes `-> {}`. TypeScript's `{}` type accepts any value except `null` and `undefined`. Essence's `{}` accepts no number, string or list, so `<- 1` in a function declared `-> {}` is `return-type-mismatch`. The `{}` a call returns is a value like any other: `returned` holds one, and [`Terminal.inspect`](/docs/library/terminal#inspect) writes it as `{}`.
+
+## Labels
+
+```essence
+implementation {
+	§ One name is both the label and the name the body reads.
+	function greet(subject: String) -> String {
+		<- "Hello, {subject}!"
+	}
+
+	§ Two names: `of` is what a call writes, `text` is what the body reads.
+	function letter(of text: String, at position: Integer) -> String {
+		<- text::character(at position, defaultingTo "?")
+	}
+
+	§ An underscore drops the label, so the argument stands on its own.
+	function shout(_ message: String) -> String {
+		<- "{message}!"
+	}
+
+	§ The spellings mix in any order.
+	function transfer(
+		_ amount: Integer,
+		to account: String,
+		memo: String,
+	) -> String {
+		<- "{amount} to {account}: {memo}"
+	}
+
+	Terminal.print(greet(subject "World")) § Hello, World!
+	Terminal.print(letter(of "Essence", at 0)) § E
+	Terminal.print(shout("Look")) § Look!
+	Terminal.print(transfer(50, to "Ada", memo "rent")) § 50 to Ada: rent
+}
+```
+
+A parameter has two names: the label a call writes, and the name the body reads. There are three ways to write them.
+
+| Parameter | The call writes | The body reads |
+| --- | --- | --- |
+| `subject: String` | `greet(subject "World")` | `subject` |
+| `of text: String` | `letter(of "Essence", at 0)` | `text` |
+| `_ message: String` | `shout("Look")` | `message` |
+
+`subject: String` uses one name for both jobs. That suits a parameter whose name already reads well at a call site. `of text: String` separates them, so the call says `of` and the body says `text`. A preposition such as `of` reads well at a call but would be a poor name inside the body. `_ message: String` has no label, so the argument is positional: the [underscore](/docs/reference/syntax-glossary#underscore) stands where the label would be. That suits an argument the function's name already implies: `shout` needs no label to say what it shouts. The three spellings mix in any order, as `transfer` shows, and two unlabelled parameters may stand side by side.
+
+Every argument a call writes carries its parameter's label, in declaration order. Write the first argument of `letter` bare and the compiler names the label it wanted:
+
+<div class="error-output">
+
+```
+[argument-label-mismatch]
+Error: This Argument is not labelled 'of'
+   ╭─┤ letter.es:6:24 │
+   │
+ 6 │     Terminal.print(letter("Essence", at 0))
+   │                           ────┬────
+   │                               ╰────── this Argument carries no label
+   │
+   │ Help: Write 'of' before the value.
+   │
+   │ Note: The signature takes 2 Arguments: Parameter 'of' is String, Parameter 'at' is Integer.
+───╯
+```
+
+</div>
+
+The same error, [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch), covers every wrong label. Swapping the two, `letter(at 0, of "Essence")`, reports one error per misplaced argument, because labels never reorder a call. A made-up label, `letter(from "Essence", at 0)`, is refused the same way: the error underlines `"Essence"` and says it "is labelled 'from'". Too few or too many arguments is [`argument-count-mismatch`](/docs/reference/diagnostics#argument-count-mismatch), "This call passes the wrong number of Arguments". A value of the wrong type in the right place is [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch), "This Argument does not fit Parameter 'at'". A label on a parameter that takes none is `argument-label-mismatch` again:
+
+<div class="error-output">
+
+```
+[argument-label-mismatch]
+Error: This Argument is labelled where Parameter 1 takes no label
+    ╭─┤ calls.es:12:31 │
+    │
+ 12 │     Terminal.print(shout(message "Look"))
+    │                                  ───┬──
+    │                                     ╰──── this is labelled 'message'
+    │
+    │ Help: Pass the value with no label.
+    │
+    │ Note: The signature takes 1 Argument: Parameter 1 is String.
+────╯
+```
+
+</div>
+
+Because a call must write the labels, in order, a call reads as a phrase: `letter(of "Essence", at 0)` says what each argument is. These pages write a function with its labels, as `letter(of:at:)`, but the declared name is still `letter`: a second `function letter(from text: String, at position: Integer)` is [`duplicate-variable`](/docs/reference/diagnostics#duplicate-variable). A reader meeting [`"42"::pad(to 6, with "0")`](/docs/library/string#pad) sees which argument is the width and which is the filler; JavaScript's `"42".padStart(6, "0")` leaves that to memory.
+
+A label and its value are separated by a space and nothing else. `greet(subject: "World")` is a `syntax-error`: `Expected a Type but found '"World"'.` The same colon on a method call, `"42"::pad(to: 6)`, is `Expected an Expression but found ':'.` `greet({ subject = "World" })` passes one [record](/docs/language/records), a value with named members, with no label where `subject` was due, and is `argument-label-mismatch`. Where JavaScript passes an options object, an Essence call writes labels.
+
+## Default values
+
+```essence
+implementation {
+	§ A default may read a parameter to its left.
+	function slice(
+		of text: String,
+		from start: Integer = 0,
+		to end: Integer = text::length(),
+	) -> String {
+		<- text::slice(from start, to end)
+	}
+
+	§ A default on an unlabelled parameter.
+	function increment(_ value: Integer, _ amount: Integer = 1) -> Integer {
+		<- value::add(amount)
+	}
+
+	Terminal.print(slice(of "essence")) § essence
+	Terminal.print(slice(of "essence", from 2)) § sence
+	Terminal.print(slice(of "essence", from 2, to 4)) § se
+	Terminal.print(increment(1)) § 2
+	Terminal.print(increment(1, 10)) § 11
+}
+```
+
+A parameter may carry a default value: [`=`](/docs/reference/syntax-glossary#equals) and an expression after its type. A call that leaves the argument out gets the default, and a call that writes it does not. The expression may read the parameters to its left, as `to end` reads `text`, and anything in the scope the function is written in. In a [method](/docs/language/namespaces-and-methods) it may also read [`@`](/docs/reference/syntax-glossary#at), the value the method is called on. The standard library's [`slice`](/docs/library/string#slice) has the same two defaults: `from start: Integer = 0, to end: Integer = @::length()`.
+
+TypeScript's optional parameter has no counterpart. `?` is a name character, so `_ name?: String` declares a required parameter named `name?`, and a call that leaves it out is `argument-count-mismatch`. A parameter a call may leave out is one with a default. There is no rest parameter either: `_ ...values: Integer` is a `syntax-error`, so take a [`List<Integer>`](/docs/library/list) instead.
+
+The default is worked out at each call that leaves the argument out, the same as a JavaScript default parameter:
+
+```essence
+implementation {
+	variable counter = 0
+
+	function stamp(_ text: String, at tick: Integer = counter) -> String {
+		<- "{text}@{tick}"
+	}
+
+	Terminal.print(stamp("a")) § a@0
+	counter = counter::add(1)
+	Terminal.print(stamp("b")) § b@1
+	Terminal.print(stamp("c", at 99)) § c@99
+}
+```
+
+Labels let a call skip a defaulted parameter in the middle. Arguments are matched by label, so `pad("ab", with "-")` leaves `to` at its default and still writes `with`:
+
+```essence
+implementation {
+	function pad(
+		_ text: String,
+		to width: Integer = 5,
+		with filler: String = ".",
+	) -> String {
+		<- text::pad(to width, with filler)
+	}
+
+	Terminal.print(pad("ab")) § ...ab
+	Terminal.print(pad("ab", to 3)) § .ab
+	Terminal.print(pad("ab", with "-")) § ---ab
+	Terminal.print(pad("ab", to 4, with "_")) § __ab
+}
+```
+
+**Compared with JavaScript.**
+
+```ts
+function pad(text: string, { width = 5, filler = "." } = {}): string {
+  return text.padStart(width, filler)
+}
+
+pad("ab") // "...ab"
+pad("ab", { filler: "-" }) // "---ab"
+pad("ab", { width: 4, filler: "_" }) // "__ab"
+```
+
+JavaScript names and skips arguments with an options object, whose keys may come in any order. Essence labels name and skip arguments without an object, but the arguments a call writes follow the declaration order. `pad("ab", with "-", to 3)` is two `argument-label-mismatch` errors, one per argument. More on [Coming from JavaScript › Functions](/docs/getting-started/coming-from-javascript#functions).
+
+Every place a default is refused, and what the compiler says:
+
+| Code | When | The compiler says |
+| --- | --- | --- |
+| [`default-type-mismatch`](/docs/reference/diagnostics#default-type-mismatch) | `by factor: Integer = "twice"` | This default does not fit Parameter 'factor' |
+| [`default-references-later-parameter`](/docs/reference/diagnostics#default-references-later-parameter) | `from start: Integer = end, to end: Integer` | 'end' is declared after the Parameter whose default reads it |
+| [`default-references-own-parameter`](/docs/reference/diagnostics#default-references-own-parameter) | `_ times: Integer = times` | 'times' is the Parameter its own default is written on |
+| [`default-references-pattern-binding`](/docs/reference/diagnostics#default-references-pattern-binding) | a default reads a name that a [pattern](/docs/language/patterns) in an earlier parameter binds | 'x' is bound by a Pattern and can not be read by a default |
+| [`indistinguishable-default-parameter`](/docs/reference/diagnostics#indistinguishable-default-parameter) | `_ first: Integer = 1, _ second: String`: a defaulted unlabelled parameter with another unlabelled one after it | This default could not be told apart from the Parameter after it |
+| [`ambiguous-overload-default`](/docs/reference/diagnostics#ambiguous-overload-default) | a default lets two [overload](/docs/reference/syntax-glossary#overload) entries accept the same call | This default makes two Overloads accept the same call |
+| [`default-on-function-literal`](/docs/reference/diagnostics#default-on-function-literal) | a default on a [function literal](/docs/reference/syntax-glossary#function-literal), `(_ count: Integer = 1) -> Integer { … }` | A Function literal can not carry a default |
+| [`default-on-protocol-requirement`](/docs/reference/diagnostics#default-on-protocol-requirement) | a default on a requirement inside a [protocol](/docs/language/protocols) | A Protocol requirement can not carry a default |
+
+A default may also be a record, and a record default fills in the members a written argument leaves out; Records explains that form.
+
+## Scope and hoisting
+
+```essence
+implementation {
+	§ A function may be called above its declaration.
+	Terminal.print(later(2)) § 3
+
+	function later(_ value: Integer) -> Integer {
+		<- value::add(1)
+	}
+
+	§ Two functions may call each other, whichever is written first.
+	function isEvenNumber(_ n: Integer) -> Boolean {
+		if n::is(0) {
+			<- true
+		}
+
+		<- isOddNumber(n::subtract(1))
+	}
+
+	function isOddNumber(_ n: Integer) -> Boolean {
+		if n::is(0) {
+			<- false
+		}
+
+		<- isEvenNumber(n::subtract(1))
+	}
+
+	Terminal.print(isEvenNumber(10)) § true
+}
+```
+
+A function declared directly inside `implementation` is in scope in the whole program. It may be called above the line that declares it, it may call itself, and two functions may call each other, whichever is written first. This is called hoisting. It is the same as a JavaScript `function` declaration.
+
+A constant is not hoisted. It comes into scope on its own line, and a function body written above it cannot name it, even when the call comes later:
+
+```essence
+§ fragment
+function readsConstant() -> Integer {
+	<- base::add(1)
+}
+
+constant base = 41
+
+Terminal.print(readsConstant())
+```
+
+<div class="error-output">
+
+```
+[unknown-name]
+Error: 'base' is not declared
+   ╭─┤ base.es:3:6 │
+   │
+ 3 │        <- base::add(1)
+   │           ──┬─
+   │             ╰─── no such Variable or Constant
+───╯
+```
+
+</div>
+
+**Compared with JavaScript.**
+
+```ts
+function readsConstant(): number {
+  return base + 1
+}
+
+const base = 41
+
+console.log(readsConstant()) // 42
+```
+
+This runs in JavaScript, which checks `const` (its temporal dead zone) when the body runs; Essence checks the name where the body is written. More on [Coming from JavaScript › Bindings](/docs/getting-started/coming-from-javascript#bindings).
+
+Functions nest and recurse, and their parameters may shadow outer names:
+
+```essence
+implementation {
+	§ A function may call itself.
+	function factorial(_ n: Integer) -> Integer {
+		if n::isLessThanOrEqualTo(1) {
+			<- 1
+		}
+
+		<- n::multiply(with factorial(n::subtract(1)))
+	}
+
+	§ A function declared inside a function reads the outer parameters.
+	function scaled(_ value: Integer) -> Integer {
+		function inner(_ n: Integer) -> Integer {
+			<- n::multiply(with value)
+		}
+
+		<- inner(2)
+	}
+
+	§ A parameter may shadow a name from the enclosing scope.
+	constant value = 10
+
+	function shadow(_ value: Integer) -> Integer {
+		<- value
+	}
+
+	Terminal.print(factorial(10)) § 3628800
+	Terminal.print(scaled(21)) § 42
+	Terminal.print(shadow(1)) § 1
+}
+```
+
+`factorial` calls itself until `n` reaches 1. `inner` is declared inside `scaled` and reads `scaled`'s parameter `value`, as a JavaScript closure does. It is in scope only inside `scaled`, and only from its own line down. A function declared inside a function body, or inside an `if` block, comes into scope at its own line, like a constant, so declare it before its first use. JavaScript hoists a function declaration to the top of whatever body it is in, and Essence hoists only the functions directly inside `implementation`. Inside `shadow`, the parameter `value` hides the constant of the same name.
+
+A function is a name in its scope, like a constant, and a name is declared once. A second `function describe` is not a second signature. It is `duplicate-variable`, whose message calls every declared name a Variable:
+
+<div class="error-output">
+
+```
+[duplicate-variable]
+Error: Variable 'describe' is already declared
+   ╭─┤ describe.es:6:11 │
+   │
+ 6 │     function describe(_ value: String) -> String {
+   │              ────┬───
+   │                  ╰───── declared a second time here
+───╯
+```
+
+</div>
+
+A constant and a function that share a name are the same error. So is [`loop`](/docs/library/loop), the one function the standard library brings into every program: declaring `function loop` is `duplicate-variable`.
+
+A function you declare carries one signature. In a program, several signatures under one name form an `overload` block, which exists only inside a namespace. That form is on Namespaces and methods. A function may also declare a type parameter, TypeScript's `<T>`, as in `function pairUp<infer Value>(…)`. `infer` here is unrelated to TypeScript's `infer`: the arguments decide the type at each call, as [Generics](/docs/language/generics) shows.
+
+## Documenting a function
+
+```essence
+implementation {
+	§§ Pads a line of text on the left, so a column of them lines up.
+	§§
+	§§ @param _ — the text to pad
+	§§ @param to — the width to reach
+	§§ @param with — the filler, one character wide
+	§§ @returns — the padded text
+	function padded(
+		_ text: String,
+		to width: Integer,
+		with filler: String = ".",
+	) -> String {
+		<- text::pad(to width, with filler)
+	}
+
+	Terminal.print(padded("42", to 6)) § ....42
+	Terminal.print(padded("42", to 6, with "0")) § 000042
+}
+```
+
+A [`§§`](/docs/reference/syntax-glossary#doc-comment) comment above a function is its documentation: Markdown that an editor shows on hover, in signature help and beside a completion. Its `@param` lines document the parameters in order, and each names its parameter the way the signature does: by its label, or `_` where it has none. So the lines for `padded` are `@param _`, `@param to` and `@param with`, not `text`, `width` and `filler`. JSDoc names a parameter the way the body reads it, and Essence names it the way a call writes it. `@returns` documents what the function returns. The tag grammar, and the warnings for a tag that names the wrong parameter, are on [Documentation comments](/docs/language/documentation-comments).

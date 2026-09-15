@@ -1,0 +1,376 @@
+---
+title: "Conditions: if and define"
+description: "Run a block with the `if` statement or pick a value with the `define` expression; every condition is a Boolean."
+section: language
+order: 30
+template: article
+---
+
+An [`if`](/docs/reference/syntax-glossary#if) runs a block of statements when a condition holds. A [`define`](/docs/reference/syntax-glossary#define) is an expression that picks a value by condition, the job a ternary does in JavaScript. Both take a [`Boolean`](/docs/library/boolean) and nothing else. Essence has no truthiness, so a number, a string or a list cannot stand where a condition stands.
+
+```essence
+implementation {
+	constant guests = 5
+
+	if guests::isGreaterThan(4) {
+		Terminal.print("book the long table") § book the long table
+	}
+
+	if guests::isZero() {
+		Terminal.print("no table needed")
+	} else if guests::isLessThanOrEqualTo(2) {
+		Terminal.print("a table for two")
+	} else {
+		Terminal.print("a table for {guests}") § a table for 5
+	}
+
+	constant size = define {
+		as "small" if guests::isLessThanOrEqualTo(2)
+		as "large" otherwise
+	}
+
+	Terminal.print("a {size} party") § a large party
+}
+```
+
+An `if` is the keyword, a condition and a block in braces. `else if` asks another question when the condition above it is `false`. `else` runs when every condition above it is `false`. With five guests, the first `if` prints, and the chain ends in its `else`. Each condition is a [method call](/docs/language/method-calls) that returns a `Boolean`: [`isGreaterThan`](/docs/library/integer#isGreaterThan), [`isZero`](/docs/library/integer#isZero) and [`isLessThanOrEqualTo`](/docs/library/integer#isLessThanOrEqualTo). The `define` at the end picks a value, as a ternary does: `size` is `"large"`, because five is more than two.
+
+The shape is JavaScript's, with three differences: the condition has no parentheses, the braces are required, and each comparison is a method call. More on [Coming from JavaScript › Control flow](/docs/getting-started/coming-from-javascript#control-flow).
+
+## Braces, not parentheses
+
+The braces around a block are required, even around a single statement. Without them, `if guests::isGreaterThan(4) Terminal.print("book the long table")` is a syntax error: `Expected '{' but found 'Terminal'.`
+
+The condition is written bare. Parentheses around it are refused, because an opening [parenthesis](/docs/reference/syntax-glossary#parentheses) where a value is expected starts the parameter list of a [function literal](/docs/language/functions-as-values), Essence's arrow function:
+
+<div class="error-output">
+
+```
+[syntax-error]
+Error: Expected a Type but found ':'.
+   ╭─┤ booking.es:4:13 │
+   │
+ 4 │     if (guests::isGreaterThan(4)) {
+   │                ▲  
+   │                ╰── here
+───╯
+```
+
+</div>
+
+The parser read `(guests:` as the start of a parameter named `guests`, expected its type after the colon, and found the second colon of `::`. Parentheses never group in Essence.
+
+A name alone in parentheses fails later. In `if (ready) { … }`, the parser reads `(ready) { … }` as a whole function literal, then looks for the `if`'s block after it. The error lands on whatever follows that literal, such as `Expected '{' but found '}'.` on a closing brace.
+
+## The condition is a Boolean
+
+```essence
+implementation {
+	constant guests   = 5
+	constant outdoors = true
+	constant raining  = false
+
+	if guests::isGreaterThan(4)::and(outdoors) {
+		Terminal.print("set up the garden") § set up the garden
+	}
+
+	if raining::negate() {
+		Terminal.print("leave the umbrellas") § leave the umbrellas
+	}
+}
+```
+
+A condition is any expression whose type is `Boolean`: a Boolean constant, a comparison, or a combination built with [`and`](/docs/library/boolean#and), [`or`](/docs/library/boolean#or) and [`negate`](/docs/library/boolean#negate).
+
+No other type is converted to a `Boolean`. A value of another type in a condition is [`condition-not-boolean`](/docs/reference/diagnostics#condition-not-boolean), and the label names the type the compiler found:
+
+<div class="error-output">
+
+```
+[condition-not-boolean]
+Error: An If Condition has to be a Boolean
+   ╭─┤ seats.es:4:5 │
+   │
+ 4 │     if remaining {
+   │        ────┬────  
+   │            ╰────── this is an Integer
+   │ 
+   │ Note: Essence has no truthiness — only a Boolean can be a Condition.
+───╯
+```
+
+</div>
+
+Write the question you mean, such as [`isPositive()`](/docs/library/integer#isPositive): `if remaining::isPositive() {`. A `define` condition follows the same rule, and the error there reads `A Define Condition has to be a Boolean`.
+
+**Compared with JavaScript.**
+
+```ts
+const remaining = 3
+
+if (remaining) {
+  console.log("seats left")
+}
+```
+
+JavaScript converts `remaining` to a boolean, and `0`, `""`, `null` and `NaN` all count as false. Essence converts nothing, so you write the test out. [`isNot`](/docs/library/integer#isNot) in `remaining::isNot(0)` asks what JavaScript's conversion asks, and `isPositive()` asks for more than zero. More on [Coming from JavaScript › What is not in the language](/docs/getting-started/coming-from-javascript#what-is-not-in-the-language).
+
+## An `if` is a statement
+
+As in JavaScript, an `if` is a statement: it runs statements and has no value. `constant label = if … { … } else { … }` is a [`syntax-error`](/docs/reference/diagnostics#syntax-error), `Expected an Expression but found 'if'.`
+
+To pick a value by condition, write a `define`, which the second half of this page covers. The other way is to declare a [`variable`](/docs/reference/syntax-glossary#variable) before the `if` and assign it in every branch:
+
+```essence
+implementation {
+	constant guests = 4
+
+	variable label = "unset"
+
+	if guests::isZero() {
+		label = "an empty table"
+	} else if guests::isEven() {
+		label = "an even table"
+	} else {
+		label = "an odd table"
+	}
+
+	Terminal.print(label) § an even table
+}
+```
+
+`label` is declared before the `if`, so each branch can assign it and the line after the `if` reads the result. A variable needs a value when it is declared, which is why `label` starts as `"unset"`. TypeScript's `let label: string`, assigned later, has no twin here. `variable label: String` followed by the `if` is a `syntax-error` reported on the `if`: `Expected '=' but found 'if'.` The same choice written as a `define` needs no placeholder, and `label` can then be a constant. Inside a function, a branch can also leave early with `<-`, Essence's `return`, which [Functions](/docs/language/functions) covers.
+
+## A block is a scope
+
+```essence
+implementation {
+	constant guests = 5
+	constant table  = "a table"
+
+	if guests::isGreaterThan(4) {
+		constant table = "the long table"
+		Terminal.print(table) § the long table
+	}
+
+	Terminal.print(table) § a table
+}
+```
+
+A name declared inside a block belongs to that block. The inner `table` shadows the outer one until the closing brace, and after it the outer `table` is back, unchanged. A `const` inside a JavaScript block behaves the same way.
+
+A name declared only inside a branch does not exist after it: reading it past the closing brace is [`unknown-name`](/docs/reference/diagnostics#unknown-name).
+
+## Choosing a value with `define`
+
+```essence
+implementation {
+	constant score = 72
+
+	constant grade = define {
+		as "distinction" if score::isGreaterThanOrEqualTo(90)
+		as "pass"        if score::isGreaterThanOrEqualTo(50)
+		as "fail"        otherwise
+	}
+
+	Terminal.print(grade) § pass
+}
+```
+
+A `define` is a list of arms between braces. Each arm is a value and the condition that selects it, and the `define` returns the value of the first arm whose condition holds. Read `as "pass" if score::isGreaterThanOrEqualTo(50)` as "use `"pass"` if the score is at least 50", which is what [`isGreaterThanOrEqualTo`](/docs/library/integer#isGreaterThanOrEqualTo) asks. The value comes first and the condition second, the other way round from `if`. The last arm has no condition: [`otherwise`](/docs/reference/syntax-glossary#otherwise) holds when no arm above it did.
+
+**Compared with JavaScript.**
+
+```ts
+const grade =
+  score >= 90 ? "distinction"
+  : score >= 50 ? "pass"
+  : "fail"
+```
+
+A `define` is JavaScript's chained ternary, and the compiler turns it into one. Two things differ: the value comes before its condition, and the final `otherwise` arm is required. There is no `switch` statement either. A chain of conditions that picks a value is a `define`, and a `switch` on one value's cases is a [`match`](/docs/language/choices-and-match). More on [Coming from JavaScript › Operators](/docs/getting-started/coming-from-javascript#operators).
+
+Arms are separated by whitespace, not commas: `as "gusty" if windy, as "calm" otherwise` is a syntax error, `Expected 'as' but found ','.` Writing the condition first, `if windy as "gusty"`, is `Expected 'as' but found 'if'.` Writing `else` in place of `otherwise` is `Expected 'if' or 'otherwise' but found 'else'.` A short `define` may be written on one line, `define { as "gusty" if windy as "calm" otherwise }`, and [`essence format`](/docs/guides/formatting) lays it out one arm per line.
+
+A `define` is an expression, so it stands wherever a value stands: on the right of a [`constant`](/docs/reference/syntax-glossary#constant), as the value of another arm, or as an argument.
+
+```essence
+implementation {
+	constant guests     = 5
+	constant vegetarian = true
+
+	constant menu = define {
+		as "nothing to cook" if guests::isZero()
+		as define {
+			as "a big vegetable stew" if vegetarian
+			as "a big roast"          otherwise
+		} if guests::isGreaterThan(4)
+		as "pasta" otherwise
+	}
+
+	Terminal.print(menu) § a big vegetable stew
+
+	Terminal.print(define {
+		as "a table for two" if guests::isLessThanOrEqualTo(2)
+		as "the long table"  otherwise
+	}) § the long table
+}
+```
+
+An arm declares nothing and binds nothing. Its value and its condition are ordinary expressions over names already in scope. The inner `define` is the outer arm's value, so that arm's condition follows the inner closing brace: `} if guests::isGreaterThan(4)`. Each arm may ask about a different value: the outer `define` asks about `guests`, the inner one about `vegetarian`. A `define` asks conditions, while a `match` takes one value apart by its shape and names what it finds.
+
+## Arms are tried in order
+
+```essence
+implementation {
+	constant score = 95
+
+	constant grade = define {
+		as "pass"        if score::isGreaterThanOrEqualTo(50)
+		as "distinction" if score::isGreaterThanOrEqualTo(90)
+		as "fail"        otherwise
+	}
+
+	Terminal.print(grade) § pass
+}
+```
+
+The conditions are asked top to bottom, and the first one that holds decides. A score of 95 meets both of the first two conditions, so the arm written first wins. The compiler does not check whether two conditions overlap: this program compiles without a warning, and the `"distinction"` arm can never be chosen.
+
+What the compiler does check is position. The `otherwise` arm always holds, so an arm written below it can never run, and the parser refuses it as [`unreachable-define-arm`](/docs/reference/diagnostics#unreachable-define-arm):
+
+<div class="error-output">
+
+```
+[unreachable-define-arm]
+Error: This arm stands below the 'otherwise' arm
+   ╭─┤ grade.es:7:3 │
+   │
+ 7 │        as "pass"        if score::isGreaterThanOrEqualTo(50)
+   │        ──────────────────────────┬──────────────────────────  
+   │                                  ╰──────────────────────────── nothing here can ever be reached
+   │ 
+   │ Help: Move this arm above the 'otherwise' arm, or delete it.
+   │ 
+   │ Note: The 'otherwise' arm is the one that always holds, so a 'define' answers there whenever it gets that far.
+───╯
+```
+
+</div>
+
+An arm is reached only when every condition above it was `false`. The compiler checks each arm knowing this, the same way it checks an `else if` branch. In the first grade example, the `"pass"` arm sees only scores below 90, and the `otherwise` arm only scores below 50. That holds for a constant such as `score`, not for a `variable`. What that proves about a value, and which methods it makes available, is on [Checked refinements](/docs/language/checked-refinements).
+
+Evaluation follows the same order. The conditions are evaluated one at a time until one holds, and then only the chosen arm's value is evaluated. In JavaScript, `isOpen && check()` never calls `check()` when `isOpen` is false. `and` always evaluates its argument, so that guard is written as a `define`:
+
+```essence
+implementation {
+	constant isOpen = false
+
+	§ `and` is a call, so its argument is evaluated first, and `inspect` prints
+	constant eager = isOpen::and(Terminal.inspect(true)) § true
+
+	§ a `define` evaluates only the arm it picks, so nothing is printed here
+	constant lazy = define {
+		as false if isOpen::negate()
+		as Terminal.inspect(true) otherwise
+	}
+
+	Terminal.print(eager) § false
+	Terminal.print(lazy) § false
+}
+```
+
+[`Terminal.inspect`](/docs/library/terminal#inspect) prints the value it is given and returns it, so it shows what runs. `and` is a method call, and a call evaluates its argument first, so the first `inspect` prints although `isOpen` is `false`. In the `define`, the first condition holds, and the second arm's value is never evaluated.
+
+## `otherwise` is mandatory
+
+Every arm but the last carries a condition. A `define` without an `otherwise` arm would have nothing to return when every condition is `false`, so the parser refuses it as [`define-without-otherwise`](/docs/reference/diagnostics#define-without-otherwise). This is the first grade example with its last arm deleted:
+
+<div class="error-output">
+
+```
+[define-without-otherwise]
+Error: This 'define' has no 'otherwise' arm
+   ╭─┤ grade.es:4:19 │
+   │
+ 4 │ ╭─▶     constant grade = define {
+   ┆ ┆   
+ 7 │ ├─▶     }
+   │ │           
+   │ ╰─────────── every value here has a condition on it
+   │ 
+   │ Help: Write the last arm as 'as <value> otherwise'.
+   │ 
+   │ Note: A 'define' answers with a value wherever it stands, so one of its arms has to be the one that always holds.
+───╯
+```
+
+</div>
+
+A `define` whose only arm is `otherwise` asks nothing. It compiles and runs with a [`define-without-cases`](/docs/reference/diagnostics#define-without-cases) warning, `This 'define' has no cases`, because a `define` has this shape while it is being written.
+
+## What a `define` returns
+
+```essence
+implementation {
+	constant windy = true
+
+	constant fromArrow = define -> String {
+		as "hold on to your hat" if windy
+		as "a fine day"          otherwise
+	}
+
+	constant fromPosition: String = define {
+		as "hold on to your hat" if windy
+		as "a fine day"          otherwise
+	}
+
+	constant fromArms = define {
+		as "none" if windy
+		as 7      otherwise
+	}
+
+	Terminal.print(fromArrow) § hold on to your hat
+	Terminal.print(fromPosition) § hold on to your hat
+	Terminal.inspect(fromArms) § "none"
+}
+```
+
+The type a `define` returns comes from one of three places, tried in this order:
+
+1. An [arrow](/docs/reference/syntax-glossary#arrow) on the `define` itself. `define -> String { … }` returns a [`String`](/docs/library/string).
+2. The position the `define` stands in. `constant fromPosition: String = define { … }` takes `String` from the annotation.
+3. The arms, when neither of the others says anything. `fromArms` has a `String` arm and an [`Integer`](/docs/library/integer) arm, so its type is the [union](/docs/language/unions-and-type-aliases) `String | Integer`: either a `String` or an `Integer`, as in TypeScript.
+
+[`Terminal.print`](/docs/library/terminal#print) refuses a union such as `String | Integer`, so the sample inspects `fromArms` instead.
+
+When the arrow or the position decides the type, every arm is held to it, the `otherwise` arm included. An arm of another type is [`return-type-mismatch`](/docs/reference/diagnostics#return-type-mismatch):
+
+<div class="error-output">
+
+```
+[return-type-mismatch]
+Error: This arm does not answer with the Type this 'define' has
+   ╭─┤ bonus.es:6:6 │
+   │
+ 6 │        as "none" otherwise
+   │           ───┬──  
+   │              ╰──── this is a String
+   │ 
+   │ Note: This 'define' answers Integer.
+───╯
+```
+
+</div>
+
+The arrow wins over the position. `constant count: Integer = define -> String { … }` makes the `define` a `String`, and the annotation then refuses it as [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch).
+
+A `define` gets no type from an argument position, even when the method has only one signature. So a `define` written straight into an argument, like the `Terminal.print(define { … })` above, takes its type from its arrow or its arms. A bare case such as `#Empty`, an `Optional` case written without its type, does not decide its own type. When no arm decides one, the compiler reports [`define-without-answer-type`](/docs/reference/diagnostics#define-without-answer-type) and asks for `define -> Type { … }`, as [Optional](/docs/language/optional) shows.
+
+<SeeAlso links={[
+	{ label: "Functions", href: "/docs/language/functions" },
+	{ label: "Choices and match", href: "/docs/language/choices-and-match" },
+	{ label: "Checked refinements", href: "/docs/language/checked-refinements" },
+	{ label: "Boolean", href: "/docs/library/boolean" },
+	{ label: "Diagnostics", href: "/docs/reference/diagnostics" },
+]} />

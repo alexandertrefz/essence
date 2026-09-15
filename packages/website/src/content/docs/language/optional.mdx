@@ -1,0 +1,409 @@
+---
+title: Optional
+description: "Hold a value that may be missing as `#Value` or `#Empty`, and read it with `match`, a default, `map` or `andThen`."
+section: language
+order: 70
+template: article
+---
+
+An [`Optional`](/docs/library/optional) is a value that either holds one item or holds nothing. It has two cases: `#Value`, which carries the item, and `#Empty`, which carries nothing. Essence has no `null` and no `undefined`. A method that may find nothing returns an `Optional`, and its type makes you handle both cases before you can use the item.
+
+```essence
+implementation {
+	constant input = "42"
+	constant age   = Integer.parse(input)
+
+	Terminal.inspect(age) § Optional#Value(42)
+	Terminal.inspect(Integer.parse("forty")) § Optional#Empty
+
+	constant message = match age -> String {
+		case #Value(years) { <- "{years} years old" }
+		case #Empty        { <- "not a number" }
+	}
+
+	Terminal.print(message) § 42 years old
+	Terminal.print(Integer.parse("forty")::value(defaultingTo 0)) § 0
+}
+```
+
+[`Integer.parse`](/docs/library/integer#parse) reads an [`Integer`](/docs/library/integer) from text. Text may not hold a number, so the method returns an `Optional<Integer>`: `#Value(42)` for `"42"`, and `#Empty` for `"forty"`. The `match` from [Choices and match](/docs/language/choices-and-match) takes it apart, with one arm (a `case` and its block) for each case. `case #Value(years)` names the item `years`. [`value(defaultingTo:)`](/docs/library/optional#value) is the short way: it returns the item, or the fallback when there is none.
+
+## Where Optionals come from
+
+```essence
+implementation {
+	constant bill   = 120
+	constant guests = 4
+
+	Terminal.inspect(bill::divide(by guests)) § Optional#Value(30/1)
+	Terminal.inspect(Integer.parse("12")) § Optional#Value(12)
+
+	constant scores = [70, 85, 90]
+
+	Terminal.inspect(scores::item(at 1)) § Optional#Value(85)
+	Terminal.inspect(scores::item(at 5)) § Optional#Empty
+	Terminal.inspect(scores::firstItem()) § Optional#Value(70)
+
+	constant word = "hello"
+
+	Terminal.inspect(word::character(at 1)) § Optional#Value("e")
+	Terminal.inspect(word::character(at 9)) § Optional#Empty
+}
+```
+
+A method returns an `Optional` when it may have nothing to return:
+
+- [`divide(by:)`](/docs/library/integer#divide) might divide by zero when the compiler cannot see the divisor, as with the constant `guests`. A literal divisor returns a plain [`Rational`](/docs/library/rational), as [Method calls](/docs/language/method-calls) shows. [`Terminal.inspect`](/docs/library/terminal#inspect) writes a whole `Rational` as `30/1`.
+- `Integer.parse` may be given text that is not a number.
+- [`item(at:)`](/docs/library/list#item) may be asked for a position past the end, and [`firstItem()`](/docs/library/list#firstItem) may be called on an empty list. Reading past the end returns `#Empty`. [Lists](/docs/language/lists) has the other reading methods.
+- [`character(at:)`](/docs/library/string#character) does the same for a [`String`](/docs/library/string). [Strings](/docs/language/strings) covers text.
+
+## `Optional` is a choice
+
+```essence
+§ fragment
+choice Optional<ItemType> {
+	Value { item: ItemType },
+	Empty,
+}
+```
+
+This is the standard library's declaration of `Optional`, word for word. It is an ordinary choice: a type with a fixed set of cases, declared the way you declare your own. `#Value` carries one member, `item`, and `#Empty` carries nothing. `ItemType` is a type parameter. In `Optional<String>`, the type argument `String` fills it, so the `#Value` holds a `String`. [Generics](/docs/language/generics) covers declaring generic types of your own. Paste the declaration into a program and the compiler reports [`duplicate-type`](/docs/reference/diagnostics#duplicate-type), because the name is taken.
+
+You make an Optional by writing one of its cases:
+
+```essence
+implementation {
+	function discount(_ code: String) -> Optional<Integer> {
+		if code::is("SPRING") {
+			<- #Value(10)
+		}
+
+		<- #Empty
+	}
+
+	constant nickname: Optional<String> = #Value("Sandy")
+	constant surname: Optional<String>  = #Empty
+
+	Terminal.print(discount("SPRING")) § Value(10)
+	Terminal.print(discount("WINTER")) § Empty
+	Terminal.print(nickname) § Value("Sandy")
+	Terminal.print(surname) § Empty
+}
+```
+
+`discount` returns `Optional<Integer>`, so each `<-` returns a case: `#Value(10)` for the spring code, and `#Empty` for any other. `nickname` and `surname` are annotated, and the annotation tells each case which choice it belongs to. [`Terminal.print`](/docs/library/terminal#print) writes an Optional as `Value(10)` or `Empty`. `Terminal.inspect`, in the first program, adds the choice's name: `Optional#Value(42)`. A string [hole](/docs/reference/syntax-glossary#interpolation) writes the `print` form, so `"{nickname}"` is `Value("Sandy")`: interpolate the item, not the Optional.
+
+An `Integer` is not an `Optional<Integer>`, and nothing wraps one for you. Return a plain `10` from `discount` and the compiler reports [`return-type-mismatch`](/docs/reference/diagnostics#return-type-mismatch):
+
+<div class="error-output">
+
+```
+[return-type-mismatch]
+Error: This value does not fit the declared return Type
+   ╭─┤ discount.es:4:7 │
+   │
+ 4 │          <- 10
+   │             ─┐
+   │              ╰── this is an Integer
+   │
+   │ Note: The Function returns Optional<Integer>.
+───╯
+```
+
+</div>
+
+**Compared with JavaScript.**
+
+```ts
+function discount(code: string): number | undefined {
+  if (code === "SPRING") {
+    return 10
+  }
+
+  return undefined
+}
+```
+
+`number | undefined` is a union, and `10` is one of its members, so `return 10` type-checks. `Optional<Integer>` is a choice, not a union with `Integer` in it, so you write `<- #Value(10)`. Because an Optional is a value of its own, `Optional<Optional<Integer>>` is a real type. In TypeScript, `number | undefined | undefined` is the same type as `number | undefined`. Called from JavaScript, an `Optional<T>` crosses as the item or `undefined`, and a nested Optional does not cross; [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) has the full table. More on [Coming from JavaScript › Absence](/docs/getting-started/coming-from-javascript#absence).
+
+`null` and `undefined` are undeclared names, reported as [`unknown-name`](/docs/reference/diagnostics#unknown-name). There is no truthiness: `if nickname { … }` is [`condition-not-boolean`](/docs/reference/diagnostics#condition-not-boolean), because only a [`Boolean`](/docs/library/boolean) can be a condition.
+
+## Writing `#Value` and `#Empty`
+
+A bare case is a case written without its choice's name, like `#Empty`. On its own, `#Empty` does not say what the Optional would hold, and `#Value` is also a case of [`Result`](/docs/library/result). So a bare case takes its choice, and its type argument, from a position that carries a type.
+
+```essence
+implementation {
+	type Profile = { name: String, nickname: Optional<String> }
+
+	function greet(_ name: String, title: Optional<String> = #Empty) -> String {
+		<- match title -> String {
+			case #Value(honorific) { <- "Hello, {honorific} {name}" }
+			case #Empty            { <- "Hello, {name}" }
+		}
+	}
+
+	function label(_ profile: Profile) -> String {
+		<- match profile.nickname -> String {
+			case #Value(nickname) { <- "{profile.name} ({nickname})" }
+			case #Empty           { <- profile.name }
+		}
+	}
+
+	constant grace: Profile = { name = "Grace", nickname = #Value("G") }
+
+	Terminal.print(greet("Ada")) § Hello, Ada
+	Terminal.print(greet("Grace", title #Value("Dr."))) § Hello, Dr. Grace
+	Terminal.print(label(grace)) § Grace (G)
+}
+```
+
+The three positions you meet first are an annotation, a function's return type, and an argument passed straight to a parameter. `grace` is annotated `Profile`, and the annotation reaches into the [record](/docs/language/records) literal, so `#Value("G")` is an `Optional<String>`. In `greet("Grace", title #Value("Dr."))`, the parameter's type decides the argument. The default `= #Empty` takes its type from its parameter too. `discount`, in the previous section, showed the remaining position: a return type.
+
+TypeScript's `title?: string` takes `"Dr."` as it is. Here the caller writes `#Value("Dr.")`: `greet("Grace", title "Dr.")` is [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch), with the note `Parameter 'title' is Optional<String>.` A record member typed `Optional` cannot be left out either. `constant ada: Profile = { name = "Ada" }` is [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch), so write `nickname = #Empty`.
+
+A record or list literal written straight into an argument passes nothing down to the cases inside it. With `#Empty` there, the compiler reports [`undecided-type-arguments`](/docs/reference/diagnostics#undecided-type-arguments):
+
+<div class="error-output">
+
+```
+[undecided-type-arguments]
+Error: Nothing decides the Type Arguments of '#Empty'
+   ╭─┤ profile.es:8:52 │
+   │
+ 8 │     Terminal.print(label({ name = "Grace", nickname = #Empty }))
+   │                                                       ───┬──
+   │                                                          ╰──── no Type Arguments here, and nothing around it decides them
+   │
+   │ Note 1: 'Optional' takes 1 Type Parameter: 'ItemType'.
+   │ Note 2: A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.
+───╯
+```
+
+</div>
+
+Only `Optional` declares `#Empty` in this program, so the choice is settled. What is missing is its type argument. The fix is the one `grace` uses: bind the record to an annotated constant, then pass the constant. A bare `#Empty` with nothing around it, as in `constant nickname = #Empty`, is the same error. Written with `#Value("G")`, the same argument is [`ambiguous-case`](/docs/reference/diagnostics#ambiguous-case), because `Result` declares a `#Value` case too; [Result](/docs/language/result) explains the rule. A parameter typed `Optional<T>` in a generic function, where the call works out `T`, decides nothing either. Generics covers `<infer T>`.
+
+A [`define`](/docs/language/conditions) whose arms are a bare `#Value` and a bare `#Empty` cannot take its type from its arms. Write the type on its arrow:
+
+```essence
+implementation {
+	constant code = "SPRING"
+
+	constant discount = define -> Optional<Integer> {
+		as #Value(10) if code::is("SPRING")
+		as #Empty     otherwise
+	}
+
+	Terminal.print(discount) § Value(10)
+}
+```
+
+Without `-> Optional<Integer>`, the compiler reports [`define-without-answer-type`](/docs/reference/diagnostics#define-without-answer-type), along with `ambiguous-case` for `#Value(10)` and `undecided-type-arguments` for `#Empty`. An annotated constant works as well: `constant discount: Optional<Integer> = define { … }`.
+
+## Getting the item out
+
+```essence
+implementation {
+	constant scores = [70, 85, 90]
+
+	constant first = match scores::firstItem() -> String {
+		case #Value(score) { <- "first score: {score}" }
+		case #Empty        { <- "no scores" }
+	}
+
+	Terminal.print(first) § first score: 70
+	Terminal.print(scores::item(at 5)::value(defaultingTo 0)) § 0
+	Terminal.print(scores::item(at 5, defaultingTo 0)) § 0
+	Terminal.print(scores::firstItem(defaultingTo 0)) § 70
+	Terminal.print(Integer.parse("forty", defaultingTo 0)) § 0
+	Terminal.print("hello"::character(at 9, defaultingTo "?")) § ?
+}
+```
+
+Both ways from the first program, `match` and `value(defaultingTo:)`, work on any Optional. `item(at:)`, `firstItem()`, `Integer.parse` and `character(at:)` each have a twin that takes `defaultingTo:` and returns the item itself, as the last four lines show. The twin of `divide(by:)` takes a `Rational` fallback, as in `bill::divide(by guests, defaultingTo 0/1)`, and `defaultingTo 0` there is [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload). A dictionary lookup has a twin too, [`value(at:defaultingTo:)`](/docs/library/dictionary#value).
+
+**Compared with JavaScript.**
+
+```ts
+const scores = [70, 85, 90]
+const sixth = scores[5]
+
+console.log(sixth ?? 0)
+
+if (sixth) {
+  console.log(`sixth score: ${sixth}`)
+}
+```
+
+`x ?? d` is `x::value(defaultingTo d)`. `if (x)` becomes a `match`, or an `if` that asks [`hasValue()`](/docs/library/optional#hasValue), because a condition must be a `Boolean`. `if (sixth)` also skips a real score of `0`, which a `match` never confuses with `#Empty`. Without `noUncheckedIndexedAccess`, TypeScript types `scores[5]` as `number`, so nothing makes you handle the missing score. `item(at:)` always returns an `Optional`. More on [Coming from JavaScript › Absence](/docs/getting-started/coming-from-javascript#absence).
+
+`otherwise` is the last arm of a `define`, not a method. `nickname::otherwise("none")` is [`unknown-method`](/docs/reference/diagnostics#unknown-method). Write `nickname::value(defaultingTo "none")`.
+
+On a list written straight into the call, as in `[70, 85, 90]::firstItem(defaultingTo 0)`, the fallback can never be used, and the compiler warns with [`fallback-never-used`](/docs/reference/diagnostics#fallback-never-used). [Checked refinements](/docs/language/checked-refinements) explains why, and why the constant `scores` above draws no warning.
+
+In a test, `require #Value(age) = Integer.parse("42")` takes an Optional apart and fails the test when it is `#Empty`. [Tests](/docs/language/tests) covers `require`.
+
+## Asking about an Optional
+
+```essence
+implementation {
+	function isLong(_ name: String) -> Boolean {
+		<- name::length()::isGreaterThan(3)
+	}
+
+	constant nickname: Optional<String> = #Value("Sandy")
+	constant surname: Optional<String>  = #Empty
+
+	Terminal.print(nickname::is("Sandy")) § true
+	Terminal.print(nickname::is(#Value("Sandy"))) § true
+	Terminal.print(nickname::isNot("Sam")) § true
+	Terminal.print(surname::is("Sandy")) § false
+	Terminal.print(surname::is(#Empty)) § true
+	Terminal.print(nickname::hasValue()) § true
+	Terminal.print(nickname::hasValue(where isLong)) § true
+	Terminal.print(surname::isEmpty()) § true
+}
+```
+
+[`is`](/docs/library/optional#is) accepts a whole Optional or a plain item. `nickname::is("Sandy")` asks whether `nickname` holds `"Sandy"`. An empty Optional holds no item, so `surname::is("Sandy")` is `false`. [`isNot`](/docs/library/optional#isNot) is the opposite of `is`. `hasValue()` and [`isEmpty()`](/docs/library/optional#isEmpty) ask which case you have, and `hasValue(where isLong)` asks whether the Optional holds an item that `isLong` accepts.
+
+`isLong` is a declared function passed by its name, with no parentheses. Every method on this page that takes a function accepts one this way. [Functions as values](/docs/language/functions-as-values) covers function types and the literal spelling, `(name) { <- … }`.
+
+`hasValue()` returns a `Boolean` and nothing more. TypeScript narrows `nickname` to `string` inside `if (nickname !== undefined)`. Here only a `match` arm narrows: inside `if nickname::hasValue() { … }`, `nickname` is still an `Optional<String>`, so a `String` method on it is refused:
+
+<div class="error-output">
+
+```
+[unknown-method]
+Error: No Method named 'uppercase' for Optional#Value
+   ╭─┤ nickname.es:5:28 │
+   │
+ 5 │        Terminal.print(nickname::uppercase())
+   │                       ────┬───  ────┬────
+   │                           ╰─────────│────── this is an Optional<String>
+   │                                     │
+   │                                     ╰────── Optional#Value has no Method of this name
+   │
+   │ Note: Every member of the Union must provide 'uppercase' — the receiver's Type is only known at runtime.
+───╯
+```
+
+</div>
+
+A method called on an Optional has to exist for every case, `#Value` and `#Empty` alike, because which case you hold is known only when the program runs. The note calls the cases the members of a union. `uppercase` exists for neither. Reaching through a chain fails the same way: `word::character(at 0)::uppercase()` is the same error. To use the item, take it out with `match`, `value(defaultingTo:)` or [`map`](/docs/library/optional#map).
+
+## Transforming an Optional
+
+```essence
+implementation {
+	function shout(_ name: String) -> String {
+		<- name::uppercase()
+	}
+
+	function readNumber(_ text: String) -> Optional<Integer> {
+		<- Integer.parse(text)
+	}
+
+	constant nickname: Optional<String> = #Value("Sandy")
+	constant surname: Optional<String>  = #Empty
+	constant ageField: Optional<String> = #Value("42")
+
+	Terminal.inspect(nickname::map(shout)) § Optional#Value("SANDY")
+	Terminal.inspect(surname::map(shout)) § Optional#Empty
+	Terminal.inspect(ageField::andThen(readNumber)) § Optional#Value(42)
+	Terminal.print(surname::map(shout)::value(defaultingTo "-")) § -
+}
+```
+
+`map` applies a function to the item and wraps the result, so `#Value("Sandy")` becomes `#Value("SANDY")`. An `#Empty` stays `#Empty`. [`andThen`](/docs/library/optional#andThen) is for a function that returns an Optional itself, like `readNumber`. It returns that Optional as it is, not wrapped in another. `Integer.parse` has several signatures under one name, so it cannot be passed by name: `ageField::andThen(Integer.parse)` is `no-matching-overload`. `readNumber` wraps the one you mean in a function of your own. A `map` followed by `value(defaultingTo:)` reads an Optional in one line.
+
+**Compared with JavaScript.**
+
+```ts
+const nickname: string | undefined = "Sandy"
+const shouted = nickname?.toUpperCase() ?? "-"
+```
+
+`map` and `andThen` are `Array.prototype.map` and `flatMap` on an array of at most one item. `x?.f()` is `map` when `f` returns a plain value, and `andThen` when `f` returns an Optional. There is no `?.`: each step through an Optional is its own `map` or `andThen` call. More on [Coming from JavaScript › Absence](/docs/getting-started/coming-from-javascript#absence).
+
+The other transforms filter an Optional, replace an empty one, or combine two:
+
+```essence
+implementation {
+	function startsWithS(_ name: String) -> Boolean {
+		<- name::starts(with "S")
+	}
+
+	constant nickname: Optional<String> = #Value("Sandy")
+	constant surname: Optional<String>  = #Empty
+	constant ageField: Optional<String> = #Value("42")
+
+	Terminal.inspect(nickname::keep(where startsWithS)) § Optional#Value("Sandy")
+	Terminal.inspect(ageField::keep(where startsWithS)) § Optional#Empty
+	Terminal.inspect(surname::or(#Value("Sam"))) § Optional#Value("Sam")
+	Terminal.inspect(nickname::or(#Value("Sam"))) § Optional#Value("Sandy")
+	Terminal.inspect(nickname::pair(with ageField)) § Optional#Value({ first = "Sandy", second = "42" })
+	Terminal.inspect(nickname::pair(with surname)) § Optional#Empty
+	Terminal.inspect(nickname::toList()) § [ "Sandy" ]
+	Terminal.inspect(surname::toList()) § []
+}
+```
+
+[`keep(where:)`](/docs/library/optional#keep) keeps the item when the function accepts it, and returns `#Empty` otherwise. [`or`](/docs/library/optional#or) returns the Optional it is called on when that holds an item, and its argument when it does not. [`pair(with:)`](/docs/library/optional#pair) puts two items in one `{ first, second }` record, and is `#Empty` when either Optional is. [`toList()`](/docs/library/optional#toList) returns a list of the one item, or the empty list. [`toResult(failingWith:)`](/docs/library/optional#toResult) turns an Optional into a `Result`, with a reason for the empty case, and the Result page covers it.
+
+## Nested Optionals
+
+```essence
+implementation {
+	function readNumber(_ text: String) -> Optional<Integer> {
+		<- Integer.parse(text)
+	}
+
+	constant ageField: Optional<String> = #Value("forty")
+	constant nested = ageField::map(readNumber)
+
+	Terminal.inspect(nested) § Optional#Value(Optional#Empty)
+	Terminal.inspect(nested::isEmpty()) § false
+	Terminal.inspect(nested::is(#Value(#Empty))) § true
+	Terminal.inspect(nested::flatten()) § Optional#Empty
+	Terminal.inspect(ageField::andThen(readNumber)) § Optional#Empty
+}
+```
+
+An Optional can hold another Optional. `ageField` holds `"forty"`, and `map(readNumber)` turns it into `#Value(#Empty)`: there was a field, and it held no number. That is not `#Empty`, which would mean there was no field at all, so `isEmpty()` is `false`. [`flatten()`](/docs/library/optional#flatten) removes one level, and `andThen(readNumber)` returns the same as `map(readNumber)::flatten()`.
+
+Comparing a nested Optional with a bare `#Empty` is ambiguous, because `#Empty` fits both levels. Written as `nested::is(#Empty)`, the call compiles and returns `false`, because it compares the outer level. The compiler warns with [`ambiguous-nesting-level`](/docs/reference/diagnostics#ambiguous-nesting-level):
+
+<div class="error-output">
+
+```
+[ambiguous-nesting-level]
+Warning: This Argument fits the receiver and what it holds
+   ╭─┤ nesting.es:4:30 │
+   │
+ 4 │     Terminal.inspect(nested::is(#Empty))
+   │                              ─┐ ───┬──
+   │                               ╰────│──── this takes an Optional<Integer> as well
+   │                                    │
+   │                                    ╰──── read as an Optional<Optional<Integer>> here
+   │
+   │ Help 1: Write '#Value(…)' around the Argument to ask whether the receiver holds it.
+   │ Help 2: Name it in a Constant annotated 'Optional<Optional<Integer>>' to go on asking about the receiver.
+   │
+   │ Note: A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.
+───╯
+```
+
+</div>
+
+Say which level you mean, and the warning goes away. To ask about the outer level, write `nested::isEmpty()`, or compare with a constant annotated `Optional<Optional<Integer>>`. To ask whether it holds an empty Optional, write `nested::is(#Value(#Empty))`.
+
+<SeeAlso links={[
+	{ label: "Choices and match", href: "/docs/language/choices-and-match" },
+	{ label: "Result", href: "/docs/language/result" },
+	{ label: "Lists", href: "/docs/language/lists" },
+	{ label: "Optional in the library", href: "/docs/library/optional" },
+	{ label: "Diagnostics", href: "/docs/reference/diagnostics" },
+]} />
