@@ -1,0 +1,371 @@
+---
+title: Using the compiler
+description: Take one program through essence check, build, run and watch, read what each prints, and wire the commands into CI.
+section: guides
+order: 10
+template: guide
+steps: 5
+minutes: 12
+---
+
+`essence` is one command for the whole toolchain: compiler, formatter, test runner, language server and debug adapter. [`check`](/docs/reference/cli#check) type-checks a program, [`build`](/docs/reference/cli#build) writes JavaScript, [`run`](/docs/reference/cli#run) compiles and runs it, and [`watch`](/docs/reference/cli#watch) rebuilds on every save. This guide takes one program through all four, shows how to read what each prints, and then wires them into CI.
+
+The commands are written as plain `essence`, which a global install puts on your path. With a project install, put your package manager's prefix in front: `npx`, `pnpm exec`, `yarn` or `bun run`. [Installation](/docs/getting-started/installation) covers both.
+
+Put this program in a file called `greeting.es`:
+
+```essence
+implementation {
+	§ A greeting, with the name interpolated into the String.
+	constant name = "world"
+
+	Terminal.print("Hello, {name}!") § Hello, world!
+}
+```
+
+[`Terminal.print`](/docs/library/terminal#print) writes a line of output, and `{name}` is a [hole](/docs/reference/syntax-glossary#interpolation) that puts the value of `name` into the string. A [`§`](/docs/reference/syntax-glossary#comment) starts a comment. These docs end a line with one to show what that line prints.
+
+<Steps>
+
+<StepItem title="Check it">
+
+`essence check` reads the program, reports what is wrong with it, and writes nothing:
+
+```sh
+$ essence check greeting.es
+  ✔ greeting.es no errors
+
+    read      0.11 ms  ░
+    parse      1.1 ms  █
+    enrich      19 ms  ████████████████████████
+    validate  0.46 ms  █
+
+    total   22 ms
+```
+
+The first line says the file has no errors. Each row below it is a stage of the compiler, with the time it took. Timings vary from run to run. A check runs four stages, in this order:
+
+| Stage | What it does |
+| --- | --- |
+| `read` | Reads the source file. |
+| `parse` | Turns the text into a syntax tree, and refuses text that is not Essence. |
+| `enrich` | Resolves every name and infers the type of every expression. |
+| `validate` | Checks the typed program against the language's rules, such as whether a value fits its declared type. |
+
+Now give `name` a type it does not have. Change line 3 to `constant name: Integer = "world"` and check again:
+
+<div class="error-output">
+
+```
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'name'
+   ╭─┤ greeting.es:3:27 │
+   │
+ 3 │     constant name: Integer = "world"
+   │                              ───┬───
+   │                                 ╰───── this is a String
+   │
+   │ Note: 'name' is declared as Integer.
+───╯
+
+─── 1 error
+  ✖ greeting.es 1 error
+    stopped while validating
+```
+
+</div>
+
+The last line names the stage that refused the file: it was read, parsed and enriched, and `validate` found the error. `essence check` exits with code 1.
+
+`assignment-type-mismatch`, in brackets on the first line, is the error's code. The code stays the same from release to release, and the message text can change. A script, an editor or a search can rely on the code, and the [Diagnostics reference](/docs/reference/diagnostics#assignment-type-mismatch) explains it under that name.
+
+Compilation stops at the first stage that reports an Error, and shows every Error that stage found. Two errors that `validate` finds come out together, in one report. An error that `enrich` finds, such as a call to a method that does not exist, hides them until it is fixed. Its report ends with `stopped while inferring types`. A syntax error hides both, because a file that does not parse never reaches `enrich`. Its report ends with `stopped while parsing`. Warnings never stop anything: a file with only Warnings checks with exit code 0, and it builds and runs.
+
+`check` covers more than the file you name:
+
+- Every [module](/docs/language/modules) the file imports is checked with it. An error in an imported module is reported under that module's name.
+- The [`tests { … }`](/docs/language/tests) block is checked too. A build leaves that block out, so a type error inside a test fails `essence check` while `essence build` of the same file succeeds.
+
+Put line 3 back to `constant name = "world"` before the next step.
+
+</StepItem>
+
+<StepItem title="Build it">
+
+`essence build` runs the same four stages and five more, and writes the JavaScript:
+
+```sh
+$ essence build greeting.es
+  ✔ greeting.es → greeting.js
+
+    read      0.09 ms  ░
+    parse      1.2 ms  ██
+    enrich      19 ms  ███████████████████████
+    validate  0.85 ms  █
+    simplify  0.21 ms  ░
+    optimise   1.1 ms  █
+    generate    19 ms  ████████████████████████
+    bundle      14 ms  █████████████████
+    write      2.7 ms  ███
+
+    output  2.3 kB · 873 B gzipped
+    total   62 ms
+```
+
+`build` is the default command, so `essence greeting.es` does the same thing. The five new rows are the stages that turn the checked program into a file. The `output` row gives the size of the file, as written and gzipped.
+
+`greeting.js` is one self-contained ES module. It carries the parts of Essence's runtime library that the program uses, and it imports nothing. `node greeting.js` and `bun greeting.js` both print `Hello, world!`, with no package installed beside it and no `"type": "module"` in a `package.json`. Each file you name on the command line is an entry. Every module an entry imports goes into its file, so each entry becomes exactly one bundle.
+
+Build it a second time without changing it, and the rows from `simplify` to `bundle` are gone. The CLI keeps each bundle it emits in a cache, so the second build checks the unchanged source and writes the cached bundle. Step 3 says where the cache lives.
+
+[`-o`](/docs/reference/cli#build--out) says where the output goes. Without it, each output lands beside its source. With one entry, `-o` names a file, unless the path ends in `/` or is a directory that already exists. With several, it names a directory, and each output keeps its source's name. Missing parent directories are created:
+
+```sh
+essence build greeting.es -o dist/hello.js
+essence build src/*.es -o dist/
+```
+
+The second command makes every `.es` file directly in `src/` an entry. A module named there as well as imported gets a bundle of its own.
+
+A few flags change what gets written:
+
+- [`--sourcemap`](/docs/reference/cli#build--sourcemap) writes a source map, `greeting.js.map`, beside the output.
+- [`--minify`](/docs/reference/cli#build--minify) minifies the JavaScript. `greeting.js` drops from 2.3 kB to 976 B.
+- [`--no-sourcemap`](/docs/reference/cli#build--no-sourcemap), [`--no-minify`](/docs/reference/cli#build--no-minify) and [`--no-embed`](/docs/reference/cli#build--no-embed) turn a setting off for one run when the project file, [`essence.json`](/docs/guides/projects), turns it on. Step 5 has the rule.
+- [`--embed`](/docs/reference/cli#build--embed) builds a bundle that a JavaScript program can load and call, with `greeting.descriptor.json` beside it, as [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) explains.
+- [`--tests`](/docs/reference/cli#build--tests) compiles the `tests { … }` block into the bundle, which exports it as `$tests`. Loading the bundle runs none of the tests. The flag exists for the debugger. To run tests, use [`essence test`](/docs/reference/cli#test).
+- [`--no-optimise`](/docs/reference/cli#build--no-optimise) turns every optimisation pass off, and [`--without-optimisation <pass>`](/docs/reference/cli#build--without-optimisation) turns one off by name. [Optimisations](/docs/reference/optimisations) lists the passes. An unknown name is refused: a near miss gets a suggestion, and any other name gets the same list.
+- [`-j <count>`](/docs/reference/cli#build--jobs) sets how many files compile in parallel, in worker threads. The default is capped at four. `-j 1` compiles everything on the main thread, which makes the stack trace of a compiler crash easier to read.
+
+</StepItem>
+
+<StepItem title="Run it">
+
+`essence run` compiles one file and runs it:
+
+```sh
+$ essence run greeting.es
+  ✔ greeting.es → ~/Library/Caches/essence/cli/11f7408d…9fd67a20b9.mjs
+
+    read      0.08 ms  ░
+    parse      1.1 ms  █
+    enrich      18 ms  ████████████████████████
+    validate  0.85 ms  █
+
+    output  2.3 kB · 873 B gzipped
+    total   21 ms
+
+  ─── program output ───────────────────────────────────────────────────────────
+Hello, world!
+  ──────────────────────────────────────────────────────────────────────────────
+
+  ✔ program exited with code 0 after 13 ms
+```
+
+Everything between the two horizontal lines is the program's own output. The last line is its exit code, and `essence run` exits with that same code. A program that crashes, such as one that overflows the stack, ends with `✖ program exited with code 1`, and `run` exits with 1. A program with an Error never starts: `run` prints the same report as `check` and exits with 1.
+
+The report stops at `validate` because step 2 already emitted this bundle, and `run` reuses it from the cache. Without `-o`, `run` writes nothing beside your source. Its bundle goes into the CLI's cache, named by a hash: `~/Library/Caches/essence/cli/<sha256>.mjs` on macOS. On Linux the cache is `~/.cache/essence/cli/`, and `XDG_CACHE_HOME` moves it on either system. The report prints the full path, shortened above. The file stays after the program exits, and the next run of an unchanged file reuses it.
+
+`ESSENCE_CLI_CACHE=off` turns that cache off, so every build and run compiles from the start. `ESSENCE_CLI_CACHE=<directory>` moves it to that directory.
+
+To keep the compiled file, give `run` an `-o` path, as in `essence run greeting.es -o hello.js`. A project whose `essence.json` sets [`build.out`](/docs/reference/project-file#build-out) gets the same: `run` writes the file there instead of into the cache.
+
+`run` takes exactly one file. Arguments after a bare `--`, as in `essence run greeting.es -- --port 8080`, are passed to the program's process. Nothing in the standard library reads them. Under [`--json`](/docs/reference/cli#global--json) the program still runs, and its output goes to stderr so that the JSON report is alone on stdout.
+
+</StepItem>
+
+<StepItem title="Watch it">
+
+`essence watch` follows every module a source imports, so give `greeting.es` a module to import. Move the name into a file of its own, `Settings.es`. Each block below starts with a comment that names its file. Save the lines after that comment under that name:
+
+```essence
+§ file: Settings.es
+implementation {
+	constant name = "world"
+}
+
+export {
+	name
+}
+```
+
+```essence
+§ file: greeting.es
+import {
+	from "./Settings.es" { name }
+}
+
+implementation {
+	Terminal.print("Hello, {name}!") § Hello, world!
+}
+```
+
+The `export` block makes `name` visible to other modules, and the `import` block brings it into `greeting.es`. Now start watching:
+
+```sh
+$ essence watch greeting.es --execute
+
+  essence watch · greeting.es
+  ✔ greeting.es → greeting.js
+
+    read      0.10 ms  ░
+    parse      1.6 ms  ██
+    enrich      20 ms  ████████████████████████
+    validate  0.39 ms  ░
+    simplify  0.22 ms  ░
+    optimise   1.1 ms  █
+    generate    19 ms  ███████████████████████
+    bundle      14 ms  █████████████████
+    write      2.8 ms  ███
+
+    output  2.4 kB · 879 B gzipped
+    total   65 ms
+
+
+  · watching for changes  r rebuild · c clear · q quit
+Hello, world!
+```
+
+`watch` compiles the source, runs it because of [`--execute`](/docs/reference/cli#watch--execute), and stays running. Change `"world"` to `"Essence"` in `Settings.es` and save it:
+
+```
+  ✔ 00:50:18  greeting.es → greeting.js  2.4 kB  15 ms
+
+
+  · watching for changes  r rebuild · c clear · q quit
+Hello, Essence!
+```
+
+Saving `Settings.es` rebuilt `greeting.es`, the source that imports it, and ran it again. `--execute`, or `-e`, runs the output after every successful rebuild. [`--clear`](/docs/reference/cli#watch--clear) clears the screen before each rebuild.
+
+Now save a mistake. Change the line in `Settings.es` to `constant name: Integer = "Essence"`. `watch` prints the same report `check` would, naming `Settings.es`, and ends with:
+
+```
+─── 1 error
+  ✖ 00:50:20  greeting.es  1 error
+
+  · watching for changes  r rebuild · c clear · q quit
+```
+
+Nothing runs, and `greeting.js` keeps the last build that compiled. Change the line back and save, and `watch` rebuilds and runs the program again.
+
+While `watch` runs, `r` forces a rebuild, `c` clears the screen, and `q` or Ctrl+C quits. `essence build greeting.es` with [`--watch`](/docs/reference/cli#build--watch) starts the same session. `watch` also takes the output flags of `build`, such as `-o` and `--sourcemap`.
+
+</StepItem>
+
+<StepItem title="Wire it into CI">
+
+A CI job for a project with its sources under `src/` needs three commands:
+
+```sh
+essence format --check "src/**/*.es"
+essence check "src/**/*.es" --quiet
+essence test
+```
+
+Keep the quotes. With them, `essence` expands the glob itself, and `**` reaches every directory under `src/`. Without them, the shell expands the glob before `essence` sees it, and bash then skips the files directly in `src/`. `check` does not take a directory: `essence check src` is refused with a [`not-a-file`](/docs/reference/diagnostics#not-a-file) error.
+
+[`essence format --check`](/docs/reference/cli#format--check) is `prettier --check`: it changes nothing, prints the name of each file that is not formatted, and exits with 1 if there is one. [Formatting](/docs/guides/formatting) covers the formatter. [`--quiet`](/docs/reference/cli#global--quiet) makes `check` print its Errors and Warnings without the stage table or progress. A clean run prints one line, such as `✔ 3 files checked`. `essence test` finds the tests in the project and runs them, as [Running tests](/docs/guides/running-tests) explains.
+
+Every command reports through its exit code:
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Success. A run with Warnings and no Errors exits 0. |
+| `1` | The command ran and failed: an Error, an unformatted file under `format --check`, or a failing test. |
+| `2` | The command line could not be read: an unknown command or option, contradictory flags, a glob that matches no file (`format` exits 1 for that), or no file at all. |
+
+`essence run` and `essence build` with [`--execute`](/docs/reference/cli#build--execute) exit with the program's own code instead. `essence test` also exits 2 when a `focused` test is left in a run that no [`--filter`](/docs/reference/cli#test--filter), [`--tag`](/docs/reference/cli#test--tag) or [`--skip-tag`](/docs/reference/cli#test--skip-tag) narrows. `focused` works like Vitest's `test.only`: only the focused tests run.
+
+A tool that reads the report wants `--json`. Save the mistake from step 4 in `Settings.es` again, `constant name: Integer = "Essence"`, and check `greeting.es`:
+
+```sh
+$ essence check greeting.es --json
+{
+  "version": "0.5.0",
+  "command": "check",
+  "ok": false,
+  "errors": 1,
+  "warnings": 0,
+  "durationMs": 25.313,
+  "files": [
+    {
+      "input": "greeting.es",
+      "output": null,
+      "ok": false,
+      "bytes": null,
+      "gzipBytes": null,
+      "durationMs": 24.829,
+      "stages": {
+        "read": 0.112,
+        "parse": 1.751,
+        "enrich": 21.985,
+        "validate": 0.699
+      },
+      "diagnostics": [
+        {
+          "file": "Settings.es",
+          "severity": "error",
+          "message": "This value does not fit the declared Type of Constant 'name'",
+          "code": "assignment-type-mismatch",
+          "line": 2,
+          "column": 27,
+          "endLine": 2,
+          "endColumn": 36
+        }
+      ]
+    }
+  ]
+}
+```
+
+The JSON document is the only thing on stdout. Each entry carries its stage timings and a `diagnostics` array. Every item in that array has a code, a severity, a message and a span, which is what a bot that annotates a pull request needs. An item's `file` is the file the problem is in, so here it is `Settings.es` while `input` is `greeting.es`.
+
+Colour follows stderr. It is on when stderr is a terminal and off when stderr is piped. Redirecting only stdout to a file keeps it on. `NO_COLOR` turns colour off and `FORCE_COLOR` turns it on. [`--color`](/docs/reference/cli#global--color) forces it on, even over `NO_COLOR`, for a CI log that renders colour.
+
+An `essence.json` at a project's root plays the part of `tsconfig.json`. It is optional. It writes build settings down once. `build`, `run` and `watch` read them, and `test` reads every one but `build.out`. A flag wins over the setting it mirrors: `--no-sourcemap` drops a `"sourcemap": true` for one run. Such a flag given together with its own negation, as `--minify` with `--no-minify`, is refused before anything runs, with exit code 2:
+
+<div class="error-output">
+
+```
+  ✖ --minify and --no-minify contradict each other — say one.
+
+  Usage: essence build <file...> [options]
+  Help:  essence help build
+```
+
+</div>
+
+On `build`, `run`, `watch`, `test` and `init`, [`--verbose`](/docs/reference/cli#global--verbose) starts the report with the project file that applies: `settings read from essence.json`, or `no essence.json governs the working directory`. In a CI log, that line shows whether the job picked up an `essence.json`. [`essence init`](/docs/reference/cli#init) writes a file to start from.
+
+</StepItem>
+
+</Steps>
+
+## Compared with the TypeScript toolchain
+
+These are the nearest TypeScript commands to `check`, `build`, `run` and `watch`:
+
+```sh
+tsc --noEmit
+esbuild greeting.ts --bundle --format=esm --outfile=greeting.js
+tsx greeting.ts
+tsx watch greeting.ts
+```
+
+- `essence check` is `tsc --noEmit`: it type-checks and writes nothing. `tsc` can take its file list from `tsconfig.json`. `essence check` has no such list, so you name the files, and a bare `essence check` exits 2.
+- `essence build` is closer to `esbuild --bundle` than to `tsc`. Each entry becomes one bundled ES module with its imports and the runtime library inside, where `tsc` writes one `.js` file per `.ts` file.
+- `essence run` works like `tsx`, except that it type-checks first. `tsx` strips the types and runs the program. `essence run` refuses a program with an Error.
+- `essence watch -e` is `tsx watch`: both follow the imports and run the program again after a save.
+
+[The tooling comparison](/docs/getting-started/coming-from-javascript#tooling) maps the rest of the JavaScript toolchain.
+
+<SeeAlso
+	links={[
+		{ label: "Command line", href: "/docs/reference/cli" },
+		{ label: "Diagnostics", href: "/docs/reference/diagnostics" },
+		{ label: "Projects and essence.json", href: "/docs/guides/projects" },
+		{ label: "Running tests", href: "/docs/guides/running-tests" },
+		{ label: "Formatting", href: "/docs/guides/formatting" },
+	]}
+/>

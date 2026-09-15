@@ -1,0 +1,474 @@
+---
+title: Debugging
+description: Stop an Essence program on a line in VS Code, read its values the way Essence prints them, step through it, and debug a test.
+section: guides
+order: 60
+template: guide
+tocDepth: 2
+steps: 6
+minutes: 15
+---
+
+The Essence debugger stops a running program on a line of your `.es` file. It shows the program's values the way Essence prints them, and steps through it one line at a time. It runs in VS Code, through the Essence extension that [Editor setup](/docs/guides/editor-setup) installs: open a `.es` file and press F5, with no `launch.json`. The compiler writes a source map, a file that pairs each position in the compiled JavaScript with a position in your source. The debugger reads it in both directions. This guide stops in a small program, reads what is there, steps through it, and then debugs a test. Commands are written as a global install runs them. [Installation](/docs/getting-started/installation) shows the prefix a project install needs.
+
+<Steps>
+
+<StepItem title="Write a program worth stopping in">
+
+This program has two [functions](/docs/language/functions), a call from one into the other, and a [list](/docs/language/lists) of [records](/docs/language/records) to look at. That is enough to give the call stack a shape.
+
+```essence
+implementation {
+
+	type Reading = { day: String, degrees: Integer }
+
+	§ The warmer of two readings, keeping the one already held on a tie.
+	function warmer(_ leader: Reading, _ reading: Reading) -> Reading {
+		if reading.degrees::isGreaterThan(leader.degrees) {
+			<- reading
+		}
+
+		<- leader
+	}
+
+	§ The warmest morning of a week, as a line to print.
+	function warmest(_ readings: List<Reading>) -> String {
+		constant initial: Reading = { day = "none", degrees = 0 }
+
+		constant best = readings::reduce(startingWith initial, warmer)
+
+		<- "{best.day} at {best.degrees}°"
+	}
+
+	constant week = [
+		{ day = "Monday", degrees = 3 },
+		{ day = "Tuesday", degrees = 9 },
+		{ day = "Wednesday", degrees = 5 },
+	]
+
+	Terminal.print(warmest(week)) § Tuesday at 9°
+}
+```
+
+`warmer` returns the warmer of two readings. `warmest` walks the list with [`reduce`](/docs/library/list#reduce), which calls `warmer` once per reading, starting from `initial`. [`essence run Weather.es`](/docs/reference/cli#run) prints `Tuesday at 9°`.
+
+Save it as `Weather.es` and keep it exactly as shown. The rest of the guide refers to its lines by number, and [`essence format`](/docs/reference/cli#format) leaves the file unchanged, so formatting it does not move them:
+
+<div class="table-scroll">
+
+| Line | What is on it |
+| --- | --- |
+| 5 | a [`§` comment](/docs/reference/syntax-glossary#comment) |
+| 7 | the [`if`](/docs/language/conditions) inside `warmer` |
+| 8 | `<- reading` |
+| 13 | a blank line |
+| 16 | `constant initial` |
+| 18 | the `reduce` call |
+| 20 | the string `warmest` returns |
+| 23 | `constant week` |
+| 29 | [`Terminal.print`](/docs/library/terminal#print) |
+
+</div>
+
+</StepItem>
+
+<StepItem title="See what a breakpoint works with">
+
+F5 builds the program for you, into a scratch directory it deletes when the session ends. The `keepArtifacts` launch attribute keeps that directory. Building the program once by hand shows what a breakpoint works with:
+
+```sh
+essence build Weather.es --sourcemap --no-optimise
+```
+
+This writes `Weather.js` and `Weather.js.map` beside the source. `Weather.js` is the bundle, the one JavaScript file that holds your program and the parts of the runtime it uses. [`--sourcemap`](/docs/reference/cli#build--sourcemap) writes the map, and [`--no-optimise`](/docs/reference/cli#build--no-optimise) turns off every optimisation pass. [Using the compiler](/docs/guides/using-the-compiler) covers `essence build`. The map starts like this:
+
+```json
+{"version":3,"sources":["/Users/you/weather/Weather.es"],"names":["reading","leader","readings","initial","warmer","best","$es_Terminal_print","warmest","week"],"mappings":";;;;;;;;;;;;…
+```
+
+- `sources` names your file by its absolute path.
+- `names` holds the names in your source, plus `$es_Terminal_print`, the name the compiler emitted for `Terminal.print`.
+- `mappings` pairs each position in the bundle with a line and column of `Weather.es`.
+- `sourcesContent`, further on, holds the source text itself.
+
+The debugger uses the map in both directions. A breakpoint on a `.es` line becomes a position in the bundle before it is set. Every stop and every stack frame is translated back to a `.es` line before you see it.
+
+Names come back the same way. JavaScript allows no `?` in a name, so a constant written `warm?` is spelled `$user_warm_3f_` in the bundle. A constant named `new`, a word JavaScript reserves, is spelled `_new`. The debugger shows both under the names you wrote.
+
+A session makes two more choices for you:
+
+- **The optimiser is off.** Many optimisation passes exist to drop statements and bindings, and those are what a debugger stops on. With the optimiser off, the code you step through has the shape your source has. The bundle is larger for it: 10.1 kB here, against 5.2 kB for an ordinary build. [Optimisations](/docs/reference/optimisations) lists every pass.
+- **The program runs under Node.** The debugger drives the program through Node's inspector, which speaks the Chrome DevTools Protocol. Bun's inspector speaks WebKit's protocol instead, so Bun can run the compiler but not the program being debugged. The extension looks for `node` on your PATH, then in the usual install locations (Homebrew, Volta, fnm, nvm), then by asking your login shell. The `essence.node.path` setting names it outright.
+
+</StepItem>
+
+<StepItem title="Start a session">
+
+Open `Weather.es` in VS Code and press F5. No `launch.json` is needed. When VS Code starts a session without a configuration, the extension builds one from the file in the editor:
+
+```json
+{
+	"type": "essence",
+	"request": "launch",
+	"name": "Debug Weather.es",
+	"program": "/Users/you/weather/Weather.es"
+}
+```
+
+The Run and Debug view offers the same entry before any `launch.json` exists. With no breakpoint set, the program runs to the end, and `Tuesday at 9°` appears in the Debug Console.
+
+**Compared with JavaScript.** A TypeScript program is usually debugged by building it with `tsc` and pointing VS Code's JavaScript debugger at the output:
+
+```json
+{
+	"type": "node",
+	"request": "launch",
+	"name": "Debug weather.ts",
+	"program": "${workspaceFolder}/src/weather.ts",
+	"preLaunchTask": "tsc: build - tsconfig.json",
+	"outFiles": ["${workspaceFolder}/dist/**/*.js"]
+}
+```
+
+There, a build task writes the JavaScript and its maps, and the `node` debugger (VS Code also accepts `pwa-node`) finds them through `outFiles`. The `essence` type has no build step to configure. Its adapter compiles the program, owns the map it wrote, and hides the frames you did not write. The rest of the toolchain is compared under [tooling](/docs/getting-started/coming-from-javascript#tooling).
+
+A debug adapter is the program between the editor and your running program: it sets breakpoints, reads the stack and evaluates what you type. Pressing F5 starts two programs:
+
+<div class="table-scroll">
+
+| Program | What runs it |
+| --- | --- |
+| The debug adapter, `essence dap`, which compiles `Weather.es` and drives the session | The Essence CLI |
+| Your compiled program | Node |
+
+</div>
+
+The extension runs the CLI that the `essence.cli.path` setting names. Without the setting, it runs `packages/cli/bin/essence` when the first workspace folder is a checkout of the Essence repository. Otherwise it runs an installed `essence`, looked for the way `node` is. An installed `essence` runs on Node. A `.js` file named by the setting runs on VS Code's own Node. A checkout's `packages/cli/bin/essence`, or any other file the setting names, runs on Bun, which the `essence.bun.path` setting can name. The `Essence` channel of the Output panel records which CLI started, on a line that begins `Starting the Debug Adapter through the`.
+
+If the program does not compile, nothing runs. Change line 16 so that `degrees` holds a string:
+
+```essence
+§ fragment
+constant initial: Reading = { day = "none", degrees = "zero" }
+```
+
+Press F5 again. Each error arrives in the Debug Console as one line, with its path, line, column and code:
+
+<div class="error-output">
+
+```
+/Users/you/weather/Weather.es:16:31 — This value does not fit the declared Type of Constant 'initial' [assignment-type-mismatch]
+```
+
+</div>
+
+The launch then fails with `'Weather.es' did not compile — see the session output.` [`essence check`](/docs/reference/cli#check) reports the same [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch) with its span drawn. Put line 16 back before the next step.
+
+</StepItem>
+
+<StepItem title="Stop on a line and read it">
+
+Click in the gutter beside line 18 and press F5. The program stops before `reduce` runs.
+
+Essence has no `debugger` statement. Written in a program, `debugger` is an unknown name, and the compiler refuses it with [`unknown-name`](/docs/reference/diagnostics#unknown-name). A breakpoint is always set from the editor.
+
+A breakpoint binds when the session finds a statement for it. A breakpoint on a line with no statement moves to the next line that has one. Ask for lines 18, 13 and 5, and they bind at 18, 16 and 7. Line 13 is blank, so its breakpoint moves to `constant initial` on line 16. Line 5 is a comment, so its breakpoint moves into `warmer` and lands on the `if` on line 7.
+
+At the stop on line 18, the Call Stack view shows two frames, and both are yours:
+
+```
+warmest      Weather.es:18:3
+Weather.es   Weather.es:29:17
+```
+
+A file's top level is named after the file. Below it sit the frames of Node's own module loading, which ran the bundle. These are glue frames, and the stack hides them. A frame the map can place is yours. A standard-library method the bundle emits under an `$es_` name stays, greyed out, under its Essence name. Everything else is glue.
+
+The Variables view's Local scope holds what `warmest` has bound so far:
+
+<div class="table-scroll">
+
+| Name | Value |
+| --- | --- |
+| `readings` | `[ { day = "Monday", degrees = 3 }, … ]` |
+| `initial` | `{ day = "none", degrees = 0 }` |
+
+</div>
+
+Values are rendered the way [`Terminal.inspect`](/docs/library/terminal#inspect) prints them: a record reads as a record, and a string is quoted. A long value is cut to one line with `…`, which `Terminal.inspect` does not do. Expand `readings` and its items appear under `0`, `1` and `2`. Expand `initial` and you get `day` and `degrees`.
+
+The Debug Console evaluates what you type in the frame you have selected. It speaks JavaScript over the compiled frame, not Essence. At the stop on line 18:
+
+<div class="table-scroll">
+
+| You type | You get |
+| --- | --- |
+| `initial` | `{ day = "none", degrees = 0 }` |
+| `initial.degrees` | `0` |
+| `initial.degrees::isEven()` | `SyntaxError: Unexpected token ':'` |
+| `readings.length` | `undefined` |
+| `readings.value.length` | `3` |
+
+</div>
+
+Results still render as Essence values. A single name that the bundle spells differently, such as `warm?` or `new`, is retried under its compiled spelling, so typing it works. Watch expressions and hovers go through the same evaluation, so an Essence expression fails there too.
+
+**Compared with JavaScript.**
+
+```ts
+// The same stop in a TypeScript version of Weather.es
+readings.length // 3
+initial.degrees + 1 // 1
+```
+
+In TypeScript, `readings` is an Array and `degrees` a number. In the Essence console, a list is an object that keeps its items in a backing array, `value`, which other lists may share. `readings.value.length` is `3` here. When `ys` is `xs::append(4)`, the two can share one array, and `xs.value.length` counts the item only `ys` holds. Read a list's items in the Variables view. An [`Integer`](/docs/library/integer) is an object whose `value` is a `number`, or a `bigint` past `Number.MAX_SAFE_INTEGER`. So `initial.degrees + 1` returns the string `[object Object]1`. Reach through `value` for the JavaScript number: `initial.degrees.value + 1` returns `1`. How lists and numbers differ from arrays and numbers in the language itself is under [collections](/docs/getting-started/coming-from-javascript#collections).
+
+A [dictionary](/docs/language/dictionaries) and a [method](/docs/language/namespaces-and-methods) read a little differently. This program counts the days of a forecast into a [`Dictionary`](/docs/library/dictionary), from inside a method:
+
+```essence
+implementation {
+	type Forecast = { days: List<String> }
+
+	namespace Forecast for Forecast {
+		tallied() -> Dictionary<String, Integer> {
+			constant counts = @.days::tally()
+
+			<- counts
+		}
+	}
+
+	constant forecast: Forecast = { days = ["sun", "rain", "sun"] }
+
+	Terminal.print(forecast::tallied()) § ["sun" = 2, "rain" = 1]
+}
+```
+
+Save it as `Forecast.es` and stop on line 8, `<- counts`. Local shows:
+
+<div class="table-scroll">
+
+| Name | Value |
+| --- | --- |
+| `self` | `{ days = [ "sun", "rain", "sun" ] }` |
+| `counts` | `[ "sun" = 2, "rain" = 1 ]` |
+
+</div>
+
+Inside a method, [`@`](/docs/reference/syntax-glossary#at), the value the method was called on, appears as `self`. In the Debug Console it is `_self`, and `self` is not defined. A dictionary shows the way `Terminal.inspect` prints it. It expands into its entries, each a record: `0 = { key = "sun", value = 2 }` and `1 = { key = "rain", value = 1 }`.
+
+</StepItem>
+
+<StepItem title="Step through it">
+
+From the stop on line 18, the three step commands land here:
+
+<div class="table-scroll">
+
+| Command | Where it lands |
+| --- | --- |
+| Step Into | `warmer`, line 7, with `leader` and `reading` in Local |
+| Step Over, from line 7 | line 8, `<- reading` |
+| Step Out, from line 8 | `warmest`, line 20, with `best` now in Local |
+
+</div>
+
+At line 7 the Call Stack holds three frames:
+
+```
+warmer       Weather.es:7:3
+warmest      Weather.es:18:3
+Weather.es   Weather.es:29:17
+```
+
+`reduce` calls `warmer`, but the frame of `reduce` is glue, so `warmer` sits directly on `warmest`.
+
+Step Into on line 18 goes straight into `warmer`, although it is `reduce` that calls it. When the bundle loads, the session tells V8, Node's JavaScript engine, to blackbox every range the map does not cover. A step runs through blackboxed code without stopping, the way `skipFiles: ["<node_internals>/**"]` keeps VS Code's JavaScript debugger out of Node's own code. Your code is mapped; the runtime and the standard library are not. On top of that, the adapter steps again when a step lands on unmapped code, and when a Step Over lands on the line it started from. Step Out works the same way: it does not stop inside `reduce`, and returns to `warmest` once the whole walk has finished.
+
+Set `"stopOnEntry": true` in a launch configuration, and the session pauses before anything else runs, on the first statement your source contains: line 23, `constant week`. The `type` and the two functions above it are declarations, and run nothing.
+
+Run Without Debugging (Ctrl+F5) goes through the same adapter and the same compile, but nothing pauses. VS Code sends no breakpoints, exceptions do not break, and `stopOnEntry` is ignored.
+
+</StepItem>
+
+<StepItem title="Debug a test">
+
+Add a [`tests` block](/docs/language/tests) below the implementation:
+
+```essence
+implementation {
+
+	type Reading = { day: String, degrees: Integer }
+
+	§ The warmer of two readings, keeping the one already held on a tie.
+	function warmer(_ leader: Reading, _ reading: Reading) -> Reading {
+		if reading.degrees::isGreaterThan(leader.degrees) {
+			<- reading
+		}
+
+		<- leader
+	}
+
+	§ The warmest morning of a week, as a line to print.
+	function warmest(_ readings: List<Reading>) -> String {
+		constant initial: Reading = { day = "none", degrees = 0 }
+
+		constant best = readings::reduce(startingWith initial, warmer)
+
+		<- "{best.day} at {best.degrees}°"
+	}
+
+	constant week = [
+		{ day = "Monday", degrees = 3 },
+		{ day = "Tuesday", degrees = 9 },
+		{ day = "Wednesday", degrees = 5 },
+	]
+
+	Terminal.print(warmest(week)) § Tuesday at 9°
+}
+
+tests {
+	test "the warmest day wins" {
+		expect warmest(week)::is("Tuesday at 9°")
+	}
+
+	test "a tie keeps the earlier reading" {
+		constant monday: Reading  = { day = "Monday", degrees = 9 }
+		constant tuesday: Reading = { day = "Tuesday", degrees = 9 }
+
+		expect warmer(monday, tuesday).day::is("Monday")
+	}
+}
+```
+
+[`essence test Weather.es`](/docs/reference/cli#test) runs both, and both pass. [Running tests](/docs/guides/running-tests) covers that command. There are three ways to debug them instead:
+
+- **The Test Explorer.** Its Debug profile starts a session for the tests you select.
+- **The Debug lens.** A Debug link sits above each `test`, and above each [`suite`](/docs/reference/syntax-glossary#suite) that holds tests. It debugs what is under it.
+- **A launch configuration** with a `tests` attribute:
+
+```json
+{
+	"type": "essence",
+	"request": "launch",
+	"name": "Debug the tests in Weather.es",
+	"program": "${workspaceFolder}/Weather.es",
+	"tests": []
+}
+```
+
+`tests` lists the ids of the tests to run, and an empty list runs every test in the file. An id is the file's path, any suite names and the test's name, as [`essence test --json`](/docs/reference/cli#global--json) reports it in each `test-start` event. You rarely write one, because the Test Explorer and the lens fill in the ids for you.
+
+Whichever way you start it, the session compiles the file with its `tests` block, as [`essence build --tests`](/docs/reference/cli#build--tests) does. It then starts a small runner beside the bundle, and the runner runs the chosen tests. A breakpoint in a test body binds and stops like any other. Set one on line 34, inside the first test, and the Call Stack shows the test body under the file's name:
+
+```
+Weather.es   Weather.es:34:10
+```
+
+The Debug Console shows the run:
+
+```
+Tuesday at 9°
+✓ the warmest day wins
+✓ a tie keeps the earlier reading
+2 passed, 0 failed, 0 deselected
+```
+
+The first line is the program's own output. Loading the bundle runs the implementation's statements before any test. A breakpoint in `warmer` therefore also stops during `warmest(week)` on line 29, before any test reaches it.
+
+</StepItem>
+
+</Steps>
+
+## Launch attributes
+
+F5 on the open file covers most sessions. For arguments, an environment or a fixed entry point, write a configuration into `.vscode/launch.json`:
+
+```json
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "essence",
+			"request": "launch",
+			"name": "Debug Weather",
+			"program": "${workspaceFolder}/Weather.es",
+			"args": [],
+			"cwd": "${workspaceFolder}",
+			"stopOnEntry": false
+		}
+	]
+}
+```
+
+The `essence` type has one request, `launch`. Ten attributes exist:
+
+<div class="table-scroll">
+
+| Attribute | Default | What it does |
+| --- | --- | --- |
+| `program` | `${file}` | The `.es` file to compile and debug. Required. |
+| `args` | `[]` | Arguments passed to the program. |
+| `cwd` | `${workspaceFolder}` | The directory the program runs in. |
+| `env` | `{}` | Environment variables set for the program. |
+| `stopOnEntry` | `false` | Pause on the first statement your source runs. |
+| `runtimeExecutable` | `"node"` | What runs the compiled JavaScript. It has to be Node. |
+| `glueFrames` | `"hide"` | `"subtle"` shows the glue frames greyed out instead of hiding them. |
+| `keepArtifacts` | `false` | Keep the compiled JavaScript and its map after the session, and say where they are. |
+| `artifact` | none | A bundle you built, to debug instead of compiling `program`. Its `.map` must sit beside it. |
+| `tests` | none | Test ids to run instead of the program. `[]` runs every test in the file. |
+
+</div>
+
+The extension checks that `program` names a `.es` file that exists, unless `artifact` is set. When `runtimeExecutable` is left out, the extension fills in the `node` it found.
+
+Setting `runtimeExecutable` to `"bun"` fails the launch after ten seconds, with `'bun' announced no inspector endpoint within 10 seconds`.
+
+Three attributes help when the session itself seems wrong:
+
+- **`keepArtifacts: true`** leaves the scratch directory in place. The Debug Console shows `Compiled to` and the bundle's path, inside a directory whose name starts with `essence-dap-`.
+- **`glueFrames: "subtle"`** turns the two frames at line 18 into nine. Below your two sit the seven frames of Node's module loading: `wrapModuleLoad`, `executeUserEntryPoint` and five anonymous ones, each shown as `match`.
+- **`artifact`** debugs a bundle you built instead of one the session compiles. Without a map beside it, each breakpoint comes back unverified, VS Code's word for a breakpoint that did not bind. The reason given is `the compiled bundle carries no source map`. An optimised bundle with its map binds and stops as well. For `Weather.es`, both give the three frames shown at line 7.
+
+## `essence dap` and `esdap`
+
+The adapter speaks the Debug Adapter Protocol over standard input and output, so any editor with a client for that protocol can start it. [`essence dap`](/docs/reference/cli#dap) is the adapter run by the CLI, compiling with the CLI's own pipeline in the same process. It is what VS Code starts.
+
+`esdap` is the same adapter as a command of its own, from the `@essence-lang/debug-adapter` package. It compiles by running `essence build` with `--sourcemap` and `--no-optimise`, and with `--tests` for a test session. It runs that build in the program's directory, so a compile error names the file relative to it: `Weather.es:16:31` instead of the full path.
+
+## Restricted Mode
+
+VS Code blocks debug sessions in a workspace you have not trusted, which it calls Restricted Mode. The Essence language features stay on there. Four settings name a program to start: `essence.cli.path`, `essence.server.path`, `essence.bun.path` and `essence.node.path`. In Restricted Mode, the values a workspace sets for them are ignored, so a repository you have not trusted cannot point them at a program of its own.
+
+## Rough edges
+
+**A callback sees only what it captured.** A [function literal](/docs/language/functions-as-values) closes over the names its body uses, and no others:
+
+```essence
+implementation {
+	function warmDays(
+		_ degrees: List<Integer>,
+		above limit: Integer,
+	) -> String {
+		constant label = "warm days"
+
+		constant warm = degrees::everyItem(where (degree) {
+			<- degree::isGreaterThan(limit)
+		})
+
+		<- "{label}: {warm}"
+	}
+
+	Terminal.print(warmDays([3, 9, 5], above 4)) § warm days: [9, 5]
+}
+```
+
+Stop on line 9, inside the literal. In the console, `limit` returns `4`, because the literal uses it. `label` fails with `ReferenceError: label is not defined`, because the literal never mentions it. Select the `warmDays` frame, one below, and `label` returns `"warm days"`. This is V8's behaviour, not Essence's. A JavaScript callback paused at the same spot gives the same `ReferenceError`.
+
+**A function literal the library calls is named `match`.** Where a JavaScript debugger shows an anonymous frame, this one shows `match`. The literal above, which [`everyItem`](/docs/library/list#everyItem) calls, appears as `match` in the Call Stack. Under `glueFrames: "subtle"`, a glue frame with no name of its own is shown as `match` too. A declared function, such as `warmer`, keeps its own name.
+
+**Runtime names show through.** The Closure scope of each function lists the runtime's helpers, such as `typeKeySymbol`, `createCase` and `createInteger`, 44 of them in `Weather.es`. Local is the scope to read. At a file's top level there is no function to be local to, so Local holds Node's module bindings (`exports`, `require`, `module`) followed by the same helpers.
+
+**No attach, and plain breakpoints only.** There is no `attach`, no conditional breakpoint, no hit count and no logpoint. You cannot set a value from the Variables view, restart a frame or step backwards.
+
+**Exceptions rarely pause.** Two exception filters exist: Uncaught Exceptions, on by default, and Caught Exceptions, off. Essence reports failure as a value, a [`Result`](/docs/language/result) or an [`Optional`](/docs/language/optional), so neither fires often. A stack overflow does not pause: the `RangeError` arrives in the Debug Console, and the session ends.
+
+**The optimiser is off for everything you step.** That includes the standard library. When a program misbehaves only when optimised, build it with [`--without-optimisation <pass>`](/docs/reference/cli#build--without-optimisation), which turns off the pass you name, and compare.

@@ -1,0 +1,289 @@
+---
+title: Editor setup
+description: Install the VS Code extension, see the language server at work, and connect any other editor through `essence lsp`.
+section: guides
+order: 50
+template: guide
+steps: 3
+minutes: 11
+---
+
+Editor support for Essence rests on one program, the language server. A language server is a process an editor asks about your code: its errors, the type under the cursor, what to complete next. Essence's server runs the same compiler stages as `essence check` and the same formatter as `essence format`. The editor and the command line never disagree about a program. VS Code gets the server through an extension. Any other editor that speaks the Language Server Protocol (LSP) starts it as `essence lsp`.
+
+<Steps>
+
+<StepItem title="Install from the Marketplace">
+
+```sh
+code --install-extension essence.essence-language
+```
+
+The extension is `essence.essence-language` on the Visual Studio Marketplace, listed as Essence. Search for Essence in the Extensions view, or run the command above in a terminal. It is not on Open VSX, the registry VSCodium installs from. In VSCodium, or another editor built from VS Code that installs from Open VSX, build the `.vsix` below and install that file.
+
+Nothing has to be on your PATH for the language features. The server ships inside the extension and runs on VS Code's own Node. VS Code's TypeScript support ships its language service the same way, which is why it works without a `typescript` package installed.
+
+A checkout of the Essence repository builds the extension, which is also the route for working on it:
+
+```sh
+bun run --cwd packages/vscode-extension package
+```
+
+The command writes `essence-language-<version>.vsix` into `packages/vscode-extension`, with the server bundled inside. Install that file with **Extensions: Install from VSIX…** in the Command Palette, or pass its path to `code --install-extension`.
+
+Debugging needs more: the `essence` command, and a Node to run your program on. The extension looks for both on your PATH, then in the directories their installers use, then through your login shell. `essence.cli.path` and `essence.node.path` name them outright, and `essence.bun.path` names the Bun a checkout's `essence` runs on. [Debugging](/docs/guides/debugging) covers the debugger and where the extension looks.
+
+The bundled server is also the fallback. If the `essence.server.path` setting names a server of your own that cannot run, the extension runs its bundled server instead and shows a warning.
+
+</StepItem>
+
+<StepItem title="Watch it work">
+
+Open a folder in VS Code and save this program in it as `lights.es`. Open the folder rather than the lone file, because references, renames and the project-wide Problems list work from the workspace folders.
+
+```essence
+implementation {
+
+	choice Light {
+		Red,
+		Amber,
+		Green,
+	}
+
+	§§ Whether a driver arriving at this Light has to stop.
+	§§ @param _ — the Light as it is showing now.
+	§§ @returns — true for every Light that is not Green.
+	function waiting(_ light: Light) -> Boolean {
+		<- match light -> Boolean {
+			case #Red   { <- true }
+			case #Amber { <- true }
+			case #Green { <- false }
+		}
+	}
+
+	constant crossing = waiting(#Red)
+
+	Terminal.print(crossing) § true
+}
+```
+
+`Light` is a [choice](/docs/language/choices-and-match), a type with a fixed set of cases. The `match` in `waiting` has one arm per case. An arm is a `case` and the block it runs. With the `essence` command from [Installation](/docs/getting-started/installation), `essence run lights.es` prints `true`.
+
+Now delete the `case #Amber` line, so that the `match` handles two of the three cases. About 200 milliseconds after you stop typing, a red squiggle appears under the `match` expression. Hover it, or open the Problems panel, and the error shows its source and code: `essence(missing-case)`.
+
+The code, [`missing-case`](/docs/reference/diagnostics#missing-case), is the error's stable name. You can filter the Problems panel by it, and the Diagnostics reference documents every code. In a terminal, `essence check lights.es` prints the same error:
+
+<div class="error-output">
+
+```
+[missing-case]
+Error: This Match Expression does not handle every Case
+    ╭─┤ lights.es:13:6 │
+    │
+ 13 │        <- match light -> Boolean {
+    │                 ──┬──
+    │                   ╰──── this is a Light
+    │
+    │ Help: Add 'case Light#Amber', or a 'case _' that covers the rest.
+    │
+    │ Note: Unhandled: 'Light#Amber'.
+────╯
+```
+
+</div>
+
+In the editor, the text drawn under the code, `this is a Light`, joins the first line. The hover reads "This Match Expression does not handle every Case: this is a Light". The note and the help follow on lines of their own.
+
+**Compared with JavaScript.**
+
+```ts
+type Light = "Red" | "Amber" | "Green"
+
+function waiting(light: Light): boolean {
+  switch (light) {
+    case "Red":
+      return true
+    case "Green":
+      return false
+  }
+}
+```
+
+With `strict` on, TypeScript reports `ts(2366)` on the return type, a missing return rather than a missing case. To have the case named, you write a `never` check in a `default` branch, or turn on a lint rule such as typescript-eslint's `switch-exhaustiveness-check`. The Essence compiler names the case itself, and its codes play the part of ESLint's rule names. More on [Coming from JavaScript › Tooling](/docs/getting-started/coming-from-javascript#tooling).
+
+A Quick Fix is an edit the editor offers for an error. Put the cursor on the squiggle and press `Ctrl+.` (`Cmd+.` on macOS). The lightbulb offers **Add missing Cases**. Accepting it adds one arm at the end of the `match`: `case Light#Amber {}`. `Light#Amber` is the case `#Amber` with its choice written in front.
+
+The new arm's body is empty on purpose, because the Quick Fix does not guess what the case returns. Until you fill it in, the file has a different error, [`missing-return`](/docs/reference/diagnostics#missing-return): "Not every path through this Function returns".
+
+Write `<- true` into the new arm, then run **Format Document**. The formatter lines up the arms, and `essence run lights.es` prints `true` again:
+
+```essence
+implementation {
+
+	choice Light {
+		Red,
+		Amber,
+		Green,
+	}
+
+	§§ Whether a driver arriving at this Light has to stop.
+	§§ @param _ — the Light as it is showing now.
+	§§ @returns — true for every Light that is not Green.
+	function waiting(_ light: Light) -> Boolean {
+		<- match light -> Boolean {
+			case #Red        { <- true }
+			case #Green      { <- false }
+			case Light#Amber { <- true }
+		}
+	}
+
+	constant crossing = waiting(#Red)
+
+	Terminal.print(crossing) § true
+}
+```
+
+Hover `waiting` where it is declared. The hover shows the signature, then renders the [`§§` documentation block](/docs/language/documentation-comments) above the function:
+
+```
+function waiting(_ Light) -> Boolean
+```
+
+> Whether a driver arriving at this Light has to stop.
+>
+> **light** — the Light as it is showing now.
+>
+> **Returns** — true for every Light that is not Green.
+
+`@param _` documents the first parameter. The `_` before `light` in the signature means a call passes that argument with no label, as `waiting(#Red)` does. The hover shows the parameter under `light`, the name the function's body uses.
+
+`constant crossing` has no type written. An inlay hint is text the editor draws into a line that is not in the file. Here the editor draws a faint `: Boolean` after `crossing`. Double-click the hint and `: Boolean` is written into the source. The lightbulb on that line offers the same edit as **Add explicit Type annotation ': Boolean'**.
+
+The server also runs your tests while you type, as Wallaby does for a JavaScript project. After an edit, this live test session re-runs only the test files the edit reached. Those are the edited file, if it has a [`tests { … }`](/docs/language/tests) section, and every test file that imports it, directly or through other modules. A failed `expect` is a [`test-failed`](/docs/reference/diagnostics#test-failed) error in Problems, even in a file you have not opened. The values a run recorded show as inlay hints beside the lines that produced them. A code lens is a clickable line of text the editor draws above code, and **Run** and **Debug** lenses sit above every `test` and `suite`. The Testing view, coverage and the test settings are on [Running tests](/docs/guides/running-tests).
+
+</StepItem>
+
+<StepItem title="Settings, commands and status">
+
+The extension has nine settings. The server reads four of them and applies a change without a restart. The extension reads the other five.
+
+<div class="table-scroll">
+
+| Setting | Default | Read by | What it does |
+| --- | --- | --- | --- |
+| `essence.inlayHints.enabled` | `true` | server | Shows inferred types as inlay hints, and the values a test run recorded. |
+| `essence.tests.enabled` | `true` | server | Runs the workspace's tests as you type. When it is off, a run you start still runs. |
+| `essence.tests.coverage` | `false` | server | Counts what each test run reaches. **Run with Coverage** in the Testing view turns it on. |
+| `essence.tests.debounce` | `450` | server | How many milliseconds the server waits after your last keystroke before it runs the tests again. |
+| `essence.server.path` | `""` | extension | A language server to run instead of the bundled one. A `.js`, `.cjs` or `.mjs` file runs on VS Code's Node; anything else is source and runs with Bun. |
+| `essence.bun.path` | `""` | extension | Where Bun is, for an `essence.server.path` or `essence.cli.path` that names source. |
+| `essence.cli.path` | `""` | extension | The `essence` command the debugger runs. |
+| `essence.node.path` | `""` | extension | The Node the debugger runs your program on. A launch configuration's `runtimeExecutable` overrides it. |
+| `essence.trace.server` | `"off"` | extension | Logs the traffic between VS Code and the server to the output channel. Set it to `"messages"` or `"verbose"`. |
+
+</div>
+
+`essence.server.path` and `essence.cli.path` accept `${workspaceFolder}`, `~` and paths relative to the workspace. Changing `essence.server.path` or `essence.bun.path` asks whether to restart the server.
+
+Restricted Mode is how VS Code opens a workspace you have not trusted. There it ignores workspace values of the four settings that name a program to run: `essence.server.path`, `essence.cli.path`, `essence.bun.path` and `essence.node.path`. A repository cannot point them at a program it ships. The language features stay on there. Debugging is off, because VS Code blocks debug sessions in Restricted Mode.
+
+The extension adds three commands to the Command Palette:
+
+- **Essence: Restart Language Server** stops the server and starts it again.
+- **Essence: Re-run Failed Tests** runs only the tests that failed last.
+- **Essence: Show Test Session Output** opens the channel where each test cycle writes its summary.
+
+An item on the right of the status bar reads **Essence**. Its icon spins while the server starts, shows a tick while it runs, and shows an error when the server has stopped or failed to start. Its tooltip names the server in use and what runs it. Clicking the item restarts the server.
+
+The **Essence** channel in the Output panel logs each start: which server, which runtime ran it, and where that runtime was found. It also holds the server's log, the traffic `essence.trace.server` asks for, and the text of any failure. A failure shows as a notification as well, with a **Show Output** button. When a runtime cannot be found, the channel lists every directory searched and the PATH that VS Code started with.
+
+For `.es` files the extension sets tabs, four columns wide, turns indentation detection off and makes itself the default formatter. **Format Document** then runs the same formatter as `essence format`, inside the server. [Formatting](/docs/guides/formatting) describes what it does.
+
+VS Code opens `essence.json`, the project file covered on [Projects and essence.json](/docs/guides/projects), the way it opens `tsconfig.json`: as JSON with comments. A schema that ships with the extension completes its keys and describes each one on hover. A mistake shows in Problems on the line that holds it, while you type. A misspelled key such as `"exclusions"` is an [`unknown-setting`](/docs/reference/diagnostics#unknown-setting) warning, and its note lists the settings that exist at that level.
+
+Snippets come from the server, not from a file in the extension. The server offers a snippet only where the code it inserts would parse. At a statement inside `implementation`, the list holds `constant`, `function`, `choice`, `namespace`, `if` and `doc` (a `§§` block), among others, but no `test` or `case`.
+
+</StepItem>
+
+</Steps>
+
+## Other editors
+
+The server speaks LSP over standard input and output, and nothing in it is specific to VS Code. Any editor with an LSP client can start it:
+
+```sh
+essence lsp
+```
+
+`esls` starts the same server. It is the command of the `@essence-lang/language-server` package, while installing `@essence-lang/cli` gives you `essence` and `esc`. `essence lsp` works wherever `essence` does. With no transport argument, the server adds `--stdio` itself, so the bare command is a working server. [Command line](/docs/reference/cli#lsp) has the command's help text.
+
+A client needs four things:
+
+- **The command**: `essence lsp` or `esls`. Arguments the client adds reach the server unchanged.
+- **The files**: `.es` files, under the language id `essence`. The server also serves buffers that were never saved.
+- **The workspace folders**: send them. Cross-file references and renames, workspace symbols and the project-wide Problems list all work from them.
+- **The configuration**: the server asks for `essence.inlayHints.enabled` and the `essence.tests` section through `workspace/configuration`. A client that returns `null` gets the defaults.
+
+The Run and Debug code lenses carry the commands `essence.test.run` and `essence.test.debug`. A lens that accepts a new snapshot carries `essence.test.acceptSnapshot`. The server does not run these commands, so the client binds each one. Each lens passes one argument, `{ ids, filePath, title }`. Running means sending `{ ids }` as the params of the server's `essence/runTests` request. Accepting a snapshot sends `{ ids, update: true }`, which records every snapshot the run produces. Results arrive as `essence/testRun` notifications.
+
+After it starts, the server registers a file watcher for three globs: `**/*.es`, `**/essence.json` and `**/package.json`. A client that supports `workspace/didChangeWatchedFiles` then tells the server about files that change outside the editor, as in a branch switch, and the server's module graph stays current. `package.json` is watched only to report the retired `"essence"` key there.
+
+The 77 snippets the server offers are also kept in the repository as `packages/vscode-extension/snippets/essence.code-snippets`, for other editors and for working without the server.
+
+No configuration for Neovim, Helix, Zed or any other editor ships with Essence. Syntax highlighting comes from a TextMate grammar inside the VS Code extension, and Essence ships no grammar for any other editor. Outside VS Code, keywords, strings and comments are therefore not coloured. The server's semantic tokens classify each name by what it resolves to. An editor that applies them colours types, type parameters, cases, namespaces, functions, methods, parameters, variables and properties.
+
+## What the server provides
+
+The server announces these capabilities when it starts. Diagnostics need none, because the server pushes them.
+
+<div class="table-scroll">
+
+| Feature | LSP request | What you get |
+| --- | --- | --- |
+| Diagnostics | `textDocument/publishDiagnostics` | Errors and warnings, each with a code, pushed about 200 ms after the last change. Files you have not opened are included. |
+| Quick Fixes and refactorings | `textDocument/codeAction` | Quick Fixes keyed on an error's code; refactorings that extract, inline, move or rewrite; **Remove the unused imports** as the organize-imports action. |
+| Code lenses | `textDocument/codeLens` | Run and Debug above every `test` and `suite`. |
+| Completion | `textDocument/completion` | Names, members, methods, cases and snippets for the place you are typing. Typing `.`, `:`, `<` or `#` opens the list. |
+| Signature help | `textDocument/signatureHelp` | The signature being called and the parameter you are on. Typing `(` or `,` opens it. |
+| Hover | `textDocument/hover` | The type of an expression, or a function's signature with its rendered `§§` block. |
+| Inlay hints | `textDocument/inlayHint` | Types the source leaves out, and the values a test run recorded. |
+| Go to definition | `textDocument/definition` | The declaration of a name, in whichever module declares it. |
+| Find references | `textDocument/references` | Every use of a name, across the workspace. |
+| Document highlight | `textDocument/documentHighlight` | The occurrences in this file, with the one that binds the name set apart from the reads. |
+| Rename | `textDocument/rename`, `textDocument/prepareRename` | A rename across the workspace, import entries included. |
+| Linked editing | `textDocument/linkedEditingRange` | A name's other occurrences change as you type it. |
+| Outline | `textDocument/documentSymbol` | Declarations with their types. A choice lists its cases. |
+| Workspace symbols | `workspace/symbol` | Declarations across the workspace, found by name. |
+| Call hierarchy | `textDocument/prepareCallHierarchy` | What calls a function and what it calls, within one file. |
+| Semantic tokens | `textDocument/semanticTokens/full` | Names classified by what they resolve to. |
+| Folding | `textDocument/foldingRange` | The import block, the sections and every body. |
+| Selection ranges | `textDocument/selectionRange` | A selection that grows through the syntax tree. |
+| Formatting | `textDocument/formatting` | The whole document, through the formatter `essence format` runs. |
+| File renames | `workspace/willRenameFiles` | The import specifiers a moved `.es` file or folder would break, rewritten before the move. |
+| Workspace folders | `workspace/didChangeWorkspaceFolders` | Folders added and removed while the server runs. |
+| Document sync | `textDocument/didChange` | The whole text of the document on every change. |
+
+</div>
+
+## What is not there
+
+- **Fix All.** The server offers no `source.fixAll` action. Removing an unused import is the one fix that is both unambiguous and certain to keep a program's meaning, so it is the one bulk action. None of the other Quick Fixes is applied in bulk.
+- **Sorting in Organize Imports.** The `source.organizeImports` action runs from `editor.codeActionsOnSave` too, but it only removes unused imports. TypeScript's Organize Imports also sorts them. Here `essence format` does the sorting.
+- **Formatting a range, or formatting as you type.** The formatter always takes the whole document.
+- **Call hierarchy across files.** A caller or callee in another module does not appear.
+- **Go to type definition, go to implementation, document links and type hierarchy.** The server does not announce them, so an editor does not offer them.
+- **Partial semantic tokens.** Every request returns the tokens for the whole file.
+
+## Errors in closed files, and rename refusals
+
+**A file you have not opened can show errors.** The analysis of an open file reaches the modules it imports. What it finds in one of them is published under that module's own URI, so the error appears in that file while it is closed. The importing file gets [`dependency-has-errors`](/docs/reference/diagnostics#dependency-has-errors) on the specifier that names the broken module.
+
+**Rename refuses some names.** It refuses a name the compiler declares itself, such as [`Boolean`](/docs/library/boolean) or [`Terminal`](/docs/library/terminal), and any name in one of the standard library's own source files. It also refuses a name declared outside every workspace folder. That refusal reads "'…' is declared outside this workspace, so its other uses can not be found." The server never indexed the uses outside the workspace, so a rename there would leave them naming something that no longer exists. Linked editing refuses compiler-declared names and standard-library files as well.
+
+<SeeAlso
+	links={[
+		{ label: "Running tests", href: "/docs/guides/running-tests" },
+		{ label: "Debugging", href: "/docs/guides/debugging" },
+		{ label: "Diagnostics", href: "/docs/reference/diagnostics" },
+		{ label: "Projects and essence.json", href: "/docs/guides/projects" },
+	]}
+/>

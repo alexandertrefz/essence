@@ -1,0 +1,343 @@
+---
+title: Formatting
+description: "Check and format Essence sources with essence format: one layout with no options, and the few spellings it never rewrites."
+section: guides
+order: 40
+template: guide
+steps: 2
+minutes: 3
+---
+
+[`essence format`](/docs/reference/cli#format) rewrites Essence source files into one layout: tabs for indentation, and lines that fit in 80 columns. There is nothing to configure, no config file and no style flags, which is the stance Go's `gofmt` takes. In Prettier terms the layout is `useTabs: true` and `tabWidth: 4` at an 80-column width, and none of it can change. No other command formats your sources: [`essence check`, `essence build` and `essence run`](/docs/guides/using-the-compiler) only read them.
+
+```sh
+essence format --check src
+essence format src
+```
+
+The first command lists the files that are not formatted. The second rewrites them.
+
+Put this in `inventory.es` to follow along. It is untidy on purpose: spaces for indentation, a list far past 80 columns, and an [`if`](/docs/reference/syntax-glossary#if) chain folded onto one line.
+
+```text
+implementation {
+    type Part = { name: String, count: Integer }
+
+    choice Level { Empty, Low, Stocked }
+
+    constant threshold = 12
+    constant parts = [{ name = "bolt", count = 4 }, { name = "washer", count = 30 }, { name = "nut", count = 0 }]
+
+  function levelOf(_ part: Part) -> Level {
+        if part.count::isZero() { <- #Empty } else if part.count::isLessThan(threshold) { <- #Low } else { <- #Stocked }
+  }
+
+    function describe(_ part: Part) -> String {
+        constant note = match levelOf(part) -> String {
+        case #Empty { <- "none left" }
+        case #Low { <- "only {part.count} left" }
+        case #Stocked { <- "{part.count} on hand" }
+        }
+
+        <- "{part.name}: {note}"
+    }
+
+    constant report = parts::map((part) { <- describe(part) })::sort()::join(with " / ")
+    Terminal.print(report) § bolt: only 4 left / nut: none left / washer: 30 on hand
+}
+```
+
+It compiles and runs as it stands. Being unformatted is not an error.
+
+<Steps>
+
+<StepItem title="Check first">
+
+`--check` names every file that is not formatted, and writes nothing:
+
+```sh
+$ essence format --check inventory.es
+inventory.es
+
+1 of 1 files are not formatted.
+```
+
+The file names go to stdout, one per line, so a script can read them. The count goes to stderr. `--check` is also Prettier's name for this flag.
+
+Three exit codes are all there are. `0` means everything was already formatted, or, without `--check`, was formatted successfully. `1` means a file was unformatted, could not be read, or would not parse, or that nothing matched the paths you named. `2` means the arguments did not make sense: an unknown flag, no files at all, `--stdin-filepath` with no path after it, `--stdin-filepath` without `--stdin`, or `--stdin` handed file arguments.
+
+That makes `--check` the form for CI and for a pre-commit hook. An argument can be a file, a directory or a glob:
+
+```sh
+essence format --check src
+essence format --check 'src/**/*.es'
+```
+
+A directory stands for every `.es` file under it, at any depth. That includes `node_modules`, `dist` and `build`. Only directories whose names start with a dot, such as `.git`, are skipped, and there is no ignore file. So point the formatter at your sources, not at the project root. Quote a glob, so that the formatter expands it and `**` matches any depth.
+
+</StepItem>
+
+<StepItem title="Format">
+
+Without `--check`, the formatter rewrites each file in place:
+
+```sh
+$ essence format inventory.es
+Formatted 1 of 1 file.
+```
+
+That is what Prettier's `--write` does. There is no `--write` flag, and `essence format --write` exits with `2`. To see the formatted text without writing it, pipe the file through `--stdin`, below.
+
+`inventory.es` now reads:
+
+```essence
+implementation {
+	type Part = { name: String, count: Integer }
+
+	choice Level {
+		Empty,
+		Low,
+		Stocked,
+	}
+
+	constant threshold = 12
+	constant parts     = [
+		{ name = "bolt", count = 4 },
+		{ name = "washer", count = 30 },
+		{ name = "nut", count = 0 },
+	]
+
+	function levelOf(_ part: Part) -> Level {
+		if part.count::isZero() {
+			<- #Empty
+		} else if part.count::isLessThan(threshold) {
+			<- #Low
+		} else {
+			<- #Stocked
+		}
+	}
+
+	function describe(_ part: Part) -> String {
+		constant note = match levelOf(part) -> String {
+			case #Empty   { <- "none left" }
+			case #Low     { <- "only {part.count} left" }
+			case #Stocked { <- "{part.count} on hand" }
+		}
+
+		<- "{part.name}: {note}"
+	}
+
+	constant report = parts
+		::map((part) { <- describe(part) })
+		::sort()
+		::join(with " / ")
+	Terminal.print(report) § bolt: only 4 left / nut: none left / washer: 30 on hand
+}
+```
+
+The program prints the same line as before. Each change follows one of the layout rules below. Run `--check` again. It prints nothing and exits `0`:
+
+```sh
+$ essence format --check inventory.es
+$ echo $?
+0
+```
+
+Only a file that changes is written. A file that was already formatted is not touched, so its modification time stays as it was.
+
+A file that does not parse is refused. This `sketch.es` never closes its [`Terminal.print(`](/docs/library/terminal#print):
+
+```text
+implementation {
+	constant name = "world"
+
+	Terminal.print("Hello, {name}!"
+}
+```
+
+<div class="error-output">
+
+```
+$ essence format sketch.es
+sketch.es:5:1: Expected ')' but found '}'.
+```
+
+</div>
+
+The file is left byte for byte as it was, and the exit code is `1`. In a run over several files, the others are still formatted, and the `Formatted … files.` line is left out. `essence check sketch.es` prints the full [`syntax-error`](/docs/reference/diagnostics#syntax-error) report.
+
+An editor formats a buffer that may be unsaved. `--stdin` reads one program from standard input and writes the formatted text to standard output:
+
+```sh
+$ printf 'implementation {\n  constant width=3\n constant height = 4\n}\n' | essence format --stdin
+implementation {
+	constant width  = 3
+	constant height = 4
+}
+```
+
+`--stdin-filepath <path>` says which file the buffer is, so a refusal names that path instead of `<stdin>`. Prettier uses the same flag name. Combined with `--check`, `--stdin` writes nothing to standard output and reports through the exit code. A buffer that does not parse still prints its refusal.
+
+Your editor can run the formatter for you. The VS Code extension makes itself the formatter for `.es` files, so Format Document and Format on Save use this same formatter. On a file that does not parse, Format on Save changes nothing and shows no message. The file's errors already say what is wrong. [Editor setup](/docs/guides/editor-setup) covers installing the extension.
+
+</StepItem>
+
+</Steps>
+
+## The layout rules
+
+These are the rules, and the formatted `inventory.es` shows most of them.
+
+- **Tabs, and 80 columns.** Each level of indentation is one tab. A tab counts as four columns. A line that would run past 80 columns is broken where its code allows: between list items, between arguments, before each `::` method call in a chain. A line of exactly 80 columns stays whole.
+- **A comment does not count toward the width.** The `Terminal.print` line of `inventory.es` is 84 columns with its [comment](/docs/reference/syntax-glossary#comment), and it stays on one line.
+- **Adjacent bindings line up.** [`constant`](/docs/reference/syntax-glossary#constant) and [`variable`](/docs/reference/syntax-glossary#variable) lines written one after another put their `=` in one column, as `threshold` and `parts` do. A name far longer than its neighbours splits the run instead of pushing every `=` to its width. A blank line or any other statement ends the run.
+- **A list or an argument list that does not fit breaks one item per line,** and gains a trailing comma, as `parts` did. A list of numbers, Booleans or cases without a payload, such as `#Low`, fills each line with as many items as fit instead, with the same trailing comma.
+- **A long chain puts each `::` call on its own line.** `report` did not fit on its line, so each [method call](/docs/reference/syntax-glossary#method-call) in the chain got a line of its own, one level deeper than the `constant`.
+- **A braced block always breaks.** A function body, an `if` branch and the cases of a [`choice`](/docs/reference/syntax-glossary#choice) go on lines of their own, even when they would fit on one. `choice Level { Empty, Low, Stocked }` became five lines. A [`match`](/docs/language/choices-and-match) arm, one `case` and its block, keeps a one-statement body on one line when it fits. So does a [function literal](/docs/reference/syntax-glossary#function-literal), as `(part) { <- describe(part) }` does.
+- **Blank lines you leave between statements are kept.** Several in a row become one, and one before a closing `}` is dropped. Line breaks inside an expression are not kept: a record you split across lines goes back on one line if it fits, where Prettier would keep it expanded.
+- **`match` and `define` arms line up in columns.** The braces of the `match` arms in `describe` sit in one column. A [`define`](/docs/language/conditions) lines up its conditions the same way:
+
+```essence
+implementation {
+	constant stock = 30
+
+	constant label = define {
+		as "none left"   if stock::isZero()
+		as "running low" if stock::isLessThan(12)
+		as "on hand"     otherwise
+	}
+
+	Terminal.print(label) § on hand
+}
+```
+
+**Compared with JavaScript.**
+
+```ts
+const threshold = 12
+const partsInStock = 3
+```
+
+Prettier never lines up `=` signs, so renaming one `const` changes one line of a diff. `essence format` lines them up, as `gofmt` does. Rename `parts` to `partsInStock`, and `threshold` is padded again too, so the diff shows both lines. More on [Coming from JavaScript › Tooling](/docs/getting-started/coming-from-javascript#tooling).
+
+## Imports and exports are sorted
+
+The formatter also orders the [`import`](/docs/reference/syntax-glossary#import) and [`export`](/docs/reference/syntax-glossary#export) blocks of a [module](/docs/language/modules), so sorting imports needs no separate tool. Here `src/Main.es` imports from two files, with the groups and the names in no particular order:
+
+```essence
+§ fragment
+import {
+	from "./Units.es" {
+		centimetres
+	}
+	from "./Shapes.es" {
+		perimeter
+		§ The type comes along for the annotation below.
+		Rectangle
+		area
+	}
+}
+```
+
+After `essence format src`, `Main.es` and the two files it imports read:
+
+```essence
+§ file: Main.es
+import {
+	from "./Shapes.es" {
+		§ The type comes along for the annotation below.
+		Rectangle
+		area
+		perimeter
+	}
+	from "./Units.es" { centimetres }
+}
+
+implementation {
+	constant box: Rectangle = { width = 3, height = 4 }
+
+	Terminal.print(centimetres(perimeter(box))) § 14 cm
+	Terminal.inspect(area(box)) § 12
+}
+```
+
+```essence
+§ file: Shapes.es
+implementation {
+	type Rectangle = { width: Integer, height: Integer }
+
+	function area(_ rectangle: Rectangle) -> Integer {
+		<- rectangle.width::multiply(with rectangle.height)
+	}
+
+	function perimeter(_ rectangle: Rectangle) -> Integer {
+		<- rectangle.width::add(rectangle.height)::multiply(with 2)
+	}
+}
+
+export {
+	Rectangle
+	area
+	perimeter
+}
+```
+
+```essence
+§ file: Units.es
+implementation {
+	function centimetres(_ amount: Integer) -> String {
+		<- "{amount} cm"
+	}
+}
+
+export {
+	centimetres
+}
+```
+
+- The groups are sorted by path: `"./Shapes.es"` comes before `"./Units.es"`.
+- The names in a group are sorted the way JavaScript's default `sort()` orders strings, so capitalised names come first: `Rectangle`, `area`, `perimeter`.
+- A comment moves with the name below it.
+- A group of one name is written on one line: `from "./Units.es" { centimetres }`.
+- An `export` block lists one name per line, sorted the same way. The names the file declares come first, and re-exports come after them. A re-export is a group such as `from "./Units.es" { centimetres }` inside `export`. It passes on a name from another file, as `export { centimetres } from "./Units.js"` does in JavaScript.
+
+## What it never rewrites
+
+Some spellings mean the same as another spelling. The formatter keeps the one you wrote. `essence format` leaves this block exactly as it is:
+
+```essence
+implementation {
+	§ This comment runs well past the eightieth column, and the formatter copies it as written.
+	§ A comment wrapped by hand
+	§     keeps its own line breaks and indentation.
+	constant million = 1_000_000
+	constant third   = 1/3
+	constant share   = 0.75
+	constant tabbed  = "a\tb"
+
+	constant origin   = { x = 0, y = 0 }
+	constant shifted  = { origin with x = 5 }
+	constant rebraced = { origin with { x = 5 } }
+	constant doubled  = [1, 2]::map((n) { <- n::multiply(with 2) })
+	constant tripled  = [1, 2]::map((_ n) { <- n::multiply(with 3) })
+
+	Terminal.inspect(million) § 1000000
+	Terminal.inspect(third) § 1/3
+	Terminal.inspect(share) § 3/4
+	Terminal.inspect(tabbed) § "a\tb"
+	Terminal.inspect(shifted::is(rebraced)) § true
+	Terminal.inspect(doubled) § [ 2, 4 ]
+	Terminal.inspect(tripled) § [ 3, 6 ]
+}
+```
+
+- **Digit groups.** `1_000_000` keeps its underscores. The separator is the same as JavaScript's. The value is `1000000`, and the groups exist only in the source.
+- **`1/3` and `0.75`.** Both are exact [`Rational`](/docs/library/rational) literals, and `0.75` is exactly `3/4`. Each keeps its spelling: a decimal is not turned into a [fraction](/docs/reference/syntax-glossary#fraction). In JavaScript `1/3` is a division; here it is one literal.
+- **Escapes.** `"a\tb"` keeps its `\t`, rather than a tab character in its place.
+- **`with` spellings.** `{ origin with x = 5 }` and `{ origin with { x = 5 } }` build the same [record](/docs/language/records), and each keeps the [`with`](/docs/reference/syntax-glossary#with) form it was written in.
+- **`(n)` and `(_ n)`.** A function literal's parameter keeps the spelling it was written with, with or without the [underscore](/docs/reference/syntax-glossary#underscore).
+- **Comments.** A comment's text is copied as written. It is never re-wrapped, even past 80 columns, and a comment you wrapped by hand keeps its line breaks.
+
+## The safety gate
+
+Before it writes, the formatter checks that its output parses to the same program and that a second pass changes nothing. If a check fails, the file is left untouched, the exit code is `1`, and in the terminal the error ends with `this is a bug in essence format.`

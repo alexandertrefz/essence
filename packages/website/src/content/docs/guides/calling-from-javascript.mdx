@@ -1,0 +1,899 @@
+---
+title: Calling Essence from JavaScript
+description: Load an Essence module from Node, Bun or a bundler, read the values and errors that cross, and give TypeScript its types.
+section: guides
+order: 70
+template: guide
+tocDepth: 2
+steps: 6
+minutes: 20
+---
+
+The `@essence-lang/client` package loads an [Essence](/docs/getting-started/what-essence-is) module, a `.es` file, and hands you its exports as plain JavaScript. A [record](/docs/language/records) becomes an object, a [list](/docs/language/lists) an array, and a missing value `undefined`. Each value is converted, or marshalled, at the boundary between the two languages. An argument of the wrong shape, such as a string where the module declares an [`Integer`](/docs/library/integer), is refused there, before any Essence code runs. So a request body can go straight to the module's functions, and Step 3 compares that check with Zod. Calls go one way: an Essence module imports only `.es` files, so the only JavaScript it runs is a function you pass it.
+
+## Four ways in
+
+| Way in | Compiles | Values you get | Use it for |
+| --- | --- | --- | --- |
+| `loadModule("./Pricing.es")` | When the module loads, so the compiler must be installed | Plain JavaScript | Servers, scripts and tests on Node or Bun |
+| A bundler plugin: `essence()` for Vite, `essenceEsbuild()` for esbuild, `essenceBun()` for Bun | When the bundler builds, or at the import under Bun | Plain JavaScript, and the module's own values under `?raw` | Browser apps, and anything else you bundle |
+| [`essence build --embed`](/docs/reference/cli#build--embed), then `loadPrebuilt("./dist/pricing.js")` | Once, ahead of time | Plain JavaScript | Deploying without compiling at run time |
+| [`essence build`](/docs/guides/using-the-compiler) | Once, ahead of time | Essence's own values, which JavaScript cannot build | Running a program rather than calling one |
+
+Essence's own values are the objects a compiled module works with. Each data value carries its type on a hidden Symbol, so a plain JavaScript value is never one of them. JavaScript builds one only through the module's `bridge`, which Step 3 uses.
+
+The first three put the same checks between the two languages. Steps 1 to 4 use `loadModule`, and what they show holds for the plugins and for `loadPrebuilt` too, with one difference for constants, under What does not cross. Step 5 moves the module into a bundler, and Step 6 ships it without the compiler.
+
+<Steps>
+
+<StepItem title="Load a module and call it">
+
+Install the client. It depends on the compiler, which `loadModule` runs.
+
+```sh
+npm install @essence-lang/client
+```
+
+The scripts on this page are ES modules that use top-level `await`. Set `"type": "module"` in your `package.json`, or name them `.mjs`.
+
+This script loads `Pricing.es`, shown below it, and calls into it:
+
+```js
+import { EssenceRational, loadModule } from "@essence-lang/client"
+
+let pricing = await loadModule("./Pricing.es")
+let { Order, priceAfter, taxOn, labels, taxRate, currency } = pricing.exports
+
+let items = [
+	{ name: "Notebook", cents: 1250n },
+	{ name: "Pencil", cents: 199n },
+]
+
+let order = Order.of({
+	items,
+	discount: { $case: "Discount#Percentage", of: new EssenceRational(1n, 10n) },
+})
+
+console.log(labels(items))
+console.log(Order.subtotal(order), Order.total(order))
+console.log(order.note, Order.noted(order, "gift wrapped").note)
+console.log(priceAfter({ $case: "Discount#Fixed", cents: 200n }, 1449n))
+console.log(currency, taxRate.toString(), taxOn(1449n, taxRate).toString())
+```
+
+```sh
+$ node use-pricing.js
+[ 'Notebook — 1250', 'Pencil — 199' ]
+1449n 1304n
+undefined gift wrapped
+1249n
+EUR 19/100 27531/100
+```
+
+`Pricing.es` prices an order. It holds most of the shapes a value can take at the boundary. There is a record, a list, a [choice](/docs/language/choices-and-match), an [`Optional`](/docs/language/optional), a [`Rational`](/docs/library/rational), an `Integer`, and a [namespace](/docs/language/namespaces-and-methods) with a static and three instance methods.
+
+```essence
+§ file: Pricing.es
+implementation {
+
+	type LineItem = { name: String, cents: Integer }
+
+	choice Discount {
+		None,
+		Fixed { cents: Integer },
+		Percentage { of: Rational },
+	}
+
+	type Order = {
+		items: List<LineItem>,
+		discount: Discount,
+		note: Optional<String>,
+	}
+
+	namespace Order for Order {
+		static of(items: List<LineItem>, discount: Discount) -> Order {
+			<- { items, discount, note = #Empty }
+		}
+
+		subtotal() -> Integer {
+			<- @.items::map(.cents)::sum()
+		}
+
+		total() -> Integer {
+			<- priceAfter(@.discount, on @::subtotal())
+		}
+
+		noted(_ note: Optional<String>) -> Order {
+			<- { @ with note = note }
+		}
+	}
+
+	function priceAfter(_ discount: Discount, on cents: Integer) -> Integer {
+		<- match discount -> Integer {
+			case #None  { <- cents }
+			case #Fixed { <- cents::subtract(@.cents) }
+			case #Percentage {
+				<- cents::multiply(with 1::subtract(@.of))::round()
+			}
+		}
+	}
+
+	function taxOn(_ cents: Integer, at rate: Rational) -> Rational {
+		<- cents::multiply(with rate)
+	}
+
+	function labels(_ items: List<LineItem>) -> List<String> {
+		<- items::map((item) { <- "{item.name} — {item.cents}" })
+	}
+
+	constant taxRate  = 19/100
+	constant currency = "EUR"
+}
+
+export {
+	Discount
+	LineItem
+	Order
+	currency
+	labels
+	priceAfter
+	taxOn
+	taxRate
+}
+```
+
+What the run shows:
+
+- **`exports` is the module as plain JavaScript.** It holds what the module's [`export` block](/docs/language/modules) lists. A constant arrives as its value, a function as a function, and a namespace as an object of functions. An `Integer` comes out as a `bigint`, so the subtotal prints as `1449n`. Each value that comes back is a fresh, ordinary object. Change it, and the next call converts the changed one.
+- **An instance method takes its receiver first.** The receiver is the value before `::`. JavaScript has no `::`, so `order::subtotal()` in Essence is `Order.subtotal(order)` here. A static such as `Order.of` reads the same in both languages.
+- **A call is positional, or takes one object of labels.** A label is the name a caller writes before an argument. In `priceAfter(_ discount: Discount, on cents: Integer)`, `on` labels `cents`, and `_` means the first parameter has none. Only a function whose parameters all have labels takes the object form, and its keys are the labels. Every parameter of `Order.of` has a label, so `Order.of(items, discount)` and `Order.of({ items, discount })` are the same call. A misspelled key is refused, not read as a positional argument.
+- **The module's body runs when it loads.** A top-level [`Terminal.print`](/docs/library/terminal#print), Essence's `console.log`, in `Pricing.es` would print during `loadModule`. It runs once per process, as an ES module's top level does. Loading the same file again returns the module without running the body a second time.
+- **Every call is synchronous.** Only loading returns a Promise, so `loadModule` is the one thing the script awaits.
+
+**Compared with JavaScript.**
+
+```js
+order.subtotal() // TypeError: order.subtotal is not a function
+Order.subtotal(order) // 1449n
+```
+
+What `Order.of` returns is a plain object with no methods. The methods live on `Order`, and none of them uses `this`, so `let { subtotal } = Order` works as well. More under [namespaces and protocols](/docs/getting-started/coming-from-javascript#namespaces-and-protocols).
+
+**Loading without a throw.** `loadModule` throws when the source does not compile, and Step 3 shows that error. `attemptLoad` takes the same arguments and returns the error instead. One of `module` and `error` is `null`:
+
+```js
+import { attemptLoad } from "@essence-lang/client"
+
+let { module, error } = await attemptLoad("./Pricing.es")
+```
+
+**Following edits.** `watchModule` keeps a loaded module up to date with its sources:
+
+```js
+import { watchModule } from "@essence-lang/client"
+
+let pricing
+
+let watcher = await watchModule("./Pricing.es", {
+	onModule(module) {
+		pricing = module.exports
+	},
+	onError(error) {
+		console.error(error.message)
+	},
+})
+
+// When you no longer need it:
+watcher.close()
+```
+
+`onModule` runs with the first load. It runs again after each saved edit that compiles, whether the edit is to `Pricing.es` or to a file it imports. An edit that does not compile calls `onError`, and the previous module stays in use. A value that `exports` handed you is plain JavaScript, so the new module accepts it.
+
+**The cache.** `loadModule` caches each compiled bundle under a hash of its sources and of the toolchain that compiled it, so a later load of unchanged sources skips the compiler. The `ESSENCE_CLIENT_CACHE` environment variable moves the cache, and `loadModule(path, { cacheDirectory })` overrides that.
+
+</StepItem>
+
+<StepItem title="Know what a value becomes">
+
+Every value is converted as it crosses. "Out" is a value Essence returns, and "in" is a value you pass.
+
+| Essence | Out, to JavaScript | In, from JavaScript |
+| --- | --- | --- |
+| `Integer` | `bigint` | `bigint`, or a `number` that is a safe integer; `2 ** 53` is refused |
+| `Rational` | `EssenceRational` | `EssenceRational`, `bigint` or `number` |
+| [`String`](/docs/library/string) | `string` | `string`, normalised to NFC |
+| [`Boolean`](/docs/library/boolean) | `boolean` | `boolean` |
+| `List<T>` | `Array` | `Array` |
+| [`Dictionary<K, V>`](/docs/language/dictionaries) | `Map` | `Map`; a plain object is refused, and the message names `new Map(Object.entries(…))` |
+| a record | a plain object | a plain object with only the keys the type declares; an `Optional` member may be left out |
+| `Optional<T>` | the value, or `undefined` | the value, `undefined` or `null`, never a `$case` object |
+| a case with a payload | `{ $case: "Discount#Fixed", cents: 200n }` | the same, or `Discount.Fixed({ cents: 200n })` |
+| a case of a choice whose cases carry no payload | `"Europe"` | `"Europe"` or `Zone.Europe` |
+| [`Result<T, F>`](/docs/language/result) | `{ $case: "Result#Value", item }` or `{ $case: "Result#Failure", reason }` | the same |
+| a function | a function | a function |
+| a [refinement](/docs/language/checked-refinements) such as `NonEmptyString` | its base type | its base type |
+| a [union](/docs/language/unions-and-type-aliases) | the member the value is | the first member, in declaration order, that fits |
+
+This module covers the rows `Pricing.es` does not:
+
+```essence
+§ file: Shipping.es
+implementation {
+
+	choice Zone {
+		Domestic,
+		Europe,
+		World,
+	}
+
+	function shipping(to zone: Zone) -> Integer {
+		<- match zone -> Integer {
+			case #Domestic { <- 490 }
+			case #Europe   { <- 990 }
+			case #World    { <- 1990 }
+		}
+	}
+
+	function quantity(from text: String) -> Result<Integer, String> {
+		<- Integer.parse(text)
+			::toResult(failingWith "'{text}' is not a whole number")
+	}
+
+	function counted(_ skus: List<String>) -> Dictionary<String, Integer> {
+		<- skus::tally()
+	}
+
+	function discounted(
+		_ cents: Integer,
+		by rule: (_: Integer) -> Integer,
+	) -> Integer {
+		<- rule(cents)
+	}
+
+	function skuCode(_ sku: NonEmptyString) -> String {
+		<- sku::uppercase()
+	}
+}
+
+export {
+	Zone
+	counted
+	discounted
+	quantity
+	shipping
+	skuCode
+}
+```
+
+```js
+import { loadModule } from "@essence-lang/client"
+
+let { Zone, counted, discounted, quantity, shipping, skuCode } = (
+	await loadModule("./Shipping.es")
+).exports
+
+console.log(shipping("Europe"), shipping(Zone.World), Zone.Domestic)
+console.log(quantity("12"))
+console.log(quantity("twelve"))
+console.log(counted(["P-1", "N-2", "P-1"]))
+console.log(discounted(1449n, (cents) => cents - 200n))
+console.log(skuCode("p-1"))
+```
+
+```sh
+$ node use-shipping.js
+990n 1990n Domestic
+{ item: 12n, '$case': 'Result#Value' }
+{ reason: "'twelve' is not a whole number", '$case': 'Result#Failure' }
+Map(2) { 'P-1' => 2n, 'N-2' => 1n }
+1249n
+P-1
+```
+
+The rules behind that output:
+
+**Going in, the declared type decides.** Coming out, every Essence value but a function carries its type, so nothing has to be decided. A function crosses as the type its position declares. Going in, `7n` could be an `Integer`, a `Rational` or an `Optional<Integer>`, so the type the module declared decides. The value is built against that type member by member. That is why a wrong argument is refused at the call and not three functions deep.
+
+**A union tries its members in declaration order.** Unlike in a TypeScript union, the order matters. A parameter declared `Integer | Rational` reads `7n` as an `Integer`. Declared `Rational | Integer`, it reads the same `7n` as a `Rational`.
+
+**A case is a tagged object.** If you know TypeScript's discriminated unions, that is what a choice becomes. `$case` is the discriminant, so `switch (discount.$case)` narrows to one case and its payload. The tag names the choice and the case: `"Discount#Fixed"`. Every exported choice is also an object of constructors, so `Discount.Fixed({ cents: 200n })` writes the tag for you and `Discount.None` is the case with no payload. Going in, the bare case name works too: `{ $case: "Fixed", cents: 200n }`. Compare cases by `$case`, because a case that comes back is a new object, never `===` to `Discount.None`.
+
+**A choice with no payloads crosses as its case names.** None of `Zone`'s cases carries a payload, so a zone is the string `"Europe"`, and `Zone.Europe` is that same string. The name is exact: `"europe"` is refused. One payload anywhere keeps the object form for every case of that choice, which is why `Discount.None` is `{ $case: "Discount#None" }`.
+
+**A `Result` crosses with a qualified tag.** It comes out as `"Result#Value"` or `"Result#Failure"`, and you write the same tag going in. Inside Essence, `#Value` is also a case of `Optional`, so the tag names the choice it means. A bare `"Value"` in a union of two choices that both have a `Value` case goes to the one declared first.
+
+**Functions cross both ways.** `discounted` [takes a function](/docs/language/functions-as-values), and the one you pass receives converted values: `cents` is a `bigint`. What it returns is checked against the declared type, so a callback that returns `"free"` throws `argument 2 → return value: expected Integer, got the string "free".`
+
+**A refinement crosses as its base type.** A refinement is a type with a check, such as `NonEmptyString`. `skuCode` takes a `NonEmptyString`, and JavaScript passes it a `string`: `skuCode("p-1")` returns `"P-1"`.
+
+**`Rational` crosses as an exact fraction.** JavaScript has no number for `1/3`, so a `Rational` comes out as an `EssenceRational`: two `bigint`s, printed by `.toString()`. A `number` going in is read for the value the double actually holds:
+
+```js
+import { EssenceRational, loadModule } from "@essence-lang/client"
+
+let { taxOn } = (await loadModule("./Pricing.es")).exports
+
+console.log(taxOn(1000n, new EssenceRational(19n, 100n)).toString())
+console.log(taxOn(1000n, 0.19).toString())
+console.log(taxOn(1000n, 0.19).toNumber())
+```
+
+```sh
+$ node rationals.js
+190
+427841964600197125/2251799813685248
+190
+```
+
+`0.19` is not `19/100`. A double stores the nearest fraction with a power-of-two denominator, and the boundary passes that exact value instead of guessing the one you meant. Build an `EssenceRational` when you mean a decimal. `.toNumber()` converts back to a `number` and loses what a double cannot hold. A `bigint` is a whole number: `taxOn(1000n, 19n)` returns `19000`.
+
+**Compared with JavaScript.**
+
+```ts
+let order = Order.of([{ name: "Pencil", cents: 199n }], Discount.None)
+
+order.note ?? "no note" // "no note"
+order.note?.length // undefined
+
+JSON.stringify(order) // throws a TypeError
+JSON.stringify(order, (key, value) =>
+	typeof value === "bigint" ? value.toString() : value,
+)
+// '{"items":[{"name":"Pencil","cents":"199"}],"discount":{"$case":"Discount#None"}}'
+```
+
+An `Optional<String>` arrives as `string | undefined`, so `??` and `?.` work on it, where Essence code writes `order.note::value(defaultingTo "no note")`. More under [absence](/docs/getting-started/coming-from-javascript#absence).
+
+Every `Integer` arrives as a `bigint`, which `JSON.stringify` refuses, so give it a replacer. [`examples/quote-server`](https://github.com/alexandertrefz/essence/tree/master/examples/quote-server) converts to `number`, because its amounts are cents that a double holds exactly. A `Dictionary` arrives as a `Map`, which `JSON.stringify` writes as `{}` without complaint, so convert it with `Object.fromEntries(map)` first. An `EssenceRational` needs `.toString()` or `.toNumber()`. More under [numbers](/docs/getting-started/coming-from-javascript#numbers).
+
+</StepItem>
+
+<StepItem title="Read the refusals">
+
+Five calls that go wrong:
+
+```js
+import { loadModule } from "@essence-lang/client"
+
+let { exports } = await loadModule("./Pricing.es")
+let { Order, priceAfter, labels } = exports
+
+function show(work) {
+	try {
+		console.log("ok:", work())
+	} catch (error) {
+		console.log(`${error.name}: ${error.message}`)
+	}
+}
+
+show(() => labels([{ name: "Pencil", cents: "199" }]))
+show(() => labels([{ name: "Pencil", cents: 199n, sku: "P-1" }]))
+show(() => priceAfter({ $case: "Discount#Fixed", cent: 200n }, 1449n))
+show(() => priceAfter({ $case: "Discount#Fixed", cents: 200n }))
+show(() => Order.of({ items: [], discounts: { $case: "Discount#None" } }))
+```
+
+```sh
+$ node errors.js
+EssenceMarshalError: argument 1 → [0].cents: expected Integer, got the string "199".
+EssenceMarshalError: argument 1 → [0]: expected { name: String, cents: Integer }, got an object with a member it does not declare — 'sku'.
+EssenceMarshalError: argument 1: expected Discount#Fixed, got an object with a member it does not declare — 'cent'.
+EssenceCallError: priceAfter(_ Discount, on: Integer) -> Integer takes 2 Arguments; 1 Argument was passed.
+EssenceCallError: Order.of(items: List<{ name: String, cents: Integer }>, discount: Discount) -> { items: List<{ name: String, cents: Integer }>, discount: Discount, note: Optional<String> } takes 2 Arguments positionally, or one object with the labels 'items', 'discount'. It was passed one object with 'items', 'discounts'.
+```
+
+The client throws one of four error classes, all exported from `@essence-lang/client`:
+
+| Class | Thrown when |
+| --- | --- |
+| `EssenceMarshalError` | A value does not fit the type on the other side, in either direction. |
+| `EssenceCallError` | A call does not fit the signature: the wrong number of arguments, keys that are not the labels, or an overloaded method. |
+| `EssenceCompileError` | The Essence source does not compile. |
+| `EssenceBuildError` | A bundler plugin broke one of its own rules while serving a module. Every source compiled, and the fault is in the plugin. |
+
+In code that ships, import `EssenceMarshalError`, `EssenceCallError` and `EssenceBuildError` from `@essence-lang/client/errors`. The package root loads the compiler, and `/errors` does not.
+
+**A marshal error says where.** `argument 1 → [0].cents` is the path from the argument down to the value that did not fit. The same text is on the error as `.path`, so a server can report it without parsing the message. In a call with one object of labels, the path starts at the label: `argument 'items' → [0]`.
+
+**A record is closed.** A key the type does not declare, such as `sku`, is refused, not dropped. So is `cent` written for `cents`, which would otherwise have left `cents` quietly missing.
+
+**A call error prints the signature.** For a function whose parameters all have labels, it also shows both ways to call it.
+
+**A compile error carries the compiler's report.** `Broken.es` adds a string to an `Integer`, and `loadModule` on it throws an `EssenceCompileError`:
+
+```js
+import { EssenceCompileError, loadModule } from "@essence-lang/client"
+
+try {
+	await loadModule("./Broken.es")
+} catch (error) {
+	if (error instanceof EssenceCompileError) {
+		console.log(error.message)
+		console.log(error.diagnostics.map((diagnostic) => diagnostic.code))
+	}
+}
+```
+
+The message is the report the compiler prints:
+
+<div class="error-output">
+
+```
+[no-matching-overload]
+Error: No overload of 'add' accepts these Arguments
+   ╭─┤ Broken.es:4:6 │
+   │
+ 4 │        <- cents::add("nineteen")
+   │           ───────────┬──────────
+   │                      ╰──────────── this call passes 1 Argument
+   │
+   │ Note 1: 'Integer::add' takes 1 Argument: Parameter 1 is Integer.
+   │ Note 2: 'Integer::add' takes 1 Argument: Parameter 1 is Rational.
+   │ Note 3: 'Integer::add' takes 1 Argument: Parameter 1 is Algebraic.
+   │ Note 4: 'Integer::add' takes 1 Argument: Parameter 1 is Transcendental.
+   │ Note 5: 'Scalar::add' takes 1 Argument: Parameter 1 is Scalar.
+───╯
+
+─── 1 error
+```
+
+</div>
+
+After it, the script prints `[ 'no-matching-overload' ]`. The error's `.diagnostics` hold one entry per diagnostic the compiler reported, warnings included, each with its [code](/docs/reference/diagnostics#no-matching-overload). A build can sort failures without reading the text.
+
+**An overloaded method cannot be called through `exports`.** Essence picks an [overload](/docs/reference/syntax-glossary#overload) by the argument types, and a JavaScript value carries no Essence type:
+
+```essence
+§ file: Tags.es
+implementation {
+
+	type Tag = { name: String }
+
+	namespace Tag for Tag {
+		overload label {
+			(_ number: Integer) -> String {
+				<- "{@.name}#{number}"
+			}
+
+			(_ text: String) -> String {
+				<- "{@.name}/{text}"
+			}
+		}
+	}
+
+	constant sale: Tag = { name = "sale" }
+}
+
+export {
+	Tag
+	sale
+}
+```
+
+```js
+import { loadModule } from "@essence-lang/client"
+
+let tags = await loadModule("./Tags.es")
+let { Tag, sale } = tags.exports
+
+try {
+	Tag.label(sale, 3n)
+} catch (error) {
+	console.log(`${error.name}: ${error.message}`)
+}
+
+let { raw, bridge, marshaller } = tags
+let label = raw.Tag.label__overload$1(raw.sale, bridge.integer(3))
+
+console.log(marshaller.toJS(label))
+```
+
+```sh
+$ node tags.js
+EssenceCallError: 'Tag.label' is overloaded, and which Overload a call means is decided by the Argument Types — which a JavaScript value does not carry. Call one of its Overloads by name instead:
+  Tag.label__overload$1(_ { name: String }, _ Integer) -> String
+  Tag.label__overload$2(_ { name: String }, _ String) -> String
+sale#3
+```
+
+`raw` is the module's exports without conversion, and each overload is a function on `raw.Tag`, named `label__overload$1` and `label__overload$2`. It takes the module's own values: `bridge.integer(3)` builds one, and `marshaller.toJS` turns the result back into JavaScript. Step 6 covers all three.
+
+**Compared with JavaScript.**
+
+```ts
+import { z } from "zod"
+
+const LineItem = z.strictObject({ name: z.string(), cents: z.number().int() })
+
+const parsed = z.array(LineItem).safeParse(await request.json())
+```
+
+Zod checks against a second schema that you keep in step by hand. The Essence boundary checks each argument's shape against the function's own parameter types, so the two cannot drift. The same JSON body can go straight to `labels`, because a safe-integer `number` is accepted for an `Integer`. More under [types](/docs/getting-started/coming-from-javascript#types).
+
+</StepItem>
+
+<StepItem title="Give TypeScript the types">
+
+`generateDeclarations` writes a TypeScript declaration file for a module. `loadModule` also returns `surface`, the compiler's description of the module's exports, and `entryPath`, the module's resolved path. The declarations are written from those two. Save the file beside the source as `Pricing.d.es.ts`, the name TypeScript 5.0 or later looks for when a file imports `./Pricing.es`, once `allowArbitraryExtensions` is on (below):
+
+```js
+import { writeFile } from "node:fs/promises"
+import {
+	declarationsPath,
+	describeModule,
+	describeTypes,
+	generateDeclarations,
+	loadModule,
+} from "@essence-lang/client"
+
+let pricing = await loadModule("./Pricing.es")
+let { surface, entryPath } = pricing
+
+await writeFile(
+	declarationsPath(entryPath),
+	generateDeclarations(describeModule(surface, entryPath), {
+		moduleName: "Pricing.es",
+		types: describeTypes(surface, entryPath),
+	}),
+)
+```
+
+Part of the file it writes:
+
+```ts
+export type Discount =
+	| { $case: "Discount#None" }
+	| { $case: "Discount#Fixed"; cents: bigint }
+	| { $case: "Discount#Percentage"; of: EssenceRational }
+
+export type LineItem = { name: string; cents: bigint }
+
+export declare const Discount: {
+	None: { $case: "Discount#None" }
+	Fixed<Payload_ extends { cents: bigint | number }>(payload: Payload_): Payload_ & { $case: "Discount#Fixed" }
+	Percentage<Payload_ extends { of: EssenceRational }>(payload: Payload_): Payload_ & { $case: "Discount#Percentage" }
+}
+
+export declare const Order: {
+	of(items: Array<Input<LineItem>>, discount: Input<Discount>): Order
+	of(labelled: { items: Array<Input<LineItem>>; discount: Input<Discount> }): Order
+	subtotal(p0: Input<Order>): bigint
+	total(p0: Input<Order>): bigint
+	noted(p0: Input<Order>, p1: string | undefined): Order
+}
+
+export declare function taxOn(p0: bigint | number, at: EssenceRational): EssenceRational
+```
+
+What the declarations say:
+
+- A type alias keeps its name. The `types` option is what declares the aliases; without it, every shape is written out where it is used.
+- A choice is the union of its cases, beside a `const` of the same name that holds the constructors.
+- `Input<T>` is the input side of a type. It widens every `Integer` inside `T` to `bigint | number`, because a safe `number` is accepted going in. What comes back stays `bigint`.
+- A function whose parameters all have labels is declared twice: positional, and with one `labelled` object.
+- A parameter is named by its label, such as `at`, or by its position, such as `p0`, when it has none.
+- `Optional<String>` is `string | undefined`, so TypeScript's null checks apply.
+- The declarations are stricter than the boundary in three places. A `Rational` takes only an `EssenceRational`, an `Optional` takes `undefined` but not `null`, and an `Optional` member of a record must be written, as `note: undefined` if nothing else. The checks at run time accept all three.
+
+Import the declared module as a type, and cast `exports` to it:
+
+```ts
+import { loadModule } from "@essence-lang/client"
+import type * as Pricing from "./Pricing.es"
+
+let pricing = await loadModule("./Pricing.es")
+let { Discount, Order, labels } = pricing.exports as typeof Pricing
+
+let order = Order.of({
+	items: [{ name: "Pencil", cents: 199 }],
+	discount: Discount.Fixed({ cents: 50 }),
+})
+
+console.log(labels(order.items), Order.total(order), order.note ?? "no note")
+```
+
+TypeScript reads a `.d.es.ts` file only with `allowArbitraryExtensions` on. Add it to the compiler options you already have:
+
+```json
+{
+	"compilerOptions": {
+		"allowArbitraryExtensions": true
+	}
+}
+```
+
+A wrong call is then a type error before it can be a runtime one:
+
+```ts
+import { loadModule } from "@essence-lang/client"
+import type * as Pricing from "./Pricing.es"
+
+let pricing = await loadModule("./Pricing.es")
+let { Discount, Order } = pricing.exports as typeof Pricing
+
+Order.of({ items: [], discounts: Discount.None })
+Order.of([{ name: "Pencil", cents: "199" }], Discount.None)
+```
+
+```sh
+$ tsc --noEmit
+wrong.ts(7,23): error TS2561: Object literal may only specify known properties, but 'discounts' does not exist in type '{ items: { name: string; cents: number | bigint; }[]; discount: Input<Discount>; }'. Did you mean to write 'discount'?
+wrong.ts(8,29): error TS2322: Type 'string' is not assignable to type 'number | bigint'.
+```
+
+The bundler plugins in Step 5 write the same file, `<Name>.d.es.ts` beside each `.es` file they compile, while a dev server runs or when you pass `declarations: true`. `examples/quote-server` and [`examples/client-2048`](https://github.com/alexandertrefz/essence/tree/master/examples/client-2048) import their `.es` files from TypeScript this way, with `allowArbitraryExtensions` in their `tsconfig.json`.
+
+An argument that cannot cross is declared `never`, with the reason in a comment, and so is an overloaded method as a whole. The one from Step 3:
+
+```ts
+export declare const Tag: { label: never /* overloaded — calling it throws */ }
+```
+
+TypeScript still accepts a `number` that is not a safe integer, such as `1.5`, which the boundary refuses when you call.
+
+</StepItem>
+
+<StepItem title="Compile in a bundler">
+
+`loadModule` compiles when the program starts, so the compiler must be installed where the program runs. A bundler plugin compiles during the build instead. An import of a `.es` file then works like any other import, and the values are the same plain JavaScript.
+
+**Vite.** This is the whole config of `examples/client-2048`:
+
+```ts
+import { essence } from "@essence-lang/client/vite-plugin"
+import { defineConfig } from "vite"
+
+export default defineConfig({
+	plugins: [essence()],
+})
+```
+
+The page imports the game's rules like any module, and accepts an edit to them:
+
+```ts
+import * as rules from "./Game.es"
+import type { Game } from "./Game.es"
+
+let game: Game = rules.empty
+
+// …
+
+if (import.meta.hot) {
+	import.meta.hot.accept("./Game.es", (fresh) => {
+		if (fresh) {
+			game = (fresh as unknown as typeof rules).resume(game)
+			render()
+		}
+	})
+}
+```
+
+When you save a `.es` file, Vite recompiles what the edit reaches and passes the update up the import graph to the nearest module that accepts it. Accept in the module that imports the `.es` file. The game state is plain JavaScript, so the new module's `resume` takes it as it is.
+
+**esbuild.** Pass the plugin to a build:
+
+```js
+import * as esbuild from "esbuild"
+import { essenceEsbuild } from "@essence-lang/client/esbuild-plugin"
+
+await esbuild.build({
+	entryPoints: ["app.js"],
+	bundle: true,
+	format: "esm",
+	outfile: "dist/app.js",
+	plugins: [essenceEsbuild()],
+})
+```
+
+```js
+import { Discount, Order, labels, taxRate } from "./Pricing.es"
+
+let items = [{ name: "Notebook", cents: 1250n }]
+let order = Order.of(items, Discount.Fixed({ cents: 200n }))
+
+console.log(labels(order.items))
+console.log(Order.total(order), taxRate.toString())
+```
+
+```sh
+$ node build.js && node dist/app.js
+[ 'Notebook — 1250' ]
+1050n 19/100
+```
+
+**Bun.** One file registers the plugin, and `bunfig.toml` loads that file before anything else runs. From `examples/quote-server`:
+
+```toml
+# bunfig.toml
+preload = ["./essence.ts"]
+```
+
+```ts
+// essence.ts
+import { essenceBun } from "@essence-lang/client/bun-plugin"
+import { plugin } from "bun"
+
+plugin(essenceBun({ root: import.meta.dirname, declarations: true }))
+```
+
+`root` is the directory the plugin resolves sources and packages from. Without it, Bun's runtime uses the directory `bun` was started in. `bun server.ts` then compiles each `.es` file when it is first imported, and `bun --hot server.ts` reloads when you save one. An edit that does not compile is reported, and the server keeps running until an edit fixes it.
+
+The quote route passes the request body to Essence and turns a refusal into a 400. quote-server's own `rules/Pricing.es` exports `quote`, which returns a `Quote` choice. `toJSON` is the server's helper that writes a JSON response, with each `bigint` turned into a `number`:
+
+```ts
+import type { Input } from "@essence-lang/client"
+import {
+	EssenceCallError,
+	EssenceMarshalError,
+} from "@essence-lang/client/errors"
+import { type Order, quote } from "./rules/Pricing.es"
+
+// … inside the POST /quote route:
+try {
+	let answer = quote(body as Input<Order>)
+
+	if (answer.$case === "Quote#Rejected") {
+		return toJSON(answer, 422)
+	}
+
+	return toJSON(answer)
+} catch (error) {
+	if (
+		error instanceof EssenceMarshalError ||
+		error instanceof EssenceCallError
+	) {
+		return toJSON({ error: error.message }, 400)
+	}
+
+	throw error
+}
+```
+
+A body whose `zone` is `"Mars"` gets a 400 with `argument 1 → .zone: expected Zone, got the string "Mars".`
+
+**What goes into the bundle.** A plugin serves each `.es` file as a JavaScript module. It wraps the entry with the client's interpreter, the code that reads the module's type description and converts each value. The interpreter imports the Essence runtime, so both end up in your bundle. A Vite production build of the esbuild example's `app.js` comes to about 50 kB minified, 13 kB gzipped. The served modules import `@essence-lang/runtime` by name, so your bundler must resolve it. The client depends on it, so most installers put it within reach; under a strict layout such as pnpm's, add it to your own dependencies.
+
+**`diagnostics: "minimal"`.** The plugin embeds a description of the module's types, which the interpreter checks values against. `essenceEsbuild({ diagnostics: "minimal" })` leaves the printed type names out of it. The checks do not change, and the messages stop naming the type:
+
+```sh
+# diagnostics: "full", the default
+EssenceMarshalError: argument 1 → [0].cents: expected Integer, got the string "199".
+# diagnostics: "minimal"
+EssenceMarshalError: argument 1 → [0].cents: expected , got the string "199".
+```
+
+**`?raw`.** `import * as raw from "./Pricing.es?raw"` imports the compiled module without the conversion: Essence's own values, under the names the module exports. Vite uses `?raw` for a file's text; here it means the module's unconverted values. Step 6 shows what those look like.
+
+</StepItem>
+
+<StepItem title="Ship without the compiler">
+
+`essence build --embed` compiles the module once and writes two files, `dist/pricing.js` and `dist/pricing.descriptor.json`. The `essence` command comes from `@essence-lang/cli`, which the client does not install:
+
+```sh
+npm install --save-dev @essence-lang/cli
+```
+
+Then build:
+
+```sh
+$ npx essence build Pricing.es -o dist/pricing.js --embed --quiet
+  ✔ Pricing.es → dist/pricing.js
+```
+
+The descriptor is the boundary written down as JSON: every export, its type, and the tag of every case. `loadPrebuilt` binds the two without compiling anything:
+
+```js
+import { loadPrebuilt } from "@essence-lang/client/prebuilt"
+
+let pricing = await loadPrebuilt("./dist/pricing.js")
+let { Discount, Order } = pricing.exports
+
+console.log(Object.keys(pricing))
+console.log(Order.total(Order.of([{ name: "Pencil", cents: 199n }], Discount.None)))
+```
+
+```sh
+$ node prebuilt.js
+[ 'exports', 'raw', 'bridge', 'interpreter', 'descriptor' ]
+199n
+```
+
+`loadPrebuilt` looks for the descriptor beside the bundle, under the name `--embed` gave it, and a second argument names one stored elsewhere. `exports` goes through the same checks as with `loadModule`. `@essence-lang/client/prebuilt` never loads the compiler. The compiler still installs with the client, but nothing on this path runs it, so you deploy the two files.
+
+**`raw`, `bridge` and `marshaller`.** `loadModule` also returns `raw`, `bridge` and `marshaller`, and `loadPrebuilt` returns `raw` and `bridge`. `raw` holds each exported function, namespace and constant under its Essence name, with no conversion. A choice's constructors exist only on `exports`. Each data value in `raw` is one of Essence's own values, with its type on the hidden Symbol, and a function carries none. `bridge` holds the constructors for that bundle's values, and `marshaller` converts in both directions:
+
+```js
+import { loadModule } from "@essence-lang/client"
+
+let pricing = await loadModule("./Pricing.es")
+
+console.log(pricing.raw.taxRate)
+console.log(pricing.marshaller.toJS(pricing.raw.taxRate).toString())
+```
+
+```sh
+$ node raw.js
+{ numerator: 19n, denominator: 100n, Symbol($type): 'Rational' }
+19/100
+```
+
+Without `--embed`, `essence build` writes a program. Its exports are Essence's own values, and a plain array passed in fails inside the module with a `TypeError`.
+
+</StepItem>
+
+</Steps>
+
+## What does not cross
+
+Some Essence values have no JavaScript form. The boundary refuses them instead of guessing, and the declaration file declares an argument that cannot cross `never`.
+
+```essence
+§ file: Limits.es
+implementation {
+
+	function firstOf<infer ItemType>(
+		_ items: List<ItemType>,
+	) -> Optional<ItemType> {
+		<- items::firstItem()
+	}
+
+	function deep(_ value: Optional<Optional<Integer>>) -> Boolean {
+		<- value::hasValue()
+	}
+
+	constant root = 2::squareRoot()
+}
+
+export {
+	deep
+	firstOf
+	root
+}
+```
+
+```js
+import { loadModule } from "@essence-lang/client"
+
+let limits = await loadModule("./Limits.es")
+let { deep, firstOf } = limits.exports
+
+function show(work) {
+	try {
+		console.log("ok:", work())
+	} catch (error) {
+		console.log(`${error.name}: ${error.message}`)
+	}
+}
+
+show(() => firstOf([1n, 2n]))
+show(() => firstOf([]))
+show(() => deep(7n))
+
+try {
+	limits.exports.root
+} catch (error) {
+	console.log(`${error.name} at ${error.path}`)
+}
+```
+
+```sh
+$ node limits.js
+EssenceMarshalError: argument 1 → [0]: ItemType is a Type Parameter — there is no shape to build a value against until it is applied.
+ok: undefined
+EssenceMarshalError: argument 1: an Optional inside an Optional has no JavaScript spelling — both levels would be 'undefined', and '#Value(#Empty)' is not '#Empty'.
+EssenceMarshalError at root
+```
+
+- **[Generics](/docs/language/generics).** A type parameter has no shape until a call applies it, so an argument in its position is refused. An empty array gets through, because there is nothing in it to build. The generic function still works through `raw`, where nothing is converted.
+- **Overloads.** A call through `exports` is refused, and each overload is a function on `raw`, as Step 3 shows.
+- **Nested `Optional`s.** `Optional<Optional<Integer>>` would be `undefined` at both levels, and `#Value(#Empty)` is not `#Empty`. It is refused going in and coming out.
+- **Numbers above `Rational`.** An [`Algebraic`](/docs/library/algebraic) or a [`Transcendental`](/docs/library/transcendental), such as `2::squareRoot()`, has no JavaScript form. Under `loadModule` and `loadPrebuilt`, a constant is converted when you read it, so reading `root` throws and the other exports still work. A bundler plugin converts every constant when the module loads, so there `root` fails the whole import.
+- **Compiling in a browser.** The compiler reads files and runs esbuild, so it runs on Node or Bun. A browser runs what a bundler plugin built.
+
+Two example projects use this boundary end to end:
+
+- `examples/quote-server` is an HTTP API on Bun whose pricing rules are Essence, reached through the Bun plugin.
+- `examples/client-2048` is the game 2048 in the browser. The rules are Essence, the page is TypeScript, and Vite serves both.
+
+The client package's [README](https://github.com/alexandertrefz/essence/tree/master/packages/client) lists every export and every plugin option.

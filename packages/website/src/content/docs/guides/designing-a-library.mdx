@@ -1,0 +1,655 @@
+---
+title: Designing a library
+description: Choose what a module exports, name its methods like the standard library, put its rules in signatures, and test it beside the code.
+section: guides
+order: 80
+template: guide
+steps: 4
+minutes: 12
+---
+
+A library is a [module](/docs/language/modules) that other people import. They see its `export` block, the list of names other files may import, and its methods' names and signatures. Those are the parts of a library that are hardest to change later. This guide designs them for `Till`, a small library for amounts of money, and then checks what a JavaScript caller can reach. This is a caller's side of the finished library:
+
+```essence
+§ file: Main.es
+import {
+	from "./Till.es" {
+		Money
+		itemise
+	}
+}
+
+implementation {
+	constant lunch  = Money.of(euros 12, cents 50)
+	constant coffee = Money.of(euros 2, cents 80)
+
+	Terminal.print(itemise([lunch, coffee])) § 12.50 + 2.80 = 15.30
+	Terminal.print(lunch::split(into 3)) § [4.17, 4.17, 4.16]
+	Terminal.print([lunch, coffee]::sort()) § [2.80, 12.50]
+	Terminal.print(Money.parse("7.5", defaultingTo Money.Zero)) § 7.50
+}
+```
+
+`Till.es` is the one file a caller imports.
+
+<Steps>
+
+<StepItem title="Choose the export surface">
+
+`Money.es` holds the core of `Till`. It declares a [record](/docs/language/records) type for an amount, a [choice](/docs/language/choices-and-match) for the ways reading one can fail, and a [namespace](/docs/language/namespaces-and-methods) that holds the methods for the type:
+
+```essence
+§ file: Money.es
+implementation {
+	§§ An amount of money, held in whole cents, the smallest amount a till counts.
+	type Money = { cents: Integer }
+
+	§§ Why a text did not read as an amount of money.
+	choice ParseFailure {
+		Blank,
+		NotANumber,
+		TooPrecise,
+	}
+
+	namespace ParseFailure for ParseFailure is Printable {}
+
+	namespace Money for Money is Printable, is Comparable {
+		§§ No money at all.
+		§§
+		§§ @example
+		§§   expect Money.Zero.cents::is(0)
+		static Zero: Money = { cents = 0 }
+
+		§§ Builds an amount from whole euros and the cents beside them.
+		§§
+		§§ @example
+		§§   expect Money.of(euros 12, cents 50).cents::is(1250)
+		static of(euros: Integer, cents: Integer) -> Money {
+			<- { cents = euros::multiply(with 100)::add(cents) }
+		}
+
+		§§ Reads an amount written in euros, such as "12.50".
+		§§
+		§§ @example
+		§§   expect Money.parse("12.5")::is(Money.of(euros 12, cents 50))
+		§§   expect Money.parse("12.505")::reason()::is(#TooPrecise)
+		§§   expect Money.parse("twelve", defaultingTo Money.Zero)::is(Money.Zero)
+		overload static parse {
+			(_ text: String) -> Result<Money, ParseFailure> {
+				constant trimmed = text::trim()
+
+				if trimmed::isEmpty() {
+					<- #Failure(#Blank)
+				}
+
+				constant number = Rational.parse(trimmed)
+
+				<- match number -> Result<Money, ParseFailure> {
+					case #Value(euros) { <- wholeCents(euros) }
+					case #Empty        { <- #Failure(#NotANumber) }
+				}
+			}
+
+			(_ text: String, defaultingTo fallback: Money) -> Money {
+				<- Money.parse(text)::value(defaultingTo fallback)
+			}
+		}
+
+		§§ Adds up a list of amounts. An empty list adds up to `Money.Zero`.
+		§§
+		§§ @example
+		§§   constant coins = [Money.of(euros 1, cents 20), Money.of(euros 0, cents 80)]
+		§§   expect Money.sum(coins)::is(Money.of(euros 2, cents 0))
+		static sum(_ amounts: List<Money>) -> Money {
+			<- { cents = amounts::map(.cents)::sum() }
+		}
+
+		§§ Orders two amounts by their value.
+		§§
+		§§ @example
+		§§   expect Money.of(euros 1, cents 0)::isLessThan(Money.of(euros 2, cents 0))
+		compare(to other: Money) -> Ordering {
+			<- @.cents::compare(to other.cents)
+		}
+
+		§§ Writes the amount in euros, with two decimal places.
+		§§
+		§§ @example
+		§§   expect Money.of(euros 7, cents 5)::toString()::is("7.05")
+		toString() -> String {
+			<- @.cents::toString(scaledBy 2)
+		}
+
+		§§ Adds another amount to this one.
+		§§
+		§§ @example
+		§§   constant total = Money.of(euros 1, cents 50)::add(Money.of(euros 0, cents 75))
+		§§   expect total::is(Money.of(euros 2, cents 25))
+		add(_ other: Money) -> Money {
+			<- { cents = @.cents::add(other.cents) }
+		}
+
+		§§ Rounds the amount to whole euros, to the nearest one unless told otherwise.
+		§§
+		§§ @example
+		§§   expect Money.of(euros 4, cents 50)::round()::toString()::is("5.00")
+		§§   expect Money.of(euros 4, cents 50)::round(toward #Down)::toString()::is("4.00")
+		round(toward direction: Rounding = #Nearest) -> Money {
+			constant euros = @.cents::divide(by 100)::round(toward direction)
+
+			<- { cents = euros::multiply(with 100) }
+		}
+
+		§§ Splits the amount into equal parts. The cents left over go to the first parts.
+		§§
+		§§ @example
+		§§   expect Money.of(euros 10, cents 0)::split(into 3)::toString()::is("[3.34, 3.33, 3.33]")
+		split(into parts: PositiveInteger) -> NonEmptyList<Money> {
+			constant share = @.cents::quotient(dividingBy parts)
+			constant extra = @.cents::remainder(dividingBy parts)
+
+			<- List.repeat(share, times parts)
+				::enumerate()
+				::map(({ index, item }) {
+					if index::isLessThan(extra) {
+						<- { cents = item::add(1) }
+					}
+
+					<- { cents = item }
+				})
+		}
+	}
+
+	§ Private: the export block does not list it.
+	function wholeCents(_ euros: Rational) -> Result<Money, ParseFailure> {
+		constant cents = euros::multiply(with 100)
+
+		if cents::isWholeNumber() {
+			<- #Value({ cents = cents::round() })
+		}
+
+		<- #Failure(#TooPrecise)
+	}
+}
+
+export {
+	Money
+	ParseFailure
+}
+```
+
+Each [`§§`](/docs/reference/syntax-glossary#doc-comment) block documents the member under it, and its `@example` lines run as tests. Steps 3 and 4 come back to them. For now, read the `export` block at the bottom.
+
+The export block lists what other files may import, and here it lists two names. Each brings a type together with the namespace of the same name. A namespace travels by name: a file reaches a namespace's methods only through a name it imported. Keep a type's methods in one namespace named like the type, and one name in the import block brings all of them.
+
+This is where a JavaScript class misleads you. An instance carries its methods, and an Essence value carries none. A file that is handed an amount but never imports `Money` prints it as `{ cents = 1250 }`, and `amount::split(into 3)` there is refused with [`unknown-method`](/docs/reference/diagnostics#unknown-method).
+
+A conformance, such as `is Printable` on a namespace, says the type meets the requirements of a [protocol](/docs/language/protocols). Conformances travel the same way as methods. A file that prints or compares a [`Result<Money, ParseFailure>`](/docs/language/result), an amount or the reason there is none, must import `ParseFailure` too. The choice's [`Printable`](/docs/library/protocols#Printable) and [`Equatable`](/docs/library/protocols#Equatable) conformances come with that name. Without it, printing the `Result` is refused with [`unsatisfied-conformance-condition`](/docs/reference/diagnostics#unsatisfied-conformance-condition), whose note reads "ParseFailure does not conform to 'Printable'".
+
+Everything the export block leaves out is private. `wholeCents` is a helper for `parse`, and a file that imports it is refused with [`not-exported`](/docs/reference/diagnostics#not-exported):
+
+<div class="error-output">
+
+```
+[not-exported]
+Error: 'wholeCents' is not exported by ./Money.es
+   ╭─┤ Private.es:2:22 │
+   │
+ 2 │     from "./Money.es" { wholeCents }
+   │                         ─────┬────
+   │                              ╰────── declared in that Module, but private
+   │
+   │ Help: Add 'wholeCents' to the 'export { … }' block of ./Money.es.
+   │
+   │ Note: A name is private unless the Module's 'export { … }' block lists it.
+───╯
+```
+
+</div>
+
+A record type is structural: any record with an [`Integer`](/docs/library/integer) member called `cents` is a `Money`. With `Money` imported, `{ cents = 1 }` prints `0.01`. So a fee a caller keeps as `{ cents = 250 }` prints as `2.50` and sorts as an amount. TypeScript is structural too, but a TypeScript object never gains methods from its shape. The member's name is part of what you publish, so choose one an unrelated record is unlikely to share.
+
+### One file for callers
+
+A library that grows past one file keeps one file for callers to import. `Receipt.es` adds a function that writes a list of amounts as one line:
+
+```essence
+§ file: Receipt.es
+import {
+	from "./Money.es" { Money }
+}
+
+implementation {
+	§§ Writes the amounts one after another, then their total.
+	§§
+	§§ @example
+	§§   constant amounts = [Money.of(euros 2, cents 80), Money.of(euros 12, cents 50)]
+	§§   expect itemise(amounts)::is("2.80 + 12.50 = 15.30")
+	function itemise(_ amounts: List<Money>) -> String {
+		constant written = amounts::map((amount) { <- amount::toString() })
+
+		<- "{written::join(with " + ")} = {Money.sum(amounts)}"
+	}
+}
+
+export {
+	itemise
+}
+```
+
+`Till.es` is a facade: a module that declares nothing and forwards names from other modules.
+
+```essence
+§ file: Till.es
+implementation {}
+
+export {
+	from "./Money.es" {
+		Money
+		ParseFailure
+	}
+	from "./Receipt.es" { itemise }
+}
+```
+
+[`essence format`](/docs/reference/cli#format) puts a file's own names first in its export block, each written without a `from`, then the forwarding groups. A facade has no names of its own, but it still opens an empty [`implementation {}`](/docs/reference/syntax-glossary#implementation). Callers import from `Till.es` only, so the files behind it can be split or renamed without a caller changing an import. A type forwarded through `Till.es` is the type `Money.es` declares, so a `ParseFailure` imported from `Till.es` fits a function that imported it from `Money.es`: one type, not two.
+
+**Compared with JavaScript.**
+
+```ts
+// till/index.ts
+export { Money, ParseFailure } from "./money"
+export * from "./receipt"
+```
+
+A TypeScript barrel can forward everything with `export *`. An Essence facade names each name it forwards, so its export block is the complete list of what callers get. [Coming from JavaScript](/docs/getting-started/coming-from-javascript#modules) lists the other differences between the two module systems.
+
+### Constants and cycles
+
+Two modules can import each other. Functions, types, choices, protocols and namespaces are hoisted, so a cycle can name any of them. A constant cannot cross a cycle. Suppose `Receipt.es` held a constant `Separator`, and `Money.es` imported it back. The import is refused with [`cyclic-constant-import`](/docs/reference/diagnostics#cyclic-constant-import):
+
+<div class="error-output">
+
+```
+[cyclic-constant-import]
+Error: Constant 'Separator' is imported across a cycle
+   ╭─┤ Money.es:2:24 │
+   │
+ 2 │     from "./Receipt.es" { Separator }
+   │                           ────┬────
+   │                               ╰────── this Constant is not readable here
+   │
+   │ Help: Move the Constant into a Module outside the cycle, or expose it as a Function.
+   │
+   │ Note 1: ./Receipt.es imports this Module back, directly or through further Modules.
+   │ Note 2: A Function, a Type Alias, a Choice, a Protocol and a Namespace are all hoisted, so a cycle can name any of them. A Constant is not: its value exists only once its Module's body has run, and inside a cycle which body runs first is not something the source states.
+───╯
+```
+
+</div>
+
+Expose the value as a function instead, `separator() -> String`, and the same cycle compiles. In ES modules the same cycle loads, and reading `Separator` before its module has run throws a `ReferenceError`. Essence refuses it while compiling.
+
+</StepItem>
+
+<StepItem title="Name methods the way the standard library does">
+
+A caller who knows the standard library should be able to guess your methods. This is `Money` from a caller's side:
+
+```essence
+§ file: Checkout.es
+import {
+	from "./Till.es" { Money }
+}
+
+implementation {
+	constant bill   = Money.of(euros 45, cents 10)
+	constant shares = bill::split(into 4)
+
+	Terminal.print(shares) § [11.28, 11.28, 11.27, 11.27]
+	Terminal.print(shares::firstItem()) § 11.28
+	Terminal.print(bill::round()) § 45.00
+	Terminal.print(bill::round(toward #Up)) § 46.00
+	Terminal.print(Money.parse("45,10", defaultingTo Money.Zero)) § 0.00
+}
+```
+
+The standard library chooses every name by four rules, stated on [The standard library](/docs/library/overview). `Money` follows them:
+
+1. `add`, `round` and `split` are commands, not `added` or `rounded`, although each returns a new amount. JavaScript needs `toSorted()` beside `sort()` to say which one copies. No Essence method changes its receiver, so `[lunch, coffee]::sort()` in `Main.es` returns a new list, and one name is enough.
+2. The preposition is the label: `split(into 4)`, `round(toward #Up)`, `compare(to other)`, never `splitInto` or `compareTo`.
+3. The amount being added is positional, `add(_ other)`, because it is the verb's direct object.
+4. Rounding down is a mode of `round`, not a `roundDown` method. The parameter takes the standard library's [`Rounding`](/docs/library/rational#Rounding) choice and defaults to `#Nearest`, so `round()` is `round(toward #Nearest)`.
+
+**Compared with JavaScript.**
+
+```ts
+function money({ euros, cents }: { euros: number; cents: number }): Money {
+	return { cents: euros * 100 + cents }
+}
+
+money({ cents: 50, euros: 12 })
+```
+
+A TypeScript options object is one argument, and its keys can come in any order. Essence labels are separate arguments, written in the order the signature declares. The compiler checks each label, and one out of place is [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch). [Coming from JavaScript](/docs/getting-started/coming-from-javascript#functions) covers labels and defaults.
+
+The rules lead to conventions that callers expect of your methods too:
+
+- The labels mean what they mean in the standard library. `where` takes a check, `on` a function that reads a key, `by` a comparison and `of` a plain value: [`hasItems(where:)`](/docs/library/list#hasItems), [`sort(on .price)`](/docs/library/list#sort), `sort(by:)`, [`count(of 30)`](/docs/library/list#count). A quantifier belongs in the name, not in a mode, so [`hasOnlyItems(where:)`](/docs/library/list#hasOnlyItems) is a method of its own.
+- A method that can come back empty has a `defaultingTo:` twin that returns the plain value. `Money.parse("45,10", defaultingTo Money.Zero)` is the twin of `Money.parse`, and it is an [overload](/docs/reference/syntax-glossary#overload) of the same name: one name with several signatures.
+- A count that makes no sense returns the empty or obvious result instead of failing, and a lookup that can find nothing returns an [`Optional`](/docs/language/optional) or a `Result`. [`List.repeat("x", times 0)`](/docs/library/list#repeat) is `[]`. Splitting into zero parts has no such result, so the next step refuses it in the signature.
+- A static constant is named like a proper noun, with a capital letter: `Money.Zero`, like the standard library's [`Number.Pi`](/docs/library/number#Pi).
+- Return types stay as narrow as the value allows, and a new signature is an overload rather than a wider type. `split` returns a [`NonEmptyList<Money>`](/docs/library/list#NonEmptyList), a list known to hold at least one item, so [`shares::firstItem()`](/docs/library/list#firstItem) is a `Money`, not an `Optional`. The standard library's [`Integer::add`](/docs/library/integer#add) has a signature that takes and returns an `Integer`, beside one that takes and returns a [`Rational`](/docs/library/rational).
+
+A default can make two signatures of one overload accept the same call. `multiply(with factor: Integer)` beside `multiply(with rate: Rational)` compiles, and a call picks one by the argument's type. Give the `Rational` one a defaulted `toward direction: Rounding = #Nearest`, and leaving the rounding out makes both take one argument labelled `with`. The compiler then refuses the pair with [`ambiguous-overload-default`](/docs/reference/diagnostics#ambiguous-overload-default), whatever the types:
+
+<div class="error-output">
+
+```
+[ambiguous-overload-default]
+Error: This default makes two Overloads accept the same call
+    ╭─┤ Overlap.es:10:55 │
+    │
+  6 │ ╭─▶          (with factor: Integer) -> Money {
+    ┆ ┆
+  8 │ ├─▶          }
+    │ │
+    │ ╰──────────────── this entry takes 1 Argument, 'with'
+    │
+ 10 │              (with rate: Rational, toward direction: Rounding = #Nearest) -> Money {
+    │                                                                 ────┬───
+    │                                                                     ╰───── leaving this out takes 1 Argument, 'with'
+    │
+    │ Help: Delete the entry the default already stands for, or give the Parameters labels that tell the two apart.
+    │
+    │ Note: An Overload is selected by the Arguments a call writes, so two entries that accept the same ones can not both be reached.
+────╯
+```
+
+</div>
+
+Once a parameter can be left out, two signatures must differ in the labels a call writes.
+
+</StepItem>
+
+<StepItem title="Put the rules in the signatures">
+
+The compiler checks a rule in a signature at every call it compiles. A rule in a body is checked only when the body runs, and every caller has to know what it rejects.
+
+### Refinement parameters
+
+`split` takes its count as a [`PositiveInteger`](/docs/library/integer#PositiveInteger). A [checked refinement](/docs/language/checked-refinements) is a type whose values have passed a check, here `@::isPositive()`, where `@` is the value being checked. The body of `split` needs no check for zero, because an Essence call that passes an unchecked count does not compile. A number read at run time is a plain `Integer`, so passing one is refused with [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload). That is the code for a call whose argument types fit no signature, even on a method with only one:
+
+<div class="error-output">
+
+```
+[no-matching-overload]
+Error: No overload of 'split' accepts these Arguments
+   ╭─┤ Guests.es:9:17 │
+   │
+ 9 │     Terminal.print(bill::split(into guests))
+   │                    ────────────┬───────────
+   │                                ╰───────────── this call passes 1 Argument
+   │
+   │ Note: 'Money::split' takes 1 Argument: Parameter 'into' is PositiveInteger.
+───╯
+```
+
+</div>
+
+An `if` that asks the refinement's question proves it inside its block:
+
+```essence
+§ file: Guests.es
+import {
+	from "./Till.es" { Money }
+}
+
+implementation {
+	constant bill   = Money.of(euros 45, cents 10)
+	constant guests = Integer.parse("3", defaultingTo 0)
+
+	if guests::isPositive() {
+		Terminal.print(bill::split(into guests)) § [15.04, 15.03, 15.03]
+	}
+}
+```
+
+The standard library has ten refinements. `PositiveInteger` is one, and [`NonEmptyString`](/docs/library/string#NonEmptyString) does the same for a text that must not be empty.
+
+### Failures with a reason
+
+```essence
+§ file: Import.es
+import {
+	from "./Till.es" {
+		Money
+		ParseFailure
+	}
+}
+
+implementation {
+	function explain(_ failure: ParseFailure) -> String {
+		<- match failure -> String {
+			case #Blank      { <- "nothing was written" }
+			case #NotANumber { <- "that is not a number" }
+			case #TooPrecise { <- "a cent is the smallest amount" }
+		}
+	}
+
+	function read(_ text: String) -> String {
+		<- match Money.parse(text) -> String {
+			case #Value(amount)   { <- "read {amount}" }
+			case #Failure(reason) { <- explain(reason) }
+		}
+	}
+
+	Terminal.print(read("12.5")) § read 12.50
+	Terminal.print(read(" ")) § nothing was written
+	Terminal.print(read("12,50")) § that is not a number
+	Terminal.print(read("12.505")) § a cent is the smallest amount
+}
+```
+
+`parse` returns a `Result`: an amount, or a `ParseFailure` that says why there is none. The failure type is a choice, so `explain` can match on every reason. A `match` that leaves a case out does not compile ([`missing-case`](/docs/reference/diagnostics#missing-case)), so a case added to `ParseFailure` shows up in every caller that matches on it.
+
+**Compared with JavaScript.**
+
+```ts
+const parseFailure = Symbol("ParseFailure")
+
+type ParseFailure = { [parseFailure]: "blank" | "not-a-number" | "too-precise" }
+
+declare function parseMoney(text: string): Money | ParseFailure
+
+const read = parseMoney("12.505")
+if (parseFailure in read) {
+	console.log(read[parseFailure])
+}
+```
+
+TypeScript makes a caller narrow `read` before it reads `cents`. But a symbol brand is a convention each library invents, and nothing asks a caller to handle every reason. `Result` is one type every Essence caller already reads, and a `match` on it has to handle both cases. [Coming from JavaScript](/docs/getting-started/coming-from-javascript#absence) maps `throw` and `try` to it.
+
+### Conformances
+
+Protocols decide whether your values print, compare and sort. A record already conforms to `Equatable` and `Printable` through the standard library's [`Record`](/docs/library/record) namespace, which compares and prints member by member. `Money` declares two conformances of its own:
+
+- `is Printable` replaces the printed form. An amount prints as `12.50` on its own, in a list, in a string hole such as `"{amount}"` and as a [dictionary](/docs/language/dictionaries) key.
+- `is Comparable` gives amounts the order [`Comparable`](/docs/library/protocols#Comparable) describes. `sort()` and `isLessThan` work on amounts, and `orders::sort(on .total)` sorts records by a `Money` member.
+
+`ParseFailure` declares `is Printable` with an empty body: a choice whose cases carry no payload prints its case names, and is `Equatable` without declaring it. Without the declaration, printing a `ParseFailure` is refused with [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound).
+
+Declare `Equatable` yourself when two values count as equal although a member differs. [`contains`](/docs/library/list#contains), [`tally`](/docs/library/list#tally) and a dictionary's keys then use your `is`:
+
+```essence
+implementation {
+	type Tag = { name: String }
+
+	namespace Tag for Tag is Equatable, is Printable {
+		is(_ other: Tag) -> Boolean {
+			<- @.name::lowercase()::is(other.name::lowercase())
+		}
+
+		toString() -> String {
+			<- "tag {@.name}"
+		}
+	}
+
+	constant sale: Tag  = { name = "Sale" }
+	constant lower: Tag = { name = "sale" }
+
+	Terminal.print(sale::is(lower)) § true
+	Terminal.print([sale]::contains(lower)) § true
+	Terminal.print([sale, lower]::tally()) § [tag Sale = 2]
+}
+```
+
+### Documentation that runs
+
+Every public member of `Money` carries a `§§` block with an `@example`. The block is the member's documentation, and an editor shows it on hover, as it does JSDoc. Unlike JSDoc, the lines under `@example` run, as Rust's doctests do, and the next step runs them as a test. [Documentation comments](/docs/language/documentation-comments) has the other two tags, `@param` and `@returns`.
+
+</StepItem>
+
+<StepItem title="Test beside the code">
+
+`Money.tests.es` sits beside `Money.es`:
+
+```essence
+§ file: Money.tests.es
+import {
+	from "./Money.es" {
+		Money
+		ParseFailure
+	}
+}
+
+tests {
+	namespace Amounts for Money is Generatable {
+		static generate(from source: Randomness) -> Money {
+			<- { cents = source::drawInteger(between 0, and 50000) }
+		}
+	}
+
+	test "reads back what it writes" for any (amount: Money) {
+		expect Money.parse(amount::toString())::is(amount)
+	}
+
+	test "splits into parts that add back up" for any (amount: Money) {
+		expect Money.sum(amount::split(into 3))::is(amount)
+	}
+
+	test "\"{text}\" is {failure}" across [
+		{ text = " ", failure = #Blank },
+		{ text = "twelve", failure = #NotANumber },
+		{ text = "12.505", failure = #TooPrecise },
+	] ({ text, failure }: { text: String, failure: ParseFailure }) {
+		expect Money.parse(text)::reason()::is(failure)
+	}
+}
+```
+
+[`essence test`](/docs/reference/cli#test) with no file names walks the directory and reports a tree of files, suites and tests:
+
+```
+$ essence test
+
+ Money.es
+   examples
+     ✓ Money.Zero example
+     ✓ Money::of example
+     ✓ Money::parse example
+     ✓ Money::sum example
+     ✓ Money::compare example
+     ✓ Money::toString example
+     ✓ Money::add example
+     ✓ Money::round example
+     ✓ Money::split example
+ Money.tests.es
+   ✓ reads back what it writes  (100 cases)
+   ✓ splits into parts that add back up  (100 cases)
+   "{text}" is {failure}
+     ✓ " " is Blank
+     ✓ "twelve" is NotANumber
+     ✓ "12.505" is TooPrecise
+ Receipt.es
+   examples
+     ✓ itemise example
+
+ 15 passed  ·  5.9 ms
+```
+
+- A file whose name ends in `.tests.es`, the counterpart of a sibling `money.test.ts`, holds tests for another file. `Money.tests.es` needs no `implementation` block: an `import` block and a `tests` block are the whole file. It imports `Money.es` as a caller would, so it reaches only what `Money.es` exports. A test that needs a private name, such as `wholeCents`, goes in a [`tests { … }`](/docs/reference/syntax-glossary#tests-block) block at the bottom of `Money.es` itself.
+- Every `@example` becomes a test in a suite called `examples`. The documentation from the last step is checked on every run.
+- [`for any`](/docs/reference/syntax-glossary#for-any) makes a property test, as fast-check's `fc.property` does: the body runs on 100 generated values. On its own, the runner derives a generator from a type's shape, and for `Money` that draws any `Integer` of cents, negative ones included. `Amounts`, a namespace for `Money` that conforms to [`Generatable`](/docs/library/protocols#Generatable), replaces it and draws amounts up to 500.00, the amounts a till takes. It is declared in the tests block, so no build of `Till` includes it.
+- [`across`](/docs/reference/syntax-glossary#across) makes a table test: the body runs once per row, and each row is reported as a test of its own.
+
+[Tests](/docs/language/tests) covers every form, and [Running tests](/docs/guides/running-tests) covers the command.
+
+</StepItem>
+
+</Steps>
+
+## Keep the JavaScript boundary crossable
+
+A JavaScript program can load `Till` through `@essence-lang/client` or a bundler plugin. [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) sets that up. This program loads `Till.es` and calls it:
+
+```js
+import { loadModule } from "@essence-lang/client"
+
+let till = await loadModule("./Till.es")
+let { Money, ParseFailure, itemise } = till.exports
+
+let lunch = Money.of({ euros: 12, cents: 50 }) // { cents: 1250n }
+
+Money.toString(Money.add(lunch, Money.Zero)) // "12.50"
+Money.split(lunch, 3) // [{ cents: 417n }, { cents: 417n }, { cents: 416n }]
+Money.round(lunch, "Down") // { cents: 1200n }
+itemise([lunch, Money.of(2, 80)]) // "12.50 + 2.80 = 15.30"
+ParseFailure.TooPrecise // "TooPrecise"
+Money.parse("12.50") // throws EssenceCallError: 'Money.parse' is overloaded, …
+```
+
+A bundler plugin also writes TypeScript declarations for what crosses, as `Till.d.es.ts` beside the source. Part of what it declares for `Money` reads:
+
+```ts
+export type ParseFailure = "Blank" | "NotANumber" | "TooPrecise"
+
+export declare const Money: {
+	Zero: Money
+	of(euros: bigint | number, cents: bigint | number): Money
+	of(labelled: { euros: bigint | number; cents: bigint | number }): Money
+	parse: never /* overloaded — calling it throws */
+	// …
+	round(p0: Input<Money>, toward?: "Nearest" | "NearestEven" | "Down" | "Up" | "TowardZero"): Money
+	split(p0: Input<Money>, into: bigint | number): Array<Money>
+}
+```
+
+`Input<Money>` is `Money` with a `number` accepted wherever it holds an `Integer`. A parameter with no label is named by its position, as `p0` is.
+
+What crosses, and how:
+
+- Labels become an options object when every parameter has one. `Money.of` takes `{ euros, cents }`, with the keys in any order, or the two values in the order the signature declares, as `Money.of(2, 80)` does. A method's receiver has no label, so `split` and `round` take positional arguments.
+- A choice whose cases carry no payload crosses as its case names, as strings. `ParseFailure` is `"Blank" | "NotANumber" | "TooPrecise"`, and `round` takes `"Down"`.
+- A `Dictionary` crosses as a `Map`, a list as an array, and an `Integer` as a `bigint`.
+- An overloaded method cannot be called through `exports`. Calling it throws, and the declarations type it `never`. Each signature is still reachable by name on the module's `raw` exports, which take Essence's own values, and Calling Essence from JavaScript shows how. A value passed to a generic function for a type parameter throws as well, because a type parameter has no shape to marshal against. A function that takes or returns an `Optional` of an `Optional` throws too.
+- A refinement crosses as its base type: `split` declares `into: bigint | number`.
+
+When JavaScript is one of the callers, export what it needs as plain functions. Write one function per operation, with no overloads and no type parameters, and return an `Optional` or a `Result` where the input can be wrong. A `Result` crosses as `{ $case: "Result#Value", item }` or `{ $case: "Result#Failure", reason }`. That pulls against Step 2, which made `parse` an overload. Keep the overload for Essence callers, and give JavaScript a function with a name of its own, such as `parseAmount(_ text: String) -> Result<Money, ParseFailure>`, which returns `Money.parse(text)`.
+
+<Note>
+	Essence is at version 0.5, before its 1.0 release, and a release can rename a method or type your library uses.
+</Note>
+
+<SeeAlso
+	links={[
+		{ label: "The standard library", href: "/docs/library/overview" },
+		{ label: "Modules", href: "/docs/language/modules" },
+		{ label: "Checked refinements", href: "/docs/language/checked-refinements" },
+		{ label: "Result", href: "/docs/language/result" },
+		{ label: "Protocols", href: "/docs/language/protocols" },
+		{ label: "Documentation comments", href: "/docs/language/documentation-comments" },
+		{ label: "Tests", href: "/docs/language/tests" },
+		{ label: "Calling Essence from JavaScript", href: "/docs/guides/calling-from-javascript" },
+	]}
+/>

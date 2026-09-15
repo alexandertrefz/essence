@@ -1,0 +1,359 @@
+---
+title: Projects and essence.json
+description: "Lay out a directory of .es files, write its settings down once with essence init, and read the Warnings a mistake earns."
+section: guides
+order: 20
+template: guide
+tocDepth: 2
+steps: 4
+minutes: 10
+---
+
+A project in Essence is a directory of `.es` files. Essence needs no manifest of its own: a build starts from one entry file and follows its imports, and `essence test` looks through the directory for tests. When a project builds or tests the same way every time, `essence init` writes a project file to hold those settings, the way `tsconfig.json` holds TypeScript's. This guide lays out a two-file project, writes its settings down, and reads the Warnings a mistake in that file prints.
+
+<Steps>
+
+<StepItem title="Lay out the directory">
+
+This project has two source files and a `package.json`:
+
+```
+my-app/
+  package.json
+  src/
+    Main.es      ← imports Report.es
+    Report.es
+  dist/          ← what essence build -o writes
+```
+
+Each file is a [module](/docs/language/modules), as in ES modules. Its `import` block lists what it takes from other files, its `implementation` block holds its code, and its `export` block lists what it hands out. `Report.es` declares one function and exports it:
+
+```essence
+§ file: Report.es
+implementation {
+	function summary(of scores: List<Integer>) -> String {
+		<- "{scores::length()} games, {scores::sum()} points"
+	}
+}
+
+export {
+	summary
+}
+```
+
+`Main.es` imports the function and prints a summary:
+
+```essence
+§ file: Main.es
+import {
+	from "./Report.es" { summary }
+}
+
+implementation {
+	Terminal.print(summary(of [3, 1, 0])) § 3 games, 4 points
+}
+```
+
+Each `from` names a file by its path from the importing file, `.es` included. `essence run src/Main.es` prints `3 games, 4 points`, and `essence watch src/Main.es` rebuilds it on every save. [Using the compiler](/docs/guides/using-the-compiler) walks through `check`, `build`, `run` and `watch`.
+
+**One entry is one bundle.** `essence build src/Main.es` compiles `Main.es` and every module it imports into one ES module, `src/Main.js`, next to the source. `-o dist/Main.js` writes it there instead. The bundle holds `Report.es` too, with no `import` statement left, so `node dist/Main.js` runs it with nothing installed beside it. This is how `esbuild --bundle` works, not `tsc`, which writes one `.js` file per `.ts` file.
+
+**Several files named are several bundles.** Name more than one file and each becomes a bundle of its own, for a project with several entry points. With several inputs, `-o` names a directory.
+
+`essence check` is given every file, `src/*.es`, rather than one entry. Checking `Main.es` alone would skip any file it does not import, such as a test file. It takes files, not a directory: `essence check src` is refused as [`not-a-file`](/docs/reference/diagnostics#not-a-file).
+
+In a JavaScript project, the commands go in the `scripts` of `package.json`, beside the toolchain as a dev dependency:
+
+```json
+{
+	"name": "my-app",
+	"private": true,
+	"scripts": {
+		"check": "essence check src/*.es",
+		"test": "essence test",
+		"format:check": "essence format --check src/*.es",
+		"build": "essence build src/Main.es -o dist/Main.js"
+	},
+	"devDependencies": {
+		"@essence-lang/cli": "0.5.0"
+	}
+}
+```
+
+`essence test` runs every test in the project, as [Running tests](/docs/guides/running-tests) explains. A build never formats. `essence format --check` fails when a file is not formatted, which makes it the command for CI. [Formatting](/docs/guides/formatting) covers the formatter.
+
+Two kinds of generated file belong in `.gitignore`:
+
+```
+dist/
+*.d.es.ts
+```
+
+`dist/` holds what `essence build` wrote. A `*.d.es.ts` file is a TypeScript declaration that the Vite and Bun plugins write beside a source, and [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) covers them. The files the test runner writes are a different matter, covered at the end of this guide.
+
+</StepItem>
+
+<StepItem title="Create essence.json">
+
+Nothing so far needed a project file. When the same flags go on every run, write them down once. [`essence init`](/docs/reference/cli#init) writes the file to start from:
+
+```sh
+$ essence init
+
+  ✔ wrote essence.json
+```
+
+```jsonc
+{
+	"$schema": "https://essencelang.org/schemas/essence.schema.json",
+
+	// Directories under this project that are not its sources.
+	"exclude": [],
+
+	"test": {
+		// Tags an everyday `essence test` leaves out; `--tag` brings one back.
+		"skipTags": []
+	}
+}
+```
+
+That is the whole file: two settings at their defaults, each under a comment that says what it is for. `$schema` is for editors. Essence reads nothing from it and accepts any String there. The file is JSON with comments and trailing commas allowed. Run `essence init` a second time and it refuses with `✖ essence.json already exists.`, leaves the file alone, and exits with 2.
+
+The nearest [`essence.json`](/docs/reference/project-file) at or above the working directory marks the project root, and the editor finds the nearest one above each file; `check` and `format` never read it.
+
+`essence.json` is not a manifest. It lists no dependencies, pins nothing in a lockfile and holds no scripts. A module names each file it imports by its relative path, and there are no package imports, so there is nothing to install. `package.json` stays the manifest of a JavaScript project.
+
+</StepItem>
+
+<StepItem title="Skip slow tests and build into dist">
+
+Settings sit at the top of the file or under `test` and `build`. This project leaves its slow tests out of an everyday run, and builds into `dist/` with a source map:
+
+```jsonc
+{
+	"$schema": "https://essencelang.org/schemas/essence.schema.json",
+
+	// Directories under this project that are not its sources.
+	"exclude": [],
+
+	"test": {
+		// Tags an everyday `essence test` leaves out; `--tag` brings one back.
+		"skipTags": ["slow"]
+	},
+
+	"build": {
+		"out": "dist",
+		"sourcemap": true
+	}
+}
+```
+
+**Compared with JavaScript.** A `tsconfig.json` holds the same kind of settings:
+
+```jsonc
+// tsconfig.json
+{
+	"extends": "./tsconfig.base.json",
+	"compilerOptions": {
+		"outDir": "dist",
+		"sourceMap": true
+	},
+	"include": ["src/**/*.ts"],
+	"exclude": ["src/**/*.test.ts"]
+}
+```
+
+`essence.json` does for `essence build` and `essence test` what `tsconfig.json` does for `tsc`. Both are JSON with comments, found by walking up from the working directory, with an `exclude` list. `build.out` and `build.sourcemap` are `outDir` and `sourceMap`. `essence check` does not read the file at all, so its settings do not reach a check. There is no `include`: a build's sources are what its entry imports, and a test run's are what it finds under the project root. There is no `extends`, and `exclude` takes directory paths, not globs. [Coming from JavaScript](/docs/getting-started/coming-from-javascript#tooling) compares the rest of the toolchain.
+
+The slow test lives in `src/Report.tests.es`, a file that holds nothing but tests for `Report.es`:
+
+```essence
+§ file: Report.tests.es
+import {
+	from "./Report.es" { summary }
+}
+
+tests {
+	test "counts the games and the points" {
+		expect summary(of [3, 1, 0])::is("3 games, 4 points")
+	}
+
+	test "adds up ten thousand games" tagged slow {
+		constant games = List.of(integersFrom 1, through 10000)
+
+		expect summary(of games)::is("10000 games, 50005000 points")
+	}
+}
+```
+
+`tagged slow` gives the second test the tag `slow`, a name a run can select tests by. [Tests](/docs/language/tests) covers the forms. An everyday run now leaves that test out:
+
+```sh
+$ essence test
+
+ src/Report.tests.es
+   ✓ counts the games and the points
+
+ 1 passed  1 deselected  ·  0.57 ms
+```
+
+`essence test --tag slow` runs the tests tagged `slow`, and only those, which suits a nightly CI job.
+
+`essence build src/Main.es` now writes `dist/Main.js` and `dist/Main.js.map`, so the build script needs no `-o`. The glob `src/*.es` also matches `Report.tests.es`. That suits `essence check`, which type-checks tests too. A build of `src/*.es` would give the test file a bundle of its own, which is why the build script names its entry.
+
+### Every setting in one line
+
+The walk is how `essence test` with no arguments, and the editor, find a project's sources. It visits every directory under the project root except `.git`, `node_modules`, `dist`, `build` and `.claude`, whether `exclude` lists them or not. The reference gives each setting's shape, its default, and the flag it matches where there is one.
+
+- [`exclude`](/docs/reference/project-file#exclude) lists directories the walk leaves out, as paths relative to `essence.json`, not globs: `"fix*"` excludes nothing, and no Warning says so.
+- [`test.skipTags`](/docs/reference/project-file#test-skipTags) lists the tags an everyday `essence test` leaves out, as above.
+- [`test.cases`](/docs/reference/project-file#test-cases) sets how many generated values each property test runs its body against, 100 by default.
+- [`test.coverage.report`](/docs/reference/project-file#test-coverage-report) is `"lcov"` or `"json"`, the report a `--coverage` run writes, and never turns coverage on by itself.
+- [`test.coverage.out`](/docs/reference/project-file#test-coverage-out) is the directory that report goes to, relative to `essence.json`.
+- [`build.out`](/docs/reference/project-file#build-out) is the directory `build`, `watch` and `run` write to, where `run` otherwise keeps its output in a cache.
+- [`build.sourcemap`](/docs/reference/project-file#build-sourcemap) writes a source map beside each output.
+- [`build.minify`](/docs/reference/project-file#build-minify) minifies the output.
+- [`build.embed`](/docs/reference/project-file#build-embed) builds a bundle a JavaScript program can load and call, with a `.descriptor.json` describing its exports beside it.
+- [`build.optimise`](/docs/reference/project-file#build-optimise) set to `false` turns the optimiser off, as `--no-optimise` does.
+- [`build.withoutOptimisations`](/docs/reference/project-file#build-withoutOptimisations) lists passes to turn off by name, and [Optimisations](/docs/reference/optimisations) names every pass.
+
+### A flag wins
+
+A flag on the command line wins over the file for the run it is on. `essence build src/Main.es -o elsewhere/Main.js` writes there, whatever `build.out` says. `--no-sourcemap`, `--no-minify` and `--no-embed` turn a setting off for one run.
+
+Three settings combine with their flags instead. `build.withoutOptimisations` and `--without-optimisation` together turn off every pass either one names. A `build.optimise` of `false` turns the optimiser off, and nothing on the command line turns it back on. `--tag` runs a tag that `test.skipTags` leaves out, and `--skip-tag` leaves out more.
+
+</StepItem>
+
+<StepItem title="Read the Warnings">
+
+A mistake in `essence.json` never stops a run. The command prints a Warning at the line, the setting falls back to its default, and the run carries on. A Warning leaves the exit code alone, so a misspelt key does not fail CI. `tsc` reports an unknown compiler option as an error, and Essence does not.
+
+A key that is not a setting is reported as [`unknown-setting`](/docs/reference/diagnostics#unknown-setting). When the key is close to a real one, the Help names it:
+
+<div class="error-output">
+
+```
+[unknown-setting]
+Warning: "build.minifyy" is not a setting
+   ╭─┤ essence.json:3:3 │
+   │
+ 3 │        "minifyy": true
+   │        ────┬────
+   │            ╰────── not a setting
+   │
+   │ Help: Did you mean "minify"?
+   │
+   │ Note 1: The settings under "build" are "out", "sourcemap", "minify", "embed", "optimise", "withoutOptimisations".
+   │ Note 2: Nothing was read from this key.
+───╯
+```
+
+</div>
+
+A known setting with a value of the wrong shape is reported as [`setting-shape`](/docs/reference/diagnostics#setting-shape). The Help writes a value that fits:
+
+<div class="error-output">
+
+```
+[setting-shape]
+Warning: "test.cases" is not a whole number of at least 1
+   ╭─┤ essence.json:3:12 │
+   │
+ 3 │        "cases": "200"
+   │                 ──┬──
+   │                   ╰──── written as a String
+   │
+   │ Help: Write it as a whole number of at least 1: 200
+   │
+   │ Note: Property tests draw the runner's default number of values.
+───╯
+```
+
+</div>
+
+A setting written in the wrong place is reported as [`moved-setting`](/docs/reference/diagnostics#moved-setting). `exclude` sits at the top of the file, not under `test`:
+
+<div class="error-output">
+
+```
+[moved-setting]
+Warning: "test.exclude" has moved to "exclude"
+   ╭─┤ essence.json:3:3 │
+   │
+ 3 │        "exclude": ["fixtures"]
+   │        ────┬────
+   │            ╰────── no longer read here
+   │
+   │ Help: Move it: "exclude": ["fixtures"]
+   │
+   │ Note 1: "exclude" keeps the editor out of those directories as well as the test walk, so it sits at the top rather than under "test".
+   │ Note 2: Nothing was read from this key.
+───╯
+```
+
+</div>
+
+An `"essence"` key in a `package.json` gets the same code, and nothing is read from it. Its Help says to move the object into `essence.json`.
+
+A file that does not parse is reported as [`unreadable-project-file`](/docs/reference/diagnostics#unreadable-project-file), and every setting stays at its default until it does:
+
+<div class="error-output">
+
+```
+[unreadable-project-file]
+Warning: essence.json could not be read as JSON
+   ╭─┤ essence.json:4:1 │
+   │
+ 4 │ }
+   │ ▲
+   │ ╰── a '}' was expected here
+   │
+   │ Help: The file is JSON with comments and trailing commas allowed, as tsconfig.json is.
+   │
+   │ Note: Every setting is at its default until the file reads.
+───╯
+```
+
+</div>
+
+`essence check` and `essence format` print none of these Warnings.
+
+</StepItem>
+
+</Steps>
+
+## Test files beside your sources
+
+`essence test` reads three kinds of file beside your sources, and writes two of them.
+
+A file whose name ends in `.tests.es` holds tests for other files, like `Report.tests.es` above. The walk picks it up by its name, as well as every module with a `tests { … }` block. It can import only what the other file exports. A test that needs a private name belongs in that file's own `tests { … }` block, below its `export` block.
+
+A stored snapshot, `expect … matches snapshot from "name"`, records a value the first time it runs, and later runs compare against the record. The runner keeps those records in `__snapshots__/<File>.es.snap`, in the directory of the file that holds the test, as Jest does. An inline `matches snapshot` is written into the test's source instead. Each `.snap` file opens with the same comment:
+
+```
+§ Snapshots recorded by `essence test`. They are read back on every run,
+§ so a change here is a change to what the tests assert. Rewrite them with
+§ `essence test --update`.
+```
+
+When a property test fails, the runner stores the value that broke it in `__counterexamples__/<File>.es.json`, in the same directory. Every later run tries that value first, and it stays after the test passes again.
+
+Both directories are assertions, not build output: commit them. The Tests page covers snapshots and property tests.
+
+## Completion in the editor
+
+The `$schema` line names the JSON Schema the file is checked against. An editor that reads it completes every key, describes a setting on hover and marks a key that is not a setting. The address serves the schema, so this works in any editor that honours `$schema`.
+
+The Essence extension for VS Code registers the same schema for every file named `essence.json`, so it completes the file with or without the line. It also shows the Warnings from the last step on the file itself, and reads `exclude` to decide what its Problems panel covers. [Editor setup](/docs/guides/editor-setup) installs the extension.
+
+<SeeAlso
+	links={[
+		{ label: "essence.json", href: "/docs/reference/project-file" },
+		{ label: "Using the compiler", href: "/docs/guides/using-the-compiler" },
+		{ label: "Running tests", href: "/docs/guides/running-tests" },
+		{ label: "Modules", href: "/docs/language/modules" },
+		{ label: "Tests", href: "/docs/language/tests" },
+		{ label: "Editor setup", href: "/docs/guides/editor-setup" },
+	]}
+/>

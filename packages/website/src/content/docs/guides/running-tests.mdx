@@ -1,0 +1,562 @@
+---
+title: Running tests
+description: Run tests with essence test, pick which ones run, watch, replay, update snapshots, measure coverage, and run them in VS Code.
+section: guides
+order: 30
+template: guide
+tocDepth: 2
+steps: 6
+minutes: 12
+---
+
+`essence test` compiles the tests in a project, runs them, and prints which passed and which failed. If you use Vitest, [`-f`](/docs/reference/cli#test--filter) is its `-t`, [`--update`](/docs/reference/cli#test--update) its `-u`, and [`--watch`](/docs/reference/cli#test--watch) its watch mode. The differences are in what a filter matches, what a leftover focus does to the exit code, and what coverage reports. How to write a test is on [Tests](/docs/language/tests). This page is about running them.
+
+<Steps>
+
+<StepItem title="Run the tests">
+
+The project is a directory, `league/`, with two files. `Points.es` scores a match, and tests itself in a `tests` block at the end:
+
+```essence
+§ file: Points.es
+implementation {
+	choice Outcome {
+		Win,
+		Draw,
+		Loss,
+	}
+
+	function outcomeOf(
+		_ scored: Integer,
+		against conceded: Integer,
+	) -> Outcome {
+		if scored::isGreaterThan(conceded) {
+			<- #Win
+		} else if scored::is(conceded) {
+			<- #Draw
+		} else {
+			<- #Loss
+		}
+	}
+
+	namespace Outcome for Outcome {
+		points() -> Integer {
+			<- match @ -> Integer {
+				case #Win  { <- 3 }
+				case #Draw { <- 1 }
+				case #Loss { <- 0 }
+			}
+		}
+	}
+
+	function summary(_ results: List<Outcome>) -> String {
+		constant total = results::map((outcome) { <- outcome::points() })::sum()
+
+		<- "{results::length()} played, {total} points"
+	}
+
+	Terminal.print(summary([#Win])) § 1 played, 3 points
+}
+
+export {
+	Outcome
+	outcomeOf
+	summary
+}
+
+tests {
+	suite "outcomes" {
+		test "calls a higher score a win" {
+			expect outcomeOf(2, against 0)::is(#Win)
+		}
+
+		test "calls a level score a draw" {
+			expect outcomeOf(1, against 1)::is(#Draw)
+		}
+	}
+
+	test "sums up two wins" {
+		expect summary([#Win, #Win]) matches snapshot "2 played, 6 points"
+	}
+}
+```
+
+`Season.tests.es` holds tests that cross modules. It imports what it tests, and holds nothing else:
+
+```essence
+§ file: Season.tests.es
+import {
+	from "./Points.es" {
+		Outcome
+		outcomeOf
+	}
+}
+
+tests {
+	test "{scored}–{conceded} is worth {points}" across [
+		{ scored = 3, conceded = 1, points = 3 },
+		{ scored = 2, conceded = 2, points = 1 },
+		{ scored = 0, conceded = 1, points = 0 },
+	] (
+		{ scored, conceded, points }: {
+			scored: Integer,
+			conceded: Integer,
+			points: Integer,
+		},
+	) {
+		expect outcomeOf(scored, against conceded)::points()::is(points)
+	}
+
+	test "never gives more than three points" tagged slow for any (
+		scored: Integer,
+		conceded: Integer,
+	) {
+		expect outcomeOf(scored, against conceded)
+			::points()
+			::isLessThanOrEqualTo(3)
+	}
+}
+```
+
+Run [`essence test`](/docs/reference/cli#test) in `league/`:
+
+```sh
+$ essence test
+1 played, 3 points
+1 played, 3 points
+
+ Points.es
+   outcomes
+     ✓ calls a higher score a win
+     ✓ calls a level score a draw
+   ✓ sums up two wins
+ Season.tests.es
+   {scored}–{conceded} is worth {points}
+     ✓ 3–1 is worth 3
+     ✓ 2–2 is worth 1
+     ✓ 0–1 is worth 0
+   ✓ never gives more than three points  (100 cases)
+
+ 7 passed  ·  1.6 ms
+```
+
+The runner compiles and runs each entry on its own. An entry is a file with a `tests` block, a file with an `@example` in a [documentation comment](/docs/language/documentation-comments), or a `.tests.es` file. Here both files are entries.
+
+The first two lines are the program's own output. The runner loads each entry the way [`essence run`](/docs/reference/cli#run) loads a program, so a module's statements run before its tests. The line prints twice because two entries load `Points.es`: `Points.es` itself, and `Season.tests.es`, which imports it.
+
+The report lists each file, then its suites, then its tests. A suite is a named group of tests:
+
+- `✓` marks a test that passed, `✗` one that failed, and `–` one that is skipped, followed by `skipped:` and its reason.
+- A table test, written with [`across`](/docs/reference/syntax-glossary#across), runs once per written row. The report shows it as a group named by its template: the test's name as written, with its `{…}` holes. Below it comes one line per row, with the holes filled.
+- A property test, written with [`for any`](/docs/reference/syntax-glossary#for-any), runs once per generated value. Its line ends with how many generated values it ran, which the report calls cases.
+- Anything a failing test printed appears under its failure, not mixed into the report.
+
+The last line counts tests by what happened to them: `passed`, `failed`, `skipped`, `deselected` and `not focused`. A filter or a tag deselects a test, and a focused test, in the next step, leaves the others `not focused`. The counts can end with `1 snapshot written`. Then comes the time, and two notes can follow it: `compile cache warm` and `1 of 2 entries cached`, which the result cache below explains.
+
+With no arguments, `essence test` searches the project: the directory that holds the nearest `essence.json`, or the working directory when no `essence.json` exists above it. When the project has an `essence.json`, the same command run in a nested directory runs the same tests. Without one, the nested directory is the project. The search skips `.git`, `node_modules`, `dist`, `build` and `.claude`, and every directory `essence.json` lists under [`exclude`](/docs/reference/project-file#exclude). [Projects and essence.json](/docs/guides/projects) covers the file.
+
+Arguments narrow the run:
+
+```sh
+$ essence test Points.es
+```
+
+A file argument runs that file's tests and the tests of the modules it imports. A directory argument runs every entry under it. A file you name is compiled even when it sits in an excluded directory. A named file that holds no tests reports `ℹ no tests in` and its name, and the run exits with `0`.
+
+A name that matches no file is the error [`file-not-found`](/docs/reference/diagnostics#file-not-found). The error prints the file's absolute path, shortened here. Every other file still runs, and the run exits with `1`:
+
+<div class="error-output">
+
+```
+[file-not-found]
+Error: No such file: /…/league/Standing.es
+
+─── 1 error
+  ⚠ Standing.es did not compile — its tests did not run
+```
+
+</div>
+
+An argument is a path, not a name filter as in `vitest points`. `essence test Points`, without `.es`, fails the same way.
+
+</StepItem>
+
+<StepItem title="Choose which tests run">
+
+`-f`, short for `--filter`, runs only the tests whose name contains the text you give:
+
+```sh
+$ essence test -f "2–2"
+1 played, 3 points
+1 played, 3 points
+
+ Season.tests.es
+   {scored}–{conceded} is worth {points}
+     ✓ 2–2 is worth 1
+
+ 1 passed  6 deselected  ·  0.71 ms  ·  compile cache warm
+```
+
+The filter matches the name as the report prints it, and also its template. So `-f "2–2"` picks one row of the table test, and `-f "is worth"` picks all three rows. The text is matched as written, case included, and is not a regular expression: `-f "win|draw"` selects nothing. Suite names never match either, so `-f outcomes` selects nothing, although a suite is called `outcomes`. Vitest's `-t` takes a pattern and matches the `describe` names too. A filter that matches no test prints `⚠ no test name contains "outcomes"`, and the run exits with `0`.
+
+A tag is a name a test carries, written after the test's name with the [`tagged`](/docs/reference/syntax-glossary#modifiers) modifier. The property test in `Season.tests.es` is `tagged slow`. A test carries its own tags and the tags of every suite around it. [`--tag slow`](/docs/reference/cli#test--tag) runs only the tests that carry `slow`, and [`--skip-tag slow`](/docs/reference/cli#test--skip-tag) leaves them out. `essence test --skip-tag slow` reports `6 passed  1 deselected`.
+
+Both flags can be repeated, and repeats are a union: `--tag network --tag slow` runs every test that carries either. When a test matches both flags, `--skip-tag` wins. A tag no test carries prints `⚠ no test carries tag "slwo"`, and the run exits with `0`.
+
+A project can leave tags out of every plain run. List them under [`test.skipTags`](/docs/reference/project-file#test-skipTags) in the `essence.json` at the project's root:
+
+```jsonc
+{
+	"$schema": "https://essencelang.org/schemas/essence.schema.json",
+
+	"test": {
+		"skipTags": ["slow"]
+	}
+}
+```
+
+Now a plain `essence test` reports `6 passed  1 deselected`. `essence test --tag slow` still runs the slow test: a tag you name on the command line comes back.
+
+A focused test, Essence's `test.only`, silences every other test of the run. Add the `focused` modifier to the draw test in `Points.es`:
+
+```essence
+§ fragment
+test "calls a level score a draw" focused {
+```
+
+Only that test runs. The rest are counted as `not focused`, and the run exits with `2`:
+
+<div class="error-output">
+
+```
+1 played, 3 points
+1 played, 3 points
+
+ Points.es
+   outcomes
+     ✓ calls a level score a draw
+
+ 1 passed  6 not focused  ·  0.77 ms
+
+
+[focused-tests-remain]
+Error: This test is still focused
+    ╭─┤ Points.es:52:3 │
+    │
+ 52 │        test "calls a level score a draw" focused {
+    │        ──┬─  
+    │          ╰─── only focused tests ran
+    │ 
+    │ Help: Remove `focused` before this lands, or narrow the run with --filter or --tag while you are iterating.
+    │ 
+    │ Note: A focused test silences every other test of the run, so a run nobody narrowed has not answered the question it was asked.
+────╯
+```
+
+</div>
+
+[`focused-tests-remain`](/docs/reference/diagnostics#focused-tests-remain) keeps a focus left behind from passing unnoticed. A narrowed run does not report it. With `-f draw`, `--tag` or `--skip-tag`, the same run exits with `0`. Remove `focused` again before the next step.
+
+</StepItem>
+
+<StepItem title="Watch for changes">
+
+`--watch`, short `-w`, runs the tests and stays up. It prints the same report under a header, `essence test · 2 files  01:01:32`, and then waits: `· watching for changes  r re-run · c clear · q quit`.
+
+Each save runs again only the entries that reach the file you saved, by importing it directly or through other modules. Every other entry keeps the result it had. The whole report then prints again, so it shows the state of the project, not a log of runs.
+
+Save `Season.tests.es`, and `1 played, 3 points` prints once: only the `Season.tests.es` entry ran again. Save `Points.es`, and it prints twice, because both entries reach that file.
+
+Press `r` to run everything again, `c` to clear the screen, and `q` or Ctrl+C to quit. A focused test never fails a watching run.
+
+</StepItem>
+
+<StepItem title="Replay a property and update a snapshot">
+
+A property test runs its body for generated values, 100 by default. This one claims that a winner outscored the other side:
+
+```essence
+§ file: Winners.tests.es
+import {
+	from "./Points.es" {
+		Outcome
+		outcomeOf
+	}
+}
+
+tests {
+	test "a winner outscored the other side" for any (
+		scored: Integer,
+		conceded: Integer,
+	) {
+		if outcomeOf(scored, against conceded)::points()::is(3) {
+			expect scored::isGreaterThan(0)
+		}
+	}
+}
+```
+
+It holds a mistake: it compares `scored` with `0`, not with `conceded`. Run `essence test Winners.tests.es`:
+
+<div class="error-output">
+
+```
+1 played, 3 points
+
+ Points.es
+   outcomes
+     ✓ calls a higher score a win
+     ✓ calls a level score a draw
+   ✓ sums up two wins
+ Winners.tests.es
+   ✗ a winner outscored the other side  (4 cases)
+
+[test-failed]
+Error: 'a winner outscored the other side' failed
+    ╭─┤ Winners.tests.es:14:11 │
+    │
+ 14 │          expect scored::isGreaterThan(0)
+    │                 ────────────┬───────────  
+    │                             ╰───────────── this expect failed
+    │ 
+    │ Help: Run it again: essence test --seed 50d97820 -f "a winner outscored the other side"
+    │ 
+    │ Note: after 4 cases, shrunk to: scored = 0  conceded = -1
+────╯
+
+ 3 passed  1 failed  ·  1.2 ms
+```
+
+</div>
+
+The tests of `Points.es` ran too, because `Winners.tests.es` imports it. The property failed after 4 cases. The runner then shrank the failure to the smallest values it could find: `scored = 0` and `conceded = -1`. That score is a win, and `0` is not greater than `0`.
+
+The run stored the failing values in `__counterexamples__/Winners.tests.es.json`, beside the file. Every later run tries the stored values before it draws new ones. Run the file again, and the report says `(0 cases · 1 replayed)`, with the Note `failed on a stored counterexample (1 re-run): scored = 0  conceded = -1`. Commit the directory with the source. It is not a cache: a stored counterexample keeps a fixed bug fixed.
+
+The Help line holds the run's seed. Each run picks a random seed and draws every property test's values from it, so your run prints its own seed and can fail after a different count. [`--seed`](/docs/reference/cli#test--seed) with that seed draws the same values again. The Help's command also tries the stored value first. It draws the search again only once `Winners.tests.es.json` is deleted, and then it fails after as many cases as the first run did. Each test folds its own identity into the seed. So `--seed` with a `-f` that names one test draws exactly what the whole run drew for it.
+
+**Compared with JavaScript.** fast-check replays a seed you pass in code:
+
+```ts
+import fc from "fast-check"
+import { outcomeOf } from "./points"
+
+fc.assert(
+	fc.property(fc.integer(), fc.integer(), (scored, conceded) => {
+		return outcomeOf(scored, conceded) !== "win" || scored > conceded
+	}),
+	{ seed: 0x50d97820 },
+)
+```
+
+`--seed` replays a whole run from the command line instead, and the counterexample store replays past failures with no flag at all.
+
+Fix the comparison:
+
+```essence
+§ fragment
+expect scored::isGreaterThan(conceded)
+```
+
+The test now passes as `✓ a winner outscored the other side  (100 cases · 1 replayed)`. The stored value stays in the file, so every run keeps checking it first, as a regression case.
+
+[`--cases 500`](/docs/reference/cli#test--cases) runs each property test for 500 values instead of 100. [`test.cases`](/docs/reference/project-file#test-cases) in `essence.json` changes the number for the whole project.
+
+`Points.es` also records a snapshot: a value a test wrote down once and compares against on every later run. The test `sums up two wins` ends in [`matches snapshot`](/docs/reference/syntax-glossary#matches-snapshot) and the recorded text, `"2 played, 6 points"`. Change the text `summary` builds, from `points` to `pts`:
+
+```essence
+§ fragment
+<- "{results::length()} played, {total} pts"
+```
+
+The snapshot test fails, and its Notes show the difference:
+
+<div class="error-output">
+
+```
+[test-failed]
+Error: 'sums up two wins' failed
+    ╭─┤ Points.es:58:10 │
+    │
+ 58 │        expect summary([#Win, #Win]) matches snapshot "2 played, 6 points"
+    │               ─────────────────────────────┬─────────────────────────────  
+    │                                            ╰─────────────────────────────── this expect failed
+    │ 
+    │ Help: Accept this run with `essence test --update`
+    │ 
+    │ Note 1: the recorded snapshot and this run differ
+    │ Note 2: the difference, - what it held, + what it was compared with:
+    │         - 2 played, 6 points
+    │         + 2 played, 6 pts
+────╯
+```
+
+</div>
+
+`--update` accepts the new value. `essence test --update` writes it back into the source through the formatter, so the line becomes `matches snapshot "2 played, 6 pts"`, and the summary adds `1 snapshot written`. A stored snapshot, written `matches snapshot from "name"`, is rewritten in the `__snapshots__` directory beside the file instead.
+
+`--update` is needed only to replace a value that differs. A `matches snapshot` with no value after it is filled in by any run. A CI run fills it in too, and the test passes. Jest's `--ci` would fail that test, and `essence test` has no such mode. To catch it in CI, check that the run left the sources unchanged, for example with `git diff --exit-code`.
+
+Change `pts` back to `points` and run `essence test --update` again, which records `2 played, 6 points` once more.
+
+</StepItem>
+
+<StepItem title="Measure coverage">
+
+[`--coverage`](/docs/reference/cli#test--coverage) compiles the tests with counters in them, and adds a table to the report:
+
+```sh
+$ essence test --coverage Points.es
+1 played, 3 points
+
+ Points.es
+   outcomes
+     ✓ calls a higher score a win
+     ✓ calls a level score a draw
+   ✓ sums up two wins
+
+ File       Lines  Branches  Cases  Not taken
+ Points.es  75%    75%       1/3    outcomeOf › else
+                                    Outcome::points › case #Draw
+                                    Outcome::points › case #Loss
+ Choice Outcome: #Loss never constructed by a test
+
+ 3 passed  ·  0.68 ms
+```
+
+Read the table column by column:
+
+- `Lines` and `Branches` are percentages. A branch is one side of an `if`: its body, or its `else`.
+- `Cases` counts [`match`](/docs/language/choices-and-match) arms, not the cases of a choice: the arms that ran, out of all arms, here 1 of 3.
+- `Not taken` names every branch and arm no test reached, by the function or method it stands in. `outcomeOf › else` is the last `else` of `outcomeOf`, because no test passes a losing score.
+- The line under the table names each case of a choice that no test ever built. A choice has a fixed set of cases, so that list is complete. Nothing the tests ran builds a `#Loss`.
+
+[`--coverage-report lcov`](/docs/reference/cli#test--coverage-report), or `--coverage-report json`, also writes the coverage to a file, and implies `--coverage`. `essence test --coverage-report lcov Points.es` ends its report with `coverage written to coverage/lcov.info`. The file goes to `coverage/` under the working directory, named `lcov.info` or `coverage.json`. [`--coverage-out`](/docs/reference/cli#test--coverage-out) names another directory.
+
+In `essence.json`, [`test.coverage.report`](/docs/reference/project-file#test-coverage-report) and [`test.coverage.out`](/docs/reference/project-file#test-coverage-out) set the format and the directory for the project:
+
+```jsonc
+{
+	"test": {
+		"coverage": {
+			"report": "json",
+			"out": "reports"
+		}
+	}
+}
+```
+
+The setting says what a coverage run writes. It never turns coverage on, so a plain `essence test` still writes nothing, and `essence test --coverage` writes `reports/coverage.json`. A flag wins over the setting.
+
+The lcov file is the tracefile coverage viewers read. For each source it writes `SF:` and the path, then one `DA:line,count` record per line with statements. `LF` and `LH` count the lines found and hit. Each branch is a `BRDA:line,block,label,count` record. `match` arms are written as branches too, labelled with their case: `BRDA:24,4,case #Win,3` says the `#Win` arm on line 24 ran three times. `BRF` and `BRH` total the branches found and hit. Here they are `7` and `4`, because the three arms count beside the four sides of the two `if`s.
+
+In the JSON file, the top level holds `schema: 1` and `files`, one object per module. A file object holds `module`, the source's path; `lines`, `branches` and `cases`, each as `{ covered, total }`; `percentages`, with `lines` and `branches`; and `missed`. Each item in `missed` has a `kind`, either `branch` or `case`, and the `scope` it stands in, such as `Outcome::points`. It also has a `label`, such as `case #Draw`, and a `position` with a start and an end line and column. Its Boolean `refinement` is true when the branch's condition narrows a type, as `scores::hasItems()` narrows a list to a [`NonEmptyList`](/docs/library/list#NonEmptyList). The table marks such a branch `(guarded)`. A file object also carries `points`, every counter with its count. The top level also carries `choices`, every case of every choice with whether a test built it.
+
+</StepItem>
+
+<StepItem title="Run tests in the editor">
+
+The VS Code extension keeps a live session, which runs the same tests in the background while you type. [Editor setup](/docs/guides/editor-setup) installs it. The live session plays the part Wallaby plays for a JavaScript project.
+
+- **Tests run as you type.** An edit runs again only the test files it reached.
+- **Failures appear in Problems.** A failed `expect` appears in the Problems panel as the error [`test-failed`](/docs/reference/diagnostics#test-failed), with the labels `essence test` prints.
+- **Values appear beside the code.** Every `constant` in a test body shows its value as an inlay hint, text the editor draws at the end of the line. So does every failed `expect`, and every line that ends in a [`§?` value comment](/docs/reference/syntax-glossary#value-comment). `essence.inlayHints.enabled` turns them off.
+- **The Testing view** lists files, then suites, then tests. It reads them from the compiled module, so a test that never ran is listed too. Each tag gets a run profile, such as **Run slow**.
+- **Run and Debug lenses** sit above each `test` and `suite`. Debug compiles the file with its tests, so a breakpoint in a test body stops like any other. [Debugging](/docs/guides/debugging) covers the debugger.
+- **Essence: Re-run Failed Tests** runs the failures again.
+- **Run with Coverage** turns on `essence.tests.coverage`. The gutter then marks each line: green where the tests ran it, grey where nothing did, amber where they ran only part. From then on, an edit runs only the tests that reached the lines you changed. An edit that adds or removes a line, or changes a top-level constant, still runs everything.
+
+Three settings control the live session:
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `essence.tests.enabled` | `true` | Runs the tests as you type. Turned off, it stops the automatic runs; a run you ask for still runs. |
+| `essence.tests.coverage` | `false` | Counts what each run reaches, for the gutter and the coverage view. |
+| `essence.tests.debounce` | `450` | How long the session waits after the last keystroke before it runs, in milliseconds. |
+
+These settings belong to your editor. The project's test settings, such as `test.skipTags`, come from `essence.json`, so the editor and `essence test` agree on which tests run.
+
+The language server also reports three things about tests. `essence test` compiles each entry on its own and never compares tags across files, so it never reports the first two. It reports the third only as the Error in step 2:
+
+- [`similar-tags`](/docs/reference/diagnostics#similar-tags) is a Warning on two tags in the workspace at most two edits apart, such as `slwo` and `slow`. It lands on the rarer of the two: `The tags 'slwo' and 'slow' are nearly the same`. Its Quick Fix, **Change to 'slow'**, writes the common spelling over the rare one.
+- [`lonely-tag`](/docs/reference/diagnostics#lonely-tag) has the severity Information, advice that never fails anything. It sits on a tag exactly one test carries: `Only one test carries the tag 'flaky'`.
+- A Warning sits on every `focused`: `This test is still focused`. Its Quick Fix, **Remove 'focused'**, deletes the modifier. Its code is `focused-tests-remain`, which the command line reports as an Error only when an un-narrowed run still holds a focus.
+
+</StepItem>
+
+</Steps>
+
+## Exit codes
+
+| Code | When |
+| --- | --- |
+| `0` | Every test that ran passed. Also when a filter or a tag matched no test. |
+| `1` | A test failed, a file did not compile, or a named file does not exist. |
+| `2` | A run nobody narrowed still holds a focused test, or the command line could not be read, such as an unknown option. |
+
+[`--json`](/docs/reference/cli#global--json) does not change the exit code. An unknown option names the closest one it knows: `essence test --fliter x` prints `✖ Unknown option "--fliter" for essence test.` and `Did you mean "--filter"?`.
+
+## The event stream
+
+`--json` writes events instead of the report: one JSON object per line (newline-delimited JSON) on standard output, and nothing else. Diagnostics stay on standard error. The editor's live session reads the same events. These are the first and last lines of `essence test --json --skip-tag slow` in `league/`, with `Winners.tests.es` in place:
+
+```
+{"schema":1,"kind":"run-start","tests":7,"focused":false}
+{"schema":1,"kind":"run-end","passed":7,"failed":0,"skipped":0,"deselected":1,"duration":1.2429580000000016,"focused":false}
+```
+
+With `--watch`, the stream holds one `run-start` to `run-end` pair for each run. Every event carries `schema: 1` and a `kind`:
+
+| Kind | What it says |
+| --- | --- |
+| `run-start` | A run begins: how many tests it plans, and whether one is focused. |
+| `test-start` | A test begins: its `id`, `name`, `suitePath`, `module` and table `row`. |
+| `test-pass` | The test passed, with its `duration` and number of `expectations`. |
+| `test-fail` | The test failed, with its `failures`. |
+| `test-skip` | The test is skipped, with its `reason`. |
+| `test-deselected` | A filter, a tag or a focus left the test out. Its `reason` says which, such as `"tag"`. |
+| `expect` | One assertion ran: its `form`, whether it `passed`, its `span` and the `values` it recorded. |
+| `probe` | The value of a `§?` line. |
+| `snapshot` | A snapshot was compared or written. |
+| `property` | A property test finished: its `cases`, `seed`, `shrinks` and `counterexample`. |
+| `output` | Text a test printed. |
+| `coverage` | One module's coverage, in a `--coverage` run. |
+| `results-cached` | The events that follow were replayed from the result cache. |
+| `run-end` | The totals. |
+
+A consumer should ignore any kind it does not know.
+
+## The result cache
+
+A run remembers what each entry reported. The next run replays an entry when its code, its snapshot and counterexample files, and the run's filters are all unchanged. The summary then counts the replayed entries, and the `--json` stream marks each with `results-cached`. A replayed entry is not loaded, so its module statements do not run.
+
+A test that failed always runs again, and so does a property test. Run `essence test` twice at the end of this guide, and the second run reports `2 of 3 entries cached`. `Winners.tests.es` holds a property test and runs again, so `1 played, 3 points` prints once instead of three times. `--update`, `--coverage` and `--seed` skip the cache, and so does `--cases`, unless it repeats the number `test.cases` sets.
+
+`ESSENCE_RESULTS_CACHE=off` turns the result cache off. The note `compile cache warm` belongs to a second cache, of compiled bundles, which `ESSENCE_CLI_CACHE=off` turns off. A third, `ESSENCE_COMPILER_CACHE`, holds the compiler's snapshot of the standard library. There is no `--no-cache` flag. To run with nothing reused, turn off all three:
+
+```sh
+$ ESSENCE_CLI_CACHE=off ESSENCE_COMPILER_CACHE=off ESSENCE_RESULTS_CACHE=off essence test
+```
+
+## Compared with JavaScript
+
+```sh
+npx vitest run -t "is worth"   # essence test -f "is worth"
+npx vitest                     # essence test --watch
+npx vitest run --coverage      # essence test --coverage
+npx vitest run -u              # essence test --update
+```
+
+Vitest watches by default in a terminal, and `run` asks it for one pass. `essence test` runs once unless you pass `--watch`. `--coverage` also names the `match` arms and choice cases no test reached. More of the toolchain is compared under [tooling](/docs/getting-started/coming-from-javascript#tooling).
+
+<SeeAlso
+	links={[
+		{ label: "Tests", href: "/docs/language/tests" },
+		{ label: "Projects and essence.json", href: "/docs/guides/projects" },
+		{ label: "Editor setup", href: "/docs/guides/editor-setup" },
+		{ label: "Debugging", href: "/docs/guides/debugging" },
+		{ label: "Command line", href: "/docs/reference/cli" },
+		{ label: "essence.json", href: "/docs/reference/project-file" },
+		{ label: "Diagnostics", href: "/docs/reference/diagnostics" },
+	]}
+/>
