@@ -1472,12 +1472,6 @@ Remove the parentheses, or call a function.
 
 Taught on: [Functions as values › Storing and returning functions](/docs/language/functions-as-values#storing-and-returning-functions)
 
-### `record-annotation-not-record`
-
-**Error.** A record literal is given a type that is not a record type. It comes from the typed record literal `Type ~> { … }`, as in `Integer ~> { x = 1 }`. An annotation on a constant, `constant point: Integer = { x = 1 }`, reports [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch) instead.
-
-Write the record with an annotated constant instead: `constant point: Point = { x = 1, y = 2 }`, where `Point` is a `type` alias for a record shape.
-
 ### `path-step-not-a-record`
 
 **Error.** A step of a member path reads a member off something that is not a record, such as `.tags.length` where `tags` is a list. Only a record or a case has members a path can step through.

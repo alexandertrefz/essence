@@ -25,7 +25,13 @@ const DIAGNOSTICS_PAGE = path.resolve(
 // on the page nor allowed on it. By family where the family has a prefix, and
 // by name where a code of one does not start with it.
 const EXPERIMENTAL_PREFIXES = ["benchmark-", "contract-", "mutation-"]
-const EXPERIMENTAL_CODES = new Set(["ungeneratable-contract"])
+const EXPERIMENTAL_CODES = new Set([
+	"ungeneratable-contract",
+	// NOTE: Not a test mode's, but held back the same way: the one code of the
+	// typed record literal `Type ~> { … }`, which the site leaves out while the
+	// literal goes unchecked. Documenting the code would teach the form.
+	"record-annotation-not-record",
+])
 
 function isExperimental(code: string): boolean {
 	return (
