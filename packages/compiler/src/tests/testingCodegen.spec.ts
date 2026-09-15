@@ -85,7 +85,7 @@ async function load(
 
 type Run = {
 	events: Array<TestEvent>
-	summary: ReturnType<typeof entryPoints.run>
+	summary: Awaited<ReturnType<typeof entryPoints.run>>
 }
 
 // NOTE: An emitted `.ts` program imports the runtime by its absolute path, which
@@ -118,7 +118,7 @@ async function run(
 	let events: Array<TestEvent> = []
 
 	try {
-		let summary = loaded.$tests.run(scoped, {
+		let summary = await loaded.$tests.run(scoped, {
 			sink: (event) => events.push(event),
 			now: () => 0,
 			filters,
@@ -911,6 +911,129 @@ describe("Test codegen — running what was emitted", () => {
 	})
 })
 
+// NOTE: A test body may `complete` whatever it likes, and the runner waits for
+// it — which is the whole of what makes asynchrony testable in the language it
+// is written in. What these ask is that the wait is really waited for: that a
+// value only a completed future can hold reaches an `expect`, that output
+// written after a wait is still attributed to the test that wrote it, and that
+// a run of several such tests is a run in the order they were written.
+describe("Test codegen — a test that completes", () => {
+	it("waits for what a test body completes", async () => {
+		let { events, summary } = await run(`implementation {
+			function doubled(_ value: Integer) -> Future<Integer> {
+				constant half = complete Async.deferred(() { <- value })
+
+				<- half::multiply(with 2)
+			}
+		}
+
+		tests {
+			test "one" {
+				constant answered = complete doubled(21)
+
+				expect answered::is(42)
+			}
+		}`)
+
+		expect(summary.passed).toBe(1)
+		expect(summary.failed).toBe(0)
+		expect(eventsOf(events, "expect").length).toBe(1)
+	})
+
+	it("keeps the output a test writes after a wait", async () => {
+		let { events } = await run(`implementation {}
+
+		tests {
+			test "first" {
+				Terminal.print("before")
+
+				constant waited = complete Async.deferred(() { <- 1 })
+
+				Terminal.print("after")
+			}
+
+			test "second" {
+				Terminal.print("beside")
+			}
+		}`)
+
+		expect(
+			eventsOf(events, "output").map((event) =>
+				event.kind === "output" ? [event.id, event.text] : null,
+			),
+		).toEqual([
+			["/first", "before\n"],
+			["/first", "after\n"],
+			["/second", "beside\n"],
+		])
+	})
+
+	it("reports a failure a test reaches after a wait", async () => {
+		let { summary, events } = await run(`implementation {}
+
+		tests {
+			test "one" {
+				constant waited = complete Async.deferred(() { <- 1 })
+
+				expect false
+			}
+		}`)
+
+		expect(summary.failed).toBe(1)
+		expect(eventsOf(events, "expect").length).toBe(1)
+	})
+
+	it("waits for a setup Constant every test of the section reads", async () => {
+		let { summary } = await run(`implementation {}
+
+		tests {
+			constant shared = complete Async.deferred(() { <- 7 })
+
+			test "one" {
+				expect shared::is(7)
+			}
+
+			test "two" {
+				expect shared::is(7)
+			}
+		}`)
+
+		expect(summary.passed).toBe(2)
+		expect(summary.failed).toBe(0)
+	})
+
+	it("waits for a row of a table test", async () => {
+		let { summary } = await run(`implementation {}
+
+		tests {
+			test "row {value}" across [
+				{ value = 1 },
+				{ value = 2 },
+			] ({ value }: { value: Integer }) {
+				constant doubled = complete Async.deferred(() { <- value::multiply(with 2) })
+
+				expect doubled::is(value::multiply(with 2))
+			}
+		}`)
+
+		expect(summary.passed).toBe(2)
+		expect(summary.failed).toBe(0)
+	})
+
+	it("leaves a test that completes nothing synchronous", async () => {
+		let code = generate(`implementation {}
+
+		tests {
+			test "one" {
+				expect true
+			}
+		}`)
+
+		expect(code).toContain("run: $context => {")
+		expect(code).not.toContain("await ")
+	})
+})
+
 describe("Test codegen — a graph of Modules", () => {
 	it("publishes one way in for every Module of the bundle", async () => {
 		let directory = mkdtempSync(join(tmpdir(), "essence-graph-"))
@@ -953,7 +1076,7 @@ describe("Test codegen — a graph of Modules", () => {
 		let events: Array<TestEvent> = []
 
 		try {
-			let summary = loaded.$tests.run(loaded.$tests.registry(), {
+			let summary = await loaded.$tests.run(loaded.$tests.registry(), {
 				sink: (event) => events.push(event),
 				now: () => 0,
 			})

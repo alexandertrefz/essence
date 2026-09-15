@@ -164,7 +164,7 @@ async function runMutant(
 		for (let id of request.ids) {
 			let before = events.length
 
-			tests.run(registry, {
+			await tests.run(registry, {
 				sink: (event) => {
 					if (
 						event.kind === "run-start" ||

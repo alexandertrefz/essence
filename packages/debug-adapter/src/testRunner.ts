@@ -26,7 +26,10 @@ export function testRunnerSource(
 const ids = ${JSON.stringify(ids)}
 const registry = $tests.registry()
 
-const summary = $tests.run(registry, {
+// NOTE: Awaited at the top level of the emitted Module, which is ESM and may:
+// a test that completes something is a test the runner waits for, and the
+// summary is only true once every one of them is over.
+const summary = await $tests.run(registry, {
 	filters: ids.length === 0 ? {} : { ids },
 	sink: (event) => {
 		if (event.kind === "test-pass") {

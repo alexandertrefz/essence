@@ -84,7 +84,7 @@ async function propertyFailures(source: string): Promise<Array<string>> {
 	let events: Array<TestEvent> = []
 
 	try {
-		loaded.$tests.run(scoped, {
+		await loaded.$tests.run(scoped, {
 			sink: (event) => events.push(event),
 			now: () => 0,
 			seed: "w4stringadditions",

@@ -236,7 +236,7 @@ async function runEntry(
 		)
 		let stored = await readSnapshots(modules)
 
-		tests.run(registry, {
+		await tests.run(registry, {
 			// NOTE: The bundle's own bookends are dropped. One cycle may cover
 			// several entries and is one run as far as a client is concerned;
 			// the counts it needs travel on the notification, and every event
@@ -283,7 +283,7 @@ async function runEntry(
 		return answer(
 			events,
 			sitesOf(registry, entry.filePath),
-			tests.select(registry, filters).focused,
+			(await tests.select(registry, filters)).focused,
 			true,
 			written === null || written.problems.length === 0
 				? null

@@ -17,6 +17,7 @@ import { discoverTestFiles } from "./discovery"
 import { redirectStdout } from "./running"
 import {
 	claimRegistries,
+	holdsFocus,
 	type LoadedBundle,
 	type LoadedSuite,
 	loadBundles,
@@ -368,9 +369,7 @@ export async function runTestWatch(
 				claims.set(suite.inputFileName, claimedIds(suite))
 			}
 
-			let focusedNow = suites.some(
-				(suite) => suite.tests.select(suite.registry, filters).focused,
-			)
+			let focusedNow = await holdsFocus(suites, filters.bench)
 
 			// NOTE: Remembered rather than read back off the events. The
 			// streams kept here carry no `run-start`, on purpose — one cycle is
@@ -412,7 +411,7 @@ export async function runTestWatch(
 				)
 			}
 
-			let { matched } = runSuites(
+			let { matched } = await runSuites(
 				suites,
 				toRun,
 				filters,

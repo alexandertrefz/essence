@@ -553,7 +553,7 @@ async function runWithCoverage(source: string): Promise<{
 	let events: Array<TestEvent> = []
 
 	try {
-		loaded.$tests.run(registryOf(modules.slice(modules.length - 1)), {
+		await loaded.$tests.run(registryOf(modules.slice(modules.length - 1)), {
 			sink: (event) => events.push(event),
 			now: () => 0,
 			coverage: true,
@@ -660,10 +660,10 @@ tests {
 		let modules = loaded.$tests.registry().modules
 		let registry = registryOf(modules.slice(modules.length - 1))
 
-		let counts = (): Array<number> => {
+		let counts = async (): Promise<Array<number>> => {
 			let events: Array<TestEvent> = []
 
-			loaded.$tests.run(registry, {
+			await loaded.$tests.run(registry, {
 				sink: (event) => events.push(event),
 				now: () => 0,
 				coverage: true,
@@ -679,7 +679,7 @@ tests {
 		}
 
 		try {
-			expect(counts()).toEqual(counts())
+			expect(await counts()).toEqual(await counts())
 		} finally {
 			rmSync(directory, { recursive: true, force: true })
 		}

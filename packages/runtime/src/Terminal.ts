@@ -246,6 +246,16 @@ export type OutputSink = (text: string, stream: OutputStream) => void
 // worker is its own realm and holds its own binding.
 let outputSink: OutputSink | null = null
 
+// NOTE: A run that WAITS keeps the sink for as long as it waits. The test
+// runner drives one test at a time, each awaited before the next is started, so
+// the dynamic extent of a sink is exactly the test it was installed for — and
+// putting it back when the Function RETURNED, rather than when the work it
+// describes is over, would attribute everything a test writes after its first
+// `complete` to whatever came next.
+//
+// NOTE: The promise is recognised rather than awaited, so the synchronous shape
+// — every run that completes nothing — costs exactly the `try`/`finally` it
+// always did and never a turn of the microtask queue.
 export function withOutputSink<Value>(
 	sink: OutputSink | null,
 	run: () => Value,
@@ -254,11 +264,44 @@ export function withOutputSink<Value>(
 
 	outputSink = sink
 
+	let answered: Value
+
 	try {
-		return run()
-	} finally {
+		answered = run()
+	} catch (thrown) {
 		outputSink = previous
+
+		throw thrown
 	}
+
+	if (!isPending(answered)) {
+		outputSink = previous
+
+		return answered
+	}
+
+	return answered.then(
+		(value: unknown) => {
+			outputSink = previous
+
+			return value
+		},
+		(thrown: unknown) => {
+			outputSink = previous
+
+			throw thrown
+		},
+	) as Value
+}
+
+// NOTE: A `then` is the whole test, which is what every consumer of a promise
+// in this runtime asks: what comes back is whatever the emitted Function
+// answered with, and an `async` one answers with a real promise.
+function isPending(value: unknown): value is Promise<unknown> {
+	return (
+		typeof (value as { then?: unknown } | null | undefined)?.then ===
+		"function"
+	)
 }
 
 // NOTE: `write(_ text: String, to stream: Stream)` — one native, with the

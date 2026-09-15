@@ -33,3 +33,24 @@ implementation {
 	§ flight, and a value that describes no work has nothing to put anywhere.
 	constant running = start 4
 }
+
+tests {
+	§ A plain test may `complete` whatever it likes: the runner drives one test
+	§ at a time and waits for each. These two are the forms it can not.
+
+	§ complete-outside-future — a benchmark body is timed over many runs, so a
+	§ wait inside it would be measured as the work.
+	benchmark "waiting" {
+		constant counted = complete Async.deferred(() { <- 5 })
+
+		expect counted::is(5)
+	}
+
+	§ complete-outside-future — and a property body runs once per generated
+	§ value, under a search that replays what it drew.
+	test "every width" for any (width: Integer) {
+		constant padded = complete Async.deferred(() { <- width })
+
+		expect padded::is(width)
+	}
+}

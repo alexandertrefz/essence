@@ -107,7 +107,7 @@ async function outcomesOf(source: string): Promise<Array<string>> {
 	let events: Array<TestEvent> = []
 
 	try {
-		loaded.$tests.run(scoped, {
+		await loaded.$tests.run(scoped, {
 			sink: (event) => events.push(event),
 			now: () => 0,
 			seed: "deadbeef",

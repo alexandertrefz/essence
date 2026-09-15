@@ -117,8 +117,22 @@ export type TestModule = {
 	module: string | null
 	spans: Array<Span>
 	tests: Array<TestManifestEntry>
-	run: (context: TestContext) => void
+	run: (context: TestContext) => Ran
 }
+
+// NOTE: THE WAIT RULE, and the one shape every entry point below answers with.
+// A body that completes something is emitted as an `async` Function and the
+// call handing it over is emitted awaited, so what each of these has to do is
+// hand the promise back — one Scope at a time, up to the `run` the runner
+// awaits. A body that completes NOTHING answers `undefined`, and every one of
+// these answers `undefined` in its turn: no promise is made, nothing is
+// scheduled, and a body that throws still throws at the call rather than
+// arriving later as a rejection nobody is holding.
+//
+// So an `await` here is always guarded by "is there anything to wait for",
+// never spent on the synchronous shape. That is what keeps a run of a thousand
+// tests that wait for nothing the run it has always been.
+export type Ran = void | Promise<void>
 
 // NOTE: The registry is per BUNDLE, not per process: esbuild inlines this
 // module into each bundle it builds, so two bundles loaded in one process hold
@@ -679,13 +693,13 @@ export function scope(
 	context: TestContext,
 	first: number,
 	last: number,
-	run: () => void,
-): void {
+	run: () => Ran,
+): Ran {
 	if (
 		context.index === -1 ||
 		(context.index >= first && context.index < last)
 	) {
-		run()
+		return run()
 	}
 }
 
@@ -697,14 +711,14 @@ export function entry(
 	context: TestContext,
 	index: number,
 	name: StringType | null,
-	run: () => void,
-): void {
+	run: () => Ran,
+): Ran {
 	if (name !== null) {
 		context.names.set(index, name.value)
 	}
 
 	if (context.index === index) {
-		run()
+		return run()
 	}
 }
 
@@ -718,8 +732,12 @@ export function rows<Value extends AnyType>(
 	first: number,
 	values: Array<Value>,
 	name: ((row: Value) => StringType) | null,
-	run: (row: Value) => void,
-): void {
+	run: (row: Value) => Ran,
+): Ran {
+	// NOTE: At most one row RUNS — the one the context selects — so there is at
+	// most one answer to hand back, and the walk is over the names either way.
+	let answered: Ran = undefined
+
 	values.forEach((value, offset) => {
 		let index = first + offset
 
@@ -734,9 +752,11 @@ export function rows<Value extends AnyType>(
 		}
 
 		if (context.index === index) {
-			run(value)
+			answered = run(value)
 		}
 	})
+
+	return answered
 }
 
 // NOTE: One benchmark, standing where it was written. It is the `entry` call
@@ -2105,14 +2125,19 @@ export type Selection =
 // and any other runner all select the same way. `focused` says whether the
 // registry holds a focused test at all, which is what a plain run exits
 // non-zero about.
-export function selectTests(
+// NOTE: Asynchronous for one reason: a `--filter` matches what a READER sees,
+// which for an interpolated name means rendering it, which means evaluating the
+// Module's setup — and a setup that completes something can only be evaluated
+// by waiting for it. A caller that holds the rendered names already, or that
+// passes no filter, waits for nothing.
+export async function selectTests(
 	registry: Registry,
 	filters: Filters = {},
 	// NOTE: The rendered names, where the caller holds them already — `runTests`
 	// works them out for the report and hands them down rather than paying for
 	// them twice.
 	rendered?: Map<string, string>,
-): {
+): Promise<{
 	selections: Array<Selection>
 	focused: boolean
 	// NOTE: How many tests the FILTER matched, whatever narrowed them
@@ -2120,7 +2145,7 @@ export function selectTests(
 	// worth saying out loud, and a run that selected nothing because a tag took
 	// them is a different sentence.
 	matched: number
-} {
+}> {
 	let bench = filters.bench === true
 	// NOTE: A focused BENCHMARK narrows nothing while the run is not measuring
 	// — it does not run either way, and counting it would silence every test of
@@ -2140,7 +2165,7 @@ export function selectTests(
 	let names =
 		filter === null
 			? new Map<string, string>()
-			: (rendered ?? renderedNames(registry))
+			: (rendered ?? (await renderedNames(registry)))
 	let matches = (entry: TestManifestEntry): boolean =>
 		filter === null ||
 		entry.name.includes(filter) ||
@@ -2279,7 +2304,16 @@ export function randomSeed(): string {
 	return nextWord(entropy()).toString(16).padStart(8, "0")
 }
 
-export function runTests(registry: Registry, options: RunOptions): RunSummary {
+// NOTE: One test at a time, each awaited before the next is started. Nothing
+// about a run is concurrent: the output sink, the coverage span and the
+// recordings a report is built from are all per test and all dynamically
+// scoped, so two tests in flight at once would be two tests writing into one
+// set of buffers. What a test may wait for is its OWN work, and the runner
+// waits with it.
+export async function runTests(
+	registry: Registry,
+	options: RunOptions,
+): Promise<RunSummary> {
 	let now = options.now ?? (() => Date.now())
 	let sink = options.sink
 
@@ -2292,8 +2326,12 @@ export function runTests(registry: Registry, options: RunOptions): RunSummary {
 	// name needs — the scope it was written in — and it costs one evaluation of
 	// the setup rather than one per test. Before the selection, because a
 	// `--filter` matches what a reader sees.
-	let names = renderedNames(registry)
-	let { selections, focused } = selectTests(registry, options.filters, names)
+	let names = await renderedNames(registry)
+	let { selections, focused } = await selectTests(
+		registry,
+		options.filters,
+		names,
+	)
 	let running = selections.filter((selection) => selection.state === "run")
 	let started = now()
 
@@ -2351,7 +2389,7 @@ export function runTests(registry: Registry, options: RunOptions): RunSummary {
 			continue
 		}
 
-		runOne(selection.test, name, sink, now, summary, options)
+		await runOne(selection.test, name, sink, now, summary, options)
 	}
 
 	summary.duration = now() - started
@@ -2395,7 +2433,7 @@ export function runTests(registry: Registry, options: RunOptions): RunSummary {
 // so would make every run pay for the one shape that needs it. Whatever the
 // setup writes on the way is dropped: the output a reader is shown belongs to a
 // test, and no test is running here.
-function renderedNames(registry: Registry): Map<string, string> {
+async function renderedNames(registry: Registry): Promise<Map<string, string>> {
 	let names = new Map<string, string>()
 
 	for (let module of registry.modules) {
@@ -2406,7 +2444,11 @@ function renderedNames(registry: Registry): Map<string, string> {
 		let context = createContext(-1)
 
 		try {
-			withOutputSink(
+			// NOTE: Awaited, because a section whose SETUP completes something
+			// is `async` whole — the names it renders are written on the
+			// context after the wait, and reading them before it would answer
+			// with the manifest's templates.
+			await withOutputSink(
 				(text, stream) => context.output.push({ stream, text }),
 				() => module.run(context),
 			)
@@ -2426,14 +2468,14 @@ function renderedNames(registry: Registry): Map<string, string> {
 	return names
 }
 
-function runOne(
+async function runOne(
 	test: RegisteredTest,
 	name: string,
 	sink: EventSink,
 	now: () => number,
 	summary: RunSummary,
 	options: RunOptions,
-): void {
+): Promise<void> {
 	let entry = test.entry
 	let spans = test.module.spans
 	let seed = options.seed ?? ""
@@ -2482,7 +2524,11 @@ function runOne(
 	let error: string | null = null
 
 	try {
-		withOutputSink(
+		// NOTE: Awaited INSIDE the `try`, so that a test which waits reports a
+		// failure the same way one that does not does: what a body throws after
+		// its first `complete` arrives here as a rejection, and the arm below
+		// is what turns either of them into the one error a report carries.
+		await withOutputSink(
 			(text, stream) => {
 				if (context.recording) {
 					context.output.push({ stream, text })

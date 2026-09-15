@@ -8354,22 +8354,36 @@ function rewriteTestsSection(
 						property("module", literalOrNull(section.module)),
 						property("spans", testSpans(section.spans)),
 						property("tests", testManifest(section.tests)),
-						property("run", {
-							type: "ArrowFunctionExpression",
-							expression: false,
-							params: [testContext()],
-							body: {
-								type: "BlockStatement",
-								body: withNamespaceScope(() =>
-									rewriteTestsNodes(section.nodes),
-								),
-							},
-						}),
+						property("run", sectionRun(section)),
 					],
 				},
 			]),
 		},
 	]
+}
+
+// NOTE: The section itself, as the Function of the per-test context the
+// manifest carries. It is `async` exactly where something inside it waits — a
+// setup Constant that completes, or a test that does — and the runner awaits
+// what it answers with either way.
+function sectionRun(
+	section: common.typedSimple.TestsSectionNode,
+): estree.ArrowFunctionExpression {
+	let run: estree.ArrowFunctionExpression = {
+		type: "ArrowFunctionExpression",
+		expression: false,
+		params: [testContext()],
+		body: {
+			type: "BlockStatement",
+			body: withNamespaceScope(() => rewriteTestsNodes(section.nodes)),
+		},
+	}
+
+	if (holdsAwait(run.body)) {
+		run.async = true
+	}
+
+	return run
 }
 
 // NOTE: One Scope's run of Nodes. A suite is a BLOCK, which is what JavaScript's
@@ -8381,6 +8395,8 @@ function rewriteTestsNodes(
 ): Array<estree.Statement> {
 	return nodes.flatMap((node) => {
 		if (node.nodeType === "TestEntry") {
+			let body = testBody(node.body)
+
 			return withStatementLocation(
 				[
 					{
@@ -8391,14 +8407,17 @@ function rewriteTestsNodes(
 						// the two is emitted is the whole of the difference: the
 						// key its baseline is stored under rides the manifest,
 						// where every durable identity already is.
-						expression: testingCall(
-							node.benchmark ? "benchmark" : "entry",
-							[
-								testContext(),
-								numberLiteral(node.index),
-								testName(node.name),
-								testBody(node.body),
-							],
+						expression: awaitedRegistration(
+							testingCall(
+								node.benchmark ? "benchmark" : "entry",
+								[
+									testContext(),
+									numberLiteral(node.index),
+									testName(node.name),
+									body,
+								],
+							),
+							body,
 						),
 					},
 				],
@@ -8438,15 +8457,18 @@ function rewriteTestsNodes(
 						// point the way a plain benchmark goes through
 						// `benchmark`; each row's baseline key is its own
 						// manifest entry's, the row spelled as its last step.
-						expression: testingCall(
-							node.benchmark ? "benchmarkRows" : "rows",
-							[
-								testContext(),
-								numberLiteral(node.first),
-								rows,
-								rowName,
-								rowBody,
-							],
+						expression: awaitedRegistration(
+							testingCall(
+								node.benchmark ? "benchmarkRows" : "rows",
+								[
+									testContext(),
+									numberLiteral(node.first),
+									rows,
+									rowName,
+									rowBody,
+								],
+							),
+							rowBody,
 						),
 					},
 				],
@@ -8501,25 +8523,30 @@ function rewriteTestsNodes(
 			// NOTE: A call rather than a bare block, so that the runtime can
 			// decline to evaluate a suite the running test is not in. The
 			// closure is the Scope JavaScript needs either way.
+			let held: estree.ArrowFunctionExpression = {
+				type: "ArrowFunctionExpression",
+				expression: false,
+				params: [],
+				body: {
+					type: "BlockStatement",
+					body: withNamespaceScope(() =>
+						rewriteTestsNodes(node.nodes),
+					),
+				},
+			}
+
 			return [
 				{
 					type: "ExpressionStatement",
-					expression: testingCall("scope", [
-						testContext(),
-						numberLiteral(node.first),
-						numberLiteral(node.last),
-						{
-							type: "ArrowFunctionExpression",
-							expression: false,
-							params: [],
-							body: {
-								type: "BlockStatement",
-								body: withNamespaceScope(() =>
-									rewriteTestsNodes(node.nodes),
-								),
-							},
-						},
-					]),
+					expression: awaitedRegistration(
+						testingCall("scope", [
+							testContext(),
+							numberLiteral(node.first),
+							numberLiteral(node.last),
+							held,
+						]),
+						held,
+					),
 				},
 			]
 		}
@@ -8697,7 +8724,7 @@ function generatorClosure(
 function rowClosure(
 	binding: string,
 	body: Array<estree.Statement>,
-): estree.Expression {
+): estree.ArrowFunctionExpression {
 	return {
 		type: "ArrowFunctionExpression",
 		expression: false,
@@ -8719,13 +8746,36 @@ function testName(
 
 function testBody(
 	body: Array<common.typedSimple.ImplementationNode>,
-): estree.Expression {
+): estree.ArrowFunctionExpression {
 	return {
 		type: "ArrowFunctionExpression",
 		expression: false,
 		params: [],
 		body: rewriteBlockStatement(body),
 	}
+}
+
+// NOTE: A registration call the runner has to WAIT for. Every Function here is
+// handed over and called by the runtime, so an `await` written inside one
+// belongs to that Function: it is made `async`, which makes what the runtime
+// hands back a promise, and the call is awaited so that the wait stays where
+// the source put it. The runtime's own entry points pass that promise straight
+// on, one Scope at a time, up to the `run` the runner awaits.
+//
+// NOTE: And nowhere else. A test that completes nothing is emitted, called and
+// reported exactly as it was before any of this existed — no `async`, no
+// promise, and a body that throws still throws where the runner catches it.
+function awaitedRegistration(
+	call: estree.CallExpression,
+	handed: estree.ArrowFunctionExpression,
+): estree.Expression {
+	if (!holdsAwait(handed.body)) {
+		return call
+	}
+
+	handed.async = true
+
+	return { type: "AwaitExpression", argument: call }
 }
 
 // NOTE: The span table, indexed by point id. Emitted whole rather than per

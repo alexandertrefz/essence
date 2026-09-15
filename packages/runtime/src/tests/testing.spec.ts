@@ -108,12 +108,12 @@ function module(
 	return { module: "/Season.es", spans, tests, run }
 }
 
-function collect(registry: ReturnType<typeof registryOf>): {
+async function collect(registry: ReturnType<typeof registryOf>): Promise<{
 	events: Array<TestEvent>
-	summary: ReturnType<typeof runTests>
-} {
+	summary: Awaited<ReturnType<typeof runTests>>
+}> {
 	let events: Array<TestEvent> = []
-	let summary = runTests(registry, {
+	let summary = await runTests(registry, {
 		sink: (event) => events.push(event),
 		now: () => 0,
 	})
@@ -151,9 +151,15 @@ describe("The per-test context", () => {
 		let ran: Array<number> = []
 		let context = createContext(1)
 
-		entry(context, 0, null, () => ran.push(0))
-		entry(context, 1, null, () => ran.push(1))
-		entry(context, 2, null, () => ran.push(2))
+		entry(context, 0, null, () => {
+			ran.push(0)
+		})
+		entry(context, 1, null, () => {
+			ran.push(1)
+		})
+		entry(context, 2, null, () => {
+			ran.push(2)
+		})
 
 		expect(ran).toEqual([1])
 	})
@@ -406,11 +412,11 @@ describe("The structural diff", () => {
 })
 
 describe("Selection", () => {
-	test("runs everything where nothing is focused or tagged", () => {
+	test("runs everything where nothing is focused or tagged", async () => {
 		let registry = registryOf([
 			module([manifest("/a"), manifest("/b")], () => {}),
 		])
-		let { selections, focused } = selectTests(registry)
+		let { selections, focused } = await selectTests(registry)
 
 		expect(focused).toBe(false)
 		expect(selections.map((selection) => selection.state)).toEqual([
@@ -419,14 +425,14 @@ describe("Selection", () => {
 		])
 	})
 
-	test("runs only the focused tests while one exists", () => {
+	test("runs only the focused tests while one exists", async () => {
 		let registry = registryOf([
 			module(
 				[manifest("/a"), manifest("/b", { focused: true })],
 				() => {},
 			),
 		])
-		let { selections, focused } = selectTests(registry)
+		let { selections, focused } = await selectTests(registry)
 
 		expect(focused).toBe(true)
 		expect(selections[0]).toEqual({
@@ -437,7 +443,7 @@ describe("Selection", () => {
 		expect(selections[1]?.state).toBe("run")
 	})
 
-	test("reports a skipped test with its reason before anything else", () => {
+	test("reports a skipped test with its reason before anything else", async () => {
 		let registry = registryOf([
 			module(
 				[
@@ -447,7 +453,7 @@ describe("Selection", () => {
 				() => {},
 			),
 		])
-		let { selections } = selectTests(registry)
+		let { selections } = await selectTests(registry)
 
 		expect(selections[0]).toEqual({
 			test: registry.tests[0]!,
@@ -456,7 +462,7 @@ describe("Selection", () => {
 		})
 	})
 
-	test("does not count a skipped test as a focused one", () => {
+	test("does not count a skipped test as a focused one", async () => {
 		let registry = registryOf([
 			module(
 				[
@@ -467,10 +473,10 @@ describe("Selection", () => {
 			),
 		])
 
-		expect(selectTests(registry).focused).toBe(false)
+		expect((await selectTests(registry)).focused).toBe(false)
 	})
 
-	test("selects by tag, and lets a skipped tag win over a named one", () => {
+	test("selects by tag, and lets a skipped tag win over a named one", async () => {
 		let registry = registryOf([
 			module(
 				[
@@ -481,7 +487,7 @@ describe("Selection", () => {
 				() => {},
 			),
 		])
-		let { selections } = selectTests(registry, {
+		let { selections } = await selectTests(registry, {
 			tags: ["slow"],
 			skipTags: ["network"],
 		})
@@ -499,7 +505,7 @@ describe("Selection", () => {
 	// the rendered name — a row of a table test, or a name with a hole in it.
 	// The template still matches, so a filter written against the source works
 	// as well.
-	test("filters on the name a run renders", () => {
+	test("filters on the name a run renders", async () => {
 		let registry = registryOf([
 			module(
 				[
@@ -514,9 +520,9 @@ describe("Selection", () => {
 				},
 			),
 		])
-		let rendered = selectTests(registry, { filter: "2–0" })
-		let template = selectTests(registry, { filter: "{scored}" })
-		let neither = selectTests(registry, { filter: "3–1" })
+		let rendered = await selectTests(registry, { filter: "2–0" })
+		let template = await selectTests(registry, { filter: "{scored}" })
+		let neither = await selectTests(registry, { filter: "3–1" })
 
 		expect(rendered.selections[0]?.state).toBe("run")
 		expect(rendered.matched).toBe(1)
@@ -525,14 +531,14 @@ describe("Selection", () => {
 		expect(neither.matched).toBe(0)
 	})
 
-	test("filters on the name template", () => {
+	test("filters on the name template", async () => {
 		let registry = registryOf([
 			module(
 				[manifest("/a", { name: "the leader" }), manifest("/b")],
 				() => {},
 			),
 		])
-		let { selections } = selectTests(registry, { filter: "leader" })
+		let { selections } = await selectTests(registry, { filter: "leader" })
 
 		expect(
 			selections.map((selection) =>
@@ -545,7 +551,7 @@ describe("Selection", () => {
 })
 
 describe("The event stream", () => {
-	test("brackets a passing run with run-start and run-end", () => {
+	test("brackets a passing run with run-start and run-end", async () => {
 		let registry = registryOf([
 			module([manifest("/a")], (context) => {
 				entry(context, 0, null, () => {
@@ -553,7 +559,7 @@ describe("The event stream", () => {
 				})
 			}),
 		])
-		let { events, summary } = collect(registry)
+		let { events, summary } = await collect(registry)
 
 		expect(kinds(events)).toEqual([
 			"run-start",
@@ -579,7 +585,7 @@ describe("The event stream", () => {
 		})
 	})
 
-	test("reports one probe per point, with the last value it held", () => {
+	test("reports one probe per point, with the last value it held", async () => {
 		let registry = registryOf([
 			module(
 				[manifest("/a")],
@@ -594,7 +600,7 @@ describe("The event stream", () => {
 				[span("count"), span("word"), span("expect")],
 			),
 		])
-		let { events } = collect(registry)
+		let { events } = await collect(registry)
 		let probes = events.filter((event) => event.kind === "probe")
 
 		expect(probes).toEqual([
@@ -617,7 +623,7 @@ describe("The event stream", () => {
 		])
 	})
 
-	test("reports a probe of a test that failed as well", () => {
+	test("reports a probe of a test that failed as well", async () => {
 		let registry = registryOf([
 			module(
 				[manifest("/a")],
@@ -630,7 +636,7 @@ describe("The event stream", () => {
 				[span("seven"), span("expect")],
 			),
 		])
-		let { events } = collect(registry)
+		let { events } = await collect(registry)
 
 		expect(kinds(events)).toEqual([
 			"run-start",
@@ -642,19 +648,19 @@ describe("The event stream", () => {
 		])
 	})
 
-	test("stamps every event with the schema version", () => {
+	test("stamps every event with the schema version", async () => {
 		let registry = registryOf([
 			module([manifest("/a")], (context) => {
 				entry(context, 0, null, () => expected(context, 0, true, null))
 			}),
 		])
 
-		for (let event of collect(registry).events) {
+		for (let event of (await collect(registry)).events) {
 			expect(event.schema).toBe(1)
 		}
 	})
 
-	test("carries a failure's values and span, resolved against the table", () => {
+	test("carries a failure's values and span, resolved against the table", async () => {
 		let registry = registryOf([
 			module(
 				[manifest("/a")],
@@ -667,7 +673,7 @@ describe("The event stream", () => {
 				[span("leader.points::is(2)"), span("leader.points")],
 			),
 		])
-		let { events, summary } = collect(registry)
+		let { events, summary } = await collect(registry)
 		let failure = events.find((event) => event.kind === "test-fail")
 
 		expect(summary.failed).toBe(1)
@@ -693,7 +699,7 @@ describe("The event stream", () => {
 		})
 	})
 
-	test("renders no value for an assertion that held", () => {
+	test("renders no value for an assertion that held", async () => {
 		let registry = registryOf([
 			module(
 				[manifest("/a")],
@@ -706,14 +712,14 @@ describe("The event stream", () => {
 				[span("leader.points::is(19)"), span("leader.points")],
 			),
 		])
-		let recorded = collect(registry).events.find(
+		let recorded = (await collect(registry)).events.find(
 			(event) => event.kind === "expect",
 		)
 
 		expect(recorded).toMatchObject({ passed: true, values: [] })
 	})
 
-	test("diffs the two operands of a failed comparison", () => {
+	test("diffs the two operands of a failed comparison", async () => {
 		let registry = registryOf([
 			module(
 				[manifest("/a")],
@@ -731,7 +737,7 @@ describe("The event stream", () => {
 				[span("a::is(b)"), span("a"), span("b")],
 			),
 		])
-		let recorded = collect(registry).events.find(
+		let recorded = (await collect(registry)).events.find(
 			(event) => event.kind === "expect",
 		)
 
@@ -748,7 +754,7 @@ describe("The event stream", () => {
 		})
 	})
 
-	test("reports a skipped test with its reason and runs nothing", () => {
+	test("reports a skipped test with its reason and runs nothing", async () => {
 		let ran = false
 		let registry = registryOf([
 			module([manifest("/a", { skipped: "not yet" })], (context) => {
@@ -757,7 +763,7 @@ describe("The event stream", () => {
 				})
 			}),
 		])
-		let { events, summary } = collect(registry)
+		let { events, summary } = await collect(registry)
 
 		expect(ran).toBe(false)
 		expect(summary.skipped).toBe(1)
@@ -773,12 +779,12 @@ describe("The event stream", () => {
 		})
 	})
 
-	test("counts a deselected test rather than failing it", () => {
+	test("counts a deselected test rather than failing it", async () => {
 		let registry = registryOf([
 			module([manifest("/a", { tags: ["slow"] })], () => {}),
 		])
 		let events: Array<TestEvent> = []
-		let summary = runTests(registry, {
+		let summary = await runTests(registry, {
 			sink: (event) => events.push(event),
 			now: () => 0,
 			filters: { skipTags: ["slow"] },
@@ -799,7 +805,7 @@ describe("The event stream", () => {
 		})
 	})
 
-	test("fails a test whose body threw, and says what threw", () => {
+	test("fails a test whose body threw, and says what threw", async () => {
 		let registry = registryOf([
 			module([manifest("/a")], (context) => {
 				entry(context, 0, null, () => {
@@ -807,7 +813,7 @@ describe("The event stream", () => {
 				})
 			}),
 		])
-		let { events, summary } = collect(registry)
+		let { events, summary } = await collect(registry)
 		let failure = events.find((event) => event.kind === "test-fail")
 
 		expect(summary.failed).toBe(1)
@@ -816,7 +822,7 @@ describe("The event stream", () => {
 		)
 	})
 
-	test("ends a test at a failed require without calling it an error", () => {
+	test("ends a test at a failed require without calling it an error", async () => {
 		let reached = false
 		let registry = registryOf([
 			module([manifest("/a")], (context) => {
@@ -832,7 +838,7 @@ describe("The event stream", () => {
 				})
 			}),
 		])
-		let { events, summary } = collect(registry)
+		let { events, summary } = await collect(registry)
 		let failure = events.find((event) => event.kind === "test-fail")
 
 		expect(reached).toBe(false)
@@ -843,7 +849,7 @@ describe("The event stream", () => {
 		).toHaveLength(1)
 	})
 
-	test("renders an interpolated name from the enumeration pass", () => {
+	test("renders an interpolated name from the enumeration pass", async () => {
 		let registry = registryOf([
 			module(
 				[
@@ -859,7 +865,7 @@ describe("The event stream", () => {
 				},
 			),
 		])
-		let started = collect(registry).events.find(
+		let started = (await collect(registry)).events.find(
 			(event) => event.kind === "test-start",
 		)
 
@@ -868,7 +874,7 @@ describe("The event stream", () => {
 
 	// NOTE: A brace is an ordinary character in a plain name, and a run that
 	// read one as a hole would evaluate the whole section once for nothing.
-	test("does not enumerate a Module whose names only look interpolated", () => {
+	test("does not enumerate a Module whose names only look interpolated", async () => {
 		let evaluations = 0
 		let registry = registryOf([
 			module(
@@ -881,7 +887,7 @@ describe("The event stream", () => {
 				},
 			),
 		])
-		let started = collect(registry).events.find(
+		let started = (await collect(registry)).events.find(
 			(event) => event.kind === "test-start",
 		)
 
@@ -889,7 +895,7 @@ describe("The event stream", () => {
 		expect(started).toMatchObject({ name: "handles { braces" })
 	})
 
-	test("keeps a test's output to that test", () => {
+	test("keeps a test's output to that test", async () => {
 		let registry = registryOf([
 			module([manifest("/a"), manifest("/b")], (context) => {
 				entry(context, 0, null, () => {
@@ -900,7 +906,7 @@ describe("The event stream", () => {
 				})
 			}),
 		])
-		let output = collect(registry).events.filter(
+		let output = (await collect(registry)).events.filter(
 			(event) => event.kind === "output",
 		)
 
@@ -944,7 +950,7 @@ function workClock(milliseconds: number): {
 
 type BenchmarkEvent = Extract<TestEvent, { kind: "benchmark" }>
 
-function measure(
+async function measure(
 	registry: ReturnType<typeof registryOf>,
 	options: {
 		clock: () => number
@@ -953,13 +959,13 @@ function measure(
 		update?: boolean
 		coverage?: boolean
 	},
-): {
+): Promise<{
 	events: Array<TestEvent>
 	measured: Array<BenchmarkEvent>
-	summary: ReturnType<typeof runTests>
-} {
+	summary: Awaited<ReturnType<typeof runTests>>
+}> {
 	let events: Array<TestEvent> = []
-	let summary = runTests(registry, {
+	let summary = await runTests(registry, {
 		sink: (event) => events.push(event),
 		now: () => 0,
 		clock: options.clock,
@@ -1004,7 +1010,7 @@ function benchmarkModule(
 }
 
 describe("Benchmarks", () => {
-	test("is left out of a run that did not ask to measure", () => {
+	test("is left out of a run that did not ask to measure", async () => {
 		let { clock } = workClock(1)
 		let registry = registryOf([
 			module(
@@ -1012,7 +1018,7 @@ describe("Benchmarks", () => {
 				() => {},
 			),
 		])
-		let { selections } = selectTests(registry)
+		let { selections } = await selectTests(registry)
 
 		expect(selections[0]?.state).toBe("run")
 		expect(selections[1]).toEqual({
@@ -1020,10 +1026,10 @@ describe("Benchmarks", () => {
 			state: "deselected",
 			reason: "bench",
 		})
-		expect(measure(registry, { clock }).measured).toEqual([])
+		expect((await measure(registry, { clock })).measured).toEqual([])
 	})
 
-	test("measures it where the run asked, and keeps running the tests", () => {
+	test("measures it where the run asked, and keeps running the tests", async () => {
 		let { clock, tick } = workClock(1)
 		let registry = registryOf([
 			benchmarkModule(tick),
@@ -1033,7 +1039,7 @@ describe("Benchmarks", () => {
 				})
 			}),
 		])
-		let { measured, summary } = measure(registry, {
+		let { measured, summary } = await measure(registry, {
 			clock,
 			filters: { bench: true },
 		})
@@ -1045,10 +1051,10 @@ describe("Benchmarks", () => {
 
 	// NOTE: The one door a measurement has without a flag. An Editor's "run this
 	// one" names a test by its id, and naming a benchmark is asking for it.
-	test("measures one somebody named, whatever the run asked for", () => {
+	test("measures one somebody named, whatever the run asked for", async () => {
 		let { clock, tick } = workClock(1)
 		let registry = registryOf([benchmarkModule(tick)])
-		let { measured } = measure(registry, {
+		let { measured } = await measure(registry, {
 			clock,
 			filters: { ids: ["/bench"] },
 		})
@@ -1056,9 +1062,9 @@ describe("Benchmarks", () => {
 		expect(measured.map((event) => event.status)).toEqual(["written"])
 	})
 
-	test("calibrates a batch and answers with the time of one run", () => {
+	test("calibrates a batch and answers with the time of one run", async () => {
 		let { clock, tick } = workClock(1)
-		let { measured } = measure(registryOf([benchmarkModule(tick)]), {
+		let { measured } = await measure(registryOf([benchmarkModule(tick)]), {
 			clock,
 			filters: { bench: true },
 		})
@@ -1079,9 +1085,9 @@ describe("Benchmarks", () => {
 		})
 	})
 
-	test("records a measurement nothing had a baseline for", () => {
+	test("records a measurement nothing had a baseline for", async () => {
 		let { clock, tick } = workClock(1)
-		let { measured, summary } = measure(
+		let { measured, summary } = await measure(
 			registryOf([benchmarkModule(tick)]),
 			{ clock, filters: { bench: true } },
 		)
@@ -1090,9 +1096,9 @@ describe("Benchmarks", () => {
 		expect(summary.failed).toBe(0)
 	})
 
-	test("fails a measurement that ran away from its baseline", () => {
+	test("fails a measurement that ran away from its baseline", async () => {
 		let { clock, tick } = workClock(1)
-		let { events, measured, summary } = measure(
+		let { events, measured, summary } = await measure(
 			registryOf([benchmarkModule(tick)]),
 			{
 				clock,
@@ -1124,9 +1130,9 @@ describe("Benchmarks", () => {
 	// NOTE: Faster is news rather than a problem, and the baseline stands until
 	// somebody says to move it — a run that quietly recorded every improvement
 	// would ratchet a benchmark down to whatever the fastest machine reached.
-	test("passes a measurement that got faster, and says so", () => {
+	test("passes a measurement that got faster, and says so", async () => {
 		let { clock, tick } = workClock(1)
-		let { measured, summary } = measure(
+		let { measured, summary } = await measure(
 			registryOf([benchmarkModule(tick)]),
 			{
 				clock,
@@ -1140,9 +1146,9 @@ describe("Benchmarks", () => {
 		expect(summary.failed).toBe(0)
 	})
 
-	test("says nothing about a measurement inside its band", () => {
+	test("says nothing about a measurement inside its band", async () => {
 		let { clock, tick } = workClock(1)
-		let { measured, summary } = measure(
+		let { measured, summary } = await measure(
 			registryOf([benchmarkModule(tick)]),
 			{
 				clock,
@@ -1155,9 +1161,9 @@ describe("Benchmarks", () => {
 		expect(summary.passed).toBe(1)
 	})
 
-	test("records a measurement outside its band where it was told to", () => {
+	test("records a measurement outside its band where it was told to", async () => {
 		let { clock, tick } = workClock(1)
-		let { measured, summary } = measure(
+		let { measured, summary } = await measure(
 			registryOf([benchmarkModule(tick)]),
 			{
 				clock,
@@ -1175,7 +1181,7 @@ describe("Benchmarks", () => {
 	// number would go into a baseline as if it meant something. The body runs
 	// exactly twice: once to be judged, and once to leave the recordings the
 	// report is built from.
-	test("reports a body that did not hold, and never times it", () => {
+	test("reports a body that did not hold, and never times it", async () => {
 		let { clock } = workClock(1)
 		let ran = 0
 		let registry = registryOf([
@@ -1186,7 +1192,7 @@ describe("Benchmarks", () => {
 				})
 			}),
 		])
-		let { events, measured, summary } = measure(registry, {
+		let { events, measured, summary } = await measure(registry, {
 			clock,
 			filters: { bench: true },
 		})
@@ -1202,7 +1208,7 @@ describe("Benchmarks", () => {
 	// NOTE: A focus left on a benchmark silences nothing while the run is not
 	// measuring — it would otherwise take a whole project's tests away over
 	// something that was never going to run.
-	test("does not silence the tests with a focus nobody is running", () => {
+	test("does not silence the tests with a focus nobody is running", async () => {
 		let registry = registryOf([
 			module(
 				[
@@ -1212,8 +1218,8 @@ describe("Benchmarks", () => {
 				() => {},
 			),
 		])
-		let plain = selectTests(registry)
-		let measuring = selectTests(registry, { bench: true })
+		let plain = await selectTests(registry)
+		let measuring = await selectTests(registry, { bench: true })
 
 		expect(plain.focused).toBe(false)
 		expect(plain.selections.map((selection) => selection.state)).toEqual([
@@ -1232,9 +1238,9 @@ describe("Benchmarks", () => {
 	// asked to wait — and the editor's run-by-id door has a session deadline
 	// behind it. The tiers are arithmetic over the injected clock, like
 	// everything else here.
-	test("takes fewer samples of a body no batching helped", () => {
+	test("takes fewer samples of a body no batching helped", async () => {
 		let { clock, tick } = workClock(300)
-		let { measured } = measure(registryOf([benchmarkModule(tick)]), {
+		let { measured } = await measure(registryOf([benchmarkModule(tick)]), {
 			clock,
 			filters: { bench: true },
 		})
@@ -1246,9 +1252,9 @@ describe("Benchmarks", () => {
 		})
 	})
 
-	test("takes one sample of a body whose one run is the measurement", () => {
+	test("takes one sample of a body whose one run is the measurement", async () => {
 		let { clock, tick } = workClock(1_200)
-		let { measured } = measure(registryOf([benchmarkModule(tick)]), {
+		let { measured } = await measure(registryOf([benchmarkModule(tick)]), {
 			clock,
 			filters: { bench: true },
 		})
@@ -1260,7 +1266,7 @@ describe("Benchmarks", () => {
 	// measurement of it would be about the counters — and a baseline recorded
 	// off one would fail the first uninstrumented run. The body still runs
 	// once, as a test's would, so its lines are covered.
-	test("runs a benchmark once, unmeasured, under coverage", () => {
+	test("runs a benchmark once, unmeasured, under coverage", async () => {
 		let ran = 0
 		let { clock } = workClock(1)
 		let registry = registryOf([
@@ -1271,7 +1277,7 @@ describe("Benchmarks", () => {
 				})
 			}),
 		])
-		let { measured, summary } = measure(registry, {
+		let { measured, summary } = await measure(registry, {
 			clock,
 			filters: { bench: true },
 			coverage: true,
@@ -1283,7 +1289,7 @@ describe("Benchmarks", () => {
 	})
 
 	// turn could only ever match the last row that ran.
-	test("keeps one stored entry per row of a table benchmark", () => {
+	test("keeps one stored entry per row of a table benchmark", async () => {
 		let { clock, tick } = workClock(1)
 		let registry = registryOf([
 			module(
@@ -1313,7 +1319,7 @@ describe("Benchmarks", () => {
 				},
 			),
 		])
-		let { measured } = measure(registry, {
+		let { measured } = await measure(registry, {
 			clock,
 			filters: { bench: true },
 			benchmarks: {
@@ -1421,7 +1427,7 @@ describe("The coverage counters", () => {
 	// NOTE: The inverse of the affected-set map, per test: the run copies the
 	// counts around each test and says which points moved. Only where it was
 	// asked — the copy is every counter, per test.
-	test("says which points each test touched, where the run asked", () => {
+	test("says which points each test touched, where the run asked", async () => {
 		let count = counters({
 			module: "/Attributed.es",
 			points: [point(1), point(2), point(3)],
@@ -1443,7 +1449,7 @@ describe("The coverage counters", () => {
 		)
 		let events: Array<TestEvent> = []
 
-		runTests(registryOf([one]), {
+		await runTests(registryOf([one]), {
 			sink: (event) => events.push(event),
 			now: () => 0,
 			coverageByTest: true,
@@ -1461,7 +1467,7 @@ describe("The coverage counters", () => {
 		])
 	})
 
-	test("attributes nothing where nobody asked", () => {
+	test("attributes nothing where nobody asked", async () => {
 		let count = counters({
 			module: "/Unasked.es",
 			points: [point(1)],
@@ -1473,7 +1479,7 @@ describe("The coverage counters", () => {
 				expected(context, 0, true, null)
 			})
 		})
-		let { events } = collect(registryOf([one]))
+		let { events } = await collect(registryOf([one]))
 
 		expect(
 			events.filter((event) => event.kind === "test-coverage"),
@@ -1491,7 +1497,7 @@ describe("The coverage counters", () => {
 		expect(count(0, value)).toBe(value)
 	})
 
-	test("is queryable from a running test's context", () => {
+	test("is queryable from a running test's context", async () => {
 		let count = counters({
 			module: "/Asked.es",
 			points: [point(1)],
@@ -1512,14 +1518,14 @@ describe("The coverage counters", () => {
 			})
 		})
 
-		runTests(registryOf([one]), { sink: () => {}, now: () => 0 })
+		await runTests(registryOf([one]), { sink: () => {}, now: () => 0 })
 
 		// NOTE: Asked from INSIDE the test, while it is running — coverage is
 		// not a thing that is only dumped when everything is over.
 		expect(seen.count).toBe(1)
 	})
 
-	test("writes a coverage event per Module, only where it was asked", () => {
+	test("writes a coverage event per Module, only where it was asked", async () => {
 		counters({
 			module: "/Reported.es",
 			points: [point(1)],
@@ -1534,11 +1540,11 @@ describe("The coverage counters", () => {
 		let silent: Array<TestEvent> = []
 		let loud: Array<TestEvent> = []
 
-		runTests(registryOf([one]), {
+		await runTests(registryOf([one]), {
 			sink: (event) => silent.push(event),
 			now: () => 0,
 		})
-		runTests(registryOf([one]), {
+		await runTests(registryOf([one]), {
 			sink: (event) => loud.push(event),
 			now: () => 0,
 			coverage: true,
@@ -1674,13 +1680,13 @@ describe("The failing-example corpus", () => {
 		)
 	}
 
-	function runWith(
+	async function runWith(
 		one: TestModule,
 		options: Partial<RunOptions> = {},
-	): Array<TestEvent> {
+	): Promise<Array<TestEvent>> {
 		let events: Array<TestEvent> = []
 
-		runTests(registryOf([one]), {
+		await runTests(registryOf([one]), {
 			sink: (event) => events.push(event),
 			now: () => 0,
 			seed: "deadbeef",
@@ -1709,9 +1715,9 @@ describe("The failing-example corpus", () => {
 	// thing the next run asks about, so the regression is caught before any
 	// randomness is spent — and reported as the value that is known to find it
 	// rather than as whatever a fresh hundred cases turn up.
-	test("re-runs a stored counterexample before it draws anything", () => {
+	test("re-runs a stored counterexample before it draws anything", async () => {
 		let seen: Array<AnyType> = []
-		let events = runWith(
+		let events = await runWith(
 			property(() => false, { seen }),
 			{
 				counterexamples: corpus({
@@ -1735,8 +1741,8 @@ describe("The failing-example corpus", () => {
 	// NOTE: Still shrunk, rather than reported as it was stored: the code has
 	// changed since the entry was written down, and it may now fail on
 	// something smaller than what broke it the first time.
-	test("shrinks a replayed failure the way it shrinks a drawn one", () => {
-		let events = runWith(
+	test("shrinks a replayed failure the way it shrinks a drawn one", async () => {
+		let events = await runWith(
 			property(() => false),
 			{
 				counterexamples: corpus({
@@ -1752,8 +1758,8 @@ describe("The failing-example corpus", () => {
 		])
 	})
 
-	test("draws its cases where every stored counterexample holds", () => {
-		let events = runWith(
+	test("draws its cases where every stored counterexample holds", async () => {
+		let events = await runWith(
 			property(() => true),
 			{
 				counterexamples: corpus({
@@ -1775,10 +1781,10 @@ describe("The failing-example corpus", () => {
 		expect(kinds(events)).toContain("test-pass")
 	})
 
-	test("runs the stored cases in the order they were stored", () => {
+	test("runs the stored cases in the order they were stored", async () => {
 		let seen: Array<AnyType> = []
 
-		runWith(
+		await runWith(
 			property(() => true, { seen }),
 			{
 				cases: 0,
@@ -1797,8 +1803,8 @@ describe("The failing-example corpus", () => {
 	// NOTE: The Types moved under the entry — here a Parameter that is a String
 	// now and held an Integer when it was written down. It is not a
 	// counterexample and not a failure: it is an entry the runner drops.
-	test("says which stored entries no longer read back", () => {
-		let events = runWith(
+	test("says which stored entries no longer read back", async () => {
+		let events = await runWith(
 			property(() => true, {
 				parameter: { name: "n", generator: { kind: "string" } },
 			}),
@@ -1827,8 +1833,8 @@ describe("The failing-example corpus", () => {
 		})
 	})
 
-	test("refuses a stored entry whose Parameters are no longer these", () => {
-		let events = runWith(
+	test("refuses a stored entry whose Parameters are no longer these", async () => {
+		let events = await runWith(
 			property(() => true),
 			{
 				counterexamples: corpus({
@@ -1852,8 +1858,8 @@ describe("The failing-example corpus", () => {
 		})
 	})
 
-	test("writes the shrunk counterexample down on a fresh failure", () => {
-		let event = reported(runWith(property(() => false)))
+	test("writes the shrunk counterexample down on a fresh failure", async () => {
+		let event = reported(await runWith(property(() => false)))
 
 		expect(event).toMatchObject({ fromCorpus: false, replayed: 0 })
 		expect(event.encoded).toEqual([{ name: "n", data: whole("0") }])
@@ -1866,9 +1872,9 @@ describe("The failing-example corpus", () => {
 	// about what one is made of, so there is nothing to write down — and one
 	// such Parameter costs the whole test its corpus, because half a case is
 	// not a case.
-	test("writes nothing down for a Parameter a Namespace generates", () => {
+	test("writes nothing down for a Parameter a Namespace generates", async () => {
 		let event = reported(
-			runWith(
+			await runWith(
 				property(() => false, {
 					parameter: {
 						name: "team",
@@ -1896,9 +1902,9 @@ describe("The failing-example corpus", () => {
 	// NOTE: The key is the Compiler's, read off the manifest — the runtime
 	// derives nothing, so the escaping exists in exactly one place and the
 	// event repeats what the entry already said.
-	test("names an entry by the key the Compiler spelled for it", () => {
+	test("names an entry by the key the Compiler spelled for it", async () => {
 		let event = reported(
-			runWith(
+			await runWith(
 				property(() => true, {
 					overrides: { key: "table/a\\/b/2" },
 				}),
@@ -1911,20 +1917,20 @@ describe("The failing-example corpus", () => {
 
 	// NOTE: The entry's own budget — a synthesized goal's — loses to an
 	// explicit `--cases` and beats the silent default, in that order.
-	test("runs an entry's own case budget unless the run named one", () => {
+	test("runs an entry's own case budget unless the run named one", async () => {
 		let budgeted = property(() => true, { overrides: { cases: 7 } })
 
-		expect(reported(runWith(budgeted, { cases: undefined }))).toMatchObject(
-			{ cases: 7, requested: 7 },
-		)
-		expect(reported(runWith(budgeted, { cases: 3 }))).toMatchObject({
+		expect(
+			reported(await runWith(budgeted, { cases: undefined })),
+		).toMatchObject({ cases: 7, requested: 7 })
+		expect(reported(await runWith(budgeted, { cases: 3 }))).toMatchObject({
 			cases: 3,
 			requested: 3,
 		})
 	})
 
-	test("replays nothing where the run was told about nothing", () => {
-		expect(reported(runWith(property(() => true)))).toMatchObject({
+	test("replays nothing where the run was told about nothing", async () => {
+		expect(reported(await runWith(property(() => true)))).toMatchObject({
 			cases: 5,
 			replayed: 0,
 			stale: [],
@@ -2027,13 +2033,13 @@ describe("The coverage-guided search", () => {
 	const SEED = "4e93e921"
 	const BUDGET = 1200
 
-	function search(
+	async function search(
 		one: TestModule,
 		options: Partial<RunOptions> = {},
-	): { found: boolean; cases: number; events: Array<TestEvent> } {
+	): Promise<{ found: boolean; cases: number; events: Array<TestEvent> }> {
 		let events: Array<TestEvent> = []
 
-		runTests(registryOf([one]), {
+		await runTests(registryOf([one]), {
 			sink: (event) => events.push(event),
 			now: () => 0,
 			seed: SEED,
@@ -2057,9 +2063,11 @@ describe("The coverage-guided search", () => {
 	// case can be credited with — so only that one fills the pool, and only that
 	// one finds the conjunction. Asserted through the search's OUTCOME, because
 	// the pool is the driver's own business and nothing exports it.
-	test("fills its pool only where a case reached new ground", () => {
-		let guided = search(pairing({ instrumented: true, gated: true }))
-		let ungated = search(pairing({ instrumented: true, gated: false }))
+	test("fills its pool only where a case reached new ground", async () => {
+		let guided = await search(pairing({ instrumented: true, gated: true }))
+		let ungated = await search(
+			pairing({ instrumented: true, gated: false }),
+		)
 
 		expect(guided.found).toBe(true)
 		expect(guided.cases).toBe(476)
@@ -2073,9 +2081,9 @@ describe("The coverage-guided search", () => {
 	// can not fill a pool however the driver is written. Same seed, same budget,
 	// same generators: the only difference is whether anything told the search
 	// where it had been.
-	test("finds a conjunction the blind search does not, at one seed", () => {
-		let guided = search(pairing({ instrumented: true, gated: true }))
-		let blind = search(pairing({ instrumented: false, gated: false }))
+	test("finds a conjunction the blind search does not, at one seed", async () => {
+		let guided = await search(pairing({ instrumented: true, gated: true }))
+		let blind = await search(pairing({ instrumented: false, gated: false }))
 
 		expect(guided.found).toBe(true)
 		expect(guided.cases).toBe(476)
@@ -2088,7 +2096,7 @@ describe("The coverage-guided search", () => {
 	// the corpus does not only catch the bug it was written for, it hands the
 	// search a place to start. Here the guard on `a` is a single value no draw
 	// ever answers, so the pool can be seeded by the replay and by nothing else.
-	test("searches around a stored value that broke new ground", () => {
+	test("searches around a stored value that broke new ground", async () => {
 		let narrow = () =>
 			pairing({
 				instrumented: true,
@@ -2113,11 +2121,11 @@ describe("The coverage-guided search", () => {
 				],
 			},
 		}
-		let seeded = search(narrow(), {
+		let seeded = await search(narrow(), {
 			seed: "2fedcba2",
 			counterexamples: corpus,
 		})
-		let control = search(narrow(), { seed: "2fedcba2" })
+		let control = await search(narrow(), { seed: "2fedcba2" })
 
 		expect(seeded.found).toBe(true)
 		expect(seeded.cases).toBe(510)
@@ -2131,9 +2139,9 @@ describe("The coverage-guided search", () => {
 	// NOTE: The coin, the pick and the neighbour are all drawn from the test's
 	// own seeded source, so `--seed` replays a guided run exactly — which is
 	// what the command a failure prints promises.
-	test("draws the same guided run twice for one seed", () => {
-		let first = search(pairing({ instrumented: true, gated: true }))
-		let again = search(pairing({ instrumented: true, gated: true }))
+	test("draws the same guided run twice for one seed", async () => {
+		let first = await search(pairing({ instrumented: true, gated: true }))
+		let again = await search(pairing({ instrumented: true, gated: true }))
 
 		expect(first.events).toEqual(again.events)
 	})

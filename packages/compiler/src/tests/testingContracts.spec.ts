@@ -129,7 +129,7 @@ async function run(
 	let events: Array<TestEvent> = []
 
 	try {
-		loaded.$tests.run(scoped, {
+		await loaded.$tests.run(scoped, {
 			sink: (event) => events.push(event),
 			now: () => 0,
 			seed: "deadbeef",

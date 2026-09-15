@@ -1778,22 +1778,17 @@ export const enrichTestsSection = (
 ): common.typed.TestsSectionNode => {
 	return {
 		nodeType: "TestsSection",
-		// NOTE: Every Scope of the section — the setup above the tests, a
-		// suite's own, and each test body — descends from this one, so the
-		// barrier is set once here. A test body is a Function the runner CALLS,
-		// and the runner does not wait for what it called, so a `complete`
-		// written in one would be an `await` in a Function nobody awaits.
-		nodes: enrichTestsNodes(
-			section.nodes,
-			childScope(scope, {
-				completing: null,
-			}),
-			{
-				suitePath: [],
-				covering: noModifiers,
-				modulePath: modulePathOf(scope) ?? testsPath ?? null,
-			},
-		),
+		// NOTE: No barrier here. The runner waits for what it called — one test
+		// at a time, each awaited before the next — so a `complete` written in
+		// the setup or in a test body is an `await` in a Function that is
+		// awaited, and the Scope chain reaches the Program's own "top-level"
+		// standing. The two forms that can NOT wait carry the barrier
+		// themselves, at `enrichTest`.
+		nodes: enrichTestsNodes(section.nodes, childScope(scope), {
+			suitePath: [],
+			covering: noModifiers,
+			modulePath: modulePathOf(scope) ?? testsPath ?? null,
+		}),
 		position: section.position,
 	}
 }
@@ -1856,7 +1851,18 @@ const enrichTest = (
 	// NOTE: A body of its own, so that what one test declares is gone by the
 	// next one — the Scope is what says two tests share nothing but the setup
 	// above them.
+	//
+	// NOTE: And the one place asynchrony is barred from a `tests { … }` block.
+	// A plain test is run once and awaited, so it may `complete` whatever it
+	// likes; the other two forms run their body many times under machinery that
+	// is measured or replayed, and neither can wait for a run without changing
+	// what it is measuring or what it drew. `complete` the work into a Constant
+	// above the test instead — the setup is awaited like everything else.
 	let bodyScope = childScope(scope)
+
+	if (node.form === "benchmark" || node.properties !== null) {
+		bodyScope.completing = null
+	}
 	// NOTE: Before the name and before the body: a table test binds its row in
 	// the body's Scope, and both of them read it — the name because it says
 	// which row it ran for, which is the whole point of interpolating one.
@@ -1907,7 +1913,10 @@ const enrichTest = (
 		// property generates is a different value every case, so a name saying
 		// which one it ran for could not be worked out once and could not name
 		// the test at all.
-		name: enrichTestName(node.name, table === null ? scope : bodyScope),
+		name: enrichTestName(
+			node.name,
+			nameScope(table === null ? scope : bodyScope),
+		),
 		tags: modifiers.tags,
 		skipped: modifiers.skipped,
 		focused: modifiers.focused,
@@ -1919,6 +1928,15 @@ const enrichTest = (
 		position: node.position,
 	}
 }
+
+// NOTE: A name is worked out BEFORE the run — the whole section is walked once
+// with no test selected to render every interpolated one, so that a `--filter`
+// matches what a reader sees — and a rendered name is a String the manifest
+// carries. So it is the one Expression of a `tests { … }` block that can not
+// wait for anything, and the barrier says so where a Diagnostic can point at
+// the hole in the name.
+const nameScope = (scope: enricher.Scope): enricher.Scope =>
+	childScope(scope, { completing: null })
 
 const enrichSuite = (
 	node: parser.SuiteNode,
@@ -1941,7 +1959,7 @@ const enrichSuite = (
 			suitePath: context.suitePath,
 			name,
 		},
-		name: enrichTestName(node.name, scope),
+		name: enrichTestName(node.name, nameScope(scope)),
 		tags: modifiers.tags,
 		skipped: modifiers.skipped,
 		focused: modifiers.focused,

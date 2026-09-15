@@ -2748,9 +2748,9 @@ Error: 'complete' waits, and nothing here can wait
     │                                        ──────────────────┬─────────────────  
     │                                                          ╰─────────────────── this suspends, and this position can not
     │ 
-    │ Help: Move the 'complete' into a Function declared '-> Future<…>', or into the Program's top level.
+    │ Help: Complete the work above this position, into a Constant it reads, or move it into a Function declared '-> Future<…>'.
     │ 
-    │ Note: A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins, and a test's body is a Function the runner does not wait for.
+    │ Note: A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins. A test's name is worked out before the run, a benchmark body is timed over many runs, and a property body runs once per generated value.
 ────╯
 
 [needless-complete]
@@ -2779,7 +2779,33 @@ Warning: This is not a Future, so there is nothing to start
     │ Note: 'start' puts a Future in flight and answers the one run of it — a value that is not a Future describes no work to run.
 ────╯
 
-─── 2 errors, 2 warnings
+[complete-outside-future]
+Error: 'complete' waits, and nothing here can wait
+    ╭─┤ Asynchrony.es:44:22 │
+    │
+ 44 │        constant counted = complete Async.deferred(() { <- 5 })
+    │                           ──────────────────┬─────────────────  
+    │                                             ╰─────────────────── this suspends, and this position can not
+    │ 
+    │ Help: Complete the work above this position, into a Constant it reads, or move it into a Function declared '-> Future<…>'.
+    │ 
+    │ Note: A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins. A test's name is worked out before the run, a benchmark body is timed over many runs, and a property body runs once per generated value.
+────╯
+
+[complete-outside-future]
+Error: 'complete' waits, and nothing here can wait
+    ╭─┤ Asynchrony.es:52:21 │
+    │
+ 52 │        constant padded = complete Async.deferred(() { <- width })
+    │                          ────────────────────┬───────────────────  
+    │                                              ╰───────────────────── this suspends, and this position can not
+    │ 
+    │ Help: Complete the work above this position, into a Constant it reads, or move it into a Function declared '-> Future<…>'.
+    │ 
+    │ Note: A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins. A test's name is worked out before the run, a benchmark body is timed over many runs, and a property body runs once per generated value.
+────╯
+
+─── 4 errors, 2 warnings
 "
 `;
 

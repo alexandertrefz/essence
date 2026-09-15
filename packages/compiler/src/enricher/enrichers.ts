@@ -3620,8 +3620,9 @@ function reportMisplacedComplete(
 
 	// NOTE: Two shapes, and they are two different mistakes. A named Function
 	// that DECLARED something else has one word missing from its signature; a
-	// position that can not suspend at all — a Parameter's default, a test body
-	// — has nowhere to put the word, and the only advice is to move it.
+	// position that can not suspend at all — a Parameter's default, a test's
+	// name, a benchmark body, a property test's body — has nowhere to put the
+	// word, and the only advice is to move it.
 	let declared = context === null || context === undefined ? null : context
 
 	reportError("'complete' waits, and nothing here can wait", node.position, {
@@ -3637,7 +3638,7 @@ function reportMisplacedComplete(
 		notes:
 			declared === null
 				? [
-						"A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins, and a test's body is a Function the runner does not wait for.",
+						"A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins. A test's name is worked out before the run, a benchmark body is timed over many runs, and a property body runs once per generated value.",
 					]
 				: [
 						"A body that writes 'complete' suspends, so it hands back a Future the caller completes in its turn — which is what its declared Type has to say.",
@@ -3645,7 +3646,7 @@ function reportMisplacedComplete(
 		helps:
 			declared === null
 				? [
-						"Move the 'complete' into a Function declared '-> Future<…>', or into the Program's top level.",
+						"Complete the work above this position, into a Constant it reads, or move it into a Function declared '-> Future<…>'.",
 					]
 				: [
 						`Declare the return Type 'Future<${describeType(declared)}>'.`,

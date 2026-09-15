@@ -2034,6 +2034,114 @@ describe("essence test — snapshots", () => {
 
 // NOTE: What a property test looks like from the command line: the report a
 // failure prints, the replay it names, and the two flags that pin a run.
+// NOTE: The whole of asynchrony, driven through the real command. A test body
+// may `complete` whatever it likes, and what these ask is that the RUNNER waits
+// for it: that a value only a finished run can hold reaches an `expect`, that
+// what a test writes after its first wait is still that test's output, and that
+// two tests never overlap.
+describe("essence test — a test that waits", () => {
+	const waiting = [
+		"implementation {",
+		"\tfunction doubled(_ value: Integer) -> Future<Integer> {",
+		"\t\tconstant waited = complete Async.sleep(milliseconds 5)",
+		"",
+		"\t\t<- value::multiply(with 2)",
+		"\t}",
+		"}",
+		"",
+		"tests {",
+		'\ttest "waits for the answer" {',
+		"\t\tconstant answered = complete doubled(21)",
+		"",
+		'\t\tTerminal.print("after the wait")',
+		"",
+		"\t\texpect answered::is(42)",
+		"\t}",
+		"",
+		'\ttest "runs after the one before it" {',
+		'\t\tTerminal.print("beside it")',
+		"",
+		"\t\texpect 1::is(1)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	const failing = [
+		"implementation {}",
+		"",
+		"tests {",
+		'\ttest "fails after waiting" {',
+		"\t\tconstant waited = complete Async.sleep(milliseconds 5)",
+		"",
+		"\t\texpect 2::add(2)::is(5)",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	it("runs a test that completes, and exits zero", async () => {
+		await withFiles({ "Waiting.es": waiting }, async (directory) => {
+			let { code, out } = await runTests(directory)
+
+			expect(out).toContain("✓ waits for the answer")
+			expect(out).toContain("2 passed")
+			expect(code).toBe(EXIT_SUCCESS)
+		})
+	})
+
+	// NOTE: The claim the output sink makes. What a test writes AFTER its first
+	// wait is still that test's, which is only true because the sink lasts as
+	// long as the run rather than as long as the call that installed it. And
+	// the two tests never overlap: the second one's line stands after the first
+	// one's, in a stream where each line names the test it belongs to.
+	it("keeps what a test writes after its wait, under the test that wrote it", async () => {
+		await withFiles({ "Waiting.es": waiting }, async (directory) => {
+			let { out } = await runTests(directory, ["--json"])
+			let events = out
+				.split("\n")
+				.filter((line) => line !== "")
+				.map((line) => JSON.parse(line) as TestEvent)
+
+			expect(
+				events.flatMap((event) =>
+					event.kind === "output"
+						? [[event.id.split("/").at(-1), event.text]]
+						: [],
+				),
+			).toEqual([
+				["waits for the answer", "after the wait\n"],
+				["runs after the one before it", "beside it\n"],
+			])
+			// NOTE: One test at a time: everything the first one emitted
+			// stands before the second one started.
+			expect(
+				events.flatMap((event) =>
+					event.kind === "test-start" || event.kind === "test-pass"
+						? [`${event.kind} ${event.name}`]
+						: [],
+				),
+			).toEqual([
+				"test-start waits for the answer",
+				"test-pass waits for the answer",
+				"test-start runs after the one before it",
+				"test-pass runs after the one before it",
+			])
+		})
+	})
+
+	it("reports a failure a test reaches after a wait", async () => {
+		await withFiles({ "Waiting.tests.es": failing }, async (directory) => {
+			let { code, err, out } = await runTests(directory)
+
+			expect(out).toContain("1 failed")
+			expect(err).toContain("'fails after waiting' failed")
+			expect(err).toContain("`is` compared 4 with 5")
+			expect(code).toBe(EXIT_FAILURE)
+		})
+	})
+})
+
 describe("essence test — property tests", () => {
 	const properties = [
 		"implementation {",

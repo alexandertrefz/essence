@@ -327,6 +327,23 @@ export async function loadBundles(
 	return bundles
 }
 
+// NOTE: Whether any bundle of a run holds a focused test. One bundle at a time,
+// because a selection renders each interpolating Module's names and a setup that
+// completes something is waited for — which is also why this is a walk rather
+// than the `some` it reads as.
+export async function holdsFocus(
+	suites: Array<LoadedSuite>,
+	bench: boolean | undefined,
+): Promise<boolean> {
+	for (let suite of suites) {
+		if ((await suite.tests.select(suite.registry, { bench })).focused) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // NOTE: One run over several bundles. `all` is every bundle the run knows
 // about and `running` the ones to drive — the two differ only for a watch
 // session, which re-runs what a change reached and leaves the rest as they
@@ -337,7 +354,7 @@ export async function loadBundles(
 // worth a second spelling here. Once one bundle says yes, every bundle is told
 // so, and the ones holding no focused test of their own deselect everything
 // through the same selection that runs the rest.
-export function runSuites(
+export async function runSuites(
 	all: Array<LoadedSuite>,
 	running: Array<LoadedSuite>,
 	filters: TestFilters,
@@ -371,7 +388,7 @@ export function runSuites(
 	// counted into the plan and written into the stream in their own place, so a
 	// warm run is the cold one's report and the cold one's stream.
 	replay: ReplayOptions = {},
-): {
+): Promise<{
 	planned: number
 	focused: boolean
 	matched: number
@@ -380,12 +397,19 @@ export function runSuites(
 	// would evaluate every interpolating Module's setup again to render names
 	// this selection has already rendered.
 	entries: Array<EntrySelection>
-} {
+}> {
 	let counters = coverage === true || coverage !== false
 	let byTest = coverage !== true && coverage !== false && coverage.byTest
-	let selected = all.map((suite) =>
-		suite.tests.select(suite.registry, filters),
-	)
+	// NOTE: One bundle at a time. A selection EVALUATES each interpolating
+	// Module's setup to render its names, and a setup that completes something
+	// is waited for — so this is the first place a run of several bundles has to
+	// ask them in order rather than map over them.
+	let selected: Array<Awaited<ReturnType<LoadedSuite["tests"]["select"]>>> =
+		[]
+
+	for (let suite of all) {
+		selected.push(await suite.tests.select(suite.registry, filters))
+	}
 	let focused = selected.some((selection) => selection.focused)
 	let runFilters: TestFilters & { focusedElsewhere?: boolean } = focused
 		? { ...filters, focusedElsewhere: true }
@@ -472,7 +496,7 @@ export function runSuites(
 			continue
 		}
 
-		suite.tests.run(suite.registry, {
+		await suite.tests.run(suite.registry, {
 			// NOTE: One run over several bundles is still one run, so each
 			// bundle's own bookends are dropped and the pair around the whole
 			// of it is written by the caller.
@@ -1200,15 +1224,7 @@ export async function runTest(
 		// filters, so the probe hands the runtime only the one filter it depends
 		// on. Asking with the run's own `--filter` would render every
 		// interpolated name a second time to be told the same thing.
-		if (
-			hits.size > 0 &&
-			suites.some(
-				(suite) =>
-					suite.tests.select(suite.registry, {
-						bench: filters.bench,
-					}).focused,
-			)
-		) {
+		if (hits.size > 0 && (await holdsFocus(suites, filters.bench))) {
 			let demoted = [...hits.keys()]
 
 			hits.clear()
@@ -1233,7 +1249,7 @@ export async function runTest(
 		})
 
 		let started = performance.now()
-		let { focused, matched, entries } = runSuites(
+		let { focused, matched, entries } = await runSuites(
 			suites,
 			suites,
 			filters,

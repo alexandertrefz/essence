@@ -631,17 +631,19 @@ export async function runMutation(
 			)
 
 			suites = claimRegistries(bundles)
-			focused = runSuites(
-				suites,
-				suites,
-				filters,
-				(event) => events.push(event),
-				// NOTE: The counters, AND what each test touched of them —
-				// which is the whole of what turns "this line ran" into "these
-				// tests reach this site".
-				{ byTest: true },
-				{ stored },
-				{ seed, cases: context.options.cases, counterexamples },
+			focused = (
+				await runSuites(
+					suites,
+					suites,
+					filters,
+					(event) => events.push(event),
+					// NOTE: The counters, AND what each test touched of them —
+					// which is the whole of what turns "this line ran" into "these
+					// tests reach this site".
+					{ byTest: true },
+					{ stored },
+					{ seed, cases: context.options.cases, counterexamples },
+				)
 			).focused
 		} finally {
 			restore()
