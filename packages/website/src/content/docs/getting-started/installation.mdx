@@ -1,0 +1,226 @@
+---
+title: Installation
+description: Install the `essence` command three ways, add the VS Code extension, and see what each of its commands does.
+section: getting-started
+order: 20
+template: article
+---
+
+import { commands, withProgramName } from "../../../../../cli/src/commands.ts"
+import extension from "../../../../../vscode-extension/package.json"
+import { VERSION } from "../../../lib/site.ts"
+
+The Essence toolchain is one npm package to install, `@essence-lang/cli`. It brings the compiler, the test runner, the formatter, a language server for editors and a debug adapter for stepping through a program, as packages it depends on. They are published as compiled JavaScript, and run on Node 22 or newer, or on Bun. You can add the package to a project, install it once for every project, or run it without installing anything.
+
+## Add it to a project
+
+<PackageManagers
+	npm="npm install --save-dev @essence-lang/cli"
+	pnpm="pnpm add --save-dev --allow-build=esbuild @essence-lang/cli"
+	yarn="yarn add --dev @essence-lang/cli"
+	bun="bun add --dev @essence-lang/cli"
+/>
+
+A development dependency is the usual place for a compiler. The lockfile records the exact version, so every machine that installs the project compiles with the same compiler. Pick your package manager once: every block that has a tab for it follows your choice.
+
+The install gives the project an `essence` command. How you reach it differs between package managers:
+
+<PackageManagers
+	npm="npx essence --version"
+	pnpm="pnpm exec essence --version"
+	yarn="yarn essence --version"
+	bun="bun run essence --version"
+/>
+
+`--version` prints the version you installed. For the release these pages describe, that is:
+
+<CodeWindow variant="command" lang="sh" code={VERSION} chrome={false} class="code-bare" />
+
+If a version comes back, the toolchain is installed. Every command on these pages is written as a bare `essence`, so with a project install put your manager's prefix in front of it. A script in `package.json` runs `essence` with no prefix.
+
+<Note>
+
+Nothing is compiled during the install, and no install script has to run. Only one part is platform-specific: esbuild, the bundler the compiler runs, whose binary arrives prebuilt as a package for your platform. esbuild also has a `postinstall` script, which the toolchain does not need. npm 12, pnpm 10 and Yarn 4.14 or later skip that script unless you allow it, and say so during the install. npm 11.19 runs it, and warns that esbuild is not covered by `allowScripts`. pnpm 11 and later exit with an error instead, which is why the pnpm command passes `--allow-build=esbuild`. pnpm records that choice in `pnpm-workspace.yaml`.
+
+</Note>
+
+Yarn 2 and later install packages with Plug'n'Play, a layout that replaces `node_modules` with a resolver map. It is their default, and the compiler cannot build under it. `yarn essence --version` works, but on Yarn 4.18 `yarn essence build` stops with an internal error:
+
+<div class="error-output">
+
+```
+[internal-error]
+Error: Internal Compiler error: ENOENT: no such file or directory, open 'bundler/index.d.ts'
+```
+
+</div>
+
+Switch the project to a `node_modules` folder and install again:
+
+```sh
+yarn config set nodeLinker node-modules
+yarn install
+```
+
+Yarn 1 installs into `node_modules` by default, and works as it is.
+
+## Install it once for every project
+
+<PackageManagers
+	npm="npm install --global @essence-lang/cli"
+	pnpm="pnpm add --global @essence-lang/cli"
+	bun="bun add --global @essence-lang/cli"
+/>
+
+A global install suits trying the language out, or `.es` files that are not part of a JavaScript project. Afterwards `essence` is on your path, which is how every command on these pages is written.
+
+pnpm and Bun keep global commands in a directory of their own. When that directory is missing from your path, each tells you what to do. pnpm asks you to run `pnpm setup`; Bun prints the `export PATH=…` line to add.
+
+Yarn 1 installs globally with `yarn global add @essence-lang/cli`. Yarn 2 and later have no global install: `yarn global` was removed and has no replacement. With them, add the toolchain to the project.
+
+## Run it without installing
+
+<PackageManagers
+	npm="npx --package @essence-lang/cli essence --version"
+	pnpm="pnpm dlx --allow-build=esbuild --package @essence-lang/cli essence --version"
+	bun="bunx @essence-lang/cli --version"
+/>
+
+`--package` is needed because the package and the command it carries have different names. The package installs two commands, `essence` and `esc`, and neither is called `cli`. Without `--package`, npm looks for a command named after the package, finds two others, and refuses to guess:
+
+<div class="error-output">
+
+```
+npm error could not determine executable to run
+```
+
+</div>
+
+Dropping `--package @essence-lang/cli` does not work either. Outside a project that has the toolchain installed, `npx essence` asks npm for a package called `essence`, and that name belongs to an unrelated package.
+
+`bunx` picks `essence` on its own, so the rest of the command follows the package name directly. Anything after `essence` works as it does with an installed copy: `npx --package @essence-lang/cli essence run hello.es` compiles a file and runs it. [Your first program](/docs/getting-started/your-first-program) writes that file.
+
+`yarn dlx` has no tab here. It installs with Plug'n'Play, so it runs `essence --version` but not a build.
+
+## The VS Code extension
+
+The VS Code extension is `essence.essence-language` on the Visual Studio Marketplace, listed as Essence. Install it from the Extensions view, or from a terminal:
+
+```sh
+code --install-extension essence.essence-language
+```
+
+Nothing has to be on your path for the language features. The language server ships inside the extension. It runs on the Node that VS Code carries, the way VS Code's TypeScript support works without a `typescript` package installed. Every feature and setting is on [Editor setup](/docs/guides/editor-setup).
+
+Only debugging needs the `essence` command, and a Node to run your program on. The extension uses the `essence.cli.path` setting when you set it, then a checkout open in the workspace, then an `essence` on your path. A project install is not on your path, so point `essence.cli.path` at `node_modules/@essence-lang/cli/bin/essence.js`.
+
+The extension is not on Open VSX, the registry VS Code's forks install from. For those editors, build the `.vsix` file from a checkout, as below.
+
+## Commands
+
+`essence help` lists every command, and `essence help <command>` describes one in full, every documented flag included.
+
+{/* Generated from packages/cli/src/commands.ts, the table the help screens are rendered from. Never type a row here. */}
+
+<div class="table-scroll">
+<table>
+	<thead>
+		<tr>
+			<th>Command</th>
+			<th>Alias</th>
+			<th>What it does</th>
+		</tr>
+	</thead>
+	<tbody>
+		{commands.map((command) => (
+			<tr>
+				<td>
+					<a href={`/docs/reference/cli#${command.name}`}>
+						<code>{command.name}</code>
+					</a>
+				</td>
+				<td>
+					{command.aliases.map((alias) => (
+						<code>{alias}</code>
+					))}
+				</td>
+				<td>{withProgramName(command.summary, "essence")}</td>
+			</tr>
+		))}
+	</tbody>
+</table>
+</div>
+
+`essence hello.es`, with no command, is `essence build hello.es`. The flags each command takes are on the page each row links to.
+
+`esc` is a second name for the same program, with the same commands and flags. The standalone `esfmt`, `esls` and `esdap` belong to the packages that implement them. In a project install, npm, Yarn 1 and Bun link them into `node_modules/.bin`, and pnpm does not. A global install puts only `essence` and `esc` on your path. `essence format`, `essence lsp` and `essence dap` always work.
+
+`essence init` writes an optional `essence.json`, the file that holds a project's settings. A folder of `.es` files needs no such file, and [Projects and essence.json](/docs/guides/projects) says when you want one.
+
+A second package, `@essence-lang/client`, is on npm for JavaScript code that loads Essence modules and calls them. [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) is its guide.
+
+## What a build writes
+
+`essence build` turns each file you name into one self-contained ES module. The parts of the Essence runtime the program uses are bundled into it, and it imports no package. It runs with no `node_modules` beside it:
+
+```sh
+essence build hello.es
+node hello.js
+```
+
+The output lands beside its source, as `hello.js`, unless a [flag](/docs/reference/cli#build--out) names another path. It carries no `import` or `export` of its own, so no `"type": "module"` is needed anywhere. Bun runs the same file with `bun hello.js`.
+
+**Compared with JavaScript.**
+
+```sh
+essence check hello.es
+essence build hello.es
+```
+
+```sh
+npx tsc --noEmit
+npx esbuild hello.ts --bundle --format=esm --outfile=hello.js
+```
+
+`essence check` does what `tsc --noEmit` does: it reports errors and writes nothing. `essence build` is closer to `esbuild --bundle` than to `tsc`, which writes one output file per source file. More: [Coming from JavaScript › Tooling](/docs/getting-started/coming-from-javascript#tooling).
+
+## Building from a checkout
+
+Build from a checkout to work on the language itself, or to run changes made since the last release. It needs git, and Bun at the version the repository's `.bun-version` file names:
+
+```sh
+git clone https://github.com/alexandertrefz/essence.git
+cd essence
+bun install
+```
+
+There is no build step. Every package the toolchain runs points its entry at its source, and Bun runs the sources as they are, so installing the workspace installs the compiler. `bun install` links `essence` into `node_modules/.bin`, so from inside the repository:
+
+```sh
+bun run essence --version
+```
+
+The executable itself is `packages/cli/bin/essence`, and it runs on Bun. A script outside the repository can call it by its full path:
+
+```sh
+/path/to/essence/packages/cli/bin/essence help
+```
+
+A checkout also packages the VS Code extension. The `.vsix` it writes is self-contained, with the language server bundled into it:
+
+<CodeWindow
+	variant="command"
+	lang="sh"
+	chrome={false}
+	class="code-bare"
+	code={`bun run --cwd packages/vscode-extension package
+code --install-extension packages/vscode-extension/essence-language-${extension.version}.vsix`}
+/>
+
+<SeeAlso
+	links={[
+		{ label: "Command line", href: "/docs/reference/cli" },
+		{ label: "Editor setup", href: "/docs/guides/editor-setup" },
+		{ label: "Projects and essence.json", href: "/docs/guides/projects" },
+	]}
+/>

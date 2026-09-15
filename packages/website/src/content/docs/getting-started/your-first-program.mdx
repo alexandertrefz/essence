@@ -1,0 +1,217 @@
+---
+title: Your first program
+description: "Write a one-file program that adds 1/3 and 2/3 exactly, then check it, run it and break it to read the errors."
+section: getting-started
+order: 30
+template: guide
+steps: 4
+minutes: 10
+---
+
+A single file is a program. You write one, check it, run it, and then break it twice to read what the compiler says. On the way you meet the six pieces of syntax the file is made of, and a kind of number JavaScript does not have: an exact fraction. You need the `essence` command from [Installation](/docs/getting-started/installation).
+
+<Steps>
+
+<StepItem title="Write hello.es">
+
+Put this in a file called `hello.es`, in any directory:
+
+```essence
+implementation {
+	§ Two exact thirds. There is no floating point in this program.
+	constant oneThird  = 1/3
+	constant twoThirds = 2/3
+
+	constant sum = oneThird::add(twoThirds)
+
+	§ A hole in a string holds an expression and prints its value.
+	Terminal.print("1/3 + 2/3 = {sum}") § 1/3 + 2/3 = 1
+}
+```
+
+A program needs no project file around it; [Projects and essence.json](/docs/guides/projects) covers the optional one a directory of files can carry.
+
+The layout is the one [`essence format`](/docs/reference/cli#format) writes: tabs for indentation, and the two adjacent `constant` lines aligned on their `=`. The `§ 1/3 + 2/3 = 1` at the end of the `Terminal.print` line is a comment. These docs end a line with such a comment to show what it prints.
+
+Six things in this file, each linked:
+
+- **[`implementation { … }`](/docs/reference/syntax-glossary#implementation) holds the program's statements**, which run top to bottom, like a module's top level. It is the only block a program needs. A file can hold others, such as the `tests` block that [Your first test](/docs/getting-started/your-first-test) adds to this file.
+- **`§` starts a [comment](/docs/reference/syntax-glossary#comment)** that runs to the end of the line, and `§§` starts a [documentation comment](/docs/language/documentation-comments). There is no `//`. The compiler reads `//` as code and refuses it. With the extension from [Editor setup](/docs/guides/editor-setup) installed, the Toggle Line Comment command writes the `§` for you.
+- **`constant sum = …` binds a name once, like `const`.** Assigning to `sum` again is a [`constant-reassignment`](/docs/reference/diagnostics#constant-reassignment) error, and a name that changes is declared `variable`, JavaScript's `let`. The compiler infers the type, and an annotation writes it after the name as in TypeScript: `constant sum: Rational = oneThird::add(twoThirds)` is the same binding. [Programs and values](/docs/language/programs-and-values) covers the shape of a file, comments, bindings, annotations and the literals, holes included.
+- **`1/3` is a literal, not a division.** It is a [`Rational`](/docs/library/rational): an exact fraction, kept in lowest terms, so `2/4` is `1/2`. A decimal such as `0.75` is another way to write a Rational: it is exactly `3/4`, and it prints as `3/4`. The slash belongs to the literal, so `1 / 3` with spaces is a [`syntax-error`](/docs/reference/diagnostics#syntax-error), and dividing two values is a method call. [Numbers](/docs/language/numbers) covers the whole family, division included.
+- **`::` calls a method on a value, and `.` reaches a member of a namespace.** A namespace is a named group of methods and statics, such as `Rational`, and a static belongs to the namespace rather than to a value. A call written `value::method(argument)` passes the value as the first argument, so [`oneThird::add(twoThirds)`](/docs/library/rational#add) is the same call as `Rational.add(oneThird, twoThirds)`. In JavaScript terms, `::` is the `.` in `items.map(…)`, and [`Terminal.print`](/docs/library/terminal#print), a static of `Terminal`, is like `Math.max`. The JavaScript spelling `oneThird.add(twoThirds)` is a [`type-without-members`](/docs/reference/diagnostics#type-without-members) error. [Method calls](/docs/language/method-calls) has the rules.
+- **`{sum}` is a hole.** Every `"…"` string [interpolates](/docs/reference/syntax-glossary#interpolation), and a hole holds any expression whose value can be printed, not only a name. `"1/3 + 2/3 = {oneThird::add(twoThirds)}"` prints the same line. Write `\{` for a brace that is not a hole.
+
+</StepItem>
+
+<StepItem title="Check it">
+
+[`essence check`](/docs/reference/cli#check) reads the file, reports what is wrong with it, and writes nothing:
+
+```sh
+$ essence check hello.es
+  ✔ hello.es no errors
+
+    read      0.27 ms  ░
+    parse      1.4 ms  ██
+    enrich      22 ms  ████████████████████████
+    validate  0.45 ms  ░
+
+    total   25 ms
+```
+
+The first line says the file has no errors. Below it, one row per stage shows where the time went. Timings vary from run to run. A check runs four stages, in this order:
+
+| Stage | What it does |
+| --- | --- |
+| `read` | Reads the source file. |
+| `parse` | Turns the text into a program, and refuses text that is not Essence, such as `//`. |
+| `enrich` | Resolves every name and infers the type of every expression. |
+| `validate` | Checks the typed program against the language's rules, such as whether a value fits its declared type. |
+
+A check stops after `validate`, so it is the fastest way to find out whether a program is valid. When a stage refuses the program, the report's last line says where it stopped: `stopped while parsing`, `stopped while inferring types` for the `enrich` stage, or `stopped while validating`. Step 4 shows two of them.
+
+</StepItem>
+
+<StepItem title="Run it">
+
+[`essence run`](/docs/reference/cli#run) compiles the file and runs it in one step:
+
+```sh
+$ essence run hello.es
+  ✔ hello.es → ~/Library/Caches/essence/cli/73a239d9…42082fd.mjs
+
+    read      0.09 ms  ░
+    parse      1.4 ms  ██
+    enrich      20 ms  ███████████████████████
+    validate  0.43 ms  █
+    simplify  0.25 ms  ░
+    optimise   1.6 ms  ██
+    generate    21 ms  ████████████████████████
+    bundle      15 ms  ██████████████████
+    write      2.8 ms  ███
+
+    output  6.4 kB · 1.9 kB gzipped
+    total   70 ms
+
+  ─── program output ───────────────────────────────────────────────────────────
+1/3 + 2/3 = 1
+  ──────────────────────────────────────────────────────────────────────────────
+
+  ✔ program exited with code 0 after 14 ms
+```
+
+The program prints `1/3 + 2/3 = 1`. The sum is exactly one: the thirds are held as thirds, and nothing is rounded on the way. A whole `Rational` prints as an integer, so the line shows `1`, not `1/1`.
+
+Everything between the two `───` lines is the program's own output. The last line is its exit code, and `essence run` exits with the same code.
+
+**Compared with JavaScript.** Here is `hello.es` in TypeScript:
+
+```ts
+const oneThird = 1 / 3
+const twoThirds = 2 / 3
+
+const sum = oneThird + twoThirds
+
+console.log(`1/3 + 2/3 = ${sum}`) // 1/3 + 2/3 = 1
+```
+
+The three spellings to learn first: `Terminal.print` for `console.log`, `::add` for `+`, and `{sum}` inside any `"…"` string for a template literal's `${sum}`. The [strings comparison](/docs/getting-started/coming-from-javascript#strings) covers the other string differences.
+
+The TypeScript version prints `1` as well, but only because its rounded sum lands back on `1`. Its `1 / 3` is already rounded to `0.3333333333333333`. Tenths show the difference:
+
+```essence
+implementation {
+	constant total = 0.1::add(0.2)
+
+	Terminal.print("0.1 + 0.2 = {total}") § 0.1 + 0.2 = 3/10
+	Terminal.print(total::is(0.3)) § true
+	Terminal.print(1/3) § 1/3
+}
+```
+
+```ts
+const total = 0.1 + 0.2
+
+console.log(`0.1 + 0.2 = ${total}`) // 0.1 + 0.2 = 0.30000000000000004
+console.log(total === 0.3) // false
+console.log(1 / 3) // 0.3333333333333333
+```
+
+[`is`](/docs/library/rational#is) plays the part of `===` here. A Rational that is not whole prints as a fraction, even when it was written as a decimal, so the sum of tenths shows as `3/10`.
+
+JavaScript's `number` is a binary floating-point value, and Essence has no floating point at all. An [`Integer`](/docs/library/integer) is a whole number of any size, with no `MAX_SAFE_INTEGER`, and a `Rational` is an exact fraction. The [numbers comparison](/docs/getting-started/coming-from-javascript#numbers) has the rest.
+
+A run goes past the four check stages and ends in a JavaScript module. `run` writes that module to the CLI's bundle cache, not beside your source. On macOS that is `~/Library/Caches/essence/cli/<sha256>.mjs`, on Linux `~/.cache/essence/cli`, and on Windows `%LOCALAPPDATA%\essence\cli\Cache`; the transcript above shortens the path. A second run of the unchanged file reuses the cached module, and its report stops at `validate`. To keep the module next to the source, build it instead: [`essence build hello.es`](/docs/reference/cli#build) writes `hello.js` beside `hello.es`.
+
+<Note>
+
+The module is self-contained. The parts of the runtime the program uses are bundled into it, and it imports nothing. `node hello.js` and `bun hello.js` both print the same line.
+
+</Note>
+
+</StepItem>
+
+<StepItem title="Break it">
+
+Declare `sum` as an `Integer`: change the `constant sum` line (line 6) to `constant sum: Integer = oneThird::add(twoThirds)` and check again:
+
+<div class="error-output">
+
+```
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'sum'
+   ╭─┤ hello.es:6:26 │
+   │
+ 6 │     constant sum: Integer = oneThird::add(twoThirds)
+   │                             ────────────┬───────────
+   │                                         ╰───────────── this is a Rational
+   │
+   │ Note: 'sum' is declared as Integer.
+───╯
+
+─── 1 error
+  ✖ hello.es 1 error
+    stopped while validating
+```
+
+</div>
+
+Two lines say what is wrong: the value is a `Rational`, and `sum` is declared as `Integer`. The last line is `stopped while validating`: the file was read, parsed and enriched, and the `validate` stage refused it.
+
+`assignment-type-mismatch` is the error's code. Every error prints its code in brackets, and the code does not change between releases. The [Diagnostics reference](/docs/reference/diagnostics#assignment-type-mismatch) has an entry for each one.
+
+Now take the annotation out again, and write the sum the way JavaScript would: `constant sum = oneThird + twoThirds`.
+
+<div class="error-output">
+
+```
+[unknown-name]
+Error: '+' is not declared
+   ╭─┤ hello.es:6:26 │
+   │
+ 6 │     constant sum = oneThird + twoThirds
+   │                             ▲
+   │                             ╰── no such Variable or Constant
+───╯
+
+─── 1 error
+  ✖ hello.es 1 error
+    stopped while inferring types
+```
+
+</div>
+
+`+` is not an operator in Essence. The compiler reads it as a name, finds nothing declared under it, and reports [`unknown-name`](/docs/reference/diagnostics#unknown-name). This time the report ends `stopped while inferring types`, the `enrich` stage. `constant sum = 1 + 2` is refused the same way.
+
+Three JavaScript habits to leave behind:
+
+- **No operators.** Every operation is a method call: `a + b` is `a::add(b)`, and `a === b` is `a::is(b)`, which compares lists and records by content.
+- **No semicolons.** A statement needs no terminator, and a `;` at the end of one is an error.
+- **`Terminal.print` is `console.log`.** There is no `console`, and `console.log("hi")` is an `unknown-name` error too.
+
+[What the compiler says when you type JavaScript](/docs/getting-started/coming-from-javascript#if-you-typed-javascript) lists the other habits and the error each one produces. Put line 6 back to `constant sum = oneThird::add(twoThirds)`, and `hello.es` runs again.
+
+</StepItem>
+
+</Steps>

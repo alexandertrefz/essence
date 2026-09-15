@@ -1,0 +1,392 @@
+---
+title: Coming from JavaScript
+description: Every JavaScript habit beside its Essence spelling and the error you get if you forget, in one lookup table per topic.
+section: getting-started
+order: 50
+template: article
+tocDepth: 2
+---
+
+Each row of a topic table pairs a JavaScript or TypeScript habit with its Essence spelling and the error you get if you write the habit instead. A dash in the error column means the habit carries over or has no error. Nothing here is explained: each Essence cell links to the page that explains it, and each error code links to its entry in the [diagnostics reference](/docs/reference/diagnostics). To look up a message the compiler printed, see [What the compiler says when you type JavaScript](/docs/getting-started/coming-from-javascript#if-you-typed-javascript).
+
+Here is a five-line TypeScript function, then the same function in Essence. Both drop the empty names and greet the rest.
+
+```ts
+function greeting(names: string[]): string {
+	const known = names.filter((name) => name.length > 0)
+	if (known.length === 0) return "Hello, nobody"
+	return `Hello, ${known.join(" and ")}`
+}
+
+console.log(greeting(["Ada", "", "Grace"])) // Hello, Ada and Grace
+console.log(greeting([])) // Hello, nobody
+```
+
+```essence
+implementation {
+	function greeting(to names: List<String>) -> String {
+		constant known = names::everyItem(where (name) {
+			<- name::hasCharacters()
+		})
+
+		if known::isEmpty() {
+			<- "Hello, nobody"
+		}
+
+		<- "Hello, {known::join(with " and ")}"
+	}
+
+	Terminal.print(greeting(to ["Ada", "", "Grace"])) § Hello, Ada and Grace
+	Terminal.print(greeting(to [])) § Hello, nobody
+}
+```
+
+This program uses parts the language pages teach later. [Programs and values](/docs/language/programs-and-values) teaches `implementation`, the `§` comments, `constant`, string and list literals, `List<String>` and the `{…}` interpolation. [Method calls](/docs/language/method-calls) teaches `::` calls and their labels, and [Conditions](/docs/language/conditions) teaches `if`. [Functions](/docs/language/functions) teaches `function`, the `to` label, `-> String` and `<-`, and [Functions as values](/docs/language/functions-as-values) teaches the `(name) { … }` literal. The library calls are [`everyItem(where:)`](/docs/library/list#everyItem), [`isEmpty()`](/docs/library/list#isEmpty), [`join(with:)`](/docs/library/list#join), [`hasCharacters()`](/docs/library/string#hasCharacters) and [`Terminal.print`](/docs/library/terminal#print).
+
+Five differences show at once. A method is called with `::`, and `.` calls a static such as `Terminal.print`. A function's return type is required, where TypeScript would infer it. `<-` returns, inside the callback too. Each call writes its labels: `to`, `where`, `with`. And the comparisons `> 0` and `=== 0` are the methods `hasCharacters()` and `isEmpty()`.
+
+## Bindings
+
+`constant` and `variable` replace `const` and `let`. A `variable` can be reassigned, and a record, a list or a dictionary is never changed in place.
+
+| JavaScript or TypeScript | Essence | If you forget |
+|---|---|---|
+| `const total = 1` | [`constant total = 1`](/docs/reference/syntax-glossary#constant) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `let count = 0`, `var count = 0` | [`variable count = 0`](/docs/reference/syntax-glossary#variable) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| a `;` at the end of a statement | [`constant total = 1`](/docs/language/programs-and-values), with no `;` | [`unknown-name`](/docs/reference/diagnostics#unknown-name); [`invalid-number`](/docs/reference/diagnostics#invalid-number) when the `;` follows a number |
+| `count += 1` | [`count = count::add(1)`](/docs/library/integer#add) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| assigning to a `const` | declare it with [`variable`](/docs/language/programs-and-values) | [`constant-reassignment`](/docs/reference/diagnostics#constant-reassignment) |
+| `let count = 0`, then `count = "none"` | a `variable` keeps the [type it was declared with](/docs/language/programs-and-values) | [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch) |
+| `let count: number`, assigned later | the value is part of the [declaration](/docs/language/programs-and-values): `variable count: Integer = 0` | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `user.name = "Ada"` | a new record, Essence's object: [`{ user with name = "Ada" }`](/docs/language/records) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `const { x, y: row } = point` | [`constant { x, y as row } = point`](/docs/language/patterns) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) as written; [`unknown-type`](/docs/reference/diagnostics#unknown-type) for `constant { x, y: row } = point` |
+| reading a `const` above its line | refused, as in the [temporal dead zone](/docs/language/functions) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `snake_case` names | [`camelCase`](/docs/reference/syntax-glossary#underscore); `_` cannot appear in a name | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `// note`, `/* note */` | [`§ note`](/docs/reference/syntax-glossary#comment) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `/** Documentation. */` | [`§§ Documentation.`](/docs/reference/syntax-glossary#doc-comment) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+
+## Operators
+
+There are none. Arithmetic, comparison and logic are method calls, read left to right.
+
+| JavaScript or TypeScript | Essence | If you forget |
+|---|---|---|
+| `a + b` | [`a::add(b)`](/docs/library/integer#add) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `a - b` | [`a::subtract(b)`](/docs/library/integer#subtract) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `a * b` | [`a::multiply(with b)`](/docs/library/integer#multiply) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `a / b` | [`a::divide(by b)`](/docs/library/integer#divide), an [`Optional`](/docs/language/optional) (a value that may be missing) unless `b` is known not to be zero | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `a % b` | [`a::remainder(dividingBy b)`](/docs/library/integer#remainder) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `a === b`, `a == b` | [`a::is(b)`](/docs/library/integer#is), which compares records and lists by content | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `a !== b` | [`a::isNot(b)`](/docs/library/integer#isNot) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `a < b`, `a <= b` | [`a::isLessThan(b)`](/docs/library/integer#isLessThan), [`a::isLessThanOrEqualTo(b)`](/docs/library/integer#isLessThanOrEqualTo) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `a > b`, `a >= b` | [`a::isGreaterThan(b)`](/docs/library/integer#isGreaterThan), [`a::isGreaterThanOrEqualTo(b)`](/docs/library/integer#isGreaterThanOrEqualTo) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `a && b` | [`a::and(b)`](/docs/library/boolean#and); both sides are evaluated, so nest an `if` when the right side must not run | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `a \|\| b` | [`a::or(b)`](/docs/library/boolean#or); both sides are evaluated | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `!a` | [`a::negate()`](/docs/library/boolean#negate) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `-x` | [`x::negate()`](/docs/library/integer#negate); `-` only signs a number literal | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `(a + b) * c` | [`a::add(b)::multiply(with c)`](/docs/language/method-calls); there are no grouping parentheses | [`redundant-parameter-label`](/docs/reference/diagnostics#redundant-parameter-label), then [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `c ? a : b` | [`define { as a if c as b otherwise }`](/docs/language/conditions) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+
+<Note>
+`constant net = price - 3` compiles, and `net` is `price`: the `-3` is a [second statement](/docs/language/programs-and-values) that nothing reads.
+</Note>
+
+## Numbers
+
+There is no `number` and no floating point. An `Integer` is a whole number with no largest value; a `Rational` is an exact fraction.
+
+| JavaScript or TypeScript | Essence | If you forget |
+|---|---|---|
+| `number` | [`Integer`](/docs/library/integer) or [`Rational`](/docs/library/rational) | [`unknown-type`](/docs/reference/diagnostics#unknown-type) |
+| `1n` | `1`: every [`Integer`](/docs/language/numbers) is arbitrary precision | [`invalid-number`](/docs/reference/diagnostics#invalid-number) |
+| `0.75` | [`0.75`](/docs/reference/syntax-glossary#fraction), an exact `Rational` that prints as `3/4` | — |
+| `0.1 + 0.2 === 0.3` is `false` | [`0.1::add(0.2)::is(0.3)`](/docs/library/rational#add) is `true` | — |
+| `10 / 4` is `2.5` | [`10::divide(by 4)`](/docs/library/integer#divide) is `5/2` | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `-7 % 3` is `-1` | [`-7::remainder(dividingBy 3)`](/docs/library/integer#remainder) is `2`; [`-7::remainder(dividingBy 3, as #Truncating)`](/docs/library/integer#Division) is `-1` | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `Math.floor(7 / 2)` | [`7::quotient(dividingBy 2)`](/docs/library/integer#quotient) is `3` | [`syntax-error`](/docs/reference/diagnostics#syntax-error) at the `/`; [`unknown-name`](/docs/reference/diagnostics#unknown-name) for `Math` |
+| `Math.max(a, b)`, `Math.min(a, b)` | [`Number.highest(a, b)`](/docs/library/number#highest), [`Number.lowest(a, b)`](/docs/library/number#lowest) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `Math.abs(n)`, `Math.round(x)` | [`n::absolute()`](/docs/library/integer#absolute), [`x::round()`](/docs/library/rational#round), which rounds halves away from zero: `-7/2::round()` is `-4`, where `Math.round(-3.5)` is `-3` | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `NaN`, `Infinity` | none; a division that can fail returns an [`Optional`](/docs/language/optional) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `parseInt("42")` | [`Integer.parse("42")`](/docs/library/integer#parse) is `#Value(42)`; `Integer.parse("4x")` is `#Empty` | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `n.toFixed(2)` | [`n::toString(as #Decimal, toPlaces 2)`](/docs/library/rational#toString) | [`type-without-members`](/docs/reference/diagnostics#type-without-members) |
+| `0xff`, `1e3` | decimal digits only: [`255`, `1_000`](/docs/language/programs-and-values) | [`invalid-number`](/docs/reference/diagnostics#invalid-number) |
+
+## Strings
+
+Double quotes only, and every string literal interpolates. `length()` counts characters as a reader sees them.
+
+| JavaScript or TypeScript | Essence | If you forget |
+|---|---|---|
+| `'hi'`, `` `hi` `` | [`"hi"`](/docs/language/strings) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `` `Hello, ${name}` `` | [`"Hello, {name}"`](/docs/reference/syntax-glossary#interpolation) | none: `"Hello, ${name}"` compiles and prints a `$` before the value |
+| `'{ "a": 1 }'` | [`"\{ \"a\": 1 }"`](/docs/reference/syntax-glossary#backslash): a literal `{` is written `\{` | [`unclosed-string`](/docs/reference/diagnostics#unclosed-string) for `"{ \"a\": 1 }"` |
+| `a + b` | [`a::append(b)`](/docs/library/string#append), or `"{a}{b}"` | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `s.length` counts UTF-16 units: `"🇩🇪".length` is `4` | [`s::length()`](/docs/library/string#length) counts characters: `"🇩🇪"::length()` is `1` | [`type-without-members`](/docs/reference/diagnostics#type-without-members) |
+| `s[0]`, `s.charAt(0)` | [`s::character(at 0)`](/docs/library/string#character), an `Optional<Character>` | [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch) for `s[0]` inside a call; [`type-without-members`](/docs/reference/diagnostics#type-without-members) for `s.charAt(0)` |
+| `s.toUpperCase()` | [`s::uppercase()`](/docs/library/string#uppercase) | [`type-without-members`](/docs/reference/diagnostics#type-without-members); [`unknown-method`](/docs/reference/diagnostics#unknown-method) for `s::toUpperCase()` |
+| `s.trim()`, `s.includes(t)` | [`s::trim()`](/docs/library/string#trim), [`s::contains(t)`](/docs/library/string#contains) | [`type-without-members`](/docs/reference/diagnostics#type-without-members) |
+| `s.split("\n")` | [`s::split(on "\n")`](/docs/library/string#split) | [`type-without-members`](/docs/reference/diagnostics#type-without-members) |
+| `s.indexOf(t)` is `-1` when absent | [`s::firstIndex(of t)`](/docs/library/string#firstIndex) is `#Empty` when absent | [`type-without-members`](/docs/reference/diagnostics#type-without-members) |
+| `"café" === "cafe\u0301"` is `false` | [`::is`](/docs/library/string#is) returns `true` for the same two spellings of `é` | — |
+| `"\u00e9"` | write `é` itself; there are [seven escapes](/docs/reference/syntax-glossary#backslash) | [`invalid-escape`](/docs/reference/diagnostics#invalid-escape) |
+
+## Collections
+
+Records, lists and dictionaries are all immutable. A method that would change one returns a new one.
+
+| JavaScript or TypeScript | Essence | If you forget |
+|---|---|---|
+| `{ x: 1, y: 2 }` | [`{ x = 1, y = 2 }`](/docs/language/records) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `{ ...point, x: 9 }` | [`{ point with x = 9 }`](/docs/reference/syntax-glossary#with) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `{ x, y }`, `point.x` | [the same](/docs/reference/syntax-glossary#braces) | — |
+| `[1, 2, 3]` | [the same](/docs/language/lists) | — |
+| `items[0]`, `items.at(-1)` | [`items::item(at 0)`](/docs/library/list#item), `items::item(at -1)`, an `Optional` | [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch) for `items[0]` inside a call; [`type-without-members`](/docs/reference/diagnostics#type-without-members) for `items.at(-1)` |
+| `items.length` | [`items::length()`](/docs/library/list#length) | [`type-without-members`](/docs/reference/diagnostics#type-without-members) |
+| `items.push(4)`, `[...items, 4]`, `items.concat(more)` | [`items::append(4)`](/docs/library/list#append), `items::append(contentsOf more)`, a new list | [`type-without-members`](/docs/reference/diagnostics#type-without-members); [`syntax-error`](/docs/reference/diagnostics#syntax-error) for `[...items, 4]` |
+| `items.pop()`, `items.shift()` | [`items::lastItem()`](/docs/library/list#lastItem) reads the item and [`items::removeLast()`](/docs/library/list#removeLast) returns the rest; `firstItem()` and [`removeFirst()`](/docs/library/list#removeFirst) at the front | [`type-without-members`](/docs/reference/diagnostics#type-without-members); [`unknown-method`](/docs/reference/diagnostics#unknown-method) for `items::pop()` |
+| `items.map(f)` | [`items::map(f)`](/docs/library/list#map) | [`type-without-members`](/docs/reference/diagnostics#type-without-members) |
+| `items.map((x, i) => …)` | [`items::enumerate()`](/docs/library/list#enumerate), then `map` reading `entry.index` and `entry.item` | [`syntax-error`](/docs/reference/diagnostics#syntax-error) as written; [`uninferable-parameter-type`](/docs/reference/diagnostics#uninferable-parameter-type), then [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload), for `items::map((x, i) { … })` |
+| `items.reduce(f, 0)` | [`items::reduce(startingWith 0, f)`](/docs/library/list#reduce) | [`type-without-members`](/docs/reference/diagnostics#type-without-members) |
+| `items.filter(p)` | [`items::everyItem(where p)`](/docs/library/list#everyItem) | [`unknown-method`](/docs/reference/diagnostics#unknown-method) for `items::filter(p)` |
+| `items.find(p)`, `items.findIndex(p)` | [`items::firstItem(where p)`](/docs/library/list#firstItem), [`items::firstIndex(where p)`](/docs/library/list#firstIndex), an `Optional` | [`unknown-method`](/docs/reference/diagnostics#unknown-method) for `items::find(p)` |
+| `items.indexOf(x)` is `-1` when absent | `items::firstIndex(of x)`, an `Optional` | [`unknown-method`](/docs/reference/diagnostics#unknown-method) for `items::indexOf(x)` |
+| `items.some(p)`, `items.every(p)` | [`items::hasItems(where p)`](/docs/library/list#hasItems), [`items::hasOnlyItems(where p)`](/docs/library/list#hasOnlyItems) | [`type-without-members`](/docs/reference/diagnostics#type-without-members); [`unknown-method`](/docs/reference/diagnostics#unknown-method) for `items::some(p)` |
+| `items.includes(x)` | [`items::contains(x)`](/docs/library/list#contains) | [`unknown-method`](/docs/reference/diagnostics#unknown-method) for `items::includes(x)` |
+| `items.slice(1, 3)` | [`items::slice(from 1, to 3)`](/docs/library/list#slice) | [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload) for `items::slice(1, 3)` |
+| `items.join(", ")` | [`items::join(with ", ")`](/docs/library/list#join) | [`type-without-members`](/docs/reference/diagnostics#type-without-members) |
+| `items.flat()` | [`items::flatten()`](/docs/library/list#flatten) | [`unknown-method`](/docs/reference/diagnostics#unknown-method) for `items::flat()` |
+| `items.sort()`, `items.toSorted()` | [`items::sort()`](/docs/library/list#sort), a new list in the items' own order | [`unknown-method`](/docs/reference/diagnostics#unknown-method) for `items::toSorted()` |
+| `items.sort((a, b) => a - b)` | `items::sort(by (a, b) { <- a::compare(to b) })`, where the function returns an `Ordering` | [`syntax-error`](/docs/reference/diagnostics#syntax-error) as written; [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload) without `by` |
+| `items.reverse()` | [`items::reverse()`](/docs/library/list#reverse), a new list | [`type-without-members`](/docs/reference/diagnostics#type-without-members) |
+| `names.map((name, i) => [name, prices[i]])` | [`names::pair(with prices)`](/docs/library/list#pair), a list of `{ first, second }` records | [`syntax-error`](/docs/reference/diagnostics#syntax-error) as written; [`unknown-method`](/docs/reference/diagnostics#unknown-method) for `names::zip(prices)` |
+| `const [first, second] = items` | none; read items with `item(at:)`, since there is no list pattern | [`syntax-error`](/docs/reference/diagnostics#syntax-error) for `constant [first, second] = items` |
+| `new Map()`, `Record<string, number>` | a [`Dictionary`](/docs/language/dictionaries): `["ann" = 31]`, or `[=]` when empty | [`unknown-name`](/docs/reference/diagnostics#unknown-name) for `new Map()`; [`type-not-generic`](/docs/reference/diagnostics#type-not-generic) for `Record<String, Integer>`: Essence's [`Record`](/docs/library/record) takes no type arguments |
+| `ages.get("ann")` | [`ages::value(at "ann")`](/docs/library/dictionary#value), an `Optional` | [`type-without-members`](/docs/reference/diagnostics#type-without-members) |
+| `ages.set("bob", 40)` | [`ages::set("bob", to 40)`](/docs/library/dictionary#set), a new dictionary | [`type-without-members`](/docs/reference/diagnostics#type-without-members) |
+| `new Set(items)` | a list, with [`removeDuplicates()`](/docs/library/list#removeDuplicates) and `contains` | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+
+<Note>
+`constant first = items[0]` compiles, and `first` is `items`: the `[0]` is a [second statement](/docs/language/programs-and-values), a list that nothing reads.
+</Note>
+
+<a id="absence"></a>
+
+## Null, undefined and exceptions
+
+There is no `null` and no `undefined`. A value that may be missing is an `Optional`; an operation that can fail with a reason returns a `Result`.
+
+| JavaScript or TypeScript | Essence | If you forget |
+|---|---|---|
+| `null`, `undefined` | [`Optional<T>`](/docs/language/optional): `#Value(x)` or `#Empty` | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `string \| null` | [`Optional<String>`](/docs/library/optional) | [`unknown-type`](/docs/reference/diagnostics#unknown-type) |
+| `x ?? d` | [`x::value(defaultingTo d)`](/docs/library/optional#value) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `user?.name` | [`user::map(.name)`](/docs/library/optional#map), still an `Optional`; [`andThen`](/docs/library/optional#andThen) when the step returns an `Optional` | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `user!` | none; take the value out with [`match`](/docs/language/choices-and-match) or `value(defaultingTo:)` | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `if (user)` | [`if user::hasValue()`](/docs/library/optional#hasValue), a `Boolean`; it does not narrow `user`, so read the value with a [`match`](/docs/language/choices-and-match) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) as written; [`condition-not-boolean`](/docs/reference/diagnostics#condition-not-boolean) for `if user` |
+| `user.name` on a value that may be missing | refused: an `Optional` is [taken apart](/docs/language/optional), never reached through | [`type-without-members`](/docs/reference/diagnostics#type-without-members); [`unknown-method`](/docs/reference/diagnostics#unknown-method) for a `::` call |
+| `throw new Error("…")` | return [`#Failure(reason)`](/docs/language/result) in a `Result<T, F>` | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `try { … } catch (error) { … }` | [`recover(with:)`](/docs/library/result#recover), [`reason()`](/docs/library/result#reason), or a `match` | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+
+## Functions
+
+A function declaration writes the type of every parameter and its return type. A call writes each label, in order.
+
+| JavaScript or TypeScript | Essence | If you forget |
+|---|---|---|
+| `function add(a, b) { … }` | [`function add(_ a: Integer, _ b: Integer) -> Integer { … }`](/docs/language/functions); `_` means the call passes the argument with no label | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| a function with no return type | [`-> Type`](/docs/reference/syntax-glossary#arrow) is always written; `-> {}` returns nothing, like `: void` | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `return x` | [`<- x`](/docs/reference/syntax-glossary#return) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| a path that falls off the end | every path [returns](/docs/language/functions) | [`missing-return`](/docs/reference/diagnostics#missing-return) |
+| `(n) => n + 1` as an argument, with its implicit return | [`(n) { <- n::add(1) }`](/docs/language/functions-as-values); a value leaves only through `<-` | [`syntax-error`](/docs/reference/diagnostics#syntax-error); [`uninferable-return-type`](/docs/reference/diagnostics#uninferable-return-type) without the `<-` |
+| `const double = (n) => n * 2` | [`constant double = (_ n: Integer) -> Integer { <- n::multiply(with 2) }`](/docs/language/functions-as-values); only an argument infers its types | [`uninferable-parameter-type`](/docs/reference/diagnostics#uninferable-parameter-type); [`missing-return-type`](/docs/reference/diagnostics#missing-return-type) without `-> Integer` |
+| `greet({ name: "Ada", loud: true })` | [labels](/docs/reference/syntax-glossary#labels), in declaration order: `greet(name "Ada", loud true)` | [`syntax-error`](/docs/reference/diagnostics#syntax-error) as written; [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch) for `greet("Ada", true)` or labels out of order |
+| `function f(a, b = 1)` | [`function f(_ a: Integer, b: Integer = 1)`](/docs/language/functions), called as `f(1, b 5)` | [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch) for `f(1, 5)` |
+| `(product) => product.price` | [`.price`](/docs/reference/syntax-glossary#member-path) | — |
+| overload signatures | [`overload`](/docs/reference/syntax-glossary#overload) entries inside a namespace, each with its own body | — |
+| `function first<T>(items: T[]): T` | [`function first<infer T>(…)`](/docs/language/generics); TypeScript's `infer` keyword is unrelated | [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch) at the call |
+| `identity<string>(x)` | none; every [type argument is inferred](/docs/reference/syntax-glossary#infer) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+
+## Control flow
+
+`if` is a statement and produces no value. `define` is the conditional expression, and `match` branches on a value's case; both produce a value. There is no loop statement.
+
+| JavaScript or TypeScript | Essence | If you forget |
+|---|---|---|
+| `if (c) { … } else if (d) { … } else { … }` | [`if c { … } else if d { … } else { … }`](/docs/language/conditions), with no parentheses | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `if (count)` | [`if count::isNot(0)`](/docs/library/integer#isNot); only a `Boolean` is a condition | [`syntax-error`](/docs/reference/diagnostics#syntax-error) as written; [`condition-not-boolean`](/docs/reference/diagnostics#condition-not-boolean) for `if count` |
+| an `if` used as a value | [`define { as a if c as b otherwise }`](/docs/reference/syntax-glossary#define) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `switch (x) { case …: }` | [`match x -> T { case … }`](/docs/language/choices-and-match), exhaustive, with its result type written, `-> T` | [`syntax-error`](/docs/reference/diagnostics#syntax-error) for `switch`; [`missing-case`](/docs/reference/diagnostics#missing-case) when a case is left out |
+| `default:` | [`case _`](/docs/reference/syntax-glossary#underscore) | — |
+| `for (const item of items)` | [`items::map(f)`](/docs/language/iteration), `reduce`, or [`loop(from 1, through 10, startingWith 0, f)`](/docs/library/loop#through) | [`syntax-error`](/docs/reference/diagnostics#syntax-error); [`uninferable-return-type`](/docs/reference/diagnostics#uninferable-return-type) for a function passed to `map` with no `<-` |
+| `items.forEach(f)` | none; to print each item, print [`items::join(with "\n")`](/docs/language/iteration) once, or `map` with a function that returns: `items::map((item) { <- Terminal.print(item) })` | [`type-without-members`](/docs/reference/diagnostics#type-without-members) for `items.forEach(f)`; [`unknown-method`](/docs/reference/diagnostics#unknown-method) for `items::forEach(f)`; [`uninferable-return-type`](/docs/reference/diagnostics#uninferable-return-type) for a function with no `<-` |
+| `while (c) { … }` | [`loop(startingWith s, while p, f)`](/docs/library/loop#while), where `p` is a function from the state to a `Boolean` | [`unknown-name`](/docs/reference/diagnostics#unknown-name), `'while' is not declared`, when the body parses as a record, as in `while (running) { running = false }`; [`syntax-error`](/docs/reference/diagnostics#syntax-error) for other bodies |
+| `break`, `continue` | [`loop(startingWith s, step f)`](/docs/library/loop#step), where `f` returns `#Done(value)` to stop and `#Continue(next)` to go round again | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+
+## Types
+
+A `type` names a shape and is structural. A `choice` is a closed set of cases and is nominal. There are no classes.
+
+| JavaScript or TypeScript | Essence | If you forget |
+|---|---|---|
+| `type Point = { x: number }` | [`type Point = { x: Integer }`](/docs/language/records); a record with more members still fits | [`unknown-type`](/docs/reference/diagnostics#unknown-type) |
+| `interface Point { x: number }` | [`type Point = { x: Integer }`](/docs/reference/syntax-glossary#type) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `{ kind: "circle", radius } \| { kind: "square", side }` | [`choice Shape { Circle { radius: Rational }, Square { side: Rational } }`](/docs/language/choices-and-match), built as `#Circle({ radius = 1/2 })` | [`missing-case`](/docs/reference/diagnostics#missing-case) when a `match` leaves a case out |
+| `"fast" \| "slow"` | [`choice Speed { Fast, Slow }`](/docs/reference/syntax-glossary#choice); there are no literal types | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `enum Color { Red, Green }` | [`choice Color { Red, Green }`](/docs/reference/syntax-glossary#case-sigil), used as `#Red`; to print one, declare `namespace Colors for Color is Printable {}` | [`unknown-name`](/docs/reference/diagnostics#unknown-name) for `enum`; [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound) when printed without that namespace |
+| `A \| B` | [`A \| B`](/docs/language/unions-and-type-aliases), the same; narrowed by `match`, never by `typeof` | [`unknown-name`](/docs/reference/diagnostics#unknown-name) for `typeof` |
+| `[string, number]` | a [record](/docs/reference/syntax-glossary#braces) with two named members; there are no tuples | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `class` | a `type` for the shape and a [namespace](/docs/language/namespaces-and-methods) for its methods | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `value as Point` | [`constant point: Point = value`](/docs/reference/syntax-glossary#colon); there is no cast | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `readonly`, `Readonly<T>` | nothing to write; records, lists and dictionaries are [immutable](/docs/language/programs-and-values) | — |
+| `type Tree = { children: Tree[] }` | none; a `type` or `choice` cannot [name itself](/docs/language/unions-and-type-aliases) | [`recursive-type-declaration`](/docs/reference/diagnostics#recursive-type-declaration) |
+| `T extends Comparable` | [`<infer T is Comparable>`](/docs/language/generics) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| a branded type checked by a type guard | a [checked refinement](/docs/language/checked-refinements): `type Positive = Integer where @::isPositive()`, proven by an `if` | — |
+
+## Namespaces and protocols
+
+Methods live in namespaces, outside the type. A protocol is a contract: a namespace declares it meets one with `is Named` (a conformance), and a type parameter requires one with `<infer T is Named>` (a bound).
+
+| JavaScript or TypeScript | Essence | If you forget |
+|---|---|---|
+| `value.method()` | [`value::method()`](/docs/reference/syntax-glossary#method-call) | [`type-without-members`](/docs/reference/diagnostics#type-without-members) |
+| `Money.of(12)` | [`Money.of(12)`](/docs/reference/syntax-glossary#dot): `.` calls a static, as in JavaScript | [`static-method-on-value`](/docs/reference/diagnostics#static-method-on-value) when called with `::` on a value |
+| `this` | [`@`](/docs/reference/syntax-glossary#at) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `class Money { euros() { … } }`, `Number.prototype.euros` | [`namespace Money for Integer { euros() -> Integer { … } }`](/docs/language/namespaces-and-methods) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) as written; [`unknown-name`](/docs/reference/diagnostics#unknown-name) for an empty `class Money {}` |
+| using a class above its declaration | a [namespace](/docs/language/namespaces-and-methods) cannot be used by a statement above it | [`use-before-declaration`](/docs/reference/diagnostics#use-before-declaration) |
+| `static rate = 100` | [`static rate = 100`](/docs/reference/syntax-glossary#static), read as `Money.rate` | — |
+| `interface Named { name(): string }` | [`protocol Named { name() -> String }`](/docs/language/protocols) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `class Person implements Named` | [`namespace People for Person is Named`](/docs/language/protocols); having the method is not conforming | [`syntax-error`](/docs/reference/diagnostics#syntax-error) for `implements`; [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound) without `is Named` |
+| a concrete method on an abstract class | a method with a [body in the protocol](/docs/language/protocols) | — |
+| `interface Loud extends Named { shout(): string }` | [`protocol Loud is Named`](/docs/reference/syntax-glossary#protocol) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `Named` as a type, `Named[]` | none; a protocol is a [bound or a conformance](/docs/language/protocols), and a union such as `Book \| Movie` stands in, reaching `name()` when both types conform | [`protocol-as-type`](/docs/reference/diagnostics#protocol-as-type) |
+| `T extends A & B` | one bound per parameter; [`protocol Both is A, is B`](/docs/language/protocols) combines them | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+
+## Modules
+
+A file is a module with named exports, the way ES modules work.
+
+| JavaScript or TypeScript | Essence | If you forget |
+|---|---|---|
+| `import { a, b as c } from "./x"` | [`import { from "./x.es" { a b as c } }`](/docs/language/modules), with no commas | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `"./x"` with no extension | [`"./x.es"`](/docs/reference/syntax-glossary#from) | [`invalid-module-specifier`](/docs/reference/diagnostics#invalid-module-specifier) |
+| `export function f …` | [`export { f }`](/docs/reference/syntax-glossary#export), in a block below `implementation` | [`unknown-name`](/docs/reference/diagnostics#unknown-name) inside `implementation`; [`unexpected-token`](/docs/reference/diagnostics#unexpected-token) below it |
+| `export default f` | none; every export is [named](/docs/language/modules) | [`unexpected-token`](/docs/reference/diagnostics#unexpected-token) |
+| `export { a } from "./x"` | [`from "./x.es" { a }`](/docs/reference/syntax-glossary#from) inside the `export` block | — |
+| `import * as money from "./x"` | none; [each name is imported](/docs/reference/syntax-glossary#import) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `import { chunk } from "lodash"` | none; a [specifier](/docs/language/modules) is a relative path to an `.es` file | [`invalid-module-specifier`](/docs/reference/diagnostics#invalid-module-specifier) |
+| `require("./x")` | none; [`import`](/docs/reference/syntax-glossary#import) only | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| two modules importing each other | allowed for [functions](/docs/language/modules); a constant cannot cross the cycle | [`cyclic-constant-import`](/docs/reference/diagnostics#cyclic-constant-import) |
+
+## Tooling
+
+One `essence` command does the work of several tools, and tests live in the source file.
+
+| JavaScript or TypeScript | Essence | If you forget |
+|---|---|---|
+| `tsc --noEmit` | [`essence check`](/docs/reference/cli#check) | — |
+| `esbuild --bundle` | [`essence build`](/docs/reference/cli#build), one self-contained JavaScript file | — |
+| `node file.js`, `tsx file.ts` | [`essence run file.es`](/docs/reference/cli#run) | — |
+| `vitest`, `jest` | [`essence test`](/docs/reference/cli#test); the tests are a [`tests { … }`](/docs/language/tests) section at the end of the file | [`test-outside-tests`](/docs/reference/diagnostics#test-outside-tests) |
+| `describe`, `it`, `expect(x).toBe(y)` | [`suite "…"`](/docs/reference/syntax-glossary#suite), [`test "…"`](/docs/reference/syntax-glossary#test), [`expect x::is(y)`](/docs/reference/syntax-glossary#expect) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) at the `=>` of `describe("…", () => …)`; [`unknown-name`](/docs/reference/diagnostics#unknown-name) for `expect(x).toBe(y)` |
+| `tsconfig.json` | [`essence.json`](/docs/guides/projects), optional, written by [`essence init`](/docs/reference/cli#init) | — |
+| `prettier` | [`essence format`](/docs/reference/cli#format), with nothing to configure | — |
+| `console.log(x)` | [`Terminal.print(x)`](/docs/library/terminal#print) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+| `console.dir(x)` | [`Terminal.inspect(x)`](/docs/library/terminal#inspect) | [`unknown-name`](/docs/reference/diagnostics#unknown-name) |
+
+<a id="if-you-typed-javascript"></a>
+<a id="what-the-compiler-says"></a>
+
+## What the compiler says when you type JavaScript
+
+None of these errors names the JavaScript habit it refuses, so the table below pairs each with its fix. Each error starts with its code in brackets and a one-line message, then points at the code, like this one for `constant total = 1 + 2`:
+
+<div class="error-output">
+
+```
+[unknown-name]
+Error: '+' is not declared
+   ╭─┤ Total.es:2:21 │
+   │
+ 2 │     constant total = 1 + 2
+   │                        ▲  
+   │                        ╰── no such Variable or Constant
+───╯
+```
+
+</div>
+
+The table lists the errors you are likely to hit first: what you typed, the error's code and message, and the fix.
+
+| You typed | The compiler says | The fix |
+|---|---|---|
+| <span id="typed-plus"></span>`1 + 2` | [`unknown-name`](/docs/reference/diagnostics#unknown-name): `'+' is not declared` | `1::add(2)` |
+| <span id="typed-string-plus"></span>`"a" + "b"` | [`unknown-name`](/docs/reference/diagnostics#unknown-name): `'+' is not declared` | `"a"::append("b")` |
+| <span id="typed-divide"></span>`count / 3` | [`syntax-error`](/docs/reference/diagnostics#syntax-error): `Expected an Expression but found '/'.` | `count::divide(by 3)` |
+| <span id="typed-equals"></span>`1 == 1`, `1 === 1` | [`syntax-error`](/docs/reference/diagnostics#syntax-error): `Expected an Expression but found '='.` | `1::is(1)` |
+| <span id="typed-and"></span>`true && false` | [`unknown-name`](/docs/reference/diagnostics#unknown-name): `'&&' is not declared` | `true::and(false)` |
+| <span id="typed-not"></span>`!true` | [`unknown-name`](/docs/reference/diagnostics#unknown-name): `'!true' is not declared` | `true::negate()` |
+| <span id="typed-negate"></span>`-price` | [`syntax-error`](/docs/reference/diagnostics#syntax-error): `Expected a Number but found 'price'.` | `price::negate()` |
+| <span id="typed-index"></span>`Terminal.print(items[0])` | [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch): `This Argument is labelled where Parameter 1 takes no label` | `Terminal.print(items::item(at 0))` |
+| <span id="typed-length"></span>`text.length` | [`type-without-members`](/docs/reference/diagnostics#type-without-members): `This value has no members to look up` | `text::length()` |
+| <span id="typed-const"></span>`const total = 1` | [`unknown-name`](/docs/reference/diagnostics#unknown-name): `'const' is not declared` | `constant total = 1` |
+| <span id="typed-let"></span>`let count = 0` | [`unknown-name`](/docs/reference/diagnostics#unknown-name): `'let' is not declared` | `variable count = 0` |
+| <span id="typed-semicolon"></span>`constant total = 1;` | [`invalid-number`](/docs/reference/diagnostics#invalid-number): `'1;' is not a valid Number` | `constant total = 1` |
+| <span id="typed-record-colon"></span>`{ x: 1, y: 2 }` | [`syntax-error`](/docs/reference/diagnostics#syntax-error): `Expected 'with' but found ':'.` | `{ x = 1, y = 2 }` |
+| <span id="typed-member-assignment"></span>`point.x = 2` | [`syntax-error`](/docs/reference/diagnostics#syntax-error): `Expected an Expression but found '='.` | `{ point with x = 2 }` |
+| <span id="typed-return"></span>`return n` | [`unknown-name`](/docs/reference/diagnostics#unknown-name): `'return' is not declared` | `<- n` |
+| <span id="typed-arrow"></span>`(n: Integer) => n` | [`syntax-error`](/docs/reference/diagnostics#syntax-error): `Expected '{' but found '='.` | `(_ n: Integer) -> Integer { <- n }` |
+| <span id="typed-arrow-argument"></span>`[1, 2]::map(n => n)` | [`syntax-error`](/docs/reference/diagnostics#syntax-error): `Expected an Expression but found '='.` | `[1, 2]::map((n) { <- n })` |
+| <span id="typed-missing-return-arrow"></span>`(n) { n::add(1) }` | [`uninferable-return-type`](/docs/reference/diagnostics#uninferable-return-type): `The return Type could not be inferred from the body` | `(n) { <- n::add(1) }` |
+| <span id="typed-ternary"></span>`true ? 1 : 2` | [`syntax-error`](/docs/reference/diagnostics#syntax-error): `Expected an Expression but found ':'.` | `define { as 1 if true as 2 otherwise }` |
+| <span id="typed-if-parentheses"></span>`if (count::isEven()) {` | [`syntax-error`](/docs/reference/diagnostics#syntax-error): `Expected a Type but found ':'.` | `if count::isEven() {` |
+| <span id="typed-if-parentheses-name"></span>`if (ready) {` | [`syntax-error`](/docs/reference/diagnostics#syntax-error): `Expected '{' but found '}'.` | `if ready {` |
+| <span id="typed-backtick"></span>`` `hi` `` | [`unknown-name`](/docs/reference/diagnostics#unknown-name): `` '`hi`' is not declared `` | `"hi"` |
+| <span id="typed-single-quote"></span>`'hi'` | [`unknown-name`](/docs/reference/diagnostics#unknown-name): `''hi'' is not declared` | `"hi"` |
+| <span id="typed-slash-comment"></span>`// a comment` | [`syntax-error`](/docs/reference/diagnostics#syntax-error): `Expected an Expression but found '/'.` | `§ a comment` |
+| <span id="typed-console-log"></span>`console.log("hi")` | [`unknown-name`](/docs/reference/diagnostics#unknown-name): `'console' is not declared` | `Terminal.print("hi")` |
+| <span id="typed-null"></span>`null` | [`unknown-name`](/docs/reference/diagnostics#unknown-name): `'null' is not declared` | `#Empty`, in an `Optional` |
+| <span id="typed-number-type"></span>`number` as a type | [`unknown-type`](/docs/reference/diagnostics#unknown-type): `Type 'number' is not declared` | `Integer` or `Rational` |
+| <span id="typed-interface"></span>`interface Point { x: Integer }` | [`syntax-error`](/docs/reference/diagnostics#syntax-error): `Expected 'with' but found ':'.` | `type Point = { x: Integer }` |
+| <span id="typed-snake-case"></span>`constant snake_case = 1` | [`syntax-error`](/docs/reference/diagnostics#syntax-error): `Expected '=' but found '_'.` | `constant snakeCase = 1` |
+
+## Same as JavaScript
+
+These need no relearning. Each carries its one caveat.
+
+- **Function hoisting.** A function can be called above its declaration. Caveat: a namespace cannot be used by a statement above it.
+- **The constant's dead zone.** A constant cannot be read above its line, the way `const` has a temporal dead zone. Caveat: a function body written above the constant cannot read it either.
+- **`{ x, y }` shorthand.** It builds a record from the names in scope. Caveat: `{ point with x }` merges a record named `x`; it is not shorthand for `x = x`.
+- **Structural object types.** A record with more members passes where a narrower `type` is asked for, and keeps them. Caveat: a literal with extra members passes too, so there is no excess-property check.
+- **Renames with `as`.** `constant { y as row } = point` and `from "./Money.es" { twice as double }`. Caveat: in a pattern, `:` annotates a type instead of renaming.
+- **ES-module shape.** A file imports by relative path and exports by name. Caveat: the `.es` extension is written, and there is no default export.
+- **Default parameters are evaluated per call, in the callee.** A default runs on every call that leaves its argument out, and may read the parameters to its left. Caveat: a call that passes the argument still writes its label.
+- **`reduce` is accumulator-first.** `[1, 2, 3]::reduce(startingWith 0, (total, item) { <- total::add(item) })` is `6`. Caveat: the start value comes first, labelled `startingWith`.
+- **`1_000`.** Digit groups are separated with `_`, after a decimal point too: `1_000.000_5`. Caveat: `_` belongs to numbers only, so `snake_case` is not a name.
+- **`"".split("\n")` is `[""]`.** `""::split(on "\n")` prints `[""]`. Caveat: the separator is labelled `on`.
+
+## What is not in the language
+
+Each entry names what stands in its place, where anything does.
+
+- **Operators.** Arithmetic, comparison and logic are method calls.
+- **`null` and `undefined`.** A value that may be missing is an `Optional`.
+- **Truthiness.** A condition is a `Boolean`; `if count` is refused as `condition-not-boolean`.
+- **Exceptions.** There is no `throw`, `try` or `catch`; a failure with a reason is a `Result`.
+- **Mutation of data.** Records, lists and dictionaries are immutable; `with` builds a new record and `append` a new list.
+- **Loop statements.** There is no `for`, `while`, `break` or `continue`; iteration is `map`, `reduce` and the `loop` family.
+- **Classes and `new`.** A `type` names a shape, a namespace holds its methods, and a literal builds the value.
+- **Recursive type declarations.** A `type` or `choice` cannot name itself, so a tree is not a type you can declare.
+- **Tuples.** A pair is a record with two named members.
+- **File, network or JSON in the standard library.** [`Terminal`](/docs/library/terminal) is the I/O: it prints, writes, inspects, and reads the program's input.
+- **Async.** There is no `async`, `await` or `Promise`; a program's statements run in order.
+- **Floating point.** `Integer` and `Rational` are exact: `0.1::add(0.2)::is(0.3)` is `true`.
+- **Calling JavaScript from Essence.** An import names `.es` files only; a `.js` specifier is an `invalid-module-specifier`. JavaScript calls Essence instead, as [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) shows.
+- **Call-site type arguments.** `identity<Integer>(1)` is a syntax error; every type argument is inferred.
+- **More than one protocol bound per parameter.** `<infer T is A, is B>` is a syntax error. Combine them through a protocol: `protocol Both is A, is B` is the one bound.
+- **Reading program arguments.** No standard-library function reads the arguments a program was started with.
+
+<SeeAlso links={[
+	{ label: "Your first program", href: "/docs/getting-started/your-first-program" },
+	{ label: "Diagnostics", href: "/docs/reference/diagnostics" },
+	{ label: "Syntax glossary", href: "/docs/reference/syntax-glossary" },
+]} />

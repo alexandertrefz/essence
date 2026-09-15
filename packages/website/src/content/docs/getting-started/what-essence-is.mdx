@@ -1,0 +1,192 @@
+---
+title: What Essence is
+description: What the language refuses to do, what it does instead, and where it sits beside Node or Bun.
+section: getting-started
+order: 10
+template: article
+---
+
+import { VERSION } from "../../../lib/site.ts"
+
+Essence is a small compiled language for the pure part of a program: the rules, the arithmetic and the data they work on. You write the rules in Essence and call them from TypeScript. Numbers are exact, a forgotten case is a compile error, and the tests sit beside the code. A program compiles to one self-contained ES module that runs on Node, on Bun and in the browser.
+
+## A pricing rule with its test
+
+An order is priced, or refused with a reason. The test sits in the same file as the code. Save the program as `Pricing.es`:
+
+```essence
+implementation {
+	choice Zone {
+		Domestic,
+		Overseas,
+	}
+
+	type Order = {
+		item: String,
+		quantity: Integer,
+		zone: Zone,
+		discount: Optional<Integer>,
+	}
+
+	function shipping(to zone: Zone) -> Integer {
+		<- match zone -> Integer {
+			case #Domestic { <- 490 }
+			case #Overseas { <- 2_490 }
+		}
+	}
+
+	function total(of order: Order, price: Integer) -> Result<Integer, String> {
+		if order.quantity::isLessThan(1) {
+			<- #Failure("{order.item}: the quantity must be at least 1")
+		}
+
+		constant goods    = price::multiply(with order.quantity)
+		constant discount = order.discount::value(defaultingTo 0)
+
+		<- #Value(goods::subtract(discount)::add(shipping(to order.zone)))
+	}
+
+	constant beans: Order = {
+		item = "Beans",
+		quantity = 2,
+		zone = #Overseas,
+		discount = #Empty,
+	}
+
+	Terminal.print(total(of beans, price 1_290)) § Value(5070)
+	Terminal.print(total(of { beans with quantity = 0 }, price 1_290)) § Failure("Beans: the quantity must be at least 1")
+}
+
+tests {
+	test "prices an order with its shipping" {
+		require #Value(cents) = total(of beans, price 1_290)
+
+		expect cents::is(5_070)
+	}
+}
+```
+
+`essence run Pricing.es` compiles the file and runs it, and the program prints the two lines in the `§` comments. [Installation](/docs/getting-started/installation) puts the `essence` command on your machine. `essence test Pricing.es` runs the program's statements, then the test:
+
+```
+Value(5070)
+Failure("Beans: the quantity must be at least 1")
+
+ Pricing.es
+   ✓ prices an order with its shipping
+
+ 1 passed  ·  0.47 ms
+```
+
+**Compared with JavaScript.** The same rule as a TypeScript function:
+
+```ts
+type Zone = "Domestic" | "Overseas"
+type Order = { item: string; quantity: number; zone: Zone; discount: number | null }
+
+function shipping(zone: Zone): number {
+	return zone === "Domestic" ? 490 : 2490
+}
+
+function total(order: Order, price: number): number {
+	if (order.quantity < 1) {
+		throw new Error(`${order.item}: the quantity must be at least 1`)
+	}
+
+	const goods = price * order.quantity
+	const discount = order.discount ?? 0
+
+	return goods - discount + shipping(order.zone)
+}
+
+const beans: Order = { item: "Beans", quantity: 2, zone: "Overseas", discount: null }
+
+console.log(total(beans, 1290)) // 5070
+
+try {
+	console.log(total({ ...beans, quantity: 0 }, 1290))
+} catch (error) {
+	console.log((error as Error).message) // Beans: the quantity must be at least 1
+}
+```
+
+Three things in it do not exist in Essence. `Pricing.es` uses an exact [`Integer`](/docs/library/integer) for the `number`, an [`Optional`](/docs/library/optional) for the `null`, and a [`Result`](/docs/library/result) the caller takes apart for the `throw`. The ternary also prices any new zone as Overseas, where Essence refuses to compile `shipping` until it handles the new zone.
+
+[Your first program](/docs/getting-started/your-first-program) builds a smaller program one step at a time. Each construct in this one has its own page:
+
+- [Programs and values](/docs/language/programs-and-values): `implementation { … }` around the statements, `constant` with its `: Order` annotation, `§` comments, number literals such as `1_290`, and strings with a `{order.item}` hole. [`Terminal.print`](/docs/library/terminal#print) writes a value and a newline.
+- [Method calls](/docs/language/method-calls): `::` calls a method on a value, as in [`order.quantity::isLessThan(1)`](/docs/library/integer#isLessThan). The argument's label is written at the call: [`price::multiply(with order.quantity)`](/docs/library/integer#multiply).
+- [Conditions](/docs/language/conditions): the `if` that refuses a quantity below one.
+- [Functions](/docs/language/functions): `function total(of order: Order, price: Integer) -> …` with its labelled parameters, the call `total(of beans, price 1_290)`, and `<-`, which returns a value from the function.
+- [Records](/docs/language/records): the record type `type Order = { … }` and the literal `{ item = "Beans", … }`, whose members take `=` where JavaScript writes `:`. `.` reads a member, as in `order.zone`, and `{ beans with quantity = 0 }` is a copy with one member changed.
+- [Choices and `match`](/docs/language/choices-and-match): `choice Zone` is a type with a fixed set of named cases. If you know TypeScript's discriminated unions, a choice is one with the tag built in. `#Overseas` builds a case (`#` marks a case, not a private field), and `match zone -> Integer` takes one apart. Inside a `case` block, `<-` gives the `match` its value.
+- [Optional](/docs/language/optional): `discount: Optional<Integer>` holds `#Empty` or a value, and [`value(defaultingTo 0)`](/docs/library/optional#value) reads it with `0` for an empty one.
+- [Result](/docs/language/result): `#Value(…)` and `#Failure(…)`, the two cases of the `Result<Integer, String>` that a function which can fail returns.
+- [Tests](/docs/language/tests): the `tests` block and its `test`. `require #Value(cents) = …` takes the `Result` apart and fails the test if it is a failure. `expect` fails the test when its [`Boolean`](/docs/library/boolean) is `false`.
+
+## What Essence does not have
+
+- **No I/O beyond [`Terminal`](/docs/library/terminal).** It has seven functions, each called like `Terminal.print(…)`: `print`, [`write`](/docs/library/terminal#write), [`inspect`](/docs/library/terminal#inspect), [`describe`](/docs/library/terminal#describe), [`readLine`](/docs/library/terminal#readLine), [`readAll`](/docs/library/terminal#readAll) and [`ask`](/docs/library/terminal#ask). There is no HTTP, no JSON, no file, no timer and no environment variable. Beside it, [`Randomness.entropy()`](/docs/library/randomness#entropy) reads random values from the host, the JavaScript runtime that runs the program. `essence run Main.es -- alpha beta` hands `alpha beta` to the process, and nothing in the language reads them.
+- **No async.** There is no `async` and no `await`. A call returns when its body is done, and waiting on a network or a timer is the host's job.
+- **No exceptions.** There is no `throw`, `try` or `catch`. A function that can fail says so in its return type, as `total` does with its `Result`.
+- **No `null` or `undefined`.** A value that may be absent is an `Optional`. The value inside cannot be used until the program says what happens when it is empty.
+- **No mutation of data.** A record, a list or a string never changes. `{ order with quantity = 3 }` is a new record, and `order` keeps its old value. There is no assignment to a member. A `constant` cannot be reassigned, and a `variable` can only be pointed at another value.
+- **No operators.** `+`, `==`, `&&`, `!`, `<` and `?:` are not syntax. Arithmetic, comparison and logic are method calls: [`price::add(tax)`](/docs/library/integer#add), [`a::is(b)`](/docs/library/integer#is), [`a::and(b)`](/docs/library/boolean#and), [`a::negate()`](/docs/library/boolean#negate), `a::isLessThan(b)`. `is` compares records and lists by value, where `===` compares objects by reference. A value picked by a condition is a [`define { … }`](/docs/reference/syntax-glossary#define) or a `match`.
+- **No classes.** There is no `class`, no `this`, no prototype, and no type inherits from another. Data you declare is a record or a choice. A [namespace](/docs/language/namespaces-and-methods) attaches methods to a type from outside, and a [protocol](/docs/language/protocols) names the methods several types share.
+- **No `for` or `while`.** A list is transformed with [`map`](/docs/library/list#map), [`reduce`](/docs/library/list#reduce) and the other list methods. Other repetition is recursion or [`loop`](/docs/library/loop), one function whose labels (`while`, `through`, `upTo`) pick the kind of loop. [Iteration](/docs/language/iteration) has all of them.
+- **No recursive types.** A `type` or a `choice` cannot name itself, so a tree or a linked list cannot be declared. The compiler reports [`recursive-type-declaration`](/docs/reference/diagnostics#recursive-type-declaration), or [`recursive-generic-choice`](/docs/reference/diagnostics#recursive-generic-choice) for a generic choice.
+- **No tuples.** `(1, 2)` does not parse. A group of values is a record with named members.
+- **No packages.** [An import](/docs/language/modules) names a relative `.es` path such as `"./Money.es"`, and nothing is searched for. The standard library is in scope without an import.
+- **No calling JavaScript from Essence.** The boundary runs one way: JavaScript calls Essence, and an Essence file cannot import JavaScript. The only host-written JavaScript that runs during a call is a function passed in as an argument.
+- **No floating point.** There is no floating-point `number` and no `NaN`. Essence's own [`Number`](/docs/library/number) is the union of its exact number types.
+- **No truthiness.** An `if` condition is a `Boolean`. `if 1` is refused as [`condition-not-boolean`](/docs/reference/diagnostics#condition-not-boolean).
+- **No default export.** An `export { … }` block lists names, and a JavaScript host imports each one by its name.
+- **No type arguments at a call site.** `identity<Integer>(1)` does not parse. A generic function's type parameters are inferred from its arguments, as [Generics](/docs/language/generics) shows.
+
+## What Essence does instead
+
+- **Exact numbers.** An `Integer` has no upper bound and a [`Rational`](/docs/library/rational) is an exact fraction: `0.1::add(0.2)::is(0.3)` is `true`, and `0.1::add(0.2)` prints `3/10`. [Numbers](/docs/language/numbers) has every number type.
+- **`Optional` and `Result`.** Absence and failure are ordinary values with two cases each. [Coming from JavaScript](/docs/getting-started/coming-from-javascript#absence) maps `null`, `undefined`, `throw` and `try` onto them.
+- **A closed `choice` with an exhaustive `match`.** A choice lists its cases once. A `match` that leaves one out is refused as [`missing-case`](/docs/reference/diagnostics#missing-case), and its Note names the case it lacks: `Unhandled: 'Zone#Overseas'.`
+- **Checked refinements.** [`NonEmptyString`](/docs/library/string#NonEmptyString) and [`PositiveInteger`](/docs/library/integer#PositiveInteger) are types with a check attached. Inside [`if name::hasCharacters()`](/docs/library/string#hasCharacters), a [`String`](/docs/library/string) is a `NonEmptyString`. Outside it, the compiler refuses a plain `String`, `""` included, where a `NonEmptyString` is asked for. [Checked refinements](/docs/language/checked-refinements) has the rest.
+- **Tests in the same file.** A failed `expect` labels the values that went into it. For a `double` that multiplies by three, `expect double(2)::is(4)` shows that `double(2)` was `6`. [Your first test](/docs/getting-started/your-first-test) reads a failure.
+- **A checked JavaScript boundary.** A value whose shape or base type does not fit is refused before the function runs. The error names the member that did not fit, as in `argument 1 → .lines[0].quantity: expected Integer, got the string "two"`. [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) has every rule.
+
+## Essence inside a JavaScript program
+
+Essence is the pure core of a program, and the JavaScript around it is the shell. The shell (Node, Bun or a browser page) reads the request, the file or the clock. It hands plain JavaScript values to an Essence function and gets plain values back. An `Integer` comes back as a `bigint`, and an `Optional` as its value or `undefined`. A case of a choice with no payloads anywhere comes back as its name, such as `"Overseas"`. Any other case, a `Result` included, comes back as an object with a `$case`.
+
+There are three ways to call a `.es` file from JavaScript, and the guide *Calling Essence from JavaScript* walks through each:
+
+- **`loadModule`** from `@essence-lang/client` compiles a file while the host runs. It returns a promise of a module whose `exports` are JavaScript functions and values.
+- **The Vite, esbuild and Bun plugins** turn an import of a `.es` file into an ordinary import, and can write a `.d.es.ts` file for TypeScript.
+- **`essence build --embed`** writes a bundle and a descriptor of its boundary, and **`loadPrebuilt`** loads the pair without compiling anything.
+
+`examples/quote-server`, listed below, uses the Bun plugin. Its `server.ts` parses the request and writes the response, and the pricing rules reach it through one import:
+
+```ts
+import type { Input } from "@essence-lang/client"
+import { catalog, type Order, quote } from "./rules/Pricing.es"
+
+// …
+
+let answer = quote(body as Input<Order>)
+
+if (answer.$case === "Quote#Rejected") {
+	return toJSON(answer, 422)
+}
+```
+
+`body` is the parsed JSON of the request. `Input<Order>` is `Order` with every `Integer` widened to `bigint | number`, which is what a caller may pass. A body that does not fit `Order` makes `quote` throw an `EssenceMarshalError` before any rule runs, and `server.ts` responds with a 400. Nothing in `server.ts` checks a field by hand.
+
+## The example programs
+
+Three programs in the repository show Essence at full size.
+
+- [`examples/league`](https://github.com/alexandertrefz/essence/tree/master/examples/league) is a six-team season as a pure program. The matches are data, and the program works out the standings and prints them with `essence run`.
+- [`examples/quote-server`](https://github.com/alexandertrefz/essence/tree/master/examples/quote-server) is a Bun HTTP API that prices orders. Every rule is Essence, reached through the Bun plugin.
+- [`examples/client-2048`](https://github.com/alexandertrefz/essence/tree/master/examples/client-2048) is the game 2048 in the browser. The board and the moves are Essence, Vite serves them through one plugin line, and undo reads a board that was never overwritten.
+
+<Note label="Version">
+This site documents Essence {VERSION}, the version `essence --version` prints; the language is pre-1.0, and a release renames things.
+</Note>

@@ -1,0 +1,284 @@
+---
+title: Your first test
+description: "Add a tests block to hello.es, run essence test, break an assertion to read the report, and take an Optional apart with require."
+section: getting-started
+order: 40
+template: guide
+tocDepth: 2
+steps: 4
+minutes: 8
+---
+
+A test is a named block of assertions: checks that must hold for the test to pass. In Essence a test can live in the file it tests, in a `tests { … }` block below the program, and `essence test` runs it. There is no test library to install and no second file to wire up. This guide adds tests to `hello.es` from [Your first program](/docs/getting-started/your-first-program), breaks one to read the failure report, and then takes a parsed number apart with `require`.
+
+<Steps>
+
+<StepItem title="Add a tests block">
+
+Open `hello.es` and add a `tests` block after the closing brace of `implementation`:
+
+```essence
+implementation {
+	constant oneThird  = 1/3
+	constant twoThirds = 2/3
+
+	constant sum = oneThird::add(twoThirds)
+
+	Terminal.print("1/3 + 2/3 = {sum}") § 1/3 + 2/3 = 1
+}
+
+tests {
+	test "thirds add to one" {
+		expect sum::is(1)
+	}
+}
+```
+
+This is the file from the previous guide with its two comment lines left out. Delete them from yours too, so the line numbers in the reports below match. The new block holds three things, each with the page that teaches it:
+
+- **`tests { … }` is the last block of a file.** The order is `import`, `implementation`, `export`, `tests`, and [Modules](/docs/language/modules) describes all four. The block sees every name the implementation declares, exported or not. That is how the test reads `sum`.
+- **`test "…" { … }` is one test.** Its name is a string, and the report prints it. [Tests](/docs/language/tests) covers everything a test can hold.
+- **`expect` takes any [`Boolean`](/docs/library/boolean).** There is no library of assertion methods like Vitest's `toBe`. [`sum::is(1)`](/docs/library/rational#is) is an ordinary method call that returns a Boolean. A value that is not a Boolean is refused as [`expect-not-boolean`](/docs/reference/diagnostics#expect-not-boolean).
+
+Write the block above the implementation and the compiler refuses the file as [`misplaced-tests-section`](/docs/reference/diagnostics#misplaced-tests-section):
+
+<div class="error-output">
+
+```
+[misplaced-tests-section]
+Error: The 'tests { … }' block belongs below the 'implementation { … }' block
+   ╭─┤ hello.es:1:1 │
+   │
+ 1 │ tests {
+   │ ──┬──
+   │   ╰──── this block is written above the implementation
+   │
+   │ Help: Move the 'tests { … }' block below 'implementation { … }', and below anything the Module exports.
+   │
+   │ Note: A Module reads top to bottom: what it imports, what it does, what it exports, what it proves.
+───╯
+```
+
+</div>
+
+**Compared with JavaScript.** The same test in Vitest:
+
+```ts
+// hello.test.ts
+import { expect, test } from "vitest"
+import { sum } from "./hello"
+
+test("thirds add to one", () => {
+	expect(sum).toBe(1)
+})
+```
+
+The Vitest version lives in a second file, imports an export of `sum`, and asserts with `toBe` from Vitest's library. The Essence test needs none of the three: it sits in the same file, reads `sum` directly, and asserts a Boolean. Vitest can keep tests in the source file too, behind `import.meta.vitest` and a `define` in the build config; Essence needs neither. The rest of the toolchain is compared under [tooling](/docs/getting-started/coming-from-javascript#tooling).
+
+</StepItem>
+
+<StepItem title="Run it">
+
+[`essence test`](/docs/reference/cli#test) compiles the file with its tests and runs them.
+
+```sh
+$ essence test hello.es
+1/3 + 2/3 = 1
+
+ hello.es
+   ✓ thirds add to one
+
+ 1 passed  ·  0.48 ms
+```
+
+The first line is the program's own output. The implementation's statements run when the file loads, before any test, so [`Terminal.print`](/docs/library/terminal#print) prints the same line as under [`essence run`](/docs/reference/cli#run). Below that is the report: the file, one line per test with `✓` for a pass, and a summary with the count and the time. The command exits with `0`. A failing test makes it exit with `1`.
+
+Three other commands handle the block. [`essence check hello.es`](/docs/reference/cli#check) type-checks the tests without running them, so `expect sum::is("one")` is an error before anything runs. [`essence build hello.es`](/docs/reference/cli#build) and `essence run` drop the block before they compile, and the built `hello.js` holds no trace of the test.
+
+</StepItem>
+
+<StepItem title="Break it">
+
+Change the `1` in the assertion to a `2`:
+
+```essence
+§ fragment
+expect sum::is(2)
+```
+
+Run the tests again:
+
+<div class="error-output">
+
+```
+1/3 + 2/3 = 1
+
+ hello.es
+   ✗ thirds add to one
+
+[test-failed]
+Error: 'thirds add to one' failed
+    ╭─┤ hello.es:12:10 │
+    │
+ 12 │        expect sum::is(2)
+    │               ─┬───┬────
+    │                ╰───│────── 1/1
+    │                    │
+    │                    ╰────── this expect failed
+    │
+    │ Note: `is` compared 1/1 with 2
+────╯
+
+ 1 failed  ·  0.67 ms
+```
+
+</div>
+
+The failure is an error with the code [`test-failed`](/docs/reference/diagnostics#test-failed), and the run exits with `1`. Read it from the top:
+
+- The Error line names the test that failed, and the line below it names the file and line of the assertion.
+- The labels put values under the expressions that produced them. `sum` held `1/1`: a name gets a label when it is a side of the outermost `is`. The label under `is` marks where the `expect` failed.
+- The Note says what `is` compared: `1/1` on the left, `2` on the right.
+
+The report writes values the way [`Terminal.inspect`](/docs/library/terminal#inspect) does. That is why a whole-number [`Rational`](/docs/library/rational) reads `1/1` here and `1` under `Terminal.print`.
+
+Labels also show values no name held. Write the sum out inside the assertion:
+
+```essence
+§ fragment
+expect oneThird::add(twoThirds)::is(2)
+```
+
+<div class="error-output">
+
+```
+[test-failed]
+Error: 'thirds add to one' failed
+    ╭─┤ hello.es:12:10 │
+    │
+ 12 │        expect oneThird::add(twoThirds)::is(2)
+    │               ────────────┬──┬───────────────
+    │                           ╰──│───────────────── 1/1
+    │                              │
+    │                              ╰───────────────── this expect failed
+    │
+    │ Note: `is` compared 1/1 with 2
+────╯
+```
+
+</div>
+
+Now `1/1` stands under the `add` call. In an assertion, every call and every member read gets a label with its value, except the last call, whose label marks the failure. A name that is not a side of the outermost `is` gets none, so `oneThird` and `twoThirds` have no label.
+
+An `expect` records its failure and the test carries on. A test with several `expect` lines reports each one that fails. Vitest's `expect` throws, so its first failure ends the test. Essence's `expect` works like Vitest's `expect.soft`.
+
+**Compared with JavaScript.** Vitest reports the same failure with the two values `toBe` saw:
+
+```
+AssertionError: expected 1 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 1
+```
+
+Vitest prints these lines whether the test wrote `sum` or `oneThird + twoThirds`. It sees only the value passed to `expect`, so its report holds no value for the steps that produced it.
+
+</StepItem>
+
+<StepItem title="Take an Optional apart">
+
+Put the assertion back to `expect sum::is(1)`. A test usually calls a function, so add one to the implementation, and a second test that starts from text, the way a program's input arrives:
+
+```essence
+implementation {
+	constant oneThird  = 1/3
+	constant twoThirds = 2/3
+
+	constant sum = oneThird::add(twoThirds)
+
+	function thirds(_ count: Integer) -> Rational {
+		<- oneThird::multiply(with count)
+	}
+
+	Terminal.print("1/3 + 2/3 = {sum}") § 1/3 + 2/3 = 1
+}
+
+tests {
+	test "thirds add to one" {
+		expect sum::is(1)
+	}
+
+	test "three thirds make one" {
+		require #Value(count) = Integer.parse("3")
+
+		expect thirds(count)::is(1)
+	}
+}
+```
+
+Three more things, each with its page:
+
+- **`function thirds(_ count: Integer) -> Rational { … }` declares a function**, and `<-` returns a value from it. `oneThird::multiply(with count)` passes `count` under the [label](/docs/reference/syntax-glossary#labels) `with`, and the label is part of the call. The `_` before `count` means `thirds` takes its argument without one, as in `thirds(count)`. [Functions](/docs/language/functions) has the whole form.
+- **[`Integer.parse("3")`](/docs/library/integer#parse) returns an [`Optional`](/docs/language/optional)**, because text may not hold a number. An `Optional<Integer>` is one of two cases, the named forms its value can take. Each is written with a `#`, which marks a case, not a private field: `#Value(…)` holding the [`Integer`](/docs/library/integer), or `#Empty`. There is no `null` to check for.
+- **`require #Value(count) = …` takes the value apart.** Left of the `=` stands a matcher, a shape the value has to fit. When the value is a `#Value`, the matcher binds `count` to the number inside, and every line below can use it. When it is `#Empty`, the test ends on this line. `require` also takes a plain Boolean, like `expect`. The difference is that a failed `require` ends the test, as a failed Vitest `expect` does, and a failed `expect` lets it carry on. The Tests page has both forms.
+
+Run `essence test hello.es` again, and both tests pass. Now give `Integer.parse` text it cannot read:
+
+```essence
+§ fragment
+require #Value(count) = Integer.parse("three")
+```
+
+<div class="error-output">
+
+```
+1/3 + 2/3 = 1
+
+ hello.es
+   ✓ thirds add to one
+   ✗ three thirds make one
+
+[test-failed]
+Error: 'three thirds make one' failed
+    ╭─┤ hello.es:20:11 │
+    │
+ 20 │        require #Value(count) = Integer.parse("three")
+    │                ───────────────────┬──┬────┬──────────
+    │                                   ╰──│────│──────────── this require failed
+    │                                      │    │
+    │                                      ╰────│──────────── Function
+    │                                           │
+    │                                           ╰──────────── Optional#Empty
+────╯
+
+ 1 passed  1 failed  ·  0.90 ms
+```
+
+</div>
+
+The `require` failed, so the test ended on that line and the `expect` below it never ran. The labels show what stood right of the `=`. `Integer.parse` read on its own is a function value, so its label says `Function`. Calling it returned `Optional#Empty`, which is `#Empty` written with its type's name, and that does not fit the matcher `#Value(count)`.
+
+</StepItem>
+
+</Steps>
+
+Put the `"3"` back and both tests pass again. Three more pieces:
+
+- A [`suite "…" { … }`](/docs/reference/syntax-glossary#suite) groups tests, like Vitest's `describe`, and the report indents them under the suite's name.
+- [`essence test --filter three`](/docs/reference/cli#test--filter) runs only the tests whose name contains `three`, like `vitest -t three`.
+- [`essence test --watch`](/docs/reference/cli#test--watch) keeps running and runs the tests again each time you save.
+
+[Running tests](/docs/guides/running-tests) covers these flags and the rest of the command. The Tests page shows how to skip or tag a test, run it once per row of a table, run it against generated values, or record a snapshot.
+
+<SeeAlso
+	links={[
+		{ label: "Tests", href: "/docs/language/tests" },
+		{ label: "Running tests", href: "/docs/guides/running-tests" },
+		{ label: "Optional", href: "/docs/language/optional" },
+		{ label: "Functions", href: "/docs/language/functions" },
+		{ label: "Coming from JavaScript", href: "/docs/getting-started/coming-from-javascript" },
+	]}
+/>
