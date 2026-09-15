@@ -9,6 +9,7 @@ import * as dictionary from "@essence-lang/runtime/Dictionary"
 import * as division from "@essence-lang/runtime/Division"
 import * as functions from "@essence-lang/runtime/functions"
 import * as future from "@essence-lang/runtime/Future"
+import * as futureList from "@essence-lang/runtime/FutureList"
 import * as groupedList from "@essence-lang/runtime/GroupedList"
 import * as groupedNonEmptyList from "@essence-lang/runtime/GroupedNonEmptyList"
 import * as integer from "@essence-lang/runtime/Integer"
@@ -19,6 +20,7 @@ import * as nestedList from "@essence-lang/runtime/NestedList"
 import * as nestedOptional from "@essence-lang/runtime/NestedOptional"
 import * as nestedResult from "@essence-lang/runtime/NestedResult"
 import * as nonEmptyDictionary from "@essence-lang/runtime/NonEmptyDictionary"
+import * as nonEmptyFutureList from "@essence-lang/runtime/NonEmptyFutureList"
 import * as nonEmptyIntegerList from "@essence-lang/runtime/NonEmptyIntegerList"
 import * as nonEmptyKeyedNumberList from "@essence-lang/runtime/NonEmptyKeyedNumberList"
 import * as nonEmpty from "@essence-lang/runtime/NonEmptyList"
@@ -44,6 +46,8 @@ import * as rational from "@essence-lang/runtime/Rational"
 import * as rationalList from "@essence-lang/runtime/RationalList"
 import * as record from "@essence-lang/runtime/Record"
 import * as result from "@essence-lang/runtime/Result"
+import * as resultFuture from "@essence-lang/runtime/ResultFuture"
+import * as resultFutureList from "@essence-lang/runtime/ResultFutureList"
 import * as resultList from "@essence-lang/runtime/ResultList"
 import * as rounding from "@essence-lang/runtime/Rounding"
 import * as scalar from "@essence-lang/runtime/Scalar"
@@ -125,16 +129,18 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	GroupedList: groupedList,
 	GroupedNonEmptyList: groupedNonEmptyList,
 	Randomness: randomness,
-	// NOTE: A Namespace with no declared Method yet — the combinators arrive
-	// with the natives that make them worth writing. Its module is anything but
-	// empty: it is the runtime asynchrony itself is built out of, read by the
-	// emission under the alias `$future`, and the row is here because the
-	// cross-check below is over the Rewriter's whole import list.
+	// NOTE: The one module that is the runtime asynchrony itself is built out
+	// of — read by the emission under the alias `$future` — as well as the
+	// Namespace's own. Every combinator of the four Namespaces under it is
+	// implemented here and re-exported there, which is what a Namespace whose
+	// answer belongs to another one's machinery looks like.
 	Future: future,
-	// NOTE: And a module holding one exported TYPE, for the reason `Scalar`'s
-	// does — a run of a Future has no representation apart from the description
-	// it came from, so everything that builds or waits for one lives in
-	// `Future.ts`.
+	ResultFuture: resultFuture,
+	FutureList: futureList,
+	NonEmptyFutureList: nonEmptyFutureList,
+	ResultFutureList: resultFutureList,
+	// NOTE: And the run's own Namespace, whose two Methods are about the run
+	// rather than about the description it came from.
 	Started: started,
 	Async: async,
 }

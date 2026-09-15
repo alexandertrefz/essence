@@ -9,6 +9,10 @@ searchDepth: 3
 namespaces:
   - "Future"
   - "Async"
+  - "ResultFuture"
+  - "FutureList"
+  - "NonEmptyFutureList"
+  - "ResultFutureList"
   - "Started"
 aliases: []
 conformsTo: []
@@ -33,3 +37,49 @@ A Function whose body writes `complete` declares `-> Future<Value>`. Calling it 
 ### deferred
 
 <MemberEntries page={"future"} name={"deferred"} />
+
+### sleep
+
+<MemberEntries page={"future"} name={"sleep"} />
+
+## Building on a Future
+
+### map
+
+<MemberEntries page={"future"} name={"map"} />
+
+### <span id="andThen">andThen</span>
+
+<MemberEntries page={"future"} name={"andThen"} />
+
+### within
+
+<MemberEntries page={"future"} name={"within"} />
+
+### attempt
+
+<MemberEntries page={"future"} name={"attempt"} />
+
+## Several at once
+
+### <span id="inSequence">inSequence</span>
+
+<MemberEntries page={"future"} name={"inSequence"} />
+
+### all
+
+<MemberEntries page={"future"} name={"all"} />
+
+### race
+
+<MemberEntries page={"future"} name={"race"} />
+
+### <span id="firstValue">firstValue</span>
+
+<MemberEntries page={"future"} name={"firstValue"} />
+
+## Reading a run
+
+`map` on `Started<Value>` is listed under [`map`](#map), with the other entries of that name.
+
+`within` on `Started<Value>` is listed under [`within`](#within), with the other entries of that name.

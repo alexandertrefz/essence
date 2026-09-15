@@ -66,6 +66,10 @@ export const runtimeNamespaceNames = [
 	"GroupedNonEmptyList",
 	"Randomness",
 	"Future",
+	"ResultFuture",
+	"FutureList",
+	"NonEmptyFutureList",
+	"ResultFutureList",
 	"Started",
 	"Async",
 ]

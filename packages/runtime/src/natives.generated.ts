@@ -30,6 +30,7 @@ import type { ResultType } from "./Result"
 import type { RoundingType } from "./Rounding"
 import type { SideType } from "./Side"
 import type { SortOrderType } from "./SortOrder"
+import type { StartedType } from "./Started"
 import type { StepType } from "./Step"
 import type { StreamType } from "./Stream"
 import type { StringType } from "./String"
@@ -812,16 +813,45 @@ export type RandomnessNatives = {
 }
 
 export type FutureNatives = {
+	// within<Value>(milliseconds: Integer) -> Future<Optional<Value>>
+	within: <Value extends AnyType>(self: FutureType<Value>, milliseconds: IntegerType) => FutureType<OptionalType<Value>>
+}
+
+export type ResultFutureNatives = {
 
 }
 
-export type StartedNatives = {
+export type FutureListNatives = {
+	// inSequence<Value>() -> Future<List<Value>>
+	inSequence: <Value extends AnyType>(self: ListType<FutureType<Value>>) => FutureType<ListType<Value>>
+	// all<Value>() -> Future<List<Value>>
+	all__overload$1: <Value extends AnyType>(self: ListType<FutureType<Value>>) => FutureType<ListType<Value>>
+	// all<Value>(atMost: Integer) -> Future<List<Value>>
+	all__overload$2: <Value extends AnyType>(self: ListType<FutureType<Value>>, atMost: IntegerType) => FutureType<ListType<Value>>
+}
 
+export type NonEmptyFutureListNatives = {
+	// race<Value>() -> Future<Value>
+	race: <Value extends AnyType>(self: ListType<FutureType<Value>>) => FutureType<Value>
+}
+
+export type ResultFutureListNatives = {
+	// firstValue<Value, Failure>() -> Future<Optional<Value>>
+	firstValue: <Value extends AnyType, Failure extends AnyType>(self: ListType<FutureType<ResultType<Value, Failure>>>) => FutureType<OptionalType<Value>>
+}
+
+export type StartedNatives = {
+	// map<Value, Other>(_: (_: Value) -> Other) -> Started<Other>
+	map: <Value extends AnyType, Other extends AnyType>(self: StartedType<Value>, argument1: (argument0: Value) => Other) => StartedType<Other>
+	// within<Value>(milliseconds: Integer) -> Started<Optional<Value>>
+	within: <Value extends AnyType>(self: StartedType<Value>, milliseconds: IntegerType) => StartedType<OptionalType<Value>>
 }
 
 export type AsyncNatives = {
 	// static deferred<Value>(_: () -> Value) -> Future<Value>
 	deferred: <Value extends AnyType>(argument0: () => Value) => FutureType<Value>
+	// static sleep(milliseconds: Integer) -> Future<Record>
+	sleep: (milliseconds: IntegerType) => FutureType<RecordType>
 }
 
 export type FunctionsNatives = {
@@ -1351,14 +1381,47 @@ export const $RandomnessArity: AssertArities<typeof import("./Randomness"), {
 
 declare const FutureModule: typeof import("./Future")
 export const $Future: FutureNatives = FutureModule
+export const $FutureAbsent: AssertNoEssenceExports<typeof import("./Future"), "map" | "andThen__overload$1" | "andThen__overload$2"> = true
+export const $FutureArity: AssertArities<typeof import("./Future"), {
+	within: 2
+}> = true
+
+declare const ResultFutureModule: typeof import("./ResultFuture")
+export const $ResultFuture: ResultFutureNatives = ResultFutureModule
+export const $ResultFutureAbsent: AssertNoEssenceExports<typeof import("./ResultFuture"), "attempt__overload$1" | "attempt__overload$2"> = true
+
+declare const FutureListModule: typeof import("./FutureList")
+export const $FutureList: FutureListNatives = FutureListModule
+export const $FutureListArity: AssertArities<typeof import("./FutureList"), {
+	inSequence: 1
+	all__overload$1: 1
+	all__overload$2: 2
+}> = true
+
+declare const NonEmptyFutureListModule: typeof import("./NonEmptyFutureList")
+export const $NonEmptyFutureList: NonEmptyFutureListNatives = NonEmptyFutureListModule
+export const $NonEmptyFutureListArity: AssertArities<typeof import("./NonEmptyFutureList"), {
+	race: 1
+}> = true
+
+declare const ResultFutureListModule: typeof import("./ResultFutureList")
+export const $ResultFutureList: ResultFutureListNatives = ResultFutureListModule
+export const $ResultFutureListArity: AssertArities<typeof import("./ResultFutureList"), {
+	firstValue: 1
+}> = true
 
 declare const StartedModule: typeof import("./Started")
 export const $Started: StartedNatives = StartedModule
+export const $StartedArity: AssertArities<typeof import("./Started"), {
+	map: 2
+	within: 2
+}> = true
 
 declare const AsyncModule: typeof import("./Async")
 export const $Async: AsyncNatives = AsyncModule
 export const $AsyncArity: AssertArities<typeof import("./Async"), {
 	deferred: 1
+	sleep: 1
 }> = true
 
 declare const functionsModule: typeof import("./functions")

@@ -1087,7 +1087,29 @@ export const PAGES: PageDefinition[] = [
 		groups: [
 			{
 				label: "Describing work",
-				members: ["Async::deferred"],
+				members: ["Async::deferred", "Async::sleep"],
+			},
+			{
+				label: "Building on a Future",
+				members: [
+					"Future::map",
+					"Future::andThen",
+					"Future::within",
+					"ResultFuture::attempt",
+				],
+			},
+			{
+				label: "Several at once",
+				members: [
+					"FutureList::inSequence",
+					"FutureList::all",
+					"NonEmptyFutureList::race",
+					"ResultFutureList::firstValue",
+				],
+			},
+			{
+				label: "Reading a run",
+				members: ["Started::map", "Started::within"],
 			},
 		],
 	},

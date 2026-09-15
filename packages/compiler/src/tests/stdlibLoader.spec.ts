@@ -1512,10 +1512,15 @@ describe("Standard Library Loader", () => {
 			"GroupedList",
 			"GroupedNonEmptyList",
 			"Randomness",
-			// NOTE: And the two the language's asynchrony is written in, after
-			// every Namespace of a value a Program HOLDS — see
+			// NOTE: And the Namespaces the language's asynchrony is written
+			// in, after every Namespace of a value a Program HOLDS, each
+			// narrower target after the one it narrows — see
 			// `builtinMemberOrder`.
 			"Future",
+			"ResultFuture",
+			"FutureList",
+			"NonEmptyFutureList",
+			"ResultFutureList",
 			"Started",
 			// NOTE: And the Namespace a future comes FROM, last — see
 			// `builtinMemberOrder`.
@@ -1553,8 +1558,8 @@ describe("Standard Library Loader", () => {
 			entries += flags.length
 		}
 
-		expect(stdlib.namespaces).toHaveLength(53)
-		expect(entries).toBe(726)
+		expect(stdlib.namespaces).toHaveLength(57)
+		expect(entries).toBe(740)
 	})
 
 	// NOTE: The other half of the ordering rule. `builtinMemberOrder` is the

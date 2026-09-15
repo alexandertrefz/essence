@@ -1,10 +1,11 @@
 declarations {
 
-	§ The one way to build a future out of nothing. Everything else in the
-	§ language builds one from a future it already has. A completing body wraps
-	§ what it waits for, `start` runs one, and `complete` reads one. So a
-	§ Program with no native answering a Future can not write one down at all.
-	§ This is the base case the rest rests on.
+	§ The two ways to build a future out of nothing. Everything else builds one
+	§ from a future it already has. A completing body wraps what it waits for,
+	§ `start` runs one and `complete` reads one. So a Program with no native
+	§ answering a Future could not write one down at all. These two are the base
+	§ case the rest rests on: a computation to carry out later, and a length of
+	§ time to wait.
 
 	§§ Work a Program describes for later.
 	namespace Async {
@@ -17,6 +18,16 @@ declarations {
 		§§ @param _ — the computation to run when the Future is started
 		§§ @returns — a Future answering what the computation answers.
 		static deferred<infer Value>(_ compute: () -> Value) -> Future<Value>
+
+		§§ Answers a Future that waits the given number of milliseconds.
+		§§
+		§§ Nothing waits while the Future is being built. Each start waits again, so a Future that is started twice waits twice.
+		§§
+		§§ A wait that is stopped never answers. The runs that `within` and `race` leave behind are stopped, and what one would have answered is never read.
+		§§
+		§§ @param milliseconds — how long to wait
+		§§ @returns — a Future answering nothing, once the time has passed.
+		static sleep(milliseconds duration: Integer) -> Future<{}>
 	}
 }
 

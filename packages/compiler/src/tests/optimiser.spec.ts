@@ -6825,4 +6825,103 @@ describe("Optimiser", () => {
 			expect(none).toEqual(all)
 		})
 	})
+	// NOTE: What every pass has to leave alone. `start` and `complete` are the
+	// two Expressions in the language with an effect the Optimiser can not see
+	// — one puts work in flight and the other suspends — so a pass that treats
+	// either as a value would move work to another turn of the event loop, or
+	// run it twice, or not at all. `purity.ts` is where they are declared
+	// impure; these are the passes that would otherwise have moved them.
+	describe("asynchrony", () => {
+		const waiting = `implementation {
+	function twice(_ value: Integer) -> Future<Integer> {
+		constant held = complete Async.deferred(() { <- value })
+
+		<- held::add(held)
+	}
+
+	Terminal.inspect(complete twice(21))
+	Terminal.inspect(complete twice(21))
+}`
+
+		it("pools no start and no complete", () => {
+			// NOTE: Two `complete twice(21)` Statements written identically.
+			// `pool-constants` declares a value written twice once, and these
+			// are two runs of the same description rather than one value.
+			let generated = generate(waiting)
+
+			expect(generated).not.toMatch(/\$pool_\d+ = await/)
+			expect(generated).not.toMatch(/\$pool_\d+ = \$future\./)
+			expect(
+				[...generated.matchAll(/await \$future\.complete\(/g)].length,
+			).toBeGreaterThanOrEqual(3)
+		})
+
+		it("inlines no walk whose body waits", () => {
+			// NOTE: `inline-loops` writes a counted walk as a `for`, and a body
+			// that waits can not be one: the wait belongs to the enclosing
+			// Function, and the inlined block is not one. The walk that carries
+			// a Future is the shape that reaches this — a callback completing
+			// something answers a Future, so the State it threads is a Future
+			// too.
+			let generated = generate(`implementation {
+	function counted() -> Future<Integer> {
+		constant seed = Async.deferred(() { <- 0 })
+		constant answer = loop(
+			from 1,
+			through 3,
+			startingWith seed,
+			(index, total) -> Future<Integer> {
+				constant held = complete total
+
+				<- held::add(index)
+			},
+		)
+
+		<- complete answer
+	}
+
+	Terminal.inspect(complete counted())
+}`)
+
+			expect(generated).toContain("loop__overload$3")
+			expect(generated).not.toContain("$loop_0_index")
+		})
+
+		it("reads an Integer through a wait without losing its parentheses", () => {
+			// NOTE: An Integer is HYBRID — a small one holds a number and a
+			// large one a bigint — and every arithmetic site reads the value off
+			// the box rather than the box. Where the box arrives through an
+			// `await`, the read is `(await …).value`, and the parentheses are
+			// the whole of what makes it one: `await x.value` waits for the
+			// member of a promise, which is `undefined`.
+			//
+			// NOTE: An operand rather than a Constant, because a `complete`
+			// bound to a name is read through the name — which is most of them,
+			// and none of them asks this question.
+			let generated = generate(`implementation {
+	function twice(_ value: Integer) -> Future<Integer> {
+		<- value::add(complete Async.deferred(() { <- value }))
+	}
+
+	Terminal.inspect(complete twice(21))
+}`)
+
+			expect(generated).toContain(
+				"Integer.sum(value.value, (await $future.complete(",
+			)
+			expect(generated).toContain("), $ctx)).value)")
+		})
+
+		it("answers what a waiting Program answers, optimised and not", async () => {
+			expect(await outputOf(generate(waiting))).toEqual(
+				await outputOf(
+					generate(waiting, {
+						enabled: false,
+						disabledPasses: new Set(),
+					}),
+				),
+			)
+			expect(await outputOf(generate(waiting))).toEqual(["42", "42"])
+		})
+	})
 })

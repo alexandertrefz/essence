@@ -4,7 +4,15 @@
 	"kind": "type",
 	"declaration": "namespace Future<infer Value> for Future<Value>",
 	"choice": null,
-	"namespaces": ["Future", "Async", "Started"],
+	"namespaces": [
+		"Future",
+		"Async",
+		"ResultFuture",
+		"FutureList",
+		"NonEmptyFutureList",
+		"ResultFutureList",
+		"Started"
+	],
 	"conformsTo": [],
 	"groups": [
 		{
@@ -40,6 +48,374 @@
 							"examples": []
 						}
 					]
+				},
+				{
+					"key": "Async::sleep",
+					"namespace": "Async",
+					"name": "sleep",
+					"receiver": "Async",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static sleep(milliseconds duration: Integer) -> Future<{}>",
+							"summary": "Answers a Future that waits the given number of milliseconds.\n\nNothing waits while the Future is being built. Each start waits again, so a Future that is started twice waits twice.\n\nA wait that is stopped never answers. The runs that `within` and `race` leave behind are stopped, and what one would have answered is never read.",
+							"parameters": [
+								{
+									"name": "milliseconds",
+									"type": "Integer",
+									"default": null,
+									"description": "how long to wait",
+									"href": null
+								}
+							],
+							"returns": "a Future answering nothing, once the time has passed.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Building on a Future",
+			"id": "building-on-a-future",
+			"members": [
+				{
+					"key": "Future::map",
+					"namespace": "Future",
+					"name": "map",
+					"receiver": "Future<Value>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "map<infer Other>(_ transform: (_: Value) -> Other) -> Future<Other>",
+							"summary": "Answers a Future that runs this one and hands its value to the transform.\n\nNothing runs while the answer is being built. Each start of the answer starts the receiver again, so two starts run the work twice and call the transform twice.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "(_: Value) -> Other",
+									"default": null,
+									"description": "the transform the value is handed to",
+									"href": null
+								}
+							],
+							"returns": "a Future answering what the transform answers.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Future::andThen",
+					"namespace": "Future",
+					"name": "andThen",
+					"receiver": "Future<Value>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers a Future that runs this one, and then work that follows it.",
+					"returns": "a Future answering what the work that follows answers.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "andThen<infer Other>(\n\t_ next: (_: Value) -> Future<Other>,\n) -> Future<Other>",
+							"summary": "Answers a Future that runs this one, and then the one the next Function builds from its value.\n\nThe Function is called once the receiver has answered, so what it builds can read that value. Nothing runs while the answer is being built.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "(_: Value) -> Future<Other>",
+									"default": null,
+									"description": "the Function building the work to run next",
+									"href": null
+								}
+							],
+							"returns": "a Future answering what the next work answers.",
+							"examples": []
+						},
+						{
+							"signature": "andThen<infer Other>(_ next: Future<Other>) -> Future<Other>",
+							"summary": "Answers a Future that runs this one, and then the given one.\n\nThe value the receiver answers with is dropped. This is the entry for work run for its effect, where what comes next does not read it.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Future<Other>",
+									"default": null,
+									"description": "the work to run once the receiver has answered",
+									"href": null
+								}
+							],
+							"returns": "a Future answering what the given work answers.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Future::within",
+					"namespace": "Future",
+					"name": "within",
+					"receiver": "Future<Value>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "within(milliseconds limit: Integer) -> Future<Optional<Value>>",
+							"summary": "Answers a Future that runs this one, and answers nothing where it takes too long.\n\nThe run is stopped at the deadline. It was started by this Method and nothing else can be waiting for it, so what it would have answered is never read.\n\nThe answer is an Optional rather than a failure, because a deadline is a question the caller asked rather than something that went wrong.",
+							"parameters": [
+								{
+									"name": "milliseconds",
+									"type": "Integer",
+									"default": null,
+									"description": "how long the run has",
+									"href": null
+								}
+							],
+							"returns": "the value, or nothing where the deadline passed first.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "ResultFuture::attempt",
+					"namespace": "ResultFuture",
+					"name": "attempt",
+					"receiver": "Future<Result<Value, Failure>>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers a Future that runs this one again while it fails, up to the given number of attempts.",
+					"returns": "a Future answering the first value, or the last reason.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "attempt(times count: Integer) -> Future<Result<Value, Failure>>",
+							"summary": "Answers a Future that runs this one until it answers a value, up to the given number of attempts.\n\nThe first attempt is one of the count, so `attempt(times 3)` runs the work three times at worst. A count below two is one attempt.\n\nThe answer is the first value, or the last reason where every attempt failed.",
+							"parameters": [
+								{
+									"name": "times",
+									"type": "Integer",
+									"default": null,
+									"description": "how many attempts to make in all",
+									"href": null
+								}
+							],
+							"returns": "a Future answering the first value, or the last reason.",
+							"examples": []
+						},
+						{
+							"signature": "attempt(\n\ttimes count: Integer,\n\tpausingMilliseconds pause: Integer,\n) -> Future<Result<Value, Failure>>",
+							"summary": "Answers the same, waiting the given number of milliseconds between two attempts.\n\nThe wait is between attempts, and never before the first or after the last.",
+							"parameters": [
+								{
+									"name": "times",
+									"type": "Integer",
+									"default": null,
+									"description": "how many attempts to make in all",
+									"href": null
+								},
+								{
+									"name": "pausingMilliseconds",
+									"type": "Integer",
+									"default": null,
+									"description": "how long to wait between two attempts",
+									"href": null
+								}
+							],
+							"returns": "a Future answering the first value, or the last reason.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Several at once",
+			"id": "several-at-once",
+			"members": [
+				{
+					"key": "FutureList::inSequence",
+					"namespace": "FutureList",
+					"name": "inSequence",
+					"receiver": "List<Future<Value>>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "inSequence() -> Future<List<Value>>",
+							"summary": "Answers a Future running every one of them in order, each started once the one before it has answered.\n\nThe answer holds one value per item, in the receiver's order. The empty List answers the empty List.\n\nThis is the entry for work that is not independent. A host can refuse a second request at once, and a walk can have an order that is what the answer means.",
+							"parameters": [],
+							"returns": "a Future answering the List of values.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "FutureList::all",
+					"namespace": "FutureList",
+					"name": "all",
+					"receiver": "List<Future<Value>>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": "Answers a Future starting them at once, or a few at a time, and answering their values in the receiver's order.",
+					"returns": "a Future answering the List of values.",
+					"examples": [],
+					"entries": [
+						{
+							"signature": "all() -> Future<List<Value>>",
+							"summary": "Answers a Future starting every one of them at once, and answering their values in the receiver's order.\n\nThe order of the answer is the receiver's, whatever order the runs finish in. The empty List answers the empty List.\n\nEverything runs on the Program's own thread, so what this saves is the waiting rather than the computing.",
+							"parameters": [],
+							"returns": "a Future answering the List of values.",
+							"examples": []
+						},
+						{
+							"signature": "all(atMost count: Integer) -> Future<List<Value>>",
+							"summary": "Answers the same, with at most the given number of runs in flight at once.\n\nA count below one runs them one at a time, and a count above the length runs them all at once.",
+							"parameters": [
+								{
+									"name": "atMost",
+									"type": "Integer",
+									"default": null,
+									"description": "how many runs to have in flight at once",
+									"href": null
+								}
+							],
+							"returns": "a Future answering the List of values.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "NonEmptyFutureList::race",
+					"namespace": "NonEmptyFutureList",
+					"name": "race",
+					"receiver": "NonEmptyList<Future<Value>>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "race() -> Future<Value>",
+							"summary": "Answers a Future starting every one of them at once, and answering with the first value any of them answers.\n\nEvery other run is stopped as soon as one has answered. What a stopped run would have answered is never read.",
+							"parameters": [],
+							"returns": "a Future answering the first value.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "ResultFutureList::firstValue",
+					"namespace": "ResultFutureList",
+					"name": "firstValue",
+					"receiver": "List<Future<Result<Value, Failure>>>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "firstValue() -> Future<Optional<Value>>",
+							"summary": "Answers a Future starting every one of them at once, and answering with the value of the first that answers one.\n\nA run that fails is not an answer, and the waiting goes on. Every other run is stopped as soon as one has answered a value.\n\nA List whose every run failed answers nothing, and so does the empty List. The name is `OptionalList::firstValue`'s, for the same question one level along.",
+							"parameters": [],
+							"returns": "the first value, or nothing where every run failed.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Reading a run",
+			"id": "reading-a-run",
+			"members": [
+				{
+					"key": "Started::map",
+					"namespace": "Started",
+					"name": "map",
+					"receiver": "Started<Value>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "map<infer Other>(_ transform: (_: Value) -> Other) -> Started<Other>",
+							"summary": "Answers the same run, with its value handed to the transform.\n\nThe work is in flight already and nothing here starts it again, so the transform runs once however often the answer is completed.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "(_: Value) -> Other",
+									"default": null,
+									"description": "the transform the value is handed to",
+									"href": null
+								}
+							],
+							"returns": "the run, answering what the transform answers.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Started::within",
+					"namespace": "Started",
+					"name": "within",
+					"receiver": "Started<Value>",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "within(milliseconds limit: Integer) -> Started<Optional<Value>>",
+							"summary": "Answers the same run, giving up on it after the given number of milliseconds.\n\nThe run is not stopped. A Started can be completed from anywhere, so a deadline one holder writes can not stop the work another is waiting for. The waiting stops and the work goes on.\n\nThe time is counted from here, because the run is in flight already.",
+							"parameters": [
+								{
+									"name": "milliseconds",
+									"type": "Integer",
+									"default": null,
+									"description": "how long to wait for it",
+									"href": null
+								}
+							],
+							"returns": "the value, or nothing where the deadline passed first.",
+							"examples": []
+						}
+					]
 				}
 			]
 		}
@@ -51,6 +427,22 @@
 		{
 			"namespace": "Async",
 			"target": "Async"
+		},
+		{
+			"namespace": "ResultFuture",
+			"target": "Future<Result<Value, Failure>>"
+		},
+		{
+			"namespace": "FutureList",
+			"target": "List<Future<Value>>"
+		},
+		{
+			"namespace": "NonEmptyFutureList",
+			"target": "NonEmptyList<Future<Value>>"
+		},
+		{
+			"namespace": "ResultFutureList",
+			"target": "List<Future<Result<Value, Failure>>>"
 		},
 		{
 			"namespace": "Started",
@@ -87,5 +479,24 @@
 		"Printable": "/docs/library/protocols#Printable",
 		"Generatable": "/docs/library/protocols#Generatable"
 	},
-	"anchors": ["at-a-glance", "describing-work", "deferred"]
+	"anchors": [
+		"at-a-glance",
+		"describing-work",
+		"deferred",
+		"sleep",
+		"building-on-a-future",
+		"map",
+		"andthen",
+		"andThen",
+		"within",
+		"attempt",
+		"several-at-once",
+		"insequence",
+		"inSequence",
+		"all",
+		"race",
+		"firstvalue",
+		"firstValue",
+		"reading-a-run"
+	]
 }

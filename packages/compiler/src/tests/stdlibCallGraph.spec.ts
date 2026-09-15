@@ -508,6 +508,12 @@ describe("Stdlib Call Graph", () => {
 			"Dictionary.update__overload$2",
 			"Dictionary.value__overload$2",
 			"Equatable.isNot",
+			// NOTE: The combinators a completing body can write for itself —
+			// each waits for the receiver and answers something else, which is
+			// one line of Essence and no runtime at all.
+			"Future.andThen__overload$1",
+			"Future.andThen__overload$2",
+			"Future.map",
 			"Generatable.shrink",
 			"Integer.add__overload$2",
 			"Integer.add__overload$3",
@@ -871,6 +877,11 @@ describe("Stdlib Call Graph", () => {
 			"Result.toList",
 			"Result.value__overload$1",
 			"Result.value__overload$2",
+			// NOTE: Written in Essence for the reason the three above are, and
+			// on themselves besides: running a description again is starting it
+			// again, so the retry is a Method that calls itself.
+			"ResultFuture.attempt__overload$1",
+			"ResultFuture.attempt__overload$2",
 			// NOTE: These four need a receiver not every List is, so they live
 			// in a Namespace of their own — receiver `List<Result<…>>` —
 			// exactly as `OptionalList`'s three do.

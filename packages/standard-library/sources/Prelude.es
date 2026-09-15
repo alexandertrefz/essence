@@ -20,6 +20,10 @@ export {
 	from "./Enumerable.es" { Enumerable }
 	from "./Future.es" {
 		Future
+		FutureList
+		NonEmptyFutureList
+		ResultFuture
+		ResultFutureList
 		Started
 	}
 	from "./Integer.es" {

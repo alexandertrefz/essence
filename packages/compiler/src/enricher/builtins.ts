@@ -244,10 +244,19 @@ export const builtinMemberOrder: Array<string> = [
 	"Randomness",
 	// NOTE: After it, and for the same reason twice over: each targets a Type
 	// nothing else targets, and a reader of this list meets the Namespaces of
-	// the values a Program HOLDS before the two that are about work it has not
+	// the values a Program HOLDS before the ones that are about work it has not
 	// finished. `Started` follows `Future` because a Started is what starting a
 	// Future answers with, which is the order the two are met in.
+	//
+	// NOTE: The narrower targets follow the one they narrow, which is the rule
+	// `NestedList` and `OptionalList` follow after `List`. Each declares a name
+	// none of the others declares, so nothing here is a tie for Completion to
+	// break: the order is what a reader meets them in.
 	"Future",
+	"ResultFuture",
+	"FutureList",
+	"NonEmptyFutureList",
+	"ResultFutureList",
 	"Started",
 	// NOTE: And last of all, because it is the one Namespace here a Program
 	// reaches without holding anything: `Async.deferred` is where a future

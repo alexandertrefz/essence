@@ -89,6 +89,7 @@ implementation {
 	constant noRationals: List<Rational> = []
 	constant noMixedNumbers: List<Integer | Rational> = []
 	constant noNestedNumbers: List<List<Integer>>     = []
+	constant noFutures: List<Future<Integer>>         = []
 
 	§ ——— String ———————————————————————————————————————————————————————————
 	show("String.isEmpty()", greeting::isEmpty())
@@ -6433,5 +6434,94 @@ c"::quote())
 		loop(from 3, downTo 9, startingWith "", step (index, acc) {
 			<- #Continue(acc::append(index::toString()))
 		}),
+	)
+	§ Asynchrony. Every line here is deterministic by construction: a value
+	§ that is ready answers in a turn of the microtask queue, and a value that
+	§ is not is a `sleep` of ten seconds, which no scheduler reorders before
+	§ it. The long sleeps are all stopped by the Method that outruns them, so
+	§ nothing here holds the process open.
+
+	constant one  = Async.deferred(() { <- 1 })
+	constant two  = Async.deferred(() { <- 2 })
+	constant slow = Async.sleep(milliseconds 10000)
+		::andThen(Async.deferred(() { <- 99 }))
+	constant kept: Result<Integer, String> = #Value(7)
+	constant lost: Result<Integer, String> = #Failure("no")
+	constant keeping = Async.deferred(() -> Result<Integer, String> { <- kept })
+	constant losing  = Async.deferred(() -> Result<Integer, String> { <- lost })
+	constant running = start Async.deferred(() { <- 3 })
+
+	show(
+		"Async.deferred<Value>(_ () -> Value)",
+		complete Async.deferred(() { <- 1 }),
+	)
+	show(
+		"Async.sleep(milliseconds: Integer)",
+		complete Async.sleep(milliseconds 0),
+	)
+	show(
+		"Future.map<Value, Other>(_ (_ Value) -> Other)",
+		complete one::map((value) { <- value::multiply(with 2) }),
+	)
+	show(
+		"Future.andThen<Value, Other>(_ (_ Value) -> Future<Other>)",
+		complete one::andThen((value) {
+			<- Async.deferred(() { <- value::add(10) })
+		}),
+	)
+	show(
+		"Future.andThen<Value, Other>(_ Future<Other>)",
+		complete one::andThen(two),
+	)
+	show(
+		"Future.within<Value>(milliseconds: Integer)",
+		complete one::within(milliseconds 10000),
+	)
+	show(
+		"Future.within<Value>(milliseconds: Integer) [too slow]",
+		complete slow::within(milliseconds 0),
+	)
+	show(
+		"ResultFuture.attempt<Value, Failure>(times: Integer)",
+		complete keeping::attempt(times 3),
+	)
+	show(
+		"ResultFuture.attempt<Value, Failure>(times: Integer) [every attempt fails]",
+		complete losing::attempt(times 3),
+	)
+	show(
+		"ResultFuture.attempt<Value, Failure>(times: Integer, pausingMilliseconds: Integer)",
+		complete losing::attempt(times 2, pausingMilliseconds 0),
+	)
+	show("FutureList.inSequence<Value>()", complete [one, two]::inSequence())
+	show(
+		"FutureList.inSequence<Value>() [empty]",
+		complete noFutures::inSequence(),
+	)
+	show("FutureList.all<Value>()", complete [one, two]::all())
+	show(
+		"FutureList.all<Value>(atMost: Integer)",
+		complete [one, two]::all(atMost 1),
+	)
+	show(
+		"FutureList.all<Value>(atMost: Integer) [a count below one]",
+		complete [one, two]::all(atMost 0),
+	)
+	show("NonEmptyFutureList.race<Value>()", complete [slow, two]::race())
+	show(
+		"ResultFutureList.firstValue<Value, Failure>()",
+		complete [losing, keeping]::firstValue(),
+	)
+	show(
+		"ResultFutureList.firstValue<Value, Failure>() [every run fails]",
+		complete [losing, losing]::firstValue(),
+	)
+	show(
+		"Started.map<Value, Other>(_ (_ Value) -> Other)",
+		complete running::map((value) { <- value::add(1) }),
+	)
+	show(
+		"Started.within<Value>(milliseconds: Integer)",
+		complete running::within(milliseconds 10000),
 	)
 }

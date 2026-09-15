@@ -522,3 +522,30 @@ started
 10
 2"
 `;
+
+exports[`Fixture Sweep FutureCombinators.es should print what it printed before 1`] = `
+"quick finished
+slow finished
+["slow", "quick"]
+first finished
+second finished
+["first", "second"]
+left finished
+right finished
+["left", "right"]
+winner finished
+winner
+Empty
+intime finished
+Value("intime")
+nothing else ran
+attempted
+attempted
+attempted
+Failure("refused")
+attempted
+Value(1)
+refused finished
+accepted finished
+Value("accepted")"
+`;

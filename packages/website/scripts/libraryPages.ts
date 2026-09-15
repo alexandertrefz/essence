@@ -84,9 +84,15 @@ const OVERRIDES: Record<string, string> = {
 	Step: "loop",
 	// NOTE: One run of a Future has no page of its own — what a Started IS can
 	// not be said without saying what a Future is, and the two are met
-	// together. Nor has the Namespace that BUILDS one, for the same reason.
+	// together. Nor has the Namespace that BUILDS one, for the same reason, nor
+	// the four narrower targets: each of them is a Method about work, and a
+	// reader looking for one is looking at the page about work.
 	Started: "Future",
 	Async: "Future",
+	ResultFuture: "Future",
+	FutureList: "Future",
+	NonEmptyFutureList: "Future",
+	ResultFutureList: "Future",
 }
 
 /*
@@ -291,15 +297,26 @@ class Placement {
 	}
 
 	pageOfNamespace(namespace: Namespace): string {
+		// NOTE: The Namespace's OWN name first, because a narrower target is
+		// not always where a reader looks for it. `FutureList` targets a List
+		// of Futures, whose head is `List`, and every Method it declares is
+		// about work rather than about Lists — so the page it belongs on is the
+		// one about work, which only an override can say.
+		let override = OVERRIDES[namespace.name]
+
+		if (override !== undefined) {
+			return override
+		}
+
 		if (namespace.targetHead !== null) {
 			return this.pageOfType(namespace.targetHead)
 		}
 
 		// NOTE: A Namespace with no target is its own page — `Terminal`,
-		// `Randomness` — unless an override says otherwise. `Async` is the one
-		// that does: what it builds is a Future, and a page about making one
-		// with no page about what one IS beside it teaches half the idea.
-		return OVERRIDES[namespace.name] ?? namespace.name
+		// `Randomness` — unless the override above said otherwise. `Async` is
+		// the one that does: what it builds is a Future, and a page about making
+		// one with no page about what one IS beside it teaches half the idea.
+		return namespace.name
 	}
 }
 

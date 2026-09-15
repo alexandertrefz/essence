@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { beforeAll, describe, expect, it } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -55,7 +55,7 @@ type CompiledProgram = {
 // `expect` assertions into the pipeline and takes its source inline. This one
 // has a single caller, reads from disk, and has to say WHICH stage refused
 // before anything is compared to the golden file.
-function compileProgram(source: string): CompiledProgram {
+async function compileProgram(source: string): Promise<CompiledProgram> {
 	let parsed = parseWithDiagnostics(source)
 
 	if (containsErrors(parsed.diagnostics)) {
@@ -87,10 +87,15 @@ function compileProgram(source: string): CompiledProgram {
 	}
 
 	try {
-		// NOTE: Synchronous on purpose. `await import` would make every caller
-		// async for no gain — the emitted module has no top level await, and
-		// Bun resolves a `require` of a freshly written file the same way.
-		require(file)
+		// NOTE: `import` rather than `require`, because the harness COMPLETES
+		// work at its top level and a Module that does is emitted with a
+		// top-level `await`. A `require` of one either refuses it or answers
+		// before the wait is over, which would record the description of a
+		// future where the golden file holds the value it answers with. It is
+		// what makes this whole file asynchronous, and the capture is installed
+		// across the wait for the same reason `fixtureSweep.spec.ts` installs
+		// its own across one.
+		await import(file)
 	} finally {
 		console.log = originalLog
 		rmSync(directory, { recursive: true, force: true })
@@ -129,17 +134,7 @@ function labelOf(line: string): string {
 // directly over a fixed seed and asserts the ranges, the exactness and the
 // replay, and by `packages/compiler/src/tests/randomness.spec.ts`, which runs
 // Programs that build a source and draw from it.
-// NOTE: And the one this harness can not RUN. `Async.deferred` answers a
-// Future, and what a Future answers with only arrives after a `complete` — a
-// top-level `await` in the emitted Module. This harness `require`s that Module
-// and captures `console.log` synchronously, so a `show(…)` line would record
-// the description rather than the value, if the `require` of a Module with a
-// top-level await succeeded at all. Covering it means making this harness
-// asynchronous, which is a decision about the golden file rather than about the
-// Namespace. Until then the entry is covered by
-// `packages/compiler/src/tests/asynchrony.spec.ts`, which compiles and runs
-// Programs that defer, start and complete.
-const COVERED_ELSEWHERE = new Set(["Terminal", "Randomness", "Async"])
+const COVERED_ELSEWHERE = new Set(["Terminal", "Randomness"])
 
 // NOTE: Every Method a Program can call, spelled the way `StdlibExhaustive.es`
 // labels it: the signature `printSignature` produces, minus its return Type.
@@ -602,7 +597,18 @@ function describeDifferences(
 }
 
 describe("Stdlib Golden", () => {
-	let { output, program } = compileProgram(readFileSync(harnessPath, "utf8"))
+	// NOTE: Compiled and run ONCE, in a `beforeAll` rather than at this Scope,
+	// because running it is asynchronous now — see `compileProgram`. The three
+	// tests below read what it left behind.
+	let output: Array<string>
+	let program: common.typedSimple.Program
+
+	beforeAll(async () => {
+		let compiled = await compileProgram(readFileSync(harnessPath, "utf8"))
+
+		output = compiled.output
+		program = compiled.program
+	})
 
 	// NOTE: The golden file was produced by RUNNING this harness against the
 	// TypeScript standard library, never written by hand. It is the record of

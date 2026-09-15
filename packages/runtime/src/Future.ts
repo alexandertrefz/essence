@@ -1,5 +1,10 @@
+import type { IntegerType } from "./Integer"
+import { createList, type ListType, materialise } from "./List"
+import type { OptionalType } from "./Optional"
+import { createEmpty, createValue } from "./Optional"
 import { registerKind } from "./registry"
-import { typeKeySymbol } from "./type"
+import type { ResultType } from "./Result"
+import { type AnyType, typeKeySymbol } from "./type"
 
 // NOTE: ASYNCHRONY'S RUNTIME, and the `Future` Namespace's module in one file —
 // the Namespace's name and the module's name are the same name, and splitting
@@ -250,3 +255,197 @@ export function complete<Value>(
 
 	return runUnder(work, childOf(context))
 }
+
+// #region The combinators
+
+// NOTE: `Future::within(milliseconds limit)` — the receiver, run under a
+// context of its own, with a deadline over it. What it answers is an Optional,
+// so a run that took too long is a value the Program reads rather than a failure
+// it handles: there is no `TimedOut` Case anywhere, and none is needed.
+//
+// NOTE: The loser is STOPPED. The run belongs to this call and to nothing else —
+// it was started here — so nothing else can be waiting for it, and what it
+// answers after the deadline is a value nobody may observe. That is the whole of
+// what cancellation is here: the work is signalled and its answer is dropped.
+export function within<Value extends AnyType>(
+	work: FutureType<Value>,
+	limit: IntegerType,
+): FutureType<OptionalType<Value>> {
+	return of(
+		(context) =>
+			new Promise((resolve, reject) => {
+				let started = start(work, context)
+				let timer = setTimeout(() => {
+					started.controller.abort()
+					resolve(createEmpty())
+				}, Number(limit.value))
+				let finished = (): void => clearTimeout(timer)
+
+				// NOTE: And the deadline goes when the run above it does. A
+				// timer left behind holds a host with an event loop open for as
+				// long as it has left to run, for an answer nobody is waiting
+				// for any more.
+				context.signal.addEventListener("abort", finished, {
+					once: true,
+				})
+
+				started.promise.then(
+					(value) => {
+						finished()
+						resolve(createValue(value))
+					},
+					(thrown) => {
+						finished()
+						reject(thrown)
+					},
+				)
+			}),
+	)
+}
+
+// NOTE: `FutureList::inSequence()` — one after another, each started only once
+// the one before it has answered. It is the combinator to reach for where the
+// work is not independent: a host that refuses a second request, a walk whose
+// order is what the answer means.
+export function inSequence<Value extends AnyType>(
+	futures: ListType<FutureType<Value>>,
+): FutureType<ListType<Value>> {
+	return of(async (context) => {
+		let answers: Array<Value> = []
+
+		for (let work of materialise(futures)) {
+			answers.push(await complete(work, context))
+		}
+
+		return createList(answers)
+	})
+}
+
+// NOTE: `FutureList::all()` — every one of them started at once, and the values
+// in the receiver's order however they finished. Concurrency is not parallelism:
+// they share the one thread, so what this buys is the waiting rather than the
+// computing.
+export function all__overload$1<Value extends AnyType>(
+	futures: ListType<FutureType<Value>>,
+): FutureType<ListType<Value>> {
+	return of(async (context) => {
+		let started = materialise(futures).map((work) => start(work, context))
+
+		// NOTE: `Promise.all` answers a fresh Array, which is what `createList`
+		// demands of every caller — the box takes the Array it is handed.
+		return createList(await Promise.all(started.map((run) => run.promise)))
+	})
+}
+
+// NOTE: `FutureList::all(atMost count)` — the same answer with a ceiling on how
+// many are in flight. A count below one runs them one at a time, which is the
+// library's rule for a count that makes no sense: nothing is dropped and the
+// answer still holds one value per item.
+export function all__overload$2<Value extends AnyType>(
+	futures: ListType<FutureType<Value>>,
+	count: IntegerType,
+): FutureType<ListType<Value>> {
+	return of(async (context) => {
+		let items = materialise(futures)
+		let total = items.length
+		let answers: Array<Value> = Array.from({ length: total })
+		let inFlight = Math.max(1, Math.min(Number(count.value), total))
+		let next = 0
+		// NOTE: One walker per slot, each taking the next item until there is
+		// none — rather than a walk of fixed batches, which would wait for the
+		// slowest of each batch before starting any of the one after it.
+		let walkers: Array<Promise<void>> = []
+
+		for (let slot = 0; slot < inFlight; slot++) {
+			walkers.push(
+				(async () => {
+					while (next < total) {
+						let index = next
+
+						next += 1
+						answers[index] = await complete(items[index]!, context)
+					}
+				})(),
+			)
+		}
+
+		await Promise.all(walkers)
+
+		return createList(answers)
+	})
+}
+
+// NOTE: `NonEmptyFutureList::race()` — every one started at once, the first
+// answer taken, and every other run stopped. The receiver is a List proven to
+// hold something, because the first answer of nothing is no answer at all.
+//
+// NOTE: The index rides with the value so that the winner can be told from the
+// losers. Racing the promises alone answers the value and leaves nothing to say
+// WHICH run it came from, and stopping them all would signal the run that won.
+export function race<Value extends AnyType>(
+	futures: ListType<FutureType<Value>>,
+): FutureType<Value> {
+	return of(async (context) => {
+		let started = materialise(futures).map((work) => start(work, context))
+		let winner = await Promise.race(
+			started.map((run, index) =>
+				run.promise.then((value) => ({
+					index,
+					value,
+				})),
+			),
+		)
+
+		for (let [index, run] of started.entries()) {
+			if (index !== winner.index) {
+				run.controller.abort()
+			}
+		}
+
+		return winner.value
+	})
+}
+
+// NOTE: `ResultFutureList::firstValue()` — every one started at once, and the
+// first VALUE any of them answers with. A run that fails is not an answer here:
+// the wait goes on, and only a List whose every run failed answers empty. The
+// name is `OptionalList::firstValue`'s, for the same question one level along.
+export function firstValue<Value extends AnyType, Failure extends AnyType>(
+	futures: ListType<FutureType<ResultType<Value, Failure>>>,
+): FutureType<OptionalType<Value>> {
+	return of((context) => {
+		let started = materialise(futures).map((work) => start(work, context))
+
+		if (started.length === 0) {
+			return createEmpty()
+		}
+
+		let awaited = started.length
+
+		return new Promise<OptionalType<Value>>((resolve, reject) => {
+			for (let run of started) {
+				run.promise.then((answer) => {
+					if (answer[typeKeySymbol] !== "Result#Value") {
+						awaited -= 1
+
+						if (awaited === 0) {
+							resolve(createEmpty())
+						}
+
+						return
+					}
+
+					for (let other of started) {
+						if (other !== run) {
+							other.controller.abort()
+						}
+					}
+
+					resolve(createValue(answer.item))
+				}, reject)
+			}
+		})
+	})
+}
+
+// #endregion

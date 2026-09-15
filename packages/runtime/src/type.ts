@@ -3,6 +3,7 @@ import type { common } from "@essence-lang/interfaces"
 import type { AlgebraicType } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
 import type { DictionaryType } from "./Dictionary"
+import type { FutureType, StartedType } from "./Future"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
 import type { OrderingType } from "./Ordering"
@@ -228,6 +229,18 @@ export type AnyType =
 	// the Type test below can NAME it rather than fall to their "unknown value"
 	// arms.
 	| RandomnessType
+	// NOTE: And the two asynchronous kinds, for a plainer reason than that: a
+	// List of them is a value the language writes down — `[first, second]::all()`
+	// — and `ListType` takes an item of this union. Both are declared in
+	// `Future.ts`, which imports nothing of this module but the key, so the
+	// reference back costs a type import and nothing at run time.
+	//
+	// NOTE: Neither carries a RENDERING or an equality here, the way every
+	// member above it does. Both are registered kinds, answered by `registry.ts`
+	// from the doors they are built through, which is what keeps the cost of
+	// asynchrony out of a Program that waits for nothing.
+	| FutureType<any>
+	| StartedType<any>
 
 // NOTE: A Dictionary box holding Essence values, which is the only Dictionary
 // anything outside the Dictionary Module ever has in hand. It is named here so
