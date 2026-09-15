@@ -9,6 +9,13 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 
+import { bundle } from "@essence-lang/compiler/bundler"
+import { enrich } from "@essence-lang/compiler/enricher"
+import { optimise } from "@essence-lang/compiler/optimiser"
+import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
+import { rewrite } from "@essence-lang/compiler/rewriter"
+import { simplify } from "@essence-lang/compiler/simplifier"
+import { validate } from "@essence-lang/compiler/validator"
 import type { TestEvent } from "@essence-lang/runtime/Testing"
 
 import {
@@ -436,6 +443,23 @@ describe("a bundle that reaches the world", () => {
 		"",
 	].join("\n")
 
+	// NOTE: One Program taken through the stages the CLI runs, to the bytes
+	// esbuild writes. The labels are what the rule reads, so nothing short of
+	// the real bundle answers the question these two tests ask.
+	async function bundled(source: string): Promise<string> {
+		let parsed = parseWithDiagnostics(source)
+		let enriched = enrich(parsed.program)
+
+		validate(enriched.program)
+
+		let result = await bundle(
+			rewrite(optimise(simplify(enriched.program))),
+			{ sourceFileName: "tests.ts", outputFileName: "tests.mjs" },
+		)
+
+		return new TextDecoder().decode(result.outputs[0]!.contents)
+	}
+
 	function withBundle<Value>(
 		text: string,
 		body: (file: string) => Promise<Value>,
@@ -490,5 +514,38 @@ describe("a bundle that reaches the world", () => {
 				await linksEffectfulRuntime(path.join(directory, "gone.mjs")),
 			).toBe(true)
 		})
+	})
+
+	// NOTE: The other half of the claim, and the half the hand-written bundles
+	// above can not make: that a REAL Program reaching the world produces a
+	// bundle carrying that label. The rule is written against a string esbuild
+	// emits, so nothing but a compile and a bundle can say the string is still
+	// the one esbuild emits — a renamed runtime module or a changed label
+	// convention would leave every test above passing and every run of an
+	// effectful test suite quietly remembered.
+	it("refuses the store for a bundle a Program reaching the world produced", async () => {
+		await withBundle(
+			await bundled(`implementation {
+	constant answered = complete Http.get("http://127.0.0.1:1/")
+
+	Terminal.print(answered::hasValue())
+}`),
+			async (file) => {
+				expect(await linksEffectfulRuntime(file)).toBe(true)
+			},
+		)
+	})
+
+	it("keeps the store for a bundle a Program that reaches none produced", async () => {
+		await withBundle(
+			await bundled(`implementation {
+	constant answered = complete Async.deferred(() { <- 1 })
+
+	Terminal.print(answered)
+}`),
+			async (file) => {
+				expect(await linksEffectfulRuntime(file)).toBe(false)
+			},
+		)
 	})
 })

@@ -288,6 +288,30 @@ describe("Bundle Size", () => {
 		).toBeLessThan(10_450)
 	})
 
+	// NOTE: 20,321 measured, where the same Program completing an
+	// `Async.deferred` instead measures 4,931 — so one `Http.get` costs 15,390
+	// bytes. Almost all of it is the second container: a request's headers and
+	// an answer's are a `Dictionary<String, String>`, so `Http.ts` reaches the
+	// store, the canonical key encoding and the kind registry, which the
+	// Dictionary ceiling above prices on its own. What is left is `Http.ts`
+	// itself, the three Case constructors beside it, and the asynchrony
+	// `Future.es` already pays for.
+	//
+	// NOTE: The figure is here so that the Namespace which reaches the world is
+	// the one whose weight is a number rather than a surprise, and so that a
+	// top-level side effect added to `Http.ts` is caught HERE as well as by the
+	// floor above: a Program that sends nothing must carry none of this, and a
+	// Program that sends must carry no more than a request needs.
+	it("charges a Program that sends one request for the request", async () => {
+		expect(
+			await bundleSizeOfSource(`implementation {
+	constant answered = complete Http.get("https://example.test/")
+
+	Terminal.print(answered::hasValue())
+}`),
+		).toBeLessThan(21_400)
+	})
+
 	// NOTE: The same claim for a bundle of several Modules, where it is far
 	// easier to lose: rewriting each Module on its own would give every one of
 	// them its own copy of every Essence-implemented standard library Method it

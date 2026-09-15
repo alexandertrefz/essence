@@ -4070,6 +4070,66 @@ declarations {
 			})
 		})
 
+		// NOTE: And the other kind of default a native can declare: a RECORD,
+		// which is MERGED into the Argument rather than standing in for one the
+		// call left out. That is a different rule from the one above, and the
+		// difference is what these tests hold: a Record default is needed by a
+		// call that wrote its Argument, because the Argument is a Record literal
+		// that may leave members out. `Http.send` is the library's own case.
+		describe("a native Method that declares a Record default", () => {
+			it("fronts a call that wrote its Argument with the shim all the same", () => {
+				let code = generate(`implementation {
+	constant answered = complete Http.send({ url = "http://x.test/" })
+
+	Terminal.inspect(answered::hasValue())
+}`)
+
+				expect(code).toContain("const $es_Http_send = request =>")
+				expect(code).toContain("$es_Http_send({")
+				expect(code).not.toContain("Http.send({")
+			})
+
+			// NOTE: Every member of the default, merged onto what the call
+			// wrote — `??`, so a member the call DID write survives. The
+			// Argument's own `url` is carried through unchanged, which is what
+			// says the merge is a merge and not a replacement.
+			it("merges every member the default fills in", () => {
+				let code = generate(`implementation {
+	constant answered = complete Http.send({ url = "http://x.test/" })
+
+	Terminal.inspect(answered::hasValue())
+}`)
+
+				expect(code).toContain("url: request.url")
+				expect(code).toContain(
+					'method: request.method ?? $type.createCase("HttpMethod#Get")',
+				)
+				expect(code).toContain(
+					'body: request.body ?? $type.createCase("Optional#Empty")',
+				)
+				expect(code).toContain(
+					'redirects: request.redirects ?? $type.createCase("Redirects#Follow")',
+				)
+			})
+
+			// NOTE: The edge the reachability walk has to draw for the two
+			// above to be emittable at all. `Http.get` is an Essence body that
+			// writes `Http.send({ url, method, headers })` and omits nothing, so
+			// the const it names is pulled in by a full-arity call or by
+			// nothing — and `checkEssenceMethodsAreDeclared` turns a missing one
+			// into a thrown Compiler bug rather than a broken Program.
+			it("pulls the shim in from an Essence body that calls it at full arity", () => {
+				let code = generate(`implementation {
+	constant answered = complete Http.get("http://x.test/")
+
+	Terminal.inspect(answered::hasValue())
+}`)
+
+				expect(code).toContain("const $es_Http_send = request =>")
+				expect(code).toContain("return $es_Http_send({")
+			})
+		})
+
 		// NOTE: A Namespace whose every member is native has nothing to merge —
 		// it keeps its plain import, and no const is emitted for it.
 		it("skips a Namespace with no Essence-implemented member", () => {
