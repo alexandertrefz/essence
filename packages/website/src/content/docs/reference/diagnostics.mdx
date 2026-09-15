@@ -5250,7 +5250,8 @@ Error: Nothing here runs
    │     ──────┬─────  
    │           ╰─────── this is a Future<String>, and its value goes nowhere
    │ 
-   │ Help: Did you mean 'complete', to wait for it — or 'start', to put it in flight and carry on?
+   │ Help 1: Did you mean 'complete', to wait for it — or 'start', to put it in flight and carry on?
+   │ Help 2: Or, where the call was written for what it does rather than for what it answers, hold its answer in a Constant.
    │ 
    │ Note: A Future describes work. Building one runs none of it — 'start' puts it in flight and 'complete' waits for what it answers with.
 ───╯
@@ -5259,6 +5260,8 @@ Error: Nothing here runs
 </div>
 
 Write `complete` in front of it to wait for it, or `start` to put it in flight and carry on.
+
+Where the statement is a call written for what it *does* — `Terminal.inspect(work)` prints, and answers with what it was handed — neither keyword is the edit. Hold the answer in a constant.
 
 Quick Fix: **Wait for it with 'complete'** and **Put it in flight with 'start'**. Neither is preferred over the other: both are whole things to mean, and the line does not say which.
 
@@ -5288,6 +5291,8 @@ Advice: Nothing waits for this
 </div>
 
 Leave it where the answer is genuinely not wanted. Otherwise hold the run in a constant and `complete` it where the answer is.
+
+The label says which statement it is. A `start` reads `this runs, and nobody reads its answer`; a call that merely answered with a run reads `this answers a run, and nobody reads what it answers with`.
 
 Inside a `test` body, fire and forget lasts as long as the test does: a test runs under a context of its own, and stopping a run stops everything it started, so work the test walked away from is stopped when the test ends. It can not print into the next test's report, and it can not hold `essence test` open.
 

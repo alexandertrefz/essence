@@ -242,6 +242,8 @@ declarations {
 		§§
 		§§ The run is not stopped. A Started can be completed from anywhere, so a deadline one holder writes can not stop the work another is waiting for. The waiting stops and the work goes on.
 		§§
+		§§ A host with an event loop stays open until that work is over. Giving up on an answer is not giving up on the run, so a Program can not exit ahead of it.
+		§§
 		§§ The time is counted from here, because the run is in flight already.
 		§§
 		§§ @param milliseconds — how long to wait for it

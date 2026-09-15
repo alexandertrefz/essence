@@ -43,6 +43,12 @@ const unit: RecordType = { [typeKeySymbol]: "Record" }
 // `complete Async.sleep(…)` means: unreferencing it would let the host exit out
 // from under the wait. A sleep nobody is waiting for is stopped by whatever
 // raced it, and the timer goes with it.
+//
+// NOTE: Which is also why `Started::within` delays an exit. Giving up on an
+// answer is not giving up on the run — a Started belongs to whoever started it —
+// so the wait it was written over is still there, holding the host open until
+// it is spent. `Future::within` stops the run it was written over, and with it
+// the timer, because that run belongs to the deadline.
 export function sleep(duration: IntegerType): FutureType<RecordType> {
 	return of(
 		(context: Context) =>

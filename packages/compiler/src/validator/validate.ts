@@ -380,8 +380,14 @@ function reportDiscardedWork(node: common.typed.ExpressionNode): void {
 			notes: [
 				"A Future describes work. Building one runs none of it — 'start' puts it in flight and 'complete' waits for what it answers with.",
 			],
+			// NOTE: And the second help, because a call that merely HANDS a
+			// Future on is the same Statement to this rule and a different
+			// mistake to whoever wrote it: `Terminal.inspect(work)` printed
+			// what it was asked to print, and what goes nowhere is the value
+			// it answered with. Neither Keyword is the edit there — a name is.
 			helps: [
 				"Did you mean 'complete', to wait for it — or 'start', to put it in flight and carry on?",
+				"Or, where the call was written for what it does rather than for what it answers, hold its answer in a Constant.",
 			],
 		})
 
@@ -389,12 +395,21 @@ function reportDiscardedWork(node: common.typed.ExpressionNode): void {
 	}
 
 	if (type.type === "Started") {
+		// NOTE: A `start` is a run this Statement put in flight; anything else
+		// of this Type is a call that ANSWERED with one, which may have been
+		// written for what it did rather than for the run it handed back. The
+		// label says which, so the reader is told about the Statement they
+		// wrote rather than about the one this rule is named for.
+		let started = node.nodeType === "Start"
+
 		reportInformation("Nothing waits for this", node.position, {
 			code: "unobserved-started",
 			labels: [
 				primary(
 					node.position,
-					"this runs, and nobody reads its answer",
+					started
+						? "this runs, and nobody reads its answer"
+						: "this answers a run, and nobody reads what it answers with",
 				),
 			],
 			notes: [

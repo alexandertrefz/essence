@@ -2832,7 +2832,8 @@ Error: Nothing here runs
     │     ─────┬────  
     │          ╰────── this is a Future<Integer>, and its value goes nowhere
     │ 
-    │ Help: Did you mean 'complete', to wait for it — or 'start', to put it in flight and carry on?
+    │ Help 1: Did you mean 'complete', to wait for it — or 'start', to put it in flight and carry on?
+    │ Help 2: Or, where the call was written for what it does rather than for what it answers, hold its answer in a Constant.
     │ 
     │ Note: A Future describes work. Building one runs none of it — 'start' puts it in flight and 'complete' waits for what it answers with.
 ────╯
@@ -2850,6 +2851,33 @@ Advice: Nothing waits for this
     │ Note: A Started can be completed any number of times, from anywhere — holding it under a name is what makes that possible later.
 ────╯
 
-─── 1 error, 1 remark
+[unused-future]
+Error: Nothing here runs
+    ╭─┤ AsynchronyStatements.es:33:2 │
+    │
+ 33 │     Terminal.inspect(headline())
+    │     ──────────────┬─────────────  
+    │                   ╰─────────────── this is a Future<Integer>, and its value goes nowhere
+    │ 
+    │ Help 1: Did you mean 'complete', to wait for it — or 'start', to put it in flight and carry on?
+    │ Help 2: Or, where the call was written for what it does rather than for what it answers, hold its answer in a Constant.
+    │ 
+    │ Note: A Future describes work. Building one runs none of it — 'start' puts it in flight and 'complete' waits for what it answers with.
+────╯
+
+[unobserved-started]
+Advice: Nothing waits for this
+    ╭─┤ AsynchronyStatements.es:38:2 │
+    │
+ 38 │     Terminal.inspect(start headline())
+    │     ─────────────────┬────────────────  
+    │                      ╰────────────────── this answers a run, and nobody reads what it answers with
+    │ 
+    │ Help: Hold it in a Constant and 'complete' it where the answer is wanted, if the answer is wanted at all.
+    │ 
+    │ Note: A Started can be completed any number of times, from anywhere — holding it under a name is what makes that possible later.
+────╯
+
+─── 2 errors, 2 remarks
 "
 `;

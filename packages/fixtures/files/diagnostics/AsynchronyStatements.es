@@ -25,4 +25,15 @@ implementation {
 	§ run; what nobody does is read what it answers with, which is a real thing
 	§ to write and a thing to be told about.
 	start headline()
+
+	§ unused-future again, for a call that HANDS the work on rather than one
+	§ that built it: `inspect` printed what it was asked to print and answered
+	§ with its Argument, so the description is what goes nowhere. Neither
+	§ Keyword is the edit here — a name is, which is what the second help says.
+	Terminal.inspect(headline())
+
+	§ unobserved-started again, with the label the other way round: nothing here
+	§ started anything, and what goes nowhere is the run `inspect` was handed
+	§ and handed back.
+	Terminal.inspect(start headline())
 }
