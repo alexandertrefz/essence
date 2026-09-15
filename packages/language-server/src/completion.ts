@@ -870,6 +870,11 @@ function findProbeReceiverInNode(
 		}
 		case "ReturnStatement":
 			return findProbeReceiverInNode(node.expression)
+		// NOTE: Neither Keyword opens a body — the operand is read where the
+		// Keyword stands — so the probe is looked for straight through it.
+		case "Start":
+		case "Complete":
+			return findProbeReceiverInNode(node.expression)
 		case "ProtocolDeclarationStatement":
 			return null
 		// NOTE: No path-key reading for a Method's Arguments, for the reason

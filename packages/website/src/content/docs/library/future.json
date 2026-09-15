@@ -1,0 +1,50 @@
+{
+	"slug": "future",
+	"title": "Future",
+	"kind": "type",
+	"declaration": "namespace Future<infer Value> for Future<Value>",
+	"choice": null,
+	"namespaces": ["Future", "Started"],
+	"conformsTo": [],
+	"groups": [],
+	"refinements": [],
+	"modes": [],
+	"tower": [],
+	"views": [
+		{
+			"namespace": "Started",
+			"target": "Started<Value>"
+		}
+	],
+	"protocols": [],
+	"seeAlso": [],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": ["at-a-glance"]
+}

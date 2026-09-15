@@ -1078,6 +1078,15 @@ export const PAGES: PageDefinition[] = [
 		],
 	},
 	{
+		slug: "future",
+		title: "Future",
+		order: 190,
+		description:
+			"Work that has not run: a description to start, and one run of it to wait for.",
+		taughtOn: [],
+		groups: [],
+	},
+	{
 		slug: "protocols",
 		title: "Protocols",
 		order: 180,

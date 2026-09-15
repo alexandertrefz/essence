@@ -1512,6 +1512,11 @@ describe("Standard Library Loader", () => {
 			"GroupedList",
 			"GroupedNonEmptyList",
 			"Randomness",
+			// NOTE: And the two the language's asynchrony is written in, after
+			// every Namespace of a value a Program HOLDS — see
+			// `builtinMemberOrder`.
+			"Future",
+			"Started",
 		])
 	})
 
@@ -1545,7 +1550,7 @@ describe("Standard Library Loader", () => {
 			entries += flags.length
 		}
 
-		expect(stdlib.namespaces).toHaveLength(50)
+		expect(stdlib.namespaces).toHaveLength(52)
 		expect(entries).toBe(725)
 	})
 

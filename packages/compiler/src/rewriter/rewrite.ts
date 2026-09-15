@@ -504,6 +504,14 @@ const runtimeModuleAliases = [
 	// that wrote no `tests` block never mentions it, and esbuild shakes the
 	// import away with the module behind it.
 	["$testing", "Testing"],
+	// NOTE: Asynchrony's own module, which is ALSO the `Future` Namespace's
+	// runtime module — one file in two roles, because the Namespace's name and
+	// the module's are the same name and splitting them would put the
+	// description of a future and the machinery that runs one in two places. The
+	// alias is what the emission of `start` and `complete` reads it by; the
+	// Namespace import beside it is what a Method call on a Future reads. A
+	// Program that waits for nothing names neither, and esbuild shakes both away.
+	["$future", "Future"],
 ] as const
 
 // NOTE: What a lone Program's head imports — every runtime module, and the test
@@ -2474,7 +2482,9 @@ function rewriteFunctionStatement(
 		type: "FunctionDeclaration",
 		id: rewriteIdentifier(node.name),
 		params: node.value.parameters.map((param) => rewriteParameter(param)),
-		body: rewriteBlockStatement(node.value.body),
+		// NOTE: A free Function that completes is wrapped exactly as a Method
+		// or a literal is — it declares a Future and answers with one.
+		body: completingBodyOf(node.value),
 	}
 }
 
@@ -2499,9 +2509,14 @@ function rewriteFunctionStatement(
 function discardedExpressionStatement(
 	expression: estree.Expression,
 ): estree.Statement {
+	// NOTE: And an `await`, which is what a `complete` written for its effects
+	// is. Nothing about it can be taken away — the wait is the point, and what
+	// it waits for has already been started — and binding it to a name would
+	// only say the same thing with a name nobody reads.
 	if (
 		expression.type === "CallExpression" ||
-		expression.type === "AssignmentExpression"
+		expression.type === "AssignmentExpression" ||
+		expression.type === "AwaitExpression"
 	) {
 		return { type: "ExpressionStatement", expression }
 	}
@@ -2525,6 +2540,76 @@ function discardedExpressionStatement(
 }
 
 const discardedValueName = "$discarded_value"
+
+// NOTE: An emitted Function that exists only to hold what JavaScript can not say
+// in an Expression position — a Match's Handlers, a compiled dispatch's held
+// values, a Combination's two operands, an inlined walk's block, a compiled
+// Matcher's test — called at once with whatever it needs. None of them is a
+// Function the Program wrote.
+//
+// Where what one holds WAITS, the wrapper has to wait too. An `await` belongs to
+// the nearest enclosing Function, and a wrapper nobody wrote is exactly the kind
+// of Function it must not belong to: the wait would be refused as a syntax error
+// where the wrapper is a plain Function, or silently answer a Promise where it is
+// an arrow returning one. So the wrapper is made `async` and the call is
+// awaited, which puts the wait back at the Statement the source wrote it in.
+//
+// NOTE: Asked of the emitted JavaScript rather than of the Nodes behind it. That
+// IS the question — an `await` reaches the enclosing Function unless a Function
+// of its own stands in between — and it is one answer for every wrapper here
+// rather than a rule each of them has to remember about the Nodes it was built
+// from.
+function calledWrapper(
+	callee: estree.FunctionExpression | estree.ArrowFunctionExpression,
+	args: Array<estree.Expression>,
+): estree.Expression {
+	let call: estree.CallExpression = {
+		type: "CallExpression",
+		optional: false,
+		callee,
+		arguments: args,
+	}
+
+	if (!holdsAwait(callee.body)) {
+		return call
+	}
+
+	callee.async = true
+
+	return { type: "AwaitExpression", argument: call }
+}
+
+// NOTE: Whether an `await` stands anywhere in this emitted JavaScript WITHOUT a
+// Function of its own around it — which is the span an `await` belongs to. The
+// walk reads every field rather than the ones each Node kind declares, so a
+// shape added to the emission later is walked without anybody remembering to
+// list it: the cost is reading a Position or two on the way, and the alternative
+// is a table that goes quietly stale around a broken Program.
+function holdsAwait(node: unknown): boolean {
+	if (Array.isArray(node)) {
+		return node.some(holdsAwait)
+	}
+
+	if (node === null || typeof node !== "object") {
+		return false
+	}
+
+	let type = (node as { type?: unknown }).type
+
+	if (type === "AwaitExpression") {
+		return true
+	}
+
+	if (
+		type === "FunctionExpression" ||
+		type === "ArrowFunctionExpression" ||
+		type === "FunctionDeclaration"
+	) {
+		return false
+	}
+
+	return Object.values(node).some(holdsAwait)
+}
 
 function rewriteExpressionStatement(
 	node:
@@ -2603,6 +2688,10 @@ function rewriteExpressionByKind(
 			return rewriteTestTrace(node)
 		case "CoverageCounter":
 			return rewriteCoverageCounter(node)
+		case "Start":
+			return rewriteStart(node)
+		case "Complete":
+			return rewriteComplete(node)
 		case "Intrinsic":
 			return rewriteIntrinsic(node)
 	}
@@ -2878,10 +2967,8 @@ function dispatchChain(
 	// dispatch's own Argument array had; a `let` would say the same thing and
 	// can not be said in an Expression position, which is where a Method
 	// Invocation stands.
-	return {
-		type: "CallExpression",
-		optional: false,
-		callee: {
+	return calledWrapper(
+		{
 			type: "ArrowFunctionExpression",
 			expression: true,
 			params: node.temporaries.map(
@@ -2892,10 +2979,8 @@ function dispatchChain(
 			),
 			body: answer,
 		},
-		arguments: node.temporaries.map((temporary) =>
-			rewriteExpression(temporary.value),
-		),
-	}
+		node.temporaries.map((temporary) => rewriteExpression(temporary.value)),
+	)
 }
 
 // NOTE: One branch's call — the Method the Compiler resolved for this member
@@ -4199,17 +4284,15 @@ function projectedCombination(
 	let lhsName: estree.Identifier = { type: "Identifier", name: "_lhs" }
 	let rhsName: estree.Identifier = { type: "Identifier", name: "_rhs" }
 
-	return {
-		type: "CallExpression",
-		optional: false,
-		callee: {
+	return calledWrapper(
+		{
 			type: "ArrowFunctionExpression",
 			expression: true,
 			params: [lhsName, rhsName],
 			body: combinedObject(lhsName, rhsName, rhsMembers),
 		},
-		arguments: [rewriteExpression(lhs), rewriteExpression(rhs)],
-	}
+		[rewriteExpression(lhs), rewriteExpression(rhs)],
+	)
 }
 
 // NOTE: `{ ...lhs, member: rhs.member, … }` — the spread and one read per
@@ -4719,6 +4802,14 @@ const compilerOwnedNames = new Set([
 	// coverage compile instrumented. Every counter in the body calls it by
 	// this name.
 	"$cover",
+	// NOTE: Asynchrony's module alias, and the name the CONTEXT a completing
+	// body runs under is bound to — the one Parameter of the async closure such
+	// a body answers with. Every `start` and every `complete` written in that
+	// body, and in every sync closure written inside it, reads the context by
+	// this name, so a Program binding it would hand its own value to the
+	// runtime's stopping machinery.
+	"$future",
+	"$ctx",
 	"Object",
 	// NOTE: A counted walk whose bounds escaped safe range converts its start
 	// with it, so a Program declaring its own `BigInt` would take the
@@ -5411,14 +5502,11 @@ function matchChain(
 //
 // NOTE: `lower-matches-to-statements` is what takes the wrapper away wherever
 // the Match stands somewhere a Statement may be written instead.
-function rewriteMatch(
-	node: common.typedSimple.MatchNode,
-): estree.CallExpression {
+function rewriteMatch(node: common.typedSimple.MatchNode): estree.Expression {
 	let value = selfIdentifier()
 
-	return {
-		type: "CallExpression",
-		callee: {
+	return calledWrapper(
+		{
 			type: "FunctionExpression",
 			body: {
 				type: "BlockStatement",
@@ -5431,9 +5519,8 @@ function rewriteMatch(
 			},
 			params: [value],
 		},
-		arguments: [rewriteExpression(node.value)],
-		optional: false,
-	}
+		[rewriteExpression(node.value)],
+	)
 }
 
 // NOTE: A chain of JavaScript conditionals and nothing else:
@@ -6023,10 +6110,8 @@ function inlineLoopExpression(
 ): estree.Expression {
 	let walk = inlinedLoop(node)
 
-	return {
-		type: "CallExpression",
-		optional: false,
-		callee: {
+	return calledWrapper(
+		{
 			type: "ArrowFunctionExpression",
 			expression: false,
 			params: [],
@@ -6035,8 +6120,8 @@ function inlineLoopExpression(
 				{ type: "ReturnStatement", argument: walk.answer },
 			]),
 		},
-		arguments: [],
-	}
+		[],
+	)
 }
 
 // NOTE: The same walk with nothing around it, and its answer written where the
@@ -7902,6 +7987,26 @@ function rewriteParameter(
 	}
 }
 
+// NOTE: The one choke point every emitted Function goes through, and so the one
+// place a COMPLETING body is turned into what it means:
+//
+//   function headline(url) {
+//       return $future.of(async ($ctx) => { … await … ; return v })
+//   }
+//
+// Calling such a Function is an ordinary synchronous call that BUILDS a future
+// and runs nothing; the body is the future's own `run`, and the context it runs
+// under arrives as that closure's one Parameter. The Parameters and their
+// defaults stay on the OUTER Function, because a default is filled in when the
+// future is built rather than when it is run — which is also why nothing here
+// may suspend outside the closure.
+//
+// NOTE: The context Parameter is always spelled `$ctx`, in every completing body
+// at every depth, and it is lexical scoping that makes that right rather than a
+// problem: a sync closure written inside such a body closes over the body's
+// `$ctx`, so the work it starts belongs to the run that built it, while a
+// completing body written inside one binds a `$ctx` of its own that shadows the
+// outer name for exactly the span its own work runs in.
 function rewriteFunctionExpression(
 	node: common.typedSimple.FunctionDefinitionNode,
 ): estree.FunctionExpression {
@@ -7909,7 +8014,118 @@ function rewriteFunctionExpression(
 		type: "FunctionExpression",
 		id: null,
 		params: node.parameters.map((param) => rewriteParameter(param)),
-		body: rewriteBlockStatement(node.body),
+		body: completingBodyOf(node),
+	}
+}
+
+// NOTE: The BODY half of the emission above, shared with the free-Function
+// Declaration, which builds its own Node around the same block.
+function completingBodyOf(
+	node: common.typedSimple.FunctionDefinitionNode,
+): estree.BlockStatement {
+	if (node.completing !== true) {
+		return rewriteBlockStatement(node.body)
+	}
+
+	completingDepth += 1
+
+	let body: estree.BlockStatement
+
+	try {
+		body = rewriteBlockStatement(node.body)
+	} finally {
+		completingDepth -= 1
+	}
+
+	return {
+		type: "BlockStatement",
+		body: [
+			{
+				type: "ReturnStatement",
+				argument: {
+					type: "CallExpression",
+					optional: false,
+					callee: memberRead(futureModule(), "of"),
+					arguments: [
+						{
+							type: "ArrowFunctionExpression",
+							async: true,
+							expression: false,
+							params: [contextIdentifier()],
+							body,
+						},
+					],
+				},
+			},
+		],
+	}
+}
+
+function futureModule(): estree.Identifier {
+	return { type: "Identifier", name: "$future" }
+}
+
+// NOTE: The context a completing body's work runs under — the Parameter of the
+// closure above, and what every `start` and `complete` inside it is handed. A
+// Program can not bind this name: `compilerOwnedNames` holds it.
+function contextIdentifier(): estree.Identifier {
+	return { type: "Identifier", name: "$ctx" }
+}
+
+// NOTE: `start x` — the future put in flight, answering the one run of it. It
+// never waits, so it is emitted as the plain call it is, wherever it stands.
+//
+// NOTE: The context is `$ctx` where one is lexically in scope and a fresh root
+// where none is — and which of those it is, is a question about the emitted
+// JavaScript rather than about the Program, which is why this Node reaches the
+// Rewriter whole. `$future.root()` is the top level's own context: work started
+// there answers to nothing above it, because there is nothing above it.
+function rewriteStart(
+	node: common.typedSimple.StartNode,
+): estree.CallExpression {
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: memberRead(futureModule(), "start"),
+		arguments: [rewriteExpression(node.expression), contextArgument()],
+	}
+}
+
+// NOTE: `complete x` — the `await` the language has no word for. A Future is
+// started under a context of its own and waited for; a Started is waited for
+// again, which answers the same value it always did.
+function rewriteComplete(
+	node: common.typedSimple.CompleteNode,
+): estree.AwaitExpression {
+	return {
+		type: "AwaitExpression",
+		argument: {
+			type: "CallExpression",
+			optional: false,
+			callee: memberRead(futureModule(), "complete"),
+			arguments: [rewriteExpression(node.expression), contextArgument()],
+		},
+	}
+}
+
+// NOTE: Which context the run belongs to. `$ctx` is in scope exactly where a
+// completing body encloses this one lexically — including through sync closures
+// written inside it, which close over it like any other binding — and the
+// Rewriter knows that because it is emitting the closure it is inside of. A
+// counter rather than a stack: nothing needs to know WHICH body, only whether
+// there is one, since every one of them binds the same name.
+let completingDepth = 0
+
+function contextArgument(): estree.Expression {
+	if (completingDepth > 0) {
+		return contextIdentifier()
+	}
+
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: memberRead(futureModule(), "root"),
+		arguments: [],
 	}
 }
 
@@ -8859,17 +9075,15 @@ function assertionTest(
 		return handlerTest(node.matcher, value, null)
 	}
 
-	return {
-		type: "CallExpression",
-		optional: false,
-		callee: {
+	return calledWrapper(
+		{
 			type: "ArrowFunctionExpression",
 			expression: true,
 			params: [selfIdentifier()],
 			body: handlerTest(node.matcher, selfIdentifier(), null),
 		},
-		arguments: [value],
-	}
+		[value],
+	)
 }
 
 // NOTE: Whether `compile-type-tests` decided this Handler's checks. Both fields

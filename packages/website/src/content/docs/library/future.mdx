@@ -1,0 +1,30 @@
+---
+title: "Future"
+description: "Work that has not run: a description to start, and one run of it to wait for."
+section: library
+order: 190
+template: type
+tocDepth: 2
+searchDepth: 3
+namespaces:
+  - "Future"
+  - "Started"
+aliases: []
+conformsTo: []
+---
+
+{/* Generated from packages/standard-library/sources by packages/website/scripts/generateStdlibDocs.ts. The description and the Taught on line are this page's own and survive --sync; everything else is rewritten by it. */}
+
+A description of work that will answer with a `Value`.
+
+Building one runs nothing. `start` puts it in flight and answers the one run of it, and `complete` waits for what it answers with. A Future can be started any number of times, and each start is a fresh run.
+
+A Function whose body writes `complete` declares `-> Future<Value>`. Calling it is an ordinary call that builds the future without running any of it.
+
+Taught on: .
+
+<MemberIndex page={"future"} />
+
+## At a glance
+
+<AtAGlance page={"future"} />

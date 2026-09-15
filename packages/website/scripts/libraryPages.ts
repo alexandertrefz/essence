@@ -82,6 +82,10 @@ const PROTOCOLS = "protocols"
  */
 const OVERRIDES: Record<string, string> = {
 	Step: "loop",
+	// NOTE: One run of a Future has no page of its own — what a Started IS can
+	// not be said without saying what a Future is, and the two are met
+	// together.
+	Started: "Future",
 }
 
 /*

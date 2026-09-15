@@ -810,6 +810,14 @@ export type RandomnessNatives = {
 	shuffle__overload$2: <ItemType extends AnyType>(self: RandomnessType, argument1: ListType<ItemType>) => ListType<ItemType>
 }
 
+export type FutureNatives = {
+
+}
+
+export type StartedNatives = {
+
+}
+
 export type FunctionsNatives = {
 	// static loop<State>(startingWith: State, while: (_: State) -> Boolean, _: (_: State) -> State) -> State
 	loop__overload$1: <State extends AnyType>(startingWith: State, argument1: (argument0: State) => BooleanType, argument2: (argument0: State) => State) => State
@@ -1334,6 +1342,12 @@ export const $RandomnessArity: AssertArities<typeof import("./Randomness"), {
 	shuffle__overload$1: 2
 	shuffle__overload$2: 2
 }> = true
+
+declare const FutureModule: typeof import("./Future")
+export const $Future: FutureNatives = FutureModule
+
+declare const StartedModule: typeof import("./Started")
+export const $Started: StartedNatives = StartedModule
 
 declare const functionsModule: typeof import("./functions")
 export const $functions: FunctionsNatives = functionsModule

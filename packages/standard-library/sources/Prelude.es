@@ -17,6 +17,10 @@ export {
 		NonEmptyDictionary
 	}
 	from "./Enumerable.es" { Enumerable }
+	from "./Future.es" {
+		Future
+		Started
+	}
 	from "./Integer.es" {
 		Division
 		Integer

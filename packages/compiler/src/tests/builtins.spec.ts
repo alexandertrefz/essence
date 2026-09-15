@@ -7,6 +7,7 @@ import * as caseSensitivity from "@essence-lang/runtime/CaseSensitivity"
 import * as dictionary from "@essence-lang/runtime/Dictionary"
 import * as division from "@essence-lang/runtime/Division"
 import * as functions from "@essence-lang/runtime/functions"
+import * as future from "@essence-lang/runtime/Future"
 import * as groupedList from "@essence-lang/runtime/GroupedList"
 import * as groupedNonEmptyList from "@essence-lang/runtime/GroupedNonEmptyList"
 import * as integer from "@essence-lang/runtime/Integer"
@@ -48,6 +49,7 @@ import * as scalar from "@essence-lang/runtime/Scalar"
 import * as side from "@essence-lang/runtime/Side"
 import * as signStyle from "@essence-lang/runtime/SignStyle"
 import * as sortOrder from "@essence-lang/runtime/SortOrder"
+import * as started from "@essence-lang/runtime/Started"
 import * as stream from "@essence-lang/runtime/Stream"
 import * as string from "@essence-lang/runtime/String"
 import * as terminal from "@essence-lang/runtime/Terminal"
@@ -122,6 +124,17 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	GroupedList: groupedList,
 	GroupedNonEmptyList: groupedNonEmptyList,
 	Randomness: randomness,
+	// NOTE: A Namespace with no declared Method yet — the combinators arrive
+	// with the natives that make them worth writing. Its module is anything but
+	// empty: it is the runtime asynchrony itself is built out of, read by the
+	// emission under the alias `$future`, and the row is here because the
+	// cross-check below is over the Rewriter's whole import list.
+	Future: future,
+	// NOTE: And a module holding one exported TYPE, for the reason `Scalar`'s
+	// does — a run of a Future has no representation apart from the description
+	// it came from, so everything that builds or waits for one lives in
+	// `Future.ts`.
+	Started: started,
 }
 
 // NOTE: What the Simplifier will emit for a declared Method — the bare name for
