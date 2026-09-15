@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
-import { complete, type Context, of, root, start } from "../Future"
+import { complete, type Context, firstValue, of, root, start } from "../Future"
 import { createInteger, type IntegerType } from "../Integer"
+import { createList } from "../List"
+import { createFailure, createValue } from "../Result"
+import { createString, type StringType } from "../String"
 import { typeKeySymbol } from "../type"
 
 // NOTE: The runtime half of asynchrony, asked directly rather than through a
@@ -29,6 +32,13 @@ function onEachHost(run: () => void): void {
 	} finally {
 		AbortSignal.any = host
 	}
+}
+
+// NOTE: A real timer rather than a microtask, because what these tests are
+// about is a second answer arriving in a LATER turn than the first — which is
+// what a run that waits for a host does.
+function pause(milliseconds: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
 const one = () => createInteger(1n)
@@ -207,6 +217,87 @@ describe("completing work", () => {
 			await expect(complete(started, root())).rejects.toThrow(
 				"bug in a native",
 			)
+		})
+	})
+})
+
+describe("the first value several runs answer with", () => {
+	// NOTE: The shape that is settled twice in one turn: two runs that both
+	// answer a value before either handler runs. The second handler arrives
+	// after the winner has been chosen, and what it must not do is stop "every
+	// other run" — which by then is the winner.
+	test("leaves the run it handed out completable", async () => {
+		await onEachHostAsync(async () => {
+			let held = new Map<string, Context>()
+			let answering = (name: string) =>
+				of(async (context: Context) => {
+					held.set(name, context)
+
+					return createValue(createString(name))
+				})
+			let answer = await complete(
+				firstValue(createList([answering("a"), answering("b")])),
+				root(),
+			)
+
+			expect(answer[typeKeySymbol]).toBe("Optional#Value")
+
+			let winner = ((answer as { item: StringType }).item as StringType)
+				.value
+
+			expect(held.get(winner)!.signal.aborted).toBe(false)
+		})
+	})
+
+	// NOTE: And the winner's own leftover work goes on. A run that started
+	// something and answered is a run whose context must stay live, because
+	// what it started is what the Program asked for — and a later answer
+	// aborting "every other run" would reach exactly that context.
+	test("leaves the winner's own work running", async () => {
+		await onEachHostAsync(async () => {
+			let ran: Array<string> = []
+			let answering = (name: string, after: number) =>
+				of(async (context: Context) => {
+					start(
+						of(async (inner: Context) => {
+							await pause(40)
+
+							if (!inner.signal.aborted) {
+								ran.push(name)
+							}
+
+							return createString(name)
+						}),
+						context,
+					)
+
+					await pause(after)
+
+					return createValue(createString(name))
+				})
+
+			await complete(
+				firstValue(createList([answering("a", 0), answering("b", 10)])),
+				root(),
+			)
+			await pause(60)
+
+			expect(ran).toEqual(["a"])
+		})
+	})
+
+	// NOTE: A List whose every run fails answers empty, and the count that says
+	// so may not be reached twice by one run.
+	test("answers empty where every run fails", async () => {
+		await onEachHostAsync(async () => {
+			let failing = (reason: string) =>
+				of(async () => createFailure(createString(reason)))
+			let answer = await complete(
+				firstValue(createList([failing("no"), failing("nor")])),
+				root(),
+			)
+
+			expect(answer[typeKeySymbol]).toBe("Optional#Empty")
 		})
 	})
 })

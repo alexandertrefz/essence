@@ -421,10 +421,24 @@ export function firstValue<Value extends AnyType, Failure extends AnyType>(
 		}
 
 		let awaited = started.length
+		// NOTE: SETTLED ONCE, and this flag is what says so. Every run answers,
+		// including the ones that answer in the same turn as the winner, and a
+		// second answer arriving after the choice was made must neither stop
+		// anything nor count towards the empty answer: it would abort every
+		// OTHER run, which by then includes the winner, and a winner whose
+		// context is aborted hands out a value nothing can complete. `race`
+		// needs no flag of its own — `Promise.race` settles once by
+		// construction — but a firstValue skips failures and so can not be
+		// written on it.
+		let found = false
 
 		return new Promise<OptionalType<Value>>((resolve, reject) => {
 			for (let run of started) {
 				run.promise.then((answer) => {
+					if (found) {
+						return
+					}
+
 					if (answer[typeKeySymbol] !== "Result#Value") {
 						awaited -= 1
 
@@ -434,6 +448,8 @@ export function firstValue<Value extends AnyType, Failure extends AnyType>(
 
 						return
 					}
+
+					found = true
 
 					for (let other of started) {
 						if (other !== run) {
