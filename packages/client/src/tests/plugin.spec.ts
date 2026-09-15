@@ -37,6 +37,21 @@ export {
 }
 `
 
+// NOTE: Work, which a build meets as a `Promise` — the one position it crosses
+// at is a call's answer, and the door that carries it is conditional like the
+// Dictionary's.
+const ASYNC_MODULE = `implementation {
+
+	function doubled(_ value: Integer) -> Future<Integer> {
+		<- complete Async.deferred(() { <- value::multiply(with 2) })
+	}
+}
+
+export {
+	doubled
+}
+`
+
 // NOTE: The shapes a declaration file has to spell and a consumer has to be able
 // to write: a Choice, a unit Choice, a Record under a name, a labelled call and
 // an `Optional`. Deliberately no Rational — a generated file borrows
@@ -225,6 +240,24 @@ export const pi = PI
 	// relative to the entry it was emitted for, and the Descriptor bakes that
 	// same tag. Disagree by one character and `areaOf` would match `#Blank` and
 	// answer 0 — no error, a wrong number.
+	// NOTE: The whole asynchrony door through a real build: a `.es` file whose
+	// Function answers work, imported by an entry that simply awaits it. The
+	// wrapper, the interpreter and `Future.ts` all have to be the ones the host
+	// resolved — a second copy of the runtime would mint a second Type key, and
+	// the answer would be refused as a value from somewhere else.
+	it("answers a call with a promise a build can await", async () => {
+		let directory = project({
+			"Async.es": ASYNC_MODULE,
+			"entry.js": `import { doubled } from "./Async.es"
+
+export const doubling = doubled(21n)
+`,
+		})
+		let bundle = await built(directory, "entry.js", "async.mjs")
+
+		expect(await (bundle.doubling as Promise<bigint>)).toBe(42n)
+	})
+
 	it("carries a Choice across as a discriminated union", async () => {
 		let directory = project({
 			"Shapes.es": SHAPES_MODULE,
@@ -704,6 +737,32 @@ export {
 		expect(code).toContain(
 			"dictionaryEntries: $runtime_type.liveEntriesOf,",
 		)
+	})
+
+	// NOTE: And the asynchrony door under the same rule: three Functions out of
+	// `Future.ts`, and behind them the abort linking, the probe for
+	// `AbortSignal.any` and every combinator the standard library binds to that
+	// module — none of which a page that waits for nothing imports.
+	it("imports the asynchrony door only where the boundary names work", async () => {
+		let plain = await wrapper()
+
+		expect(plain).not.toContain("@essence-lang/runtime/Future")
+		expect(plain).not.toContain("futureAnswer:")
+
+		let directory = project({ "Async.es": ASYNC_MODULE })
+		let plugin = essence({ declarations: false })
+		let code =
+			(await plugin.load.call(
+				context(),
+				path.join(directory, "Async.es"),
+			)) ?? ""
+
+		expect(code).toContain(
+			'import * as $runtime_Future from "@essence-lang/runtime/Future"',
+		)
+		expect(code).toContain("future: $runtime_Future.of,")
+		expect(code).toContain("futureContext: $runtime_Future.root,")
+		expect(code).toContain("futureAnswer: $runtime_Future.complete,")
 	})
 
 	// NOTE: What a Descriptor carries beyond the decisions themselves: the Type

@@ -270,6 +270,33 @@ export const entries = [...ages(new Map([["alex", 39n]]))]
 		])
 	})
 
+	// NOTE: And the asynchrony door end to end through the same plugin: the
+	// entry awaits what a call answers with, which is a run the wrapper started
+	// under `Future.ts` — the very copy the built Module waits on, since both
+	// import it by name and the build resolves one.
+	it("answers a call with a promise the build awaits", async () => {
+		let directory = project({
+			"Async.es": `implementation {
+
+	function doubled(_ value: Integer) -> Future<Integer> {
+		<- complete Async.deferred(() { <- value::multiply(with 2) })
+	}
+}
+
+export {
+	doubled
+}
+`,
+			"entry.js": `import { doubled } from "./Async.es"
+
+export const doubling = doubled(21n)
+`,
+		})
+		let { module } = await built(directory, "entry.js")
+
+		expect(await (module.doubling as Promise<bigint>)).toBe(42n)
+	})
+
 	// NOTE: The raw door and the wrapper, in one build, holding one Module: a
 	// value built through the runtime the build resolved is a value the
 	// marshalled door's Functions were compiled against.

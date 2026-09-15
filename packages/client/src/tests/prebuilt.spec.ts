@@ -393,6 +393,93 @@ export {
 		expect((module.exports.twice as (value: bigint) => bigint)(3n)).toBe(6n)
 	})
 
+	// NOTE: The asynchrony door, decided the same way and carried into the same
+	// pair — so a bundle `esc` wrote and a sidecar beside it answer a call with
+	// a promise without a Compiler anywhere in reach. The host's own stop rides
+	// along: `loadPrebuilt` takes a signal for the reason `loadModule` does, and
+	// a run started under one that is already aborted answers nothing at all.
+	it("writes a pair that carries work, and a stop for it", async () => {
+		let built = path.join(directory, "waiting")
+		let bundle = path.join(built, "Waiting.js")
+		let source = path.join(directory, "Waiting.es")
+
+		writeFileSync(
+			source,
+			`implementation {
+
+	function doubled(_ value: Integer) -> Future<Integer> {
+		<- complete Async.deferred(() { <- value::multiply(with 2) })
+	}
+}
+
+export {
+	doubled
+}
+`,
+		)
+
+		let run = esc("build", source, "-o", bundle, "--embed", "--quiet")
+
+		expect(run.code).toBe(0)
+
+		let module = await loadPrebuilt(bundle)
+		let doubled = module.exports.doubled as (
+			value: bigint,
+		) => Promise<bigint>
+
+		expect(await doubled(21n)).toBe(42n)
+
+		let stopping = new AbortController()
+
+		stopping.abort()
+
+		let stoppable = await loadPrebuilt(bundle, undefined, {
+			signal: stopping.signal,
+		})
+
+		// NOTE: A deferred computation has nothing to stop partway — it runs to
+		// its end the moment it is started — so what is asserted here is that
+		// the stop reaches the binding at all and changes no answer. What a
+		// stopped WAIT looks like is `marshal.spec.ts`'s to say.
+		expect(
+			await (
+				stoppable.exports.doubled as (value: bigint) => Promise<bigint>
+			)(21n),
+		).toBe(42n)
+	})
+
+	// NOTE: And the other direction of the same decision: `esc` leaves the whole
+	// of `Future.ts` out of a bundle whose boundary names no work.
+	it("leaves the asynchrony door out of a pair that names none", () => {
+		let built = path.join(directory, "sync")
+		let bundle = path.join(built, "Sync.js")
+		let source = path.join(directory, "Sync.es")
+
+		writeFileSync(
+			source,
+			`implementation {
+
+	function thrice(_ value: Integer) -> Integer {
+		<- value::multiply(with 3)
+	}
+}
+
+export {
+	thrice
+}
+`,
+		)
+
+		let run = esc("build", source, "-o", bundle, "--embed", "--quiet")
+
+		expect(run.code).toBe(0)
+
+		let code = readFileSync(bundle, "utf8")
+
+		expect(code).not.toContain("futureContext")
+		expect(code).not.toContain("futureAnswer")
+	})
+
 	// NOTE: The Descriptor `esc` wrote and the one an in-memory compile of the
 	// same entry writes are the same boundary — which is what says the two
 	// writers of one are one writer. Indentation is the only difference allowed,
