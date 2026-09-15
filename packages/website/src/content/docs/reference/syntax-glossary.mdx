@@ -1334,6 +1334,56 @@ implementation {
 
 Taught on [Records](/docs/language/records) and [Dictionaries](/docs/language/dictionaries).
 
+<h3 id="start">`start`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A word in front of an expression that puts a [`Future<T>`](/docs/library/future) in flight and answers the `Started<T>` of that one run. It takes the whole method chain after it: `start work::map(f)` starts `work::map(f)`. | Wherever a value stands. It never waits, so no body has to allow for it. As a statement it is fire-and-forget, reported once as [`unobserved-started`](/docs/reference/diagnostics#unobserved-started). | A wait: reading the answer is `complete`. A keyword everywhere — it is an ordinary name unless an expression follows it on the line, so `constant start = 1` compiles. An argument label, for that same reason. In front of a value that is no Future it is [`needless-start`](/docs/reference/diagnostics#needless-start). |
+
+</div>
+
+```essence
+implementation {
+	function slowly(_ value: Integer) -> Future<Integer> {
+		complete Async.sleep(milliseconds 1)
+
+		<- value
+	}
+
+	constant running = start slowly(7)
+
+	Terminal.print(complete running) § 7
+}
+```
+
+Taught on [Asynchrony](/docs/language/asynchrony).
+
+<h3 id="complete">`complete`</h3>
+
+<div class="table-scroll">
+
+| What it is | Where it is legal | What it is not |
+| --- | --- | --- |
+| A word in front of an expression that waits for what a `Future<T>` or a `Started<T>` answers with, and answers the `T`. A `Future` is started by the wait; a `Started` is running already. It takes the whole method chain after it. | In a function, method or function literal it makes a completing body of — which declares `-> Future<…>` — at a program's or module's top level, and in a [`test`](/docs/reference/syntax-glossary#test) body. | `await`: there is no `async` to pair it with, and the body is what marks the function. Legal in a test's name, a `benchmark` body, a property body or a parameter's default ([`complete-outside-future`](/docs/reference/diagnostics#complete-outside-future)). A grouping: `complete work::map(f)` waits for `work::map(f)`, so a method on the answer needs a constant first. |
+
+</div>
+
+```essence
+implementation {
+	function doubled(_ value: Integer) -> Future<Integer> {
+		constant waited = complete Async.deferred(() { <- value })
+
+		<- waited::multiply(with 2)
+	}
+
+	Terminal.print(complete doubled(21)) § 42
+}
+```
+
+Taught on [Asynchrony](/docs/language/asynchrony).
+
 <h3 id="interpolation">Interpolation `"{…}"`</h3>
 
 <div class="table-scroll">
@@ -1825,7 +1875,7 @@ Many of the words the forms above are written with are also ordinary names. Only
 | Words | As a name |
 | --- | --- |
 | `if`, `else`, `type`, `variable`, `constant`, `function`, `implementation`, `overload`, `match`, `define`, `namespace`, `protocol`, `for`, `true`, `false` | Reserved. `constant for = 1` is a syntax error, `Expected an Identifier but found 'for'`. |
-| `case`, `otherwise`, `with`, `infer`, `choice`, `import`, `export`, `from`, `as`, `static`, `tests`, `test`, `suite`, `expect`, `require`, `where` | Allowed. Each works as a keyword only where a form expects it. |
+| `case`, `otherwise`, `with`, `infer`, `choice`, `import`, `export`, `from`, `as`, `static`, `tests`, `test`, `suite`, `expect`, `require`, `where`, `start`, `complete` | Allowed. Each works as a keyword only where a form expects it. |
 | `is`, `across`, `any`, `matches`, `snapshot`, `declarations` | Allowed. These are ordinary names that a few forms read in position. |
 
 </div>
@@ -1842,11 +1892,11 @@ implementation {
 }
 ```
 
-A record may therefore have a member named `from` or `test`, and a library method may take a `where` label, as [`everyItem(where:)`](/docs/library/list#everyItem) does. `for` is reserved; it appears in `namespace Name for Type` and in `for any`.
+A record may therefore have a member named `from` or `test`, and a library method may take a `where` label, as [`everyItem(where:)`](/docs/library/list#everyItem) does. `for` is reserved; it appears in `namespace Name for Type` and in `for any`. `start` and `complete` are read as keywords only where an expression follows them on the line, which is the rule under [`start` and `complete` read the rest of the line](/docs/reference/syntax-glossary#keyword-before-expression).
 
 ## Where whitespace matters
 
-Most line breaks and all indentation carry no meaning: a statement ends where the grammar says it does, and [`essence format`](/docs/guides/formatting) decides the layout. The six rules below depend on how tokens sit next to each other.
+Most line breaks and all indentation carry no meaning: a statement ends where the grammar says it does, and [`essence format`](/docs/guides/formatting) decides the layout. The seven rules below depend on how tokens sit next to each other.
 
 <h3 id="labels-flush">A label sits in front of its value</h3>
 
@@ -1878,6 +1928,10 @@ An `if` condition takes no parentheses. A `(` in an expression starts a function
 <h3 id="case-after-label">A space between a label and `#`</h3>
 
 `round(toward #Down)` is the label `toward` and the bare case `#Down`. Written flush, `toward#Down` reads as the case `Down` of a choice named `toward`, and the compiler reports two errors: [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload) on the call, then `unknown-type`, `Type 'toward' is not declared`. The flush form is right for naming a case with its choice, `Ordering#Less`. The [`#` case](/docs/reference/syntax-glossary#case-sigil) entry runs both spellings.
+
+<h3 id="keyword-before-expression">`start` and `complete` read the rest of the line</h3>
+
+Each is a keyword where an expression follows it, and an ordinary name where none does. `constant start = 1` binds a constant, `span.start` reads a member, and `f(start, other)` passes two names. The cost is that `constant held = start` followed by an expression on the next line is **one** statement — `start` takes what is under it, and nothing reports the constant that was meant. Write the value on the same line. For the same reason an argument label can not be spelled `start` or `complete`: `f(start x)` is the keyword and its operand. The [`start`](/docs/reference/syntax-glossary#start) and [`complete`](/docs/reference/syntax-glossary#complete) entries run both readings.
 
 <h3 id="minus-before-digit">`-` only before a number</h3>
 
