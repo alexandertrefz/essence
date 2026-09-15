@@ -47,6 +47,7 @@ import {
 	bundleHashOf,
 	createStoreReader,
 	hostKey,
+	linksEffectfulRuntime,
 	readResult,
 	RESULTS_FORMAT,
 	type ResultRecord,
@@ -1372,6 +1373,16 @@ export async function runTest(
 				key === undefined ||
 				selection === undefined ||
 				!isRemembered(stream)
+			) {
+				continue
+			}
+
+			// NOTE: Asked on the way IN rather than on the way out. An entry
+			// whose bundle reaches the world is never written here, so there is
+			// nothing for a later run to find — which is what keeps the warm
+			// path from having to read every bundle it is about to NOT load.
+			if (
+				await linksEffectfulRuntime(bundleOf.get(suite.inputFileName)!)
 			) {
 				continue
 			}

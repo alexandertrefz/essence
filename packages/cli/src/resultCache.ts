@@ -28,6 +28,16 @@ import type { TestEvent } from "@essence-lang/runtime/Testing"
 // would have to key a test against a graph slice nothing computes, and anything
 // coarser would lose the whole project to one edit.
 //
+// NOTE: THE ONE EXCEPTION, and the one thing above that is not true of every
+// Program. A test that reaches the network is not a function of its inputs at
+// all: the same bytes asked the same question of the same host answer
+// differently on Tuesday, and a remembered pass would go on reporting Monday's
+// answer until something unrelated changed the key. So an entry whose bundle
+// links a runtime module that talks to the world is neither read from this
+// store nor written to it — see `linksEffectfulRuntime`, which is what decides
+// it, and which asks the BUNDLE rather than the sources, because a bundle is
+// all a warm run has in hand.
+//
 // NOTE: A sibling of `cache.ts` in shape and deliberately so: same area rules,
 // same atomic write, same age-ordered prune. What it holds is the only
 // difference — JSON a run wrote rather than JavaScript the emitter did.
@@ -38,7 +48,12 @@ const AREA = "results"
 // in the KEY so that a change to what a record means retires every name spelled
 // under the old meaning, rather than leaving them to be read and refused one at
 // a time.
-export const RESULTS_FORMAT = "essence-results-1"
+//
+// NOTE: `2` because the rule below about a bundle that reaches the world is a
+// change to what a record MEANS: a store written before it can hold an answer
+// this version would never have remembered, and the only way to be sure of not
+// replaying one is to stop reading the names it was written under.
+export const RESULTS_FORMAT = "essence-results-2"
 
 // NOTE: How many answers are kept. A record is a few kilobytes of JSON where a
 // bundle is a few hundred, so this store may hold four times what the bundle
@@ -217,6 +232,53 @@ export function resultKey(parts: ResultKeyParts): string {
 	}
 
 	return hash.digest("hex")
+}
+
+// NOTE: The runtime modules a cached answer may not have been produced by. One
+// name so far, and it is named rather than reached for: `Http` is the module a
+// Program's requests go out through, and everything else in this runtime answers
+// out of the Program's own values.
+//
+// NOTE: Spelled as esbuild LABELS it. Every module a bundle inlines is written
+// into the output under its path relative to the runtime directory — see
+// `absWorkingDir` in `bundler/index.ts`, which anchors those labels so that the
+// same Program compiles to the same bytes from any directory — so the label is
+// a fact about the bundle rather than a string that happens to be in it.
+const EFFECTFUL_RUNTIME_LABELS = ["// Http.ts"]
+
+// NOTE: Any label at all, which is what says the labels are READABLE. A minified
+// bundle carries none of them, and a run that can not see what a bundle links
+// may not conclude that it links nothing — so it is refused the store instead.
+// Nothing minifies a test bundle today; this is what keeps that from becoming a
+// silent hole the day something does.
+const RUNTIME_LABEL = /^\/\/ [\w./-]+\.ts$/m
+
+// NOTE: Whether this bundle links a runtime module that reaches the world. It is
+// asked of an entry ABOUT TO BE REMEMBERED, and of nothing else: an entry that
+// is never written is never found, so the warm path never reads a bundle to
+// decide it is allowed to skip it.
+//
+// NOTE: A bundle that can not be read at all is refused too. The store is an
+// optimisation over a run that works without it, so every uncertainty here is
+// answered by running the tests.
+export async function linksEffectfulRuntime(
+	bundleFileName: string,
+): Promise<boolean> {
+	let text: string
+
+	try {
+		text = await readFile(bundleFileName, "utf8")
+	} catch {
+		return true
+	}
+
+	if (!RUNTIME_LABEL.test(text)) {
+		return true
+	}
+
+	return EFFECTFUL_RUNTIME_LABELS.some((label) =>
+		text.split("\n").includes(label),
+	)
 }
 
 // NOTE: The name the bundle cache wrote this entry under, read back off the file

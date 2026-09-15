@@ -16,6 +16,7 @@ import {
 	createStoreReader,
 	hostKey,
 	type KeyedFilters,
+	linksEffectfulRuntime,
 	prune,
 	readRecord,
 	readResult,
@@ -409,6 +410,85 @@ describe("where the result store lives", () => {
 	it("has a place of its own where nothing was said", () => {
 		withVariable(undefined, () => {
 			expect(resultCacheDirectory()).toContain(`${path.sep}results`)
+		})
+	})
+})
+
+// NOTE: The one thing a remembered answer can not be remembered THROUGH. Every
+// module named here is checked by the label esbuild writes above the code it
+// inlines, so these fixtures are bundles as far as this question is concerned:
+// what a real one holds between the labels is code, and nothing here reads it.
+describe("a bundle that reaches the world", () => {
+	const linked = [
+		"// type.ts",
+		'var typeKeySymbol = Symbol("$type");',
+		"",
+		"// Http.ts",
+		"function send(request) {}",
+		"",
+	].join("\n")
+	const plain = [
+		"// type.ts",
+		'var typeKeySymbol = Symbol("$type");',
+		"",
+		"// Testing.ts",
+		"function register(module) {}",
+		"",
+	].join("\n")
+
+	function withBundle<Value>(
+		text: string,
+		body: (file: string) => Promise<Value>,
+	): Promise<Value> {
+		return withDirectoryAsync(async (directory) => {
+			let file = path.join(directory, "tests.mjs")
+
+			writeFileSync(file, text)
+
+			return body(file)
+		})
+	}
+
+	it("is refused the store where it links the HTTP runtime", async () => {
+		await withBundle(linked, async (file) => {
+			expect(await linksEffectfulRuntime(file)).toBe(true)
+		})
+	})
+
+	it("keeps the store where it links nothing of the kind", async () => {
+		await withBundle(plain, async (file) => {
+			expect(await linksEffectfulRuntime(file)).toBe(false)
+		})
+	})
+
+	// NOTE: A name inside a STRING or a comment of the Program's own is not a
+	// label, which is the whole reason the check is written against the labels
+	// rather than against the text.
+	it("reads the label rather than the text around it", async () => {
+		await withBundle(
+			[
+				"// type.ts",
+				'var name = "// Http.ts";',
+				"var note = 4; // Http.ts",
+				"",
+			].join("\n"),
+			async (file) => {
+				expect(await linksEffectfulRuntime(file)).toBe(false)
+			},
+		)
+	})
+
+	it("refuses a bundle whose labels it can not read", async () => {
+		await withBundle("var a=1;var b=2;export{a,b};", async (file) => {
+			expect(await linksEffectfulRuntime(file)).toBe(true)
+		})
+	})
+
+	it("refuses a bundle that is not there at all", async () => {
+		await withDirectoryAsync(async (directory) => {
+			expect(
+				await linksEffectfulRuntime(path.join(directory, "gone.mjs")),
+			).toBe(true)
 		})
 	})
 })
