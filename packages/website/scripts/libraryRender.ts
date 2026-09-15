@@ -25,7 +25,7 @@
  * slugger.
  */
 
-import type { PageManifest } from "./libraryManifest.ts"
+import { modesTitle, type PageManifest } from "./libraryManifest.ts"
 import type { LibraryPage } from "./libraryPages.ts"
 
 /** The first line of every generated body — and how `--sync` tells a generated page from a hand-written one. */
@@ -380,9 +380,11 @@ export function renderPage(
 	}
 
 	if (manifest.modes.length > 0) {
-		block(layout.heading(2, "Modes").line)
+		let title = modesTitle(manifest.modes)
 
-		if (manifest.modes.every((mode) => mode.payloadFree)) {
+		block(layout.heading(2, title).line)
+
+		if (title === "Modes") {
 			block(
 				`Each mode below is a choice whose cases carry no payload. You pass one to a method to choose how the method works. Every mode has \`is\`, \`isNot\` and \`toString\`, and \`cases()\` on its name lists its cases, as in \`${manifest.modes[0]!.name}.cases()\`. None of them is written out for a mode: [Protocols](/docs/library/protocols#Enumerable) says where each one comes from.`,
 			)

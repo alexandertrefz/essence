@@ -12,6 +12,7 @@
  * is set in the quieter colour.
  */
 
+import { modesTitle } from "../../../scripts/libraryManifest.ts"
 import { libraryPage } from "./library.ts"
 
 interface Props {
@@ -116,7 +117,11 @@ rows = [
 		"refinements",
 		manifest.refinements.map((refinement) => refinement.name),
 	),
-	extra("Modes", "modes", manifest.modes.map((mode) => mode.name)),
+	extra(
+		modesTitle(manifest.modes),
+		modesTitle(manifest.modes).toLowerCase(),
+		manifest.modes.map((mode) => mode.name),
+	),
 ].filter((row): row is Row => row !== undefined)
 ---
 

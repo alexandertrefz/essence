@@ -107,6 +107,20 @@ export interface ManifestMode {
 	takenBy: Array<ManifestLink & { default: string | null }>
 }
 
+/**
+ * What the section of a page's hosted Choices is called, in its heading and in
+ * the member index.
+ *
+ * NOTE: A mode is a Choice whose cases carry nothing, passed to pick how a
+ * method works — `Rounding`, `Side`. `Step` is hosted the same way and is not
+ * one: its cases carry the State and the answer. A page hosting a Choice like
+ * it calls the section what it holds rather than a word the lede under it
+ * defines to mean something else.
+ */
+export function modesTitle(modes: ManifestMode[]): "Modes" | "Choices" {
+	return modes.every((mode) => mode.payloadFree) ? "Modes" : "Choices"
+}
+
 export interface ManifestAlias {
 	name: string
 	declaration: string
