@@ -67,6 +67,38 @@ export type RuntimeBridge = {
 	dictionaryEntries?: (
 		dictionary: EssenceValue,
 	) => Array<[EssenceValue, EssenceValue]>
+	// NOTE: And the three a bundle carries ONLY where its boundary names a
+	// Future or a Started — `carriesFuture` is that question, and
+	// `FUTURE_BRIDGE_MODULES` is what it decides.
+	//
+	// NOTE: `future` BUILDS one out of a JavaScript Function, which is the
+	// whole of what a host callback declared to answer work is: the Function is
+	// called at every start rather than once, because that is what a
+	// description IS. `futureContext` is the context such a run belongs to —
+	// a root, with nothing above it — and `futureAnswer` is the wait: it
+	// starts a Future under the context it is given and answers the promise,
+	// and hands back the promise a Started already holds. One member for both
+	// kinds, because the runtime already tells them apart and a second copy of
+	// that rule is the only way this side could come to disagree.
+	future?: (run: (context: FutureContext) => unknown) => EssenceValue
+	futureContext?: () => FutureContext
+	futureAnswer?: (work: EssenceValue, context: FutureContext) => unknown
+}
+
+// NOTE: The context one run of a Future belongs to — the signal the work reads
+// and the controller that stops it, as `Future.ts` declares it. Spelled out here
+// rather than imported from the runtime for the reason `EssenceValue` above is
+// spelled as `object`: this file is the vocabulary of the DOOR, and the half of
+// it that reads a bridge back is the half that may not name the runtime at all.
+//
+// NOTE: Both halves are ordinary web platform objects rather than Essence
+// values, so there is no bundle's Type key in either and a host may hold one of
+// its own beside them — which is exactly what the marshaller does with the
+// `AbortSignal` a binding is given: it links it to the controller of the root
+// every run it starts belongs under.
+export type FutureContext = {
+	signal: AbortSignal
+	controller: AbortController
 }
 
 type BridgeMember = keyof RuntimeBridge
@@ -74,10 +106,12 @@ type BridgeMember = keyof RuntimeBridge
 // NOTE: One runtime Module and the members a bridge takes out of it.
 type BridgeModule = [string, Array<[BridgeMember, string]>]
 
-// NOTE: What the boundary of the Module this bridge is for holds — today the
-// one question, asked of the Descriptor by `carriesDictionary`.
+// NOTE: What the boundary of the Module this bridge is for holds — one flag per
+// conditional door, each asked of the Descriptor: `carriesDictionary` and
+// `carriesFuture`.
 export type BridgeOptions = {
 	dictionary?: boolean
+	future?: boolean
 }
 
 // NOTE: What a `RuntimeBridge` is MADE OF, as one table: the member, the
@@ -132,14 +166,46 @@ const DICTIONARY_BRIDGE_MODULES: Array<BridgeModule> = [
 	["Dictionary", [["dictionary", "createDictionaryFrom"]]],
 ]
 
-// NOTE: The table a bridge is built out of, with the Dictionary door folded in
-// where the Module's boundary names one — merged by runtime Module rather than
-// appended, because two entries for one file would import it twice under one
-// alias and the injected Module would not parse.
+// NOTE: The asynchrony door, carried under the same rule and for the same
+// reason: `Future.ts` is the whole of what a run IS — the abort linking, the
+// probe for `AbortSignal.any` and the fallback under it, and every combinator
+// the standard library binds to that module — and a boundary that can hold no
+// Future anywhere has no use for any of it.
+//
+// NOTE: All three come from `Future.ts`, including the way a run is WAITED for.
+// `Started.ts` holds the two Methods a run in flight answers and no door of its
+// own: what a Started is and how one is read live in `Future.ts`, and asking
+// for a promise through `complete` is asking the runtime the one question it
+// already answers for both kinds.
+const FUTURE_BRIDGE_MODULES: Array<BridgeModule> = [
+	[
+		"Future",
+		[
+			["future", "of"],
+			["futureContext", "root"],
+			["futureAnswer", "complete"],
+		],
+	],
+]
+
+// NOTE: The table a bridge is built out of, with each conditional door folded
+// in where the Module's boundary names what it is for — merged by runtime
+// Module rather than appended, because two entries for one file would import it
+// twice under one alias and the injected Module would not parse.
 export function runtimeBridgeModules(
 	options: BridgeOptions = {},
 ): Array<BridgeModule> {
-	if (options.dictionary !== true) {
+	let doors: Array<Array<BridgeModule>> = []
+
+	if (options.dictionary === true) {
+		doors.push(DICTIONARY_BRIDGE_MODULES)
+	}
+
+	if (options.future === true) {
+		doors.push(FUTURE_BRIDGE_MODULES)
+	}
+
+	if (doors.length === 0) {
 		return RUNTIME_BRIDGE_MODULES
 	}
 
@@ -147,7 +213,7 @@ export function runtimeBridgeModules(
 		([fileName, members]) => [fileName, [...members]],
 	)
 
-	for (let [fileName, members] of DICTIONARY_BRIDGE_MODULES) {
+	for (let [fileName, members] of doors.flat()) {
 		let existing = modules.find(([name]) => name === fileName)
 
 		if (existing === undefined) {
@@ -167,11 +233,12 @@ export function runtimeBridgeModules(
 // either a build handed exports it never asked for or a load told the bundle
 // "exports no runtime bridge".
 //
-// NOTE: The Dictionary door is NOT named here, and it does not have to be:
-// which door a bundle gets is decided by `carriesDictionary` out of the
-// Module's own Descriptor, so it is a function of the sources this key already
-// stands for. Naming it would mean knowing the answer before the graph has been
-// linked, which is exactly when a caller asks for this.
+// NOTE: The conditional doors are NOT named here, and they do not have to be:
+// which of them a bundle gets is decided by `carriesDictionary` and
+// `carriesFuture` out of the Module's own Descriptor, so each is a function of
+// the sources this key already stands for. Naming one would mean knowing the
+// answer before the graph has been linked, which is exactly when a caller asks
+// for this.
 export const BRIDGE_KEY = `essence-embed-bridge-1:${RUNTIME_BRIDGE_MODULES.map(
 	([fileName, members]) =>
 		`${fileName}(${members

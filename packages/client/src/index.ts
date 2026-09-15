@@ -1,5 +1,6 @@
 export {
 	type EssenceValue,
+	type FutureContext,
 	type RuntimeBridge,
 	runtimeBridgeOf,
 } from "./bridge"
@@ -59,6 +60,7 @@ export {
 	createInterpreter,
 	type EssenceFunction,
 	type Interpreter,
+	type InterpreterOptions,
 	type ModuleBindings,
 } from "./marshal-runtime"
 export {
@@ -102,7 +104,12 @@ export {
 // the Descriptor beside it, bound without a Compiler. Reached through the root
 // like everything else, and importable on its own — `@essence-lang/client/prebuilt`
 // pulls in nothing but the interpreter.
-export { descriptorPath, loadPrebuilt, type PrebuiltModule } from "./prebuilt"
+export {
+	descriptorPath,
+	loadPrebuilt,
+	type PrebuiltModule,
+	type PrebuiltOptions,
+} from "./prebuilt"
 export {
 	essence,
 	type PluginContext,

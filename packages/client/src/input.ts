@@ -22,16 +22,25 @@ import type { EssenceRational } from "./rational"
 // mapped Type would walk its METHODS — every member `keyof Map` names — and
 // answer a shape that has a `get` and a `set` and no widened key at all, which
 // is the one thing a Parameter of a Dictionary needs said.
+//
+// NOTE: And a `Promise` is named for the same reason. It is what work crosses
+// as — a call's answer, and a callback declared to answer a Future — so the
+// mapped Type would otherwise walk `then`, `catch` and `finally` and hand back
+// a shape with three Functions in it and nothing awaitable about it. It stops
+// here whole: what the promise HOLDS is spelled by the declaration that printed
+// it, which is where the direction was already decided.
 export type Input<T> = T extends bigint
 	? bigint | number
 	: T extends EssenceRational
 		? T
 		: T extends (...args: never) => unknown
 			? T
-			: T extends ReadonlyArray<infer Item>
-				? Array<Input<Item>>
-				: T extends ReadonlyMap<infer Key, infer Value>
-					? Map<Input<Key>, Input<Value>>
-					: T extends object
-						? { [Key in keyof T]: Input<T[Key]> }
-						: T
+			: T extends Promise<unknown>
+				? T
+				: T extends ReadonlyArray<infer Item>
+					? Array<Input<Item>>
+					: T extends ReadonlyMap<infer Key, infer Value>
+						? Map<Input<Key>, Input<Value>>
+						: T extends object
+							? { [Key in keyof T]: Input<T[Key]> }
+							: T

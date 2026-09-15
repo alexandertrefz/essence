@@ -87,13 +87,18 @@ export type MarshallerOptions = {
 	// with no Type over it answers the same string a declared position would —
 	// a door that could be built without it would spell one Case two ways.
 	module: ModuleDescriptor
+	// NOTE: The host's own stop, under which every run this door starts belongs
+	// — see `InterpreterOptions`, which is where it goes and what it means.
+	signal?: AbortSignal
 }
 
 export function createMarshaller(
 	bridge: RuntimeBridge,
 	options: MarshallerOptions,
 ): Marshaller {
-	let interpreter = createInterpreter(bridge, options.module)
+	let interpreter = createInterpreter(bridge, options.module, {
+		signal: options.signal,
+	})
 	let context: DescribeContext = { entryPath: options.entryPath }
 	// NOTE: One Descriptor per Type, kept against the Type itself. Describing is
 	// the whole of what this door pays for having been spelled in the Compiler's

@@ -5388,3 +5388,500 @@ exports[`A Module described describes Defaults.es 1`] = `
 }
 `;
 
+
+exports[`A Module described describes Async.es 1`] = `
+{
+  "exports": {
+    "attempted": {
+      "emitted": "attempted",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "string",
+              "shown": "String",
+            },
+          },
+          {
+            "label": "using",
+            "of": {
+              "kind": "function",
+              "parameters": [
+                {
+                  "label": null,
+                  "of": {
+                    "kind": "string",
+                    "shown": "String",
+                  },
+                },
+              ],
+              "returns": {
+                "kind": "future",
+                "of": {
+                  "arms": [
+                    {
+                      "choice": "Result",
+                      "kind": "case",
+                      "name": "Value",
+                      "optional": false,
+                      "payload": {
+                        "item": {
+                          "of": {
+                            "kind": "string",
+                            "shown": "String",
+                          },
+                        },
+                      },
+                      "shown": "Result<String, String>#Value",
+                      "tag": "Result#Value",
+                      "unitChoice": false,
+                    },
+                    {
+                      "choice": "Result",
+                      "kind": "case",
+                      "name": "Failure",
+                      "optional": false,
+                      "payload": {
+                        "reason": {
+                          "of": {
+                            "kind": "string",
+                            "shown": "String",
+                          },
+                        },
+                      },
+                      "shown": "Result<String, String>#Failure",
+                      "tag": "Result#Failure",
+                      "unitChoice": false,
+                    },
+                  ],
+                  "kind": "union",
+                  "shown": "Result<String, String>",
+                },
+                "shown": "Future<Result<String, String>>",
+              },
+              "shown": "(_ String) -> Future<Result<String, String>>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "future",
+          "of": {
+            "arms": [
+              {
+                "choice": "Result",
+                "kind": "case",
+                "name": "Value",
+                "optional": false,
+                "payload": {
+                  "item": {
+                    "of": {
+                      "kind": "string",
+                      "shown": "String",
+                    },
+                  },
+                },
+                "shown": "Result<String, String>#Value",
+                "tag": "Result#Value",
+                "unitChoice": false,
+              },
+              {
+                "choice": "Result",
+                "kind": "case",
+                "name": "Failure",
+                "optional": false,
+                "payload": {
+                  "reason": {
+                    "of": {
+                      "kind": "string",
+                      "shown": "String",
+                    },
+                  },
+                },
+                "shown": "Result<String, String>#Failure",
+                "tag": "Result#Failure",
+                "unitChoice": false,
+              },
+            ],
+            "kind": "union",
+            "shown": "Result<String, String>",
+          },
+          "shown": "Future<Result<String, String>>",
+        },
+        "shown": "(_ String, using: (_ String) -> Future<Result<String, String>>) -> Future<Result<String, String>>",
+      },
+    },
+    "counted": {
+      "emitted": "counted",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "key": {
+                "kind": "string",
+                "shown": "String",
+              },
+              "kind": "dictionary",
+              "shown": "Dictionary<String, Integer>",
+              "value": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+            },
+          },
+        ],
+        "returns": {
+          "kind": "future",
+          "of": {
+            "key": {
+              "kind": "string",
+              "shown": "String",
+            },
+            "kind": "dictionary",
+            "shown": "Dictionary<String, Integer>",
+            "value": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+          "shown": "Future<Dictionary<String, Integer>>",
+        },
+        "shown": "(_ Dictionary<String, Integer>) -> Future<Dictionary<String, Integer>>",
+      },
+    },
+    "doubled": {
+      "emitted": "doubled",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "future",
+          "of": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+          "shown": "Future<Integer>",
+        },
+        "shown": "(_ Integer) -> Future<Integer>",
+      },
+    },
+    "greeted": {
+      "emitted": "greeted",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "string",
+              "shown": "String",
+            },
+          },
+          {
+            "label": "after",
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "future",
+          "of": {
+            "kind": "string",
+            "shown": "String",
+          },
+          "shown": "Future<String>",
+        },
+        "shown": "(_ String, after: Integer) -> Future<String>",
+      },
+    },
+    "loaded": {
+      "emitted": "loaded",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "string",
+              "shown": "String",
+            },
+          },
+          {
+            "label": "using",
+            "of": {
+              "kind": "function",
+              "parameters": [
+                {
+                  "label": null,
+                  "of": {
+                    "kind": "string",
+                    "shown": "String",
+                  },
+                },
+              ],
+              "returns": {
+                "kind": "future",
+                "of": {
+                  "kind": "string",
+                  "shown": "String",
+                },
+                "shown": "Future<String>",
+              },
+              "shown": "(_ String) -> Future<String>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "future",
+          "of": {
+            "kind": "string",
+            "shown": "String",
+          },
+          "shown": "Future<String>",
+        },
+        "shown": "(_ String, using: (_ String) -> Future<String>) -> Future<String>",
+      },
+    },
+    "nested": {
+      "emitted": "nested",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "future",
+          "of": {
+            "kind": "future",
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+            "shown": "Future<Integer>",
+          },
+          "shown": "Future<Future<Integer>>",
+        },
+        "shown": "(_ Integer) -> Future<Future<Integer>>",
+      },
+    },
+    "queued": {
+      "emitted": "queued",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "record",
+              "members": {
+                "work": {
+                  "of": {
+                    "kind": "future",
+                    "of": {
+                      "kind": "integer",
+                      "shown": "Integer",
+                    },
+                    "shown": "Future<Integer>",
+                  },
+                },
+              },
+              "shown": "{ work: Future<Integer> }",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "record",
+          "members": {
+            "work": {
+              "of": {
+                "kind": "future",
+                "of": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+                "shown": "Future<Integer>",
+              },
+            },
+          },
+          "shown": "{ work: Future<Integer> }",
+        },
+        "shown": "(_ { work: Future<Integer> }) -> { work: Future<Integer> }",
+      },
+    },
+    "ran": {
+      "emitted": "ran",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "future",
+              "of": {
+                "kind": "integer",
+                "shown": "Integer",
+              },
+              "shown": "Future<Integer>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "future",
+          "of": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+          "shown": "Future<Integer>",
+        },
+        "shown": "(_ Future<Integer>) -> Future<Integer>",
+      },
+    },
+    "running": {
+      "emitted": "running",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "started",
+          "of": {
+            "kind": "integer",
+            "shown": "Integer",
+          },
+          "shown": "Started<Integer>",
+        },
+        "shown": "(_ Integer) -> Started<Integer>",
+      },
+    },
+    "shelved": {
+      "emitted": "shelved",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "string",
+              "shown": "String",
+            },
+          },
+          {
+            "label": "using",
+            "of": {
+              "kind": "function",
+              "parameters": [
+                {
+                  "label": null,
+                  "of": {
+                    "kind": "string",
+                    "shown": "String",
+                  },
+                },
+              ],
+              "returns": {
+                "kind": "future",
+                "of": {
+                  "kind": "string",
+                  "shown": "String",
+                },
+                "shown": "Future<String>",
+              },
+              "shown": "(_ String) -> Future<String>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "(_ String, using: (_ String) -> Future<String>) -> Integer",
+      },
+    },
+    "together": {
+      "emitted": "together",
+      "kind": "function",
+      "of": {
+        "kind": "function",
+        "parameters": [
+          {
+            "label": null,
+            "of": {
+              "kind": "list",
+              "of": {
+                "kind": "future",
+                "of": {
+                  "kind": "integer",
+                  "shown": "Integer",
+                },
+                "shown": "Future<Integer>",
+              },
+              "shown": "List<Future<Integer>>",
+            },
+          },
+        ],
+        "returns": {
+          "kind": "future",
+          "of": {
+            "kind": "list",
+            "of": {
+              "kind": "integer",
+              "shown": "Integer",
+            },
+            "shown": "List<Integer>",
+          },
+          "shown": "Future<List<Integer>>",
+        },
+        "shown": "(_ List<Future<Integer>>) -> Future<List<Integer>>",
+      },
+    },
+    "work": {
+      "emitted": "work",
+      "kind": "constant",
+      "of": {
+        "kind": "future",
+        "of": {
+          "kind": "integer",
+          "shown": "Integer",
+        },
+        "shown": "Future<Integer>",
+      },
+    },
+  },
+}
+`;

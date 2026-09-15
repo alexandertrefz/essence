@@ -12,6 +12,7 @@ import type { RuntimeBridge } from "@essence-lang/compiler/embed/bridge"
 // the two could ever come apart, and there is no second copy of one name.
 export type {
 	EssenceValue,
+	FutureContext,
 	RuntimeBridge,
 } from "@essence-lang/compiler/embed/bridge"
 

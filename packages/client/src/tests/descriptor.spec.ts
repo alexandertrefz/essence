@@ -2,12 +2,18 @@ import { describe, expect, it } from "bun:test"
 import { readFileSync } from "node:fs"
 import * as path from "node:path"
 
-import { linkToMemory } from "@essence-lang/compiler/embed"
+import {
+	carriesDictionary,
+	carriesFuture,
+	linkToMemory,
+} from "@essence-lang/compiler/embed"
 import { canonicalPath } from "@essence-lang/compiler/modules"
 
 import {
+	type DeclaredType,
 	describe as describeType,
 	describeModule,
+	describeTypes,
 	type Descriptor,
 	type ModuleDescriptor,
 } from "../descriptor"
@@ -23,6 +29,7 @@ const FIXTURES = [
 	"Defaults.es",
 	"Escaped.es",
 	"Refused.es",
+	"Async.es",
 ]
 
 // NOTE: Linked rather than compiled — describing reads an Export Surface, and
@@ -33,6 +40,14 @@ function moduleDescriptor(fileName: string): ModuleDescriptor {
 	let entry = canonicalPath(path.join(FILES, fileName))
 
 	return describeModule(linkToMemory(entry).surface, entry)
+}
+
+// NOTE: The Types the Module names beside the values it binds, which is the
+// other half of the boundary every door question is asked of.
+function moduleTypes(fileName: string): Array<DeclaredType> {
+	let entry = canonicalPath(path.join(FILES, fileName))
+
+	return describeTypes(linkToMemory(entry).surface, entry)
 }
 
 // NOTE: The fixtures, described. A snapshot is the right shape for this because
@@ -213,6 +228,72 @@ describe("A Module described", () => {
 		expect(calls.exports.boxed).toMatchObject({
 			of: { parameters: [{ of: { kind: "union" } }] },
 		})
+	})
+
+	// NOTE: Work is described WHEREVER it is met — a Type is described where it
+	// stands, and which positions may hold one is the marshaller's rule. So the
+	// Descriptor carries a `future` node at the answer that crosses and at the
+	// Record member that is refused alike, and the refusal is a sentence read
+	// off the shape rather than a node baked here.
+	it("describes work as what it answers with, at every position", () => {
+		let described = moduleDescriptor("Async.es")
+
+		expect(described.exports.doubled).toMatchObject({
+			kind: "function",
+			of: {
+				returns: {
+					kind: "future",
+					of: { kind: "integer" },
+					shown: "Future<Integer>",
+				},
+			},
+		})
+		expect(described.exports.running).toMatchObject({
+			of: { returns: { kind: "started", of: { kind: "integer" } } },
+		})
+		expect(described.exports.queued).toMatchObject({
+			of: {
+				parameters: [
+					{
+						of: {
+							kind: "record",
+							members: { work: { of: { kind: "future" } } },
+						},
+					},
+				],
+			},
+		})
+	})
+
+	// NOTE: The door question, which is what decides whether the bundle carries
+	// the three runtime Functions work crosses through. Asked of the whole
+	// boundary, so a Module that names no Future anywhere pays for none of it.
+	it("answers whether the boundary names work at all", () => {
+		expect(
+			carriesFuture(
+				moduleDescriptor("Async.es"),
+				moduleTypes("Async.es"),
+			),
+		).toBe(true)
+		expect(
+			carriesFuture(
+				moduleDescriptor("Marshal.es"),
+				moduleTypes("Marshal.es"),
+			),
+		).toBe(false)
+	})
+
+	// NOTE: And the walk goes THROUGH work to what it answers with, which is a
+	// value that crosses like any other — a Module whose only Dictionary is the
+	// one a future answers with still needs the door a Dictionary crosses
+	// through. `counted` is that Module's whole reason for existing.
+	it("finds a Dictionary a future answers with", () => {
+		expect(
+			carriesDictionary(
+				moduleDescriptor("Async.es"),
+				moduleTypes("Async.es"),
+			),
+		).toBe(true)
 	})
 })
 

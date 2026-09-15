@@ -256,11 +256,12 @@ async function writeDescriptor(
 
 // NOTE: What makes an embedded bundle one — the runtime's own Type key and value
 // constructors, injected as a Module and handed over as the bundle's default
-// export — and whether it carries the door a Dictionary crosses through, which
-// is asked of the Module's own Descriptor. `@essence-lang/client` asks the same
-// question of the same Descriptor before it compiles, so one graph gets one
-// bundle whichever tool built it, and the key both of them cache under does not
-// have to name the answer.
+// export — and which of the conditional doors it carries: the one a Dictionary
+// crosses through and the one asynchronous work does, each asked of the
+// Module's own Descriptor. `@essence-lang/client` asks the same questions of the
+// same Descriptor before it compiles, so one graph gets one bundle whichever
+// tool built it, and the key both of them cache under does not have to name the
+// answer.
 //
 // NOTE: A standard library source has no Surface — it is one shared declaration
 // space rather than a Module — so there is no boundary to ask about and the
@@ -275,14 +276,16 @@ async function runtimeBridgeFor(
 		return (sources) => withRuntimeBridge(sources)
 	}
 
-	let { carriesDictionary, describeModule, describeTypes } =
+	let { carriesDictionary, carriesFuture, describeModule, describeTypes } =
 		await import("@essence-lang/compiler/embed/describe")
-	let dictionary = carriesDictionary(
-		describeModule(front.surface, front.entryPath),
-		describeTypes(front.surface, front.entryPath),
-	)
+	// NOTE: Described ONCE for both questions — describing a Module is a walk
+	// of its whole Surface, and the two flags are read in the same breath.
+	let described = describeModule(front.surface, front.entryPath)
+	let declared = describeTypes(front.surface, front.entryPath)
+	let dictionary = carriesDictionary(described, declared)
+	let future = carriesFuture(described, declared)
 
-	return (sources) => withRuntimeBridge(sources, { dictionary })
+	return (sources) => withRuntimeBridge(sources, { dictionary, future })
 }
 
 // NOTE: A remembered bundle as the outputs of the compile that would have

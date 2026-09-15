@@ -561,7 +561,107 @@ export declare function $user_ok_3f_(p0: EssenceValue): EssenceValue`)
 	})
 })
 
+describe("Asynchronous work in the declarations", () => {
+	// NOTE: One position and one spelling: a call's ANSWER, as a `Promise` of
+	// what the work answers with. A callback declared to answer a Future reads
+	// the same way — it is an answer too, one the host writes — and every other
+	// position is `never` with the sentence the boundary would have thrown, so
+	// the line a host would have been refused at fails to typecheck instead.
+	it("declares work as a promise where a call answers one", async () => {
+		expect(await declarationsOf(clientFixture("Async.es"))).toBe(
+			`// Generated from Async.es by @essence-lang/client. Do not edit.
+//
+// The Module as JavaScript — marshalled at every boundary.
+
+import type { Input } from "@essence-lang/client"
+
+export type Job = {
+	work: never /* a Future<Integer> is work rather than a value, and work crosses only as a call's answer */
+}
+
+export declare function attempted(p0: string, using: (p0: string) => Promise<{ $case: "Result#Value"; item: string } | { $case: "Result#Failure"; reason: string }>): Promise<{ $case: "Result#Value"; item: string } | { $case: "Result#Failure"; reason: string }>
+export declare function counted(p0: Map<string, bigint | number>): Promise<Map<string, bigint>>
+export declare function doubled(p0: bigint | number): Promise<bigint>
+export declare function greeted(p0: string, after: bigint | number): Promise<string>
+export declare function loaded(p0: string, using: (p0: string) => Promise<string>): Promise<string>
+export declare function nested(p0: bigint | number): Promise<never /* a Future<Integer> is work rather than a value, and work crosses only as a call's answer */>
+export declare function queued(p0: Input<Job>): Job
+export declare function ran(p0: never /* a Future<Integer> is work rather than a value, and work crosses only as a call's answer */): Promise<bigint>
+export declare function running(p0: bigint | number): Promise<bigint>
+export declare function shelved(p0: string, using: (p0: string) => Promise<string>): bigint
+export declare function together(p0: Array<never /* a Future<Integer> is work rather than a value, and work crosses only as a call's answer */>): Promise<Array<bigint>>
+export declare const work: never /* a Future<Integer> is work rather than a value, and work crosses only as a call's answer */
+`,
+		)
+	})
+
+	// NOTE: The bundle view says nothing about any of it, as it says nothing
+	// about every other shape: what the emitted Module binds is an Essence value
+	// under the name the Rewriter emitted it as, and a Future there is a value
+	// like the rest.
+	it("leaves work opaque in the bundle view", async () => {
+		let text = await declarationsOf(clientFixture("Async.es"), "bundle")
+
+		expect(text).toContain(
+			"export declare function doubled(p0: EssenceValue): EssenceValue",
+		)
+		expect(text).not.toContain("Promise")
+		expect(text).not.toContain("never")
+	})
+})
+
 describe("A consumer of the generated declarations", () => {
+	// NOTE: The asynchrony door as a reader meets it: a call is awaited, and a
+	// callback declared to answer work is an ordinary `async` Function. Both
+	// halves have to typecheck for the door to be worth having — a declaration
+	// that only the marshaller agreed with would be a door nobody could open.
+	it("awaits a call and writes a callback that answers work", async () => {
+		let declarations = await declarationsFor(clientFixture("Async.es"))
+		let run = typecheck({
+			"Async.d.es.ts": declarations,
+			"consumer.ts": `import { attempted, counted, doubled, loaded, running } from "./Async.es"
+
+export let doubling = doubled(21n)
+export let answered: Promise<bigint> = doubling
+export let inFlight: Promise<bigint> = running(21n)
+export let entries: Promise<Map<string, bigint>> = counted(new Map([["a", 1]]))
+
+export async function read(): Promise<string> {
+	return await loaded("key", async (key) => key.toUpperCase())
+}
+
+export async function tried(): Promise<string> {
+	let answer = await attempted("key", async (key) => ({
+		$case: "Result#Failure" as const,
+		reason: key,
+	}))
+
+	return answer.$case === "Result#Value" ? answer.item : answer.reason
+}
+`,
+		})
+
+		expect(run.output).toBe("")
+		expect(run.code).toBe(0)
+	})
+
+	// NOTE: And the position that is refused, refused at the line that writes
+	// it. `never` is what makes that happen: a call the marshaller would throw
+	// on does not compile.
+	it("is refused work handed in", async () => {
+		let declarations = await declarationsFor(clientFixture("Async.es"))
+		let run = typecheck({
+			"Async.d.es.ts": declarations,
+			"consumer.ts": `import { ran } from "./Async.es"
+
+export let wrong = ran(Promise.resolve(1n))
+`,
+		})
+
+		expect(run.code).not.toBe(0)
+		expect(run.output).toContain("consumer.ts")
+	})
+
 	it("typechecks against them", async () => {
 		let declarations = await declarationsFor(clientFixture("Marshal.es"))
 		let run = typecheck({

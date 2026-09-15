@@ -1,5 +1,5 @@
 import { bareCaseCollision } from "./bare-cases"
-import type { EssenceValue, RuntimeBridge } from "./bridge"
+import type { EssenceValue, FutureContext, RuntimeBridge } from "./bridge"
 import type {
 	CaseDescriptor,
 	Descriptor,
@@ -198,6 +198,11 @@ type Inbound = (value: unknown, at: Path | null, step: Step) => EssenceValue
 
 type Outbound = (value: unknown, at: Path | null, step: Step) => unknown
 
+// NOTE: What a link that was never made is released by. One Function rather
+// than a `null` to test for, because the release is run on a path that has just
+// waited for work: a branch there buys nothing and reads worse.
+function nothing(): void {}
+
 // NOTE: The members of one Record or one Case's payload, compiled — the readers
 // under the names a value carries them under, and the same readers in the order
 // the Type declares them. Which of the two answers is asked first is the whole
@@ -281,9 +286,25 @@ type ListBox = {
 	frontLen?: number
 }
 
+// NOTE: What a binding knows that a Descriptor does not — today the one thing:
+// the host's own `AbortSignal`, if it has one. It belongs to the INTERPRETER
+// rather than to a call because it is a fact about the whole binding: every run
+// this boundary starts belongs under it, so stopping it stops everything the
+// host asked this Module for and nothing else.
+export type InterpreterOptions = {
+	// NOTE: The ROOT context of every run the boundary starts, rather than a
+	// second mechanism beside the one the language already has. A Program's own
+	// `start` makes a child of the context it was written in and `::within` and
+	// `::race` stop their losers through exactly such a child — so a host that
+	// hands a signal over is handing over the top of that same tree, and
+	// everything below it is stopped the way everything else is.
+	signal?: AbortSignal
+}
+
 export function createInterpreter(
 	bridge: RuntimeBridge,
 	module: ModuleDescriptor,
+	options: InterpreterOptions = {},
 ): Interpreter {
 	// NOTE: The bundle's own Type key and constructors, read off the bridge ONCE.
 	// Every value that crosses reaches one of them, and a property load on the
@@ -381,6 +402,14 @@ export function createInterpreter(
 	// a `TypeError` about `undefined` from inside a walk.
 	let makeDictionary = bridge.dictionary
 	let dictionaryEntries = bridge.dictionaryEntries
+	// NOTE: And the three of the asynchrony door, carried under the same rule —
+	// see `runtimeBridgeModules`. Undefined where the boundary names no Future
+	// and no Started, and a Descriptor that names one is then a Descriptor from
+	// another compile, which is what `noFutureDoor` says.
+	let makeFuture = bridge.future
+	let makeFutureContext = bridge.futureContext
+	let futureAnswer = bridge.futureAnswer
+	let hostSignal = options.signal
 	// NOTE: Every unit Choice Case the MODULE names, under the tag its values
 	// carry. Whether a Case crosses as a bare string is a fact about the Choice
 	// and a value carries nothing that says it, so the general walk — which
@@ -412,6 +441,12 @@ export function createInterpreter(
 	// converter below it already built.
 	let inbound = new WeakMap<Descriptor, Inbound>()
 	let outbound = new WeakMap<Descriptor, Outbound>()
+	// NOTE: A table of its own, because an ANSWER is the one position that reads
+	// a shape differently from every other: a Future is work everywhere and a
+	// `Promise` here. The same Descriptor node can stand in both — a Type Alias
+	// for a Future, answered by one Function and held by a Record somewhere else
+	// — and one table would then hand whichever rule was compiled first to both.
+	let answers = new WeakMap<Descriptor, Outbound>()
 	let outboundMembers = new WeakMap<DescribedMembers, Members>()
 	let calls = new WeakMap<FunctionDescriptor, Call>()
 	// NOTE: What a position that declared nothing reads its members by — no
@@ -438,6 +473,30 @@ export function createInterpreter(
 		if (compiled === undefined) {
 			compiled = buildOut(expected)
 			outbound.set(expected, compiled)
+		}
+
+		return compiled
+	}
+
+	// NOTE: What a call ANSWERS with, which is the one position asynchronous
+	// work crosses at — `Future<T>` and `Started<T>` come back as a `Promise` of
+	// what they answer with, and everywhere else they are refused. The rule is
+	// here rather than in `buildOut` because it is a rule about the POSITION: a
+	// Function's answer is where a Program said work would be handed over, and a
+	// Record's member is where it said a value would be.
+	//
+	// NOTE: Every other shape goes to the ordinary door, memo table and all —
+	// this is one branch in front of it, not a second reading of anything.
+	function compileAnswerOut(expected: Descriptor): Outbound {
+		if (expected.kind !== "future" && expected.kind !== "started") {
+			return compileOut(expected)
+		}
+
+		let compiled = answers.get(expected)
+
+		if (compiled === undefined) {
+			compiled = buildAnswerOut(expected)
+			answers.set(expected, compiled)
 		}
 
 		return compiled
@@ -509,7 +568,7 @@ export function createInterpreter(
 				arity: parameters.length,
 				labels,
 				readers: parameters.map((parameter) => compileIn(parameter.of)),
-				answer: compileOut(signature.returns),
+				answer: compileAnswerOut(signature.returns),
 				positional,
 				// NOTE: The same Array where no labels may be written, rather
 				// than a second one holding the same strings — `readCall`
@@ -1127,6 +1186,18 @@ export function createInterpreter(
 			}
 			case "function":
 				return buildCallbackIn(expected)
+			// NOTE: Work can not be BUILT from a JavaScript value. A Future is a
+			// description of Essence work and a Started is one run of it, and
+			// what a host holds instead is a `Promise` — an answer that has not
+			// arrived, which describes nothing and can not be run again. The one
+			// place a host says "work" is a callback the Module calls: the
+			// callback is the description, and `buildCallbackIn` is where that
+			// is read.
+			case "future":
+			case "started":
+				return (value, at, step) => {
+					throw asynchronyFromHost(shown, at, step)
+				}
 			// NOTE: Everything the boundary has no mapping for, refused in the
 			// words the Compiler wrote when it still had the Type to name.
 			case "refused": {
@@ -1397,11 +1468,36 @@ export function createInterpreter(
 		let handed = signature.parameters.map((parameter) =>
 			compileOut(parameter.of),
 		)
-		let back = compileIn(signature.returns)
+		// NOTE: A callback the Module calls for WORK rather than for a value —
+		// declared `-> Future<T>`, which is the one way asynchronous work
+		// crosses INTO a Module. What the host writes is an ordinary Function
+		// answering a `Promise`; what the Module gets is a Future, and the two
+		// differ in WHEN the host is called: a Future is a description, so the
+		// call is made at every start and not one moment sooner. A host's
+		// `(url) => fetch(url)` handed to a Parameter of this shape is therefore
+		// a request that has not been made, and `::attempt(times 3)` over it
+		// makes three.
+		//
+		// NOTE: A `Started` answer is not a door of its own. A Started is one
+		// run of the Module's own work and a host has no way to start one, so it
+		// falls to the refusal in `buildIn` like every other position — see
+		// `asynchronyFromHost`.
+		let work =
+			signature.returns.kind === "future" ? signature.returns : null
+		let back = compileIn(work === null ? signature.returns : work.of)
+		let makeWork = makeFuture
 
 		return (value, at, step) => {
 			if (typeof value !== "function") {
 				throw mismatch(value, shown, at, step)
+			}
+
+			// NOTE: Asked where the callback ARRIVES rather than where it is
+			// called, because that is where a host can still be told what to do
+			// about it: a refusal out of a call the Module made names a Function
+			// the host passed pages earlier.
+			if (work !== null && makeWork === undefined) {
+				throw noFutureDoor(at, step)
 			}
 
 			let target = value as (...args: Array<unknown>) => unknown
@@ -1415,6 +1511,37 @@ export function createInterpreter(
 
 			let answered = within(arrived, "return value")
 
+			if (work === null) {
+				return (...args: Array<EssenceValue>): EssenceValue => {
+					// oxlint-disable-next-line unicorn/no-new-array -- the length, as above
+					let given: Array<unknown> = new Array(count)
+
+					for (let position = 0; position < count; position++) {
+						given[position] = handed[position]!(
+							args[position],
+							null,
+							places[position]!,
+						)
+					}
+
+					return back(target(...given), null, answered)
+				}
+			}
+
+			let build = makeWork!
+
+			// NOTE: The Arguments cross when the MODULE calls the callback, and
+			// the host is called when the work is STARTED. They are two moments
+			// and the values belong to the first of them: the Module handed them
+			// over when it built the future, and a start that read them again
+			// would be reading values the Module may have moved on from.
+			//
+			// NOTE: The context is not passed on. A host Function takes what its
+			// own declaration says it takes, and handing it a fourth Argument it
+			// never asked for would be this package inventing a calling
+			// convention for code it did not write — the same reason a callback
+			// is called positionally. A host that wants to be stopped can close
+			// over an `AbortController` of its own; the README says so.
 			return (...args: Array<EssenceValue>): EssenceValue => {
 				// oxlint-disable-next-line unicorn/no-new-array -- the length, as above
 				let given: Array<unknown> = new Array(count)
@@ -1427,7 +1554,11 @@ export function createInterpreter(
 					)
 				}
 
-				return back(target(...given), null, answered)
+				return build(() =>
+					Promise.resolve(target(...given)).then((held) =>
+						back(held, null, answered),
+					),
+				)
 			}
 		}
 	}
@@ -1646,11 +1777,130 @@ export function createInterpreter(
 								spell(at, step),
 							)
 						: toJS(value, at, step, expected)
+			// NOTE: Work met somewhere other than a call's answer, which is the
+			// one position it crosses at — see `compileAnswerOut`, which is the
+			// door, and `asynchronyInsideValue`, which is the sentence. A fact
+			// about the SHAPE rather than about any value of it, so it compiles
+			// to the refusal itself.
+			case "future":
+			case "started":
+				return (value, at, step) => {
+					throw asynchronyInsideValue(expected.shown, at, step)
+				}
 			// NOTE: A Type the way IN has no mapping for is still a value on the
 			// way out, and its tag says what it is — `Optional<Algebraic>` hands
 			// back an Algebraic's own refusal rather than the Type Parameter's.
 			case "refused":
 				return (value, at, step) => toJS(value, at, step, expected)
+		}
+	}
+
+	// NOTE: A call's answer that has not run — the whole of the asynchrony door,
+	// and the only place this boundary starts anything.
+	//
+	// A FUTURE is started here, once per call: what a Function answers with is a
+	// description, and a host holding a `Promise` is holding a run. Each call
+	// starts its own, which is what a Future means — two calls are two runs —
+	// and the run belongs to a ROOT context made for it, with the host's own
+	// signal above that root where the binding was given one.
+	//
+	// A STARTED is already in flight, and nothing here starts it again: what
+	// crosses is the promise it holds. The host's signal is deliberately NOT
+	// linked to one — `Started::within` states the same rule from inside the
+	// language: a run belongs to whoever started it and may be waited for from
+	// anywhere, so a deadline or a stop written by one holder may not stop the
+	// work the others are waiting for.
+	//
+	// NOTE: The value inside is marshalled when it ARRIVES, so a refusal of it
+	// comes back as a rejected promise rather than as a throw at the call. There
+	// is nowhere else for it to go: the value does not exist yet when the call
+	// answers, which is the whole reason the position is a promise.
+	//
+	// NOTE: The promise gains no segment of its own in the path. It is
+	// transparent on this side exactly as an `Optional` is — a host awaiting a
+	// call's answer reads the value, not a box around it — so a refusal inside
+	// one is spelled from where the answer was.
+	function buildAnswerOut(
+		expected: Extract<Descriptor, { kind: "future" | "started" }>,
+	): Outbound {
+		let answer = futureAnswer
+		let makeContext = makeFutureContext
+
+		if (answer === undefined || makeContext === undefined) {
+			return (value, at, step) => {
+				throw noFutureDoor(at, step)
+			}
+		}
+
+		let tag = expected.kind === "future" ? "Future" : "Started"
+		let started = expected.kind === "started"
+		let item = compileOut(expected.of)
+
+		return (value, at, step) => {
+			if (!tagged(value, tag)) {
+				return toJS(value, at, step, expected)
+			}
+
+			// NOTE: A Started is waited for under a context of its own that
+			// nothing reads — the runtime answers one with the promise it
+			// already holds — so there is nothing to unlink afterwards either.
+			let root = started
+				? { context: makeContext(), release: nothing }
+				: rootContext(makeContext)
+			let answered = answer(value as EssenceValue, root.context)
+
+			return Promise.resolve(answered).then(
+				(held) => {
+					root.release()
+
+					return item(held, at, step)
+				},
+				(thrown) => {
+					root.release()
+
+					throw thrown
+				},
+			)
+		}
+	}
+
+	// NOTE: The context a run the boundary started belongs to: a root of its
+	// own, with the host's signal linked above it where the binding was given
+	// one. Per CALL, because two calls are two runs and one may not stop the
+	// other — which is exactly what the Rewriter emits at a Program's top level,
+	// a fresh root per site.
+	//
+	// NOTE: `release` is what takes the link off again once the run is over, and
+	// it is why the link is not simply left in place: a host signal lives as
+	// long as the host does, and a listener per call on it would be a listener
+	// per call that outlives the call. It is the same bookkeeping `childOf`
+	// keeps in the runtime, kept here for the one link this side makes.
+	function rootContext(makeContext: () => FutureContext): {
+		context: FutureContext
+		release: () => void
+	} {
+		let context = makeContext()
+
+		if (hostSignal === undefined) {
+			return { context, release: nothing }
+		}
+
+		// NOTE: A signal that is aborted ALREADY stops the run before it starts,
+		// rather than starting work the host has said it no longer wants.
+		if (hostSignal.aborted) {
+			context.controller.abort(hostSignal.reason)
+
+			return { context, release: nothing }
+		}
+
+		let signal = hostSignal
+		let forward = (): void => context.controller.abort(signal.reason)
+
+		signal.addEventListener("abort", forward, { once: true })
+
+		return {
+			context,
+			release: () => signal.removeEventListener("abort", forward),
 		}
 	}
 
@@ -1784,6 +2034,14 @@ export function createInterpreter(
 			}
 			case OPTIONAL_EMPTY:
 				return undefined
+			// NOTE: Work met where nothing declared any — a Record member the
+			// boundary never named, a `toJS` with no Type over it. It is refused
+			// in the words a declared position is refused in, because it is the
+			// same refusal: work crosses as a call's answer and nowhere else,
+			// and a walk that reached one here reached it inside a value.
+			case "Future":
+			case "Started":
+				throw asynchronyInsideValue(tag, at, step)
 		}
 
 		if (tag.includes("#")) {
@@ -2302,6 +2560,71 @@ export function createInterpreter(
 		)
 	}
 
+	// NOTE: Work met anywhere but a call's answer, in both directions and in the
+	// same words, because it is one rule: a Future is a DESCRIPTION of work and
+	// the boundary starts it where it crosses, so a position that holds one has
+	// to be a position that says when it should run. A call's answer says so —
+	// the call is what asked for the work. A Record's member, a List's item and
+	// a Case's payload say nothing of the kind: starting one to spell it would
+	// run work nobody asked for, every time the value crossed, and handing the
+	// description over unstarted would hand over a JavaScript object that
+	// describes nothing.
+	//
+	// NOTE: Marked as having reached INSIDE the value, so that a Union holding
+	// work answers with this sentence rather than with the Union — it is a
+	// refusal of the SHAPE, which `reachedInside` calls the useful one.
+	function asynchronyInsideValue(
+		shown: string,
+		at: Path | null,
+		step: Step,
+	): EssenceMarshalError {
+		let where = spell(at, step)
+
+		return new EssenceMarshalError(
+			`${where}: a ${shown} is work rather than a value, and work crosses only as a call's answer — inside a value there is nothing to say when it should run. Answer it from a Function, or complete it and hand the value over.`,
+			where,
+			true,
+		)
+	}
+
+	// NOTE: The same rule met from the other side: a host handing work IN. It is
+	// worded apart from the refusal above because the way out of it is different
+	// — there is no JavaScript value that is a Future, whatever position it is
+	// written at, so the fix is never "move it" but always "hand over what it
+	// answers with, or let the Module do the starting".
+	function asynchronyFromHost(
+		shown: string,
+		at: Path | null,
+		step: Step,
+	): EssenceMarshalError {
+		let where = spell(at, step)
+
+		return new EssenceMarshalError(
+			`${where}: a ${shown} can not be built from a JavaScript value — a Promise is an answer that has not arrived, not a description that can be run. Work crosses INTO a Module as a callback declared to answer one, which is called at every start; pass such a Function, or hand the value over.`,
+			where,
+			true,
+		)
+	}
+
+	// NOTE: Work met where the bundle carries no door for it. Unlike the
+	// Dictionary's, this one is not reachable from a boundary the Compiler
+	// described: work at an undeclared position is refused by
+	// `asynchronyInsideValue` before any door is asked for, so a Descriptor that
+	// names a Future while the bundle carries none is a Descriptor and a bundle
+	// that did not come from one compile.
+	//
+	// NOTE: Said out loud for the reason `runtimeBridgeOf` says its own: a
+	// `TypeError` about `undefined` from inside a walk names nothing a reader
+	// can act on.
+	function noFutureDoor(at: Path | null, step: Step): EssenceMarshalError {
+		let where = spell(at, step)
+
+		return new EssenceMarshalError(
+			`${where}: this bundle carries no asynchrony door — it was built for a boundary that names no Future and no Started, so it is not the bundle this Descriptor was written for. Build the two together: 'loadModule', a bundler plugin, or 'esc build --embed'.`,
+			where,
+		)
+	}
+
 	function collidingCase(
 		at: Path | null,
 		step: Step,
@@ -2367,6 +2690,15 @@ export function createInterpreter(
 				: `an array of ${value.length} item${
 						value.length === 1 ? "" : "s"
 					}`
+		}
+
+		// NOTE: A Promise, named as one. It has no own keys either, so the clause
+		// at the bottom would call it an empty object — and of every value a
+		// host is likely to hand the wrong door, this is the one whose mistake is
+		// worth naming: it is an answer that has not arrived, and the Module has
+		// somewhere to put one only where it declared work.
+		if (value instanceof Promise) {
+			return "a Promise, which crosses only where the Module declared a Future"
 		}
 
 		// NOTE: Named as the Map it is rather than read for members it has none
@@ -2497,6 +2829,9 @@ export type BindOptions = {
 	// when a bundle was evaluated, so a bridge belongs to one bundle and binding
 	// against another's would build values the Module can not read.
 	bridge: RuntimeBridge
+	// NOTE: The host's own stop, which becomes the ROOT of every run this
+	// binding starts — see `InterpreterOptions`.
+	signal?: AbortSignal
 }
 
 type Callable = (...args: Array<unknown>) => unknown
@@ -2506,7 +2841,9 @@ export function bind(
 	descriptor: ModuleDescriptor,
 	options: BindOptions,
 ): ModuleBindings {
-	let interpreter = createInterpreter(options.bridge, descriptor)
+	let interpreter = createInterpreter(options.bridge, descriptor, {
+		signal: options.signal,
+	})
 	let raw = bindRaw(bundle, descriptor)
 	let exports: Record<string, unknown> = {}
 
@@ -3354,6 +3691,13 @@ function familiesOf(descriptor: Descriptor): Set<string> | null {
 		}
 		case "function":
 			return new Set(["function"])
+		// NOTE: Neither can take a value at all on the way in, and both are
+		// answered the way `refused` is rather than with an empty Set: an arm
+		// that has to be TRIED is an arm whose own sentence is the one a reader
+		// gets, and "work can not be built from a JavaScript value" is worth
+		// more than the Union's own mismatch.
+		case "future":
+		case "started":
 		case "refused":
 			return null
 	}
@@ -3497,8 +3841,14 @@ function collectBareCases(
 	found: Map<string, string>,
 ): void {
 	switch (descriptor.kind) {
+		// NOTE: A Future and a Started are walked THROUGH, because what they
+		// answer with is a value that crosses: a `Future<Direction>` answered by
+		// a Function puts that Choice's Cases on this boundary exactly as a
+		// `List<Direction>` does.
 		case "list":
 		case "optional":
+		case "future":
+		case "started":
 			collectBareCases(descriptor.of, found)
 
 			return

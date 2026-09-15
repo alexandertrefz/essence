@@ -22,6 +22,7 @@ let cacheDirectory = ""
 let module: EssenceModule
 let marshaller: Marshaller
 let leaves: EssenceModule
+let async: EssenceModule
 
 beforeAll(async () => {
 	cacheDirectory = realpathSync.native(
@@ -36,7 +37,10 @@ beforeAll(async () => {
 		path.join(import.meta.dirname, "files", "Leaves.es"),
 		{ cacheDirectory },
 	)
+	async = await loadModule(asyncFixture, { cacheDirectory })
 })
+
+const asyncFixture = path.join(import.meta.dirname, "files", "Async.es")
 
 afterAll(() => {
 	rmSync(cacheDirectory, { recursive: true, force: true })
@@ -109,6 +113,32 @@ async function withProject<Result>(
 	} finally {
 		rmSync(directory, { recursive: true, force: true })
 	}
+}
+
+// NOTE: A wait of the TEST's own, which is what makes a stopped run something
+// to assert rather than a race: a timer set after the Module's expires after
+// it, so a wait of this one that fires while the Module's has not is a wait the
+// Module's will never finish.
+function delay(milliseconds: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
+// NOTE: Whether a promise has SETTLED — the whole of what a stopped run looks
+// like from this side. Nothing is ever rejected: a Future can not fail, so work
+// that was stopped answers nothing at all.
+function settlingOf(promise: Promise<unknown>): () => boolean {
+	let settled = false
+
+	promise.then(
+		() => {
+			settled = true
+		},
+		() => {
+			settled = true
+		},
+	)
+
+	return () => settled
 }
 
 function marshalError(work: () => unknown): EssenceMarshalError {
@@ -1997,5 +2027,248 @@ describe("A leaf met alone and met inside a List", () => {
 
 		expect(asItem("integers", tagged)).toEqual(asLeaf("integer", tagged))
 		expect(asItem("texts", tagged)).toEqual(asLeaf("text", tagged))
+	})
+})
+
+// NOTE: The one position asynchronous work crosses at — a call's ANSWER, as a
+// `Promise` of what the work answers with — and the positions it does not,
+// which are every other one. Both halves are here together because they are one
+// rule: a Future is a DESCRIPTION, and a position that holds one has to be a
+// position that says when it should run.
+describe("Asynchronous work", () => {
+	function call(name: string, ...args: Array<unknown>): unknown {
+		return (async.exports[name] as (...args: Array<unknown>) => unknown)(
+			...args,
+		)
+	}
+
+	it("answers a call with a promise of what the work answers", async () => {
+		let answer = call("doubled", 21n)
+
+		expect(answer).toBeInstanceOf(Promise)
+		expect(await answer).toBe(42n)
+	})
+
+	// NOTE: A run in flight rather than a description of one. `running` starts
+	// the work itself and answers the run, so what crosses is the promise that
+	// run already holds — nothing here starts it again.
+	it("hands back the promise a run in flight holds", async () => {
+		expect(await call("running", 21n)).toBe(42n)
+	})
+
+	// NOTE: What a Future answers with is a value like any other, walked by the
+	// item's own reader — the Dictionary door included, which is why the door
+	// question walks through work to what it answers with.
+	it("marshals what the work answers with", async () => {
+		expect(await call("counted", new Map([["a", 1n]]))).toEqual(
+			new Map([["a", 1n]]),
+		)
+	})
+
+	// NOTE: The IN door, and the whole of why it is a callback rather than a
+	// Promise: a callback declared to answer a Future is called at every START,
+	// so the Module can run it again. `attempted` runs it twice while it fails,
+	// and a Promise handed over instead would have been one answer awaited
+	// twice.
+	it("calls a host callback at every start", async () => {
+		let calls = 0
+		let answer = await call("attempted", "key", (key: string) => {
+			calls += 1
+
+			return Promise.resolve({
+				$case: "Result#Failure",
+				reason: `${key} is gone`,
+			})
+		})
+
+		expect(calls).toBe(2)
+		expect(answer).toEqual({
+			$case: "Result#Failure",
+			reason: "key is gone",
+		})
+	})
+
+	// NOTE: And the other half of the same claim: building a future runs
+	// nothing, so a callback whose work the Module never starts is never called
+	// at all.
+	it("never calls a callback whose work is not started", () => {
+		let calls = 0
+
+		expect(
+			call("shelved", "key", () => {
+				calls += 1
+
+				return Promise.resolve("read")
+			}),
+		).toBe(1n)
+		expect(calls).toBe(0)
+	})
+
+	// NOTE: The host is called with the Arguments the MODULE handed over, and
+	// what it answers with is marshalled IN against what the Future was declared
+	// to answer with — both directions of an ordinary callback, one start later.
+	it("marshals both directions of a callback that answers work", async () => {
+		expect(
+			await call("loaded", "key", (key: string) => Promise.resolve(key)),
+		).toBe("key")
+
+		let refused = await (
+			call("loaded", "key", () => Promise.resolve(7)) as Promise<unknown>
+		).then(
+			() => null,
+			(thrown: unknown) => thrown,
+		)
+
+		expect(refused).toBeInstanceOf(EssenceMarshalError)
+		expect((refused as EssenceMarshalError).message).toBe(
+			"argument 2 → return value: expected String, got the number 7.",
+		)
+	})
+
+	// NOTE: Work at a Parameter, which is the position a host has nothing to
+	// build for: a Promise is an answer that has not arrived, not a description
+	// that can be run.
+	it("refuses work handed in", () => {
+		let refused = marshalError(() => call("ran", Promise.resolve(1n)))
+
+		expect(refused.message).toBe(
+			"argument 1: a Future<Integer> can not be built from a JavaScript value — a Promise is an answer that has not arrived, not a description that can be run. Work crosses INTO a Module as a callback declared to answer one, which is called at every start; pass such a Function, or hand the value over.",
+		)
+	})
+
+	// NOTE: The same refusal one level along — the position is the item of a
+	// List rather than the Argument itself, and the path says which.
+	it("refuses a List of work", () => {
+		expect(
+			marshalError(() => call("together", [Promise.resolve(1n)])).message,
+		).toContain("argument 1 → [0]: a Future<Integer> can not be built")
+	})
+
+	// NOTE: And inside a Record, where the member is what is named.
+	it("refuses work inside a value", () => {
+		expect(
+			marshalError(() => call("queued", { work: Promise.resolve(1n) }))
+				.message,
+		).toContain("argument 1 → .work: a Future<Integer> can not be built")
+	})
+
+	// NOTE: The way OUT of the same rule, which can only be met past the one
+	// position that crosses: `nested` answers work that answers work, so the
+	// outer future is a promise and the inner one is a value inside it. The
+	// refusal therefore arrives as a REJECTION — the value did not exist when
+	// the call answered, which is the whole reason the position is a promise.
+	it("refuses work a promise answers with", async () => {
+		let thrown = await (call("nested", 3n) as Promise<unknown>).then(
+			() => null,
+			(error: unknown) => error,
+		)
+
+		expect(thrown).toBeInstanceOf(EssenceMarshalError)
+		expect((thrown as EssenceMarshalError).message).toBe(
+			"return value: a Future<Integer> is work rather than a value, and work crosses only as a call's answer — inside a value there is nothing to say when it should run. Answer it from a Function, or complete it and hand the value over.",
+		)
+	})
+
+	// NOTE: A constant is not a call, so there is nothing to have asked for the
+	// work — reading the name is refused rather than answered with a run nobody
+	// asked to start. It is refused where it is READ, like every other constant
+	// the boundary has no mapping for, so the rest of the Module is reachable.
+	it("refuses a constant that holds work", () => {
+		expect(marshalError(() => async.exports.work).message).toContain(
+			"work: a Future<Integer> is work rather than a value",
+		)
+	})
+
+	// NOTE: A Promise handed where a value was declared, named as what it is.
+	// Every other object with no keys of its own reads as "an empty object",
+	// which says nothing about the one mistake worth naming here.
+	it("names a Promise handed where a value was declared", () => {
+		expect(
+			marshalError(() => call("doubled", Promise.resolve(2n))).message,
+		).toBe(
+			"argument 1: expected Integer, got a Promise, which crosses only where the Module declared a Future.",
+		)
+	})
+})
+
+// NOTE: The host's own stop. A binding given an `AbortSignal` makes it the ROOT
+// of every run the boundary starts, rather than a second mechanism beside the
+// one the language has: `::within` and `::race` stop their losers through a
+// child of the context they were written in, and this is the top of that same
+// tree.
+//
+// NOTE: One controller and one binding PER test, rather than one shared by the
+// four. A stop is pulled once and never put back, so a shared one would make
+// each test depend on the order the others ran in — and a test run on its own
+// would be a test run against a signal nobody had aborted.
+describe("A host's signal", () => {
+	function bound(signal: AbortSignal): Promise<EssenceModule> {
+		return loadModule(asyncFixture, { cacheDirectory, signal })
+	}
+
+	function greeted(module: EssenceModule, after: bigint): Promise<unknown> {
+		return (
+			module.exports.greeted as (
+				name: string,
+				after: bigint,
+			) => Promise<unknown>
+		)("hi", after)
+	}
+
+	// NOTE: The control. The same work, under a binding that was given a signal,
+	// answers exactly as it does without one — a stop that is never pulled
+	// changes nothing.
+	it("leaves an unstopped run alone", async () => {
+		let module = await bound(new AbortController().signal)
+
+		expect(await greeted(module, 0n)).toBe("hi")
+	})
+
+	// NOTE: A run stopped while it is going on. The wait is signalled, its timer
+	// is cleared and the promise is left unsettled: a Future can not fail, so a
+	// stopped run answers nothing at all rather than rejecting — which is what
+	// the language means by cancellation everywhere else.
+	it("stops the runs a call started", async () => {
+		let stopping = new AbortController()
+		let module = await bound(stopping.signal)
+		let settled = settlingOf(greeted(module, 0n))
+
+		stopping.abort()
+
+		await delay(20)
+
+		expect(settled()).toBe(false)
+	})
+
+	// NOTE: And a signal that is aborted ALREADY stops the run before it starts,
+	// rather than starting work the host has said it no longer wants.
+	it("starts nothing under a signal that is already aborted", async () => {
+		let stopping = new AbortController()
+		let module = await bound(stopping.signal)
+
+		stopping.abort()
+
+		let settled = settlingOf(greeted(module, 0n))
+
+		await delay(20)
+
+		expect(settled()).toBe(false)
+	})
+
+	// NOTE: A Started is NOT stopped by it. `Started::within` states the same
+	// rule from inside the language: one run belongs to whoever started it and
+	// may be waited for from anywhere, so a stop written by one holder may not
+	// take the answer away from the others.
+	it("leaves a run in flight to whoever started it", async () => {
+		let stopping = new AbortController()
+		let module = await bound(stopping.signal)
+
+		stopping.abort()
+
+		expect(
+			await (
+				module.exports.running as (value: bigint) => Promise<unknown>
+			)(21n),
+		).toBe(42n)
 	})
 })

@@ -68,6 +68,16 @@ export type Descriptor =
 	// is collapsed here, because every rule about it is a rule about the pair.
 	| { kind: "optional"; of: Descriptor; shown: string }
 	| { kind: "union"; arms: Array<Descriptor>; shown: string }
+	// NOTE: Work that has not run, and one run of it — a `Promise` on the other
+	// side, in the one position a promise may stand: a call's ANSWER. What each
+	// of them HOLDS is described like any other Type Argument, because that is
+	// the value which finally crosses; the description itself is a closure and
+	// the run is a promise and a controller, and none of that is written down
+	// here for the reason no half of a Dictionary's box is. The marshaller says
+	// why the answer is the only position, and `bridge.ts` says when a bundle
+	// carries the door.
+	| { kind: "future"; of: Descriptor; shown: string }
+	| { kind: "started"; of: Descriptor; shown: string }
 	| CaseDescriptor
 	| FunctionDescriptor
 	// NOTE: A Type this boundary has no mapping for, carrying the sentence that
@@ -411,18 +421,24 @@ function describeBody(
 				why: `${shown} is a Namespace rather than a value — there is nothing on the JavaScript side to build one from.`,
 				shown,
 			}
-		// NOTE: Asynchrony has no door yet. A Future is a description of work
-		// and a Started is one run of it, and both carry a context that decides
-		// when the work stops — so crossing one means deciding what a JavaScript
-		// `Promise` handed in is a description OF, and which side owns the
-		// stopping. Refused by name rather than through the fallthrough below,
-		// because that message says a mapping is missing and this one is a
-		// design that has not been taken.
+		// NOTE: Asynchrony, which crosses as a `Promise` of what the work
+		// answers with — so what is described is that value, and the two kinds are
+		// told apart because they are not reached alike: a Future has not run and
+		// is started to be read, a Started is running already and is only waited
+		// for. WHICH positions may hold one is the marshaller's rule rather than
+		// this one's, for the reason a refinement's predicate is left to it — that
+		// is a question about the place a value stands in, and a Type is described
+		// wherever it is met.
 		case "Future":
+			return {
+				kind: "future",
+				of: describeWith(type.valueType, context, printing),
+				shown,
+			}
 		case "Started":
 			return {
-				kind: "refused",
-				why: `${shown} is asynchronous work, which does not cross the boundary yet — hand the value it answers with over instead.`,
+				kind: "started",
+				of: describeWith(type.valueType, context, printing),
 				shown,
 			}
 		// NOTE: The numeric tower above Rational, for now, and whatever else
@@ -882,8 +898,51 @@ export function carriesDictionary(
 	module: ModuleDescriptor,
 	types: ReadonlyArray<DeclaredType>,
 ): boolean {
+	return boundaryReaches(
+		module,
+		types,
+		(descriptor) => descriptor.kind === "dictionary",
+	)
+}
+
+// NOTE: The same question for asynchrony — whether any position of the boundary
+// is a Future or a Started, which is what decides whether the bundle carries the
+// three runtime Functions one crosses through. See `FUTURE_BRIDGE_MODULES`,
+// which is where that door is and why it is not carried always.
+//
+// NOTE: Asked of every position rather than of the ANSWERS alone, though an
+// answer is the only position the marshaller will cross one at. A Future
+// anywhere else is refused — and a refusal is a sentence the marshaller writes
+// out of the Descriptor, not out of the bridge, so the door being there changes
+// nothing about it. Asking the narrower question would mean stating the
+// marshaller's rule here as well, and two copies of that rule is exactly how a
+// boundary comes to refuse what the door was carried for.
+export function carriesFuture(
+	module: ModuleDescriptor,
+	types: ReadonlyArray<DeclaredType>,
+): boolean {
+	return boundaryReaches(
+		module,
+		types,
+		(descriptor) =>
+			descriptor.kind === "future" || descriptor.kind === "started",
+	)
+}
+
+// NOTE: Every Descriptor a Module's boundary is made of, asked one question —
+// the walk both doors are decided by, written once because it is the same walk:
+// what differs between them is the node they are looking for and nothing else.
+function boundaryReaches(
+	module: ModuleDescriptor,
+	types: ReadonlyArray<DeclaredType>,
+	wanted: (descriptor: Descriptor) => boolean,
+): boolean {
+	function reaching(descriptor: Descriptor): boolean {
+		return reaches(descriptor, wanted)
+	}
+
 	for (let declared of types) {
-		if (declared.of !== null && reachesDictionary(declared.of)) {
+		if (declared.of !== null && reaching(declared.of)) {
 			return true
 		}
 	}
@@ -892,23 +951,19 @@ export function carriesDictionary(
 		switch (entry.kind) {
 			case "constant":
 			case "function":
-				if (reachesDictionary(entry.of)) {
+				if (reaching(entry.of)) {
 					return true
 				}
 
 				break
 			case "overloaded":
-				if (
-					entry.overloads.some((overload) =>
-						reachesDictionary(overload.of),
-					)
-				) {
+				if (entry.overloads.some((overload) => reaching(overload.of))) {
 					return true
 				}
 
 				break
 			case "choice":
-				if (entry.cases.some(reachesDictionary)) {
+				if (entry.cases.some(reaching)) {
 					return true
 				}
 
@@ -916,16 +971,16 @@ export function carriesDictionary(
 			case "namespace":
 				if (
 					Object.values(entry.properties).some((property) =>
-						reachesDictionary(property.of),
+						reaching(property.of),
 					) ||
 					Object.values(entry.methods).some((method) =>
 						method.kind === "function"
-							? reachesDictionary(method.of)
+							? reaching(method.of)
 							: method.overloads.some((overload) =>
-									reachesDictionary(overload.of),
+									reaching(overload.of),
 								),
 					) ||
-					(entry.cases ?? []).some(reachesDictionary)
+					(entry.cases ?? []).some(reaching)
 				) {
 					return true
 				}
@@ -941,28 +996,46 @@ export function carriesDictionary(
 // a Type that reaches itself is answered with a `refused` node rather than
 // followed — which is the same reason the interpreter can compile a node's
 // children while compiling the node.
-function reachesDictionary(descriptor: Descriptor): boolean {
+//
+// NOTE: The question is asked of the node BEFORE its children, so a door's own
+// kind stops the walk there — and every other kind is walked through whatever it
+// holds, a Future and a Started included: what a Future answers with is a value
+// that crosses, so a `Future<Dictionary<String, Integer>>` names a Dictionary on
+// this boundary exactly as a Function answering one does.
+function reaches(
+	descriptor: Descriptor,
+	wanted: (descriptor: Descriptor) => boolean,
+): boolean {
+	if (wanted(descriptor)) {
+		return true
+	}
+
 	switch (descriptor.kind) {
-		case "dictionary":
-			return true
 		case "list":
 		case "optional":
-			return reachesDictionary(descriptor.of)
+		case "future":
+		case "started":
+			return reaches(descriptor.of, wanted)
+		case "dictionary":
+			return (
+				reaches(descriptor.key, wanted) ||
+				reaches(descriptor.value, wanted)
+			)
 		case "record":
 			return Object.values(descriptor.members).some((member) =>
-				reachesDictionary(member.of),
+				reaches(member.of, wanted),
 			)
 		case "case":
 			return Object.values(descriptor.payload).some((member) =>
-				reachesDictionary(member.of),
+				reaches(member.of, wanted),
 			)
 		case "union":
-			return descriptor.arms.some(reachesDictionary)
+			return descriptor.arms.some((arm) => reaches(arm, wanted))
 		case "function":
 			return (
 				descriptor.parameters.some((parameter) =>
-					reachesDictionary(parameter.of),
-				) || reachesDictionary(descriptor.returns)
+					reaches(parameter.of, wanted),
+				) || reaches(descriptor.returns, wanted)
 			)
 		// NOTE: Every remaining kind spelled out rather than left to a bare
 		// `default`, so a Descriptor kind added later has to be answered here

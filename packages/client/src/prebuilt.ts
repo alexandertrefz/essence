@@ -58,9 +58,17 @@ export type PrebuiltModule = ModuleBindings & {
 	descriptor: ModuleDescriptor
 }
 
+// NOTE: What a prebuilt load can be told that its two files do not say — today
+// the one thing, and the same thing `LoadOptions` carries: the host's own stop,
+// which becomes the root of every run this binding starts.
+export type PrebuiltOptions = {
+	signal?: AbortSignal
+}
+
 export async function loadPrebuilt(
 	bundlePath: string,
 	sidecarPath: string = descriptorPath(bundlePath),
+	options: PrebuiltOptions = {},
 ): Promise<PrebuiltModule> {
 	let descriptor = await readDescriptor(sidecarPath)
 	// NOTE: A URL rather than a path, because `import()` reads a specifier and a
@@ -73,9 +81,11 @@ export async function loadPrebuilt(
 	let bridge = runtimeBridgeOf(namespace)
 
 	return {
-		...bind(namespace, descriptor, { bridge }),
+		...bind(namespace, descriptor, { bridge, signal: options.signal }),
 		bridge,
-		interpreter: createInterpreter(bridge, descriptor),
+		interpreter: createInterpreter(bridge, descriptor, {
+			signal: options.signal,
+		}),
 		descriptor,
 	}
 }

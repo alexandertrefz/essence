@@ -45,6 +45,7 @@ export {
 	BRIDGE_SPECIFIER,
 	type BridgeOptions,
 	type EssenceValue,
+	type FutureContext,
 	RUNTIME_BRIDGE_MODULES,
 	type RuntimeBridge,
 	runtimeBridgeModules,
@@ -57,6 +58,7 @@ export {
 // describing costs nothing more than describing.
 export {
 	carriesDictionary,
+	carriesFuture,
 	type CaseDescriptor,
 	type DeclaredType,
 	describe,

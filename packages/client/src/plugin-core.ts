@@ -8,6 +8,7 @@ import {
 import { containsErrors } from "@essence-lang/compiler/diagnostics"
 import {
 	carriesDictionary,
+	carriesFuture,
 	emitToMemory,
 	runtimeBridgeModules,
 } from "@essence-lang/compiler/embed"
@@ -490,11 +491,13 @@ export function wrapperFor(
 			? withoutShown(descriptor)
 			: descriptor
 	// NOTE: The same table the injected bridge is written out of, asked the
-	// same question: a Module whose boundary names no Dictionary imports
+	// same questions: a Module whose boundary names no Dictionary imports
 	// neither of the two Functions one crosses through, and so carries none of
-	// the store behind them into the host's build.
+	// the store behind them into the host's build — and a Module that names no
+	// asynchronous work imports none of `Future.ts` either.
 	let modules = runtimeBridgeModules({
 		dictionary: carriesDictionary(descriptor, types),
+		future: carriesFuture(descriptor, types),
 	})
 	let runtimeImports = modules.map(
 		([fileName]) =>
@@ -639,6 +642,13 @@ function nodeWithoutShown(node: Descriptor): Descriptor {
 		case "list":
 			return { ...node, of: nodeWithoutShown(node.of), shown: "" }
 		case "optional":
+			return { ...node, of: nodeWithoutShown(node.of), shown: "" }
+		// NOTE: Written out rather than folded into the two above, so that a
+		// kind holding an `of` which arrives later has to be answered here as
+		// well — a node walked as the wrong kind would keep the Type it names.
+		case "future":
+			return { ...node, of: nodeWithoutShown(node.of), shown: "" }
+		case "started":
 			return { ...node, of: nodeWithoutShown(node.of), shown: "" }
 		case "dictionary":
 			return {

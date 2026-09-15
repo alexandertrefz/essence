@@ -13,6 +13,7 @@ import { type EssenceModule, loadModule } from "../index"
 import { createInterpreter, type EssenceFunction } from "../marshal-runtime"
 
 let cacheDirectory = ""
+let async: EssenceModule
 let absence: EssenceModule
 let calls: EssenceModule
 let geometry: EssenceModule
@@ -23,6 +24,10 @@ let math: EssenceModule
 beforeAll(async () => {
 	cacheDirectory = realpathSync.native(
 		mkdtempSync(path.join(tmpdir(), "essence-bind-")),
+	)
+	async = await loadModule(
+		path.join(import.meta.dirname, "files", "Async.es"),
+		{ cacheDirectory },
 	)
 	absence = await loadModule(
 		path.join(import.meta.dirname, "files", "Absence.es"),
@@ -207,6 +212,54 @@ describe("Calling a Function", () => {
 		expect(there(10n, 4n)).toBe(6n)
 		expect(callError(() => here(1n)).message).toStartWith("here(")
 		expect(callError(() => there(1n)).message).toStartWith("there(")
+	})
+
+	// NOTE: The one way the asynchrony door can be missing: a Descriptor that
+	// names work bound against a bridge that carries none, which is a Descriptor
+	// and a bundle that did not come from one compile. It is unreachable from a
+	// boundary the Compiler described — `carriesFuture` asks of the whole of it
+	// — so it is built here by taking the door off a bridge that has one.
+	//
+	// NOTE: Both halves are asked, because they are refused in different places:
+	// a call's ANSWER finds out when the answer comes back, and a callback
+	// declared to answer work finds out where it ARRIVES, which is where a host
+	// can still be told what to do about it.
+	it("says so where the bundle carries no asynchrony door", () => {
+		let doorless = { ...async.bridge }
+
+		delete doorless.future
+		delete doorless.futureContext
+		delete doorless.futureAnswer
+
+		let interpreter = createInterpreter(
+			doorless,
+			describeModule(async.surface, async.entryPath),
+		)
+		let context = { entryPath: async.entryPath }
+		let doubled = interpreter.wrapFunction(
+			async.raw.doubled as EssenceFunction,
+			describeSignature(
+				async.surface.values.doubled as common.BaseFunction,
+				context,
+			),
+			"doubled",
+		)
+		let loaded = interpreter.wrapFunction(
+			async.raw.loaded as EssenceFunction,
+			describeSignature(
+				async.surface.values.loaded as common.BaseFunction,
+				context,
+			),
+			"loaded",
+		)
+
+		expect(marshalError(() => doubled(21n)).message).toContain(
+			"return value: this bundle carries no asynchrony door",
+		)
+		expect(
+			marshalError(() => loaded("key", () => Promise.resolve("read")))
+				.message,
+		).toContain("argument 2: this bundle carries no asynchrony door")
 	})
 
 	// NOTE: And a Function goes the other way as well. What the Module hands a

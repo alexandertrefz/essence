@@ -347,6 +347,12 @@ function crossesDifferently(node: Descriptor): boolean {
 	switch (node.kind) {
 		case "list":
 		case "optional":
+		// NOTE: Work prints one way as an answer and another way everywhere
+		// else, which is a difference between POSITIONS rather than between the
+		// two directions — so what decides this is what it holds, exactly as for
+		// a List.
+		case "future":
+		case "started":
 			return crossesDifferently(node.of)
 		case "dictionary":
 			return (
@@ -398,6 +404,8 @@ function widensOnInput(node: Descriptor): boolean {
 			return true
 		case "list":
 		case "optional":
+		case "future":
+		case "started":
 			return widensOnInput(node.of)
 		case "dictionary":
 			return widensOnInput(node.key) || widensOnInput(node.value)
@@ -575,11 +583,28 @@ function createWalker(
 			// answer is a value passing IN. Either way it is wrapped to marshal
 			// around its calls, so the signature printed here is the one whoever
 			// holds it really calls.
+			//
+			// NOTE: The answer goes through `printAnswer`, which is the one
+			// position asynchronous work has a spelling at — so a Method
+			// answering a `Future<String>` reads `=> Promise<string>`, and a
+			// callback Parameter declared to answer one reads the same, which is
+			// what its writer really has to write.
 			case "function":
 				return `(${printParameters(
 					node.parameters,
 					direction === "out" ? "in" : "out",
-				)}) => ${print(node.returns, direction)}`
+				)}) => ${printAnswer(node.returns, direction)}`
+			// NOTE: Work anywhere but a call's answer, which is the one position
+			// it crosses at — see `printAnswer`. `never` rather than the shape
+			// it would have had, for the reason an Overload set is `never`: it
+			// makes the line the interpreter would throw on fail to typecheck
+			// instead, and the sentence beside it is the one it would have
+			// thrown. The refusal is the same in both directions, because the
+			// rule is about the POSITION rather than about the way it is
+			// crossed.
+			case "future":
+			case "started":
+				return `never /* a ${node.shown} is work rather than a value, and work crosses only as a call's answer */`
 			// NOTE: The numeric tower above Rational, a Type Parameter nothing
 			// has applied, and whatever else arrives before its mapping does —
 			// each carrying the sentence the Compiler wrote while it still had
@@ -709,6 +734,35 @@ function createWalker(
 		return unique.length === 0 ? ["never"] : unique
 	}
 
+	// NOTE: What a call ANSWERS with — the one position asynchronous work
+	// crosses at, and so the one position that reads a `Future<T>` as
+	// `Promise<T>` rather than as the refusal `printBody` prints everywhere
+	// else. It is the declaration half of `compileAnswerOut`, and it is written
+	// as a door in front of `print` for the same reason that one is: the rule is
+	// about the position rather than about the shape.
+	//
+	// NOTE: A `Started<T>` crosses OUT as a promise like a Future — it is a run
+	// in flight, and what a host gets is the wait — but there is no way IN: a
+	// host callback can not answer one, because it has nothing to start a run of
+	// the Module's own work with. So the way in falls through to the refusal,
+	// which is what the marshaller does with the same position.
+	//
+	// NOTE: `Promise<T>` and not `Promise<T> | T` on the way in, though the
+	// boundary would take a value the host answered without one. A declaration
+	// says what a position IS, and a Parameter offering both spellings would ask
+	// its reader to choose between them where there is one right answer: what is
+	// declared as work is written as work.
+	function printAnswer(node: Descriptor, direction: Direction): string {
+		if (
+			node.kind === "future" ||
+			(node.kind === "started" && direction === "out")
+		) {
+			return `Promise<${print(node.of, direction)}>`
+		}
+
+		return print(node, direction)
+	}
+
 	// NOTE: Everything under a Parameter crosses the way the Parameter does —
 	// the item Type of a List Parameter, the member Type of a Record one. Which
 	// way that is belongs to the caller: the Module's own Parameters are values
@@ -818,7 +872,7 @@ function createWalker(
 		}
 
 		if (entry.kind === "function" && isValueName(name)) {
-			let returns = print(entry.of.returns, "out")
+			let returns = printAnswer(entry.of.returns, "out")
 			let positional = `export declare function ${name}(${printParameters(
 				entry.of.parameters,
 				"in",
@@ -913,14 +967,14 @@ function createWalker(
 				`${memberName(name)}(${printParameters(
 					method.of.parameters,
 					"in",
-				)}): ${print(method.of.returns, "out")}`,
+				)}): ${printAnswer(method.of.returns, "out")}`,
 			)
 
 			let labelled = labelledParameters(method.of)
 
 			if (labelled !== null) {
 				entries.push(
-					`${memberName(name)}(${labelled}): ${print(
+					`${memberName(name)}(${labelled}): ${printAnswer(
 						method.of.returns,
 						"out",
 					)}`,

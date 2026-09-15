@@ -4,6 +4,7 @@ import { containsErrors } from "@essence-lang/compiler/diagnostics"
 import {
 	BRIDGE_KEY,
 	carriesDictionary,
+	carriesFuture,
 	compileToMemory,
 	linkToMemory,
 	withRuntimeBridge,
@@ -39,6 +40,12 @@ export type LoadOptions = {
 	// NOTE: Overrides both the default location and `ESSENCE_CLIENT_CACHE`, for a
 	// host that wants its compiled bundles to travel with its own build output.
 	cacheDirectory?: string
+	// NOTE: The host's own stop. Every run this Module's boundary starts — a
+	// call answering a `Future` — belongs under it, so aborting it stops
+	// everything the host asked this Module for and nothing else. It reaches the
+	// BINDING rather than the compile: the bundle is the same bundle either way,
+	// which is why it is no part of the hash the cache is named by.
+	signal?: AbortSignal
 }
 
 export type EssenceModule = {
@@ -138,6 +145,7 @@ export async function attemptLoad(
 					linked.surface,
 					linked.files,
 					cached,
+					options.signal,
 				),
 				error: null,
 				files: linked.files,
@@ -148,19 +156,26 @@ export async function attemptLoad(
 
 	let compiled = await compileToMemory(entry, {
 		...embedding,
-		// NOTE: The bridge, and whether it carries the door a Dictionary
-		// crosses through — asked of this Module's own Descriptor, which is
-		// what keeps the answer a function of the sources the bundle is named
+		// NOTE: The bridge, and which of the conditional doors it carries —
+		// the one a Dictionary crosses through and the one asynchronous work
+		// does, each asked of this Module's own Descriptor, which is what
+		// keeps the answer a function of the sources the bundle is named
 		// after. Described here rather than beside the binding below because
 		// this is where the bundle is built; a load that finds its bundle in
 		// the cache never asks.
-		transformSources: (sources) =>
-			withRuntimeBridge(sources, {
-				dictionary: carriesDictionary(
-					describeModule(linked.surface, entry),
-					describeTypes(linked.surface, entry),
-				),
-			}),
+		//
+		// NOTE: Described ONCE for both questions. Describing a Module is a
+		// walk of its whole Surface, and asking it twice over two Descriptors
+		// would be two walks for two flags that are read in the same breath.
+		transformSources: (sources) => {
+			let described = describeModule(linked.surface, entry)
+			let declared = describeTypes(linked.surface, entry)
+
+			return withRuntimeBridge(sources, {
+				dictionary: carriesDictionary(described, declared),
+				future: carriesFuture(described, declared),
+			})
+		},
 		// NOTE: The bundle is going to be written into the cache directory, and
 		// the inline source map spells its `.es` sources relative to wherever the
 		// bundle sits. The hash is not known until the compile is over, so the
@@ -186,6 +201,7 @@ export async function attemptLoad(
 			compiled.surface,
 			compiled.files,
 			await cacheBundle(directory, compiled.bundleHash, compiled.code),
+			options.signal,
 		),
 		error: null,
 		files: compiled.files,
@@ -202,6 +218,7 @@ async function importModule(
 	surface: ExportSurface,
 	files: Array<string>,
 	file: string,
+	signal: AbortSignal | undefined,
 ): Promise<EssenceModule> {
 	let namespace = (await import(pathToFileURL(file).href)) as Record<
 		string,
@@ -216,8 +233,9 @@ async function importModule(
 	let marshaller = createMarshaller(bridge, {
 		entryPath: entry,
 		module: descriptor,
+		signal,
 	})
-	let { exports, raw } = bind(namespace, descriptor, { bridge })
+	let { exports, raw } = bind(namespace, descriptor, { bridge, signal })
 
 	return {
 		entryPath: entry,
