@@ -123,7 +123,14 @@ function yamlList(items: string[]): string {
 		: `\n${items.map((item) => `  - ${quoted(item)}`).join("\n")}`
 }
 
-function taughtOnLine(slugs: string[]): string {
+// NOTE: Null where a page is taught NOWHERE — a Type the Language pages have
+// not reached yet — so the page says nothing rather than saying "Taught on: ."
+// The line comes back the moment a page teaches it.
+function taughtOnLine(slugs: string[]): string | null {
+	if (slugs.length === 0) {
+		return null
+	}
+
 	let links = slugs.map((slug) => {
 		let title = LANGUAGE_TITLES[slug]
 
@@ -274,7 +281,11 @@ export function renderPage(
 		}
 	}
 
-	block(preserved.taughtOn ?? taughtOnLine(page.definition.taughtOn))
+	let taughtOn = preserved.taughtOn ?? taughtOnLine(page.definition.taughtOn)
+
+	if (taughtOn !== null) {
+		block(taughtOn)
+	}
 
 	if (page.definition.note !== undefined) {
 		block(page.definition.note)
