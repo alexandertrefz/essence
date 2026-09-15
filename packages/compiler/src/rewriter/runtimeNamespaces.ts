@@ -67,4 +67,5 @@ export const runtimeNamespaceNames = [
 	"Randomness",
 	"Future",
 	"Started",
+	"Async",
 ]

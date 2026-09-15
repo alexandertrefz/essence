@@ -15,6 +15,7 @@ import type { AlgebraicType } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
 import type { CaseSensitivityType } from "./CaseSensitivity"
 import type { DictionaryType } from "./Dictionary"
+import type { FutureType } from "./Future"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
 import type { NormalizationFormType } from "./NormalizationForm"
@@ -818,6 +819,11 @@ export type StartedNatives = {
 
 }
 
+export type AsyncNatives = {
+	// static deferred<Value>(_: () -> Value) -> Future<Value>
+	deferred: <Value extends AnyType>(argument0: () => Value) => FutureType<Value>
+}
+
 export type FunctionsNatives = {
 	// static loop<State>(startingWith: State, while: (_: State) -> Boolean, _: (_: State) -> State) -> State
 	loop__overload$1: <State extends AnyType>(startingWith: State, argument1: (argument0: State) => BooleanType, argument2: (argument0: State) => State) => State
@@ -1348,6 +1354,12 @@ export const $Future: FutureNatives = FutureModule
 
 declare const StartedModule: typeof import("./Started")
 export const $Started: StartedNatives = StartedModule
+
+declare const AsyncModule: typeof import("./Async")
+export const $Async: AsyncNatives = AsyncModule
+export const $AsyncArity: AssertArities<typeof import("./Async"), {
+	deferred: 1
+}> = true
 
 declare const functionsModule: typeof import("./functions")
 export const $functions: FunctionsNatives = functionsModule

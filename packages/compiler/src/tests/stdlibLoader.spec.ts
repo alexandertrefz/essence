@@ -1517,6 +1517,9 @@ describe("Standard Library Loader", () => {
 			// `builtinMemberOrder`.
 			"Future",
 			"Started",
+			// NOTE: And the Namespace a future comes FROM, last — see
+			// `builtinMemberOrder`.
+			"Async",
 		])
 	})
 
@@ -1550,8 +1553,8 @@ describe("Standard Library Loader", () => {
 			entries += flags.length
 		}
 
-		expect(stdlib.namespaces).toHaveLength(52)
-		expect(entries).toBe(725)
+		expect(stdlib.namespaces).toHaveLength(53)
+		expect(entries).toBe(726)
 	})
 
 	// NOTE: The other half of the ordering rule. `builtinMemberOrder` is the

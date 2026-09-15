@@ -1084,7 +1084,12 @@ export const PAGES: PageDefinition[] = [
 		description:
 			"Work that has not run: a description to start, and one run of it to wait for.",
 		taughtOn: [],
-		groups: [],
+		groups: [
+			{
+				label: "Describing work",
+				members: ["Async::deferred"],
+			},
+		],
 	},
 	{
 		slug: "protocols",

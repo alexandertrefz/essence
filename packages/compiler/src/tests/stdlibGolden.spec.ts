@@ -129,7 +129,17 @@ function labelOf(line: string): string {
 // directly over a fixed seed and asserts the ranges, the exactness and the
 // replay, and by `packages/compiler/src/tests/randomness.spec.ts`, which runs
 // Programs that build a source and draw from it.
-const COVERED_ELSEWHERE = new Set(["Terminal", "Randomness"])
+// NOTE: And the one this harness can not RUN. `Async.deferred` answers a
+// Future, and what a Future answers with only arrives after a `complete` — a
+// top-level `await` in the emitted Module. This harness `require`s that Module
+// and captures `console.log` synchronously, so a `show(…)` line would record
+// the description rather than the value, if the `require` of a Module with a
+// top-level await succeeded at all. Covering it means making this harness
+// asynchronous, which is a decision about the golden file rather than about the
+// Namespace. Until then the entry is covered by
+// `packages/compiler/src/tests/asynchrony.spec.ts`, which compiles and runs
+// Programs that defer, start and complete.
+const COVERED_ELSEWHERE = new Set(["Terminal", "Randomness", "Async"])
 
 // NOTE: Every Method a Program can call, spelled the way `StdlibExhaustive.es`
 // labels it: the signature `printSignature` produces, minus its return Type.

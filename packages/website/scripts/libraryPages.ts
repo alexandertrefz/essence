@@ -84,8 +84,9 @@ const OVERRIDES: Record<string, string> = {
 	Step: "loop",
 	// NOTE: One run of a Future has no page of its own — what a Started IS can
 	// not be said without saying what a Future is, and the two are met
-	// together.
+	// together. Nor has the Namespace that BUILDS one, for the same reason.
 	Started: "Future",
+	Async: "Future",
 }
 
 /*
@@ -290,9 +291,15 @@ class Placement {
 	}
 
 	pageOfNamespace(namespace: Namespace): string {
-		return namespace.targetHead === null
-			? namespace.name
-			: this.pageOfType(namespace.targetHead)
+		if (namespace.targetHead !== null) {
+			return this.pageOfType(namespace.targetHead)
+		}
+
+		// NOTE: A Namespace with no target is its own page — `Terminal`,
+		// `Randomness` — unless an override says otherwise. `Async` is the one
+		// that does: what it builds is a Future, and a page about making one
+		// with no page about what one IS beside it teaches half the idea.
+		return OVERRIDES[namespace.name] ?? namespace.name
 	}
 }
 

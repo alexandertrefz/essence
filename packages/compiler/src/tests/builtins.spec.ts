@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import type { common } from "@essence-lang/interfaces"
 import * as algebraic from "@essence-lang/runtime/Algebraic"
+import * as async from "@essence-lang/runtime/Async"
 import * as boolean from "@essence-lang/runtime/Boolean"
 import * as caseSensitivity from "@essence-lang/runtime/CaseSensitivity"
 import * as dictionary from "@essence-lang/runtime/Dictionary"
@@ -135,6 +136,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	// it came from, so everything that builds or waits for one lives in
 	// `Future.ts`.
 	Started: started,
+	Async: async,
 }
 
 // NOTE: What the Simplifier will emit for a declared Method — the bare name for

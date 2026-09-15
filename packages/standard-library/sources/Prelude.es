@@ -8,6 +8,7 @@ declarations {}
 
 export {
 	from "./Algebraic.es" { Algebraic }
+	from "./Async.es" { Async }
 	from "./Boolean.es" { Boolean }
 	from "./Comparable.es" { Comparable }
 	from "./Dictionary.es" {

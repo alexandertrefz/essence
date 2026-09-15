@@ -135,8 +135,15 @@ export function start<Value>(
 ): StartedType<Value> {
 	registerFutureKinds()
 
-	if (work[typeKeySymbol] === "Started") {
-		return work
+	if (work[typeKeySymbol] !== "Future") {
+		// NOTE: A Started is answered with itself, and so is anything else.
+		// Starting a Started is `needless-start` and starting a value that
+		// describes no work is the same Warning — both compile, because both
+		// are Warnings, and a Program that compiles has to mean what the
+		// Warning says it means: the Keyword is a no-op and the value carries
+		// on. The alternative is a `TypeError` out of this module naming a
+		// field the value never had.
+		return work as StartedType<Value>
 	}
 
 	let child = childOf(context)
@@ -170,6 +177,13 @@ export function complete<Value>(
 ): Value | Promise<Value> {
 	if (work[typeKeySymbol] === "Started") {
 		return work.promise
+	}
+
+	// NOTE: And anything that is not a Future is its own answer, for the reason
+	// `start` answers one with itself: `needless-complete` is a Warning, so the
+	// Program runs, and what it runs has to be the no-op the Warning describes.
+	if (work[typeKeySymbol] !== "Future") {
+		return work as unknown as Value
 	}
 
 	registerFutureKinds()

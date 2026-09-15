@@ -249,6 +249,11 @@ export const builtinMemberOrder: Array<string> = [
 	// Future answers with, which is the order the two are met in.
 	"Future",
 	"Started",
+	// NOTE: And last of all, because it is the one Namespace here a Program
+	// reaches without holding anything: `Async.deferred` is where a future
+	// comes FROM, and a reader meets what a future is before meeting how one
+	// is made.
+	"Async",
 ]
 
 // NOTE: The same rule for the Type table, and for the same reason — a Type's
