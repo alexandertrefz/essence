@@ -124,6 +124,12 @@ export function renameEdits(
 export type Declaration = {
 	builtin: boolean
 	kind: DeclarationKind
+	// NOTE: A Parameter whose name DOUBLES as its call site label —
+	// `function compute(value: Integer)`, where the Parser reuses one Identifier
+	// for the binding and the label. Its kind is `parameter`, so nothing about
+	// the kind says a rename of it rewrites call sites too, and the two words a
+	// label may not be spelled would have gone in unrefused.
+	labelled?: boolean
 	definition: common.Position | null
 	// NOTE: Where the name starts being resolvable. `null` means "anywhere in
 	// its Scope" — builtins, and the declaration kinds the Enricher hoists
@@ -345,6 +351,14 @@ export function isValidLabelName(name: string): boolean {
 	}
 
 	return isValidIdentifierName(name) || keywordIdentifiers.has(name)
+}
+
+// NOTE: And the name a Parameter whose name doubles as its label may take: one
+// that is valid as BOTH. `isValidLabelName` admits `with`, `from` and `as`,
+// none of which can bind a name, and `isValidIdentifierName` admits `start` and
+// `complete`, neither of which can be a label. What is left is the intersection.
+export function isValidBindingLabelName(name: string): boolean {
+	return isValidIdentifierName(name) && !prefixKeywords.has(name)
 }
 
 // NOTE: REFUSED outright inside a standard library source — and with it
@@ -1681,6 +1695,7 @@ function walkFunctionDefinition(
 				parameter.internalName.position.end,
 			)
 
+			declaration.labelled = true
 			labels.set(parameter.internalName.content, declaration)
 		} else {
 			// NOTE: An explicit external name is its own symbol — renaming

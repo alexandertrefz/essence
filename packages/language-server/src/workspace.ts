@@ -104,6 +104,10 @@ export type WorkspaceOccurrence = {
 export type WorkspaceSymbol = {
 	name: string
 	kind: DeclarationKind
+	// NOTE: Carried from the Declaration for the reason it exists there: a
+	// Parameter whose name doubles as its call site label is renamed through
+	// this path as well, and the gate has to know that here too.
+	labelled?: boolean
 	// NOTE: Null when nothing in the workspace declares it: an entry naming
 	// something no reachable Module exports still joins its own occurrences, so
 	// that renaming it stays possible where it IS written.
@@ -1722,6 +1726,7 @@ function joinComponent(
 				siteOf(key, () => ({
 					name: occurrence.name,
 					kind: declaration.kind,
+					labelled: declaration.labelled,
 					filePath,
 					definition: declaration.definition,
 					occurrences: [],

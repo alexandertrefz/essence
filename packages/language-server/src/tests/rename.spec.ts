@@ -11,6 +11,7 @@ import {
 	findRenameableOccurrence,
 	identifierPattern,
 	isValidIdentifierName,
+	isValidBindingLabelName,
 	isValidLabelName,
 	renameEdits,
 } from "../rename"
@@ -438,6 +439,50 @@ describe("Rename of argument labels", () => {
 				"}",
 			].join("\n"),
 		)
+	})
+
+	// NOTE: The same Parameter, and the name the rename may NOT be given. The
+	// Parser reuses one Identifier for the binding and the call site label, so
+	// a rename to `start` rewrites `compute(seed 1)` into `compute(start 1)` —
+	// which the Parser reads as a `start` of `1`, with the label gone and the
+	// call refused by `argument-label-mismatch`. The declaration is marked for
+	// exactly that, and the mark is what picks the stricter of the two rules.
+	it("should mark a Parameter whose name doubles as its label", () => {
+		let source = [
+			"implementation {",
+			"\tconstant result = compute(seed 1)",
+			"",
+			"\tfunction compute (seed: Integer) -> Integer {",
+			"\t\t<- seed",
+			"\t}",
+			"}",
+		].join("\n")
+		let occurrence = findOccurrence(source, { line: 4, column: 20 })
+
+		expect(occurrence?.declaration.kind).toBe("parameter")
+		expect(occurrence?.declaration.labelled).toBe(true)
+		expect(isValidBindingLabelName("start")).toBe(false)
+		expect(isValidBindingLabelName("complete")).toBe(false)
+		expect(isValidBindingLabelName("amount")).toBe(true)
+	})
+
+	// NOTE: And a Parameter with a label of its own is two symbols, so renaming
+	// the BINDING never touches a call site and either word is a name it may
+	// take.
+	it("should leave a Parameter behind its own label unmarked", () => {
+		let source = [
+			"implementation {",
+			"\tconstant result = compute(of 1)",
+			"",
+			"\tfunction compute (of seed: Integer) -> Integer {",
+			"\t\t<- seed",
+			"\t}",
+			"}",
+		].join("\n")
+		let occurrence = findOccurrence(source, { line: 4, column: 23 })
+
+		expect(occurrence?.declaration.kind).toBe("parameter")
+		expect(occurrence?.declaration.labelled).toBeUndefined()
 	})
 
 	// NOTE: `with` is a Keyword the grammar's Identifier rule reads as an
@@ -977,6 +1022,28 @@ describe("isValidLabelName", () => {
 		expect(isValidLabelName("start")).toBe(false)
 		expect(isValidLabelName("complete")).toBe(false)
 		expect(isValidIdentifierName("start")).toBe(true)
+	})
+})
+
+// NOTE: And the name a Parameter whose name DOUBLES as its label may take,
+// which is neither rule on its own: `with` binds nothing and `start` labels
+// nothing, so what is left is what both admit.
+describe("isValidBindingLabelName", () => {
+	it("should refuse what only a label may be", () => {
+		expect(isValidBindingLabelName("with")).toBe(false)
+		expect(isValidBindingLabelName("as")).toBe(false)
+		expect(isValidBindingLabelName("case")).toBe(false)
+		expect(isValidLabelName("with")).toBe(true)
+	})
+
+	it("should refuse what only a binding may be", () => {
+		expect(isValidBindingLabelName("start")).toBe(false)
+		expect(isValidBindingLabelName("complete")).toBe(false)
+	})
+
+	it("should accept an ordinary Identifier", () => {
+		expect(isValidBindingLabelName("amount")).toBe(true)
+		expect(isValidBindingLabelName("Name2")).toBe(true)
 	})
 })
 

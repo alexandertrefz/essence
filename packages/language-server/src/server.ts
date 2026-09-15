@@ -89,6 +89,7 @@ import {
 	findOccurrences,
 	findRenameableOccurrence,
 	identifierPattern,
+	isValidBindingLabelName,
 	isValidIdentifierName,
 	isValidLabelName,
 	renameEdits,
@@ -1459,9 +1460,21 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// LABEL lives in the grammar's Identifier rule, which reads Keywords
 		// like `with` and `from` as ordinary Identifiers — the standard
 		// library's own labels are spelled with them.
-		let kind = anchor?.symbol.kind ?? occurrence!.declaration.kind
+		//
+		// NOTE: And a Parameter whose name DOUBLES as its label has to satisfy
+		// both rules at once. Its kind is `parameter`, so the Identifier rule
+		// alone would let `start` and `complete` through — and the rename then
+		// rewrites every call site into `compute(start 1)`, which the Parser
+		// reads as a `start` of `1`: the label is gone and the call no longer
+		// compiles.
+		let symbol = anchor?.symbol ?? occurrence!.declaration
+		let kind = symbol.kind
 		let isValidNewName =
-			kind === "label" ? isValidLabelName : isValidIdentifierName
+			kind === "label"
+				? isValidLabelName
+				: symbol.labelled === true
+					? isValidBindingLabelName
+					: isValidIdentifierName
 
 		if (!isValidNewName(params.newName)) {
 			return new ResponseError(
