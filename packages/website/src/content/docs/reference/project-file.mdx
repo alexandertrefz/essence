@@ -1,6 +1,6 @@
 ---
 title: essence.json
-description: Every key of the project file, with its type, its default, the flag it mirrors and the commands that read it.
+description: The keys of the project file, with each one's type, its default, the flag it mirrors and the commands that read it.
 section: reference
 order: 30
 template: reference
@@ -8,7 +8,7 @@ tocDepth: 2
 searchDepth: 3
 ---
 
-`essence.json` holds a project's settings, the way `tsconfig.json` holds the settings of `tsc`. [`essence build`](/docs/reference/cli#build) and [`essence test`](/docs/reference/cli#test) read it on every run, so the command line does not repeat them. The directory that holds it is the project root. [Projects and essence.json](/docs/guides/projects) walks through setting one up. This file sets every key:
+`essence.json` holds a project's settings, the way `tsconfig.json` holds the settings of `tsc`. [`essence build`](/docs/reference/cli#build) and [`essence test`](/docs/reference/cli#test) read it on every run, so the command line does not repeat them. The directory that holds it is the project root. [Projects and essence.json](/docs/guides/projects) walks through setting one up. This file sets each key this page describes:
 
 ```jsonc
 {
@@ -40,7 +40,7 @@ searchDepth: 3
 
 Every key is optional. A key the file leaves out keeps its default. An empty file is allowed too, and still marks the root.
 
-## Every key
+## The keys
 
 A dotted name on this page is a path into the file: `test.coverage.report` is `report` inside `coverage` inside `test`. A key written with the dots in it, such as `"test.cases"` at the top of the file, is not a setting. Essence reports it with a Warning and reads nothing from it. VS Code's `settings.json` spells keys with dots, and this file nests them.
 
