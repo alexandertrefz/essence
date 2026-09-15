@@ -67,7 +67,7 @@ resolves inside an Astro build.
 | `cliHelp.spec.ts` | `/docs/reference/cli` has one entry per flag an `essence help` screen lists, and every address a screen prints is a page |
 | `projectSchema.spec.ts` | the served JSON Schema, one `/docs/reference/project-file` entry per setting, and the file `essence init` writes as two pages show it |
 | `stdlibMembers.spec.ts` | the generated library pages against the standard library, member by member |
-| `navigation.spec.ts` | the sidebar, the reading chain and the on-this-page lists |
+| `navigation.spec.ts` | the sidebar and its groups — every top-level page of a grouped section, Language's included, names one — the reading chain and the on-this-page lists |
 
 A code with no documentation is worse than no code at all: it is printed in
 every terminal report and handed to every Language Server client, and the whole

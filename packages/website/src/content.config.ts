@@ -21,6 +21,13 @@ let docs = defineCollection({
 			description: z.string(),
 			section: z.enum(SECTIONS),
 			order: z.number(),
+			/**
+			 * The labelled run of its section the page sits under in the
+			 * sidebar, e.g. `Basics`. A section groups every top-level page or
+			 * none, and a group is one run in `order` — `getSidebar` refuses
+			 * anything else — so the label never reorders a page.
+			 */
+			group: z.string().optional(),
 			/** Which page template renders this entry. */
 			template: z
 				.enum(["article", "guide", "reference", "type"])

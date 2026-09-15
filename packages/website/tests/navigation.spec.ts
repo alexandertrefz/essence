@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test"
+import { readdirSync, readFileSync } from "node:fs"
+import * as path from "node:path"
 
 import {
 	type DocEntryLike,
@@ -104,6 +106,198 @@ describe("the sidebar", () => {
 		)
 
 		expect(sidebar.map((section) => section.id)).not.toContain("guides")
+	})
+})
+
+function grouped(id: string, order: number, group: string): DocEntryLike {
+	let base = entry(id, order)
+
+	return { ...base, data: { ...base.data, group } }
+}
+
+/** A section's runs as `[label, ids]`, which is all a failure needs to show. */
+function runsOf(
+	sidebar: ReturnType<typeof getSidebar>,
+	id: DocEntryLike["data"]["section"],
+): [string, string[]][] {
+	return sidebar
+		.find((section) => section.id === id)!
+		.groups.map((group) => [
+			group.label,
+			group.items.map((item) => item.id),
+		])
+}
+
+// Deliberately out of order again: the runs have to come out of the sort, not
+// out of the order the entries were written in.
+let language = [
+	grouped("language/generics", 190, "Abstraction"),
+	grouped("language/method-calls", 20, "Basics"),
+	grouped("language/records", 50, "Modelling data"),
+	grouped("language/programs-and-values", 10, "Basics"),
+	grouped("language/protocols", 200, "Abstraction"),
+	grouped("language/optional", 70, "Modelling data"),
+]
+
+let withGroups = [
+	...entries.filter((e) => e.data.section !== "language"),
+	...language,
+]
+
+describe("the sidebar's groups", () => {
+	it("splits a section into labelled runs in the order its pages already have", () => {
+		let sidebar = getSidebar(withGroups)
+		let section = sidebar.find((s) => s.id === "language")!
+
+		expect(runsOf(sidebar, "language")).toEqual([
+			[
+				"Basics",
+				["language/programs-and-values", "language/method-calls"],
+			],
+			["Modelling data", ["language/records", "language/optional"]],
+			["Abstraction", ["language/generics", "language/protocols"]],
+		])
+		expect(section.groups.flatMap((group) => group.items)).toEqual(
+			section.items,
+		)
+	})
+
+	it("never moves a page: the reading chain and the crumbs read the same order", () => {
+		expect(
+			getReadingChain(withGroups)
+				.map((link) => link.id)
+				.filter((id) => id.startsWith("language/")),
+		).toEqual(
+			getSidebar(withGroups)
+				.find((s) => s.id === "language")!
+				.items.map((item) => item.id),
+		)
+		expect(getCrumbs(withGroups, "language/optional")[1]).toEqual({
+			label: "Language",
+			href: "/docs/language/programs-and-values",
+		})
+	})
+
+	it("leaves a section whose pages name no group as it was", () => {
+		let before = getSidebar(entries)
+		let after = getSidebar(withGroups)
+
+		for (let section of before) {
+			expect(section.groups).toEqual([])
+		}
+
+		for (let id of ["getting-started", "library", "guides", "reference"]) {
+			let section = after.find((s) => s.id === id)!
+
+			expect(section.groups).toEqual([])
+			expect(section).toEqual(before.find((s) => s.id === id)!)
+		}
+	})
+
+	it("refuses a page with no group in a section whose other pages name one", () => {
+		let unfiled = [...withGroups, entry("language/strings", 160)]
+
+		expect(() => getSidebar(unfiled)).toThrow(
+			"language/strings has no `group`, but other Language pages name one.",
+		)
+	})
+
+	it("refuses a group that comes back after another run", () => {
+		let split = [
+			...withGroups,
+			grouped("language/checked-refinements", 100, "Basics"),
+		]
+
+		expect(() => getSidebar(split)).toThrow(
+			'language/checked-refinements is in the group "Basics", but pages of another group come between it and the rest of "Basics".',
+		)
+	})
+
+	it("refuses a group on a page written under another", () => {
+		let nested = [
+			...withGroups,
+			grouped("language/records/with", 55, "Modelling data"),
+		]
+
+		expect(() => getSidebar(nested)).toThrow(
+			'language/records/with names the group "Modelling data", but it is written under language/records',
+		)
+	})
+
+	it("lets a page written under another follow its parent's run", () => {
+		let nested = [...withGroups, entry("language/records/with", 55)]
+		let records = getSidebar(nested)
+			.find((s) => s.id === "language")!
+			.groups.find((group) => group.label === "Modelling data")!
+			.items.find((item) => item.id === "language/records")!
+
+		expect(records.children.map((child) => child.id)).toEqual([
+			"language/records/with",
+		])
+	})
+})
+
+// NOTE: The one check on the published pages. Every rule above is held on a
+// hand-made collection, as the note at the top says — but "every page of a
+// grouped section names its group" is a rule about what gets published, and
+// the page it has to catch is the next one a writer adds. So the real pages go
+// through `getSidebar` too, which is where the rules throw. They are read as
+// files, as every doc gate reads them, because `astro:content` only resolves
+// inside an Astro build.
+const DOCS_DIRECTORY = path.resolve(import.meta.dirname, "../src/content/docs")
+
+function pagesUnder(directory: string): string[] {
+	return readdirSync(directory, { withFileTypes: true })
+		.flatMap((file) => {
+			let full = path.join(directory, file.name)
+
+			return file.isDirectory()
+				? pagesUnder(full)
+				: /\.mdx?$/.test(file.name)
+					? [full]
+					: []
+		})
+		.sort()
+}
+
+/** What a page's frontmatter holds before the schema fills in its defaults. */
+type Frontmatter = Omit<DocEntryLike["data"], "template"> & {
+	template?: DocEntryLike["data"]["template"]
+}
+
+/** A page as the collection loads it: its id and the frontmatter the navigation reads. */
+function readPage(file: string): DocEntryLike {
+	let source = readFileSync(file, "utf8")
+	let frontmatter = /^---\n([\s\S]*?)\n---\n/.exec(source)?.[1]
+
+	if (frontmatter === undefined) {
+		throw new Error(`${file} has no frontmatter.`)
+	}
+
+	let data = Bun.YAML.parse(frontmatter) as Frontmatter
+
+	return {
+		id: path
+			.relative(DOCS_DIRECTORY, file)
+			.replace(/\.mdx?$/, "")
+			.split(path.sep)
+			.join("/"),
+		data: { ...data, template: data.template ?? "article" },
+	}
+}
+
+describe("the published sidebar", () => {
+	let published = pagesUnder(DOCS_DIRECTORY).map(readPage)
+
+	it("groups every Language page, one run per label, in the order the pages already have", () => {
+		let section = getSidebar(published).find((s) => s.id === "language")!
+		let labels = section.groups.map((group) => group.label)
+
+		expect(section.groups).not.toEqual([])
+		expect(section.groups.flatMap((group) => group.items)).toEqual(
+			section.items,
+		)
+		expect(new Set(labels).size).toBe(labels.length)
 	})
 })
 

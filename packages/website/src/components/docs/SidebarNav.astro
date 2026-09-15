@@ -6,6 +6,12 @@
  * One component with two skins rather than two trees: the mobile menu gets the
  * exact list the rail shows, so a page can never be reachable on one and
  * missing from the other.
+ *
+ * A section whose pages name groups (see `getSidebar`) is drawn as its runs,
+ * each under a label of its own. A run is a `role="group"` named by that
+ * label rather than a list: the rows are bare links on every section, and a
+ * group is what lets a screen reader say "Basics" on the way into the pages
+ * under it without changing how any other section is written.
  */
 
 import SidebarBranch from "./SidebarBranch.astro"
@@ -36,12 +42,39 @@ let overviewActive = activeId === undefined
 		sections.map((section) => (
 			<div class="group">
 				<div class="group__label">{section.label}</div>
-				<SidebarBranch
-					items={section.items}
-					activeId={activeId}
-					mono={section.id === "reference"}
-					variant={variant}
-				/>
+				{section.groups.length === 0 ? (
+					<SidebarBranch
+						items={section.items}
+						activeId={activeId}
+						mono={section.id === "reference"}
+						variant={variant}
+					/>
+				) : (
+					section.groups.map((group, index) => {
+						// NOTE: The tree is drawn twice on every page — the
+						// rail and the mobile menu — so the variant is part
+						// of the id, or the two runs' labels would collide.
+						let labelId = `sidebar-${variant}-${section.id}-${index + 1}`
+
+						return (
+							<div
+								class="subgroup"
+								role="group"
+								aria-labelledby={labelId}
+							>
+								<div class="subgroup__label" id={labelId}>
+									{group.label}
+								</div>
+								<SidebarBranch
+									items={group.items}
+									activeId={activeId}
+									mono={section.id === "reference"}
+									variant={variant}
+								/>
+							</div>
+						)
+					})
+				)}
 			</div>
 		))
 	}
@@ -85,6 +118,34 @@ let overviewActive = activeId === undefined
 		color: var(--text-faintest);
 	}
 
+	/*
+	 * A labelled run inside a section — the Language section's "Basics" and
+	 * the rest. A column of its own, spaced like the section it sits in, so its
+	 * rows keep the rhythm of an ungrouped section's.
+	 */
+	.tree[data-variant="rail"] .subgroup {
+		display: flex;
+		flex-direction: column;
+		gap: 9px;
+	}
+
+	.tree[data-variant="rail"] .subgroup + .subgroup {
+		margin-top: 10px;
+	}
+
+	/*
+	 * The run's label is the section label's quieter sibling: the same mono
+	 * face in sentence case, with no tracking, so it can never be mistaken for
+	 * the section that holds it — nor, being smaller and fainter than a row,
+	 * for a page.
+	 */
+	.tree[data-variant="rail"] .subgroup__label {
+		padding: 0 0 0 12px;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		color: var(--text-faint);
+	}
+
 	/* The mobile tree — 1m. Same order, touch-sized rows. */
 
 	.tree[data-variant="mobile"] .overview {
@@ -109,6 +170,19 @@ let overviewActive = activeId === undefined
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
+	}
+
+	.tree[data-variant="mobile"] .subgroup {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.tree[data-variant="mobile"] .subgroup__label {
+		padding: 12px 12px 4px;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		color: var(--text-faint);
 	}
 
 	/*

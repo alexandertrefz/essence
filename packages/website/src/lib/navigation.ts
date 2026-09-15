@@ -56,6 +56,8 @@ export interface DocEntryLike {
 		section: SectionId
 		order: number
 		template: Template
+		/** The labelled run a top-level page sits in — see `groupsIn`. */
+		group?: string
 	}
 }
 
@@ -78,8 +80,29 @@ export interface SidebarItem extends DocLink {
 	children: SidebarItem[]
 }
 
-export interface SidebarSection extends Section {
+/**
+ * A labelled run of a section's top-level pages: the Language section's
+ * "Basics", "Modelling data" and the rest.
+ */
+export interface SidebarGroup {
+	label: string
 	items: SidebarItem[]
+}
+
+export interface SidebarSection extends Section {
+	/** Every top-level page of the section, in order, grouped or not. */
+	items: SidebarItem[]
+	/**
+	 * The same pages split into their labelled runs, or empty for a section
+	 * whose pages name no group. Laid end to end, the groups' items are `items`.
+	 *
+	 * NOTE: Beside the flat list rather than instead of it, and a label laid
+	 * over the order rather than a sort of its own. The reading chain, the
+	 * breadcrumbs, the hub and search each put a section's pages in `order`
+	 * without ever seeing a group, so a grouping that moved a page in the rail
+	 * would have the rail disagree with that page's own next link.
+	 */
+	groups: SidebarGroup[]
 }
 
 export interface Crumb {
@@ -263,8 +286,61 @@ function topLevelIn(
 }
 
 /*
+ * A section's top-level pages as labelled runs, in the order they already
+ * have: each run is the pages next to one another that name the same `group`.
+ *
+ * NOTE: A section groups every one of its top-level pages or none of them, and
+ * a label names one run. Breaking either throws rather than drawing something,
+ * because what would be drawn looks deliberate: a page without a group would
+ * sit under the heading of whichever run it followed, and a label that came
+ * back after another run would put the same heading in the rail twice. Both
+ * are what the next page a writer adds is likely to do — a new Language page
+ * with no `group`, or an `order` that lands inside another run — and a build
+ * that names the page is the one place that mistake would be seen.
+ */
+function groupsIn(
+	section: Section,
+	pages: readonly { entry: DocEntryLike; item: SidebarItem }[],
+): SidebarGroup[] {
+	if (pages.every(({ entry }) => entry.data.group === undefined)) {
+		return []
+	}
+
+	let groups: SidebarGroup[] = []
+
+	for (let { entry, item } of pages) {
+		let label = entry.data.group
+
+		if (label === undefined) {
+			throw new Error(
+				`${entry.id} has no \`group\`, but other ${section.label} pages name one. A section groups every top-level page or none of them: give it the group it belongs in.`,
+			)
+		}
+
+		let last = groups.at(-1)
+
+		if (last !== undefined && last.label === label) {
+			last.items.push(item)
+
+			continue
+		}
+
+		if (groups.some((group) => group.label === label)) {
+			throw new Error(
+				`${entry.id} is in the group "${label}", but pages of another group come between it and the rest of "${label}". A group is one run of pages in \`order\`: move this page's \`order\` next to theirs, or change its group.`,
+			)
+		}
+
+		groups.push({ label, items: [item] })
+	}
+
+	return groups
+}
+
+/*
  * The sidebar tree: sections in the fixed order, empty ones omitted, each
- * section's pages carrying whatever hangs off them, to any depth.
+ * section's pages carrying whatever hangs off them, to any depth, and split
+ * into their labelled runs where the pages name them.
  *
  * A page whose parent does not exist is promoted to the top of its section
  * rather than dropped. It is a mistake either way, but a mistake that leaves a
@@ -283,6 +359,16 @@ export function getSidebar(entries: readonly DocEntryLike[]): SidebarSection[] {
 				continue
 			}
 
+			// NOTE: A page written under another is drawn under it, whatever
+			// run its parent is in, so a `group` of its own would do nothing —
+			// and frontmatter that does nothing is refused, as the schema
+			// refuses a key it does not name.
+			if (entry.data.group !== undefined) {
+				throw new Error(
+					`${entry.id} names the group "${entry.data.group}", but it is written under ${parent}, and only a section's top-level pages are grouped. Take \`group\` off it: it sits wherever ${parent} does.`,
+				)
+			}
+
 			children.set(parent, [...(children.get(parent) ?? []), entry])
 		}
 
@@ -293,9 +379,22 @@ export function getSidebar(entries: readonly DocEntryLike[]): SidebarSection[] {
 			children: (children.get(entry.id) ?? []).map(build),
 		})
 
-		let items = topLevelIn(entries, section.id).map(build)
+		let pages = topLevelIn(entries, section.id).map((entry) => ({
+			entry,
+			item: build(entry),
+		}))
 
-		return items.length === 0 ? [] : [{ ...section, items }]
+		if (pages.length === 0) {
+			return []
+		}
+
+		return [
+			{
+				...section,
+				items: pages.map(({ item }) => item),
+				groups: groupsIn(section, pages),
+			},
+		]
 	})
 }
 
