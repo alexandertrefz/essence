@@ -143,7 +143,7 @@ declarations {
 			§§ @param integersFrom — the first Integer of the List
 			§§ @param through — the last Integer of the List, which is included
 			§§ @returns — the List of Integers. It is empty when the end is below the start.
-			(integersFrom first: Integer, through end: Integer) -> List<Integer>
+			(integersFrom start: Integer, through end: Integer) -> List<Integer>
 
 			§§ Answers the Integers from one value up to, but not including, another.
 			§§
@@ -156,11 +156,11 @@ declarations {
 			§§ @param integersFrom — the first Integer of the List
 			§§ @param upTo — the Integer the List stops before
 			§§ @returns — the List of Integers. It is empty when the end is not above the start.
-			(integersFrom first: Integer, upTo end: Integer) -> List<Integer> {
+			(integersFrom start: Integer, upTo end: Integer) -> List<Integer> {
 				§ The excluded end is the included one, one lower. The entry
 				§ above counts up only, so a `through` below the start answers
 				§ nothing and no guard is needed here.
-				<- List.of(integersFrom first, through end::subtract(1))
+				<- List.of(integersFrom start, through end::subtract(1))
 			}
 
 			§§ Answers the Integers from one value down through another, both included.
@@ -175,7 +175,7 @@ declarations {
 			§§ @param downTo — the last Integer of the List, which is included
 			§§ @returns — the List of Integers, which is never empty.
 			(
-				integersFrom first: Integer,
+				integersFrom start: Integer,
 				downTo end: Integer,
 			) -> NonEmptyList<Integer>
 
@@ -192,7 +192,7 @@ declarations {
 			§§ @param by — how far each step moves, which is never zero
 			§§ @returns — the List of Integers. It is empty when the step moves away from the end.
 			(
-				integersFrom first: Integer,
+				integersFrom start: Integer,
 				through end: Integer,
 				by step: NonZeroInteger,
 			) -> List<Integer>
@@ -210,7 +210,7 @@ declarations {
 			§§ @param by — how far each step moves, which is never zero
 			§§ @returns — the List of Integers. It is empty when the step moves away from the end.
 			(
-				integersFrom first: Integer,
+				integersFrom start: Integer,
 				upTo end: Integer,
 				by step: NonZeroInteger,
 			) -> List<Integer> {
@@ -223,7 +223,7 @@ declarations {
 					as end::add(1)      otherwise
 				}
 
-				<- List.of(integersFrom first, through nearer, by step)
+				<- List.of(integersFrom start, through nearer, by step)
 			}
 
 			§§ Answers the Integers from one value down through another, moving by the given step.
@@ -239,7 +239,7 @@ declarations {
 			§§ @param by — how far each step moves, which is never zero
 			§§ @returns — the List of Integers, which is never empty.
 			(
-				integersFrom first: Integer,
+				integersFrom start: Integer,
 				downTo end: Integer,
 				by step: NonZeroInteger,
 			) -> NonEmptyList<Integer>
@@ -578,9 +578,9 @@ declarations {
 				§ things. An `#Empty` answer means no item matched. A
 				§ `#Value(#Empty)` answer means the item that matched is itself
 				§ empty.
-				constant seed: Optional<ItemType> = #Empty
+				constant start: Optional<ItemType> = #Empty
 
-				<- @::reduce(startingWith seed, step (found, item) {
+				<- @::reduce(startingWith start, step (found, item) {
 					if check(item) {
 						<- #Done(#Value(item))
 					} else {
@@ -1263,7 +1263,7 @@ declarations {
 		§§ @param to — the position to stop before, counting the same way. It is the length when the call leaves it out.
 		§§ @returns — the List of items in that range. It is empty when the range is empty, inverted, or entirely outside the List.
 		slice(
-			from first: Integer = 0,
+			from start: Integer = 0,
 			to end: Integer = @::length(),
 		) -> List<ItemType>
 
@@ -1676,9 +1676,9 @@ declarations {
 			<infer Key is Comparable>(
 				on key: (_: ItemType) -> Key,
 			) -> Optional<ItemType> {
-				constant seed: Optional<ItemType> = #Empty
+				constant start: Optional<ItemType> = #Empty
 
-				<- @::reduce(startingWith seed, (lowest, item) {
+				<- @::reduce(startingWith start, (lowest, item) {
 					<- match lowest -> Optional<ItemType> {
 						case #Empty { <- #Value(item) }
 
@@ -1760,9 +1760,9 @@ declarations {
 			<infer Key is Comparable>(
 				on key: (_: ItemType) -> Key,
 			) -> Optional<ItemType> {
-				constant seed: Optional<ItemType> = #Empty
+				constant start: Optional<ItemType> = #Empty
 
-				<- @::reduce(startingWith seed, (highest, item) {
+				<- @::reduce(startingWith start, (highest, item) {
 					<- match highest -> Optional<ItemType> {
 						case #Empty { <- #Value(item) }
 
@@ -2262,9 +2262,9 @@ declarations {
 		§§
 		§§ @returns — the first value, or an empty Optional.
 		firstValue() -> Optional<ItemType> {
-			constant seed: Optional<ItemType> = #Empty
+			constant start: Optional<ItemType> = #Empty
 
-			<- @::reduce(startingWith seed, step (found, item) {
+			<- @::reduce(startingWith start, step (found, item) {
 				<- match item -> Step<Optional<ItemType>, Optional<ItemType>> {
 					case #Value(value) { <- #Done(#Value(value)) }
 					case #Empty        { <- #Continue(found) }

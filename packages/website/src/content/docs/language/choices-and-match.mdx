@@ -92,7 +92,7 @@ implementation {
 		}
 	}
 
-	function opening() -> Route {
+	function start() -> Route {
 		<- #Home
 	}
 
@@ -103,14 +103,14 @@ implementation {
 	Terminal.print(describe(full)) § article choices
 	Terminal.print(describe(short)) § article choices
 	Terminal.print(describe(named)) § search for match, page 2
-	Terminal.print(describe(opening())) § home
+	Terminal.print(describe(start())) § home
 	Terminal.print(describe(#Article("direct"))) § article direct
 }
 ```
 
 A case that carries nothing is written alone: `#Home`. A case with a payload takes its record in parentheses: `#Article({ slug = "choices" })`. When the record has exactly one member, that member's value can stand in for the whole record, so `#Article("choices")` builds the same value. Writing the choice in front of the sigil, `Route#Search(…)`, names the choice outright. A payload may carry more members than its case declares, as a record may: `#Article({ slug = "choices", draft = true })` compiles, where TypeScript's excess-property check would refuse it. [`Terminal.inspect`](/docs/library/terminal#inspect) shows the `draft`, but an arm cannot read it: `@.draft` is [`unknown-member`](/docs/reference/diagnostics#unknown-member).
 
-A bare `#Case` takes its choice from the position it stands in. Three positions decide it. The first is the annotation on a [constant](/docs/language/programs-and-values) (`full`, `short`). The second is the declared return type of a [function](/docs/language/functions) (`opening`). The third is the parameter a direct argument is passed to (`describe(#Article("direct"))`). Where no position decides, the compiler looks the name up among the choices in scope, and one choice declaring it is enough.
+A bare `#Case` takes its choice from the position it stands in. Three positions decide it. The first is the annotation on a [constant](/docs/language/programs-and-values) (`full`, `short`). The second is the declared return type of a [function](/docs/language/functions) (`start`). The third is the parameter a direct argument is passed to (`describe(#Article("direct"))`). Where no position decides, the compiler looks the name up among the choices in scope, and one choice declaring it is enough.
 
 When two choices in scope declare the same case name, the lookup cannot pick one, and only a position decides. A record or list literal written as an argument is not such a position:
 

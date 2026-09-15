@@ -71,7 +71,7 @@ The same `{ width, height }` takes a `Size` apart in `area`'s parameter, in the 
 | `name as other` | `other` | nothing | `{ y as row }` |
 | `name: Type as other` | `other` | the member's type | `{ x: Integer as column }` |
 | `name = value as other` | — | — | a syntax error: `Expected '}' but found 'as'.` |
-| `name as { … }` | what the inner pattern binds | what the inner pattern checks | `{ from as { x, y } }` |
+| `name as { … }` | what the inner pattern binds | what the inner pattern checks | `{ start as { x, y } }` |
 | [`{ … } as whole`](/docs/reference/syntax-glossary#pattern-whole) | the parts, and the whole value as `whole` | what the parts check | `{ width, height } as size` |
 
 A bare `name` is `name: Type` with the type left off. The two bind the same name and differ only in what they check. In a `match` arm, `name: Type` is a check: the arm runs only when the member has that type. In a declaration or a parameter it is an annotation, which the compiler checks like any other.
@@ -384,9 +384,9 @@ implementation {
 	Terminal.print(accepted) § [2, 4]
 	Terminal.print(refused) § [1, 3, 5]
 
-	constant line = { from = { x = 1, y = 2 }, to = { x = 4, y = 6 } }
+	constant line = { start = { x = 1, y = 2 }, end = { x = 4, y = 6 } }
 
-	constant { from as { x as left }, to as { x as right } } = line
+	constant { start as { x as left }, end as { x as right } } = line
 
 	Terminal.print(right::subtract(left)) § 3
 
@@ -405,7 +405,7 @@ implementation {
 
 A `constant` or `variable` declaration takes a pattern where its name goes. [`partition(where:)`](/docs/library/list#partition) returns `{ accepted, refused }`, and one declaration reads both lists.
 
-`from as { x as left }` nests. It reads `from`, then the `x` inside it, and binds that as `left`. TypeScript nests with a colon, `{ from: { x: left } }`. Here a colon gives a type, so nesting takes `as`.
+`start as { x as left }` nests. It reads `start`, then the `x` inside it, and binds that as `left`. TypeScript nests with a colon, `{ start: { x: left } }`. Here a colon gives a type, so nesting takes `as`.
 
 `as size` binds the whole value beside its parts. An annotation follows the pattern, after `as whole` when there is one: `{ width, height } as size: Size`.
 
@@ -497,7 +497,7 @@ Take a list apart with its methods, such as [`firstItem()`](/docs/library/list#f
 | --- | --- | --- |
 | `case [first, second]` | `Expected a Type but found '['.` | a list method, such as `firstItem()` |
 | `constant { x, ...others } = point` | `Expected an Identifier but found '.'.` | the members you need; the pattern ignores the rest |
-| `constant { from: { x } } = line` | `Expected ':' but found '}'.` | `constant { from as { x } } = line` |
+| `constant { start: { x } } = line` | `Expected ':' but found '}'.` | `constant { start as { x } } = line` |
 | `case #Value(_)` | `Expected an Identifier but found '_'.` | `case #Value`, with no binder |
 | `case #Value(0)` | `Expected an Identifier but found '0'.` | `case #Value({ item = 0 })` |
 | `case { item, discount as #Value(amount) }` | `Expected '}' but found 'as'.` | a second `match`, below |

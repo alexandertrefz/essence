@@ -445,7 +445,7 @@ describe("Optional", () => {
 	describe("A List of Optionals", () => {
 		const lists = [
 			`constant rows: List<Optional<Integer>> = [#Value(1), #Empty, #Value(3)]`,
-			`constant filled: List<Optional<Integer>> = [#Value(1), #Value(3)]`,
+			`constant complete: List<Optional<Integer>> = [#Value(1), #Value(3)]`,
 			`constant blanks: List<Optional<Integer>> = [#Empty, #Empty]`,
 			`constant none: List<Optional<Integer>> = []`,
 		].join("\n\t\t\t\t\t")
@@ -457,7 +457,7 @@ describe("Optional", () => {
 
 					Terminal.inspect(rows::values())
 					Terminal.inspect(rows::allValues())
-					Terminal.inspect(filled::allValues())
+					Terminal.inspect(complete::allValues())
 					Terminal.inspect(blanks::allValues())
 				}`),
 			).toEqual([

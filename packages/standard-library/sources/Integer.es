@@ -113,7 +113,7 @@ declarations {
 				{
 					<- #Empty
 				} else {
-					constant seed: Optional<Integer> = #Value(0)
+					constant start: Optional<Integer> = #Value(0)
 
 					§ A digit's value is its distance from the point of `0`.
 					§ The body used to look each one up in a String of the ten
@@ -123,7 +123,7 @@ declarations {
 					§ way. The lookup stopped building anything the day
 					§ `firstIndex` went native.
 					constant magnitude = digitPoints::reduce(
-						startingWith seed,
+						startingWith start,
 						step (value, point) {
 							constant digit = point::subtract(48)
 

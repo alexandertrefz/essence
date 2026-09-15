@@ -398,7 +398,7 @@ describe("Signature Help for a standard library Method", () => {
 		it("should step the active Parameter over a default a label skipped", () => {
 			let source = [
 				"implementation {",
-				"\tfunction cut (from first: Integer = 0, to end: Integer) -> Integer {",
+				"\tfunction cut (from start: Integer = 0, to end: Integer) -> Integer {",
 				"\t\t<- end",
 				"\t}",
 				"\tcut(to 3, ",

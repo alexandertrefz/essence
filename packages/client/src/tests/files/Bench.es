@@ -34,9 +34,9 @@ implementation {
 		_ rows: List<List<Integer>>,
 		_ labels: List<String>,
 	) -> List<Cell> {
-		constant first: Walk = { position = 0, cells = [] }
+		constant start: Walk = { position = 0, cells = [] }
 
-		constant walked = rows::reduce(startingWith first, (state, row) {
+		constant walked = rows::reduce(startingWith start, (state, row) {
 			constant total = row::reduce(startingWith 0, (sum, cell) {
 				<- sum::add(cell)
 			})

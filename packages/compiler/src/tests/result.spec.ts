@@ -590,7 +590,7 @@ describe("Result", () => {
 	describe("A List of Results", () => {
 		const lists = [
 			`constant rows: List<Result<Integer, String>> = [#Value(1), #Failure("a"), #Value(3), #Failure("b")]`,
-			`constant filled: List<Result<Integer, String>> = [#Value(1), #Value(3)]`,
+			`constant complete: List<Result<Integer, String>> = [#Value(1), #Value(3)]`,
 			`constant broken: List<Result<Integer, String>> = [#Failure("a"), #Failure("b")]`,
 			`constant none: List<Result<Integer, String>> = []`,
 		].join("\n\t\t\t\t\t")
@@ -621,7 +621,7 @@ describe("Result", () => {
 				await run(`implementation {
 					${lists}
 
-					Terminal.inspect(filled::allValues())
+					Terminal.inspect(complete::allValues())
 					Terminal.inspect(rows::allValues())
 					Terminal.inspect(broken::allValues())
 				}`),
@@ -659,7 +659,7 @@ describe("Result", () => {
 					Terminal.inspect(rows::allValues()::reason()::map((reasons) {
 						<- reasons::firstItem()
 					}))
-					Terminal.inspect(filled::allValues()::reason()::map((reasons) {
+					Terminal.inspect(complete::allValues()::reason()::map((reasons) {
 						<- reasons::firstItem()
 					}))
 				}`),

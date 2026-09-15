@@ -119,7 +119,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "loop<infer State>(\n\tfrom first: Integer,\n\tthrough end: Integer,\n\tstartingWith state: State,\n\t_ advance: (_: Integer, _: State) -> State,\n) -> State",
+							"signature": "loop<infer State>(\n\tfrom start: Integer,\n\tthrough end: Integer,\n\tstartingWith state: State,\n\t_ advance: (_: Integer, _: State) -> State,\n) -> State",
 							"summary": "Runs the body once for each Integer from `from` up through `through`, and answers the State after the last step.\n\nBoth endpoints are included and the count only runs up. An end below the start runs the body zero times and answers the seed untouched. That mirrors `List.of(integersFrom:through:)`. To count down, use the `downTo:` entry. The entry always finishes, because the range is fixed before the first step.",
 							"parameters": [
 								{
@@ -170,7 +170,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "loop<infer State>(\n\tfrom first: Integer,\n\tupTo end: Integer,\n\tstartingWith state: State,\n\t_ advance: (_: Integer, _: State) -> State,\n) -> State",
+							"signature": "loop<infer State>(\n\tfrom start: Integer,\n\tupTo end: Integer,\n\tstartingWith state: State,\n\t_ advance: (_: Integer, _: State) -> State,\n) -> State",
 							"summary": "Runs the body once for each Integer from `from` up to, but not including, `upTo`, and answers the State after the last step.\n\nThe count only runs up. The body runs zero times when `upTo` is not above `from`, and the seed is answered untouched. That mirrors `List.of(integersFrom:upTo:)`, so a count written from a length is empty rather than inverted.",
 							"parameters": [
 								{
@@ -221,7 +221,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "loop<infer State>(\n\tfrom first: Integer,\n\tdownTo end: Integer,\n\tstartingWith state: State,\n\t_ advance: (_: Integer, _: State) -> State,\n) -> State",
+							"signature": "loop<infer State>(\n\tfrom start: Integer,\n\tdownTo end: Integer,\n\tstartingWith state: State,\n\t_ advance: (_: Integer, _: State) -> State,\n) -> State",
 							"summary": "Runs the body once for each Integer from `from` down through `downTo`, and answers the State after the last step.\n\nBoth endpoints are included and the count only runs down. The first Integer is always seen, so an end above the start runs the body once. That mirrors `List.of(integersFrom:downTo:)`. The entry always finishes, because the range is fixed before the first step.",
 							"parameters": [
 								{
@@ -315,7 +315,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "loop<infer State>(\n\tfrom first: Integer,\n\tthrough end: Integer,\n\tstartingWith state: State,\n\tstep advance: (_: Integer, _: State) -> Step<State, State>,\n) -> State",
+							"signature": "loop<infer State>(\n\tfrom start: Integer,\n\tthrough end: Integer,\n\tstartingWith state: State,\n\tstep advance: (_: Integer, _: State) -> Step<State, State>,\n) -> State",
 							"summary": "Runs the body over the Integers from `from` up through `through`, and lets the body stop before the end.\n\nEach step answers with a `Step`. A `#Continue` carries the next State, and the count goes on. A `#Done` carries the answer, and the loop finishes with it at once. The count running out answers the State the last step carried. An end below the start runs the body zero times and answers the seed.",
 							"parameters": [
 								{
@@ -366,7 +366,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "loop<infer State>(\n\tfrom first: Integer,\n\tupTo end: Integer,\n\tstartingWith state: State,\n\tstep advance: (_: Integer, _: State) -> Step<State, State>,\n) -> State",
+							"signature": "loop<infer State>(\n\tfrom start: Integer,\n\tupTo end: Integer,\n\tstartingWith state: State,\n\tstep advance: (_: Integer, _: State) -> Step<State, State>,\n) -> State",
 							"summary": "Runs the body over the Integers from `from` up to, but not including, `upTo`, and lets the body stop before the end.\n\nEach step answers with a `Step`, as the `through:` entry beside it reads. The body runs zero times when `upTo` is not above `from`, and the seed is answered untouched.",
 							"parameters": [
 								{
@@ -417,7 +417,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "loop<infer State>(\n\tfrom first: Integer,\n\tdownTo end: Integer,\n\tstartingWith state: State,\n\tstep advance: (_: Integer, _: State) -> Step<State, State>,\n) -> State",
+							"signature": "loop<infer State>(\n\tfrom start: Integer,\n\tdownTo end: Integer,\n\tstartingWith state: State,\n\tstep advance: (_: Integer, _: State) -> Step<State, State>,\n) -> State",
 							"summary": "Runs the body over the Integers from `from` down through `downTo`, and lets the body stop before the end.\n\nEach step answers with a `Step`, as the `through:` entry reads. The first Integer is always seen, so an end above the start runs the body once and answers what that step carried.",
 							"parameters": [
 								{

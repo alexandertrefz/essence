@@ -1011,16 +1011,16 @@ describe("a walk's carried State", () => {
 		// the first rule's exactness means: a refinement is a promise the
 		// Validator kept, not a second representation.
 		let source = program(`	constant half: Rational = 1/2
-	constant seed = half::denominator()
+	constant start = half::denominator()
 
-	constant answer = loop(from 1, through 3, startingWith seed, (
+	constant answer = loop(from 1, through 3, startingWith start, (
 		_index,
 		carried,
 	) { <- carried::add(carried) })
 
 	Terminal.print(answer)`)
 
-		expect(generate(source)).toContain("let $loop_0_state = seed.value;")
+		expect(generate(source)).toContain("let $loop_0_state = start.value;")
 		expect(await outputOf(source)).toEqual(["16"])
 	})
 

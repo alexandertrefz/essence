@@ -12,8 +12,8 @@ implementation {
 	§ the labels tell the two apart, and not legal as `a?: T, b: U` in
 	§ TypeScript. The positional declaration keeps it required and widens it;
 	§ only the labelled form marks it optional.
-	function cut(from first: Integer = 0, to end: Integer) -> Integer {
-		<- end::subtract(first)
+	function cut(from start: Integer = 0, to end: Integer) -> Integer {
+		<- end::subtract(start)
 	}
 
 	§ Every Parameter defaulted, so a call may write nothing at all.

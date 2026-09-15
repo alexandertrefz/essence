@@ -12,8 +12,8 @@ implementation {
 
 	§ A default may read `@`, the Parameters to its left, and anything the
 	§ Declaration is written inside — never one to its right.
-	function cut(from first: Integer = end, to end: Integer) -> Integer {
-		<- end::subtract(first)
+	function cut(from start: Integer = end, to end: Integer) -> Integer {
+		<- end::subtract(start)
 	}
 
 	§ Never the Parameter it is written on either: the default IS what that

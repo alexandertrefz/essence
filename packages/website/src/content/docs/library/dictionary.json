@@ -717,7 +717,7 @@
 							"examples": []
 						},
 						{
-							"signature": "update<infer KeyType is Equatable>(\n\tat key: KeyType,\n\tdefaultingTo fallback: ValueType,\n\twith transform: (_: ValueType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
+							"signature": "update<infer KeyType is Equatable>(\n\tat key: KeyType,\n\tdefaultingTo start: ValueType,\n\twith transform: (_: ValueType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
 							"summary": "Answers a new Dictionary with the given key's value transformed, starting from the given value where the key holds no value.\n\nA key that holds no value is set to the transform of the given value.",
 							"parameters": [
 								{

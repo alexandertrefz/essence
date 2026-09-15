@@ -1829,7 +1829,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "slice(from first: Integer = 0, to end: Integer = @::length()) -> String",
+							"signature": "slice(from start: Integer = 0, to end: Integer = @::length()) -> String",
 							"summary": "Answers the characters from one position up to, but not including, another.\n\nA negative position counts back from the end, so `slice(from 0, to -1)` drops the last character. An empty or inverted range answers the empty String.",
 							"parameters": [
 								{

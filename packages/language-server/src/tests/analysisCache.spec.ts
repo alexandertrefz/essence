@@ -138,13 +138,13 @@ const topSource = `import {
 }
 
 implementation {
-	constant amount: Amount = { cents = 250 }
+	constant start: Amount = { cents = 250 }
 
 	function describe(_ amount: Amount) -> Amount {
 		<- averaged(amount)::halved()
 	}
 
-	Terminal.print(describe(amount).cents::toString())
+	Terminal.print(describe(start).cents::toString())
 }
 `
 

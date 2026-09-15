@@ -411,12 +411,12 @@ The labels a call writes pick the entry. Each row links to its full signature.
 
 ```essence
 implementation {
-	function countdown(from first: Integer) -> String {
-		if first::isLessThanOrEqualTo(0) {
+	function countdown(from start: Integer) -> String {
+		if start::isLessThanOrEqualTo(0) {
 			<- "liftoff"
 		}
 
-		<- "{first} {countdown(from first::subtract(1))}"
+		<- "{start} {countdown(from start::subtract(1))}"
 	}
 
 	Terminal.print(countdown(from 3)) § 3 2 1 liftoff

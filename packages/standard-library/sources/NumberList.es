@@ -537,9 +537,9 @@ declarations {
 		§§
 		§§ @returns — the List of totals, which is never empty.
 		runningTotal() -> NonEmptyList<Scalar> {
-			constant seed: Scalar = 0
+			constant start: Scalar = 0
 
-			<- @::accumulate(startingWith seed, (total, item) {
+			<- @::accumulate(startingWith start, (total, item) {
 				<- total::add(item)
 			})
 		}

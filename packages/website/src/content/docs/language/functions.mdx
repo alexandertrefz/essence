@@ -298,10 +298,10 @@ implementation {
 	§ A default may read a parameter to its left.
 	function slice(
 		of text: String,
-		from first: Integer = 0,
+		from start: Integer = 0,
 		to end: Integer = text::length(),
 	) -> String {
-		<- text::slice(from first, to end)
+		<- text::slice(from start, to end)
 	}
 
 	§ A default on an unlabelled parameter.
@@ -317,7 +317,7 @@ implementation {
 }
 ```
 
-A parameter may carry a default value: [`=`](/docs/reference/syntax-glossary#equals) and an expression after its type. A call that leaves the argument out gets the default, and a call that writes it does not. The expression may read the parameters to its left, as `to end` reads `text`, and anything in the scope the function is written in. In a [method](/docs/language/namespaces-and-methods) it may also read [`@`](/docs/reference/syntax-glossary#at), the value the method is called on. The standard library's [`slice`](/docs/library/string#slice) has the same two defaults: `from first: Integer = 0, to end: Integer = @::length()`.
+A parameter may carry a default value: [`=`](/docs/reference/syntax-glossary#equals) and an expression after its type. A call that leaves the argument out gets the default, and a call that writes it does not. The expression may read the parameters to its left, as `to end` reads `text`, and anything in the scope the function is written in. In a [method](/docs/language/namespaces-and-methods) it may also read [`@`](/docs/reference/syntax-glossary#at), the value the method is called on. The standard library's [`slice`](/docs/library/string#slice) has the same two defaults: `from start: Integer = 0, to end: Integer = @::length()`.
 
 TypeScript's optional parameter has no counterpart. `?` is a name character, so `_ name?: String` declares a required parameter named `name?`, and a call that leaves it out is `argument-count-mismatch`. A parameter a call may leave out is one with a default. There is no rest parameter either: `_ ...values: Integer` is a `syntax-error`, so take a [`List<Integer>`](/docs/library/list) instead.
 
@@ -376,7 +376,7 @@ Every place a default is refused, and what the compiler says:
 | Code | When | The compiler says |
 | --- | --- | --- |
 | [`default-type-mismatch`](/docs/reference/diagnostics#default-type-mismatch) | `by factor: Integer = "twice"` | This default does not fit Parameter 'factor' |
-| [`default-references-later-parameter`](/docs/reference/diagnostics#default-references-later-parameter) | `from first: Integer = end, to end: Integer` | 'end' is declared after the Parameter whose default reads it |
+| [`default-references-later-parameter`](/docs/reference/diagnostics#default-references-later-parameter) | `from start: Integer = end, to end: Integer` | 'end' is declared after the Parameter whose default reads it |
 | [`default-references-own-parameter`](/docs/reference/diagnostics#default-references-own-parameter) | `_ times: Integer = times` | 'times' is the Parameter its own default is written on |
 | [`default-references-pattern-binding`](/docs/reference/diagnostics#default-references-pattern-binding) | a default reads a name that a [pattern](/docs/language/patterns) in an earlier parameter binds | 'x' is bound by a Pattern and can not be read by a default |
 | [`indistinguishable-default-parameter`](/docs/reference/diagnostics#indistinguishable-default-parameter) | `_ first: Integer = 1, _ second: String`: a defaulted unlabelled parameter with another unlabelled one after it | This default could not be told apart from the Parameter after it |

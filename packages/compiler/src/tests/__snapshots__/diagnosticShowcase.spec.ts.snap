@@ -202,7 +202,7 @@ Error: This default does not fit Parameter 'factor'
 Error: 'end' is declared after the Parameter whose default reads it
     ╭─┤ Defaults.es:15:37 │
     │
- 15 │     function cut(from first: Integer = end, to end: Integer) -> Integer {
+ 15 │     function cut(from start: Integer = end, to end: Integer) -> Integer {
     │                                        ─┬─     ─┬─  
     │                                         ╰───────│─── read here
     │                                                 │   
