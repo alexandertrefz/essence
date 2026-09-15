@@ -64,6 +64,7 @@ math.exports.square(12n) // 144n
 | `Result<T, F>`    | `{ $case: "Result#Value", item: T }` or `{ $case: "Result#Failure", reason: F }` |
 | a Case of a Choice | `{ $case: "Choice#Case", ...payload }` |
 | a Case of a Choice with no payloads at all | the bare Case name, `"Up"` |
+| `Future<T>` / `Started<T>` | a `Promise`, at a call's answer alone — see [`Work`](#work) |
 
 The mapping loses nothing in either direction. There is no JavaScript number
 for `1/3`, so a `Rational` crosses as its two `bigint` parts; a `number` handed
@@ -305,6 +306,88 @@ carries: a JavaScript Function takes its Arguments in order, and this package
 does not invent a calling convention for code it did not write. It is called
 as many times as the Module calls it — a callback is not a value marshalled
 once and remembered.
+
+## Work
+
+A Function whose Essence signature answers a `Future<T>` answers a `Promise`
+here, and calling it is what puts the work in flight. A Future is a
+*description* — building one runs nothing at all — so the boundary starts one
+run per call and hands back the promise of that run.
+
+```js
+let async = await loadModule("./Async.es")
+
+await async.exports.headline("https://example.com") // the String it answers with
+```
+
+A `Started<T>` is one run that is already going on, so nothing here starts it
+again: what crosses is the promise that run holds, however many times it is
+read.
+
+A call's answer is the **only** position work crosses at. A `Future` inside a
+value — a Record's member, a List's item, a Case's payload — is refused in both
+directions, because there is nothing inside a value to say when it should run:
+starting it to spell it would run work nobody asked for, every time the value
+crossed, and handing the description over unstarted would hand over a
+JavaScript object that describes nothing. A constant that holds work is refused
+for the same reason, where it is read.
+
+```
+argument 1 → .work: a Future<Integer> is work rather than a value, and work
+crosses only as a call's answer — inside a value there is nothing to say when
+it should run.
+```
+
+Nothing goes the other way as a value either. A `Promise` is an answer that has
+not arrived, not a description that can be run, so one handed in is refused —
+and named as what it is wherever it is passed, so `expected Integer, got a
+Promise` reads as the mistake it is rather than as "an empty object".
+
+### Work the host does
+
+The way work crosses **into** a Module is a callback the Module calls: a
+Parameter declared `(_: String) -> Future<String>` takes an ordinary JavaScript
+Function answering a Promise.
+
+```js
+let page = await async.exports.loaded("/index.html", (path) => fetch(path).then((answer) => answer.text()))
+```
+
+The difference between that and passing a Promise is the whole reason it is a
+callback: the host's Function is called **at every start**, not once. A Module
+that writes `::attempt(times 3)` over such work calls it three times while it
+fails, and a Module that builds the work and never starts it never calls it at
+all.
+
+The callback is called with the Arguments the Module hands over, marshalled
+out, and what it answers with is marshalled in against what the Future was
+declared to answer with — the two directions of any other callback, one start
+later. It is **not** handed a signal: a host Function takes what its own
+declaration says it takes, and a host that wants to be stopped can close over
+an `AbortController` of its own.
+
+### Stopping
+
+`loadModule`, `bind` and `loadPrebuilt` take a `signal`, and it becomes the
+**root** of every run the boundary starts rather than a second mechanism beside
+the one the language has.
+
+```js
+let stopping = new AbortController()
+let async = await loadModule("./Async.es", { signal: stopping.signal })
+let answering = async.exports.headline("https://example.com")
+
+stopping.abort()
+```
+
+Everything that call started is stopped with it: `Async.sleep` clears its timer,
+`::within` and `::race` stop their losers through a child of the same context,
+and a request the standard library made is aborted. A stopped run answers
+**nothing at all** — a Future can not fail, so the promise is left unsettled
+rather than rejected, which is what cancellation means everywhere else in the
+language. A `Started` is left alone: one run belongs to whoever started it and
+may be waited for from anywhere, so a stop written by one holder may not take
+the answer away from the others.
 
 ## Types
 
@@ -694,6 +777,14 @@ not during the load.
 - **Nested Optionals.** `Optional<T>` is `T | undefined`, and `undefined` does
   not nest. `Optional<Optional<T>>` is refused in both directions rather than
   collapsed into the one level JavaScript can spell.
+- **Work anywhere but a call's answer.** A `Future` or a `Started` crosses as
+  the answer of a call and nowhere else — not inside a value, not as a constant,
+  and not as an Argument. `Future<Future<T>>` therefore comes back as a promise
+  whose answer is refused. See [`Work`](#work), which says why.
+- **A signal for the host's own callback.** A callback declared to answer a
+  Future is called with its declared Arguments and nothing else, so a host that
+  wants to be stopped has to carry its own `AbortController`. The run's signal
+  is the runtime's, and the standard library's natives read it.
 - **Compiling in a browser.** The compiler reads files and shells out to
   esbuild. What a browser can run is the *output* — which is what the bundler
   plugins are for.
