@@ -52,7 +52,7 @@ export const PAGES: PageDefinition[] = [
 		title: "Integer",
 		order: 20,
 		description:
-			"Whole numbers of any size, exact and without a width to overflow: arithmetic, parsing, testing and printing.",
+			"Whole numbers of any size that never overflow: arithmetic, parsing, testing and printing.",
 		taughtOn: [
 			"language/method-calls",
 			"language/numbers",
@@ -236,7 +236,7 @@ export const PAGES: PageDefinition[] = [
 		title: "Number",
 		order: 40,
 		description:
-			"The union of the numeric kinds: comparing across kinds, the constants, and the static aggregates.",
+			"The union of every kind of number: the constants Pi, Tau, E and GoldenRatio, totals, parsing, and comparing across kinds.",
 		taughtOn: ["language/numbers", "language/unions-and-type-aliases"],
 		groups: [
 			{
@@ -548,7 +548,7 @@ export const PAGES: PageDefinition[] = [
 		title: "List",
 		order: 90,
 		description:
-			"The ordered sequence: every method returns a new List and leaves the one it was called on unchanged.",
+			"Ordered collections of items: reading, searching, transforming, sorting and totalling, each method returning a new List.",
 		taughtOn: ["language/lists", "language/iteration"],
 		groups: [
 			{
@@ -963,7 +963,7 @@ export const PAGES: PageDefinition[] = [
 		title: "Record",
 		order: 130,
 		description:
-			"The methods every record answers: equality, printing and its keys.",
+			"The methods every record has: equality, printing and reading its keys.",
 		taughtOn: ["language/records"],
 		groups: [
 			{
@@ -982,7 +982,7 @@ export const PAGES: PageDefinition[] = [
 		title: "Ordering",
 		order: 140,
 		description:
-			"What `compare` returns, less, equal or greater, and `then` for ordering on a second key.",
+			"What `compare` returns, `#Less`, `#Equal` or `#Greater`, and `then` for ordering by a second key.",
 		taughtOn: ["language/protocols", "language/lists"],
 		groups: [
 			{
@@ -1001,7 +1001,7 @@ export const PAGES: PageDefinition[] = [
 		title: "loop and Step",
 		order: 150,
 		description:
-			"The loop functions: repeat a body over a State while a condition holds, over a range of Integers, or until it stops.",
+			"The `loop` functions and `Step`: repeat a function while a condition holds, across a range of integers, or until it returns `#Done`.",
 		taughtOn: ["language/iteration"],
 		groups: [
 			{

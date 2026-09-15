@@ -140,7 +140,7 @@ Taught on: [Dictionaries](/docs/language/dictionaries).
 
 ## Refinements
 
-Each type below is a checked refinement: the compiler holds a value to its condition before the value has the type. [Checked refinements](/docs/language/checked-refinements) shows how a value earns one. Each section lists the methods above that return something tighter on it, and the methods that return it.
+Each type below is a checked refinement: a type with a condition. A value has the type only once the compiler knows the condition holds, and [Checked refinements](/docs/language/checked-refinements) shows how it finds out. Under each one, *Tighter here* lists the methods above that return a more precise type when called on it. *Returned by* lists the methods that return it.
 
 ### <span id="NonEmptyDictionary">NonEmptyDictionary</span>
 

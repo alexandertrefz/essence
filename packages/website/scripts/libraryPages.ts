@@ -21,7 +21,9 @@
  *      every Protocol goes to the Protocols page — Generatable too, though
  *      `Randomness.es` declares it.
  *   6. One override, `Step`: its file declares the Choice and nothing a page
- *      could hang from, and it is what a `loop` body answers.
+ *      could hang from. It goes to `loop`, because the callback of a `step`
+ *      form of `loop` returns one. The only other callback that does is
+ *      `List::reduce`'s early-stopping form; a plain `loop` body does not.
  *
  * "The first Type a file declares a page for" is the first Namespace in the
  * file over a Type no file declares (`Integer`, `List`), over a refinement of
@@ -75,7 +77,8 @@ const PROTOCOLS = "protocols"
 /*
  * The one declaration no rule can place. `Step.es` declares the Choice and no
  * Namespace, so nothing names a page it belongs on — and a reader meets it
- * where a `loop` body has to answer one.
+ * where a callback has to return one: the `step` forms of `loop`, and the
+ * early-stopping form of `List::reduce`.
  */
 const OVERRIDES: Record<string, string> = {
 	Step: "loop",
@@ -102,8 +105,8 @@ const PROTOCOL_NOTES: Record<string, string[]> = {
 		"Every choice has `is` and `isNot` without declaring `Equatable`. Two of its values are equal when they are the same case with equal payloads.",
 	],
 	Printable: [
-		"A choice whose cases carry no payload prints its case name once a namespace declares `is Printable` for it, and the namespace body can stay empty: `namespace Side for Side is Equatable, is Printable {}`.",
-		"An interpolation hole in a String needs a `Printable` value. Any other value is the Error [`interpolation-not-printable`](/docs/reference/diagnostics#interpolation-not-printable).",
+		"A choice whose cases carry no payload prints its case name once a namespace declares `is Printable` for it. The namespace body can stay empty: `namespace Side for Side is Equatable, is Printable {}`.",
+		"An interpolation hole in a String needs a `Printable` value. Any other value is [`interpolation-not-printable`](/docs/reference/diagnostics#interpolation-not-printable).",
 	],
 	Enumerable: [
 		"Every choice whose cases carry no payload has the static `cases()` without declaring `Enumerable`. It returns the cases in the order they are declared: `Side.cases()` is `[Start, End, BothEnds]`.",

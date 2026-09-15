@@ -935,8 +935,8 @@
 				}
 			],
 			"notes": [
-				"A choice whose cases carry no payload prints its case name once a namespace declares `is Printable` for it, and the namespace body can stay empty: `namespace Side for Side is Equatable, is Printable {}`.",
-				"An interpolation hole in a String needs a `Printable` value. Any other value is the Error [`interpolation-not-printable`](/docs/reference/diagnostics#interpolation-not-printable)."
+				"A choice whose cases carry no payload prints its case name once a namespace declares `is Printable` for it. The namespace body can stay empty: `namespace Side for Side is Equatable, is Printable {}`.",
+				"An interpolation hole in a String needs a `Printable` value. Any other value is [`interpolation-not-printable`](/docs/reference/diagnostics#interpolation-not-printable)."
 			],
 			"headed": []
 		},

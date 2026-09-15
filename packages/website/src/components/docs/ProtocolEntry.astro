@@ -60,8 +60,9 @@ let provided = group.members.filter(
 					</a>
 				</>
 			))}
-			: a conformance to <code>{protocol.name}</code> brings everything that
-			protocol provides as well.
+			: a type that conforms to <code>{protocol.name}</code> conforms to{" "}
+			{protocol.extends.length === 1 ? "it" : "each of them"} too, and gets
+			what {protocol.extends.length === 1 ? "it provides" : "they provide"}.
 		</p>
 	)
 }

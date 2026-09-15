@@ -365,7 +365,7 @@ export function renderPage(
 	if (manifest.refinements.length > 0) {
 		block(layout.heading(2, "Refinements").line)
 		block(
-			`Each type below is a checked refinement: the compiler holds a value to its condition before the value has the type. [Checked refinements](/docs/language/checked-refinements) shows how a value earns one. Each section lists the methods above that return something tighter on it, and the methods that return it.`,
+			`Each type below is a checked refinement: a type with a condition. A value has the type only once the compiler knows the condition holds, and [Checked refinements](/docs/language/checked-refinements) shows how it finds out. Under each one, *Tighter here* lists the methods above that return a more precise type when called on it. *Returned by* lists the methods that return it.`,
 		)
 
 		for (let refinement of manifest.refinements) {
@@ -384,7 +384,7 @@ export function renderPage(
 
 		if (manifest.modes.every((mode) => mode.payloadFree)) {
 			block(
-				`Each mode below is a choice whose cases carry no payload, passed to a method to pick how it works. Every mode has \`is\`, \`isNot\` and \`toString\`, and its type lists its cases with \`cases()\`. The sources write none of them: [Protocols](/docs/library/protocols#Enumerable) says where each comes from.`,
+				`Each mode below is a choice whose cases carry no payload. You pass one to a method to choose how the method works. Every mode has \`is\`, \`isNot\` and \`toString\`, and \`cases()\` on its name lists its cases, as in \`${manifest.modes[0]!.name}.cases()\`. None of them is written out for a mode: [Protocols](/docs/library/protocols#Enumerable) says where each one comes from.`,
 			)
 		}
 

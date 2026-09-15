@@ -37,7 +37,8 @@ let code = { lang: ESSENCE_LANG, themes: ESSENCE_THEMES, defaultColor: false as 
 			{
 				manifest.kind === "namespace" && statics && (
 					<p class="glance__note">
-						No <code>for</code> type, so every member is a static:{" "}
+						The namespace has no <code>for</code> type, so every member is a
+						static, called as{" "}
 						<code>{manifest.title}.{members[0]?.name ?? ""}(…)</code>.
 					</p>
 				)
@@ -45,7 +46,7 @@ let code = { lang: ESSENCE_LANG, themes: ESSENCE_THEMES, defaultColor: false as 
 			{
 				manifest.kind === "function family" && (
 					<p class="glance__note">
-						{members.length} entries, told apart by the labels a call writes.
+						{members.length} entries. A call picks one by the labels it writes.
 					</p>
 				)
 			}
@@ -126,7 +127,8 @@ let code = { lang: ESSENCE_LANG, themes: ESSENCE_THEMES, defaultColor: false as 
 						})}
 					</ul>
 					<p class="glance__note">
-						A value of the type a view is for has the view's methods as its own.
+						A view is a namespace for a narrower type. A value of that type has
+						the view's methods on top of its own.
 					</p>
 				</dd>
 			</div>

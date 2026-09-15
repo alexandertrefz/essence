@@ -4,9 +4,11 @@
  *
  * A conditional conformance is shown with its condition rather than as a bare
  * name — `Comparable where ItemType is Comparable` is a different claim from
- * `Comparable`, and it is the one that explains why sorting a List of Records
- * is a compile error while sorting a List of Integers is not. Flattening the
- * two into one chip would hide exactly the thing worth reading.
+ * `Comparable`, and it is the one that decides whether two Lists compare:
+ * `[1, 2]::isLessThan([1, 3])` compiles, and the same call on two Lists of
+ * Records does not. Flattening the two into one chip would hide exactly the
+ * thing worth reading. (Sorting a List of Records fails for another reason:
+ * `sort` bounds its own `ItemType`, which its entry shows.)
  *
  * Each Protocol links to its section on the Protocols page, which says what it
  * requires, what it provides, and who else conforms.
