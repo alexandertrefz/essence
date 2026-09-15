@@ -27,7 +27,6 @@ package's own `tsconfig.json` type-checks `src/` for the editor.
 | `astro.config.ts` | site URL, MDX, and the Shiki setup |
 | `src/content.config.ts` | the `docs` collection's schema |
 | `src/content/docs/` | the published documentation pages, by section |
-| `dictionaries.md`, `protocols.md`, `records.md` | drafts the Language pages replace, not published |
 | `src/layouts/`, `src/components/` | the page shells and the design's parts |
 | `src/styles/` | `tokens.css` (both themes), `base.css`, `prose.css`, `shiki.css` |
 | `src/lib/` | navigation, site constants, the two Shiki theme JSONs |

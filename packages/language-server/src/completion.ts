@@ -1249,8 +1249,8 @@ function memberCompletions(
 	// NOTE: And a base that names a TYPE rather than a value — a Choice whose
 	// `cases` is derived, and a Protocol-bounded Type Parameter whose members
 	// are its bound's. Both read off a Namespace nobody declared, which is the
-	// spelling `protocols.md` headlines, and both compiled, ran and hovered
-	// long before either was offered here.
+	// spelling `/docs/language/protocols` teaches, and both compiled, ran and
+	// hovered long before either was offered here.
 	if (!namesType) {
 		return []
 	}
