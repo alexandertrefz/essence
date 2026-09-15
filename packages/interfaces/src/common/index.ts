@@ -253,6 +253,17 @@ export type DiagnosticData =
 			section: "import" | "export"
 			block: Position
 	  }
+	// NOTE: A mismatch that is one missing `complete` rather than a wrong value,
+	// and WHICH of the two it is: `unstarted` is a `Future<T>` where its `T` was
+	// wanted, `in-flight` a `Started<T>`. Both are the same edit — write
+	// `complete` in front of the value — which is why one fix reads this rather
+	// than the Help's sentence, whose wording this file reserves the right to
+	// change. `not-a-future` is deliberately absent: "build a future" is a
+	// judgement about the body, not an edit anything can make.
+	| {
+			kind: "asynchrony-mismatch"
+			mismatch: "unstarted" | "in-flight"
+	  }
 	// NOTE: The Namespace a static Method is reached through, so a fix can
 	// write `Namespace.make(value, …)` for a `value::make(…)`. ONE name rather
 	// than every candidate: the Namespace that declares the static is the one

@@ -1631,6 +1631,7 @@ function checkDefineAnswer(
 				...asynchronyHelps(node.type, value.type),
 				...evidence.helps,
 			],
+			data: asynchronyData(node.type, value.type),
 		},
 	)
 }
@@ -2730,6 +2731,7 @@ function reportDeclarationMismatch(
 				...asynchronyHelps(declaredType, value.type),
 				...evidence.helps,
 			],
+			data: asynchronyData(declaredType, value.type),
 		},
 	)
 }
@@ -2774,6 +2776,7 @@ function validateVariableAssignmentStatement(
 					...asynchronyHelps(node.name.type, node.value.type),
 					...evidence.helps,
 				],
+				data: asynchronyData(node.name.type, node.value.type),
 			},
 		)
 	}
@@ -3097,6 +3100,7 @@ function validateReturnStatement(
 					),
 					...evidence.helps,
 				],
+				data: asynchronyData(expected, node.expression.type),
 			},
 		)
 	}
@@ -3312,6 +3316,22 @@ function fitsExpectedType(
 //
 // This is the ordinary positions' wording — an Argument, a Declaration, an
 // Assignment, a `define` arm — where the value is the thing to change.
+// NOTE: The same question the two Helps below ask, answered as DATA. A Quick
+// Fix reads this rather than the Help's sentence: the wording is written per
+// site and is free to change, and a fix keyed on prose breaks silently when it
+// does. `not-a-future` carries nothing, because there is no edit to make — what
+// a body has to do about it is build a future, which is a judgement.
+function asynchronyData(
+	expected: common.Type,
+	actual: common.Type,
+): common.DiagnosticData | undefined {
+	let mismatch = asynchronyMismatch(expected, actual)
+
+	return mismatch === "unstarted" || mismatch === "in-flight"
+		? { kind: "asynchrony-mismatch", mismatch }
+		: undefined
+}
+
 function asynchronyHelps(
 	expected: common.Type,
 	actual: common.Type,
@@ -3802,6 +3822,10 @@ function reportArgumentMismatch(
 					: asynchronyHelps(parameter.type, argumentNode.value.type)),
 				...evidence.helps,
 			],
+			data:
+				parameter === undefined
+					? undefined
+					: asynchronyData(parameter.type, argumentNode.value.type),
 		},
 	)
 }

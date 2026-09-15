@@ -104,22 +104,20 @@ export function discardedFutureActions(
 	].map((entry) => ({ ...entry, isPreferred: false }))
 }
 
-// NOTE: The Helps that ask for one word to be written in front of a value —
-// `asynchronyHelps` and `returnAsynchronyHelps` in the Validator, whose other
-// answer ("build a future") is not an edit anything here can write. Matched on
-// the Help rather than on the code, because the codes these arrive under —
-// an assignment's and a return's mismatch — are reported for every other
-// mismatch in the language as well.
-const addsComplete = /add 'complete'/i
-
 // NOTE: A Type mismatch that is one missing word: a Future or a Started
 // standing where the value it answers with is wanted. The Validator has already
-// decided that, by assignability, and says so in its Help — so what is left
+// decided that, by assignability, and says so in its `data` — so what is left
 // here is writing the word.
+//
+// NOTE: Read off the DATA rather than off the Help's sentence. The codes these
+// arrive under are reported for every other mismatch in the language as well,
+// so the code alone can not decide it — and the Helps are written per report
+// site, in wording `interfaces/common` explicitly reserves the right to change.
+// A fix keyed on prose is a fix that stops firing with the whole suite green.
 export function waitForValueAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 ): CodeActionEntry | null {
-	if (!diagnostic.helps.some((help) => addsComplete.test(help))) {
+	if (diagnostic.data?.kind !== "asynchrony-mismatch") {
 		return null
 	}
 

@@ -464,9 +464,13 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		wrapInHoldingCaseActions(diagnostic, program),
 	"argument-label-mismatch": ({ diagnostic, lines }) =>
 		listed(argumentLabelAction(diagnostic, lines)),
-	// NOTE: Every mismatch in the language arrives under these two codes, and
-	// what picks the asynchrony ones out is the Help the Validator wrote —
-	// `waitForValueAction` answers nothing where there is none.
+	// NOTE: Every mismatch in the language arrives under these three codes, and
+	// what picks the asynchrony ones out is the `data` the Validator carried on
+	// the report — `waitForValueAction` answers nothing where there is none.
+	// An Argument is where a reader meets this most: `show(work)` is the shape
+	// a missing `complete` takes in everyday code.
+	"argument-type-mismatch": ({ diagnostic }) =>
+		listed(waitForValueAction(diagnostic)),
 	"assignment-type-mismatch": ({ diagnostic }) =>
 		listed(waitForValueAction(diagnostic)),
 	"at-in-static-method": ({ diagnostic, program, lines }) =>

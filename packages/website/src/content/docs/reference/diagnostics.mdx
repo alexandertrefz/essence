@@ -1188,6 +1188,8 @@ Error: This Argument does not fit Parameter 1
 
 Pass a value of that type: `greet("Ada")`.
 
+Asynchrony adds the same three Helps this code carries at a constant. A [`Future`](/docs/library/future) passed where its value is wanted asks for `complete`, and so does a `Started`, which is still in flight; the Quick Fix **Wait for it with 'complete'** writes the word for either. A plain value where a future is wanted asks for one to be built.
+
 Taught on: [Functions › Labels](/docs/language/functions#labels)
 
 ### `incomplete-record-argument`
@@ -1324,7 +1326,7 @@ Error: This value does not fit the declared return Type
 
 Return a value of the declared type, or change the declared type.
 
-Asynchrony adds two Helps under this code. A future returned where the value is wanted asks for `complete`, and the Quick Fix **Wait for it with 'complete'** writes it. A bare value returned from a body declared `-> Future<…>` that completes nothing says the body has to build a future — `Async.deferred`, [`map`](/docs/library/future#map) or [`andThen`](/docs/library/future#andThen) — which is not an edit anything can write for you.
+Asynchrony adds three Helps under this code, and a `define` arm that answers the wrong type reports under it too. A future returned where the value is wanted asks for `complete`; so does a `Started`, which is still in flight; the Quick Fix **Wait for it with 'complete'** writes the word for either. A bare value returned from a body declared `-> Future<…>` that completes nothing says the body has to build a future — `Async.deferred`, [`map`](/docs/library/future#map) or [`andThen`](/docs/library/future#andThen) — which is not an edit anything can write for you.
 
 Taught on: [Functions › Returning with `<-`](/docs/language/functions#returning-with--)
 

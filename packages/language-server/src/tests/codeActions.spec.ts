@@ -7706,6 +7706,11 @@ describe("Quick Fixes for asynchrony", () => {
 			expect(codesOf(applied(lines, fix))).toEqual([])
 		})
 
+		// NOTE: The one fix here that trades its Diagnostic for another rather
+		// than clearing the buffer: a body that waits has to declare a Future,
+		// which is the fix offered next. The chain converges, and the assertion
+		// below is what says so — the step after this one wraps the annotation
+		// and the step after that completes the call.
 		it("writes it in front of what a body returns", () => {
 			let lines = [
 				"implementation {",
@@ -7724,6 +7729,131 @@ describe("Quick Fixes for asynchrony", () => {
 			expect(applied(lines, fix)[2]).toBe(
 				"\t\t<- complete Async.deferred(() { <- value })",
 			)
+			expect(codesOf(applied(lines, fix))).toEqual([
+				"complete-outside-future",
+			])
+		})
+
+		// NOTE: The whole chain, so that a change which stops it converging
+		// fails rather than passing quietly. Three fixes from a body that
+		// returns work to a Program the Compiler says nothing about.
+		it("converges in three steps from the body that returns work", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction doubled(_ value: Integer) -> Integer {",
+				"\t\t<- Async.deferred(() { <- value })",
+				"\t}",
+				"",
+				"\tTerminal.inspect(doubled(2))",
+				"}",
+			]
+			let codes = [codesOf(lines)]
+
+			for (let step = 0; step < 3; step++) {
+				let fix = quickFixes(lines)[0] as CodeActionEntry
+
+				lines = applied(lines, fix)
+				codes.push(codesOf(lines))
+			}
+
+			expect(codes).toEqual([
+				["return-type-mismatch"],
+				["complete-outside-future"],
+				["unused-future"],
+				[],
+			])
+		})
+
+		// NOTE: An ARGUMENT is where a reader meets this most — `show(work)` is
+		// what a missing `complete` looks like in everyday code — and the fix
+		// was offered at a Constant one line above it and nowhere here.
+		it("writes the word in front of an Argument", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction show(_ value: Integer) -> Integer {",
+				"\t\t<- value",
+				"\t}",
+				"",
+				"\tconstant work = Async.deferred(() { <- 1 })",
+				"",
+				"\tTerminal.inspect(show(work))",
+				"}",
+			]
+
+			let fix = quickFixes(lines).find(
+				(entry) => entry.diagnosticCode === "argument-type-mismatch",
+			) as CodeActionEntry
+
+			expect(fix.title).toBe("Wait for it with 'complete'")
+			expect(applied(lines, fix)[7]).toBe(
+				"\tTerminal.inspect(show(complete work))",
+			)
+			expect(codesOf(applied(lines, fix))).toEqual([])
+		})
+
+		// NOTE: The three shapes the fix answered but no test asked it about:
+		// a run in flight at a Constant, one at a return, and a body that
+		// already waits handing back a future.
+		it("writes the word for a run that is in flight", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant running = start Async.deferred(() { <- 1 })",
+				"\tconstant value: Integer = running",
+				"\tTerminal.inspect(value)",
+				"}",
+			]
+
+			let fix = quickFixes(lines).find(
+				(entry) => entry.diagnosticCode === "assignment-type-mismatch",
+			) as CodeActionEntry
+
+			expect(fix.title).toBe("Wait for it with 'complete'")
+			expect(applied(lines, fix)[2]).toBe(
+				"\tconstant value: Integer = complete running",
+			)
+			expect(codesOf(applied(lines, fix))).toEqual([])
+		})
+
+		it("writes the word for a run a body hands back", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction doubled(_ value: Integer) -> Integer {",
+				"\t\t<- start Async.deferred(() { <- value })",
+				"\t}",
+				"",
+				"\tTerminal.inspect(doubled(2))",
+				"}",
+			]
+
+			let fix = quickFixes(lines).find(
+				(entry) => entry.diagnosticCode === "return-type-mismatch",
+			) as CodeActionEntry
+
+			expect(fix.title).toBe("Wait for it with 'complete'")
+			expect(applied(lines, fix)[2]).toBe(
+				"\t\t<- complete start Async.deferred(() { <- value })",
+			)
+		})
+
+		it("writes the word where a waiting body answers with a future", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction doubled(_ value: Integer) -> Future<Integer> {",
+				"\t\tconstant ignored = complete Async.deferred(() { <- 1 })",
+				"",
+				"\t\t<- Async.deferred(() { <- value })",
+				"\t}",
+				"",
+				"\tTerminal.inspect(complete doubled(2))",
+				"}",
+			]
+
+			let fix = quickFixes(lines).find(
+				(entry) => entry.diagnosticCode === "return-type-mismatch",
+			) as CodeActionEntry
+
+			expect(fix.title).toBe("Wait for it with 'complete'")
+			expect(codesOf(applied(lines, fix))).toEqual([])
 		})
 
 		// NOTE: The codes these arrive under are the ordinary mismatches', so

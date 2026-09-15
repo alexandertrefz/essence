@@ -728,6 +728,66 @@ ${deferredThree}
 			expect(completing[0]!.code).toBe("return-type-mismatch")
 			expect(completing[0]!.helps?.[0]).toContain("Add 'complete'")
 		})
+
+		// NOTE: And the same answer as DATA, at every one of the five sites
+		// that reports it. A Quick Fix reads this rather than the Help's
+		// sentence: the Helps are written per site, in wording that is free to
+		// change, and a fix keyed on prose stops firing with the suite green.
+		// `not-a-future` carries none, because there is no edit to make.
+		it("carries which word is missing as data", () => {
+			let dataOf = (source: string): unknown =>
+				diagnosticsOf(source)[0]?.data
+
+			expect(
+				dataOf(`implementation {
+	constant answer: Integer = Async.deferred(() { <- 1 })
+}`),
+			).toEqual({ kind: "asynchrony-mismatch", mismatch: "unstarted" })
+			expect(
+				dataOf(`implementation {
+	variable answer = 1
+	answer = Async.deferred(() { <- 1 })
+}`),
+			).toEqual({ kind: "asynchrony-mismatch", mismatch: "unstarted" })
+			expect(
+				dataOf(`implementation {
+	function show(_ value: Integer) -> Integer {
+		<- value
+	}
+
+	constant shown = show(Async.deferred(() { <- 1 }))
+}`),
+			).toEqual({ kind: "asynchrony-mismatch", mismatch: "unstarted" })
+			expect(
+				dataOf(`implementation {
+	function three() -> Integer {
+		<- Async.deferred(() { <- 3 })
+	}
+}`),
+			).toEqual({ kind: "asynchrony-mismatch", mismatch: "unstarted" })
+			expect(
+				dataOf(`implementation {
+	constant ready = true
+	constant answer: Integer = define {
+		as Async.deferred(() { <- 1 }) if ready
+		as 2 otherwise
+	}
+}`),
+			).toEqual({ kind: "asynchrony-mismatch", mismatch: "unstarted" })
+			expect(
+				dataOf(`implementation {
+	constant running = start Async.deferred(() { <- 1 })
+	constant answer: Integer = running
+}`),
+			).toEqual({ kind: "asynchrony-mismatch", mismatch: "in-flight" })
+			expect(
+				dataOf(`implementation {
+	function three() -> Future<Integer> {
+		<- 3
+	}
+}`),
+			).toBeUndefined()
+		})
 	})
 
 	describe("the emission", () => {
