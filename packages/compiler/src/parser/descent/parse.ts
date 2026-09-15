@@ -53,6 +53,12 @@ type NamespaceBodyNode = Parameters<
 // `Optional::otherwise` was a Method of the standard library's own until it
 // was renamed — which reserving the word outright would forbid forever.
 //
+// NOTE: `start` and `complete` are here for the reason `expect` and `require`
+// are: each opens its own form only where an Expression follows it and nothing
+// carries the word itself on, and is a name everywhere else. The two are a
+// harder case than the assertions, because their form is an EXPRESSION rather
+// than a Statement — see `opensAsynchrony` below for the one reading that costs.
+//
 // NOTE: A Set rather than an Array, here and for the two lists below. Each is
 // asked of a Token, in a loop over every Token — a scan of ten strings per
 // question is what a membership test costs when it is written as one.
@@ -74,6 +80,8 @@ const identifierTokenTypes = new Set([
 	TokenType.KeywordExpect,
 	TokenType.KeywordRequire,
 	TokenType.KeywordOtherwise,
+	TokenType.KeywordStart,
+	TokenType.KeywordComplete,
 ])
 
 function isIdentifierToken(token: Token | undefined): boolean {
@@ -96,8 +104,6 @@ const expressionStartTokenTypes = new Set([
 	TokenType.SymbolLeftBrace,
 	TokenType.KeywordMatch,
 	TokenType.KeywordDefine,
-	TokenType.KeywordStart,
-	TokenType.KeywordComplete,
 	TokenType.LiteralString,
 	TokenType.LiteralStringStart,
 	TokenType.LiteralNumber,
@@ -137,6 +143,47 @@ function continuesExpression(
 		following.type === TokenType.SymbolHash &&
 		isAdjacent(token.position, following.position)
 	)
+}
+
+// NOTE: Whether one of the two asynchrony Keywords stands where it opens its
+// prefix Expression rather than naming something — the `expect`/`require` rule,
+// asked in expression position instead of in statement position. `complete`
+// reads as the Keyword in `complete headline(url)` and as a name in
+// `complete::isEmpty()`, `complete.first`, `complete(1)`, `complete#Win`,
+// `{ complete = 1 }` and `Terminal.print(complete)`.
+//
+// NOTE: One reading is LOST to this, and it is worth writing down because
+// nothing reports it. The two words are the only Identifiers whose form is an
+// Expression, so where a Statement ends on one and the next Statement begins
+// with an Expression, the two read as one:
+//
+//     constant held = start        § the value called `start` is what was meant
+//     Terminal.print(held)         § and this is what the Keyword takes instead
+//
+// Essence ends a Statement at the end of the Expression and not at a Token of
+// its own, so there is nothing for the Parser to notice. A Keyword-only reading
+// would refuse the first line outright and cost every `start` in the sources
+// their name; a name-only reading would need parentheses the language does not
+// have. Between the two this is the reading that is quiet in the rarer place.
+// The Type of the Statement it builds is almost always wrong, so what the
+// Program gets is a Diagnostic about the operand rather than silence.
+//
+// NOTE: And one name: an Argument's LABEL may not be spelled with either word.
+// A label stands directly in front of its value, which is exactly where the
+// prefix form opens, so `compute(start 1)` is a `start` of `1` — the Keyword
+// reading wins in argument position for the same reason it wins everywhere
+// else, and `Terminal.print(complete headline(url))` is what it buys.
+// `argumentIsLabelled` says the same thing from the other side; the Language
+// Server's rename refuses the two words as label names because of it.
+function opensAsynchrony(token: Token, following: Token | undefined): boolean {
+	if (
+		token.type !== TokenType.KeywordStart &&
+		token.type !== TokenType.KeywordComplete
+	) {
+		return false
+	}
+
+	return startsExpression(following) && !continuesExpression(token, following)
 }
 
 // NOTE: The words that open a form of their own where they stand and are
@@ -3091,7 +3138,11 @@ class DescentParser {
 				return this.parseDefine()
 			case TokenType.KeywordStart:
 			case TokenType.KeywordComplete:
-				return this.parseStartOrComplete(token)
+				if (opensAsynchrony(token, following)) {
+					return this.parseStartOrComplete(token)
+				}
+
+				return this.parseIdentifier()
 			case TokenType.SymbolAt:
 				this.tokens.next()
 				return generators.self(token.position)
@@ -3179,24 +3230,15 @@ class DescentParser {
 	// `start` reached from there behaves as a primary Expression that happens to
 	// be greedy, and `expressionStartTokenTypes` stays exactly what its NOTE
 	// says it is — the cases this switch answers.
+	//
+	// NOTE: Reached only through `opensAsynchrony`, which has already found the
+	// Expression the operand is read from. A word with nothing behind it is a
+	// name — `constant held = complete` reads the value `complete`, and it is
+	// the Enricher that answers for a name nothing declared.
 	protected parseStartOrComplete(
 		keyword: Token,
 	): parser.StartNode | parser.CompleteNode {
 		this.tokens.next()
-
-		if (!startsExpression(this.tokens.peek())) {
-			throw new ParseError(
-				`'${keyword.value}' needs an Expression to ${keyword.value}`,
-				keyword.position,
-				`nothing to ${keyword.value} follows this`,
-				{
-					code: "syntax-error",
-					notes: [
-						`'${keyword.value}' is written in front of the work it is about — '${keyword.value} headline(url)'.`,
-					],
-				},
-			)
-		}
 
 		let expression = this.parseExpression()
 		let position = {
@@ -5831,8 +5873,19 @@ class DescentParser {
 	// `Holder<Integer>#Full(…)` and it also opens a Generic Function literal
 	// that could be a labelled argument's value, and only a parse can tell
 	// which — `parsePrimaryExpression` says the same thing about the same `<`.
+	//
+	// NOTE: `start` and `complete` are the exception the rule above can not
+	// decide: both readings span the argument, because the label reading takes
+	// the word and the value behind it and the Keyword reading takes the word
+	// and the Expression behind it — the same two Tokens. The Keyword wins, so
+	// that `Terminal.print(complete headline(url))` is the wait it reads as, and
+	// an Argument label is the one place neither word may be a name.
 	protected argumentIsLabelled(): boolean {
 		let following = this.tokens.peek(1)
+
+		if (opensAsynchrony(this.tokens.peek()!, following)) {
+			return false
+		}
 
 		if (
 			!startsExpression(following) ||

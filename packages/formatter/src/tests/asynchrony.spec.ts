@@ -60,6 +60,21 @@ describe("start and complete", () => {
 		)
 	})
 
+	// NOTE: And both are ordinary names wherever no Expression follows them,
+	// which the printer has nothing to decide about. What it must never do is
+	// leave one at the end of a line with a Statement below it, because that
+	// text reads as the Keyword and its operand — the safety gate would refuse
+	// such output, and the round trip is what says it never has to.
+	it("writes either word where it is a name", () => {
+		roundTrips(
+			block(
+				"\tconstant start = { complete = 1 }",
+				"",
+				"\tTerminal.print(start.complete::toString())",
+			),
+		)
+	})
+
 	// NOTE: A chain the Keyword holds breaks the way any chain does, with each
 	// link on a line of its own and the Keyword staying with the head.
 	it("breaks a chain that does not fit under the Keyword", () => {

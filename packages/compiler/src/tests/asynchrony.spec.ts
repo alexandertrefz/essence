@@ -172,40 +172,123 @@ describe("Asynchrony", () => {
 			}
 		})
 
-		// NOTE: The Keyword is read where it stands, so the Statement after the
-		// one that went wrong is still read — which is the whole of what
-		// recovery is for.
-		it("reports a Keyword with nothing to be about, and reads on", () => {
-			let { program, diagnostics } = parseWithDiagnostics(
-				`implementation {
-	constant nothing = complete
-	constant after = 1
-}`,
-			)
-
-			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
-				"syntax-error",
-			])
-			expect(diagnostics[0]!.message).toContain("'complete'")
-			expect(
-				program.implementation.nodes.map((node) => node.nodeType),
-			).toEqual(["ConstantDeclarationStatement"])
-		})
-
-		// NOTE: Both are Keywords now, so neither can be a name. The message is
-		// the Parser's own, because a Keyword where an Identifier belongs is a
-		// Token problem rather than a Type one.
-		it("refuses either word as a name", () => {
+		// NOTE: Both words are CONTEXTUAL — the Keyword only in front of an
+		// Expression, an ordinary name everywhere else, which is the rule
+		// `expect` and `require` are read by. The positions below are the ones
+		// the standard library, the fixtures, the examples and the docs write
+		// them in, and they are pinned one by one because the rule lives in a
+		// single `if` and everything else in the language reads through it.
+		it("reads either word as a name a Declaration binds", () => {
 			expect(
 				codesOf(`implementation {
 	constant start = 1
+	variable complete = start::add(1)
+
+	complete = complete::add(start)
+
+	Terminal.print(complete::toString())
 }`),
-			).toEqual(["syntax-error"])
+			).toEqual([])
+		})
+
+		it("reads either word as a Record member", () => {
 			expect(
 				codesOf(`implementation {
-	constant point = { complete = true }
+	constant span = { start = 1, complete = 2 }
+	constant { start, complete } = span
+
+	Terminal.print(span.start::add(complete)::toString())
 }`),
-			).toEqual(["syntax-error"])
+			).toEqual([])
+		})
+
+		it("reads either word as a Function and as a Method", () => {
+			expect(
+				codesOf(`implementation {
+	namespace Game for Integer {
+		start() -> Integer {
+			<- @
+		}
+	}
+
+	function complete(of game: Integer) -> Integer {
+		<- game::start()
+	}
+
+	Terminal.print(complete(of 2)::toString())
+}`),
+			).toEqual([])
+		})
+
+		it("reads either word as a Parameter's name behind a label", () => {
+			expect(
+				codesOf(`implementation {
+	function span(from start: Integer, to complete: Integer) -> Integer {
+		<- complete::subtract(start)
+	}
+
+	Terminal.print(span(from 1, to 4)::toString())
+}`),
+			).toEqual([])
+		})
+
+		// NOTE: The one name the two words may not be, and the price of the
+		// contextual reading. An Argument's label stands exactly where the
+		// prefix form opens, so the Keyword wins there as it wins everywhere —
+		// which is what lets `Terminal.print(complete headline(url))` be the
+		// wait it reads as.
+		it("reads an Argument that opens with either word as the Keyword", () => {
+			let program = parse(`implementation {
+	constant answer = compute(start 1)
+}`)
+			let node = program.implementation.nodes[0]
+
+			if (node?.nodeType !== "ConstantDeclarationStatement") {
+				throw new Error("expected a Constant Declaration")
+			}
+
+			if (node.value.nodeType !== "FunctionInvocation") {
+				throw new Error("expected a Function Invocation")
+			}
+
+			expect(node.value.arguments.length).toBe(1)
+			expect(node.value.arguments[0]!.name).toBeNull()
+			expect(node.value.arguments[0]!.value.nodeType).toBe("Start")
+		})
+
+		// NOTE: The one reading the contextual rule loses, pinned so that a
+		// change to it is a change to this test — see the NOTE on
+		// `opensAsynchrony`. A Statement ending on one of the words and a
+		// Statement opening with an Expression read as ONE Statement, because
+		// Essence ends a Statement at the end of its Expression and at no Token
+		// of its own. Two Declarations were written here; one is what is read.
+		it("takes the Statement below as the operand where a name ends a line", () => {
+			let program = parse(`implementation {
+	constant start = 1
+	constant held = start
+	Terminal.print(held::toString())
+}`)
+			let nodes = program.implementation.nodes
+			let held = nodes[1]
+
+			expect(nodes.length).toBe(2)
+
+			if (held?.nodeType !== "ConstantDeclarationStatement") {
+				throw new Error("expected a Constant Declaration")
+			}
+
+			expect(held.value.nodeType).toBe("Start")
+		})
+
+		// NOTE: And where nothing follows at all the word is a name, so it is
+		// the Enricher that answers for one nothing declared — the Parser has
+		// no refusal of its own left to make.
+		it("reads a word with nothing behind it as a name", () => {
+			expect(
+				codesOf(`implementation {
+	constant nothing = complete
+}`),
+			).toEqual(["unknown-name"])
 		})
 	})
 
