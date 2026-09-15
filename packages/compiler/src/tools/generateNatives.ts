@@ -29,6 +29,9 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	DictionaryType: "./Dictionary",
 	FutureType: "./Future",
 	StartedType: "./Started",
+	HttpMethodType: "./HttpMethod",
+	RedirectsType: "./Redirects",
+	HttpFailureType: "./HttpFailure",
 	IntegerType: "./Integer",
 	ListType: "./List",
 	NumberType: "./Number",
@@ -95,6 +98,13 @@ const UNION_NAME_ALIASES: Record<string, string> = {
 	CaseSensitivity: "CaseSensitivityType",
 	Number: "NumberType",
 	Stream: "StreamType",
+	// NOTE: The three `Http.es` declares. Two of them travel INTO `Http.send`
+	// inside the Request Record, and the third is what it answers a `#Failure`
+	// with — so all three reach the one native's signature, which is what puts
+	// them here.
+	HttpMethod: "HttpMethodType",
+	Redirects: "RedirectsType",
+	HttpFailure: "HttpFailureType",
 }
 
 // NOTE: The generic siblings of `UNION_NAME_ALIASES`, keyed on `UnionType.alias.name`

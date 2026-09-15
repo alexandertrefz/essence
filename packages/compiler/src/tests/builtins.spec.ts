@@ -12,6 +12,9 @@ import * as future from "@essence-lang/runtime/Future"
 import * as futureList from "@essence-lang/runtime/FutureList"
 import * as groupedList from "@essence-lang/runtime/GroupedList"
 import * as groupedNonEmptyList from "@essence-lang/runtime/GroupedNonEmptyList"
+import * as http from "@essence-lang/runtime/Http"
+import * as httpFailure from "@essence-lang/runtime/HttpFailure"
+import * as httpMethod from "@essence-lang/runtime/HttpMethod"
 import * as integer from "@essence-lang/runtime/Integer"
 import * as integerList from "@essence-lang/runtime/IntegerList"
 import * as keyedNumberList from "@essence-lang/runtime/KeyedNumberList"
@@ -45,6 +48,8 @@ import * as randomness from "@essence-lang/runtime/Randomness"
 import * as rational from "@essence-lang/runtime/Rational"
 import * as rationalList from "@essence-lang/runtime/RationalList"
 import * as record from "@essence-lang/runtime/Record"
+import * as redirects from "@essence-lang/runtime/Redirects"
+import * as response from "@essence-lang/runtime/Response"
 import * as result from "@essence-lang/runtime/Result"
 import * as resultFuture from "@essence-lang/runtime/ResultFuture"
 import * as resultFutureList from "@essence-lang/runtime/ResultFutureList"
@@ -143,6 +148,22 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	// rather than about the description it came from.
 	Started: started,
 	Async: async,
+	// NOTE: The one module in this table that reaches outside the Program. Its
+	// name is load-bearing twice over: the Rewriter imports it under the
+	// Namespace's own name, and `cli/src/resultCache.ts` refuses to remember a
+	// run whose bundle carries the label esbuild writes for this very file.
+	Http: http,
+	// NOTE: A Namespace with no native at all, so its module holds only the
+	// re-export comment — both of its Methods are written in Essence, exactly
+	// as `NestedResult`'s one is.
+	Response: response,
+	// NOTE: Two Choices with no native either, for the reason `Stream` has
+	// none: all three Methods of each are derived from the Choice.
+	HttpMethod: httpMethod,
+	Redirects: redirects,
+	// NOTE: And the third, which does carry one — its Cases have a reason to
+	// print, so `toString` is written rather than derived.
+	HttpFailure: httpFailure,
 }
 
 // NOTE: What the Simplifier will emit for a declared Method — the bare name for

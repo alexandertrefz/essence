@@ -134,7 +134,16 @@ function labelOf(line: string): string {
 // directly over a fixed seed and asserts the ranges, the exactness and the
 // replay, and by `packages/compiler/src/tests/randomness.spec.ts`, which runs
 // Programs that build a source and draw from it.
-const COVERED_ELSEWHERE = new Set(["Terminal", "Randomness"])
+// NOTE: And the one Namespace this harness may not REACH. Every entry of
+// `Http` sends a request, and a line here would make the golden capture a
+// record of what some host answered on the day it was recaptured — which is
+// the opposite of what a golden file is for. The suite would also have to
+// stand up a server before it could be read at all. The entries are covered by
+// `packages/compiler/src/tests/http.spec.ts`, which runs Programs against a
+// `Bun.serve` started in the spec and asserts what each one sent and got back.
+// `Response` is NOT here: what it answers is read off a Record a line can
+// write down, and neither of its Methods sends anything.
+const COVERED_ELSEWHERE = new Set(["Terminal", "Randomness", "Http"])
 
 // NOTE: Every Method a Program can call, spelled the way `StdlibExhaustive.es`
 // labels it: the signature `printSignature` produces, minus its return Type.

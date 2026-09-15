@@ -1,0 +1,556 @@
+{
+	"slug": "http",
+	"title": "Http",
+	"kind": "namespace",
+	"declaration": "namespace Http",
+	"choice": null,
+	"namespaces": [
+		"Http",
+		"Response",
+		"HttpMethod",
+		"Redirects",
+		"HttpFailure"
+	],
+	"conformsTo": [],
+	"groups": [
+		{
+			"label": "Sending a request",
+			"id": "sending-a-request",
+			"members": [
+				{
+					"key": "Http::send",
+					"namespace": "Http",
+					"name": "send",
+					"receiver": "Http",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static send(\n\t_ request: Request = {\n\t\tmethod = #Get,\n\t\theaders = [=],\n\t\tbody = #Empty,\n\t\tredirects = #Follow,\n\t},\n) -> Future<Result<Response, HttpFailure>>",
+							"summary": "Answers work that sends the given request and answers with what the host said.\n\nNothing is sent while the answer is being built. Each start sends the request again, so a request that is started twice is made twice.\n\nA request that reaches a host answers `#Value` with its Response, whatever the status is. A request that reaches none answers `#Failure` with the reason.\n\nA run that is stopped never answers. The runs that `within` and `race` leave behind are stopped, and what one would have answered is never read.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "Request",
+									"default": "{\n\t\t\t\tmethod = #Get,\n\t\t\t\theaders = [=],\n\t\t\t\tbody = #Empty,\n\t\t\t\tredirects = #Follow,\n\t\t\t}",
+									"description": "the request to send; every member but `url` has a default",
+									"href": null
+								}
+							],
+							"returns": "work answering the Response, or the reason there is none.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "The verbs",
+			"id": "the-verbs",
+			"members": [
+				{
+					"key": "Http::get",
+					"namespace": "Http",
+					"name": "get",
+					"receiver": "Http",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static get(\n\t_ url: String,\n\theaders: Dictionary<String, String> = [=],\n) -> Future<Result<Response, HttpFailure>>",
+							"summary": "Answers work that asks the given address for what it holds.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the address to ask",
+									"href": null
+								},
+								{
+									"name": "headers",
+									"type": "Dictionary<String, String>",
+									"default": "[=]",
+									"description": "the headers to send; none when it is left out",
+									"href": null
+								}
+							],
+							"returns": "work answering the Response, or the reason there is none.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Http::post",
+					"namespace": "Http",
+					"name": "post",
+					"receiver": "Http",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static post(\n\t_ url: String,\n\tbody: String,\n\theaders: Dictionary<String, String> = [=],\n) -> Future<Result<Response, HttpFailure>>",
+							"summary": "Answers work that sends the given body to the address.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the address to send to",
+									"href": null
+								},
+								{
+									"name": "body",
+									"type": "String",
+									"default": null,
+									"description": "the body to send",
+									"href": null
+								},
+								{
+									"name": "headers",
+									"type": "Dictionary<String, String>",
+									"default": "[=]",
+									"description": "the headers to send; none when it is left out",
+									"href": null
+								}
+							],
+							"returns": "work answering the Response, or the reason there is none.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Http::put",
+					"namespace": "Http",
+					"name": "put",
+					"receiver": "Http",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static put(\n\t_ url: String,\n\tbody: String,\n\theaders: Dictionary<String, String> = [=],\n) -> Future<Result<Response, HttpFailure>>",
+							"summary": "Answers work that puts the given body at the address.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the address to put to",
+									"href": null
+								},
+								{
+									"name": "body",
+									"type": "String",
+									"default": null,
+									"description": "the body to send",
+									"href": null
+								},
+								{
+									"name": "headers",
+									"type": "Dictionary<String, String>",
+									"default": "[=]",
+									"description": "the headers to send; none when it is left out",
+									"href": null
+								}
+							],
+							"returns": "work answering the Response, or the reason there is none.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Http::patch",
+					"namespace": "Http",
+					"name": "patch",
+					"receiver": "Http",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static patch(\n\t_ url: String,\n\tbody: String,\n\theaders: Dictionary<String, String> = [=],\n) -> Future<Result<Response, HttpFailure>>",
+							"summary": "Answers work that sends the given body as a change to what the address holds.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the address to change",
+									"href": null
+								},
+								{
+									"name": "body",
+									"type": "String",
+									"default": null,
+									"description": "the body to send",
+									"href": null
+								},
+								{
+									"name": "headers",
+									"type": "Dictionary<String, String>",
+									"default": "[=]",
+									"description": "the headers to send; none when it is left out",
+									"href": null
+								}
+							],
+							"returns": "work answering the Response, or the reason there is none.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Http::delete",
+					"namespace": "Http",
+					"name": "delete",
+					"receiver": "Http",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static delete(\n\t_ url: String,\n\theaders: Dictionary<String, String> = [=],\n) -> Future<Result<Response, HttpFailure>>",
+							"summary": "Answers work that asks the address to remove what it holds.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the address to ask",
+									"href": null
+								},
+								{
+									"name": "headers",
+									"type": "Dictionary<String, String>",
+									"default": "[=]",
+									"description": "the headers to send; none when it is left out",
+									"href": null
+								}
+							],
+							"returns": "work answering the Response, or the reason there is none.",
+							"examples": []
+						}
+					]
+				},
+				{
+					"key": "Http::head",
+					"namespace": "Http",
+					"name": "head",
+					"receiver": "Http",
+					"kind": "static method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "static head(\n\t_ url: String,\n\theaders: Dictionary<String, String> = [=],\n) -> Future<Result<Response, HttpFailure>>",
+							"summary": "Answers work that asks the address for the headers alone.\n\nThe answer carries the headers a `get` would answer with, and an empty body.",
+							"parameters": [
+								{
+									"name": "_",
+									"type": "String",
+									"default": null,
+									"description": "the address to ask",
+									"href": null
+								},
+								{
+									"name": "headers",
+									"type": "Dictionary<String, String>",
+									"default": "[=]",
+									"description": "the headers to send; none when it is left out",
+									"href": null
+								}
+							],
+							"returns": "work answering the Response, or the reason there is none.",
+							"examples": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Reading the answer",
+			"id": "reading-the-answer",
+			"members": [
+				{
+					"key": "Response::isSuccessful",
+					"namespace": "Response",
+					"name": "isSuccessful",
+					"receiver": "Response",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "isSuccessful() -> Boolean",
+							"summary": "Answers whether the status is one of the successful ones.\n\nThe successful statuses are 200 through 299. A redirect, a refusal and a host error are each a Response that answers `false` here.",
+							"parameters": [],
+							"returns": "`true` when the status is between 200 and 299.",
+							"examples": [
+								"constant answered: Response = {\n  status = 204,\n  headers = [=],\n  body = \"\",\n}\n\nexpect answered::isSuccessful()"
+							]
+						}
+					]
+				},
+				{
+					"key": "Response::header",
+					"namespace": "Response",
+					"name": "header",
+					"receiver": "Response",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "header(named name: String) -> Optional<String>",
+							"summary": "Answers the header of the given name, whatever case it is written in.\n\nThe keys of a Response are lowercase, so the name is lowercased before it is looked up. A header the answer does not carry answers nothing.",
+							"parameters": [
+								{
+									"name": "named",
+									"type": "String",
+									"default": null,
+									"description": "the name of the header, in any case",
+									"href": null
+								}
+							],
+							"returns": "the header's value, or nothing where the answer carries none.",
+							"examples": [
+								"constant answered: Response = {\n  status = 200,\n  headers = [\"content-type\" = \"text/plain\"],\n  body = \"hi\",\n}\n\nexpect answered::header(named \"Content-Type\")::is(\"text/plain\")\nexpect answered::header(named \"accept\")::isEmpty()"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"label": "Reading a failure",
+			"id": "reading-a-failure",
+			"members": [
+				{
+					"key": "HttpFailure::toString",
+					"namespace": "HttpFailure",
+					"name": "toString",
+					"receiver": "HttpFailure",
+					"kind": "method",
+					"origin": "declared",
+					"protocol": null,
+					"condition": null,
+					"summary": null,
+					"returns": null,
+					"examples": [],
+					"entries": [
+						{
+							"signature": "toString() -> String",
+							"summary": "Answers the failure as a String, written `InvalidUrl(…)`, `Unreachable(…)` or `InvalidBody(…)`.\n\nThe reason is quoted, as a String payload is quoted inside any structure. The `#` sigil is left out, as `Result` prints `Failure` and `Ordering` prints `Less`.",
+							"parameters": [],
+							"returns": "the rendering of the Case and its reason.",
+							"examples": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"refinements": [],
+	"modes": [
+		{
+			"name": "HttpMethod",
+			"declaration": "choice HttpMethod {\n\tGet,\n\tPost,\n\tPut,\n\tPatch,\n\tDelete,\n\tHead,\n\tOptions,\n}",
+			"description": "Which method of HTTP a request is made with.\n\n`#Get` is what a request that names none is made with. The Cases are the seven methods this library sends, spelled as the Choice a `method` member takes.",
+			"cases": [
+				{
+					"name": "Get",
+					"payload": null
+				},
+				{
+					"name": "Post",
+					"payload": null
+				},
+				{
+					"name": "Put",
+					"payload": null
+				},
+				{
+					"name": "Patch",
+					"payload": null
+				},
+				{
+					"name": "Delete",
+					"payload": null
+				},
+				{
+					"name": "Head",
+					"payload": null
+				},
+				{
+					"name": "Options",
+					"payload": null
+				}
+			],
+			"payloadFree": true,
+			"takenBy": []
+		},
+		{
+			"name": "Redirects",
+			"declaration": "choice Redirects {\n\tFollow,\n\tManual,\n\tRefuse,\n}",
+			"description": "What a request does with a redirect a host answers with.\n\nUnder `#Follow` the request is made again at the new address, which is what a request that names no Case does. Under `#Manual` the redirect is the answer, and the `location` header holds where it points. Under `#Refuse` a redirect is a failure.",
+			"cases": [
+				{
+					"name": "Follow",
+					"payload": null
+				},
+				{
+					"name": "Manual",
+					"payload": null
+				},
+				{
+					"name": "Refuse",
+					"payload": null
+				}
+			],
+			"payloadFree": true,
+			"takenBy": []
+		},
+		{
+			"name": "HttpFailure",
+			"declaration": "choice HttpFailure {\n\tInvalidUrl { url: String },\n\tUnreachable { reason: String },\n\tInvalidBody { reason: String },\n}",
+			"description": "Why a request answered with no Response.\n\nThe Case `#InvalidUrl` is an address this library can not read. The Case `#Unreachable` is a host that was not reached. It covers a refused connection, a name that does not resolve and a certificate that was not accepted. The Case `#InvalidBody` is an answer whose body could not be read as text.\n\nA status is none of these. A host that answers 404 answered, and 404 is a Response.",
+			"cases": [
+				{
+					"name": "InvalidUrl",
+					"payload": "{ url: String }"
+				},
+				{
+					"name": "Unreachable",
+					"payload": "{ reason: String }"
+				},
+				{
+					"name": "InvalidBody",
+					"payload": "{ reason: String }"
+				}
+			],
+			"payloadFree": false,
+			"takenBy": []
+		}
+	],
+	"tower": [
+		{
+			"name": "Request",
+			"declaration": "type Request = {\n\turl: String,\n\tmethod: HttpMethod,\n\theaders: Dictionary<String, String>,\n\tbody: Optional<String>,\n\tredirects: Redirects,\n}",
+			"description": "A request to send.\n\nOnly `url` has to be written. The default on `Http.send` fills in a `#Get` with no headers, no body and `#Follow`.\n\nThe body is a String or nothing. A request carrying one names its own `content-type` in the headers, because this library adds none."
+		},
+		{
+			"name": "Response",
+			"declaration": "type Response = {\n\tstatus: Integer,\n\theaders: Dictionary<String, String>,\n\tbody: String,\n}",
+			"description": "What a host answered with.\n\nThe header keys are lowercase, which is what makes a Dictionary the right shape for them. HTTP header names do not differ by case, and `header(named:)` reads one under any spelling.\n\nThe body is text. A host answering bytes that are not text answers `#InvalidBody` instead of a Response."
+		}
+	],
+	"views": [
+		{
+			"namespace": "Response",
+			"target": "Response"
+		}
+	],
+	"protocols": [],
+	"seeAlso": [],
+	"links": {
+		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
+		"NonEmptyList": "/docs/library/list#NonEmptyList",
+		"SortOrder": "/docs/library/list#SortOrder",
+		"HttpMethod": "/docs/library/http#HttpMethod",
+		"Redirects": "/docs/library/http#Redirects",
+		"HttpFailure": "/docs/library/http#HttpFailure",
+		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
+		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
+		"PositiveInteger": "/docs/library/integer#PositiveInteger",
+		"Division": "/docs/library/integer#Division",
+		"NonZeroRational": "/docs/library/rational#NonZeroRational",
+		"NonNegativeRational": "/docs/library/rational#NonNegativeRational",
+		"PositiveRational": "/docs/library/rational#PositiveRational",
+		"NumberFormat": "/docs/library/rational#NumberFormat",
+		"Rounding": "/docs/library/rational#Rounding",
+		"SignStyle": "/docs/library/rational#SignStyle",
+		"NonEmptyString": "/docs/library/string#NonEmptyString",
+		"Character": "/docs/library/string#Character",
+		"Side": "/docs/library/string#Side",
+		"CaseSensitivity": "/docs/library/string#CaseSensitivity",
+		"NormalizationForm": "/docs/library/string#NormalizationForm",
+		"Stream": "/docs/library/terminal#Stream",
+		"Step": "/docs/library/loop#Step",
+		"Comparable": "/docs/library/protocols#Comparable",
+		"Enumerable": "/docs/library/protocols#Enumerable",
+		"Orderable": "/docs/library/protocols#Orderable",
+		"Equatable": "/docs/library/protocols#Equatable",
+		"Printable": "/docs/library/protocols#Printable",
+		"Generatable": "/docs/library/protocols#Generatable"
+	},
+	"anchors": [
+		"at-a-glance",
+		"the-tower",
+		"request",
+		"Request",
+		"response",
+		"Response",
+		"sending-a-request",
+		"send",
+		"the-verbs",
+		"get",
+		"post",
+		"put",
+		"patch",
+		"delete",
+		"head",
+		"reading-the-answer",
+		"issuccessful",
+		"isSuccessful",
+		"header",
+		"reading-a-failure",
+		"tostring",
+		"toString",
+		"choices",
+		"httpmethod",
+		"HttpMethod",
+		"redirects",
+		"Redirects",
+		"httpfailure",
+		"HttpFailure"
+	]
+}

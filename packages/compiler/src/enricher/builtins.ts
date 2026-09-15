@@ -136,6 +136,16 @@ export const builtinMemberOrder: Array<string> = [
 	// newest and shares no Method name with anything here — all three of its
 	// Methods are derived.
 	"Stream",
+	// NOTE: And the two a request is written in, with the mode Choices for the
+	// reason `Stream` is here rather than beside `Terminal`: what puts a
+	// Namespace in this block is that every Method of it is DERIVED, and both
+	// of these declare a Choice of payload-free Cases and write nothing. They
+	// share no Method name with anything here, so their position decides only
+	// where a reader of this list meets them. The third Choice `Http.es`
+	// declares, `HttpFailure`, is not here: its Cases carry a reason, so it
+	// writes a `toString` and is met beside the Namespace that answers it.
+	"HttpMethod",
+	"Redirects",
 	"Record",
 	"List",
 	// NOTE: Directly after `List`, because both target a List and the position
@@ -258,11 +268,28 @@ export const builtinMemberOrder: Array<string> = [
 	"NonEmptyFutureList",
 	"ResultFutureList",
 	"Started",
-	// NOTE: And last of all, because it is the one Namespace here a Program
-	// reaches without holding anything: `Async.deferred` is where a future
-	// comes FROM, and a reader meets what a future is before meeting how one
-	// is made.
+	// NOTE: And last of all among them, because it is the one Namespace there a
+	// Program reaches without holding anything: `Async.deferred` is where a
+	// future comes FROM, and a reader meets what a future is before meeting how
+	// one is made.
 	"Async",
+	// NOTE: And after every one of them, because what it answers is a future
+	// and a reader has to have met one. `Http` is the only Namespace in this
+	// list whose Methods reach outside the Program, which is the other half of
+	// why it is last: the order here is what a reader meets, and the door to a
+	// host is the last thing the library offers.
+	"Http",
+	// NOTE: Then what a host answered, because a Response is what `Http` hands
+	// back. Neither of its two Methods is named anywhere above, so the position
+	// decides only where a reader meets them.
+	"Response",
+	// NOTE: And the reason there is no Response, last. It is met after the
+	// answer for the reason `Result` is met after `Optional`: a reader meets
+	// what a call answers with before meeting why it sometimes does not. Its
+	// `toString` is the one Method of the three Choices `Http.es` declares that
+	// is written rather than derived, which is why it is here and they are up
+	// with the mode Choices.
+	"HttpFailure",
 ]
 
 // NOTE: The same rule for the Type table, and for the same reason — a Type's
@@ -355,6 +382,19 @@ export const builtinTypeOrder: Array<string> = [
 	// NOTE: With the other mode Choices, and last among them for the reason it
 	// is last in the member order above.
 	"Stream",
+	// NOTE: And the two a request is written in, for the reason they follow
+	// `Stream` in the member order above.
+	"HttpMethod",
+	"Redirects",
+	// NOTE: Then the rest of what `Http.es` declares, in the order a reader
+	// meets it: what is sent, what comes back, and why sometimes nothing does.
+	// `closestMatch` breaks a tie on the FIRST candidate and there is no tie
+	// here to break — no two of these are one edit apart, and none is one edit
+	// from a Type above — so the order decides only where an annotation's
+	// Completion offers them.
+	"Request",
+	"Response",
+	"HttpFailure",
 	// NOTE: After every Type a Program writes down, because it is the one Type
 	// a Program never writes down: a source arrives as a Parameter of
 	// `Generatable::generate` and goes nowhere else. Listing it earlier would

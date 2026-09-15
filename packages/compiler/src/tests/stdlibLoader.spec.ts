@@ -1470,6 +1470,11 @@ describe("Standard Library Loader", () => {
 			"Division",
 			"SortOrder",
 			"Stream",
+			// NOTE: And the two Choices a request is written in, with the mode
+			// Choices because every Method of each is derived — see
+			// `builtinMemberOrder`.
+			"HttpMethod",
+			"Redirects",
 			"Record",
 			"List",
 			// NOTE: The two Namespaces a List value can reach besides `List`,
@@ -1522,9 +1527,15 @@ describe("Standard Library Loader", () => {
 			"NonEmptyFutureList",
 			"ResultFutureList",
 			"Started",
-			// NOTE: And the Namespace a future comes FROM, last — see
-			// `builtinMemberOrder`.
+			// NOTE: And the Namespace a future comes FROM, last of those —
+			// see `builtinMemberOrder`.
 			"Async",
+			// NOTE: And the door to a host after every one of them, with what
+			// it answers and the reason it sometimes answers nothing — see
+			// `builtinMemberOrder`.
+			"Http",
+			"Response",
+			"HttpFailure",
 		])
 	})
 
@@ -1558,8 +1569,8 @@ describe("Standard Library Loader", () => {
 			entries += flags.length
 		}
 
-		expect(stdlib.namespaces).toHaveLength(57)
-		expect(entries).toBe(740)
+		expect(stdlib.namespaces).toHaveLength(62)
+		expect(entries).toBe(750)
 	})
 
 	// NOTE: The other half of the ordering rule. `builtinMemberOrder` is the
@@ -2302,6 +2313,10 @@ describe("Standard Library Loader", () => {
 			"Rational::isLessThan",
 			"Rational::isWholeNumber",
 			"Record::is",
+			// NOTE: A chain, so it is a question of its own — `isSuccessful`
+			// asks the STATUS whether it lies between two bounds, and nothing
+			// else names that range.
+			"Response::isSuccessful",
 			"Result::hasValue",
 			"Result::is",
 			"String::contains",

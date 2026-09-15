@@ -3479,6 +3479,70 @@ c"::quote())
 	show("Choice_Printable.toString() [Stream#Error]", toError::toString())
 	show("Choice_Enumerable.cases() [Stream]", Stream.cases())
 
+	§ ——— Http —————————————————————————————————————————————————————————————
+	§ The `Http` Namespace itself is exempt from this harness, because every
+	§ entry of it sends a request and a line here would record what a host
+	§ answered on the day the capture was taken. See `COVERED_ELSEWHERE` in
+	§ `stdlibGolden.spec.ts`. What is left is read off values written down.
+	constant asGet: HttpMethod       = #Get
+	constant asPost: HttpMethod      = #Post
+	constant following: Redirects    = #Follow
+	constant refusing: Redirects     = #Refuse
+	constant badAddress: HttpFailure = #InvalidUrl("h ttp://x")
+	constant noHost: HttpFailure     = #Unreachable("refused")
+	constant unreadable: HttpFailure = #InvalidBody("not text")
+	constant answered: Response      = {
+		status = 200,
+		headers = ["content-type" = "text/plain"],
+		body = "hi",
+	}
+	constant missing: Response       = {
+		status = 404,
+		headers = [=],
+		body = "",
+	}
+
+	show("Choice_Equatable.is(_ HttpMethod)", asGet::is(#Get))
+	show("Choice_Equatable.is(_ HttpMethod) [differing]", asGet::is(#Post))
+	show("Choice_Equatable.isNot(_ HttpMethod)", asGet::isNot(#Post))
+	show("Choice_Equatable.isNot(_ HttpMethod) [same]", asPost::isNot(#Post))
+	show("Choice_Printable.toString() [HttpMethod#Get]", asGet::toString())
+	show("Choice_Enumerable.cases() [HttpMethod]", HttpMethod.cases())
+	show("Choice_Equatable.is(_ Redirects)", following::is(#Follow))
+	show("Choice_Equatable.is(_ Redirects) [differing]", following::is(#Refuse))
+	show("Choice_Equatable.isNot(_ Redirects)", following::isNot(#Refuse))
+	show("Choice_Equatable.isNot(_ Redirects) [same]", refusing::isNot(#Refuse))
+	show("Choice_Printable.toString() [Redirects#Refuse]", refusing::toString())
+	show("Choice_Enumerable.cases() [Redirects]", Redirects.cases())
+	show(
+		"Choice_Equatable.is(_ HttpFailure)",
+		noHost::is(#Unreachable("refused")),
+	)
+	show(
+		"Choice_Equatable.is(_ HttpFailure) [a differing reason]",
+		noHost::is(#Unreachable("gone")),
+	)
+	show(
+		"Choice_Equatable.isNot(_ HttpFailure) [a differing Case]",
+		noHost::isNot(#InvalidBody("refused")),
+	)
+	show("HttpFailure.toString() [InvalidUrl]", badAddress::toString())
+	show("HttpFailure.toString() [Unreachable]", noHost::toString())
+	show("HttpFailure.toString() [InvalidBody]", unreadable::toString())
+	show("Response.isSuccessful()", answered::isSuccessful())
+	show(
+		"Response.isSuccessful() [a status that is not]",
+		missing::isSuccessful(),
+	)
+	show(
+		"Response.header(named: String)",
+		answered::header(named "Content-Type"),
+	)
+	show(
+		"Response.header(named: String) [no such header]",
+		answered::header(named "accept"),
+	)
+
 	§ ——— Record ———————————————————————————————————————————————————————————
 	§ LOAD-BEARING: `point` prints as `{ x = 1, y = 2 }`, well under sixty
 	§ characters. `getStringRepresentation` has a bug where a Record whose

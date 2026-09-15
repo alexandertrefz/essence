@@ -515,6 +515,16 @@ describe("Stdlib Call Graph", () => {
 			"Future.andThen__overload$2",
 			"Future.map",
 			"Generatable.shrink",
+			// NOTE: The six verbs, and no `send` beside them: the one native of
+			// that Namespace is a Node only where a body writes it, and a
+			// shim's frame is not one. Each of these calls `Http.send`, which
+			// is an edge to a native and therefore no edge here.
+			"Http.delete",
+			"Http.get",
+			"Http.head",
+			"Http.patch",
+			"Http.post",
+			"Http.put",
 			"Integer.add__overload$2",
 			"Integer.add__overload$3",
 			"Integer.add__overload$4",
@@ -857,6 +867,11 @@ describe("Stdlib Call Graph", () => {
 			"RationalList.sum",
 			"RationalList.variance__overload$1",
 			"RationalList.variance__overload$2",
+			// NOTE: Both Methods of what a host answered, and both written in
+			// Essence — one reads the status and one reads a header, and
+			// neither needs anything the Record does not hold.
+			"Response.header",
+			"Response.isSuccessful",
 			// NOTE: Every Method of the carrier that says why, and every one
 			// of them is written in Essence — `toString` is the one native,
 			// for the reason `Optional.toString` is one.

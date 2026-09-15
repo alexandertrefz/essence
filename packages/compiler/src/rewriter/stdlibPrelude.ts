@@ -446,6 +446,38 @@ export function nativeShimName(
 		: null
 }
 
+// NOTE: The shims a written Argument needs as much as a missing one does. A
+// scalar default STANDS IN for an Argument the call left out, so a call that
+// wrote one needs no frame — which is the rule above. A RECORD default is
+// MERGED into the Argument instead: `Http.send({ url = "…" })` is a whole
+// Request only once the members the default fills in are put on it, and that
+// merge is the shim's prologue. So a native whose shim carries one is called
+// through the shim always, exactly as a bodied Method with a Record default
+// runs its own merge on every call.
+//
+// Keyed and named like the set above, and built from the same list — the two
+// differ only in the `prologue` test, which is the one thing that says which
+// kind of default a shim was built for.
+const mergingShimNames = derivedFromStdlib(
+	() =>
+		new Set(
+			stdlibPrelude().flatMap((namespace) =>
+				namespace.node.nativeShims
+					.filter((shim) => shim.prologue.length > 0)
+					.map((shim) => `${namespace.name}\u0000${shim.memberName}`),
+			),
+		),
+)
+
+export function mergingNativeShimName(
+	namespaceName: string,
+	memberName: string,
+): string | null {
+	return mergingShimNames().has(`${namespaceName}\u0000${memberName}`)
+		? essenceMethodIdentifier(namespaceName, memberName)
+		: null
+}
+
 // NOTE: The same answer for a static Property the prelude gives a VALUE to. It
 // is asked separately from the Methods, and not because the emitted name differs
 // — it is the one `essenceMethodIdentifier` spells, and a member is a Method or

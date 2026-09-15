@@ -7,10 +7,11 @@ import { type AnyType, typeKeySymbol } from "./type"
 // Essence (`packages/standard-library/sources/Result.es`); what else lives here
 // is the Type the generated native contract renders that one signature against.
 //
-// NOTE: No constructors, where `Optional.ts` carries two. An Optional is built
-// by the natives themselves — every one that can come back empty — and no
-// native answers a Result: the Cases are built by Essence bodies, which the
-// Rewriter emits as `$type.createCase` calls.
+// NOTE: Two constructors, where there used to be none. Almost every Case of
+// this Choice is built by an Essence body, which the Rewriter emits as a
+// `$type.createCase` call; `Http.send` is the one native that ANSWERS a Result,
+// and these are the door it builds one through. They are `Optional.ts`'s two
+// under the names this Choice's Cases carry.
 export type ValueType<Value extends AnyType> = {
 	[typeKeySymbol]: "Result#Value"
 	item: Value
@@ -24,6 +25,18 @@ export type FailureType<Failure extends AnyType> = {
 export type ResultType<Value extends AnyType, Failure extends AnyType> =
 	| ValueType<Value>
 	| FailureType<Failure>
+
+export function createValue<Value extends AnyType>(
+	item: Value,
+): ValueType<Value> {
+	return { [typeKeySymbol]: "Result#Value", item }
+}
+
+export function createFailure<Failure extends AnyType>(
+	reason: Failure,
+): FailureType<Failure> {
+	return { [typeKeySymbol]: "Result#Failure", reason }
+}
 
 // NOTE: The one Method here, and native for the reason `Optional.toString` is:
 // an Essence body renders a payload through a hole, and a hole renders a String

@@ -16,6 +16,8 @@ import type { BooleanType } from "./Boolean"
 import type { CaseSensitivityType } from "./CaseSensitivity"
 import type { DictionaryType } from "./Dictionary"
 import type { FutureType } from "./Future"
+import type { HttpFailureType } from "./HttpFailure"
+import type { HttpMethodType } from "./HttpMethod"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
 import type { NormalizationFormType } from "./NormalizationForm"
@@ -26,6 +28,7 @@ import type { OrderingType } from "./Ordering"
 import type { RandomnessType } from "./Randomness"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
+import type { RedirectsType } from "./Redirects"
 import type { ResultType } from "./Result"
 import type { RoundingType } from "./Rounding"
 import type { SideType } from "./Side"
@@ -517,6 +520,14 @@ export type StreamNatives = {
 
 }
 
+export type HttpMethodNatives = {
+
+}
+
+export type RedirectsNatives = {
+
+}
+
 export type RecordNatives = {
 	// is(_: Record) -> Boolean
 	is: (self: RecordType, argument1: RecordType) => BooleanType
@@ -854,6 +865,20 @@ export type AsyncNatives = {
 	sleep: (milliseconds: IntegerType) => FutureType<RecordType>
 }
 
+export type HttpNatives = {
+	// static send(_: { url: String, method: HttpMethod, headers: Dictionary<String, String>, body: Optional<String>, redirects: Redirects }) -> Future<Result<{ status: Integer, headers: Dictionary<String, String>, body: String }, HttpFailure>>
+	send: (argument0: RecordType & { url: StringType; method: HttpMethodType; headers: DictionaryType<StringType, StringType>; body: OptionalType<StringType>; redirects: RedirectsType }) => FutureType<ResultType<RecordType & { status: IntegerType; headers: DictionaryType<StringType, StringType>; body: StringType }, HttpFailureType>>
+}
+
+export type ResponseNatives = {
+
+}
+
+export type HttpFailureNatives = {
+	// toString() -> String
+	toString: (self: HttpFailureType) => StringType
+}
+
 export type FunctionsNatives = {
 	// static loop<State>(startingWith: State, while: (_: State) -> Boolean, _: (_: State) -> State) -> State
 	loop__overload$1: <State extends AnyType>(startingWith: State, argument1: (argument0: State) => BooleanType, argument2: (argument0: State) => State) => State
@@ -1166,6 +1191,12 @@ export const $SortOrder: SortOrderNatives = SortOrderModule
 declare const StreamModule: typeof import("./Stream")
 export const $Stream: StreamNatives = StreamModule
 
+declare const HttpMethodModule: typeof import("./HttpMethod")
+export const $HttpMethod: HttpMethodNatives = HttpMethodModule
+
+declare const RedirectsModule: typeof import("./Redirects")
+export const $Redirects: RedirectsNatives = RedirectsModule
+
 declare const RecordModule: typeof import("./Record")
 export const $Record: RecordNatives = RecordModule
 export const $RecordArity: AssertArities<typeof import("./Record"), {
@@ -1422,6 +1453,23 @@ export const $Async: AsyncNatives = AsyncModule
 export const $AsyncArity: AssertArities<typeof import("./Async"), {
 	deferred: 1
 	sleep: 1
+}> = true
+
+declare const HttpModule: typeof import("./Http")
+export const $Http: HttpNatives = HttpModule
+export const $HttpAbsent: AssertNoEssenceExports<typeof import("./Http"), "get" | "post" | "put" | "patch" | "delete" | "head"> = true
+export const $HttpArity: AssertArities<typeof import("./Http"), {
+	send: 1
+}> = true
+
+declare const ResponseModule: typeof import("./Response")
+export const $Response: ResponseNatives = ResponseModule
+export const $ResponseAbsent: AssertNoEssenceExports<typeof import("./Response"), "isSuccessful" | "header"> = true
+
+declare const HttpFailureModule: typeof import("./HttpFailure")
+export const $HttpFailure: HttpFailureNatives = HttpFailureModule
+export const $HttpFailureArity: AssertArities<typeof import("./HttpFailure"), {
+	toString: 1
 }> = true
 
 declare const functionsModule: typeof import("./functions")

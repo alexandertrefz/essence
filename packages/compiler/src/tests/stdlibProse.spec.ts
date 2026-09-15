@@ -44,6 +44,7 @@ const ACRONYMS = new Set([
 	"CLI",
 	"CPU",
 	"CRLF",
+	"HTTP",
 	"JSON",
 	"LSP",
 	"NFC",

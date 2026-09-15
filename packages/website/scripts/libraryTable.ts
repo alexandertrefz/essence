@@ -1114,6 +1114,39 @@ export const PAGES: PageDefinition[] = [
 		],
 	},
 	{
+		slug: "http",
+		title: "Http",
+		order: 200,
+		description:
+			"Requests to a host, as work that has not run: what to send, what comes back, and why sometimes nothing does.",
+		taughtOn: [],
+		groups: [
+			{
+				label: "Sending a request",
+				members: ["Http::send"],
+			},
+			{
+				label: "The verbs",
+				members: [
+					"Http::get",
+					"Http::post",
+					"Http::put",
+					"Http::patch",
+					"Http::delete",
+					"Http::head",
+				],
+			},
+			{
+				label: "Reading the answer",
+				members: ["Response::isSuccessful", "Response::header"],
+			},
+			{
+				label: "Reading a failure",
+				members: ["HttpFailure::toString"],
+			},
+		],
+	},
+	{
 		slug: "protocols",
 		title: "Protocols",
 		order: 180,

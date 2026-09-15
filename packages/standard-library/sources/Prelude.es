@@ -26,6 +26,14 @@ export {
 		ResultFutureList
 		Started
 	}
+	from "./Http.es" {
+		Http
+		HttpFailure
+		HttpMethod
+		Redirects
+		Request
+		Response
+	}
 	from "./Integer.es" {
 		Division
 		Integer

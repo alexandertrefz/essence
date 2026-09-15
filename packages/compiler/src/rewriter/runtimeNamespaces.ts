@@ -72,4 +72,9 @@ export const runtimeNamespaceNames = [
 	"ResultFutureList",
 	"Started",
 	"Async",
+	"Http",
+	"Response",
+	"HttpMethod",
+	"Redirects",
+	"HttpFailure",
 ]

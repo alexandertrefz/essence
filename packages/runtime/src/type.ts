@@ -4,6 +4,7 @@ import type { AlgebraicType } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
 import type { DictionaryType } from "./Dictionary"
 import type { FutureType, StartedType } from "./Future"
+import type { HttpFailureType } from "./HttpFailure"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
 import type { OrderingType } from "./Ordering"
@@ -241,6 +242,16 @@ export type AnyType =
 	// asynchrony out of a Program that waits for nothing.
 	| FutureType<any>
 	| StartedType<any>
+	// NOTE: And the Cases of one Choice, which no other Choice needs. A Case is
+	// ordinarily built by an Essence body and reaches this union through nothing
+	// — `Optional`, `Result` and `Step` are all absent. `HttpFailure` is here
+	// because a NATIVE answers one: `Http.send` hands back a
+	// `Result<Response, HttpFailure>`, and the generated native contract renders
+	// that Type against `ResultType`, whose Parameters this union bounds. The
+	// payload-free `HttpMethod` and `Redirects` are absent for the other half of
+	// the same reason: nothing native answers either, they only travel INTO a
+	// request.
+	| HttpFailureType
 
 // NOTE: A Dictionary box holding Essence values, which is the only Dictionary
 // anything outside the Dictionary Module ever has in hand. It is named here so

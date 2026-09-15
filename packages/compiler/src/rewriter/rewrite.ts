@@ -35,6 +35,7 @@ import {
 	essenceMethodName,
 	essencePropertyName,
 	protocolMemberIdentifier,
+	mergingNativeShimName,
 	nativeFreeFunctionNames,
 	nativeShimName,
 	type PreludeFreeFunction,
@@ -1768,6 +1769,20 @@ export function reachableEssenceMethods(
 		),
 	)
 
+	// NOTE: And the shims a call at FULL arity names too — the ones whose
+	// default is a Record, which is merged into what the call wrote rather than
+	// standing in for what it left out. `namespaceMember` routes every call of
+	// one through the shim, so the edge has to be drawn from every call of one:
+	// `Http.get` writes `Http.send({ url, method, headers })` and names
+	// `$es_Http_send` though it omits nothing.
+	let mergingShimmed = new Set(
+		namespaces.flatMap((namespace) =>
+			namespace.node.nativeShims
+				.filter((shim) => shim.prologue.length > 0)
+				.map((shim) => `${namespace.name} ${shim.memberName}`),
+		),
+	)
+
 	// NOTE: The static Properties this prelude gives a value to — the third
 	// table, keyed like `implemented` because a Property read is spelled exactly
 	// like a static Method reference and the two are told apart by which table
@@ -1805,6 +1820,7 @@ export function reachableEssenceMethods(
 							implementedProperties,
 							shimmed,
 							provided,
+							mergingShimmed,
 						),
 					},
 				],
@@ -1835,6 +1851,7 @@ export function reachableEssenceMethods(
 							implementedProperties,
 							shimmed,
 							provided,
+							mergingShimmed,
 						),
 					},
 				],
@@ -1860,6 +1877,7 @@ export function reachableEssenceMethods(
 					implementedProperties,
 					shimmed,
 					provided,
+					mergingShimmed,
 				),
 			},
 		])
@@ -1887,6 +1905,7 @@ export function reachableEssenceMethods(
 						implementedProperties,
 						shimmed,
 						provided,
+						mergingShimmed,
 					),
 				},
 			]),
@@ -1913,6 +1932,7 @@ export function reachableEssenceMethods(
 							implementedProperties,
 							shimmed,
 							provided,
+							mergingShimmed,
 						),
 					},
 				],
@@ -2029,6 +2049,12 @@ export function essenceMethodReferences(
 	// the same question `namespaceMember` routes on — the two have to agree, or
 	// a const is named in a body and never pulled in.
 	provided: Set<string> = new Set(),
+	// NOTE: The native pairs whose shim MERGES a Record default into what the
+	// call wrote. Consulted where the call left nothing out, because that is
+	// exactly where `namespaceMember` routes one to its shim and the set above
+	// does not — the two have to agree, or a const is named in a body and never
+	// pulled in.
+	mergingShims: Set<string> = new Set(),
 ): EssenceMemberReferences {
 	let references = new Set<string>()
 	let evaluatedReferences = new Set<string>()
@@ -2124,6 +2150,8 @@ export function essenceMethodReferences(
 
 			if (record["omitsArguments"] === true) {
 				consider(base?.["name"], member?.["name"], shimmed, true)
+			} else {
+				consider(base?.["name"], member?.["name"], mergingShims, true)
 			}
 		} else if (record["nodeType"] === "UnionMethodInvocation") {
 			for (let dispatch of (record["cases"] as Array<
@@ -2143,17 +2171,15 @@ export function essenceMethodReferences(
 					)
 				}
 
-				if (
+				consider(
+					dispatch["namespaceName"],
+					dispatch["methodName"],
 					(dispatch["omittedParameterIndices"] as Array<number>)
 						?.length > 0
-				) {
-					consider(
-						dispatch["namespaceName"],
-						dispatch["methodName"],
-						shimmed,
-						true,
-					)
-				}
+						? shimmed
+						: mergingShims,
+					true,
+				)
 			}
 		} else if (record["nodeType"] === "Intrinsic") {
 			// NOTE: The two intrinsics that name a Namespace member — a
@@ -2184,20 +2210,18 @@ export function essenceMethodReferences(
 						)
 					}
 
-					if (
+					consider(
+						dispatchCase["namespaceName"],
+						dispatchCase["methodName"],
 						(
 							dispatchCase[
 								"omittedParameterIndices"
 							] as Array<number>
 						)?.length > 0
-					) {
-						consider(
-							dispatchCase["namespaceName"],
-							dispatchCase["methodName"],
-							shimmed,
-							true,
-						)
-					}
+							? shimmed
+							: mergingShims,
+						true,
+					)
 				}
 			} else if (record["kind"] === "direct-method") {
 				consider(
@@ -2245,6 +2269,16 @@ export function essenceMethodReferences(
 						member?.["name"],
 						implementedProperties,
 						true,
+					)
+					// NOTE: And the shim of a native whose Record default is
+					// merged, for the reason a call of one draws that edge: a
+					// bare reference to it is routed to the shim too, because
+					// the merge is what makes it the whole Method.
+					consider(
+						base["name"],
+						member?.["name"],
+						mergingShims,
+						!isStored,
 					)
 				}
 			}
@@ -3954,8 +3988,16 @@ function namespaceMember(
 		return { type: "Identifier", name: essenceName }
 	}
 
-	if (omitsArguments && !isShadowingUserNamespace(namespaceName)) {
-		let shimName = nativeShimName(namespaceName, memberName)
+	// NOTE: A call that LEAVES an Argument out needs the frame the default is
+	// evaluated in, and a call that wrote every Argument does not — unless the
+	// default is a RECORD, which is merged into what the call wrote rather than
+	// standing in for it. `Http.send({ url = "…" })` writes its Argument and
+	// still needs the four members the default fills in, so a shim that merges
+	// one is named whatever the call left out. See `mergingNativeShimName`.
+	if (!isShadowingUserNamespace(namespaceName)) {
+		let shimName = omitsArguments
+			? nativeShimName(namespaceName, memberName)
+			: mergingNativeShimName(namespaceName, memberName)
 
 		if (shimName !== null) {
 			return { type: "Identifier", name: shimName }

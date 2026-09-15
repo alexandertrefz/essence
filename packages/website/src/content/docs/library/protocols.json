@@ -454,6 +454,24 @@
 					"via": null
 				},
 				{
+					"label": "HttpMethod",
+					"href": "/docs/library/http#HttpMethod",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Redirects",
+					"href": "/docs/library/http#Redirects",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "HttpFailure",
+					"href": "/docs/library/http#HttpFailure",
+					"condition": null,
+					"via": null
+				},
+				{
 					"label": "Division",
 					"href": "/docs/library/integer#Division",
 					"condition": null,
@@ -790,6 +808,24 @@
 					"label": "Dictionary",
 					"href": "/docs/library/dictionary",
 					"condition": "KeyType is Printable, ValueType is Printable",
+					"via": null
+				},
+				{
+					"label": "HttpMethod",
+					"href": "/docs/library/http#HttpMethod",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "Redirects",
+					"href": "/docs/library/http#Redirects",
+					"condition": null,
+					"via": null
+				},
+				{
+					"label": "HttpFailure",
+					"href": "/docs/library/http#HttpFailure",
+					"condition": null,
 					"via": null
 				},
 				{
@@ -1165,6 +1201,14 @@
 				{
 					"label": "Stream",
 					"href": "/docs/library/terminal#Stream"
+				},
+				{
+					"label": "HttpMethod",
+					"href": "/docs/library/http#HttpMethod"
+				},
+				{
+					"label": "Redirects",
+					"href": "/docs/library/http#Redirects"
 				}
 			],
 			"requiredBy": [],
@@ -1190,6 +1234,9 @@
 		"NonEmptyDictionary": "/docs/library/dictionary#NonEmptyDictionary",
 		"NonEmptyList": "/docs/library/list#NonEmptyList",
 		"SortOrder": "/docs/library/list#SortOrder",
+		"HttpMethod": "/docs/library/http#HttpMethod",
+		"Redirects": "/docs/library/http#Redirects",
+		"HttpFailure": "/docs/library/http#HttpFailure",
 		"NonZeroInteger": "/docs/library/integer#NonZeroInteger",
 		"NonNegativeInteger": "/docs/library/integer#NonNegativeInteger",
 		"PositiveInteger": "/docs/library/integer#PositiveInteger",
