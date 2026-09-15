@@ -274,8 +274,6 @@ const reservedWords = new Set([
 	"for",
 	"infer",
 	"choice",
-	"start",
-	"complete",
 	"true",
 	"false",
 	// NOTE: Structurally significant inside a Pattern, where it separates a
@@ -331,7 +329,21 @@ const keywordIdentifiers = new Set([
 	"as",
 ])
 
+// NOTE: The mirror of the Set above, and the only place the two asynchrony
+// Keywords are refused. Both are ordinary Identifiers — a Constant, a Record
+// member, a Parameter and a Method may each be called `start` — but a LABEL is
+// the one position where the Parser reads them as their prefix form instead: a
+// label stands directly in front of the Argument's value, which is exactly
+// where `start x` opens, so a label renamed to one would turn `compute(start
+// 1)` into a `start` of `1`. The rule lives in the Parser's `opensAsynchrony`;
+// this is what keeps a rename from writing through it.
+const prefixKeywords = new Set(["start", "complete"])
+
 export function isValidLabelName(name: string): boolean {
+	if (prefixKeywords.has(name)) {
+		return false
+	}
+
 	return isValidIdentifierName(name) || keywordIdentifiers.has(name)
 }
 

@@ -937,6 +937,15 @@ describe("isValidIdentifierName", () => {
 		// every line that names it afterwards.
 		expect(isValidIdentifierName("define")).toBe(false)
 	})
+
+	// NOTE: And the two words that are NOT reserved, though they are Keywords.
+	// Both are contextual — the Keyword only in front of an Expression — so a
+	// binding may carry either name, and the standard library's own fold seeds
+	// and range positions do.
+	it("should accept the two asynchrony Keywords", () => {
+		expect(isValidIdentifierName("start")).toBe(true)
+		expect(isValidIdentifierName("complete")).toBe(true)
+	})
 })
 
 describe("isValidLabelName", () => {
@@ -958,6 +967,70 @@ describe("isValidLabelName", () => {
 		expect(isValidLabelName("true")).toBe(false)
 		expect(isValidLabelName("two words")).toBe(false)
 		expect(isValidLabelName("1value")).toBe(false)
+	})
+
+	// NOTE: The one position the two asynchrony Keywords may not stand in, and
+	// the only place a label is stricter than a binding. A label is written
+	// directly in front of its value, which is where the prefix form opens, so
+	// `compute(start 1)` is a `start` of `1` and the label is gone.
+	it("should refuse the two asynchrony Keywords a binding may take", () => {
+		expect(isValidLabelName("start")).toBe(false)
+		expect(isValidLabelName("complete")).toBe(false)
+		expect(isValidIdentifierName("start")).toBe(true)
+	})
+})
+
+// NOTE: Accepting a name is only half of it — what the rename WRITES has to
+// still be the Program it was. Both words are read as Keywords in front of an
+// Expression, so every position here is re-parsed rather than only compared,
+// and the standard library's own sources write each of them.
+describe("Rename to an asynchrony Keyword", () => {
+	function parsesCleanly(source: string): Array<common.Diagnostic> {
+		return parseWithDiagnostics(source).diagnostics
+	}
+
+	it("renames a Constant and its reads to `start`", () => {
+		let source = [
+			"implementation {",
+			"\tconstant seed = 1",
+			"",
+			"\tTerminal.print(seed::toString())",
+			"}",
+		].join("\n")
+		let renamed = rename(source, { line: 2, column: 11 }, "start")
+
+		expect(renamed).toBe(
+			[
+				"implementation {",
+				"\tconstant start = 1",
+				"",
+				"\tTerminal.print(start::toString())",
+				"}",
+			].join("\n"),
+		)
+		expect(parsesCleanly(renamed!)).toEqual([])
+	})
+
+	it("renames a Record member and its reads to `complete`", () => {
+		let source = [
+			"implementation {",
+			"\tconstant span = { filled = 1 }",
+			"",
+			"\tTerminal.print(span.filled::toString())",
+			"}",
+		].join("\n")
+		let renamed = rename(source, { line: 2, column: 20 }, "complete")
+
+		expect(renamed).toBe(
+			[
+				"implementation {",
+				"\tconstant span = { complete = 1 }",
+				"",
+				"\tTerminal.print(span.complete::toString())",
+				"}",
+			].join("\n"),
+		)
+		expect(parsesCleanly(renamed!)).toEqual([])
 	})
 })
 
@@ -1530,12 +1603,12 @@ describe("Rename with Patterns", () => {
 			"}",
 		].join("\n")
 
-		expect(rename(source, { line: 2, column: 21 }, "corner")).toBe(
+		expect(rename(source, { line: 2, column: 21 }, "start")).toBe(
 			[
 				"implementation {",
-				"\tconstant point = { corner = { x = 1, y = 2 } }",
+				"\tconstant point = { start = { x = 1, y = 2 } }",
 				"",
-				"\tconstant { corner as { x, y } } = point",
+				"\tconstant { start as { x, y } } = point",
 				"",
 				"\tTerminal.print(x::add(y))",
 				"}",
@@ -1904,10 +1977,10 @@ describe("Rename of a name a default reads", () => {
 			"}",
 		].join("\n")
 
-		expect(rename(source, { line: 2, column: 55 }, "lowest")).toBe(
+		expect(rename(source, { line: 2, column: 55 }, "start")).toBe(
 			[
 				"implementation {",
-				"\tfunction pick(_ lowest: Integer, to second: Integer = lowest) -> Integer {",
+				"\tfunction pick(_ start: Integer, to second: Integer = start) -> Integer {",
 				"\t\t<- second",
 				"\t}",
 				"}",
