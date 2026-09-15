@@ -3,6 +3,11 @@ import { describe, expect, it } from "bun:test"
 import { createBoolean } from "@essence-lang/runtime/Boolean"
 import type { DictionaryType, Slot } from "@essence-lang/runtime/Dictionary"
 import { createDictionary, TOMBSTONE } from "@essence-lang/runtime/Dictionary"
+import {
+	of as futureOf,
+	root as futureRoot,
+	start as futureStart,
+} from "@essence-lang/runtime/Future"
 import type { IntegerType } from "@essence-lang/runtime/Integer"
 import { createInteger } from "@essence-lang/runtime/Integer"
 import { anyIs } from "@essence-lang/runtime/internalHelpers"
@@ -177,6 +182,15 @@ describe("the in-debuggee renderer", () => {
 			createRational(6n, 2n),
 			createRational(2n, 4n),
 			createRational(-4n, 6n),
+			// NOTE: Both asynchronous kinds, which render as their bare names
+			// and hold no parts: a reader paused in a debugger is shown what
+			// the Program has — work, or one run of it — and never the closure
+			// or the promise underneath.
+			futureOf(() => createInteger(1n)),
+			futureStart(
+				futureOf(() => createInteger(1n)),
+				futureRoot(),
+			),
 		]
 
 		for (let value of values) {
@@ -193,6 +207,7 @@ describe("the in-debuggee renderer", () => {
 		)
 		expect(describeOne(createList([])).kind).toBe("list")
 		expect(describeOne(createCase("Ordering#Less")).kind).toBe("leaf")
+		expect(describeOne(futureOf(() => createInteger(1n))).kind).toBe("leaf")
 		expect(
 			describeOne(
 				createCase("Shape#Circle", { radius: createInteger(2n) }),

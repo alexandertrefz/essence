@@ -101,10 +101,17 @@ function describeEssenceValues(...values: Array<unknown>): string {
 			return `${numerator}/${denominator}`
 		}
 
+		// NOTE: `Future` and `Started` are here rather than among the structures
+		// below for the reason the runtime's own printer renders them as bare
+		// names: what a Future holds is a JavaScript closure and what a Started
+		// holds is a promise and a controller, which are this Compiler's
+		// bookkeeping rather than anything the Program wrote.
 		if (
 			tag === "Algebraic" ||
 			tag === "Transcendental" ||
-			tag === "Randomness"
+			tag === "Randomness" ||
+			tag === "Future" ||
+			tag === "Started"
 		) {
 			return tag
 		}

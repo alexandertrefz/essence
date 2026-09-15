@@ -511,6 +511,12 @@ function runtimeTagOf(type: common.Type): string | null {
 		case "Algebraic":
 		case "Transcendental":
 		case "Randomness":
+		// NOTE: Both asynchronous kinds carry a key of their own, and
+		// `isValueOfType` reads it and nothing else — what a Future will ANSWER
+		// is not there to look at. So the tag IS the whole check for either of
+		// them, at any Value Type.
+		case "Future":
+		case "Started":
 		case "Record":
 			return type.type
 		case "List":
@@ -575,6 +581,8 @@ function checkIsTagAlone(matcher: common.Type): boolean {
 		case "Algebraic":
 		case "Transcendental":
 		case "Randomness":
+		case "Future":
+		case "Started":
 		case "GenericList":
 		case "GenericDictionary":
 			return true
@@ -704,6 +712,11 @@ function checkIsImplied(matcher: common.Type, valueType: common.Type): boolean {
 		case "Algebraic":
 		case "Transcendental":
 		case "Randomness":
+		// NOTE: By KIND alone, for both asynchronous Types, which is the whole
+		// of what `isValueOfType` asks of one — a `Future<String>` Matcher and
+		// a `Future<Integer>` value are the same question to the runtime.
+		case "Future":
+		case "Started":
 			return valueType.type === matcher.type
 		case "Function":
 			return valueType.type === "Function"
