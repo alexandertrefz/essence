@@ -1133,6 +1133,8 @@ Error: This value does not fit Variable 'count'
 
 Assign a value of the declared type, or change the declaration's type.
 
+Asynchrony adds three Helps under this code. A [`Future`](/docs/library/future) standing where its value is wanted asks for `complete`, and so does a `Started`, which is still in flight; the Quick Fix **Wait for it with 'complete'** writes the word for either. A plain value where a future is wanted asks for one to be built — `Async.deferred(…)`, [`map`](/docs/library/future#map) or [`andThen`](/docs/library/future#andThen).
+
 Taught on: [Programs and values › Constants and variables](/docs/language/programs-and-values#constants-and-variables)
 
 ### `argument-type-mismatch`
@@ -1293,6 +1295,8 @@ Error: This value does not fit the declared return Type
 </div>
 
 Return a value of the declared type, or change the declared type.
+
+Asynchrony adds two Helps under this code. A future returned where the value is wanted asks for `complete`, and the Quick Fix **Wait for it with 'complete'** writes it. A bare value returned from a body declared `-> Future<…>` that completes nothing says the body has to build a future — `Async.deferred`, [`map`](/docs/library/future#map) or [`andThen`](/docs/library/future#andThen) — which is not an edit anything can write for you.
 
 Taught on: [Functions › Returning with `<-`](/docs/language/functions#returning-with--)
 
@@ -5169,6 +5173,155 @@ Ask it of a statement in the `tests { … }` block, or write `§` for a plain co
 Quick Fix: **Write an ordinary '§' Comment**.
 
 Taught on: [Tests › Examples and value comments](/docs/language/tests#examples-and-value-comments)
+
+## Asynchrony
+
+The two words work is written with, and the two ways a value that is work goes missing. [Asynchrony](/docs/language/asynchrony) teaches all five.
+
+### `complete-outside-future`
+
+**Error.** `complete` stands where nothing can wait for it. A body that writes `complete` suspends, so it hands its caller a future and has to declare `-> Future<…>`. The report has two shapes: a named function or method whose declared return type is not a `Future`, and a position that can not suspend at all.
+
+<div class="error-output">
+
+```
+[complete-outside-future]
+Error: 'complete' waits, and nothing here can wait
+   ╭─┤ Headline.es:3:23 │
+   │
+ 3 │        constant answered = complete Async.deferred(() { <- url })
+   │                            ───────────────────┬──────────────────  
+   │                                               ╰────────────────── this Function returns String
+   │ 
+   │ Help: Declare the return Type 'Future<String>'.
+   │ 
+   │ Note: A body that writes 'complete' suspends, so it hands back a Future the caller completes in its turn — which is what its declared Type has to say.
+───╯
+```
+
+</div>
+
+Declare the return type a future of what the body answers with. The positions that can not suspend are a parameter's default, a test's name, a `benchmark` body and a property body, `test … for any (…)`; each reports the same code with its own label. There the fix is to complete the work above the position, into a constant it reads.
+
+Quick Fix: **Declare the return Type 'Future\<String\>'**, wrapping the return type the body already declares. It is offered on a `complete` in a body, and not in a parameter's default, where wrapping that function's return type would leave the default exactly as wrong.
+
+Taught on: [Asynchrony › A body that waits](/docs/language/asynchrony#a-body-that-waits)
+
+### `unused-future`
+
+**Error.** A statement is a future. Building one runs nothing, so a description nobody starts and nobody waits for does nothing at all.
+
+<div class="error-output">
+
+```
+[unused-future]
+Error: Nothing here runs
+   ╭─┤ Report.es:8:2 │
+   │
+ 8 │     delayed("a")
+   │     ──────┬─────  
+   │           ╰─────── this is a Future<String>, and its value goes nowhere
+   │ 
+   │ Help: Did you mean 'complete', to wait for it — or 'start', to put it in flight and carry on?
+   │ 
+   │ Note: A Future describes work. Building one runs none of it — 'start' puts it in flight and 'complete' waits for what it answers with.
+───╯
+```
+
+</div>
+
+Write `complete` in front of it to wait for it, or `start` to put it in flight and carry on.
+
+Quick Fix: **Wait for it with 'complete'** and **Put it in flight with 'start'**. Neither is preferred over the other: both are whole things to mean, and the line does not say which.
+
+Taught on: [Asynchrony › One run, read many times](/docs/language/asynchrony#one-run-read-many-times)
+
+### `unobserved-started`
+
+**Information.** A statement is a started run. It does run — what nobody does is read what it answers with. Fire and forget is allowed, and this says so once.
+
+<div class="error-output">
+
+```
+[unobserved-started]
+Advice: Nothing waits for this
+    ╭─┤ Report.es:27:2 │
+    │
+ 27 │     start headline()
+    │     ────────┬───────  
+    │             ╰───────── this runs, and nobody reads its answer
+    │ 
+    │ Help: Hold it in a Constant and 'complete' it where the answer is wanted, if the answer is wanted at all.
+    │ 
+    │ Note: A Started can be completed any number of times, from anywhere — holding it under a name is what makes that possible later.
+────╯
+```
+
+</div>
+
+Leave it where the answer is genuinely not wanted. Otherwise hold the run in a constant and `complete` it where the answer is.
+
+There is no Quick Fix. Both answers are things only you know: leaving it is no edit at all, and holding it in a constant needs a name for the work.
+
+Taught on: [Asynchrony › One run, read many times](/docs/language/asynchrony#one-run-read-many-times)
+
+### `needless-complete`
+
+**Warning.** The value after `complete` is neither a `Future` nor a `Started`, so it is already the answer. The span is greyed out rather than underlined.
+
+<div class="error-output">
+
+```
+[needless-complete]
+Warning: This is not work to wait for
+   ╭─┤ Waited.es:2:20 │
+   │
+ 2 │     constant waited = complete 3
+   │                                ▲  
+   │                                ╰── this is an Integer
+   │ 
+   │ Help: Drop the 'complete'.
+   │ 
+   │ Note: 'complete' waits for what a Future or a Started answers with — a value that is neither is already the answer.
+───╯
+```
+
+</div>
+
+Drop the word.
+
+Quick Fix: **Drop the 'complete'**.
+
+Taught on: [Asynchrony › A body that waits](/docs/language/asynchrony#a-body-that-waits)
+
+### `needless-start`
+
+**Warning.** The value after `start` is not a `Future`, so it describes no work to put in flight.
+
+<div class="error-output">
+
+```
+[needless-start]
+Warning: This is not a Future, so there is nothing to start
+   ╭─┤ Running.es:2:21 │
+   │
+ 2 │     constant running = start 4
+   │                              ▲  
+   │                              ╰── this is an Integer
+   │ 
+   │ Help: Drop the 'start'.
+   │ 
+   │ Note: 'start' puts a Future in flight and answers the one run of it — a value that is not a Future describes no work to run.
+───╯
+```
+
+</div>
+
+Drop the word. A `Started` reports the same code with a message of its own, `This is already in flight`: the run belongs to whoever started it, and there is no second run to ask for.
+
+Quick Fix: **Drop the 'start'**.
+
+Taught on: [Asynchrony › One run, read many times](/docs/language/asynchrony#one-run-read-many-times)
 
 ## The project file
 
