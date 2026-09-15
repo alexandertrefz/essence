@@ -370,12 +370,12 @@ declarations {
 			§§ @returns — the Dictionary with the transformed value.
 			<infer KeyType is Equatable>(
 				at key: KeyType,
-				defaultingTo start: ValueType,
+				defaultingTo fallback: ValueType,
 				with transform: (_: ValueType) -> ValueType,
 			) -> Dictionary<KeyType, ValueType> {
 				<- @::set(
 					key,
-					to transform(@::value(at key, defaultingTo start)),
+					to transform(@::value(at key, defaultingTo fallback)),
 				)
 			}
 		}

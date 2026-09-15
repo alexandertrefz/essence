@@ -155,37 +155,37 @@ implementation {
 	}
 
 	constant home: Coordinate = { x = 5, y = 6 }
-	constant start: Point     = { x = 1, y = 2, label = "start" }
+	constant corner: Point    = { x = 1, y = 2, label = "corner" }
 
 	Terminal.print(describe(home)) § (5, 6)
-	Terminal.print(describe(start)) § (1, 2)
-	Terminal.print(start) § { x = 1, y = 2, label = "start" }
+	Terminal.print(describe(corner)) § (1, 2)
+	Terminal.print(corner) § { x = 1, y = 2, label = "corner" }
 }
 ```
 
 Typing is structural. `Point` is not a box a value has to be put into but a description of a shape. Any record with an [`Integer`](/docs/library/integer) `x` and an `Integer` `y` is a `Point`, whether or not anybody said so. `Coordinate` names the same shape, so a `Coordinate` passes wherever a `Point` is asked for, and the other way round.
 
-A record may also have more members than the type names. `start` carries a `label` that `Point` does not mention, and the annotation admits it. The extra member is kept, not dropped: `start` prints with its `label`, and a `with` update of `start` keeps it too. It cannot be read through `Point`, though: `start.label` is [`unknown-member`](/docs/reference/diagnostics#unknown-member), because the type names only `x` and `y`. The same holds for the payload of a case, on [Choices and `match`](/docs/language/choices-and-match).
+A record may also have more members than the type names. `corner` carries a `label` that `Point` does not mention, and the annotation admits it. The extra member is kept, not dropped: `corner` prints with its `label`, and a `with` update of `corner` keeps it too. It cannot be read through `Point`, though: `corner.label` is [`unknown-member`](/docs/reference/diagnostics#unknown-member), because the type names only `x` and `y`. The same holds for the payload of a case, on [Choices and `match`](/docs/language/choices-and-match).
 
 The check goes down through nested records:
 
 ```essence
 implementation {
 	type Point = { x: Integer, y: Integer }
-	type Line = { start: Point, end: Point }
+	type Line = { from: Point, to: Point }
 
 	function width(of line: Line) -> Integer {
-		<- line.end.x::subtract(line.start.x)
+		<- line.to.x::subtract(line.from.x)
 	}
 
 	constant stroke = {
-		start = { x = 0, y = 0, z = 0 },
-		end = { x = 3, y = 4, z = 5 },
+		from = { x = 0, y = 0, z = 0 },
+		to = { x = 3, y = 4, z = 5 },
 		colour = "red",
 	}
 
 	Terminal.print(width(of stroke)) § 3
-	Terminal.print(stroke.end) § { x = 3, y = 4, z = 5 }
+	Terminal.print(stroke.to) § { x = 3, y = 4, z = 5 }
 }
 ```
 
@@ -196,7 +196,7 @@ implementation {
 ```ts
 type Point = { x: number; y: number }
 
-const start: Point = { x: 1, y: 2, label: "start" }
+const corner: Point = { x: 1, y: 2, label: "corner" }
 // error TS2353: Object literal may only specify known properties,
 // and 'label' does not exist in type 'Point'.
 ```
@@ -425,18 +425,18 @@ An argument is merged into the default, so it takes path keys and descends as `w
 implementation {
 	type Point = { x: Integer, y: Integer }
 
-	constant here: Point  = { x = 1, y = 2 }
-	constant start: Point = { x = 1, y = 2, label = "start" }
+	constant here: Point   = { x = 1, y = 2 }
+	constant corner: Point = { x = 1, y = 2, label = "corner" }
 
 	Terminal.print(here::is({ y = 2, x = 1 })) § true
 	Terminal.print(here::isNot({ x = 2, y = 2 })) § true
-	Terminal.print(here::is(start)) § false
+	Terminal.print(here::is(corner)) § false
 	Terminal.print(here::toString()) § { x = 1, y = 2 }
-	Terminal.print(start::keys()) § ["x", "y", "label"]
+	Terminal.print(corner::keys()) § ["x", "y", "label"]
 }
 ```
 
-Every record has four methods, listed under [Record](/docs/library/record) in the library: [`is`](/docs/library/record#is), [`isNot`](/docs/library/record#isNot), [`toString`](/docs/library/record#toString) and [`keys`](/docs/library/record#keys). `is` compares structurally. Two records are equal when they have the same members with equal values, in any order. A kept extra member counts, so `start` is not `here`. `toString` returns the text [`Terminal.print`](/docs/library/terminal#print) writes, and `keys()` returns the member names in the order written, like `Object.keys`, extra members included.
+Every record has four methods, listed under [Record](/docs/library/record) in the library: [`is`](/docs/library/record#is), [`isNot`](/docs/library/record#isNot), [`toString`](/docs/library/record#toString) and [`keys`](/docs/library/record#keys). `is` compares structurally. Two records are equal when they have the same members with equal values, in any order. A kept extra member counts, so `corner` is not `here`. `toString` returns the text [`Terminal.print`](/docs/library/terminal#print) writes, and `keys()` returns the member names in the order written, like `Object.keys`, extra members included.
 
 **Compared with JavaScript.**
 

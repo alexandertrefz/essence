@@ -853,12 +853,12 @@ describe("Dispatch and Resolution", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				namespace Counters for Integer {
 					overload step {
-						(startingWith start: Integer, while limit: Integer = 10, by amount: Integer) -> Integer {
-							<- start
+						(startingWith first: Integer, while limit: Integer = 10, by amount: Integer) -> Integer {
+							<- first
 						}
 
-						(startingWith start: Integer, by amount: Integer) -> Integer {
-							<- start
+						(startingWith first: Integer, by amount: Integer) -> Integer {
+							<- first
 						}
 					}
 				}

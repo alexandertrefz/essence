@@ -4016,7 +4016,7 @@ declarations {
 		// would stop the `Function.length` `builtins.spec.ts` checks — so the
 		// Compiler synthesizes the frame instead, as a const beside the prelude,
 		// and the runtime never learns that defaults exist. `String.slice` is
-		// the library's own case: `slice(from start: Integer = 0, to end:
+		// the library's own case: `slice(from first: Integer = 0, to end:
 		// Integer = @::length())`.
 		describe("a native Method that declares a default", () => {
 			// NOTE: The whole of what the shim buys, and the whole of what it
@@ -4039,9 +4039,9 @@ declarations {
 }`)
 
 				expect(code).toContain(
-					"const $es_String_slice = (_self, start = ",
+					"const $es_String_slice = (_self, first = ",
 				)
-				expect(code).toContain(") => String.slice(_self, start, end);")
+				expect(code).toContain(") => String.slice(_self, first, end);")
 				expect(code).toContain("$es_String_slice($pool_0, $pool_1)")
 			})
 

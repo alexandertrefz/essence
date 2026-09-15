@@ -427,13 +427,13 @@ describe("Rename of argument labels", () => {
 			"}",
 		].join("\n")
 
-		expect(rename(source, { line: 4, column: 20 }, "start")).toBe(
+		expect(rename(source, { line: 4, column: 20 }, "amount")).toBe(
 			[
 				"implementation {",
-				"\tconstant result = compute(start 1)",
+				"\tconstant result = compute(amount 1)",
 				"",
-				"\tfunction compute (start: Integer) -> Integer {",
-				"\t\t<- start",
+				"\tfunction compute (amount: Integer) -> Integer {",
+				"\t\t<- amount",
 				"\t}",
 				"}",
 			].join("\n"),
@@ -1530,12 +1530,12 @@ describe("Rename with Patterns", () => {
 			"}",
 		].join("\n")
 
-		expect(rename(source, { line: 2, column: 21 }, "start")).toBe(
+		expect(rename(source, { line: 2, column: 21 }, "corner")).toBe(
 			[
 				"implementation {",
-				"\tconstant point = { start = { x = 1, y = 2 } }",
+				"\tconstant point = { corner = { x = 1, y = 2 } }",
 				"",
-				"\tconstant { start as { x, y } } = point",
+				"\tconstant { corner as { x, y } } = point",
 				"",
 				"\tTerminal.print(x::add(y))",
 				"}",
@@ -1904,10 +1904,10 @@ describe("Rename of a name a default reads", () => {
 			"}",
 		].join("\n")
 
-		expect(rename(source, { line: 2, column: 55 }, "start")).toBe(
+		expect(rename(source, { line: 2, column: 55 }, "lowest")).toBe(
 			[
 				"implementation {",
-				"\tfunction pick(_ start: Integer, to second: Integer = start) -> Integer {",
+				"\tfunction pick(_ lowest: Integer, to second: Integer = lowest) -> Integer {",
 				"\t\t<- second",
 				"\t}",
 				"}",

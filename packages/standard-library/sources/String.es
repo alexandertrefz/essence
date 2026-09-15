@@ -891,7 +891,7 @@ declarations {
 		§§ @param from — the first position to include; zero when it is left out.
 		§§ @param to — the position to stop before; the length when it is left out.
 		§§ @returns — the String of that range of characters.
-		slice(from start: Integer = 0, to end: Integer = @::length()) -> String
+		slice(from first: Integer = 0, to end: Integer = @::length()) -> String
 
 		§§ Answers the String padded with the given String up to the given length.
 		§§

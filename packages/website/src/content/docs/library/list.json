@@ -115,7 +115,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "static of(integersFrom start: Integer, through end: Integer) -> List<Integer>",
+							"signature": "static of(integersFrom first: Integer, through end: Integer) -> List<Integer>",
 							"summary": "Answers the Integers from one value up through another, both included.\n\nThe count only runs up. An end below the start answers the empty List. To count down, use the `downTo:` entry.",
 							"parameters": [
 								{
@@ -139,7 +139,7 @@
 							]
 						},
 						{
-							"signature": "static of(integersFrom start: Integer, upTo end: Integer) -> List<Integer>",
+							"signature": "static of(integersFrom first: Integer, upTo end: Integer) -> List<Integer>",
 							"summary": "Answers the Integers from one value up to, but not including, another.\n\nThe count only runs up. An end at or below the start answers the empty List.",
 							"parameters": [
 								{
@@ -163,7 +163,7 @@
 							]
 						},
 						{
-							"signature": "static of(\n\tintegersFrom start: Integer,\n\tdownTo end: Integer,\n) -> NonEmptyList<Integer>",
+							"signature": "static of(\n\tintegersFrom first: Integer,\n\tdownTo end: Integer,\n) -> NonEmptyList<Integer>",
 							"summary": "Answers the Integers from one value down through another, both included.\n\nThe count only runs down. The first value is always answered, so an end above the start answers a List holding that value alone. The answer certainly has something in it.",
 							"parameters": [
 								{
@@ -187,7 +187,7 @@
 							]
 						},
 						{
-							"signature": "static of(\n\tintegersFrom start: Integer,\n\tthrough end: Integer,\n\tby step: NonZeroInteger,\n) -> List<Integer>",
+							"signature": "static of(\n\tintegersFrom first: Integer,\n\tthrough end: Integer,\n\tby step: NonZeroInteger,\n) -> List<Integer>",
 							"summary": "Answers the Integers from one value through another, moving by the given step.\n\nThe step is added each turn, and the walk stops where a step passes the end. A step that moves away from the end answers the empty List.",
 							"parameters": [
 								{
@@ -218,7 +218,7 @@
 							]
 						},
 						{
-							"signature": "static of(\n\tintegersFrom start: Integer,\n\tupTo end: Integer,\n\tby step: NonZeroInteger,\n) -> List<Integer>",
+							"signature": "static of(\n\tintegersFrom first: Integer,\n\tupTo end: Integer,\n\tby step: NonZeroInteger,\n) -> List<Integer>",
 							"summary": "Answers the Integers from one value up to, but not including, another, moving by the given step.\n\nThe step is added each turn, and the walk stops before the end. A step that moves away from the end answers the empty List.",
 							"parameters": [
 								{
@@ -249,7 +249,7 @@
 							]
 						},
 						{
-							"signature": "static of(\n\tintegersFrom start: Integer,\n\tdownTo end: Integer,\n\tby step: NonZeroInteger,\n) -> NonEmptyList<Integer>",
+							"signature": "static of(\n\tintegersFrom first: Integer,\n\tdownTo end: Integer,\n\tby step: NonZeroInteger,\n) -> NonEmptyList<Integer>",
 							"summary": "Answers the Integers from one value down through another, moving by the given step.\n\nThe step is added each turn, and the walk stops where a step passes the end. The first value is always answered, so a step that moves away from the end answers a List holding that value alone.",
 							"parameters": [
 								{
@@ -3047,7 +3047,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "slice(\n\tfrom start: Integer = 0,\n\tto end: Integer = @::length(),\n) -> List<ItemType>",
+							"signature": "slice(\n\tfrom first: Integer = 0,\n\tto end: Integer = @::length(),\n) -> List<ItemType>",
 							"summary": "Answers a new List of the items from one position up to, but not including, another.\n\nA negative position counts back from the end, so `slice(from 0, to -1)` drops the last item.",
 							"parameters": [
 								{

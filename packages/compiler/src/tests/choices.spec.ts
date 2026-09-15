@@ -3495,10 +3495,10 @@ describe("Choices", () => {
 					}
 
 					constant red: Colour = #Red
-					constant start: Side = #Start
+					constant side: Side = #Start
 
 					Terminal.inspect(namesOf(red))
-					Terminal.inspect(namesOf(start))
+					Terminal.inspect(namesOf(side))
 				}`),
 			).toEqual(["3", "3"])
 		})

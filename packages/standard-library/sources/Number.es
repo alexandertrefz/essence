@@ -190,10 +190,10 @@ declarations {
 			§§ @param _ — the Numbers to add up
 			§§ @returns — the total.
 			(_ numbers: List<Scalar>) -> Scalar {
-				constant start: Scalar = 0
+				constant seed: Scalar = 0
 
 				constant total = numbers::reduce(
-					startingWith start,
+					startingWith seed,
 					(accumulated, number) { <- accumulated::add(number) },
 				)
 
@@ -248,10 +248,10 @@ declarations {
 			§§ @param _ — the Numbers to multiply
 			§§ @returns — the product.
 			(_ numbers: List<Scalar>) -> Scalar {
-				constant start: Scalar = 1
+				constant seed: Scalar = 1
 
 				constant total = numbers::reduce(
-					startingWith start,
+					startingWith seed,
 					(accumulated, number) {
 						<- accumulated::multiply(with number)
 					},
@@ -469,9 +469,9 @@ declarations {
 			§§ @param _ — the Integers to compare
 			§§ @returns — the lowest Integer, or nothing for the empty List.
 			(_ integers: List<Integer>) -> Optional<Integer> {
-				constant start: Optional<Integer> = #Empty
+				constant seed: Optional<Integer> = #Empty
 
-				<- integers::reduce(startingWith start, (lowest, integer) {
+				<- integers::reduce(startingWith seed, (lowest, integer) {
 					<- match lowest -> Optional<Integer> {
 						case #Empty { <- #Value(integer) }
 
@@ -489,9 +489,9 @@ declarations {
 			§§ @param _ — the Rationals to compare
 			§§ @returns — the lowest Rational, or nothing for the empty List.
 			(_ rationals: List<Rational>) -> Optional<Rational> {
-				constant start: Optional<Rational> = #Empty
+				constant seed: Optional<Rational> = #Empty
 
-				<- rationals::reduce(startingWith start, (lowest, rational) {
+				<- rationals::reduce(startingWith seed, (lowest, rational) {
 					<- match lowest -> Optional<Rational> {
 						case #Empty { <- #Value(rational) }
 
@@ -512,9 +512,9 @@ declarations {
 			§§ @param _ — the Numbers to compare
 			§§ @returns — the lowest Number, or nothing for the empty List.
 			(_ numbers: List<Scalar>) -> Optional<Scalar> {
-				constant start: Optional<Scalar> = #Empty
+				constant seed: Optional<Scalar> = #Empty
 
-				<- numbers::reduce(startingWith start, (lowest, number) {
+				<- numbers::reduce(startingWith seed, (lowest, number) {
 					<- match lowest -> Optional<Scalar> {
 						case #Empty { <- #Value(number) }
 
@@ -704,9 +704,9 @@ declarations {
 			§§ @param _ — the Integers to compare
 			§§ @returns — the highest Integer, or nothing for the empty List.
 			(_ integers: List<Integer>) -> Optional<Integer> {
-				constant start: Optional<Integer> = #Empty
+				constant seed: Optional<Integer> = #Empty
 
-				<- integers::reduce(startingWith start, (highest, integer) {
+				<- integers::reduce(startingWith seed, (highest, integer) {
 					<- match highest -> Optional<Integer> {
 						case #Empty { <- #Value(integer) }
 
@@ -724,9 +724,9 @@ declarations {
 			§§ @param _ — the Rationals to compare
 			§§ @returns — the highest Rational, or nothing for the empty List.
 			(_ rationals: List<Rational>) -> Optional<Rational> {
-				constant start: Optional<Rational> = #Empty
+				constant seed: Optional<Rational> = #Empty
 
-				<- rationals::reduce(startingWith start, (highest, rational) {
+				<- rationals::reduce(startingWith seed, (highest, rational) {
 					<- match highest -> Optional<Rational> {
 						case #Empty { <- #Value(rational) }
 
@@ -744,9 +744,9 @@ declarations {
 			§§ @param _ — the Numbers to compare
 			§§ @returns — the highest Number, or nothing for the empty List.
 			(_ numbers: List<Scalar>) -> Optional<Scalar> {
-				constant start: Optional<Scalar> = #Empty
+				constant seed: Optional<Scalar> = #Empty
 
-				<- numbers::reduce(startingWith start, (highest, number) {
+				<- numbers::reduce(startingWith seed, (highest, number) {
 					<- match highest -> Optional<Scalar> {
 						case #Empty { <- #Value(number) }
 

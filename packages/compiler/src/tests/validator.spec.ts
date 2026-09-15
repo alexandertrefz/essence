@@ -2441,7 +2441,7 @@ describe("Validator", () => {
 
 		it("should name the Parameter an Argument was actually paired with", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				function cut(from start: Integer = 0, to end: String) -> String {
+				function cut(from first: Integer = 0, to end: String) -> String {
 					<- end
 				}
 

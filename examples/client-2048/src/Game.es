@@ -85,7 +85,7 @@ implementation {
 	}
 
 	§§ A new game: an empty board with the two tiles it opens with.
-	function start() -> Game {
+	function deal() -> Game {
 		<- withNewTile(withNewTile(empty))
 	}
 
@@ -168,6 +168,7 @@ implementation {
 export {
 	Game
 	Status
+	deal
 	empty
 	emptyCells
 	highest
@@ -176,7 +177,6 @@ export {
 	moves
 	place
 	resume
-	start
 	status
 	undo
 	withNewTile
@@ -271,7 +271,7 @@ tests {
 		}
 
 		test "opens a new game with two tiles and no moves behind it" {
-			constant game = start()
+			constant game = deal()
 
 			expect emptyCells(game)::length()::is(14)
 			expect moves(game)::is(0)

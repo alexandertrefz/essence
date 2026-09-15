@@ -274,6 +274,8 @@ const reservedWords = new Set([
 	"for",
 	"infer",
 	"choice",
+	"start",
+	"complete",
 	"true",
 	"false",
 	// NOTE: Structurally significant inside a Pattern, where it separates a

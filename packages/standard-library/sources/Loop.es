@@ -78,7 +78,7 @@ declarations {
 		§§ @param _ — the body, handed each Integer and the running State, answering with the next State.
 		§§ @returns — the State after the last step, or the seed when the body never runs.
 		<infer State>(
-			from start: Integer,
+			from first: Integer,
 			through end: Integer,
 			startingWith state: State,
 			_ advance: (_: Integer, _: State) -> State,
@@ -87,7 +87,7 @@ declarations {
 			§ Record. The `carried` member is the caller's State, and `index`
 			§ is the count the body is handed each turn.
 			constant { carried } = loop(
-				startingWith { index = start, carried = state },
+				startingWith { index = first, carried = state },
 				while ({ index }) { <- index::isLessThanOrEqualTo(end) },
 				({ index, carried }) {
 					<- {
@@ -122,7 +122,7 @@ declarations {
 		§§ @param _ — the body, handed each Integer and the running State, answering with the next State.
 		§§ @returns — the State after the last step, or the seed when the body never runs.
 		<infer State>(
-			from start: Integer,
+			from first: Integer,
 			upTo end: Integer,
 			startingWith state: State,
 			_ advance: (_: Integer, _: State) -> State,
@@ -131,7 +131,7 @@ declarations {
 			§ entry counts up only, so an end at or below the start reaches a
 			§ `through` below it and the body never runs.
 			<- loop(
-				from start,
+				from first,
 				through end::subtract(1),
 				startingWith state,
 				advance,
@@ -148,7 +148,7 @@ declarations {
 		§§ @param _ — the body, handed each Integer and the running State, answering with the next State.
 		§§ @returns — the State after the last step.
 		<infer State>(
-			from start: Integer,
+			from first: Integer,
 			downTo end: Integer,
 			startingWith state: State,
 			_ advance: (_: Integer, _: State) -> State,
@@ -159,8 +159,8 @@ declarations {
 			§ `List.of(integersFrom:downTo:)` carries into its Type.
 			constant { carried } = loop(
 				startingWith {
-					index = start::subtract(1),
-					carried = advance(start, state),
+					index = first::subtract(1),
+					carried = advance(first, state),
 				},
 				while ({ index }) { <- index::isGreaterThanOrEqualTo(end) },
 				({ index, carried }) {
@@ -184,7 +184,7 @@ declarations {
 		§§ @param step — the body, handed each Integer and the running State, answering with a `Step`.
 		§§ @returns — the State the count ran out on, or the value the first `#Done` carries.
 		<infer State>(
-			from start: Integer,
+			from first: Integer,
 			through end: Integer,
 			startingWith state: State,
 			step advance: (_: Integer, _: State) -> Step<State, State>,
@@ -195,7 +195,7 @@ declarations {
 			§ earlier. Both Type Parameters of the body's `Step` are the State,
 			§ which is what lets one answer stand for either ending.
 			<- loop(
-				startingWith { index = start, carried = state },
+				startingWith { index = first, carried = state },
 				step ({ index, carried }) {
 					if index::isGreaterThan(end) {
 						<- #Done(carried)
@@ -226,7 +226,7 @@ declarations {
 		§§ @param step — the body, handed each Integer and the running State, answering with a `Step`.
 		§§ @returns — the State the count ran out on, or the value the first `#Done` carries.
 		<infer State>(
-			from start: Integer,
+			from first: Integer,
 			upTo end: Integer,
 			startingWith state: State,
 			step advance: (_: Integer, _: State) -> Step<State, State>,
@@ -235,7 +235,7 @@ declarations {
 			§ one lower, exactly as the run-to-the-end `upTo:` entry is written
 			§ on its own neighbour.
 			<- loop(
-				from start,
+				from first,
 				through end::subtract(1),
 				startingWith state,
 				step advance,
@@ -252,7 +252,7 @@ declarations {
 		§§ @param step — the body, handed each Integer and the running State, answering with a `Step`.
 		§§ @returns — the State the count ran out on, or the value the first `#Done` carries.
 		<infer State>(
-			from start: Integer,
+			from first: Integer,
 			downTo end: Integer,
 			startingWith state: State,
 			step advance: (_: Integer, _: State) -> Step<State, State>,
@@ -262,7 +262,7 @@ declarations {
 			§ seen. It is why this entry is not written on the up-counting one
 			§ with the comparisons turned round.
 			<- loop(
-				startingWith { index = start, carried = state },
+				startingWith { index = first, carried = state },
 				step ({ index, carried }) {
 					<- match advance(index, carried)
 						-> Step<{ index: Integer, carried: State }, State>

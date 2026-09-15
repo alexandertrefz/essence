@@ -26,11 +26,11 @@ function distance(movement: Movement, row: number, column: number): number {
 	)
 }
 
-// NOTE: `start` deals a new game its two tiles. That a game opens with two is
+// NOTE: `deal` hands a new game its two tiles. That a game opens with two is
 // a rule of the game, so it is a rule of the Module, and the page asks for one
 // rather than dealing it.
 function newGame(): void {
-	game = rules.start()
+	game = rules.deal()
 	render()
 }
 

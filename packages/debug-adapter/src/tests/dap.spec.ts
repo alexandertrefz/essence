@@ -234,7 +234,7 @@ describe("a debug session", () => {
 	}, 60_000)
 
 	// NOTE: The three faces a List box wears once its runs are shared, all
-	// bound at one pause: `start` still names a box whose inner Array `held`'s
+	// bound at one pause: `given` still names a box whose inner Array `held`'s
 	// first append grew past it, `held` was then prepended to and holds its
 	// first item in a second run stored backwards, and `grown` views the whole
 	// of the Array all three share. Reading any of them off its raw Array
@@ -256,8 +256,8 @@ describe("a debug session", () => {
 			programPath,
 			"implementation {\n" +
 				"\n" +
-				"\tfunction grow(_ start: List<Integer>) -> Integer {\n" +
-				"\t\tvariable held = start::append(1)\n" +
+				"\tfunction grow(_ given: List<Integer>) -> Integer {\n" +
+				"\t\tvariable held = given::append(1)\n" +
 				"\t\tvariable grown = held::append(2)\n" +
 				"\n" +
 				"\t\theld = held::prepend(0)\n" +
@@ -305,7 +305,7 @@ describe("a debug session", () => {
 			let shown = (name: string) =>
 				variables.find((variable) => variable.name === name)!
 
-			expect(shown("start").value).toBe("[]")
+			expect(shown("given").value).toBe("[]")
 			expect(shown("held").value).toBe("[ 0, 1 ]")
 			expect(shown("grown").value).toBe("[ 1, 2 ]")
 

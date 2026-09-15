@@ -1562,10 +1562,10 @@ Taught on [Patterns](/docs/language/patterns).
 
 ```essence
 implementation {
-	constant line = { start = { x = 1, y = 2 }, label = "edge" }
-	constant { start as { x as startX }, label as name } = line
+	constant line = { from = { x = 1, y = 2 }, label = "edge" }
+	constant { from as { x as fromX }, label as name } = line
 
-	Terminal.print("{name} starts at {startX}") § edge starts at 1
+	Terminal.print("{name} starts at {fromX}") § edge starts at 1
 }
 ```
 

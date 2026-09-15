@@ -1447,9 +1447,9 @@ describe("Enricher", () => {
 				typeOfFirstConstant(`implementation {
 					namespace Finder<infer ItemType> for List<ItemType> {
 						firstMatch(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
-							constant start: Optional<ItemType> = #Empty
+							constant seed: Optional<ItemType> = #Empty
 
-							<- @::reduce(startingWith start, step (found, item) {
+							<- @::reduce(startingWith seed, step (found, item) {
 								if check(item) { <- #Done(#Value(item)) }
 
 								<- #Continue(found)
@@ -2050,9 +2050,9 @@ describe("Enricher", () => {
 				let { program, diagnostics } = enrichSource(`implementation {
 					namespace Finder<infer Item> for List<Item> {
 						firstMatch(where check: (_ item: Item) -> Boolean) -> Optional<Item> {
-							constant start: Optional<Item> = #Empty
+							constant seed: Optional<Item> = #Empty
 
-							<- @::reduce(startingWith start, step (found, item) {
+							<- @::reduce(startingWith seed, step (found, item) {
 								if check(item) { <- #Done(#Value(item)) }
 
 								<- #Continue(found)
@@ -5869,7 +5869,7 @@ describe("Enricher", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					namespace Slices for List<Integer> {
-						cut(_ start: Integer = 0, to end: Integer) -> Integer {
+						cut(_ first: Integer = 0, to end: Integer) -> Integer {
 							<- end
 						}
 					}
@@ -5925,8 +5925,8 @@ describe("Enricher", () => {
 			// pairs `to` — decided from labels alone.
 			it("should skip an interior default the next label steps over", () => {
 				let value = lastConstantFunctionInvocation(`implementation {
-					function cut(from start: Integer = 0, to end: Integer) -> Integer {
-						<- end::subtract(start)
+					function cut(from first: Integer = 0, to end: Integer) -> Integer {
+						<- end::subtract(first)
 					}
 
 					constant value = cut(to 3)

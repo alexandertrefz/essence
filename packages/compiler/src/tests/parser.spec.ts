@@ -3931,8 +3931,8 @@ import { from "./Geometry.es" { Rectangle } }`,
 			it("should read a Module Keyword as a Parameter label and name", () => {
 				let { program, diagnostics } = parseWithDiagnostics(
 					`implementation {
-						function slice(from start: Integer, as end: Integer) -> Integer {
-							<- start
+						function slice(from first: Integer, as end: Integer) -> Integer {
+							<- first
 						}
 					}`,
 				)
@@ -3954,7 +3954,7 @@ import { from "./Geometry.es" { Rectangle } }`,
 							(parameter) =>
 								parameterInternalName(parameter)?.content,
 						),
-					).toEqual(["start", "end"])
+					).toEqual(["first", "end"])
 				}
 			})
 

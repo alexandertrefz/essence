@@ -2443,7 +2443,7 @@ describe("Completion of a Protocol-bounded Type Parameter", () => {
 describe("Completion of a label a call may leave out", () => {
 	let source = [
 		"implementation {",
-		"\tfunction cut (from start: Integer = 0, to end: Integer) -> Integer {",
+		"\tfunction cut (from first: Integer = 0, to end: Integer) -> Integer {",
 		"\t\t<- end",
 		"\t}",
 		"\tcut(",
@@ -2564,8 +2564,8 @@ describe("Completion of a label inside a Parameter's default", () => {
 	it("should offer the labels of a call written in a default", () => {
 		let source = [
 			"implementation {",
-			"\tfunction cut(from start: Integer, to end: Integer) -> Integer {",
-			"\t\t<- end::subtract(start)",
+			"\tfunction cut(from first: Integer, to end: Integer) -> Integer {",
+			"\t\t<- end::subtract(first)",
 			"\t}",
 			"",
 			"\tfunction span(_ width: Integer = cut(from 0, ) -> Integer {",
