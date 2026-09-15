@@ -437,15 +437,27 @@ export {
 			signal: stopping.signal,
 		})
 
-		// NOTE: A deferred computation has nothing to stop partway — it runs to
-		// its end the moment it is started — so what is asserted here is that
-		// the stop reaches the binding at all and changes no answer. What a
-		// stopped WAIT looks like is `marshal.spec.ts`'s to say.
-		expect(
-			await (
-				stoppable.exports.doubled as (value: bigint) => Promise<bigint>
-			)(21n),
-		).toBe(42n)
+		// NOTE: A host that has already pulled its stop is a host that wants
+		// nothing started, and a call only BUILDS the work — so nothing runs and
+		// the promise never settles, which is what a stopped run answers with
+		// everywhere. A deferred computation has nothing to stop PARTWAY, which
+		// is exactly why the decision has to be made before it starts.
+		let settled = false
+
+		void (stoppable.exports.doubled as (value: bigint) => Promise<bigint>)(
+			21n,
+		).then(
+			() => {
+				settled = true
+			},
+			() => {
+				settled = true
+			},
+		)
+
+		await new Promise((resolve) => setTimeout(resolve, 20))
+
+		expect(settled).toBe(false)
 	})
 
 	// NOTE: And the other direction of the same decision: `esc` leaves the whole

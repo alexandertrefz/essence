@@ -380,14 +380,24 @@ let answering = async.exports.headline("https://example.com")
 stopping.abort()
 ```
 
-Everything that call started is stopped with it: `Async.sleep` clears its timer,
-`::within` and `::race` stop their losers through a child of the same context,
-and a request the standard library made is aborted. A stopped run answers
-**nothing at all** — a Future can not fail, so the promise is left unsettled
-rather than rejected, which is what cancellation means everywhere else in the
-language. A `Started` is left alone: one run belongs to whoever started it and
-may be waited for from anywhere, so a stop written by one holder may not take
-the answer away from the others.
+Every run that call started is **signalled**, and a stopped run answers **nothing
+at all** — a Future can not fail, so the promise is left unsettled rather than
+rejected, which is what cancellation means everywhere else in the language.
+
+Stopping is cooperative, which decides what it reaches. Work suspended in a
+native that reads the signal stops there: `Async.sleep` clears its timer,
+`Http.send` aborts the request, and `::within` and `::race` stop their losers
+through a child of the same context. Work that is already running to its end
+runs to its end and answers — nothing between two statements reads a signal, so
+there is no point at which it could be taken away.
+
+A signal that is **already** aborted is different: the call builds a future and
+runs none of it, so the boundary does not start it at all. Nothing runs, no host
+callback is called, and the promise the host holds never settles.
+
+A `Started` is left alone in every case: one run belongs to whoever started it
+and may be waited for from anywhere, so a stop written by one holder may not
+take the answer away from the others.
 
 ## Types
 

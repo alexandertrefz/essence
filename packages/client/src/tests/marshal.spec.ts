@@ -2305,9 +2305,11 @@ describe("A host's signal", () => {
 		expect(settled()).toBe(false)
 	})
 
-	// NOTE: And a signal that is aborted ALREADY stops the run before it starts,
-	// rather than starting work the host has said it no longer wants.
-	it("starts nothing under a signal that is already aborted", async () => {
+	// NOTE: And a signal that is aborted ALREADY is a host that wants nothing
+	// started. The call BUILDS a future and runs none of it, so the boundary has
+	// nothing to stop: it simply does not start it, and what the host holds is
+	// the promise a stopped run answers with, which is none at all.
+	it("answers nothing under a signal that is already aborted", async () => {
 		let stopping = new AbortController()
 		let module = await bound(stopping.signal)
 
@@ -2317,6 +2319,56 @@ describe("A host's signal", () => {
 
 		await delay(20)
 
+		expect(settled()).toBe(false)
+	})
+
+	// NOTE: The half that is not about a wait. `doubled` completes an
+	// `Async.deferred`, which has nothing to stop partway — so before, it ran
+	// to its end and the host was handed the answer it had said it no longer
+	// wanted. Nothing is started at all now.
+	it("runs nothing at all under a signal that is already aborted", async () => {
+		let stopping = new AbortController()
+		let module = await bound(stopping.signal)
+
+		stopping.abort()
+
+		let settled = settlingOf(
+			(module.exports.doubled as (value: bigint) => Promise<unknown>)(
+				21n,
+			),
+		)
+
+		await delay(20)
+
+		expect(settled()).toBe(false)
+	})
+
+	// NOTE: And a host callback is not called either, for the same reason: a
+	// callback declared to answer a Future is called at every START, and there
+	// is no start here.
+	it("calls no host callback under a signal that is already aborted", async () => {
+		let stopping = new AbortController()
+		let module = await bound(stopping.signal)
+
+		stopping.abort()
+
+		let calls = 0
+		let settled = settlingOf(
+			(
+				module.exports.loaded as (
+					key: string,
+					load: (key: string) => unknown,
+				) => Promise<unknown>
+			)("key", (key: string) => {
+				calls += 1
+
+				return Promise.resolve(key)
+			}),
+		)
+
+		await delay(20)
+
+		expect(calls).toBe(0)
 		expect(settled()).toBe(false)
 	})
 

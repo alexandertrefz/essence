@@ -1841,6 +1841,19 @@ export function createInterpreter(
 				return toJS(value, at, step, expected)
 			}
 
+			// NOTE: A host that has already pulled its stop is a host that wants
+			// nothing started. A Future has not run yet — the call above only
+			// BUILT it — so there is nothing here to stop: it is simply not
+			// started, and what the host holds is the promise a stopped run
+			// answers with, which is none at all.
+			//
+			// A Started is not declined, for the reason it is not linked either:
+			// the run was put in flight before this boundary saw it, and it
+			// belongs to whoever started it.
+			if (!started && hostSignal?.aborted === true) {
+				return new Promise(() => {})
+			}
+
 			// NOTE: A Started is waited for under a context of its own that
 			// nothing reads — the runtime answers one with the promise it
 			// already holds — so there is nothing to unlink afterwards either.
@@ -1885,8 +1898,19 @@ export function createInterpreter(
 			return { context, release: nothing }
 		}
 
-		// NOTE: A signal that is aborted ALREADY stops the run before it starts,
-		// rather than starting work the host has said it no longer wants.
+		// NOTE: A signal that is aborted ALREADY aborts this context before
+		// anything is run under it. The run is declined outright one level up,
+		// where the answer is built — see `buildAnswerOut` — and this is what
+		// makes a run that somehow reaches here read a signal that is already
+		// pulled.
+		//
+		// NOTE: What a MID-RUN abort does is cooperative, and the word for it is
+		// signalled rather than stopped. Work suspended in a native that reads
+		// the signal — `Async.sleep`, `Http.send`, and `::within` and `::race`
+		// over either — stops there and answers nothing at all. Work already
+		// running to its end runs to its end and answers: there is no point in
+		// it at which anything could be taken away, because nothing between two
+		// Statements reads a signal.
 		if (hostSignal.aborted) {
 			context.controller.abort(hostSignal.reason)
 

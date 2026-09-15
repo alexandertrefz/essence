@@ -409,7 +409,13 @@ let answering = reports.exports.delayed("first")
 stopping.abort() // `answering` never settles
 ```
 
-Everything that call started stops with it: [`Async.sleep`](/docs/library/future#sleep) clears its timer, [`within`](/docs/library/future#within) and [`race`](/docs/library/future#race) stop their losers, and a request [`Http`](/docs/library/http) made is aborted. A stopped run answers **nothing at all** — a future cannot fail, so the promise is left unsettled rather than rejected, which is what cancellation means everywhere else in the language. A `Started` is left alone: one run belongs to whoever started it, and a stop written by one holder may not take the answer away from the others.
+Every run that call started is **signalled**, and a stopped run answers **nothing at all** — a future cannot fail, so the promise is left unsettled rather than rejected, which is what cancellation means everywhere else in the language.
+
+Stopping is cooperative, which decides what it reaches. Work suspended in a native that reads the signal stops there: [`Async.sleep`](/docs/library/future#sleep) clears its timer, a request [`Http`](/docs/library/http) made is aborted, and [`within`](/docs/library/future#within) and [`race`](/docs/library/future#race) stop their losers. Work already running to its end runs to its end and answers — nothing between two statements reads a signal.
+
+A signal that is **already** aborted is different: the call builds a future and runs none of it, so the boundary does not start it at all. Nothing runs, no host callback is called, and the promise never settles.
+
+A `Started` is left alone in every case: one run belongs to whoever started it, and a stop written by one holder may not take the answer away from the others.
 
 [Asynchrony](/docs/language/asynchrony) teaches the Essence side of all of this.
 
