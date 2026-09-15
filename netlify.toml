@@ -19,6 +19,15 @@ to = "/docs/reference/diagnostics"
 status = 301
 force = true
 
+# The optimisation passes, at the short address beside it. `essence help build`
+# sends a reader to the page a pass is documented under, and a name typed from
+# a terminal is typed short.
+[[redirects]]
+from = "/optimisations"
+to = "/docs/reference/optimisations"
+status = 301
+force = true
+
 # Project layout left Getting Started and became the Projects guide. The old
 # address was live, so it keeps working.
 [[redirects]]

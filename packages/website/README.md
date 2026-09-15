@@ -81,7 +81,8 @@ Bun from the root (this package resolves through the workspace's
 
 The old GitHub Pages workflow and the root `docs` symlink are gone. The one URL
 that outlived them, `/diagnostics`, is a 301 in `netlify.toml` to
-`/docs/reference/diagnostics`.
+`/docs/reference/diagnostics`; `/optimisations` sits beside it, for the address
+`essence help build` names.
 
 Connecting the repository to a Netlify site and pointing the domain at it is a
 dashboard step; the configuration here is everything the build itself needs.

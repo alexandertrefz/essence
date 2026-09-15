@@ -196,9 +196,9 @@ const withoutOptimisationOption: OptionSpec = {
 	summary: "Turn one optimisation pass off, by name",
 	details:
 		"Repeatable, and the name is the one the pass is documented under at " +
-		"essence-language.org/optimisations. Every other pass keeps running: " +
-		"no pass depends on another, so any set of them emits a correct " +
-		"Program, and turning one off is how a suspect is named.",
+		"https://essencelang.org/docs/reference/optimisations. Every other " +
+		"pass keeps running: no pass depends on another, so any set of them " +
+		"emits a correct Program, and turning one off is how a suspect is named.",
 }
 
 // NOTE: The one flag that changes what the OUTPUT IS rather than how it was
