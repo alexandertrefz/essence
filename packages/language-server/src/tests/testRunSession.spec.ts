@@ -263,18 +263,38 @@ describe("The Server's live test session", () => {
 
 		expect(second?.ids).toHaveLength(1)
 
-		let { result } = await session.request<{ run: number | null }>(
-			{ method: "essence/runTests" },
-			{ ids: second?.ids, files: [pathOf("Season.tests.es")] },
-		)
+		let ask = async () => {
+			let { result } = await session.request<{ run: number | null }>(
+				{ method: "essence/runTests" },
+				{ ids: second?.ids, files: [pathOf("Season.tests.es")] },
+			)
 
-		expect(result.run).not.toBeNull()
+			expect(result.run).not.toBeNull()
 
-		// NOTE: Waited for by the NUMBER the request answered with. The session
-		// runs on its own account too, so a run of its own slipping in between
-		// would make the second run to end somebody else's — and the assertion
-		// below would then be about a batch nobody narrowed.
-		let ended = await session.waitForTestRun(result.run as number)
+			// NOTE: Waited for by the NUMBER the request answered with. The
+			// session runs on its own account too, so a run of its own slipping
+			// in between would make the second run to end somebody else's — and
+			// the assertion below would then be about a batch nobody narrowed.
+			return session.waitForTestRun(result.run as number)
+		}
+
+		// NOTE: And asked AGAIN where that number was not this request's. A
+		// request landing while a run is in flight is folded into it: the
+		// session answers with the run already going and remembers the file
+		// without the ids, so the batch that ends is the whole file's. Opening a
+		// file defers a cycle behind the debounce, and that deferred cycle is
+		// the run that can be in flight here — on a machine loaded enough for
+		// the window to pass while the two requests above are in the air. Once
+		// it has ended nothing is running and nothing is armed for another
+		// debounce, so the second ask can not be folded in its turn.
+		let ended = await ask()
+
+		if (ended.ids.length === 0) {
+			ended = await ask()
+		}
+
+		expect(ended.ids).toHaveLength(1)
+
 		let started = ended.events.filter(
 			(event) => event.kind === "test-start",
 		)
