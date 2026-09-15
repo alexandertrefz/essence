@@ -229,6 +229,15 @@ describe("A session whose run never ends", () => {
 
 			// NOTE: And the session is still a session. Nothing about the run
 			// that was stopped is held against the next one.
+			//
+			// NOTE: The deadline is raised first, and the recovery run is why
+			// the session has a movable one. 3 s is what stops the endless run
+			// in a test's worth of time; the run after it is the more expensive
+			// of the two — the deadline handler terminated the Worker, so this
+			// one pays a cold Worker start AND a cold compile the endless run
+			// had already paid — and on an oversubscribed host it clamped at
+			// the wall and reported nothing passed.
+			session.setDeadline(60_000)
 			writeFileSync(file, quick)
 			session.run({ files: [file] })
 

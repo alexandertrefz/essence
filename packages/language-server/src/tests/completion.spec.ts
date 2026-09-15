@@ -1675,6 +1675,20 @@ describe("Completion", () => {
 			])
 		})
 
+		// NOTE: Both asynchrony words are legal at the head of a Statement —
+		// `complete f()` there analyses clean and `start f()` is the deliberate
+		// Information — so they are offered there as well as inside an
+		// Expression, though neither is a Keyword the Statement parser
+		// dispatches on.
+		it("should offer both asynchrony Keywords at the start of a Statement", () => {
+			let source = ["implementation {", "\t", "}"].join("\n")
+
+			let keywords = keywordsOf(source, { line: 2, column: 2 })
+
+			expect(keywords).toContain("start")
+			expect(keywords).toContain("complete")
+		})
+
 		// NOTE: `as` and `otherwise` are the middle and the end of a `define`
 		// arm rather than the start of an Expression, and this list is the
 		// starts — see the NOTE on `expressionKeywords`.

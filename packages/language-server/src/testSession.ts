@@ -113,6 +113,11 @@ export type TestSession = {
 	isEnabled(): boolean
 	// NOTE: How long a burst of edits is allowed to be before it costs a run.
 	setDebounce(milliseconds: number): void
+	// NOTE: How long a run may take before it is stopped. Movable because a
+	// session that has just STOPPED a run owes the next one room: the deadline
+	// handler terminated the Worker, so the run after it pays a cold Worker
+	// start and a cold compile the stopped run had already paid.
+	setDeadline(milliseconds: number): void
 	// NOTE: Whether a run counts what it reached. Turning it on compiles every
 	// entry again — an instrumented bundle is different bytes — so the answer
 	// arrives on the next cycle rather than at once.
@@ -811,6 +816,9 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		isEnabled: () => enabled,
 		setDebounce(milliseconds: number): void {
 			debounce = Math.max(0, milliseconds)
+		},
+		setDeadline(milliseconds: number): void {
+			deadline = Math.max(1, milliseconds)
 		},
 		setCoverage(next: boolean): void {
 			if (next === coverageEnabled) {

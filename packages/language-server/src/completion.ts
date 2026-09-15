@@ -2469,9 +2469,18 @@ function isAtStatementStart(headText: string): boolean {
 // will not parse costs one Parser Diagnostic on the next keystroke; the
 // alternative is a second, approximate model of where each Keyword may stand,
 // which would be wrong in subtler ways.
+// NOTE: `start` and `complete` are added to the STATEMENT list rather than put
+// in it, because that list is what `parseImplementationNode` dispatches on and
+// neither word is one of those: a Statement opening with either is an ordinary
+// Expression Statement. Both are legal there all the same — `complete f()` at
+// Statement position analyses clean and `start f()` is the deliberate
+// Information — so a reader typing `comp` at the head of a line was being
+// offered nothing while the same prefix inside an Expression offered both.
 function keywordCompletions(headText: string): Array<CompletionEntry> {
 	return (
-		isAtStatementStart(headText) ? statementKeywords : expressionKeywords
+		isAtStatementStart(headText)
+			? [...statementKeywords, "start", "complete"]
+			: expressionKeywords
 	).map((keyword) => ({
 		label: keyword,
 		kind: "keyword" as const,
