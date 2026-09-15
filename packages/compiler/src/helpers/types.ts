@@ -35,6 +35,65 @@ export function overloadIndexOf(name: string): number | null {
 //
 // Two stages ask: the Validator lets a body promising it fall off its end, and
 // the Simplifier spells the fall-off out. They must agree, so they ask here.
+// NOTE: What a `<-` in a body answers with — the declared Type for every
+// ordinary body, and the INNER Type for a completing one. A body that suspends
+// is written as though it answered the value, and the future is what the
+// emission wraps around it, so `function headline(_ url: String) ->
+// Future<String>` returns a String from its `<-`.
+//
+// NOTE: A completing body whose declaration is not a Future is answered with
+// what it declared. The `complete` inside it has been reported already, and
+// unwrapping something that is not a future would say the same thing again at
+// every `<-`.
+export function returnedTypeOf(
+	declared: common.Type,
+	completing: boolean,
+): common.Type {
+	return completing && declared.type === "Future"
+		? declared.valueType
+		: declared
+}
+
+// NOTE: What a Type mismatch has to say about ASYNCHRONY, and null wherever it
+// has nothing — which is every mismatch in a Program that waits for nothing.
+// Three shapes are worth naming, and each is one missing word rather than a
+// wrong value:
+//
+//   - `"unstarted"` — a `Future<T>` stands where its `T` is wanted. The work
+//     was described and never run.
+//   - `"in-flight"` — a `Started<T>` stands where its `T` is wanted. The work
+//     IS running, and nobody waited for it.
+//   - `"not-a-future"` — a `T` stands where a `Future<T>` is wanted, which is
+//     what a body that declares a future and completes nothing answers with.
+//
+// Each is decided by assignability rather than by the spelling, so a
+// `Future<Integer>` arriving where a String is wanted is a plain mismatch and
+// gets none of this: `complete` would not have fixed it.
+export type AsynchronyMismatch = "unstarted" | "in-flight" | "not-a-future"
+
+export function asynchronyMismatch(
+	expected: common.Type,
+	actual: common.Type,
+): AsynchronyMismatch | null {
+	if (
+		(actual.type === "Future" || actual.type === "Started") &&
+		expected.type !== actual.type &&
+		matchesType(expected, actual.valueType)
+	) {
+		return actual.type === "Future" ? "unstarted" : "in-flight"
+	}
+
+	if (
+		expected.type === "Future" &&
+		actual.type !== "Future" &&
+		matchesType(expected.valueType, actual)
+	) {
+		return "not-a-future"
+	}
+
+	return null
+}
+
 export function isUnitType(type: common.Type): boolean {
 	return type.type === "Record" && Object.keys(type.members).length === 0
 }

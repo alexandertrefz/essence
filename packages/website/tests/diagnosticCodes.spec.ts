@@ -31,6 +31,16 @@ const EXPERIMENTAL_CODES = new Set([
 	// typed record literal `Type ~> { … }`, which the site leaves out while the
 	// literal goes unchecked. Documenting the code would teach the form.
 	"record-annotation-not-record",
+	// NOTE: And the five of asynchrony, held back until the site has a page
+	// about `start`, `complete` and `Future` for them to be looked up beside.
+	// A code documented on a page that never says what a future IS would send
+	// its reader somewhere that explains nothing. They come off this list with
+	// the page that documents them.
+	"complete-outside-future",
+	"unused-future",
+	"unobserved-started",
+	"needless-complete",
+	"needless-start",
 ])
 
 function isExperimental(code: string): boolean {

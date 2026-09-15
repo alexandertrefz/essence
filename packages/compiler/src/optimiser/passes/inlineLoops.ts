@@ -492,6 +492,17 @@ function callbackOf(
 		return null
 	}
 
+	// NOTE: A COMPLETING callback is left alone. This pass writes the callback's
+	// body out where the call stands, and a completing body is not emitted as
+	// its body at all — it is emitted as a Function that answers with a future,
+	// with everything written in it inside the async closure that future runs.
+	// Inlined, its `await`s would land in whatever Function the walk was written
+	// into, which is not one that can wait. The call stays a call, and the
+	// future it builds per turn is the price of a walk that suspends.
+	if (value.value.completing === true) {
+		return null
+	}
+
 	// NOTE: A callback's Parameter can not carry a default — a Function literal
 	// is refused one at the Parser, since its arity is fixed by the Function
 	// Type it was written for — and this pass binds each Parameter as a `const`,

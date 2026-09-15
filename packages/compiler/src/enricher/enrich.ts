@@ -111,6 +111,11 @@ export function topLevelScope(
 		parent: null,
 		modulePath: options.modulePath,
 		unimportedNamespaces: options.unimportedNamespaces,
+		// NOTE: A Program's own Statements are the body of the emitted Module,
+		// and a Module may `await` at its top level — so `complete` is written
+		// here exactly as it is written in a completing body, and nothing has to
+		// be declared for it.
+		completing: "top-level",
 		members,
 		// NOTE: Taken HERE, where `members` holds the builtins and nothing
 		// else — the Program's own declarations are written into this same
@@ -1773,11 +1778,22 @@ export const enrichTestsSection = (
 ): common.typed.TestsSectionNode => {
 	return {
 		nodeType: "TestsSection",
-		nodes: enrichTestsNodes(section.nodes, childScope(scope), {
-			suitePath: [],
-			covering: noModifiers,
-			modulePath: modulePathOf(scope) ?? testsPath ?? null,
-		}),
+		// NOTE: Every Scope of the section — the setup above the tests, a
+		// suite's own, and each test body — descends from this one, so the
+		// barrier is set once here. A test body is a Function the runner CALLS,
+		// and the runner does not wait for what it called, so a `complete`
+		// written in one would be an `await` in a Function nobody awaits.
+		nodes: enrichTestsNodes(
+			section.nodes,
+			childScope(scope, {
+				completing: null,
+			}),
+			{
+				suitePath: [],
+				covering: noModifiers,
+				modulePath: modulePathOf(scope) ?? testsPath ?? null,
+			},
+		),
 		position: section.position,
 	}
 }

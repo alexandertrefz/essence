@@ -62,6 +62,20 @@ export type Scope = {
 	// and a Scope whose `<-` belongs to a Function that has no expected return
 	// Type yet must not answer with the enclosing Function's.
 	expectedReturnType?: common.Type | null
+	// NOTE: Whether a `complete` may be written in this Scope, and what it is
+	// held to where it may. A Function body Scope carries the Type its
+	// Declaration wrote — a completing body's `Future<T>`, and whatever a body
+	// that suspends nothing wrote where the word turns up in one anyway; a
+	// Program's top level carries `"top-level"`, where a `complete` is the
+	// top-level `await` the emitted Module is allowed; and `null` is a position
+	// that suspends nothing at all and can not be made to — a Parameter's
+	// default, which the emitted callee fills in before its own asynchrony
+	// begins, and a test body, whose runner does not await what it runs yet.
+	//
+	// It is read by walking outwards, like `expectedReturnType`, so a Match
+	// Handler and an `if` body inside a completing body answer with that body's
+	// Type — and, like it, `null` is a BARRIER rather than a missing answer.
+	completing?: common.Type | "top-level" | null
 	// NOTE: Set on a static Method's body Scope, where `@` means nothing: a
 	// static Method is called on the Namespace and is emitted without the
 	// receiver Parameter `@` lowers to. It is a BARRIER rather than the mere

@@ -242,6 +242,13 @@ export const builtinMemberOrder: Array<string> = [
 	// list meets the Namespaces of the values a Program works with before the
 	// one only a property test is handed.
 	"Randomness",
+	// NOTE: After it, and for the same reason twice over: each targets a Type
+	// nothing else targets, and a reader of this list meets the Namespaces of
+	// the values a Program HOLDS before the two that are about work it has not
+	// finished. `Started` follows `Future` because a Started is what starting a
+	// Future answers with, which is the order the two are met in.
+	"Future",
+	"Started",
 ]
 
 // NOTE: The same rule for the Type table, and for the same reason — a Type's

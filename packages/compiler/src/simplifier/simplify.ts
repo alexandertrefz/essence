@@ -118,6 +118,8 @@ function simplifyImplementationNode(
 		case "Match":
 		case "Define":
 		case "CaseValue":
+		case "Start":
+		case "Complete":
 			return simplifyExpression(node)
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
@@ -183,6 +185,25 @@ function simplifyExpression(
 			return simplifyDefine(node)
 		case "CaseValue":
 			return simplifyCaseValue(node)
+		// NOTE: Both survive whole. Neither can be lowered here, because what
+		// each becomes needs the context the RUN belongs to, and that is a fact
+		// about the emitted JavaScript — the enclosing completing body's own
+		// parameter, or a fresh root where there is none — which only the
+		// Rewriter is standing in the right place to answer.
+		case "Start":
+			return {
+				nodeType: "Start",
+				expression: simplifyExpression(node.expression),
+				type: node.type,
+				position: node.position,
+			}
+		case "Complete":
+			return {
+				nodeType: "Complete",
+				expression: simplifyExpression(node.expression),
+				type: node.type,
+				position: node.position,
+			}
 	}
 }
 
@@ -1683,6 +1704,7 @@ function simplifyFunctionDefinition(
 			...simplifyBody(node.body),
 		],
 		returnType: node.returnType,
+		...(node.completing === true ? { completing: true as const } : {}),
 	}
 }
 

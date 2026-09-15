@@ -49,6 +49,7 @@ import {
 	matchArguments,
 	matchesType,
 	matchesTypeWithBindings,
+	returnedTypeOf,
 	mentionsUnsolvedTypeParameter,
 	mergeUnionMembers,
 	mergedRecordType,
@@ -221,6 +222,8 @@ export function enrichNode(
 		case "Match":
 		case "Define":
 		case "CaseValue":
+		case "Start":
+		case "Complete":
 			return [enrichExpression(node, scope)]
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
@@ -319,6 +322,10 @@ function enrichCalleeExpression(
 			return enrichDefine(node, scope, expectedType)
 		case "CaseValue":
 			return enrichCaseValue(node, scope, expectedType)
+		case "Start":
+			return enrichStart(node, scope)
+		case "Complete":
+			return enrichComplete(node, scope)
 	}
 }
 
@@ -1846,13 +1853,22 @@ export function enrichMethodFunctionDefinition(
 	// NOTE: Read from the signature before the body so that `<-` Expressions can
 	// consult it — a bare Case resolves against the declared return Type first.
 	let returnType = signature.returnType
-	newScope.expectedReturnType = returnType
+	let completing = method.value.completing === true
+
+	newScope.expectedReturnType = returnedTypeOf(returnType, completing)
+
+	// NOTE: The barrier while the Parameters are read, for the reason
+	// `enrichFunctionDefinition` puts one there: a default is the emitted
+	// Method's own and suspends nothing.
+	newScope.completing = null
 
 	let { parameters, bindings } = enrichParameterList(
 		method.value.parameters,
 		newScope,
 		signature.parameterTypes,
 	)
+
+	newScope.completing = completing ? returnType : null
 
 	return {
 		nodeType: "FunctionDefinition",
@@ -1875,6 +1891,7 @@ export function enrichMethodFunctionDefinition(
 		inferredReturnType: null,
 		parameterListPosition: method.value.parameterListPosition,
 		headPosition: signatureHeadPositionOf(method.value),
+		...(completing ? { completing: true as const } : {}),
 	}
 }
 
@@ -1958,13 +1975,24 @@ function enrichFunctionDefinition(
 			? { type: "Error" as const }
 			: resolveType(node.returnType, newScope))
 
-	newScope.expectedReturnType = returnType
+	let completing = node.completing === true
+
+	newScope.expectedReturnType = returnedTypeOf(returnType, completing)
+
+	// NOTE: A `= expression` default suspends NOTHING, however the body around
+	// it is declared: it is filled in by the emitted Function itself, outside
+	// the async closure a completing body answers with. So the barrier is in
+	// place while the Parameters are read, and the body's own standing is
+	// written over it afterwards.
+	newScope.completing = null
 
 	let { parameters, bindings } = enrichParameterList(
 		node.parameters,
 		newScope,
 		contextualType?.parameterTypes,
 	)
+
+	newScope.completing = completing ? returnType : null
 
 	return {
 		nodeType: "FunctionDefinition",
@@ -1982,6 +2010,7 @@ function enrichFunctionDefinition(
 		inferredReturnType: node.returnType === null ? returnType : null,
 		parameterListPosition: node.parameterListPosition,
 		headPosition: signatureHeadPositionOf(node),
+		...(completing ? { completing: true as const } : {}),
 	}
 }
 
@@ -3460,6 +3489,188 @@ function resolveMatcher(
 		memberTypes: null,
 		payload: null,
 	}
+}
+
+// NOTE: `start expr` — a `Future<Value>` becomes the `Started<Value>` that
+// stands for one run of it. Nothing about this waits, so it asks nothing of the
+// body it stands in and is legal wherever an Expression is.
+//
+// NOTE: An operand that is not a Future is answered with ITSELF rather than with
+// an Error Type. The Warning below says what is wrong, and a Program that then
+// reads the value goes on reading exactly what it wrote down — an Error Type
+// here would cascade a second Diagnostic through everything the value reaches.
+function enrichStart(
+	node: parser.StartNode,
+	scope: enricher.Scope,
+): common.typed.StartNode {
+	let expression = enrichExpression(node.expression, scope)
+	let type = expression.type
+
+	if (type.type === "Future") {
+		return {
+			nodeType: "Start",
+			expression,
+			position: node.position,
+			type: { type: "Started", valueType: type.valueType },
+		}
+	}
+
+	if (type.type !== "Error") {
+		reportWarning(
+			type.type === "Started"
+				? "This is already in flight"
+				: "This is not a Future, so there is nothing to start",
+			node.position,
+			{
+				code: "needless-start",
+				labels: [
+					primary(
+						node.expression.position,
+						`this is ${withArticle(describeType(type))}`,
+					),
+				],
+				tags: ["unnecessary"],
+				notes: [
+					"'start' puts a Future in flight and answers the one run of it — a value that is not a Future describes no work to run.",
+				],
+				helps: ["Drop the 'start'."],
+			},
+		)
+	}
+
+	return {
+		nodeType: "Start",
+		expression,
+		position: node.position,
+		type,
+	}
+}
+
+// NOTE: `complete expr` — the `Value` a `Future<Value>` or a `Started<Value>`
+// answers with. It SUSPENDS, so where it may be written is a question about the
+// body around it, which `scope.completing` answers: a completing body's declared
+// `Future<T>`, a Program's top level, or a position that can not suspend at all.
+//
+// NOTE: The operand is typed BEFORE the position is judged, so a `complete`
+// written in the wrong place still hands a Hover the Type it would have
+// answered with — and so the two Diagnostics below never both fire on one word.
+function enrichComplete(
+	node: parser.CompleteNode,
+	scope: enricher.Scope,
+): common.typed.CompleteNode {
+	let expression = enrichExpression(node.expression, scope)
+	let type = expression.type
+
+	reportMisplacedComplete(node, scope)
+
+	if (type.type === "Future" || type.type === "Started") {
+		return {
+			nodeType: "Complete",
+			expression,
+			position: node.position,
+			type: type.valueType,
+		}
+	}
+
+	if (type.type !== "Error") {
+		reportWarning("This is not work to wait for", node.position, {
+			code: "needless-complete",
+			labels: [
+				primary(
+					node.expression.position,
+					`this is ${withArticle(describeType(type))}`,
+				),
+			],
+			tags: ["unnecessary"],
+			notes: [
+				"'complete' waits for what a Future or a Started answers with — a value that is neither is already the answer.",
+			],
+			helps: ["Drop the 'complete'."],
+		})
+	}
+
+	return {
+		nodeType: "Complete",
+		expression,
+		position: node.position,
+		type,
+	}
+}
+
+// NOTE: The one place `complete-outside-future` is decided. Every `complete` in
+// a Function body is in a body the Parser has already marked as completing —
+// the mark IS "this body writes the word" — so what is left to be wrong is the
+// DECLARATION: a body that suspends answers a Future, and one that says it
+// answers anything else is the mistake this names.
+function reportMisplacedComplete(
+	node: parser.CompleteNode,
+	scope: enricher.Scope,
+): void {
+	let context = completionContextOf(scope)
+
+	if (context === "top-level" || context?.type === "Future") {
+		return
+	}
+
+	// NOTE: An Error Type here is a return annotation that has already been
+	// reported — a second Diagnostic would restate it in vaguer terms.
+	if (context?.type === "Error") {
+		return
+	}
+
+	// NOTE: Two shapes, and they are two different mistakes. A named Function
+	// that DECLARED something else has one word missing from its signature; a
+	// position that can not suspend at all — a Parameter's default, a test body
+	// — has nowhere to put the word, and the only advice is to move it.
+	let declared = context === null || context === undefined ? null : context
+
+	reportError("'complete' waits, and nothing here can wait", node.position, {
+		code: "complete-outside-future",
+		labels: [
+			primary(
+				node.position,
+				declared === null
+					? "this suspends, and this position can not"
+					: `this Function returns ${describeType(declared)}`,
+			),
+		],
+		notes:
+			declared === null
+				? [
+						"A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins, and a test's body is a Function the runner does not wait for.",
+					]
+				: [
+						"A body that writes 'complete' suspends, so it hands back a Future the caller completes in its turn — which is what its declared Type has to say.",
+					],
+		helps:
+			declared === null
+				? [
+						"Move the 'complete' into a Function declared '-> Future<…>', or into the Program's top level.",
+					]
+				: [
+						`Declare the return Type 'Future<${describeType(declared)}>'.`,
+					],
+	})
+}
+
+// NOTE: The nearest Scope with an answer, which a Scope carrying the barrier
+// `null` is — read outwards exactly as `expectedReturnType` is, and for the same
+// reason: an `if` body and a Match Handler suspend wherever the body holding
+// them does.
+function completionContextOf(
+	scope: enricher.Scope,
+): common.Type | "top-level" | null | undefined {
+	let searchScope: enricher.Scope | null = scope
+
+	while (searchScope !== null) {
+		if (searchScope.completing !== undefined) {
+			return searchScope.completing
+		}
+
+		searchScope = searchScope.parent
+	}
+
+	return undefined
 }
 
 function enrichMatch(
@@ -7555,6 +7766,11 @@ function writtenKeyLookup(
 		case "IfStatement":
 		case "IfElseStatement":
 			return writtenKeyLookup(node.condition, check)
+		// NOTE: The operand of either Keyword is read where the Keyword stands
+		// — neither opens a body — so the walk carries straight on through it.
+		case "Start":
+		case "Complete":
+			return writtenKeyLookup(node.expression, check)
 		case "Identifier":
 		case "Self":
 		case "StringValue":
@@ -9690,6 +9906,13 @@ function inferReturnTypeFromBody(
 			// inner one's.
 			inferenceScope.expectedReturnType = null
 
+			// NOTE: And the same barrier for asynchrony, for the same reason:
+			// what a `complete` in this body is held to is this literal's own
+			// declaration, which is the very thing being worked out. The
+			// Diagnostics of this pass are dropped, so the barrier decides
+			// nothing but that the enclosing body's is not consulted.
+			inferenceScope.completing = null
+
 			let types: Array<common.Type> = []
 
 			collectReturnedTypes(
@@ -9706,7 +9929,17 @@ function inferReturnTypeFromBody(
 				return null
 			}
 
-			return unionOfTypes(types)
+			let answer: common.Type | null = unionOfTypes(types)
+
+			// NOTE: A completing body's `<-` answers with the VALUE, and the
+			// Function answers with the future around it — so what is read off
+			// the body has to be wrapped back up before it can be the literal's
+			// return Type. `(url) { <- complete headline(url) }` is
+			// `(_: String) -> Future<String>`, which is what the position it
+			// stands in is matched against.
+			return answer === null || node.completing !== true
+				? answer
+				: { type: "Future" as const, valueType: answer }
 		})
 
 		return result

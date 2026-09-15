@@ -137,6 +137,20 @@ export function isPureExpression(
 		// whole point of it.
 		case "CoverageCounter":
 			return false
+		// NOTE: Putting work in flight RUNS it — a future with nothing to wait
+		// for inside runs to its end the moment it is started — so nothing may
+		// pool a `start`, hoist it out of the branch it was written in, or drop
+		// one whose `Started` nobody reads. Starting is the whole point of it,
+		// exactly as recording is a trace's.
+		case "Start":
+			return false
+		// NOTE: And `complete` waits for what a `start` set going, which is an
+		// observation of everything that ran in between: moving one moves every
+		// effect the awaited work had past the Statements around it. Refused for
+		// the reason a Match is refused whole — what it is about happens
+		// somewhere this function is not reading.
+		case "Complete":
+			return false
 		case "Intrinsic":
 			return isPureIntrinsic(node, shadowed)
 	}
@@ -353,6 +367,18 @@ function isPureIntrinsic(
 // bounded for every pair. `Integer.raise` is `a ** b`, which is bounded only by
 // how much memory the answer needs. `List` and `Optional` take Function
 // Arguments and run them, so their purity is the caller's Function's.
+//
+// NOTE: And the asynchronous Namespaces — `Async`, `Http`, `Future` and
+// `Started` — are absent for a reason of their own, which is why they are named
+// here rather than left to the rule that a Namespace with no entry is refused.
+// A Future is a DESCRIPTION, so building one runs nothing and half of what they
+// declare really is pure by these three counts. What they answer with is not:
+// `Future::map` and `andThen` take a Function and run it, `Async.deferred` is a
+// thunk nobody has called yet, `within` and `race` stop their losers, and
+// `Http.send` is the network. A table that let the builders through and refused
+// the rest would be a line drawn through one Namespace, and an editor reading
+// this list would have to know which side of it each entry falls on. So none of
+// them is here, and a `start` and a `complete` are refused outright above.
 //
 // NOTE: And `Terminal` above all, whose absence is the one this table can least
 // afford to lose. It is named here rather than left to be inferred because the

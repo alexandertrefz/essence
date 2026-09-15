@@ -4,6 +4,7 @@ import {
 	collectDiagnostics,
 	primary,
 	reportError,
+	reportInformation,
 	reportWarning,
 	secondary,
 } from "../diagnostics/index"
@@ -32,6 +33,8 @@ import {
 	isUnitType,
 	matchArguments,
 	matchesType,
+	returnedTypeOf,
+	asynchronyMismatch,
 	mergedRecordType,
 	missingRecordMembers,
 	type MatchableArgument,
@@ -272,6 +275,16 @@ function validateImplementationNode(
 		case "Match":
 		case "Define":
 		case "CaseValue":
+		case "Start":
+		case "Complete":
+			// NOTE: The one position where what an Expression ANSWERS with
+			// decides whether it may stand at all — a Statement drops the
+			// value, and for work that is the whole of what went wrong. Asked
+			// here rather than in `validateExpression`, because this is the
+			// reading that knows the value goes nowhere: the same Expression
+			// inside another one is fine.
+			reportDiscardedWork(node)
+
 			return validateExpression(node)
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
@@ -325,12 +338,72 @@ function validateExpression(
 			return validateInterpolatedStringValue(node)
 		case "Combination":
 			return validateCombination(node)
+		case "Start":
+		case "Complete":
+			validateExpression(node.expression)
+
+			return node
 		case "StringValue":
 		case "IntegerValue":
 		case "BooleanValue":
 		case "Self":
 			// these nodes dont need any validation
 			return node
+	}
+}
+
+// NOTE: An Expression written in a Statement position — its value goes nowhere
+// — and the two answers that makes a mistake of.
+//
+// A `Future` is a DESCRIPTION of work: dropping one runs nothing at all, which
+// is never what somebody writing it down meant, so it is an Error. A `Started`
+// is work that IS running, and dropping it is fire-and-forget — a real thing to
+// write, and a thing to be told about, so it is an Information rather than a
+// complaint.
+//
+// NOTE: Asked of every Expression Statement rather than only of the two
+// Keywords, because the Type is what decides it: a plain call answering a
+// Future — `headline(url)` on its own line — is exactly the mistake this is for,
+// and the call says nothing about asynchrony on its face.
+function reportDiscardedWork(node: common.typed.ExpressionNode): void {
+	let type = node.type
+
+	if (type.type === "Future") {
+		reportError("Nothing here runs", node.position, {
+			code: "unused-future",
+			labels: [
+				primary(
+					node.position,
+					`this is ${withArticle(describeType(type))}, and its value goes nowhere`,
+				),
+			],
+			notes: [
+				"A Future describes work. Building one runs none of it — 'start' puts it in flight and 'complete' waits for what it answers with.",
+			],
+			helps: [
+				"Did you mean 'complete', to wait for it — or 'start', to put it in flight and carry on?",
+			],
+		})
+
+		return
+	}
+
+	if (type.type === "Started") {
+		reportInformation("Nothing waits for this", node.position, {
+			code: "unobserved-started",
+			labels: [
+				primary(
+					node.position,
+					"this runs, and nobody reads its answer",
+				),
+			],
+			notes: [
+				"A Started can be completed any number of times, from anywhere — holding it under a name is what makes that possible later.",
+			],
+			helps: [
+				"Hold it in a Constant and 'complete' it where the answer is wanted, if the answer is wanted at all.",
+			],
+		})
 	}
 }
 
@@ -1527,7 +1600,10 @@ function checkDefineAnswer(
 				`This 'define' answers ${describeType(node.type)}.`,
 				...evidence.notes,
 			],
-			helps: evidence.helps,
+			helps: [
+				...asynchronyHelps(node.type, value.type),
+				...evidence.helps,
+			],
 		},
 	)
 }
@@ -2623,7 +2699,10 @@ function reportDeclarationMismatch(
 				`${name === null ? "The Pattern" : `'${name}'`} is declared as ${describeType(declaredType)}.`,
 				...evidence.notes,
 			],
-			helps: evidence.helps,
+			helps: [
+				...asynchronyHelps(declaredType, value.type),
+				...evidence.helps,
+			],
 		},
 	)
 }
@@ -2664,7 +2743,10 @@ function validateVariableAssignmentStatement(
 						: []),
 					...evidence.notes,
 				],
-				helps: evidence.helps,
+				helps: [
+					...asynchronyHelps(node.name.type, node.value.type),
+					...evidence.helps,
+				],
 			},
 		)
 	}
@@ -2941,12 +3023,24 @@ function validateReturnStatement(
 			labels: [primary(node.position, "this is outside any Function")],
 		})
 	} else if (
-		!fitsExpectedType(currentFunctionContext.returnType, node.expression)
-	) {
-		let evidence = refinementEvidence(
-			currentFunctionContext.returnType,
+		!fitsExpectedType(
+			returnedTypeOf(
+				currentFunctionContext.returnType,
+				currentFunctionContext.completing === true,
+			),
 			node.expression,
 		)
+	) {
+		// NOTE: A completing body is written as though it answered the VALUE —
+		// the future is what the emission wraps around it — so what a `<-` is
+		// held to is the inner Type of the declared `Future<T>`. Everything
+		// below reads that same Type, so the message names what the reader has
+		// to write rather than the future they never spell in a `<-`.
+		let expected = returnedTypeOf(
+			currentFunctionContext.returnType,
+			currentFunctionContext.completing === true,
+		)
+		let evidence = refinementEvidence(expected, node.expression)
 
 		reportError(
 			"This value does not fit the declared return Type",
@@ -2965,10 +3059,17 @@ function validateReturnStatement(
 					...evidence.labels,
 				],
 				notes: [
-					`The Function returns ${describeType(currentFunctionContext.returnType)}.`,
+					`The Function returns ${describeType(expected)}.`,
 					...evidence.notes,
 				],
-				helps: evidence.helps,
+				helps: [
+					...returnAsynchronyHelps(
+						expected,
+						node.expression.type,
+						currentFunctionContext.completing === true,
+					),
+					...evidence.helps,
+				],
 			},
 		)
 	}
@@ -3118,7 +3219,13 @@ function validateDefiniteReturn(
 	definition: common.typed.FunctionDefinitionNode,
 	position: common.Position,
 ): void {
-	let returnType = definition.returnType
+	// NOTE: The inner Type for a completing body, for the reason a `<-` is held
+	// to it: `-> Future<{}>` is a body that answers nothing, and asking it for a
+	// `<-` would refuse every `complete Async.sleep(…)` written on its own line.
+	let returnType = returnedTypeOf(
+		definition.returnType,
+		definition.completing === true,
+	)
 
 	if (
 		isUnitType(returnType) ||
@@ -3165,6 +3272,62 @@ function fitsExpectedType(
 // 'NonEmptyList' names something the Program would refuse for taking no Arguments. A
 // refinement carrying none spells as its name alone, which is every non-generic
 // one.
+// NOTE: The Helps a mismatch gets where the difference is one missing word
+// about asynchrony rather than a wrong value. `asynchronyMismatch` decides
+// WHICH of the three it is, by assignability, and the wording is written at each
+// site because what a reader should do about it is different in each.
+//
+// This is the ordinary positions' wording — an Argument, a Declaration, an
+// Assignment, a `define` arm — where the value is the thing to change.
+function asynchronyHelps(
+	expected: common.Type,
+	actual: common.Type,
+): Array<string> {
+	switch (asynchronyMismatch(expected, actual)) {
+		case "unstarted":
+			return ["This describes work that has not run — add 'complete'."]
+		case "in-flight":
+			return [
+				"This is still in flight — add 'complete' to wait for what it answers with.",
+			]
+		case "not-a-future":
+			return [
+				"Build a future to answer with: 'Async.deferred(…)', or '::map' or '::andThen' on one you already have.",
+			]
+		default:
+			return []
+	}
+}
+
+// NOTE: And the same three in RETURN position, where the body is the thing to
+// change and one of them reads completely differently: a body that declares a
+// future and hands back a bare value has not written a future anywhere, and
+// whether it completes anything is what decides what it should do about that.
+function returnAsynchronyHelps(
+	expected: common.Type,
+	actual: common.Type,
+	completing: boolean,
+): Array<string> {
+	switch (asynchronyMismatch(expected, actual)) {
+		case "unstarted":
+			return [
+				completing
+					? "Add 'complete' — this body waits, so it answers with values rather than with futures."
+					: "This describes work that has not run — add 'complete', which makes this a body that waits.",
+			]
+		case "in-flight":
+			return [
+				"This is still in flight — add 'complete' to wait for what it answers with.",
+			]
+		case "not-a-future":
+			return [
+				"This body completes nothing, so it has to RETURN a future — complete something, or build one ('Async.deferred(…)', '::map', '::andThen').",
+			]
+		default:
+			return []
+	}
+}
+
 function refinementEvidence(
 	expected: common.Type | undefined,
 	value?: common.typed.ExpressionNode,
@@ -3599,7 +3762,13 @@ function reportArgumentMismatch(
 				...spelling.notes,
 				...evidence.notes,
 			],
-			helps: [...spelling.helps, ...evidence.helps],
+			helps: [
+				...spelling.helps,
+				...(parameter === undefined
+					? []
+					: asynchronyHelps(parameter.type, argumentNode.value.type)),
+				...evidence.helps,
+			],
 		},
 	)
 }

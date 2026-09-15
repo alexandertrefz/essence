@@ -346,6 +346,29 @@ export type ExpressionNode =
 	| MatchNode
 	| DefineNode
 	| CaseValueNode
+	| StartNode
+	| CompleteNode
+
+// NOTE: `start expr`, typed. `type` is the `Started<Value>` of the operand's
+// `Future<Value>` — putting work in flight neither runs it to its end nor waits
+// for it, so this Expression suspends nothing and may stand anywhere.
+export interface StartNode {
+	nodeType: "Start"
+	expression: ExpressionNode
+	position: Position
+	type: Type
+}
+
+// NOTE: `complete expr`, typed. `type` is the `Value` the operand's
+// `Future<Value>` or `Started<Value>` answers with. It SUSPENDS the body it
+// stands in, which is what makes a body holding one a completing body — see
+// `FunctionDefinitionNode.completing`.
+export interface CompleteNode {
+	nodeType: "Complete"
+	expression: ExpressionNode
+	position: Position
+	type: Type
+}
 
 // NOTE: `choice` carries the Choice's Union Type, `caseName` the CaseType —
 // so the cursor can land on either half of `ChoiceName#CaseName`. It is null
@@ -1144,6 +1167,15 @@ export interface FunctionDefinitionNode {
 	// anchors a Method or a Function literal to, so that the cursor on a blank
 	// line in its body is answered by nothing rather than by the whole thing.
 	headPosition: Position
+	// NOTE: Carried up from the Parser's own Node — this body writes a
+	// `complete` of its own, so it SUSPENDS. Three readers ask: the Enricher,
+	// which reads `<-` against the inner Type of the declared `Future<T>` rather
+	// than against the Future itself; the Validator, which holds the declaration
+	// to being a Future at all; and the Rewriter, which emits such a body as a
+	// Function returning `$future.of(async ($ctx) => …)`.
+	//
+	// NOTE: Absent rather than `false`, like the Parser's.
+	completing?: true
 }
 
 export interface ArgumentNode {

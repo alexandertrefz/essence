@@ -944,6 +944,18 @@ function walkChildren(
 
 			return value === node.value ? node : { ...node, value }
 		}
+		// NOTE: The operand of either Keyword is an Expression like any other and
+		// is offered to the passes as one — what the Keyword does with it is the
+		// Rewriter's business, and a pass that folds a constant inside a
+		// `complete` has folded a constant.
+		case "Start":
+		case "Complete": {
+			let expression = walkExpression(node.expression, rewrites)
+
+			return expression === node.expression
+				? node
+				: { ...node, expression }
+		}
 		case "Intrinsic":
 			return walkIntrinsicChildren(node, rewrites)
 		// NOTE: An instrumented point wraps the Expression that stands there,

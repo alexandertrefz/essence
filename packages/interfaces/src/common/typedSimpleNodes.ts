@@ -378,6 +378,29 @@ export type ExpressionNode =
 	| TestTraceNode
 	| CoverageCounterNode
 	| IntrinsicNode
+	| StartNode
+	| CompleteNode
+
+// NOTE: `start expr` and `complete expr`, simplified. Both survive as Nodes of
+// their own all the way to emission, because what each lowers to needs one thing
+// the Simplifier does not have: WHICH context the run belongs to, which is a
+// lexical question about the emitted JavaScript rather than about the Program.
+// The Rewriter answers it — the enclosing completing body's context parameter,
+// or a fresh root where there is none — and emits `$future.start(x, ctx)` and
+// `await $future.complete(x, ctx)`.
+export interface StartNode {
+	nodeType: "Start"
+	expression: ExpressionNode
+	type: Type
+	position?: Position
+}
+
+export interface CompleteNode {
+	nodeType: "Complete"
+	expression: ExpressionNode
+	type: Type
+	position?: Position
+}
 
 // NOTE: An instrumented point: record what stands here, then answer with it.
 // Wrapping an Expression in one changes nothing about what the Expression
@@ -1699,6 +1722,11 @@ export interface FunctionDefinitionNode {
 	parameters: Array<ParameterNode>
 	body: Array<ImplementationNode>
 	returnType: Type
+	// NOTE: This body suspends — see the typed Node this is carried down from.
+	// The Rewriter is the last reader and the one the mark exists for: a
+	// completing body is emitted as a plain Function that RETURNS a future,
+	// with everything written here inside the async closure that future runs.
+	completing?: true
 }
 
 export interface ParameterNode {
