@@ -60,17 +60,31 @@ describe("start and complete", () => {
 		)
 	})
 
-	// NOTE: And both are ordinary names wherever no Expression follows them,
-	// which the printer has nothing to decide about. What it must never do is
-	// leave one at the end of a line with a Statement below it, because that
-	// text reads as the Keyword and its operand — the safety gate would refuse
-	// such output, and the round trip is what says it never has to.
+	// NOTE: And both are ordinary names wherever no Expression follows them on
+	// their own line, which the printer has nothing to decide about.
 	it("writes either word where it is a name", () => {
 		roundTrips(
 			block(
 				"\tconstant start = { complete = 1 }",
 				"",
 				"\tTerminal.print(start.complete::toString())",
+			),
+		)
+	})
+
+	// NOTE: A word that ends its line is a name and the Statement below it is a
+	// Statement of its own, so there are two here for the printer to print and
+	// it leaves both where they are. The Parser's line rule is what makes that
+	// true: while the operand could begin on a later line, these two came in as
+	// ONE Statement and were printed back as one, which is a formatter baking a
+	// misparse into the source it was asked to leave alone.
+	it("leaves a word that ends its line where it was written", () => {
+		roundTrips(
+			block(
+				"\tconstant start = 1",
+				"\tconstant held  = start",
+				"",
+				"\tTerminal.print(held::toString())",
 			),
 		)
 	})

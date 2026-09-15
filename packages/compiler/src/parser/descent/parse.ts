@@ -57,7 +57,8 @@ type NamespaceBodyNode = Parameters<
 // are: each opens its own form only where an Expression follows it and nothing
 // carries the word itself on, and is a name everywhere else. The two are a
 // harder case than the assertions, because their form is an EXPRESSION rather
-// than a Statement — see `opensAsynchrony` below for the one reading that costs.
+// than a Statement — see `opensAsynchrony` below for the two narrowings that
+// takes and the two readings it still costs.
 //
 // NOTE: A Set rather than an Array, here and for the two lists below. Each is
 // asked of a Token, in a loop over every Token — a scan of ten strings per
@@ -145,36 +146,70 @@ function continuesExpression(
 	)
 }
 
+// NOTE: The Token types that begin an Expression of their own and yet only ever
+// stand where one has ENDED. They are read by `opensAsynchrony` below, whose
+// NOTE says what each of them closes and why leaving them out of the prefix
+// reading costs nothing written.
+const afterExpressionTokenTypes = new Set([
+	TokenType.SymbolLeftBrace,
+	TokenType.SymbolDash,
+	TokenType.KeywordWith,
+	TokenType.KeywordOtherwise,
+])
+
+function standsAfterExpression(token: Token): boolean {
+	return afterExpressionTokenTypes.has(token.type)
+}
+
 // NOTE: Whether one of the two asynchrony Keywords stands where it opens its
 // prefix Expression rather than naming something — the `expect`/`require` rule,
-// asked in expression position instead of in statement position. `complete`
-// reads as the Keyword in `complete headline(url)` and as a name in
-// `complete::isEmpty()`, `complete.first`, `complete(1)`, `complete#Win`,
-// `{ complete = 1 }` and `Terminal.print(complete)`.
+// asked in expression position instead of in statement position, with two
+// narrowings of its own. `complete` reads as the Keyword in
+// `complete headline(url)` and as a name in `complete::isEmpty()`,
+// `complete.first`, `complete(1)`, `complete#Win`, `{ complete = 1 }` and
+// `Terminal.print(complete)`.
 //
-// NOTE: One reading is LOST to this, and it is worth writing down because
-// nothing reports it. The two words are the only Identifiers whose form is an
-// Expression, so where a Statement ends on one and the next Statement begins
-// with an Expression, the two read as one:
+// NOTE: The first narrowing is the LINE. An operand that begins on a later line
+// than the word is no operand at all, because Essence ends a Statement at the
+// end of its Expression and at no Token of its own — without the line, these
+// two Statements would read as one and nothing would report it:
 //
-//     constant held = start        § the value called `start` is what was meant
-//     Terminal.print(held)         § and this is what the Keyword takes instead
+//     constant held = start        § the value called `start` is what is meant
+//     Terminal.print(held)         § and this is a Statement of its own
 //
-// Essence ends a Statement at the end of the Expression and not at a Token of
-// its own, so there is nothing for the Parser to notice. A Keyword-only reading
-// would refuse the first line outright and cost every `start` in the sources
-// their name; a name-only reading would need parentheses the language does not
-// have. Between the two this is the reading that is quiet in the rarer place.
-// The Type of the Statement it builds is almost always wrong, so what the
-// Program gets is a Diagnostic about the operand rather than silence.
+// It costs nothing anybody writes. Both words take the whole postfix chain
+// behind them, so an operand whose Arguments are broken over lines still
+// BEGINS on the Keyword's own line, and `esfmt` prints the two words with
+// exactly one space behind them and no other way.
 //
-// NOTE: And one name: an Argument's LABEL may not be spelled with either word.
-// A label stands directly in front of its value, which is exactly where the
-// prefix form opens, so `compute(start 1)` is a `start` of `1` — the Keyword
-// reading wins in argument position for the same reason it wins everywhere
-// else, and `Terminal.print(complete headline(url))` is what it buys.
-// `argumentIsLabelled` says the same thing from the other side; the Language
-// Server's rename refuses the two words as label names because of it.
+// NOTE: The second is a short list of Tokens that begin an Expression and yet
+// only ever stand where one has ENDED, so a value named `start` or `complete`
+// can be the Expression they stand behind. `{` opens the block of an `if`, a
+// `match` or a Guard (`if start { … }`), `otherwise` closes a `define` arm
+// (`as complete otherwise`), `with` carries a Record or Dictionary base on
+// (`[held with "a" = 1]`) and `-` opens the `->` of a `match`'s answer Type
+// (`match start -> Integer {`). Excluding them costs nothing either: the only
+// Expression a `{` opens is a Record literal, `-` a negative number, and
+// neither is a Future or a Started, so the Keyword reading of those was a
+// `needless-start` in every case.
+//
+// NOTE: What the rule still costs is one name and one reading, and both are
+// worth writing down because nothing reports either. The name: an Argument's
+// LABEL may not be spelled with either word. A label stands directly in front
+// of its value, which is exactly where the prefix form opens, so
+// `compute(start 1)` is a `start` of `1` — and `Terminal.print(complete
+// headline(url))` is what that buys. `argumentIsLabelled` says the same thing
+// from the other side; the Language Server's rename refuses the two words as
+// label names because of it.
+//
+// NOTE: The reading: a CONTEXTUAL word standing behind a value named `start` or
+// `complete` is taken as the operand, because a contextual word is an
+// Identifier and an Identifier begins an Expression. `expect complete matches
+// snapshot` waits for a value called `matches` rather than matching the value
+// called `complete` against a snapshot. The Keyword reading wins there for the
+// same reason it wins in Argument position, and what the Program gets is a
+// Diagnostic about the operand — `matches` is not declared — rather than
+// silence.
 function opensAsynchrony(token: Token, following: Token | undefined): boolean {
 	if (
 		token.type !== TokenType.KeywordStart &&
@@ -183,7 +218,15 @@ function opensAsynchrony(token: Token, following: Token | undefined): boolean {
 		return false
 	}
 
-	return startsExpression(following) && !continuesExpression(token, following)
+	if (following === undefined || standsAfterExpression(following)) {
+		return false
+	}
+
+	return (
+		startsExpression(following) &&
+		!continuesExpression(token, following) &&
+		following.position.start.line === token.position.start.line
+	)
 }
 
 // NOTE: The words that open a form of their own where they stand and are

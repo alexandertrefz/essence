@@ -256,13 +256,13 @@ describe("Asynchrony", () => {
 			expect(node.value.arguments[0]!.value.nodeType).toBe("Start")
 		})
 
-		// NOTE: The one reading the contextual rule loses, pinned so that a
-		// change to it is a change to this test — see the NOTE on
-		// `opensAsynchrony`. A Statement ending on one of the words and a
-		// Statement opening with an Expression read as ONE Statement, because
-		// Essence ends a Statement at the end of its Expression and at no Token
-		// of its own. Two Declarations were written here; one is what is read.
-		it("takes the Statement below as the operand where a name ends a line", () => {
+		// NOTE: The line is half the rule. A Statement ending on one of the
+		// words and a Statement opening with an Expression read as TWO, because
+		// the operand of a `start` begins on the `start`'s own line or the word
+		// is a name. Without that, Essence ending a Statement at the end of its
+		// Expression and at no Token of its own would make these one, and
+		// nothing would report it.
+		it("leaves the Statement below alone where a name ends a line", () => {
 			let program = parse(`implementation {
 	constant start = 1
 	constant held = start
@@ -271,13 +271,74 @@ describe("Asynchrony", () => {
 			let nodes = program.implementation.nodes
 			let held = nodes[1]
 
-			expect(nodes.length).toBe(2)
+			expect(nodes.length).toBe(3)
 
 			if (held?.nodeType !== "ConstantDeclarationStatement") {
 				throw new Error("expected a Constant Declaration")
 			}
 
-			expect(held.value.nodeType).toBe("Start")
+			expect(held.value.nodeType).toBe("Identifier")
+		})
+
+		// NOTE: And an operand written over several lines still begins on the
+		// Keyword's own line, which is why the line rule costs nothing anybody
+		// writes.
+		it("reads an operand whose Arguments are broken over lines", () => {
+			let program = parse(`implementation {
+	constant answered = complete send(
+		1,
+		2,
+	)
+}`)
+			let answered = program.implementation.nodes[0]
+
+			if (answered?.nodeType !== "ConstantDeclarationStatement") {
+				throw new Error("expected a Constant Declaration")
+			}
+
+			expect(answered.value.nodeType).toBe("Complete")
+		})
+
+		// NOTE: The Tokens that begin an Expression and yet only ever stand
+		// where one has ENDED — every one of them can follow a value named
+		// `start` or `complete`, and the Keyword reading of any of them was a
+		// `needless-start` at best. `{` alone covers three forms: an `if`'s
+		// block, a `match`'s and a Guard's.
+		it("leaves either word a name where the Token behind it ends an Expression", () => {
+			expect(
+				codesOf(`implementation {
+	type Point = { x: Integer, y: Integer }
+
+	constant start = true
+	constant complete: Point = { x = 1, y = 2 }
+	constant flag = false
+
+	if start {
+		Terminal.print("yes")
+	} else {
+		Terminal.print("no")
+	}
+
+	constant chosen = define {
+		as 2 if flag
+		as complete.x otherwise
+	}
+
+	constant moved = { complete with x = 3 }
+
+	constant named = match complete.y -> String {
+		case 2 {
+			<- "two"
+		}
+		case _ {
+			<- "other"
+		}
+	}
+
+	Terminal.print(chosen::add(moved.x)::toString())
+	Terminal.print(named)
+}`),
+			).toEqual([])
 		})
 
 		// NOTE: And where nothing follows at all the word is a name, so it is
