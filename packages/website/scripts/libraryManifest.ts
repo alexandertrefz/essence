@@ -164,6 +164,8 @@ export interface PageManifest {
 	modes: ManifestMode[]
 	/** The union aliases a page explains (the numeric tower). */
 	tower: ManifestAlias[]
+	/** What the page calls that section. "The tower" is the numeric page's. */
+	towerLabel: string
 	/** The folded Namespaces that are neither a refinement's nor a mode's, with the Type each is for. */
 	views: Array<{ namespace: string; target: string }>
 	protocols: ManifestProtocol[]

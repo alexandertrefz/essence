@@ -107,5 +107,5 @@ serves it as marshalled JavaScript.
 | [`site-check.spec.ts`](site-check.spec.ts) | Runs the survey's own tests, starts a host on a free port, and runs the command against it end to end. |
 
 [`site-check.spec.ts`](site-check.spec.ts) reaches no network: it serves three
-pages of its own on a free port, and the one address that answers nothing is the
-discard port on loopback.
+pages of its own on a free port, and the one address that answers nothing is a
+port on loopback that nothing binds.

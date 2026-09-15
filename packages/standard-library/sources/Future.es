@@ -123,6 +123,14 @@ declarations {
 				}
 			}
 
+			§ `pausingMilliseconds` is the one label here that fuses a unit noun
+			§ to a gerund. The bare word is taken by a different question:
+			§ `within(milliseconds:)` and `Async.sleep(milliseconds:)` name a
+			§ length. This names what to do between two attempts, and how long.
+			§ `attempt(times 3, pausing 200)` was the alternative, with the unit
+			§ left to the `@param`. It says nothing at the call about what the
+			§ 200 is counted in.
+
 			§§ Answers the same, waiting the given number of milliseconds between two attempts.
 			§§
 			§§ The wait is between attempts, and never before the first or after the last.
@@ -165,6 +173,14 @@ declarations {
 		§ body, so a `map` over one answers a List of Futures rather than a List
 		§ of values. And writing the walk as recursion would slice the receiver
 		§ once per item.
+
+		§ `inSequence()` is `all(atMost 1)` by construction. The ceiling clamps
+		§ to one walker, which is this walk. It keeps a name of its own because
+		§ the name states the intent where the count states the mechanism. A
+		§ reader writing `inSequence` says the order is what the answer means,
+		§ rather than picking a number. The alternative was a `Concurrency` mode
+		§ on `all`, which would have made running them at once the case that
+		§ names a mode.
 
 		§§ Answers a Future running every one of them in order, each started once the one before it has answered.
 		§§

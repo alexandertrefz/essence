@@ -26,7 +26,8 @@ const results = mkdtempSync(path.join(tmpdir(), "essence-site-check-results-"))
 
 // NOTE: A host of this spec's own on a free port. Nothing here reaches the
 // network: the three pages below are everything the command is pointed at,
-// and the one address that answers nothing is the discard port on loopback.
+// and the one address that answers nothing is a port on loopback that nothing
+// binds, which the kernel refuses in a turn.
 const UNREACHABLE = "http://127.0.0.1:1/"
 
 let server: Server<undefined> | null = null

@@ -1435,6 +1435,7 @@
 			"description": "An Integer or a Rational: the two numeric kinds a Program computes with exactly.\n\nEvery Number is a Scalar or an Irrational. The two Methods below answer a Scalar for any two Scalars, which is what the mixed aggregates fold on."
 		}
 	],
+	"towerLabel": "The tower",
 	"views": [
 		{
 			"namespace": "Scalar",

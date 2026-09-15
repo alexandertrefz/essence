@@ -14,9 +14,11 @@ import { createFailure, createValue, type ResultType } from "./Result"
 import { createString, type StringType } from "./String"
 import { liveEntriesOf, typeKeySymbol } from "./type"
 
-// NOTE: THE ONE RUNTIME MODULE THAT REACHES OUTSIDE THE PROGRAM. Everything
-// else in this runtime answers out of values the Program already holds; a
-// request goes to a host, and what comes back is not a function of the inputs.
+// NOTE: THE ONE RUNTIME MODULE THAT REACHES ANOTHER HOST. Everything else in
+// this runtime answers out of values the Program already holds or out of THIS
+// host's own streams, descriptors and entropy — `Terminal` and `Randomness` are
+// those — where a request goes to a machine of its own, and what comes back is
+// not a function of the inputs.
 // Two things rest on this module being exactly one file with exactly this name:
 // the Optimiser refuses `Http` a place in its purity table, and the test result
 // cache refuses to remember a run whose bundle links `Http.ts` — see

@@ -309,7 +309,7 @@ Reach for `map` and `andThen` where you are assembling a description to hand som
 
 ## Requests to a host
 
-[`Http`](/docs/library/http) is the one namespace in the standard library that reaches outside the program. Every entry answers a future, so a request is a description until something starts it.
+[`Http`](/docs/library/http) is the one namespace in the standard library that reaches another host — `Terminal` and `Randomness` reach this one, its streams and its entropy. Every entry answers a future, so a request is a description until something starts it.
 
 ```essence
 implementation {

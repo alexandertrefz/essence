@@ -309,7 +309,7 @@ export function renderPage(
 	}
 
 	if (manifest.tower.length > 0) {
-		block(layout.heading(2, "The tower").line)
+		block(layout.heading(2, manifest.towerLabel).line)
 
 		for (let alias of manifest.tower) {
 			block(layout.heading(3, alias.name, [alias.name]).line)

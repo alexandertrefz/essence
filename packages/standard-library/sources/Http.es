@@ -15,7 +15,7 @@ import {
 
 declarations {
 
-	§ The one Namespace of this library that reaches outside the Program. It
+	§ The one Namespace of this library that reaches another host. It
 	§ answers a Future, so a request is a description until something starts
 	§ it, and the waiting is written with `complete` like any other wait.
 	§
@@ -147,9 +147,11 @@ declarations {
 			<- @.status::isBetween(200, and 299)
 		}
 
-		§§ Answers the header of the given name, whatever case it is written in.
+		§§ Answers the header of the given name, whatever case the name is written in.
 		§§
-		§§ The keys of a Response are lowercase, so the name is lowercased before it is looked up. A header the answer does not carry answers nothing.
+		§§ The keys of a Response a host answered with are lowercase, so the name is lowercased before it is looked up. A header the answer does not carry answers nothing.
+		§§
+		§§ A Response a Program wrote down itself is found only where it wrote the key in lowercase. The lookup key is always the lowercased name, and a key written `Content-Type` is reached by no spelling at all.
 		§§
 		§§ @example
 		§§   constant answered: Response = {
@@ -196,7 +198,15 @@ declarations {
 			},
 		) -> Future<Result<Response, HttpFailure>>
 
-		§ The six verbs. Each is one call of `send` with the method written
+		§ The six verbs. Six names for one call with the mode written in, where
+		§ rule 4 would have `Http.request(url, method #Post, body …)` take the
+		§ `HttpMethod` Choice declared above. They were taken anyway because
+		§ HTTP's own vocabulary is the verb. Every reader arrives knowing the
+		§ six, and a mode Argument would spell what the name already says. The
+		§ general entry for whoever wants it is `send`, and the seventh method
+		§ is reached through it.
+		§
+		§ Each is one call of `send` with the method written
 		§ in, which is what makes them Essence rather than six natives. The
 		§ headers are a default rather than an Overload, for the reason the
 		§ Stream on `Terminal.write` is one. Both call forms stay writable and

@@ -969,6 +969,7 @@ export function buildLibrary(surface: Surface): LibraryPage[] {
 				refinements,
 				modes,
 				tower,
+				towerLabel: definition.towerLabel ?? "The tower",
 				views: on.namespaces
 					.filter(
 						(namespace) =>

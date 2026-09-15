@@ -5276,7 +5276,7 @@ Error: 'complete' waits, and nothing here can wait
    │
  3 │        constant answered = complete Async.deferred(() { <- url })
    │                            ───────────────────┬──────────────────  
-   │                                               ╰────────────────── this Function returns String
+   │                                               ╰──────────────────── this Function returns String
    │ 
    │ Help: Declare the return Type 'Future<String>'.
    │ 
@@ -5286,7 +5286,7 @@ Error: 'complete' waits, and nothing here can wait
 
 </div>
 
-Declare the return type a future of what the body answers with. The positions that can not suspend are a parameter's default, a test's name, a `benchmark` body and a property body, `test … for any (…)`; each reports the same code with its own label. There the fix is to complete the work above the position, into a constant it reads.
+Declare the return type a future of what the body answers with. The positions that can not suspend are a parameter's default, a test's name, a `benchmark` body and a property body, `test … for any (…)`; each reports the same code, under one label that says the position can not suspend, and the Note names all four. There the fix is to complete the work above the position, into a constant it reads.
 
 Quick Fix: **Declare the return Type 'Future\<String\>'**, wrapping the return type the body already declares. It is offered on a `complete` in a body, and not in a parameter's default, where wrapping that function's return type would leave the default exactly as wrong.
 

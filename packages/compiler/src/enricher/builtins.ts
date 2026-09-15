@@ -275,9 +275,11 @@ export const builtinMemberOrder: Array<string> = [
 	"Async",
 	// NOTE: And after every one of them, because what it answers is a future
 	// and a reader has to have met one. `Http` is the only Namespace in this
-	// list whose Methods reach outside the Program, which is the other half of
-	// why it is last: the order here is what a reader meets, and the door to a
-	// host is the last thing the library offers.
+	// list whose Methods reach ANOTHER host, which is the other half of why it
+	// is last: the order here is what a reader meets, and the door to a host is
+	// the last thing the library offers. `Terminal` and `Randomness` reach THIS
+	// host — its streams, its descriptors and its entropy — and neither leaves
+	// the machine the Program runs on.
 	"Http",
 	// NOTE: Then what a host answered, because a Response is what `Http` hands
 	// back. Neither of its two Methods is named anywhere above, so the position

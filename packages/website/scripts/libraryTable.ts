@@ -44,6 +44,12 @@ export interface PageDefinition {
 	seeAlso?: string[]
 	/** One hand-written paragraph under the lede, for a fact no declaration states. */
 	note?: string
+	/**
+	 * What the page calls its section of Type Aliases. "The tower" is the
+	 * numeric one's and says nothing anywhere else, so a page with aliases of
+	 * its own names them.
+	 */
+	towerLabel?: string
 }
 
 export const PAGES: PageDefinition[] = [
@@ -1120,6 +1126,7 @@ export const PAGES: PageDefinition[] = [
 		description:
 			"Requests to a host, as work that has not run: what to send, what comes back, and why sometimes nothing does.",
 		taughtOn: ["language/asynchrony"],
+		towerLabel: "Either side of a request",
 		groups: [
 			{
 				label: "Sending a request",

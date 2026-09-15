@@ -341,7 +341,7 @@
 					"entries": [
 						{
 							"signature": "header(named name: String) -> Optional<String>",
-							"summary": "Answers the header of the given name, whatever case it is written in.\n\nThe keys of a Response are lowercase, so the name is lowercased before it is looked up. A header the answer does not carry answers nothing.",
+							"summary": "Answers the header of the given name, whatever case the name is written in.\n\nThe keys of a Response a host answered with are lowercase, so the name is lowercased before it is looked up. A header the answer does not carry answers nothing.\n\nA Response a Program wrote down itself is found only where it wrote the key in lowercase. The lookup key is always the lowercased name, and a key written `Content-Type` is reached by no spelling at all.",
 							"parameters": [
 								{
 									"name": "named",
@@ -483,6 +483,7 @@
 			"description": "What a host answered with.\n\nThe header keys are lowercase, which is what makes a Dictionary the right shape for them. HTTP header names do not differ by case, and `header(named:)` reads one under any spelling.\n\nA name a host sent twice is one entry, with its values joined by `, `. That is what a host does to every other header name, and `set-cookie` is joined the same way here. Two cookies joined like that can not be read apart again, because a cookie's `Expires` holds a comma.\n\nThe body is text, decoded as UTF-8. Bytes that are not text are read as replacement characters, so an answer that is not text is a Response with a lossy body."
 		}
 	],
+	"towerLabel": "Either side of a request",
 	"views": [
 		{
 			"namespace": "Response",
@@ -524,7 +525,7 @@
 	},
 	"anchors": [
 		"at-a-glance",
-		"the-tower",
+		"either-side-of-a-request",
 		"request",
 		"Request",
 		"response",

@@ -5976,6 +5976,7 @@
 		}
 	],
 	"tower": [],
+	"towerLabel": "The tower",
 	"views": [
 		{
 			"namespace": "NestedList",

@@ -34,15 +34,16 @@ one entry reaches, and a List crosses to them through two Namespaces of its own
 `Dictionary.es` declares beside the container they answer.
 The modes a Method takes are Choices declared beside it: `Side`, `Rounding`,
 `SignStyle`, `Division`, `NumberFormat`, `CaseSensitivity`,
-`NormalizationForm`, `SortOrder`, `Stream` and `Step`.
+`NormalizationForm`, `SortOrder`, `Stream`, `HttpMethod`, `Redirects` and
+`Step`.
 A Choice whose Cases all carry no payload derives both its `Equatable` and its
-`Printable` conformance, so nine of those ten have a Namespace that declares
+`Printable` conformance, so eleven of those twelve have a Namespace that declares
 the two and holds no body at all: `#Less` prints `Less` without anybody writing
 that down. `Step` has none, because both of its Cases carry a payload and only a
 Choice of Cases that carry none derives a `toString`.
 The same rule derives `Enumerable`, and that one nobody declares: `Side.cases()`
 answers `[#Start, #End, #BothEnds]`, in the order the Choice declares them, for
-every Choice of payload-free Cases a Program can reach — the nine modes above
+every Choice of payload-free Cases a Program can reach — the eleven modes above
 that are one, `Ordering` with them, and a Program's own alike.
 
 The only things NOT declared here are the ones no declaration could produce:
@@ -72,7 +73,7 @@ later, or a length of time to wait — and four narrower targets hold the
 combinators. `ResultFuture` is a future answering a Result, `FutureList`
 and `ResultFutureList` are Lists of futures, and `NonEmptyFutureList` is
 the List a race needs (`Future.es`, `Async.es`).
-`Http` is the one Namespace that reaches outside the Program at all, and it
+`Http` is the one Namespace that reaches another host, and it
 answers work like everything above: `Http.send` is its one native and the six
 verbs are written on it, `Request` and `Response` are the Records either side
 of a request, `HttpMethod` and `Redirects` are the modes it takes, and
@@ -150,9 +151,10 @@ global invariant, stated once here, not something each name re-encodes. `::`
 already lends the receiver-first feel; the imperative completes it and reads
 better (`1::add(2)`, not `1::added(2)`). The last two transforming participles
 here were `groupedBy` and `tallied`, and they are `group(on:)` and `tally()`
-now. `Randomness.seeded` is the one participle left, and it is not a
-transformation: a static creator names what the thing it builds IS, and a source
-built from a seed is a seeded one.
+now. `Randomness.seeded` and `Async.deferred` are the two participles left, and
+neither is a transformation: a static creator names what the thing it builds IS
+— a source built from a seed is a seeded one, and work put off until something
+starts it is deferred.
 
 **2. A preposition is a label, never fused into the verb.** When an Argument is
 reached through a preposition — *of* a thing, *on* a separator, *with* a prefix,
@@ -247,13 +249,21 @@ conformance puts the Method in reach and pass the receiver, exactly as
 `Orderable.isLessThan(a, b)` is `protocol-as-value`, since a Protocol is a bound
 and never a value.
 
-Three name SHAPES, so rule 1 is not misapplied:
+Four name SHAPES, so rule 1 is not misapplied:
 
 | Shape | Form | Examples |
 |---|---|---|
 | **Transformation** — does something, returns the result | imperative command | `sort`, `reverse`, `trim`, `negate`, `pad`, `clamp`, `raise(to:)`, `join(with:)` |
 | **Predicate** — returns a `Boolean` | `is…`/`has…`/`doesNot…` prefix, or a direct verb | `isEmpty`, `isEven`, `hasItems`, `hasCharacters`, `contains`, `starts(with:)` |
 | **Accessor** — returns an intrinsic part | noun or adjective; no verb to force | `length`, `numerator`, `reciprocal`, `absolute`, `keys`, `firstItem`, `item(at:)`, `firstIndex(of:)` |
+| **Relation** — says WHEN, HOW MUCH or IN WHAT ORDER work runs | the relation itself, not the act | `within(milliseconds:)`, `inSequence`, `all`, `andThen`, `firstValue` |
+
+The fourth row is asynchrony's, and it is a row rather than an exception
+because there is no verb for "run these with a deadline over them" that is not
+longer than the relation. `within` is a preposition, `inSequence` a
+prepositional phrase, `all` a determiner and `andThen` a conjunction; each names
+the relation the work stands in, and the act — running it — is what every entry
+of those Namespaces does.
 
 Rules 2 and 3 do NOT apply to the `is…`/`has…`/`doesNot…` prefixes — those are
 predicate naming, not prepositional Arguments, so `isGreaterThan`, `isBetween`

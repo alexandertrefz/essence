@@ -148,7 +148,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	// rather than about the description it came from.
 	Started: started,
 	Async: async,
-	// NOTE: The one module in this table that reaches outside the Program. Its
+	// NOTE: The one module in this table that reaches another host. Its
 	// name is load-bearing twice over: the Rewriter imports it under the
 	// Namespace's own name, and `cli/src/resultCache.ts` refuses to remember a
 	// run whose bundle carries the label esbuild writes for this very file.
