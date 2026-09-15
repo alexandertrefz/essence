@@ -3499,19 +3499,62 @@ function resolveMatcher(
 // an Error Type. The Warning below says what is wrong, and a Program that then
 // reads the value goes on reading exactly what it wrote down — an Error Type
 // here would cascade a second Diagnostic through everything the value reaches.
+// NOTE: What `start` and `complete` answer with, MEMBER BY MEMBER. A Union of
+// work is reachable from a `define`, a `match` or an `if` whose arms answer
+// different Future Types, and the runtime answers each member on its own: a
+// Future is run, a Started is waited for, and anything else is its own answer.
+// So the Type has to be read the same way, or an accepted Program has a value
+// the emission awaited and a Type that says it is still work.
+//
+// NOTE: One level. `buildUnion` flattens anonymous Unions as it builds them, so
+// the members of a Union written down are the members there are — and a NAMED
+// Union stays whole for the same reason it does everywhere else: its name is
+// its spelling.
+//
+// Answers null where no member is work at all, which is what the two
+// `needless-*` Warnings are for.
+function unwrapWork(
+	type: common.Type,
+	unwrap: (member: common.Type) => common.Type | null,
+): common.Type | null {
+	if (type.type !== "UnionType") {
+		return unwrap(type)
+	}
+
+	let unwrapped = false
+	let members = type.types.map((member) => {
+		let answer = unwrap(member)
+
+		if (answer === null) {
+			return member
+		}
+
+		unwrapped = true
+
+		return answer
+	})
+
+	return unwrapped ? buildUnion(members) : null
+}
+
 function enrichStart(
 	node: parser.StartNode,
 	scope: enricher.Scope,
 ): common.typed.StartNode {
 	let expression = enrichExpression(node.expression, scope)
 	let type = expression.type
+	let started = unwrapWork(type, (member) =>
+		member.type === "Future"
+			? { type: "Started", valueType: member.valueType }
+			: null,
+	)
 
-	if (type.type === "Future") {
+	if (started !== null) {
 		return {
 			nodeType: "Start",
 			expression,
 			position: node.position,
-			type: { type: "Started", valueType: type.valueType },
+			type: started,
 		}
 	}
 
@@ -3563,12 +3606,18 @@ function enrichComplete(
 
 	reportMisplacedComplete(node, scope)
 
-	if (type.type === "Future" || type.type === "Started") {
+	let answered = unwrapWork(type, (member) =>
+		member.type === "Future" || member.type === "Started"
+			? member.valueType
+			: null,
+	)
+
+	if (answered !== null) {
 		return {
 			nodeType: "Complete",
 			expression,
 			position: node.position,
-			type: type.valueType,
+			type: answered,
 		}
 	}
 

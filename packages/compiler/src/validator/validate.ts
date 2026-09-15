@@ -365,10 +365,22 @@ function validateExpression(
 // Keywords, because the Type is what decides it: a plain call answering a
 // Future — `headline(url)` on its own line — is exactly the mistake this is for,
 // and the call says nothing about asynchrony on its face.
+// NOTE: A Union of work is work. `complete` and `start` unwrap such a Union
+// member by member, because the runtime answers each member on its own, and a
+// Statement holding one drops exactly as much as a Statement holding a single
+// Future does. One level, for the reason `unwrapWork` gives in the Enricher.
+function holdsWork(type: common.Type, kind: "Future" | "Started"): boolean {
+	return (
+		type.type === kind ||
+		(type.type === "UnionType" &&
+			type.types.some((member) => member.type === kind))
+	)
+}
+
 function reportDiscardedWork(node: common.typed.ExpressionNode): void {
 	let type = node.type
 
-	if (type.type === "Future") {
+	if (holdsWork(type, "Future")) {
 		reportError("Nothing here runs", node.position, {
 			code: "unused-future",
 			labels: [
@@ -394,7 +406,7 @@ function reportDiscardedWork(node: common.typed.ExpressionNode): void {
 		return
 	}
 
-	if (type.type === "Started") {
+	if (holdsWork(type, "Started")) {
 		// NOTE: A `start` is a run this Statement put in flight; anything else
 		// of this Type is a call that ANSWERED with one, which may have been
 		// written for what it did rather than for the run it handed back. The

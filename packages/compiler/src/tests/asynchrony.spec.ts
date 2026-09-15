@@ -438,6 +438,109 @@ describe("Asynchrony", () => {
 			).toBe("String")
 		})
 
+		// NOTE: A Union of work is reachable from a `define`, a `match` or an
+		// `if` whose arms answer different Future Types, and the runtime reads
+		// it MEMBER BY MEMBER: a Future is run, a Started is waited for, and
+		// anything else is its own answer. So the Type is read the same way —
+		// otherwise the emission awaits a value the Compiler still calls work.
+		it("answers a Union of work member by member", () => {
+			expect(
+				lastConstantType(`implementation {
+	function work(_ n: Integer) -> Future<Integer> {
+		<- Async.deferred(() { <- n })
+	}
+
+	function text(_ s: String) -> Future<String> {
+		<- Async.deferred(() { <- s })
+	}
+
+	function either(_ flag: Boolean) -> Future<Integer> | Future<String> {
+		<- define {
+			as work(1) if flag
+			as text("a") otherwise
+		}
+	}
+
+	constant answered = complete either(true)
+}`),
+			).toBe("Integer | String")
+			expect(
+				lastConstantType(`implementation {
+	function work(_ n: Integer) -> Future<Integer> {
+		<- Async.deferred(() { <- n })
+	}
+
+	function either(_ flag: Boolean) -> Future<Integer> | String {
+		<- define {
+			as work(1) if flag
+			as "plain" otherwise
+		}
+	}
+
+	constant answered = complete either(true)
+}`),
+			).toBe("Integer | String")
+			expect(
+				lastConstantType(`implementation {
+	function work(_ n: Integer) -> Future<Integer> {
+		<- Async.deferred(() { <- n })
+	}
+
+	function either(_ flag: Boolean) -> Future<Integer> | String {
+		<- define {
+			as work(1) if flag
+			as "plain" otherwise
+		}
+	}
+
+	constant running = start either(true)
+}`),
+			).toBe("Started<Integer> | String")
+		})
+
+		// NOTE: And what it is not: a Union with no work in it is the same
+		// `needless-*` Warning a single value of that Type is.
+		it("still refuses a Union holding no work at all", () => {
+			expect(
+				codesOf(`implementation {
+	function either(_ flag: Boolean) -> Integer | String {
+		<- define {
+			as 1 if flag
+			as "plain" otherwise
+		}
+	}
+
+	constant answered = complete either(true)
+	constant running = start either(true)
+
+	Terminal.inspect(answered)
+	Terminal.inspect(running)
+}`),
+			).toEqual(["needless-complete", "needless-start"])
+		})
+
+		// NOTE: A Statement holding a Union of work drops exactly as much as one
+		// holding a single Future, so it is the same two Diagnostics.
+		it("names a Union of work dropped in a Statement", () => {
+			expect(
+				codesOf(`implementation {
+	function work(_ n: Integer) -> Future<Integer> {
+		<- Async.deferred(() { <- n })
+	}
+
+	function either(_ flag: Boolean) -> Future<Integer> | String {
+		<- define {
+			as work(1) if flag
+			as "plain" otherwise
+		}
+	}
+
+	either(true)
+	start either(true)
+}`),
+			).toEqual(["unused-future", "unobserved-started"])
+		})
+
 		// NOTE: A completing body is written as though it answered the value,
 		// and the future is what the emission wraps around it — so a `<-`
 		// answering the inner Type is what compiles, and one answering the
