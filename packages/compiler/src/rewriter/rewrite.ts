@@ -8395,6 +8395,11 @@ function rewriteTestsNodes(
 ): Array<estree.Statement> {
 	return nodes.flatMap((node) => {
 		if (node.nodeType === "TestEntry") {
+			// NOTE: In the order the Arguments stand, because rewriting is not
+			// free of order: a Constant the name pools is pooled before one the
+			// body pools, and the pool's names are what a reader of the emitted
+			// Module sees.
+			let name = testName(node.name)
 			let body = testBody(node.body)
 
 			return withStatementLocation(
@@ -8413,7 +8418,7 @@ function rewriteTestsNodes(
 								[
 									testContext(),
 									numberLiteral(node.index),
-									testName(node.name),
+									name,
 									body,
 								],
 							),
