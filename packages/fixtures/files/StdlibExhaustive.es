@@ -90,6 +90,7 @@ implementation {
 	constant noMixedNumbers: List<Integer | Rational> = []
 	constant noNestedNumbers: List<List<Integer>>     = []
 	constant noFutures: List<Future<Integer>>         = []
+	constant noAnswers: List<Future<Result<Integer, String>>> = []
 
 	§ ——— String ———————————————————————————————————————————————————————————
 	show("String.isEmpty()", greeting::isEmpty())
@@ -6515,6 +6516,10 @@ c"::quote())
 	show(
 		"ResultFutureList.firstValue<Value, Failure>() [every run fails]",
 		complete [losing, losing]::firstValue(),
+	)
+	show(
+		"ResultFutureList.firstValue<Value, Failure>() [empty]",
+		complete noAnswers::firstValue(),
 	)
 	show(
 		"Started.map<Value, Other>(_ (_ Value) -> Other)",

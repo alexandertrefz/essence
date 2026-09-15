@@ -1828,5 +1828,6 @@
 "NonEmptyFutureList.race<Value>() => 2"
 "ResultFutureList.firstValue<Value, Failure>() => Value(7)"
 "ResultFutureList.firstValue<Value, Failure>() [every run fails] => Empty"
+"ResultFutureList.firstValue<Value, Failure>() [empty] => Empty"
 "Started.map<Value, Other>(_ (_ Value) -> Other) => 4"
 "Started.within<Value>(milliseconds: Integer) => Value(3)"
