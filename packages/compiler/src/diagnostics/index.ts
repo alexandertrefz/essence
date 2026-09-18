@@ -168,19 +168,27 @@ export function containsErrors(diagnostics: Array<common.Diagnostic>): boolean {
 	return diagnostics.some((diagnostic) => diagnostic.severity === "error")
 }
 
-// NOTE: Whether a verdict of this code already stands about this line. The one
-// question a report asks about the ones made in front of it, and it is asked by
-// exactly one caller: the bare-Case answer is a GUESS about a name, and a guess
-// is worth making only where nothing has already said that the line is another
-// language's. `throw new Error("x")` is three names, and `Stream` declaring an
-// `#Error` is not a reason to offer `#Error` for the third of them.
+// NOTE: Whether a verdict of this code already stands about this line — and,
+// where `message` is given, that verdict and no other. The one question a report
+// asks about the ones made in front of it, and it has two callers.
+//
+// The bare-Case answer is a GUESS about a name, and a guess is worth making only
+// where nothing has already said that the line is another language's: `throw new
+// Error("x")` is three names, and `Stream` declaring an `#Error` is not a reason
+// to offer `#Error` for the third of them.
+//
+// A String written in the other quotes is broken into several names by the
+// braces of its holes, and one refusal about it is one mistake answered: the
+// names behind the first are pieces of the same String.
 export function reportedOnLine(
 	code: common.DiagnosticCode,
 	line: number,
+	message?: string,
 ): boolean {
 	return activeDiagnostics.some(
 		(diagnostic) =>
 			diagnostic.code === code &&
+			(message === undefined || diagnostic.message === message) &&
 			diagnostic.position !== null &&
 			diagnostic.position.start.line === line,
 	)

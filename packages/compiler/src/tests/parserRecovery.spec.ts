@@ -231,6 +231,71 @@ describe("Parser Recovery", () => {
 		)
 	})
 
+	// NOTE: An EVEN number of forgotten quotes leaves nothing unterminated at
+	// all — the Lexer runs out of nothing, and what is left of each swallowed
+	// line is the name that stood behind the quote that closed the String above
+	// it. `'two' is not declared` was the whole of what this file said.
+	it("should name the String that swallowed a line where nothing is left open", () => {
+		let { diagnostics } = parseWithDiagnostics(
+			`implementation {
+	constant a = "one
+	constant b = "two
+	constant c = "three"
+
+	Terminal.print(a)
+}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].code).toBe("unclosed-string")
+		expect(diagnostics[0].position).toEqual({
+			start: { line: 2, column: 15 },
+			end: { line: 2, column: 16 },
+		})
+		expect(diagnostics[0].labels[0]).toMatchObject({
+			kind: "primary",
+			message: "opened here",
+		})
+		expect(diagnostics[0].labels[2]?.message).toBe(
+			"and this is what that quote left standing",
+		)
+		expect(diagnostics[0].helps).toEqual([
+			`Add the missing '"' at the end of line 2.`,
+		])
+	})
+
+	// NOTE: The other half of that rule — a String written to span lines, which
+	// is Essence and stays silent. What tells the two apart is the name standing
+	// behind the closing quote on its line: two Expressions never stand side by
+	// side, so there is nothing else that name could be.
+	it("should leave a String that really does span lines alone", () => {
+		let sources = [
+			`implementation {
+	constant poem = "Roses
+are red"
+
+	Terminal.print(poem)
+}`,
+			`implementation {
+	constant poem = "Roses
+are red"::append("!")
+
+	Terminal.print(poem)
+}`,
+			`implementation {
+	constant poem = "Roses
+are red"
+	constant name = "Ada"
+
+	Terminal.print(poem::append(name))
+}`,
+		]
+
+		for (let source of sources) {
+			expect(parseWithDiagnostics(source).diagnostics).toEqual([])
+		}
+	})
+
 	// NOTE: The claim is about the String that closed DIRECTLY in front of the
 	// unclosed one and on its line. A one-line String written between the two
 	// clears it, and so does a line break: neither file below is the shape the

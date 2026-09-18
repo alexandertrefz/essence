@@ -1716,6 +1716,13 @@ class DescentParser {
 				break
 			}
 
+			// NOTE: Asked here rather than by an element reader, because what it
+			// answers is a line that is NO element — swallowed, so the list
+			// carries on with the line behind it and nothing is dropped.
+			if (this.swallowForeignComment()) {
+				continue
+			}
+
 			let startState = this.tokens.save()
 
 			// NOTE: Each element is read with no record of a reading thrown
@@ -1745,6 +1752,70 @@ class DescentParser {
 		}
 
 		return elements
+	}
+
+	// NOTE: `# count the items` — a Comment written the way Python and the
+	// shells write one. A `#` opens a CASE here, so the line read as a bare Case
+	// and then a Statement per word behind it, and every one of those words was
+	// answered as a name nothing declares: one habit, four Diagnostics.
+	//
+	// Narrow on purpose, because `#Red` and `# Red` are both Essence and a
+	// Program may write either. What makes this a Comment is the WORDS behind
+	// the Case: a Case carries its payload in brackets, and no Statement of this
+	// language stands behind another on one line. So the shape is the `#`, a
+	// name, at least one more name, and nothing on the line that is not one —
+	// which leaves a one-word Comment (`# todo`) to be read as the Case it is
+	// indistinguishable from.
+	protected swallowForeignComment(): boolean {
+		let hash = this.tokens.peek()
+
+		if (hash?.type !== TokenType.SymbolHash) {
+			return false
+		}
+
+		let line = hash.position.start.line
+		let words = 0
+
+		for (let offset = 1; ; offset++) {
+			let token = this.tokens.peek(offset)
+
+			if (token === undefined || token.position.start.line !== line) {
+				break
+			}
+
+			if (!isIdentifierToken(token)) {
+				return false
+			}
+
+			words++
+		}
+
+		if (words < 2) {
+			return false
+		}
+
+		if (!this.suppressDiagnostics) {
+			reportError("A Comment is written with '§'", hash.position, {
+				code: "foreign-syntax",
+				labels: [primary(hash.position, "Essence writes '§' here")],
+				notes: [
+					"A '§' Comment runs to the end of its line, and a '§§' block above a Declaration documents it.",
+					"A '#' opens a Case, so '#count' is a value and each word behind it is read as a Statement of its own.",
+				],
+				helps: ["Write '§' in place of '#'."],
+				data: {
+					kind: "essence-spelling",
+					position: hash.position,
+					spelling: "§",
+				},
+			})
+		}
+
+		while (this.tokens.peek()?.position.start.line === line) {
+			this.tokens.next()
+		}
+
+		return true
 	}
 
 	protected recoverFromError(
@@ -2010,6 +2081,8 @@ class DescentParser {
 			return this.parseVariableAssignmentStatement()
 		}
 
+		this.refuseNameBehindSwallowedLines(token)
+
 		let declaration = this.parseForeignDeclarationStatement(token)
 
 		if (declaration !== null) {
@@ -2021,6 +2094,76 @@ class DescentParser {
 		this.refuseMemberAssignment(expression)
 
 		return expression
+	}
+
+	// NOTE: The other half of a forgotten quote. A String that never closes runs
+	// to the end of the input and the Lexer says so — but where the quote it ran
+	// into was ANOTHER String's opening one, the count comes out even and
+	// nothing is unterminated at all. What is left is the name that stood behind
+	// that quote, read as a Statement of its own:
+	//
+	//     constant a = "one
+	//     constant b = "two        § `two` is all that is left of this line
+	//     constant c = "three"
+	//
+	// and `'two' is not declared` was the whole of what a file with two
+	// forgotten quotes said. The String that SPANS LINES is named here for the
+	// reason `swallowedTheLinesBelow` names it there: it is the '"' a reader has
+	// to write, and a String written to span lines is not usually followed, on
+	// the line it closes, by a name standing on its own.
+	//
+	// The shape is narrow: a name OPENING a Statement, directly behind a String
+	// whose two quotes are on different lines, on the line the second of them
+	// stands on. Two Expressions never stand side by side in this language, so
+	// there is nothing else this can be.
+	protected refuseNameBehindSwallowedLines(token: Token): void {
+		let previous = this.tokens.peek(-1)
+
+		if (
+			!isIdentifierToken(token) ||
+			previous?.type !== TokenType.LiteralString ||
+			previous.position.start.line === previous.position.end.line ||
+			previous.position.end.line !== token.position.start.line
+		) {
+			return
+		}
+
+		let opened = previous.position.start
+		let closed = {
+			start: {
+				line: previous.position.end.line,
+				column: previous.position.end.column - 1,
+			},
+			end: previous.position.end,
+		}
+
+		throw new ParseError(
+			"This String Literal is never closed",
+			{
+				start: opened,
+				end: { line: opened.line, column: opened.column + 1 },
+			},
+			"opened here",
+			{
+				code: "unclosed-string",
+				labels: [
+					secondary(
+						closed,
+						"closed by this quote, which reads as the start of another String",
+					),
+					secondary(
+						token.position,
+						"and this is what that quote left standing",
+					),
+				],
+				notes: [
+					`A String Literal may span lines, and the line breaks are part of it — so the quote on line ${previous.position.end.line} closed the one opened on line ${opened.line}, and what a reader wrote to open a String of its own closed this one instead.`,
+				],
+				helps: [
+					`Add the missing '"' at the end of line ${opened.line}.`,
+				],
+			},
+		)
 	}
 
 	// NOTE: `const price = 12`, `let count = 3`, `return n` — a whole Statement

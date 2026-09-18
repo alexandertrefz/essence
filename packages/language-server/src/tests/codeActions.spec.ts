@@ -1852,6 +1852,37 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).not.toContain("unclosed-string")
 		})
 
+		// NOTE: An EVEN number of forgotten quotes leaves nothing unterminated —
+		// the count comes out right and the Lexer runs out of nothing — so this
+		// report comes from the Parser rather than the Lexer. It carries the
+		// same Labels, so it reads the same fix, and applying it twice closes
+		// both.
+		it("should close each of a pair of Strings that swallowed a line", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant a = "one',
+				'\tconstant b = "two',
+				'\tconstant c = "three"',
+				"",
+				"\tTerminal.print(a)",
+				"}",
+			]
+
+			let [first] = quickFixes(lines)
+
+			expect(first.diagnosticCode).toBe("unclosed-string")
+
+			let once = applied(lines, first)
+
+			expect(once[1]).toBe('\tconstant a = "one"')
+
+			let [second] = quickFixes(once)
+			let twice = applied(once, second)
+
+			expect(twice[2]).toBe('\tconstant b = "two"')
+			expect(codesOf(twice)).toEqual([])
+		})
+
 		it("should stay silent where the opening quote has been typed over", () => {
 			let lines = ["implementation {", "\tconstant greeting = hello", "}"]
 

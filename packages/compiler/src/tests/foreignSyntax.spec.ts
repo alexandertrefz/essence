@@ -1103,6 +1103,91 @@ describe("Foreign syntax", () => {
 			])
 		})
 
+		// NOTE: A template literal is NOT one Token — a `{` ends a name, so the
+		// holes break the run into a name, a `$`, a Record Literal and a quote
+		// standing on its own, and each of the four was answered as a name
+		// nothing declares. One String, one report.
+		it("refuses a template literal once, holes and all", () => {
+			let source = program(
+				'constant name = "Ada"',
+				"constant s = `Hello ${name}`",
+				"Terminal.print(s)",
+			)
+
+			expect(codesOf(source)).toEqual(["foreign-syntax"])
+			expect(messagesOf(source)).toEqual([
+				"A String is written in double quotes",
+			])
+			expect(helpsOf(source)).toEqual([
+				`Write the whole String in double quotes, each hole in braces: '"Hello, {name}"'.`,
+			])
+			expect(notesOf(source)[1]).toBe(
+				"A hole carries no '$' — a '$' written in a String is a '$' the String prints.",
+			)
+		})
+
+		// NOTE: A run that closed on its own quote is ONE edit, so it keeps its
+		// fix; a run broken into pieces is a String the reader has to write out,
+		// and offering to rewrite the first piece of it would write a String
+		// holding a third of what they wrote.
+		it("carries a fix only for a run that closed on its own quote", () => {
+			expect(
+				onlyDiagnostic(program("constant s = `hi`")).data,
+			).toMatchObject({
+				kind: "essence-spelling",
+				spelling: '"hi"',
+			})
+
+			expect(
+				onlyDiagnostic(
+					program(
+						'constant name = "Ada"',
+						"constant s = `Hello ${name}`",
+					),
+				).data,
+			).toBeUndefined()
+		})
+
+		// NOTE: `#Red` and `# Red` are both Essence, so what makes a `#` a
+		// Comment is the WORDS behind the Case: a Case carries its payload in
+		// brackets, and no Statement of this language stands behind another on
+		// one line.
+		it("refuses a Comment written with a '#'", () => {
+			let source = program(
+				"# count the items",
+				"constant items = [1, 2, 3]",
+				"Terminal.print(items)",
+			)
+
+			expect(codesOf(source)).toEqual(["foreign-syntax"])
+			expect(messagesOf(source)).toEqual([
+				"A Comment is written with '§'",
+			])
+			expect(helpsOf(source)).toEqual(["Write '§' in place of '#'."])
+		})
+
+		it("leaves a Case written with a '#' alone", () => {
+			expect(
+				codesOf(
+					program(
+						"choice Colour { red, green }",
+						"constant c: Colour = #red",
+						"Terminal.print(c::is(#green))",
+					),
+				),
+			).toEqual([])
+
+			expect(
+				codesOf(
+					program(
+						"choice Light { Red, Green }",
+						"constant c: Light = # Red",
+						"Terminal.print(c::is(#Green))",
+					),
+				),
+			).toEqual([])
+		})
+
 		it("refuses the two postfix habits with the Optional", () => {
 			expect(
 				messagesOf(

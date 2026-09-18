@@ -1191,29 +1191,21 @@ function reportForeignName(
 		return true
 	}
 
-	// NOTE: `'hi'` and `` `hi` `` are one Identifier each — neither quote ends a
-	// name — so the whole of what was written is in hand, and the Essence
-	// spelling of it is that text in the quotes this language has.
+	// NOTE: The rest of a String written in the other quotes. One refusal about
+	// it already stands on this line, and the names behind it are pieces of the
+	// same String — see `reportForeignString`.
 	if (
-		name.length >= 2 &&
-		(name.startsWith("'") || name.startsWith("`")) &&
-		name.endsWith(name[0] as string)
+		reportedOnLine(
+			"foreign-syntax",
+			node.position.start.line,
+			foreignStringMessage,
+		)
 	) {
-		reportError("A String is written in double quotes", node.position, {
-			code: "foreign-syntax",
-			labels: [
-				primary(node.position, "this is read as a name, not a String"),
-			],
-			notes: [
-				"Double quotes are the only String Literal, and every one of them interpolates: '\"Hello, {name}\"'.",
-			],
-			helps: [`Write '"${name.slice(1, -1)}"'.`],
-			data: {
-				kind: "essence-spelling",
-				position: node.position,
-				spelling: `"${name.slice(1, -1)}"`,
-			},
-		})
+		return true
+	}
+
+	if (name.startsWith("'") || name.startsWith("`")) {
+		reportForeignString(node, name)
 
 		return true
 	}
@@ -1297,6 +1289,57 @@ function reportForeignName(
 	}
 
 	return reportBareCaseName(node, scope, context.applied === true)
+}
+
+// NOTE: The one sentence a String in the other quotes is answered with, spelled
+// here so that the report and the rule that silences the rest of its line read
+// the same text rather than two copies of it.
+const foreignStringMessage = "A String is written in double quotes"
+
+// NOTE: `'hi'` and `` `hi` `` are one Identifier each — neither quote ends a
+// name — so the whole of what was written is in hand, and the Essence spelling
+// of it is that text in the quotes this language has.
+//
+// NOTE: `` `Hello ${name}` `` is NOT one Identifier. A `{` ends a name, so the
+// holes break the run into a name, a `$`, a Record Literal and a quote standing
+// on its own, and each of the four was answered as an undeclared name of its
+// own. A name that merely OPENS with a quote is answered about the String, and
+// what the line holds behind it says nothing: there is one String here, and one
+// mistake. What a fix can write is the other half of the difference — a run
+// that closed on its own quote is one edit, and a run broken into pieces is a
+// String the reader has to write out, so only the first carries a Quick Fix.
+function reportForeignString(node: parser.IdentifierNode, name: string): void {
+	let quote = name[0] as string
+	let closed = name.length >= 2 && name.endsWith(quote)
+
+	reportError(foreignStringMessage, node.position, {
+		code: "foreign-syntax",
+		labels: [
+			primary(node.position, "this is read as a name, not a String"),
+		],
+		notes: [
+			"Double quotes are the only String Literal, and every one of them interpolates: '\"Hello, {name}\"'.",
+			...(closed
+				? []
+				: [
+						"A hole carries no '$' — a '$' written in a String is a '$' the String prints.",
+					]),
+		],
+		helps: closed
+			? [`Write '"${name.slice(1, -1)}"'.`]
+			: [
+					`Write the whole String in double quotes, each hole in braces: '"Hello, {name}"'.`,
+				],
+		...(closed
+			? {
+					data: {
+						kind: "essence-spelling" as const,
+						position: node.position,
+						spelling: `"${name.slice(1, -1)}"`,
+					},
+				}
+			: {}),
+	})
 }
 
 // NOTE: One word of another language, answered where it stands. Answers whether
