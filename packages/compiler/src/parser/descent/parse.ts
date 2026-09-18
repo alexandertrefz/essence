@@ -578,6 +578,16 @@ type ModuleSectionRead = {
 	side: "above" | "below"
 }
 
+// NOTE: The brackets that CLOSE something. A list reader that has just stepped
+// over a `,` is looking for its next member, and none of these begins one: the
+// list is short of its own closing bracket, and one of these is the bracket that
+// arrived in its place. See `refuseListContinuation`.
+const closingBracketTokenTypes = new Set([
+	TokenType.SymbolRightParen,
+	TokenType.SymbolRightBracket,
+	TokenType.SymbolRightBrace,
+])
+
 // NOTE: The Tokens a Statement that begins with a bare name goes on with —
 // a reassignment, a Method call, a member read, a call, an index. See
 // `parseOptionalRefinementPredicate`.
@@ -2530,6 +2540,11 @@ class DescentParser {
 				if (this.tokens.peek()?.type === TokenType.SymbolRightBrace) {
 					break
 				}
+
+				this.refuseListContinuation(
+					TokenType.SymbolRightBrace,
+					leftBrace,
+				)
 
 				cases.push(this.parseChoiceCase())
 			}
@@ -4823,6 +4838,11 @@ class DescentParser {
 					break
 				}
 
+				this.refuseListContinuation(
+					TokenType.SymbolRightBrace,
+					leftBrace,
+				)
+
 				members.push(this.parsePatternMember())
 			}
 		}
@@ -5058,7 +5078,7 @@ class DescentParser {
 			)
 		}
 
-		let keyValuePairList = this.parseKeyValuePairList(true)
+		let keyValuePairList = this.parseKeyValuePairList(true, leftBrace)
 		let rightBrace = this.tokens.expectClosing(
 			TokenType.SymbolRightBrace,
 			leftBrace,
@@ -5089,7 +5109,7 @@ class DescentParser {
 		}
 
 		let record = this.backtrack(() => {
-			let keyValuePairList = this.parseKeyValuePairList(true)
+			let keyValuePairList = this.parseKeyValuePairList(true, leftBrace)
 			let rightBrace = this.tokens.expectClosing(
 				TokenType.SymbolRightBrace,
 				leftBrace,
@@ -5140,8 +5160,10 @@ class DescentParser {
 
 		let combinationOfKeys = (allowShorthand: boolean) =>
 			this.backtrack(() => {
-				let keyValuePairList =
-					this.parseKeyValuePairList(allowShorthand)
+				let keyValuePairList = this.parseKeyValuePairList(
+					allowShorthand,
+					leftBrace,
+				)
 				let rightBrace = this.tokens.expectClosing(
 					TokenType.SymbolRightBrace,
 					leftBrace,
@@ -5309,8 +5331,12 @@ class DescentParser {
 	// an update — `["a" = 1]` writes a key that is a VALUE, and a bare name
 	// there is that value and not short for anything. See
 	// `parseDictionaryUpdate`.
+	// NOTE: `opening` is the `{` this list stands in, carried down so that a
+	// member the reader never began is answered with the bracket the braces are
+	// short of — see `refuseListContinuation`.
 	protected parseKeyValuePairList(
 		allowShorthand: boolean,
+		opening: Token,
 	): ReturnType<typeof generators.buildKeyValuePairList> {
 		let pairs = [this.parseKeyValuePair(allowShorthand)]
 
@@ -5320,6 +5346,8 @@ class DescentParser {
 			if (this.tokens.peek()?.type === TokenType.SymbolRightBrace) {
 				break
 			}
+
+			this.refuseListContinuation(TokenType.SymbolRightBrace, opening)
 
 			pairs.push(this.parseKeyValuePair(allowShorthand))
 		}
@@ -5508,7 +5536,7 @@ class DescentParser {
 			)
 		}
 
-		let keyValuePairList = this.parseKeyValuePairList(true)
+		let keyValuePairList = this.parseKeyValuePairList(true, leftBrace)
 		let rightBrace = this.tokens.expectClosing(
 			TokenType.SymbolRightBrace,
 			leftBrace,
@@ -6063,7 +6091,7 @@ class DescentParser {
 		let first = this.parseExpression()
 
 		if (this.tokens.peek()?.type === TokenType.SymbolEqual) {
-			let entries = this.parseDictionaryEntries(first)
+			let entries = this.parseDictionaryEntries(first, leftBracket)
 
 			this.refuseTrailingEntrySeparator()
 
@@ -6103,6 +6131,11 @@ class DescentParser {
 			if (this.tokens.peek()?.type === TokenType.SymbolRightBracket) {
 				break
 			}
+
+			this.refuseListContinuation(
+				TokenType.SymbolRightBracket,
+				leftBracket,
+			)
 
 			values.push(this.parseExpression())
 		}
@@ -6148,8 +6181,10 @@ class DescentParser {
 	// where a List allows one, and for the same reason: a list of things laid
 	// out one to a line grows by a line rather than by a line and an edit above
 	// it.
+	// NOTE: And the `[` these entries stand in, for the same reason.
 	protected parseDictionaryEntries(
 		firstKey: parser.ExpressionNode,
+		opening: Token,
 	): Array<parser.DictionaryEntryNode> {
 		let entries = [this.parseDictionaryEntry(firstKey)]
 
@@ -6159,6 +6194,8 @@ class DescentParser {
 			if (this.tokens.peek()?.type === TokenType.SymbolRightBracket) {
 				break
 			}
+
+			this.refuseListContinuation(TokenType.SymbolRightBracket, opening)
 
 			entries.push(this.parseDictionaryEntry(this.parseExpression()))
 		}
@@ -6277,7 +6314,7 @@ class DescentParser {
 		let first = this.parseExpression()
 
 		if (this.tokens.peek()?.type === TokenType.SymbolEqual) {
-			let entries = this.parseDictionaryEntries(first)
+			let entries = this.parseDictionaryEntries(first, leftBracket)
 			// NOTE: The key list spans the keys and nothing else — the brackets
 			// belong to the Combination, which is the Node they open and close.
 			// Exactly what a braced update's key list spans; see
@@ -6449,6 +6486,8 @@ class DescentParser {
 				break
 			}
 
+			this.refuseListContinuation(TokenType.SymbolRightAngle, leftAngle)
+
 			generics.push(this.parseGenericDeclaration())
 		}
 
@@ -6543,6 +6582,11 @@ class DescentParser {
 				if (this.tokens.peek()?.type === TokenType.SymbolRightParen) {
 					break
 				}
+
+				this.refuseListContinuation(
+					TokenType.SymbolRightParen,
+					leftParen,
+				)
 
 				parameters.push(this.parseParameter(allowsInferredTypes))
 			}
@@ -6972,6 +7016,11 @@ class DescentParser {
 					break
 				}
 
+				this.refuseListContinuation(
+					TokenType.SymbolRightParen,
+					leftParen,
+				)
+
 				args.push(this.parseArgument(leftParen))
 			}
 		}
@@ -7212,6 +7261,8 @@ class DescentParser {
 				break
 			}
 
+			this.refuseListContinuation(TokenType.SymbolRightAngle, leftAngle)
+
 			typeArguments.push(this.parseType())
 		}
 
@@ -7269,6 +7320,11 @@ class DescentParser {
 				if (this.tokens.peek()?.type === TokenType.SymbolRightParen) {
 					break
 				}
+
+				this.refuseListContinuation(
+					TokenType.SymbolRightParen,
+					leftParen,
+				)
 
 				parameterTypes.push(this.parseFunctionTypeParameter())
 			}
@@ -7344,6 +7400,8 @@ class DescentParser {
 			if (this.tokens.peek()?.type === TokenType.SymbolRightBrace) {
 				break
 			}
+
+			this.refuseListContinuation(TokenType.SymbolRightBrace, leftBrace)
 
 			pairs.push(this.parseKeyTypePair())
 		}
@@ -7740,6 +7798,39 @@ class DescentParser {
 		return account === null
 			? null
 			: { ...account, position: lexeme.position }
+	}
+
+	// NOTE: What stands after a `,` in a list — the next member, this list's own
+	// closing bracket, which is the trailing comma a reader writes on purpose,
+	// or a mistake. The mistake this answers is the third: a bracket that closes
+	// SOMETHING ELSE, which says the list was never closed and that the bracket
+	// standing here belongs to whatever holds it.
+	//
+	// The list's own opener is in hand here and nowhere the member readers can
+	// reach, so without this the report came out of `parseIdentifier` — "Expected
+	// an Identifier but found ')'", about a member nobody was writing, with no
+	// word about the `{` it is short of. The same file WITHOUT the trailing comma
+	// was answered "Expected '}' but found ')'" and the brace was named, because
+	// the reader that closes the list is the one that met the `)`. The comma was
+	// the whole difference.
+	//
+	// Only the brackets, and the end of the input. Everything else that can not
+	// begin a member is text the member readers say more about than this could.
+	protected refuseListContinuation(
+		closing: lexer.TokenType,
+		opening: Token,
+	): void {
+		let token = this.tokens.peek()
+
+		if (
+			token !== undefined &&
+			(token.type === closing ||
+				!closingBracketTokenTypes.has(token.type))
+		) {
+			return
+		}
+
+		this.tokens.failClosing(closing, opening)
 	}
 
 	protected refuseForeignText(refusal: ForeignRefusal): never {

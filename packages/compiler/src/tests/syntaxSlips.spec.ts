@@ -219,6 +219,100 @@ describe("Syntax slips", () => {
 		})
 	}
 
+	// NOTE: The fifteen above are pinned one slip at a time, because each of
+	// them is a shape of its own. This one is a shape every LIST has, and what
+	// it holds is that they all answer it alike: a trailing comma used to lose
+	// the "opened here" Label, because the reader that met the wrong bracket was
+	// then the one reading a member rather than the one closing the list, and
+	// only the closer has the opener in hand. Eleven readers share the loop;
+	// these are the eight a Program written by hand reaches.
+	describe("a list closed by the wrong bracket behind a trailing comma", () => {
+		let lists: Array<[string, string, string, common.Cursor]> = [
+			[
+				"a Record Literal",
+				"implementation {\n\tconstant point = {\n\t\tx = 1,\n\t\ty = 2,\n\t)\n}",
+				"Expected '}' but found ')'.",
+				{ line: 2, column: 19 },
+			],
+			[
+				"a List Literal",
+				"implementation {\n\tconstant items = [\n\t\t1,\n\t\t2,\n\t)\n}",
+				"Expected ']' but found ')'.",
+				{ line: 2, column: 19 },
+			],
+			[
+				"a Dictionary Literal",
+				'implementation {\n\tconstant ages = [\n\t\t"a" = 1,\n\t\t"b" = 2,\n\t)\n}',
+				"Expected ']' but found ')'.",
+				{ line: 2, column: 18 },
+			],
+			[
+				"an Argument list",
+				"implementation {\n\tTerminal.print(\n\t\t1,\n\t\t2,\n\t]\n}",
+				"Expected ')' but found ']'.",
+				{ line: 2, column: 16 },
+			],
+			[
+				"a Parameter list",
+				"implementation {\n\tfunction f(\n\t\t_ a: Integer,\n\t\t_ b: Integer,\n\t] -> Integer { <- a }\n}",
+				"Expected ')' but found ']'.",
+				{ line: 2, column: 12 },
+			],
+			[
+				"a Record Type",
+				"implementation {\n\ttype P = {\n\t\tx: Integer,\n\t\ty: Integer,\n\t)\n}",
+				"Expected '}' but found ')'.",
+				{ line: 2, column: 11 },
+			],
+			[
+				"a Choice's Cases",
+				"implementation {\n\tchoice C {\n\t\tRed,\n\t\tGreen,\n\t)\n}",
+				"Expected '}' but found ')'.",
+				{ line: 2, column: 11 },
+			],
+			[
+				"a Pattern",
+				"implementation {\n\tconstant p = { x = 1, y = 2 }\n\tconstant {\n\t\tx,\n\t\ty,\n\t) = p\n}",
+				"Expected '}' but found ')'.",
+				{ line: 3, column: 11 },
+			],
+		]
+
+		for (let [name, source, message, openedAt] of lists) {
+			it(`should name the bracket ${name} is short of`, () => {
+				let { diagnostics } = parseWithDiagnostics(source)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].message).toBe(message)
+
+				let opened = diagnostics[0].labels.find(
+					(label) => label.kind === "secondary",
+				)
+
+				expect(opened?.message).toBe("opened here")
+				expect(opened?.position.start).toEqual(openedAt)
+			})
+		}
+
+		// NOTE: The other half: a trailing comma in front of the list's OWN
+		// bracket is written on purpose, and every one of these parses clean.
+		it("should keep a trailing comma in front of the right bracket", () => {
+			let sources = [
+				"implementation {\n\tconstant point = {\n\t\tx = 1,\n\t\ty = 2,\n\t}\n\tTerminal.print(point.x)\n}",
+				"implementation {\n\tconstant items = [\n\t\t1,\n\t\t2,\n\t]\n\tTerminal.print(items)\n}",
+				'implementation {\n\tconstant ages = [\n\t\t"a" = 1,\n\t\t"b" = 2,\n\t]\n\tTerminal.inspect(ages)\n}',
+				"implementation {\n\tTerminal.print(\n\t\t1,\n\t)\n}",
+				"implementation {\n\tfunction f(\n\t\t_ a: Integer,\n\t) -> Integer { <- a }\n\tTerminal.print(f(1))\n}",
+				"implementation {\n\ttype P = {\n\t\tx: Integer,\n\t}\n\tconstant p: P = { x = 1 }\n\tTerminal.print(p.x)\n}",
+				"implementation {\n\tchoice C {\n\t\tRed,\n\t\tGreen,\n\t}\n\tconstant c: C = #Red\n\tTerminal.print(c::is(#Red))\n}",
+			]
+
+			for (let source of sources) {
+				expect(parseWithDiagnostics(source).diagnostics).toEqual([])
+			}
+		})
+	})
+
 	// NOTE: A Comment runs to the end of its line and no further, so there is
 	// no such thing as one that is never closed — the question a reader coming
 	// from a language with `/* … */` asks, answered by the two files below
