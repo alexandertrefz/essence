@@ -660,6 +660,58 @@ export class TokenStream {
 		return this.index >= this.tokens.length
 	}
 
+	// NOTE: The block a file that runs out of braces most likely left open, and
+	// the `}` that closed it instead. Which block a `}` closes is decided by
+	// COUNTING, so a file one brace short hands every `}` below the mistake to
+	// the block above the one it was written for — and the report then comes out
+	// at the end of the input, about the outermost block, which is the one place
+	// the mistake is not.
+	//
+	// Indentation is what a reader meant and what the counting ignores. A `}`
+	// written further OUT than the line that opened the block it just closed is
+	// a `}` meant for a block further out, so the block it took the brace from
+	// is the one that never got its own. The FIRST such pair is the answer: a
+	// file short of two braces is short of the innermost one first.
+	//
+	// Asked only where a block really is unclosed, so a file that merely writes
+	// a `}` where an author would not is never measured by this at all.
+	outdentedClose(): { opened: Token; closed: Token } | null {
+		let stack: Array<{ brace: Token; indent: number }> = []
+		let lineStart = new Map<number, number>()
+
+		for (let token of this.tokens) {
+			let line = token.position.start.line
+
+			if (!lineStart.has(line)) {
+				lineStart.set(line, token.position.start.column)
+			}
+
+			if (token.type === TokenType.SymbolLeftBrace) {
+				stack.push({
+					brace: token,
+					indent: lineStart.get(line) as number,
+				})
+
+				continue
+			}
+
+			if (token.type !== TokenType.SymbolRightBrace) {
+				continue
+			}
+
+			let opened = stack.pop()
+
+			if (
+				opened !== undefined &&
+				token.position.start.column < opened.indent
+			) {
+				return { opened: opened.brace, closed: token }
+			}
+		}
+
+		return null
+	}
+
 	// NOTE: Used to position end-of-input Diagnostics — the end of the last
 	// Token of the input, or the very start of the file when it has none.
 	endPosition(): common.Position {

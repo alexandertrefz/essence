@@ -25,6 +25,10 @@ type Slip = {
 	// NOTE: Where the bracket this one is short of was opened, for the slips
 	// that are noticed a line or more below it.
 	openedAt?: common.Cursor
+	// NOTE: And where the `}` that took a block's brace was written, for the one
+	// slip whose second Label says that instead — a block left open is reported
+	// about the block, not about the end of the input. See `outdentedClose`.
+	closedAt?: common.Cursor
 }
 
 const SLIPS: Array<Slip> = [
@@ -93,8 +97,8 @@ const SLIPS: Array<Slip> = [
 }`,
 		code: "unclosed-block",
 		message: "This block is never closed",
-		at: { line: 6, column: 2 },
-		openedAt: { line: 1, column: 16 },
+		at: { line: 2, column: 26 },
+		closedAt: { line: 6, column: 1 },
 	},
 	{
 		name: "a ')' where a ']' belongs",
@@ -216,8 +220,113 @@ describe("Syntax slips", () => {
 					)
 				})
 			}
+
+			if (slip.closedAt !== undefined) {
+				it("should point at the '}' that took its brace", () => {
+					let closed = diagnostics[0].labels.find(
+						(label) => label.kind === "secondary",
+					)
+
+					expect(closed?.message).toBe(
+						"this '}' is written further out, so it closes the block around it",
+					)
+					expect(closed?.position.start).toEqual(
+						slip.closedAt as common.Cursor,
+					)
+				})
+			}
 		})
 	}
+
+	// NOTE: Which block a `}` closes is COUNTED, so a file one brace short hands
+	// every `}` below the mistake to the block above the one it was written for
+	// — and the report used to come out about the outermost block, which is the
+	// one place the mistake is not. Its Help, followed, wrote a `}` at the end
+	// of the file and made the file compile with the wrong meaning.
+	describe("a block whose '}' another block took", () => {
+		let blocks: Array<[string, string, common.Cursor, common.Cursor]> = [
+			[
+				"an 'if' inside the implementation",
+				`implementation {
+	constant count = 5
+
+	if count::isGreaterThan(3) {
+		Terminal.print("many")
+
+	Terminal.print("done")
+}`,
+				{ line: 4, column: 29 },
+				{ line: 8, column: 1 },
+			],
+			[
+				"the inner of two nested 'if's",
+				`implementation {
+	function outer(_ n: Integer) -> Integer {
+		if n::isPositive() {
+			if n::isEven() {
+				<- n
+
+		<- 0
+	}
+
+	Terminal.print(outer(2))
+}`,
+				{ line: 4, column: 19 },
+				{ line: 8, column: 2 },
+			],
+			[
+				"a 'match' arm",
+				`implementation {
+	choice Light { Red, Green }
+
+	function name(_ light: Light) -> String {
+		<- match light -> String {
+			case #Red {
+				<- "red"
+
+			case #Green { <- "green" }
+		}
+	}
+
+	Terminal.print(name(#Red))
+}`,
+				{ line: 6, column: 14 },
+				{ line: 10, column: 3 },
+			],
+		]
+
+		for (let [name, source, opened, closed] of blocks) {
+			describe(name, () => {
+				// NOTE: The one `unclosed-block` of the file, which is not
+				// always the only Diagnostic in it: an arm read past the brace
+				// it is short of is read as text nobody wrote, and what that
+				// text says is reported where it stands.
+				let report = parseWithDiagnostics(source).diagnostics.find(
+					(diagnostic) => diagnostic.code === "unclosed-block",
+				)
+
+				it("should be reported about the block, not the end of the input", () => {
+					expect(report?.position?.start).toEqual(opened)
+					expect(report?.labels[0]?.message).toBe(
+						"this block is never closed",
+					)
+				})
+
+				it("should name the '}' that closed it instead", () => {
+					expect(report?.labels[1]?.position.start).toEqual(closed)
+				})
+
+				// NOTE: The Help is the other half of the finding: "Add the
+				// missing '}'" over a report about the outermost block sent a
+				// reader to the end of the file.
+				it("should say where the brace goes", () => {
+					expect(report?.helps).toEqual([
+						"Write the '}' where this block's Statements end.",
+					])
+				})
+			})
+		}
+	})
 
 	// NOTE: The fifteen above are pinned one slip at a time, because each of
 	// them is a shape of its own. This one is a shape every LIST has, and what

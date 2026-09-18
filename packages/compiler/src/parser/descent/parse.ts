@@ -1823,8 +1823,34 @@ class DescentParser {
 		// NOTE: Only the innermost torn-open block reports — a missing `}`
 		// necessarily tears open every enclosing block as well.
 		if (!this.suppressDiagnostics) {
-			let endPosition = this.tokens.endPosition()
+			this.reportUnclosedBlock(openingPosition)
 
+			this.suppressDiagnostics = true
+		}
+
+		return this.tokens.endPosition()
+	}
+
+	// NOTE: Where the brace is missing, which is not where its absence is
+	// noticed. The block that ran out of input is the OUTERMOST one — a missing
+	// `}` tears open every block around it, and the counting hands the braces
+	// below the mistake to the blocks above the ones they were written for. So
+	// `implementation {` was named for an `if` four lines down, and the Help,
+	// followed, wrote a `}` at the end of the file and made it compile with the
+	// wrong meaning: every Statement below the `if` inside it.
+	//
+	// `outdentedClose` asks what the counting can not: which `}` was written
+	// further out than the block it closed. Where it answers, the report is
+	// about THAT block, positioned on its `{` — which is what an Editor jumps to
+	// — and the `}` that took its brace is the second Label. Where it does not,
+	// the report is what it was: the end of the input, and the outermost block.
+	protected reportUnclosedBlock(
+		openingPosition: common.Position | null,
+	): void {
+		let outdented = this.tokens.outdentedClose()
+		let endPosition = this.tokens.endPosition()
+
+		if (outdented === null) {
 			reportError("This block is never closed", endPosition, {
 				code: "unclosed-block",
 				labels: [
@@ -1836,10 +1862,26 @@ class DescentParser {
 				helps: ["Add the missing '}'."],
 			})
 
-			this.suppressDiagnostics = true
+			return
 		}
 
-		return this.tokens.endPosition()
+		reportError("This block is never closed", outdented.opened.position, {
+			code: "unclosed-block",
+			labels: [
+				primary(
+					outdented.opened.position,
+					"this block is never closed",
+				),
+				secondary(
+					outdented.closed.position,
+					"this '}' is written further out, so it closes the block around it",
+				),
+			],
+			notes: [
+				"Which block a '}' closes is counted rather than read off the indentation, so a file one brace short hands every '}' below the mistake to the block above the one it was written for — and the end of the input is where that is noticed.",
+			],
+			helps: ["Write the '}' where this block's Statements end."],
+		})
 	}
 
 	// #endregion
