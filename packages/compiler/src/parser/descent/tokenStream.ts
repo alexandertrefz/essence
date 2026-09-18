@@ -579,6 +579,14 @@ export class TokenStream {
 		)
 	}
 
+	// NOTE: How far into the Token array the reading has got — the measure
+	// furthest-failure tracking compares two readings by. A number rather than
+	// `save()`, which allocates a state object, because this is asked on the
+	// failure path of every speculation.
+	get offset(): number {
+		return this.index
+	}
+
 	save(): TokenStreamState {
 		return { index: this.index, braceDepth: this.braceDepth }
 	}

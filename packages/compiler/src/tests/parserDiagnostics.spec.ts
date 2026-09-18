@@ -979,19 +979,25 @@ greet() -> String { <- @ }
 
 		// NOTE: The other half of the rule. A generic failure IS "this reading
 		// was not the one written", so it is still given back and the readings
-		// behind it still run — these two are refused by the LAST of them, and
-		// its message is the one that has always been reported.
+		// behind it still run — and both of these are refused by the LAST of
+		// them, at the `=` of the first member, which is the Token the update
+		// reading needs a `with` at and nobody wrote either of these files
+		// about. What is reported is the reading that got FURTHEST instead: the
+		// Literal one, which died on the member value, where the mistake is.
 		it("should still give a generic failure back to the next reading", () => {
-			for (let member of ["{ x = ] }", "{ x = y. }"]) {
+			let members: Array<[string, string]> = [
+				["{ x = ] }", "Expected an Expression but found ']'."],
+				["{ x = y. }", "Expected an Identifier but found '}'."],
+			]
+
+			for (let [member, message] of members) {
 				let { diagnostics } = parseWithDiagnostics(
 					`implementation { constant a = ${member} }`,
 				)
 
 				expect(diagnostics).toHaveLength(1)
 				expect(diagnostics[0].code).toBe("syntax-error")
-				expect(diagnostics[0].message).toBe(
-					"Expected 'with' but found '='.",
-				)
+				expect(diagnostics[0].message).toBe(message)
 			}
 		})
 
@@ -1104,6 +1110,207 @@ describe("Parser AST", () => {
 			expect(diagnostics[0].message).toBe(
 				"Expected an Identifier but found '{'.",
 			)
+		})
+	})
+
+	// NOTE: Where several readings of one piece of text all fail, the one
+	// reported is the one that got FURTHEST — not the last one tried, which is
+	// the fallback and by construction the reading that got least far. Each of
+	// these was answered, before that rule, at the Token the FALLBACK died on:
+	// two Tokens into a Statement whose mistake is four lines below it.
+	describe("The furthest reading", () => {
+		// NOTE: The unlabelled reading of `names::map(…)` spans the Argument and
+		// runs on to the `Terminal` of the next Statement; the labelled reading
+		// behind it takes `names` for a label and dies on the `:` of the `::`.
+		// That `:` is what a missing ')' used to be reported at.
+		it("should report a call missing its ')' at the call, not at a label", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+	constant names = ["ada", "alan"]
+
+	Terminal.print(names::map((name) { <- name::length() })
+
+	Terminal.print("after")
+}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("syntax-error")
+			expect(diagnostics[0].message).toBe(
+				"Expected ')' but found 'Terminal'.",
+			)
+			expect(diagnostics[0].position).toEqual({
+				start: { line: 6, column: 2 },
+				end: { line: 6, column: 10 },
+			})
+			expect(diagnostics[0].labels[1]?.message).toBe("opened here")
+			expect(diagnostics[0].labels[1]?.position).toEqual({
+				start: { line: 4, column: 16 },
+				end: { line: 4, column: 17 },
+			})
+		})
+
+		// NOTE: The Literal reading of the braces meets the stray ')' four lines
+		// down; the update reading behind it needs a `with` where the first
+		// member's `=` stands, and that `=` is what the whole family of mistakes
+		// inside a Record used to be answered at.
+		it("should report a Record's mistake where it stands, not as a missing 'with'", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+	constant game = { moves = 0, carried = ["lamp"] }
+
+	constant turn = {
+		game = {
+			game with
+				moves = game.moves::add(1),
+				carried = game.carried::append("key")),
+		},
+		message = "You take the key.",
+	}
+}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("syntax-error")
+			expect(diagnostics[0].message).toBe("Expected '}' but found ')'.")
+			expect(diagnostics[0].position).toEqual({
+				start: { line: 8, column: 42 },
+				end: { line: 8, column: 43 },
+			})
+		})
+
+		// NOTE: Every Diagnostic each of these produces is listed, not just the
+		// first. The third member closes the Record early, so the `}` that was
+		// meant to close it stands behind the whole Program — which is a second
+		// mistake in the same source and belongs on the page.
+		it("should report a mistake inside a Record wherever it stands", () => {
+			let members: Array<[string, Array<string>, number]> = [
+				[
+					"{ x = 1, y = }",
+					["Expected an Expression but found '}'."],
+					44,
+				],
+				["{ x = [1, 2, y = 3 }", ["Expected ']' but found '='."], 46],
+				[
+					"{ x = 1, }, y = 2 }",
+					[
+						"Expected an Expression but found ','.",
+						"Unexpected '}' after the end of the Program",
+					],
+					41,
+				],
+			]
+
+			for (let [member, messages, column] of members) {
+				let { diagnostics } = parseWithDiagnostics(
+					`implementation { constant a = ${member} }`,
+				)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.message),
+				).toEqual(messages)
+				expect(diagnostics[0].position?.start.column).toBe(column)
+			}
+		})
+
+		// NOTE: The Dictionary readings share the brackets with the List one and
+		// are told apart by a Token of lookahead rather than by speculation, so
+		// nothing here is read twice — these are here to hold that, not to prove
+		// a swap.
+		it("should report a mistake inside a Dictionary wherever it stands", () => {
+			let literals: Array<[string, string]> = [
+				[`["x" = 1, "y" = ]`, "Expected an Expression but found ']'."],
+				[`["x" = [1, 2, "y" = 3]`, "Expected ']' but found '='."],
+				[`[d with "x" = ]`, "Expected an Expression but found ']'."],
+			]
+
+			for (let [literal, message] of literals) {
+				let { diagnostics } = parseWithDiagnostics(
+					`implementation { constant a = ${literal} }`,
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].message).toBe(message)
+			}
+		})
+
+		// NOTE: `nesting-too-deep` is given BACK by a speculation rather than
+		// raised out of it, so an attempt that exhausted the budget is a reading
+		// thrown away like any other — and it is still the true account of this
+		// Record, whose member really is nested past what the Parser reads. It
+		// was answered with "Expected 'with' but found '='" at the first member,
+		// from the update reading that never got past it.
+		it("should report the budget an abandoned reading exhausted", () => {
+			let deep = `${"[".repeat(1030)}1${"]".repeat(1030)}`
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation { constant a = { x = ${deep} } }`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("nesting-too-deep")
+		})
+
+		// NOTE: A coded refusal is a verdict about written text and outranks a
+		// reading that merely got further — it never becomes a thrown-away
+		// reading in the first place, because `refusesTheText` raises it out of
+		// the speculation instead of giving it back.
+		it("should leave a coded refusal ahead of the furthest reading", () => {
+			let refusals: Array<[string, common.DiagnosticCode]> = [
+				["{ x = .5 }", "partial-decimal-literal"],
+				[
+					"{ found = define { as 1 if flag } }",
+					"define-without-otherwise",
+				],
+				["{ x = .price::rounded() }", "path-is-members-only"],
+			]
+
+			for (let [source, code] of refusals) {
+				let { diagnostics } = parseWithDiagnostics(
+					`implementation { constant a = ${source} }`,
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe(code)
+			}
+		})
+
+		// NOTE: A reading that HELD answers for the ones tried beside it. The
+		// Literal reading of these braces runs out at the `with`, four Tokens
+		// ahead of where the Combination that IS written ends — and the mistake
+		// below it is the one that has to be reported.
+		it("should not answer a later mistake with a reading that was replaced", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+	constant b = { a with other }::merge(1 2)
+}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe("Expected ')' but found '2'.")
+			expect(diagnostics[0].position?.start.line).toBe(2)
+		})
+
+		// NOTE: And a Statement that was read answers for them too. Two things
+		// hold this: the Record Literal reading of the first Statement HELD, so
+		// the update reading it replaced is dropped where every replaced
+		// reading is, and the record would have to stand further into the input
+		// than the second Statement's own failure to be reported at all. The
+		// clear at the head of the Statement loop is a third, and is defensive
+		// — see the NOTE on it. What this pins is the answer, not which of the
+		// three produced it.
+		it("should not answer one Statement with a reading thrown away for another", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+	constant a = { x = 1, y = 2 }
+	constant b = ]
+}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Expected an Expression but found ']'.",
+			)
+			expect(diagnostics[0].position?.start.line).toBe(3)
 		})
 	})
 

@@ -611,6 +611,36 @@ class DescentParser {
 	// directly in a suite are its setup, and there is no test there for an
 	// assertion to belong to.
 	protected insideTestBody = false
+	// NOTE: How many speculations are on the stack. It is what tells the
+	// readings of ONE piece of text — the alternatives a construction is tried
+	// as — from the readings of the text inside one of them, which is the whole
+	// of what `furthestFailure` below needs to know. See `forgetFailuresFrom`.
+	private speculationDepth = 0
+	// NOTE: The failure that reached FURTHEST into the input among the readings
+	// a speculation threw away, and which is reported instead of the failure of
+	// the reading that was kept last.
+	//
+	// A speculation asks the same text to be read several ways and keeps the
+	// first reading that holds together. Where NONE of them does, the failure a
+	// reader used to be told about was the LAST one's — the fallback's — which
+	// is the reading that got least far by construction, because the fallback is
+	// tried where the readings in front of it have already failed. So a call
+	// missing its `)` was answered at the `::` of its receiver, where the
+	// Argument's label reading died two Tokens in, and the Record Literal
+	// holding a stray `)` four lines down was answered with "Expected 'with'" at
+	// its first member, where the update reading died. The mistake is at the
+	// Token the readings AGREE about, which is as far as the furthest of them
+	// got.
+	//
+	// NOTE: A coded refusal never lands here. It is raised out of the
+	// speculation by `refusesTheText` rather than given back, so it is never a
+	// reading that was thrown away — and it keeps its precedence over everything
+	// this records, which is what a verdict about written text is owed.
+	private furthestFailure: ParseError | null = null
+	private furthestFailureOffset = 0
+	// NOTE: The `speculationDepth` the speculation that recorded it was ENTERED
+	// at, which is the level its sibling readings stand on.
+	private furthestFailureDepth = 0
 
 	constructor(source: string, options: ParserOptions = {}) {
 		this.tokens = new TokenStream(source)
@@ -1538,14 +1568,16 @@ class DescentParser {
 
 	// #region Error Recovery
 
-	protected reportParseError(error: unknown): void {
-		if (!(error instanceof ParseError)) {
-			throw error
+	protected reportParseError(caught: unknown): void {
+		if (!(caught instanceof ParseError)) {
+			throw caught
 		}
 
-		if (this.suppressDiagnostics || error.reported) {
+		if (this.suppressDiagnostics || caught.reported) {
 			return
 		}
+
+		let error = this.furthestOf(caught)
 
 		if (error.position === null) {
 			reportError(error.message, null, {
@@ -1571,6 +1603,44 @@ class DescentParser {
 			helps: error.helps,
 			data: error.data,
 		})
+	}
+
+	// NOTE: Which of two accounts of one broken Statement is reported — the
+	// failure of the reading that was KEPT, or the furthest failure among the
+	// readings that were thrown away on the way to it. See `furthestFailure`.
+	//
+	// Four things have to hold for the recorded one to win, and each of them is
+	// a way of asking whether it is still about text nobody has read since:
+	//
+	//   - The caught failure is a plain one. A coded refusal is a verdict about
+	//     written text, and it outranks a reading that merely got further —
+	//     `{ x = .5 }` is answered by the decimal, not by whatever the update
+	//     reading tripped over behind it.
+	//   - The record stands FURTHER into the input than the reading that was
+	//     kept managed to get. Where it does not, the kept reading's failure is
+	//     the furthest one and there is nothing to swap.
+	//   - The record belongs to this level of speculation or one inside it.
+	//     A failure recorded outside the speculation this Statement is being
+	//     read inside of is an alternative of a LARGER construction, still being
+	//     tried, and answering for this text with it would be the mistake this
+	//     whole mechanism exists to undo, turned around.
+	//   - It is consumed once. Two Statements can not both be answered by one
+	//     abandoned reading.
+	private furthestOf(caught: ParseError): ParseError {
+		let recorded = this.furthestFailure
+
+		if (
+			recorded === null ||
+			refusesTheText(caught) ||
+			this.furthestFailureOffset <= this.tokens.offset ||
+			this.furthestFailureDepth < this.speculationDepth
+		) {
+			return caught
+		}
+
+		this.furthestFailure = null
+
+		return recorded
 	}
 
 	// NOTE: Several parts of the AST hold their members in a name-keyed
@@ -1637,6 +1707,25 @@ class DescentParser {
 			}
 
 			let startState = this.tokens.save()
+
+			// NOTE: Each element is read with no record of a reading thrown
+			// away for the element in front of it — `forgetFailuresFrom` is
+			// about a group of alternatives resolving, and a Statement that
+			// parsed is that too. An abandoned reading of the LARGER
+			// construction this loop is running inside of is left alone: it is
+			// still a live alternative, and the depth is what tells the two
+			// apart.
+			//
+			// NOTE: Defensive, and deliberately so. A record only ever wins
+			// where it stands FURTHER into the input than the reading that was
+			// kept — see `furthestOf` — and every reading a Statement is given
+			// stops at or before the Statement's own end, so a record left by
+			// the Statement in front can not reach past the next one's failure.
+			// No written Program is known that needs this line. It costs one
+			// comparison per Statement, and what it is insurance against is a
+			// reading that one day reads ahead of the Statement it is a reading
+			// OF, which is exactly the shape nothing would notice.
+			this.forgetFailuresFrom(this.speculationDepth)
 
 			try {
 				elements.push(parseElement())
@@ -4322,6 +4411,10 @@ class DescentParser {
 			}
 
 			let startState = this.tokens.save()
+
+			// NOTE: Per arm, for the reason `parseStatementList` does it per
+			// element — an arm that was read is a group of readings resolving.
+			this.forgetFailuresFrom(this.speculationDepth)
 
 			try {
 				let keyword = this.tokens.expect(TokenType.KeywordAs)
@@ -7537,11 +7630,20 @@ class DescentParser {
 		// read in a shape the Program was never in.
 		let savedCompletesSeen = this.completesSeen
 		let diagnosticMark = markDiagnostics()
+		let depth = this.speculationDepth
+
+		this.speculationDepth = depth + 1
 
 		try {
 			let result = parseAttempt()
 
 			if (keeps()) {
+				// NOTE: A reading that HELD answers for the readings tried
+				// beside it — they were about text this one has now spanned —
+				// and for every group speculated inside it, which resolved on
+				// the way.
+				this.forgetFailuresFrom(depth)
+
 				return result
 			}
 		} catch (error) {
@@ -7570,6 +7672,14 @@ class DescentParser {
 
 				throw error
 			}
+
+			// NOTE: Recorded BEFORE the rewind below, which is the only moment
+			// the stream still stands where this reading stopped. A reading
+			// that `keeps` turned down is not recorded — it read the text to
+			// its end, and what it failed is a test of the text AROUND it.
+			this.noteFurthestFailure(error, depth)
+		} finally {
+			this.speculationDepth = depth
 		}
 
 		this.tokens.restore(saved)
@@ -7578,6 +7688,54 @@ class DescentParser {
 		rewindDiagnostics(diagnosticMark)
 
 		return null
+	}
+
+	// NOTE: Kept where it got further than whatever stands here already. Ties go
+	// to the reading tried FIRST, which is the order the alternatives are
+	// written in — a Record Literal before a Record update, an Argument's
+	// Expression before its label — and that order is itself a judgement about
+	// which reading the text is likelier to have been written as.
+	//
+	// NOTE: A `nesting-too-deep` is kept like any other, though `rewoundCodes`
+	// gives it back for a reason — an attempt recurs a level deeper than the
+	// reading it stands in for, so it can exhaust the budget where the reading
+	// that is kept fits inside it, and RE-RAISING it would refuse a Program this
+	// Parser accepts. Recording it refuses nothing: a reading that holds clears
+	// the record on its way out, so only a Statement that is being dropped
+	// anyway can ever be answered with one. And for that Statement it is the
+	// true account — `{ x = <a thousand brackets> }` is text that really is
+	// nested too deeply, and leaving it out answered that with "Expected 'with'"
+	// at the first member, which is the very thing this mechanism is here to
+	// stop.
+	private noteFurthestFailure(error: ParseError, depth: number): void {
+		let offset = this.tokens.offset
+
+		if (
+			this.furthestFailure !== null &&
+			offset <= this.furthestFailureOffset
+		) {
+			return
+		}
+
+		this.furthestFailure = error
+		this.furthestFailureOffset = offset
+		this.furthestFailureDepth = depth
+	}
+
+	// NOTE: Forgets a recorded failure once nothing is left that it could be an
+	// alternative READING of — either because a sibling reading held, or because
+	// the Statement loop has moved on to the next element. `depth` is the level
+	// that has resolved: a failure recorded AT it was a reading of the text that
+	// is now settled, one recorded INSIDE it belongs to a group that resolved on
+	// the way, and one recorded outside it is still a live alternative of the
+	// construction this text stands in.
+	private forgetFailuresFrom(depth: number): void {
+		if (
+			this.furthestFailure !== null &&
+			this.furthestFailureDepth >= depth
+		) {
+			this.furthestFailure = null
+		}
 	}
 
 	// #endregion

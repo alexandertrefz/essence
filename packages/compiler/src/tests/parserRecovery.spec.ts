@@ -667,7 +667,9 @@ describe("Parser Recovery", () => {
 		// for the `define` closes the Record instead and resynchronisation
 		// carries on past the arm below it. What is left of the file is one
 		// brace short whichever way it is read, so the Statement goes — but the
-		// one Diagnostic about it is the one that is true.
+		// one Diagnostic about it is the one that is true, and it is about the
+		// brace: the Literal reading of `{ a = 1` runs out at the `if`, which is
+		// further than the update reading behind it ever got.
 		it("should not refuse an otherwise arm its own recovery skipped", () => {
 			let { diagnostics } = parseWithDiagnostics(
 				`implementation {
@@ -682,9 +684,7 @@ describe("Parser Recovery", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("syntax-error")
-			expect(diagnostics[0].message).toBe(
-				"Expected 'with' but found '='.",
-			)
+			expect(diagnostics[0].message).toBe("Expected '}' but found 'if'.")
 		})
 
 		// NOTE: A Token where an `as` belongs read NOTHING, so there are no
