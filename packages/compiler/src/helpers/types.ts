@@ -1512,11 +1512,11 @@ export function typeContainsUnknown(type: common.Type): boolean {
 			return true
 		case "List":
 			return typeContainsUnknown(type.itemType)
-		// NOTE: And the two asynchronous containers, whose bare spelling IS
-		// `Future<Unknown>` — there is no second Type standing for the
-		// unapplied form, because no Expression builds a Future out of nothing
-		// and so nothing leaves an item slot legitimately open. A Future
-		// nobody decided the answer Type of is undecided, full stop.
+		// NOTE: And the two asynchronous containers, whose open slot no Program
+		// can write — a bare `Future` is refused where it is spelled, and no
+		// Expression builds one out of nothing. So the answer here is about the
+		// Compiler's own Types: a Future nobody decided the answer Type of is
+		// undecided, full stop, whichever stage was holding it.
 		case "Future":
 		case "Started":
 			return typeContainsUnknown(type.valueType)
@@ -2292,10 +2292,10 @@ function matchTypes(
 	// member (`memberTypeOf`), an Alias whose body could not be resolved
 	// (`aliasBodyType`). Each of those has already been reported or has nothing
 	// to report, and refusing them here would pile a second Diagnostic on top
-	// of every one. It is also what reads a bare `Future` or `Started`, which
-	// are the applied Types with their one slot left Unknown: a producer
-	// nothing ever writes into, so accepting every one of them promises
-	// nothing.
+	// of every one. Outermost error recovery is the whole of the list: a bare
+	// `Future` or `Started` used to reach here as well, and is refused where it
+	// is written instead, because it was a spelling that minted VALUES of this
+	// Type and no recovery at all.
 	//
 	// NOTE: The undecided SLOT of a container is a different question and has
 	// its own rules below — the Unknown a `[]` or a `[=]` leaves behind is a
@@ -2389,10 +2389,10 @@ function matchTypes(
 	}
 
 	// NOTE: Covariant in the one slot, which is the only variance a Future can
-	// have: it is a producer and nothing ever writes a value INTO one. The bare
-	// spelling needs no rule of its own — `Future` is `Future<Unknown>`, and the
-	// Unknown rule above accepts every Future while promising nothing, which is
-	// exactly what a bare `List` does.
+	// have: it is a producer and nothing ever writes a value INTO one. There is
+	// no bare spelling to give a rule of its own — a written `Future` is refused
+	// for the Type Argument it left off — so the slot reaching here still open
+	// is the Compiler's own recovery, and the Unknown rule reads it as one.
 	if (lhs.type === "Future" && rhs.type === "Future") {
 		return matchTypes(lhs.valueType, rhs.valueType, context, NESTED)
 	}

@@ -4750,6 +4750,46 @@ function resolveIdentifierTypeDeclarationType(
 		return applyGenericAlias(result, [], scope, node.position)
 	}
 
+	// NOTE: The two asynchronous containers take their one Type Argument the way
+	// `Optional` and every generic Choice take theirs, and a bare spelling of one
+	// is refused the way a bare `Optional` is. What `primitiveTypes` hands out for
+	// the name is the applied shape with its slot left Unknown — there is no
+	// second Type standing for the unapplied form, because nothing builds a
+	// Future out of nothing — so a written `Future` used to mean `Future<Unknown>`
+	// and `complete` on one answered a VALUE of Type Unknown. That value fits
+	// every annotation there is, which is what `Unknown` means as an actual Type,
+	// and `[complete work()]` was a List of one Integer under a
+	// `List<String>` nothing refused. `Unknown` is the Compiler's own answer where
+	// it had nothing better to give; a spelling an author can write is not one of
+	// the places it belongs.
+	//
+	// Recovered as the container with an Error inside it, exactly as a wrong Type
+	// Argument count recovers: the shape is still a Future, so `complete` reads it
+	// and the Error answers for what it holds without a second Diagnostic.
+	if (
+		(result.type === "Future" || result.type === "Started") &&
+		result.valueType.type === "Unknown"
+	) {
+		reportError(
+			`Type '${result.type}' was given the wrong number of Type Arguments`,
+			node.position,
+			{
+				code: "wrong-type-argument-count",
+				labels: [
+					primary(
+						node.position,
+						`${countOf(0, "Type Argument")} given`,
+					),
+				],
+				notes: [`'${result.type}' takes 1 Type Parameter.`],
+			},
+		)
+
+		return result.type === "Future"
+			? { type: "Future", valueType: { type: "Error" } }
+			: { type: "Started", valueType: { type: "Error" } }
+	}
+
 	return result
 }
 
@@ -4864,10 +4904,12 @@ export function applyTypeArguments(
 	}
 
 	// NOTE: The two asynchronous containers, applied the way a List is. There is
-	// no unapplied Type to normalise FROM — a bare `Future` already IS
-	// `Future<Unknown>`, which is what `primitiveTypes` hands out — so the base
-	// this reads is the applied shape with its slot still undecided, and the
-	// application decides it.
+	// no unapplied Type to normalise FROM — what `primitiveTypes` hands out for
+	// the name is the applied shape with its slot left Unknown — so the base this
+	// reads is that shape, and the application decides the slot. It is the only
+	// reader of the open form: the name reaching a Declaration with nothing
+	// applied to it is refused rather than resolved, so the slot stands open only
+	// between the lookup and this.
 	if (baseType.type === "Future" || baseType.type === "Started") {
 		let name = baseType.type
 

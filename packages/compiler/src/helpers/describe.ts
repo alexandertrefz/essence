@@ -288,8 +288,8 @@ export function withArticle(description: string): string {
 // the item Type of a List or either half of a Dictionary left `Unknown`, which
 // in a Program only ever comes from `[]` or `[=]`: `Unknown` is unspellable, so
 // there is nothing else for one to be. A `Future`'s open slot is NOT one —
-// nothing writes into a Future, and its bare spelling is the applied Type with
-// the slot deliberately left open.
+// nothing writes into a Future, and a bare `Future` is refused where it is
+// written rather than left standing for a reader to meet here.
 function undecidedContainerIn(type: common.Type): "List" | "Dictionary" | null {
 	switch (type.type) {
 		case "List":

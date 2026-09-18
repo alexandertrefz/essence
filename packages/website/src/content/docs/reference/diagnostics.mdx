@@ -1810,6 +1810,8 @@ Error: List takes exactly 1 Type Argument
 
 Give it as many as it declares: `List<Integer>`.
 
+Writing none at all is the same mistake, and the same code: `Optional`, `Result`, [`Future`](/docs/library/future), `Started` and every generic choice are refused when the type arguments are left off entirely. `List` and `Dictionary` are the exceptions — a bare `List` is a list of anything and says so.
+
 Taught on: [Generics › A type alias applies its type arguments too](/docs/language/generics#a-type-alias-applies-its-type-arguments-too)
 
 ### `type-not-generic`

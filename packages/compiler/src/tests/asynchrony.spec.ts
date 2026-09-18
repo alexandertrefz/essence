@@ -620,6 +620,56 @@ ${deferredThree}
 	})
 
 	describe("the Diagnostics", () => {
+		// NOTE: Both Types take their one Type Argument, and a bare spelling is
+		// refused exactly as a bare `Optional` is. There is no unapplied Type to
+		// mean — the name resolves to the applied shape with its slot left
+		// Unknown — so a written `Future` meant `Future<Unknown>`, and `complete`
+		// on one answered a VALUE of Type Unknown. `Unknown` as an actual Type is
+		// bottom: that value fit every annotation there is, so
+		// `constant got: List<String> = [complete work()]` compiled and printed
+		// an Integer.
+		it("refuses the bare spellings of the two Types", () => {
+			let future = diagnosticsOf(`implementation {
+	function work() -> Future {
+		<- Async.deferred(() { <- 42 })
+	}
+}`)
+
+			expect(future.map((diagnostic) => diagnostic.code)).toEqual([
+				"wrong-type-argument-count",
+			])
+			expect(future[0]!.message).toBe(
+				"Type 'Future' was given the wrong number of Type Arguments",
+			)
+			expect(future[0]!.notes).toEqual([
+				"'Future' takes 1 Type Parameter.",
+			])
+
+			expect(
+				codesOf(`implementation {
+	constant running: Started = start Async.deferred(() { <- 42 })
+}`),
+			).toEqual(["wrong-type-argument-count"])
+		})
+
+		// NOTE: The Program the hole was found through, refused now at the
+		// annotation that opened it. Nothing downstream of the refusal is
+		// reported: the recovery is the container with an Error inside it, and an
+		// Error is already somebody's Diagnostic.
+		it("refuses the laundering a bare Future used to allow", () => {
+			expect(
+				codesOf(`implementation {
+	function work() -> Future {
+		<- Async.deferred(() { <- 42 })
+	}
+
+	constant got: List<String> = [complete work()]
+
+	Terminal.print(got::join(with " "))
+}`),
+			).toEqual(["wrong-type-argument-count"])
+		})
+
 		it("refuses a 'complete' nothing can wait for", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 	function three() -> Integer {

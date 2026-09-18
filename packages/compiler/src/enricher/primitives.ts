@@ -34,13 +34,17 @@ const randomnessType: common.RandomnessType = { type: "Randomness" }
 // — nothing a `type`, `choice` or `protocol` could say produces a value the
 // runtime alone can build, run and wait for.
 //
-// NOTE: The BARE spelling is the applied one with its slot left Unknown, rather
-// than a second Type the way `GenericList` is a second Type beside `List`. What
-// `GenericList` exists for is the empty List Literal, which has to be assignable
-// to every List; no Expression builds a Future out of nothing, so there is no
-// such literal here and nothing for a second tag to say. `matchTypes` reads the
-// Unknown slot exactly as it reads a bare `List`: it accepts every Future and
-// promises nothing about one.
+// NOTE: What the NAME resolves to is the applied shape with its slot left
+// Unknown, rather than a second Type the way `GenericList` is a second Type
+// beside `List`. What `GenericList` exists for is the empty List Literal, which
+// has to be assignable to every List; no Expression builds a Future out of
+// nothing, so there is no such literal here and nothing for a second tag to say.
+//
+// An author can not write that shape down: `resolveIdentifierTypeDeclarationType`
+// refuses a bare `Future` or `Started` the way a bare `Optional` is refused, so
+// the slot is open only between the name being looked up and the Type Arguments
+// being applied to it. It has to be, and that is the whole of why it is Unknown
+// rather than an Error: the entry here is what `Future<Integer>` APPLIES.
 const futureType: common.FutureType = {
 	type: "Future",
 	valueType: { type: "Unknown" },

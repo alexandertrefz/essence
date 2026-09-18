@@ -3393,6 +3393,11 @@ describe("Completion under start and complete", () => {
 
 	// NOTE: Both Types are builtins, so what this says is that they are in the
 	// table the Type reading offers from — a Program can not declare either.
+	//
+	// NOTE: The NAME is what is offered, and the Type Argument is the writer's to
+	// add — `Future` without one is refused as `wrong-type-argument-count`. That
+	// is how every generic Type is offered here, `Optional` and `Result`
+	// included, so the two of them stand in the list beside these to say it.
 	it("should offer Future and Started where a Type is written", () => {
 		let source = [
 			"implementation {",
@@ -3404,5 +3409,7 @@ describe("Completion under start and complete", () => {
 
 		expect(labels).toContain("Future")
 		expect(labels).toContain("Started")
+		expect(labels).toContain("Optional")
+		expect(labels).toContain("Result")
 	})
 })
