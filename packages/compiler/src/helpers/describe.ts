@@ -282,3 +282,124 @@ export function withArticle(description: string): string {
 		? `an ${description}`
 		: `a ${description}`
 }
+
+// NOTE: Which container inside a Type has a slot nobody decided — the first
+// one found, because one is all a Diagnostic says a sentence about. A slot is
+// the item Type of a List or either half of a Dictionary left `Unknown`, which
+// in a Program only ever comes from `[]` or `[=]`: `Unknown` is unspellable, so
+// there is nothing else for one to be. A `Future`'s open slot is NOT one —
+// nothing writes into a Future, and its bare spelling is the applied Type with
+// the slot deliberately left open.
+function undecidedContainerIn(type: common.Type): "List" | "Dictionary" | null {
+	switch (type.type) {
+		case "List":
+			return type.itemType.type === "Unknown"
+				? "List"
+				: undecidedContainerIn(type.itemType)
+		case "Dictionary":
+			return type.keyType.type === "Unknown" ||
+				type.valueType.type === "Unknown"
+				? "Dictionary"
+				: (undecidedContainerIn(type.keyType) ??
+						undecidedContainerIn(type.valueType))
+		case "Record":
+			for (let memberType of Object.values(type.members)) {
+				let found = undecidedContainerIn(memberType)
+
+				if (found !== null) {
+					return found
+				}
+			}
+
+			return null
+		// NOTE: A refinement decides nothing its base has not — what is still
+		// undecided about a `NonEmptyList<Unknown>` is the item Type.
+		case "Refinement":
+			return undecidedContainerIn(type.base)
+		default:
+			return null
+	}
+}
+
+// NOTE: The same Type with every undecided slot filled in, to be SPELLED rather
+// than compared — an annotation that would have answered the blank, at the exact
+// depth the blank sits. Filled in with concrete example Types, which is what
+// makes it an example: `List<List<Unknown>>` reads back as `List<List<Integer>>`
+// and `{ items: List<Unknown> }` as `{ items: List<Integer> }`, so the reader is
+// shown the shape they have to write and not a `List<Integer>` that answers a
+// different Declaration.
+function spelledWithDecidedSlots(type: common.Type): common.Type {
+	switch (type.type) {
+		case "Unknown":
+			return { type: "Integer" }
+		case "List":
+			return {
+				type: "List",
+				itemType: spelledWithDecidedSlots(type.itemType),
+			}
+		case "Dictionary":
+			return {
+				type: "Dictionary",
+				keyType:
+					type.keyType.type === "Unknown"
+						? { type: "String" }
+						: spelledWithDecidedSlots(type.keyType),
+				valueType: spelledWithDecidedSlots(type.valueType),
+			}
+		case "Record":
+			return {
+				type: "Record",
+				members: Object.fromEntries(
+					Object.entries(type.members).map(([name, memberType]) => [
+						name,
+						spelledWithDecidedSlots(memberType),
+					]),
+				),
+			}
+		case "Refinement":
+			return { ...type, base: spelledWithDecidedSlots(type.base) }
+		default:
+			return type
+	}
+}
+
+// NOTE: What a mismatch has to say when the Type it EXPECTED carries a slot
+// nobody decided. `List<Unknown>` names no Type a reader can act on: it is a
+// blank, and the value is refused for being a write into a blank rather than for
+// holding the wrong thing — which is a refusal nothing else in the Diagnostic
+// explains. The note says what the blank is and the help says where it is
+// filled in, the same two things `uninferable-item-type` says about the capture
+// it refuses, which is the other place an author meets an undecided slot.
+//
+// `name` is what the value is called where the mismatch is reported, so the help
+// can show the annotation as it would be written. Null where the report has no
+// name to use — a Record update names the value it updates by Expression — and
+// the shape alone is spelled then.
+export function undecidedSlotEvidence(
+	expected: common.Type,
+	name: string | null,
+): { notes: Array<string>; helps: Array<string> } {
+	let container = undecidedContainerIn(expected)
+
+	if (container === null) {
+		return { notes: [], helps: [] }
+	}
+
+	let dictionary = container === "Dictionary"
+	let spelling = describeType(spelledWithDecidedSlots(expected))
+
+	return {
+		notes: [
+			dictionary
+				? "An empty Dictionary Literal leaves its key and value Types unknown until a write decides them, and nothing has written into this one — an 'Unknown' here is a blank, not a Type."
+				: "An empty List Literal leaves its item Type unknown until a write decides it, and nothing has written into this one — the 'Unknown' here is a blank, not a Type.",
+		],
+		helps: [
+			`${
+				name === null
+					? `Annotate the Declaration that creates it, where a Record states the Types of its members — '${spelling}'`
+					: `Annotate the Declaration — 'variable ${name}: ${spelling}'`
+			} — so what is written into it is judged against the ${dictionary ? "Types" : "Type"} it holds.`,
+		],
+	}
+}

@@ -14,6 +14,7 @@ import {
 	describeParameter,
 	describeSignature,
 	describeType,
+	undecidedSlotEvidence,
 	withArticle,
 } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
@@ -2744,6 +2745,15 @@ function validateVariableAssignmentStatement(
 	if (!fitsExpectedType(node.name.type, node.value)) {
 		let declaredType = describeType(node.name.type)
 		let evidence = refinementEvidence(node.name.type, node.value)
+		// NOTE: The one mismatch a reader can meet whose EXPECTED side is the
+		// Enricher's own answer rather than something written down. Every other
+		// Type a value is judged against is an annotation, and `Unknown` is
+		// unspellable — so `List<Unknown>` can only stand here, where the
+		// Variable was declared from an empty Literal and no assignment has
+		// decided it yet. Naming a blank explains nothing on its own; these two
+		// sentences are what make the refusal answerable. `partial-type-mismatch`
+		// says the same about a member, one level in.
+		let undecided = undecidedSlotEvidence(node.name.type, node.name.content)
 
 		reportError(
 			`This value does not fit Variable '${node.name.content}'`,
@@ -2772,10 +2782,12 @@ function validateVariableAssignmentStatement(
 								`'${node.name.content}' is declared as ${declaredType}.`,
 							]
 						: []),
+					...undecided.notes,
 					...evidence.notes,
 				],
 				helps: [
 					...asynchronyHelps(node.name.type, node.value.type),
+					...undecided.helps,
 					...evidence.helps,
 				],
 				data: asynchronyData(node.name.type, node.value.type),

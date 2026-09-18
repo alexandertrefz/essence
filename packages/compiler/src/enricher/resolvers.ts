@@ -21,6 +21,7 @@ import {
 	countOf,
 	describeType,
 	displayChoiceName,
+	undecidedSlotEvidence,
 	withArticle,
 } from "../helpers/describe"
 import {
@@ -259,6 +260,14 @@ export function combinationTypeOf(
 		return combined
 	}
 
+	// NOTE: The update is measured against `combined`, so a member this update
+	// DECIDED is not what refused it — what can be is a member it names and
+	// leaves undecided, `items = 1` over an `items` that came from an empty List
+	// Literal. `{ items: List<Unknown> }` names no Type a reader can act on, and
+	// the two sentences that make it answerable are the ones a Variable's own
+	// assignment is refused with.
+	let undecided = undecidedSlotEvidence(combined, null)
+
 	reportError("This is not a Partial of the value it updates", rhsPosition, {
 		code: "partial-type-mismatch",
 		labels: [
@@ -273,7 +282,9 @@ export function combinationTypeOf(
 		],
 		notes: [
 			"An update may only set members the original already has, with the Types it declared for them.",
+			...undecided.notes,
 		],
+		helps: undecided.helps,
 	})
 
 	return lhsType

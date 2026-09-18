@@ -442,6 +442,8 @@ A `List` literal is items between [square brackets](/docs/reference/syntax-gloss
 
 `[]` is a list with no items that says nothing about what they would be. Its type is `List<Unknown>`, and `print` refuses it as [`unsatisfied-conformance-condition`](/docs/reference/diagnostics#unsatisfied-conformance-condition) until an annotation such as `List<Integer>` decides. Items need not share a type, but a list is not a tuple: `["Ada", 36]` is a `List<String | Integer>`, and `print` refuses it the same way. A record is the way to group values of different types.
 
+An annotation is not the only thing that decides. A variable declared from `[]` takes its item type from the first write into it: after `items = ["a"]` it is a `List<String>`, and a later assignment that disagrees is refused as [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch). A record member an update writes is decided the same way, and so is the seed of a fold such as `reduce(startingWith [], …)`, which takes its item type from what the combiner answers. What never happens is a write that leaves the slot undecided: a value written into a `List<Unknown>` is refused, because a type that takes any value while promising any value is no type at all. `[=]` follows the same rule with two slots instead of one.
+
 A list is a value like any other: bind it, print it, put it in a hole. What you can do with one is on [Lists](/docs/language/lists): reading an item, adding, mapping, sorting, and why a written list is known to have items.
 
 ## Data never changes

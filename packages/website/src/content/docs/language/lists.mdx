@@ -95,7 +95,7 @@ implementation {
 }
 ```
 
-The literal is on [Programs and values](/docs/language/programs-and-values): items go in square brackets, the type is written `List<Integer>`, and an empty `[]` needs a type annotation. The items need not share a type. `labels` is a `List<Integer | String>`: each item is an [`Integer`](/docs/library/integer) or a [`String`](/docs/library/string), a [union](/docs/language/unions-and-type-aliases) of the two types.
+The literal is on [Programs and values](/docs/language/programs-and-values): items go in square brackets, the type is written `List<Integer>`, and an empty `[]` needs something to decide its item type — an annotation, or the first write into the variable it was declared as. The items need not share a type. `labels` is a `List<Integer | String>`: each item is an [`Integer`](/docs/library/integer) or a [`String`](/docs/library/string), a [union](/docs/language/unions-and-type-aliases) of the two types.
 
 `Terminal.print(labels)` is refused as [`unsatisfied-conformance-condition`](/docs/reference/diagnostics#unsatisfied-conformance-condition): [`print`](/docs/library/terminal#print) needs items that are [`Printable`](/docs/library/protocols#Printable), and a union is not. [`inspect`](/docs/library/terminal#inspect) prints any value. `print` writes `[3, 1, 2]`. `inspect` writes `[ 3, 1, 2 ]`, with spaces inside the brackets, as Node's `console.log` spaces an array. Both quote the strings in a list. Only a bare string differs: `print("two")` writes `two`, and `inspect("two")` writes `"two"`.
 

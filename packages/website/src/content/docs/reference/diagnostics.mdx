@@ -1218,6 +1218,8 @@ Assign a value of the declared type, or change the declaration's type.
 
 Asynchrony adds three Helps under this code. A [`Future`](/docs/library/future) standing where its value is wanted asks for `complete`, and so does a `Started`, which is still in flight; the Quick Fix **Wait for it with 'complete'** writes the word for either. A plain value where a future is wanted asks for one to be built — `Async.deferred(…)`, [`map`](/docs/library/future#map) or [`andThen`](/docs/library/future#andThen).
 
+A variable declared from an empty `[]` or `[=]` carries a slot nothing has decided, and a value written into one is refused rather than let through — `List<Unknown>` is a blank, not a type. That refusal adds a Note saying so, and a Help spelling the annotation that would decide it at the depth the blank sits: `'variable rows: List<List<Integer>>'` for a variable declared as `[[]]`, `'variable box: { items: List<Integer> }'` where the blank is a record's member.
+
 Taught on: [Programs and values › Constants and variables](/docs/language/programs-and-values#constants-and-variables)
 
 ### `argument-type-mismatch`
@@ -1782,6 +1784,8 @@ Error: This is not a Partial of the value it updates
 </div>
 
 Set only members the original has, with their declared types: `{ point with x = 3 }`.
+
+An update is what DECIDES a member the original left undecided, so `{ box with items = ["a"] }` over a `box` whose `items` came from `[]` answers `{ items: List<String> }` and is not refused. What is refused is an update that would leave the slot undecided — `items = 1` says nothing about what a list holds — and that report carries the same Note and Help as [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch), with the shape to annotate spelled out: `'{ items: List<Integer> }'`.
 
 Taught on: [Records › When the compiler refuses a record](/docs/language/records#when-the-compiler-refuses-a-record)
 

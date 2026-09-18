@@ -521,6 +521,115 @@ describe("Unknown Slot Narrowing", () => {
 		})
 	})
 
+	// NOTE: What a reader is told where the refusal still lands. `List<Unknown>`
+	// on the EXPECTED side of a mismatch names no Type anybody can act on — it
+	// is the blank the Declaration left — so the Diagnostic has to say that it
+	// is a blank and where it is filled in. The annotation is spelled at the
+	// depth the blank actually sits: an example that answers a different
+	// Declaration is worse than none.
+	describe("the refusal a reader is shown", () => {
+		function undecidedHelp(source: string): string {
+			let errors = errorsFor(source)
+
+			expect(errors).toHaveLength(1)
+
+			return errors[0].helps.join("\n")
+		}
+
+		function undecidedNote(source: string): string {
+			let errors = errorsFor(source)
+
+			expect(errors).toHaveLength(1)
+
+			return errors[0].notes.join("\n")
+		}
+
+		it("spells the annotation that would decide a List", () => {
+			let source = `implementation {
+				variable items = []
+
+				items = "a"
+			}`
+
+			expect(undecidedHelp(source)).toContain(
+				"'variable items: List<Integer>'",
+			)
+			expect(undecidedNote(source)).toContain(
+				"An empty List Literal leaves its item Type unknown",
+			)
+		})
+
+		it("spells it at the depth the undecided slot sits", () => {
+			expect(
+				undecidedHelp(`implementation {
+					variable rows = [[]]
+
+					rows = ["a"]
+				}`),
+			).toContain("'variable rows: List<List<Integer>>'")
+		})
+
+		it("spells both slots of a Dictionary, and says both are blank", () => {
+			let source = `implementation {
+				variable ages = [=]
+
+				ages = ["a"]
+			}`
+
+			expect(undecidedHelp(source)).toContain(
+				"'variable ages: Dictionary<String, Integer>'",
+			)
+			expect(undecidedNote(source)).toContain(
+				"leaves its key and value Types unknown",
+			)
+		})
+
+		it("spells the Record whose member is the blank", () => {
+			expect(
+				undecidedHelp(`implementation {
+					variable box = { items = [] }
+
+					box = { items = "a" }
+				}`),
+			).toContain("'variable box: { items: List<Integer> }'")
+		})
+
+		// NOTE: The update names the value it updates by Expression rather than
+		// by name, so there is no annotation to write out — the shape is.
+		it("spells the shape where an update refuses a member", () => {
+			let errors = errorsFor(`implementation {
+				constant box = { items = [] }
+				constant updated = { box with items = 1 }
+			}`)
+
+			expect(errors[0].code).toBe("partial-type-mismatch")
+			expect(errors[0].helps.join("\n")).toContain(
+				"'{ items: List<Integer> }'",
+			)
+			expect(errors[0].notes.join("\n")).toContain(
+				"An empty List Literal leaves its item Type unknown",
+			)
+		})
+
+		// NOTE: Said only about a blank. A slot an assignment DECIDED is a Type
+		// like any other, and a later assignment that disagrees with it is
+		// refused for what it holds — there is nothing undecided to explain.
+		it("says nothing about a slot an earlier write decided", () => {
+			let errors = errorsFor(`implementation {
+				variable items = []
+
+				items = ["a"]
+				items = [1]
+			}`)
+
+			expect(errors).toHaveLength(1)
+			expect(errors[0].helps).toEqual([])
+			expect(errors[0].notes.some((note) => note.includes("blank"))).toBe(
+				false,
+			)
+		})
+	})
+
 	// NOTE: An undecided item Type is a slot nothing has filled, not a promise
 	// to hold nothing — an empty List Literal still fits every annotated List,
 	// which is the whole reason it is written without one.
