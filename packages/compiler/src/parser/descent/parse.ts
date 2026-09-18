@@ -2205,16 +2205,37 @@ class DescentParser {
 		// compiles either way, and which of the two was meant is the reader's to
 		// say.
 		let word = foreignWord(token.value)
+		// NOTE: `let mut total = 0` — Rust writes TWO words where this language
+		// writes one, and the name it declares stands a Token further along than
+		// `declaresAName` looks. Read as one habit over the span both words
+		// cover, so that the fix writes `variable` over the pair rather than
+		// leaving a `mut` standing between the Keyword and the name.
+		let mutable =
+			spelling === "variable" &&
+			this.tokens.peek(1)?.value === "mut" &&
+			this.declaresAName(1)
 
-		if (spelling === null || word === null || !this.declaresAName()) {
+		if (
+			spelling === null ||
+			word === null ||
+			!(mutable || this.declaresAName())
+		) {
 			return null
 		}
+
+		let written = mutable
+			? {
+					start: token.position.start,
+					end: (this.tokens.peek(1) as Token).position.end,
+				}
+			: token.position
 
 		this.reportForeignStatement(token, spelling, {
 			message: `'${token.value}' is not how Essence declares a binding`,
 			label: `Essence writes '${spelling}' here`,
 			notes: [word.note],
 			helps: [...word.helps],
+			span: written,
 		})
 
 		// NOTE: The Keyword is stepped over and the rest is read by the Statement
@@ -2223,9 +2244,13 @@ class DescentParser {
 		// wrong with them is reported by the readers that always reported it.
 		this.tokens.next()
 
+		if (mutable) {
+			this.tokens.next()
+		}
+
 		return spelling === "constant"
-			? this.parseDeclaredConstant(token.position)
-			: this.parseDeclaredVariable(token.position)
+			? this.parseDeclaredConstant(written)
+			: this.parseDeclaredVariable(written)
 	}
 
 	// NOTE: `class Money { … }`, `enum Colour { … }`, `interface Point { … }` —
@@ -2405,8 +2430,8 @@ class DescentParser {
 	// front of it is read as one: the name (or the Pattern) it declares, and the
 	// `=` that gives it its value. Without the `=`, `let count` is two names and
 	// this would claim the first of them.
-	protected declaresAName(): boolean {
-		let name = this.tokens.peek(1)
+	protected declaresAName(from = 0): boolean {
+		let name = this.tokens.peek(1 + from)
 
 		if (name === undefined) {
 			return false
@@ -2420,7 +2445,7 @@ class DescentParser {
 			return false
 		}
 
-		let following = this.tokens.peek(2)?.type
+		let following = this.tokens.peek(2 + from)?.type
 
 		return (
 			following === TokenType.SymbolEqual ||
@@ -2473,20 +2498,26 @@ class DescentParser {
 			label: string
 			notes: Array<string>
 			helps: Array<string>
+			// NOTE: What the one word REPLACES, where that is more than the word
+			// itself — `let mut` is two words and one habit. The word's own span
+			// wherever it is left out.
+			span?: common.Position
 		},
 	): void {
 		if (this.suppressDiagnostics) {
 			return
 		}
 
-		reportError(account.message, token.position, {
+		let written = account.span ?? token.position
+
+		reportError(account.message, written, {
 			code: "foreign-syntax",
-			labels: [primary(token.position, account.label)],
+			labels: [primary(written, account.label)],
 			notes: account.notes,
 			helps: account.helps,
 			data: {
 				kind: "essence-spelling",
-				position: token.position,
+				position: written,
 				spelling,
 			},
 		})

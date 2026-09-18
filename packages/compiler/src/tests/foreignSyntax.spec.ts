@@ -275,6 +275,39 @@ describe("Foreign syntax", () => {
 			])
 		})
 
+		// NOTE: Rust writes two words where this language writes one, so the two
+		// are one habit here: reported over the span they cover, fixed by one
+		// edit, and read on as the Variable they declare. Answered word by word
+		// they were four Diagnostics, and the fix for the first of them left a
+		// `mut` standing between the Keyword and the name.
+		it("reads 'let mut' as the one word it stands for", () => {
+			let source = program(
+				"let mut total = 0",
+				"total = total::add(1)",
+				"Terminal.print(total)",
+			)
+
+			expect(codesOf(source)).toEqual(["foreign-syntax"])
+			expect(messagesOf(source)).toEqual([
+				"'let' is not how Essence declares a binding",
+			])
+
+			let { data } = onlyDiagnostic(source)
+
+			expect(data).toMatchObject({
+				kind: "essence-spelling",
+				spelling: "variable",
+			})
+
+			if (data?.kind !== "essence-spelling") {
+				throw new Error(
+					"Diagnostic carries no essence-spelling payload.",
+				)
+			}
+
+			expect(spanOf(source, data.position)).toBe("let mut")
+		})
+
 		it("reads the annotation and the Pattern the Statement wrote", () => {
 			expect(
 				codesOf(
