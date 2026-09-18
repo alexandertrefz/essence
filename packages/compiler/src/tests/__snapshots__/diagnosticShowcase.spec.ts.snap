@@ -3228,3 +3228,30 @@ Advice: Nothing waits for this
 ─── 2 errors, 2 remarks
 "
 `;
+
+exports[`Diagnostic Showcase SwallowedString.es should render the same report every time 1`] = `
+"[unclosed-string]
+Error: This String Literal is never closed
+    ╭─┤ SwallowedString.es:20:22 │
+    │
+ 20 │     constant greeting = "Hello
+    │                         ▲  
+    │                         ╰── opened here
+ 21 │     constant name = "Ada"
+    │                     ▲  
+    │                     ╰── closed by this quote, which reads as the start of another String
+    │ 
+ 25 │ }
+    │  │ 
+    │  ╰─ and the input ends inside that one
+    │ 
+    │ Help 1: Add the missing '"' at the end of line 20.
+    │ Help 2: Or, if line 20 was meant to carry the lines below it, add it at the end of the input instead.
+    │ 
+    │ Note 1: A String Literal may span lines, and the line breaks are part of it — so the quote on line 21 closed the one opened on line 20, and the String that quote was written to open is the one that ran to the end of the input.
+    │ Note 2: One '"' is missing either way. It is reported against the String that spans lines, because a String written to span them is not usually followed, on the line it closes, by a second one that never closes at all.
+────╯
+
+─── 1 error
+"
+`;

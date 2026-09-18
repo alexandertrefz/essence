@@ -10,11 +10,15 @@ import type { CodeActionEdit, CodeActionEntry } from "./index"
 // in the very text the edit is about to land in, and a Position from an analysis
 // two keystrokes old points at something else entirely.
 
-// NOTE: The Diagnostic stands at the END OF THE INPUT — an unclosed String
-// swallows every line below it, so that is where the Lexer ran out — and the
-// quote that opened it is the secondary Label. The fix writes the missing quote
-// where the reader forgot it: at the end of the line the String opened on, which
-// is what gives the lines below it back to the Program.
+// NOTE: The String's opening quote is the first Label standing on a `"`, which
+// is the one thing the two shapes of this Diagnostic share. The plain one stands
+// at the END OF THE INPUT — an unclosed String swallows every line below it, so
+// that is where the Lexer ran out — and carries the opening quote as its
+// secondary Label. The one that names a String for SWALLOWING the lines below it
+// stands on that String's opening quote itself, with the quote it closed on
+// beside it. Either way the fix writes the missing quote where the reader forgot
+// it: at the end of the line the String opened on, which is what gives the lines
+// below it back to the Program.
 //
 // A String may run over line breaks, so the LINE is a reading of what was meant
 // rather than the only place a quote could go. It is the reading every other one
@@ -25,10 +29,10 @@ export function closeStringAction(
 	lines: Array<string>,
 ): CodeActionEntry | null {
 	let opening = diagnostic.labels.find(
-		(label) => label.kind === "secondary",
+		(label) => sliceOf(lines, label.position) === '"',
 	)?.position
 
-	if (opening === undefined || sliceOf(lines, opening) !== '"') {
+	if (opening === undefined) {
 		return null
 	}
 

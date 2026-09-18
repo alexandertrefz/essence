@@ -244,6 +244,16 @@ function reportMissingSeparator(problem: DocumentationProblem): void {
 	)
 }
 
+// NOTE: The span of the one character a quote Cursor stands on. Every Label in
+// the unclosed-String report points at a `"`, and a zero-width span renders as
+// an arrow at nothing.
+function quoteAt(cursor: common.Cursor): common.Position {
+	return {
+		start: cursor,
+		end: { line: cursor.line, column: cursor.column + 1 },
+	}
+}
+
 export type TokenStreamState = {
 	index: number
 	braceDepth: number
@@ -309,42 +319,7 @@ export class TokenStream {
 				throw error
 			}
 
-			// NOTE: `endOfInput` is where the Lexer STOPPED — one line past
-			// the last one when the file ends in a newline, where a label has
-			// no text to point at and renders dangling. Clamped to just after
-			// the last visible character, the way `endPosition()` keeps the
-			// parser's own end-of-input Diagnostics on real content. Counted
-			// character by character as the Lexer counts, so the two spellings
-			// of one column can not drift.
-			let endOfContent = { line: 1, column: 1 }
-
-			for (let character of source.trimEnd()) {
-				endOfContent =
-					character === "\n"
-						? { line: endOfContent.line + 1, column: 1 }
-						: {
-								line: endOfContent.line,
-								column: endOfContent.column + 1,
-							}
-			}
-
-			let position = { start: endOfContent, end: endOfContent }
-			let openingQuote = {
-				start: error.openedAt,
-				end: {
-					line: error.openedAt.line,
-					column: error.openedAt.column + 1,
-				},
-			}
-
-			reportError("This String Literal is never closed", position, {
-				code: "unclosed-string",
-				labels: [
-					primary(position, "the input ends here"),
-					secondary(openingQuote, "opened here"),
-				],
-				helps: ["Add the missing '\"'."],
-			})
+			this.reportUnterminatedString(error, source)
 
 			this.hadLexerError = true
 		}
@@ -414,6 +389,91 @@ export class TokenStream {
 					? index
 					: this.nextTilde[index + 1]!
 		}
+	}
+
+	// NOTE: The one fatal Lexer error, which stops the Token stream where it
+	// stands — and the one Diagnostic the Parser reports before it has read a
+	// Token.
+	protected reportUnterminatedString(
+		error: UnterminatedStringError,
+		source: string,
+	): void {
+		// NOTE: `endOfInput` is where the Lexer STOPPED — one line past the
+		// last one when the file ends in a newline, where a label has no text
+		// to point at and renders dangling. Clamped to just after the last
+		// visible character, the way `endPosition()` keeps the parser's own
+		// end-of-input Diagnostics on real content. Counted character by
+		// character as the Lexer counts, so the two spellings of one column can
+		// not drift.
+		let endOfContent = { line: 1, column: 1 }
+
+		for (let character of source.trimEnd()) {
+			endOfContent =
+				character === "\n"
+					? { line: endOfContent.line + 1, column: 1 }
+					: {
+							line: endOfContent.line,
+							column: endOfContent.column + 1,
+						}
+		}
+
+		let position = { start: endOfContent, end: endOfContent }
+		let swallower = error.swallower
+
+		if (swallower === null) {
+			reportError("This String Literal is never closed", position, {
+				code: "unclosed-string",
+				labels: [
+					primary(position, "the input ends here"),
+					secondary(quoteAt(error.openedAt), "opened here"),
+				],
+				helps: ["Add the missing '\"'."],
+			})
+
+			return
+		}
+
+		// NOTE: The likelier reading of two — see `swallowedTheLinesBelow` in
+		// the Lexer, which decides between them and says why. The String NAMED
+		// here is the one that SPANS LINES, because that is the '"' a reader has
+		// to write; the quote it closed on and the end of the input are both
+		// still pointed at, so the reading this one was chosen over stands on
+		// the page rather than only in the Lexer.
+		//
+		// NOTE: The Position is the opening quote rather than the end of the
+		// input, which is the one place this parts company with
+		// `unclosed-block`: what an Editor jumps to, and what `essence check`
+		// prints as `file:line:column`, is then the line the missing '"' belongs
+		// on. The plain case keeps the end of the input, where the String really
+		// does run out.
+		//
+		// NOTE: The opening quote is the FIRST Label standing on a `"`, which is
+		// the shape the `unclosed-string` Quick Fix reads the String's start off
+		// — see `closeStringAction`. It writes the quote at the end of that
+		// Label's line, so the swapped report moves the fix with it.
+		reportError(
+			"This String Literal is never closed",
+			quoteAt(swallower.openedAt),
+			{
+				code: "unclosed-string",
+				labels: [
+					primary(quoteAt(swallower.openedAt), "opened here"),
+					secondary(
+						quoteAt(swallower.closedAt),
+						"closed by this quote, which reads as the start of another String",
+					),
+					secondary(position, "and the input ends inside that one"),
+				],
+				notes: [
+					`A String Literal may span lines, and the line breaks are part of it — so the quote on line ${swallower.closedAt.line} closed the one opened on line ${swallower.openedAt.line}, and the String that quote was written to open is the one that ran to the end of the input.`,
+					`One '"' is missing either way. It is reported against the String that spans lines, because a String written to span them is not usually followed, on the line it closes, by a second one that never closes at all.`,
+				],
+				helps: [
+					`Add the missing '"' at the end of line ${swallower.openedAt.line}.`,
+					`Or, if line ${swallower.openedAt.line} was meant to carry the lines below it, add it at the end of the input instead.`,
+				],
+			},
+		)
 	}
 
 	// NOTE: Whether a `Type ~> { … }` can begin here at all — see `nextTilde`.

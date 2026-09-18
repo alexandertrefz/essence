@@ -82,7 +82,7 @@ const CORPUS = corpus()
 
 // NOTE: The showcase files the formatter must REFUSE — every one of them
 // carries an error the Parser itself reported, and formatting a file the Parser
-// could not read whole is exactly what the gate is there to prevent. Three of
+// could not read whole is exactly what the gate is there to prevent. Four of
 // them genuinely do not parse; the rest parse and are refused all the same,
 // because a `default-on-function-literal`, a `shorthand-in-combination`, a
 // `shorthand-on-path-key` and a `test-outside-tests` are errors like any other
@@ -90,6 +90,7 @@ const CORPUS = corpus()
 const REFUSED = new Set([
 	"diagnostics/Syntax.es",
 	"diagnostics/UnclosedString.es",
+	"diagnostics/SwallowedString.es",
 	"diagnostics/DefaultsSyntax.es",
 	"diagnostics/MemberPathSyntax.es",
 	"diagnostics/RecordShorthand.es",

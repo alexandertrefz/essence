@@ -188,6 +188,81 @@ describe("Parser Recovery", () => {
 		})
 	})
 
+	// NOTE: A String Literal may span lines, so the Lexer's reading of the file
+	// below is a String from line 2 to the quote in front of `Ada`, `Ada` as a
+	// name, and a String opened behind it that never closes — and "opened here"
+	// used to point at that last quote, which is one the author wrote on
+	// purpose. One '"' is missing under either reading; the one that spans lines
+	// is the one nobody writes on purpose, and is named as the culprit.
+	it("should name the String that swallowed the lines below it", () => {
+		let { diagnostics } = parseWithDiagnostics(
+			`implementation {
+	constant greeting = "Hello
+	constant name = "Ada"
+
+	Terminal.print(greeting)
+	Terminal.print(name)
+}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].code).toBe("unclosed-string")
+		expect(diagnostics[0].position).toEqual({
+			start: { line: 2, column: 22 },
+			end: { line: 2, column: 23 },
+		})
+		expect(diagnostics[0].labels).toHaveLength(3)
+		expect(diagnostics[0].labels[0]).toMatchObject({
+			kind: "primary",
+			message: "opened here",
+		})
+		expect(diagnostics[0].labels[1]).toMatchObject({
+			kind: "secondary",
+			position: {
+				start: { line: 3, column: 18 },
+				end: { line: 3, column: 19 },
+			},
+		})
+		expect(diagnostics[0].labels[2]?.message).toBe(
+			"and the input ends inside that one",
+		)
+		expect(diagnostics[0].helps[0]).toBe(
+			`Add the missing '"' at the end of line 2.`,
+		)
+	})
+
+	// NOTE: The claim is about the String that closed DIRECTLY in front of the
+	// unclosed one and on its line. A one-line String written between the two
+	// clears it, and so does a line break: neither file below is the shape the
+	// swap is for, and each is reported about the String that really was left
+	// open.
+	it("should keep the plain report where the evidence is not there", () => {
+		let sources = [
+			`implementation {
+	constant poem = "Roses
+are red"
+	constant name = "Ada"
+	constant note = "unclosed
+}`,
+			`implementation {
+	constant poem = "Roses
+are red"::append("x")
+	constant note = "unclosed
+}`,
+		]
+
+		for (let source of sources) {
+			let { diagnostics } = parseWithDiagnostics(source)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unclosed-string")
+			expect(diagnostics[0].labels).toHaveLength(2)
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"the input ends here",
+			)
+		}
+	})
+
 	// NOTE: The Lexer stops one line PAST the last one when the file ends in a
 	// newline — a label there has no text to point at and renders dangling, so
 	// the position is clamped to just after the last visible character.

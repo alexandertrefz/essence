@@ -19,19 +19,37 @@ export type LexingError = {
 	code: "invalid-number" | "invalid-escape" | "comment-in-hole"
 }
 
+// NOTE: A String Literal that CLOSED, kept only for as long as it takes the
+// next one to close too — see `lastClosedString`. `spansLines` is the whole
+// reason it is kept.
+export type ClosedString = {
+	openedAt: Cursor
+	closedAt: Cursor
+	spansLines: boolean
+}
+
 // NOTE: The one fatal Lexer error — after an unterminated String there is
 // nothing left to lex. It carries the two Cursors the report needs: where the
 // input ran out, and where the String that never closed was opened.
 export class UnterminatedStringError extends Error {
 	endOfInput: Cursor
 	openedAt: Cursor
+	// NOTE: The String Literal that closed directly in front of this one AND
+	// spanned lines, where there is one — the likelier culprit of the two. See
+	// `swallowedTheLinesBelow`.
+	swallower: ClosedString | null
 
-	constructor(endOfInput: Cursor, openedAt: Cursor) {
+	constructor(
+		endOfInput: Cursor,
+		openedAt: Cursor,
+		swallower: ClosedString | null = null,
+	) {
 		super(
 			`String Token not closed at line: ${endOfInput.line}, column: ${endOfInput.column}`,
 		)
 		this.endOfInput = endOfInput
 		this.openedAt = openedAt
+		this.swallower = swallower
 	}
 }
 
@@ -304,6 +322,13 @@ export class Lexer {
 	// NOTE: Collected rather than thrown — see `LexingError`. The caller reads
 	// them once lexing is done; `reset` starts a new input with none.
 	public errors: Array<LexingError>
+	// NOTE: The String Literal that closed most recently, and nothing older.
+	// It is the one piece of evidence the unterminated-String report has about
+	// WHICH quote is the missing one — see `swallowedTheLinesBelow` — and each
+	// close overwrites it, so a plain one-line String standing between a
+	// multi-line String and an unterminated one clears the claim rather than
+	// letting it reach across.
+	protected lastClosedString: ClosedString | null
 
 	constructor() {
 		this.data = ""
@@ -314,6 +339,7 @@ export class Lexer {
 		this.pending = []
 		this.pendingIndex = 0
 		this.errors = []
+		this.lastClosedString = null
 	}
 
 	reset(data: string, state: Cursor = { line: 1, column: 1 }) {
@@ -324,6 +350,7 @@ export class Lexer {
 		this.pending = []
 		this.pendingIndex = 0
 		this.errors = []
+		this.lastClosedString = null
 	}
 
 	next(): lexer.Token | undefined {
@@ -692,6 +719,8 @@ export class Lexer {
 		}
 
 		if (firstChunk.terminator === "quote") {
+			this.noteClosedString(stringStart)
+
 			return {
 				value: firstChunk.value,
 				type: TokenType.LiteralString,
@@ -788,11 +817,26 @@ export class Lexer {
 			})
 
 			if (chunk.terminator === "quote") {
+				this.noteClosedString(stringStart)
+
 				break
 			}
 		}
 
 		return head
+	}
+
+	// NOTE: Called with the String's opening Cursor the moment its closing quote
+	// has been consumed, so the Lexer's own Cursor stands just past that quote
+	// and the quote itself is the character in front of it. What is kept is the
+	// pair of Cursors and whether the two are on different lines; see
+	// `lastClosedString`.
+	protected noteClosedString(openedAt: Cursor): void {
+		this.lastClosedString = {
+			openedAt,
+			closedAt: { line: this.line, column: this.column - 1 },
+			spansLines: this.line > openedAt.line,
+		}
 	}
 
 	// NOTE: Whitespace only — a line break inside a hole is a Token like any
@@ -940,7 +984,53 @@ export class Lexer {
 	}
 
 	protected throwUnterminatedString(cursor: Cursor, openedAt: Cursor): never {
-		throw new UnterminatedStringError(cursor, openedAt)
+		throw new UnterminatedStringError(
+			cursor,
+			openedAt,
+			this.swallowedTheLinesBelow(openedAt),
+		)
+	}
+
+	// NOTE: WHICH quote is the missing one. A String Literal in Essence may span
+	// lines and the line breaks are part of it, so a String opened on line 2 and
+	// closed on line 3 is a String the language has, and the one the input ended
+	// inside of is — strictly — the one that was left open. Strictly is not
+	// helpful: the file below says the same thing twice, and the reader is
+	// pointed at a quote they wrote on purpose.
+	//
+	//     constant greeting = "Hello
+	//     constant name = "Ada"
+	//
+	// Exactly one '"' is missing under either reading. Under the first, the one
+	// at the end of line 1; the quote in front of `Ada` closes nothing, it opens
+	// `"Ada"`. Under the second, the author wrote a String holding a line of
+	// their own source, left `Ada` standing bare behind it, and then opened a
+	// String they never closed. The first is what people write; the second is
+	// not a file anybody has.
+	//
+	// So: a String that SPANNED LINES and closed on the very line the unclosed
+	// one opens on is named as the culprit instead. Both readings are in the
+	// report either way — the reader is shown the quote that closed it and told
+	// what the other reading would mean — because this is a judgement about
+	// which mistake is likelier and not something the Lexer can know.
+	//
+	// The narrowing is two-sided on purpose. `lastClosedString` holds the String
+	// that closed DIRECTLY in front of this one and no older one, so a one-line
+	// String written between the two clears the claim; and the two quotes have
+	// to share a line, so an unclosed String further down the file is reported
+	// about itself.
+	protected swallowedTheLinesBelow(openedAt: Cursor): ClosedString | null {
+		let previous = this.lastClosedString
+
+		if (
+			previous === null ||
+			!previous.spansLines ||
+			previous.closedAt.line !== openedAt.line
+		) {
+			return null
+		}
+
+		return previous
 	}
 
 	// #endregion

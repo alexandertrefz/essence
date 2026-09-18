@@ -160,6 +160,36 @@ Error: This String Literal is never closed
 
 </div>
 
+A literal may span lines, so a missing `"` has two readings: the string ran on, or the quote that appeared to close it was written to open the next one. Where a string that spans lines closes on the very line the unclosed one opens on, the report names the spanning string instead — the quote missing from the end of its first line is the one mistake that explains the file — and points at the quote that closed it and at the end of the input beside it.
+
+<div class="error-output">
+
+```
+[unclosed-string]
+Error: This String Literal is never closed
+   ╭─┤ Greeting.es:2:22 │
+   │
+ 2 │     constant greeting = "Hello
+   │                         ▲  
+   │                         ╰── opened here
+ 3 │     constant name = "Ada"
+   │                     ▲  
+   │                     ╰── closed by this quote, which reads as the start of another String
+   │ 
+ 6 │ }
+   │  │ 
+   │  ╰─ and the input ends inside that one
+   │ 
+   │ Help 1: Add the missing '"' at the end of line 2.
+   │ Help 2: Or, if line 2 was meant to carry the lines below it, add it at the end of the input instead.
+   │ 
+   │ Note 1: A String Literal may span lines, and the line breaks are part of it — so the quote on line 3 closed the one opened on line 2, and the String that quote was written to open is the one that ran to the end of the input.
+   │ Note 2: One '"' is missing either way. It is reported against the String that spans lines, because a String written to span them is not usually followed, on the line it closes, by a second one that never closes at all.
+───╯
+```
+
+</div>
+
 Add the closing `"`. For a literal brace, write `\{` and `\}`: `"\{\"a\": 1\}"` prints `{"a": 1}`.
 
 Quick Fix: **Add the missing '"'**.

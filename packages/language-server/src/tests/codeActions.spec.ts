@@ -1824,6 +1824,34 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).not.toContain("unclosed-string")
 		})
 
+		// NOTE: The Diagnostic that names a String for SWALLOWING the lines below
+		// it stands on that String's own opening quote rather than at the end of
+		// the input, and carries the quote it closed on as a Label of its own.
+		// The fix reads the String's start off the first Label standing on a
+		// `"`, which is the opening one under both shapes — so the quote lands
+		// at the end of line 2, where the reader forgot it, and not on line 3.
+		it("should close the String that swallowed the lines below it", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant greeting = "Hello',
+				'\tconstant name = "Ada"',
+				"",
+				"\tTerminal.print(greeting)",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Add the missing '\"'")
+			expect(fix.diagnosticCode).toBe("unclosed-string")
+
+			let result = applied(lines, fix)
+
+			expect(result[1]).toBe('\tconstant greeting = "Hello"')
+			expect(result[2]).toBe('\tconstant name = "Ada"')
+			expect(codesOf(result)).not.toContain("unclosed-string")
+		})
+
 		it("should stay silent where the opening quote has been typed over", () => {
 			let lines = ["implementation {", "\tconstant greeting = hello", "}"]
 
