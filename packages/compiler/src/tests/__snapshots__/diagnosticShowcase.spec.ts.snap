@@ -1878,20 +1878,7 @@ Warning: This 'defaultingTo' Argument can never be read
 `;
 
 exports[`Diagnostic Showcase Syntax.es should render the same report every time 1`] = `
-"[comment-in-hole]
-Error: A Comment can not be written inside an interpolation hole
-    ╭─┤ Syntax.es:37:36 │
-    │
- 37 │     constant labelled = "answer: { 42 § the answer }"
-    │                                       ──────┬──────  
-    │                                             ╰──────── this Comment would swallow the rest of the String
-    │ 
-    │ Help: Move the Comment out of the String — behind the closing '"' works.
-    │ 
-    │ Note: A Comment runs to the end of its line — inside a hole it would take the hole's '}' and the String's closing '"' with it.
-────╯
-
-[syntax-error]
+"[syntax-error]
 Error: Expected '=' but found '42'.
     ╭─┤ Syntax.es:14:18 │
     │
@@ -1924,6 +1911,19 @@ Error: A Protocol Method can not take a Parameter apart
     │ Help: Write one name, and take it apart where it is used.
     │ 
     │ Note: A Protocol Method declares what a call looks like and nothing about how it is carried out, so a Pattern here would name parts for nobody to read.
+────╯
+
+[comment-in-hole]
+Error: A Comment can not be written inside an interpolation hole
+    ╭─┤ Syntax.es:37:36 │
+    │
+ 37 │     constant labelled = "answer: { 42 § the answer }"
+    │                                       ──────┬──────  
+    │                                             ╰──────── this Comment would swallow the rest of the String
+    │ 
+    │ Help: Move the Comment out of the String — behind the closing '"' works.
+    │ 
+    │ Note: A Comment runs to the end of its line — inside a hole it would take the hole's '}' and the String's closing '"' with it.
 ────╯
 
 [mixed-rational-literal]
@@ -2279,6 +2279,25 @@ Error: 'require' may only be written in a test's body
     │ Note: An assertion records its result against the test that is running, so it is a Statement of a test's own block and of the blocks nested in it — never of a Function literal written there.
 ────╯
 
+[misplaced-tests-section]
+Error: The 'tests { … }' block belongs below the 'export { … }' block
+    ╭─┤ TestsSyntax.es:40:1 │
+    │
+ 40 │ ╭─▶ tests {
+    ┆ ┆   
+ 71 │ ├─▶ }
+    │ │       
+    │ ╰─────── this block is written above what the Module hands out
+    │ 
+ 73 │     export {
+    │     ───┬──  
+    │        ╰──── the export block is here
+    │ 
+    │ Help: Move the 'tests { … }' block below 'export { … }'.
+    │ 
+    │ Note: A Module reads top to bottom: what it imports, what it does, what it exports, what it proves.
+────╯
+
 [matcher-on-expect]
 Error: An 'expect' can not take a value apart
     ╭─┤ TestsSyntax.es:50:10 │
@@ -2347,25 +2366,6 @@ Error: A snapshot records a value, and this line took one apart
     │ Help 2: Or snapshot the value whole, where it is one that prints: 'expect value matches snapshot'.
     │ 
     │ Note: A snapshot is of the value an assertion is written over, printed as text. 'require MATCHER = EXPR' is written over a shape instead: it asks what the value has to be and names its parts, so what there is to record is one of those names.
-────╯
-
-[misplaced-tests-section]
-Error: The 'tests { … }' block belongs below the 'export { … }' block
-    ╭─┤ TestsSyntax.es:40:1 │
-    │
- 40 │ ╭─▶ tests {
-    ┆ ┆   
- 71 │ ├─▶ }
-    │ │       
-    │ ╰─────── this block is written above what the Module hands out
-    │ 
- 73 │     export {
-    │     ───┬──  
-    │        ╰──── the export block is here
-    │ 
-    │ Help: Move the 'tests { … }' block below 'export { … }'.
-    │ 
-    │ Note: A Module reads top to bottom: what it imports, what it does, what it exports, what it proves.
 ────╯
 
 ─── 10 errors

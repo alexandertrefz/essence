@@ -137,6 +137,35 @@ describe("Parser Diagnostics", () => {
 		})
 	})
 
+	// NOTE: The Lexer reads the whole file before the Parser reads a Token of
+	// it, so everything the Lexer had to say stood above everything the Parser
+	// did, whatever line each of them was about — a bad escape on line 4 printed
+	// over a Number on line 2. Reading a report is reading a file.
+	describe("The order a report is read in", () => {
+		it("should print the Diagnostics in the order the lines are written", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+	constant n = 0xFF
+	constant m = 1e5
+	constant s = "bad \\q here"
+	constant t = 2px
+}`,
+			)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([
+				["invalid-number", 2],
+				["invalid-number", 3],
+				["invalid-escape", 4],
+				["invalid-number", 5],
+			])
+		})
+	})
+
 	describe("Line endings", () => {
 		it("should parse a file with Windows line endings", () => {
 			let { diagnostics } = parseWithDiagnostics(

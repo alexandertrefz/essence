@@ -3765,7 +3765,8 @@ import { from "./Geometry.es" { Rectangle } }`,
 
 			// NOTE: A block on the wrong side is still parsed where it stands, so
 			// what is inside it is read rather than cascading into the Diagnostics
-			// about the Program's shape.
+			// about the Program's shape. The two come out in the order the file
+			// reads them: the block's own Keyword stands left of what is in it.
 			it("should read a misplaced section's entries rather than cascade", () => {
 				let { diagnostics } = parseWithDiagnostics(
 					`implementation { }
@@ -3776,7 +3777,7 @@ import { from "./Geometry.es" { Rectangle } }`,
 				expect(diagnostics).toHaveLength(2)
 				expect(
 					diagnostics.map((diagnostic) => diagnostic.code),
-				).toEqual(["syntax-error", "misplaced-module-section"])
+				).toEqual(["misplaced-module-section", "syntax-error"])
 			})
 
 			it("should keep a well-placed section beside a misplaced one", () => {
