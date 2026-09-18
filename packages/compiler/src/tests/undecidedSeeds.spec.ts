@@ -566,6 +566,73 @@ describe("Undecided Seeds", () => {
 			).toEqual(['[ "a", "ccc" ]', '"2"'])
 		})
 
+		// NOTE: The decision a slot takes carries no proof, which is what keeps
+		// the idiom that BUILT the Dictionary writable against it. Deciding the
+		// values `NonEmptyList<String>` off the `[]::append(word)` one turn
+		// answers refuses the `defaultingTo []` of the very next turn — a
+		// Dictionary of non-empty Lists has no empty List to fall back to.
+		it("decides a Dictionary's values without the proof one write carried", async () => {
+			expect(
+				await run(`implementation {
+					constant lists = ["apple", "bb"]::reduce(startingWith [=], (current, word) {
+						<- [current with word = []::append(word)]
+					})
+
+					constant missing = lists::value(at "zz", defaultingTo [])
+
+					Terminal.inspect(missing)
+				}`),
+			).toEqual(["[]"])
+		})
+
+		it("decides it where the fold reads the slot back to build it", async () => {
+			expect(
+				await run(`implementation {
+					constant grouped = ["apple", "avocado", "bb"]::reduce(startingWith [=], (current, word) {
+						constant key = word::length()
+
+						<- [current with key = current::value(at key, defaultingTo [])::append(word)]
+					})
+
+					Terminal.inspect(grouped::keys()::sort())
+				}`),
+			).toEqual(["[ 2, 5, 7 ]"])
+		})
+
+		// NOTE: And at every depth, because a proof one level in refuses the
+		// next write just as surely: `rows::append(["a"]::append("b"))` decides
+		// a List of Lists of Strings, never a List of NON-EMPTY ones, so the
+		// empty List written after it still fits.
+		it("decides a slot inside a slot without its proof", async () => {
+			expect(
+				await run(`implementation {
+					variable rows = []
+
+					rows = rows::append(["a"]::append("b"))
+					rows = rows::append([])
+
+					Terminal.inspect(rows)
+				}`),
+			).toEqual(['[ [ "a", "b" ], [] ]'])
+		})
+
+		// NOTE: The other direction, unchanged and worth saying beside them: a
+		// slot the fold DECIDED still reads an empty List as bottom, so clearing
+		// what was built is not a write that has to decide anything.
+		it("still takes an empty List into a slot the fold decided", async () => {
+			expect(
+				await run(`implementation {
+					constant tallied = ["apple", "bb"]::reduce(startingWith { items = [] }, (current, word) {
+						<- { items = current.items::append(word) }
+					})
+
+					constant cleared = { tallied with items = [] }
+
+					Terminal.inspect(cleared.items)
+				}`),
+			).toEqual(["[]"])
+		})
+
 		// NOTE: A Type Parameter the RECEIVER bound, which is the order every
 		// Method is matched in: `rows::append(["a"])` binds the item Type to
 		// `List<Unknown>` off the receiver and then had nothing left to do with

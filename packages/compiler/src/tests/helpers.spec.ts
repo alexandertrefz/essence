@@ -3389,11 +3389,10 @@ describe("Helpers", () => {
 			})
 
 			// NOTE: The rule a write into an undecided slot follows, in the one
-			// place both halves can be spelled. A refinement is evidence about
-			// the value that was written, and where that value decides the
-			// CONTAINER — the Type of a name whose earlier value was an empty
-			// List nothing proved anything about — the evidence is dropped.
-			// Where it decides a slot INSIDE one, it is what stands there.
+			// place it can be spelled on its own. A refinement is evidence about
+			// the ONE value that was written, and a slot holds every value the
+			// name that owns it will ever hold — so the evidence is dropped
+			// wherever it stands, at the container and at every depth inside it.
 			describe("resolveUnknownSlots", () => {
 				const unknownList: Type = {
 					type: "List",
@@ -3422,7 +3421,12 @@ describe("Helpers", () => {
 					).toEqual({ type: "List", itemType: string })
 				})
 
-				it("should keep the refinement a slot itself was written with", () => {
+				// NOTE: A slot INSIDE the container drops its evidence too, which
+				// is what makes the write after the deciding one possible:
+				// `rows = rows::append(["a"]::append("b"))` decides a List of
+				// Lists of Strings, and the `rows::append([])` written under it
+				// is an empty List going where a NON-EMPTY one was proved.
+				it("should look through a refinement standing in a slot", () => {
 					expect(
 						resolveUnknownSlots(unknownList, {
 							type: "List",
@@ -3430,7 +3434,7 @@ describe("Helpers", () => {
 						}),
 					).toEqual({
 						type: "List",
-						itemType: nonEmpty(string),
+						itemType: { type: "List", itemType: string },
 					})
 				})
 

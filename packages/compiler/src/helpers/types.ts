@@ -1558,6 +1558,72 @@ export function decidesAnUndecidedSlot(written: common.Type): boolean {
 	return written.type !== "Unknown" && !typeContainsError(written)
 }
 
+// NOTE: The Type with every proof taken off it, however deep one sits — the
+// shape a decision is allowed to be. It enumerates the places a Type ARGUMENT
+// can stand, the same list `typeContainsUnknown` walks and for the same reason:
+// those are the positions a value's own Type reaches, and stopping there is what
+// keeps a Choice that names itself from looping. A Type holding no refinement at
+// all comes back as itself, so a decision that changes nothing is recognisable
+// by identity, which is how every caller here tells a pin from a no-op.
+function withoutRefinements(type: common.Type): common.Type {
+	switch (type.type) {
+		case "Refinement":
+			return withoutRefinements(type.base)
+		case "List": {
+			let itemType = withoutRefinements(type.itemType)
+
+			return itemType === type.itemType
+				? type
+				: { type: "List", itemType }
+		}
+		case "Future": {
+			let valueType = withoutRefinements(type.valueType)
+
+			return valueType === type.valueType
+				? type
+				: { type: "Future", valueType }
+		}
+		case "Started": {
+			let valueType = withoutRefinements(type.valueType)
+
+			return valueType === type.valueType
+				? type
+				: { type: "Started", valueType }
+		}
+		case "Dictionary": {
+			let keyType = withoutRefinements(type.keyType)
+			let valueType = withoutRefinements(type.valueType)
+
+			return keyType === type.keyType && valueType === type.valueType
+				? type
+				: { type: "Dictionary", keyType, valueType }
+		}
+		case "Record": {
+			let members: Record<string, common.Type> = {}
+			let stripped = false
+
+			for (let [name, memberType] of Object.entries(type.members)) {
+				members[name] = withoutRefinements(memberType)
+				stripped ||= members[name] !== memberType
+			}
+
+			return stripped ? { type: "Record", members } : type
+		}
+		// NOTE: The name and the alias go with the arm they described, exactly as
+		// they do wherever else an arm is rebuilt — `NonEmptyList<String> | X` is
+		// not what a Union whose first arm is now a plain List is called.
+		case "UnionType": {
+			let types = type.types.map(withoutRefinements)
+
+			return types.some((arm, index) => arm !== type.types[index])
+				? { type: "UnionType", types }
+				: type
+		}
+		default:
+			return type
+	}
+}
+
 // NOTE: `stored` with every Unknown slot `value` has an answer for filled in —
 // what turns `variable items = []` into a List of Integers the moment
 // `items = [1, 2]` says so. Only slots that are Unknown are touched, so a Type
@@ -1576,12 +1642,25 @@ export function resolveUnknownSlots(
 			return stored
 		}
 
-		// NOTE: A slot nothing decided takes the written Type WHOLE, refinement
-		// and all — pinning `List<Unknown>` from a `List<NonEmptyList<String>>`
-		// gives back a List of NON-EMPTY Lists. What stands in a slot is what
-		// the value put there, and a refinement is part of that.
+		// NOTE: A DECISION never carries a refinement, at any depth. A slot
+		// decided by inference holds many values over the life of the name that
+		// owns it — a fold's accumulator, a Dictionary's values, a List's items —
+		// and a refinement is a proof about ONE value. Pinning the proof into the
+		// slot makes the next write of an unrefined value impossible, and that
+		// write is usually the fold's own: `[current with word = []::append(word)]`
+		// decides the values `NonEmptyList<String>`, and then the
+		// `current::value(at key, defaultingTo [])` that BUILT it no longer fits
+		// its own Dictionary. An author who wants the proof in the slot annotates,
+		// which is the one place a Type is stated rather than inferred.
+		//
+		// This reverses the reading inherited from master, where a slot took the
+		// written Type whole. That reading was invisible while an undecided slot
+		// accepted everything; a slot that now refuses what does not fit it has to
+		// hold the Type the name can keep writing, not the Type one write proved.
 		if (stored.type === "Unknown") {
-			return decidesAnUndecidedSlot(written) ? written : stored
+			return decidesAnUndecidedSlot(written)
+				? withoutRefinements(written)
+				: stored
 		}
 
 		// NOTE: A refinement standing over the CONTAINER whose slots are being
