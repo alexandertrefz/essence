@@ -628,6 +628,137 @@ describe("Unknown Slot Narrowing", () => {
 				false,
 			)
 		})
+
+		// NOTE: And said only about the blank that DID the refusing. A Type can
+		// hold a blank the value it turned away never met, and a sentence about
+		// that one answers a question nobody asked — here the Integers in `items`
+		// are what is wrong, and `others` is a blank both sides carry.
+		it("says nothing about a blank standing beside the refusal", () => {
+			let errors = errorsFor(`implementation {
+				variable box = { items = [], others = [] }
+
+				box = { items = ["a"], others = [] }
+				box = { items = [1], others = [] }
+			}`)
+
+			expect(errors).toHaveLength(1)
+			expect(errors[0].helps).toEqual([])
+			expect(errors[0].notes.some((note) => note.includes("blank"))).toBe(
+				false,
+			)
+		})
+
+		it("says nothing where an update refuses a member that is decided", () => {
+			let errors = errorsFor(`implementation {
+				constant box = { items = [], name = "a" }
+				constant renamed = { box with name = 1 }
+			}`)
+
+			expect(errors).toHaveLength(1)
+			expect(errors[0].code).toBe("partial-type-mismatch")
+			expect(errors[0].helps).toEqual([])
+			expect(errors[0].notes.some((note) => note.includes("blank"))).toBe(
+				false,
+			)
+		})
+
+		// NOTE: A blank can stand in one arm of a Union, and the reader is shown
+		// it there — `declared as List<Unknown> | String here` names a half of a
+		// Type nobody can act on, and the annotation that answers it is the whole
+		// Union with that arm filled in.
+		it("explains a blank standing in one arm of a Union", () => {
+			let source = `implementation {
+				variable x = define {
+					as [] if true
+					as "a" otherwise
+				}
+
+				x = 1
+			}`
+
+			expect(undecidedHelp(source)).toContain(
+				"'variable x: List<Integer> | String'",
+			)
+			expect(undecidedNote(source)).toContain(
+				"An empty List Literal leaves its item Type unknown",
+			)
+		})
+
+		// NOTE: A Function literal's return Type is inferred, so a combiner over
+		// a seed nothing decided returns a blank — which is what every `<-` in it
+		// is measured against, and the only Type the report can name.
+		it("explains the blank a combiner's every branch is refused against", () => {
+			let errors = errorsFor(`implementation {
+				constant mixed = [1, 2]::reduce(startingWith [], (current, number) {
+					if number::is(1) {
+						<- current::append(number)
+					}
+
+					<- current::append("two")
+				})
+			}`)
+
+			expect(errors.map((error) => error.code)).toEqual([
+				"return-type-mismatch",
+				"return-type-mismatch",
+			])
+
+			for (let error of errors) {
+				expect(error.notes.join("\n")).toContain(
+					"An empty List Literal leaves its item Type unknown",
+				)
+				expect(error.helps.join("\n")).toContain("'List<Integer>'")
+			}
+		})
+
+		// NOTE: The same for a Case payload, where the blank is a member of the
+		// Record a generic Choice was applied to.
+		it("explains the blank a Case payload is refused against", () => {
+			let errors = errorsFor(`implementation {
+				constant mixed = [1, 2]::reduce(startingWith [], step (current, number) {
+					if number::is(1) {
+						<- #Continue(current::append(number))
+					}
+
+					<- #Continue(current::append("two"))
+				})
+			}`)
+
+			expect(
+				errors.some(
+					(error) =>
+						error.code === "payload-type-mismatch" &&
+						error.notes
+							.join("\n")
+							.includes(
+								"An empty List Literal leaves its item Type unknown",
+							),
+				),
+			).toBe(true)
+		})
+
+		// NOTE: A capture names a Declaration, so its Help spells one — under the
+		// keyword that Declaration used and around whatever holds the blank. It
+		// used to spell `variable f: List<Integer>` whatever it was answering,
+		// which under a `constant` holding a Future is wrong twice over.
+		it("spells a capture's annotation from its own Declaration", () => {
+			let errors = errorsFor(`implementation {
+				function gather() -> Future<List<Integer>> {
+					constant f = Async.deferred(() { <- [] })
+
+					<- Async.deferred(() { <- complete f })
+				}
+			}`)
+
+			let capture = errors.find(
+				(error) => error.code === "uninferable-item-type",
+			)!
+
+			expect(capture).toBeDefined()
+			expect(capture.helps.join("\n")).toContain(
+				"'constant f: Future<List<Integer>>'",
+			)
+		})
 	})
 
 	// NOTE: An undecided item Type is a slot nothing has filled, not a promise

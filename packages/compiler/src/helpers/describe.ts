@@ -1,5 +1,7 @@
 import type { common } from "@essence-lang/interfaces"
 
+import { decidesAnUndecidedSlot } from "./types"
+
 // NOTE: The spelling a Generic is SHOWN under. `createFreshenedInference`
 // alpha-renames a callee's Generics for the span of one invocation — `T`
 // becomes `T`, a zero-width space and a counter — and a Generic that never
@@ -283,42 +285,143 @@ export function withArticle(description: string): string {
 		: `a ${description}`
 }
 
-// NOTE: Which container inside a Type has a slot nobody decided — the first
-// one found, because one is all a Diagnostic says a sentence about. A slot is
-// the item Type of a List or either half of a Dictionary left `Unknown`, which
-// in a Program only ever comes from `[]` or `[=]`: `Unknown` is unspellable, so
-// there is nothing else for one to be. A `Future`'s open slot is NOT one —
-// nothing writes into a Future, and a bare `Future` is refused where it is
-// written rather than left standing for a reader to meet here.
-function undecidedContainerIn(type: common.Type): "List" | "Dictionary" | null {
-	switch (type.type) {
-		case "List":
-			return type.itemType.type === "Unknown"
-				? "List"
-				: undecidedContainerIn(type.itemType)
-		case "Dictionary":
-			return type.keyType.type === "Unknown" ||
-				type.valueType.type === "Unknown"
-				? "Dictionary"
-				: (undecidedContainerIn(type.keyType) ??
-						undecidedContainerIn(type.valueType))
-		case "Record":
-			for (let memberType of Object.values(type.members)) {
-				let found = undecidedContainerIn(memberType)
+// NOTE: Which container inside `expected` holds the blank a Diagnostic is about
+// — the first one found, because one is all a Diagnostic says a sentence about. A
+// slot is the item Type of a List or either half of a Dictionary left `Unknown`,
+// which in a Program only ever comes from `[]` or `[=]`: `Unknown` is
+// unspellable, so there is nothing else for one to be.
+//
+// `written` is the Type that was REFUSED, and what it is for is to keep the
+// sentence about the blank that did the refusing. Looking at the expected side
+// alone said it about refusals that had nothing to do with one: `box = { items =
+// [1], others = [] }`, over a `box` whose `items` an earlier assignment decided,
+// is refused for the Integers in `items`, and a note about the `others` nothing
+// has written into answers a question nobody asked.
+//
+// Where the two sides are the SAME shape they are walked in lockstep, and a slot
+// answers only where the expected side is a blank and the written side decides it
+// — the very rule `matchTypes` refused by, asked here in the same words through
+// `decidesAnUndecidedSlot`. A Record is walked over the members BOTH sides have,
+// because a member an update does not name is one it says nothing about.
+//
+// Where the shapes differ there is no slot to pair anything with, and the value
+// stands opposite the expected Type whole: `items = "a"` over a `variable items =
+// []` is measured against `List<Unknown>` and refused, and `List<Unknown>` is
+// exactly what the reader is shown and can not act on. So the blank is looked for
+// in the expected Type alone — provided the value is not itself a blank, since
+// one blank refuses no other.
+//
+// Null `written` asks that one-sided question outright, for the report that is
+// about a blank rather than about a value refused by one: a capture is refused
+// because the body around it can never be re-checked, so there is nothing
+// standing opposite the blank to compare it with.
+function refusedSlotIn(
+	expected: common.Type,
+	written: common.Type | null,
+): "List" | "Dictionary" | null {
+	// NOTE: A refinement decides nothing its base has not — what is still
+	// undecided about a `NonEmptyList<Unknown>` is the item Type, on either side.
+	while (expected.type === "Refinement") {
+		expected = expected.base
+	}
 
-				if (found !== null) {
-					return found
-				}
+	while (written !== null && written.type === "Refinement") {
+		written = written.base
+	}
+
+	if (written !== null && written.type !== expected.type) {
+		return decidesAnUndecidedSlot(written)
+			? refusedSlotIn(expected, null)
+			: null
+	}
+
+	// NOTE: Walked THROUGH rather than reported on. A Future's own slot is never
+	// a blank a Program left — a bare `Future` is refused where it is written —
+	// but a Future built around an empty List carries one all the same, and the
+	// sentence about it is a sentence about that List.
+	if (expected.type === "Future" || expected.type === "Started") {
+		return refusedSlotIn(
+			expected.valueType,
+			written === null
+				? null
+				: (written as common.FutureType | common.StartedType).valueType,
+		)
+	}
+
+	if (expected.type === "List") {
+		let writtenItemType =
+			written === null ? null : (written as common.ListType).itemType
+
+		return expected.itemType.type === "Unknown" &&
+			(writtenItemType === null ||
+				decidesAnUndecidedSlot(writtenItemType))
+			? "List"
+			: refusedSlotIn(expected.itemType, writtenItemType)
+	}
+
+	if (expected.type === "Dictionary") {
+		let other = written as common.DictionaryType | null
+
+		if (
+			(expected.keyType.type === "Unknown" &&
+				(other === null || decidesAnUndecidedSlot(other.keyType))) ||
+			(expected.valueType.type === "Unknown" &&
+				(other === null || decidesAnUndecidedSlot(other.valueType)))
+		) {
+			return "Dictionary"
+		}
+
+		return (
+			refusedSlotIn(
+				expected.keyType,
+				other === null ? null : other.keyType,
+			) ??
+			refusedSlotIn(
+				expected.valueType,
+				other === null ? null : other.valueType,
+			)
+		)
+	}
+
+	if (expected.type === "Record") {
+		let other = written as common.RecordType | null
+
+		for (let [name, memberType] of Object.entries(expected.members)) {
+			if (other !== null && !Object.hasOwn(other.members, name)) {
+				continue
 			}
 
-			return null
-		// NOTE: A refinement decides nothing its base has not — what is still
-		// undecided about a `NonEmptyList<Unknown>` is the item Type.
-		case "Refinement":
-			return undecidedContainerIn(type.base)
-		default:
-			return null
+			let found = refusedSlotIn(
+				memberType,
+				other === null ? null : other.members[name],
+			)
+
+			if (found !== null) {
+				return found
+			}
+		}
+
+		return null
 	}
+
+	// NOTE: Arm by arm and one-sidedly, because a Union's arms pair with nothing:
+	// the value was measured against the whole Union and turned away by all of
+	// them at once. A blank standing in one arm is still a blank the reader is
+	// shown — `variable x = define { as [] if flag  as "a" otherwise }` leaves one
+	// — and it is still the half of `List<Unknown> | String` nobody can act on.
+	if (expected.type === "UnionType") {
+		for (let arm of expected.types) {
+			let found = refusedSlotIn(arm, null)
+
+			if (found !== null) {
+				return found
+			}
+		}
+
+		return null
+	}
+
+	return null
 }
 
 // NOTE: The same Type with every undecided slot filled in, to be SPELLED rather
@@ -336,6 +439,20 @@ function spelledWithDecidedSlots(type: common.Type): common.Type {
 			return {
 				type: "List",
 				itemType: spelledWithDecidedSlots(type.itemType),
+			}
+		// NOTE: Spelled through, the way the walk above looks through one — the
+		// annotation an author writes for a `constant f = Async.deferred(() { <-
+		// [] })` is the whole `Future<List<Integer>>`, blank and container and
+		// all.
+		case "Future":
+			return {
+				type: "Future",
+				valueType: spelledWithDecidedSlots(type.valueType),
+			}
+		case "Started":
+			return {
+				type: "Started",
+				valueType: spelledWithDecidedSlots(type.valueType),
 			}
 		case "Dictionary":
 			return {
@@ -356,8 +473,23 @@ function spelledWithDecidedSlots(type: common.Type): common.Type {
 					]),
 				),
 			}
+		// NOTE: An arm at a time, so a blank standing in one arm of a Union is
+		// spelled where it stands and the arms beside it are spelled as they are.
+		case "UnionType":
+			return {
+				...type,
+				types: type.types.map(spelledWithDecidedSlots),
+			}
+		// NOTE: The Type ARGUMENTS as well as the base, because they are what a
+		// refinement is printed from: `describeType` spells one as its name and
+		// its Type Arguments and never reads the base at all, so filling the base
+		// alone filled a blank nobody would see.
 		case "Refinement":
-			return { ...type, base: spelledWithDecidedSlots(type.base) }
+			return {
+				...type,
+				base: spelledWithDecidedSlots(type.base),
+				typeArguments: type.typeArguments?.map(spelledWithDecidedSlots),
+			}
 		default:
 			return type
 	}
@@ -371,15 +503,21 @@ function spelledWithDecidedSlots(type: common.Type): common.Type {
 // filled in, the same two things `uninferable-item-type` says about the capture
 // it refuses, which is the other place an author meets an undecided slot.
 //
+// `written` is the Type of the value that was refused, because the sentence is
+// about a blank that refused something and not about every blank in sight. See
+// `refusedSlotIn`: the two are walked together and the evidence is offered only
+// where a blank stands opposite a Type that would have decided it.
+//
 // `name` is what the value is called where the mismatch is reported, so the help
 // can show the annotation as it would be written. Null where the report has no
-// name to use — a Record update names the value it updates by Expression — and
-// the shape alone is spelled then.
+// name to use — a Record update names the value it updates by Expression, a
+// return has no name at all — and the shape alone is spelled then.
 export function undecidedSlotEvidence(
 	expected: common.Type,
+	written: common.Type,
 	name: string | null,
 ): { notes: Array<string>; helps: Array<string> } {
-	let container = undecidedContainerIn(expected)
+	let container = refusedSlotIn(expected, written)
 
 	if (container === null) {
 		return { notes: [], helps: [] }
@@ -395,11 +533,39 @@ export function undecidedSlotEvidence(
 				: "An empty List Literal leaves its item Type unknown until a write decides it, and nothing has written into this one — the 'Unknown' here is a blank, not a Type.",
 		],
 		helps: [
+			// NOTE: The shape alone where there is no name, because every report
+			// that has none is a step away from the Declaration that would answer
+			// it — a Record update names the value it updates by Expression, a
+			// `<-` and a `define` arm answer a position rather than a name — and
+			// the Type is what has to be written wherever that Declaration is.
 			`${
 				name === null
-					? `Annotate the Declaration that creates it, where a Record states the Types of its members — '${spelling}'`
+					? `Annotate the Declaration that creates it — '${spelling}'`
 					: `Annotate the Declaration — 'variable ${name}: ${spelling}'`
 			} — so what is written into it is judged against the ${dictionary ? "Types" : "Type"} it holds.`,
 		],
+	}
+}
+
+// NOTE: The annotation that would decide the blanks in a Type, spelled as the
+// Declaration holding it would be written — the same spelling
+// `undecidedSlotEvidence` puts in its help, offered to the one report that names
+// a Declaration rather than a refusal. `keyword` is what that Declaration was
+// written with: an annotation shown under a `constant` as `variable` is advice
+// that does not compile, and so is one that spells the blank's own container
+// where the Declaration holds something around it — `variable f: List<Integer> =
+// []` under a `constant f = Async.deferred(() { <- [] })` gets both wrong.
+//
+// `container` says which of the two Literals left the blank, because a
+// Dictionary has two slots and no item Type, so the sentences about one are not
+// the sentences about the other. Null where the Type holds no blank at all.
+export function undecidedSlotAnnotation(
+	type: common.Type,
+	keyword: string,
+	name: string,
+): { container: "List" | "Dictionary" | null; annotation: string } {
+	return {
+		container: refusedSlotIn(type, null),
+		annotation: `${keyword} ${name}: ${describeType(spelledWithDecidedSlots(type))}`,
 	}
 }

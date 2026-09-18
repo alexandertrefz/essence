@@ -266,7 +266,7 @@ export function combinationTypeOf(
 	// Literal. `{ items: List<Unknown> }` names no Type a reader can act on, and
 	// the two sentences that make it answerable are the ones a Variable's own
 	// assignment is refused with.
-	let undecided = undecidedSlotEvidence(combined, null)
+	let undecided = undecidedSlotEvidence(combined, rhsType, null)
 
 	reportError("This is not a Partial of the value it updates", rhsPosition, {
 		code: "partial-type-mismatch",

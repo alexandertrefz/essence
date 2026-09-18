@@ -728,8 +728,12 @@ describe("Dictionary literals", () => {
 					(line) => !line.includes("item Type"),
 				),
 			).toBe(true)
+			// NOTE: The annotation alone, spelled the way every other report of a
+			// blank spells one. A value can not be shown with it: the same Help
+			// answers a Declaration whose blank sits inside something else, where
+			// the initialiser is no Literal at all.
 			expect(diagnostic.helps).toEqual([
-				"Annotate the declaration — 'variable ages: Dictionary<String, Integer> = [=]' — so the Function is checked against the Types it will hold.",
+				"Annotate the declaration — 'variable ages: Dictionary<String, Integer>' — so the Function is checked against the Types it will hold.",
 			])
 		})
 

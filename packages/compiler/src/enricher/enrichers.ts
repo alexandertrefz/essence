@@ -16,6 +16,7 @@ import {
 	describeSignature,
 	describeType,
 	displayChoiceName,
+	undecidedSlotAnnotation,
 	withArticle,
 } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
@@ -2560,7 +2561,19 @@ function reportUninferableCapture(
 	// sentence about one. The Help above all: 'variable ages: List<Integer> =
 	// []' written under a Declaration whose value is `[=]` is advice that does
 	// not compile.
-	let dictionary = type.type === "Dictionary"
+	//
+	// Both are read off the Declaration rather than assumed. The Help used to
+	// spell one Type and one keyword whatever it was answering, and a `constant
+	// f = Async.deferred(() { <- [] })` — a blank two containers deep, under a
+	// name that can not be assigned to at all — was told to write 'variable f:
+	// List<Integer> = []'. The annotation is the captured Type with its blanks
+	// filled at the depth they stand, under the keyword the Declaration used.
+	let annotation = undecidedSlotAnnotation(
+		type,
+		declaringScope.constants.has(node.content) ? "constant" : "variable",
+		node.content,
+	)
+	let dictionary = annotation.container === "Dictionary"
 
 	reportError(
 		dictionary
@@ -2589,9 +2602,7 @@ function reportUninferableCapture(
 					: "An empty List Literal leaves its item Type unknown until an assignment decides it, and this Function was checked before that happened.",
 			],
 			helps: [
-				dictionary
-					? `Annotate the declaration — 'variable ${node.content}: Dictionary<String, Integer> = [=]' — so the Function is checked against the Types it will hold.`
-					: `Annotate the declaration — 'variable ${node.content}: List<Integer> = []' — so the Function is checked against the Type it will hold.`,
+				`Annotate the declaration — '${annotation.annotation}' — so the Function is checked against the ${dictionary ? "Types" : "Type"} it will hold.`,
 			],
 		},
 	)
@@ -12067,6 +12078,17 @@ function replacedFallbackNotes(
 			]
 }
 
+// NOTE: No `undecidedSlotEvidence` here, unlike every other report whose
+// expected side can hold a blank. That sentence is only true where a blank stood
+// opposite a Type that would have decided it, and this reporter has the
+// candidates' DECLARED Parameter Types beside a parser Node whose Arguments
+// nothing has typed — so the pair the question is about is not in hand, and
+// asking it of the declared side alone would say a blank refused a value it may
+// have had nothing to do with. Nor is one owed: a call refused here was measured
+// against a Type something decided. `constant kept: List<Integer> =
+// words::reduce(startingWith seed, (current, word) { <- current::append(word) })`
+// is refused for appending a String to a List of Integers, and the annotation
+// that decided that is written three lines above it.
 function reportNoMatchingOverload(
 	node: parser.MethodInvocationNode,
 	namespaces: Map<string, common.NamespaceType>,

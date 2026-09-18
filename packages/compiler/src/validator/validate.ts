@@ -1613,6 +1613,7 @@ function checkDefineAnswer(
 	}
 
 	let evidence = refinementEvidence(node.type, value)
+	let undecided = undecidedSlotEvidence(node.type, value.type, null)
 
 	reportError(
 		"This arm does not answer with the Type this 'define' has",
@@ -1629,10 +1630,12 @@ function checkDefineAnswer(
 			notes: [
 				`This 'define' answers ${describeType(node.type)}.`,
 				...evidence.notes,
+				...undecided.notes,
 			],
 			helps: [
 				...asynchronyHelps(node.type, value.type),
 				...evidence.helps,
+				...undecided.helps,
 			],
 			data: asynchronyData(node.type, value.type),
 		},
@@ -2416,6 +2419,16 @@ function validateCaseValue(
 	} else if (
 		!matchesType(payloadType, casePayloadType(node.type, node.value))
 	) {
+		// NOTE: A generic Choice applied to a blank carries one: a `step` body
+		// over a seed nothing decided constructs `#Continue` out of a
+		// `{ state: List<Unknown> }`, and what refuses the payload is the blank
+		// rather than anything the payload holds.
+		let undecided = undecidedSlotEvidence(
+			payloadType,
+			casePayloadType(node.type, node.value),
+			null,
+		)
+
 		reportError(
 			`This payload does not fit Case '#${node.type.name}'`,
 			node.value.position,
@@ -2429,16 +2442,19 @@ function validateCaseValue(
 				],
 				notes: [
 					`'#${node.type.name}' carries ${withArticle(describeType(payloadType))}.`,
+					...undecided.notes,
 				],
-				// NOTE: A single-member Case would have accepted the value
-				// through the shorthand, so the hint only helps where it can not:
-				// a multi-member Case needs the whole Record spelled out.
-				helps:
-					Object.keys(node.type.members).length > 1
+				helps: [
+					// NOTE: A single-member Case would have accepted the value
+					// through the shorthand, so the hint only helps where it can
+					// not: a multi-member Case needs the whole Record spelled out.
+					...(Object.keys(node.type.members).length > 1
 						? [
 								"The one-member shorthand '#Case(value)' only applies to single-member Cases.",
 							]
-						: [],
+						: []),
+					...undecided.helps,
+				],
 			},
 		)
 	}
@@ -2753,7 +2769,11 @@ function validateVariableAssignmentStatement(
 		// decided it yet. Naming a blank explains nothing on its own; these two
 		// sentences are what make the refusal answerable. `partial-type-mismatch`
 		// says the same about a member, one level in.
-		let undecided = undecidedSlotEvidence(node.name.type, node.name.content)
+		let undecided = undecidedSlotEvidence(
+			node.name.type,
+			node.value.type,
+			node.name.content,
+		)
 
 		reportError(
 			`This value does not fit Variable '${node.name.content}'`,
@@ -3085,6 +3105,16 @@ function validateReturnStatement(
 			currentFunctionContext.completing === true,
 		)
 		let evidence = refinementEvidence(expected, node.expression)
+		// NOTE: A Function literal's return Type is inferred rather than
+		// written, so this is the second place a blank can be the EXPECTED
+		// side of a refusal: a combiner whose accumulator nothing decided
+		// returns `List<Unknown>`, and every `<-` writing into it is refused
+		// against a Type the reader can not act on or even spell.
+		let undecided = undecidedSlotEvidence(
+			expected,
+			node.expression.type,
+			null,
+		)
 
 		reportError(
 			"This value does not fit the declared return Type",
@@ -3105,6 +3135,7 @@ function validateReturnStatement(
 				notes: [
 					`The Function returns ${describeType(expected)}.`,
 					...evidence.notes,
+					...undecided.notes,
 				],
 				helps: [
 					...returnAsynchronyHelps(
@@ -3113,6 +3144,7 @@ function validateReturnStatement(
 						currentFunctionContext.completing === true,
 					),
 					...evidence.helps,
+					...undecided.helps,
 				],
 				data: asynchronyData(expected, node.expression.type),
 			},

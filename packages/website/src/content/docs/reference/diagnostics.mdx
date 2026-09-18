@@ -1218,7 +1218,9 @@ Assign a value of the declared type, or change the declaration's type.
 
 Asynchrony adds three Helps under this code. A [`Future`](/docs/library/future) standing where its value is wanted asks for `complete`, and so does a `Started`, which is still in flight; the Quick Fix **Wait for it with 'complete'** writes the word for either. A plain value where a future is wanted asks for one to be built — `Async.deferred(…)`, [`map`](/docs/library/future#map) or [`andThen`](/docs/library/future#andThen).
 
-A variable declared from an empty `[]` or `[=]` carries a slot nothing has decided, and a value written into one is refused rather than let through — `List<Unknown>` is a blank, not a type. That refusal adds a Note saying so, and a Help spelling the annotation that would decide it at the depth the blank sits: `'variable rows: List<List<Integer>>'` for a variable declared as `[[]]`, `'variable box: { items: List<Integer> }'` where the blank is a record's member.
+A variable declared from an empty `[]` or `[=]` carries a slot nothing has decided, and a write that would leave it undecided is refused rather than let through. A value that _can_ decide the slot always does, so what reaches this report is a write that cannot — and `List<Unknown>` on the expected side is a blank, not a type. That is what the Note and Help are there to say: the Note explains the label, and the Help spells the annotation that would decide the blank at the depth it sits — `'variable rows: List<List<Integer>>'` for a variable declared as `[[]]`, `'variable box: { items: List<Integer> }'` where the blank is a record's member, `'variable x: List<Integer> | String'` where it is one arm of a union.
+
+The same pair is added wherever else a blank can be the expected side: [`partial-type-mismatch`](#partial-type-mismatch) for a record update, [`return-type-mismatch`](#return-type-mismatch) for a `<-` or a `define` arm inside a function literal whose return type was inferred, and [`payload-type-mismatch`](#payload-type-mismatch) for a case built from a generic choice applied to one. They are said only about the blank that did the refusing: a type can hold a blank the refused value never met, and nothing is said about that one.
 
 Taught on: [Programs and values › Constants and variables](/docs/language/programs-and-values#constants-and-variables)
 
@@ -3247,7 +3249,7 @@ Error: 'items' is captured before its item Type is decided
    │           ──┬──  
    │             ╰──── captured here as a List<Unknown>
    │ 
-   │ Help: Annotate the declaration — 'variable items: List<Integer> = []' — so the Function is checked against the Type it will hold.
+   │ Help: Annotate the declaration — 'variable items: List<Integer>' — so the Function is checked against the Type it will hold.
    │ 
    │ Note: An empty List Literal leaves its item Type unknown until an assignment decides it, and this Function was checked before that happened.
 ───╯
@@ -3255,7 +3257,7 @@ Error: 'items' is captured before its item Type is decided
 
 </div>
 
-Annotate the variable: `variable items: List<Integer> = []`.
+Annotate the variable: `variable items: List<Integer> = []`. The help spells that annotation from the declaration you wrote — its keyword, and its type with the blank filled in at the depth the blank sits — so a `constant f = Async.deferred(() { <- [] })` is told to write `constant f: Future<List<Integer>>`.
 
 ### `uninferable-return-type`
 
