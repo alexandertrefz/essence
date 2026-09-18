@@ -2003,17 +2003,23 @@ class DescentParser {
 					? "variable"
 					: null
 
-		if (spelling === null || !this.declaresAName()) {
+		// NOTE: The table's own Helps, not one written here. `let` and `var`
+		// carry two — a `variable` and, under it, the `constant` a binding
+		// nothing reassigns should be — and this site used to print the first of
+		// them and drop the second. The fix stays the one word: `variable`
+		// compiles either way, and which of the two was meant is the reader's to
+		// say.
+		let word = foreignWord(token.value)
+
+		if (spelling === null || word === null || !this.declaresAName()) {
 			return null
 		}
 
 		this.reportForeignStatement(token, spelling, {
 			message: `'${token.value}' is not how Essence declares a binding`,
 			label: `Essence writes '${spelling}' here`,
-			notes: [
-				"A binding is declared with 'constant', or with 'variable' where it is reassigned; there is no third form.",
-			],
-			helps: [`Write '${spelling}' in place of '${token.value}'.`],
+			notes: [word.note],
+			helps: [...word.helps],
 		})
 
 		// NOTE: The Keyword is stepped over and the rest is read by the Statement
@@ -2039,19 +2045,31 @@ class DescentParser {
 	// reporting on it would bury the one line that matters.
 	protected refuseForeignDeclarationBlock(token: Token): void {
 		let word = foreignWord(token.value)
+		let brace = this.foreignBlockBraceOffset()
 
-		if (word === null || !this.declaresAForeignBlock()) {
+		if (word === null || brace === null) {
 			return
 		}
 
 		let position = token.position
+		// NOTE: A block whose `}` never arrives is left where it is. Skipping
+		// it would take the rest of the file with it and answer the whole of
+		// what is broken with one sentence about the word — the missing brace,
+		// which is the mistake that wants reporting, would never be reached.
+		let named = isIdentifierToken(this.tokens.peek(1))
 
-		this.skipBalancedBlock()
+		if (this.foreignBlockCloses(brace)) {
+			this.skipBalancedBlock(brace)
+		}
 
 		throw new ParseError(
-			`'${token.value}' declares nothing in Essence`,
+			named
+				? `'${token.value}' declares nothing in Essence`
+				: `'${token.value}' opens no block in Essence`,
 			position,
-			"this is another language's declaration",
+			named
+				? "this is another language's declaration"
+				: "this is another language's Statement",
 			{
 				code: "foreign-syntax",
 				notes: [word.note],
@@ -2060,33 +2078,119 @@ class DescentParser {
 		)
 	}
 
-	// NOTE: The shape, and nothing looser: the word, a name, and the `{` of a
-	// block on the same line. `class`, `enum` and `interface` are ordinary names
-	// here — a Program may declare any of them — so what makes this a foreign
-	// declaration is the two Identifiers in a row, which no Statement of this
-	// language begins with.
-	protected declaresAForeignBlock(): boolean {
+	// NOTE: The `{` a block this language has no reading for opens, counted in
+	// Tokens from the word — or null where what stands here is not one of the
+	// four shapes. All four are written on ONE line:
+	//
+	//     try { … }              the word alone
+	//     class Money { … }      the word and a name
+	//     switch (x) { … }       the word and a head in parentheses
+	//     func main() { … }      the word, a name and a head
+	//
+	// `class`, `try` and `switch` are ordinary names here — a Program may
+	// declare any of them — so what makes this another language's is the shape:
+	// two Identifiers in a row, a `(…)` where nothing calls anything, a block
+	// standing behind either. The LINE is what keeps a Record Literal written
+	// under a bare name on the line below out of it.
+	protected foreignBlockBraceOffset(): number | null {
 		let word = this.tokens.peek()
-		let name = this.tokens.peek(1)
-		let brace = this.tokens.peek(2)
 
-		return (
-			word !== undefined &&
-			isIdentifierToken(name) &&
-			brace?.type === TokenType.SymbolLeftBrace &&
-			brace.position.start.line === word.position.start.line
-		)
+		if (word === undefined) {
+			return null
+		}
+
+		let line = word.position.start.line
+		let onLine = (token: Token | undefined) =>
+			token !== undefined && token.position.start.line === line
+		let offset = 1
+
+		if (isIdentifierToken(this.tokens.peek(offset))) {
+			offset++
+		}
+
+		let head = this.tokens.peek(offset)?.type === TokenType.SymbolLeftParen
+
+		if (head) {
+			let depth = 0
+
+			// NOTE: A head that does not close on its line is not this shape —
+			// the loop leaves only through its own `)`, or through here.
+			while (true) {
+				let token = this.tokens.peek(offset)
+
+				if (token === undefined || !onLine(token)) {
+					return null
+				}
+
+				offset++
+
+				if (token.type === TokenType.SymbolLeftParen) {
+					depth++
+				} else if (token.type === TokenType.SymbolRightParen) {
+					depth--
+
+					if (depth === 0) {
+						break
+					}
+				}
+			}
+
+			// NOTE: What a head in parentheses is followed by before its block:
+			// `fn double(n: i32) -> i32 {` writes its answer Type there, and so
+			// does `func greet(_ who: String) -> String {`. Read past rather than
+			// spelled out, because what is between them is another language's
+			// Type grammar and this is not the place to learn it. Only behind a
+			// head, so that `try {` still has to write its `{` where the shape
+			// says it does.
+			while (
+				onLine(this.tokens.peek(offset)) &&
+				this.tokens.peek(offset)?.type !== TokenType.SymbolLeftBrace
+			) {
+				offset++
+			}
+		}
+
+		let brace = this.tokens.peek(offset)
+
+		return onLine(brace) && brace?.type === TokenType.SymbolLeftBrace
+			? offset
+			: null
 	}
 
-	// NOTE: Everything up to and including the `}` that closes the first `{`
-	// ahead, so that the refusal thrown behind it is resynchronised past a body
-	// rather than into it. Bounded by the end of the input, which is the one way
-	// a `{` never closes.
-	protected skipBalancedBlock(): void {
-		while (!this.tokens.isAtEnd()) {
-			if (this.tokens.next().type === TokenType.SymbolLeftBrace) {
-				break
+	// NOTE: Whether the block at `braceOffset` has the `}` that closes it
+	// anywhere ahead. Asked before anything is read past, because what is done
+	// about a block that never closes is the opposite of what is done about one
+	// that does.
+	protected foreignBlockCloses(braceOffset: number): boolean {
+		let depth = 0
+
+		for (let offset = braceOffset; ; offset++) {
+			let token = this.tokens.peek(offset)
+
+			if (token === undefined) {
+				return false
 			}
+
+			if (token.type === TokenType.SymbolLeftBrace) {
+				depth++
+			} else if (token.type === TokenType.SymbolRightBrace) {
+				depth--
+
+				if (depth === 0) {
+					return true
+				}
+			}
+		}
+	}
+
+	// NOTE: Everything up to and including the `}` that closes the block at
+	// `braceOffset`, so that the refusal thrown behind it is resynchronised past
+	// a body rather than into it. The body of a declaration this language does
+	// not have is not a Program's business, and reporting on it would bury the
+	// one line that matters.
+	protected skipBalancedBlock(braceOffset: number): void {
+		for (let step = 0; step <= braceOffset; step++) {
+			this.tokens.next()
 		}
 
 		let depth = 1

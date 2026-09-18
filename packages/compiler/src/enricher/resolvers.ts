@@ -26,6 +26,7 @@ import {
 	withArticle,
 } from "../helpers/describe"
 import {
+	type ForeignWord,
 	foreignOperatorAccount,
 	foreignOperatorIn,
 	foreignWord,
@@ -1180,6 +1181,16 @@ function reportForeignName(
 ): boolean {
 	let name = node.content
 
+	// NOTE: The table stands FIRST, and for one entry: `println!` is a name a
+	// reader wrote whole, and every rule below it would take the `!` off the end
+	// and answer about that instead — the postfix habits before the operators,
+	// and both before the words. Every other entry is a plain word that none of
+	// them would have claimed, so the order costs nothing and says one thing:
+	// what was WRITTEN is answered before what it is made of.
+	if (reportForeignWord(node, foreignWord(name))) {
+		return true
+	}
+
 	// NOTE: `'hi'` and `` `hi` `` are one Identifier each — neither quote ends a
 	// name — so the whole of what was written is in hand, and the Essence
 	// spelling of it is that text in the quotes this language has.
@@ -1285,29 +1296,36 @@ function reportForeignName(
 		return true
 	}
 
-	let word = foreignWord(name)
+	return reportBareCaseName(node, scope, context.applied === true)
+}
 
-	if (word !== null) {
-		reportError(`'${name}' names nothing in Essence`, node.position, {
-			code: "foreign-syntax",
-			labels: [primary(node.position, "no such Variable or Constant")],
-			notes: [word.note],
-			helps: [...word.helps],
-			...(word.spelling === null
-				? {}
-				: {
-						data: {
-							kind: "essence-spelling" as const,
-							position: node.position,
-							spelling: word.spelling,
-						},
-					}),
-		})
-
-		return true
+// NOTE: One word of another language, answered where it stands. Answers whether
+// it reported, so that the one call site reads as the question it is asking.
+function reportForeignWord(
+	node: parser.IdentifierNode,
+	word: ForeignWord | null,
+): boolean {
+	if (word === null) {
+		return false
 	}
 
-	return reportBareCaseName(node, scope, context.applied === true)
+	reportError(`'${node.content}' names nothing in Essence`, node.position, {
+		code: "foreign-syntax",
+		labels: [primary(node.position, "no such Variable or Constant")],
+		notes: [word.note],
+		helps: [...word.helps],
+		...(word.spelling === null
+			? {}
+			: {
+					data: {
+						kind: "essence-spelling" as const,
+						position: node.position,
+						spelling: word.spelling,
+					},
+				}),
+	})
+
+	return true
 }
 
 // NOTE: `constant light: Light = Red` — the Case is there, the `#` in front of

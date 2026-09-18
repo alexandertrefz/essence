@@ -264,9 +264,14 @@ describe("Foreign syntax", () => {
 				"foreign-syntax",
 				"foreign-syntax",
 			])
+			// NOTE: Both Helps the table carries, not the first of them. A
+			// binding nothing reassigns is a `constant`, and a reader who wrote
+			// `let` out of habit has no way to know that from the fix alone.
 			expect(helpsOf(source)).toEqual([
 				"Write 'variable' in place of 'let'.",
+				"Or 'constant', where the value is never reassigned.",
 				"Write 'variable' in place of 'var'.",
+				"Or 'constant', where the value is never reassigned.",
 			])
 		})
 
@@ -405,6 +410,155 @@ describe("Foreign syntax", () => {
 		it("leaves a value named 'class' alone", () => {
 			expect(
 				codesOf(program("constant class = 1", "Terminal.print(class)")),
+			).toEqual([])
+		})
+
+		// NOTE: The four shapes a block is opened in — see
+		// `foreignBlockBraceOffset`. Each of them used to end in `Expected
+		// 'with' but found '}'`, which is the Record Literal reading of the
+		// block, reported a screen below the word that opened it.
+		it("refuses a block whatever stands between the word and its brace", () => {
+			let blocks: Array<[Array<string>, string]> = [
+				[
+					["try {", '\tTerminal.print("hi")', "}"],
+					"'try' opens no block in Essence",
+				],
+				[
+					["switch (x) {", "\tcase 1:", "}"],
+					"'switch' opens no block in Essence",
+				],
+				[
+					["while (x) {", '\tTerminal.print("hi")', "}"],
+					"'while' opens no block in Essence",
+				],
+				[
+					["func main() {", '\tTerminal.print("hi")', "}"],
+					"'func' declares nothing in Essence",
+				],
+				[
+					["fn double(n: i32) -> i32 {", "\tn", "}"],
+					"'fn' declares nothing in Essence",
+				],
+			]
+
+			for (let [lines, message] of blocks) {
+				let source = program("constant x = 1", ...lines)
+
+				expect({ message, codes: codesOf(source) }).toEqual({
+					message,
+					codes: ["foreign-syntax"],
+				})
+				expect(messagesOf(source)).toEqual([message])
+			}
+		})
+
+		it("reads past a block nested inside another", () => {
+			expect(
+				messagesOf(
+					program(
+						"try {",
+						"\tswitch (1) {",
+						'\t\tcase 1: Terminal.print("hi")',
+						"\t}",
+						"}",
+					),
+				),
+			).toEqual(["'try' opens no block in Essence"])
+		})
+
+		// NOTE: A block whose `}` never arrives is not read past — the Tokens
+		// stay where they are, so nothing a later reading needs is swallowed by
+		// a count that could never have balanced. It is still answered once, at
+		// the word, and nothing is said about what stands inside it.
+		it("answers a block that never closes once, at the word", () => {
+			expect(
+				messagesOf(
+					[
+						"implementation {",
+						"\ttry {",
+						'\t\tTerminal.print("hi")',
+					].join("\n"),
+				),
+			).toEqual(["'try' opens no block in Essence"])
+		})
+
+		// NOTE: The words the other four languages people arrive from write.
+		// Each is an ordinary name here, so each is answered exactly where an
+		// `unknown-name` would have been.
+		it("answers the words Python, Rust, Go, Swift and Ruby write", () => {
+			let words: Array<[string, string]> = [
+				[
+					"def",
+					"Write 'function greet(_ name: String) -> String { … }'.",
+				],
+				[
+					"fn",
+					"Write 'function greet(_ name: String) -> String { … }'.",
+				],
+				[
+					"func",
+					"Write 'function greet(_ name: String) -> String { … }'.",
+				],
+				["elif", "Write 'else if' in place of 'elif'."],
+				[
+					"len",
+					"Write 'items::length()', which answers for a List, a String and a Dictionary alike.",
+				],
+				["println", "Write 'Terminal.print(…)'."],
+				["puts", "Write 'Terminal.print(…)'."],
+				["echo", "Write 'Terminal.print(…)'."],
+				[
+					"fmt",
+					"Write 'Terminal.print(…)' to print a value, and 'Terminal.inspect(…)' to print its structure.",
+				],
+				[
+					"guard",
+					"Write 'match held -> String { case #Value(value) { … } case #Empty { … } }'.",
+				],
+				["mut", "Write 'variable' in place of 'let mut'."],
+				["Some", "Write '#Value(x)' in place of 'Some(x)'."],
+			]
+
+			for (let [word, help] of words) {
+				let source = program(`Terminal.print(${word})`)
+
+				expect({ word, codes: codesOf(source) }).toEqual({
+					word,
+					codes: ["foreign-syntax"],
+				})
+				expect({ word, helps: helpsOf(source) }).toEqual({
+					word,
+					helps: [help],
+				})
+			}
+		})
+
+		// NOTE: `println!` is keyed with its `!`, which is what a reader wrote
+		// and what the Lexer hands over — a `!` ends no name. Every rule under
+		// the table would have taken the `!` off the end and answered about
+		// that: the postfix habits first, and the operators behind them.
+		it("answers a macro by the whole of what was written", () => {
+			let source = program('println!("hi")')
+
+			expect(codesOf(source)).toEqual(["foreign-syntax"])
+			expect(messagesOf(source)).toEqual([
+				"'println!' names nothing in Essence",
+			])
+		})
+
+		it("leaves the new words alone where a Program declares them", () => {
+			expect(
+				codesOf(
+					program(
+						"constant len = 1",
+						"constant fmt = 2",
+						"constant guard = 3",
+						"constant mut = 4",
+						"constant Some = 5",
+						"Terminal.print(len::add(fmt)::add(guard))",
+						"Terminal.print(mut::add(Some))",
+					),
+				),
 			).toEqual([])
 		})
 	})

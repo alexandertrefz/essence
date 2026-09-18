@@ -273,6 +273,18 @@ const foreignWords: ReadonlyMap<string, ForeignWord> = new Map([
 			],
 		},
 	],
+	// NOTE: Rust's `let mut x`, which is two words where Essence writes one. The
+	// `let` is answered by its own entry, so what is left to say about the `mut`
+	// is that it goes — and the empty spelling is what a Quick Fix removes it
+	// with.
+	[
+		"mut",
+		{
+			spelling: "",
+			note: "A binding is declared with 'constant', or with 'variable' where it is reassigned; there is no third form.",
+			helps: ["Write 'variable' in place of 'let mut'."],
+		},
+	],
 	[
 		"return",
 		{
@@ -314,6 +326,14 @@ const foreignWords: ReadonlyMap<string, ForeignWord> = new Map([
 		},
 	],
 	[
+		"Some",
+		{
+			spelling: "#Value",
+			note: "A value that may be missing is an Optional, which is '#Value(x)' or '#Empty'.",
+			helps: ["Write '#Value(x)' in place of 'Some(x)'."],
+		},
+	],
+	[
 		"this",
 		{
 			spelling: "@",
@@ -335,6 +355,66 @@ const foreignWords: ReadonlyMap<string, ForeignWord> = new Map([
 			spelling: "Terminal.print",
 			note: "Printing is a static Method of the 'Terminal' Namespace, reached through its name.",
 			helps: ["Write 'Terminal.print(…)'."],
+		},
+	],
+	// NOTE: The same word in four more languages. `println!` is keyed with its
+	// `!`, which is what a reader wrote and what the Lexer hands over: a `!` ends
+	// no name, so the macro arrives as one Identifier.
+	[
+		"println",
+		{
+			spelling: "Terminal.print",
+			note: "Printing is a static Method of the 'Terminal' Namespace, reached through its name.",
+			helps: ["Write 'Terminal.print(…)'."],
+		},
+	],
+	[
+		"println!",
+		{
+			spelling: "Terminal.print",
+			note: "Printing is a static Method of the 'Terminal' Namespace, reached through its name — there are no macros, so nothing is spelled with a '!'.",
+			helps: [
+				"Write 'Terminal.print(\"count: {n}\")' — every String interpolates, so there is no format String to pass.",
+			],
+		},
+	],
+	[
+		"puts",
+		{
+			spelling: "Terminal.print",
+			note: "Printing is a static Method of the 'Terminal' Namespace, reached through its name.",
+			helps: ["Write 'Terminal.print(…)'."],
+		},
+	],
+	[
+		"echo",
+		{
+			spelling: "Terminal.print",
+			note: "Printing is a static Method of the 'Terminal' Namespace, reached through its name.",
+			helps: ["Write 'Terminal.print(…)'."],
+		},
+	],
+	// NOTE: No spelling. `fmt.Println(…)` would become `Terminal.Println(…)`,
+	// which is a Method the Namespace does not declare — a fix that trades one
+	// refusal for another.
+	[
+		"fmt",
+		{
+			spelling: null,
+			note: "Printing is a static Method of the 'Terminal' Namespace, reached through its name.",
+			helps: [
+				"Write 'Terminal.print(…)' to print a value, and 'Terminal.inspect(…)' to print its structure.",
+			],
+		},
+	],
+	[
+		"len",
+		{
+			spelling: null,
+			note: "How much a value holds is a Method on the value itself, as every question about one is.",
+			helps: [
+				"Write 'items::length()', which answers for a List, a String and a Dictionary alike.",
+			],
 		},
 	],
 	[
@@ -413,6 +493,55 @@ const foreignWords: ReadonlyMap<string, ForeignWord> = new Map([
 			note: "There are no classes: a 'type' names the shape and a 'namespace' holds the Methods over it.",
 			helps: [
 				"Write 'type Money = { euros: Integer }' and 'namespace Monies for Money { … }'.",
+			],
+		},
+	],
+	// NOTE: The word three more languages declare a Function with. One word
+	// replaces one word, and what a reader then has to add is the annotations —
+	// which the Help writes out, because a signature is where every Type in
+	// Essence is written down.
+	[
+		"def",
+		{
+			spelling: "function",
+			note: "A Function is declared with 'function', and its signature writes the Type of every Parameter and of what it answers.",
+			helps: ["Write 'function greet(_ name: String) -> String { … }'."],
+		},
+	],
+	[
+		"fn",
+		{
+			spelling: "function",
+			note: "A Function is declared with 'function', and its signature writes the Type of every Parameter and of what it answers.",
+			helps: ["Write 'function greet(_ name: String) -> String { … }'."],
+		},
+	],
+	[
+		"func",
+		{
+			spelling: "function",
+			note: "A Function is declared with 'function', and its signature writes the Type of every Parameter and of what it answers.",
+			helps: ["Write 'function greet(_ name: String) -> String { … }'."],
+		},
+	],
+	[
+		"elif",
+		{
+			spelling: "else if",
+			note: "An 'if' takes an Expression and a block, and 'else' carries the next one — there is no third word.",
+			helps: ["Write 'else if' in place of 'elif'."],
+		},
+	],
+	// NOTE: Swift's early exit. Nothing leaves a block early in Essence, so the
+	// answer is a shape rather than a word: the value is taken apart, and both
+	// Cases answer.
+	[
+		"guard",
+		{
+			spelling: null,
+			note: "Nothing leaves a block early: an 'if' answers on both sides, and a 'match' takes a value apart and covers every Case.",
+			helps: [
+				"Write 'match held -> String { case #Value(value) { … } case #Empty { … } }'.",
 			],
 		},
 	],

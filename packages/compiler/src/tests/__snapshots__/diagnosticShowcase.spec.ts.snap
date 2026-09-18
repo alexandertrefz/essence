@@ -734,7 +734,8 @@ Error: 'let' is not how Essence declares a binding
     │     ─┬─  
     │      ╰─── Essence writes 'variable' here
     │ 
-    │ Help: Write 'variable' in place of 'let'.
+    │ Help 1: Write 'variable' in place of 'let'.
+    │ Help 2: Or 'constant', where the value is never reassigned.
     │ 
     │ Note: A binding is declared with 'constant', or with 'variable' where it is reassigned; there is no third form.
 ────╯

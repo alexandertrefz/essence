@@ -6295,6 +6295,69 @@ describe("Code Actions", () => {
 			expect(applied(lines, fixes[0])[1]).toBe("\t§ a note")
 		})
 
+		it("should write the same sigil over a Comment written with a '#'", () => {
+			let lines = [
+				"implementation {",
+				"\t# count the items",
+				"\tconstant items = [1, 2, 3]",
+				"\tTerminal.print(items)",
+				"}",
+			]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual(["Write '§' instead of '#'"])
+
+			let result = applied(lines, fixes[0])
+
+			expect(result[1]).toBe("\t§ count the items")
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: Two words and one habit — the edit writes `variable` over both,
+		// because writing it over the `let` alone leaves the `mut` standing
+		// between the Keyword and the name it declares.
+		it("should write one Keyword over the two 'let mut' spells", () => {
+			let lines = [
+				"implementation {",
+				"\tlet mut total = 0",
+				"\ttotal = total::add(1)",
+				"\tTerminal.print(total)",
+				"}",
+			]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Write 'variable' instead of 'let mut'",
+			])
+
+			let result = applied(lines, fixes[0])
+
+			expect(result[1]).toBe("\tvariable total = 0")
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A run that closed on its own quote is one edit. A run broken
+		// into pieces by its holes is a String the reader writes out, so nothing
+		// is offered rather than a String holding a third of what they wrote.
+		it("should write the quotes a String is written in", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant s = `Hello`",
+				"\tTerminal.print(s)",
+				"}",
+			]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Write '\"Hello\"' instead of '`Hello`'",
+			])
+
+			let result = applied(lines, fixes[0])
+
+			expect(result[1]).toBe('\tconstant s = "Hello"')
+			expect(codesOf(result)).toEqual([])
+		})
+
 		// NOTE: Every habit whose answer is a restructuring rather than a
 		// substitution — there is nothing to write over, and an action that wrote
 		// half of it would leave a Program that is refused for a second reason.
