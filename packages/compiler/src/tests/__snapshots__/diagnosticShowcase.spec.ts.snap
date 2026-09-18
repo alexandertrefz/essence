@@ -892,7 +892,7 @@ Error: A call writes no Type Arguments
     │                                  ╰────── these are worked out from the Arguments
     │ 
     │ Help 1: Write 'twice(…)' and let the Arguments decide.
-    │ Help 2: Where the Arguments do not decide, annotate what the call is bound to instead.
+    │ Help 2: Where the Arguments do not decide, give the Type Parameter a place among the Parameters.
     │ 
     │ Note: Every Type Argument is inferred at the call, which is why a Generic Parameter is declared 'infer' — there is no spelling that pins one.
 ────╯
@@ -935,7 +935,8 @@ Error: Type Parameter 'Answer' could not be inferred
     │ │                                                          
     │ ╰────────────────────────────────────────────────────────── nothing here determines what it binds to
     │ 
-    │ Help: Write the Type Argument explicitly.
+    │ Help 1: Give the Type Parameter a place among the Parameters, so that an Argument binds it.
+    │ Help 2: Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.
 ────╯
 
 [unsatisfied-bound]

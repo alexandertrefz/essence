@@ -3835,8 +3835,13 @@ class DescentParser {
 						// NOTE: The Arguments are what decide, so a call that
 						// can not be read from them is a signature question
 						// rather than a call one — and this is where a reader
-						// who reached for the brackets finds that out.
-						"Where the Arguments do not decide, annotate what the call is bound to instead.",
+						// who reached for the brackets finds that out. The
+						// annotation on the binding is NOT the other end: it
+						// does not reach back into the call, and offering it
+						// here answered a reader with `uninferable-type-
+						// parameter` and its own Help pointing straight back at
+						// the brackets they had just taken out.
+						"Where the Arguments do not decide, give the Type Parameter a place among the Parameters.",
 					],
 					data: {
 						kind: "essence-spelling",

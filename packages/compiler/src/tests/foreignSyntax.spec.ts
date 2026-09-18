@@ -819,6 +819,13 @@ describe("Foreign syntax", () => {
 			expect(messagesOf(source)).toEqual([
 				"A call writes no Type Arguments",
 			])
+			// NOTE: The second Help is where a reader whose Arguments decide
+			// nothing goes next, and it may not send them to the annotation:
+			// the annotation does not bind a Type Parameter either, so that
+			// Help led back here through `uninferable-type-parameter`.
+			expect(helpsOf(source)[1]).toBe(
+				"Where the Arguments do not decide, give the Type Parameter a place among the Parameters.",
+			)
 		})
 
 		it("refuses a String written in the other quotes", () => {

@@ -5994,6 +5994,29 @@ describe("Enricher", () => {
 					diagnostics.map((diagnostic) => diagnostic.code),
 				).toContain("uninferable-type-parameter")
 			})
+
+			// NOTE: Neither end the Help used to offer exists. There is no
+			// spelling for a Type Argument at a call — that is its own refusal
+			// — and the annotation on the binding does not reach back into the
+			// call either, which is what this pins: the Help has to name an
+			// edit that ends somewhere other than back here.
+			it("should offer an edit that is not the annotation already written", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					function blank<infer Item>() -> List<Item> {
+						<- []
+					}
+
+					constant items: List<Integer> = blank()
+				}`)
+
+				expect(diagnostics.map(({ code }) => code)).toEqual([
+					"uninferable-type-parameter",
+				])
+				expect(diagnostics[0]!.helps).toEqual([
+					"Give the Type Parameter a place among the Parameters, so that an Argument binds it.",
+					"Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.",
+				])
+			})
 		})
 
 		// NOTE: `hasDefault` is the whole of what a TYPE says about a default

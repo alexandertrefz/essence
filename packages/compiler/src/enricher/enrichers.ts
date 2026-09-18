@@ -11586,7 +11586,18 @@ function reportUnboundGenerics(
 						"nothing here determines what it binds to",
 					),
 				],
-				helps: ["Write the Type Argument explicitly."],
+				// NOTE: There is no such thing as writing a Type Argument —
+				// `blank<Integer>()` is itself a `foreign-syntax` refusal — so
+				// the Help that offered one sent a reader from this report
+				// straight into that one. Nor does the annotation on the
+				// binding reach back into the call: a Type Parameter is bound
+				// by the ARGUMENTS and by nothing else, which is what leaves a
+				// signature that names one only in its answer Type unbindable
+				// from anywhere. So: the two ends a reader can actually hold.
+				helps: [
+					"Give the Type Parameter a place among the Parameters, so that an Argument binds it.",
+					"Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.",
+				],
 			},
 		)
 	}
