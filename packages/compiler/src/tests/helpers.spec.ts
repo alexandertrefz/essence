@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test"
 import type { common } from "@essence-lang/interfaces"
 import { lexer } from "@essence-lang/interfaces"
 import type {
+	DictionaryType,
 	ErrorType,
 	FunctionType,
 	GenericUse,
@@ -226,20 +227,70 @@ describe("Helpers", () => {
 			type: "String",
 		}
 
-		// const unknownList: ListType = {
-		// 	type: "List",
-		// 	itemType: { type: "Unknown" },
-		// }
+		const unknownList: ListType = {
+			type: "List",
+			itemType: { type: "Unknown" },
+		}
 
-		// const stringList: ListType = {
-		// 	type: "List",
-		// 	itemType: { type: "String" },
-		// }
+		const stringList: ListType = {
+			type: "List",
+			itemType: { type: "String" },
+		}
 
-		// const integerList: ListType = {
-		// 	type: "List",
-		// 	itemType: { type: "Integer" },
-		// }
+		const integerList: ListType = {
+			type: "List",
+			itemType: { type: "Integer" },
+		}
+
+		const listOfUnknownLists: ListType = {
+			type: "List",
+			itemType: unknownList,
+		}
+
+		const listOfStringLists: ListType = {
+			type: "List",
+			itemType: stringList,
+		}
+
+		const errorList: ListType = {
+			type: "List",
+			itemType: { type: "Error" },
+		}
+
+		const listOfErrorLists: ListType = {
+			type: "List",
+			itemType: errorList,
+		}
+
+		const errorValueDictionary: DictionaryType = {
+			type: "Dictionary",
+			keyType: { type: "String" },
+			valueType: { type: "Error" },
+		}
+
+		const undecidedDictionary: DictionaryType = {
+			type: "Dictionary",
+			keyType: { type: "Unknown" },
+			valueType: { type: "Unknown" },
+		}
+
+		const undecidedKeyDictionary: DictionaryType = {
+			type: "Dictionary",
+			keyType: { type: "Unknown" },
+			valueType: { type: "Integer" },
+		}
+
+		const undecidedValueDictionary: DictionaryType = {
+			type: "Dictionary",
+			keyType: { type: "String" },
+			valueType: { type: "Unknown" },
+		}
+
+		const stringToIntegerDictionary: DictionaryType = {
+			type: "Dictionary",
+			keyType: { type: "String" },
+			valueType: { type: "Integer" },
+		}
 
 		const smallStringRecordType: RecordType = {
 			type: "Record",
@@ -634,9 +685,14 @@ describe("Helpers", () => {
 
 			expect(matchesType(unknown, unionTypeStringInteger)).toBe(true)
 
-			// expect(matchesType(unknown, unknownList)).toBe(true)
-			// expect(matchesType(unknown, stringList)).toBe(true)
-			// expect(matchesType(unknown, integerList)).toBe(true)
+			// NOTE: An `Unknown` standing for the WHOLE expected Type is the
+			// Compiler's own answer where it had nothing better to say, and it
+			// accepts every Type including a decided container. The undecided
+			// SLOT of a container is the other question, below.
+			expect(matchesType(unknown, unknownList)).toBe(true)
+			expect(matchesType(unknown, stringList)).toBe(true)
+			expect(matchesType(unknown, integerList)).toBe(true)
+			expect(matchesType(unknown, stringToIntegerDictionary)).toBe(true)
 
 			expect(matchesType(unknown, noArgumentFunctionType)).toBe(true)
 			expect(matchesType(unknown, singleArgumentFunctionType)).toBe(true)
@@ -774,20 +830,103 @@ describe("Helpers", () => {
 			).toBe(false)
 		})
 
-		// it("should match matching ListTypes", () => {
-		// 	expect(matchesType(unknownList, stringList)).toBe(true)
-		// 	expect(matchesType(unknownList, integerList)).toBe(true)
-		// 	expect(matchesType(stringList, unknownList)).toBe(true)
-		// 	expect(matchesType(integerList, unknownList)).toBe(true)
+		it("should match matching ListTypes", () => {
+			expect(matchesType(stringList, stringList)).toBe(true)
+			expect(matchesType(integerList, integerList)).toBe(true)
+		})
 
-		// 	expect(matchesType(stringList, stringList)).toBe(true)
-		// 	expect(matchesType(integerList, integerList)).toBe(true)
-		// })
+		it("should not match mismatched ListTypes", () => {
+			expect(matchesType(stringList, integerList)).toBe(false)
+			expect(matchesType(integerList, stringList)).toBe(false)
+		})
 
-		// it("should not match mismatched ListTypes", () => {
-		// 	expect(matchesType(stringList, integerList)).toBe(false)
-		// 	expect(matchesType(integerList, stringList)).toBe(false)
-		// })
+		// NOTE: The two halves of the slot rule. An undecided item Type may be
+		// READ as bottom — that is an empty List Literal fitting every List —
+		// and a value WRITTEN into it has to decide it. Doing both at once is
+		// the hole: an expected `List<Unknown>` that accepted a `List<String>`
+		// took the Strings and stayed a Type that fits every List, so the same
+		// value was read back out as a List of Integers.
+		it("should read an undecided item Type as bottom", () => {
+			expect(matchesType(stringList, unknownList)).toBe(true)
+			expect(matchesType(integerList, unknownList)).toBe(true)
+			expect(matchesType(unknownList, unknownList)).toBe(true)
+		})
+
+		it("should refuse a write into an undecided item Type", () => {
+			expect(matchesType(unknownList, stringList)).toBe(false)
+			expect(matchesType(unknownList, integerList)).toBe(false)
+		})
+
+		// NOTE: Asked at every depth, because that is where a slot can hide: a
+		// `[[]]` is a List of one undecided List, and the item Type of the
+		// OUTER List is decided the moment it holds a List at all.
+		it("should refuse a write into an undecided item Type nested in one", () => {
+			expect(matchesType(listOfStringLists, listOfUnknownLists)).toBe(
+				true,
+			)
+			expect(matchesType(listOfUnknownLists, listOfStringLists)).toBe(
+				false,
+			)
+		})
+
+		// NOTE: An Error in the written slot is no write to refuse. Whatever
+		// produced it was reported where it came from, and `resolveUnknownSlots`
+		// declines to pin a slot to one for the same reason — so refusing it
+		// here would report that one mistake a second time, against a slot that
+		// stayed open only because the first report is why nothing filled it.
+		it("should not refuse a write of an Error into an undecided slot", () => {
+			expect(matchesType(unknownList, errorList)).toBe(true)
+			expect(matchesType(listOfUnknownLists, listOfErrorLists)).toBe(true)
+			expect(
+				matchesType(undecidedValueDictionary, errorValueDictionary),
+			).toBe(true)
+		})
+
+		// NOTE: Per slot here too. An Error excuses the slot it stands in and
+		// no other, so the decided keys of `Dictionary<String, Error>` are
+		// still a write the undecided ones refuse.
+		it("should refuse a decided slot beside one holding an Error", () => {
+			expect(matchesType(undecidedDictionary, errorValueDictionary)).toBe(
+				false,
+			)
+		})
+
+		// NOTE: The same rule per slot, which is how a Dictionary is compared
+		// throughout — an empty `[=]` decides neither slot, and a Dictionary
+		// half-decided by one write is still refused over the slot that write
+		// said nothing about.
+		it("should read an undecided Dictionary slot as bottom", () => {
+			expect(
+				matchesType(stringToIntegerDictionary, undecidedDictionary),
+			).toBe(true)
+			expect(
+				matchesType(stringToIntegerDictionary, undecidedKeyDictionary),
+			).toBe(true)
+			expect(
+				matchesType(
+					stringToIntegerDictionary,
+					undecidedValueDictionary,
+				),
+			).toBe(true)
+			expect(matchesType(undecidedDictionary, undecidedDictionary)).toBe(
+				true,
+			)
+		})
+
+		it("should refuse a write into an undecided Dictionary slot", () => {
+			expect(
+				matchesType(undecidedDictionary, stringToIntegerDictionary),
+			).toBe(false)
+			expect(
+				matchesType(undecidedKeyDictionary, stringToIntegerDictionary),
+			).toBe(false)
+			expect(
+				matchesType(
+					undecidedValueDictionary,
+					stringToIntegerDictionary,
+				),
+			).toBe(false)
+		})
 
 		it("should match matching FunctionTypes", () => {
 			expect(

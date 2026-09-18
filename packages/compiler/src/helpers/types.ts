@@ -1542,15 +1542,27 @@ export function typeContainsUnknown(type: common.Type): boolean {
 	}
 }
 
+// NOTE: Whether a value written into a slot nothing has decided DECIDES it.
+// Anything that is not itself a blank does, with one exception: a Type carrying
+// an Error decides nothing. Whatever produced that Error was reported where it
+// came from, and an Error is poison everywhere else for the same reason —
+// pinning a slot to one would spread a single mistake over every later use of
+// the name, and REFUSING the write would report that mistake a second time.
+//
+// One question, asked by both halves of the rule: `resolveUnknownSlots` fills a
+// slot where this holds, and `matchTypes` refuses a write where it holds and the
+// slot is still open. Asking it in only one of the two places is what made
+// `{ box with items = box.items::append(undeclared) }` a
+// `partial-type-mismatch` stacked on top of the name that is not declared.
+export function decidesAnUndecidedSlot(written: common.Type): boolean {
+	return written.type !== "Unknown" && !typeContainsError(written)
+}
+
 // NOTE: `stored` with every Unknown slot `value` has an answer for filled in —
 // what turns `variable items = []` into a List of Integers the moment
 // `items = [1, 2]` says so. Only slots that are Unknown are touched, so a Type
 // that already decided something keeps it and the caller can tell that nothing
 // was pinned by getting the very same Type back.
-//
-// An Error is not an answer: whatever produced it was reported where it came
-// from, and pinning a slot to it would spread that one mistake over every later
-// use of the name.
 export function resolveUnknownSlots(
 	stored: common.Type,
 	value: common.Type,
@@ -1569,9 +1581,7 @@ export function resolveUnknownSlots(
 		// gives back a List of NON-EMPTY Lists. What stands in a slot is what
 		// the value put there, and a refinement is part of that.
 		if (stored.type === "Unknown") {
-			return written.type === "Unknown" || typeContainsError(written)
-				? stored
-				: written
+			return decidesAnUndecidedSlot(written) ? written : stored
 		}
 
 		// NOTE: A refinement standing over the CONTAINER whose slots are being
@@ -2274,6 +2284,22 @@ function matchTypes(
 		return false
 	}
 
+	// NOTE: `Unknown` as the WHOLE expected Type accepts everything, and stays
+	// that way. No author wrote it — `Unknown` is unspellable in Essence — so
+	// the only place it can stand here is an answer the Compiler had nothing
+	// better to give: a `case _` with nothing left to catch
+	// (`resolveWildcardMatcherType`), a member read off a Type that has no such
+	// member (`memberTypeOf`), an Alias whose body could not be resolved
+	// (`aliasBodyType`). Each of those has already been reported or has nothing
+	// to report, and refusing them here would pile a second Diagnostic on top
+	// of every one. It is also what reads a bare `Future` or `Started`, which
+	// are the applied Types with their one slot left Unknown: a producer
+	// nothing ever writes into, so accepting every one of them promises
+	// nothing.
+	//
+	// NOTE: The undecided SLOT of a container is a different question and has
+	// its own rules below — the Unknown a `[]` or a `[=]` leaves behind is a
+	// blank waiting to be filled, and a value written into it decides it.
 	if (lhs.type === "Unknown") {
 		return true
 	}
@@ -2293,6 +2319,22 @@ function matchTypes(
 	}
 
 	if (lhs.type === "List" && rhs.type === "List") {
+		// NOTE: An undecided item Type is a SLOT, and a slot may be READ as
+		// bottom but never WRITTEN into without being decided. Accepting a
+		// decided List here did both at once: `List<Unknown>` took a List of
+		// Strings and remained a `List<Unknown>` afterwards, which fits every
+		// List in turn — so the items came back out as Integers and every
+		// Number Method ran on Strings. Whoever owns the slot decides it before
+		// the question is asked (an assignment, a Record update, the seed of a
+		// Type Parameter); a slot that reaches here still undecided is one
+		// nothing in the Program ever filled, and the write is refused.
+		if (
+			lhs.itemType.type === "Unknown" &&
+			decidesAnUndecidedSlot(rhs.itemType)
+		) {
+			return false
+		}
+
 		// NOTE: Empty List Literals have an Unknown itemType and
 		// are assignable to any List.
 		if (rhs.itemType.type === "Unknown") {
@@ -2313,6 +2355,20 @@ function matchTypes(
 	}
 
 	if (lhs.type === "Dictionary" && rhs.type === "Dictionary") {
+		// NOTE: The write rule above, asked per slot: an undecided key or value
+		// Type refuses a Dictionary that has decided that slot, and the other
+		// slot has no say in it. Both halves matter — a Dictionary whose keys
+		// were decided and whose values were not still launders its values —
+		// and neither can be answered by the slot beside it.
+		if (
+			(lhs.keyType.type === "Unknown" &&
+				decidesAnUndecidedSlot(rhs.keyType)) ||
+			(lhs.valueType.type === "Unknown" &&
+				decidesAnUndecidedSlot(rhs.valueType))
+		) {
+			return false
+		}
+
 		// NOTE: The empty-List rule applied to each slot SEPARATELY. An empty
 		// Dictionary decides neither, so it is assignable to any Dictionary the
 		// way an empty List Literal is assignable to any List — and a slot that

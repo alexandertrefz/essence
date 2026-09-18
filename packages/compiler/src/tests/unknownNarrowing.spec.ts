@@ -393,6 +393,30 @@ describe("Unknown Slot Narrowing", () => {
 				}`),
 			).toEqual(["partial-type-mismatch"])
 		})
+
+		// NOTE: An Error decides nothing, so there is no write here to refuse.
+		// The slot stayed open BECAUSE the name is not declared, and reporting
+		// the Partial on top of that would charge the author twice for one
+		// mistake — which is what an Error means everywhere else in the match.
+		it("says nothing of an update whose value is already an Error", () => {
+			expect(
+				codesFor(`implementation {
+					constant box = { items = [] }
+					constant filled = { box with items = box.items::append(undeclaredThing) }
+				}`),
+			).toEqual(["unknown-name"])
+		})
+
+		// NOTE: And still reports what the Error does not excuse: a member the
+		// original does not have is a second mistake, not the same one.
+		it("still refuses an update naming a member that is not there", () => {
+			expect(
+				codesFor(`implementation {
+					constant box = { items = [] }
+					constant filled = { box with missing = [undeclaredThing] }
+				}`),
+			).toEqual(["unknown-name", "partial-type-mismatch"])
+		})
 	})
 
 	// NOTE: The one place a later assignment comes too late. A literal's body is

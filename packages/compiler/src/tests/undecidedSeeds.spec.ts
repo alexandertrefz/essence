@@ -445,6 +445,106 @@ describe("Undecided Seeds", () => {
 		})
 	})
 
+	// NOTE: A decision the call makes but writes onto no Node. The seed's own
+	// brackets take the decided Type where the seed is WRITTEN as a Literal, and
+	// a name standing in the same place keeps the undecided Type its Declaration
+	// gave it — so everything downstream that re-derives the call from its Nodes
+	// has to reach the decision another way. The Validator re-matches the
+	// committed Signature, and where the plain re-match binds the Parameter to
+	// the blank again it asks a second time, seeded from the Type the call itself
+	// carries.
+	describe("a seed written as a name rather than as a Literal", () => {
+		// NOTE: Reported as an Internal Compiler Error before the Validator read
+		// the call's own Type: the combiner it re-matched was recorded as
+		// `(_: Integer, _: List<Integer>) -> List<Integer>` and the seed beside
+		// it still said `List<Unknown>`, which is a call no re-match of those two
+		// can make sense of.
+		it("hands the decided State to a loop seeded with a name", async () => {
+			expect(
+				await run(`implementation {
+					constant seed = []
+					constant grown = loop(from 1, through 2, startingWith seed, (index, kept) {
+						<- kept::append(index)
+					})
+
+					Terminal.inspect(grown::sort())
+				}`),
+			).toEqual(["[ 1, 2 ]"])
+		})
+
+		// NOTE: The whole accumulator bound to a Type Parameter rather than a slot
+		// inside one, which is the case a later Argument decides: `T := List<Unknown>`
+		// off the name, then `["a"]` says what the List holds.
+		it("decides a Type Parameter a name bound to an undecided slot", async () => {
+			expect(
+				await run(`implementation {
+					function pair <infer T>(_ a: T, _ b: T) -> T {
+						<- b
+					}
+
+					constant empty = []
+					constant both = pair(empty, ["a"])
+
+					Terminal.inspect(both::sort())
+				}`),
+			).toEqual(['[ "a" ]'])
+		})
+
+		// NOTE: One mistake, one report. An Argument carrying a blank binds no
+		// Type Parameter, so `["a"]` is what decides `T` and the blank is read
+		// against it. Binding `T` to the blank instead made the very Argument
+		// that decides it a write into one, and the call was refused twice: for
+		// the `["a"]` that is right, and for the `"two"` that is wrong.
+		it("reports only the Argument that is wrong beside a blank", () => {
+			expect(
+				codesFor(`implementation {
+					function pair <infer T>(_ a: T, _ b: T, _ c: Integer) -> T {
+						<- b
+					}
+
+					constant empty = []
+					constant both = pair(empty, ["a"], "two")
+				}`),
+			).toEqual(["argument-type-mismatch"])
+		})
+
+		// NOTE: Every Argument a blank. The deferred ones are matched in the
+		// order they were written, so the first binds the Type Parameter and the
+		// rest are read against it — to a blank, which is the honest answer for a
+		// call that was handed nothing that says anything.
+		it("binds the first of several blanks and reads the rest against it", async () => {
+			expect(
+				await run(`implementation {
+					function pair <infer T>(_ a: T, _ b: T, _ c: Integer) -> T {
+						<- b
+					}
+
+					constant empty = []
+					constant other = []
+					constant both = pair(empty, other, 1)
+
+					Terminal.inspect(both)
+				}`),
+			).toEqual(["[]"])
+		})
+
+		// NOTE: The seeded re-match rescues nothing it cannot explain. An
+		// Argument that disagrees with a Parameter the decision never touched is
+		// reported exactly as it is in a call that writes no empty seed at all.
+		it("still reports an Argument the decision does not explain", () => {
+			expect(
+				codesFor(`implementation {
+					function take(_ items: List<String>, _ count: Integer) -> Integer {
+						<- count
+					}
+
+					constant empty = []
+					constant taken = take(empty, "two")
+				}`),
+			).toEqual(["argument-type-mismatch"])
+		})
+	})
+
 	// NOTE: The first match stops at its first mismatch, and where a blank seed
 	// bound the Type Parameter that mismatch is the very Argument that decides it
 	// — so an Argument written AFTER it is read for the first time by the second

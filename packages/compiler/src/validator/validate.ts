@@ -26,6 +26,7 @@ import {
 } from "../helpers/predicateEval"
 import { bodyDefinitelyReturns } from "../helpers/returns"
 import {
+	applyGenericBindings,
 	createFreshenedInference,
 	flattenUnionMembers,
 	isMergedLevel,
@@ -33,12 +34,16 @@ import {
 	isUnitType,
 	matchArguments,
 	matchesType,
+	matchesTypeWithBindings,
 	returnedTypeOf,
 	asynchronyMismatch,
+	type ArgumentMatchResult,
+	type GenericBindings,
 	mergedRecordType,
 	missingRecordMembers,
 	type MatchableArgument,
 	typeContainsError,
+	typeContainsUnknown,
 } from "../helpers/types"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
@@ -659,11 +664,11 @@ function checkCommittedOverload(
 		)
 	}
 
-	let { parameterTypes, context } = createFreshenedInference(overload)
-	let matched = matchArguments(
-		parameterTypes,
-		matchableArgumentsFromTypedNodes(node.arguments),
-		{ inference: context },
+	let matched = matchCommittedArguments(
+		overload,
+		node.arguments,
+		node.type,
+		false,
 	)
 
 	if (matched.type !== "Match") {
@@ -1016,6 +1021,7 @@ function validateFunctionInvocation(
 		validateSimpleFunctionInvocation(
 			functionType,
 			node.arguments,
+			node.type,
 			node.position,
 		)
 	} else {
@@ -1027,15 +1033,11 @@ function validateFunctionInvocation(
 		) {
 			checkCommittedOverload(node, functionType, describeCallee)
 		} else {
-			let { parameterTypes, context } =
-				createFreshenedInference(functionType)
-			let matchResult = matchArguments(
-				parameterTypes,
-				matchableArgumentsFromTypedNodes(node.arguments),
-				{
-					collectAllMismatches: true,
-					inference: context,
-				},
+			let matchResult = matchCommittedArguments(
+				functionType,
+				node.arguments,
+				node.type,
+				true,
 			)
 
 			if (matchResult.type === "ArityMismatch") {
@@ -3447,10 +3449,104 @@ function matchableArgumentsFromTypedNodes(
 		name: argumentNode.name,
 		mergedValue: () => argumentNode.value,
 		spellsItsMembers: argumentNode.value.nodeType === "RecordValue",
+		// NOTE: An Argument carrying a slot nobody decided binds no Type
+		// Parameter, so it is matched after every Argument that can decide one —
+		// the holding-back a prefixed Case construction gets, for the same reason
+		// and one Argument kind over. A blank is bottom to READ and nothing to
+		// bind: binding `T` to the `List<Unknown>` an empty `[]` left turned
+		// every Argument after it into a write into a blank, and `pair(empty,
+		// ["a"], "two")` was refused for the `["a"]` that DECIDES `T` beside the
+		// `"two"` that is genuinely wrong. Deferred, the `["a"]` binds `T` and
+		// the blank is read against it, which is what the Enricher made of the
+		// same call.
+		bindsNothing: typeContainsUnknown(argumentNode.type),
 		getType: (expectedType) =>
 			admittedTypeOf(expectedType, argumentNode.value) ??
 			argumentNode.type,
 	}))
+}
+
+// NOTE: The Arguments matched against the Signature the Enricher committed to —
+// and, where that fails while an Argument still carries an undecided slot,
+// matched a SECOND time with the Type Parameters the Enricher decided read back
+// off the Type it recorded for the call.
+//
+// A decision made from the Arguments TOGETHER can not be re-derived from them
+// one at a time. `invocationWithDecidedSeeds` fills a Type Parameter bound to an
+// undecided slot from the call's expected Type, from the Arguments that were
+// only checked against it, or from what a Function literal's body answers — and
+// a NAME standing at an Argument position keeps the undecided Type its own
+// Declaration wrote, deliberately, because what an empty `[]` bound to a name
+// decides is that Declaration's business. Re-deriving the bindings from those
+// Nodes alone binds the Parameter to the blank all over again, and every
+// Argument that reacted to the decision then fits nothing: the combiner of a
+// `loop(startingWith seed, …)` is resolved against `List<Integer>`, and the seed
+// it is re-matched beside says `List<Unknown>`.
+//
+// What the Enricher decided is written down, though — it is substituted into the
+// Type of the call itself — so reading the bindings back off that Type asks the
+// re-match with the answer the Enricher had. Which is what the re-match is for:
+// it CHECKS a commitment, it does not make one again.
+//
+// Only a GENERIC call carrying an undecided slot pays for the second attempt,
+// and only the first attempt's answer is ever reported: nothing a seeded match
+// says can hide a mismatch the plain one found. A signature with no Type
+// Parameter has nothing to seed, so the blank an Argument carries is measured
+// against a written Type and the two attempts would be the same one.
+//
+// Seeding from the call's own Type is unification, and unification can fail
+// halfway — leaving some Parameters seeded and others not. Safe, because a seed
+// is never a verdict: a wrong or missing one makes the second attempt FAIL, and
+// a failed second attempt is the first attempt's answer.
+//
+// It is the deferral above that keeps this rare. An Argument carrying a blank
+// binds nothing, so the Arguments that decide a Type Parameter bind it first and
+// the blank is read against what they decided — which is every call whose blank
+// stands beside an Argument of the same Parameter. What is left for the rescue is
+// a call whose decision came from somewhere the Arguments can not be asked
+// again: a callback's body, or the position the whole call stands in.
+function matchCommittedArguments(
+	signature: common.BaseFunction,
+	argumentNodes: Array<common.typed.ArgumentNode>,
+	recordedType: common.Type,
+	collectAllMismatches: boolean,
+): ArgumentMatchResult {
+	let matchableArguments = matchableArgumentsFromTypedNodes(argumentNodes)
+	let first = createFreshenedInference(signature)
+	let matched = matchArguments(first.parameterTypes, matchableArguments, {
+		collectAllMismatches,
+		inference: first.context,
+	})
+
+	if (
+		matched.type === "Match" ||
+		signature.generics.length === 0 ||
+		!argumentNodes.some((argumentNode) =>
+			typeContainsUnknown(argumentNode.type),
+		)
+	) {
+		return matched
+	}
+
+	let second = createFreshenedInference(signature)
+	let rename: GenericBindings = new Map()
+
+	for (let [fresh, original] of second.freshToOriginal) {
+		rename.set(original, { type: "GenericUse", name: fresh })
+	}
+
+	matchesTypeWithBindings(
+		applyGenericBindings(signature.returnType, rename),
+		recordedType,
+		second.context,
+	)
+
+	let seeded = matchArguments(second.parameterTypes, matchableArguments, {
+		collectAllMismatches,
+		inference: second.context,
+	})
+
+	return seeded.type === "Match" ? seeded : matched
 }
 
 function reportArityMismatch(
@@ -3871,20 +3967,18 @@ function partialSpellingEvidence(
 function validateSimpleFunctionInvocation(
 	functionType: common.FunctionType | common.StaticMethodType,
 	argumentNodes: Array<common.typed.ArgumentNode>,
+	recordedType: common.Type,
 	position: common.Position,
 ) {
 	for (let argumentNode of argumentNodes) {
 		validateExpression(argumentNode.value)
 	}
 
-	let { parameterTypes, context } = createFreshenedInference(functionType)
-	let matchResult = matchArguments(
-		parameterTypes,
-		matchableArgumentsFromTypedNodes(argumentNodes),
-		{
-			collectAllMismatches: true,
-			inference: context,
-		},
+	let matchResult = matchCommittedArguments(
+		functionType,
+		argumentNodes,
+		recordedType,
+		true,
 	)
 
 	if (matchResult.type === "ArityMismatch") {
