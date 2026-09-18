@@ -39,6 +39,7 @@ import {
 	matchesType,
 	matchesTypeWithBindings,
 	refinementWithTypeArguments,
+	resolveUnknownSlots,
 	type GenericBindings,
 	type NamespaceTarget,
 	typeContainsError,
@@ -236,8 +237,26 @@ export function combinationTypeOf(
 
 	// TODO: Resolve Applied Types and check wether they are Records
 
-	if (isPartialOf(lhsType, rhsType)) {
-		return lhsType
+	// NOTE: An update WRITES the members it names, so it DECIDES the ones the
+	// original left undecided: `{ box with items = ["a"] }` over a `box` whose
+	// `items` came from an empty List Literal answers `{ items: List<String> }`,
+	// and not the `{ items: List<Unknown> }` the base still carries. Handing the
+	// blank back would make the update's own answer fit every List while the
+	// value in it holds Strings.
+	//
+	// Decided BEFORE the Partial check, so that check reads the member Type this
+	// update just settled rather than the blank it filled — an update is what
+	// SETTLES a slot, never what has to fit into one. A member the update does
+	// not name keeps whatever the original said about it, undecided included.
+	// NOTE: Asked rather than asserted. `resolveUnknownSlots` answers the Type it
+	// was given wherever it decided nothing, and both sides here are Records, so
+	// a Record is what comes back — but the answer is a `common.Type` and a cast
+	// would be this code promising something the helper's signature does not.
+	let resolved = resolveUnknownSlots(lhsType, rhsType)
+	let combined = resolved.type === "Record" ? resolved : lhsType
+
+	if (isPartialOf(combined, rhsType)) {
+		return combined
 	}
 
 	reportError("This is not a Partial of the value it updates", rhsPosition, {

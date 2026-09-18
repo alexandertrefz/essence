@@ -301,6 +301,100 @@ describe("Unknown Slot Narrowing", () => {
 		})
 	})
 
+	// NOTE: An update WRITES the members it names, so it decides the ones the
+	// original left undecided — the same rule as an assignment's, one level in.
+	// Reading the base's blank back out of the update would let `{ box with
+	// items = ["a"] }` stand for a Record whose `items` fits every List.
+	describe("a Record member declared from an empty List Literal", () => {
+		it("is decided by the update that writes it", () => {
+			expect(
+				codesFor(`implementation {
+					constant box = { items = [] }
+					constant filled = { box with items = ["a"] }
+
+					constant integers: { items: List<Integer> } = filled
+				}`),
+			).toEqual(["assignment-type-mismatch"])
+		})
+
+		it("is decided by a path key that writes it", () => {
+			expect(
+				codesFor(`implementation {
+					constant outer = { inner = { items = [] } }
+					constant filled = { outer with inner.items = ["a"] }
+
+					constant integers: { inner: { items: List<Integer> } } = filled
+				}`),
+			).toEqual(["assignment-type-mismatch"])
+		})
+
+		it("leaves a member the update does not name undecided", async () => {
+			expect(
+				await run(`implementation {
+					constant box = { items = [], others = [] }
+					constant filled = { box with items = ["a"] }
+
+					constant integers: List<Integer> = filled.others
+
+					Terminal.inspect(filled.items::sort())
+					Terminal.inspect(integers::length()::toString())
+				}`),
+			).toEqual(['[ "a" ]', '"0"'])
+		})
+
+		// NOTE: Both halves at once — the update decides the member, and the
+		// assignment it feeds decides the Variable from the Record the update
+		// answered.
+		it("is decided through an assignment that updates in place", async () => {
+			expect(
+				await run(`implementation {
+					variable box = { items = [] }
+
+					box = { box with items = box.items::append("x") }
+
+					Terminal.inspect(box.items::sort())
+				}`),
+			).toEqual(['[ "x" ]'])
+		})
+
+		// NOTE: A member's two slots are decided the way its one item Type is —
+		// `{ base with ages = ["alex" = 39] }` over a `base` whose `ages` came
+		// from `[=]` leaked both of them.
+		it("decides both slots of a Dictionary member", () => {
+			expect(
+				codesFor(`implementation {
+					constant base = { ages = [=] }
+					constant filled = { base with ages = ["alex" = 39] }
+
+					constant strings: { ages: Dictionary<String, String> } = filled
+				}`),
+			).toEqual(["assignment-type-mismatch"])
+		})
+
+		// NOTE: And the same without an annotation to carry it — the decided
+		// member is what the Method the update's answer is read with gets,
+		// which is where an undecided one did its damage.
+		it("hands the decided member to the Methods that read it", () => {
+			expect(
+				codesFor(`implementation {
+					constant box = { items = [] }
+					constant filled = { box with items = ["a"] }
+
+					Terminal.inspect(filled.items::append(1))
+				}`),
+			).toEqual(["no-matching-overload"])
+		})
+
+		it("refuses an update that disagrees with a decided member", () => {
+			expect(
+				codesFor(`implementation {
+					constant box = { items = ["a"] }
+					constant filled = { box with items = [1] }
+				}`),
+			).toEqual(["partial-type-mismatch"])
+		})
+	})
+
 	// NOTE: The one place a later assignment comes too late. A literal's body is
 	// checked once, where it is written, so a captured `items` is checked as a
 	// `List<Unknown>` — which fits `List<String>` — and no decision made further
