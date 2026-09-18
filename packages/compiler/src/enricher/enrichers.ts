@@ -10787,29 +10787,60 @@ function decidedSeedBindings(
 			return
 		}
 
-		let probe: GenericInferenceContext = {
-			bindableNames: open,
-			bindings: new Map(),
+		// NOTE: An answer built out of branches is unified BRANCH BY BRANCH.
+		// Unification reads one Type against another, and a Union is not one
+		// Type: a `step` body answering `#Continue(kept::append(number))` in one
+		// arm and `#Continue(kept)` in the other answers two instantiations of
+		// the same Choice, and asking `Progress<State, Result>` about the pair of
+		// them binds nothing, so the branch that says what the accumulator holds
+		// was never heard. Each branch is asked on its own and what they found is
+		// collected per Parameter; a branch the declared Type can not be read
+		// against says nothing and is skipped, which is what a Union arm of
+		// another shape entirely is.
+		let anonymous =
+			answer.type === "UnionType" &&
+			answer.name === undefined &&
+			answer.alias === undefined
+		let candidates = new Map<common.GenericName, Array<common.Type>>()
+
+		for (let branch of anonymous
+			? (answer as common.UnionType).types
+			: [answer]) {
+			let probe: GenericInferenceContext = {
+				bindableNames: open,
+				bindings: new Map(),
+			}
+
+			if (
+				!matchesTypeWithBindings(
+					applyGenericBindings(declared, settled),
+					branch,
+					probe,
+				)
+			) {
+				continue
+			}
+
+			for (let [name, candidate] of probe.bindings) {
+				candidates.set(name, [
+					...(candidates.get(name) ?? []),
+					candidate,
+				])
+			}
 		}
 
-		if (
-			!matchesTypeWithBindings(
-				applyGenericBindings(declared, settled),
-				answer,
-				probe,
-			)
-		) {
-			return
-		}
-
-		for (let [name, candidate] of probe.bindings) {
+		// NOTE: The branches' answers are handed over as the Union they are, so
+		// `resolveUnknownSlots` weighs them the one way this rule weighs branches
+		// anywhere: slot by slot, a blank taking what the branches that fill it
+		// agree on and staying blank where they disagree.
+		for (let [name, found] of candidates) {
 			let bound = context.bindings.get(name)
 
 			if (bound === undefined) {
 				continue
 			}
 
-			let filled = resolveUnknownSlots(bound, candidate)
+			let filled = resolveUnknownSlots(bound, buildUnion(found))
 
 			if (filled !== bound) {
 				decisions.set(name, filled)
@@ -10867,47 +10898,82 @@ function decidedSeedBindings(
 		)
 	}
 
-	for (let [index, parameter] of parameterTypes.entries()) {
-		let argument = argumentFor(index)
+	// NOTE: The bindings as this reading has them SO FAR — what the Arguments
+	// decided, with everything settled since written over it. A body is read
+	// against these rather than against the Arguments' own answer, because a
+	// decision already made is one the body is entitled to see: an annotation
+	// deciding the accumulator should have the combiner read with the
+	// accumulator decided.
+	let bindingsSoFar = (): GenericBindings => {
+		let bindings = new Map(context.bindings)
 
-		if (
-			parameter.type.type !== "Function" ||
-			argument === undefined ||
-			!waitsOnAnOpenParameter(parameter.type.returnType)
-		) {
-			continue
+		for (let [name, type] of decisions) {
+			bindings.set(name, type)
 		}
 
-		// NOTE: The literal is read against its Parameter Types as the seed left
-		// them — `(kept: List<Unknown>, word: String)`, which is what its body was
-		// going to be enriched under anyway — and against a return Type left
-		// UNSOLVED, which is what makes `resolveContextualReturnType` read the
-		// body rather than hand the position's own answer back. That answer is the
-		// undecided Type itself, and a call that asked it would be told what it
-		// already knew.
-		let substituted = applyGenericBindings(parameter.type, context.bindings)
-		let open = applyGenericBindings(parameter.type, settled)
+		return bindings
+	}
 
-		if (substituted.type !== "Function" || open.type !== "Function") {
-			continue
-		}
+	// NOTE: Rounds, because one body can answer two Parameters and answer the
+	// second only once the first is decided. `loop(startingWith [], step (kept) {
+	// … <- #Done(kept) … <- #Continue(kept::append("x")) })` decides the State
+	// from the arm that APPENDS, and only a reading under that decision can say
+	// that what the loop ANSWERS is the same List of Strings — read under the
+	// blank, `#Done(kept)` hands back the blank it was given.
+	//
+	// A round that decides nothing ends it, so a call with nothing open pays for
+	// no round at all and the usual call with one open Parameter pays for one. At
+	// worst there is a round per open Parameter, because a round that does not
+	// decide one stops.
+	let decidedBefore = -1
 
-		// NOTE: Silent, because the position it asks about is one no reading of
-		// this call will ever commit to: the return Type is held open ON PURPOSE,
-		// and a literal whose body answers nothing is told its return Type can
-		// not be inferred from it — where the call itself had already decided
-		// that position and the body's real complaint is that it returns nothing
-		// at all. What it says here is a question's echo, not a reading. The two
-		// readings that ARE kept report for themselves, one of them right below.
-		let { result: answered } = collectDiagnostics(() =>
-			argument.getType(
-				{ ...substituted, returnType: open.returnType },
-				context.bindings,
-			),
-		)
+	while (decisions.size > decidedBefore && decisions.size < undecided.size) {
+		decidedBefore = decisions.size
 
-		if (answered.type === "Function") {
-			decideFrom(open.returnType, answered.returnType)
+		for (let [index, parameter] of parameterTypes.entries()) {
+			let argument = argumentFor(index)
+
+			if (
+				parameter.type.type !== "Function" ||
+				argument === undefined ||
+				!waitsOnAnOpenParameter(parameter.type.returnType)
+			) {
+				continue
+			}
+
+			// NOTE: The literal is read against its Parameter Types as the seed
+			// left them — `(kept: List<Unknown>, word: String)`, which is what its
+			// body was going to be enriched under anyway — and against a return
+			// Type left UNSOLVED, which is what makes `resolveContextualReturnType`
+			// read the body rather than hand the position's own answer back. That
+			// answer is the undecided Type itself, and a call that asked it would
+			// be told what it already knew.
+			let bindings = bindingsSoFar()
+			let substituted = applyGenericBindings(parameter.type, bindings)
+			let open = applyGenericBindings(parameter.type, settled)
+
+			if (substituted.type !== "Function" || open.type !== "Function") {
+				continue
+			}
+
+			// NOTE: Silent, because the position it asks about is one no reading
+			// of this call will ever commit to: the return Type is held open ON
+			// PURPOSE, and a literal whose body answers nothing is told its return
+			// Type can not be inferred from it — where the call itself had already
+			// decided that position and the body's real complaint is that it
+			// returns nothing at all. What it says here is a question's echo, not
+			// a reading. The two readings that ARE kept report for themselves, one
+			// of them right below.
+			let { result: answered } = collectDiagnostics(() =>
+				argument.getType(
+					{ ...substituted, returnType: open.returnType },
+					bindings,
+				),
+			)
+
+			if (answered.type === "Function") {
+				decideFrom(open.returnType, answered.returnType)
+			}
 		}
 	}
 

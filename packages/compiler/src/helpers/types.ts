@@ -1600,6 +1600,28 @@ export function resolveUnknownSlots(
 			value = value.base
 		}
 
+		// NOTE: A written Union is asked member by member, because a value built
+		// out of branches says what it holds in the branches that WRITE into the
+		// accumulator and nothing at all in the ones that hand it back untouched.
+		// `if number::isLessThan(0) { <- kept }` beside `<- kept::append(number)`
+		// answers `NonEmptyList<Integer> | List<Unknown>`: one member decides the
+		// item Type, the other is the blank the seed came in as, and reading the
+		// two together decides nothing. Asked separately and merged slot-wise,
+		// the blank takes the answer the members that have one agree on — which
+		// is also what lets a Record seed decide one member per branch, as
+		// `{ evens = [], odds = [] }` does.
+		//
+		// Before `visiting`, so the members can each be walked against the very
+		// `stored` this call is resolving. What guards the recursion instead is
+		// the written side shrinking: every member is smaller than the Union it
+		// came from, and a Type is a finite tree.
+		if (value.type === "UnionType" && stored.type !== "UnionType") {
+			return agreedDecisions(
+				stored,
+				value.types.map((member) => resolve(stored, member)),
+			)
+		}
+
 		visiting.add(stored)
 
 		try {
@@ -1690,6 +1712,147 @@ export function resolveUnknownSlots(
 	}
 
 	return resolve(stored, value)
+}
+
+// NOTE: What several readings of the same `stored` AGREE its blanks are, slot by
+// slot. Each candidate is `stored` with some of its blanks filled — one per
+// member of a written Union — so every one of them has its shape, and each blank
+// is answered by the candidates that HAVE an answer for it: a branch handing the
+// accumulator back untouched says nothing about it, and the branch appending to
+// it says everything, so one branch is enough to decide a slot.
+//
+// Two candidates answering the same blank DIFFERENTLY leave it blank. There is
+// no one Type the value holds, and picking either would be picking the branch
+// that happens to be written first — so the slot stays open and the write is
+// refused with the note that says nothing decided it, which is the truth about a
+// fold whose branches disagree.
+function agreedDecisions(
+	stored: common.Type,
+	candidates: Array<common.Type>,
+): common.Type {
+	if (stored.type === "Unknown") {
+		let [first, ...rest] = candidates.filter(
+			(candidate) => candidate.type !== "Unknown",
+		)
+
+		if (first === undefined) {
+			return stored
+		}
+
+		return rest.every(
+			(other) => matchesType(first, other) && matchesType(other, first),
+		)
+			? first
+			: stored
+	}
+
+	if (stored.type === "List") {
+		let itemType = agreedDecisions(
+			stored.itemType,
+			candidates.map((candidate) =>
+				candidate.type === "List"
+					? candidate.itemType
+					: stored.itemType,
+			),
+		)
+
+		return itemType === stored.itemType
+			? stored
+			: { type: "List", itemType }
+	}
+
+	if (stored.type === "Future" || stored.type === "Started") {
+		let shape = stored.type
+		let valueType = agreedDecisions(
+			stored.valueType,
+			candidates.map((candidate) =>
+				candidate.type === shape
+					? candidate.valueType
+					: stored.valueType,
+			),
+		)
+
+		if (valueType === stored.valueType) {
+			return stored
+		}
+
+		return shape === "Future"
+			? { type: "Future", valueType }
+			: { type: "Started", valueType }
+	}
+
+	if (stored.type === "Dictionary") {
+		let keyType = agreedDecisions(
+			stored.keyType,
+			candidates.map((candidate) =>
+				candidate.type === "Dictionary"
+					? candidate.keyType
+					: stored.keyType,
+			),
+		)
+		let valueType = agreedDecisions(
+			stored.valueType,
+			candidates.map((candidate) =>
+				candidate.type === "Dictionary"
+					? candidate.valueType
+					: stored.valueType,
+			),
+		)
+
+		return keyType === stored.keyType && valueType === stored.valueType
+			? stored
+			: { type: "Dictionary", keyType, valueType }
+	}
+
+	// NOTE: Member by member, which is what a seed holding two accumulators
+	// needs: `{ evens = [], odds = [] }` is written one member per branch, so
+	// neither branch decides the Record and both together decide every member.
+	if (stored.type === "Record") {
+		let members: Record<string, common.Type> = {}
+		let pinned = false
+
+		for (let [name, memberType] of Object.entries(stored.members)) {
+			let resolved = agreedDecisions(
+				memberType,
+				candidates.map((candidate) =>
+					candidate.type === "Record" &&
+					Object.hasOwn(candidate.members, name)
+						? candidate.members[name]
+						: memberType,
+				),
+			)
+
+			members[name] = resolved
+			pinned ||= resolved !== memberType
+		}
+
+		return pinned ? { type: "Record", members } : stored
+	}
+
+	// NOTE: Arm by arm and by POSITION, because every candidate came out of the
+	// same `stored` — a Union whose arms were rebuilt still has them in the order
+	// it had them in, and a candidate that is not that Union at all decided
+	// nothing about its arms.
+	if (stored.type === "UnionType") {
+		let arms = stored.types
+		let types = arms.map((arm, index) =>
+			agreedDecisions(
+				arm,
+				candidates.map((candidate) =>
+					candidate.type === "UnionType" &&
+					candidate.types.length === arms.length
+						? candidate.types[index]
+						: arm,
+				),
+			),
+		)
+
+		return types.some((arm, index) => arm !== arms[index])
+			? { type: "UnionType", types }
+			: stored
+	}
+
+	return stored
 }
 
 // NOTE: A Simple requirement is fulfilled by a Simple Method or by the first

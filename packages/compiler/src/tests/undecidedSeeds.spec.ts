@@ -221,6 +221,240 @@ describe("Undecided Seeds", () => {
 		})
 	})
 
+	// NOTE: The combiner an author actually writes. A filter keeps the
+	// accumulator in one branch and writes into it in the other, so the body
+	// answers `NonEmptyList<Integer> | List<Unknown>` — one branch saying what it
+	// holds and one saying nothing at all. Read as one Type that decides nothing,
+	// and every one of these was refused for returning a decided List where the
+	// Function returns `List<Unknown>`. Read branch by branch, the branch that
+	// writes decides the slot and the branch that hands the seed back is silent,
+	// which is what it is.
+	describe("a combiner that writes in only some of its branches", () => {
+		it("decides from the branch that writes, after an early return", async () => {
+			expect(
+				await run(`implementation {
+					constant kept = [1, -2, 3]::reduce(startingWith [], (current, number) {
+						if number::isLessThan(0) {
+							<- current
+						}
+
+						<- current::append(number)
+					})
+
+					Terminal.inspect(kept::sort())
+				}`),
+			).toEqual(["[ 1, 3 ]"])
+		})
+
+		it("decides it through an if and an else", async () => {
+			expect(
+				await run(`implementation {
+					constant kept = [1, 2, 3, 4]::reduce(startingWith [], (current, number) {
+						if number::remainder(dividingBy 2)::is(0) {
+							<- current::append(number)
+						} else {
+							<- current
+						}
+					})
+
+					Terminal.inspect(kept::sort())
+				}`),
+			).toEqual(["[ 2, 4 ]"])
+		})
+
+		// NOTE: Which branch writes is nothing to the rule — a slot takes what
+		// the branches that fill it agree on, and the order they are written in
+		// is not one of them.
+		it("decides it with the branches the other way round", async () => {
+			expect(
+				await run(`implementation {
+					constant kept = [1, 2, 3, 4]::reduce(startingWith [], (current, number) {
+						if number::remainder(dividingBy 2)::isNot(0) {
+							<- current
+						} else {
+							<- current::append(number)
+						}
+					})
+
+					Terminal.inspect(kept::sort())
+				}`),
+			).toEqual(["[ 2, 4 ]"])
+		})
+
+		it("decides it through a conditional expression", async () => {
+			expect(
+				await run(`implementation {
+					constant kept = [1, 2, 3, 4]::reduce(startingWith [], (current, number) {
+						<- define {
+							as current::append(number) if number::remainder(dividingBy 2)::is(0)
+							as current otherwise
+						}
+					})
+
+					Terminal.inspect(kept::sort())
+				}`),
+			).toEqual(["[ 2, 4 ]"])
+		})
+
+		// NOTE: A `step` body answers a Choice rather than the accumulator, so
+		// the branches are two instantiations of one Choice and the slot is a
+		// Case's payload member. Same rule, one level in.
+		it("decides it through a step body answering a Case", async () => {
+			expect(
+				await run(`implementation {
+					constant kept = [1, 2, 3, 4]::reduce(startingWith [], step (current, number) {
+						if number::remainder(dividingBy 2)::is(0) {
+							<- #Continue(current::append(number))
+						} else {
+							<- #Continue(current)
+						}
+					})
+
+					Terminal.inspect(kept::sort())
+				}`),
+			).toEqual(["[ 2, 4 ]"])
+		})
+
+		// NOTE: Two Parameters, and the second decided only once the first is.
+		// `#Done` hands back the accumulator, so what the loop ANSWERS is what
+		// the accumulator came to — which the arm that appends says and the arm
+		// that answers can only repeat.
+		it("decides what a step body's #Done answers from what #Continue wrote", async () => {
+			expect(
+				await run(`implementation {
+					constant found = loop(startingWith [], step (current) {
+						if current::length()::isGreaterThan(2) {
+							<- #Done(current)
+						}
+
+						<- #Continue(current::append("x"))
+					})
+
+					Terminal.inspect(found::sort())
+				}`),
+			).toEqual(['[ "x", "x", "x" ]'])
+		})
+
+		it("decides it under a counted loop", async () => {
+			expect(
+				await run(`implementation {
+					constant grown = loop(from 1, through 5, startingWith [], (index, current) {
+						if index::remainder(dividingBy 2)::is(0) {
+							<- current
+						}
+
+						<- current::append(index)
+					})
+
+					Terminal.inspect(grown::sort())
+				}`),
+			).toEqual(["[ 1, 3, 5 ]"])
+		})
+
+		// NOTE: One accumulator per member, each written by its own branch —
+		// so neither branch decides the Record and the two together decide
+		// every member of it.
+		it("decides a Record seed one member per branch", async () => {
+			expect(
+				await run(`implementation {
+					constant split = [1, 2, 3, 4]::reduce(startingWith { evens = [], odds = [] }, (current, number) {
+						if number::remainder(dividingBy 2)::is(0) {
+							<- { current with evens = current.evens::append(number) }
+						} else {
+							<- { current with odds = current.odds::append(number) }
+						}
+					})
+
+					Terminal.inspect(split.evens::sort())
+					Terminal.inspect(split.odds::sort())
+				}`),
+			).toEqual(["[ 2, 4 ]", "[ 1, 3 ]"])
+		})
+
+		// NOTE: A branch answering the seed itself decides nothing and refuses
+		// nothing either — what the OTHER branch writes is still the answer.
+		it("decides it where a branch answers an empty List of its own", async () => {
+			expect(
+				await run(`implementation {
+					constant kept = [1, 2]::reduce(startingWith [], (current, number) {
+						if number::isGreaterThan(1) {
+							<- current::append(number)
+						}
+
+						<- []
+					})
+
+					Terminal.inspect(kept::sort())
+				}`),
+			).toEqual(["[ 2 ]"])
+		})
+
+		it("decides it inside a tests block", () => {
+			expect(
+				codesFor(`implementation {
+					function evens(_ numbers: List<Integer>) -> List<Integer> {
+						<- numbers
+					}
+				}
+
+				tests {
+					test "a fold that sometimes keeps the seed" {
+						constant kept = [1, 2, 3]::reduce(startingWith [], (current, number) {
+							if number::isGreaterThan(1) {
+								<- current::append(number)
+							} else {
+								<- current
+							}
+						})
+
+						require [2, 3] = kept
+					}
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: Branches that disagree decide nothing. There is no one Type the
+		// accumulator holds, and taking the branch that happens to be written
+		// first would be inventing one — so the slot stays open and every write
+		// into it is refused, which is the same answer a fold nothing writes
+		// into at all gets.
+		it("refuses a combiner whose branches write different Types", () => {
+			expect(
+				codesFor(`implementation {
+					constant mixed = [1, 2, 3]::reduce(startingWith [], (current, number) {
+						if number::is(1) {
+							<- current::append(number)
+						}
+
+						if number::is(2) {
+							<- current::append("two")
+						}
+
+						<- current
+					})
+				}`),
+			).toEqual(["return-type-mismatch", "return-type-mismatch"])
+		})
+
+		// NOTE: A branch that decides the accumulator WHOLE is not made worse by
+		// the branch beside it that decides one member of it.
+		it("decides a member one branch leaves alone", async () => {
+			expect(
+				await run(`implementation {
+					constant tallied = ["a", "", "bb"]::reduce(startingWith { items = [], skipped = 0 }, (current, word) {
+						if word::isEmpty() {
+							<- { current with skipped = current.skipped::add(1) }
+						}
+
+						<- { current with items = current.items::append(word) }
+					})
+
+					Terminal.inspect(tallied.items::sort())
+				}`),
+			).toEqual(['[ "a", "bb" ]'])
+		})
+	})
+
 	describe("the position a fold is written in", () => {
 		// NOTE: The Declaration's annotation is a decision somebody wrote down,
 		// and it is read BEFORE anything is inferred from the call's own
