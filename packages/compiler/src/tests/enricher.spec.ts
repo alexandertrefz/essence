@@ -3922,10 +3922,7 @@ describe("Enricher", () => {
 					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'through' is Integer, Parameter 'startingWith' is State, Parameter 4 is (_: Integer, _: State) -> State.",
 					"'loop' takes 2 Arguments: Parameter 'startingWith' is State, Parameter 'step' is (_: State) -> Step<State, Answer>.",
 					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'upTo' is Integer, Parameter 'startingWith' is State, Parameter 4 is (_: Integer, _: State) -> State.",
-					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'downTo' is Integer, Parameter 'startingWith' is State, Parameter 4 is (_: Integer, _: State) -> State.",
-					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'through' is Integer, Parameter 'startingWith' is State, Parameter 'step' is (_: Integer, _: State) -> Step<State, State>.",
-					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'upTo' is Integer, Parameter 'startingWith' is State, Parameter 'step' is (_: Integer, _: State) -> Step<State, State>.",
-					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'downTo' is Integer, Parameter 'startingWith' is State, Parameter 'step' is (_: Integer, _: State) -> Step<State, State>.",
+					"And 4 more Overloads of this name, not listed.",
 				])
 			})
 

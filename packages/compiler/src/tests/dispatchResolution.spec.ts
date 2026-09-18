@@ -1177,7 +1177,8 @@ describe("What a refused call is told", () => {
 	// NOTE: Eight entries of one `add` refuse the same Argument for the same
 	// reason, and the Labels say it once. A clause per Note would be the same
 	// sentence eight times over the list a reader is scanning for the entry they
-	// meant.
+	// meant — and the list itself stops at five, for the same reason: see
+	// `cappedNotes`.
 	it("says nothing more under a candidate refused the same way", () => {
 		expect(
 			diagnosticsFor(`implementation {
@@ -1189,10 +1190,44 @@ describe("What a refused call is told", () => {
 			"'Integer::add' takes 1 Argument: Parameter 1 is Algebraic.",
 			"'Integer::add' takes 1 Argument: Parameter 1 is Transcendental.",
 			"'NonNegativeInteger::add' takes 1 Argument: Parameter 1 is PositiveInteger.",
-			"'NonNegativeInteger::add' takes 1 Argument: Parameter 1 is NonNegativeInteger.",
-			"'PositiveInteger::add' takes 1 Argument: Parameter 1 is NonNegativeInteger.",
-			"'Scalar::add' takes 1 Argument: Parameter 1 is Scalar.",
+			"And 3 more Overloads of this name, not listed.",
 		])
+	})
+
+	// NOTE: Fourteen entries under one Label is a wall to read past rather than
+	// a list to read, and the entry a reader is looking for is somewhere in it.
+	// Five, and a count of what is left.
+	describe("a name with more entries than a report lists", () => {
+		let source = `implementation {
+			Terminal.print(Number.highest(1))
+		}`
+
+		it("lists five of them and counts the rest", () => {
+			let notes = diagnosticsFor(source)[0]!.notes
+
+			expect(notes).toHaveLength(6)
+			expect(notes[5]).toBe(
+				"And 9 more Overloads of this name, not listed.",
+			)
+		})
+
+		// NOTE: The closest candidate's Note is what the report's own Labels are
+		// about, so a list that left it out would be the list of the wrong five.
+		it("keeps the closest candidate's own Note in the list", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant numbers = [1, 2]
+
+				Terminal.print(Number.highest(numbers, 3))
+			}`)
+			let notes = diagnostics[0]!.notes
+
+			expect(notes).toHaveLength(6)
+			expect(
+				notes
+					.slice(0, 5)
+					.some((note) => note.includes("List<Integer>")),
+			).toBe(true)
+		})
 	})
 
 	// NOTE: And where a candidate disagreed somewhere ELSE, its Note says so —

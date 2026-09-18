@@ -11656,6 +11656,31 @@ function partitionInstanceMethodNamespaces(
 // resolves the Method once per member, so each member is matched as if the
 // receiver had that Type. Otherwise the receiver is the Type the base was
 // already enriched to.
+// NOTE: What every written Argument offers a match — its label, its Type under
+// whichever Parameter Type is being tried, and the four answers only the typer
+// can give. Spelled once for the three sites that build it, which had three
+// copies of one object literal between them.
+function argumentMatchables(
+	args: Array<parser.ArgumentNode>,
+	typer: ArgumentTyper,
+): Array<MatchableArgument> {
+	return args.map((argument) => ({
+		name: argument.name?.content ?? null,
+		getType: (
+			expectedType: common.Type,
+			bindings: GenericBindings | null,
+		) => typer.getType(argument.value, expectedType, bindings),
+		bindsNothing: bindsNoTypeParameter(argument),
+		decide: (decided: common.Type) =>
+			typer.decideArgument(argument.value, decided),
+		mergedValue: () => typer.enrichedArgumentValue(argument.value),
+		spellsItsMembers: argument.value.nodeType === "RecordValue",
+	}))
+}
+
+// NOTE: And the same, with the RECEIVER in front of them: a `::` call matches
+// its receiver as an Argument like any other, which is what lets one Method
+// signature carry both.
 function methodMatchableArguments(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
@@ -11664,18 +11689,7 @@ function methodMatchableArguments(
 ): Array<MatchableArgument> {
 	return [
 		{ name: null, getType: () => receiverType ?? baseType },
-		...node.arguments.map((argument) => ({
-			name: argument.name?.content ?? null,
-			getType: (
-				expectedType: common.Type,
-				bindings: GenericBindings | null,
-			) => typer.getType(argument.value, expectedType, bindings),
-			bindsNothing: bindsNoTypeParameter(argument),
-			decide: (decided: common.Type) =>
-				typer.decideArgument(argument.value, decided),
-			mergedValue: () => typer.enrichedArgumentValue(argument.value),
-			spellsItsMembers: argument.value.nodeType === "RecordValue",
-		})),
+		...argumentMatchables(node.arguments, typer),
 	]
 }
 
@@ -12472,6 +12486,36 @@ function closestRefusal(
 	return closest
 }
 
+// NOTE: How many candidates a report LISTS. `Number.highest(1)` reaches
+// fourteen entries, and fourteen signatures under one Label is a wall to read
+// past rather than a list to read — the entry a reader is looking for is in
+// there, and finding it is the work the report was supposed to save them.
+const listedCandidateNotes = 5
+
+// NOTE: The first five, in the order they are DECLARED, which is the order they
+// were probed in — and a sentence saying how many are left. The closest
+// candidate's Note is always among them, moved to the front where it would
+// otherwise fall outside: it is the one the report's own Labels are about, and a
+// list that named every entry but that one would be the list of the wrong five.
+function cappedNotes(notes: Array<string>, closest: number): Array<string> {
+	if (notes.length <= listedCandidateNotes) {
+		return notes
+	}
+
+	let listed =
+		closest < listedCandidateNotes
+			? notes.slice(0, listedCandidateNotes)
+			: [
+					notes[closest] as string,
+					...notes.slice(0, listedCandidateNotes - 1),
+				]
+
+	return [
+		...listed,
+		`And ${countOf(notes.length - listed.length, "more Overload")} of this name, not listed.`,
+	]
+}
+
 // NOTE: One Note per candidate — what it takes, and where this call disagreed
 // with it where that is NOT what the report's own Labels already say. The clause
 // is what turns a list of signatures a reader has to compare by eye into a list
@@ -12675,8 +12719,15 @@ function overloadRefusalReport(
 	helps: Array<string>
 } {
 	let closest = closestRefusal(refusals)
-	let notes = refusals.map((refusal) =>
-		candidateNote(refusal, matchableArguments, closest?.detail ?? null),
+	let notes = cappedNotes(
+		refusals.map((refusal) =>
+			candidateNote(refusal, matchableArguments, closest?.detail ?? null),
+		),
+		closest === null
+			? -1
+			: refusals.findIndex(
+					(refusal) => refusal.candidate === closest.candidate,
+				),
 	)
 
 	if (closest === null) {
@@ -14004,18 +14055,7 @@ function resolveFunctionInvocation(
 		type.type === "SimpleMethod" ||
 		type.type === "StaticMethod"
 	) {
-		let matchableArguments: Array<MatchableArgument> = node.arguments.map(
-			(argument) => ({
-				name: argument.name?.content ?? null,
-				getType: (expectedType, bindings) =>
-					typer.getType(argument.value, expectedType, bindings),
-				bindsNothing: bindsNoTypeParameter(argument),
-				decide: (decided) =>
-					typer.decideArgument(argument.value, decided),
-				mergedValue: () => typer.enrichedArgumentValue(argument.value),
-				spellsItsMembers: argument.value.nodeType === "RecordValue",
-			}),
-		)
+		let matchableArguments = argumentMatchables(node.arguments, typer)
 
 		// NOTE: A callee without an `overload` block is its own single
 		// candidate — one signature to match, one set of bounds to solve and
@@ -14101,18 +14141,7 @@ function resolveFunctionInvocation(
 		type.type === "OverloadedMethod" ||
 		type.type === "OverloadedStaticMethod"
 	) {
-		const matchableArguments: Array<MatchableArgument> = node.arguments.map(
-			(argument) => ({
-				name: argument.name?.content ?? null,
-				getType: (expectedType, bindings) =>
-					typer.getType(argument.value, expectedType, bindings),
-				bindsNothing: bindsNoTypeParameter(argument),
-				decide: (decided) =>
-					typer.decideArgument(argument.value, decided),
-				mergedValue: () => typer.enrichedArgumentValue(argument.value),
-				spellsItsMembers: argument.value.nodeType === "RecordValue",
-			}),
-		)
+		const matchableArguments = argumentMatchables(node.arguments, typer)
 
 		let selected = selectOverload(
 			type.overloads,

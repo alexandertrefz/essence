@@ -19,9 +19,9 @@ export type LexingError = {
 	code: "invalid-number" | "invalid-escape" | "comment-in-hole"
 }
 
-// NOTE: A String Literal that CLOSED, kept only for as long as it takes the
-// next one to close too — see `lastClosedString`. `spansLines` is the whole
-// reason it is kept.
+// NOTE: A String Literal that CLOSED, built where the unterminated-String
+// report asks which one it was — see `swallowedTheLinesBelow`. `spansLines` is
+// the whole reason it is asked for.
 export type ClosedString = {
 	openedAt: Cursor
 	closedAt: Cursor
@@ -328,7 +328,17 @@ export class Lexer {
 	// close overwrites it, so a plain one-line String standing between a
 	// multi-line String and an unterminated one clears the claim rather than
 	// letting it reach across.
-	protected lastClosedString: ClosedString | null
+	//
+	// NOTE: Four numbers rather than the `ClosedString` they spell, because
+	// every String in every file closes and only a file that FAILS ever asks.
+	// A pair of objects per closed String is an allocation on the Lexer's
+	// hottest path to answer a question almost nothing asks; the object is built
+	// where it is asked for instead. A zero line means no String has closed yet,
+	// which is a line number no Token has.
+	protected closedStringOpenedLine: number
+	protected closedStringOpenedColumn: number
+	protected closedStringClosedLine: number
+	protected closedStringClosedColumn: number
 
 	constructor() {
 		this.data = ""
@@ -339,7 +349,10 @@ export class Lexer {
 		this.pending = []
 		this.pendingIndex = 0
 		this.errors = []
-		this.lastClosedString = null
+		this.closedStringOpenedLine = 0
+		this.closedStringOpenedColumn = 0
+		this.closedStringClosedLine = 0
+		this.closedStringClosedColumn = 0
 	}
 
 	reset(data: string, state: Cursor = { line: 1, column: 1 }) {
@@ -350,7 +363,10 @@ export class Lexer {
 		this.pending = []
 		this.pendingIndex = 0
 		this.errors = []
-		this.lastClosedString = null
+		this.closedStringOpenedLine = 0
+		this.closedStringOpenedColumn = 0
+		this.closedStringClosedLine = 0
+		this.closedStringClosedColumn = 0
 	}
 
 	next(): lexer.Token | undefined {
@@ -829,14 +845,12 @@ export class Lexer {
 	// NOTE: Called with the String's opening Cursor the moment its closing quote
 	// has been consumed, so the Lexer's own Cursor stands just past that quote
 	// and the quote itself is the character in front of it. What is kept is the
-	// pair of Cursors and whether the two are on different lines; see
-	// `lastClosedString`.
+	// two Cursors, as four numbers; see `closedStringOpenedLine` for why.
 	protected noteClosedString(openedAt: Cursor): void {
-		this.lastClosedString = {
-			openedAt,
-			closedAt: { line: this.line, column: this.column - 1 },
-			spansLines: this.line > openedAt.line,
-		}
+		this.closedStringOpenedLine = openedAt.line
+		this.closedStringOpenedColumn = openedAt.column
+		this.closedStringClosedLine = this.line
+		this.closedStringClosedColumn = this.column - 1
 	}
 
 	// NOTE: Whitespace only — a line break inside a hole is a Token like any
@@ -1014,23 +1028,30 @@ export class Lexer {
 	// what the other reading would mean — because this is a judgement about
 	// which mistake is likelier and not something the Lexer can know.
 	//
-	// The narrowing is two-sided on purpose. `lastClosedString` holds the String
-	// that closed DIRECTLY in front of this one and no older one, so a one-line
-	// String written between the two clears the claim; and the two quotes have
-	// to share a line, so an unclosed String further down the file is reported
-	// about itself.
+	// The narrowing is two-sided on purpose. What is kept is the String that
+	// closed DIRECTLY in front of this one and no older one — each close
+	// overwrites the four numbers — so a one-line String written between the two
+	// clears the claim; and the two quotes have to share a line, so an unclosed
+	// String further down the file is reported about itself.
 	protected swallowedTheLinesBelow(openedAt: Cursor): ClosedString | null {
-		let previous = this.lastClosedString
-
 		if (
-			previous === null ||
-			!previous.spansLines ||
-			previous.closedAt.line !== openedAt.line
+			this.closedStringClosedLine <= this.closedStringOpenedLine ||
+			this.closedStringClosedLine !== openedAt.line
 		) {
 			return null
 		}
 
-		return previous
+		return {
+			openedAt: {
+				line: this.closedStringOpenedLine,
+				column: this.closedStringOpenedColumn,
+			},
+			closedAt: {
+				line: this.closedStringClosedLine,
+				column: this.closedStringClosedColumn,
+			},
+			spansLines: true,
+		}
 	}
 
 	// #endregion
