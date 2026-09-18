@@ -167,6 +167,138 @@ describe("Unknown Slot Narrowing", () => {
 				}`),
 			).toEqual(["assignment-type-mismatch"])
 		})
+
+		it("decides the inner slot of a nested empty List too", () => {
+			expect(
+				codesFor(`implementation {
+					variable rows = [[]]
+
+					rows = [["a"]]
+
+					constant integers: List<List<Integer>> = rows
+				}`),
+			).toEqual(["assignment-type-mismatch"])
+		})
+
+		// NOTE: `append` answers a `NonEmptyList<String>`, a refinement over the
+		// List the Variable is being handed — and a write is a write however the
+		// value that made it is spelled. The run is what proves it: `sort` needs
+		// an Orderable of the item Type, and an undecided item Type has none, so
+		// this Program did not compile at all before the write decided the slot.
+		it("decides its item Type from a write that answers a Refinement", async () => {
+			expect(
+				await run(`implementation {
+					variable items = []
+
+					items = items::append("b")
+					items = items::append("a")
+
+					Terminal.inspect(items::sort())
+				}`),
+			).toEqual(['[ "a", "b" ]'])
+		})
+
+		it("refuses the annotation that write would have laundered", () => {
+			expect(
+				codesFor(`implementation {
+					variable items = []
+
+					items = items::append("a")
+
+					constant integers: List<Integer> = items
+				}`),
+			).toEqual(["assignment-type-mismatch"])
+		})
+
+		// NOTE: The shape the hole was reported as, which no annotation is
+		// written in at all: `Number.sum` takes a List of Numbers, an undecided
+		// item Type fit that, and the Program compiled and then added Strings
+		// up. Decided, there is simply no overload to call.
+		it("keeps the decided items out of a Method that wanted Numbers", () => {
+			expect(
+				codesFor(`implementation {
+					variable items = []
+
+					items = items::append("a")
+
+					Terminal.print(Number.sum(items))
+				}`),
+			).toEqual(["no-matching-overload"])
+		})
+
+		// NOTE: The second call is made ON the refinement the first answered —
+		// `NonEmptyList` declares no `append` of its own, so it flows into its
+		// base to be dispatched — and answers a refinement again. One write is
+		// one decision however many calls built the value it wrote.
+		it("decides it from a chain of calls answering a Refinement", async () => {
+			expect(
+				await run(`implementation {
+					variable items = []
+
+					items = items::append("b")::append("a")
+
+					Terminal.inspect(items::sort())
+				}`),
+			).toEqual(['[ "a", "b" ]'])
+		})
+
+		// NOTE: Pinned to the refinement's BASE, never to the refinement. The
+		// Variable's earlier value was the empty List the Declaration wrote, and
+		// nothing proved that one holds anything — so `NonEmptyList<String>` is
+		// a Type the name never had, and an empty List is still a value it takes.
+		it("pins to the base of the Refinement rather than to the Refinement", async () => {
+			expect(
+				await run(`implementation {
+					variable items = []
+
+					items = items::append("a")
+					items = []
+
+					Terminal.inspect(items::length()::toString())
+				}`),
+			).toEqual(['"0"'])
+		})
+	})
+
+	// NOTE: Two slots and nothing else new — `[=]` decides neither, and both are
+	// decided by the first write that says what they hold, exactly as a List's
+	// one item Type is.
+	describe("a Variable declared from an empty Dictionary Literal", () => {
+		it("decides both slots from a write that answers a Refinement", async () => {
+			expect(
+				await run(`implementation {
+					variable ages = [=]
+
+					ages = ages::set("kim", to 7)
+
+					Terminal.inspect(ages::keys()::sort())
+				}`),
+			).toEqual(['[ "kim" ]'])
+		})
+
+		it("decides both slots from an update", async () => {
+			expect(
+				await run(`implementation {
+					variable ages = [=]
+
+					ages = [ages with "kim" = 7]
+
+					Terminal.inspect(ages::keys()::sort())
+				}`),
+			).toEqual(['[ "kim" ]'])
+		})
+
+		it("refuses the annotation the write would have laundered", () => {
+			expect(
+				codesFor(`implementation {
+					variable ages = [=]
+
+					ages = ages::set("kim", to 7)
+
+					constant strings: Dictionary<String, String> = ages
+				}`),
+			).toEqual(["assignment-type-mismatch"])
+		})
 	})
 
 	// NOTE: The one place a later assignment comes too late. A literal's body is
@@ -183,6 +315,25 @@ describe("Unknown Slot Narrowing", () => {
 				}
 
 				items = [1, 2]
+			}`)
+
+			expect(errors).toHaveLength(1)
+			expect(errors[0].code).toBe("uninferable-item-type")
+		})
+
+		// NOTE: The write below the capture answers a refinement, which decides
+		// the slot — and still not in time. Nothing about WHICH write decides a
+		// slot moves the line a capture is refused at: the body was checked
+		// where it was written.
+		it("refuses it above a write that answers a Refinement", () => {
+			let errors = errorsFor(`implementation {
+				variable items = []
+
+				constant launder = () -> List<String> {
+					<- items
+				}
+
+				items = items::append(1)
 			}`)
 
 			expect(errors).toHaveLength(1)

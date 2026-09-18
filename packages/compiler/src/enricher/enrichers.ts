@@ -6279,12 +6279,22 @@ function enrichVariableAssignmentStatement(
 	// NOTE: The target Variable's Type is the value's expected Type — a bare
 	// Case in the value resolves against it before the scope scan.
 	let value = enrichExpression(node.value, scope, name.type)
-
-	narrowUnknownSlots(node.name.content, declaringScope, value.type)
+	let pinned = narrowUnknownSlots(
+		node.name.content,
+		declaringScope,
+		value.type,
+	)
 
 	return {
 		nodeType: "VariableAssignmentStatement",
-		name,
+		// NOTE: The Identifier carries the Type the assignment DECIDED, not the
+		// undecided one it was read with: the Validator judges this very
+		// statement against `name.type`, and an assignment that decides a slot
+		// is judged against the slot it decided rather than against the blank
+		// it filled. The Node is rebuilt instead of re-enriched, because
+		// `enrichIdentifier` reports the capture of an undecided name and the
+		// capture is a fact about where the Identifier was READ.
+		name: pinned === null ? name : { ...name, type: pinned },
 		value,
 		declarationPosition,
 		position: node.position,
@@ -6303,24 +6313,31 @@ function enrichVariableAssignmentStatement(
 // Two Handlers of a Match assigning different item Types therefore leave the
 // second one mismatched rather than widening to a Union: the declaration is
 // where a name that holds both belongs, and an annotation there says so.
+//
+// The decided Type is answered back, or null where this assignment decided
+// nothing, so the statement that made the decision can be judged against it.
 function narrowUnknownSlots(
 	name: string,
 	declaringScope: enricher.Scope | null,
 	valueType: common.Type,
-): void {
+): common.Type | null {
 	// NOTE: A Constant's reassignment was reported already, and letting the
 	// statement that was refused decide the Type every accepted one is judged
 	// against would make the refusal change the Program.
 	if (declaringScope === null || declaringScope.constants.has(name)) {
-		return
+		return null
 	}
 
 	let storedType = declaringScope.members[name]
 	let narrowed = resolveUnknownSlots(storedType, valueType)
 
-	if (narrowed !== storedType) {
-		declaringScope.members[name] = narrowed
+	if (narrowed === storedType) {
+		return null
 	}
+
+	declaringScope.members[name] = narrowed
+
+	return narrowed
 }
 
 function enrichNamespaceDefinitionStatement(

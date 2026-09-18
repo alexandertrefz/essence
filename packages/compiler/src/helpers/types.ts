@@ -1559,15 +1559,35 @@ export function resolveUnknownSlots(
 	// back to a Type already being walked.
 	let visiting = new Set<common.Type>()
 
-	let resolve = (stored: common.Type, value: common.Type): common.Type => {
-		if (stored === value || visiting.has(stored)) {
+	let resolve = (stored: common.Type, written: common.Type): common.Type => {
+		if (stored === written || visiting.has(stored)) {
 			return stored
 		}
 
+		// NOTE: A slot nothing decided takes the written Type WHOLE, refinement
+		// and all — pinning `List<Unknown>` from a `List<NonEmptyList<String>>`
+		// gives back a List of NON-EMPTY Lists. What stands in a slot is what
+		// the value put there, and a refinement is part of that.
 		if (stored.type === "Unknown") {
-			return value.type === "Unknown" || typeContainsError(value)
+			return written.type === "Unknown" || typeContainsError(written)
 				? stored
-				: value
+				: written
+		}
+
+		// NOTE: A refinement standing over the CONTAINER whose slots are being
+		// filled is looked through instead, and its evidence dropped:
+		// `variable items = []` followed by `items = items::append("a")` pins a
+		// `List<String>`, never the `NonEmptyList<String>` the call answered.
+		// The refinement is proof about THAT value, and `stored` is the Type of
+		// a name whose earlier value — the empty List — was not refined at all,
+		// so keeping it would put a Type on the name that its own Declaration
+		// never satisfied. The slots underneath are still the value's, which is
+		// why the rule stops at this one level. Refinements nest, so the walk
+		// does too.
+		let value = written
+
+		while (value.type === "Refinement") {
+			value = value.base
 		}
 
 		visiting.add(stored)

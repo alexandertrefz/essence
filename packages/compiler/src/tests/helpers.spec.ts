@@ -3249,6 +3249,79 @@ describe("Helpers", () => {
 				expect(typeContainsUnknown(nonZero)).toBe(false)
 			})
 
+			// NOTE: The rule a write into an undecided slot follows, in the one
+			// place both halves can be spelled. A refinement is evidence about
+			// the value that was written, and where that value decides the
+			// CONTAINER — the Type of a name whose earlier value was an empty
+			// List nothing proved anything about — the evidence is dropped.
+			// Where it decides a slot INSIDE one, it is what stands there.
+			describe("resolveUnknownSlots", () => {
+				const unknownList: Type = {
+					type: "List",
+					itemType: { type: "Unknown" },
+				}
+
+				function nonEmpty(itemType: Type): Type {
+					return refinementOf(
+						{ type: "List", itemType },
+						"NonEmptyList",
+					)
+				}
+
+				it("should pin a container to the base of a refinement", () => {
+					expect(
+						resolveUnknownSlots(unknownList, nonEmpty(string)),
+					).toEqual({ type: "List", itemType: string })
+				})
+
+				it("should look through a refinement of a refinement", () => {
+					expect(
+						resolveUnknownSlots(
+							unknownList,
+							refinementOf(nonEmpty(string), "SortedList"),
+						),
+					).toEqual({ type: "List", itemType: string })
+				})
+
+				it("should keep the refinement a slot itself was written with", () => {
+					expect(
+						resolveUnknownSlots(unknownList, {
+							type: "List",
+							itemType: nonEmpty(string),
+						}),
+					).toEqual({
+						type: "List",
+						itemType: nonEmpty(string),
+					})
+				})
+
+				it("should look through one standing over a Record member", () => {
+					expect(
+						resolveUnknownSlots(
+							{ type: "Record", members: { items: unknownList } },
+							{
+								type: "Record",
+								members: { items: nonEmpty(string) },
+							},
+						),
+					).toEqual({
+						type: "Record",
+						members: { items: { type: "List", itemType: string } },
+					})
+				})
+
+				// NOTE: Nothing was decided, so the very same Type comes back —
+				// the answer every caller reads as "this write pinned nothing".
+				it("should answer with the stored Type where the base decides nothing", () => {
+					expect(
+						resolveUnknownSlots(
+							unknownList,
+							nonEmpty({ type: "Unknown" }),
+						),
+					).toBe(unknownList)
+				})
+			})
+
 			it("should find a refinement buried anywhere in a Type", () => {
 				expect(typeContainsRefinement(nonZero)).toBe(true)
 				expect(
