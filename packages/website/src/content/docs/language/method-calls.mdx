@@ -328,8 +328,12 @@ Error: No overload of 'clamp' accepts these Arguments
    ╭─┤ overload.es:4:17 │
    │
  4 │     Terminal.print(temperature::clamp(0, and 100))
-   │                    ───────────────┬──────────────  
-   │                                   ╰──────────────── this call passes 2 Arguments
+   │                                 ──┬── ▲  
+   │                                   ╰───│── 'Integer::clamp' takes Parameter 'between' here
+   │                                       │  
+   │                                       ╰── this Argument carries no label
+   │ 
+   │ Help: Write 'between' before the value.
    │ 
    │ Note 1: 'Integer::clamp' (provided by Orderable) takes 2 Arguments: Parameter 'between' is Integer, Parameter 'and' is Integer.
    │ Note 2: 'Number::clamp' (provided by Orderable) takes 2 Arguments: Parameter 'between' is Number, Parameter 'and' is Number.
@@ -338,7 +342,7 @@ Error: No overload of 'clamp' accepts these Arguments
 
 </div>
 
-The notes list every signature the method has, with the label and type of each parameter, so the fix is read off a note: `temperature::clamp(between 0, and 100)`. "Provided by Orderable" means the method's body comes from [`Orderable`](/docs/library/protocols#Orderable), a protocol: a set of methods a type promises to have. A protocol is like a TypeScript interface that can also carry method bodies. [Protocols](/docs/language/protocols) covers them. A misspelt label, a reordered one such as `clamp(and 100, between 0)`, and a wrong argument type such as `cents::add("1")` are reported the same way.
+The report leads with the entry the call came closest to: the label says what the argument carries, the one beside the method name says what that entry wanted there, and the Help is the edit. The notes list every signature the method has, with the label and type of each parameter: `temperature::clamp(between 0, and 100)`. "Provided by Orderable" means the method's body comes from [`Orderable`](/docs/library/protocols#Orderable), a protocol: a set of methods a type promises to have. A protocol is like a TypeScript interface that can also carry method bodies. [Protocols](/docs/language/protocols) covers them. A misspelt label, a reordered one such as `clamp(and 100, between 0)`, and a wrong argument type such as `cents::add("1")` are reported the same way.
 
 <SeeAlso links={[
 	{ label: "Conditions", href: "/docs/language/conditions" },

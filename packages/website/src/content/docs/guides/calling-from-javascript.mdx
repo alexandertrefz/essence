@@ -497,8 +497,10 @@ Error: No overload of 'add' accepts these Arguments
    ╭─┤ Broken.es:4:6 │
    │
  4 │        <- cents::add("nineteen")
-   │           ───────────┬──────────
-   │                      ╰──────────── this call passes 1 Argument
+   │                  ─┬─ ─────┬────
+   │                   ╰───────│────── 'Integer::add' takes an Integer as Parameter 1
+   │                           │
+   │                           ╰────── this is a String
    │
    │ Note 1: 'Integer::add' takes 1 Argument: Parameter 1 is Integer.
    │ Note 2: 'Integer::add' takes 1 Argument: Parameter 1 is Rational.

@@ -388,8 +388,10 @@ Error: No overload of 'split' accepts these Arguments
    ╭─┤ Guests.es:9:17 │
    │
  9 │     Terminal.print(bill::split(into guests))
-   │                    ────────────┬───────────
-   │                                ╰───────────── this call passes 1 Argument
+   │                          ──┬──      ───┬──
+   │                            ╰───────────│──── 'Money::split' takes a PositiveInteger as Parameter 'into'
+   │                                        │
+   │                                        ╰──── this is an Integer
    │
    │ Note: 'Money::split' takes 1 Argument: Parameter 'into' is PositiveInteger.
 ───╯

@@ -1978,7 +1978,7 @@ Which method or overload a call reaches, and what its arguments ask of it.
 
 ### `no-matching-overload`
 
-**Error.** The arguments fit none of a method's overloads. Each candidate signature is listed in a Note.
+**Error.** The arguments fit none of a method's overloads. The labels name the argument the closest candidate refused, what it is, and what that candidate takes there; each candidate signature is listed in a Note, with where it first disagreed where that is somewhere else.
 
 <div class="error-output">
 
@@ -1988,8 +1988,10 @@ Error: No overload of 'add' accepts these Arguments
    ╭─┤ Add.es:2:17 │
    │
  2 │     Terminal.print(5::add("one"))
-   │                    ──────┬──────  
-   │                          ╰──────── this call passes 1 Argument
+   │                       ─┬─ ──┬──  
+   │                        ╰────│──── 'Integer::add' takes an Integer as Parameter 1
+   │                             │    
+   │                             ╰──── this is a String
    │ 
    │ Note 1: 'Integer::add' takes 1 Argument: Parameter 1 is Integer.
    │ Note 2: 'Integer::add' takes 1 Argument: Parameter 1 is Rational.

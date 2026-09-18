@@ -571,7 +571,7 @@ implementation {
 }
 ```
 
-This is the `Whole` and `Exact` pair from above, kept under one name in one namespace. The entry is chosen while compiling, and each entry compiles to a JavaScript function of its own. Nothing checks types at run time to pick one. A call that no entry accepts is [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload), with one note per entry:
+This is the `Whole` and `Exact` pair from above, kept under one name in one namespace. The entry is chosen while compiling, and each entry compiles to a JavaScript function of its own. Nothing checks types at run time to pick one. A call that no entry accepts is [`no-matching-overload`](/docs/reference/diagnostics#no-matching-overload). It leads with the entry the call came closest to, and lists one note per entry:
 
 <div class="error-output">
 
@@ -581,8 +581,12 @@ Error: No overload of 'wrap' accepts these Arguments
     ╭─┤ wrap.es:18:17 │
     │
  18 │     Terminal.print("essence"::wrap(around "*"))
-    │                    ─────────────┬─────────────  
-    │                                 ╰─────────────── this call passes 1 Argument
+    │                               ──┬─        ─┬─  
+    │                                 ╰──────────│─── 'Wrapping::wrap' takes Parameter 'in' here
+    │                                            │   
+    │                                            ╰─── this is labelled 'around'
+    │ 
+    │ Help: Write 'in' before the value.
     │ 
     │ Note 1: 'Wrapping::wrap' takes no Arguments.
     │ Note 2: 'Wrapping::wrap' takes 1 Argument: Parameter 'in' is String.

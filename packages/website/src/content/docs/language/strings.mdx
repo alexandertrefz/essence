@@ -71,8 +71,10 @@ Error: No overload of 'character' accepts these Arguments
    ╭─┤ fallback.es:4:17 │
    │
  4 │     Terminal.print(word::character(at 9, defaultingTo ""))
-   │                    ───────────────────┬──────────────────
-   │                                       ╰──────────────────── this call passes 2 Arguments
+   │                          ────┬────                    ─┐
+   │                              ╰─────────────────────────│── 'String::character' takes a Character as Parameter 'defaultingTo'
+   │                                                        │
+   │                                                        ╰── this is a String
    │
    │ Note 1: 'String::character' takes 1 Argument: Parameter 'at' is Integer.
    │ Note 2: 'String::character' takes 2 Arguments: Parameter 'at' is Integer, Parameter 'defaultingTo' is Character.

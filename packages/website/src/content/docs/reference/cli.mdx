@@ -387,8 +387,10 @@ Error: No overload of 'is' accepts these Arguments
     ╭─┤ greeting.es:15:10 │
     │
  15 │        expect greeting(to "Ada")::is(42)
-    │               ─────────────┬────────────
-    │                            ╰────────────── this call passes 1 Argument
+    │                                   ─┐ ─┐
+    │                                    ╰──│── 'String::is' takes a String as Parameter 1
+    │                                       │
+    │                                       ╰── this is an Integer
     │
     │ Note 1: 'String::is' takes 1 Argument: Parameter 1 is String.
     │ Note 2: 'String::is' takes 2 Arguments: Parameter 1 is String, Parameter 'comparing' is CaseSensitivity.

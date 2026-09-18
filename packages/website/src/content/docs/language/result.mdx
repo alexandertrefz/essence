@@ -336,8 +336,10 @@ Error: No overload of 'keep' accepts these Arguments
     ╭─┤ chain.es:13:19 │
     │
  13 │     Terminal.inspect(parsed::keep(where isSmall, failingWith #TooBig))
-    │                      ────────────────────────┬───────────────────────
-    │                                              ╰───────────────────────── this call passes 2 Arguments
+    │                              ──┬─                            ───┬───
+    │                                ╰────────────────────────────────│───── 'Result::keep' takes a Problem#NotANumber as Parameter 'failingWith'
+    │                                                                 │
+    │                                                                 ╰───── this is a Problem#TooBig
     │
     │ Note: 'Result::keep' takes 2 Arguments: Parameter 'where' is (_: Integer) -> Boolean, Parameter 'failingWith' is Problem#NotANumber.
 ────╯
@@ -455,8 +457,10 @@ Error: No overload of 'andThen' accepts these Arguments
     ╭─┤ steps.es:17:19 │
     │
  17 │     Terminal.inspect(readNumber("1")::andThen(seat))
-    │                      ───────────────┬──────────────
-    │                                     ╰──────────────── this call passes 1 Argument
+    │                                       ───┬─── ──┬─
+    │                                          ╰──────│─── 'Result::andThen' takes a (_: Integer) -> Result<Other, SeatProblem> as Parameter 1
+    │                                                 │
+    │                                                 ╰─── this is a (_: Integer) -> Result<String, String>
     │
     │ Note: 'Result::andThen' takes 1 Argument: Parameter 1 is (_: Integer) -> Result<Other, SeatProblem>.
 ────╯
