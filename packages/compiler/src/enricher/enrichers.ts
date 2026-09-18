@@ -44,6 +44,8 @@ import {
 	createFreshenedInference,
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
+	genericNamesMentioned,
+	type GenericInferenceContext,
 	impliedConjunctKeys,
 	isPartialOf,
 	matchArguments,
@@ -55,6 +57,7 @@ import {
 	mergedRecordType,
 	namespaceAnswersForBase,
 	negatedPredicateConjunct,
+	pairArguments,
 	predicateConjunctKey,
 	provenConjuncts,
 	refinableBaseTag,
@@ -285,9 +288,9 @@ function enrichCalleeExpression(
 ): common.typed.ExpressionNode {
 	switch (node.nodeType) {
 		case "MethodInvocation":
-			return enrichMethodInvocation(node, scope)
+			return enrichMethodInvocation(node, scope, expectedType)
 		case "FunctionInvocation":
-			return enrichFunctionInvocation(node, scope)
+			return enrichFunctionInvocation(node, scope, expectedType)
 		case "Combination":
 			return enrichCombination(node, scope)
 		case "RecordValue":
@@ -1028,6 +1031,11 @@ function payloadStandsForCase(
 function enrichMethodInvocation(
 	node: parser.MethodInvocationNode,
 	scope: enricher.Scope,
+	// NOTE: Handed on to the typer rather than used here — an Invocation's own
+	// Type is worked out from its Arguments, and the one thing the position
+	// around it decides is a Type Parameter its Arguments left half open. See
+	// `decidedSeedBindings`.
+	expectedType: common.Type | null = null,
 ): common.typed.MethodInvocationNode {
 	// NOTE: The receiver is enriched once and its Type drives Method resolution
 	// — the resolved Invocation reuses this same typed base. Each Argument is
@@ -1048,7 +1056,7 @@ function enrichMethodInvocation(
 	// thing the Namespace it reached does. Refinements erase before emission, so
 	// the Node the Rewriter sees is the Integer it always was.
 	let base = writtenReceiver(enrichExpression(node.base, scope), scope)
-	let typer = makeArgumentTyper(scope)
+	let typer = makeArgumentTyper(scope, expectedType)
 	let resolved = resolveMethodInvocation(node, base.type, scope, typer)
 	let {
 		namespace,
@@ -1092,11 +1100,13 @@ function enrichMethodInvocation(
 function enrichFunctionInvocation(
 	node: parser.FunctionInvocationNode,
 	scope: enricher.Scope,
+	// NOTE: Read exactly as a Method Invocation's is — see there.
+	expectedType: common.Type | null = null,
 ): common.typed.FunctionInvocationNode {
 	// NOTE: The callee and every Argument are enriched once — its Type drives
 	// resolution and the same typed Nodes build the final Invocation.
 	let name = enrichCalleeExpression(node.name, scope)
-	let typer = makeArgumentTyper(scope)
+	let typer = makeArgumentTyper(scope, expectedType)
 	let {
 		type,
 		conformances,
@@ -10025,6 +10035,37 @@ function inferReturnTypeFromBody(
 // side, rather than in the Resolver. Enrichment imports the Resolver, never the
 // other way round.
 
+// NOTE: A written container Literal's Node carrying the Type a call decided for
+// the Parameter it stands at — one answer per spelling, and null for every other
+// Expression. The three are the ones a decision can be written ONTO, and each
+// declares the shape that Type may be, so a decision of another shape is no
+// decision for it. They are not the only Expressions whose Type can hold an
+// undecided slot — a `define` whose arms all answer an empty List carries one
+// too, and so does a call that answers its own undecided seed — but a Node built
+// out of other Nodes says what they said, and rewriting the top of one would
+// leave the Types underneath disagreeing with it. A NAME is left alone for a
+// reason of its own: what an empty `[]` bound to a name decides is settled where
+// the name is, and a call that pinned the Type at one of its uses would say
+// something the Declaration never said.
+function decidedLiteralNode(
+	node: common.typed.ExpressionNode,
+	decided: common.Type,
+): common.typed.ExpressionNode | null {
+	if (node.nodeType === "ListValue" && decided.type === "List") {
+		return { ...node, type: decided }
+	}
+
+	if (node.nodeType === "DictionaryValue" && decided.type === "Dictionary") {
+		return { ...node, type: decided }
+	}
+
+	if (node.nodeType === "RecordValue" && decided.type === "Record") {
+		return { ...node, type: decided }
+	}
+
+	return null
+}
+
 // NOTE: Enriches each Argument value at most once per invocation resolution.
 // The typed Node is reused for every overload probe and, afterwards, for the
 // final typed Invocation. A Function literal that omitted its annotations is the
@@ -10064,9 +10105,25 @@ type ArgumentTyper = {
 		sawErrorArgument: boolean
 	}
 	noteErrorArgument: () => void
+	// NOTE: Writes the Type a finished call decided for a Parameter onto the
+	// Argument Node standing at it, where that Node is a written container
+	// Literal with a slot nobody had decided. See `decideWrittenArguments`.
+	decideArgument: (value: parser.ExpressionNode, decided: common.Type) => void
+	// NOTE: What the position AROUND the Invocation asks it to be — a
+	// Declaration's annotation, the enclosing Function's declared return Type —
+	// and null where the position says nothing. Read by `decidedSeedBindings`
+	// alone, which is the one question an Invocation's own Type Parameters can
+	// have an answer to out there: a Parameter bound to a Type with a slot the
+	// Arguments left open (`Answer := List<Unknown>` off a `startingWith []`) is
+	// decided by what the call is written INTO. Every other Expression reads the
+	// expected Type where it is enriched, so it never travels this far.
+	expectedType: common.Type | null
 }
 
-function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
+function makeArgumentTyper(
+	scope: enricher.Scope,
+	expectedType: common.Type | null = null,
+): ArgumentTyper {
 	let cache = new Map<parser.ExpressionNode, common.typed.ExpressionNode>()
 	let admissions = new Map<
 		parser.ExpressionNode,
@@ -10333,6 +10390,7 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 	}
 
 	return {
+		expectedType,
 		getType(value, expectedType, bindings = null) {
 			// NOTE: Only a Function literal with omitted annotations reacts to
 			// the expected Type, and it may resolve differently per probe — so it
@@ -10437,6 +10495,45 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 		enrichedArgumentValue(value) {
 			return enrichOnce(value)
 		},
+		decideArgument(value, decided) {
+			let enriched = cache.get(value)
+
+			// NOTE: A Parameter Type still mentioning one of the CALL's own
+			// unsolved Type Parameters is no decision, the same way it is none
+			// for a prefixed Case construction: `pick([], ["a"], [])` over a
+			// `pick <infer T, infer U>(_ a: T, _ b: T, _ c: List<U>)` would write
+			// `List<U>` onto the third Argument's brackets, under the freshened
+			// name only a call still matching can produce. Nothing bound `U`, so
+			// the call is refused as uninferable — but a Node carrying a Type
+			// Parameter no Declaration declares is not a thing to leave behind on
+			// the way there.
+			if (
+				enriched === undefined ||
+				mentionsUnsolvedTypeParameter(decided)
+			) {
+				return
+			}
+
+			let type = resolveUnknownSlots(enriched.type, decided)
+
+			if (type === enriched.type) {
+				return
+			}
+
+			let node = decidedLiteralNode(enriched, type)
+
+			if (node === null) {
+				return
+			}
+
+			// NOTE: Written through the probe recordings, exactly as a
+			// contextually typed Function literal's resolution is: the decision
+			// belongs to ONE candidate, and a candidate that loses must leave
+			// nothing behind on a Node the winner reads.
+			recordDecidedArgument(() => {
+				cache.set(value, node)
+			})
+		},
 		enrichArgumentNode(argument) {
 			let value = enrichOnce(argument.value)
 
@@ -10537,6 +10634,7 @@ type InferredInvocation = {
 function inferInvocation(
 	signature: common.BaseFunction,
 	matchableArguments: Array<MatchableArgument>,
+	typer: ArgumentTyper,
 ): InferredInvocation | undefined {
 	if (signature.generics.length === 0) {
 		let matched = matchArguments(
@@ -10563,6 +10661,27 @@ function inferInvocation(
 		inference: context,
 	})
 
+	// NOTE: Asked before the match is answered with, because what it answers is
+	// the same match run again under the Types this one left open — and asked of
+	// a match that FAILED as well, because a Parameter bound to something with a
+	// slot nobody decided is a reason a match fails: `[[]]::append([1])` binds
+	// the item Type to `List<Unknown>` off the seed, and the `List<Integer>` that
+	// follows has to DECIDE that slot rather than be measured against it. Only
+	// the second match's answer counts either way — see
+	// `invocationWithDecidedSeeds`.
+	let decided = invocationWithDecidedSeeds(
+		signature,
+		parameterTypes,
+		context,
+		freshToOriginal,
+		matchableArguments,
+		typer,
+	)
+
+	if (decided !== undefined) {
+		return decided
+	}
+
 	if (matched.type !== "Match") {
 		return undefined
 	}
@@ -10572,6 +10691,419 @@ function inferInvocation(
 		unfreshenBindings(context.bindings, freshToOriginal),
 		matched.omittedParameterIndices,
 	)
+}
+
+// NOTE: The Type Parameters this call bound to a Type carrying a slot nobody
+// decided. An empty `[]` seed is the whole of how one arises: `reduce(startingWith
+// [], …)` binds `Answer := List<Unknown>`, which says the fold carries a List and
+// nothing at all about what it holds — and `Unknown` is bottom as an Argument and
+// top as a Parameter, so every later occurrence of `Answer` is waved through
+// against it. A slot nobody decided may be READ as bottom; a WRITE has to decide
+// it, and this is the set of bindings a write is still owed for.
+//
+// One walk per binding, and a walk that stops at the first shape holding no Type
+// Argument — so a call whose Arguments named Types for themselves, which is every
+// call in a Program that writes no empty seed, is answered by walking a handful of
+// small Types.
+function undecidedBindingNames(
+	context: GenericInferenceContext,
+): Set<common.GenericName> {
+	let undecided = new Set<common.GenericName>()
+
+	for (let [name, type] of context.bindings) {
+		if (typeContainsUnknown(type)) {
+			undecided.add(name)
+		}
+	}
+
+	return undecided
+}
+
+// NOTE: This call's bindings with every slot its Arguments left open filled in
+// from what the call says ELSEWHERE, under the Generics the signature declares —
+// or null where there was nothing open, which is the answer for every call that
+// writes no empty seed.
+//
+// Three things can say it, in this order. The position the whole Invocation
+// stands in comes first: `constant kept: List<String> = words::reduce(startingWith
+// [], …)` decides the fold's `Answer` before a single Argument of it is re-read,
+// because an annotation is a decision somebody wrote down and inference never
+// overrules one. Then the Arguments that were CHECKED against the open Parameter
+// rather than having bound it — `[[]]::append([1])` binds the item Type off the
+// seed and has nothing left to do with the `List<Integer>` beside it but agree.
+// And last a Function literal Argument's BODY: the combiner of
+// `words::reduce(startingWith [], (kept, word) { <- kept::append(word) })` answers
+// a `NonEmptyList<String>`, so the fold carries a List of Strings whatever the
+// brackets that seeded it left open.
+//
+// Both are read the same way — the DECLARED Type unified against the answer, with
+// everything the Arguments did decide substituted into it first, so the open
+// Parameter is the only one standing in it. Unification at the outermost position
+// binds a Type Parameter to a refinement's BASE (see `matchTypes`), which is
+// exactly right here: the seed was empty, so what the fold carries is a List, not
+// the `NonEmptyList` one turn of the combiner happens to answer.
+//
+// Only Unknown slots are filled, through `resolveUnknownSlots` — a binding the
+// Arguments DECIDED is never overruled, and a Parameter nothing bound at all stays
+// unbound and is reported as uninferable exactly as before.
+function decidedSeedBindings(
+	signature: common.BaseFunction,
+	parameterTypes: common.BaseFunction["parameterTypes"],
+	context: GenericInferenceContext,
+	freshToOriginal: Map<common.GenericName, common.GenericName>,
+	matchableArguments: Array<MatchableArgument>,
+	expectedType: common.Type | null,
+): GenericBindings | null {
+	let undecided = undecidedBindingNames(context)
+
+	if (undecided.size === 0) {
+		return null
+	}
+
+	// NOTE: What the Arguments DID decide, kept apart so it can be substituted
+	// into the Types below while the open Parameters stay standing in them. They
+	// are the freshened names, which is what makes them recognisable as this
+	// call's own further down.
+	let settled: GenericBindings = new Map()
+
+	for (let [name, type] of context.bindings) {
+		if (!undecided.has(name)) {
+			settled.set(name, type)
+		}
+	}
+
+	let decisions: GenericBindings = new Map()
+
+	// NOTE: One unification, against a context bindable over exactly the
+	// Parameters still open — so a Parameter this answer does not mention is left
+	// alone rather than bound to whatever stands opposite it, and a failed
+	// unification decides nothing at all.
+	let decideFrom = (declared: common.Type, answer: common.Type): void => {
+		let open = new Set(
+			[...undecided].filter((name) => !decisions.has(name)),
+		)
+
+		if (open.size === 0) {
+			return
+		}
+
+		let probe: GenericInferenceContext = {
+			bindableNames: open,
+			bindings: new Map(),
+		}
+
+		if (
+			!matchesTypeWithBindings(
+				applyGenericBindings(declared, settled),
+				answer,
+				probe,
+			)
+		) {
+			return
+		}
+
+		for (let [name, candidate] of probe.bindings) {
+			let bound = context.bindings.get(name)
+
+			if (bound === undefined) {
+				continue
+			}
+
+			let filled = resolveUnknownSlots(bound, candidate)
+
+			if (filled !== bound) {
+				decisions.set(name, filled)
+			}
+		}
+	}
+
+	if (expectedType !== null) {
+		// NOTE: The signature's return Type under THIS call's freshened names,
+		// which `createFreshenedInference` renamed the Parameter Types to. The
+		// rename it used is its `freshToOriginal` read backwards.
+		let rename: GenericBindings = new Map()
+
+		for (let [fresh, original] of freshToOriginal) {
+			rename.set(original, { type: "GenericUse", name: fresh })
+		}
+
+		decideFrom(
+			applyGenericBindings(signature.returnType, rename),
+			expectedType,
+		)
+	}
+
+	let argumentFor = argumentsByParameter(parameterTypes, matchableArguments)
+	let waitsOnAnOpenParameter = (type: common.Type): boolean =>
+		decisions.size < undecided.size &&
+		[...genericNamesMentioned(type)].some(
+			(name) => undecided.has(name) && !decisions.has(name),
+		)
+
+	// NOTE: The Arguments that were CHECKED against the open Parameter rather
+	// than having bound it. A Parameter binds on its first occurrence and is only
+	// checked on every later one, and an undecided slot accepts every check — so
+	// `[[]]::append([1])` binds the item Type to `List<Unknown>` off the seed and
+	// waves the `List<Integer>` that follows straight through it. What the later
+	// Argument says is read here, where the whole call is in hand and the binding
+	// can be filled in rather than merely agreed with.
+	for (let [index, parameter] of parameterTypes.entries()) {
+		let argument = argumentFor(index)
+
+		if (
+			parameter.type.type === "Function" ||
+			argument === undefined ||
+			!waitsOnAnOpenParameter(parameter.type)
+		) {
+			continue
+		}
+
+		decideFrom(
+			applyGenericBindings(parameter.type, settled),
+			argument.getType(
+				applyGenericBindings(parameter.type, context.bindings),
+				context.bindings,
+			),
+		)
+	}
+
+	for (let [index, parameter] of parameterTypes.entries()) {
+		let argument = argumentFor(index)
+
+		if (
+			parameter.type.type !== "Function" ||
+			argument === undefined ||
+			!waitsOnAnOpenParameter(parameter.type.returnType)
+		) {
+			continue
+		}
+
+		// NOTE: The literal is read against its Parameter Types as the seed left
+		// them — `(kept: List<Unknown>, word: String)`, which is what its body was
+		// going to be enriched under anyway — and against a return Type left
+		// UNSOLVED, which is what makes `resolveContextualReturnType` read the
+		// body rather than hand the position's own answer back. That answer is the
+		// undecided Type itself, and a call that asked it would be told what it
+		// already knew.
+		let substituted = applyGenericBindings(parameter.type, context.bindings)
+		let open = applyGenericBindings(parameter.type, settled)
+
+		if (substituted.type !== "Function" || open.type !== "Function") {
+			continue
+		}
+
+		// NOTE: Silent, because the position it asks about is one no reading of
+		// this call will ever commit to: the return Type is held open ON PURPOSE,
+		// and a literal whose body answers nothing is told its return Type can
+		// not be inferred from it — where the call itself had already decided
+		// that position and the body's real complaint is that it returns nothing
+		// at all. What it says here is a question's echo, not a reading. The two
+		// readings that ARE kept report for themselves, one of them right below.
+		let { result: answered } = collectDiagnostics(() =>
+			argument.getType(
+				{ ...substituted, returnType: open.returnType },
+				context.bindings,
+			),
+		)
+
+		if (answered.type === "Function") {
+			decideFrom(open.returnType, answered.returnType)
+		}
+	}
+
+	if (decisions.size === 0) {
+		return null
+	}
+
+	let decided = new Map(context.bindings)
+
+	for (let [name, type] of decisions) {
+		decided.set(name, type)
+	}
+
+	return unfreshenBindings(decided, freshToOriginal)
+}
+
+// NOTE: The invocation matched a SECOND time, with the slots its Arguments left
+// open decided — and undefined where there was nothing to decide or nothing
+// decided it, which is every call in a Program that writes no empty seed.
+//
+// The second match is what makes a decision worth anything: the Arguments that
+// react to their position are re-read under the decided Parameter Types, so the
+// combiner of a `reduce(startingWith [], …)` is resolved against `(_: List<String>,
+// _: String) -> List<String>` and the `kept` its body reads is a List of Strings
+// rather than the undecided List the seed named. It is the recording of THAT
+// resolution the enrichment pass reads back, which is where a body misreading the
+// accumulator — `Number.sum(kept)` over a List of Strings — is finally refused.
+//
+// Held on both rails while it runs, exactly as a speculative Overload probe is,
+// and both are handed on where it holds up: the recordings are committed and the
+// Diagnostics reported. A second match that does NOT hold up is discarded whole,
+// which is what the holding is for.
+//
+// Reporting them is not a nicety. The first match stops at its first mismatch,
+// and after a blank seed that mismatch is often the very Argument that would
+// decide it — so an Argument standing after it is READ here for the first time,
+// and `enrichOnce` keeps what it read. A Diagnostic held here is held forever:
+// `triple(empty, ["a"], record.missing)` checked clean and emitted the member
+// that is not there. An Argument BOTH matches read says the same thing twice, and
+// `report` drops an exact repeat — so it is reported once, by whichever match
+// said it first.
+//
+// An erroring second match still wins. It is the only reading there is: the first
+// match failed, which is why a second one ran at all, and the Argument that
+// errored was read under these Types and no others. `sawErrorArgument` travels
+// with it, so a Type Parameter left unbound by an Error Argument is not reported
+// on top of the Argument's own Diagnostic.
+//
+// NOTE: A fresh inference, seeded with the decision, rather than the first one
+// with a binding overwritten — and made where no match is in flight, which is
+// what makes it safe. `markBindings` and `restoreBindings` undo a failed match
+// attempt by dropping everything bound PAST a mark, and the mark is a count: a
+// binding replaced in place keeps its position and its key, so the rollback that
+// runs between the members of an expected Union can neither see it nor undo it,
+// and the attempt that failed would decide the attempts after it. That rollback
+// is only reachable while a Type is being matched, which is exactly what this is
+// not: the first match is over, and the second one is handed its seeds before it
+// matches anything, so they sit ahead of every mark it can take. Nothing
+// overwrites them either — `matchGenericUse` binds a Parameter's FIRST occurrence
+// and only ever checks one that is already bound.
+function invocationWithDecidedSeeds(
+	signature: common.BaseFunction,
+	parameterTypes: common.BaseFunction["parameterTypes"],
+	context: GenericInferenceContext,
+	freshToOriginal: Map<common.GenericName, common.GenericName>,
+	matchableArguments: Array<MatchableArgument>,
+	typer: ArgumentTyper,
+): InferredInvocation | undefined {
+	// NOTE: Whether reading an Argument under the decided Types produced an Error
+	// belongs to the decision, and only where the decision is the one the call
+	// keeps: a second match that does not hold up is discarded whole, and an Error
+	// it saw on the way would otherwise stand against the reading that IS kept.
+	let { result, sawErrorArgument } = typer.probeErrorArguments(() => {
+		// NOTE: Under a recording of its own, which is dropped. Working the
+		// decision out means asking Arguments what they make of a position — and
+		// an Argument that reads its position RECORDS the one it was read against,
+		// which the enrichment pass reads back. The positions asked about here are
+		// this reading's own working, one of them a return Type deliberately held
+		// open; the position the call commits to is the one the match below
+		// settles on, and it records that for itself.
+		let { result: decided } = probeContextualFunctionTypes(() =>
+			decidedSeedBindings(
+				signature,
+				parameterTypes,
+				context,
+				freshToOriginal,
+				matchableArguments,
+				typer.expectedType,
+			),
+		)
+
+		if (decided === null) {
+			return undefined
+		}
+
+		let second = createFreshenedInference(signature)
+
+		for (let [fresh, original] of second.freshToOriginal) {
+			let type = decided.get(original)
+
+			if (type !== undefined) {
+				second.context.bindings.set(fresh, type)
+			}
+		}
+
+		let { result, recording } = probeContextualFunctionTypes(() =>
+			collectDiagnostics(() =>
+				matchArguments(second.parameterTypes, matchableArguments, {
+					inference: second.context,
+				}),
+			),
+		)
+
+		// NOTE: The decision is a reading of the call, not a judgement on it — a
+		// second match that fails leaves the first one's answer standing, and the
+		// undecided Type it carries is what the refusal of a WRITE against an
+		// undecided slot is there to catch.
+		if (result.result.type !== "Match") {
+			return undefined
+		}
+
+		commitContextualFunctionTypes(recording)
+
+		for (let diagnostic of result.diagnostics) {
+			report(diagnostic)
+		}
+
+		decideWrittenArguments(
+			second.parameterTypes,
+			second.context,
+			matchableArguments,
+		)
+
+		return substituteInferredReturnType(
+			signature,
+			unfreshenBindings(second.context.bindings, second.freshToOriginal),
+			result.result.omittedParameterIndices,
+		)
+	})
+
+	if (result !== undefined && sawErrorArgument) {
+		typer.noteErrorArgument()
+	}
+
+	return result
+}
+
+// NOTE: The decision written onto the Argument Nodes it was made for — the
+// brackets that wrote nothing taking the Type the call worked out for them, so
+// that the typed Program says what the call decided rather than what its
+// Arguments happened to say on their own.
+//
+// It is what keeps the typed tree answerable twice. Every stage after the
+// Enricher reads a call off its Nodes, and the Validator re-matches the committed
+// signature against exactly those Types: a seed still typed `List<Unknown>` beside
+// a combiner typed `(_: List<String>, _: String) -> List<String>` is a call no
+// re-match can make sense of, since the seed is what a re-match binds the
+// Parameter from. Both halves say the same thing here.
+//
+// Only what was WRITTEN as a container Literal is decided, and only through
+// `resolveUnknownSlots`, so nothing a value carries for itself is overwritten. A
+// NAME standing at the same position is deliberately left alone: what an empty
+// `[]` bound to a name decides is that Declaration's business, decided where the
+// name is, and a call that pinned the Type at one of its uses would say something
+// the Declaration never said.
+function decideWrittenArguments(
+	parameterTypes: common.BaseFunction["parameterTypes"],
+	context: GenericInferenceContext,
+	matchableArguments: Array<MatchableArgument>,
+): void {
+	let argumentFor = argumentsByParameter(parameterTypes, matchableArguments)
+
+	for (let [index, parameter] of parameterTypes.entries()) {
+		argumentFor(index)?.decide?.(
+			applyGenericBindings(parameter.type, context.bindings),
+		)
+	}
+}
+
+// NOTE: The Argument standing at each Parameter, or undefined where the call
+// wrote none — a Parameter filled in by its default has no Argument to ask
+// anything of, and neither has any Parameter of a call whose Arguments could not
+// be paired up at all, which is a call no match accepts.
+function argumentsByParameter(
+	parameterTypes: common.BaseFunction["parameterTypes"],
+	matchableArguments: Array<MatchableArgument>,
+): (index: number) => MatchableArgument | undefined {
+	let pairing = pairArguments(parameterTypes, matchableArguments)
+
+	return (index) => {
+		let argumentIndex = pairing?.forParameter[index]
+
+		return argumentIndex === null || argumentIndex === undefined
+			? undefined
+			: matchableArguments[argumentIndex]
+	}
 }
 
 // NOTE: Substitutes the collected bindings into the return Type — Generics
@@ -10639,7 +11171,7 @@ function probeOverload(
 	typer: ArgumentTyper,
 ): ProbedOverload | undefined {
 	let { result, sawErrorArgument } = typer.probeErrorArguments(() => {
-		let inferred = inferInvocation(overload, matchableArguments)
+		let inferred = inferInvocation(overload, matchableArguments, typer)
 
 		if (inferred === undefined) {
 			return undefined
@@ -10962,6 +11494,7 @@ function resolveInvokedMethodInNamespace(
 			getType: (expectedType, bindings) =>
 				typer.getType(argument.value, expectedType, bindings),
 			bindsNothing: bindsNoTypeParameter(argument),
+			decide: (decided) => typer.decideArgument(argument.value, decided),
 			mergedValue: () => typer.enrichedArgumentValue(argument.value),
 			spellsItsMembers: argument.value.nodeType === "RecordValue",
 		}),
@@ -12585,6 +13118,8 @@ function resolveFunctionInvocation(
 				getType: (expectedType, bindings) =>
 					typer.getType(argument.value, expectedType, bindings),
 				bindsNothing: bindsNoTypeParameter(argument),
+				decide: (decided) =>
+					typer.decideArgument(argument.value, decided),
 				mergedValue: () => typer.enrichedArgumentValue(argument.value),
 				spellsItsMembers: argument.value.nodeType === "RecordValue",
 			}),
@@ -12680,6 +13215,8 @@ function resolveFunctionInvocation(
 				getType: (expectedType, bindings) =>
 					typer.getType(argument.value, expectedType, bindings),
 				bindsNothing: bindsNoTypeParameter(argument),
+				decide: (decided) =>
+					typer.decideArgument(argument.value, decided),
 				mergedValue: () => typer.enrichedArgumentValue(argument.value),
 				spellsItsMembers: argument.value.nodeType === "RecordValue",
 			}),
@@ -15051,6 +15588,12 @@ type ContextualFunctionTypeRecording = {
 	>
 	cases: Map<parser.CaseValueNode, RecordedCaseValueContext>
 	paths: Map<parser.MemberPathNode, RecordedCaseValueContext>
+	// NOTE: And what a candidate decided for the Argument Nodes it was matched
+	// against — held as the work rather than as a Type, because the Node it
+	// writes onto belongs to the typer of whichever Invocation is being probed,
+	// and a nested one is probed inside its caller's probe. See
+	// `decideWrittenArguments`.
+	decided: Array<() => void>
 }
 
 // NOTE: The recordings of the probes currently running, innermost last. An
@@ -15094,6 +15637,18 @@ function recordedContextualFunctionType(
 	}
 
 	return contextualFunctionTypes.get(node)
+}
+
+// NOTE: The same rail for a decision written onto an Argument Node — held by the
+// probe that made it, run where no probe is.
+function recordDecidedArgument(decide: () => void): void {
+	let innermost = probeRecordings[probeRecordings.length - 1]
+
+	if (innermost === undefined) {
+		decide()
+	} else {
+		innermost.decided.push(decide)
+	}
 }
 
 function recordContextualCaseValueType(
@@ -15188,6 +15743,7 @@ function probeContextualFunctionTypes<Result>(probe: () => Result): {
 		functions: new Map(),
 		cases: new Map(),
 		paths: new Map(),
+		decided: [],
 	}
 
 	probeRecordings.push(recording)
@@ -15217,6 +15773,10 @@ function commitContextualFunctionTypes(
 	for (let [node, recorded] of recording.paths) {
 		recordContextualMemberPathType(node, recorded)
 	}
+
+	for (let decide of recording.decided) {
+		recordDecidedArgument(decide)
+	}
 }
 
 // NOTE: Enriches under a recording that is NOT the committed one — how a
@@ -15233,6 +15793,7 @@ function withContextualFunctionTypes<Result>(
 		functions: new Map(recording.functions),
 		cases: new Map(recording.cases),
 		paths: new Map(recording.paths),
+		decided: [...recording.decided],
 	})
 
 	try {

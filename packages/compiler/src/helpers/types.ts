@@ -2631,6 +2631,12 @@ export type MatchableArgument = {
 	// it rather than by what it says on its own. Answered lazily: an Argument is
 	// enriched at most once per Invocation, and this is asked once per candidate.
 	mergedValue?: () => common.typed.ExpressionNode | null
+	// NOTE: Fills the Unknown slots of this Argument's own Type from the Type the
+	// finished call decided for the Parameter it stands at — the brackets of a
+	// written `[]` taking what the call worked out for them. Absent everywhere the
+	// Argument has no Node to write onto: the Validator matches typed Nodes, and
+	// what it reads there is a decision the Enricher has already made.
+	decide?: (decided: common.Type) => void
 	// NOTE: Set on an Argument written as a Record LITERAL, whose emitted value
 	// therefore carries exactly the members its Type names and no others.
 	//
