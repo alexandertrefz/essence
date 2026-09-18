@@ -2961,6 +2961,28 @@ export type ArgumentPairing = {
 	omittedParameterIndices: Array<number>
 }
 
+// NOTE: What ONE refused Argument was refused for, for a report that has to
+// name the Argument rather than only the signature it was held to. Collected
+// only where a caller hands `matchArguments` somewhere to put it, which is the
+// Diagnostic path alone: a match that is only asked whether it matches pays one
+// comparison against `undefined` per refusal and nothing else.
+//
+// `argumentType` is null where the LABEL is what disagreed — matching an
+// Argument reads its label before its Type, so there is no Type to report when
+// the label is already wrong, and asking for one would type an Argument nothing
+// else typed.
+//
+// `matchedParameters` is how many Parameters this candidate answered before it
+// refused one, which is what "closest" is measured in: two candidates a call
+// misses are ordered by how far into the signature the call got.
+export type ArgumentMismatchDetail = {
+	argumentIndex: number
+	parameterIndex: number
+	matchedParameters: number
+	expectedType: common.Type
+	argumentType: common.Type | null
+}
+
 export type ArgumentMatchResult =
 	| { type: "Match"; omittedParameterIndices: Array<number> }
 	| { type: "ArityMismatch" }
@@ -3262,6 +3284,10 @@ export function matchArguments(
 	options: {
 		collectAllMismatches?: boolean
 		inference?: GenericInferenceContext
+		// NOTE: Where to put what each refusal was ABOUT, in the order the
+		// Arguments were matched in — see `ArgumentMismatchDetail`. Passed by the
+		// reports that name the Argument a candidate refused, and by nothing else.
+		explain?: Array<ArgumentMismatchDetail>
 	} = {},
 ): ArgumentMatchResult {
 	let pairing = pairArguments(parameters, matchableArguments)
@@ -3311,29 +3337,54 @@ export function matchArguments(
 						inferenceContext.bindings,
 					)
 
-		if (
-			parameter.name !== argument.name ||
-			!argumentFits(
-				parameter,
+		// NOTE: The label is compared before the Type is asked for, and the two
+		// branches stay apart so that it still is: a labelless Argument standing
+		// at a labelled Parameter is refused without typing anything, which is
+		// what keeps an Argument nothing committed to from being enriched.
+		if (parameter.name === argument.name) {
+			let argumentType = argument.getType(
 				expectedType,
-				argument,
-				argument.getType(
-					expectedType,
-					inferenceContext?.bindings ?? null,
-				),
-				inferenceContext,
+				inferenceContext?.bindings ?? null,
 			)
-		) {
-			if (!options.collectAllMismatches) {
-				return {
-					type: "ArgumentMismatch",
-					mismatchedArgumentIndices: [argumentIndex],
-					parameterForArgument: argumentPairingInverse(pairing),
-				}
+
+			if (
+				argumentFits(
+					parameter,
+					expectedType,
+					argument,
+					argumentType,
+					inferenceContext,
+				)
+			) {
+				continue
 			}
 
-			mismatchedArgumentIndices.push(argumentIndex)
+			options.explain?.push({
+				argumentIndex,
+				parameterIndex: i,
+				matchedParameters: position,
+				expectedType,
+				argumentType,
+			})
+		} else {
+			options.explain?.push({
+				argumentIndex,
+				parameterIndex: i,
+				matchedParameters: position,
+				expectedType,
+				argumentType: null,
+			})
 		}
+
+		if (!options.collectAllMismatches) {
+			return {
+				type: "ArgumentMismatch",
+				mismatchedArgumentIndices: [argumentIndex],
+				parameterForArgument: argumentPairingInverse(pairing),
+			}
+		}
+
+		mismatchedArgumentIndices.push(argumentIndex)
 	}
 
 	if (mismatchedArgumentIndices.length > 0) {

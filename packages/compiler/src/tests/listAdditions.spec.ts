@@ -549,12 +549,22 @@ describe("Which rung a call lands on", () => {
 			})::toString())
 		}`)
 
+		// NOTE: The cascade is reported BEFORE the call's own refusal, because
+		// a report that no candidate takes this many Arguments says what the
+		// call passed — and reading what each Argument came to is what enriches
+		// the literal nothing ever gave a context to. Inside out is the right
+		// way round to read the two anyway.
 		expect(diagnostics.map(({ code }) => code)).toEqual([
+			"uninferable-parameter-type",
+			"uninferable-parameter-type",
 			"no-matching-overload",
-			"uninferable-parameter-type",
-			"uninferable-parameter-type",
 		])
-		expect(diagnostics[0]!.notes?.length).toBe(2)
+		// NOTE: The two entries `List` declares, spelled out. A count holds
+		// while the sentences under it drift into something else.
+		expect(diagnostics[2]!.notes).toEqual([
+			"'List::reduce' takes 2 Arguments: Parameter 'startingWith' is Answer, Parameter 2 is (_: Answer, _: Integer) -> Answer.",
+			"'List::reduce' takes 2 Arguments: Parameter 'startingWith' is Answer, Parameter 'step' is (_: Answer, _: Integer) -> Step<Answer, Answer>.",
+		])
 	})
 
 	// NOTE: An `if` asking `hasItems` mints the proof, and the two Methods

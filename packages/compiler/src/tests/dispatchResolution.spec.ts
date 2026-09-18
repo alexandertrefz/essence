@@ -1092,3 +1092,372 @@ describe("Dispatch and Resolution", () => {
 		})
 	})
 })
+
+// NOTE: What a call no candidate accepts is TOLD. The report used to name only
+// what each candidate declares — "'String::append' takes 1 Argument: Parameter 1
+// is String" under "this call passes 1 Argument" — which says everything about
+// the callee and nothing about the call: the Argument's own Type, the half a
+// reader can not read off a signature, was never printed at all, and which of
+// the Arguments was the wrong one had to be worked out from a list. It leads
+// with the closest candidate now, and the Labels say what was passed and what
+// was wanted where.
+describe("What a refused call is told", () => {
+	// NOTE: The finding's own example, and the shape three studies named as the
+	// most frequent complaint: one candidate, one Argument, and a message that
+	// said neither what it is nor what it should have been.
+	describe("an Argument of the wrong Type", () => {
+		let source = `implementation {
+			constant total = 12
+
+			Terminal.print("Total: "::append(total))
+		}`
+
+		it("names the Argument and what it came to", () => {
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics.map(({ code }) => code)).toEqual([
+				"no-matching-overload",
+			])
+			expect(diagnostics[0]!.labels[0]!.kind).toBe("primary")
+			expect(diagnostics[0]!.labels[0]!.message).toBe(
+				"this is an Integer",
+			)
+			expect(underlinedText(source, diagnostics[0]!.labels[0]!)).toBe(
+				"total",
+			)
+		})
+
+		it("names what the candidate takes there, beside the callee", () => {
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics[0]!.labels[1]!.kind).toBe("secondary")
+			expect(diagnostics[0]!.labels[1]!.message).toBe(
+				"'String::append' takes a String as Parameter 1",
+			)
+			expect(underlinedText(source, diagnostics[0]!.labels[1]!)).toBe(
+				"append",
+			)
+		})
+
+		// NOTE: The signature is still listed. What the Labels say is where THIS
+		// call went wrong; what the Note says is what the callee takes, which is
+		// what a reader rewriting the call needs to see whole.
+		it("still lists the signature", () => {
+			expect(diagnosticsFor(source)[0]!.notes).toEqual([
+				"'String::append' takes 1 Argument: Parameter 1 is String.",
+			])
+		})
+	})
+
+	// NOTE: The A1 refusal, which is where this report is met on a Program that
+	// looks right: a fold's accumulator decided by what its combiner writes,
+	// handed to a Method over Numbers. "Parameter 1 is List<Integer>" with no
+	// word about what was passed left the one fact that explains it unsaid.
+	it("names the Type a Method over Numbers was handed instead", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			constant words = ["a", "bb"]
+			constant kept = words::reduce(startingWith [], (current, word) {
+				<- current::append(word)
+			})
+
+			Terminal.print(Number.sum(kept)::toString())
+		}`)
+
+		expect(diagnostics.map(({ code }) => code)).toEqual([
+			"no-matching-overload",
+		])
+		expect(diagnostics[0]!.labels[0]!.message).toBe(
+			"this is a List<String>",
+		)
+		expect(diagnostics[0]!.labels[1]!.message).toBe(
+			"'Number.sum' takes a List<Integer> as Parameter 1",
+		)
+	})
+
+	// NOTE: Eight entries of one `add` refuse the same Argument for the same
+	// reason, and the Labels say it once. A clause per Note would be the same
+	// sentence eight times over the list a reader is scanning for the entry they
+	// meant.
+	it("says nothing more under a candidate refused the same way", () => {
+		expect(
+			diagnosticsFor(`implementation {
+				Terminal.print(5::add("one"))
+			}`)[0]!.notes,
+		).toEqual([
+			"'Integer::add' takes 1 Argument: Parameter 1 is Integer.",
+			"'Integer::add' takes 1 Argument: Parameter 1 is Rational.",
+			"'Integer::add' takes 1 Argument: Parameter 1 is Algebraic.",
+			"'Integer::add' takes 1 Argument: Parameter 1 is Transcendental.",
+			"'NonNegativeInteger::add' takes 1 Argument: Parameter 1 is PositiveInteger.",
+			"'NonNegativeInteger::add' takes 1 Argument: Parameter 1 is NonNegativeInteger.",
+			"'PositiveInteger::add' takes 1 Argument: Parameter 1 is NonNegativeInteger.",
+			"'Scalar::add' takes 1 Argument: Parameter 1 is Scalar.",
+		])
+	})
+
+	// NOTE: And where a candidate disagreed somewhere ELSE, its Note says so —
+	// which is the whole of what tells two entries of one name apart. The entry
+	// taking a bare item refused the LABEL; the entry the call meant refused the
+	// Type behind it.
+	it("says where a candidate disagreed otherwise", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			constant numbers = [1, 2, 3]
+
+			Terminal.print(numbers::append(contentsOf ["a"])::toString())
+		}`)
+
+		expect(diagnostics[0]!.notes).toEqual([
+			"'List::append' takes 1 Argument: Parameter 1 is Integer — this call writes 'contentsOf' where Parameter 1 takes no label.",
+			"'List::append' takes 1 Argument: Parameter 'contentsOf' is List<Integer>.",
+		])
+	})
+
+	// NOTE: Which is also the tie the closest candidate is decided by. Both
+	// entries stopped at the same Parameter, and the one that agreed on the
+	// label got further into the call than the one that did not — leading with
+	// the entry the call clearly did not mean would be a report about the wrong
+	// signature.
+	it("leads with the candidate whose labels agreed", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			constant numbers = [1, 2, 3]
+
+			Terminal.print(numbers::append(contentsOf ["a"])::toString())
+		}`)
+
+		expect(diagnostics[0]!.labels[0]!.message).toBe(
+			"this is a List<String>",
+		)
+		expect(diagnostics[0]!.labels[1]!.message).toBe(
+			"'List::append' takes a List<Integer> as Parameter 'contentsOf'",
+		)
+	})
+
+	// NOTE: Among candidates of the right arity, the closest is the one that
+	// answered the most Parameters before refusing one — the second entry here,
+	// which took the String and stopped at the Integer beside it.
+	it("leads with the candidate that got furthest into the call", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			namespace Shipping {
+				overload static label {
+					(_ code: Integer, to city: String) -> String {
+						<- "{code}"
+					}
+
+					(_ name: String, to postcode: Integer) -> String {
+						<- name
+					}
+				}
+			}
+
+			Terminal.print(Shipping.label("Ada", to 1/2))
+		}`)
+
+		expect(diagnostics.map(({ code }) => code)).toEqual([
+			"no-matching-overload",
+		])
+		expect(diagnostics[0]!.labels[0]!.message).toBe("this is a Rational")
+		expect(diagnostics[0]!.labels[1]!.message).toBe(
+			"'Shipping.label' takes an Integer as Parameter 'to'",
+		)
+	})
+
+	// NOTE: A label that does not agree is what the call got wrong, and saying
+	// it is an Integer where a String was wanted would name nothing the call did
+	// — the Type behind the label was never even read. The Help is the
+	// Validator's own, word for word: one mistake, one edit, however the callee
+	// was reached.
+	describe("an Argument labelled wrongly", () => {
+		let source = `implementation {
+			constant temperature = 42
+
+			Terminal.print(temperature::clamp(0, and 100)::toString())
+		}`
+
+		it("says what the Argument is labelled and what was expected", () => {
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics.map(({ code }) => code)).toEqual([
+				"no-matching-overload",
+			])
+			expect(diagnostics[0]!.labels[0]!.message).toBe(
+				"this Argument carries no label",
+			)
+			expect(underlinedText(source, diagnostics[0]!.labels[0]!)).toBe("0")
+			expect(diagnostics[0]!.labels[1]!.message).toBe(
+				"'Integer::clamp' takes Parameter 'between' here",
+			)
+		})
+
+		it("offers the edit the label asks for", () => {
+			expect(diagnosticsFor(source)[0]!.helps).toEqual([
+				"Write 'between' before the value.",
+			])
+		})
+	})
+
+	// NOTE: The other half of a label mismatch — a label written where the
+	// Parameter takes none.
+	it("says so where the Parameter takes no label at all", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			Terminal.print("essence"::append(with "!"))
+		}`)
+
+		expect(diagnostics[0]!.labels[0]!.message).toBe(
+			"this is labelled 'with'",
+		)
+		expect(diagnostics[0]!.labels[1]!.message).toBe(
+			"'String::append' takes no label on Parameter 1",
+		)
+		expect(diagnostics[0]!.helps).toEqual(["Pass the value with no label."])
+	})
+
+	// NOTE: A label no candidate declares anywhere is matched before anything is
+	// typed, and the Parameter it names nowhere leaves the count wrong — so the
+	// report falls back to the call's shape and would be about a count nobody
+	// miscounted. The label is named instead, which is what went wrong.
+	it("names a label no candidate declares", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			constant numbers = [1, 2, 3]
+
+			Terminal.print(numbers::slice(at 1)::toString())
+		}`)
+
+		expect(diagnostics.map(({ code }) => code)).toEqual([
+			"no-matching-overload",
+		])
+		expect(diagnostics[0]!.notes[0]).toBe(
+			"No Parameter of 'slice' is labelled 'at'.",
+		)
+	})
+
+	// NOTE: Where no candidate takes this many Arguments there is no Argument to
+	// lead with — nothing was refused for what it is. The report stays about the
+	// call's shape, and says what the call handed over, which is the half a
+	// reader can not count off their own source.
+	it("names what a call of the wrong shape passed", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			constant word = "essence"
+
+			Terminal.print(word::character(at 1, 2, 3))
+		}`)
+
+		expect(diagnostics.map(({ code }) => code)).toEqual([
+			"no-matching-overload",
+		])
+		expect(diagnostics[0]!.labels[0]!.message).toBe(
+			"this call passes 3 Arguments: an Integer, an Integer and an Integer",
+		)
+	})
+
+	// NOTE: A call that passes nothing has nothing to list, and the count says
+	// the whole of it.
+	it("leaves the list out where the call passes nothing", () => {
+		expect(
+			diagnosticsFor(`implementation {
+				Terminal.print("essence"::prepend())
+			}`)[0]!.labels[0]!.message,
+		).toBe("this call passes 0 Arguments")
+	})
+
+	// NOTE: A Function literal Argument is named by the signature it was read as
+	// — which is the one thing a reader can not see, since the literal they
+	// wrote spells none of it.
+	it("names the signature a Function literal was read as", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			constant numbers = [1, 2, 3]
+
+			Terminal.print(numbers::map((item: Integer, index: Integer) -> Integer {
+				<- item
+			})::length()::toString())
+		}`)
+
+		expect(diagnostics.map(({ code }) => code)).toEqual([
+			"no-matching-overload",
+		])
+		expect(diagnostics[0]!.labels[0]!.message).toBe(
+			"this is a (item: Integer, index: Integer) -> Integer",
+		)
+	})
+
+	// NOTE: And where the literal could not be read at all, the report says that
+	// and points at it rather than naming the Error Type nobody wrote. The
+	// literal's own Diagnostic is untouched — it is the one that says which
+	// Parameter has no Type and how to give it one.
+	it("says so where a Function literal could not be read", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			constant numbers = [1, 2, 3]
+
+			Terminal.print(numbers::map((item, index) { <- item })::length()::toString())
+		}`)
+
+		expect(diagnostics.map(({ code }) => code)).toEqual([
+			"uninferable-parameter-type",
+			"no-matching-overload",
+		])
+		expect(diagnostics[1]!.labels[0]!.message).toBe(
+			"this Argument's Type could not be read",
+		)
+		expect(diagnostics[1]!.notes).toEqual([
+			"'List::map' takes 1 Argument: Parameter 1 is (_: Integer) -> Other.",
+		])
+	})
+
+	// NOTE: The pair the blank question is about is in hand here for the first
+	// time — the Parameter Type the closest candidate held the Argument to, and
+	// the Type the Argument came to. A Type Parameter bound to a blank by an
+	// earlier Argument refuses the one after it for being a write into a blank
+	// rather than for holding the wrong thing, and nothing else in the report
+	// says so. The same two sentences every other refusal over a blank carries.
+	it("explains a blank on the expected side", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			namespace Keeps {
+				overload static keep {
+					<infer T>(_ seed: T, _ more: T) -> T {
+						<- seed
+					}
+
+					<infer T>(_ seed: T, _ more: T, _ third: T) -> T {
+						<- seed
+					}
+				}
+			}
+
+			constant empty = []
+
+			Terminal.print(Keeps.keep(empty, ["a"], 1)::length()::toString())
+		}`)
+
+		expect(diagnostics.map(({ code }) => code)).toEqual([
+			"no-matching-overload",
+		])
+		expect(diagnostics[0]!.labels[1]!.message).toBe(
+			"'Keeps.keep' takes a List<Unknown> as Parameter 2",
+		)
+		expect(diagnostics[0]!.notes).toContain(
+			"An empty List Literal leaves its item Type unknown until a write decides it, and nothing has written into this one — the 'Unknown' here is a blank, not a Type.",
+		)
+		expect(diagnostics[0]!.helps).toEqual([
+			"Annotate the Declaration that creates it — 'List<Integer>' — so what is written into it is judged against the Type it holds.",
+		])
+	})
+
+	// NOTE: A Union receiver whose covering Namespace declares the Method is
+	// reported against the receiver as written — per-member dispatch is the
+	// second chance, not the failure worth reporting — and the Argument it
+	// refused is named exactly as it is anywhere else.
+	it("names the Argument a Union receiver's Namespace refused", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			constant maybe: Optional<Rational> = #Empty
+
+			Terminal.inspect(maybe::value(defaultingTo 0))
+		}`)
+
+		expect(diagnostics.map(({ code }) => code)).toEqual([
+			"no-matching-overload",
+		])
+		expect(diagnostics[0]!.labels[0]!.message).toBe("this is an Integer")
+		expect(diagnostics[0]!.labels[1]!.message).toBe(
+			"'Optional::value' takes a Rational as Parameter 'defaultingTo'",
+		)
+	})
+})

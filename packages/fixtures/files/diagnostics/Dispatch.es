@@ -20,8 +20,8 @@ implementation {
 	§ is neither zero nor negative, so the refined Namespaces are searched too.
 	constant magnitude = 1::lenght()
 
-	§ no-matching-overload — every candidate signature is listed.
-	constant piece = "essence"::prepend()
+	§ no-matching-overload — the Argument refused, and every candidate listed.
+	constant piece = "essence"::prepend(1)
 
 	§ no-namespace-for-value.
 	constant nowhere = { x = 1 }::describe()

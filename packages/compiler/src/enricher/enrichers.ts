@@ -13,10 +13,12 @@ import { providedMethodProtocol } from "../helpers/conformance"
 import {
 	choiceIdentity,
 	countOf,
+	describeParameter,
 	describeSignature,
 	describeType,
 	displayChoiceName,
 	undecidedSlotAnnotation,
+	undecidedSlotEvidence,
 	withArticle,
 } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
@@ -39,6 +41,7 @@ import { closestMatch } from "../helpers/suggest"
 import {
 	answersForBase,
 	applyGenericBindings,
+	type ArgumentMismatchDetail,
 	buildUnion,
 	canonicalPredicateConjuncts,
 	createFreshenedChoiceInference,
@@ -11533,6 +11536,65 @@ function partitionInstanceMethodNamespaces(
 	return { instanceNamespaces, staticNamespaces }
 }
 
+// NOTE: The Arguments of a `::` call as matching reads them, with the receiver
+// unshifted in front of them: it occupies the first Parameter of every
+// non-static Method signature. One builder for selection and for the report that
+// explains a failed selection — a second spelling of this list would be a second
+// answer to what the call passed, and the report would be describing a call
+// nothing resolved.
+//
+// `receiverType` stands in for the receiver where a Union receiver's dispatch
+// resolves the Method once per member, so each member is matched as if the
+// receiver had that Type. Otherwise the receiver is the Type the base was
+// already enriched to.
+function methodMatchableArguments(
+	node: parser.MethodInvocationNode,
+	baseType: common.Type,
+	typer: ArgumentTyper,
+	receiverType: common.Type | null = null,
+): Array<MatchableArgument> {
+	return [
+		{ name: null, getType: () => receiverType ?? baseType },
+		...node.arguments.map((argument) => ({
+			name: argument.name?.content ?? null,
+			getType: (
+				expectedType: common.Type,
+				bindings: GenericBindings | null,
+			) => typer.getType(argument.value, expectedType, bindings),
+			bindsNothing: bindsNoTypeParameter(argument),
+			decide: (decided: common.Type) =>
+				typer.decideArgument(argument.value, decided),
+			mergedValue: () => typer.enrichedArgumentValue(argument.value),
+			spellsItsMembers: argument.value.nodeType === "RecordValue",
+		})),
+	]
+}
+
+// NOTE: Where each of those Arguments is WRITTEN — the receiver's place first,
+// which is left of the `::`, and each written Argument's own after it.
+function methodArgumentPositions(
+	node: parser.MethodInvocationNode,
+): Array<common.Position> {
+	return [
+		node.base.position,
+		...node.arguments.map((argument) => argument.value.position),
+	]
+}
+
+// NOTE: What each written Argument came to. ENRICHES, which is why it is only
+// ever asked by the report that falls back to the call's shape — see
+// `overloadRefusalReport`. An Argument enriched here is enriched exactly once
+// all the same: the typer holds one Node per Argument and the Invocation's own
+// enrichment reads it back.
+function writtenArgumentTypes(
+	args: Array<parser.ArgumentNode>,
+	typer: ArgumentTyper,
+): Array<common.Type> {
+	return args.map(
+		(argument) => typer.enrichedArgumentValue(argument.value).type,
+	)
+}
+
 function resolveInvokedMethodInNamespace(
 	node: parser.MethodInvocationNode,
 	resolvedNamespace: common.NamespaceType,
@@ -11565,26 +11627,12 @@ function resolveInvokedMethodInNamespace(
 		return
 	}
 
-	let matchableArguments: Array<MatchableArgument> = node.arguments.map(
-		(argument) => ({
-			name: argument.name?.content ?? null,
-			getType: (expectedType, bindings) =>
-				typer.getType(argument.value, expectedType, bindings),
-			bindsNothing: bindsNoTypeParameter(argument),
-			decide: (decided) => typer.decideArgument(argument.value, decided),
-			mergedValue: () => typer.enrichedArgumentValue(argument.value),
-			spellsItsMembers: argument.value.nodeType === "RecordValue",
-		}),
+	let matchableArguments = methodMatchableArguments(
+		node,
+		baseType,
+		typer,
+		receiverType,
 	)
-
-	// NOTE: Union dispatch resolves the Method once per member Type — the
-	// override stands in for the receiver so each member is matched as if
-	// the receiver had that Type. Otherwise the receiver is the Type the
-	// base was already enriched to.
-	matchableArguments.unshift({
-		name: null,
-		getType: () => receiverType ?? baseType,
-	})
 
 	// NOTE: A SimpleMethod is its own single candidate — one signature to match
 	// and one set of bounds to solve is what `selectOverload` does for one
@@ -11912,69 +11960,502 @@ function reportStaticMethodOnValue(
 	)
 }
 
-// NOTE: The receiver occupies the first Parameter of every non-static Method
-// signature, but it is written to the left of the `::` rather than inside the
-// parentheses — listing it among the Arguments would describe a call nobody
-// can write.
-function describeMethodOverloads(
-	methodType: common.Type | undefined,
-): Array<Array<common.Parameter>> {
-	if (methodType === undefined) {
-		return []
-	}
+// NOTE: One entry a refused call was measured against, as a report names it.
+// `signature` is what the Arguments were matched against and `receiverParameters`
+// is how much of its front the call did not write: the receiver occupies the
+// first Parameter of every non-static Method signature, but a `::` call writes it
+// to the LEFT of the parentheses, so listing it among the Arguments would
+// describe a call nobody can write. It is also what `Parameter 1` counts from —
+// and, where the refusal is the receiver itself, what says so instead of naming a
+// Parameter the reader can not find in the call.
+type OverloadCandidate = {
+	// NOTE: Spelled as a report writes it, quotes and all — `'String::append'`,
+	// `'Number.sum'`, and the bare "This callee" a call whose callee is an
+	// Expression rather than a name is left with.
+	name: string
+	// NOTE: The half a PROVIDED Method needs beside its name — a reader who never
+	// wrote `isLessThan` anywhere needs both which Namespace's rung rejected them
+	// and where the body lives. Empty for a written Method.
+	qualifier: string
+	signature: common.BaseFunction
+	receiverParameters: number
+}
 
-	let dropsReceiver =
-		methodType.type === "SimpleMethod" ||
-		methodType.type === "OverloadedMethod"
+// NOTE: Why one candidate refused this call — the first Parameter it could not
+// answer, or null where the Arguments could not be paired with its Parameters at
+// all, which is a count nobody can report per Argument.
+type CandidateRefusal = {
+	candidate: OverloadCandidate
+	detail: ArgumentMismatchDetail | null
+}
 
-	switch (methodType.type) {
+// NOTE: The signatures one Method declares, with the receiver still on the front
+// — see `OverloadCandidate`. A name no Namespace declares answers with none,
+// which is the answer for a Diagnostic that was handed a Namespace reached
+// another way.
+function methodOverloadSignatures(methodType: common.Type | undefined): {
+	signatures: Array<common.BaseFunction>
+	receiverParameters: number
+} {
+	switch (methodType?.type) {
 		case "SimpleMethod":
+			return { signatures: [methodType], receiverParameters: 1 }
 		case "StaticMethod":
-			return [
-				dropsReceiver
-					? methodType.parameterTypes.slice(1)
-					: methodType.parameterTypes,
-			]
+			return { signatures: [methodType], receiverParameters: 0 }
 		case "OverloadedMethod":
+			return { signatures: methodType.overloads, receiverParameters: 1 }
 		case "OverloadedStaticMethod":
-			return methodType.overloads.map((overload) =>
-				dropsReceiver
-					? overload.parameterTypes.slice(1)
-					: overload.parameterTypes,
-			)
+			return { signatures: methodType.overloads, receiverParameters: 0 }
 		default:
-			return []
+			return { signatures: [], receiverParameters: 0 }
 	}
 }
 
-// NOTE: One Note per candidate signature, each read off the Namespace
+// NOTE: The candidates a `::` call reached, each read off the Namespace
 // SPECIALIZED against this receiver — a `List<Integer>` is told its `prepend`
 // takes an `Integer`, not an `ItemType`. The reader is being shown what the
 // call would have had to pass, and a Namespace Generic is not something they
-// wrote.
+// wrote. Matching is measured against the same specialized signature, so the
+// Type a report names as expected is the Type the report also refuses against.
 //
 // A PROVIDED Method is named by the Namespace whose conformance put it in
 // reach, with the Protocol that wrote it said beside it — a reader who never
 // wrote `isLessThan` anywhere needs both halves to find it: which Namespace's
 // rung rejected them, and where the body lives.
-function describeCandidateSignatures(
+function methodCandidates(
 	node: parser.MethodInvocationNode,
 	namespaces: Map<string, common.NamespaceType>,
 	baseType: common.Type,
-): Array<string> {
+): Array<OverloadCandidate> {
 	return [...specializedNamespacesFor(namespaces, baseType)].flatMap(
-		([namespaceName, namespaceType]) =>
-			describeMethodOverloads(
+		([namespaceName, namespaceType]) => {
+			let { signatures, receiverParameters } = methodOverloadSignatures(
 				namespaceType.methods[node.member.content],
-			).map(
-				(parameterTypes) =>
-					`'${candidateNamespaceName(namespaceName, namespaceType)}::${node.member.content}'${
-						namespaceType.providedBy === undefined
-							? ""
-							: ` (provided by ${namespaceType.providedBy})`
-					} ${describeSignature(parameterTypes)}.`,
-			),
+			)
+
+			return signatures.map((signature) => ({
+				name: `'${candidateNamespaceName(namespaceName, namespaceType)}::${node.member.content}'`,
+				qualifier:
+					namespaceType.providedBy === undefined
+						? ""
+						: ` (provided by ${namespaceType.providedBy})`,
+				signature,
+				receiverParameters,
+			}))
+		},
 	)
+}
+
+// NOTE: What the call would have had to write at one Parameter of one candidate.
+// The receiver is not a Parameter a call can count to: it is written left of the
+// `::`, so a report about it says what it is rather than which place it stands
+// in.
+function describeCandidateParameter(
+	candidate: OverloadCandidate,
+	parameterIndex: number,
+): string {
+	let written = parameterIndex - candidate.receiverParameters
+
+	return written < 0
+		? "its receiver"
+		: describeParameter(
+				candidate.signature.parameterTypes[parameterIndex],
+				written,
+			)
+}
+
+// NOTE: Every candidate matched once more, for the report alone. What a refusal
+// was ABOUT is not recorded while the candidates are probed, because a call that
+// RESOLVES probes candidates that fail on the way to the one that answers: the
+// happy path would pay for a Diagnostic nobody reports.
+//
+// Nothing is enriched here that the probes did not enrich already. Each match
+// stops at the first refusal — `collectAllMismatches` is deliberately not asked
+// for — which is exactly where that candidate's own probe stopped, so every
+// Argument whose Type this asks for has been asked before and answers from the
+// typer's cache. That is what makes it safe to run under `collectDiagnostics`:
+// what is thrown away here is what was already reported, or already held back,
+// while the candidates were probed. An unannotated Function literal is the one
+// Argument read again rather than read back, and reading it again reports from
+// inside its body and records what it resolved to — so the recording is thrown
+// away with the Diagnostics, and the committed one stands.
+function refusedCandidates(
+	candidates: Array<OverloadCandidate>,
+	matchableArguments: Array<MatchableArgument>,
+): Array<CandidateRefusal> {
+	let { result } = probeContextualFunctionTypes(() =>
+		collectDiagnostics(() =>
+			candidates.map((candidate) => ({
+				candidate,
+				detail: candidateRefusal(candidate, matchableArguments),
+			})),
+		),
+	)
+
+	return result.result
+}
+
+// NOTE: One candidate's first refusal, or null where its Parameters and this
+// call's Arguments could not be paired at all. A Generic signature is matched
+// under a freshened inference context of its own, exactly as `inferInvocation`
+// matches it — a Parameter mentioning a Type Parameter the call binds is not a
+// Type anything can be measured against until the Argument that binds it has
+// been.
+function candidateRefusal(
+	candidate: OverloadCandidate,
+	matchableArguments: Array<MatchableArgument>,
+): ArgumentMismatchDetail | null {
+	let explain: Array<ArgumentMismatchDetail> = []
+	let { signature } = candidate
+
+	if (signature.generics.length === 0) {
+		matchArguments(signature.parameterTypes, matchableArguments, {
+			explain,
+		})
+	} else {
+		let { parameterTypes, context } = createFreshenedInference(signature)
+
+		matchArguments(parameterTypes, matchableArguments, {
+			explain,
+			inference: context,
+		})
+	}
+
+	return explain[0] ?? null
+}
+
+// NOTE: The candidate a report LEADS with — the one this call came closest to
+// answering, measured in Parameters answered before the refusal. A candidate
+// whose Parameters the Arguments could not even be paired with is not in the
+// running: it refused the call's shape rather than one of its Arguments, and the
+// count the whole report falls back to is what says so.
+//
+// A refusal over a Type beats one over a LABEL at the same depth. Both stopped
+// at the same Parameter, but a label is compared BEFORE a Type, so a candidate
+// that agreed on every label got further into the call than one that did not —
+// `[1]::append(contentsOf ["a"])` is the everyday shape of it, where the entry
+// taking a bare item disagrees at the same Parameter as the entry the call
+// clearly meant.
+//
+// Ties go to the candidate declared first, which is the order they were probed
+// in and the order their Notes are listed in.
+function closestRefusal(
+	refusals: Array<CandidateRefusal>,
+): { candidate: OverloadCandidate; detail: ArgumentMismatchDetail } | null {
+	let closest: {
+		candidate: OverloadCandidate
+		detail: ArgumentMismatchDetail
+	} | null = null
+
+	for (let { candidate, detail } of refusals) {
+		if (detail === null) {
+			continue
+		}
+
+		if (
+			closest === null ||
+			detail.matchedParameters > closest.detail.matchedParameters ||
+			(detail.matchedParameters === closest.detail.matchedParameters &&
+				detail.argumentType !== null &&
+				closest.detail.argumentType === null)
+		) {
+			closest = { candidate, detail }
+		}
+	}
+
+	return closest
+}
+
+// NOTE: One Note per candidate — what it takes, and where this call disagreed
+// with it where that is NOT what the report's own Labels already say. The clause
+// is what turns a list of signatures a reader has to compare by eye into a list
+// they can read: with three entries of one `append` in front of them, the entry
+// that refused a label and the entry that refused a Type are told apart by it.
+//
+// Which is also why a candidate that refused the call the same way the closest
+// one did says nothing more. `5::add("one")` reaches eight entries that all
+// refuse the same Argument for being a String, and eight copies of that sentence
+// under a Label already saying it is noise a reader has to read past to find the
+// entry they meant.
+//
+// A candidate that refused the ARITY says nothing more either. The count it
+// takes stands in its signature and the count the call passes stands in the
+// Label, so a clause holding one against the other is a third spelling of the
+// same sentence.
+function candidateNote(
+	{ candidate, detail }: CandidateRefusal,
+	matchableArguments: Array<MatchableArgument>,
+	lead: ArgumentMismatchDetail | null,
+): string {
+	let written = candidate.signature.parameterTypes.slice(
+		candidate.receiverParameters,
+	)
+
+	return `${candidate.name}${candidate.qualifier} ${describeSignature(written)}${
+		detail === null || refusedAlike(detail, lead)
+			? ""
+			: ` — ${refusalClause(candidate, detail, matchableArguments)}`
+	}.`
+}
+
+// NOTE: Whether two candidates were refused over the same thing — the same
+// Argument, over a Type rather than a label or the other way round, and the same
+// Type read off it. The Type is compared as it is SPELLED, which is how a report
+// tells two of them apart: an Argument read against one candidate's Parameter
+// Types can come to a different Type under another's, and an unannotated
+// Function literal is exactly that.
+function refusedAlike(
+	detail: ArgumentMismatchDetail,
+	lead: ArgumentMismatchDetail | null,
+): boolean {
+	if (lead === null || detail.argumentIndex !== lead.argumentIndex) {
+		return false
+	}
+
+	return detail.argumentType === null || lead.argumentType === null
+		? detail.argumentType === lead.argumentType
+		: describeType(detail.argumentType) === describeType(lead.argumentType)
+}
+
+// NOTE: What this call did at the Parameter one candidate refused, said from the
+// CALL's side — the Notes describe candidates, so the clause that ends one has
+// to say which of them the call is being measured against.
+function refusalClause(
+	candidate: OverloadCandidate,
+	detail: ArgumentMismatchDetail,
+	matchableArguments: Array<MatchableArgument>,
+): string {
+	let parameter = candidate.signature.parameterTypes[detail.parameterIndex]
+	let name = describeCandidateParameter(candidate, detail.parameterIndex)
+
+	if (detail.argumentType === null) {
+		let label = matchableArguments[detail.argumentIndex]?.name ?? null
+
+		if (parameter?.name == null) {
+			return `this call writes '${label}' where ${name} takes no label`
+		}
+
+		return label === null
+			? `this call writes no label where ${name} is expected`
+			: `this call writes '${label}' where ${name} is expected`
+	}
+
+	return `this call passes ${describeWrittenArgument(detail.argumentType)} as ${name}`
+}
+
+// NOTE: An Argument as a report names it. An Error is a Type nobody wrote: it is
+// what an Argument that could not be read at all answers, and it already carries
+// a Diagnostic of its own — so the report says that much and leaves the Type it
+// does not have out of it.
+function describeWrittenArgument(type: common.Type): string {
+	return typeContainsError(type)
+		? "an Argument whose Type could not be read"
+		: withArticle(describeType(type))
+}
+
+// NOTE: An English list, for the one report that has to name several Types in a
+// row. Written here rather than joined with commas throughout, because "a String
+// and an Integer" is what the reader would have said about their own call.
+function joinedWithAnd(described: Array<string>): string {
+	if (described.length < 2) {
+		return described.join("")
+	}
+
+	return `${described.slice(0, -1).join(", ")} and ${described[described.length - 1]}`
+}
+
+// NOTE: A label no candidate declares anywhere, for the report that fell back to
+// the call's shape. A written label is matched before anything is typed and a
+// Parameter it names nowhere takes an Argument away from the Parameter that
+// needed it, so the count comes out wrong and the report is about a count nobody
+// miscounted — `numbers::slice(at 1)` passes the one Argument `slice` takes and
+// is refused for passing one Argument. The label is what went wrong, and it is
+// said here rather than left to be spotted in a list of signatures.
+//
+// Where a candidate PAIRED the Argument the label is not this report's business:
+// the refusal is then the label mismatch itself, which names the Parameter the
+// call meant and says how to write it.
+function unknownLabelEvidence(
+	refusals: Array<CandidateRefusal>,
+	matchableArguments: Array<MatchableArgument>,
+	callee: string,
+): { notes: Array<string>; helps: Array<string> } {
+	let declared = new Set<string>()
+
+	for (let { candidate } of refusals) {
+		for (let parameter of candidate.signature.parameterTypes) {
+			if (parameter.name != null) {
+				declared.add(parameter.name)
+			}
+		}
+	}
+
+	let notes: Array<string> = []
+	let helps: Array<string> = []
+
+	for (let { name } of matchableArguments) {
+		if (name === null || declared.has(name)) {
+			continue
+		}
+
+		let suggestion = closestMatch(name, [...declared])
+
+		notes.push(`No Parameter of ${callee} is labelled '${name}'.`)
+
+		if (suggestion !== null) {
+			helps.push(`Did you mean '${suggestion}'?`)
+		}
+	}
+
+	return { notes, helps }
+}
+
+// NOTE: What a call whose shape no candidate takes handed over. The count is
+// what refused it and the Types are what a reader still has to learn from the
+// report — they can count the Arguments in their own source, and they can not
+// see what each of them came to.
+//
+// Left out where one of them could not be read: that Argument carries a
+// Diagnostic of its own, and "an Error" names no Type anybody wrote.
+function passedArgumentsLabel(passed: Array<common.Type>): string {
+	let counted = `this call passes ${countOf(passed.length, "Argument")}`
+
+	return passed.length === 0 || passed.some(typeContainsError)
+		? counted
+		: `${counted}: ${joinedWithAnd(passed.map((type) => withArticle(describeType(type))))}`
+}
+
+// NOTE: The Labels, Notes and Helps every `no-matching-overload` report is built
+// from, whichever of the three shapes of call raised it — a `::` call, one
+// member of a Union receiver's dispatch, and a `Namespace.method(…)` call whose
+// receiver is an ordinary Argument.
+//
+// The report LEADS with the closest candidate: its Label names the Argument that
+// was refused and says what it is, and the Label beside it says what that
+// candidate takes there. Naming only what every candidate DECLARES — which is
+// what this report used to do — left the one thing the call got wrong to be
+// worked out from a list, and the Argument's own Type, the half a reader can not
+// read off the signature, was never said at all.
+//
+// Where no candidate takes this many Arguments there is no Argument to lead
+// with: nothing was refused for what it is, and the report stays about the call's
+// shape.
+function overloadRefusalReport(
+	refusals: Array<CandidateRefusal>,
+	matchableArguments: Array<MatchableArgument>,
+	// NOTE: Where each matchable Argument is WRITTEN, the receiver's place
+	// included, so that a report can point at the one that was refused. Parallel
+	// to `matchableArguments`, which is what pairs a refusal with a place.
+	positions: Array<common.Position>,
+	call: {
+		position: common.Position
+		// NOTE: Where the callee is NAMED, which is where the secondary Label
+		// saying what it takes belongs — the Argument's own place is taken by the
+		// Label saying what was passed.
+		callee: common.Position
+		// NOTE: And what it is called, for the sentences that are about the call
+		// rather than about one candidate of it. Spelled as a report writes it,
+		// quotes and all.
+		name: string
+		// NOTE: Asked only where the report falls back to the call's shape, and
+		// asked as a function because asking ENRICHES: a call no candidate could
+		// pair its Arguments with has typed none of them, and the Types are read
+		// out here rather than under the probe that threw its Diagnostics away.
+		passed: () => Array<common.Type>
+	},
+): {
+	labels: [common.DiagnosticLabel, ...Array<common.DiagnosticLabel>]
+	notes: Array<string>
+	helps: Array<string>
+} {
+	let closest = closestRefusal(refusals)
+	let notes = refusals.map((refusal) =>
+		candidateNote(refusal, matchableArguments, closest?.detail ?? null),
+	)
+
+	if (closest === null) {
+		let unknownLabels = unknownLabelEvidence(
+			refusals,
+			matchableArguments,
+			call.name,
+		)
+
+		return {
+			labels: [
+				primary(call.position, passedArgumentsLabel(call.passed())),
+			],
+			notes: [...unknownLabels.notes, ...notes],
+			helps: unknownLabels.helps,
+		}
+	}
+
+	let { candidate, detail } = closest
+	let parameter = candidate.signature.parameterTypes[detail.parameterIndex]
+	let parameterName = describeCandidateParameter(
+		candidate,
+		detail.parameterIndex,
+	)
+	let position = positions[detail.argumentIndex] ?? call.position
+
+	// NOTE: A LABEL that does not agree is what the call got wrong, and the Type
+	// behind it was never asked for — matching reads a label first, and an
+	// Argument nothing committed to must not be enriched to describe a mistake
+	// that is not about it. The Help is the Validator's own, word for word: one
+	// mismatch, one edit, however the callee was reached.
+	if (detail.argumentType === null) {
+		let label = matchableArguments[detail.argumentIndex]?.name ?? null
+
+		return {
+			labels: [
+				primary(
+					position,
+					label === null
+						? "this Argument carries no label"
+						: `this is labelled '${label}'`,
+				),
+				secondary(
+					call.callee,
+					parameter?.name == null
+						? `${candidate.name} takes no label on ${parameterName}`
+						: `${candidate.name} takes ${parameterName} here`,
+				),
+			],
+			notes,
+			helps: [
+				parameter?.name == null
+					? "Pass the value with no label."
+					: `Write '${parameter.name}' before the value.`,
+			],
+		}
+	}
+
+	// NOTE: The pair the blank question is about is finally in hand here — the
+	// Parameter Type the closest candidate held this Argument to, and the Type
+	// the Argument came to. A `List<Unknown>` Parameter refuses a write for being
+	// a write into a blank rather than for holding the wrong thing, and nothing
+	// else in this report says so.
+	let undecided = undecidedSlotEvidence(
+		detail.expectedType,
+		detail.argumentType,
+		null,
+	)
+
+	return {
+		labels: [
+			primary(
+				position,
+				typeContainsError(detail.argumentType)
+					? "this Argument's Type could not be read"
+					: `this is ${withArticle(describeType(detail.argumentType))}`,
+			),
+			secondary(
+				call.callee,
+				`${candidate.name} takes ${withArticle(describeType(detail.expectedType))} as ${parameterName}`,
+			),
+		],
+		notes: [...notes, ...undecided.notes],
+		helps: undecided.helps,
+	}
 }
 
 // NOTE: What a candidate is CALLED in a report. A provided Method's pseudo
@@ -12026,8 +12507,8 @@ function describeCandidateDeclaration(
 //
 // A PROVIDED Method needs no note of its own any more. It stands on the
 // specificity ladder beside the written Methods, so a call that reached one and
-// missed is describing it already — `describeCandidateSignatures` names it and
-// the Protocol that wrote it.
+// missed is describing it already — `methodCandidates` names it and the
+// Protocol that wrote it.
 //
 // Said as a note rather than refused. Which Namespace answers a name is the
 // Program's to decide, and tying the two candidates together would refuse
@@ -12078,43 +12559,66 @@ function replacedFallbackNotes(
 			]
 }
 
-// NOTE: No `undecidedSlotEvidence` here, unlike every other report whose
-// expected side can hold a blank. That sentence is only true where a blank stood
-// opposite a Type that would have decided it, and this reporter has the
-// candidates' DECLARED Parameter Types beside a parser Node whose Arguments
-// nothing has typed — so the pair the question is about is not in hand, and
-// asking it of the declared side alone would say a blank refused a value it may
-// have had nothing to do with. Nor is one owed: a call refused here was measured
-// against a Type something decided. `constant kept: List<Integer> =
-// words::reduce(startingWith seed, (current, word) { <- current::append(word) })`
-// is refused for appending a String to a List of Integers, and the annotation
-// that decided that is written three lines above it.
+// NOTE: `memberType` is set only where a Union receiver's per-member dispatch
+// raised this — every candidate is then measured against that member, which is
+// the receiver the Arguments would have been passed to.
 function reportNoMatchingOverload(
 	node: parser.MethodInvocationNode,
 	namespaces: Map<string, common.NamespaceType>,
 	baseType: common.Type,
 	scope: enricher.Scope,
+	typer: ArgumentTyper,
+	memberType: common.Type | null = null,
 ): void {
+	let receiverType = memberType ?? baseType
+	let matchableArguments = methodMatchableArguments(
+		node,
+		baseType,
+		typer,
+		memberType,
+	)
+	let { labels, notes, helps } = overloadRefusalReport(
+		refusedCandidates(
+			methodCandidates(node, namespaces, receiverType),
+			matchableArguments,
+		),
+		matchableArguments,
+		methodArgumentPositions(node),
+		{
+			position: node.position,
+			callee: node.member.position,
+			name: `'${node.member.content}'`,
+			passed: () => writtenArgumentTypes(node.arguments, typer),
+		},
+	)
+
 	reportError(
-		`No overload of '${node.member.content}' accepts these Arguments`,
+		memberType === null
+			? `No overload of '${node.member.content}' accepts these Arguments`
+			: `No overload of '${node.member.content}' accepts these Arguments for ${describeType(memberType)}`,
 		node.position,
 		{
 			code: "no-matching-overload",
-			labels: [
-				primary(
-					node.position,
-					`this call passes ${countOf(node.arguments.length, "Argument")}`,
-				),
-			],
+			labels:
+				memberType === null
+					? labels
+					: [
+							...labels,
+							secondary(
+								node.base.position,
+								`${describeType(memberType)} is a member of this Union`,
+							),
+						],
 			notes: [
-				...describeCandidateSignatures(node, namespaces, baseType),
+				...notes,
 				...replacedFallbackNotes(
 					node.member.content,
 					namespaces,
-					baseType,
+					receiverType,
 					scope,
 				),
 			],
+			helps,
 		},
 	)
 }
@@ -12565,7 +13069,13 @@ function resolveMethodInvocation(
 		// the Diagnostic below.
 		commitContextualFunctionTypes(lastRecording)
 
-		reportNoMatchingOverload(node, matchingNamespaces, baseType, scope)
+		reportNoMatchingOverload(
+			node,
+			matchingNamespaces,
+			baseType,
+			scope,
+			typer,
+		)
 
 		return resolveFailedMethodInvocation()
 	} else if (resolvedMethods.length === 1) {
@@ -12708,6 +13218,7 @@ function resolveUnionMethodDispatch(
 					coveringNamespaces,
 					unionType,
 					scope,
+					typer,
 				)
 
 				return resolveFailedMethodInvocation()
@@ -12826,38 +13337,15 @@ function resolveUnionMethodDispatch(
 			// NOTE: As above — a covering Namespace's rejection is the one
 			// worth reporting, since it is the receiver the call was written
 			// against.
-			if (coveringNamespaces.size > 0) {
-				reportNoMatchingOverload(
-					node,
-					coveringNamespaces,
-					unionType,
-					scope,
-				)
-
-				return resolveFailedMethodInvocation()
-			}
-
-			reportError(
-				`No overload of '${node.member.content}' accepts these Arguments for ${describeType(memberType)}`,
-				node.position,
-				{
-					code: "no-matching-overload",
-					labels: [
-						primary(
-							node.position,
-							`this call passes ${countOf(node.arguments.length, "Argument")}`,
-						),
-						secondary(
-							node.base.position,
-							`${describeType(memberType)} is a member of this Union`,
-						),
-					],
-					notes: describeCandidateSignatures(
-						node,
-						matchingNamespaces,
-						memberType,
-					),
-				},
+			reportNoMatchingOverload(
+				node,
+				coveringNamespaces.size > 0
+					? coveringNamespaces
+					: matchingNamespaces,
+				unionType,
+				scope,
+				typer,
+				coveringNamespaces.size > 0 ? null : memberType,
 			)
 
 			return resolveFailedMethodInvocation()
@@ -13346,19 +13834,31 @@ function resolveFunctionInvocation(
 		// Argument, so unlike the `::` twin nothing is dropped from the
 		// signature.
 		let callee = describeInvocationCallee(node.name)
+		let { labels, notes, helps } = overloadRefusalReport(
+			refusedCandidates(
+				type.overloads.map((overload) => ({
+					name: callee,
+					qualifier: "",
+					signature: overload,
+					receiverParameters: 0,
+				})),
+				matchableArguments,
+			),
+			matchableArguments,
+			node.arguments.map((argument) => argument.value.position),
+			{
+				position: node.position,
+				callee: node.name.position,
+				name: callee,
+				passed: () => writtenArgumentTypes(node.arguments, typer),
+			},
+		)
 
 		reportError("No overload accepts these Arguments", node.position, {
 			code: "no-matching-overload",
-			labels: [
-				primary(
-					node.position,
-					`this call passes ${countOf(node.arguments.length, "Argument")}`,
-				),
-			],
-			notes: type.overloads.map(
-				(overload) =>
-					`${callee} ${describeSignature(overload.parameterTypes)}.`,
-			),
+			labels,
+			notes,
+			helps,
 		})
 
 		return {

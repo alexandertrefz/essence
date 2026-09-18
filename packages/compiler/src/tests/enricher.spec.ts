@@ -3888,8 +3888,8 @@ describe("Enricher", () => {
 				expect(diagnostics[0].code).toBe("no-matching-overload")
 				expect(diagnostics[0].notes).toEqual([
 					"'List::prepend' takes 1 Argument: Parameter 1 is Integer.",
-					"'List::prepend' takes 1 Argument: Parameter 'contentsOf' is List<Integer>.",
-					"'NonEmptyList::prepend' takes 1 Argument: Parameter 'contentsOf' is List<Integer>.",
+					"'List::prepend' takes 1 Argument: Parameter 'contentsOf' is List<Integer> — this call writes no label where Parameter 'contentsOf' is expected.",
+					"'NonEmptyList::prepend' takes 1 Argument: Parameter 'contentsOf' is List<Integer> — this call writes no label where Parameter 'contentsOf' is expected.",
 				])
 			})
 

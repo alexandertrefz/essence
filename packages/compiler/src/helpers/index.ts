@@ -55,6 +55,7 @@ export {
 	answersForBase,
 	applyGenericBindings,
 	type ArgumentMatchResult,
+	type ArgumentMismatchDetail,
 	type ArgumentPairing,
 	argumentPairingInverse,
 	borrowedGenericName,

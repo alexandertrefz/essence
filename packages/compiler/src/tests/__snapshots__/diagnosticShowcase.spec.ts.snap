@@ -421,9 +421,11 @@ Error: No Method named 'lenght' for this value
 Error: No overload of 'prepend' accepts these Arguments
     ╭─┤ Dispatch.es:24:19 │
     │
- 24 │     constant piece = "essence"::prepend()
-    │                      ──────────┬─────────  
-    │                                ╰─────────── this call passes 0 Arguments
+ 24 │     constant piece = "essence"::prepend(1)
+    │                                 ───┬─── ▲  
+    │                                    ╰────│── 'String::prepend' takes a String as Parameter 1
+    │                                         │  
+    │                                         ╰── this is an Integer
     │ 
     │ Note: 'String::prepend' takes 1 Argument: Parameter 1 is String.
 ────╯
