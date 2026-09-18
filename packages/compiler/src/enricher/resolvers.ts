@@ -5,6 +5,7 @@ import type { common, enricher, parser } from "@essence-lang/interfaces"
 import {
 	collectDiagnostics,
 	primary,
+	reportedOnLine,
 	reportError,
 	reportWarning,
 	secondary,
@@ -24,6 +25,12 @@ import {
 	undecidedSlotEvidence,
 	withArticle,
 } from "../helpers/describe"
+import {
+	foreignOperatorAccount,
+	foreignOperatorIn,
+	foreignWord,
+	semicolonAccount,
+} from "../helpers/foreign"
 import {
 	conformanceParameterName,
 	parameterInternalName,
@@ -652,12 +659,35 @@ export function listItemTypeOf(valueTypes: Array<common.Type>): common.Type {
 	return buildUnion(itemTypes)
 }
 
+// NOTE: What a Lookup that finds no member can be told beyond "there is no such
+// member": whether a METHOD of that name answers for the base. That is the first
+// mistake anyone arriving from a language whose Methods are members makes —
+// `names.length()` for `names::length()` — and the only thing that tells it from
+// a misspelling is the Namespace walk, which is why the question is handed in as
+// a thunk: it costs what a Method lookup costs and is asked only where the
+// Program is refused already.
+//
+// Supplied by the Lookup enricher alone. A member PATH is handed none: a path
+// reads members off its Argument and calls nothing, whatever separator it wrote.
+export type MemberAccessContext = {
+	// NOTE: The span between the base and the member — the `.` a fix writes
+	// `::` over. Read off the two Positions rather than off the Token, because
+	// no Node stands for a separator.
+	separator: common.Position
+	// NOTE: Whether the Lookup is a call's callee: `names.length()` rather than
+	// `names.length`. The two get different Helps and different fixes — the
+	// second has to grow the parentheses the first already wrote.
+	isCalled: boolean
+	methodNamed: (name: string) => common.MethodType | null
+}
+
 // NOTE: The result Type of a Lookup, computed from its base's already enriched
 // Type. The member and base Positions are all it needs to point the Diagnostics.
 export function lookupTypeOf(
 	baseType: common.Type,
 	memberName: string,
 	positions: { member: common.Position; base: common.Position },
+	access: MemberAccessContext | null = null,
 ): common.Type {
 	if (baseType.type === "Error") {
 		return baseType
@@ -685,11 +715,23 @@ export function lookupTypeOf(
 		if (Object.hasOwn(baseType.members, memberName)) {
 			return baseType.members[memberName]
 		} else {
+			if (
+				reportMethodCalledWithDot(
+					baseType,
+					memberName,
+					positions,
+					access,
+				)
+			) {
+				return { type: "Error" }
+			}
+
 			reportUnknownMember(
 				memberName,
 				positions.member,
 				describeType(baseType),
 				Object.keys(baseType.members),
+				access,
 			)
 
 			return { type: "Error" }
@@ -700,16 +742,34 @@ export function lookupTypeOf(
 		if (Object.hasOwn(baseType.members, memberName)) {
 			return baseType.members[memberName]
 		} else {
+			if (
+				reportMethodCalledWithDot(
+					baseType,
+					memberName,
+					positions,
+					access,
+				)
+			) {
+				return { type: "Error" }
+			}
+
 			reportUnknownMember(
 				memberName,
 				positions.member,
 				`Case '${displayChoiceName(baseType.choice)}#${baseType.name}'`,
 				Object.keys(baseType.members),
+				access,
 			)
 
 			return { type: "Error" }
 		}
 	} else {
+		if (
+			reportMethodCalledWithDot(baseType, memberName, positions, access)
+		) {
+			return { type: "Error" }
+		}
+
 		reportError("This value has no members to look up", positions.base, {
 			code: "type-without-members",
 			labels: [
@@ -719,10 +779,125 @@ export function lookupTypeOf(
 				),
 			],
 			notes: ["Only Records, Cases and Namespaces have members."],
+			helps: methodSeparatorHelps(memberName, access),
 		})
 
 		return { type: "Error" }
 	}
+}
+
+// NOTE: The one sentence a member access that found nothing is worth adding
+// where the member was CALLED and no Method answers it: a `.` there is a call
+// written the way another language writes one, and the reader is one Token away
+// from `unknown-method`, which lists what the value does answer and offers the
+// near miss. Nothing is offered as a Quick Fix — the Method is not there, so the
+// rewrite trades one refusal for another, and announcing that as a fix promises
+// a working Program.
+//
+// Silent for a member READ, where a `.` is exactly how a Record's member is
+// reached and there is no reason to suspect a Method was meant.
+function methodSeparatorHelps(
+	memberName: string,
+	access: MemberAccessContext | null,
+): Array<string> {
+	if (access === null || !access.isCalled) {
+		return []
+	}
+
+	return [
+		`A Method is called with '::' rather than '.' — write '::${memberName}(…)' if '${memberName}' is one.`,
+	]
+}
+
+// NOTE: `names.length()` — the Method is there, it is simply not reached this
+// way, which is a different mistake from a misspelled member and the first one
+// anybody writes. Answers whether it reported, so each caller falls through to
+// the report it always made when no Method of the name answers.
+//
+// NOTE: The Namespace branch above asks nothing: a `.` is how a Namespace's own
+// members are reached, so `Terminal.prnt(…)` is a misspelling and nothing else.
+function reportMethodCalledWithDot(
+	baseType: common.Type,
+	memberName: string,
+	positions: { member: common.Position; base: common.Position },
+	access: MemberAccessContext | null,
+): boolean {
+	let method = access?.methodNamed(memberName) ?? null
+
+	if (access === null || method === null) {
+		return false
+	}
+
+	let answersAlone = answersWithoutArguments(method)
+	// NOTE: Where the `()` a READ never wrote belongs — just past the member,
+	// which is a zero-width span. Null where the reader already wrote the call.
+	let call = access.isCalled
+		? null
+		: { start: positions.member.end, end: positions.member.end }
+	// NOTE: No payload at all where the member was READ and the Method takes an
+	// Argument: the `()` a fix would write answers it with none, so the edit
+	// would trade one refusal for another. What to pass is the reader's to say,
+	// and the Help says so with its ellipsis.
+	let fixable = access.isCalled || answersAlone
+	let spelling = access.isCalled
+		? `'::${memberName}'`
+		: `'::${memberName}${answersAlone ? "()" : "(…)"}'`
+
+	reportError(`'${memberName}' is a Method, not a member`, positions.member, {
+		code: "method-called-with-dot",
+		labels: [
+			primary(positions.member, "a Method is reached with '::'"),
+			secondary(
+				positions.base,
+				`this is ${withArticle(describeType(baseType))}`,
+			),
+		],
+		notes: [
+			"Methods live in Namespaces rather than in the values they work on, so '::' reaches one and '.' reads a member a Record or a Case declares.",
+		],
+		helps: [
+			access.isCalled
+				? `Write ${spelling} in place of '.${memberName}'.`
+				: `Write ${spelling} in place of '.${memberName}' — a Method is called, never read.`,
+		],
+		...(fixable
+			? {
+					data: {
+						kind: "method-with-dot" as const,
+						separator: access.separator,
+						call,
+					},
+				}
+			: {}),
+	})
+
+	return true
+}
+
+// NOTE: Whether a call of this Method may write no Arguments at all — every
+// Parameter of it defaulted, or of ONE of its Overloads. It decides whether the
+// `()` a fix writes is a call that resolves, and nothing else: a Method that
+// needs an Argument is named in the Help with the `…` the reader has to fill in.
+function answersWithoutArguments(method: common.MethodType): boolean {
+	let overloads =
+		method.type === "OverloadedMethod" ||
+		method.type === "OverloadedStaticMethod"
+			? method.overloads
+			: [method]
+
+	return overloads.some((overload) =>
+		overload.parameterTypes
+			// NOTE: The receiver occupies the first Parameter of every instance
+			// signature and is written left of the `::` — see
+			// `describeMethodOverloads`.
+			.slice(
+				method.type === "SimpleMethod" ||
+					method.type === "OverloadedMethod"
+					? 1
+					: 0,
+			)
+			.every((parameter) => parameter.hasDefault === true),
+	)
 }
 
 // NOTE: The name lookup a Parameter's default is subject to — the ordinary
@@ -942,15 +1117,334 @@ function reportProvidedMethodOutOfReach(
 	)
 }
 
-// NOTE: `shorthandMember` is set where the name was written as a Record
-// literal's whole member — `{ x }` — and is used for nothing but the extra
-// sentence on `unknown-name`: a reader who wrote the shorthand without knowing
-// it was one otherwise gets told that a name they never meant to read is not
-// declared.
+// NOTE: The bare form (`#Add({ … })`) resolves the way Method lookup
+// resolves its Namespace — every Choice in Type scope is scanned for the
+// Case, and only actual ambiguity asks for the prefix. Shadowed Type names
+// are skipped, mirroring `getAllNamespacesInScope`.
+//
+// NOTE: Every Case rather than only the ones spelled a given way, because the
+// near miss a failed resolution offers is drawn from the same scan — a
+// candidate set narrowed to exact matches has nothing left to suggest from.
+export function findCaseTypesInScope(
+	scope: enricher.Scope,
+): Array<common.CaseType> {
+	let seenTypeNames = new Set<string>()
+	let cases = new Map<string, common.CaseType>()
+	let searchScope: enricher.Scope | null = scope
+
+	while (searchScope !== null) {
+		for (let [typeName, type] of Object.entries(searchScope.types)) {
+			if (seenTypeNames.has(typeName)) {
+				continue
+			}
+
+			seenTypeNames.add(typeName)
+
+			// NOTE: A generic Choice is a Generic Alias over the anonymous
+			// Union of its Cases — a bare `#Continue` scans that body Union too,
+			// finding the DECLARED Case the way it finds a plain Choice's.
+			let members =
+				type.type === "UnionType"
+					? flattenUnionMembers(type)
+					: type.type === "GenericAlias" &&
+						  type.aliasedType.type === "UnionType"
+						? flattenUnionMembers(type.aliasedType)
+						: [type]
+
+			for (let member of members) {
+				if (member.type === "Case") {
+					cases.set(`${member.choice}#${member.name}`, member)
+				}
+			}
+		}
+
+		searchScope = searchScope.parent
+	}
+
+	return [...cases.values()]
+}
+
+// NOTE: What a name nothing declares is answered with BEFORE `unknown-name` —
+// the habits of the languages people arrive from, and the one slip Essence's own
+// grammar invites: a Case written without its `#`. Answers whether it reported,
+// so that everything it has nothing to say about falls through to the report
+// that has always been made.
+//
+// NOTE: Asked only of a name that resolved to NOTHING, which is what makes the
+// whole table safe: a Program that declares `const`, `print` or `Red` itself
+// never reaches here, and none of these words is reserved by it.
+function reportForeignName(
+	node: parser.IdentifierNode,
+	scope: enricher.Scope,
+	context: NameContext,
+): boolean {
+	let name = node.content
+
+	// NOTE: `'hi'` and `` `hi` `` are one Identifier each — neither quote ends a
+	// name — so the whole of what was written is in hand, and the Essence
+	// spelling of it is that text in the quotes this language has.
+	if (
+		name.length >= 2 &&
+		(name.startsWith("'") || name.startsWith("`")) &&
+		name.endsWith(name[0] as string)
+	) {
+		reportError("A String is written in double quotes", node.position, {
+			code: "foreign-syntax",
+			labels: [
+				primary(node.position, "this is read as a name, not a String"),
+			],
+			notes: [
+				"Double quotes are the only String Literal, and every one of them interpolates: '\"Hello, {name}\"'.",
+			],
+			helps: [`Write '"${name.slice(1, -1)}"'.`],
+			data: {
+				kind: "essence-spelling",
+				position: node.position,
+				spelling: `"${name.slice(1, -1)}"`,
+			},
+		})
+
+		return true
+	}
+
+	// NOTE: A `;` ends no name and no Statement, so a Statement written with one
+	// carries it into the name in front of it. What goes is the `;` alone — the
+	// name it was written against is the reader's own, and whatever is wrong with
+	// it is reported once it stands on its own again.
+	if (name.endsWith(";")) {
+		let semicolon = {
+			start: {
+				line: node.position.end.line,
+				column: node.position.end.column - 1,
+			},
+			end: node.position.end,
+		}
+
+		reportError(semicolonAccount.message, semicolon, {
+			code: semicolonAccount.code,
+			labels: [primary(semicolon, semicolonAccount.label)],
+			notes: [...semicolonAccount.notes],
+			helps: [...semicolonAccount.helps],
+			data: {
+				kind: "essence-spelling",
+				position: semicolon,
+				spelling: "",
+			},
+		})
+
+		return true
+	}
+
+	// NOTE: `user!` and `user?` — the two postfix habits, each of which ends no
+	// name and so arrives inside one. Answered before the operator table, which
+	// would read the `!` as a negation and offer the reader the opposite of what
+	// they asked for.
+	//
+	// NOTE: `user?.name` names the member it was reaching for — `map(.name)` —
+	// because the Lookup around it hands that down. `.member` is what is left
+	// where there is no member to name, which is `user?` standing on its own.
+	if (name.length > 1 && (name.endsWith("!") || name.endsWith("?"))) {
+		let value = name.slice(0, -1)
+		let reached = context.readMember ?? "member"
+
+		reportError(
+			`Essence has no '${name.slice(-1)}' after a value`,
+			node.position,
+			{
+				code: "foreign-syntax",
+				labels: [primary(node.position, "this is read as one name")],
+				notes: [
+					"A value that may be missing is an Optional, which is taken apart rather than reached into or asserted away.",
+				],
+				helps: [
+					`Write '${value}::map(.${reached})' to reach through one, and '${value}::value(defaultingTo d)' for the value or a fallback.`,
+					"Or take it apart with a 'match', which is the only way to the value itself.",
+				],
+			},
+		)
+
+		return true
+	}
+
+	let operator = foreignOperatorIn(name)
+
+	if (operator !== null) {
+		// NOTE: `!ready` is one Identifier, so the operand is in hand and the
+		// Help can name it — which is the difference between being told the rule
+		// and being shown the line. Only a PREFIX operator has one to name: an
+		// infix one is refused by the Parser, where the right operand has not
+		// been read.
+		reportOperatorNotSupported(
+			operator,
+			node.position,
+			operator === "!" && name.startsWith("!") && name.length > 1
+				? [`Write '${name.slice(1)}::negate()'.`]
+				: [],
+		)
+
+		return true
+	}
+
+	let word = foreignWord(name)
+
+	if (word !== null) {
+		reportError(`'${name}' names nothing in Essence`, node.position, {
+			code: "foreign-syntax",
+			labels: [primary(node.position, "no such Variable or Constant")],
+			notes: [word.note],
+			helps: [...word.helps],
+			...(word.spelling === null
+				? {}
+				: {
+						data: {
+							kind: "essence-spelling" as const,
+							position: node.position,
+							spelling: word.spelling,
+						},
+					}),
+		})
+
+		return true
+	}
+
+	return reportBareCaseName(node, scope, context.applied === true)
+}
+
+// NOTE: `constant light: Light = Red` — the Case is there, the `#` in front of
+// it is not. Reported as the undeclared name it is, because that is what it is:
+// `Red` names no value, and the Choice that declares the Case is what the Notes
+// add. EVERY Choice that declares it is named rather than one, for the reason
+// `ambiguous-case` names every one — which of them was meant is not something
+// this can decide, and the `#Red` a fix writes is what asks that question next.
+//
+// NOTE: This is a GUESS about a name, and the whole of what makes a guess worth
+// making is that the edit it offers is the one the reader wanted. Three shapes
+// where it is not:
+//
+//   - The name is APPLIED and every Case of it carries no payload.
+//     `throw new Error("negative")` found `Stream#Error`, offered `'#Error'`,
+//     and wrote `throw new #Error("negative")` — a Case that takes nothing,
+//     handed a String. Nothing here is a Case, so nothing is said.
+//   - The name is NOT applied and every Case of it CARRIES a payload. `#Red`
+//     alone is `missing-payload`, so the Choices are still named — that is the
+//     half a reader can not look up — and the fix is withheld, exactly as
+//     `methodSeparatorHelps` withholds one for a Method that takes Arguments.
+//   - A `foreign-syntax` verdict already stands about the line. It has said
+//     that what is written there is another language's, and a Case is an
+//     answer to a question the reader has stopped asking.
+function reportBareCaseName(
+	node: parser.IdentifierNode,
+	scope: enricher.Scope,
+	applied: boolean,
+): boolean {
+	let declaring = findCaseTypesInScope(scope).filter(
+		(candidate) => candidate.name === node.content,
+	)
+
+	if (
+		declaring.length === 0 ||
+		reportedOnLine("foreign-syntax", node.position.start.line)
+	) {
+		return false
+	}
+
+	let carriesPayload = declaring.map(
+		(candidate) => Object.keys(candidate.members).length > 0,
+	)
+
+	if (applied && carriesPayload.every((carries) => !carries)) {
+		return false
+	}
+
+	let payloadWanted = !applied && carriesPayload.every((carries) => carries)
+
+	let choiceNames = [
+		...new Set(
+			declaring.map((candidate) => displayChoiceName(candidate.choice)),
+		),
+	]
+
+	reportError(`'${node.content}' is not declared`, node.position, {
+		code: "unknown-name",
+		labels: [primary(node.position, "no such Variable or Constant")],
+		notes: [
+			...choiceNames.map(
+				(choiceName) =>
+					`'${choiceName}' declares a Case '#${node.content}'.`,
+			),
+			"A Case is written with a '#' in front of it, which is what tells one from a name.",
+		],
+		helps: [
+			payloadWanted
+				? `Write '#${node.content}(…)' — the Case carries a payload.`
+				: `Write '#${node.content}'.`,
+		],
+		...(payloadWanted
+			? {}
+			: {
+					data: {
+						kind: "essence-spelling" as const,
+						position: node.position,
+						spelling: `#${node.content}`,
+					},
+				}),
+	})
+
+	return true
+}
+
+// NOTE: Reported from here and thrown by the Parser, because which of the two
+// meets an operator is decided by how it lexes rather than by what it is. Both
+// read `foreignOperatorAccount` for the whole of what is SAID — see
+// `helpers/foreign` — so the two can not drift into two voices; what is left
+// here is the reporting, which is the half that differs.
+export function reportOperatorNotSupported(
+	operator: string,
+	position: common.Position,
+	// NOTE: What the site knows that the table can not — the operand of a prefix
+	// operator, which only the Enricher has in hand. It replaces the table's own
+	// Help, which is the same sentence with a placeholder standing where the
+	// reader's name goes.
+	leadingHelps: Array<string> = [],
+): void {
+	let account = foreignOperatorAccount(operator, leadingHelps)
+
+	if (account === null) {
+		return
+	}
+
+	reportError(account.message, position, {
+		code: account.code,
+		labels: [primary(position, account.label)],
+		notes: account.notes,
+		helps: account.helps,
+	})
+}
+
+// NOTE: What the POSITION a name stands in knows about it, which the name
+// itself can not say. None of it changes a lookup — a name resolves the same
+// way wherever it is written — and all of it is read by what a name NOTHING
+// declares is answered with, which is a guess, and a guess is only ever as good
+// as what the site around it knows.
+export type NameContext = {
+	// NOTE: Written as a Record literal's whole member — `{ x }` — which earns
+	// one extra sentence on `unknown-name`: a reader who wrote the shorthand
+	// without knowing it was one otherwise gets told that a name they never
+	// meant to read is not declared.
+	shorthandMember?: boolean
+	// NOTE: Written with Arguments behind it, which is what tells `Error("x")`
+	// from `Error`. See `reportBareCaseName`.
+	applied?: boolean
+	// NOTE: The member being read off it — the `name` of `user?.name` — so that
+	// the postfix habits offer the reader the member they were reaching for
+	// rather than the word "member".
+	readMember?: string | null
+}
+
 export function resolveIdentifierType(
 	node: parser.IdentifierNode,
 	scope: enricher.Scope,
-	shorthandMember = false,
+	context: NameContext = {},
 ): common.Type {
 	let name = node.content
 	let resolved = findVariableOrBarredName(name, scope)
@@ -976,13 +1470,13 @@ export function resolveIdentifierType(
 					],
 				},
 			)
-		} else {
+		} else if (!reportForeignName(node, scope, context)) {
 			reportError(`'${name}' is not declared`, node.position, {
 				code: "unknown-name",
 				labels: [
 					primary(node.position, "no such Variable or Constant"),
 				],
-				notes: shorthandMember
+				notes: context.shorthandMember
 					? [
 							`A bare member name in a Record Literal is the member AND its value, so '${name}' is read here as well as written.`,
 						]
@@ -5026,6 +5520,7 @@ function reportUnknownMember(
 	memberPosition: common.Position,
 	baseDescription: string,
 	memberNames: Array<string>,
+	access: MemberAccessContext | null = null,
 ): void {
 	let suggestion = closestMatch(memberName, memberNames)
 
@@ -5043,7 +5538,12 @@ function reportUnknownMember(
 								.map((memberName) => `'${memberName}'`)
 								.join(", ")}.`,
 						],
-			helps: suggestion === null ? [] : [`Did you mean '${suggestion}'?`],
+			helps: [
+				...(suggestion === null
+					? []
+					: [`Did you mean '${suggestion}'?`]),
+				...methodSeparatorHelps(memberName, access),
+			],
 			...suggestionData(suggestion),
 		},
 	)

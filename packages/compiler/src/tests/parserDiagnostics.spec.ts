@@ -204,18 +204,20 @@ _ 2
 			})
 		})
 
+		// NOTE: The Statement is DROPPED rather than left holding the `3` alone,
+		// because a `/` behind a finished Expression on its own line is division
+		// written the way another language writes it — see `foreignTextAhead`.
+		// What the joining rule claims is unchanged: the two parts did not become
+		// a Rational.
 		it("should not join a '/' denominator written apart on one line", () => {
 			let { program, diagnostics } = parseWithDiagnostics(
 				"implementation { constant a = 3 / 2 }",
 			)
 
-			expect(containsErrors(diagnostics)).toBe(true)
-			expect(
-				declaredValue(program.implementation.nodes[0]),
-			).toMatchObject({
-				nodeType: "IntegerValue",
-				value: "3",
-			})
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"operator-not-supported",
+			])
+			expect(program.implementation.nodes).toEqual([])
 		})
 
 		it("should join the parts of a Number written flush", () => {
@@ -859,6 +861,12 @@ greet() -> String { <- @ }
 			// `~>`. That reading was thrown away, so what it found about it
 			// must be thrown away with it; only the error of the reading that
 			// was kept is left.
+			//
+			// NOTE: That error is the `:` standing where a Record Literal's `=`
+			// belongs, which is a refusal of the text and travels out of the
+			// speculation rather than being given back — the duplicate the
+			// abandoned reading found is still nowhere in the report, which is
+			// the whole of what this is about.
 			let { diagnostics } = parseWithDiagnostics(
 				`implementation {
 					{ a: Integer, a: String }
@@ -866,7 +874,7 @@ greet() -> String { <- @ }
 			)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].code).toBe("syntax-error")
+			expect(diagnostics[0].code).toBe("foreign-syntax")
 		})
 
 		// NOTE: `{ x = .5 }` is read as a Record Literal first and as a

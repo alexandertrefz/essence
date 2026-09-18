@@ -280,6 +280,36 @@ export type DiagnosticData =
 	// Function has nothing to hang a conformance off, and a Type Parameter is
 	// not a Type anybody declares one for.
 	| { kind: "ungeneratable"; typeName: string }
+	// NOTE: One span and what Essence spells there instead — the whole of what a
+	// fix for a written JavaScript habit has to do, since every one of them is a
+	// word or a Symbol standing where another belongs: `const` where `constant`
+	// does, `null` where `#Empty` does, a Record member's `:` where its `=` does.
+	// An empty `spelling` is a DELETION, which is what the habits that write
+	// something Essence writes nothing for need — the `;` at the end of a
+	// Statement.
+	//
+	// NOTE: The span rather than the Diagnostic's own Position, because the two
+	// differ wherever the report is about more than the text that changes: a
+	// refused `const price = 12` underlines the whole Statement and rewrites the
+	// Keyword alone. And carried rather than re-derived, for the reason
+	// `introduced-names` gives — a refused Statement is DROPPED, so the Program a
+	// fix reads holds no Node standing where the habit was written.
+	| { kind: "essence-spelling"; position: Position; spelling: string }
+	// NOTE: A Method reached with the `.` of a member — the span of that `.`, so
+	// a fix writes `::` over it, and where the call's own `()` belongs when the
+	// reader wrote none. `call` is null where they did write one, which is the
+	// difference between `names.length()` and `names.length`: the first is one
+	// edit and the second is two.
+	//
+	// NOTE: Absent where the Method takes an Argument the call would have to
+	// write. Turning `names.item` into `names::item()` answers a Method that
+	// takes an index with none, so the fix would trade one refusal for another;
+	// what to pass is the reader's to say, and the Help says so.
+	| {
+			kind: "method-with-dot"
+			separator: Position
+			call: Position | null
+	  }
 
 // NOTE: Every Diagnostic carries one, and `/docs/reference/diagnostics`
 // documents every one of these but those only the experimental test modes
@@ -312,6 +342,10 @@ export type DiagnosticCode =
 	| "declarations-outside-stdlib"
 	| "overload-function-outside-stdlib"
 	| "misplaced-module-section"
+	// Habits from other languages — text that is not Essence and says plainly
+	// which language it is.
+	| "foreign-syntax"
+	| "operator-not-supported"
 	// Tests — the `tests { … }` section and what may be written in it.
 	| "misplaced-tests-section"
 	| "test-outside-tests"
@@ -365,6 +399,7 @@ export type DiagnosticCode =
 	| "unknown-protocol"
 	| "unknown-member"
 	| "type-without-members"
+	| "method-called-with-dot"
 	// Types — a value that does not fit where it was put.
 	| "assignment-type-mismatch"
 	| "argument-type-mismatch"

@@ -942,11 +942,23 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
+		// NOTE: `toString` is a Method the standard library really declares over a
+		// Record, so a Lookup of it meets the separator rule rather than a member
+		// that is not there — the inherited member this was written about is
+		// refused by the same walk either way. A prototype member that is no
+		// Method of anything still reports `unknown-member`.
 		it("should report a Lookup of a member only Object.prototype has", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant a = { name = "x" }
 					constant b = a.toString
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["method-called-with-dot"])
+
+			expect(
+				diagnosticsFor(`implementation {
+					constant a = { name = "x" }
+					constant b = a.hasOwnProperty
 				}`).map((diagnostic) => diagnostic.code),
 			).toEqual(["unknown-member"])
 		})

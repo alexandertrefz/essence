@@ -556,6 +556,351 @@ Warning: This '@param' names a Parameter that does not exist
 "
 `;
 
+exports[`Diagnostic Showcase ForeignNames.es should render the same report every time 1`] = `
+"[method-called-with-dot]
+Error: 'length' is a Method, not a member
+    ╭─┤ ForeignNames.es:24:23 │
+    │
+ 24 │     Terminal.print(names.length())
+    │                    ──┬── ───┬──  
+    │                      ╰──────│──── this is a List<String>
+    │                             │    
+    │                             ╰──── a Method is reached with '::'
+    │ 
+    │ Help: Write '::length' in place of '.length'.
+    │ 
+    │ Note: Methods live in Namespaces rather than in the values they work on, so '::' reaches one and '.' reads a member a Record or a Case declares.
+────╯
+
+[method-called-with-dot]
+Error: 'length' is a Method, not a member
+    ╭─┤ ForeignNames.es:25:23 │
+    │
+ 25 │     Terminal.print(names.length)
+    │                    ──┬── ───┬──  
+    │                      ╰──────│──── this is a List<String>
+    │                             │    
+    │                             ╰──── a Method is reached with '::'
+    │ 
+    │ Help: Write '::length()' in place of '.length' — a Method is called, never read.
+    │ 
+    │ Note: Methods live in Namespaces rather than in the values they work on, so '::' reaches one and '.' reads a member a Record or a Case declares.
+────╯
+
+[type-without-members]
+Error: This value has no members to look up
+    ╭─┤ ForeignNames.es:29:17 │
+    │
+ 29 │     Terminal.print(names.at(0))
+    │                    ──┬──  
+    │                      ╰──── this is a List<String>
+    │ 
+    │ Help: A Method is called with '::' rather than '.' — write '::at(…)' if 'at' is one.
+    │ 
+    │ Note: Only Records, Cases and Namespaces have members.
+────╯
+
+[unknown-member]
+Error: { name: String } has no member 'nam'
+    ╭─┤ ForeignNames.es:33:22 │
+    │
+ 33 │     Terminal.print(user.nam())
+    │                         ─┬─  
+    │                          ╰─── no such member
+    │ 
+    │ Help 1: Did you mean 'name'?
+    │ Help 2: A Method is called with '::' rather than '.' — write '::nam(…)' if 'nam' is one.
+    │ 
+    │ Note: { name: String } has 'name'.
+────╯
+
+[foreign-syntax]
+Error: 'null' names nothing in Essence
+    ╭─┤ ForeignNames.es:37:21 │
+    │
+ 37 │     constant missing = null
+    │                        ──┬─  
+    │                          ╰─── no such Variable or Constant
+    │ 
+    │ Help: Write '#Empty'.
+    │ 
+    │ Note: There is no null: a value that may be missing is an Optional, which is '#Value(x)' or '#Empty'.
+────╯
+
+[foreign-syntax]
+Error: 'new' names nothing in Essence
+    ╭─┤ ForeignNames.es:38:20 │
+    │
+ 38 │     constant listed = new
+    │                       ─┬─  
+    │                        ╰─── no such Variable or Constant
+    │ 
+    │ Help: Write the Literal — '{ x = 1 }' for a Record, '[1, 2]' for a List, '["a" = 1]' for a Dictionary.
+    │ 
+    │ Note: There is no 'new' and there are no classes: a Literal builds a value, and a static Method makes one where building it takes work.
+────╯
+
+[foreign-syntax]
+Error: 'console' names nothing in Essence
+    ╭─┤ ForeignNames.es:39:2 │
+    │
+ 39 │     console.log("hi")
+    │     ───┬───  
+    │        ╰───── no such Variable or Constant
+    │ 
+    │ Help: Write 'Terminal.print(…)' to print a value, and 'Terminal.inspect(…)' to print its structure.
+    │ 
+    │ Note: Printing is a static Method of the 'Terminal' Namespace, reached through its name.
+────╯
+
+[foreign-syntax]
+Error: Essence has no '!' after a value
+    ╭─┤ ForeignNames.es:43:17 │
+    │
+ 43 │     Terminal.print(user!)
+    │                    ──┬──  
+    │                      ╰──── this is read as one name
+    │ 
+    │ Help 1: Write 'user::map(.member)' to reach through one, and 'user::value(defaultingTo d)' for the value or a fallback.
+    │ Help 2: Or take it apart with a 'match', which is the only way to the value itself.
+    │ 
+    │ Note: A value that may be missing is an Optional, which is taken apart rather than reached into or asserted away.
+────╯
+
+[foreign-syntax]
+Error: Essence has no '?' after a value
+    ╭─┤ ForeignNames.es:44:17 │
+    │
+ 44 │     Terminal.print(user?.name)
+    │                    ──┬──  
+    │                      ╰──── this is read as one name
+    │ 
+    │ Help 1: Write 'user::map(.name)' to reach through one, and 'user::value(defaultingTo d)' for the value or a fallback.
+    │ Help 2: Or take it apart with a 'match', which is the only way to the value itself.
+    │ 
+    │ Note: A value that may be missing is an Optional, which is taken apart rather than reached into or asserted away.
+────╯
+
+[operator-not-supported]
+Error: Essence has no '!' operator
+    ╭─┤ ForeignNames.es:48:21 │
+    │
+ 48 │     constant flipped = !ready
+    │                        ───┬──  
+    │                           ╰──── this is not a Method call
+    │ 
+    │ Help: Write 'ready::negate()'.
+    │ 
+    │ Note: Arithmetic, comparison and logic are Method calls in Essence, read left to right — there are no operators, and so no precedence to remember.
+────╯
+
+[unknown-name]
+Error: 'Red' is not declared
+    ╭─┤ ForeignNames.es:52:26 │
+    │
+ 52 │     constant light: Light = Red
+    │                             ─┬─  
+    │                              ╰─── no such Variable or Constant
+    │ 
+    │ Help: Write '#Red'.
+    │ 
+    │ Note 1: 'Light' declares a Case '#Red'.
+    │ Note 2: A Case is written with a '#' in front of it, which is what tells one from a name.
+────╯
+
+─── 11 errors
+"
+`;
+
+exports[`Diagnostic Showcase ForeignSyntax.es should render the same report every time 1`] = `
+"[foreign-syntax]
+Error: 'const' is not how Essence declares a binding
+    ╭─┤ ForeignSyntax.es:16:2 │
+    │
+ 16 │     const price = 12
+    │     ──┬──  
+    │       ╰──── Essence writes 'constant' here
+    │ 
+    │ Help: Write 'constant' in place of 'const'.
+    │ 
+    │ Note: A binding is declared with 'constant', or with 'variable' where it is reassigned; there is no third form.
+────╯
+
+[foreign-syntax]
+Error: 'let' is not how Essence declares a binding
+    ╭─┤ ForeignSyntax.es:17:2 │
+    │
+ 17 │     let count = 3
+    │     ─┬─  
+    │      ╰─── Essence writes 'variable' here
+    │ 
+    │ Help: Write 'variable' in place of 'let'.
+    │ 
+    │ Note: A binding is declared with 'constant', or with 'variable' where it is reassigned; there is no third form.
+────╯
+
+[foreign-syntax]
+Error: A Comment is written with '§'
+    ╭─┤ ForeignSyntax.es:20:2 │
+    │
+ 20 │     // a note
+    │     ─┐  
+    │      ╰── Essence writes '§' here
+    │ 
+    │ Help: Write '§' in place of '//'.
+    │ 
+    │ Note: A '§' Comment runs to the end of its line, and a '§§' block above a Declaration documents it.
+────╯
+
+[operator-not-supported]
+Error: Essence has no '+' operator
+    ╭─┤ ForeignSyntax.es:24:25 │
+    │
+ 24 │     constant total = price + 1
+    │                            ▲  
+    │                            ╰── this is not a Method call
+    │ 
+    │ Help 1: Write 'a::add(b)' for Numbers.
+    │ Help 2: Write 'a::append(b)' to join two Strings.
+    │ 
+    │ Note: Arithmetic, comparison and logic are Method calls in Essence, read left to right — there are no operators, and so no precedence to remember.
+────╯
+
+[operator-not-supported]
+Error: Essence has no '==' operator
+    ╭─┤ ForeignSyntax.es:25:24 │
+    │
+ 25 │     constant same = price == 12
+    │                           ─┐  
+    │                            ╰── this is not a Method call
+    │ 
+    │ Help: Write 'a::is(b)', which compares Records and Lists by their content.
+    │ 
+    │ Note: Arithmetic, comparison and logic are Method calls in Essence, read left to right — there are no operators, and so no precedence to remember.
+────╯
+
+[operator-not-supported]
+Error: Essence has no '&&' operator
+    ╭─┤ ForeignSyntax.es:26:25 │
+    │
+ 26 │     constant either = true && false
+    │                            ─┐  
+    │                             ╰── this is not a Method call
+    │ 
+    │ Help: Write 'a::and(b)' — both sides are worked out, so nest an 'if' where the right one must not run.
+    │ 
+    │ Note: Arithmetic, comparison and logic are Method calls in Essence, read left to right — there are no operators, and so no precedence to remember.
+────╯
+
+[foreign-syntax]
+Error: A Statement does not end with ';'
+    ╭─┤ ForeignSyntax.es:29:18 │
+    │
+ 29 │     constant net = 9;
+    │                     ▲  
+    │                     ╰── nothing ends a Statement
+    │ 
+    │ Help: Remove the ';'.
+    │ 
+    │ Note: A Statement ends where its Expression ends — the Parser reads no line breaks either, so nothing has to be written between two of them.
+────╯
+
+[foreign-syntax]
+Error: A Record member is written with '='
+    ╭─┤ ForeignSyntax.es:33:23 │
+    │
+ 33 │     constant origin = { x: 0, y: 0 }
+    │                          ▲  
+    │                          ╰── Essence writes '=' here
+    │ 
+    │ Help: Write 'x = …'.
+    │ 
+    │ Note: A ':' in braces annotates a Type instead — '{ x: Integer }' is the Record Type whose member 'x' is an Integer.
+────╯
+
+[foreign-syntax]
+Error: A Record's member can not be assigned
+    ╭─┤ ForeignSyntax.es:37:2 │
+    │
+ 37 │     user.name = "Grace"
+    │     ────┬────  
+    │         ╰────── this member is read, never written
+    │ 
+    │ Help: Write '{ user with name = … }', and bind the answer.
+    │ 
+    │ Note: Records are immutable: nothing changes one in place, and 'with' builds the Record that differs from it.
+────╯
+
+[foreign-syntax]
+Error: A Function literal has no '=>'
+    ╭─┤ ForeignSyntax.es:40:33 │
+    │
+ 40 │     constant double = (n: Integer) => n
+    │                                    ─┐  
+    │                                     ╰── the body belongs in braces
+    │ 
+    │ Help: Write '(n: Integer) -> Integer { <- n }'.
+    │ 
+    │ Note: A Function literal is its Parameter list, its answer Type and a block, and a value leaves one only through '<-'.
+────╯
+
+[foreign-syntax]
+Error: Essence has no conditional operator
+    ╭─┤ ForeignSyntax.es:43:25 │
+    │
+ 43 │     constant chosen = true ? 1 : 2
+    │                            ▲  
+    │                            ╰── this begins nothing
+    │ 
+    │ Help: Write 'define { as a if c as b otherwise }'.
+    │ 
+    │ Note: 'define' is the conditional Expression: each arm names its value with 'as' and the condition it holds under with 'if'.
+────╯
+
+[foreign-syntax]
+Error: 'return' is not how Essence answers with a value
+    ╭─┤ ForeignSyntax.es:48:3 │
+    │
+ 48 │        return n::multiply(with 2)
+    │        ───┬──  
+    │           ╰──── Essence writes '<-' here
+    │ 
+    │ Help: Write '<-' in place of 'return'.
+    │ 
+    │ Note: A value leaves a Function through '<-', which is the arrow its signature writes its return Type with.
+────╯
+
+[foreign-syntax]
+Error: 'class' declares nothing in Essence
+    ╭─┤ ForeignSyntax.es:53:2 │
+    │
+ 53 │     class Money {
+    │     ──┬──  
+    │       ╰──── this is another language's declaration
+    │ 
+    │ Help: Write 'type Money = { euros: Integer }' and 'namespace Monies for Money { … }'.
+    │ 
+    │ Note: There are no classes: a 'type' names the shape and a 'namespace' holds the Methods over it.
+────╯
+
+[foreign-syntax]
+Error: A call writes no Type Arguments
+    ╭─┤ ForeignSyntax.es:60:27 │
+    │
+ 60 │     constant identity = twice<Integer>(2)
+    │                              ────┬────  
+    │                                  ╰────── these are worked out from the Arguments
+    │ 
+    │ Help 1: Write 'twice(…)' and let the Arguments decide.
+    │ Help 2: Where the Arguments do not decide, annotate what the call is bound to instead.
+    │ 
+    │ Note: Every Type Argument is inferred at the call, which is why a Generic Parameter is declared 'infer' — there is no spelling that pins one.
+────╯
+
+─── 14 errors
+"
+`;
+
 exports[`Diagnostic Showcase GenericChoice.es should render the same report every time 1`] = `
 "[wrong-type-argument-count]
 Error: Type 'Step' was given the wrong number of Type Arguments

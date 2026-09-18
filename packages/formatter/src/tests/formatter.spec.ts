@@ -97,6 +97,7 @@ const REFUSED = new Set([
 	"diagnostics/DictionarySyntax.es",
 	"diagnostics/TestsSyntax.es",
 	"diagnostics/DefineSyntax.es",
+	"diagnostics/ForeignSyntax.es",
 ])
 
 describe("formatter", () => {

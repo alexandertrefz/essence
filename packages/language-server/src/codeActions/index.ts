@@ -61,6 +61,7 @@ import {
 	updateBracketsAction,
 	wrapInHoldingCaseActions,
 } from "./fixes"
+import { essenceSpellingAction, methodSeparatorAction } from "./foreignFixes"
 import {
 	declareFutureReturnAction,
 	discardedFutureActions,
@@ -437,6 +438,16 @@ const importOrSpellingFix: FixProvider = (context) => [
 	...spellingFix(context),
 ]
 
+// NOTE: An unknown name has a third answer that the two above can not reach: it
+// is the name of a Case, written without the `#` that makes one. The Diagnostic
+// says so with a payload of its own, so this stands FIRST — a name the Compiler
+// has matched to a Case in scope is a better answer than a near miss by edit
+// distance or an import of a name nothing exports.
+const bareCaseOrImportOrSpellingFix: FixProvider = (context) => [
+	...listed(essenceSpellingAction(context.diagnostic, context.lines)),
+	...importOrSpellingFix(context),
+]
+
 // NOTE: A `@param` suggestion is the Parameter's NAME and the span it is
 // written over is that name alone, so the title spells the whole tag back while
 // the edit rewrites only what the tag named.
@@ -511,6 +522,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(removeFallbackAction(diagnostic, lines)),
 	"focused-tests-remain": ({ diagnostic, lines }) =>
 		listed(removeFocusedAction(diagnostic, lines)),
+	"foreign-syntax": ({ diagnostic, lines }) =>
+		listed(essenceSpellingAction(diagnostic, lines)),
 	"incomplete-record-argument": ({ diagnostic, lines }) =>
 		listed(missingMembersAction(diagnostic, lines)),
 	"infer-on-applied-parameter": ({ diagnostic, program, lines }) =>
@@ -534,6 +547,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(matcherBeforeValueAction(diagnostic, lines)),
 	"matcher-on-expect": ({ diagnostic, lines }) =>
 		listed(requireKeywordAction(diagnostic, lines)),
+	"method-called-with-dot": ({ diagnostic, lines }) =>
+		listed(methodSeparatorAction(diagnostic, lines)),
 	"misnamed-documentation-parameter": documentationSpellingFix,
 	"misplaced-module-section": ({ diagnostic, program, lines }) =>
 		listed(moveModuleSectionAction(diagnostic, program, lines)),
@@ -628,7 +643,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 			),
 		),
 	],
-	"unknown-name": importOrSpellingFix,
+	"unknown-name": bareCaseOrImportOrSpellingFix,
 	"unknown-protocol": importOrSpellingFix,
 	"unknown-type": importOrSpellingFix,
 	"unknown-where-generic": ({ diagnostic, program }) =>

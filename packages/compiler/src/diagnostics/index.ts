@@ -168,6 +168,24 @@ export function containsErrors(diagnostics: Array<common.Diagnostic>): boolean {
 	return diagnostics.some((diagnostic) => diagnostic.severity === "error")
 }
 
+// NOTE: Whether a verdict of this code already stands about this line. The one
+// question a report asks about the ones made in front of it, and it is asked by
+// exactly one caller: the bare-Case answer is a GUESS about a name, and a guess
+// is worth making only where nothing has already said that the line is another
+// language's. `throw new Error("x")` is three names, and `Stream` declaring an
+// `#Error` is not a reason to offer `#Error` for the third of them.
+export function reportedOnLine(
+	code: common.DiagnosticCode,
+	line: number,
+): boolean {
+	return activeDiagnostics.some(
+		(diagnostic) =>
+			diagnostic.code === code &&
+			diagnostic.position !== null &&
+			diagnostic.position.start.line === line,
+	)
+}
+
 // NOTE: A savepoint in the active collection, for speculative work that is
 // abandoned far more often than it is kept — the parser backtracks on nearly
 // every Expression, and a fresh collection per attempt is a per-Expression

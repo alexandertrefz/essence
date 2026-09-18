@@ -118,6 +118,37 @@ describe("LSP", () => {
 			expect(diagnostics[0].code).toBe("assignment-type-mismatch")
 		})
 
+		// NOTE: The Compiler stops after the Parser, so what a habit written
+		// BEHIND a Statement costs is only ever visible here: a Declaration
+		// dropped with the refusal leaves its name undeclared, and the editor
+		// answers that at every line that reads it. The Parser reads past a ';'
+		// and a Comment for exactly this reason — see `swallowForeignTail`.
+		it("should keep the Statement a ';' or a Comment was written behind", () => {
+			expect(
+				analyse(`implementation {
+					constant price = 250;
+					Terminal.print(price)
+					Terminal.print(price::add(1))
+				}`).map((diagnostic) => diagnostic.message),
+			).toEqual(["A Statement does not end with ';'"])
+
+			expect(
+				analyse(`implementation {
+					constant price = 250 // the price
+					Terminal.print(price)
+					Terminal.print(price::add(1))
+				}`).map((diagnostic) => diagnostic.message),
+			).toEqual(["A Comment is written with '§'"])
+
+			expect(
+				analyse(`implementation {
+					constant price = 250 /* the price */
+					Terminal.print(price)
+					Terminal.print(price::add(1))
+				}`).map((diagnostic) => diagnostic.message),
+			).toEqual(["A Comment is written with '§'"])
+		})
+
 		it("should not run the Validator when the Enricher reported errors", () => {
 			let diagnostics = analyse(`implementation {
 				constant a = undeclaredVariable

@@ -93,6 +93,7 @@ import {
 	derivedPrintableNamespace,
 	derivedPrintableNamespaceName,
 	enumerableMethodName,
+	findCaseTypesInScope,
 	findProtocolInScope,
 	getAllNamespacesInScope,
 	protocolMethodBody,
@@ -102,6 +103,7 @@ import {
 	specializedNamespacesFor,
 	listItemTypeOf,
 	lookupTypeOf,
+	type MemberAccessContext,
 	namespaceNamedByType,
 	providedNamespaceMember,
 	recordValueTypeOf,
@@ -115,6 +117,7 @@ import {
 	resolveFunctionSignatureType,
 	resolveGenericDeclarations,
 	resolveIdentifierType,
+	type NameContext,
 	applyTypeArguments,
 	resolveMethodLookupNamespacesForReceiverType,
 	resolveMethodType,
@@ -289,6 +292,10 @@ function enrichCalleeExpression(
 	node: parser.ExpressionNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
+	// NOTE: Whether an Invocation is what asked for this Expression, rather than
+	// a position that reads it as a value. Only a Lookup reads it, and only to
+	// tell `names.length()` from `names.length` when the member is not there.
+	isCalled = false,
 ): common.typed.ExpressionNode {
 	switch (node.nodeType) {
 		case "MethodInvocation":
@@ -316,11 +323,13 @@ function enrichCalleeExpression(
 		case "DictionaryValue":
 			return enrichDictionaryValue(node, scope, expectedType)
 		case "Lookup":
-			return enrichLookup(node, scope)
+			return enrichLookup(node, scope, isCalled)
 		case "MemberPath":
 			return enrichMemberPath(node, scope, expectedType)
 		case "Identifier":
-			return enrichIdentifierExpression(node, scope)
+			return enrichIdentifierExpression(node, scope, {
+				applied: isCalled,
+			})
 		case "Self":
 			return enrichSelf(node, scope)
 		case "Match":
@@ -1109,7 +1118,7 @@ function enrichFunctionInvocation(
 ): common.typed.FunctionInvocationNode {
 	// NOTE: The callee and every Argument are enriched once — its Type drives
 	// resolution and the same typed Nodes build the final Invocation.
-	let name = enrichCalleeExpression(node.name, scope)
+	let name = enrichCalleeExpression(node.name, scope, null, true)
 	let typer = makeArgumentTyper(scope, expectedType)
 	let {
 		type,
@@ -2852,9 +2861,31 @@ function writtenKeyIdentity(key: common.typed.ExpressionNode): string | null {
 	}
 }
 
+// NOTE: The value a member is read off, enriched with the MEMBER's name in
+// hand, which is what this position knows and the base does not. It is read by
+// one thing: `user?.name` is one Identifier — a `?` ends no name — and the Help
+// it is answered with offers `user::map(.name)` rather than `.member`.
+function enrichLookupBase(
+	node: parser.LookupNode,
+	scope: enricher.Scope,
+): common.typed.ExpressionNode {
+	if (node.base.nodeType !== "Identifier") {
+		return enrichExpression(node.base, scope)
+	}
+
+	return enrichIdentifierExpression(node.base, scope, {
+		readMember: node.member.content,
+	})
+}
+
 function enrichLookup(
 	node: parser.LookupNode,
 	scope: enricher.Scope,
+	// NOTE: Whether the Lookup is what an Invocation calls — see
+	// `enrichCalleeExpression`. Read for one thing: a member that is not there
+	// and is CALLED is a Method call written with the separator another language
+	// uses, and the Diagnostic for that says so.
+	isCalled = false,
 ): common.typed.LookupNode {
 	// NOTE: A base naming a TYPE rather than a value — a Choice, or a
 	// Protocol-bounded Type Parameter — reads its member off a Namespace nobody
@@ -2864,7 +2895,7 @@ function enrichLookup(
 	let named = namespaceNamedByType(node, scope)
 	let base: common.typed.ExpressionNode =
 		named === null || node.base.nodeType !== "Identifier"
-			? enrichExpression(node.base, scope)
+			? enrichLookupBase(node, scope)
 			: {
 					nodeType: "Identifier",
 					content: node.base.content,
@@ -2901,10 +2932,15 @@ function enrichLookup(
 	let type =
 		provided?.type ??
 		fabricated?.type ??
-		lookupTypeOf(base.type, node.member.content, {
-			member: node.member.position,
-			base: node.base.position,
-		})
+		lookupTypeOf(
+			base.type,
+			node.member.content,
+			{
+				member: node.member.position,
+				base: node.base.position,
+			},
+			memberAccessContext(node, base.type, scope, isCalled),
+		)
 
 	return {
 		nodeType: "Lookup",
@@ -2927,6 +2963,59 @@ function enrichLookup(
 		...(fabricated?.namespaceName === undefined
 			? {}
 			: { namespaceName: fabricated.namespaceName }),
+	}
+}
+
+// NOTE: What a Lookup that finds no member is answered with — see
+// `MemberAccessContext`. The Method question is a thunk because the Namespace
+// walk behind it is what a Method call costs, and a Lookup that finds its member
+// never asks.
+//
+// NOTE: Null for a Namespace base. A `.` is how a Namespace's own members are
+// reached, so there is no separator to suspect there, and the Namespaces
+// targeting a Namespace are nobody's question.
+function memberAccessContext(
+	node: parser.LookupNode,
+	baseType: common.Type,
+	scope: enricher.Scope,
+	isCalled: boolean,
+): MemberAccessContext | null {
+	if (baseType.type === "Namespace") {
+		return null
+	}
+
+	return {
+		// NOTE: Everything between the base and the member, which is the `.` and
+		// whatever whitespace was written around it. The whole of it is what a fix
+		// overwrites, so `value . member` rewrites as cleanly as `value.member`.
+		separator: {
+			start: node.base.position.end,
+			end: node.member.position.start,
+		},
+		isCalled,
+		methodNamed: (name) => {
+			let declaring = namespacesDeclaringMethod(
+				name,
+				resolveMethodLookupNamespacesForReceiverType(
+					baseType,
+					null,
+					scope,
+				),
+				baseType,
+				scope,
+				node.member.position,
+			)
+
+			for (let namespace of declaring.values()) {
+				let method = namespace.methods[name]
+
+				if (method !== undefined) {
+					return method
+				}
+			}
+
+			return null
+		},
 	}
 }
 
@@ -3282,7 +3371,10 @@ function enrichIdentifier(
 function enrichIdentifierExpression(
 	node: parser.IdentifierNode,
 	scope: enricher.Scope,
-	shorthandMember = false,
+	// NOTE: What the position the name stands in knows about it — see
+	// `NameContext`. It changes nothing about the lookup, and everything about
+	// what a name nothing declares is answered with.
+	context: NameContext = {},
 ): common.typed.ExpressionNode {
 	let declaringScope = findDeclaringScope(node.content, scope)
 	let alias = declaringScope?.selfMemberAliases?.[node.content]
@@ -3291,7 +3383,7 @@ function enrichIdentifierExpression(
 		return enrichIdentifier(
 			node,
 			scope,
-			resolveIdentifierType(node, scope, shorthandMember),
+			resolveIdentifierType(node, scope, context),
 		)
 	}
 
@@ -8256,7 +8348,9 @@ function enrichMember(
 	let value = member.value!
 
 	if (member.shorthand === true && value.nodeType === "Identifier") {
-		return asValue(enrichIdentifierExpression(value, scope, true))
+		return asValue(
+			enrichIdentifierExpression(value, scope, { shorthandMember: true }),
+		)
 	}
 
 	return enrichExpression(value, scope, expectedType)
@@ -14608,51 +14702,6 @@ function resolveCaseReference(
 	}
 
 	return caseType
-}
-
-// NOTE: The bare form (`#Add({ … })`) resolves the way Method lookup
-// resolves its Namespace — every Choice in Type scope is scanned for the
-// Case, and only actual ambiguity asks for the prefix. Shadowed Type names
-// are skipped, mirroring `getAllNamespacesInScope`.
-//
-// NOTE: Every Case rather than only the ones spelled a given way, because the
-// near miss a failed resolution offers is drawn from the same scan — a
-// candidate set narrowed to exact matches has nothing left to suggest from.
-function findCaseTypesInScope(scope: enricher.Scope): Array<common.CaseType> {
-	let seenTypeNames = new Set<string>()
-	let cases = new Map<string, common.CaseType>()
-	let searchScope: enricher.Scope | null = scope
-
-	while (searchScope !== null) {
-		for (let [typeName, type] of Object.entries(searchScope.types)) {
-			if (seenTypeNames.has(typeName)) {
-				continue
-			}
-
-			seenTypeNames.add(typeName)
-
-			// NOTE: A generic Choice is a Generic Alias over the anonymous
-			// Union of its Cases — a bare `#Continue` scans that body Union too,
-			// finding the DECLARED Case the way it finds a plain Choice's.
-			let members =
-				type.type === "UnionType"
-					? flattenUnionMembers(type)
-					: type.type === "GenericAlias" &&
-						  type.aliasedType.type === "UnionType"
-						? flattenUnionMembers(type.aliasedType)
-						: [type]
-
-			for (let member of members) {
-				if (member.type === "Case") {
-					cases.set(`${member.choice}#${member.name}`, member)
-				}
-			}
-		}
-
-		searchScope = searchScope.parent
-	}
-
-	return [...cases.values()]
 }
 
 function resolveBareCaseReference(

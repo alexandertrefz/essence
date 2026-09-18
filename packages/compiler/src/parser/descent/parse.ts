@@ -11,6 +11,13 @@ import {
 	rewindDiagnostics,
 	secondary,
 } from "../../diagnostics/index"
+import {
+	foreignOperatorAccount,
+	foreignPunctuationLead,
+	foreignWord,
+	operatorNote,
+	semicolonAccount,
+} from "../../helpers/foreign"
 import { matcherNames } from "../../helpers/patterns"
 import * as generators from "../nodeGenerators"
 import {
@@ -363,6 +370,135 @@ function writtenSeparatorLexeme(
 		isAdjacent(found.position, next.position)
 	) {
 		return "->"
+	}
+
+	return null
+}
+
+// NOTE: One refusal's worth of account for text that is not Essence — built
+// where the habit is RECOGNISED and thrown where it stands. Coded, never
+// `syntax-error`, so that it survives speculation: `a == b` is `a == b` under
+// every reading of the text around it, and handing that back for a second
+// reading answers it in worse words. See the NOTE on `speculate`.
+type ForeignRefusal = {
+	code: common.DiagnosticCode
+	message: string
+	label: string
+	position: common.Position
+	notes: Array<string>
+	helps: Array<string>
+	data?: common.DiagnosticData
+}
+
+// NOTE: What a Token contributes to a foreign lexeme, or null where it
+// contributes nothing. Two sources, because the Lexer splits an operator between
+// them: the Symbols it knows (`=`, `<`, `-`) are Tokens of their own, and
+// everything else — `+`, `&`, `!`, `;`, `?` — ends no name and so arrives inside
+// an Identifier, together with whatever was written flush behind it.
+function foreignTokenLead(token: Token): string | null {
+	switch (token.type) {
+		case TokenType.SymbolEqual:
+			return "="
+		case TokenType.SymbolLeftAngle:
+			return "<"
+		case TokenType.SymbolRightAngle:
+			return ">"
+		case TokenType.SymbolSlash:
+			return "/"
+		case TokenType.SymbolDash:
+			return "-"
+		case TokenType.SymbolPipe:
+			return "|"
+		case TokenType.Identifier:
+			return foreignPunctuationLead(token.value)
+		default:
+			return null
+	}
+}
+
+// NOTE: The lexemes that are made of the same characters as a habit and are
+// Essence — the two arrows, and the `->`'s halves written on their own. Asked of
+// the WHOLE joined text rather than of each Token, which is what keeps
+// `match x -> T` and `<- value` out of this entirely while leaving `a - b` and
+// `a < b` in.
+const essenceLexemes: ReadonlySet<string> = new Set(["->", "<-", "=", "|", "~"])
+
+// NOTE: What Essence writes in place of a habit that is not an operator. Each is
+// its own shape rather than its own code: `foreign-syntax` is the verdict "this
+// is another language's spelling", and which spelling it was is what the message
+// and the `essence-spelling` payload carry.
+function foreignSyntaxRefusal(
+	text: string,
+	position: common.Position,
+): ForeignRefusal | null {
+	if (text === "//") {
+		return {
+			code: "foreign-syntax",
+			message: "A Comment is written with '§'",
+			label: "Essence writes '§' here",
+			position,
+			notes: [
+				"A '§' Comment runs to the end of its line, and a '§§' block above a Declaration documents it.",
+			],
+			helps: ["Write '§' in place of '//'."],
+			data: { kind: "essence-spelling", position, spelling: "§" },
+		}
+	}
+
+	if (text.startsWith("/*")) {
+		return {
+			code: "foreign-syntax",
+			message: "A Comment is written with '§'",
+			label: "Essence writes '§' here",
+			position,
+			// NOTE: No `essence-spelling`, because a block Comment is two
+			// spellings and the second of them is nowhere in hand — a `§` written
+			// over the `/*` would leave the `*/` standing at the end of whatever
+			// line it was written on.
+			notes: [
+				"There is no block Comment: a '§' runs to the end of its line, and a block is written one line at a time.",
+			],
+			helps: ["Write '§' at the head of each line."],
+		}
+	}
+
+	if (text === "=>") {
+		return {
+			code: "foreign-syntax",
+			message: "A Function literal has no '=>'",
+			label: "the body belongs in braces",
+			position,
+			notes: [
+				"A Function literal is its Parameter list, its answer Type and a block, and a value leaves one only through '<-'.",
+			],
+			// NOTE: A WHOLE literal, annotations and all. A Help that wrote
+			// only the braces around a body — `'(n) { <- n::add(1) }'` — left
+			// `uninferable-parameter-type` and `missing-return-type` standing
+			// behind the edit it offered, which is the same refusal twice more
+			// for a reader who followed it.
+			helps: ["Write '(n: Integer) -> Integer { <- n }'."],
+		}
+	}
+
+	if (text === "?") {
+		return {
+			code: "foreign-syntax",
+			message: "Essence has no conditional operator",
+			label: "this begins nothing",
+			position,
+			notes: [
+				"'define' is the conditional Expression: each arm names its value with 'as' and the condition it holds under with 'if'.",
+			],
+			helps: ["Write 'define { as a if c as b otherwise }'."],
+		}
+	}
+
+	if (text === ";") {
+		return {
+			...semicolonAccount,
+			position,
+			data: { kind: "essence-spelling", position, spelling: "" },
+		}
 	}
 
 	return null
@@ -1733,7 +1869,273 @@ class DescentParser {
 			return this.parseVariableAssignmentStatement()
 		}
 
-		return this.parseExpression()
+		let declaration = this.parseForeignDeclarationStatement(token)
+
+		if (declaration !== null) {
+			return declaration
+		}
+
+		let expression = this.parseExpression()
+
+		this.refuseMemberAssignment(expression)
+
+		return expression
+	}
+
+	// NOTE: `const price = 12`, `let count = 3`, `return n` — a whole Statement
+	// written in another language's words, read as the Statement it was meant to
+	// be and reported once. Reported and RECOVERED rather than refused, which is
+	// the whole point: a dropped `const price = 12` leaves `price` undeclared, so
+	// every line that reads it is told so, and one mistake becomes as many
+	// Diagnostics as the Constant has readers.
+	//
+	// NOTE: Narrow on purpose. The word only opens this where what follows it is
+	// the Statement it stands for — a name and an `=` for a declaration, an
+	// Expression on the same line for a return — so `constant const = 1` declares
+	// a Constant called `const`, and `Terminal.print(return)` reads a value called
+	// `return`. Neither word is reserved by this.
+	protected parseForeignDeclarationStatement(
+		token: Token,
+	): parser.ImplementationNode | null {
+		if (token.type !== TokenType.Identifier) {
+			return null
+		}
+
+		if (token.value === "return") {
+			return this.parseForeignReturnStatement(token)
+		}
+
+		this.refuseForeignDeclarationBlock(token)
+
+		let spelling =
+			token.value === "const"
+				? "constant"
+				: token.value === "let" || token.value === "var"
+					? "variable"
+					: null
+
+		if (spelling === null || !this.declaresAName()) {
+			return null
+		}
+
+		this.reportForeignStatement(token, spelling, {
+			message: `'${token.value}' is not how Essence declares a binding`,
+			label: `Essence writes '${spelling}' here`,
+			notes: [
+				"A binding is declared with 'constant', or with 'variable' where it is reassigned; there is no third form.",
+			],
+			helps: [`Write '${spelling}' in place of '${token.value}'.`],
+		})
+
+		// NOTE: The Keyword is stepped over and the rest is read by the Statement
+		// it was meant to be, so a `: Type` annotation, a Pattern and the value
+		// are all read exactly as they would have been — and whatever else is
+		// wrong with them is reported by the readers that always reported it.
+		this.tokens.next()
+
+		return spelling === "constant"
+			? this.parseDeclaredConstant(token.position)
+			: this.parseDeclaredVariable(token.position)
+	}
+
+	// NOTE: `class Money { … }`, `enum Colour { … }`, `interface Point { … }` —
+	// a word, a name and a block, which is a shape Essence has no reading for at
+	// all: two Identifiers written in a row are two Statements, and the block
+	// behind them a third. Left alone, each of the three is reported separately
+	// and the one thing that is actually wrong is said once out of four times.
+	//
+	// The BLOCK is read past before the refusal is thrown, so the Statements
+	// inside it are never read as Statements of the Program: the body of a
+	// declaration this language does not have is not a Program's business, and
+	// reporting on it would bury the one line that matters.
+	protected refuseForeignDeclarationBlock(token: Token): void {
+		let word = foreignWord(token.value)
+
+		if (word === null || !this.declaresAForeignBlock()) {
+			return
+		}
+
+		let position = token.position
+
+		this.skipBalancedBlock()
+
+		throw new ParseError(
+			`'${token.value}' declares nothing in Essence`,
+			position,
+			"this is another language's declaration",
+			{
+				code: "foreign-syntax",
+				notes: [word.note],
+				helps: [...word.helps],
+			},
+		)
+	}
+
+	// NOTE: The shape, and nothing looser: the word, a name, and the `{` of a
+	// block on the same line. `class`, `enum` and `interface` are ordinary names
+	// here — a Program may declare any of them — so what makes this a foreign
+	// declaration is the two Identifiers in a row, which no Statement of this
+	// language begins with.
+	protected declaresAForeignBlock(): boolean {
+		let word = this.tokens.peek()
+		let name = this.tokens.peek(1)
+		let brace = this.tokens.peek(2)
+
+		return (
+			word !== undefined &&
+			isIdentifierToken(name) &&
+			brace?.type === TokenType.SymbolLeftBrace &&
+			brace.position.start.line === word.position.start.line
+		)
+	}
+
+	// NOTE: Everything up to and including the `}` that closes the first `{`
+	// ahead, so that the refusal thrown behind it is resynchronised past a body
+	// rather than into it. Bounded by the end of the input, which is the one way
+	// a `{` never closes.
+	protected skipBalancedBlock(): void {
+		while (!this.tokens.isAtEnd()) {
+			if (this.tokens.next().type === TokenType.SymbolLeftBrace) {
+				break
+			}
+		}
+
+		let depth = 1
+
+		while (depth > 0 && !this.tokens.isAtEnd()) {
+			let type = this.tokens.next().type
+
+			if (type === TokenType.SymbolLeftBrace) {
+				depth++
+			} else if (type === TokenType.SymbolRightBrace) {
+				depth--
+			}
+		}
+	}
+
+	// NOTE: What a declaration Keyword has to be followed by before the word in
+	// front of it is read as one: the name (or the Pattern) it declares, and the
+	// `=` that gives it its value. Without the `=`, `let count` is two names and
+	// this would claim the first of them.
+	protected declaresAName(): boolean {
+		let name = this.tokens.peek(1)
+
+		if (name === undefined) {
+			return false
+		}
+
+		if (name.type === TokenType.SymbolLeftBrace) {
+			return true
+		}
+
+		if (!isIdentifierToken(name)) {
+			return false
+		}
+
+		let following = this.tokens.peek(2)?.type
+
+		return (
+			following === TokenType.SymbolEqual ||
+			following === TokenType.SymbolColon
+		)
+	}
+
+	protected parseForeignReturnStatement(
+		token: Token,
+	): parser.ReturnStatementNode | null {
+		let following = this.tokens.peek(1)
+
+		if (
+			following === undefined ||
+			!startsExpression(following) ||
+			continuesExpression(token, following) ||
+			following.position.start.line !== token.position.start.line
+		) {
+			return null
+		}
+
+		this.reportForeignStatement(token, "<-", {
+			message: "'return' is not how Essence answers with a value",
+			label: "Essence writes '<-' here",
+			notes: [
+				"A value leaves a Function through '<-', which is the arrow its signature writes its return Type with.",
+			],
+			helps: ["Write '<-' in place of 'return'."],
+		})
+
+		this.tokens.next()
+
+		let value = this.parseExpression()
+
+		return generators.returnStatement(value, {
+			start: token.position.start,
+			end: value.position.end,
+		})
+	}
+
+	// NOTE: Reported rather than thrown, because the Statement is read on: the
+	// throw is what would drop it, and dropping it is what this exists to avoid.
+	// Suppressed exactly where every other report is — inside a speculation that
+	// is thrown away, and behind a failure that has already been reported.
+	protected reportForeignStatement(
+		token: Token,
+		spelling: string,
+		account: {
+			message: string
+			label: string
+			notes: Array<string>
+			helps: Array<string>
+		},
+	): void {
+		if (this.suppressDiagnostics) {
+			return
+		}
+
+		reportError(account.message, token.position, {
+			code: "foreign-syntax",
+			labels: [primary(token.position, account.label)],
+			notes: account.notes,
+			helps: account.helps,
+			data: {
+				kind: "essence-spelling",
+				position: token.position,
+				spelling,
+			},
+		})
+	}
+
+	// NOTE: `user.name = "Ada"` — the one habit that is not a word or a Symbol
+	// but a whole shape, and the only place a Lookup is ever followed by an `=`.
+	// Refused here rather than where the Expression ended, because a lone `=` is
+	// Essence everywhere else it stands behind one: it separates a Dictionary's
+	// key from its value and a Record member's name from its own.
+	protected refuseMemberAssignment(expression: parser.ExpressionNode): void {
+		if (
+			expression.nodeType !== "Lookup" ||
+			this.tokens.peek()?.type !== TokenType.SymbolEqual
+		) {
+			return
+		}
+
+		let base =
+			expression.base.nodeType === "Identifier"
+				? expression.base.content
+				: "value"
+
+		throw new ParseError(
+			"A Record's member can not be assigned",
+			expression.position,
+			"this member is read, never written",
+			{
+				code: "foreign-syntax",
+				notes: [
+					"Records are immutable: nothing changes one in place, and 'with' builds the Record that differs from it.",
+				],
+				helps: [
+					`Write '{ ${base} with ${expression.member.content} = … }', and bind the answer.`,
+				],
+			},
+		)
 	}
 
 	// NOTE: A `§§` block above a Declaration documents whatever the Declaration
@@ -1754,6 +2156,20 @@ class DescentParser {
 
 	protected parseConstantDeclarationStatement(): parser.ConstantDeclarationStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordConstant)
+
+		return this.parseDeclaredConstant(keyword.position)
+	}
+
+	// NOTE: Everything a Constant Declaration is behind its Keyword, with the
+	// Keyword's own span handed in. Split out for the one caller that has stepped
+	// over a Keyword this language does not have — see
+	// `parseForeignDeclarationStatement` — so that a `const` recovers into
+	// exactly the Statement a `constant` would have read, annotation, Pattern,
+	// Documentation and all.
+	protected parseDeclaredConstant(
+		keywordPosition: common.Position,
+	): parser.ConstantDeclarationStatementNode {
+		let keyword = { position: keywordPosition }
 		let name = this.parseDeclaredName()
 		let type = this.parseOptionalDeclarationType()
 
@@ -1777,6 +2193,15 @@ class DescentParser {
 
 	protected parseVariableDeclarationStatement(): parser.VariableDeclarationStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordVariable)
+
+		return this.parseDeclaredVariable(keyword.position)
+	}
+
+	// NOTE: The Variable half of the split above, for the same one caller.
+	protected parseDeclaredVariable(
+		keywordPosition: common.Position,
+	): parser.VariableDeclarationStatementNode {
+		let keyword = { position: keywordPosition }
 		let name = this.parseDeclaredName()
 		let type = this.parseOptionalDeclarationType()
 
@@ -3112,11 +3537,238 @@ class DescentParser {
 			}
 		}
 
+		// NOTE: What stands where the Expression ENDED, when it is another
+		// language's way of carrying one on. The Expression reading is complete
+		// and correct — `1` really is the Expression in `1 + 2` — so this is the
+		// one place that can see the `+` at all: the Statement loop would read it
+		// as an Expression of its own and report an undeclared name.
+		//
+		// NOTE: The LINE is the whole of the narrowing, and it is what keeps two
+		// Statements two: nothing carries an Expression on across a line break, so
+		// a `-` opening the next line is a negative Number and not a subtraction
+		// anybody wrote. Every habit answered here is written flush behind its
+		// left operand or one blank away from it.
+		let foreign = this.foreignTextAhead()
+
+		if (
+			foreign !== null &&
+			foreign.position.start.line === expression.position.end.line
+		) {
+			this.refuseCallTypeArguments(expression)
+
+			if (!this.swallowForeignTail()) {
+				this.refuseForeignText(foreign)
+			}
+
+			this.reportForeignText(foreign)
+		}
+
 		return expression
+	}
+
+	// NOTE: The habits that stand BEHIND a whole Statement rather than inside
+	// one — a `;` closing it and a `//` or `/* … */` Comment written after it.
+	// The Expression in front of them is complete and correct, so they are read
+	// past and the Statement is kept, which is the recovery
+	// `parseForeignDeclarationStatement` makes for `const` and for the same
+	// reason: a thrown refusal takes the Declaration with it, and a Constant
+	// nothing declared is reported again at every line that reads it. One
+	// mistake was answered with one Diagnostic per reader.
+	//
+	// NOTE: Only where the habit is the WHOLE of what is left to read of it: a
+	// `;` that is a Token of its own, a `//` and the line behind it, and a
+	// `/* … */` that closes. A `*/` that never arrives is refused as it was —
+	// what a reading past it would swallow is the rest of the file.
+	protected swallowForeignTail(): boolean {
+		let lexeme = this.foreignLexeme()
+
+		if (lexeme === null) {
+			return false
+		}
+
+		if (lexeme.text === ";") {
+			if (this.tokens.peek()?.value !== ";") {
+				return false
+			}
+
+			this.tokens.next()
+
+			return true
+		}
+
+		if (lexeme.text === "//") {
+			let line = lexeme.position.start.line
+
+			while (this.tokens.peek()?.position.start.line === line) {
+				this.tokens.next()
+			}
+
+			return true
+		}
+
+		if (!lexeme.text.startsWith("/*")) {
+			return false
+		}
+
+		let closing = this.blockCommentLength()
+
+		if (closing === null) {
+			return false
+		}
+
+		for (let step = 0; step < closing; step++) {
+			this.tokens.next()
+		}
+
+		return true
+	}
+
+	// NOTE: How many Tokens the `/* … */` at the cursor was written across,
+	// or null where it never closes. The Lexer ends no name on a `*` and the
+	// `/` is a Symbol, so the closing `*/` arrives as a Token ending in `*`
+	// with a `/` written flush behind it — `*/` on its own, and `word*/` where
+	// nothing separated them.
+	protected blockCommentLength(): number | null {
+		for (let offset = 1; ; offset++) {
+			let token = this.tokens.peek(offset)
+
+			if (token === undefined) {
+				return null
+			}
+
+			if (token.type !== TokenType.SymbolSlash) {
+				continue
+			}
+
+			let previous = this.tokens.peek(offset - 1)
+
+			if (
+				previous !== undefined &&
+				previous.value.endsWith("*") &&
+				isAdjacent(previous.position, token.position)
+			) {
+				return offset + 1
+			}
+		}
+	}
+
+	// NOTE: The refusal made as a Diagnostic rather than thrown, for the sites
+	// that read past what they are reporting. Suppressed exactly where every
+	// other report is — inside a speculation that is thrown away.
+	protected reportForeignText(refusal: ForeignRefusal): void {
+		if (this.suppressDiagnostics) {
+			return
+		}
+
+		reportError(refusal.message, refusal.position, {
+			code: refusal.code,
+			labels: [primary(refusal.position, refusal.label)],
+			notes: refusal.notes,
+			helps: refusal.helps,
+			...(refusal.data === undefined ? {} : { data: refusal.data }),
+		})
+	}
+
+	// NOTE: `identity<Integer>(1)` — a `<` behind a name that closes on a `>`
+	// with a `(` flush behind it, which is the one shape a comparison can not
+	// take. Asked before the operator table, which would read the `<` as a
+	// comparison and offer the reader `isLessThan` for a call they wrote.
+	protected refuseCallTypeArguments(expression: parser.ExpressionNode): void {
+		if (
+			expression.nodeType !== "Identifier" ||
+			this.tokens.peek()?.type !== TokenType.SymbolLeftAngle
+		) {
+			return
+		}
+
+		let depth = 0
+
+		// NOTE: Bounded, and to the LINE: what is being looked for is a spelling
+		// somebody wrote on purpose, and an unbounded scan over a file whose
+		// angles never balance is a scan of the file per `<` in it.
+		for (let offset = 0; offset < 32; offset++) {
+			let token = this.tokens.peek(offset)
+
+			if (
+				token === undefined ||
+				token.position.start.line !== expression.position.end.line
+			) {
+				return
+			}
+
+			if (token.type === TokenType.SymbolLeftAngle) {
+				depth++
+
+				continue
+			}
+
+			if (token.type !== TokenType.SymbolRightAngle) {
+				continue
+			}
+
+			depth--
+
+			if (depth > 0) {
+				continue
+			}
+
+			let following = this.tokens.peek(offset + 1)
+
+			if (
+				following?.type !== TokenType.SymbolLeftParen ||
+				!isAdjacent(token.position, following.position)
+			) {
+				return
+			}
+
+			let position = {
+				start: expression.position.end,
+				end: token.position.end,
+			}
+
+			throw new ParseError(
+				"A call writes no Type Arguments",
+				position,
+				"these are worked out from the Arguments",
+				{
+					code: "foreign-syntax",
+					notes: [
+						"Every Type Argument is inferred at the call, which is why a Generic Parameter is declared 'infer' — there is no spelling that pins one.",
+					],
+					helps: [
+						`Write '${expression.content}(…)' and let the Arguments decide.`,
+						// NOTE: The Arguments are what decide, so a call that
+						// can not be read from them is a signature question
+						// rather than a call one — and this is where a reader
+						// who reached for the brackets finds that out.
+						"Where the Arguments do not decide, annotate what the call is bound to instead.",
+					],
+					data: {
+						kind: "essence-spelling",
+						position,
+						spelling: "",
+					},
+				},
+			)
+		}
 	}
 
 	protected parsePrimaryExpression(): parser.ExpressionNode {
 		let token = this.peekOrFail("an Expression")
+
+		// NOTE: The same question in prefix position, asked of a Token that opens
+		// no Expression — a `//` at the head of a line, a `/` left over from
+		// something written above it. Asked HERE rather than in the default arm
+		// below, because the arms in between read Tokens this would answer for:
+		// a `-` opens a negative Number and a `<` opens a generic Function
+		// literal, and both are Essence wherever they stand at the head of one.
+		if (!startsExpression(token)) {
+			let foreign = this.foreignTextAhead()
+
+			if (foreign !== null) {
+				this.refuseForeignText(foreign)
+			}
+		}
 
 		// NOTE: `ChoiceName#CaseName` — recognised before the typed-Record
 		// backtrack, since a `#` can never follow the Type of a typed Record
@@ -4470,6 +5122,55 @@ class DescentParser {
 			return this.parsePathKeyValue(name, path.steps, allowShorthand)
 		}
 
+		// NOTE: `{ x: 0 }` — a member written with the separator every other
+		// language writes an object's with. Refused HERE, where the name and the
+		// `:` are both in hand, rather than left to the readings above: the
+		// shorthand below would claim `x` as a member of its own and the reading
+		// would fall apart one Token later, on a `}` that is nowhere near the
+		// mistake.
+		//
+		// NOTE: A `:` in braces is Essence in two other places, and neither
+		// reaches this: a Record TYPE (`{ x: Integer }`) is read by
+		// `parseRecordType`, and a Pattern's Type annotation (`{ x: Integer }` in
+		// `constant { x: Integer } = point`) by `parsePatternMember`. This is the
+		// key list of a Record LITERAL, where a `:` spells nothing at all.
+		let colon = this.tokens.peek()
+
+		if (colon?.type === TokenType.SymbolColon) {
+			// NOTE: The span a fix writes over runs from the name to the value,
+			// and what it writes is ' = ' — a `:` is written flush against its
+			// name and an `=` is written with a blank either side, so rewriting
+			// the Token alone would leave `{ x= 0 }` for the Formatter to tidy.
+			// Only where the value stands on the same line: a span across a line
+			// break would pull the two together.
+			let value = this.tokens.peek(1)
+			let rewritten =
+				value !== undefined &&
+				value.position.start.line === colon.position.start.line
+					? {
+							position: {
+								start: name.position.end,
+								end: value.position.start,
+							},
+							spelling: " = ",
+						}
+					: { position: colon.position, spelling: "=" }
+
+			throw new ParseError(
+				"A Record member is written with '='",
+				colon.position,
+				"Essence writes '=' here",
+				{
+					code: "foreign-syntax",
+					notes: [
+						"A ':' in braces annotates a Type instead — '{ x: Integer }' is the Record Type whose member 'x' is an Integer.",
+					],
+					helps: [`Write '${name.content} = …'.`],
+					data: { kind: "essence-spelling", ...rewritten },
+				},
+			)
+		}
+
 		// NOTE: The value is a Node of its own at the name's Position rather
 		// than the name Node itself — two Declarations at one Position is
 		// exactly what the shorthand is, and the rename index is built to
@@ -4980,10 +5681,50 @@ class DescentParser {
 		)
 	}
 
+	// NOTE: The name behind a `-` is offered as the thing to negate only where
+	// it is the WHOLE of what was being negated. `-price` is `price::negate()`,
+	// but `- tree::hasItems()` negates a call, and naming its receiver offers
+	// an edit that negates something else entirely. What tells the two apart is
+	// the Token behind the name: the four that carry an Expression on.
+	protected negationHelp(operand: Token): string {
+		let carriesOn = this.tokens.peek(1)?.type
+
+		if (
+			carriesOn === TokenType.SymbolDot ||
+			carriesOn === TokenType.SymbolColon ||
+			carriesOn === TokenType.SymbolLeftParen ||
+			carriesOn === TokenType.SymbolLeftBracket
+		) {
+			return "A value is negated with '::negate()' written on it."
+		}
+
+		return `Write '${operand.value}::negate()'.`
+	}
+
 	protected parseInteger(): { value: string; position: common.Position } {
 		let dash: Token | null = null
 		if (this.tokens.peek()?.type === TokenType.SymbolDash) {
 			dash = this.tokens.next()
+
+			// NOTE: `-price` — a `-` signs a Number Literal and negates nothing,
+			// so a name behind one is the prefix operator another language
+			// writes. Answered here because this is where the sign is read: the
+			// Expression parser reaches a `-` only as the head of a Number, and
+			// what follows it is this rule's to judge.
+			let operand = this.tokens.peek()
+
+			if (operand !== undefined && isIdentifierToken(operand)) {
+				throw new ParseError(
+					"Essence has no '-' operator",
+					dash.position,
+					"a '-' only signs a Number Literal",
+					{
+						code: "operator-not-supported",
+						notes: [operatorNote],
+						helps: [this.negationHelp(operand)],
+					},
+				)
+			}
 		}
 
 		let digits = this.parseDigitRun()
@@ -6373,6 +7114,22 @@ class DescentParser {
 		this.enterNesting()
 
 		try {
+			// NOTE: `(n: Integer) => n` — the one habit that is written where a
+			// BLOCK belongs, which is why it is answered here rather than beside
+			// the operators: the Parameter list read cleanly and what follows it
+			// is an arrow no construction of this language has. Every block goes
+			// through here, so the `=>` of a Function literal, of an `if` and of a
+			// `match` arm are all answered in the same words.
+			let arrow = this.foreignLexeme()
+			let refusal =
+				arrow?.text === "=>"
+					? foreignSyntaxRefusal(arrow.text, arrow.position)
+					: null
+
+			if (refusal !== null) {
+				this.refuseForeignText(refusal)
+			}
+
 			let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
 			let body = this.parseStatementList(() =>
@@ -6542,6 +7299,98 @@ class DescentParser {
 		}
 
 		return token
+	}
+
+	// NOTE: The foreign lexeme standing at the cursor, joined back out of the
+	// Tokens it was split into — `=` and `=` written flush are the `==` a reader
+	// wrote, and `!` and `=` are their `!=`. Only ADJACENT Tokens are joined, and
+	// only behind one whose whole value was taken: `+2` contributes its `+` and
+	// stops there, so what is underlined is the operator and never the operand.
+	//
+	// Null where nothing at the cursor is made of these characters, which is the
+	// answer for every Program that is not written in another language.
+	protected foreignLexeme(): {
+		text: string
+		position: common.Position
+	} | null {
+		let first = this.tokens.peek()
+
+		if (first === undefined) {
+			return null
+		}
+
+		let lead = foreignTokenLead(first)
+
+		if (lead === null) {
+			return null
+		}
+
+		let text = lead
+		let end = {
+			line: first.position.start.line,
+			column: first.position.start.column + lead.length,
+		}
+		let whole = lead.length === first.value.length
+
+		for (let offset = 1; whole; offset++) {
+			let token = this.tokens.peek(offset)
+
+			if (token === undefined || token.position.start.line !== end.line) {
+				break
+			}
+
+			if (token.position.start.column !== end.column) {
+				break
+			}
+
+			let next = foreignTokenLead(token)
+
+			if (next === null) {
+				break
+			}
+
+			text += next
+			end = { line: end.line, column: end.column + next.length }
+			whole = next.length === token.value.length
+		}
+
+		return { text, position: { start: first.position.start, end } }
+	}
+
+	// NOTE: The verdict on the lexeme at the cursor: a habit with its own shape,
+	// an operator this language deliberately has none of, or nothing at all.
+	// Essence's own lexemes are answered `null` here rather than excluded Token by
+	// Token, which is what keeps `match x -> T` and `<- value` whole while leaving
+	// `a - b` and `a < b` refused.
+	protected foreignTextAhead(): ForeignRefusal | null {
+		let lexeme = this.foreignLexeme()
+
+		if (lexeme === null || essenceLexemes.has(lexeme.text)) {
+			return null
+		}
+
+		let syntax = foreignSyntaxRefusal(lexeme.text, lexeme.position)
+
+		if (syntax !== null) {
+			return syntax
+		}
+
+		let account = foreignOperatorAccount(lexeme.text)
+
+		if (account === null) {
+			return null
+		}
+
+		return { ...account, position: lexeme.position }
+	}
+
+	protected refuseForeignText(refusal: ForeignRefusal): never {
+		throw new ParseError(refusal.message, refusal.position, refusal.label, {
+			code: refusal.code,
+			notes: refusal.notes,
+			helps: refusal.helps,
+			data: refusal.data,
+		})
 	}
 
 	// NOTE: A reading kept wherever it parsed at all — the same text is often

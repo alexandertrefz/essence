@@ -1,5 +1,7 @@
 import { type common, lexer } from "@essence-lang/interfaces"
 
+import { foreignPunctuation } from "../helpers/foreign"
+
 const TokenType = lexer.TokenType
 type Token = lexer.Token
 type Cursor = common.Cursor
@@ -560,8 +562,25 @@ export class Lexer {
 				break
 			}
 
-			if ((characterClass & isDigit) === 0 && digitsEnd === -1) {
-				digitsEnd = end
+			if ((characterClass & isDigit) === 0) {
+				// NOTE: A Number ENDS at a character another language writes an
+				// operator with — `1+2` is two Numbers and a habit, not one
+				// malformed Number, and `total = 1;` is a Number with a `;`
+				// behind it. Neither ends a word for the Lexer, which has no
+				// class but Identifier to put them in, so each is left to lex as
+				// one and answered where it stands: the Parser knows whether it
+				// is reading an operator or a Statement terminator, and this does
+				// not.
+				//
+				// Everything else is read into the Literal and reported as one
+				// malformed Number — see the NOTE above.
+				if (foreignPunctuation.has(data[end] as string)) {
+					break
+				}
+
+				if (digitsEnd === -1) {
+					digitsEnd = end
+				}
 			}
 
 			end++

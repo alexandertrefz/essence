@@ -56,27 +56,29 @@ Where a code has a Quick Fix, its entry gives the title your editor shows. Two e
 
 ## If you typed JavaScript
 
-These twenty JavaScript habits cause most first-hour reports. Each habit links its row on [Coming from JavaScript](/docs/getting-started/coming-from-javascript), which quotes the message and gives the Essence spelling.
+These twenty JavaScript habits cause most first-hour reports. Nearly all of them report one of three codes — [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) for a habit written as words or punctuation, [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported) for an operator, and [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot) for a method reached with a `.`. Each habit links its row on [Coming from JavaScript](/docs/getting-started/coming-from-javascript), which quotes the message and gives the Essence spelling.
 
-- [`1 + 2`](/docs/getting-started/coming-from-javascript#typed-plus): [`unknown-name`](/docs/reference/diagnostics#unknown-name)
-- [`count / 3`](/docs/getting-started/coming-from-javascript#typed-divide): [`syntax-error`](/docs/reference/diagnostics#syntax-error)
-- [`1 === 1`](/docs/getting-started/coming-from-javascript#typed-equals): `syntax-error`
-- [`true && false`](/docs/getting-started/coming-from-javascript#typed-and): `unknown-name`
-- [`!true`](/docs/getting-started/coming-from-javascript#typed-not): `unknown-name`
-- [`if (ready) {`](/docs/getting-started/coming-from-javascript#typed-if-parentheses-name): `syntax-error`
+- [`1 + 2`](/docs/getting-started/coming-from-javascript#typed-plus): [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported)
+- [`count / 3`](/docs/getting-started/coming-from-javascript#typed-divide): `operator-not-supported`
+- [`1 === 1`](/docs/getting-started/coming-from-javascript#typed-equals): `operator-not-supported`
+- [`true && false`](/docs/getting-started/coming-from-javascript#typed-and): `operator-not-supported`
+- [`!true`](/docs/getting-started/coming-from-javascript#typed-not): `operator-not-supported`
+- [`if (ready) {`](/docs/getting-started/coming-from-javascript#typed-if-parentheses-name): [`syntax-error`](/docs/reference/diagnostics#syntax-error)
 - [`items[0]`](/docs/getting-started/coming-from-javascript#typed-index): [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch)
-- [`text.length`](/docs/getting-started/coming-from-javascript#typed-length): [`type-without-members`](/docs/reference/diagnostics#type-without-members)
-- [`const total = 1`](/docs/getting-started/coming-from-javascript#typed-const): `unknown-name`
-- [`console.log("hi")`](/docs/getting-started/coming-from-javascript#typed-console-log): `unknown-name`
-- [`constant total = 1;`](/docs/getting-started/coming-from-javascript#typed-semicolon): [`invalid-number`](/docs/reference/diagnostics#invalid-number)
-- [`{ x: 1, y: 2 }`](/docs/getting-started/coming-from-javascript#typed-record-colon): `syntax-error`
-- [`point.x = 2`](/docs/getting-started/coming-from-javascript#typed-member-assignment): `syntax-error`
-- [`return n`](/docs/getting-started/coming-from-javascript#typed-return): `unknown-name`
-- [`(n: Integer) => n`](/docs/getting-started/coming-from-javascript#typed-arrow): `syntax-error`
+- [`text.length`](/docs/getting-started/coming-from-javascript#typed-length): [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot)
+- [`text.charAt(0)`](/docs/getting-started/coming-from-javascript#typed-charat): [`type-without-members`](/docs/reference/diagnostics#type-without-members)
+- [`const total = 1`](/docs/getting-started/coming-from-javascript#typed-const): [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax)
+- [`console.log("hi")`](/docs/getting-started/coming-from-javascript#typed-console-log): `foreign-syntax`
+- [`constant total = 1;`](/docs/getting-started/coming-from-javascript#typed-semicolon): `foreign-syntax`
+- [`{ x: 1, y: 2 }`](/docs/getting-started/coming-from-javascript#typed-record-colon): `foreign-syntax`
+- [`point.x = 2`](/docs/getting-started/coming-from-javascript#typed-member-assignment): `foreign-syntax`
+- [`return n`](/docs/getting-started/coming-from-javascript#typed-return): `foreign-syntax`
+- [`(n: Integer) => n`](/docs/getting-started/coming-from-javascript#typed-arrow): `foreign-syntax`
 - [`(n) { n::add(1) }`](/docs/getting-started/coming-from-javascript#typed-missing-return-arrow): [`uninferable-return-type`](/docs/reference/diagnostics#uninferable-return-type)
-- [`true ? 1 : 2`](/docs/getting-started/coming-from-javascript#typed-ternary): `syntax-error`
-- [`// a comment`](/docs/getting-started/coming-from-javascript#typed-slash-comment): `syntax-error`
-- [`null`](/docs/getting-started/coming-from-javascript#typed-null): `unknown-name`
+- [`true ? 1 : 2`](/docs/getting-started/coming-from-javascript#typed-ternary): `foreign-syntax`
+- [`// a comment`](/docs/getting-started/coming-from-javascript#typed-slash-comment): `foreign-syntax`
+- [`null`](/docs/getting-started/coming-from-javascript#typed-null): `foreign-syntax`
+- [`Red`, for a case of a choice](/docs/getting-started/coming-from-javascript#typed-bare-case): [`unknown-name`](/docs/reference/diagnostics#unknown-name)
 - [`number` as a type](/docs/getting-started/coming-from-javascript#typed-number-type): [`unknown-type`](/docs/reference/diagnostics#unknown-type)
 
 ## Syntax
@@ -102,7 +104,7 @@ Error: Expected '=' but found '42'.
 
 </div>
 
-When the line is a JavaScript habit, the message is the parser's guess, not the fix: `if (ready) {` reports `Expected '{' but found '}'.` Look the line up in the list above. Otherwise, write what the message says was expected.
+A JavaScript habit the parser recognises is answered by [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) or [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported) instead, which name the habit. What is left here is the parser's guess rather than the fix: `if (ready) {` reports `Expected '{' but found '}'.` Look the line up in the list above. Otherwise, write what the message says was expected.
 
 Taught on: [Programs and values › The shape of a file](/docs/language/programs-and-values#the-shape-of-a-file)
 
@@ -735,6 +737,69 @@ Quick Fix: **Move the 'export \{ … \}' block below the implementation**, or **
 
 Taught on: [Modules › The four blocks of a file](/docs/language/modules#the-four-blocks-of-a-file)
 
+### `foreign-syntax`
+
+**Error.** The line is written in another language. The message names the habit and the note names the Essence spelling. Every row of [Coming from JavaScript](/docs/getting-started/coming-from-javascript) that reports this one gives the rewritten line.
+
+<div class="error-output">
+
+```
+[foreign-syntax]
+Error: 'const' is not how Essence declares a binding
+   ╭─┤ Total.es:2:2 │
+   │
+ 2 │     const total = 1
+   │     ──┬──  
+   │       ╰──── Essence writes 'constant' here
+   │ 
+   │ Help: Write 'constant' in place of 'const'.
+   │ 
+   │ Note: A binding is declared with 'constant', or with 'variable' where it is reassigned; there is no third form.
+───╯
+```
+
+</div>
+
+One code covers the family, and the message says which habit was written. It answers: `const`, `let` and `var`; `return`; a `;` at the end of a statement; `\{ x: 1 \}` for a record member; `point.x = 2`; `(n) => n`; `c ? a : b`; `// a comment` and `/* a comment */`; `'hi'` and `` `hi` `` for a string; a `class`, `enum` or `interface` declaration; `identity<Integer>(1)`; `user!` and `user?.name`; and the words `null`, `undefined`, `this`, `self`, `console`, `print`, `Math`, `parseInt`, `new`, `switch`, `typeof`, `throw`, `while`, `break`, `async`, `await`, `Map` and `Set`.
+
+A declaration keyword is reported once and read on: `const price = 12` declares `price` for the rest of the file, so one mistake is one report rather than one per line that reads it.
+
+Quick Fix: **Write 'constant' instead of 'const'**, and its equivalent wherever one word replaces one word. There is none where the fix is a restructuring — a `=>` body, a ternary, a member assignment.
+
+Taught on: [Coming from JavaScript](/docs/getting-started/coming-from-javascript)
+
+### `operator-not-supported`
+
+**Error.** An operator stands where a method call belongs. Essence has none: arithmetic, comparison and logic are methods, read left to right.
+
+<div class="error-output">
+
+```
+[operator-not-supported]
+Error: Essence has no '+' operator
+   ╭─┤ Sum.es:2:21 │
+   │
+ 2 │     constant total = 1 + 2
+   │                        ▲  
+   │                        ╰── this is not a Method call
+   │ 
+   │ Help 1: Write 'a::add(b)' for Numbers.
+   │ Help 2: Write 'a::append(b)' to join two Strings.
+   │ 
+   │ Note: Arithmetic, comparison and logic are Method calls in Essence, read left to right — there are no operators, and so no precedence to remember.
+───╯
+```
+
+</div>
+
+The helps name the method for the operator that was written. The [operator table](/docs/getting-started/coming-from-javascript#operators) has all of them in one place.
+
+`!ready` and `a+b` report this from the enricher rather than the parser: neither character ends a name, so each is read as one name and is not refused until nothing declares it.
+
+There is no Quick Fix. The rewrite moves the left operand in front of a `::` and the right one into an argument list, which is a restructuring rather than a substitution — and the parser refuses at the operator, with only the left operand read.
+
+Taught on: [Method calls](/docs/language/method-calls)
+
 ## Names
 
 A name that is declared twice, never declared, or used where it cannot be.
@@ -969,7 +1034,9 @@ Taught on: [Namespaces and methods › Where a namespace can be used](/docs/lang
 
 ### `unknown-name`
 
-**Error.** A name is used that nothing in scope declares. The Help suggests the closest name when there is one. JavaScript operators and keywords land here too: `+`, `&&`, `const`, `return` and `null` are not names in Essence. So does a word between braces in a string, which is read as a name in a hole: `"use { and } carefully"` reports `'and' is not declared`.
+**Error.** A name is used that nothing in scope declares. The Help suggests the closest name when there is one. A word between braces in a string lands here too, since it is read as a name in a hole: `"use { and } carefully"` reports `'and' is not declared`.
+
+A name that is a [case of a choice in scope](/docs/language/choices-and-match) is answered here rather than left to the near miss: the notes name every choice that declares it, and the fix writes the `#` in front of it. A JavaScript operator or keyword is answered by [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported) or [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) instead.
 
 <div class="error-output">
 
@@ -990,7 +1057,7 @@ Error: 'nmae' is not declared
 
 Fix the spelling, declare the name, or import it.
 
-Quick Fix: **Change to 'name'**. A name that a module in the workspace exports also gets a fix that imports it.
+Quick Fix: **Change to 'name'**. A name that a module in the workspace exports also gets a fix that imports it, and one that names a case gets **Write '#Red' instead of 'Red'** above both.
 
 Taught on: [Functions › Scope and hoisting](/docs/language/functions#scope-and-hoisting)
 
@@ -1171,11 +1238,13 @@ Taught on: [Records › When the compiler refuses a record](/docs/language/recor
 ```
 [type-without-members]
 Error: This value has no members to look up
-   ╭─┤ Length.es:4:17 │
+   ╭─┤ Character.es:4:17 │
    │
- 4 │     Terminal.print(text.length)
+ 4 │     Terminal.print(text.charAt(0))
    │                    ──┬─  
    │                      ╰─── this is a String
+   │ 
+   │ Help: A Method is called with '::' rather than '.' — write '::charAt(…)' if 'charAt' is one.
    │ 
    │ Note: Only Records, Cases and Namespaces have members.
 ───╯
@@ -1183,7 +1252,38 @@ Error: This value has no members to look up
 
 </div>
 
-Call the method: `text::length()`.
+The help appears where the member was called. `charAt` is no method of a `String`, which is why this is not [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot): write `text::charAt(0)` and the next report lists what a `String` does answer — `character(at:)`, here.
+
+Taught on: [Method calls › Statics and the dot](/docs/language/method-calls#statics-and-the-dot)
+
+### `method-called-with-dot`
+
+**Error.** A method was reached with the `.` of a member. Methods live in namespaces rather than in the values they work on, so `::` reaches one.
+
+<div class="error-output">
+
+```
+[method-called-with-dot]
+Error: 'length' is a Method, not a member
+   ╭─┤ Length.es:4:22 │
+   │
+ 4 │     Terminal.print(text.length)
+   │                    ──┬─ ───┬──  
+   │                      ╰─────│──── this is a String
+   │                            │    
+   │                            ╰──── a Method is reached with '::'
+   │ 
+   │ Help: Write '::length()' in place of '.length' — a Method is called, never read.
+   │ 
+   │ Note: Methods live in Namespaces rather than in the values they work on, so '::' reaches one and '.' reads a member a Record or a Case declares.
+───╯
+```
+
+</div>
+
+The method is there; only the separator is wrong. A member that was read rather than called — `text.length` rather than `text.length()` — is told so too, since a method is called and never read.
+
+Quick Fix: **Call it with '::'**. It writes the `::` and, where the method was read and takes no arguments, the `()` behind it.
 
 Taught on: [Method calls › Statics and the dot](/docs/language/method-calls#statics-and-the-dot)
 

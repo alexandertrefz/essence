@@ -6143,6 +6143,190 @@ describe("Code Actions", () => {
 			).toEqual(["Change to 'first'"])
 		})
 	})
+
+	describe("method-called-with-dot", () => {
+		it("should write the separator a Method is reached with", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant names = ["ada", "alan"]',
+				"\tTerminal.print(names.length())",
+				"}",
+			]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual(["Call it with '::'"])
+
+			let result = applied(lines, fixes[0])
+
+			expect(result[2]).toBe("\tTerminal.print(names::length())")
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: Two edits for a member that was READ — the separator and the
+		// parentheses a call needs and a read never wrote.
+		it("should write the call a member read never wrote", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant names = ["ada", "alan"]',
+				"\tTerminal.print(names.length)",
+				"}",
+			]
+			let fixes = quickFixes(lines)
+			let result = applied(lines, fixes[0])
+
+			expect(result[2]).toBe("\tTerminal.print(names::length())")
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A Method that takes an Argument gets no fix at all: the `()` the
+		// action would write answers it with none, which is a second refusal
+		// dressed up as a fix.
+		it("should offer nothing where the Method takes an Argument", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant n = 1",
+				"\tTerminal.print(n.add)",
+				"}",
+			]
+
+			expect(titles(quickFixes(lines))).toEqual([])
+		})
+	})
+
+	describe("foreign-syntax", () => {
+		it("should write the Keyword Essence declares a binding with", () => {
+			let lines = [
+				"implementation {",
+				"\tconst price = 12",
+				"\tTerminal.print(price)",
+				"}",
+			]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Write 'constant' instead of 'const'",
+			])
+
+			let result = applied(lines, fixes[0])
+
+			expect(result[1]).toBe("\tconstant price = 12")
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should write the arrow a value leaves through", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction twice(_ n: Integer) -> Integer {",
+				"\t\treturn n::multiply(with 2)",
+				"\t}",
+				"\tTerminal.print(twice(2))",
+				"}",
+			]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual(["Write '<-' instead of 'return'"])
+			expect(applied(lines, fixes[0])[2]).toBe(
+				"\t\t<- n::multiply(with 2)",
+			)
+		})
+
+		it("should write the separator a Record member is written with", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant origin = { x: 0 }",
+				"\tTerminal.print(origin.x)",
+				"}",
+			]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual(["Write '=' instead of ':'"])
+
+			let result = applied(lines, fixes[0])
+
+			expect(result[1]).toBe("\tconstant origin = { x = 0 }")
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should remove a ';' rather than write anything in its place", () => {
+			let lines = ["implementation {", '\tTerminal.print("hi");', "}"]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual(["Remove the ';'"])
+
+			let result = applied(lines, fixes[0])
+
+			expect(result[1]).toBe('\tTerminal.print("hi")')
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should write the sigil a Comment is written with", () => {
+			let lines = ["implementation {", "\t// a note", "}"]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual(["Write '§' instead of '//'"])
+			expect(applied(lines, fixes[0])[1]).toBe("\t§ a note")
+		})
+
+		// NOTE: Every habit whose answer is a restructuring rather than a
+		// substitution — there is nothing to write over, and an action that wrote
+		// half of it would leave a Program that is refused for a second reason.
+		it("should offer nothing where the answer is a shape", () => {
+			expect(
+				titles(
+					quickFixes([
+						"implementation {",
+						"\tconstant n = true ? 1 : 2",
+						"}",
+					]),
+				),
+			).toEqual([])
+
+			expect(
+				titles(
+					quickFixes([
+						"implementation {",
+						"\tconstant double = (n: Integer) => n",
+						"}",
+					]),
+				),
+			).toEqual([])
+
+			expect(
+				titles(
+					quickFixes([
+						"implementation {",
+						'\tconstant user = { name = "Ada" }',
+						'\tuser.name = "Grace"',
+						"}",
+					]),
+				),
+			).toEqual([])
+		})
+	})
+
+	describe("a Case written without its sigil", () => {
+		const LINES = [
+			"implementation {",
+			"\tchoice Light { Red, Green }",
+			"\tconstant light: Light = Red",
+			"\tTerminal.print(light::is(#Red))",
+			"}",
+		]
+
+		// NOTE: The Case stands above the near miss and above the imports: a name
+		// the Compiler matched to a Case in scope is a better answer than a
+		// spelling guess.
+		it("should write the sigil in front of the name", () => {
+			let fixes = quickFixes(LINES)
+
+			expect(titles(fixes)[0]).toBe("Write '#Red' instead of 'Red'")
+
+			let result = applied(LINES, fixes[0])
+
+			expect(result[2]).toBe("\tconstant light: Light = #Red")
+			expect(codesOf(result)).toEqual([])
+		})
+	})
 })
 
 // NOTE: The one door a Diagnostic this analysis did NOT produce comes in by —
