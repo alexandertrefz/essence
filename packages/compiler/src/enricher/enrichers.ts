@@ -1096,8 +1096,10 @@ function enrichMethodInvocation(
 			name: node.member.content,
 			position: node.member.position,
 		},
-		arguments: node.arguments.map((argument) =>
-			typer.enrichArgumentNode(argument),
+		arguments: underRefusedCall(type.type === "Error", () =>
+			node.arguments.map((argument) =>
+				typer.enrichArgumentNode(argument),
+			),
 		),
 		position: node.position,
 		namespace,
@@ -1137,8 +1139,10 @@ function enrichFunctionInvocation(
 	return {
 		nodeType: "FunctionInvocation",
 		name,
-		arguments: node.arguments.map((argument) =>
-			typer.enrichArgumentNode(argument),
+		arguments: underRefusedCall(type.type === "Error", () =>
+			node.arguments.map((argument) =>
+				typer.enrichArgumentNode(argument),
+			),
 		),
 		position: node.position,
 		type,
@@ -12229,6 +12233,203 @@ function candidateRefusal(
 	return explain[0] ?? null
 }
 
+// NOTE: Whether a candidate ACCEPTS these Arguments, asked of a call that has
+// already been refused and only ever of Arguments rearranged from the ones it
+// wrote. Probed exactly as `refusedCandidates` probes — the recordings and the
+// Diagnostics of a reading nobody keeps are thrown away, and what is left is
+// the yes or no.
+function candidateAccepts(
+	candidate: OverloadCandidate,
+	matchableArguments: Array<MatchableArgument>,
+): boolean {
+	let { result } = probeContextualFunctionTypes(() =>
+		collectDiagnostics(() => {
+			let { signature } = candidate
+
+			if (signature.generics.length === 0) {
+				return (
+					matchArguments(signature.parameterTypes, matchableArguments)
+						.type === "Match"
+				)
+			}
+
+			let { parameterTypes, context } =
+				createFreshenedInference(signature)
+
+			return (
+				matchArguments(parameterTypes, matchableArguments, {
+					inference: context,
+				}).type === "Match"
+			)
+		}),
+	)
+
+	return result.result
+}
+
+// NOTE: The Arguments as they would stand after one edit — two of them
+// exchanged where `swap` says so, and each of the two carrying the label its new
+// Parameter declares. A reader swapping two Arguments writes the labels that go
+// with them, so a reading that did not would answer about a call nobody would
+// write.
+function rearrangedArguments(
+	candidate: OverloadCandidate,
+	matchableArguments: Array<MatchableArgument>,
+	first: number,
+	second: number,
+	swap: boolean,
+): Array<MatchableArgument> {
+	let rearranged = [...matchableArguments]
+	let labelled = (argument: MatchableArgument, at: number) => ({
+		...argument,
+		name: candidate.signature.parameterTypes[at]?.name ?? null,
+	})
+
+	if (swap) {
+		rearranged[first] = labelled(
+			matchableArguments[second] as MatchableArgument,
+			first,
+		)
+		rearranged[second] = labelled(
+			matchableArguments[first] as MatchableArgument,
+			second,
+		)
+	} else {
+		rearranged[first] = labelled(
+			matchableArguments[first] as MatchableArgument,
+			first,
+		)
+		rearranged[second] = labelled(
+			matchableArguments[second] as MatchableArgument,
+			second,
+		)
+	}
+
+	return rearranged
+}
+
+// NOTE: The two Arguments a call wrote the other way round, or null where it
+// wrote none. `[1, 2, 3]::reduce((total, item) { … }, 0)` is the everyday shape
+// of it: the seed and the step, in the order the language a reader came from
+// writes them, and the report it got was about the label the first Argument was
+// missing — whose Help, followed, wrote the label onto the step and answered
+// with three more Diagnostics.
+//
+// Asked of the closest candidate alone, and answered only where the swap is what
+// fixes the call: where writing the labels WITHOUT swapping fixes it too, the
+// mistake is the labels and the report about them is the one to make. Exactly
+// one pair may qualify — two would be a call this can not read, and a guess
+// about which of them was meant is worth less than the report it would replace.
+function argumentsInOtherOrder(
+	candidate: OverloadCandidate,
+	matchableArguments: Array<MatchableArgument>,
+): { first: number; second: number } | null {
+	let found: { first: number; second: number } | null = null
+
+	for (
+		let first = candidate.receiverParameters;
+		first < matchableArguments.length;
+		first++
+	) {
+		for (
+			let second = first + 1;
+			second < matchableArguments.length;
+			second++
+		) {
+			if (
+				!candidateAccepts(
+					candidate,
+					rearrangedArguments(
+						candidate,
+						matchableArguments,
+						first,
+						second,
+						true,
+					),
+				) ||
+				candidateAccepts(
+					candidate,
+					rearrangedArguments(
+						candidate,
+						matchableArguments,
+						first,
+						second,
+						false,
+					),
+				)
+			) {
+				continue
+			}
+
+			if (found !== null) {
+				return null
+			}
+
+			found = { first, second }
+		}
+	}
+
+	return found
+}
+
+// NOTE: What a call that wrote two Arguments the other way round is answered
+// with — where each of the two belongs, and the one edit that puts them there.
+// The Notes stay what they were: the signatures are still what a reader checks
+// the order against.
+function swappedOrderReport(
+	candidate: OverloadCandidate,
+	swapped: { first: number; second: number },
+	positions: Array<common.Position>,
+	call: { position: common.Position; callee: common.Position },
+	notes: Array<string>,
+): {
+	labels: [common.DiagnosticLabel, ...Array<common.DiagnosticLabel>]
+	notes: Array<string>
+	helps: Array<string>
+} {
+	let firstName = describeCandidateParameter(candidate, swapped.second)
+	let secondName = describeCandidateParameter(candidate, swapped.first)
+	let swapHelp = swappedOrderHelp(candidate, swapped)
+	let written = (at: number) => positions[at] ?? call.position
+
+	return {
+		labels: [
+			primary(
+				written(swapped.first),
+				`this Argument is what ${firstName} takes`,
+			),
+			secondary(
+				written(swapped.second),
+				`and this one is what ${secondName} takes`,
+			),
+		],
+		notes: ["This call passes the Arguments in the other order.", ...notes],
+		helps: [swapHelp],
+	}
+}
+
+// NOTE: The one edit, labels and all. A Parameter that declares a label is
+// written with it wherever it stands, so an edit that moves an Argument moves
+// the label with it — and a reader who exchanged the two values and nothing else
+// would be answered next by the label they did not write.
+function swappedOrderHelp(
+	candidate: OverloadCandidate,
+	swapped: { first: number; second: number },
+): string {
+	let names = [swapped.first, swapped.second]
+		.map((at) => candidate.signature.parameterTypes[at]?.name)
+		.filter((name) => name != null)
+		.map((name) => `'${name}'`)
+
+	if (names.length === 0) {
+		return "Write them the other way round."
+	}
+
+	return `Write them the other way round, with ${joinedWithAnd(names)} before the ${
+		names.length === 1 ? "value it labels" : "values they label"
+	}.`
+}
+
 // NOTE: The candidate a report LEADS with — the one this call came closest to
 // answering, measured in Parameters answered before the refusal. A candidate
 // whose Parameters the Arguments could not even be paired with is not in the
@@ -12495,6 +12696,16 @@ function overloadRefusalReport(
 	}
 
 	let { candidate, detail } = closest
+
+	// NOTE: Asked before either branch below, because both of them answer about
+	// ONE Argument and this is a mistake about two. A call whose Arguments fit
+	// the other way round is not a call that got one of them wrong.
+	let swapped = argumentsInOtherOrder(candidate, matchableArguments)
+
+	if (swapped !== null) {
+		return swappedOrderReport(candidate, swapped, positions, call, notes)
+	}
+
 	let parameter = candidate.signature.parameterTypes[detail.parameterIndex]
 	let parameterName = describeCandidateParameter(
 		candidate,
@@ -16458,6 +16669,30 @@ function needsContext(node: parser.FunctionDefinitionNode): boolean {
 	)
 }
 
+// NOTE: How many calls that RESOLVED TO NOTHING are having their Arguments
+// enriched. A Function literal takes its Parameter Types from the call it is
+// passed to, so a call that no candidate answered has none to give — and saying
+// so is the same mistake reported a second and a third time. `[1, 2,
+// 3]::reduce((total, item) { … }, 0)` answered with the refusal the reader has
+// to act on, and then twice more about a literal they would not touch.
+//
+// The refusal is what a reader fixes; every Type in the literal follows from it.
+let refusedCallDepth = 0
+
+function underRefusedCall<T>(refused: boolean, work: () => T): T {
+	if (!refused) {
+		return work()
+	}
+
+	refusedCallDepth++
+
+	try {
+		return work()
+	} finally {
+		refusedCallDepth--
+	}
+}
+
 // NOTE: An unannotated Parameter takes its Type *and* its label from the
 // expected signature, positionally — which is why the Parser records no
 // external name for one. An annotated Parameter is resolved exactly as it
@@ -16487,6 +16722,13 @@ function resolveContextualParameterTypes(
 		let expectedParameter = expectedFunction?.parameterTypes[index]
 
 		if (expectedParameter === undefined) {
+			// NOTE: Silent inside a call nothing answered — see
+			// `refusedCallDepth`. The Type is still an Error, so nothing
+			// downstream reads a Parameter this never gave one.
+			if (refusedCallDepth > 0) {
+				return { name: null, type: { type: "Error" }, documentation }
+			}
+
 			reportError(
 				`The Type of Parameter '${parameterLabel(parameter)}' could not be inferred`,
 				parameter.position,

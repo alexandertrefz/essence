@@ -1330,6 +1330,77 @@ describe("What a refused call is told", () => {
 		)
 	})
 
+	// NOTE: The order a reader arriving from another language writes a fold in.
+	// The refusal was about the LABEL the first Argument was missing, which is
+	// true and is not the mistake — and the Help, followed, wrote that label
+	// onto the step and answered with three more Diagnostics.
+	describe("Arguments written in the other order", () => {
+		let source = `implementation {
+			Terminal.print([1, 2, 3]::reduce((total, item) { <- total::add(item) }, 0))
+		}`
+
+		it("says the call passes them the other way round", () => {
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics.map(({ code }) => code)).toEqual([
+				"no-matching-overload",
+			])
+			expect(diagnostics[0]!.notes[0]).toBe(
+				"This call passes the Arguments in the other order.",
+			)
+		})
+
+		it("says where each of the two belongs", () => {
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics[0]!.labels[0]!.kind).toBe("primary")
+			expect(diagnostics[0]!.labels[0]!.message).toBe(
+				"this Argument is what Parameter 2 takes",
+			)
+			expect(diagnostics[0]!.labels[1]!.message).toBe(
+				"and this one is what Parameter 'startingWith' takes",
+			)
+		})
+
+		// NOTE: The label moves with the Argument. A reader who exchanged the
+		// two values and nothing else would be answered next by the label they
+		// did not write, which is the report this one replaced.
+		it("writes the label the swap carries with it", () => {
+			expect(diagnosticsFor(source)[0]!.helps).toEqual([
+				"Write them the other way round, with 'startingWith' before the value it labels.",
+			])
+		})
+
+		// NOTE: A Function literal takes its Parameter Types from the call, and
+		// a call nothing answered has none to give — so saying that its
+		// Parameters have no Type is the same mistake told twice more. The
+		// refusal is the one report, and every Type in the literal follows from
+		// fixing it.
+		it("says nothing about the literal's own Parameters", () => {
+			expect(diagnosticsFor(source).map(({ code }) => code)).toEqual([
+				"no-matching-overload",
+			])
+		})
+	})
+
+	// NOTE: The other half of that rule: where writing the LABELS fixes the
+	// call, the labels are what went wrong and the report about them is the one
+	// to make. Only a swap that is the whole edit is reported as one.
+	it("keeps the label report where the order is right", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			constant numbers = [1, 2, 3]
+
+			Terminal.print(numbers::slice(1, 2)::length()::toString())
+		}`)
+
+		expect(diagnostics.map(({ code }) => code)).toEqual([
+			"no-matching-overload",
+		])
+		expect(diagnostics[0]!.notes[0]).not.toBe(
+			"This call passes the Arguments in the other order.",
+		)
+	})
+
 	// NOTE: Where no candidate takes this many Arguments there is no Argument to
 	// lead with — nothing was refused for what it is. The report stays about the
 	// call's shape, and says what the call handed over, which is the half a
