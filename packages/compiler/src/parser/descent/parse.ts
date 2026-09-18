@@ -2324,7 +2324,7 @@ class DescentParser {
 		let name = this.parseIdentifier()
 		let generics = this.parseOptionalGenericList()
 
-		this.tokens.expect(TokenType.SymbolLeftBrace)
+		let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
 		let cases: Array<parser.ChoiceCaseNode> = []
 
@@ -2342,7 +2342,10 @@ class DescentParser {
 			}
 		}
 
-		let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
+		let rightBrace = this.tokens.expectClosing(
+			TokenType.SymbolRightBrace,
+			leftBrace,
+		)
 
 		return generators.choiceDeclarationStatement(
 			name,
@@ -3494,9 +3497,12 @@ class DescentParser {
 
 				let namespaceSpecifier: parser.IdentifierNode | null = null
 				if (this.tokens.peek()?.type === TokenType.SymbolLeftAngle) {
-					this.tokens.next()
+					let leftAngle = this.tokens.next()
 					namespaceSpecifier = this.parseIdentifier()
-					this.tokens.expect(TokenType.SymbolRightAngle)
+					this.tokens.expectClosing(
+						TokenType.SymbolRightAngle,
+						leftAngle,
+					)
 				}
 
 				let member = this.parseIdentifier()
@@ -4091,7 +4097,7 @@ class DescentParser {
 		let end = caseName.position.end
 
 		if (this.tokens.peek()?.type === TokenType.SymbolLeftParen) {
-			this.tokens.next()
+			let leftParen = this.tokens.next()
 
 			if (this.tokens.peek()?.type !== TokenType.SymbolRightParen) {
 				value = this.parseExpression()
@@ -4131,7 +4137,10 @@ class DescentParser {
 				)
 			}
 
-			end = this.tokens.expect(TokenType.SymbolRightParen).position.end
+			end = this.tokens.expectClosing(
+				TokenType.SymbolRightParen,
+				leftParen,
+			).position.end
 		}
 
 		return generators.caseValueNode(
@@ -4578,14 +4587,17 @@ class DescentParser {
 			return null
 		}
 
-		this.tokens.expect(TokenType.SymbolLeftParen)
+		let leftParen = this.tokens.expect(TokenType.SymbolLeftParen)
 
 		let binding =
 			this.tokens.peek()?.type === TokenType.SymbolLeftBrace
 				? this.parsePattern()
 				: this.parseIdentifier()
 
-		let closing = this.tokens.expect(TokenType.SymbolRightParen)
+		let closing = this.tokens.expectClosing(
+			TokenType.SymbolRightParen,
+			leftParen,
+		)
 
 		return { node: binding, end: closing.position.end }
 	}
@@ -4613,7 +4625,10 @@ class DescentParser {
 			}
 		}
 
-		let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
+		let rightBrace = this.tokens.expectClosing(
+			TokenType.SymbolRightBrace,
+			leftBrace,
+		)
 
 		this.reportDuplicateNames(
 			members.map(([, member]) => member),
@@ -4842,7 +4857,10 @@ class DescentParser {
 		}
 
 		let keyValuePairList = this.parseKeyValuePairList(true)
-		let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
+		let rightBrace = this.tokens.expectClosing(
+			TokenType.SymbolRightBrace,
+			leftBrace,
+		)
 
 		return generators.recordValueNode(null, keyValuePairList.data, {
 			start: leftBrace.position.start,
@@ -4870,7 +4888,10 @@ class DescentParser {
 
 		let record = this.backtrack(() => {
 			let keyValuePairList = this.parseKeyValuePairList(true)
-			let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
+			let rightBrace = this.tokens.expectClosing(
+				TokenType.SymbolRightBrace,
+				leftBrace,
+			)
 
 			return generators.recordValueNode(null, keyValuePairList.data, {
 				start: leftBrace.position.start,
@@ -4919,7 +4940,10 @@ class DescentParser {
 			this.backtrack(() => {
 				let keyValuePairList =
 					this.parseKeyValuePairList(allowShorthand)
-				let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
+				let rightBrace = this.tokens.expectClosing(
+					TokenType.SymbolRightBrace,
+					leftBrace,
+				)
 
 				return generators.combination(
 					lhs,
@@ -4949,7 +4973,10 @@ class DescentParser {
 		// before it is ever offered the shorthand.
 		let expressionCombination = this.backtrack(() => {
 			let rhs = this.parseExpression()
-			let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
+			let rightBrace = this.tokens.expectClosing(
+				TokenType.SymbolRightBrace,
+				leftBrace,
+			)
 
 			return generators.combination(lhs, rhs, {
 				start: leftBrace.position.start,
@@ -5012,7 +5039,10 @@ class DescentParser {
 			)
 		}
 
-		let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
+		let rightBrace = this.tokens.expectClosing(
+			TokenType.SymbolRightBrace,
+			leftBrace,
+		)
 
 		return generators.combination(lhs, rhs, {
 			start: leftBrace.position.start,
@@ -5277,7 +5307,10 @@ class DescentParser {
 		}
 
 		let keyValuePairList = this.parseKeyValuePairList(true)
-		let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
+		let rightBrace = this.tokens.expectClosing(
+			TokenType.SymbolRightBrace,
+			leftBrace,
+		)
 
 		return generators.recordValueNode(null, keyValuePairList.data, {
 			start: leftBrace.position.start,
@@ -5805,7 +5838,10 @@ class DescentParser {
 		if (this.tokens.peek()?.type === TokenType.SymbolEqual) {
 			this.tokens.next()
 
-			let rightBracket = this.tokens.expect(TokenType.SymbolRightBracket)
+			let rightBracket = this.tokens.expectClosing(
+				TokenType.SymbolRightBracket,
+				leftBracket,
+			)
 
 			return generators.dictionaryValueNode([], {
 				start: leftBracket.position.start,
@@ -5829,7 +5865,10 @@ class DescentParser {
 
 			this.refuseTrailingEntrySeparator()
 
-			let rightBracket = this.tokens.expect(TokenType.SymbolRightBracket)
+			let rightBracket = this.tokens.expectClosing(
+				TokenType.SymbolRightBracket,
+				leftBracket,
+			)
 
 			return generators.dictionaryValueNode(entries, {
 				start: leftBracket.position.start,
@@ -5866,7 +5905,10 @@ class DescentParser {
 			values.push(this.parseExpression())
 		}
 
-		let rightBracket = this.tokens.expect(TokenType.SymbolRightBracket)
+		let rightBracket = this.tokens.expectClosing(
+			TokenType.SymbolRightBracket,
+			leftBracket,
+		)
 
 		return generators.listValueNode(values, {
 			start: leftBracket.position.start,
@@ -6045,7 +6087,10 @@ class DescentParser {
 
 			this.refuseTrailingEntrySeparator()
 
-			let rightBracket = this.tokens.expect(TokenType.SymbolRightBracket)
+			let rightBracket = this.tokens.expectClosing(
+				TokenType.SymbolRightBracket,
+				leftBracket,
+			)
 
 			return generators.combination(
 				base,
@@ -6083,7 +6128,10 @@ class DescentParser {
 			)
 		}
 
-		let rightBracket = this.tokens.expect(TokenType.SymbolRightBracket)
+		let rightBracket = this.tokens.expectClosing(
+			TokenType.SymbolRightBracket,
+			leftBracket,
+		)
 
 		return generators.combination(
 			base,
@@ -6202,7 +6250,10 @@ class DescentParser {
 			generics.push(this.parseGenericDeclaration())
 		}
 
-		let rightAngle = this.tokens.expect(TokenType.SymbolRightAngle)
+		let rightAngle = this.tokens.expectClosing(
+			TokenType.SymbolRightAngle,
+			leftAngle,
+		)
 
 		return {
 			generics,
@@ -6295,7 +6346,10 @@ class DescentParser {
 			}
 		}
 
-		let rightParen = this.tokens.expect(TokenType.SymbolRightParen)
+		let rightParen = this.tokens.expectClosing(
+			TokenType.SymbolRightParen,
+			leftParen,
+		)
 
 		return {
 			parameters,
@@ -6694,7 +6748,7 @@ class DescentParser {
 		let args: Array<parser.ArgumentNode> = []
 
 		if (this.tokens.peek()?.type !== TokenType.SymbolRightParen) {
-			args.push(this.parseArgument())
+			args.push(this.parseArgument(leftParen))
 
 			while (this.tokens.peek()?.type === TokenType.SymbolComma) {
 				this.tokens.next()
@@ -6703,11 +6757,14 @@ class DescentParser {
 					break
 				}
 
-				args.push(this.parseArgument())
+				args.push(this.parseArgument(leftParen))
 			}
 		}
 
-		let rightParen = this.tokens.expect(TokenType.SymbolRightParen)
+		let rightParen = this.tokens.expectClosing(
+			TokenType.SymbolRightParen,
+			leftParen,
+		)
 
 		return {
 			args,
@@ -6794,7 +6851,7 @@ class DescentParser {
 		return true
 	}
 
-	protected parseArgument(): parser.ArgumentNode {
+	protected parseArgument(opening: Token): parser.ArgumentNode {
 		if (isIdentifierToken(this.tokens.peek())) {
 			if (this.argumentIsLabelled()) {
 				let name = this.parseIdentifier()
@@ -6807,6 +6864,15 @@ class DescentParser {
 			// and a labelled argument, so we try the Expression reading first
 			// and fall back to the labelled reading — exactly one of the two
 			// can reach the end of the argument.
+			//
+			// NOTE: The failure is phrased as the Argument list's own close
+			// would phrase it — "Expected ')' but found 'X'" at the Token the
+			// Expression stopped in front of — rather than as a remark about
+			// the reading ("Expression does not span the whole argument"). It
+			// used to be neither reported nor positioned, because the labelled
+			// reading below always answered for the text; furthest-failure
+			// tracking reports it wherever this reading got FURTHER than that
+			// one, and a call missing its `)` is exactly when it does.
 			let unlabelledArgument = this.backtrack(() => {
 				let value = this.parseExpression()
 				let next = this.tokens.peek()?.type
@@ -6815,7 +6881,7 @@ class DescentParser {
 					next !== TokenType.SymbolComma &&
 					next !== TokenType.SymbolRightParen
 				) {
-					fail("Expression does not span the whole argument.")
+					this.tokens.failClosing(TokenType.SymbolRightParen, opening)
 				}
 
 				return generators.argument(null, value)
@@ -6924,7 +6990,10 @@ class DescentParser {
 			typeArguments.push(this.parseType())
 		}
 
-		let rightAngle = this.tokens.expect(TokenType.SymbolRightAngle)
+		let rightAngle = this.tokens.expectClosing(
+			TokenType.SymbolRightAngle,
+			leftAngle,
+		)
 
 		return {
 			typeArguments,
@@ -6980,7 +7049,7 @@ class DescentParser {
 			}
 		}
 
-		this.tokens.expect(TokenType.SymbolRightParen)
+		this.tokens.expectClosing(TokenType.SymbolRightParen, leftParen)
 
 		let returnType = this.parseReturnType()
 
@@ -7054,7 +7123,10 @@ class DescentParser {
 			pairs.push(this.parseKeyTypePair())
 		}
 
-		let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
+		let rightBrace = this.tokens.expectClosing(
+			TokenType.SymbolRightBrace,
+			leftBrace,
+		)
 
 		this.reportDuplicateNames(pairs, "Member", "duplicate-member")
 

@@ -525,6 +525,60 @@ export class TokenStream {
 		return this.next()
 	}
 
+	// NOTE: The Token that CLOSES a bracketed construction, expected where the
+	// construction has stopped growing. It differs from a plain `expect` in one
+	// thing: the Label beside the primary one, which says where the bracket it
+	// would close was opened. A bracket left open is noticed at the first Token
+	// that can not carry its contents on, and that Token is usually nowhere
+	// near the mistake — the reader is told "expected ')'" about a line that
+	// holds no parenthesis at all, and has to find the opening one by counting.
+	//
+	// NOTE: "opened here" rather than "this '(' is never closed", which is what
+	// it looks like from the inside and is not what this knows. The `)` may
+	// stand two Tokens further on, with a stray `+` in front of it: the bracket
+	// is open AT THIS TOKEN, which is the whole of the claim, and it is the same
+	// claim `parseClosingBrace` and the unclosed-String report make in the same
+	// words.
+	//
+	// NOTE: And only where the two stand on different LINES. A bracket and the
+	// Token that would not close it written on one line are both under the
+	// reader's eye already, and a second arrow at a character they can see is
+	// noise: `print(1 + 2)` is answered with "expected ')'" at the `+` and
+	// nothing else, exactly as it always was. What nobody finds by looking is
+	// the bracket opened four lines up.
+	expectClosing(tokenType: lexer.TokenType, opening: Token): Token {
+		let token = this.tokens[this.index]
+
+		if (token !== undefined && token.type === tokenType) {
+			return this.next()
+		}
+
+		this.failClosing(tokenType, opening)
+	}
+
+	// NOTE: The failure `expectClosing` raises, thrown by hand where a reading
+	// has already decided that the closing Token is not there — an Argument
+	// whose Expression stopped short of the bracket is the case in point, and
+	// it must fail in the SAME words the Argument list's own close would, or
+	// which of the two readings is reported becomes visible to the reader.
+	failClosing(tokenType: lexer.TokenType, opening: Token): never {
+		let token = this.tokens[this.index]
+		let position = token?.position ?? this.endPosition()
+		let found = token === undefined ? "end of input" : describeToken(token)
+
+		throw new ParseError(
+			`Expected ${describeTokenType(tokenType)} but found ${found}.`,
+			position,
+			`expected ${describeTokenType(tokenType)}`,
+			{
+				labels:
+					opening.position.start.line === position.start.line
+						? []
+						: [secondary(opening.position, "opened here")],
+			},
+		)
+	}
+
 	save(): TokenStreamState {
 		return { index: this.index, braceDepth: this.braceDepth }
 	}

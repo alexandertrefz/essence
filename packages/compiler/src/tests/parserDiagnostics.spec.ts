@@ -1107,6 +1107,73 @@ describe("Parser AST", () => {
 		})
 	})
 
+	// NOTE: A bracket is noticed as missing at the first Token that can not
+	// carry its contents on, which is a line — or a screen — away from the
+	// bracket itself. The Label is what closes that distance, and it is written
+	// only where there IS one: a pair on a single line is under the reader's eye
+	// already.
+	describe("An unclosed bracket", () => {
+		it("should point at the '(' a call never closed", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+	constant total = Math.sum(
+		1,
+		2
+	Terminal.print(total)
+}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("syntax-error")
+			expect(diagnostics[0].message).toBe(
+				"Expected ')' but found 'Terminal'.",
+			)
+			expect(diagnostics[0].labels).toHaveLength(2)
+			expect(diagnostics[0].labels[1]?.kind).toBe("secondary")
+			expect(diagnostics[0].labels[1]?.message).toBe("opened here")
+			expect(diagnostics[0].labels[1]?.position).toEqual({
+				start: { line: 2, column: 27 },
+				end: { line: 2, column: 28 },
+			})
+		})
+
+		it("should point at the '[' a List never closed", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+	constant names = [
+		"ada",
+		"alan"
+	Terminal.print(names)
+}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Expected ']' but found 'Terminal'.",
+			)
+			expect(diagnostics[0].labels[1]?.message).toBe("opened here")
+			expect(diagnostics[0].labels[1]?.position).toEqual({
+				start: { line: 2, column: 19 },
+				end: { line: 2, column: 20 },
+			})
+		})
+
+		// NOTE: The pair written on one line keeps the Diagnostic it has always
+		// had, with one Label: the bracket is under the reader's eye already.
+		// The mistake is a second Argument written without a comma, because an
+		// operator written there — `1 + 2` — is answered by
+		// `operator-not-supported` before the bracket is ever missed.
+		it("should stay silent about a bracket on the line of the mistake", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { Terminal.print(1 2) }",
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe("Expected ')' but found '2'.")
+			expect(diagnostics[0].labels).toHaveLength(1)
+		})
+	})
+
 	it("should span an Expression Combination from brace to brace", () => {
 		let node = declaredValue(
 			firstNode("implementation { constant a = { base with other } }"),
