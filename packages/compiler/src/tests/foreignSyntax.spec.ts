@@ -4,6 +4,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
+import { operatorNote } from "../helpers/foreign"
 import { parseWithDiagnostics } from "../parser/index"
 
 // NOTE: What a reader arriving from another language writes, and what the
@@ -579,6 +580,117 @@ describe("Foreign syntax", () => {
 			expect(helpsOf(program("constant both = true && false"))).toEqual([
 				"Write 'a::and(b)' — both sides are worked out, so nest an 'if' where the right one must not run.",
 			])
+		})
+
+		// NOTE: The whole family, in the four places one is written: between two
+		// Literals and between two names, as a whole Statement and inside a
+		// call. The call with NAMES in it is where six of the fourteen used to
+		// fall through to `Expected ')' but found 'tax'` — `total` read as an
+		// Argument's label and `+ tax` as its value — and it is the one column
+		// nothing covered, because a Literal can not be a label and so the
+		// Literal row always went the other way.
+		it("names the operator wherever one is written", () => {
+			let operators = [
+				"+",
+				"-",
+				"*",
+				"/",
+				"%",
+				"==",
+				"===",
+				"!=",
+				"<",
+				">",
+				"&&",
+				"||",
+				"??",
+			]
+
+			for (let operator of operators) {
+				for (let [left, right] of [
+					["1", "2"],
+					["a", "b"],
+				]) {
+					let written = `${left} ${operator} ${right}`
+					let sources = [
+						program(
+							"constant a = 1",
+							"constant b = 2",
+							`constant v = ${written}`,
+						),
+						program(
+							"constant a = 1",
+							"constant b = 2",
+							`Terminal.print(${written})`,
+						),
+					]
+
+					for (let source of sources) {
+						expect({ written, codes: codesOf(source) }).toEqual({
+							written,
+							codes: ["operator-not-supported"],
+						})
+						expect({
+							written,
+							messages: messagesOf(source),
+						}).toEqual({
+							written,
+							messages: [`Essence has no '${operator}' operator`],
+						})
+					}
+				}
+			}
+		})
+
+		// NOTE: The other half of the rule above: a name in front of an operator
+		// is no label, and a name in front of a VALUE still is. `-` is the one
+		// lexeme of the family that opens a value of this language, so a label
+		// stands in front of it and a negative Number follows.
+		it("keeps a labelled Argument whose value opens with punctuation", () => {
+			expect(
+				codesOf(
+					program(
+						"function f(label n: Integer) -> Integer { <- n }",
+						"Terminal.print(f(label -1))",
+					),
+				),
+			).toEqual([])
+
+			expect(
+				helpsOf(
+					program(
+						"function f(label n: Boolean) -> Boolean { <- n }",
+						"constant ready = true",
+						"Terminal.print(f(label !ready))",
+					),
+				),
+			).toEqual(["Write 'ready::negate()'."])
+
+			expect(
+				helpsOf(
+					program(
+						"function f(label s: String) -> String { <- s }",
+						"Terminal.print(f(label 'hi'))",
+					),
+				),
+			).toEqual([`Write '"hi"'.`])
+		})
+
+		// NOTE: There are no grouping parentheses, so a `(` in Expression
+		// position opens a Function literal's Parameter list — which read `a` as
+		// a label and `+` as the name it labelled, and answered with
+		// `redundant-parameter-label` about a Parameter nobody wrote.
+		it("names the operator inside parentheses a reader wrote to group", () => {
+			let source = program(
+				"constant a = 1",
+				"constant b = 2",
+				"constant c = 3",
+				"constant x = (a + b) * c",
+			)
+
+			expect(codesOf(source)).toEqual(["operator-not-supported"])
+			expect(messagesOf(source)).toEqual(["Essence has no '+' operator"])
+			expect(notesOf(source)).toEqual([operatorNote])
 		})
 
 		it("refuses an operator written flush against its operands", () => {

@@ -6551,6 +6551,19 @@ class DescentParser {
 		let annotationFollows = () =>
 			this.tokens.peek()?.type === TokenType.SymbolColon
 
+		// NOTE: `(a + b) * c` — the parentheses a reader wrote to GROUP, read
+		// here as the Parameter list of a Function literal, `a` as a label and
+		// `+` as the name it labels. What came of that was
+		// `redundant-parameter-label` about a Parameter nobody wrote, and then
+		// a `syntax-error` at the `b` behind it. The `+` is refused instead,
+		// where it stands, with the note that says there are no grouping
+		// parentheses either — see `operatorNote`.
+		let following = this.foreignTextFollowing()
+
+		if (following !== null) {
+			this.refuseForeignText(following)
+		}
+
 		// NOTE: A leading `{` — a Pattern standing where the internal name goes,
 		// with no label written. Like a bare `item`, it takes both its Type and
 		// its label from the expected signature.
@@ -6930,6 +6943,16 @@ class DescentParser {
 			following!.type === TokenType.SymbolLeftParen ||
 			following!.type === TokenType.SymbolLeftAngle
 		) {
+			return false
+		}
+
+		// NOTE: A label never stands in front of another language's operator.
+		// `Terminal.print(total + tax)` read `total` as one and `+ tax` as its
+		// value, and what came of that was `Expected ')' but found 'tax'` — the
+		// Argument list complaining about text that was never an Argument's.
+		// Read as an Expression instead, the `+` is met where the Expression
+		// ENDS, which is where the operator table answers for it.
+		if (this.foreignTextFollowing() !== null) {
 			return false
 		}
 
@@ -7479,11 +7502,22 @@ class DescentParser {
 	//
 	// Null where nothing at the cursor is made of these characters, which is the
 	// answer for every Program that is not written in another language.
-	protected foreignLexeme(): {
+	//
+	// NOTE: `from` is how far ahead of the cursor to read, and everything but
+	// `argumentIsLabelled` reads at the cursor itself. That one has to ask about
+	// the Token BEHIND the one it is deciding, because what it decides is
+	// whether the name in front of an operator is a label.
+	protected foreignLexeme(from = 0): {
 		text: string
 		position: common.Position
+		// NOTE: Whether the first Token gave the whole of itself to the lexeme.
+		// `+` did and `+2` did not, which is the difference between an operator
+		// standing between two values and one written flush against its
+		// operand — and the second is answered by the Enricher, which has the
+		// operand in hand and can name it.
+		whole: boolean
 	} | null {
-		let first = this.tokens.peek()
+		let first = this.tokens.peek(from)
 
 		if (first === undefined) {
 			return null
@@ -7501,8 +7535,9 @@ class DescentParser {
 			column: first.position.start.column + lead.length,
 		}
 		let whole = lead.length === first.value.length
+		let wholeFirst = whole
 
-		for (let offset = 1; whole; offset++) {
+		for (let offset = from + 1; whole; offset++) {
 			let token = this.tokens.peek(offset)
 
 			if (token === undefined || token.position.start.line !== end.line) {
@@ -7524,7 +7559,11 @@ class DescentParser {
 			whole = next.length === token.value.length
 		}
 
-		return { text, position: { start: first.position.start, end } }
+		return {
+			text,
+			position: { start: first.position.start, end },
+			whole: wholeFirst,
+		}
 	}
 
 	// NOTE: The verdict on the lexeme at the cursor: a habit with its own shape,
@@ -7552,6 +7591,51 @@ class DescentParser {
 		}
 
 		return { ...account, position: lexeme.position }
+	}
+
+	// NOTE: The verdict on the Token standing BEHIND the cursor — the same
+	// question as `foreignTextAhead`, asked one Token early. Its two callers are
+	// about to read the Token at the cursor as a NAME, and a name is never what
+	// stands in front of one of these: `Terminal.print(total + tax)` read
+	// `total` as an Argument's label, and `constant x = (a + b) * c` read `a` as
+	// a Parameter's.
+	//
+	// The operator has to be the whole of the Token it opens. `+` between two
+	// values is one, and the `+` of `+tax` is not: that one arrives glued to its
+	// operand, and the Enricher answers it with the operand in hand and names
+	// it.
+	protected foreignTextFollowing(): ForeignRefusal | null {
+		// NOTE: Only an Identifier, and that is the whole of the narrowing. The
+		// Symbols an operator is made of — `=`, `<`, `>`, `/`, `|` — begin no
+		// Expression, so neither caller ever reached this question for one. A
+		// `-` DOES begin one, and is left alone on purpose: `compute(offset -1)`
+		// is a labelled Argument carrying a negative Number, and there is no
+		// telling that from a subtraction without reading what follows the sign.
+		if (this.tokens.peek(1)?.type !== TokenType.Identifier) {
+			return null
+		}
+
+		let lexeme = this.foreignLexeme(1)
+
+		if (
+			lexeme === null ||
+			!lexeme.whole ||
+			essenceLexemes.has(lexeme.text)
+		) {
+			return null
+		}
+
+		let syntax = foreignSyntaxRefusal(lexeme.text, lexeme.position)
+
+		if (syntax !== null) {
+			return syntax
+		}
+
+		let account = foreignOperatorAccount(lexeme.text)
+
+		return account === null
+			? null
+			: { ...account, position: lexeme.position }
 	}
 
 	protected refuseForeignText(refusal: ForeignRefusal): never {
