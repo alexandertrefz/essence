@@ -3327,6 +3327,31 @@ Error: No Method named 'add' for this value
     │ Note 3: Searched Namespace 'Future'.
 ────╯
 
-─── 3 errors
+[unknown-case]
+Error: 'Rounding' declares no Case '#Floor'
+    ╭─┤ KnownAnswers.es:39:36 │
+    │
+ 39 │     Terminal.print(7/2::round(toward #Floor)::toString())
+    │                                       ──┬──  
+    │                                         ╰──── no such Case
+    │ 
+    │ Note: This position takes a Rounding: '#Nearest', '#NearestEven', '#Down', '#Up', '#TowardZero'.
+────╯
+
+[unknown-case]
+Error: No Choice in scope declares a Case '#Truncated'
+    ╭─┤ KnownAnswers.es:43:35 │
+    │
+ 43 │     constant options = { division = #Truncated }
+    │                                      ────┬────  
+    │                                          ╰────── no such Case
+    │ 
+    │ Help 1: Did you mean '#Truncating'?
+    │ Help 2: Annotate the value, or pass it where a Choice is expected, so the Case resolves against that Choice's own Cases.
+    │ 
+    │ Note: 'Division' declares '#Truncating'.
+────╯
+
+─── 5 errors
 "
 `;

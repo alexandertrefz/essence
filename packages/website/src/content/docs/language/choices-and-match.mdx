@@ -151,13 +151,13 @@ The annotation on `visit` reaches into its record literal, so `#Home` there is a
 
 A list literal written as an argument behaves the same way: `total([#Home])` is `ambiguous-case` too. The same holds for an argument to a generic function whose parameter type the call works out, a form Generics teaches. You meet this first with `#Value`, which both [Optional](/docs/language/optional) and [Result](/docs/language/result) declare. Result states the rule in full.
 
-A name that no choice in scope declares is [`unknown-case`](/docs/reference/diagnostics#unknown-case), with the nearest name the compiler knows. Here the first program misspells `#Article`:
+A name the position's choice does not declare is [`unknown-case`](/docs/reference/diagnostics#unknown-case). The report names that choice and lists the cases it does declare, which is how you discover them. Here the first program misspells `#Article`:
 
 <div class="error-output">
 
 ```
 [unknown-case]
-Error: No Choice in scope declares a Case '#Artcle'
+Error: 'Route' declares no Case '#Artcle'
     ╭─┤ routes.es:17:29 │
     │
  17 │     constant reading: Route = #Artcle({ slug = "choices" })
@@ -165,10 +165,14 @@ Error: No Choice in scope declares a Case '#Artcle'
     │                                   ╰──── no such Case
     │
     │ Help: Did you mean '#Article'?
+    │
+    │ Note: This position takes a Route: '#Home', '#Article(slug)', '#Search({ query, page })'.
 ────╯
 ```
 
 </div>
+
+A case that carries something is listed with what it carries, so the note is a list you can write from. Where no position decides the choice — a record literal's member, a constant with no annotation — the message stays "No Choice in scope declares a Case", names the choices that declare the nearest name, and the Help says to annotate the value so that a choice has a say.
 
 A case value has the type of its case, not of its choice. On its own, `Route#Home` has the type `Route#Home`, and errors use that name. It still fits wherever a `Route` is wanted. It matters where nothing else decides the type, as for a [variable](/docs/reference/syntax-glossary#variable) declared from a case. TypeScript widens `let c = Colour.Red` to `Colour`, and Essence keeps the case type. Assigning another case to it is [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch):
 
@@ -649,7 +653,7 @@ implementation {
 
 A mode is a choice passed as an argument. `#Decimal` is a case of [`NumberFormat`](/docs/library/rational#NumberFormat), `#NearestEven` of [`Rounding`](/docs/library/rational#Rounding), `#Start` of [`Side`](/docs/library/string#Side) and `#Truncating` of [`Division`](/docs/library/integer#Division). Each is a direct argument, so the parameter's type decides the choice and no prefix is needed. JavaScript picks a mode by method name, as `trimStart()` does, or by a string option, as `roundingMode: "halfEven"` does. Its `%` is `#Truncating`. A mode with a default is a defaulted parameter: `half::round()` rounds `toward #Nearest`. The calls are [`toString`](/docs/library/rational#toString), [`round`](/docs/library/rational#round), [`trim`](/docs/library/string#trim) and [`remainder`](/docs/library/integer#remainder).
 
-A misspelt mode is `unknown-case`, and `#Strat` gets "Did you mean '#Start'?". A mode is never a string, so a typo cannot slip through: `trim(at "start")` is `no-matching-overload`, because `at` takes a `Side`. Each mode's cases are listed on the page of the type whose methods take it, as `Rounding`, `NumberFormat`, `Side` and `Division` are above. [`SortOrder`](/docs/library/list#SortOrder), for one, is on List.
+A misspelt mode is `unknown-case`, and `#Strat` gets "Did you mean '#Start'?" beside the Note "This position takes a Side: '#Start', '#End', '#BothEnds'." — so the compiler lists the mode's cases where you got one wrong. A mode is never a string, so a typo cannot slip through: `trim(at "start")` is `no-matching-overload`, because `at` takes a `Side`. Each mode's cases are listed on the page of the type whose methods take it, as `Rounding`, `NumberFormat`, `Side` and `Division` are above. [`SortOrder`](/docs/library/list#SortOrder), for one, is on List.
 
 [`Ordering`](/docs/library/ordering), what [`compare`](/docs/library/integer#compare) returns, and [`Step`](/docs/library/loop#Step), what a `loop` step returns, are ordinary choices too. A `match` takes them apart like any other:
 

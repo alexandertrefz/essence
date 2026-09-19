@@ -491,3 +491,248 @@ ${future}
 		})
 	})
 })
+
+describe("A Case the position decides", () => {
+	// NOTE: Every flag in the standard library is a bare Case passed at a
+	// Parameter, so this report is how a reader discovers what `round(toward:)`
+	// takes. It used to say that no Choice in scope declared the name and stop.
+	it("should name the Choice the Parameter takes and list its Cases", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				Terminal.print(7/2::round(toward #Floor)::toString())
+			}`,
+			"unknown-case",
+		)
+
+		expect(diagnostic.message).toBe("'Rounding' declares no Case '#Floor'")
+		expect(diagnostic.notes).toEqual([
+			"This position takes a Rounding: '#Nearest', '#NearestEven', '#Down', '#Up', '#TowardZero'.",
+		])
+	})
+
+	it("should draw the near miss from that Choice's own Cases", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				Terminal.print(7/2::round(toward #Doun)::toString())
+			}`,
+			"unknown-case",
+		)
+
+		expect(diagnostic.helps).toEqual(["Did you mean '#Down'?"])
+		expect(diagnostic.data).toEqual({
+			kind: "suggestion",
+			suggestion: "Down",
+		})
+	})
+
+	// NOTE: One parse tree enriched over and over, which is what an editor does
+	// with the buffer under the cursor. The expectation is recorded against the
+	// NAME Node, and that Node outlives every pass — so the recording is
+	// deduped where it is written, and the report says the same thing each time
+	// rather than growing a Type per pass behind it.
+	it("should answer the same way on every enrichment of one parse tree", () => {
+		let parsed = parse(`implementation {
+			Terminal.print(7/2::round(toward #Floor)::toString())
+		}`)
+		let passes = [0, 1, 2].map(
+			() =>
+				enrich(parsed).diagnostics.find(
+					(diagnostic) => diagnostic.code === "unknown-case",
+				)?.notes,
+		)
+
+		expect(passes[0]).toEqual([
+			"This position takes a Rounding: '#Nearest', '#NearestEven', '#Down', '#Up', '#TowardZero'.",
+		])
+		expect(passes[1]).toEqual(passes[0] as Array<string>)
+		expect(passes[2]).toEqual(passes[0] as Array<string>)
+	})
+
+	it("should answer an annotation the same way", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				constant mode: Rounding = #Floor
+
+				Terminal.inspect(mode)
+			}`,
+			"unknown-case",
+		)
+
+		expect(diagnostic.message).toBe("'Rounding' declares no Case '#Floor'")
+	})
+
+	it("should answer a return position the same way", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				function chosen() -> Rounding {
+					<- #Floor
+				}
+
+				Terminal.inspect(chosen())
+			}`,
+			"unknown-case",
+		)
+
+		expect(diagnostic.notes).toEqual([
+			"This position takes a Rounding: '#Nearest', '#NearestEven', '#Down', '#Up', '#TowardZero'.",
+		])
+	})
+
+	// NOTE: A Case that carries something is spelled with what it carries, so
+	// the list is one a reader can write from. `#Value` beside `#Empty` with
+	// nothing to tell them apart is a list nobody can act on.
+	it("should spell a Case with the payload it carries", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				constant held: Optional<Integer> = #Sum(1)
+
+				Terminal.inspect(held)
+			}`,
+			"unknown-case",
+		)
+
+		expect(diagnostic.notes).toEqual([
+			"This position takes an Optional: '#Value(item)', '#Empty'.",
+		])
+	})
+
+	// NOTE: And a payload of SEVERAL members is spelled as the Record it is. The
+	// pattern form this printed — '#Rect(width, height)' — is
+	// `case-payload-is-one-value` the moment it is copied into the position the
+	// list stands in, which is one refusal traded for the next.
+	it("should spell a payload of several members as a Record", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				choice Shape {
+					Circle { radius: Integer },
+					Rect { width: Integer, height: Integer },
+					Dot,
+				}
+
+				constant drawn: Shape = #Bogus
+
+				Terminal.inspect(drawn)
+			}`,
+			"unknown-case",
+		)
+
+		expect(diagnostic.notes).toEqual([
+			"This position takes a Shape: '#Circle(radius)', '#Rect({ width, height })', '#Dot'.",
+		])
+	})
+
+	it("should print a Case list that compiles", () => {
+		expect(
+			compiles(`implementation {
+				choice Shape {
+					Circle { radius: Integer },
+					Rect { width: Integer, height: Integer },
+					Dot,
+				}
+
+				constant radius = 5
+				constant width = 1
+				constant height = 2
+
+				constant round: Shape = #Circle(radius)
+				constant boxed: Shape = #Rect({ width, height })
+				constant point: Shape = #Dot
+
+				Terminal.inspect([round, boxed, point])
+			}`),
+		).toBe(true)
+	})
+
+	// NOTE: An Overload whose candidates take different Choices is the one shape
+	// this can not decide, so every Choice is named and none of them is the
+	// message's subject.
+	it("should name every Choice where the candidates disagree", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				choice Colour { Red, Green }
+				choice Shape { Round, Square }
+
+				namespace Drawn for Integer {
+					overload draw {
+						(_ colour: Colour) -> Integer { <- @ }
+						(_ shape: Shape) -> Integer { <- @ }
+					}
+				}
+
+				Terminal.inspect(1::draw(#Blue))
+			}`,
+			"unknown-case",
+		)
+
+		expect(diagnostic.message).toBe(
+			"No Choice this position accepts declares a Case '#Blue'",
+		)
+		expect(diagnostic.notes).toEqual([
+			"This position takes a Colour: '#Red', '#Green'.",
+			"This position takes a Shape: '#Round', '#Square'.",
+		])
+	})
+
+	// NOTE: Nothing decides a Record Literal's member, so nothing here can name
+	// a Choice — and the one thing worth saying is how to get a report that can.
+	it("should say how to get a Choice where the position decides nothing", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				constant options = { rounding = #Floor }
+
+				Terminal.inspect(options)
+			}`,
+			"unknown-case",
+		)
+
+		expect(diagnostic.message).toBe(
+			"No Choice in scope declares a Case '#Floor'",
+		)
+		expect(diagnostic.helps).toEqual([
+			"Annotate the value, or pass it where a Choice is expected, so the Case resolves against that Choice's own Cases.",
+		])
+	})
+
+	// NOTE: And where the scan DID find a near miss, which Choice declares it —
+	// the half a reader has nowhere to look up. The Cases themselves are still
+	// not listed: the scan reaches the whole prelude.
+	it("should name the Choice that declares the near miss", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				constant options = { division = #Truncated }
+
+				Terminal.inspect(options)
+			}`,
+			"unknown-case",
+		)
+
+		expect(diagnostic.notes).toEqual(["'Division' declares '#Truncating'."])
+		expect(diagnostic.helps[0]).toBe("Did you mean '#Truncating'?")
+	})
+
+	// NOTE: A `match` written one level out. The subject declares no Case at
+	// all, so the list of what it does declare was empty and the report said
+	// nothing whatsoever.
+	it("should say a matched subject holds the Choice", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				choice Answer { Yes, No }
+
+${future.replace("Future<Integer>", "Future<Answer>").replace("<- 41", "<- #Yes")}
+
+				match fetched() -> {} {
+					case #Yes { <- {} }
+					case _ { <- {} }
+				}
+			}`,
+			"unknown-case",
+		)
+
+		expect(diagnostic.notes).toEqual([
+			"'#Yes' is a Case of Answer, which is what a Future<Answer> holds.",
+		])
+		expect(diagnostic.helps).toEqual([
+			"Wait for it first — 'constant answered = complete …' — and match 'answered'.",
+		])
+	})
+})

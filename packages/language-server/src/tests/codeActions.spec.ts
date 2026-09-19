@@ -702,6 +702,26 @@ describe("Code Actions", () => {
 			)
 		})
 
+		// NOTE: The near miss for a mode is drawn from the Choice the Parameter
+		// takes, so the fix writes a Case that will resolve — the scan over
+		// every Choice in scope could offer one from an unrelated Choice, which
+		// would compile into a second refusal.
+		it("should suggest a Case from the Choice a Parameter takes", () => {
+			let lines = [
+				"implementation {",
+				"\tTerminal.inspect(7/2::round(toward #Doun))",
+				"}",
+			]
+
+			let [fix] = unknownCaseFixes(lines)
+
+			expect(fix.title).toBe("Change to '#Down'")
+			expect(applied(lines, fix)[1]).toBe(
+				"\tTerminal.inspect(7/2::round(toward #Down))",
+			)
+			expect(codesOf(applied(lines, fix))).toEqual([])
+		})
+
 		// NOTE: A guess is only worth offering when it is close. A name nothing
 		// resembles must leave the Diagnostic to speak for itself rather than
 		// send the reader to an unrelated Case.

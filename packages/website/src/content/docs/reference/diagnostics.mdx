@@ -2642,26 +2642,34 @@ Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-
 
 ### `unknown-case`
 
-**Error.** No case of that name exists where one was looked for. That place is a named choice, the matched value's type, or, for a bare `#Case`, every choice in scope.
+**Error.** No case of that name exists where one was looked for. That place is a named choice, the matched value's type, the choice the position expects, or, for a bare `#Case` nothing decides, every choice in scope.
+
+Where the position decides a choice — an annotation, a return type, a parameter a direct argument is passed to, a `match` over a known subject — the report names that choice and lists the cases it declares. Every mode in the standard library is a bare case at a parameter, so this is how you discover what [`round(toward:)`](/docs/library/rational#round) or [`trim(at:)`](/docs/library/string#trim) will take:
 
 <div class="error-output">
 
 ```
 [unknown-case]
-Error: No Choice in scope declares a Case '#Purple'
-   ╭─┤ Colour.es:7:29 │
+Error: 'Colour' declares no Case '#Purple'
+   ╭─┤ Colour.es:8:29 │
    │
- 7 │     constant colour: Colour = #Purple
+ 8 │     constant colour: Colour = #Purple
    │                                ───┬──  
    │                                   ╰──── no such Case
+   │ 
+   │ Note: This position takes a Colour: '#Red', '#Green', '#Blue'.
 ───╯
 ```
 
 </div>
 
+A case that carries a payload is listed with it — `'#Value(item)'` — so the note is a list you can write from, and a long list stops at eight with "and N more". A case carries one value, so a payload of several members is listed as the [record](/docs/language/records) it is: `'#Rect({ width, height })'`, which is what you write where the list stands. An [overload](/docs/reference/syntax-glossary#overload) whose candidates accept different choices gets one note each, and the message names none of them.
+
+Where nothing decides the choice, the message is "No Choice in scope declares a Case '#Purple'", a note names the choices that declare the nearest case name, and the Help says to annotate the value so that a choice has a say. A `match` written on a value that *holds* the choice — a [future](/docs/language/asynchrony) answering one — is told so, and told to wait for it first.
+
 Fix the case name.
 
-Quick Fix: **Change to '#Red'** when a case name is close.
+Quick Fix: **Change to '#Red'** when a case name is close. The near miss is drawn from the position's own choice where there is one, so it is always a case that would resolve.
 
 Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
 

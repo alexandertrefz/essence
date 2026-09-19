@@ -32,4 +32,15 @@ implementation {
 	§ 'complete' takes the whole chain behind it, so the word can not go in
 	§ front of this call.
 	Terminal.print(fetched()::add(1)::toString())
+
+	§ unknown-case — the Parameter takes a Rounding and nothing else, so the
+	§ report is about that Choice and lists what it declares. Every mode in the
+	§ library is a bare Case at a Parameter, and this is how a reader finds one.
+	Terminal.print(7/2::round(toward #Floor)::toString())
+
+	§ unknown-case — and where no position decides, the Choice that declares the
+	§ near miss is named instead, because that is the half nobody can look up.
+	constant options = { division = #Truncated }
+
+	Terminal.inspect(options)
 }

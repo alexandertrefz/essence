@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util"
+
 import type { common, enricher, parser } from "@essence-lang/interfaces"
 
 import {
@@ -15505,6 +15507,145 @@ function resolveCaseReference(
 	return caseType
 }
 
+// NOTE: Every Type a bare Case was measured against before it failed to resolve
+// — read by the report and by nothing else. A Case written as an Argument is
+// probed once per Overload candidate, and each probe throws its Diagnostics away
+// and leaves no recording behind where nothing resolved. So the position that
+// DECIDED the Case is in hand everywhere except the one place the refusal is
+// finally written, which is why `#Floor` was told that no Choice in scope
+// declares it while the Parameter it stood at took a Rounding and nothing else.
+//
+// Keyed on the NAME Node rather than the construction, because that is what both
+// rails have in hand and what the Diagnostic underlines. Written on the failure
+// path of a probe as well as on the direct positions, and read once.
+//
+// NOTE: A Type is recorded ONCE. The Node is the parse tree's, which outlives
+// the enrichment that wrote here — the Language Server enriches one cached parse
+// tree on every keystroke — so an entry that merely appended would grow by one
+// Type per probe per pass for as long as the buffer is open. The report never
+// showed it, because reading groups by Choice and drops the repeats; what grew
+// was the memory behind a Diagnostic that says the same thing every time.
+const expectedChoicesForCase = new WeakMap<
+	parser.IdentifierNode,
+	Array<common.Type>
+>()
+
+function noteExpectedChoice(
+	caseName: parser.IdentifierNode,
+	expectedType: common.Type,
+): void {
+	let expectations = expectedChoicesForCase.get(caseName)
+
+	if (expectations === undefined) {
+		expectedChoicesForCase.set(caseName, [expectedType])
+	} else if (
+		!expectations.some((recorded) =>
+			isDeepStrictEqual(recorded, expectedType),
+		)
+	) {
+		expectations.push(expectedType)
+	}
+}
+
+// NOTE: The Choices a position accepts, each with the Cases it declares there —
+// grouped by Choice because an Overload's candidates may accept several, and a
+// reader picking between them has to see which Cases belong to which. The Cases
+// are the position's own rather than the Choice's whole declaration: a Parameter
+// typed `Optional<Integer>` accepts `#Value` and `#Empty` and that is the honest
+// list, even where the Choice has more.
+function expectedChoicesOf(
+	caseName: parser.IdentifierNode,
+): Map<string, Array<common.CaseType>> {
+	let choices = new Map<string, Array<common.CaseType>>()
+
+	for (let expectation of expectedChoicesForCase.get(caseName) ?? []) {
+		for (let member of unionArmsOf(expectation)) {
+			if (member.type !== "Case") {
+				continue
+			}
+
+			let choiceName = displayChoiceName(member.choice)
+			let declared = choices.get(choiceName)
+
+			if (declared === undefined) {
+				choices.set(choiceName, [member])
+			} else if (
+				!declared.some((candidate) => candidate.name === member.name)
+			) {
+				declared.push(member)
+			}
+		}
+	}
+
+	return choices
+}
+
+// NOTE: A Case as a reader would have to WRITE it, payload and all — listing
+// `#Value` beside `#Empty` with nothing to tell them apart is a list nobody can
+// act on. This list stands where a value is CONSTRUCTED, which is what decides
+// how the payload is spelled: a Case carries one value, so a payload of several
+// members is carried as a Record, and `'#Rect(width, height)'` — the pattern
+// form, which is what this printed — is `case-payload-is-one-value` the moment
+// it is copied. `'#Rect({ width, height })'` is the same names in the Record
+// Literal's shorthand, and compiles wherever they are bound.
+const CASE_LIST_CAP = 8
+
+function spelledCases(cases: Array<common.CaseType>): string {
+	let spelled = cases.slice(0, CASE_LIST_CAP).map((candidate) => {
+		let members = Object.keys(candidate.members)
+
+		return members.length === 0
+			? `'#${candidate.name}'`
+			: members.length === 1
+				? `'#${candidate.name}(${members[0]})'`
+				: `'#${candidate.name}({ ${members.join(", ")} })'`
+	})
+
+	return cases.length > CASE_LIST_CAP
+		? `${spelled.join(", ")} and ${cases.length - CASE_LIST_CAP} more`
+		: spelled.join(", ")
+}
+
+// NOTE: A `match` written one level out — the subject holds the Choice rather
+// than being it, which is what a `match` on the Future that answers one is. The
+// Matcher then names a Case the subject really has not got, and the list of what
+// it does declare is empty, so the report said nothing at all.
+//
+// Asked of the same `heldValuesOf` a Method call asks, so the two reports agree
+// about what a value holds — and answered only where the held Type declares the
+// very Case that was written, which is what makes this an account of the mistake
+// rather than a guess at it.
+function heldCaseSubject(
+	valueType: common.Type,
+	caseName: string,
+): { notes: Array<string>; helps: Array<string> } {
+	for (let held of heldValuesOf(valueType)) {
+		let declares = unionArmsOf(held.type).some(
+			(member) => member.type === "Case" && member.name === caseName,
+		)
+
+		if (!declares) {
+			continue
+		}
+
+		return {
+			notes: [
+				`'#${caseName}' is a Case of ${describeType(held.type)}, which is what ${withArticle(describeType(valueType))} holds.`,
+			],
+			helps:
+				held.kind === "future" || held.kind === "started"
+					? [
+							`Wait for it first — 'constant answered = complete …' — and match 'answered'.`,
+						]
+					: [
+							`Match what it holds rather than the ${describeType(valueType)} around it.`,
+						],
+		}
+	}
+
+	return { notes: [], helps: [] }
+}
+
 function resolveBareCaseReference(
 	caseName: parser.IdentifierNode,
 	scope: enricher.Scope,
@@ -15519,28 +15660,103 @@ function resolveBareCaseReference(
 	}
 
 	if (candidates.length === 0) {
-		reportError(
-			`No Choice in scope declares a Case '#${caseName.content}'`,
-			caseName.position,
-			{
-				code: "unknown-case",
-				labels: [primary(caseName.position, "no such Case")],
-				// NOTE: Drawn from every Choice in scope, which is exactly what
-				// the message says was searched. The Cases are NOT listed as a
-				// note the way a named Choice's are: the scan reaches the whole
-				// prelude, and a Diagnostic that prints every Case in the
-				// language buries the one line worth reading.
-				...caseSuggestion(
-					caseName.content,
-					casesInScope.map((candidate) => candidate.name),
-				),
-			},
-		)
+		reportUnknownBareCase(caseName, casesInScope)
 	} else {
 		reportAmbiguousCase(caseName, candidates, "in scope")
 	}
 
 	return { type: "Error" }
+}
+
+// NOTE: Where the position says which Choice was meant, the report is about THAT
+// Choice — its name in the message, the Cases it declares as a note, and the near
+// miss drawn from them rather than from every Case in the language. Every flag in
+// the standard library is a bare Case passed at a Parameter, so this report is
+// how a reader discovers what `round(toward:)` or `trim(at:)` will take.
+//
+// Where the position says nothing, the report stays the one it always was, with
+// one sentence added: the Choices that declare the near miss, which is the half a
+// reader can not look up, and what to write so the Case has a Choice to resolve
+// against at all.
+function reportUnknownBareCase(
+	caseName: parser.IdentifierNode,
+	casesInScope: Array<common.CaseType>,
+): void {
+	let expected = expectedChoicesOf(caseName)
+
+	if (expected.size > 0) {
+		let choiceNames = [...expected.keys()]
+		let accepted = [...expected.values()].flat()
+
+		reportError(
+			// NOTE: One Choice is named outright. Several is an Overload whose
+			// candidates disagree, and which of them the reader meant is exactly
+			// what this can not decide — so the message stays about the Case and
+			// the notes name each Choice in turn.
+			choiceNames.length === 1
+				? `'${choiceNames[0]}' declares no Case '#${caseName.content}'`
+				: `No Choice this position accepts declares a Case '#${caseName.content}'`,
+			caseName.position,
+			{
+				code: "unknown-case",
+				labels: [primary(caseName.position, "no such Case")],
+				notes: [...expected].map(
+					([choiceName, cases]) =>
+						`This position takes ${withArticle(choiceName)}: ${spelledCases(cases)}.`,
+				),
+				...caseSuggestion(
+					caseName.content,
+					accepted.map((candidate) => candidate.name),
+				),
+			},
+		)
+
+		return
+	}
+
+	let suggestion = caseSuggestion(
+		caseName.content,
+		casesInScope.map((candidate) => candidate.name),
+	)
+	// NOTE: WHICH Choices declare the near miss, which the scan already has in
+	// hand and the reader has nowhere to look up. The Cases themselves are still
+	// not listed: the scan reaches the whole prelude, and a Diagnostic that
+	// prints every Case in the language buries the one line worth reading.
+	let declaring =
+		suggestion.data?.kind === "suggestion"
+			? [
+					...new Set(
+						casesInScope
+							.filter(
+								(candidate) =>
+									candidate.name ===
+									(suggestion.data as { suggestion: string })
+										.suggestion,
+							)
+							.map((candidate) =>
+								displayChoiceName(candidate.choice),
+							),
+					),
+				]
+			: []
+
+	reportError(
+		`No Choice in scope declares a Case '#${caseName.content}'`,
+		caseName.position,
+		{
+			code: "unknown-case",
+			labels: [primary(caseName.position, "no such Case")],
+			notes: declaring.map(
+				(choiceName) =>
+					`'${choiceName}' declares '#${(suggestion.data as { suggestion: string }).suggestion}'.`,
+			),
+			...suggestion,
+			helps: [
+				...suggestion.helps,
+				"Annotate the value, or pass it where a Choice is expected, so the Case resolves against that Choice's own Cases.",
+			],
+		},
+	)
 }
 
 // NOTE: Contextual resolution for the bare form — the expected Type of the
@@ -15600,6 +15816,10 @@ function resolveCaseValueType(
 			if (contextual !== null) {
 				return contextual
 			}
+
+			// NOTE: Kept for the refusal below, which is written where the
+			// position is no longer in hand — see `expectedChoicesForCase`.
+			noteExpectedChoice(node.caseName, expectedType)
 		}
 
 		let bareCase = resolveBareCaseReference(node.caseName, scope)
@@ -16837,6 +17057,14 @@ function resolveCaseMatcherType(
 			),
 		]
 
+		// NOTE: A subject that HOLDS the Choice rather than being it — a
+		// `match` written on the Future that answers one, which declares no
+		// Case at all and so is answered with a list of nothing. Asked with
+		// the same question `unknown-method` asks of a receiver, and it says
+		// the same thing: the value is one level out.
+		let held = heldCaseSubject(valueType, node.caseName.content)
+		let suggestion = caseSuggestion(node.caseName.content, memberCaseNames)
+
 		// NOTE: The name alone, not the whole Matcher — a Quick Fix rewrites
 		// exactly what the Diagnostic underlines, and the `#` the reader
 		// already wrote is not part of the near miss.
@@ -16851,15 +17079,18 @@ function resolveCaseMatcherType(
 						"no such Case in this Union",
 					),
 				],
-				notes:
-					memberCaseNames.length === 0
+				notes: [
+					...held.notes,
+					...(memberCaseNames.length === 0
 						? []
 						: [
 								`The matched value declares ${memberCaseNames
 									.map((name) => `'#${name}'`)
 									.join(", ")}.`,
-							],
-				...caseSuggestion(node.caseName.content, memberCaseNames),
+							]),
+				],
+				...suggestion,
+				helps: [...held.helps, ...suggestion.helps],
 			},
 		)
 	} else {
