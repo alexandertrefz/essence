@@ -3686,6 +3686,32 @@ Error: Integer | String can not be interpolated into a String
 
 Match the value apart and interpolate each case: `case Integer { <- "value: {@}" } case String { <- "value: {@}" }`.
 
+A hole holding a [future](/docs/language/asynchrony) is a forgotten `complete` rather than a printing problem, and the report says so in the words every other missing-`complete` report uses:
+
+<div class="error-output">
+
+```
+[interpolation-not-printable]
+Error: Future<Integer> can not be interpolated into a String
+   ╭─┤ Report.es:8:27 │
+   │
+ 8 │     Terminal.print("answer: {fetched()}")
+   │                              ────┬────
+   │                                  ╰────── this is Future<Integer>, which is not Printable
+   │
+   │ Help: This describes work that has not run — add 'complete'.
+   │
+   │ Note 1: Future<Integer> does not conform to 'Printable'.
+   │ Note 2: Integer is what a Future<Integer> answers with, once something waits for it.
+───╯
+```
+
+</div>
+
+The word is named only where it may stand — inside a body that answers a future, and at a program's top level. Anywhere else the note says so and the Help is to declare the enclosing function `-> Future<…>`.
+
+Quick Fix: **Wait for it with 'complete'**, where the word may stand. There is none for any other unprintable hole: what to write there is a `match`, which is a restructuring.
+
 Taught on: [Unions and type aliases › Using a union before a match](/docs/language/unions-and-type-aliases#using-a-union-before-a-match)
 
 ### `redundant-interpolation-to-string`

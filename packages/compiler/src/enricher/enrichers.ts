@@ -2387,6 +2387,8 @@ function enrichInterpolatedStringValue(
 				// (an Error-typed hole, an unknown Protocol) — stay silent to
 				// avoid a cascade, exactly as `resolveConformances` does.
 				if (solved.chain.length > 0) {
+					let waiting = interpolatedAsynchrony(expression.type, scope)
+
 					reportError(
 						`${describeType(expression.type)} can not be interpolated into a String`,
 						expression.position,
@@ -2398,10 +2400,13 @@ function enrichInterpolatedStringValue(
 									`this is ${describeType(expression.type)}, which is not Printable`,
 								),
 							],
-							notes: solved.chain,
-							helps: [
+							notes: [...solved.chain, ...(waiting?.notes ?? [])],
+							helps: waiting?.helps ?? [
 								"Interpolate only Printable values; match an Optional or a Union apart first and interpolate each Case.",
 							],
+							...(waiting?.data === undefined
+								? {}
+								: { data: waiting.data }),
 						},
 					)
 				}
@@ -2433,6 +2438,68 @@ function enrichInterpolatedStringValue(
 		segments,
 		position: node.position,
 		type: { type: "String" },
+	}
+}
+
+// NOTE: A Future or a Started in a hole, which is the forgotten `complete`
+// wearing another Diagnostic's clothes: `"{fetched()}"` was told that a
+// `Future<Integer>` is not Printable and left to work out why an Integer-shaped
+// thing is not one. What is missing is the word, and what the hole would print
+// is what the work answers with — so this says both, in the voice the Validator
+// and `unknown-method` already say them in.
+//
+// The word is only offered where it may STAND: `complete` waits inside a body
+// that answers a Future and at a Program's top level, and nowhere else — the
+// rule `asynchronyEvidence` follows, and the reason the Help is replaced by a
+// Note about the enclosing Function's Type in every other position. The
+// `asynchrony-mismatch` payload rides along wherever the word may be written,
+// which is what the Quick Fix inserting it reads.
+//
+// Null for every other hole, which leaves `interpolation-not-printable` exactly
+// as it was for an Optional and a bare Union.
+function interpolatedAsynchrony(
+	type: common.Type,
+	scope: enricher.Scope,
+): {
+	notes: Array<string>
+	helps: Array<string>
+	data?: common.DiagnosticData
+} | null {
+	let erased = eraseRefinements(type)
+
+	if (erased.type !== "Future" && erased.type !== "Started") {
+		return null
+	}
+
+	let context = completionContextOf(scope)
+	let waits = context === "top-level" || context?.type === "Future"
+	let state = asynchronyState(
+		erased.type === "Future" ? "unstarted" : "in-flight",
+	)
+
+	// NOTE: The state sentence is said ONCE. Where the word may be written it
+	// opens the Help that writes it, which is the shared wording every other
+	// report about a forgotten `complete` uses; where it may not, no Help
+	// carries it and the Note says it instead.
+	return {
+		notes: [
+			`${waits ? "" : `${state} — `}${describeType(
+				erased.valueType,
+			)} is what ${withArticle(
+				describeType(erased),
+			)} answers with, once something waits for it.`,
+			...(waits
+				? []
+				: [
+						"'complete' only stands in a body that answers a Future, and this position is not one.",
+					]),
+		],
+		helps: waits
+			? asynchronyHelps(erased.valueType, erased)
+			: [
+					"Declare the enclosing Function '-> Future<…>', which is what lets its body wait.",
+				],
+		...(waits ? { data: asynchronyData(erased.valueType, erased) } : {}),
 	}
 }
 

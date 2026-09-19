@@ -529,6 +529,11 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(missingMembersAction(diagnostic, lines)),
 	"infer-on-applied-parameter": ({ diagnostic, program, lines }) =>
 		listed(removeInferAction(diagnostic, program, lines)),
+	// NOTE: A hole holding a Future is a forgotten `complete` like any other,
+	// and is told from every other unprintable hole by the same `data` — which
+	// the Enricher carries only where the word may be written.
+	"interpolation-not-printable": ({ diagnostic }) =>
+		listed(waitForValueAction(diagnostic)),
 	"invalid-escape": ({ diagnostic, lines }) =>
 		invalidEscapeActions(diagnostic, lines),
 	"invalid-module-specifier": ({ diagnostic, lines }) =>

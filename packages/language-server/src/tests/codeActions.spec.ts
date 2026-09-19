@@ -8264,6 +8264,29 @@ describe("Quick Fixes for asynchrony", () => {
 			expect(codesOf(applied(lines, fix))).toEqual([])
 		})
 
+		// NOTE: And a String's hole, which met the same forgotten word under a
+		// Diagnostic about `Printable` and was offered nothing at all.
+		it("writes the word inside a String's hole", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant work = Async.deferred(() { <- 1 })",
+				"",
+				'\tTerminal.print("got {work}")',
+				"}",
+			]
+
+			let fix = quickFixes(lines).find(
+				(entry) =>
+					entry.diagnosticCode === "interpolation-not-printable",
+			) as CodeActionEntry
+
+			expect(fix.title).toBe("Wait for it with 'complete'")
+			expect(applied(lines, fix)[3]).toBe(
+				'\tTerminal.print("got {complete work}")',
+			)
+			expect(codesOf(applied(lines, fix))).toEqual([])
+		})
+
 		// NOTE: The three shapes the fix answered but no test asked it about:
 		// a run in flight at a Constant, one at a return, and a body that
 		// already waits handing back a future.

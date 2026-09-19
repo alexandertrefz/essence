@@ -354,6 +354,111 @@ ${future}
 		})
 	})
 
+	// NOTE: And the same forgotten word met in a String's hole, which said the
+	// Future was not Printable and left the reader to work out why something
+	// Integer-shaped is not. One voice: the state sentence and the word are the
+	// ones every other report about a missing `complete` prints.
+	describe("a Future in a String's hole", () => {
+		it("should name the word and what the work answers with", () => {
+			let diagnostic = firstOf(
+				`implementation {
+${future}
+
+					Terminal.print("got {fetched()}")
+				}`,
+				"interpolation-not-printable",
+			)
+
+			expect(diagnostic.notes).toEqual([
+				"Future<Integer> does not conform to 'Printable'.",
+				"Integer is what a Future<Integer> answers with, once something waits for it.",
+			])
+			expect(diagnostic.helps).toEqual([
+				"This describes work that has not run — add 'complete'.",
+			])
+			expect(diagnostic.data).toEqual({
+				kind: "asynchrony-mismatch",
+				mismatch: "unstarted",
+			})
+		})
+
+		it("should say a Started is in flight", () => {
+			let diagnostic = firstOf(
+				`implementation {
+${future}
+
+					constant run = start fetched()
+
+					Terminal.print("got {run}")
+				}`,
+				"interpolation-not-printable",
+			)
+
+			expect(diagnostic.helps).toEqual([
+				"This is still in flight — add 'complete' to wait for what it answers with.",
+			])
+		})
+
+		// NOTE: The word is only named where it may stand, which is the rule
+		// every Help about `complete` is held to.
+		it("should withhold the word where nothing here can wait", () => {
+			let diagnostic = firstOf(
+				`implementation {
+${future}
+
+					function shown(_ work: Future<Integer>) -> String {
+						<- "got {work}"
+					}
+
+					Terminal.print(shown(fetched()))
+				}`,
+				"interpolation-not-printable",
+			)
+
+			expect(diagnostic.notes[2]).toBe(
+				"'complete' only stands in a body that answers a Future, and this position is not one.",
+			)
+			expect(diagnostic.helps).toEqual([
+				"Declare the enclosing Function '-> Future<…>', which is what lets its body wait.",
+			])
+			expect(diagnostic.data).toBeUndefined()
+		})
+
+		// NOTE: A hole that holds neither is answered exactly as it always was.
+		it("should leave an unprintable hole that waits for nothing alone", () => {
+			let diagnostic = firstOf(
+				`implementation {
+					constant greet = (subject: String) -> String { <- subject }
+
+					Terminal.print("greeting: {greet}")
+				}`,
+				"interpolation-not-printable",
+			)
+
+			expect(diagnostic.helps).toEqual([
+				"Interpolate only Printable values; match an Optional or a Union apart first and interpolate each Case.",
+			])
+		})
+
+		it("should print Helps that compile", () => {
+			expect(
+				compiles(`implementation {
+${future}
+
+					function shown(_ work: Future<Integer>) -> Future<String> {
+						<- "got {complete work}"
+					}
+
+					constant run = start fetched()
+
+					Terminal.print("got {complete fetched()}")
+					Terminal.print("got {complete run}")
+					Terminal.print(complete shown(fetched()))
+				}`),
+			).toBe(true)
+		})
+	})
+
 	// NOTE: The evidence is looked up with the lookup a call is decided by, so a
 	// Namespace the Program writes itself counts exactly as the standard
 	// library's does — and one it has not got counts for neither.
