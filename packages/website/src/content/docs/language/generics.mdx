@@ -93,18 +93,23 @@ Error: This Argument does not fit Parameter 1
 
 </div>
 
-There is no syntax for writing type arguments at a call. `paired<Integer, String>(1, with "one")` is a [`syntax-error`](/docs/reference/diagnostics#syntax-error):
+There is no syntax for writing type arguments at a call. `paired<Integer, String>(1, with "one")` is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax):
 
 <div class="error-output">
 
 ```
-[syntax-error]
-Error: Expected an Identifier but found '1'.
-   ╭─┤ paired.es:9:41 │
+[foreign-syntax]
+Error: A call writes no Type Arguments
+   ╭─┤ paired.es:9:23 │
    │
  9 │     Terminal.print(paired<Integer, String>(1, with "one"))
-   │                                            ▲  
-   │                                            ╰── here
+   │                          ────────┬────────  
+   │                                  ╰────────── these are worked out from the Arguments
+   │ 
+   │ Help 1: Write 'paired(…)' and let the Arguments decide.
+   │ Help 2: Where the Arguments do not decide, give the Type Parameter a place among the Parameters.
+   │ 
+   │ Note: Every Type Argument is inferred at the call, which is why a Generic Parameter is declared 'infer' — there is no spelling that pins one.
 ───╯
 ```
 
@@ -122,12 +127,15 @@ Error: Type Parameter 'Item' could not be inferred
  6 │     constant names: List<String> = emptied()
    │                                    ────┬────  
    │                                        ╰────── nothing here determines what it binds to
+   │ 
+   │ Help 1: Give the Type Parameter a place among the Parameters, so that an Argument binds it.
+   │ Help 2: Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.
 ───╯
 ```
 
 </div>
 
-The block leaves out the error's Help, which asks for the type argument to be written at the call. No syntax for that exists. Give `Item` a place among the parameters, so that an argument can bind it, or write the value directly: `constant names: List<String> = []` compiles.
+The two helps are the only ways out, because no syntax pins a type argument at the call. Give `Item` a place among the parameters, so that an argument can bind it, or write the value directly: `constant names: List<String> = []` compiles.
 
 A generic function is a value like any other function, and each call through the value binds its type parameters again:
 

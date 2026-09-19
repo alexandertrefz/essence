@@ -39,7 +39,7 @@ implementation {
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| A note from `§` to the end of the line. The compiler ignores it. | On a line of its own, or after code on the same line. | A block comment. `//` and `/* */` are syntax errors, and `# note` reads as a case. A comment can not stand inside an [interpolation hole](/docs/reference/syntax-glossary#interpolation) ([`comment-in-hole`](/docs/reference/diagnostics#comment-in-hole)). |
+| A note from `§` to the end of the line. The compiler ignores it. | On a line of its own, or after code on the same line. | A block comment. `//` and `/* */` are [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), and `# note` reads as a case. A comment can not stand inside an [interpolation hole](/docs/reference/syntax-glossary#interpolation) ([`comment-in-hole`](/docs/reference/diagnostics#comment-in-hole)). |
 
 </div>
 
@@ -246,7 +246,7 @@ Taught on [Protocols](/docs/language/protocols).
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| Returns a value from the function, method, function literal or match arm it stands in. | In the body of a function, method or function literal, and in a match arm. | `return`, which is an unknown name. At the top level it is [`top-level-return`](/docs/reference/diagnostics#top-level-return). In a match arm it returns from the match, not from the function around it. |
+| Returns a value from the function, method, function literal or match arm it stands in. | In the body of a function, method or function literal, and in a match arm. | `return`, which is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax). A `<-` at the top level is [`top-level-return`](/docs/reference/diagnostics#top-level-return). In a match arm it returns from the match, not from the function around it. |
 
 </div>
 
@@ -361,7 +361,7 @@ Taught on [Unions and type aliases](/docs/language/unions-and-type-aliases).
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| A [Rational](/docs/library/rational) literal, written as two integers with `/` between them. It is kept in lowest terms, so `6/8` is `3/4`. | Between digits, written flush: `3/4`, `-3/4`. | Division. `3 / 4` with spaces and `3/n` are syntax errors; divide with [`divide(by:)`](/docs/library/integer#divide). `3/0` is [`zero-denominator`](/docs/reference/diagnostics#zero-denominator). |
+| A [Rational](/docs/library/rational) literal, written as two integers with `/` between them. It is kept in lowest terms, so `6/8` is `3/4`. | Between digits, written flush: `3/4`, `-3/4`. | Division. `3 / 4` with spaces is [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported) and `3/n` is a syntax error; divide with [`divide(by:)`](/docs/library/integer#divide). `3/0` is [`zero-denominator`](/docs/reference/diagnostics#zero-denominator). |
 
 </div>
 
@@ -441,7 +441,7 @@ Taught on [Method calls](/docs/language/method-calls) and [Records](/docs/langua
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| The sign of a number literal: `-7`, `-3/4`, `-0.5`. | In front of a number literal. | Subtraction or negation. `-balance` is a syntax error; call [`negate()`](/docs/library/integer#negate) or [`subtract(…)`](/docs/library/integer#subtract). `10 - 4` is two statements, `10` and `-4`. |
+| The sign of a number literal: `-7`, `-3/4`, `-0.5`. | In front of a number literal. | Subtraction or negation. `-balance` and `10 - 4` are both [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported); call [`negate()`](/docs/library/integer#negate) or [`subtract(…)`](/docs/library/integer#subtract). A `-4` that opens the next line is still a signed literal. |
 
 </div>
 
@@ -486,7 +486,7 @@ Taught on [Programs and values](/docs/language/programs-and-values).
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| Six things. A block. A record type, `{ x: Integer }`. A record value, `{ x = 0 }`, where `{ x }` is short for `{ x = x }`. A [pattern](/docs/reference/syntax-glossary#pattern-name), `constant { x } = point`. An update, `{ origin with x = 5 }`. A hole in a string, `"{x}"`. `{}` is the unit value, the empty record. | Wherever a block, a type or a value stands. | A JavaScript object. A record value writes `=`, so `{ x: 0 }` as a value is a syntax error. |
+| Six things. A block. A record type, `{ x: Integer }`. A record value, `{ x = 0 }`, where `{ x }` is short for `{ x = x }`. A [pattern](/docs/reference/syntax-glossary#pattern-name), `constant { x } = point`. An update, `{ origin with x = 5 }`. A hole in a string, `"{x}"`. `{}` is the unit value, the empty record. | Wherever a block, a type or a value stands. | A JavaScript object. A record value writes `=`, so `{ x: 0 }` as a value is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax). |
 
 </div>
 
@@ -564,7 +564,7 @@ Taught on [Functions](/docs/language/functions) and [Method calls](/docs/languag
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| Type parameters where they are declared (`<infer Item>`), type arguments where they are applied (`List<String>`, `Optional<String>#Empty`), and a namespace or protocol pick after `::`. | After a type's name; after the name of a function, method or namespace in its declaration; after `::`. | Comparison, which is [`isLessThan(…)`](/docs/library/integer#isLessThan). A call can not write type arguments: `firstOf<String>(names, or "x")` is a syntax error. The `<` stays on the line of the type it applies to. |
+| Type parameters where they are declared (`<infer Item>`), type arguments where they are applied (`List<String>`, `Optional<String>#Empty`), and a namespace or protocol pick after `::`. | After a type's name; after the name of a function, method or namespace in its declaration; after `::`. | Comparison, which is [`isLessThan(…)`](/docs/library/integer#isLessThan). A call can not write type arguments: `firstOf<String>(names, or "x")` is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax). The `<` stays on the line of the type it applies to. |
 
 </div>
 
@@ -592,7 +592,7 @@ Taught on [Generics](/docs/language/generics).
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| The start of a type: after a constant's or variable's name, a parameter's name, a member of a record type, or a member of a pattern. | Wherever a type follows. | A label separator (`slice(from: 1)` is a syntax error) or a record value (`{ x: 0 }` is a syntax error). |
+| The start of a type: after a constant's or variable's name, a parameter's name, a member of a record type, or a member of a pattern. | Wherever a type follows. | A label separator (`slice(from: 1)` is a syntax error) or a record value (`{ x: 0 }` is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax)). |
 
 </div>
 
@@ -1904,7 +1904,7 @@ A label and its value are separated by a space, never by `:` or `=`. `slice(from
 
 <h3 id="one-token">A fraction is one token</h3>
 
-Digits, `/` and digits written flush are one Rational literal. The same goes for `_` between digits and for the point of a decimal. `Terminal.print(3 / 4)` is a syntax error, `Expected ')' but found '/'`, and `3/n` is `Expected a Number but found 'n'`. The [`/` fraction](/docs/reference/syntax-glossary#fraction) entry runs it.
+Digits, `/` and digits written flush are one Rational literal. The same goes for `_` between digits and for the point of a decimal. `Terminal.print(3 / 4)` is [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported), `Essence has no '/' operator`, and `3/n` is a syntax error, `Expected a Number but found 'n'`. The [`/` fraction](/docs/reference/syntax-glossary#fraction) entry runs it.
 
 <h3 id="broken-chain">`::` leads a broken chain</h3>
 
@@ -1935,7 +1935,7 @@ Each is a keyword where an expression follows it on the same line, and an ordina
 
 <h3 id="minus-before-digit">`-` only before a number</h3>
 
-`-` belongs to a number literal. In front of a name it is a syntax error, `Expected a Number but found 'balance'`. Between two numbers it starts a new statement: `constant difference = 10 - 4` binds `10`, and `-4` becomes a statement of its own, with no error. The [`-` minus](/docs/reference/syntax-glossary#minus) entry runs a signed literal.
+`-` belongs to a number literal. In front of a name it is [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported), `Essence has no '-' operator`, and so is a `-` between two numbers: `constant difference = 10 - 4` is refused rather than read as `10` and `-4`. An operator is only found where the expression in front of it ended on the same line, so a statement that opens on the next line with `-4` is still a signed literal. The [`-` minus](/docs/reference/syntax-glossary#minus) entry runs a signed literal.
 
 ## What there is no syntax for
 
@@ -1943,14 +1943,14 @@ Each is a keyword where an expression follows it on the same line, and an ordina
 
 | Not in the language | Write instead | What the compiler says |
 | --- | --- | --- |
-| Operators: `+`, `-`, `*`, `/`, `==`, `<`, `&&`, `\|\|`, `!` | Methods: [`a::add(b)`](/docs/library/integer#add), `a::is(b)`, `a::isLessThan(b)`, [`a::and(b)`](/docs/library/boolean#and), `flag::negate()` | `constant total = 1 + 2` reports `'+' is not declared`; inside a call, `Terminal.print(1 + 2)` is a syntax error |
-| A statement separator, `;` | Nothing: statements are separated by whitespace | `1;` is [`invalid-number`](/docs/reference/diagnostics#invalid-number) |
-| Block comments and `//` | A run of `§` lines | A syntax error |
-| `return` | `<-` | `'return' is not declared` |
+| Operators: `+`, `-`, `*`, `/`, `==`, `<`, `&&`, `\|\|`, `!` | Methods: [`a::add(b)`](/docs/library/integer#add), `a::is(b)`, `a::isLessThan(b)`, [`a::and(b)`](/docs/library/boolean#and), `flag::negate()` | `constant total = 1 + 2` and `Terminal.print(1 + 2)` both report [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported), `Essence has no '+' operator` |
+| A statement separator, `;` | Nothing: statements are separated by whitespace | `1;` is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), `A Statement does not end with ';'` |
+| Block comments and `//` | A run of `§` lines | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), `A Comment is written with '§'` |
+| `return` | `<-` | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), `'return' names nothing in Essence` |
 | Hexadecimal, binary and exponent numbers: `0xFF`, `0b101`, `1e5` | Decimal digits, grouped with `_` | `invalid-number` |
-| `null` and `undefined` | [`Optional`](/docs/library/optional): `#Value(item)` or `#Empty` | `'null' is not declared` |
-| Loop statements: `for`, `while` | `map`, [`reduce`](/docs/library/list#reduce) and the [`loop`](/docs/library/loop) functions | A syntax error; a `while` whose body happens to parse as a record is `'while' is not declared` instead |
-| Type arguments at a call: `first<Integer>(…)` | Nothing: the arguments decide the type | A syntax error |
+| `null` and `undefined` | [`Optional`](/docs/library/optional): `#Value(item)` or `#Empty` | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), `'null' names nothing in Essence` |
+| Loop statements: `for`, `while` | `map`, [`reduce`](/docs/library/list#reduce) and the [`loop`](/docs/library/loop) functions | `for` is a syntax error; `while` is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), `'while' opens no block in Essence` |
+| Type arguments at a call: `first<Integer>(…)` | Nothing: the arguments decide the type | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), `A call writes no Type Arguments` |
 
 </div>
 

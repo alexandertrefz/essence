@@ -128,7 +128,7 @@ function discount(code: string): number | undefined {
 
 `number | undefined` is a union, and `10` is one of its members, so `return 10` type-checks. `Optional<Integer>` is a choice, not a union with `Integer` in it, so you write `<- #Value(10)`. Because an Optional is a value of its own, `Optional<Optional<Integer>>` is a real type. In TypeScript, `number | undefined | undefined` is the same type as `number | undefined`. Called from JavaScript, an `Optional<T>` crosses as the item or `undefined`, and a nested Optional does not cross; [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) has the full table. More on [Coming from JavaScript › Absence](/docs/getting-started/coming-from-javascript#absence).
 
-`null` and `undefined` are undeclared names, reported as [`unknown-name`](/docs/reference/diagnostics#unknown-name). There is no truthiness: `if nickname { … }` is [`condition-not-boolean`](/docs/reference/diagnostics#condition-not-boolean), because only a [`Boolean`](/docs/library/boolean) can be a condition.
+`null` and `undefined` are [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), each answered with `#Empty`. There is no truthiness: `if nickname { … }` is [`condition-not-boolean`](/docs/reference/diagnostics#condition-not-boolean), because only a [`Boolean`](/docs/library/boolean) can be a condition.
 
 ## Writing `#Value` and `#Empty`
 

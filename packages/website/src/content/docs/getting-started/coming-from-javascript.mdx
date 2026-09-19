@@ -69,7 +69,7 @@ Five differences show at once. A method is called with `::`, and `.` calls a sta
 
 There are none. Arithmetic, comparison and logic are method calls, read left to right.
 
-Every row of this table reports [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported), whose helps name the method for the operator you wrote. Only the last two are something else.
+Every row of this table reports [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported), whose helps name the method for the operator you wrote. Only the last row is something else.
 
 | JavaScript or TypeScript | Essence | If you forget |
 |---|---|---|
@@ -86,7 +86,7 @@ Every row of this table reports [`operator-not-supported`](/docs/reference/diagn
 | `a \|\| b` | [`a::or(b)`](/docs/library/boolean#or); both sides are evaluated | `Essence has no '\|\|' operator` |
 | `!a` | [`a::negate()`](/docs/library/boolean#negate) | `Essence has no '!' operator`, and the help names `a` |
 | `-x` | [`x::negate()`](/docs/library/integer#negate); `-` only signs a number literal | `Essence has no '-' operator` |
-| `(a + b) * c` | [`a::add(b)::multiply(with c)`](/docs/language/method-calls); there are no grouping parentheses | [`syntax-error`](/docs/reference/diagnostics#syntax-error): a `(` opens a function literal's parameter list |
+| `(a + b) * c` | [`a::add(b)::multiply(with c)`](/docs/language/method-calls); there are no grouping parentheses | `Essence has no '+' operator`, at the `+` inside the parentheses |
 | `c ? a : b` | [`define { as a if c as b otherwise }`](/docs/language/conditions) | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) |
 
 <Note>
@@ -187,7 +187,7 @@ There is no `null` and no `undefined`. A value that may be missing is an `Option
 | `if (user)` | [`if user::hasValue()`](/docs/library/optional#hasValue), a `Boolean`; it does not narrow `user`, so read the value with a [`match`](/docs/language/choices-and-match) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) as written; [`condition-not-boolean`](/docs/reference/diagnostics#condition-not-boolean) for `if user` |
 | `user.name` on a value that may be missing | refused: an `Optional` is [taken apart](/docs/language/optional), never reached through | [`type-without-members`](/docs/reference/diagnostics#type-without-members); [`unknown-method`](/docs/reference/diagnostics#unknown-method) for a `::` call |
 | `throw new Error("…")` | return [`#Failure(reason)`](/docs/language/result) in a `Result<T, F>` | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) |
-| `try { … } catch (error) { … }` | [`recover(with:)`](/docs/library/result#recover), [`reason()`](/docs/library/result#reason), or a `match` | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `try { … } catch (error) { … }` | [`recover(with:)`](/docs/library/result#recover), [`reason()`](/docs/library/result#reason), or a `match` | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) |
 
 ## Functions
 
@@ -217,11 +217,11 @@ A function declaration writes the type of every parameter and its return type. A
 | `if (c) { … } else if (d) { … } else { … }` | [`if c { … } else if d { … } else { … }`](/docs/language/conditions), with no parentheses | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
 | `if (count)` | [`if count::isNot(0)`](/docs/library/integer#isNot); only a `Boolean` is a condition | [`syntax-error`](/docs/reference/diagnostics#syntax-error) as written; [`condition-not-boolean`](/docs/reference/diagnostics#condition-not-boolean) for `if count` |
 | an `if` used as a value | [`define { as a if c as b otherwise }`](/docs/reference/syntax-glossary#define) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
-| `switch (x) { case …: }` | [`match x -> T { case … }`](/docs/language/choices-and-match), exhaustive, with its result type written, `-> T` | [`syntax-error`](/docs/reference/diagnostics#syntax-error) for `switch`; [`missing-case`](/docs/reference/diagnostics#missing-case) when a case is left out |
+| `switch (x) { case …: }` | [`match x -> T { case … }`](/docs/language/choices-and-match), exhaustive, with its result type written, `-> T` | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) for `switch`; [`missing-case`](/docs/reference/diagnostics#missing-case) when a case is left out |
 | `default:` | [`case _`](/docs/reference/syntax-glossary#underscore) | — |
 | `for (const item of items)` | [`items::map(f)`](/docs/language/iteration), `reduce`, or [`loop(from 1, through 10, startingWith 0, f)`](/docs/library/loop#through) | [`syntax-error`](/docs/reference/diagnostics#syntax-error); [`uninferable-return-type`](/docs/reference/diagnostics#uninferable-return-type) for a function passed to `map` with no `<-` |
 | `items.forEach(f)` | none; to print each item, print [`items::join(with "\n")`](/docs/language/iteration) once, or `map` with a function that returns: `items::map((item) { <- Terminal.print(item) })` | [`type-without-members`](/docs/reference/diagnostics#type-without-members) for `items.forEach(f)`; [`unknown-method`](/docs/reference/diagnostics#unknown-method) for `items::forEach(f)`; [`uninferable-return-type`](/docs/reference/diagnostics#uninferable-return-type) for a function with no `<-` |
-| `while (c) { … }` | [`loop(startingWith s, while p, f)`](/docs/library/loop#while), where `p` is a function from the state to a `Boolean` | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) when the body parses as a record, as in `while (running) { running = false }`; [`syntax-error`](/docs/reference/diagnostics#syntax-error) for other bodies |
+| `while (c) { … }` | [`loop(startingWith s, while p, f)`](/docs/library/loop#while), where `p` is a function from the state to a `Boolean` | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), whatever the body holds |
 | `break`, `continue` | [`loop(startingWith s, step f)`](/docs/library/loop#step), where `f` returns `#Done(value)` to stop and `#Continue(next)` to go round again | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) |
 
 ## Types
@@ -257,10 +257,10 @@ Methods live in namespaces, outside the type. A protocol is a contract: a namesp
 | `class Money { euros() { … } }`, `Number.prototype.euros` | [`namespace Money for Integer { euros() -> Integer { … } }`](/docs/language/namespaces-and-methods) | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), once; the class body is read past rather than into |
 | using a class above its declaration | a [namespace](/docs/language/namespaces-and-methods) cannot be used by a statement above it | [`use-before-declaration`](/docs/reference/diagnostics#use-before-declaration) |
 | `static rate = 100` | [`static rate = 100`](/docs/reference/syntax-glossary#static), read as `Money.rate` | — |
-| `interface Named { name(): string }` | [`protocol Named { name() -> String }`](/docs/language/protocols) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `interface Named { name(): string }` | [`protocol Named { name() -> String }`](/docs/language/protocols) | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) |
 | `class Person implements Named` | [`namespace People for Person is Named`](/docs/language/protocols); having the method is not conforming | [`syntax-error`](/docs/reference/diagnostics#syntax-error) for `implements`; [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound) without `is Named` |
 | a concrete method on an abstract class | a method with a [body in the protocol](/docs/language/protocols) | — |
-| `interface Loud extends Named { shout(): string }` | [`protocol Loud is Named`](/docs/reference/syntax-glossary#protocol) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
+| `interface Loud extends Named { shout(): string }` | [`protocol Loud is Named`](/docs/reference/syntax-glossary#protocol) | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), naming the `extends` |
 | `Named` as a type, `Named[]` | none; a protocol is a [bound or a conformance](/docs/language/protocols), and a union such as `Book \| Movie` stands in, reaching `name()` when both types conform | [`protocol-as-type`](/docs/reference/diagnostics#protocol-as-type) |
 | `T extends A & B` | one bound per parameter; [`protocol Both is A, is B`](/docs/language/protocols) combines them | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
 
@@ -392,7 +392,7 @@ Each entry names what stands in its place, where anything does.
 - **`async`, `await` and `Promise`.** Work that has not run is a [`Future`](/docs/library/future), a value: `complete` waits for what one answers with and `start` puts one in flight. See [Asynchrony](/docs/language/asynchrony).
 - **Floating point.** `Integer` and `Rational` are exact: `0.1::add(0.2)::is(0.3)` is `true`.
 - **Calling JavaScript from Essence.** An import names `.es` files only; a `.js` specifier is an `invalid-module-specifier`. JavaScript calls Essence instead, as [Calling Essence from JavaScript](/docs/guides/calling-from-javascript) shows.
-- **Call-site type arguments.** `identity<Integer>(1)` is a syntax error; every type argument is inferred.
+- **Call-site type arguments.** `identity<Integer>(1)` is refused as `foreign-syntax`: a call writes no type arguments, and every one of them is inferred.
 - **More than one protocol bound per parameter.** `<infer T is A, is B>` is a syntax error. Combine them through a protocol: `protocol Both is A, is B` is the one bound.
 - **Reading program arguments.** No standard-library function reads the arguments a program was started with.
 

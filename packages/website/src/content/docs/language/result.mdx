@@ -108,7 +108,7 @@ implementation {
 
 A function that can fail declares a `Result` return type and returns one of the two cases with [`<-`](/docs/reference/syntax-glossary#return). Where JavaScript would `throw`, Essence returns `#Failure(…)`. `#Value(36)` is the one-member shorthand for `#Value({ item = 36 })`, and both spellings compile. The reason can be any type. A [`String`](/docs/library/string) is quick to write. A choice of your own, like `Problem`, lets a `match` check that every reason is handled.
 
-There is no `throw` and no `try`. `throw` is read as a name and reported as [`unknown-name`](/docs/reference/diagnostics#unknown-name), and `try { … }` is a [`syntax-error`](/docs/reference/diagnostics#syntax-error).
+There is no `throw` and no `try`. Both are [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax): `'throw' names nothing in Essence`, and `'try' opens no block in Essence`.
 
 A `match` cannot skip the failure. One that handles `#Value` and not `#Failure` is [`missing-case`](/docs/reference/diagnostics#missing-case):
 

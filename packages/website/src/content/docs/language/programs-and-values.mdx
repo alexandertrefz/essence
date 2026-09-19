@@ -360,7 +360,7 @@ Violets are blue."
 
 Output that runs over two lines continues on a comment line of its own, as the last `print` shows.
 
-A `String` is written between double quotes, and only double quotes: `'Ada'` is read as a name and fails as `unknown-name`. A literal may span lines, and the line breaks are part of it; `inspect` writes them as `\n`. A literal that is never closed is [`unclosed-string`](/docs/reference/diagnostics#unclosed-string), and where a literal that spans lines closes on the very line an unclosed one opens on, that report names the spanning literal: one quote is missing either way, and the one at the end of its first line is the reading that leaves the rest of the file as code.
+A `String` is written between double quotes, and only double quotes: `'Ada'` is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), `A String is written in double quotes`. A literal may span lines, and the line breaks are part of it; `inspect` writes them as `\n`. A literal that is never closed is [`unclosed-string`](/docs/reference/diagnostics#unclosed-string), and where a literal that spans lines closes on the very line an unclosed one opens on, that report names the spanning literal: one quote is missing either way, and the one at the end of its first line is the reading that leaves the rest of the file as code.
 
 [`{…}`](/docs/reference/syntax-glossary#interpolation) inside a string is a hole. It takes any expression: a method call, a list, or another string literal with holes of its own. The hole renders its value the way `print` does. Only a value that knows how to print may stand in a hole, so a union such as `Integer | String` is refused there as [`interpolation-not-printable`](/docs/reference/diagnostics#interpolation-not-printable). Calling `toString()` inside a hole is redundant, and the compiler warns about it as [`redundant-interpolation-to-string`](/docs/reference/diagnostics#redundant-interpolation-to-string).
 
@@ -395,7 +395,7 @@ console.log(`Hello, ${name}!`)
 console.log('single quotes work too')
 ```
 
-Every `"…"` literal interpolates, so there is no separate template literal. A `$` before a hole is not an error but text: `"Hello, ${name}!"` prints `Hello, $Ada!`. Single quotes and backticks do not exist, so `` `Hello` `` is read as a name, like `'Ada'`. More on [Coming from JavaScript › Strings](/docs/getting-started/coming-from-javascript#strings).
+Every `"…"` literal interpolates, so there is no separate template literal. A `$` before a hole is not an error but text: `"Hello, ${name}!"` prints `Hello, $Ada!`. Single quotes and backticks do not exist, so `` `Hello ${name}` `` is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), like `'Ada'`, and its help writes the whole string in double quotes with each hole in braces. More on [Coming from JavaScript › Strings](/docs/getting-started/coming-from-javascript#strings).
 
 ### Booleans
 

@@ -36,10 +36,10 @@ The layout is the one [`essence format`](/docs/reference/cli#format) writes: tab
 Six things in this file, each linked:
 
 - **[`implementation { … }`](/docs/reference/syntax-glossary#implementation) holds the program's statements**, which run top to bottom, like a module's top level. It is the only block a program needs. A file can hold others, such as the `tests` block that [Your first test](/docs/getting-started/your-first-test) adds to this file.
-- **`§` starts a [comment](/docs/reference/syntax-glossary#comment)** that runs to the end of the line, and `§§` starts a [documentation comment](/docs/language/documentation-comments). There is no `//`. The compiler reads `//` as code and refuses it. With the extension from [Editor setup](/docs/guides/editor-setup) installed, the Toggle Line Comment command writes the `§` for you.
+- **`§` starts a [comment](/docs/reference/syntax-glossary#comment)** that runs to the end of the line, and `§§` starts a [documentation comment](/docs/language/documentation-comments). There is no `//`, and writing one is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), `A Comment is written with '§'`. With the extension from [Editor setup](/docs/guides/editor-setup) installed, the Toggle Line Comment command writes the `§` for you.
 - **`constant sum = …` binds a name once, like `const`.** Assigning to `sum` again is a [`constant-reassignment`](/docs/reference/diagnostics#constant-reassignment) error, and a name that changes is declared `variable`, JavaScript's `let`. The compiler infers the type, and an annotation writes it after the name as in TypeScript: `constant sum: Rational = oneThird::add(twoThirds)` is the same binding. [Programs and values](/docs/language/programs-and-values) covers the shape of a file, comments, bindings, annotations and the literals, holes included.
-- **`1/3` is a literal, not a division.** It is a [`Rational`](/docs/library/rational): an exact fraction, kept in lowest terms, so `2/4` is `1/2`. A decimal such as `0.75` is another way to write a Rational: it is exactly `3/4`, and it prints as `3/4`. The slash belongs to the literal, so `1 / 3` with spaces is a [`syntax-error`](/docs/reference/diagnostics#syntax-error), and dividing two values is a method call. [Numbers](/docs/language/numbers) covers the whole family, division included.
-- **`::` calls a method on a value, and `.` reaches a member of a namespace.** A namespace is a named group of methods and statics, such as `Rational`, and a static belongs to the namespace rather than to a value. A call written `value::method(argument)` passes the value as the first argument, so [`oneThird::add(twoThirds)`](/docs/library/rational#add) is the same call as `Rational.add(oneThird, twoThirds)`. In JavaScript terms, `::` is the `.` in `items.map(…)`, and [`Terminal.print`](/docs/library/terminal#print), a static of `Terminal`, is like `Math.max`. The JavaScript spelling `oneThird.add(twoThirds)` is a [`type-without-members`](/docs/reference/diagnostics#type-without-members) error. [Method calls](/docs/language/method-calls) has the rules.
+- **`1/3` is a literal, not a division.** It is a [`Rational`](/docs/library/rational): an exact fraction, kept in lowest terms, so `2/4` is `1/2`. A decimal such as `0.75` is another way to write a Rational: it is exactly `3/4`, and it prints as `3/4`. The slash belongs to the literal, so `1 / 3` with spaces is [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported), and dividing two values is a method call. [Numbers](/docs/language/numbers) covers the whole family, division included.
+- **`::` calls a method on a value, and `.` reaches a member of a namespace.** A namespace is a named group of methods and statics, such as `Rational`, and a static belongs to the namespace rather than to a value. A call written `value::method(argument)` passes the value as the first argument, so [`oneThird::add(twoThirds)`](/docs/library/rational#add) is the same call as `Rational.add(oneThird, twoThirds)`. In JavaScript terms, `::` is the `.` in `items.map(…)`, and [`Terminal.print`](/docs/library/terminal#print), a static of `Terminal`, is like `Math.max`. The JavaScript spelling `oneThird.add(twoThirds)` is a [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot) error. [Method calls](/docs/language/method-calls) has the rules.
 - **`{sum}` is a hole.** Every `"…"` string [interpolates](/docs/reference/syntax-glossary#interpolation), and a hole holds any expression whose value can be printed, not only a name. `"1/3 + 2/3 = {oneThird::add(twoThirds)}"` prints the same line. Write `\{` for a brace that is not a hole.
 
 </StepItem>
@@ -186,29 +186,34 @@ Now take the annotation out again, and write the sum the way JavaScript would: `
 <div class="error-output">
 
 ```
-[unknown-name]
-Error: '+' is not declared
+[operator-not-supported]
+Error: Essence has no '+' operator
    ╭─┤ hello.es:6:26 │
    │
  6 │     constant sum = oneThird + twoThirds
-   │                             ▲
-   │                             ╰── no such Variable or Constant
+   │                             ▲  
+   │                             ╰── this is not a Method call
+   │ 
+   │ Help 1: Write 'a::add(b)' for Numbers.
+   │ Help 2: Write 'a::append(b)' to join two Strings.
+   │ 
+   │ Note: Arithmetic, comparison and logic are Method calls in Essence, read left to right — there are no operators, and so no precedence to remember.
 ───╯
 
 ─── 1 error
   ✖ hello.es 1 error
-    stopped while inferring types
+    stopped while parsing
 ```
 
 </div>
 
-`+` is not an operator in Essence. The compiler reads it as a name, finds nothing declared under it, and reports [`unknown-name`](/docs/reference/diagnostics#unknown-name). This time the report ends `stopped while inferring types`, the `enrich` stage. `constant sum = 1 + 2` is refused the same way.
+`+` is not an operator in Essence. The compiler names the operator you wrote and reports [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported), with a help for each method that stands in its place. This time the report ends `stopped while parsing`, the `parse` stage. `constant sum = 1 + 2` is refused the same way.
 
 Three JavaScript habits to leave behind:
 
 - **No operators.** Every operation is a method call: `a + b` is `a::add(b)`, and `a === b` is `a::is(b)`, which compares lists and records by content.
 - **No semicolons.** A statement needs no terminator, and a `;` at the end of one is an error.
-- **`Terminal.print` is `console.log`.** There is no `console`, and `console.log("hi")` is an `unknown-name` error too.
+- **`Terminal.print` is `console.log`.** There is no `console`, and `console.log("hi")` is a `foreign-syntax` error too.
 
 [What the compiler says when you type JavaScript](/docs/getting-started/coming-from-javascript#if-you-typed-javascript) lists the other habits and the error each one produces. Put line 6 back to `constant sum = oneThird::add(twoThirds)`, and `hello.es` runs again.
 

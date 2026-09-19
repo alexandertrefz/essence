@@ -100,7 +100,7 @@ implementation {
 
 `<-` returns the value on its right and leaves the function at once. A `<-` inside an [`if`](/docs/language/conditions) block leaves the whole function, not only the block, so `sign` reads as a run of early returns with no nesting. A statement written after a `<-` in the same block never runs, and the compiler does not warn about it.
 
-Apart from a `-> {}` body that runs to its closing brace, `<-` is the only way a value leaves a function. There is no `return` keyword. In `return value`, `return` is read as a name, so the line is [`unknown-name`](/docs/reference/diagnostics#unknown-name): "'return' is not declared". A `<-` outside any function is [`top-level-return`](/docs/reference/diagnostics#top-level-return), "There is nothing here to return from".
+Apart from a `-> {}` body that runs to its closing brace, `<-` is the only way a value leaves a function. There is no `return` keyword. In `return value`, the line is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax): "'return' is not how Essence answers with a value", and the help writes the `<-`. A `<-` outside any function is [`top-level-return`](/docs/reference/diagnostics#top-level-return), "There is nothing here to return from".
 
 The value must fit the declared type. Declare `double` as `-> String` and its body no longer fits, which is [`return-type-mismatch`](/docs/reference/diagnostics#return-type-mismatch):
 

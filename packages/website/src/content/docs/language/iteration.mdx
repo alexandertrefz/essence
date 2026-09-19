@@ -57,7 +57,7 @@ Error: Expected an Expression but found 'for'.
 
 </div>
 
-`while`, `do`, `break` and `continue` are not keywords, so the error depends on the code around them. `while n::isLessThan(100) { n = n::multiply(with 2) }` is an [`unknown-name`](/docs/reference/diagnostics#unknown-name) error, `'while' is not declared`, because its braces parse as a record. A body that is not record-shaped, such as `{ Terminal.print(n) }`, is a `syntax-error` instead. Written as JavaScript, `while (n < 100) {` stops the parser at the `100`: `Expected an Identifier but found '100'.`
+`while`, `do`, `break` and `continue` are not keywords, so the error depends on the code around them. `while n::isLessThan(100) { n = n::multiply(with 2) }` is a [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) error, `'while' names nothing in Essence`, because its braces parse as a record. A body that is not record-shaped, such as `{ Terminal.print(n) }`, is a `syntax-error` instead. Written as JavaScript, `while (n < 100) {` is `foreign-syntax` again, `'while' opens no block in Essence`, reported at the word itself whatever the body holds.
 
 Iteration is an expression instead. `reduce` and `loop` each take a function and call it once per turn. They pass in the value so far and take the next value back, and the whole call returns the value the last turn produced. `map` calls its function once per item and returns a list of every result.
 

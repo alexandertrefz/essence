@@ -56,24 +56,28 @@ implementation {
 
 Members are separated by commas, and a trailing comma is allowed; `essence format` writes one when it breaks a literal over lines. A member's value is any expression, another record included. `.` reads through as many levels as the record has, as `ada.address.city` does. The literal's type is the shape it has, `{ name: String, born: Integer, address: { city: String, country: String } }`, so `ada` needs no annotation.
 
-Write a member the JavaScript way, with a colon, and the parser stops at the colon with a [`syntax-error`](/docs/reference/diagnostics#syntax-error):
+Write a member the JavaScript way, with a colon, and the parser stops at the colon with a [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax):
 
 <div class="error-output">
 
 ```
-[syntax-error]
-Error: Expected 'with' but found ':'.
+[foreign-syntax]
+Error: A Record member is written with '='
    ╭─┤ ada.es:2:23 │
    │
  2 │     constant ada = { name: "Ada", born: 1815 }
-   │                          ▲
-   │                          ╰── expected 'with'
+   │                          ▲  
+   │                          ╰── Essence writes '=' here
+   │ 
+   │ Help: Write 'name = …'.
+   │ 
+   │ Note: A ':' in braces annotates a Type instead — '{ x: Integer }' is the Record Type whose member 'x' is an Integer.
 ───╯
 ```
 
 </div>
 
-The message names `with`, but the fix is `=`. A member written twice in one literal is an error too, and so is reading a member the record does not have. Both are in the table under "When the compiler refuses a record" below.
+A member written twice in one literal is an error too, and so is reading a member the record does not have. Both are in the table under "When the compiler refuses a record" below.
 
 A member written as a bare name takes its value from the name in scope:
 
@@ -221,7 +225,7 @@ implementation {
 }
 ```
 
-`{ order with quantity = 5, paid = true }` copies `order` and sets the members in its key list. The keys are separated by commas; a long key list may break over lines and end in a trailing comma. `order` is untouched, because nothing changes a record in place. Assigning to a member, `order.paid = true`, is a syntax error: `Expected an Expression but found '='.`
+`{ order with quantity = 5, paid = true }` copies `order` and sets the members in its key list. The keys are separated by commas; a long key list may break over lines and end in a trailing comma. `order` is untouched, because nothing changes a record in place. Assigning to a member, `order.paid = true`, is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax): `A Record's member can not be assigned`.
 
 After `with` comes either a key list or one expression. An expression is merged whole:
 

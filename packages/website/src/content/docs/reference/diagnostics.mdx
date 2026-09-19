@@ -56,7 +56,7 @@ Where a code has a Quick Fix, its entry gives the title your editor shows. Two e
 
 ## If you typed JavaScript
 
-These twenty JavaScript habits cause most first-hour reports. Nearly all of them report one of three codes — [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) for a habit written as words or punctuation, [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported) for an operator, and [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot) for a method reached with a `.`. Each habit links its row on [Coming from JavaScript](/docs/getting-started/coming-from-javascript), which quotes the message and gives the Essence spelling.
+These twenty-two JavaScript habits cause most first-hour reports, and they are not the whole of what the compiler answers: the [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) entry below lists the fifty words it knows by name. Nearly all of them report one of three codes — [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) for a habit written as words or punctuation, [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported) for an operator, and [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot) for a method reached with a `.`. Each habit links its row on [Coming from JavaScript](/docs/getting-started/coming-from-javascript), which quotes the message and gives the Essence spelling.
 
 - [`1 + 2`](/docs/getting-started/coming-from-javascript#typed-plus): [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported)
 - [`count / 3`](/docs/getting-started/coming-from-javascript#typed-divide): `operator-not-supported`
@@ -198,22 +198,48 @@ Taught on: [Programs and values › Strings](/docs/language/programs-and-values#
 
 ### `unclosed-block`
 
-**Error.** A `{` is never closed. The report points at the brace that opened the block and at the end of the input.
+**Error.** A `{` is never closed. Where a `}` below the mistake is written further out than the brace it was meant for, the report is about the block that lost its brace: it points at that block's `{`, and at the `}` that closed it instead.
 
 <div class="error-output">
 
 ```
 [unclosed-block]
 Error: This block is never closed
-   ╭─┤ Greeting.es:4:2 │
+   ╭─┤ Greeting.es:2:43 │
+   │
+ 2 │     function greet(_ name: String) -> String {
+   │                                              ▲  
+   │                                              ╰── this block is never closed
+   │ 
+ 4 │ }
+   │ ▲  
+   │ ╰── this '}' is written further out, so it closes the block around it
+   │ 
+   │ Help: Write the '}' where this block's Statements end.
+   │ 
+   │ Note: Which block a '}' closes is counted rather than read off the indentation, so a file one brace short hands every '}' below the mistake to the block above the one it was written for — and the end of the input is where that is noticed.
+───╯
+```
+
+</div>
+
+Here the function has no `}` of its own, so the file's last `}` closes the function, and `implementation` is the block left open. Write a `}` after `<- name`.
+
+Where no `}` stands further out than its opener — a file that simply ends one brace short — there is no second brace to point at, so the report names the outermost open block and the end of the input:
+
+<div class="error-output">
+
+```
+[unclosed-block]
+Error: This block is never closed
+   ╭─┤ Greeting.es:2:29 │
    │
  1 │ implementation {
    │                ▲  
    │                ╰── opened here
-   │ 
- 4 │ }
-   │  │ 
-   │  ╰─ the input ends here
+ 2 │     constant greeting = "Hello"
+   │                                │ 
+   │                                ╰─ the input ends here
    │ 
    │ Help: Add the missing '}'.
 ───╯
@@ -221,11 +247,11 @@ Error: This block is never closed
 
 </div>
 
-Close every open block. Here the function has no `}` of its own, so the last `}` closes the function and `implementation` stays open. Write a `}` after `<- name`.
+Close every open block.
 
 ### `invalid-number`
 
-**Error.** A number literal holds something other than digits. Essence has no hexadecimal, binary or exponent form. A trailing `;` makes the literal `1;`, which is not a number either.
+**Error.** A number literal holds something other than digits. Essence has no hexadecimal, binary or exponent form. A trailing `;` is answered by [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) instead.
 
 <div class="error-output">
 
@@ -790,7 +816,11 @@ Error: 'const' is not how Essence declares a binding
 
 </div>
 
-One code covers the family, and the message says which habit was written. It answers: `const`, `let` and `var`; `return`; a `;` at the end of a statement; `\{ x: 1 \}` for a record member; `point.x = 2`; `(n) => n`; `c ? a : b`; `// a comment` and `/* a comment */`; `'hi'` and `` `hi` `` for a string; a `class`, `enum` or `interface` declaration; `identity<Integer>(1)`; `user!` and `user?.name`; and the words `null`, `undefined`, `this`, `self`, `console`, `print`, `Math`, `parseInt`, `new`, `switch`, `typeof`, `throw`, `while`, `break`, `async`, `await`, `Map` and `Set`.
+One code covers the family, and the message says which habit was written. It answers fifty words, and a dozen habits written in punctuation or quotes.
+
+The punctuation: a `;` at the end of a statement; `{ x: 1 }` for a record member; `point.x = 2`; `(n) => n`; `c ? a : b`; `// a comment` and `/* a comment */`; `'hi'` and `` `hi` `` for a string; `identity<Integer>(1)`; and `user!` and `user?.name`.
+
+The words: `const`, `let`, `var`, `mut` and `return`; `null`, `undefined`, `nil`, `None` and `Some`; `this` and `self`; `print`, `println`, `println!`, `puts`, `echo` and `fmt`; `len`, `console`, `Math`, `parseInt`, `parseFloat`, `NaN` and `Infinity`; `new`, `class`, `def`, `fn` and `func`; `elif`, `guard`, `switch`, `typeof` and `instanceof`; `throw`, `try` and `catch`; `while`, `break` and `continue`; `enum`, `interface`, `implements` and `extends`; `async` and `await`; and `Map`, `Set` and `require`.
 
 A declaration keyword is reported once and read on: `const price = 12` declares `price` for the rest of the file, so one mistake is one report rather than one per line that reads it.
 
@@ -2128,9 +2158,7 @@ Error: No overload of 'add' accepts these Arguments
    │ Note 3: 'Integer::add' takes 1 Argument: Parameter 1 is Algebraic.
    │ Note 4: 'Integer::add' takes 1 Argument: Parameter 1 is Transcendental.
    │ Note 5: 'NonNegativeInteger::add' takes 1 Argument: Parameter 1 is PositiveInteger.
-   │ Note 6: 'NonNegativeInteger::add' takes 1 Argument: Parameter 1 is NonNegativeInteger.
-   │ Note 7: 'PositiveInteger::add' takes 1 Argument: Parameter 1 is NonNegativeInteger.
-   │ Note 8: 'Scalar::add' takes 1 Argument: Parameter 1 is Scalar.
+   │ Note 6: And 3 more Overloads of this name, not listed.
 ───╯
 ```
 
@@ -3299,11 +3327,20 @@ What the compiler could not work out on its own.
 ```
 [uninferable-type-parameter]
 Error: Type Parameter 'Item' could not be inferred
+   ╭─┤ Empty.es:6:19 │
+   │
+ 6 │     constant items = empty()
+   │                      ───┬───  
+   │                         ╰───── nothing here determines what it binds to
+   │ 
+   │ Help 1: Give the Type Parameter a place among the Parameters, so that an Argument binds it.
+   │ Help 2: Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.
+───╯
 ```
 
 </div>
 
-The Help printed with this error says to write the type argument. Essence has no syntax for that at a call: `empty<Integer>()` is a `syntax-error`. Annotating the constant does not help either. Give the function a parameter whose type mentions the type parameter, so that the compiler infers it from the argument: `emptyLike<infer Item>(_ sample: List<Item>)`.
+The two helps are the only ways out, because no syntax pins a type argument at a call: `empty<Integer>()` is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax). Annotating the constant does not help either. Give the function a parameter whose type mentions the type parameter, so that the compiler infers it from the argument: `emptyLike<infer Item>(_ sample: List<Item>)`.
 
 Taught on: [Generics › Only the arguments bind](/docs/language/generics#only-the-arguments-bind)
 

@@ -138,7 +138,7 @@ implementation {
 
 [`Terminal.print`](/docs/library/terminal#print) is a static too: `Terminal` is a namespace, and `print` is one of its statics. `Number.Pi` is a static that holds a value. It is the exact number, not a float, so it prints as `π`. [`Number.highest`](/docs/library/number#highest) is a static that is called with arguments, positional or labelled like any method's. How a namespace declares its methods and statics is on [Namespaces and methods](/docs/language/namespaces-and-methods).
 
-The same `.` reads a member of a [record](/docs/language/records), Essence's version of a plain JavaScript object, as `order.total`. JavaScript also calls a method with `.`, so `price.multiply(with 3)` is a common slip. It is [`type-without-members`](/docs/reference/diagnostics#type-without-members), `This value has no members to look up`, because an [`Integer`](/docs/library/integer) has no members for `.` to read.
+The same `.` reads a member of a [record](/docs/language/records), Essence's version of a plain JavaScript object, as `order.total`. JavaScript also calls a method with `.`, so `price.multiply(with 3)` is a common slip. It is [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot), `'multiply' is a Method, not a member`, because a method lives in a namespace rather than among the value's members. Where the name is no method either, as in `price.frobnicate()`, it is [`type-without-members`](/docs/reference/diagnostics#type-without-members), `This value has no members to look up`, because an [`Integer`](/docs/library/integer) has no members for `.` to read.
 
 ## There are no operators
 
@@ -170,28 +170,33 @@ const ready = !done && (count > 0 || force)
 
 In Essence the three lines are `price::add(shipping)::multiply(with quantity)`, `a::is(b)` and `done::negate()::and(count::isGreaterThan(0)::or(force))`. One difference in meaning: `&&` and `||` stop at the first operand that decides them, while `and` and [`or`](/docs/library/boolean#or) are calls and evaluate both sides. More on [Coming from JavaScript › Operators](/docs/getting-started/coming-from-javascript#operators).
 
-Write `constant total = 1 + 2` and the compiler reads the number `1`, then a name `+`, then the number `2`:
+Write `constant total = 1 + 2` and the compiler names the operator you wrote:
 
 <div class="error-output">
 
 ```
-[unknown-name]
-Error: '+' is not declared
+[operator-not-supported]
+Error: Essence has no '+' operator
    ╭─┤ operators.es:2:21 │
    │
  2 │     constant total = 1 + 2
    │                        ▲  
-   │                        ╰── no such Variable or Constant
+   │                        ╰── this is not a Method call
+   │ 
+   │ Help 1: Write 'a::add(b)' for Numbers.
+   │ Help 2: Write 'a::append(b)' to join two Strings.
+   │ 
+   │ Note: Arithmetic, comparison and logic are Method calls in Essence, read left to right — there are no operators, and so no precedence to remember.
 ───╯
 ```
 
 </div>
 
-`+` is a name character, so the compiler looks it up as a name and reports [`unknown-name`](/docs/reference/diagnostics#unknown-name). So do `*`, `%` and `&&`. Without spaces the whole run is one name: `price+1`, `count++` and `!true` are each reported as not declared. `=`, `<`, `>`, `|` and `/` are not name characters, so `1 == 1`, `3 < 2`, `true || false` and `10 / 4` are syntax errors instead. Inside an argument list, `Terminal.print(1 + 2)` is a syntax error too: `Expected ')' but found '+'.`
+Every operator is answered the same way, by name, with [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported): `*`, `%`, `&&`, `==`, `<`, `||` and `/` each get their own message, and the help writes the method for the one you typed. Spaces make no difference, so `price+1`, `count++` and `!true` are each answered about the operator inside them. Neither does an argument list: `Terminal.print(1 + 2)` reports the same `Essence has no '+' operator`.
 
-Apart from the arrow [`->`](/docs/reference/syntax-glossary#arrow), [`-`](/docs/reference/syntax-glossary#minus) has one job: it is the sign of a number literal. `-250` is a literal. In front of a name it is a syntax error: `Terminal.print(-balance)` is `Expected a Number but found 'balance'.`
+Apart from the arrow [`->`](/docs/reference/syntax-glossary#arrow), [`-`](/docs/reference/syntax-glossary#minus) has one job: it is the sign of a number literal. `-250` is a literal. In front of a name, `Terminal.print(-balance)` is `Essence has no '-' operator`, and the help names the operand: `Write 'balance::negate()'.`
 
-Between two numbers it is not refused, and that is a trap. `constant difference = 10 - 4` binds `10`, and `- 4` becomes a statement of its own, the literal `-4`. `essence format` shows this by moving `- 4` onto its own line.
+Between two numbers it is refused as well. `constant difference = 10 - 4` reports `Essence has no '-' operator` rather than binding `10` and leaving `- 4` as a statement of its own. An operator is only found where the expression in front of it ended on the same line, so a statement that opens on the next line with `-4` is still the literal `-4`.
 
 ## Arithmetic
 
