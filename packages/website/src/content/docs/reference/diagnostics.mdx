@@ -1146,7 +1146,7 @@ Error: 'nmae' is not declared
 
 Fix the spelling, declare the name, or import it.
 
-Quick Fix: **Change to 'name'**. A name that a module in the workspace exports also gets a fix that imports it, and one that names a case gets **Write '#Red' instead of 'Red'** above both. A name a namespace reaches gets **Write 'Clock.noon' instead of 'noon'** and no spelling fix: the name is not what went wrong. Written as a [record literal's shorthand](/docs/language/records#writing-a-record), that fix spells the member out — **Write 'head = Http.head' instead of 'head'** — because `{ Http.head }` puts a path where a member name belongs.
+Quick Fix: **Change to 'name'**. A name that a module in the workspace exports also gets a fix that imports it, and one that names a case gets **Write '#Red' instead of 'Red'** above both. A name a namespace reaches gets **Write 'Clock.noon' instead of 'noon'** and no spelling fix: the name is not what went wrong. Where the name is a [record literal's shorthand](/docs/language/records#writing-a-record) it is the member as well as its value, so those fixes spell the member out — **Write 'head = Http.head' instead of 'head'**, **Write 'Red = #Red' instead of 'Red'** — because `{ Http.head }` and `{ #Red }` are not records.
 
 Taught on: [Functions › Scope and hoisting](/docs/language/functions#scope-and-hoisting)
 

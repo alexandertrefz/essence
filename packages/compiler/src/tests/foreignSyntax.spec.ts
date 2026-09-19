@@ -709,6 +709,24 @@ describe("Foreign syntax", () => {
 			})
 		})
 
+		// NOTE: `{ Red }` is a Record Literal's shorthand, where the name is the
+		// member AND its value — so the sigil written over the name alone leaves
+		// `{ #Red }`, which is not a Record Literal at all but `Expected 'with'`.
+		// The member is spelled out instead.
+		it("spells the member out where the name is a shorthand", () => {
+			let source = program(
+				"choice Light { Red, Green }",
+				"constant lit = { Red }",
+				"Terminal.print(lit::toString())",
+			)
+
+			expect(helpsOf(source)).toEqual(["Write 'Red = #Red'."])
+			expect(onlyDiagnostic(source).data).toMatchObject({
+				kind: "essence-spelling",
+				spelling: "Red = #Red",
+			})
+		})
+
 		it("says nothing where a habit was already reported on the line", () => {
 			let source = program(
 				"choice Failure { Timeout, Error }",

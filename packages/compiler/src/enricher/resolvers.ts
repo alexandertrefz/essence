@@ -1288,7 +1288,7 @@ function reportForeignName(
 		return true
 	}
 
-	return reportBareCaseName(node, scope, context.applied === true)
+	return reportBareCaseName(node, scope, context)
 }
 
 // NOTE: The one sentence a String in the other quotes is answered with, spelled
@@ -1396,8 +1396,10 @@ function reportForeignWord(
 function reportBareCaseName(
 	node: parser.IdentifierNode,
 	scope: enricher.Scope,
-	applied: boolean,
+	context: NameContext,
 ): boolean {
+	let applied = context.applied === true
+
 	let declaring = findCaseTypesInScope(scope).filter(
 		(candidate) => candidate.name === node.content,
 	)
@@ -1425,6 +1427,15 @@ function reportBareCaseName(
 		),
 	]
 
+	// NOTE: And the member spelled out where the name is a Record Literal's
+	// shorthand, for the reason the Namespace reach spells one out — `{ #Red }`
+	// is not even a Record Literal, it is `Expected 'with'`.
+	let written = memberSpelling(
+		node.content,
+		`#${node.content}${payloadWanted ? "(…)" : ""}`,
+		context,
+	)
+
 	reportError(`'${node.content}' is not declared`, node.position, {
 		code: "unknown-name",
 		labels: [primary(node.position, "no such Variable or Constant")],
@@ -1437,8 +1448,8 @@ function reportBareCaseName(
 		],
 		helps: [
 			payloadWanted
-				? `Write '#${node.content}(…)' — the Case carries a payload.`
-				: `Write '#${node.content}'.`,
+				? `Write '${written}' — the Case carries a payload.`
+				: `Write '${written}'.`,
 		],
 		...(payloadWanted
 			? {}
@@ -1446,7 +1457,7 @@ function reportBareCaseName(
 					data: {
 						kind: "essence-spelling" as const,
 						position: node.position,
-						spelling: `#${node.content}`,
+						spelling: written,
 					},
 				}),
 	})

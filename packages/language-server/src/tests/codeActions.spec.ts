@@ -6593,6 +6593,28 @@ describe("Code Actions", () => {
 			expect(result[2]).toBe("\tconstant light: Light = #Red")
 			expect(codesOf(result)).toEqual([])
 		})
+
+		// NOTE: And in a Record Literal's shorthand, where the name is the
+		// member as well as its value — `{ #Red }` is `Expected 'with'`.
+		it("should spell the member out where the name is a shorthand", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Light { Red, Green }",
+				"\tconstant lit = { Red }",
+				"",
+				"\tTerminal.print(lit::toString())",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Write 'Red = #Red' instead of 'Red'")
+
+			let result = applied(lines, fix)
+
+			expect(result[2]).toBe("\tconstant lit = { Red = #Red }")
+			expect(codesOf(result)).toEqual([])
+		})
 	})
 })
 
