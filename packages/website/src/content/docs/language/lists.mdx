@@ -51,7 +51,7 @@ console.log([10, 9, 1].sort()) // [ 1, 10, 9 ]
 
 | JavaScript | Essence |
 | --- | --- |
-| `items[0]`, `items.at(-1)` | `items::item(at 0)`, `items::item(at -1)`: an `Optional` |
+| `items[0]`, `items.at(-1)` | `items::item(at 0)`, `items::item(at -1)`: an `Optional`; the brackets are [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) |
 | `items.length` | [`items::length()`](/docs/library/list#length): a method, with the parentheses |
 | `items.push(x)`, `[...items, x]`, `items.concat(more)` | `items::append(x)`, `items::append(contentsOf more)`: a new list; spread is a [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
 | `items.pop()`, `items.shift()` | [`items::lastItem()`](/docs/library/list#lastItem) to read the item, then [`items::removeLast()`](/docs/library/list#removeLast) for the rest; `firstItem()` and [`removeFirst()`](/docs/library/list#removeFirst) at the front |
@@ -99,28 +99,56 @@ The literal is on [Programs and values](/docs/language/programs-and-values): ite
 
 `Terminal.print(labels)` is refused as [`unsatisfied-conformance-condition`](/docs/reference/diagnostics#unsatisfied-conformance-condition): [`print`](/docs/library/terminal#print) needs items that are [`Printable`](/docs/library/protocols#Printable), and a union is not. [`inspect`](/docs/library/terminal#inspect) prints any value. `print` writes `[3, 1, 2]`. `inspect` writes `[ 3, 1, 2 ]`, with spaces inside the brackets, as Node's `console.log` spaces an array. Both quote the strings in a list. Only a bare string differs: `print("two")` writes `two`, and `inspect("two")` writes `"two"`.
 
-There is no indexing. `item(at:)` reads a position, counting from 0, and a negative position counts from the end. `item(at 0)` prints `Value(3)`, the `#Value` case without its `#`. Inside a call, `scores[0]` is not a read. The name before the brackets is taken as an argument [label](/docs/reference/syntax-glossary#labels), the word that names an argument, like `at` in `item(at 0)`. `[0]` is taken as a list. The compiler refuses it as [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch):
+There is no indexing. `item(at:)` reads a position, counting from 0, and a negative position counts from the end. `item(at 0)` prints `Value(3)`, the `#Value` case without its `#`. `scores[0]` is refused at the brackets, wherever it is written, as [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax):
 
 <div class="error-output">
 
 ```
-[argument-label-mismatch]
-Error: This Argument is labelled where Parameter 1 takes no label
+[foreign-syntax]
+Error: A value is not indexed with brackets
    ╭─┤ podium.es:4:23 │
    │
  4 │     Terminal.print(scores[0])
    │                          ─┬─
-   │                           ╰─── this is labelled 'scores'
+   │                           ╰─── nothing reads a value with brackets
    │
-   │ Help: Pass the value with no label.
+   │ Help 1: Write 'scores::item(at 0)' for a List, and 'scores::character(at 0)' for a String.
+   │ Help 2: Write 'scores::value(at 0)' for a Dictionary, whose keys are values of its own key Type rather than positions.
+   │ Help 3: A negative position counts back from the end, and 'firstItem()' and 'lastItem()' name the two ends of a List.
    │
-   │ Note: The signature takes 1 or 2 Arguments: Parameter 1 is Value, Parameter 'to' is Stream, which may be left out.
+   │ Note 1: Nothing carries an Expression on into brackets: what stands here is 'scores' and then a List of its own — two Statements, and a reading of an item in neither.
+   │ Note 2: A position or a key can always name nothing, so each of these answers an Optional — and each takes a 'defaultingTo:' entry that answers a value in its place.
 ───╯
 ```
 
 </div>
 
-On a line of its own, `constant first = scores[0]` compiles as two statements: a [constant](/docs/reference/syntax-glossary#constant) bound to the whole list, and a list `[0]` that nothing reads.
+Writing into one is refused the same way, and the report is about writing: there is no `scores[0] = 5` because nothing changes a list in place. The methods that change a list answer a new one, so the name is written again:
+
+<div class="error-output">
+
+```
+[foreign-syntax]
+Error: A value is not written into with brackets
+   ╭─┤ podium.es:5:2 │
+   │
+ 5 │     scores[0] = 5
+   │     ────┬────
+   │         ╰────── nothing writes into a value with brackets
+   │
+   │ Help 1: Write 'scores = scores::replace(5, at 0)' for a List.
+   │ Help 2: Write 'scores = scores::set(0, to 5)' for a Dictionary, whose keys are values of its own key Type rather than positions.
+   │
+   │ Note 1: Nothing changes a collection in place: a Method that changes one answers a NEW collection, which is why 'scores' is written again.
+   │ Note 2: A name written again is a 'variable' — a 'constant' is bound once.
+───╯
+```
+
+</div>
+
+The brackets are what the report points at, and the whole of what it reports. Without the refusal `constant first = scores[0]` would be two statements — a [constant](/docs/reference/syntax-glossary#constant) bound to the whole list, and a list `[0]` that nothing reads — and the mistake would have surfaced on the first line that used `first` as an item. The declaration is kept, so `first` stays declared and nothing below it is reported twice for one mistake.
+
+A `[` written a space behind a name is still a list: `append(contentsOf [4])` passes one under a [label](/docs/reference/syntax-glossary#labels), the word that names an argument, like `at` in `item(at 0)`. The space is the whole difference, as it is for `#` and `.`.
 
 A list is not a pattern either. `case []` in a [`match`](/docs/language/choices-and-match) is a `syntax-error`, `Expected a Type but found '['.` Nor is `constant [first, second] = scores`: it is a `syntax-error` too. To branch on whether a list is empty, check `hasItems()` in an [`if`](/docs/reference/syntax-glossary#if), or match on what `firstItem()` returns.
 

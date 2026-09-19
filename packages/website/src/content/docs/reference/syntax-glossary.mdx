@@ -511,7 +511,7 @@ Taught on [Records](/docs/language/records).
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| A list (`[2, 3, 5]`), a dictionary (`["ada" = 36]`), the empty dictionary (`[=]`) and a dictionary update (`[ages with "ada" = 37]`). | Where a value stands. | Indexing. `constant first = primes[0]` binds the whole list, and `[0]` becomes a statement of its own; read an item with [`item(at:)`](/docs/library/list#item). `[]` is an empty list, never an empty dictionary. |
+| A list (`[2, 3, 5]`), a dictionary (`["ada" = 36]`), the empty dictionary (`[=]`) and a dictionary update (`[ages with "ada" = 37]`). | Where a value stands. | Indexing. A `[` written flush against a value is refused as [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax): `primes[0]` reads no item, and `primes::item(at 0)` does. `[]` is an empty list, never an empty dictionary. |
 
 </div>
 
@@ -1900,7 +1900,7 @@ Most line breaks and all indentation carry no meaning: a statement ends where th
 
 <h3 id="labels-flush">A label sits in front of its value</h3>
 
-A label and its value are separated by a space, never by `:` or `=`. `slice(from: 1, to: 3)` is a syntax error, `Expected an Expression but found ':'`. Inside an argument list, any word followed by a value reads as a label. `Terminal.print(primes[0])` is therefore read as the label `primes` and the list `[0]`, which is `argument-label-mismatch`. The [labels](/docs/reference/syntax-glossary#labels) entry runs the spelling that works.
+A label and its value are separated by a space, never by `:` or `=`. `slice(from: 1, to: 3)` is a syntax error, `Expected an Expression but found ':'`. Inside an argument list, any word followed by a value reads as a label — with the space. Written flush, a `#`, a `.` and a `[` carry the name on instead: `Choice#Case` and `order.isPaid` are one value each, and `primes[0]` is an index, refused as [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax). So `append(contentsOf [4])` passes a list and `append(contentsOf[4])` does not. The [labels](/docs/reference/syntax-glossary#labels) entry runs the spelling that works.
 
 <h3 id="one-token">A fraction is one token</h3>
 

@@ -64,7 +64,7 @@ These twenty-two JavaScript habits cause most first-hour reports, and they are n
 - [`true && false`](/docs/getting-started/coming-from-javascript#typed-and): `operator-not-supported`
 - [`!true`](/docs/getting-started/coming-from-javascript#typed-not): `operator-not-supported`
 - [`if (ready) {`](/docs/getting-started/coming-from-javascript#typed-if-parentheses-name): [`syntax-error`](/docs/reference/diagnostics#syntax-error)
-- [`items[0]`](/docs/getting-started/coming-from-javascript#typed-index): [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch)
+- [`items[0]`](/docs/getting-started/coming-from-javascript#typed-index): [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax)
 - [`text.length`](/docs/getting-started/coming-from-javascript#typed-length): [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot)
 - [`text.charAt(0)`](/docs/getting-started/coming-from-javascript#typed-charat): [`type-without-members`](/docs/reference/diagnostics#type-without-members)
 - [`const total = 1`](/docs/getting-started/coming-from-javascript#typed-const): [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax)
@@ -816,13 +816,17 @@ Error: 'const' is not how Essence declares a binding
 
 </div>
 
-One code covers the family, and the message says which habit was written. It answers fifty words, and a dozen habits written in punctuation or quotes.
+One code covers the family, and the message says which habit was written. It answers fifty words, and thirteen habits written in punctuation, quotes or brackets.
 
-The punctuation: a `;` at the end of a statement; `{ x: 1 }` for a record member; `point.x = 2`; `(n) => n`; `c ? a : b`; `// a comment` and `/* a comment */`; `'hi'` and `` `hi` `` for a string; `identity<Integer>(1)`; and `user!` and `user?.name`.
+The punctuation: a `;` at the end of a statement; `{ x: 1 }` for a record member; `point.x = 2`; `(n) => n`; `c ? a : b`; `// a comment` and `/* a comment */`; `'hi'` and `` `hi` `` for a string; `identity<Integer>(1)`; `primes[0]` and `ages["ada"]` for an item read by position or key, and `primes[0] = 5` for one written by position; and `user!` and `user?.name`.
 
 The words: `const`, `let`, `var`, `mut` and `return`; `null`, `undefined`, `nil`, `None` and `Some`; `this` and `self`; `print`, `println`, `println!`, `puts`, `echo` and `fmt`; `len`, `console`, `Math`, `parseInt`, `parseFloat`, `NaN` and `Infinity`; `new`, `class`, `def`, `fn` and `func`; `elif`, `guard`, `switch`, `typeof` and `instanceof`; `throw`, `try` and `catch`; `while`, `break` and `continue`; `enum`, `interface`, `implements` and `extends`; `async` and `await`; and `Map`, `Set` and `require`.
 
-A declaration keyword is reported once and read on: `const price = 12` declares `price` for the rest of the file, so one mistake is one report rather than one per line that reads it.
+A declaration keyword is reported once and read on: `const price = 12` declares `price` for the rest of the file, so one mistake is one report rather than one per line that reads it. An index recovers the same way, and has to: `constant first = primes[0]` keeps `first` declared, bound to an error rather than to the list in front of the brackets, so neither the name nor its type is reported about again.
+
+An index with an `=` behind it is a write, and is answered about writing: `primes[0] = 5` gets `A value is not written into with brackets`, the methods that rebuild a list and a dictionary — `primes = primes::replace(5, at 0)`, `ages = ages::set("ada", to 37)` — and the whole statement, since nothing changes a collection in place. That one is refused rather than read on: what follows the `=` is the value being stored, and reading on would answer it as a statement of its own.
+
+An index is refused by its spacing. A `[` written flush against the value in front of it is an index; one written a space behind a name is the list that name labels, as in `append(contentsOf [4])`. That is the rule `#` and `.` are already read by — see [A label sits in front of its value](/docs/reference/syntax-glossary#labels-flush).
 
 Quick Fix: **Write 'constant' instead of 'const'**, and its equivalent wherever one word replaces one word. There is none where the fix is a restructuring — a `=>` body, a ternary, a member assignment.
 
@@ -1443,7 +1447,7 @@ Taught on: [Records › Record parameters with defaults](/docs/language/records#
 
 ### `argument-label-mismatch`
 
-**Error.** An argument's label does not match its parameter: a different label, a missing one, or one where the parameter takes none. JavaScript's `items[0]` lands here, because `Terminal.print(items[0])` reads `items` as a label.
+**Error.** An argument's label does not match its parameter: a different label, a missing one, or one where the parameter takes none.
 
 <div class="error-output">
 
@@ -1464,7 +1468,7 @@ Error: This Argument is labelled where Parameter 1 takes no label
 
 </div>
 
-Write the labels the signature declares, in its order. The Note lists the signature. An item of a list is read with `items::item(at 0)`.
+Write the labels the signature declares, in its order. The Note lists the signature. `Terminal.print(items[0])` used to land here, since `items` read as a label and `[0]` as the list it labelled; it is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) now, reported at the brackets.
 
 Quick Fix: **Remove the label**. A missing or a different label gets the fix that writes or changes it.
 

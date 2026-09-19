@@ -124,7 +124,7 @@ Double quotes only, and every string literal interpolates. `length()` counts cha
 | `'{ "a": 1 }'` | [`"\{ \"a\": 1 }"`](/docs/reference/syntax-glossary#backslash): a literal `{` is written `\{` | [`unclosed-string`](/docs/reference/diagnostics#unclosed-string) for `"{ \"a\": 1 }"` |
 | `a + b` | [`a::append(b)`](/docs/library/string#append), or `"{a}{b}"` | [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported) |
 | `s.length` counts UTF-16 units: `"🇩🇪".length` is `4` | [`s::length()`](/docs/library/string#length) counts characters: `"🇩🇪"::length()` is `1` | [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot) |
-| `s[0]`, `s.charAt(0)` | [`s::character(at 0)`](/docs/library/string#character), an `Optional<Character>` | [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch) for `s[0]` inside a call; [`type-without-members`](/docs/reference/diagnostics#type-without-members) for `s.charAt(0)`, since a `String` has no `charAt` under any spelling |
+| `s[0]`, `s.charAt(0)` | [`s::character(at 0)`](/docs/library/string#character), an `Optional<Character>` | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) for `s[0]`, at the brackets; [`type-without-members`](/docs/reference/diagnostics#type-without-members) for `s.charAt(0)`, since a `String` has no `charAt` under any spelling |
 | `s.toUpperCase()` | [`s::uppercase()`](/docs/library/string#uppercase) | [`type-without-members`](/docs/reference/diagnostics#type-without-members); [`unknown-method`](/docs/reference/diagnostics#unknown-method) for `s::toUpperCase()` |
 | `s.trim()`, `s.includes(t)` | [`s::trim()`](/docs/library/string#trim), [`s::contains(t)`](/docs/library/string#contains) | [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot) for `trim`; [`type-without-members`](/docs/reference/diagnostics#type-without-members) for `includes` |
 | `s.split("\n")` | [`s::split(on "\n")`](/docs/library/string#split) | [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot) |
@@ -142,7 +142,7 @@ Records, lists and dictionaries are all immutable. A method that would change on
 | `{ ...point, x: 9 }` | [`{ point with x = 9 }`](/docs/reference/syntax-glossary#with) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
 | `{ x, y }`, `point.x` | [the same](/docs/reference/syntax-glossary#braces) | — |
 | `[1, 2, 3]` | [the same](/docs/language/lists) | — |
-| `items[0]`, `items.at(-1)` | [`items::item(at 0)`](/docs/library/list#item), `items::item(at -1)`, an `Optional` | [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch) for `items[0]` inside a call; [`type-without-members`](/docs/reference/diagnostics#type-without-members) for `items.at(-1)` |
+| `items[0]`, `items.at(-1)` | [`items::item(at 0)`](/docs/library/list#item), `items::item(at -1)`, an `Optional` | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) for `items[0]`, at the brackets; [`type-without-members`](/docs/reference/diagnostics#type-without-members) for `items.at(-1)` |
 | `items.length` | [`items::length()`](/docs/library/list#length) | [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot) |
 | `items.push(4)`, `[...items, 4]`, `items.concat(more)` | [`items::append(4)`](/docs/library/list#append), `items::append(contentsOf more)`, a new list | [`type-without-members`](/docs/reference/diagnostics#type-without-members), since a list has no `push` under any spelling; [`syntax-error`](/docs/reference/diagnostics#syntax-error) for `[...items, 4]` |
 | `items.pop()`, `items.shift()` | [`items::lastItem()`](/docs/library/list#lastItem) reads the item and [`items::removeLast()`](/docs/library/list#removeLast) returns the rest; `firstItem()` and [`removeFirst()`](/docs/library/list#removeFirst) at the front | [`type-without-members`](/docs/reference/diagnostics#type-without-members); [`unknown-method`](/docs/reference/diagnostics#unknown-method) for `items::pop()` |
@@ -168,7 +168,7 @@ Records, lists and dictionaries are all immutable. A method that would change on
 | `new Set(items)` | a list, with [`removeDuplicates()`](/docs/library/list#removeDuplicates) and `contains` | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) |
 
 <Note>
-`constant first = items[0]` compiles, and `first` is `items`: the `[0]` is a [second statement](/docs/language/programs-and-values), a list that nothing reads.
+`constant first = items[0]` is refused at the brackets, wherever it is written. Nothing carries an expression on into brackets, so without the refusal the line would be two statements — `items`, and a list `[0]` that nothing reads — and the mistake would surface further down, on the first line that used `first` as an item. The declaration is kept all the same, so only the brackets are reported.
 </Note>
 
 <a id="absence"></a>
@@ -334,7 +334,7 @@ The table lists the errors you are likely to hit first: what you typed, the erro
 | <span id="typed-and"></span>`true && false` | [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported): `Essence has no '&&' operator` | `true::and(false)` |
 | <span id="typed-not"></span>`!true` | [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported): `Essence has no '!' operator` | `true::negate()` |
 | <span id="typed-negate"></span>`-price` | [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported): `Essence has no '-' operator` | `price::negate()` |
-| <span id="typed-index"></span>`Terminal.print(items[0])` | [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch): `This Argument is labelled where Parameter 1 takes no label` | `Terminal.print(items::item(at 0))` |
+| <span id="typed-index"></span>`Terminal.print(items[0])` | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax): `A value is not indexed with brackets` | `Terminal.print(items::item(at 0))` |
 | <span id="typed-length"></span>`text.length` | [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot): `'length' is a Method, not a member` | `text::length()` |
 | <span id="typed-charat"></span>`text.charAt(0)` | [`type-without-members`](/docs/reference/diagnostics#type-without-members): `This value has no members to look up` | `text::character(at 0)` |
 | <span id="typed-const"></span>`const total = 1` | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax): `'const' is not how Essence declares a binding` | `constant total = 1` |

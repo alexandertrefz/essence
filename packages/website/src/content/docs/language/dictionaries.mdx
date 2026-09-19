@@ -208,7 +208,7 @@ const pairs = [...stock.entries()] // [["apples", 4], ["pears", 0]]
 
 Each `Map` method has an Essence name. `get(key)` is `value(at key)`, `has(key)` is `hasKey(key)`, and `size` is `length()`. `set(key, value)` is `set(key, to value)`, and `delete(key)` is [`remove(at key)`](/docs/library/dictionary#remove).
 
-There is no `stock["kiwis"]` and no `stock.kiwis`. `stock.kiwis` is refused as [`type-without-members`](/docs/reference/diagnostics#type-without-members), and `stock["kiwis"]` inside a call as [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch). On a line of its own, `constant kiwis = stock["kiwis"]` compiles as two statements: `constant kiwis = stock`, then a list `["kiwis"]` that nothing reads. No error says so, and `kiwis` holds the whole dictionary. More on [Coming from JavaScript › Collections](/docs/getting-started/coming-from-javascript#collections).
+There is no `stock["kiwis"]` and no `stock.kiwis`. `stock.kiwis` is refused as [`type-without-members`](/docs/reference/diagnostics#type-without-members), and `stock["kiwis"]` as [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), at the brackets and wherever they are written. Its help leads with `stock::value(at "kiwis")`, because a string key names a dictionary: a list and a string are read by position, and a position is an integer. More on [Coming from JavaScript › Collections](/docs/getting-started/coming-from-javascript#collections).
 
 ## Setting and removing entries
 
