@@ -42,19 +42,56 @@ export function editDistance(left: string, right: string): number {
 	return distances[rows - 1]![columns - 1]!
 }
 
+// NOTE: Whether two names begin with the same letter, which is the one position
+// in a word a slip almost never lands on — and the one a reader reads first. Two
+// names that open alike look alike; two that do not are two words.
+//
+// Compared without case, because the shift key is a slip like any other and the
+// two spellings of a first letter are the same letter.
+function sharesOpeningLetter(left: string, right: string): boolean {
+	return (
+		left.length > 0 &&
+		right.length > 0 &&
+		(left[0] as string).toLowerCase() === (right[0] as string).toLowerCase()
+	)
+}
+
 // NOTE: A suggestion is only offered when it is close enough to be plausible —
 // proposing an unrelated flag is worse than proposing nothing.
+//
+// Two edits on a short name is not a near miss, it is a coincidence. `add` and
+// `pad` differ in two letters of three, `noon` and `loop` in two of four, and
+// both were offered as "Did you mean" with a Quick Fix behind them that wrote
+// the wrong word into the reader's file. So the rule is read off the NAME rather
+// than off a fixed threshold: one edit is always a near miss — a single slip,
+// a swap of two letters included, is the typo people actually make — and
+// anything beyond one has to be small next to the name it is measured against,
+// a third of its length at most, and has to open on the same letter.
 export function closestMatch(
 	input: string,
 	candidates: Array<string>,
 ): string | null {
-	let best: { name: string; distance: number } | null = null
+	let best: {
+		name: string
+		distance: number
+		sharesOpening: boolean
+	} | null = null
 
 	for (let candidate of candidates) {
 		let distance = editDistance(input, candidate)
+		let sharesOpening = sharesOpeningLetter(input, candidate)
 
-		if (best === null || distance < best.distance) {
-			best = { name: candidate, distance }
+		// NOTE: A tie is broken on the FIRST candidate, which several callers
+		// order their candidates for — see `builtins`. The one thing that comes
+		// before that order is the opening letter: between two names the same
+		// distance away, the one that starts as the input does is the one the
+		// reader was looking at.
+		if (
+			best === null ||
+			distance < best.distance ||
+			(distance === best.distance && sharesOpening && !best.sharesOpening)
+		) {
+			best = { name: candidate, distance, sharesOpening }
 		}
 	}
 
@@ -62,12 +99,15 @@ export function closestMatch(
 		return null
 	}
 
-	let threshold = Math.max(2, Math.floor(input.length / 3))
-
 	// NOTE: A candidate must also share more with the input than it differs
 	// from it. Without that, every short name is within the threshold of
 	// every other short name, and `point.z` gets told it meant `point.x`.
-	return best.distance <= threshold && best.distance < input.length
+	if (best.distance >= input.length) {
+		return null
+	}
+
+	return best.distance <= 1 ||
+		(best.distance * 3 <= input.length && best.sharesOpening)
 		? best.name
 		: null
 }

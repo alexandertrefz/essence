@@ -298,9 +298,18 @@ export const builtinMemberOrder: Array<string> = [
 // position must be a property of its name, not of the file name that happens to
 // declare it. Two surfaces read this order: `closestMatch` breaks a tie on the
 // FIRST candidate, so "did you mean …?" would otherwise name whichever Type
-// sorted first (`Oational` is distance 1 from both `Rational` and `Optional`),
-// and Completion of a Type annotation ships these in table order with no
-// `sortText` of its own.
+// sorted first, and Completion of a Type annotation ships these in table order
+// with no `sortText` of its own.
+//
+// That tie-break is the second one, not the first. What comes before it is the
+// OPENING LETTER — the one position in a word a slip rarely lands on — so
+// `Oational`, one edit from both `Rational` and `Optional`, is answered
+// `Optional` wherever the two stand in this table. The order decides the ties
+// the opening letter leaves: two candidates the same distance away that both
+// open as the written name does, or neither. That is the tie a Type and its
+// refinement make — `Integer` and `NonZeroInteger` are both answers to a name
+// opening on neither letter — which is why each refinement is placed directly
+// behind the Type it refines.
 export const builtinTypeOrder: Array<string> = [
 	"Boolean",
 	"String",

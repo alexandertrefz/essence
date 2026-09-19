@@ -586,6 +586,39 @@ describe("Code Actions", () => {
 			)
 		})
 
+		// NOTE: The two that made the rule. `add` and `pad` are two edits apart
+		// on a name of three letters, `noon` and `loop` two on four, and each
+		// was offered as the PREFERRED fix — so the lightbulb's first entry
+		// wrote a word the reader had never heard of into their file.
+		it("should offer no spelling fix for a Method two edits away", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant primes = [2, 3, 5]",
+				"\tconstant first = primes",
+				"",
+				"\tTerminal.print(first::add(1)::toString())",
+				"}",
+			]
+
+			expect(titles(quickFixes(lines))).not.toContain("Change to 'pad'")
+		})
+
+		it("should offer no spelling fix for a Name two edits away", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Clock for Integer {",
+				"\t\tstatic noon = 43_200",
+				"",
+				"\t\tisAfterNoon() -> Boolean {",
+				"\t\t\t<- @::isGreaterThan(noon)",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			expect(titles(quickFixes(lines))).not.toContain("Change to 'loop'")
+		})
+
 		it("should render an unknown Case with its sigil but replace only the name", () => {
 			let lines = [
 				"implementation {",

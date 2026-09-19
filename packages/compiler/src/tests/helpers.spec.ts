@@ -31,6 +31,7 @@ import { recordDefaultNesting } from "../helpers/defaults"
 import { describeType } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
 import { stripPosition, stripPositionFromArray } from "../helpers/nodes"
+import { closestMatch } from "../helpers/suggest"
 import {
 	applyGenericBindings,
 	buildUnion,
@@ -3976,5 +3977,55 @@ describe("Dictionary Types", () => {
 				resolveUnknownSlots(stored, dictionary(integer, string)),
 			).toBe(stored)
 		})
+	})
+})
+
+// NOTE: The rule is what decides whether a "Did you mean" is printed at all,
+// and every one of them carries a Quick Fix that writes the name into the
+// reader's file — so the pairs that must NOT be offered are tested beside the
+// ones that must.
+describe("closestMatch", () => {
+	it("should offer a name one edit away", () => {
+		expect(closestMatch("lenth", ["length", "prepend"])).toBe("length")
+		expect(closestMatch("totla", ["total", "count"])).toBe("total")
+		expect(closestMatch("hasValu", ["hasValue", "isEmpty"])).toBe(
+			"hasValue",
+		)
+	})
+
+	// NOTE: The two that started this. Both are two edits on a name too short
+	// to spare them, and both were offered with a fix behind them.
+	it("should refuse two edits on a short name", () => {
+		expect(closestMatch("add", ["pad", "join"])).toBeNull()
+		expect(closestMatch("noon", ["loop", "count"])).toBeNull()
+	})
+
+	it("should admit two edits on a name long enough to carry them", () => {
+		expect(closestMatch("firstIdx", ["firstIndex"])).toBe("firstIndex")
+		expect(closestMatch("sbtrct", ["subtract"])).toBe("subtract")
+	})
+
+	// NOTE: `uppercase` and `lowercase` are three edits apart and mean opposite
+	// things. The length alone admits that many; the opening letter is what
+	// tells the reader's own word from its mirror image.
+	it("should refuse a far name that opens on another letter", () => {
+		expect(closestMatch("uppercase", ["lowercase"])).toBeNull()
+		expect(closestMatch("prepend", ["append"])).toBeNull()
+	})
+
+	it("should still offer a one-edit name that opens on another letter", () => {
+		expect(closestMatch("bength", ["length"])).toBe("length")
+	})
+
+	// NOTE: Both candidates are one edit away, so the order they were handed in
+	// would have answered — and the one the reader was looking at is the one
+	// that opens as their own spelling does.
+	it("should prefer the candidate opening as the input does", () => {
+		expect(closestMatch("sart", ["part", "start"])).toBe("start")
+	})
+
+	it("should offer nothing when there is nothing to offer", () => {
+		expect(closestMatch("undeclaredMethod", [])).toBeNull()
+		expect(closestMatch("", ["length"])).toBeNull()
 	})
 })
