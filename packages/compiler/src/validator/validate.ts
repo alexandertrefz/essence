@@ -10,10 +10,13 @@ import {
 } from "../diagnostics/index"
 import { caseDefaults, parameterDefaults } from "../helpers/defaults"
 import {
+	asynchronyData,
+	asynchronyHelps,
 	countOf,
 	describeParameter,
 	describeSignature,
 	describeType,
+	returnAsynchronyHelps,
 	undecidedSlotEvidence,
 	withArticle,
 } from "../helpers/describe"
@@ -37,7 +40,6 @@ import {
 	matchesType,
 	matchesTypeWithBindings,
 	returnedTypeOf,
-	asynchronyMismatch,
 	type ArgumentMatchResult,
 	type GenericBindings,
 	mergedRecordType,
@@ -3364,78 +3366,6 @@ function fitsExpectedType(
 // 'NonEmptyList' names something the Program would refuse for taking no Arguments. A
 // refinement carrying none spells as its name alone, which is every non-generic
 // one.
-// NOTE: The Helps a mismatch gets where the difference is one missing word
-// about asynchrony rather than a wrong value. `asynchronyMismatch` decides
-// WHICH of the three it is, by assignability, and the wording is written at each
-// site because what a reader should do about it is different in each.
-//
-// This is the ordinary positions' wording — an Argument, a Declaration, an
-// Assignment, a `define` arm — where the value is the thing to change.
-// NOTE: The same question the two Helps below ask, answered as DATA. A Quick
-// Fix reads this rather than the Help's sentence: the wording is written per
-// site and is free to change, and a fix keyed on prose breaks silently when it
-// does. `not-a-future` carries nothing, because there is no edit to make — what
-// a body has to do about it is build a future, which is a judgement.
-function asynchronyData(
-	expected: common.Type,
-	actual: common.Type,
-): common.DiagnosticData | undefined {
-	let mismatch = asynchronyMismatch(expected, actual)
-
-	return mismatch === "unstarted" || mismatch === "in-flight"
-		? { kind: "asynchrony-mismatch", mismatch }
-		: undefined
-}
-
-function asynchronyHelps(
-	expected: common.Type,
-	actual: common.Type,
-): Array<string> {
-	switch (asynchronyMismatch(expected, actual)) {
-		case "unstarted":
-			return ["This describes work that has not run — add 'complete'."]
-		case "in-flight":
-			return [
-				"This is still in flight — add 'complete' to wait for what it answers with.",
-			]
-		case "not-a-future":
-			return [
-				"Build a future to answer with: 'Async.deferred(…)', or '::map' or '::andThen' on one you already have.",
-			]
-		default:
-			return []
-	}
-}
-
-// NOTE: And the same three in RETURN position, where the body is the thing to
-// change and one of them reads completely differently: a body that declares a
-// future and hands back a bare value has not written a future anywhere, and
-// whether it completes anything is what decides what it should do about that.
-function returnAsynchronyHelps(
-	expected: common.Type,
-	actual: common.Type,
-	completing: boolean,
-): Array<string> {
-	switch (asynchronyMismatch(expected, actual)) {
-		case "unstarted":
-			return [
-				completing
-					? "Add 'complete' — this body waits, so it answers with values rather than with futures."
-					: "This describes work that has not run — add 'complete', which makes this a body that waits.",
-			]
-		case "in-flight":
-			return [
-				"This is still in flight — add 'complete' to wait for what it answers with.",
-			]
-		case "not-a-future":
-			return [
-				"This body completes nothing, so it has to RETURN a future — complete something, or build one ('Async.deferred(…)', '::map', '::andThen').",
-			]
-		default:
-			return []
-	}
-}
-
 function refinementEvidence(
 	expected: common.Type | undefined,
 	value?: common.typed.ExpressionNode,

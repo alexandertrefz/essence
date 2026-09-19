@@ -8195,6 +8195,37 @@ describe("Quick Fixes for asynchrony", () => {
 			expect(codesOf(applied(lines, fix))).toEqual([])
 		})
 
+		// NOTE: And the shape the Validator never sees. A call that picks no
+		// Overload is refused by the Enricher, so `argument-type-mismatch` is
+		// never reported for it and the fix above was never offered — while
+		// the mistake is exactly the same one.
+		it("writes the word in front of an Argument of a refused Overload", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Shown for Integer {",
+				"\t\toverload show {",
+				"\t\t\t(_ count: Integer) -> Integer { <- count }",
+				"\t\t\t(twice flag: Boolean) -> Integer { <- 0 }",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant work = Async.deferred(() { <- 1 })",
+				"",
+				"\tTerminal.inspect(1::show(work))",
+				"}",
+			]
+
+			let fix = quickFixes(lines).find(
+				(entry) => entry.diagnosticCode === "no-matching-overload",
+			) as CodeActionEntry
+
+			expect(fix.title).toBe("Wait for it with 'complete'")
+			expect(applied(lines, fix)[10]).toBe(
+				"\tTerminal.inspect(1::show(complete work))",
+			)
+			expect(codesOf(applied(lines, fix))).toEqual([])
+		})
+
 		// NOTE: The codes these arrive under are the ordinary mismatches', so
 		// the fix has to answer nothing where the Validator wrote no Help about
 		// asynchrony.

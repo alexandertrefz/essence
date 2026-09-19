@@ -75,7 +75,7 @@ console.log([10, 9, 1].sort()) // [ 1, 10, 9 ]
 
 </div>
 
-The compiler does not know these JavaScript names, and its suggestions can mislead. `items::indexOf(2)` gets "Did you mean 'index'?", but [`index(on:)`](/docs/library/list#index) builds a [dictionary](/docs/language/dictionaries), a value that maps keys to values; you want `firstIndex(of:)`. A wrong name passed a [function literal](/docs/reference/syntax-glossary#function-literal) also reports [`uninferable-parameter-type`](/docs/reference/diagnostics#uninferable-parameter-type), and fixing the name clears both.
+The compiler does not know these JavaScript names, and a near miss is offered only where the call could have meant it. `items::indexOf(2)` is offered nothing: [`index(on:)`](/docs/library/list#index) is one edit away, but it takes a label this call did not write — and it builds a [dictionary](/docs/language/dictionaries) rather than finding a position. What you want is `firstIndex(of:)`. A wrong name passed a [function literal](/docs/reference/syntax-glossary#function-literal) also reports [`uninferable-parameter-type`](/docs/reference/diagnostics#uninferable-parameter-type), and fixing the name clears both.
 
 More on [Coming from JavaScript › Collections](/docs/getting-started/coming-from-javascript#collections).
 

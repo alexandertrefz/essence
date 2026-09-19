@@ -124,10 +124,43 @@ export function waitForValueAction(
 	return insertKeywordAction(diagnostic, "complete", "Wait for it with")
 }
 
+// NOTE: The same missing word on a call that picked no Overload at all, where
+// the Diagnostic is reported at the WHOLE call and the Argument that was refused
+// is what its primary Label points at. So the edit is measured off that Label
+// rather than off the Diagnostic's own span — writing the word in front of the
+// call would wait for the call, which is not what the Help describes and not
+// what the reader meant.
+//
+// The Enricher withholds the payload for a `::` call's receiver, which is the
+// one Argument whose Label is not a place this word can go.
+export function waitForArgumentAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+): CodeActionEntry | null {
+	if (diagnostic.data?.kind !== "asynchrony-mismatch") {
+		return null
+	}
+
+	let refused = diagnostic.labels.find((label) => label.kind === "primary")
+
+	if (refused === undefined) {
+		return null
+	}
+
+	return insertKeywordAction(
+		diagnostic,
+		"complete",
+		"Wait for it with",
+		refused.position,
+	)
+}
+
 function insertKeywordAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	keyword: string,
 	title: string,
+	// NOTE: Where the word goes, which is the Diagnostic's own span for every
+	// report that points at the value itself.
+	at: common.Position = diagnostic.position,
 ): CodeActionEntry {
 	return {
 		title: `${title} '${keyword}'`,
@@ -140,10 +173,7 @@ function insertKeywordAction(
 		isPreferred: true,
 		edits: [
 			{
-				range: {
-					start: diagnostic.position.start,
-					end: diagnostic.position.start,
-				},
+				range: { start: at.start, end: at.start },
 				newText: `${keyword} `,
 			},
 		],

@@ -287,7 +287,11 @@ Error: No Method named 'uppercase' for Optional#Value
    │                                     │
    │                                     ╰────── Optional#Value has no Method of this name
    │
-   │ Note: Every member of the Union must provide 'uppercase' — the receiver's Type is only known at runtime.
+   │ Help 1: Read the value out with '::value(defaultingTo …)' and call '::uppercase()' on it, or reach through it with '::map((value) { <- value::uppercase() })'.
+   │ Help 2: Or take it apart with a 'match', and call '::uppercase()' on the payload.
+   │
+   │ Note 1: 'uppercase' is a Method of String, and 'Optional#Value' carries one.
+   │ Note 2: Every member of the Union must provide 'uppercase' — the receiver's Type is only known at runtime.
 ───╯
 ```
 

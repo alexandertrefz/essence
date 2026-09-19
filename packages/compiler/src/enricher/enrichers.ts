@@ -11,6 +11,9 @@ import {
 } from "../diagnostics/index"
 import { providedMethodProtocol } from "../helpers/conformance"
 import {
+	asynchronyData,
+	asynchronyHelps,
+	asynchronyState,
 	choiceIdentity,
 	countOf,
 	describeParameter,
@@ -37,7 +40,7 @@ import {
 	reducedRationalSpelling,
 	refinementInside,
 } from "../helpers/predicateEval"
-import { closestMatch } from "../helpers/suggest"
+import { closestMatch, editDistance } from "../helpers/suggest"
 import {
 	answersForBase,
 	applyGenericBindings,
@@ -11959,16 +11962,357 @@ function methodNamesOf(
 	return [...methodNames]
 }
 
+// NOTE: What a receiver HOLDS. It answers the one question "no such Method" can
+// be wrong about in a way a reader can not see: the Method may well exist, one
+// level in. `first::add(1)` on a `List<Integer>` was told "Did you mean 'pad'?"
+// while `add` sat on `Integer`, which is exactly what the List holds.
+//
+// Five shapes hold something. Two hold it behind a wait — a `Future` describes
+// work that answers it and a `Started` is one run of that work — two hold it in
+// a container, and a Case holds it in its payload, which is how `Optional` and
+// `Result` are reached along with every Choice a Program declares.
+//
+// A Record is deliberately absent. Its members are reached with a `.`, and a
+// `::` call on one is `unknown-method` about the Record itself; nothing there is
+// one level in.
+type HeldValue = {
+	type: common.Type
+	kind: "future" | "started" | "list" | "dictionary" | "case"
+	// NOTE: Which Case carries it, spelled as a report writes it. Set for the
+	// Case shape and for it alone, because that is the only one whose sentence
+	// names something other than the receiver.
+	carrier?: string
+}
+
+function heldValuesOf(receiverType: common.Type): Array<HeldValue> {
+	// NOTE: Refinements erased first, so a `NonEmptyList<Integer>` holds its
+	// items exactly as the `List<Integer>` underneath it does. What the proof
+	// says is about the List, never about what is in it.
+	let type = eraseRefinements(receiverType)
+
+	switch (type.type) {
+		case "Future":
+			return [{ type: type.valueType, kind: "future" }]
+		case "Started":
+			return [{ type: type.valueType, kind: "started" }]
+		case "List":
+			return [{ type: type.itemType, kind: "list" }]
+		case "Dictionary":
+			return [{ type: type.valueType, kind: "dictionary" }]
+		case "Case":
+			return payloadsOf(type)
+		case "UnionType":
+			return flattenUnionMembers(type).flatMap((member) =>
+				member.type === "Case" ? payloadsOf(member) : [],
+			)
+		default:
+			return []
+	}
+}
+
+function payloadsOf(caseType: common.CaseType): Array<HeldValue> {
+	return Object.values(caseType.members).map((payload) => ({
+		type: payload,
+		kind: "case" as const,
+		carrier: `${displayChoiceName(caseType.choice)}#${caseType.name}`,
+	}))
+}
+
+// NOTE: Whether a `::` call of this name would resolve for this Type — asked
+// with the very lookup a call is decided by, rather than by scanning the
+// standard library for the name. A Namespace a Program writes over its own item
+// Type counts exactly as `Integer` does, and a Namespace it has not imported
+// counts for neither, which is what keeps this evidence honest.
+//
+// Answered on the FAILURE path only: every caller has already been told that no
+// Method of the name answers for the receiver itself.
+function methodAnswersFor(
+	methodName: string,
+	receiverType: common.Type,
+	scope: enricher.Scope,
+	position: common.Position,
+): boolean {
+	let namespaces = resolveMethodLookupNamespacesForReceiverType(
+		receiverType,
+		null,
+		scope,
+	)
+
+	return (
+		partitionInstanceMethodNamespaces(
+			methodName,
+			namespacesDeclaringMethod(
+				methodName,
+				namespaces,
+				receiverType,
+				scope,
+				position,
+			),
+		).instanceNamespaces.size > 0
+	)
+}
+
+// NOTE: The ways a value is read OUT of the thing holding it, tried in this
+// order and printed at most once. Each is checked against the receiver's own
+// Namespaces before it reaches a Help: the name has to be declared, the labels
+// have to be the ones the Overload takes, and the Overload has to ANSWER the
+// held value rather than another wrapper around it.
+//
+// The return check is what earns the table its keep. `List::firstItem()` answers
+// an `Optional<ItemType>`, so offering it would trade one refusal for the same
+// refusal one level along — while `NonEmptyList::firstItem()` answers the item
+// outright and is the right thing to print for a List that carries the proof.
+// Neither the name nor the labels can tell those two apart.
+const readingSpellings: Array<{ name: string; labels: Array<string> }> = [
+	{ name: "firstItem", labels: [] },
+	{ name: "value", labels: ["defaultingTo"] },
+	{ name: "value", labels: ["at", "defaultingTo"] },
+	{ name: "item", labels: ["at", "defaultingTo"] },
+]
+
+function readingSpellingFor(
+	namespaces: Map<string, common.NamespaceType>,
+	receiverType: common.Type,
+	held: common.Type,
+): string | null {
+	// NOTE: Specialized against the receiver, so what a signature ANSWERS is the
+	// Type the reader would get — `List<Integer>::item(at:, defaultingTo:)` is an
+	// `Integer` here rather than an `ItemType` nobody wrote.
+	let specialized = specializedNamespacesFor(namespaces, receiverType)
+
+	for (let spelling of readingSpellings) {
+		for (let namespace of specialized.values()) {
+			let { signatures, receiverParameters } = methodOverloadSignatures(
+				namespace.methods[spelling.name],
+			)
+
+			for (let signature of signatures) {
+				let parameters =
+					signature.parameterTypes.slice(receiverParameters)
+
+				if (
+					parameters.length === spelling.labels.length &&
+					parameters.every(
+						(parameter, index) =>
+							parameter.name === spelling.labels[index],
+					) &&
+					matchesType(held, signature.returnType)
+				) {
+					return `::${spelling.name}(${spelling.labels
+						.map((label) => `${label} …`)
+						.join(", ")})`
+				}
+			}
+		}
+	}
+
+	return null
+}
+
+// NOTE: Whether `::map` would hand the held value straight to a Function the
+// reader writes. Asked of the receiver's own Namespaces, and asked about the
+// TRANSFORM rather than about the name: `Dictionary::map` takes a
+// `{ key, value }` and never the value on its own, so the Help that would have
+// bound one is not offered for a Dictionary at all.
+function mapsOverHeldValue(
+	namespaces: Map<string, common.NamespaceType>,
+	receiverType: common.Type,
+	held: common.Type,
+): boolean {
+	for (let namespace of specializedNamespacesFor(
+		namespaces,
+		receiverType,
+	).values()) {
+		let { signatures, receiverParameters } = methodOverloadSignatures(
+			namespace.methods["map"],
+		)
+
+		for (let signature of signatures) {
+			let parameter = signature.parameterTypes[receiverParameters]
+
+			if (
+				signature.parameterTypes.length === receiverParameters + 1 &&
+				parameter?.name == null &&
+				parameter?.type.type === "Function" &&
+				parameter.type.parameterTypes.length === 1 &&
+				matchesType(
+					held,
+					parameter.type.parameterTypes[0]?.type as common.Type,
+				)
+			) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// NOTE: The report a receiver that HOLDS the answer gets, in place of the near
+// miss by edit distance. It is the one thing this Diagnostic knows and did not
+// say: the reader did not misspell anything, they wrote the call one level out.
+//
+// Null where nothing is held or where the name answers for nothing that is held,
+// which leaves every other `unknown-method` exactly as it was.
+function heldValueEvidence(
+	node: parser.MethodInvocationNode,
+	receiverType: common.Type,
+	namespaces: Map<string, common.NamespaceType>,
+	scope: enricher.Scope,
+): { notes: Array<string>; helps: Array<string> } | null {
+	let methodName = node.member.content
+	let held = heldValuesOf(receiverType).find((candidate) =>
+		methodAnswersFor(methodName, candidate.type, scope, node.position),
+	)
+
+	if (held === undefined) {
+		return null
+	}
+
+	// NOTE: The Arguments as the call already writes them, which a Help must not
+	// invent: what to pass is the reader's to say, and an ellipsis says so. A
+	// call that passes none is spelled with the empty parentheses it has, so the
+	// whole Help compiles as it stands.
+	let call = `::${methodName}${node.arguments.length === 0 ? "()" : "(…)"}`
+	let inner = describeType(held.type)
+	let binder =
+		held.kind === "list" || held.kind === "dictionary" ? "item" : "value"
+	let through = mapsOverHeldValue(namespaces, receiverType, held.type)
+		? `::map((${binder}) { <- ${binder}${call} })`
+		: null
+
+	if (held.kind === "future" || held.kind === "started") {
+		return asynchronyEvidence(node, receiverType, held, scope, {
+			inner,
+			call,
+			through,
+		})
+	}
+
+	let reading = readingSpellingFor(namespaces, receiverType, held.type)
+
+	if (held.kind === "case") {
+		// NOTE: Two Helps, the way the postfix habits are answered — the
+		// spellings that reach the value in one sentence, and the `match` that
+		// takes it apart in the other. A Choice always has the second; which of
+		// the two spellings it has is asked of its own Namespaces, and a Choice
+		// a Program declares itself usually has neither — which is why the
+		// `match` opens on "Or" only where something stands in front of it.
+		let reaching =
+			reading === null && through === null
+				? []
+				: [
+						reading === null
+							? `Reach through it with '${through}'.`
+							: through === null
+								? `Read the value out with '${reading}' and call '${call}' on it.`
+								: `Read the value out with '${reading}' and call '${call}' on it, or reach through it with '${through}'.`,
+					]
+
+		return {
+			notes: [
+				`'${methodName}' is a Method of ${inner}, and '${held.carrier}' carries one.`,
+			],
+			helps: [
+				...reaching,
+				`${reaching.length === 0 ? "Take" : "Or take"} it apart with a 'match', and call '${call}' on the payload.`,
+			],
+		}
+	}
+
+	return {
+		notes: [
+			`'${methodName}' is a Method of ${inner}, which is what ${withArticle(
+				describeType(receiverType),
+			)} holds — a Method of its ${held.kind === "list" ? "items" : "values"} rather than of the ${
+				held.kind === "list" ? "List" : "Dictionary"
+			} itself.`,
+		],
+		helps: [
+			...(through === null
+				? []
+				: [`Call '${call}' on each ${binder} — '${through}'.`]),
+			...(reading === null
+				? []
+				: [
+						`${through === null ? "Read" : "Or read"} one out with '${reading}' and call '${call}' on it.`,
+					]),
+		],
+	}
+}
+
+// NOTE: And the two shapes whose answer is not "reach in" but "wait". What the
+// reader has to write is decided by the POSITION rather than by the Type: a
+// `complete` only stands in a body that answers a Future, so the Help that names
+// the word is withheld wherever writing it would be refused — the same rule
+// `methodSeparatorHelps` follows, and the one yesterday's review was written
+// about.
+//
+// The note about the chain is the half nobody can work out from the report. This
+// language has no grouping parentheses and `complete` takes the whole postfix
+// chain behind it, so the obvious edit — the word in front of the receiver —
+// waits for the very call that was refused and reports this Diagnostic again.
+//
+// `::map` is offered beside it and never instead of it, with what it answers
+// said out loud: it hands the Method the value all right, and what comes back is
+// another Future, which is a different Program from the one the reader was
+// writing.
+function asynchronyEvidence(
+	node: parser.MethodInvocationNode,
+	receiverType: common.Type,
+	held: HeldValue,
+	scope: enricher.Scope,
+	spelling: { inner: string; call: string; through: string | null },
+): { notes: Array<string>; helps: Array<string> } {
+	let context = completionContextOf(scope)
+	let waits = context === "top-level" || context?.type === "Future"
+	let state = asynchronyState(
+		held.kind === "future" ? "unstarted" : "in-flight",
+	)
+	let reaching =
+		spelling.through === null
+			? []
+			: [
+					`${waits ? "Or reach" : "Reach"} through it with '${spelling.through}', which answers another ${held.kind === "future" ? "Future" : "Started"}.`,
+				]
+
+	return {
+		notes: [
+			`'${node.member.content}' is a Method of ${spelling.inner}. ${state} — the ${spelling.inner} is what ${withArticle(
+				describeType(receiverType),
+			)} answers with, once something waits for it.`,
+			...(waits
+				? [
+						"'complete' takes the whole chain behind it, so a 'complete' written in front of this call would wait for the call rather than for the receiver.",
+					]
+				: [
+						"'complete' only stands in a body that answers a Future, and this position is not one.",
+					]),
+		],
+		helps: waits
+			? [
+					`Wait for it on a line of its own — 'constant answered = complete …' — and call '${spelling.call}' on 'answered'.`,
+					...reaching,
+				]
+			: [
+					...reaching,
+					"Or declare the enclosing Function '-> Future<…>', which is what lets its body wait.",
+				],
+	}
+}
+
 function reportUnknownMethod(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
 	namespaces: Map<string, common.NamespaceType>,
 	scope: enricher.Scope,
 ): void {
-	let suggestion = closestMatch(
-		node.member.content,
-		methodNamesOf(namespaces),
-	)
+	let held = heldValueEvidence(node, baseType, namespaces, scope)
+	// NOTE: The near miss is the LAST thing tried, and is not tried at all where
+	// the value holds the answer: a guess by edit distance standing beside a
+	// Method the Compiler actually found is a guess the reader has to rule out,
+	// and the Quick Fix behind it would rewrite the name rather than the call.
+	let suggestion = held === null ? closestMethodName(node, namespaces) : null
 	let namespaceNames = [...namespaces.keys()]
 
 	// NOTE: A Protocol-bounded receiver — the `@` of a provided Method, or a
@@ -12028,15 +12372,18 @@ function reportUnknownMethod(
 					`this is ${withArticle(describeType(baseType))}`,
 				),
 			],
-			notes:
-				namespaceNames.length === 0
+			notes: [
+				...(held?.notes ?? []),
+				...(namespaceNames.length === 0
 					? []
 					: [
 							`Searched ${namespaceNames.length === 1 ? "Namespace" : "Namespaces"} ${namespaceNames
 								.map((name) => `'${name}'`)
 								.join(", ")}.`,
-						],
+						]),
+			],
 			helps: [
+				...(held?.helps ?? []),
 				...(suggestion === null
 					? []
 					: [`Did you mean '${suggestion}'?`]),
@@ -12050,6 +12397,98 @@ function reportUnknownMethod(
 			...suggestionData(suggestion),
 		},
 	)
+}
+
+// NOTE: The near miss for a Method name, drawn FIRST from the names whose call
+// this call could have been. A name is only a near miss if writing it would
+// leave the line standing, and an Overload that takes two labelled Arguments is
+// no answer to a call that wrote one: `Did you mean 'index'?` for a call passing
+// a Function is a suggestion whose Quick Fix trades one refusal for another.
+//
+// Then, where those name nothing close, every Method name the Namespaces
+// declare — under two conditions, because this is the pool the fitting names
+// were introduced to keep out of the report. The call has to have written a
+// LABEL, and the name has to be one edit away.
+//
+// `primes::lenght(of 1)` is both, and is what this door was opened for: the
+// fitting names can not answer it — nothing near takes an `of` — while `length`
+// is one transposition off, and the `of` is a second mistake standing beside the
+// first rather than a reason to say nothing about the name. A call that labelled
+// nothing is measured against the fitting names alone: `primes::indx()` is one
+// edit from `index(on:)`, and a reader reaching for a Method that takes a
+// labelled Argument would have written the label. Neither door opens for
+// `primes::indexOf(2)`, which labels nothing and is two edits from `index`.
+function closestMethodName(
+	node: parser.MethodInvocationNode,
+	namespaces: Map<string, common.NamespaceType>,
+): string | null {
+	let written = node.member.content
+	let fitting = closestMatch(
+		written,
+		methodNamesFittingCall(node, namespaces),
+	)
+
+	if (
+		fitting !== null ||
+		!node.arguments.some((argument) => argument.name !== null)
+	) {
+		return fitting
+	}
+
+	let anyName = closestMatch(written, methodNamesOf(namespaces))
+
+	return anyName !== null && editDistance(written, anyName) <= 1
+		? anyName
+		: null
+}
+
+// NOTE: Measured on the SHAPE alone — how many Arguments, and which labels —
+// because the Types were never matched here: no candidate was selected, so no
+// Argument was enriched against one, and enriching them to rank a guess would
+// report against Parameters nothing committed to.
+function methodNamesFittingCall(
+	node: parser.MethodInvocationNode,
+	namespaces: Map<string, common.NamespaceType>,
+): Array<string> {
+	let written = node.arguments.map(
+		(argument) => argument.name?.content ?? null,
+	)
+
+	return methodNamesOf(namespaces).filter((name) =>
+		[...namespaces.values()].some((namespace) => {
+			let { signatures, receiverParameters } = methodOverloadSignatures(
+				namespace.methods[name],
+			)
+
+			return signatures.some((signature) =>
+				callShapeFits(
+					signature.parameterTypes.slice(receiverParameters),
+					written,
+				),
+			)
+		}),
+	)
+}
+
+// NOTE: Whether these Arguments could be paired with these Parameters at all —
+// the same greedy walk `pairArguments` makes, read down to what is decidable
+// without a single Type: a Parameter answers the Argument in front of it when
+// their labels agree, and a defaulted one may be stepped over instead.
+function callShapeFits(
+	parameters: common.BaseFunction["parameterTypes"],
+	written: Array<string | null>,
+): boolean {
+	let next = 0
+
+	for (let parameter of parameters) {
+		if (next < written.length && written[next] === parameter.name) {
+			next += 1
+		} else if (!parameter.hasDefault) {
+			return false
+		}
+	}
+
+	return next === written.length
 }
 
 // NOTE: A Protocol's PROVIDED Methods are reached through the Protocol, exactly
@@ -12763,6 +13202,12 @@ function overloadRefusalReport(
 	labels: [common.DiagnosticLabel, ...Array<common.DiagnosticLabel>]
 	notes: Array<string>
 	helps: Array<string>
+	// NOTE: Carried out of here for the one refusal that has a mechanical
+	// answer — an Argument that is a Future where its value is wanted. The
+	// Validator has said this on `argument-type-mismatch` since asynchrony
+	// landed, and a call refused for picking no Overload never reached it: the
+	// Quick Fix is keyed on the DATA, so both reports have to carry it.
+	data?: common.DiagnosticData
 } {
 	let closest = closestRefusal(refusals)
 	let notes = cappedNotes(
@@ -12852,6 +13297,13 @@ function overloadRefusalReport(
 		detail.argumentType,
 		null,
 	)
+	// NOTE: And the other difference a Type name alone does not explain: the
+	// Argument describes work rather than being what the work answers with.
+	// `show(work)` is the shape a forgotten `complete` takes in everyday code,
+	// and it reads as a plain mismatch between `Future<Integer>` and `Integer`
+	// until this says otherwise. Written in the Validator's own words, which is
+	// where the reader meets the same sentence on every other position.
+	let asynchrony = asynchronyHelps(detail.expectedType, detail.argumentType)
 
 	return {
 		labels: [
@@ -12867,7 +13319,16 @@ function overloadRefusalReport(
 			),
 		],
 		notes: [...notes, ...undecided.notes],
-		helps: undecided.helps,
+		helps: [...asynchrony, ...undecided.helps],
+		// NOTE: And the DATA for the fix that writes the word, for an Argument
+		// the caller wrote and never for the RECEIVER of a `::` call. `complete`
+		// takes the whole postfix chain behind it, so the word written in front
+		// of a receiver waits for the call it is the receiver of — which is the
+		// one place this edit would not be the edit the Help describes.
+		data:
+			detail.argumentIndex < candidate.receiverParameters
+				? undefined
+				: asynchronyData(detail.expectedType, detail.argumentType),
 	}
 }
 
@@ -12990,7 +13451,7 @@ function reportNoMatchingOverload(
 		typer,
 		memberType,
 	)
-	let { labels, notes, helps } = overloadRefusalReport(
+	let { labels, notes, helps, data } = overloadRefusalReport(
 		refusedCandidates(
 			methodCandidates(node, namespaces, receiverType),
 			matchableArguments,
@@ -13032,6 +13493,7 @@ function reportNoMatchingOverload(
 				),
 			],
 			helps,
+			...(data === undefined ? {} : { data }),
 		},
 	)
 }
@@ -13557,6 +14019,41 @@ function resolveMethodInvocation(
 	}
 }
 
+// NOTE: Which members of the Union answer the name and which do not. The report
+// above names the ONE member the walk stopped at, and the note beside it says
+// "every member must provide this" — which leaves the reader to try each member
+// in turn to find out how far off they are. A Union half of whose members have
+// the Method is a different situation from one where none of them has it, and
+// this is the sentence that tells the two apart.
+//
+// Empty where no member answers at all: the sentence would then name every
+// member of the Union twice over and say nothing the note above it has not.
+function dividedUnionNotes(
+	node: parser.MethodInvocationNode,
+	unionType: common.UnionType,
+	scope: enricher.Scope,
+): Array<string> {
+	let providing: Array<string> = []
+	let lacking: Array<string> = []
+
+	for (let member of flattenUnionMembers(unionType)) {
+		let answers = methodAnswersFor(
+			node.member.content,
+			member,
+			scope,
+			node.position,
+		)
+
+		;(answers ? providing : lacking).push(describeType(member))
+	}
+
+	return providing.length === 0
+		? []
+		: [
+				`'${node.member.content}' answers for ${joinedWithAnd(providing)}, and not for ${joinedWithAnd(lacking)}.`,
+			]
+}
+
 // NOTE: Per-member dispatch for a Union-typed receiver — the Method is
 // resolved statically for every member Type, and the Invocation is only
 // valid when every member resolves unambiguously. Its Type is the Union of
@@ -13644,16 +14141,18 @@ function resolveUnionMethodDispatch(
 			// everyday case: `firstItem()::hasValu()` reaches here because no
 			// Case declares the name, and the Method it meant is one letter
 			// away on the Namespace over both Cases.
-			let suggestion = closestMatch(
-				node.member.content,
-				methodNamesOf(
-					resolveMethodLookupNamespacesForReceiverType(
-						unionType,
-						node.namespaceSpecifier,
-						scope,
-					),
-				),
+			let coveringLookup = resolveMethodLookupNamespacesForReceiverType(
+				unionType,
+				node.namespaceSpecifier,
+				scope,
 			)
+			// NOTE: And the evidence is looked for on the whole Union too. An
+			// `Optional<Integer>` arrives here member by member, so the Case
+			// under the cursor is what the Method was missing from — while what
+			// the reader HOLDS is the Optional, and `Integer` is a payload of it.
+			let held = heldValueEvidence(node, unionType, coveringLookup, scope)
+			let suggestion =
+				held === null ? closestMethodName(node, coveringLookup) : null
 
 			reportError(
 				`No Method named '${node.member.content}' for ${describeType(memberType)}`,
@@ -13671,12 +14170,16 @@ function resolveUnionMethodDispatch(
 						),
 					],
 					notes: [
+						...(held?.notes ?? []),
 						`Every member of the Union must provide '${node.member.content}' — the receiver's Type is only known at runtime.`,
+						...dividedUnionNotes(node, unionType, scope),
 					],
-					helps:
-						suggestion === null
+					helps: [
+						...(held?.helps ?? []),
+						...(suggestion === null
 							? []
-							: [`Did you mean '${suggestion}'?`],
+							: [`Did you mean '${suggestion}'?`]),
+					],
 					...suggestionData(suggestion),
 				},
 			)
@@ -14225,7 +14728,7 @@ function resolveFunctionInvocation(
 		// Argument, so unlike the `::` twin nothing is dropped from the
 		// signature.
 		let callee = describeInvocationCallee(node.name)
-		let { labels, notes, helps } = overloadRefusalReport(
+		let { labels, notes, helps, data } = overloadRefusalReport(
 			refusedCandidates(
 				type.overloads.map((overload) => ({
 					name: callee,
@@ -14250,6 +14753,7 @@ function resolveFunctionInvocation(
 			labels,
 			notes,
 			helps,
+			...(data === undefined ? {} : { data }),
 		})
 
 		return {

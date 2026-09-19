@@ -3273,3 +3273,60 @@ Error: This String Literal is never closed
 ─── 1 error
 "
 `;
+
+exports[`Diagnostic Showcase KnownAnswers.es should render the same report every time 1`] = `
+"[unknown-method]
+Error: No Method named 'add' for this value
+    ╭─┤ KnownAnswers.es:25:25 │
+    │
+ 25 │     Terminal.print(primes::add(1)::toString())
+    │                    ───┬──  ─┬─  
+    │                       ╰─────│─── this is a List<Integer>
+    │                             │   
+    │                             ╰─── no Method of this name
+    │ 
+    │ Help 1: Call '::add(…)' on each item — '::map((item) { <- item::add(…) })'.
+    │ Help 2: Or read one out with '::item(at …, defaultingTo …)' and call '::add(…)' on it.
+    │ 
+    │ Note 1: 'add' is a Method of Integer, which is what a List<Integer> holds — a Method of its items rather than of the List itself.
+    │ Note 2: Searched Namespaces 'List', 'IntegerList', 'NumberList', 'KeyedNumberList', 'GroupedList'.
+────╯
+
+[unknown-method]
+Error: No Method named 'add' for Optional#Value
+    ╭─┤ KnownAnswers.es:29:38 │
+    │
+ 29 │     Terminal.print(primes::firstItem()::add(1)::toString())
+    │                    ─────────┬─────────  ─┬─  
+    │                             ╰────────────│─── this is an Optional<Integer>
+    │                                          │   
+    │                                          ╰─── Optional#Value has no Method of this name
+    │ 
+    │ Help 1: Read the value out with '::value(defaultingTo …)' and call '::add(…)' on it, or reach through it with '::map((value) { <- value::add(…) })'.
+    │ Help 2: Or take it apart with a 'match', and call '::add(…)' on the payload.
+    │ 
+    │ Note 1: 'add' is a Method of Integer, and 'Optional#Value' carries one.
+    │ Note 2: Every member of the Union must provide 'add' — the receiver's Type is only known at runtime.
+────╯
+
+[unknown-method]
+Error: No Method named 'add' for this value
+    ╭─┤ KnownAnswers.es:34:28 │
+    │
+ 34 │     Terminal.print(fetched()::add(1)::toString())
+    │                    ────┬────  ─┬─  
+    │                        ╰───────│─── this is a Future<Integer>
+    │                                │   
+    │                                ╰─── no Method of this name
+    │ 
+    │ Help 1: Wait for it on a line of its own — 'constant answered = complete …' — and call '::add(…)' on 'answered'.
+    │ Help 2: Or reach through it with '::map((value) { <- value::add(…) })', which answers another Future.
+    │ 
+    │ Note 1: 'add' is a Method of Integer. This describes work that has not run — the Integer is what a Future<Integer> answers with, once something waits for it.
+    │ Note 2: 'complete' takes the whole chain behind it, so a 'complete' written in front of this call would wait for the call rather than for the receiver.
+    │ Note 3: Searched Namespace 'Future'.
+────╯
+
+─── 3 errors
+"
+`;

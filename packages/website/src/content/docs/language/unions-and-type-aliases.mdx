@@ -232,7 +232,8 @@ Error: No Method named 'hasCharacters' for Integer
    │                                   │        
    │                                   ╰──────── Integer has no Method of this name
    │ 
-   │ Note: Every member of the Union must provide 'hasCharacters' — the receiver's Type is only known at runtime.
+   │ Note 1: Every member of the Union must provide 'hasCharacters' — the receiver's Type is only known at runtime.
+   │ Note 2: 'hasCharacters' answers for String, and not for Integer.
 ───╯
 ```
 

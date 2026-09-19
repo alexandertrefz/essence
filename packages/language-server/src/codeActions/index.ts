@@ -66,6 +66,7 @@ import {
 	declareFutureReturnAction,
 	discardedFutureActions,
 	dropKeywordAction,
+	waitForArgumentAction,
 	waitForValueAction,
 } from "./futureFixes"
 import { overlaps } from "./geometry"
@@ -566,6 +567,12 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(dropKeywordAction(diagnostic, program, lines)),
 	"needless-start": ({ diagnostic, program, lines }) =>
 		listed(dropKeywordAction(diagnostic, program, lines)),
+	// NOTE: A call that picked no Overload is most often a call with the wrong
+	// value in it, and has no mechanical answer — except for the one shape the
+	// Enricher marks with `data`: an Argument that describes work where the work's
+	// answer is wanted.
+	"no-matching-overload": ({ diagnostic }) =>
+		listed(waitForArgumentAction(diagnostic)),
 	"nonconforming-namespace": implementProtocolAction,
 	"not-exported": ({ diagnostic, imports }) =>
 		listed(exportNameAction(diagnostic, imports)),

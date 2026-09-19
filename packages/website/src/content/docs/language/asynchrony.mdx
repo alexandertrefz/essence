@@ -428,7 +428,7 @@ constant answered = complete work
 Terminal.print(answered::toString())
 ```
 
-`complete work::toString()` would look for `toString` on the `Future`, and report [`unknown-method`](/docs/reference/diagnostics#unknown-method).
+`complete work::toString()` would look for `toString` on the `Future`, and report [`unknown-method`](/docs/reference/diagnostics#unknown-method). That report says so: its Note names `toString` as a method of the value the future answers with, and says that `complete` takes the whole chain — which is why the word cannot simply move to the front of the call.
 
 ## Concurrency is not parallelism
 

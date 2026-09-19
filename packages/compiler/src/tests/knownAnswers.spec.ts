@@ -1,0 +1,493 @@
+import { describe, expect, it } from "bun:test"
+
+import type { common } from "@essence-lang/interfaces"
+
+import { containsErrors } from "../diagnostics/index"
+import { enrich } from "../enricher/index"
+import { parse, parseWithDiagnostics } from "../parser/index"
+
+// NOTE: Three reporters that knew the answer and said something else. A Method
+// the receiver has not got may be a Method of what it HOLDS, a Case no Choice in
+// scope declares was written where a Choice is expected, and a bare name that is
+// not declared may be a static of the Namespace it was written inside. Each of
+// them used to end in a guess by edit distance.
+//
+// Every Help printed here is compiled below, in `compiles`. A Help is a promise
+// that what it prints works when it is followed, and a report that breaks that
+// promise is worse than one that says nothing.
+function diagnosticsFor(source: string): Array<common.Diagnostic> {
+	return enrich(parse(source)).diagnostics
+}
+
+function firstOf(
+	source: string,
+	code: common.DiagnosticCode,
+): common.Diagnostic {
+	let found = diagnosticsFor(source).find(
+		(diagnostic) => diagnostic.code === code,
+	)
+
+	if (found === undefined) {
+		throw new Error(
+			`No '${code}' reported; got ${diagnosticsFor(source)
+				.map((diagnostic) => diagnostic.code)
+				.join(", ")}.`,
+		)
+	}
+
+	return found
+}
+
+// NOTE: What a Help promises, checked by compiling it. Every Program here is the
+// probe from the test above it with the Help's own spelling written into it, so
+// a Help that stops compiling fails the test that prints it rather than a
+// reader's afternoon.
+function compiles(source: string): boolean {
+	let parsed = parseWithDiagnostics(source)
+
+	if (containsErrors(parsed.diagnostics)) {
+		return false
+	}
+
+	return !containsErrors(enrich(parsed.program).diagnostics)
+}
+
+const future = [
+	"	function fetched() -> Future<Integer> {",
+	"		complete Async.sleep(milliseconds 1)",
+	"",
+	"		<- 41",
+	"	}",
+].join("\n")
+
+describe("A Method of what the value holds", () => {
+	describe("a List", () => {
+		let source = `implementation {
+			constant primes = [2, 3, 5]
+			constant first = primes
+
+			Terminal.print(first::add(1)::toString())
+		}`
+
+		it("should name the item Type rather than a near miss", () => {
+			let diagnostic = firstOf(source, "unknown-method")
+
+			expect(diagnostic.notes[0]).toBe(
+				"'add' is a Method of Integer, which is what a List<Integer> holds — a Method of its items rather than of the List itself.",
+			)
+			expect(diagnostic.helps).toEqual([
+				"Call '::add(…)' on each item — '::map((item) { <- item::add(…) })'.",
+				"Or read one out with '::item(at …, defaultingTo …)' and call '::add(…)' on it.",
+			])
+		})
+
+		// NOTE: `pad` is what this used to offer, with a Quick Fix behind it.
+		it("should offer no near miss and no Quick Fix payload", () => {
+			let diagnostic = firstOf(source, "unknown-method")
+
+			expect(
+				diagnostic.helps.some((help) =>
+					help.startsWith("Did you mean"),
+				),
+			).toBe(false)
+			expect(diagnostic.data).toBeUndefined()
+		})
+
+		it("should print Helps that compile", () => {
+			expect(
+				compiles(`implementation {
+					constant primes = [2, 3, 5]
+					constant first = primes
+
+					Terminal.print(first::map((item) { <- item::add(1) })::toString())
+					Terminal.print(first::item(at 0, defaultingTo 0)::add(1)::toString())
+				}`),
+			).toBe(true)
+		})
+
+		// NOTE: The proof changes which reading Method answers the item outright
+		// — `List::firstItem()` answers an Optional and would trade one refusal
+		// for the same one — so the Help is read off the receiver rather than
+		// written once for every List.
+		it("should offer the proven List its own reading Method", () => {
+			let diagnostic = firstOf(
+				`implementation {
+					constant proven: NonEmptyList<Integer> = [1, 2]
+
+					Terminal.print(proven::add(1)::toString())
+				}`,
+				"unknown-method",
+			)
+
+			expect(diagnostic.helps[1]).toBe(
+				"Or read one out with '::firstItem()' and call '::add(…)' on it.",
+			)
+		})
+
+		// NOTE: A List of Lists holds a List, and `add` is a Method of neither.
+		// Nothing is claimed where nothing was found.
+		it("should say nothing where the item Type has not got the Method", () => {
+			let diagnostic = firstOf(
+				`implementation {
+					constant nested = [[1], [2]]
+
+					Terminal.print(nested::add(1)::toString())
+				}`,
+				"unknown-method",
+			)
+
+			expect(diagnostic.helps).toEqual([])
+			expect(diagnostic.notes).toEqual([
+				"Searched Namespaces 'List', 'NestedList', 'KeyedNumberList', 'GroupedList'.",
+			])
+		})
+	})
+
+	describe("a Dictionary", () => {
+		it("should name the value Type and offer the reading Method", () => {
+			let diagnostic = firstOf(
+				`implementation {
+					constant lookup = ["k" = 1]
+
+					Terminal.print(lookup::add(1)::toString())
+				}`,
+				"unknown-method",
+			)
+
+			expect(diagnostic.notes[0]).toBe(
+				"'add' is a Method of Integer, which is what a Dictionary<String, Integer> holds — a Method of its values rather than of the Dictionary itself.",
+			)
+			// NOTE: And no `::map` Help. `Dictionary::map` hands its transform a
+			// whole `{ key, value }` entry and never the value on its own, so
+			// the Help that would have bound one is not offered here.
+			expect(diagnostic.helps).toEqual([
+				"Read one out with '::value(at …, defaultingTo …)' and call '::add(…)' on it.",
+			])
+		})
+
+		it("should print a Help that compiles", () => {
+			expect(
+				compiles(`implementation {
+					constant lookup = ["k" = 1]
+
+					Terminal.print(lookup::value(at "k", defaultingTo 0)::add(1)::toString())
+				}`),
+			).toBe(true)
+		})
+	})
+
+	describe("a Case's payload", () => {
+		let source = `implementation {
+			constant numbers = [3, 4]
+
+			Terminal.print(numbers::firstItem()::add(1)::toString())
+		}`
+
+		it("should name the Case that carries the value", () => {
+			let diagnostic = firstOf(source, "unknown-method")
+
+			expect(diagnostic.notes[0]).toBe(
+				"'add' is a Method of Integer, and 'Optional#Value' carries one.",
+			)
+			expect(diagnostic.helps).toEqual([
+				"Read the value out with '::value(defaultingTo …)' and call '::add(…)' on it, or reach through it with '::map((value) { <- value::add(…) })'.",
+				"Or take it apart with a 'match', and call '::add(…)' on the payload.",
+			])
+		})
+
+		it("should answer a Result the same way", () => {
+			let diagnostic = firstOf(
+				`implementation {
+					function parsed() -> Result<Integer, String> { <- #Value(1) }
+
+					Terminal.print(parsed()::add(1)::toString())
+				}`,
+				"unknown-method",
+			)
+
+			expect(diagnostic.notes[0]).toBe(
+				"'add' is a Method of Integer, and 'Result#Value' carries one.",
+			)
+		})
+
+		// NOTE: A Choice a Program declares has no reading Method and no `map`,
+		// so the `match` is the only Help there — and a Help that stands first
+		// does not open on "Or".
+		it("should open the match Help on 'Or' only where one precedes it", () => {
+			let diagnostic = firstOf(
+				`implementation {
+					choice Holder {
+						Numbered { count: Integer },
+						Titled { title: String },
+					}
+
+					constant held: Holder = #Numbered(3)
+
+					Terminal.inspect(held::add(1))
+				}`,
+				"unknown-method",
+			)
+
+			expect(diagnostic.helps).toEqual([
+				"Take it apart with a 'match', and call '::add(…)' on the payload.",
+			])
+		})
+
+		it("should print Helps that compile", () => {
+			expect(
+				compiles(`implementation {
+					constant numbers = [3, 4]
+
+					Terminal.print(numbers::firstItem()::value(defaultingTo 0)::add(1)::toString())
+					Terminal.print(numbers::firstItem()::map((value) { <- value::add(1) })::toString())
+
+					match numbers::firstItem() -> {} {
+						case #Value(item) {
+							Terminal.print(item::add(1)::toString())
+
+							<- {}
+						}
+						case _ { <- {} }
+					}
+				}`),
+			).toBe(true)
+		})
+	})
+
+	describe("a Union whose members disagree", () => {
+		it("should say which members answer the name and which do not", () => {
+			let diagnostic = firstOf(
+				`implementation {
+					function pick(_ flag: Boolean) -> Integer | String {
+						if flag { <- 1 } else { <- "one" }
+					}
+
+					Terminal.print(pick(true)::uppercase())
+				}`,
+				"unknown-method",
+			)
+
+			expect(diagnostic.notes).toEqual([
+				"Every member of the Union must provide 'uppercase' — the receiver's Type is only known at runtime.",
+				"'uppercase' answers for String, and not for Integer.",
+			])
+		})
+	})
+
+	describe("a Future", () => {
+		let source = `implementation {
+${future}
+
+			Terminal.print(fetched()::add(1)::toString())
+		}`
+
+		it("should say the work has not run and where the word goes", () => {
+			let diagnostic = firstOf(source, "unknown-method")
+
+			expect(diagnostic.notes.slice(0, 2)).toEqual([
+				"'add' is a Method of Integer. This describes work that has not run — the Integer is what a Future<Integer> answers with, once something waits for it.",
+				"'complete' takes the whole chain behind it, so a 'complete' written in front of this call would wait for the call rather than for the receiver.",
+			])
+			expect(diagnostic.helps).toEqual([
+				"Wait for it on a line of its own — 'constant answered = complete …' — and call '::add(…)' on 'answered'.",
+				"Or reach through it with '::map((value) { <- value::add(…) })', which answers another Future.",
+			])
+		})
+
+		it("should print Helps that compile", () => {
+			expect(
+				compiles(`implementation {
+${future}
+
+					constant answered = complete fetched()
+					constant mapped   = complete fetched()::map((value) { <- value::add(1) })
+
+					Terminal.print(answered::add(1)::toString())
+					Terminal.print(mapped::toString())
+				}`),
+			).toBe(true)
+		})
+
+		// NOTE: A body that answers something other than a Future can not write
+		// the word at all, so naming it would be advice that does not compile.
+		it("should withhold the wait where nothing here can wait", () => {
+			let diagnostic = firstOf(
+				`implementation {
+${future}
+
+					function plain() -> Integer {
+						<- fetched()::add(1)
+					}
+
+					Terminal.print(plain()::toString())
+				}`,
+				"unknown-method",
+			)
+
+			expect(diagnostic.notes[1]).toBe(
+				"'complete' only stands in a body that answers a Future, and this position is not one.",
+			)
+			expect(diagnostic.helps).toEqual([
+				"Reach through it with '::map((value) { <- value::add(…) })', which answers another Future.",
+				"Or declare the enclosing Function '-> Future<…>', which is what lets its body wait.",
+			])
+		})
+
+		it("should say a Started is in flight rather than undescribed", () => {
+			let diagnostic = firstOf(
+				`implementation {
+${future}
+
+					constant run = start fetched()
+
+					Terminal.print(run::add(1)::toString())
+				}`,
+				"unknown-method",
+			)
+
+			expect(diagnostic.notes[0]).toBe(
+				"'add' is a Method of Integer. This is still in flight — the Integer is what a Started<Integer> answers with, once something waits for it.",
+			)
+			expect(diagnostic.helps[1]).toBe(
+				"Or reach through it with '::map((value) { <- value::add(…) })', which answers another Started.",
+			)
+		})
+	})
+
+	// NOTE: The evidence is looked up with the lookup a call is decided by, so a
+	// Namespace the Program writes itself counts exactly as the standard
+	// library's does — and one it has not got counts for neither.
+	describe("a Namespace the Program wrote", () => {
+		it("should find a Method a user Namespace declares for the item", () => {
+			let diagnostic = firstOf(
+				`implementation {
+					namespace Doubling for Integer {
+						doubled() -> Integer { <- @::multiply(with 2) }
+					}
+
+					constant primes = [2, 3, 5]
+
+					Terminal.print(primes::doubled()::toString())
+				}`,
+				"unknown-method",
+			)
+
+			expect(diagnostic.notes[0]).toBe(
+				"'doubled' is a Method of Integer, which is what a List<Integer> holds — a Method of its items rather than of the List itself.",
+			)
+		})
+	})
+})
+
+describe("A near miss that could not have been this call", () => {
+	// NOTE: `index` really is one edit from `indx`, and it takes a label this
+	// call did not write. A Method that could not have been called this way is
+	// not the Method that was meant, and the Quick Fix behind the suggestion
+	// would have traded one refusal for another.
+	it("should prefer a candidate the written Arguments could pair with", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				constant primes = [2, 3, 5]
+
+				Terminal.print(primes::indx()::toString())
+			}`,
+			"unknown-method",
+		)
+
+		expect(diagnostic.helps).toEqual([])
+		expect(diagnostic.data).toBeUndefined()
+	})
+
+	// NOTE: And the other half of the rule: a name the call's own shape fits is
+	// still offered, which is what `index` was measured against.
+	it("should keep a candidate the written Arguments do pair with", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				constant primes = [2, 3, 5]
+
+				Terminal.print(primes::lenght()::toString())
+			}`,
+			"unknown-method",
+		)
+
+		expect(diagnostic.helps).toEqual(["Did you mean 'length'?"])
+	})
+
+	// NOTE: A misspelled name with a LABEL behind it lost its suggestion to that
+	// rule: nothing fitting `(of …)` is near `lenght`, so the pool that was
+	// asked came back with nothing to say. The label is a second mistake, not a
+	// reason to go quiet about the first.
+	it("should name the Method where the label is wrong as well", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				constant primes = [2, 3, 5]
+
+				Terminal.print(primes::lenght(of 1)::toString())
+			}`,
+			"unknown-method",
+		)
+
+		expect(diagnostic.helps).toEqual(["Did you mean 'length'?"])
+	})
+
+	it("should answer a String receiver the same way", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				constant word = "abc"
+
+				Terminal.print(word::lenght(of 1)::toString())
+			}`,
+			"unknown-method",
+		)
+
+		expect(diagnostic.helps).toEqual(["Did you mean 'length'?"])
+	})
+
+	// NOTE: And the name this door may not let back in. `indexOf` labels
+	// nothing and is two edits from `index(on:)`, so neither the fitting names
+	// nor the second pool answers it.
+	it("should stay silent for a name that is two edits from a Method", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				constant primes = [2, 3, 5]
+
+				Terminal.print(primes::indexOf(2)::toString())
+			}`,
+			"unknown-method",
+		)
+
+		expect(diagnostic.helps).toEqual([])
+		expect(diagnostic.data).toBeUndefined()
+	})
+})
+
+describe("An Argument that describes work", () => {
+	// NOTE: The Validator has said this on `argument-type-mismatch` since
+	// asynchrony landed. A call that picked no Overload never reached the
+	// Validator at all, so the same sentence is said here.
+	it("should name the missing word on a refused Overload", () => {
+		let diagnostic = firstOf(
+			`implementation {
+${future}
+
+				namespace Shown for Integer {
+					overload show {
+						(_ count: Integer) -> {} { <- {} }
+						(twice flag: Boolean) -> {} { <- {} }
+					}
+				}
+
+				1::show(fetched())
+			}`,
+			"no-matching-overload",
+		)
+
+		expect(diagnostic.helps).toEqual([
+			"This describes work that has not run — add 'complete'.",
+		])
+		expect(diagnostic.data).toEqual({
+			kind: "asynchrony-mismatch",
+			mismatch: "unstarted",
+		})
+	})
+})

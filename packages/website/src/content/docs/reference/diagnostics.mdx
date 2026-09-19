@@ -2170,6 +2170,10 @@ Error: No overload of 'add' accepts these Arguments
 
 Pass arguments that one of the listed signatures takes: `5::add(1)`.
 
+One refused argument has an answer of its own: a [future](/docs/language/asynchrony) written where the value it answers with is wanted. The Help is the one every other position gets — `This describes work that has not run — add 'complete'.` — and it carries the Quick Fix below.
+
+Quick Fix: **Wait for it with 'complete'**, for that argument alone. Nothing is offered for any other refusal: what to pass instead is a judgement.
+
 Taught on: [Method calls › When a call fails](/docs/language/method-calls#when-a-call-fails)
 
 ### `ambiguous-namespace`
@@ -2256,7 +2260,66 @@ Error: No Method named 'shout' for this value
 
 Fix the spelling, declare the method in a namespace, or import the namespace that has it.
 
-Quick Fix: **Change to 'name'** when a method name is close, or an import of a namespace another module exports.
+When the value **holds** something that does have the method, the report says so instead of guessing at a near miss. A list holds its items, a dictionary its values, a case its payload, and a [future](/docs/language/asynchrony) the value it answers with:
+
+<div class="error-output">
+
+```
+[unknown-method]
+Error: No Method named 'add' for this value
+   ╭─┤ Totals.es:4:25 │
+   │
+ 4 │     Terminal.print(prices::add(1)::toString())
+   │                    ───┬──  ─┬─  
+   │                       ╰─────│─── this is a List<Integer>
+   │                             │   
+   │                             ╰─── no Method of this name
+   │ 
+   │ Help 1: Call '::add(…)' on each item — '::map((item) { <- item::add(…) })'.
+   │ Help 2: Or read one out with '::item(at …, defaultingTo …)' and call '::add(…)' on it.
+   │ 
+   │ Note 1: 'add' is a Method of Integer, which is what a List<Integer> holds — a Method of its items rather than of the List itself.
+   │ Note 2: Searched Namespaces 'List', 'IntegerList', 'NumberList', 'KeyedNumberList', 'GroupedList'.
+───╯
+```
+
+</div>
+
+The reading method in the second Help is read off the receiver, so a [`NonEmptyList`](/docs/library/list#NonEmptyList) is offered `firstItem()` — which answers the item outright — and a plain list is offered `item(at:defaultingTo:)` instead. A [`Dictionary`](/docs/library/dictionary) gets no `::map` Help at all, because its transform is handed a whole `{ key, value }` entry rather than the value on its own.
+
+A forgotten [`complete`](/docs/language/asynchrony) is the same mistake with a different answer. `complete` takes the whole call chain behind it, so the word cannot go in front of the call that was refused, and the Help binds the value first:
+
+<div class="error-output">
+
+```
+[unknown-method]
+Error: No Method named 'add' for this value
+   ╭─┤ Report.es:8:28 │
+   │
+ 8 │     Terminal.print(fetched()::add(1)::toString())
+   │                    ────┬────  ─┬─  
+   │                        ╰───────│─── this is a Future<Integer>
+   │                                │   
+   │                                ╰─── no Method of this name
+   │ 
+   │ Help 1: Wait for it on a line of its own — 'constant answered = complete …' — and call '::add(…)' on 'answered'.
+   │ Help 2: Or reach through it with '::map((value) { <- value::add(…) })', which answers another Future.
+   │ 
+   │ Note 1: 'add' is a Method of Integer. This describes work that has not run — the Integer is what a Future<Integer> answers with, once something waits for it.
+   │ Note 2: 'complete' takes the whole chain behind it, so a 'complete' written in front of this call would wait for the call rather than for the receiver.
+   │ Note 3: Searched Namespace 'Future'.
+───╯
+```
+
+</div>
+
+Written where nothing can wait — inside a body that answers something other than a future — the Help naming the word is withheld, because following it would be refused. A `Started` reads the same, with "This is still in flight" in place of the first sentence.
+
+On a union receiver the Note also says which members answer the name: `'uppercase' answers for String, and not for Integer.`
+
+A near miss is drawn first from the methods whose call this call could have been — the ones whose labels and argument count fit what was written — so a name that would only trade this refusal for the next is not offered. Where none of those is close and the call wrote a label, every method name is measured again, one edit at most: `primes::lenght(of 1)` is answered `Did you mean 'length'?`, because the label is a second mistake rather than a reason to say nothing about the name.
+
+Quick Fix: **Change to 'name'** when a method name is close, or an import of a namespace another module exports. No spelling fix is offered where the value holds the answer: the name is not what went wrong.
 
 Taught on: [Method calls › When a call fails](/docs/language/method-calls#when-a-call-fails)
 
