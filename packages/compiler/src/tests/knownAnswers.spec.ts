@@ -736,3 +736,549 @@ ${future.replace("Future<Integer>", "Future<Answer>").replace("<- 41", "<- #Yes"
 		])
 	})
 })
+
+describe("A name the Namespace around it reaches", () => {
+	const clock = [
+		"			namespace Clock for Integer {",
+		"				static noon = 43_200",
+		"",
+		"				static make(_ seconds: Integer) -> Integer { <- seconds }",
+		"",
+		"				isAfterNoon() -> Boolean { <- @::isGreaterThan(Clock.noon) }",
+		"",
+	].join("\n")
+
+	// NOTE: This is what was answered with "Did you mean 'loop'?" — a word from
+	// the prelude two edits away, with a Quick Fix behind it.
+	it("should name a static of the enclosing Namespace", () => {
+		let diagnostic = firstOf(
+			`implementation {
+${clock}
+				afterNoon() -> Boolean { <- @::isGreaterThan(noon) }
+			}
+
+			Terminal.print(50_000::afterNoon()::toString())
+		}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Write 'Clock.noon'."])
+		expect(diagnostic.notes).toEqual([
+			"A static is reached through its Namespace, inside the Namespace too.",
+		])
+		expect(diagnostic.data).toEqual({
+			kind: "essence-spelling",
+			position: diagnostic.position as common.Position,
+			spelling: "Clock.noon",
+		})
+	})
+
+	it("should name a static Method of the enclosing Namespace", () => {
+		let diagnostic = firstOf(
+			`implementation {
+${clock}
+				built() -> Integer { <- make(1) }
+			}
+
+			Terminal.print(50_000::built()::toString())
+		}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Write 'Clock.make'."])
+	})
+
+	// NOTE: An instance Method is reached through the value it works on, and
+	// inside a Method body that value is `@`.
+	it("should name an instance Method of the enclosing Namespace", () => {
+		let diagnostic = firstOf(
+			`implementation {
+${clock}
+				twice() -> Boolean { <- isAfterNoon() }
+			}
+
+			Terminal.print(50_000::twice()::toString())
+		}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Write '@::isAfterNoon'."])
+		expect(diagnostic.data).toEqual({
+			kind: "essence-spelling",
+			position: diagnostic.position as common.Position,
+			spelling: "@::isAfterNoon",
+		})
+	})
+
+	it("should write the parentheses for a Method that was only named", () => {
+		let diagnostic = firstOf(
+			`implementation {
+${clock}
+				twice() -> Boolean { <- isAfterNoon }
+			}
+
+			Terminal.print(50_000::twice()::toString())
+		}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Write '@::isAfterNoon()'."])
+	})
+
+	it("should name a member of the receiver's Record Type", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				namespace Sized for { width: Integer } {
+					area() -> Integer { <- width }
+				}
+
+				Terminal.print({ width = 2 }::area()::toString())
+			}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Write '@.width'."])
+		expect(diagnostic.notes).toEqual([
+			"'width' is a member of { width: Integer }, and a member is read off the value rather than named on its own.",
+		])
+	})
+
+	it("should name the one Namespace in scope that declares the static", () => {
+		let diagnostic = firstOf(
+			`implementation {
+${clock}
+			}
+
+			Terminal.print(noon::toString())
+		}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Write 'Clock.noon'."])
+		expect(diagnostic.notes).toEqual([
+			"'Clock' declares a static 'noon', and a static is reached through its Namespace.",
+		])
+	})
+
+	// NOTE: Which of them was meant is not something this can decide, so they
+	// are listed and nothing writes one of them into the reader's file.
+	it("should list every Namespace and offer no fix where several declare it", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				namespace Clock for Integer { static noon = 1 }
+				namespace Watch for Integer { static noon = 2 }
+
+				Terminal.print(noon::toString())
+			}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.notes).toEqual([
+			"'Clock' declares a static 'noon'.",
+			"'Watch' declares a static 'noon'.",
+		])
+		expect(diagnostic.data).toBeUndefined()
+	})
+
+	// NOTE: The standard library's own statics answer the same way, which is
+	// what a reader arriving from a language with free functions writes.
+	it("should reach the standard library's statics too", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				Terminal.print(Pi::toString())
+			}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Write 'Number.Pi'."])
+	})
+
+	// NOTE: A Record Literal's shorthand is the member AND its value, so the
+	// reach written over the name alone — `{ Clock.noon }` — is refused as
+	// `shorthand-on-path-key`, one refusal traded for the next. The member is
+	// spelled out instead.
+	it("should spell the member out where the name is a shorthand", () => {
+		let diagnostic = firstOf(
+			`implementation {
+${clock}
+				wrapped() -> { noon: Integer } { <- { noon } }
+			}
+
+			Terminal.inspect(1::wrapped())
+		}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Write 'noon = Clock.noon'."])
+		expect(diagnostic.data).toEqual({
+			kind: "essence-spelling",
+			position: diagnostic.position as common.Position,
+			spelling: "noon = Clock.noon",
+		})
+	})
+
+	// NOTE: Sixteen plain lowercase names are statics of the prelude — `head`,
+	// `write`, `get`, `send` — and a `head` written one line under a Constant
+	// called `heads` is a misspelling far more often than it is `Http.head`
+	// without its Namespace. The reach took the first Help and the fix, and
+	// wrote a Namespace over a name that was one edit from the reader's own.
+	it("should let a near miss lead a Namespace that is merely in scope", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				constant heads = [1, 2]
+
+				Terminal.inspect(head)
+			}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual([
+			"Did you mean 'heads'?",
+			"Or write 'Http.head'.",
+		])
+		expect(diagnostic.data).toEqual({
+			kind: "suggestion",
+			suggestion: "heads",
+		})
+	})
+
+	it("should answer a name one edit from a Constant the same way", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				constant writer = "w"
+
+				Terminal.print(write)
+			}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual([
+			"Did you mean 'writer'?",
+			"Or write 'Terminal.write'.",
+		])
+	})
+
+	// NOTE: And the other way where there is nothing to lead with: the reach
+	// stands alone and keeps its fix.
+	it("should keep the reach and its fix where nothing is a near miss", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				Terminal.print(Pi::toString())
+			}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Write 'Number.Pi'."])
+		expect(diagnostic.data).toEqual({
+			kind: "essence-spelling",
+			position: diagnostic.position as common.Position,
+			spelling: "Number.Pi",
+		})
+	})
+
+	// NOTE: The Namespace the name stands INSIDE is evidence from the site
+	// rather than a guess, so it keeps the first Help and the fix however close
+	// something else in scope is spelled.
+	it("should keep the enclosing Namespace ahead of a near miss", () => {
+		let diagnostic = firstOf(
+			`implementation {
+${clock}
+				total() -> Integer {
+					constant nook = 1
+
+					<- noon::add(nook)
+				}
+			}
+
+			Terminal.print(1::total()::toString())
+		}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Write 'Clock.noon'."])
+		expect(diagnostic.data).toEqual({
+			kind: "essence-spelling",
+			position: diagnostic.position as common.Position,
+			spelling: "Clock.noon",
+		})
+	})
+
+	it("should spell a Namespace in scope out the same way", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				constant r = { head }
+
+				Terminal.inspect(r)
+			}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Write 'head = Http.head'."])
+	})
+
+	it("should print Helps that compile", () => {
+		expect(
+			compiles(`implementation {
+${clock}
+				fixedStatic() -> Boolean { <- @::isGreaterThan(Clock.noon) }
+				fixedMake() -> Integer { <- Clock.make(1) }
+				fixedMethod() -> Boolean { <- @::isAfterNoon() }
+				wrapped() -> { noon: Integer } { <- { noon = Clock.noon } }
+			}
+
+			namespace Sized for { width: Integer } {
+				area() -> Integer { <- @.width }
+			}
+
+			constant reached = { head = Http.head }
+
+			Terminal.print(Number.Pi::toString())
+			Terminal.print(Clock.noon::toString())
+			Terminal.print(50_000::fixedStatic()::toString())
+			Terminal.print(50_000::fixedMake()::toString())
+			Terminal.print(50_000::fixedMethod()::toString())
+			Terminal.inspect(50_000::wrapped())
+			Terminal.inspect(reached)
+			Terminal.print({ width = 2 }::area()::toString())
+		}`),
+		).toBe(true)
+	})
+
+	// NOTE: The near miss is what the Namespace reach replaces, so a name no
+	// Namespace declares still gets one.
+	it("should keep the near miss where no Namespace reaches the name", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				constant total = 1
+
+				Terminal.print(totla::toString())
+			}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Did you mean 'total'?"])
+	})
+})
+
+// NOTE: The `@` half of that reach, which is the half that can be wrong about
+// the value it names: a Method body binds `@` to the receiver, a Match Handler
+// binds it to the value matched, and a reach is only ever true of one of them.
+// Every Help here is asked of the Method lookup a `::` call is decided by, so
+// what it prints is a call that resolves.
+describe("A Method reached through the '@' that is in hand", () => {
+	const route = [
+		"			choice Route {",
+		"				Home,",
+		"				Article { slug: String },",
+		"			}",
+		"",
+	].join("\n")
+
+	// NOTE: This is what was answered `Write '@::area()'` — a spelling that
+	// resolves nothing at all, because the `@` it wrote is the matched Route.
+	it("should not offer '@' for a Method the matched value has not got", () => {
+		let diagnostic = firstOf(
+			`implementation {
+${route}
+			namespace Sized for { width: Integer } {
+				area() -> Integer { <- @.width }
+
+				report(_ route: Route) -> String {
+					<- match route -> String {
+						case #Home { <- area::toString() }
+						case #Article { <- @.slug }
+					}
+				}
+			}
+
+			Terminal.print({ width = 3 }::report(#Home))
+		}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.notes).toEqual([
+			"'area' is a Method of 'Sized', and the '@' here is the value this Handler matched — a Route#Home rather than the value the Method works on.",
+		])
+		expect(diagnostic.helps).toEqual([
+			"Name the receiver above the 'match' — 'constant receiver = @' — and write 'receiver::area()'.",
+		])
+		expect(diagnostic.data).toBeUndefined()
+	})
+
+	// NOTE: And the same Handler where the value matched DOES answer the name,
+	// which is the case the enclosing Namespace's own table could not tell from
+	// the one above.
+	it("should offer '@' for a Method the matched value has", () => {
+		let diagnostic = firstOf(
+			`implementation {
+			namespace Clock for Integer {
+				named(_ hour: Integer) -> String {
+					<- match hour -> String {
+						case 0 { <- toString() }
+						case _ { <- "later" }
+					}
+				}
+			}
+
+			Terminal.print(1::named(0))
+		}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Write '@::toString'."])
+		expect(diagnostic.data).toEqual({
+			kind: "essence-spelling",
+			position: diagnostic.position as common.Position,
+			spelling: "@::toString",
+		})
+	})
+
+	// NOTE: A Function literal binds no `@` of its own, so the receiver of the
+	// Method around it is still the one in hand — and the reach still holds.
+	it("should reach the receiver from inside a Function literal", () => {
+		let diagnostic = firstOf(
+			`implementation {
+			namespace Sized for { width: Integer } {
+				area() -> Integer { <- @.width }
+
+				twice() -> Integer {
+					constant doubled = () -> Integer { <- area() }
+
+					<- doubled()
+				}
+			}
+
+			Terminal.print({ width = 3 }::twice()::toString())
+		}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Write '@::area'."])
+	})
+
+	// NOTE: A static Method's body has no `@` to write, and a reach that named
+	// one would be refused by `at-in-static-method` — so nothing is offered.
+	it("should offer nothing in a static Method's body", () => {
+		let diagnostic = firstOf(
+			`implementation {
+			namespace Sized for { width: Integer } {
+				area() -> Integer { <- @.width }
+
+				static biggest() -> Integer { <- area() }
+			}
+
+			Terminal.print(Sized.biggest()::toString())
+		}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual([])
+		expect(diagnostic.notes).toEqual([])
+	})
+
+	// NOTE: A Protocol's PROVIDED Method is reached through the value exactly as
+	// a written one is, and the Namespace's own table never held it.
+	it("should reach a Protocol's provided Method", () => {
+		let diagnostic = firstOf(
+			`implementation {
+			protocol Greets {
+				greeting() -> String
+
+				greetTwice() -> String { <- "{@::greeting()}{@::greeting()}" }
+			}
+
+			namespace Person for { name: String } is Greets {
+				greeting() -> String { <- @.name }
+
+				shout() -> String { <- greetTwice() }
+			}
+
+			Terminal.print({ name = "Ada" }::shout())
+		}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Write '@::greetTwice'."])
+	})
+
+	// NOTE: And a Method another Namespace declares for the same Type, which is
+	// the same lookup answering from somewhere the enclosing Namespace's table
+	// can not see.
+	it("should reach a Method another Namespace declares for the Type", () => {
+		let diagnostic = firstOf(
+			`implementation {
+			namespace Clock for Integer {
+				isAfterNoon() -> Boolean { <- @::isGreaterThan(43_200) }
+			}
+
+			namespace Watch for Integer {
+				late() -> Boolean { <- isAfterNoon() }
+			}
+
+			Terminal.print(50_000::late()::toString())
+		}`,
+			"unknown-name",
+		)
+
+		expect(diagnostic.helps).toEqual(["Write '@::isAfterNoon'."])
+	})
+
+	it("should print Helps that compile", () => {
+		expect(
+			compiles(`implementation {
+${route}
+			protocol Greets {
+				greeting() -> String
+
+				greetTwice() -> String { <- "{@::greeting()}{@::greeting()}" }
+			}
+
+			namespace Sized for { width: Integer } is Greets {
+				area() -> Integer { <- @.width }
+
+				greeting() -> String { <- "sized" }
+
+				report(_ route: Route) -> String {
+					constant receiver = @
+
+					<- match route -> String {
+						case #Home { <- receiver::area()::toString() }
+						case #Article { <- @.slug }
+					}
+				}
+
+				twice() -> Integer {
+					constant doubled = () -> Integer { <- @::area() }
+
+					<- doubled()
+				}
+
+				shout() -> String { <- @::greetTwice() }
+			}
+
+			namespace Clock for Integer {
+				isAfterNoon() -> Boolean { <- @::isGreaterThan(43_200) }
+
+				named(_ hour: Integer) -> String {
+					<- match hour -> String {
+						case 0 { <- @::toString() }
+						case _ { <- "later" }
+					}
+				}
+			}
+
+			namespace Watch for Integer {
+				late() -> Boolean { <- @::isAfterNoon() }
+			}
+
+			constant box = { width = 3 }
+
+			Terminal.print(box::report(#Home))
+			Terminal.print(box::twice()::toString())
+			Terminal.print(box::shout())
+			Terminal.print(1::named(0))
+			Terminal.print(50_000::late()::toString())
+		}`),
+		).toBe(true)
+	})
+})

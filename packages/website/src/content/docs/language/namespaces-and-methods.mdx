@@ -214,7 +214,7 @@ implementation {
 }
 ```
 
-A static is reached as `Namespace.name`, with a [dot](/docs/reference/syntax-glossary#dot). That holds inside the namespace too: `welcome` reads `Shop.name`, and a bare `name` there is [`unknown-name`](/docs/reference/diagnostics#unknown-name). A static value may hold any value: a string, a record, a list, a function. A method without `static` in a namespace with no `for`, such as `Shop`, is [`untyped-namespace-method`](/docs/reference/diagnostics#untyped-namespace-method), "A Namespace without a target Type can only hold static Methods".
+A static is reached as `Namespace.name`, with a [dot](/docs/reference/syntax-glossary#dot). That holds inside the namespace too: `welcome` reads `Shop.name`, and a bare `name` there is [`unknown-name`](/docs/reference/diagnostics#unknown-name) — whose Help writes it out for you, `Write 'Shop.name'.`, with a Quick Fix behind it. A static value may hold any value: a string, a record, a list, a function. A method without `static` in a namespace with no `for`, such as `Shop`, is [`untyped-namespace-method`](/docs/reference/diagnostics#untyped-namespace-method), "A Namespace without a target Type can only hold static Methods".
 
 A static method called on a value with `::` is [`static-method-on-value`](/docs/reference/diagnostics#static-method-on-value), and the Help writes out the call you meant:
 

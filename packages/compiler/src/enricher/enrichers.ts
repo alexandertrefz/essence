@@ -101,10 +101,12 @@ import {
 	findCaseTypesInScope,
 	findProtocolInScope,
 	getAllNamespacesInScope,
+	isStaticMethod,
 	protocolMethodBody,
 	invalidateNamespacesInScope,
-	providedMethodNamespaces,
+	namespacesDeclaringMethod,
 	namespacesTargeting,
+	partitionInstanceMethodNamespaces,
 	specializedNamespacesFor,
 	listItemTypeOf,
 	lookupTypeOf,
@@ -3907,8 +3909,13 @@ function enrichMatch(
 			// NOTE: `expectedReturnType` is what a Handler's `<-` yields — a
 			// bare Case there resolves against the Match's declared return
 			// Type first.
+			//
+			// `isMatchHandlerBody` says what the `@` bound below IS, for the
+			// one report that has to tell a Handler's `@` from a Method's —
+			// see `namespaceReach`.
 			let bodyScope = childScope(scope, {
 				expectedReturnType: returnType,
+				isMatchHandlerBody: true,
 			})
 
 			let { matcher, literal, memberLiterals, memberTypes, payload } =
@@ -6672,6 +6679,14 @@ function enrichNamespaceDefinitionStatement(
 	// NOTE: Namespace Generics are visible in every Method — bodies reference
 	// them as opaque GenericUses.
 	let methodScope = scopeWithGenerics(node.generics, scope)
+
+	// NOTE: Written onto the fresh Scope rather than nested in one of its own,
+	// because it costs a body nothing and is read by one Diagnostic. A Method
+	// body does NOT see the Namespace's own name as a binding — the Namespace is
+	// declared in the Scope around the Statement, and that is what `Clock.noon`
+	// resolves through inside a Method exactly as outside it. See
+	// `Scope.namespace`.
+	methodScope.namespace = { name: node.name.content, type }
 
 	return {
 		nodeType: "NamespaceDefinitionStatement",
@@ -11658,44 +11673,6 @@ function reportUnboundGenerics(
 	}
 }
 
-// NOTE: A Method that is called on its Namespace (`Namespace.method(…)`)
-// rather than on a value. `undefined` answers false: a Namespace that does not
-// declare the name at all is not the static case, it is the unknown-Method one.
-function isStaticMethodType(methodType: common.Type | undefined): boolean {
-	return (
-		methodType !== undefined &&
-		(methodType.type === "StaticMethod" ||
-			methodType.type === "OverloadedStaticMethod")
-	)
-}
-
-// NOTE: Which of the Namespaces declaring the Method can answer an INSTANCE
-// call, and which only declare it as static. Every Method Invocation is an
-// instance call — the receiver written left of the `::` is the first Argument —
-// so a static declaration is not a candidate at all. Keeping the static ones
-// rather than dropping them is what lets the Diagnostic say the Method exists
-// and is called differently, instead of claiming there is no such Method.
-function partitionInstanceMethodNamespaces(
-	methodName: string,
-	namespaces: Map<string, common.NamespaceType>,
-): {
-	instanceNamespaces: Map<string, common.NamespaceType>
-	staticNamespaces: Map<string, common.NamespaceType>
-} {
-	let instanceNamespaces = new Map<string, common.NamespaceType>()
-	let staticNamespaces = new Map<string, common.NamespaceType>()
-
-	for (let [name, namespace] of namespaces) {
-		if (isStaticMethodType(namespace.methods[methodName])) {
-			staticNamespaces.set(name, namespace)
-		} else {
-			instanceNamespaces.set(name, namespace)
-		}
-	}
-
-	return { instanceNamespaces, staticNamespaces }
-}
-
 // NOTE: The Arguments of a `::` call as matching reads them, with the receiver
 // unshifted in front of them: it occupies the first Parameter of every
 // non-static Method signature. One builder for selection and for the report that
@@ -11797,7 +11774,7 @@ function resolveInvokedMethodInNamespace(
 	// Argument one place to the right. Static Methods are filtered out before
 	// resolution reaches this (`reportStaticMethodOnValue` says so); refusing
 	// them again here is what keeps that filtering from being load-bearing.
-	if (isStaticMethodType(methodType)) {
+	if (isStaticMethod(methodType)) {
 		return
 	}
 
@@ -13584,153 +13561,6 @@ function reportUndecidedReceiverType(
 			],
 		},
 	)
-}
-
-// NOTE: A `value::<Name>method()` whose Name is a PROTOCOL, which is how the
-// `ambiguous-namespace` report is answered when the two candidates are two
-// Protocols providing one name — `Name the Namespace` has to name something a
-// call can write, and a written Namespace is not what either of them is.
-//
-// The receiver's own Namespaces are looked up again, unspecified, because they
-// are the evidence the conformance is read from: the specifier's lookup came
-// back empty (a Protocol is not in the members table), and asking the door with
-// nothing would leave a Namespace-declared conformance unseen.
-//
-// Every candidate the named Protocol offers is kept, not one: a provided Method
-// is a candidate of each Namespace that declares the conformance, so naming the
-// Protocol narrows the ladder to that Protocol's rungs and leaves the ladder.
-// `5::<Orderable>isBetween(1, and 3/2)` still falls from Integer's rung to the
-// covering Number's, exactly as the unqualified call does.
-//
-// A REQUIREMENT is not reachable this way. It is written by a Namespace, and
-// that Namespace is what a specifier names; only a provided Method is the
-// Protocol's own to offer.
-function providedMethodNamespacesNamed(
-	specifierName: string,
-	methodName: string,
-	baseType: common.Type,
-	scope: enricher.Scope,
-	position: common.Position,
-): Map<string, common.NamespaceType> {
-	let named = new Map<string, common.NamespaceType>()
-
-	if (findProtocolInScope(specifierName, scope) === null) {
-		return named
-	}
-
-	for (let [name, namespace] of providedMethodNamespaces(
-		methodName,
-		baseType,
-		resolveMethodLookupNamespacesForReceiverType(
-			baseType,
-			null,
-			scope,
-		).values(),
-		scope,
-		position,
-	)) {
-		if (namespace.providedBy === specifierName) {
-			named.set(name, namespace)
-		}
-	}
-
-	return named
-}
-
-// NOTE: Which of the Namespaces found for a receiver actually declare the
-// Method — the written ones, a Protocol's PROVIDED ones beside them, and the
-// ONE door the derived Namespaces come through, for both the whole-Union lookup
-// and the per-member one. The derives are consulted only when the written
-// Namespaces have already come up empty, which is what makes a derive a
-// fallback rather than a competitor: a Namespace that writes its own `is` or
-// `toString` is never tied against one, so it can not be made ambiguous by it.
-function namespacesDeclaringMethod(
-	methodName: string,
-	namespaces: Map<string, common.NamespaceType>,
-	baseType: common.Type,
-	scope: enricher.Scope,
-	position: common.Position,
-	// NOTE: The name a `value::<Name>method()` wrote, when it wrote one. Only
-	// the provided-Method door reads it: `namespaces` is already the answer to
-	// the specifier for every WRITTEN Namespace, and comes back empty where the
-	// name is a Protocol's, which lives in another table entirely.
-	specifier: parser.IdentifierNode | null = null,
-): Map<string, common.NamespaceType> {
-	if (specifier !== null && namespaces.size === 0) {
-		return providedMethodNamespacesNamed(
-			specifier.content,
-			methodName,
-			baseType,
-			scope,
-			position,
-		)
-	}
-
-	let matchingNamespaces = new Map<string, common.NamespaceType>()
-
-	for (let [name, namespace] of namespaces) {
-		if (Object.hasOwn(namespace.methods, methodName)) {
-			matchingNamespaces.set(name, namespace)
-		}
-	}
-
-	// NOTE: The derives are asked only where nothing WRITTEN answered, and a
-	// derive that answers answers alone. A derive is fabricated FOR this
-	// receiver — its `isNot` takes the whole Choice, so
-	// `Ordering#Less::isNot(#Equal)` answers — while a provided Method is one
-	// body over the conformer's own Type, which a receiver narrowed to a single
-	// Case binds to that Case, leaving no sibling Case assignable to it. Both
-	// answer the same question, so the one that answers it for every receiver
-	// goes first, and the other is not put on the ladder beside it.
-	if (matchingNamespaces.size === 0) {
-		let derived = derivedEquatableNamespace(baseType, scope)
-
-		if (derived !== null && Object.hasOwn(derived.methods, methodName)) {
-			matchingNamespaces.set(derivedEquatableNamespaceName, derived)
-		}
-
-		// NOTE: The printing derive reads the Namespaces already found for the
-		// receiver, because it answers only where one of them declared
-		// `is Printable` — which is the difference between the two derives, and
-		// the reason this one takes them and the one above does not.
-		let printable = derivedPrintableNamespace(
-			baseType,
-			namespaces.values(),
-			scope,
-		)
-
-		if (
-			printable !== null &&
-			Object.hasOwn(printable.methods, methodName)
-		) {
-			matchingNamespaces.set(derivedPrintableNamespaceName, printable)
-		}
-
-		if (matchingNamespaces.size > 0) {
-			return matchingNamespaces
-		}
-	}
-
-	// NOTE: A Protocol's PROVIDED Methods stand on the specificity ladder
-	// BESIDE the written ones, one rung per Namespace that declares the
-	// conformance. That is the override rule as it really is: a Namespace
-	// writing the name replaces the provided Method on ITS OWN rung — the walk
-	// leaves that source out — and takes nothing from any other Namespace's. So
-	// `3::isLessThan(Number.Pi)` is offered Integer's written entries and the
-	// covering Number's provided one, and falls to Number's when Integer's
-	// reject the Argument, exactly as `5::compare(1/2)` falls to
-	// `Number::compare`.
-	for (let [name, namespace] of providedMethodNamespaces(
-		methodName,
-		baseType,
-		namespaces.values(),
-		scope,
-		position,
-	)) {
-		matchingNamespaces.set(name, namespace)
-	}
-
-	return matchingNamespaces
 }
 
 // NOTE: A Type Parameter that no Scope here declares — a name that reached this
@@ -19278,6 +19108,8 @@ function scopeWithNamespaceSelf(
 		members: { [node.name.content]: type },
 		declarations: { [node.name.content]: node.name.position },
 		constants: new Set([node.name.content]),
+		// NOTE: Read by `unknown-name` alone — see `Scope.namespace`.
+		namespace: { name: node.name.content, type },
 	})
 }
 

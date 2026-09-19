@@ -3352,6 +3352,32 @@ Error: No Choice in scope declares a Case '#Truncated'
     │ Note: 'Division' declares '#Truncating'.
 ────╯
 
-─── 5 errors
+[unknown-name]
+Error: 'noon' is not declared
+    ╭─┤ KnownAnswers.es:53:24 │
+    │
+ 53 │          <- @::isGreaterThan(noon)
+    │                              ──┬─  
+    │                                ╰─── no such Variable or Constant
+    │ 
+    │ Help: Write 'Clock.noon'.
+    │ 
+    │ Note: A static is reached through its Namespace, inside the Namespace too.
+────╯
+
+[unknown-name]
+Error: 'width' is not declared
+    ╭─┤ KnownAnswers.es:61:7 │
+    │
+ 61 │          <- width
+    │             ──┬──  
+    │               ╰──── no such Variable or Constant
+    │ 
+    │ Help: Write '@.width'.
+    │ 
+    │ Note: 'width' is a member of { width: Integer }, and a member is read off the value rather than named on its own.
+────╯
+
+─── 7 errors
 "
 `;

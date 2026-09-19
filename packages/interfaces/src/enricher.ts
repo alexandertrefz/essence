@@ -76,6 +76,16 @@ export type Scope = {
 	// Handler and an `if` body inside a completing body answer with that body's
 	// Type — and, like it, `null` is a BARRIER rather than a missing answer.
 	completing?: common.Type | "top-level" | null
+	// NOTE: The Namespace this Scope is INSIDE, set on the Scope a Namespace
+	// declares its own name into and read through the parent chain — so every
+	// signature, property and Method body under it answers with it.
+	//
+	// Nothing resolves through this: a Namespace's statics are reached as
+	// `Namespace.name` inside the Namespace exactly as outside it, and a Method
+	// through `@::`. It exists so that a name which resolved to NOTHING can be
+	// asked whether the Namespace around it declares one — which is the whole of
+	// what `noon` needed to be told, and what it was told `loop` instead.
+	namespace?: { name: string; type: common.NamespaceType }
 	// NOTE: Set on a static Method's body Scope, where `@` means nothing: a
 	// static Method is called on the Namespace and is emitted without the
 	// receiver Parameter `@` lowers to. It is a BARRIER rather than the mere
@@ -83,6 +93,12 @@ export type Scope = {
 	// while a Match Handler nested inside still binds its own `@` and wins,
 	// because that binding sits closer to the use.
 	isStaticMethodBody?: boolean
+	// NOTE: Set on a Match Handler's body Scope, which is the other thing that
+	// binds `@` — the value matched rather than a receiver. Nothing resolves
+	// through this either: it exists so that a report about a name which
+	// resolved to nothing can say WHICH of the two `@` is here, and offer the
+	// one edit that reaches the receiver again from inside a Handler.
+	isMatchHandlerBody?: boolean
 	// NOTE: The Protocol whose provided Method this Scope is the body of. A
 	// provided Method is emitted ONCE, above every Program that reaches it, so
 	// a name the Program itself declares — a Constant, a Function, a Namespace

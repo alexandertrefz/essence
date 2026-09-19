@@ -1102,6 +1102,31 @@ Taught on: [Namespaces and methods › Where a namespace can be used](/docs/lang
 
 A name that is a [case of a choice in scope](/docs/language/choices-and-match) is answered here rather than left to the near miss: the notes name every choice that declares it, and the fix writes the `#` in front of it. A JavaScript operator or keyword is answered by [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported) or [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) instead.
 
+A name a [namespace](/docs/language/namespaces-and-methods) reaches is answered here too, and before the near miss. A static is reached as `Namespace.name` inside its own namespace as well as outside it, so this is the report a bare `noon` gets one line under `static noon`:
+
+<div class="error-output">
+
+```
+[unknown-name]
+Error: 'noon' is not declared
+   ╭─┤ Clock.es:6:24 │
+   │
+ 6 │          <- @::isGreaterThan(noon)
+   │                              ──┬─  
+   │                                ╰─── no such Variable or Constant
+   │ 
+   │ Help: Write 'Clock.noon'.
+   │ 
+   │ Note: A static is reached through its Namespace, inside the Namespace too.
+───╯
+```
+
+</div>
+
+The same holds for a static method called bare (`make(1)` is `Clock.make(1)`), for a method the value in hand answers (`isAfterNoon()` is `@::isAfterNoon()`, and a protocol's provided method is reached the same way), and for a member of the receiver's record type (`width` is `@.width`). Each of those is read off the `@` that is actually in hand: inside a `match` arm that is the value matched, so a method of the enclosing namespace is not offered through it there.
+
+Outside every namespace, one namespace in scope declaring the static is named with a fix, and several are listed with none — [`Number.Pi`](/docs/library/number#Pi) answers a bare `Pi` this way. A name that is also one edit from something in scope is answered with that name first, and the namespace second: `head`, written under a constant `heads`, is `Did you mean 'heads'?` and then `Or write 'Http.head'.`
+
 <div class="error-output">
 
 ```
@@ -1121,7 +1146,7 @@ Error: 'nmae' is not declared
 
 Fix the spelling, declare the name, or import it.
 
-Quick Fix: **Change to 'name'**. A name that a module in the workspace exports also gets a fix that imports it, and one that names a case gets **Write '#Red' instead of 'Red'** above both.
+Quick Fix: **Change to 'name'**. A name that a module in the workspace exports also gets a fix that imports it, and one that names a case gets **Write '#Red' instead of 'Red'** above both. A name a namespace reaches gets **Write 'Clock.noon' instead of 'noon'** and no spelling fix: the name is not what went wrong. Written as a [record literal's shorthand](/docs/language/records#writing-a-record), that fix spells the member out — **Write 'head = Http.head' instead of 'head'** — because `{ Http.head }` puts a path where a member name belongs.
 
 Taught on: [Functions › Scope and hoisting](/docs/language/functions#scope-and-hoisting)
 

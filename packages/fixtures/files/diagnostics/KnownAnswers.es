@@ -43,4 +43,22 @@ implementation {
 	constant options = { division = #Truncated }
 
 	Terminal.inspect(options)
+
+	§ unknown-name — a static is reached through its Namespace inside the
+	§ Namespace too. This is the report that offered 'loop'.
+	namespace Clock for Integer {
+		static noon = 43_200
+
+		isAfterNoon() -> Boolean {
+			<- @::isGreaterThan(noon)
+		}
+	}
+
+	§ unknown-name — and an instance Method of the same Namespace, called with
+	§ neither a receiver nor the separator that reaches one.
+	namespace Sized for { width: Integer } {
+		area() -> Integer {
+			<- width
+		}
+	}
 }

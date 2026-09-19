@@ -1532,18 +1532,54 @@ export function resolveIdentifierType(
 				},
 			)
 		} else if (!reportForeignName(node, scope, context)) {
+			// NOTE: What a Namespace around the name — or one in scope — declares
+			// under it, asked BEFORE the near miss. The name is not misspelled
+			// where the Namespace it stands INSIDE has it: it is written without
+			// the thing that reaches it, and that is evidence from the site
+			// rather than a guess.
+			//
+			// A Namespace merely in SCOPE is the weaker half of that. Sixteen
+			// plain lowercase names — `head`, `write`, `get`, `send` — are
+			// statics of the prelude, and a `head` written one line under
+			// `constant heads = [1, 2]` is a misspelling of the Constant far
+			// more often than it is `Http.head` without its Namespace. So the
+			// near miss is asked there too, and it LEADS where there is one: it
+			// takes the first Help and the fix, and the reach follows it as the
+			// other thing the name could have been.
+			let reached = namespaceReach(node, scope, context)
+			let suggestion =
+				reached === null || reached.inScope === true
+					? suggestionInScope(name, scope, "members")
+					: null
+			let nearMiss =
+				suggestion === null ? [] : [`Did you mean '${suggestion}'?`]
+			let leads = suggestion !== null && reached !== null
+
 			reportError(`'${name}' is not declared`, node.position, {
 				code: "unknown-name",
 				labels: [
 					primary(node.position, "no such Variable or Constant"),
 				],
-				notes: context.shorthandMember
-					? [
-							`A bare member name in a Record Literal is the member AND its value, so '${name}' is read here as well as written.`,
-						]
-					: [],
-				helps: suggestionHelps(name, scope, "members"),
-				...suggestionData(suggestionInScope(name, scope, "members")),
+				notes: [
+					...(context.shorthandMember
+						? [
+								`A bare member name in a Record Literal is the member AND its value, so '${name}' is read here as well as written.`,
+							]
+						: []),
+					...(reached?.notes ?? []),
+				],
+				helps: leads
+					? [...nearMiss, ...(reached?.helps ?? []).map(following)]
+					: [...(reached?.helps ?? []), ...nearMiss],
+				...(reached?.spelling === undefined || leads
+					? suggestionData(suggestion)
+					: {
+							data: {
+								kind: "essence-spelling" as const,
+								position: node.position,
+								spelling: reached.spelling,
+							},
+						}),
 			})
 		}
 
@@ -1555,6 +1591,294 @@ export function resolveIdentifierType(
 	}
 }
 
+// NOTE: What a name NOTHING declares can still be reached through, which is the
+// last thing `unknown-name` knows and never said. A static is reached as
+// `Namespace.name` inside its own Namespace exactly as outside it, so a `noon`
+// written one line under `static noon = 43_200` resolves to nothing — and was
+// answered with "Did you mean 'loop'?", a word from the prelude two edits away.
+//
+// Four reaches, in the order a reader is likeliest to have meant them, and every
+// one of them a spelling rather than a rule: the Namespace around the name has
+// the static, has it as a static Method, has it as an instance Method the
+// receiver answers, or the receiver's own Record declares it as a member. Then
+// the Namespaces in scope, for a name written outside every Namespace.
+//
+// `spelling` is what the Quick Fix writes over the name, and is absent wherever
+// the reader has to choose — several Namespaces declare the name, and which of
+// them was meant is not something this can decide.
+//
+// `inScope` tells the two halves apart for the caller: what the Namespace AROUND
+// the name declares is evidence from the site, and what a Namespace merely in
+// scope declares is a second candidate for a name that may simply be mistyped.
+function namespaceReach(
+	node: parser.IdentifierNode,
+	scope: enricher.Scope,
+	context: NameContext,
+): {
+	notes: Array<string>
+	helps: Array<string>
+	spelling?: string
+	inScope?: boolean
+} | null {
+	let name = node.content
+	let enclosing = enclosingNamespaceOf(scope)
+	let enclosingMethod = enclosing?.type.methods[name]
+
+	if (
+		enclosing !== null &&
+		(Object.hasOwn(enclosing.type.properties, name) ||
+			isStaticMethod(enclosingMethod))
+	) {
+		let written = memberSpelling(name, `${enclosing.name}.${name}`, context)
+
+		return {
+			notes: [
+				`A static is reached through its Namespace, inside the Namespace too.`,
+			],
+			helps: [`Write '${written}'.`],
+			spelling: written,
+		}
+	}
+
+	// NOTE: An instance Method is reached through the value it works on, and
+	// that value is `@`. A static Method's body has no `@` at all, and
+	// `findSelfBinding` says so rather than answering with the instance
+	// Methods' binding around it — so the reach is offered exactly where
+	// writing it would compile.
+	let self = findSelfBinding(scope)
+
+	if (self !== null && self !== "static") {
+		// NOTE: WHICH Methods `@` answers is asked of the lookup a `::` call is
+		// decided by, rather than read off the enclosing Namespace's own table.
+		// The two agree in a Method body and part company wherever `@` was
+		// rebound: inside a Match Handler `@` is the value matched, and
+		// `area::toString()` written in one was answered `Write '@::area()'` —
+		// which is `no-namespace-for-value` about a Route#Home. Asking the
+		// lookup makes the Help true by construction, and answers MORE while it
+		// is at it: a Protocol's PROVIDED Methods and every other Namespace over
+		// the same Type are reached through `@` exactly as the Namespace the
+		// name was written inside is.
+		let answering = methodReachedThroughSelf(
+			name,
+			self.type,
+			scope,
+			node.position,
+		)
+
+		if (answering !== null) {
+			let reach = spelledMethodReach("@", name, answering, context)
+			let written = memberSpelling(name, reach.spelled, context)
+
+			return {
+				notes: [
+					`A Method is reached through the value it works on, which is '@' here.`,
+				],
+				helps: [`Write '${written}'.`],
+				...(reach.fixable ? { spelling: written } : {}),
+			}
+		}
+
+		if (
+			self.type.type === "Record" &&
+			Object.hasOwn(self.type.members, name)
+		) {
+			let written = memberSpelling(name, `@.${name}`, context)
+
+			return {
+				notes: [
+					`'${name}' is a member of ${describeType(self.type)}, and a member is read off the value rather than named on its own.`,
+				],
+				helps: [`Write '${written}'.`],
+				spelling: written,
+			}
+		}
+
+		// NOTE: The Namespace around the name has the Method and `@` is not what
+		// it works on, which is the Match Handler's `@` and no other: a Handler
+		// rebinds the one name a Method's receiver has, and this language has
+		// nothing that names the receiver THROUGH that rebinding. So the reach
+		// is a Note about where the Method lives and a Help that gives the
+		// receiver a name of its own above the `match` — two edits in two
+		// places, which is why no fix is offered for it.
+		if (
+			enclosing !== null &&
+			enclosingMethod !== undefined &&
+			self.matched
+		) {
+			let reach = spelledMethodReach(
+				"receiver",
+				name,
+				enclosingMethod,
+				context,
+			)
+
+			return {
+				notes: [
+					`'${name}' is a Method of '${enclosing.name}', and the '@' here is the value this Handler matched — ${withArticle(describeType(self.type))} rather than the value the Method works on.`,
+				],
+				helps: [
+					`Name the receiver above the 'match' — 'constant receiver = @' — and write '${memberSpelling(name, reach.spelled, context)}'.`,
+				],
+			}
+		}
+	}
+
+	// NOTE: And a static named from outside its Namespace, which is the same
+	// mistake with the Namespace further away. One Namespace declaring it is an
+	// answer; several is a question only the reader can settle, so they are
+	// listed and no fix is offered.
+	//
+	// A static METHOD counts as much as a static value: `deferred(…)` is
+	// `Async.deferred(…)` and `Pi` is `Number.Pi`, and both are written without
+	// the one thing that reaches them.
+	let declaring = [...getAllNamespacesInScope(scope, null).entries()].flatMap(
+		([namespaceName, namespaceType]) =>
+			Object.hasOwn(namespaceType.properties, name) ||
+			isStaticMethod(namespaceType.methods[name])
+				? [namespaceName]
+				: [],
+	)
+
+	if (declaring.length === 1) {
+		let written = memberSpelling(name, `${declaring[0]}.${name}`, context)
+
+		return {
+			notes: [
+				`'${declaring[0]}' declares a static '${name}', and a static is reached through its Namespace.`,
+			],
+			helps: [`Write '${written}'.`],
+			spelling: written,
+			inScope: true,
+		}
+	}
+
+	if (declaring.length > 1) {
+		return {
+			notes: declaring.map(
+				(namespaceName) =>
+					`'${namespaceName}' declares a static '${name}'.`,
+			),
+			helps: [
+				`Write the Namespace in front of it — '${memberSpelling(name, `${declaring[0]}.${name}`, context)}'.`,
+			],
+			inScope: true,
+		}
+	}
+
+	return null
+}
+
+// NOTE: A Help that stands BEHIND another one, which is a Help that opens on
+// "Or": the two are alternatives, and the reader picks between them rather than
+// following both. Written here rather than spelled twice in the reaches, none of
+// which knows whether anything came before it.
+function following(help: string): string {
+	return `Or ${(help[0] as string).toLowerCase()}${help.slice(1)}`
+}
+
+// NOTE: What a reach is written as WHERE IT STANDS, which is the reach itself
+// everywhere but one place: a Record Literal's shorthand `{ head }` is the
+// member AND its value, so a spelling written over the name — `{ Http.head }` —
+// is refused as `shorthand-on-path-key`, one refusal traded for the next. The
+// member is spelled out instead, `{ head = Http.head }`, which is the Record the
+// reader meant and the only thing that compiles here.
+function memberSpelling(
+	name: string,
+	reach: string,
+	context: NameContext,
+): string {
+	return context.shorthandMember === true ? `${name} = ${reach}` : reach
+}
+
+// NOTE: Which Method of this name a `::` call on the value would reach, asked
+// of the very lookup an Invocation is decided by rather than of one Namespace's
+// table — see `methodAnswersFor`, which asks the same question on the
+// Invocation's own failure path. Null where no Method of the name answers for
+// the Type at all, which is what makes the reach above a spelling that compiles.
+//
+// The FIRST Namespace that declares it is the one handed back, and only its
+// Parameters are read: what the answer decides is the parentheses, and an
+// Overload that takes no Arguments is one wherever it is declared.
+function methodReachedThroughSelf(
+	name: string,
+	selfType: common.Type,
+	scope: enricher.Scope,
+	position: common.Position,
+): common.MethodType | null {
+	let { instanceNamespaces } = partitionInstanceMethodNamespaces(
+		name,
+		namespacesDeclaringMethod(
+			name,
+			resolveMethodLookupNamespacesForReceiverType(selfType, null, scope),
+			selfType,
+			scope,
+			position,
+		),
+	)
+
+	for (let namespace of instanceNamespaces.values()) {
+		let method = namespace.methods[name]
+
+		if (method !== undefined) {
+			return method
+		}
+	}
+
+	return null
+}
+
+// NOTE: The same rule `reportMethodCalledWithDot` follows about the
+// parentheses: a name written APPLIED already has them, and one written bare
+// needs them written for it — with an ellipsis where the Method takes
+// Arguments, which is the reader's to fill in and so is no fix at all.
+function spelledMethodReach(
+	receiver: string,
+	name: string,
+	method: common.MethodType,
+	context: NameContext,
+): { spelled: string; fixable: boolean } {
+	let applied = context.applied === true
+	let answersAlone = answersWithoutArguments(method)
+
+	return {
+		spelled: applied
+			? `${receiver}::${name}`
+			: `${receiver}::${name}${answersAlone ? "()" : "(…)"}`,
+		fixable: applied || answersAlone,
+	}
+}
+
+// NOTE: Whether a Namespace declares this name as something reached on the
+// Namespace itself (`Namespace.method(…)`) rather than on a value. `undefined`
+// — a Namespace that does not declare the name at all — is not one: that is the
+// unknown-Method case, which is a different report.
+export function isStaticMethod(method: common.Type | undefined): boolean {
+	return (
+		method !== undefined &&
+		(method.type === "StaticMethod" ||
+			method.type === "OverloadedStaticMethod")
+	)
+}
+
+// NOTE: The Namespace a Scope stands inside, walking outwards — see
+// `Scope.namespace`. A Namespace can not be written inside another, so the first
+// answer is the only one.
+function enclosingNamespaceOf(
+	scope: enricher.Scope,
+): { name: string; type: common.NamespaceType } | null {
+	for (
+		let searchScope: enricher.Scope | null = scope;
+		searchScope !== null;
+		searchScope = searchScope.parent
+	) {
+		if (searchScope.namespace !== undefined) {
+			return searchScope.namespace
+		}
+	}
+
+	return null
+}
+
 // NOTE: What `@` refers to at this point in the Program, walking outwards: the
 // nearest binding wins, and a static Method's body stops the walk. The barrier
 // is the whole point — a static Method is declared inside a `namespace … for
@@ -1562,12 +1886,19 @@ export function resolveIdentifierType(
 // answer would type-check a body the Rewriter emits without a receiver.
 function findSelfBinding(
 	scope: enricher.Scope,
-): { type: common.Type } | "static" | null {
+): { type: common.Type; matched: boolean } | "static" | null {
 	let searchScope: enricher.Scope | null = scope
 
 	while (searchScope !== null) {
 		if (Object.hasOwn(searchScope.members, "@")) {
-			return { type: searchScope.members["@"] }
+			// NOTE: `matched` says which of the two `@` this is — the value a
+			// Match Handler matched, or the receiver of the Method around it.
+			// Read by `namespaceReach` and by nothing else: what the name
+			// resolves to is the same either way.
+			return {
+				type: searchScope.members["@"],
+				matched: searchScope.isMatchHandlerBody === true,
+			}
 		}
 
 		if (searchScope.isStaticMethodBody) {
@@ -6580,6 +6911,180 @@ export function resolveMethodLookupNamespacesForReceiverType(
 		getAllNamespacesInScope(scope, namespaceSpecifier),
 		baseType,
 	)
+}
+
+// NOTE: Which of the Namespaces declaring the Method can answer an INSTANCE
+// call, and which only declare it as static. Every Method Invocation is an
+// instance call — the receiver written left of the `::` is the first Argument —
+// so a static declaration is not a candidate at all. Keeping the static ones
+// rather than dropping them is what lets the Diagnostic say the Method exists
+// and is called differently, instead of claiming there is no such Method.
+export function partitionInstanceMethodNamespaces(
+	methodName: string,
+	namespaces: Map<string, common.NamespaceType>,
+): {
+	instanceNamespaces: Map<string, common.NamespaceType>
+	staticNamespaces: Map<string, common.NamespaceType>
+} {
+	let instanceNamespaces = new Map<string, common.NamespaceType>()
+	let staticNamespaces = new Map<string, common.NamespaceType>()
+
+	for (let [name, namespace] of namespaces) {
+		if (isStaticMethod(namespace.methods[methodName])) {
+			staticNamespaces.set(name, namespace)
+		} else {
+			instanceNamespaces.set(name, namespace)
+		}
+	}
+
+	return { instanceNamespaces, staticNamespaces }
+}
+
+// NOTE: A `value::<Name>method()` whose Name is a PROTOCOL, which is how the
+// `ambiguous-namespace` report is answered when the two candidates are two
+// Protocols providing one name — `Name the Namespace` has to name something a
+// call can write, and a written Namespace is not what either of them is.
+//
+// The receiver's own Namespaces are looked up again, unspecified, because they
+// are the evidence the conformance is read from: the specifier's lookup came
+// back empty (a Protocol is not in the members table), and asking the door with
+// nothing would leave a Namespace-declared conformance unseen.
+//
+// Every candidate the named Protocol offers is kept, not one: a provided Method
+// is a candidate of each Namespace that declares the conformance, so naming the
+// Protocol narrows the ladder to that Protocol's rungs and leaves the ladder.
+// `5::<Orderable>isBetween(1, and 3/2)` still falls from Integer's rung to the
+// covering Number's, exactly as the unqualified call does.
+//
+// A REQUIREMENT is not reachable this way. It is written by a Namespace, and
+// that Namespace is what a specifier names; only a provided Method is the
+// Protocol's own to offer.
+function providedMethodNamespacesNamed(
+	specifierName: string,
+	methodName: string,
+	baseType: common.Type,
+	scope: enricher.Scope,
+	position: common.Position,
+): Map<string, common.NamespaceType> {
+	let named = new Map<string, common.NamespaceType>()
+
+	if (findProtocolInScope(specifierName, scope) === null) {
+		return named
+	}
+
+	for (let [name, namespace] of providedMethodNamespaces(
+		methodName,
+		baseType,
+		resolveMethodLookupNamespacesForReceiverType(
+			baseType,
+			null,
+			scope,
+		).values(),
+		scope,
+		position,
+	)) {
+		if (namespace.providedBy === specifierName) {
+			named.set(name, namespace)
+		}
+	}
+
+	return named
+}
+
+// NOTE: Which of the Namespaces found for a receiver actually declare the
+// Method — the written ones, a Protocol's PROVIDED ones beside them, and the
+// ONE door the derived Namespaces come through, for both the whole-Union lookup
+// and the per-member one. The derives are consulted only when the written
+// Namespaces have already come up empty, which is what makes a derive a
+// fallback rather than a competitor: a Namespace that writes its own `is` or
+// `toString` is never tied against one, so it can not be made ambiguous by it.
+export function namespacesDeclaringMethod(
+	methodName: string,
+	namespaces: Map<string, common.NamespaceType>,
+	baseType: common.Type,
+	scope: enricher.Scope,
+	position: common.Position,
+	// NOTE: The name a `value::<Name>method()` wrote, when it wrote one. Only
+	// the provided-Method door reads it: `namespaces` is already the answer to
+	// the specifier for every WRITTEN Namespace, and comes back empty where the
+	// name is a Protocol's, which lives in another table entirely.
+	specifier: parser.IdentifierNode | null = null,
+): Map<string, common.NamespaceType> {
+	if (specifier !== null && namespaces.size === 0) {
+		return providedMethodNamespacesNamed(
+			specifier.content,
+			methodName,
+			baseType,
+			scope,
+			position,
+		)
+	}
+
+	let matchingNamespaces = new Map<string, common.NamespaceType>()
+
+	for (let [name, namespace] of namespaces) {
+		if (Object.hasOwn(namespace.methods, methodName)) {
+			matchingNamespaces.set(name, namespace)
+		}
+	}
+
+	// NOTE: The derives are asked only where nothing WRITTEN answered, and a
+	// derive that answers answers alone. A derive is fabricated FOR this
+	// receiver — its `isNot` takes the whole Choice, so
+	// `Ordering#Less::isNot(#Equal)` answers — while a provided Method is one
+	// body over the conformer's own Type, which a receiver narrowed to a single
+	// Case binds to that Case, leaving no sibling Case assignable to it. Both
+	// answer the same question, so the one that answers it for every receiver
+	// goes first, and the other is not put on the ladder beside it.
+	if (matchingNamespaces.size === 0) {
+		let derived = derivedEquatableNamespace(baseType, scope)
+
+		if (derived !== null && Object.hasOwn(derived.methods, methodName)) {
+			matchingNamespaces.set(derivedEquatableNamespaceName, derived)
+		}
+
+		// NOTE: The printing derive reads the Namespaces already found for the
+		// receiver, because it answers only where one of them declared
+		// `is Printable` — which is the difference between the two derives, and
+		// the reason this one takes them and the one above does not.
+		let printable = derivedPrintableNamespace(
+			baseType,
+			namespaces.values(),
+			scope,
+		)
+
+		if (
+			printable !== null &&
+			Object.hasOwn(printable.methods, methodName)
+		) {
+			matchingNamespaces.set(derivedPrintableNamespaceName, printable)
+		}
+
+		if (matchingNamespaces.size > 0) {
+			return matchingNamespaces
+		}
+	}
+
+	// NOTE: A Protocol's PROVIDED Methods stand on the specificity ladder
+	// BESIDE the written ones, one rung per Namespace that declares the
+	// conformance. That is the override rule as it really is: a Namespace
+	// writing the name replaces the provided Method on ITS OWN rung — the walk
+	// leaves that source out — and takes nothing from any other Namespace's. So
+	// `3::isLessThan(Number.Pi)` is offered Integer's written entries and the
+	// covering Number's provided one, and falls to Number's when Integer's
+	// reject the Argument, exactly as `5::compare(1/2)` falls to
+	// `Number::compare`.
+	for (let [name, namespace] of providedMethodNamespaces(
+		methodName,
+		baseType,
+		namespaces.values(),
+		scope,
+		position,
+	)) {
+		matchingNamespaces.set(name, namespace)
+	}
+
+	return matchingNamespaces
 }
 
 // NOTE: The enclosing Namespace's Generics are merged into every Method

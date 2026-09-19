@@ -619,6 +619,98 @@ describe("Code Actions", () => {
 			expect(titles(quickFixes(lines))).not.toContain("Change to 'loop'")
 		})
 
+		// NOTE: And what stands there instead — the Namespace the static is
+		// reached through, which the Compiler had in hand all along.
+		it("should write the Namespace in front of its own static", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Clock for Integer {",
+				"\t\tstatic noon = 43_200",
+				"",
+				"\t\tisAfterNoon() -> Boolean {",
+				"\t\t\t<- @::isGreaterThan(noon)",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.print(50_000::isAfterNoon()::toString())",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Write 'Clock.noon' instead of 'noon'")
+			expect(fix.diagnosticCode).toBe("unknown-name")
+			expect(applied(lines, fix)[5]).toBe(
+				"\t\t\t<- @::isGreaterThan(Clock.noon)",
+			)
+			expect(codesOf(applied(lines, fix))).toEqual([])
+		})
+
+		it("should write the receiver in front of a Method called bare", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Clock for Integer {",
+				"\t\tisAfterNoon() -> Boolean { <- @::isGreaterThan(1) }",
+				"",
+				"\t\ttwice() -> Boolean {",
+				"\t\t\t<- isAfterNoon()",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.print(50_000::twice()::toString())",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe(
+				"Write '@::isAfterNoon' instead of 'isAfterNoon'",
+			)
+			expect(applied(lines, fix)[5]).toBe("\t\t\t<- @::isAfterNoon()")
+			expect(codesOf(applied(lines, fix))).toEqual([])
+		})
+
+		// NOTE: Which Namespace was meant is the reader's to settle, so the
+		// report lists them and nothing writes one of them into the file.
+		it("should offer no fix where several Namespaces declare the static", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Clock for Integer { static noon = 1 }",
+				"\tnamespace Watch for Integer { static noon = 2 }",
+				"",
+				"\tTerminal.print(noon::toString())",
+				"}",
+			]
+
+			expect(
+				quickFixes(lines).filter(
+					(entry) => entry.diagnosticCode === "unknown-name",
+				),
+			).toEqual([])
+		})
+
+		// NOTE: A reach written over the name of a Record Literal's shorthand is
+		// refused as `shorthand-on-path-key` — `{ Http.head }` is not a Record.
+		// The member is spelled out instead, which is what the reader wrote in
+		// the first place plus the reach they left out.
+		it("should spell out the member where the name is a shorthand", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant r = { head }",
+				"",
+				"\tTerminal.inspect(r)",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Write 'head = Http.head' instead of 'head'")
+			expect(applied(lines, fix)[1]).toBe(
+				"\tconstant r = { head = Http.head }",
+			)
+			expect(codesOf(applied(lines, fix))).toEqual([])
+		})
+
 		it("should render an unknown Case with its sigil but replace only the name", () => {
 			let lines = [
 				"implementation {",
