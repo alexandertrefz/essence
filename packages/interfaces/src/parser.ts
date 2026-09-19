@@ -253,6 +253,38 @@ export type ExpressionNode =
 	| CaseValueNode
 	| StartNode
 	| CompleteNode
+	| RefusedValueNode
+
+// NOTE: What is left where an Expression was refused WHERE IT WAS WRITTEN —
+// `primes[0]`, which is how every other language reads an item and how none of
+// this one does. The habit is reported at its brackets and the brackets are
+// read past, and this Node is the hole they leave so that the Statement around
+// them is still a Statement: `constant first = primes[0]` declares `first`, and
+// the Enricher types this `Error`, which is the Type every reader of a refused
+// value stays quiet about.
+//
+// Both halves of that are load-bearing. Dropping the Statement leaves `first`
+// undeclared and one mistake is reported again at every line that reads the
+// name — the cascade a `const price = 12` recovers from for the same reason.
+// Keeping `primes` as the value is the other half of the same cascade: `first`
+// would be a List, and `first::add(1)` would be answered with a near miss for a
+// Method nobody was reaching for.
+//
+// Nothing downstream of the Enricher ever sees one, the way nothing downstream
+// of it sees a `MemberPath`: a refused value only ever stands in a tree the
+// Parser reported an error on, and no stage runs past a reported error.
+export interface RefusedValueNode {
+	nodeType: "RefusedValue"
+	// NOTE: What was written in FRONT of the refused text, kept whole. It is a
+	// value a reader wrote, and it is enriched exactly as it would have been —
+	// so a mistake inside it is still reported, and only the reading of the
+	// brackets is lost. What stood INSIDE them is not kept: `items[items.length
+	// - 1]` holds a member read and an operator that would each be refused in
+	// their own right, and a reader who has not written the call yet is owed one
+	// refusal rather than three.
+	base: ExpressionNode
+	position: Position
+}
 
 // NOTE: `start expr` and `complete expr` — the two prefix Keywords asynchrony
 // is written with. `start` puts a Future in flight and answers the `Started`

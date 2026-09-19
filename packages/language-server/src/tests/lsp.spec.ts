@@ -149,6 +149,46 @@ describe("LSP", () => {
 			).toEqual(["A Comment is written with '§'"])
 		})
 
+		// NOTE: The same property for `primes[0]`, and visible in the same one
+		// place: an `essence check` stops after the Parser, so a cascade a
+		// refused index set off would be the editor's alone to show. Both
+		// halves are pinned — the name is still DECLARED, so nothing says
+		// `unknown-name` about it, and what it is bound to is an Error rather
+		// than the List in front of the brackets, so nothing offers `pad` for
+		// the `add` written on the line below.
+		it("should keep the Declaration an index was written in, and type it Error", () => {
+			expect(
+				analyse(`implementation {
+					constant primes = [2, 3, 5]
+					constant first = primes[0]
+					Terminal.print(first::add(1))
+					Terminal.print(first)
+				}`).map((diagnostic) => diagnostic.message),
+			).toEqual(["A value is not indexed with brackets"])
+		})
+
+		// NOTE: And nothing the BASE of a refused index has to say is said
+		// either. What stands in front of the brackets is decided by where the
+		// Parser cut the Expression: a label written flush against a '[' is
+		// read as the value the brackets index, so `contentsOf[3, 4]` reported
+		// `'contentsOf' is not declared` about a name nobody wrote as a name. A
+		// base whose own report would have been true is silenced with it — one
+		// written mistake, one report.
+		it("should say nothing about the value a refused index stands behind", () => {
+			expect(
+				analyse(`implementation {
+					constant readings = [1, 2]
+					Terminal.inspect(readings::append(contentsOf[3, 4]))
+				}`).map((diagnostic) => diagnostic.message),
+			).toEqual(["A value is not indexed with brackets"])
+
+			expect(
+				analyse(`implementation {
+					Terminal.inspect(undeclared[0])
+				}`).map((diagnostic) => diagnostic.message),
+			).toEqual(["A value is not indexed with brackets"])
+		})
+
 		it("should not run the Validator when the Enricher reported errors", () => {
 			let diagnostics = analyse(`implementation {
 				constant a = undeclaredVariable

@@ -54,6 +54,12 @@ implementation {
 		euros() {}
 	}
 
+	§ foreign-syntax — an item read by writing its position in brackets. The
+	§ Declaration is read on, so `first` is declared and bound to an Error, and
+	§ nothing below it is told a second thing about a mistake answered here.
+	constant primes = [2, 3, 5]
+	constant first = primes[0]
+
 	§ foreign-syntax — Type Arguments written at the call rather than inferred.
 	§ Written last: resynchronisation reads on from the '<' it was refused at,
 	§ and the '}' it finds first is the one that ends this block.

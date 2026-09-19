@@ -65,6 +65,13 @@ function spanOf(source: string, position: common.Position): string {
 		)
 }
 
+// NOTE: The text the one Diagnostic a Program carries underlines. A Position is
+// nullable for the few Diagnostics that stand for a whole file rather than for
+// something written in one; every refusal asked here stands at a span.
+function refusedSpan(source: string): string {
+	return spanOf(source, onlyDiagnostic(source).position as common.Position)
+}
+
 // NOTE: Written as one line per Statement with a real tab, so a span read back
 // out of the source is read out of the text a reader would have written.
 function program(...lines: Array<string>): string {
@@ -1268,6 +1275,428 @@ describe("Foreign syntax", () => {
 		})
 	})
 
+	// NOTE: `primes[0]` — the one habit in the family that is a SHAPE rather
+	// than a lexeme: every character of it is Essence, and what is foreign is a
+	// value standing flush in front of a List. Written apart it is two
+	// Statements and compiles, which is why the mistake used to surface a line
+	// or two below with a near miss for a Method nobody was reaching for.
+	describe("a value indexed with brackets", () => {
+		it("refuses the brackets where they were written", () => {
+			let source = program(
+				"constant primes = [2, 3, 5]",
+				"constant first = primes[0]",
+				"Terminal.print(first::add(1))",
+			)
+
+			expect(codesOf(source)).toEqual(["foreign-syntax"])
+			expect(messagesOf(source)).toEqual([
+				"A value is not indexed with brackets",
+			])
+			expect(labelsOf(source)).toEqual([
+				"nothing reads a value with brackets",
+			])
+			expect(refusedSpan(source)).toBe("[0]")
+		})
+
+		// NOTE: The whole of the recovery, and the reason the refusal is
+		// reported rather than thrown. Dropping the Statement leaves `first`
+		// undeclared and answers one mistake at every line that reads the name;
+		// keeping `primes` as its value makes `first` a List and answers
+		// `first::add(1)` with a near miss for `pad`.
+		it("declares the name and says nothing further about it", () => {
+			let source = program(
+				"constant primes = [2, 3, 5]",
+				"constant first = primes[0]",
+				"Terminal.print(first::add(1))",
+				"Terminal.print(first)",
+			)
+
+			expect(codesOf(source)).toEqual(["foreign-syntax"])
+		})
+
+		it("names the Method each collection reads an item with", () => {
+			expect(
+				helpsOf(
+					program(
+						"constant primes = [2, 3, 5]",
+						"constant first = primes[0]",
+						"Terminal.print(first)",
+					),
+				),
+			).toEqual([
+				"Write 'primes::item(at 0)' for a List, and 'primes::character(at 0)' for a String.",
+				"Write 'primes::value(at 0)' for a Dictionary, whose keys are values of its own key Type rather than positions.",
+				"A negative position counts back from the end, and 'firstItem()' and 'lastItem()' name the two ends of a List.",
+			])
+		})
+
+		// NOTE: A String key says the collection is a Dictionary and says it
+		// loudly — a List and a String are read by POSITION, and a position is
+		// an Integer and nothing else — so the Dictionary's Method leads and
+		// the two position Methods are never handed the String.
+		it("leads with the Dictionary where a String was written as the key", () => {
+			let source = program(
+				'constant ages = ["ada" = 36]',
+				'constant adasAge = ages["ada"]',
+				"Terminal.print(adasAge)",
+			)
+
+			expect(codesOf(source)).toEqual(["foreign-syntax"])
+			expect(helpsOf(source)).toEqual([
+				`Write 'ages::value(at "ada")' for a Dictionary, which is the collection a String keys.`,
+				"A List and a String are read by position instead: 'ages::item(at 0)' and 'ages::character(at 0)'.",
+			])
+			expect(refusedSpan(source)).toBe('["ada"]')
+		})
+
+		it("puts the written key back in front of the reader", () => {
+			expect(
+				helpsOf(
+					program(
+						"constant items = [1, 2, 3]",
+						"constant index = 1",
+						"constant one = items[index]",
+						"Terminal.print(one)",
+					),
+				)[0],
+			).toBe(
+				"Write 'items::item(at index)' for a List, and 'items::character(at index)' for a String.",
+			)
+		})
+
+		// NOTE: The receiver is spelled back out where the Parser holds its
+		// text — a name, or a path of them. `collection` stands in where it does
+		// not, and it is not `value` on purpose: one of the three Methods offered
+		// is itself called `value`, and `'value::value(at 0)'` reads as a rule
+		// about a Keyword rather than as a name to substitute.
+		it("names the receiver where its spelling was written down", () => {
+			expect(
+				helpsOf(
+					program(
+						"constant box = { items = [1, 2] }",
+						"constant first = box.items[0]",
+						"Terminal.print(first)",
+					),
+				)[0],
+			).toBe(
+				"Write 'box.items::item(at 0)' for a List, and 'box.items::character(at 0)' for a String.",
+			)
+
+			expect(
+				helpsOf(
+					program(
+						"function make() -> List<Integer> { <- [1] }",
+						"constant first = make()[0]",
+						"Terminal.print(first)",
+					),
+				)[0],
+			).toBe(
+				"Write 'collection::item(at 0)' for a List, and 'collection::character(at 0)' for a String.",
+			)
+		})
+
+		// NOTE: Anything but a single written value falls back to the schema.
+		// What stood between the brackets is never parsed — `items.length` is a
+		// member read and the `-` an operator, and each would be refused in its
+		// own right for a reader who has not written the call yet.
+		it("answers a written Expression once, and with the schema", () => {
+			let source = program(
+				"constant items = [1, 2, 3]",
+				"constant last = items[items.length - 1]",
+				"Terminal.print(last)",
+			)
+
+			expect(codesOf(source)).toEqual(["foreign-syntax"])
+			expect(helpsOf(source)[0]).toBe(
+				"Write 'items::item(at 0)' for a List, and 'items::character(at 0)' for a String.",
+			)
+		})
+
+		// NOTE: One habit written twice over. The second `[` stands flush
+		// against the first's `]`, which is the rule that made the first an
+		// index, so the whole run is read past and answered once.
+		it("answers a run of brackets once", () => {
+			let source = program(
+				"constant matrix = [[1, 2], [3, 4]]",
+				"constant cell = matrix[0][1]",
+				"Terminal.print(cell)",
+			)
+
+			expect(codesOf(source)).toEqual(["foreign-syntax"])
+			expect(refusedSpan(source)).toBe("[0][1]")
+		})
+
+		it("refuses an index written behind a call, a literal and a member read", () => {
+			expect(
+				codesOf(
+					program(
+						"function make() -> List<Integer> { <- [1] }",
+						"constant got = make()[0]",
+						"Terminal.print(got)",
+					),
+				),
+			).toEqual(["foreign-syntax"])
+
+			expect(
+				codesOf(
+					program(
+						'constant letter = "abc"[0]',
+						"Terminal.print(letter)",
+					),
+				),
+			).toEqual(["foreign-syntax"])
+
+			expect(
+				codesOf(
+					program(
+						'constant items = [{ name = "Ada" }]',
+						"constant who = items[0].name",
+						"Terminal.print(who)",
+					),
+				),
+			).toEqual(["foreign-syntax"])
+		})
+
+		// NOTE: In Argument position the name in front of the brackets used to
+		// read as a LABEL and the brackets as the List it labelled, so the
+		// report was `argument-label-mismatch` about a label nobody wrote. The
+		// `[` joins `#` and `.` in `argumentIsLabelled`: written flush it
+		// carries the name on, and a label is what stands a space in front of
+		// its value.
+		it("refuses an index written as an Argument", () => {
+			let source = program(
+				"constant primes = [2, 3, 5]",
+				"Terminal.print(primes[0])",
+			)
+
+			expect(codesOf(source)).toEqual(["foreign-syntax"])
+			expect(refusedSpan(source)).toBe("[0]")
+		})
+
+		it("refuses an index inside each container and inside a String's hole", () => {
+			expect(
+				codesOf(
+					program(
+						"constant primes = [2, 3, 5]",
+						"constant wrapped = [primes[0], 1]",
+						"Terminal.print(wrapped)",
+					),
+				),
+			).toEqual(["foreign-syntax"])
+
+			expect(
+				codesOf(
+					program(
+						"constant primes = [2, 3, 5]",
+						"constant held = { first = primes[0] }",
+						"Terminal.print(held)",
+					),
+				),
+			).toEqual(["foreign-syntax"])
+
+			expect(
+				codesOf(
+					program(
+						"constant primes = [2, 3, 5]",
+						'constant keyed = ["a" = primes[0]]',
+						"Terminal.print(keyed)",
+					),
+				),
+			).toEqual(["foreign-syntax"])
+
+			expect(
+				codesOf(
+					program(
+						"constant primes = [2, 3, 5]",
+						'Terminal.print("first: {primes[0]}")',
+					),
+				),
+			).toEqual(["foreign-syntax"])
+		})
+
+		it("refuses an index written as a subject, an arm and a condition", () => {
+			expect(
+				codesOf(
+					program(
+						"constant primes = [2, 3, 5]",
+						"constant named = match primes[0] -> String {",
+						'\tcase 2 { <- "two" }',
+						'\tcase _ { <- "other" }',
+						"}",
+						"Terminal.print(named)",
+					),
+				),
+			).toEqual(["foreign-syntax"])
+
+			expect(
+				codesOf(
+					program(
+						"constant primes = [2, 3, 5]",
+						"constant picked = define -> Integer {",
+						"\tas primes[0] if true",
+						"\tas 0 otherwise",
+						"}",
+						"Terminal.print(picked)",
+					),
+				),
+			).toEqual(["foreign-syntax"])
+
+			expect(
+				codesOf(
+					program(
+						"constant primes = [2, 3, 5]",
+						"if primes[0]::isLessThan(3) {",
+						'\tTerminal.print("low")',
+						"} else {",
+						'\tTerminal.print("high")',
+						"}",
+					),
+				),
+			).toEqual(["foreign-syntax"])
+		})
+
+		it("refuses an index written as a whole Statement", () => {
+			expect(
+				codesOf(program("constant primes = [2, 3, 5]", "primes[0]")),
+			).toEqual(["foreign-syntax"])
+		})
+
+		// NOTE: The brackets with an `=` behind them, which is a WRITE and was
+		// answered as two reports — the refusal, and then `Expected an
+		// Expression but found '='` from the Statement loop reading what was
+		// left — with three Helps between them, every one of them about a
+		// Method that READS.
+		describe("and written into", () => {
+			let source = program(
+				"variable primes = [2, 3, 5]",
+				"primes[0] = 5",
+				"Terminal.print(primes)",
+			)
+
+			it("answers the write once, and about writing", () => {
+				expect(codesOf(source)).toEqual(["foreign-syntax"])
+				expect(messagesOf(source)).toEqual([
+					"A value is not written into with brackets",
+				])
+				expect(labelsOf(source)).toEqual([
+					"nothing writes into a value with brackets",
+				])
+				expect(refusedSpan(source)).toBe("primes[0]")
+			})
+
+			it("names the Method each collection is rebuilt with", () => {
+				expect(helpsOf(source)).toEqual([
+					"Write 'primes = primes::replace(5, at 0)' for a List.",
+					"Write 'primes = primes::set(0, to 5)' for a Dictionary, whose keys are values of its own key Type rather than positions.",
+				])
+				expect(notesOf(source)).toEqual([
+					"Nothing changes a collection in place: a Method that changes one answers a NEW collection, which is why 'primes' is written again.",
+					"A name written again is a 'variable' — a 'constant' is bound once.",
+				])
+			})
+
+			it("leads with the Dictionary where a String was written as the key", () => {
+				expect(
+					helpsOf(
+						program(
+							'variable ages = ["ada" = 36]',
+							'ages["ada"] = 37',
+							"Terminal.print(ages)",
+						),
+					),
+				).toEqual([
+					`Write 'ages = ages::set("ada", to 37)' for a Dictionary, which is the collection a String keys.`,
+					`Or 'ages = [ages with "ada" = 37]', which is the same Dictionary spelled as a Literal.`,
+				])
+			})
+
+			// NOTE: The value is read off the Token for the reason the key is,
+			// and only where it is the whole of what is left of the Statement.
+			// Anything longer is the reader's own Expression, and a Help that
+			// quoted half of it would print something nobody wrote.
+			it("writes a schema where the value is more than one Token", () => {
+				expect(
+					helpsOf(
+						program(
+							"variable primes = [2, 3, 5]",
+							"primes[0] = 2::add(3)",
+							"Terminal.print(primes)",
+						),
+					)[0],
+				).toBe("Write 'primes = primes::replace(…, at 0)' for a List.")
+			})
+
+			// NOTE: `==` is two Tokens and another habit entirely, so it is
+			// left to the operator table — the brackets are still read, and the
+			// comparison is answered on its own.
+			it("leaves a comparison to the operator it is written with", () => {
+				expect(
+					codesOf(
+						program(
+							"constant primes = [2, 3, 5]",
+							"constant same = primes[0] == 5",
+							"Terminal.print(same)",
+						),
+					),
+				).toEqual(["foreign-syntax", "operator-not-supported"])
+			})
+
+			it("prints Helps that compile", () => {
+				expect(
+					codesOf(
+						program(
+							"variable primes = [2, 3, 5]",
+							"primes = primes::replace(5, at 0)",
+							'variable ages = ["ada" = 36]',
+							'ages = ages::set("ada", to 37)',
+							'variable years = ["ada" = 36]',
+							'years = [years with "ada" = 37]',
+							"Terminal.print(primes)",
+							"Terminal.print(ages)",
+							"Terminal.print(years)",
+						),
+					),
+				).toEqual([])
+			})
+		})
+
+		// NOTE: A `[` whose `]` never arrives is left where it stands. Reading
+		// past it would swallow the rest of the file to answer a habit, and the
+		// List Literal that was never closed is what wants reporting there.
+		it("leaves a bracket that never closes to the List Literal", () => {
+			expect(
+				codesOf(
+					program(
+						"constant primes = [2, 3, 5]",
+						"constant first = primes[0",
+					),
+				),
+			).toEqual(["syntax-error"])
+		})
+
+		// NOTE: The one shape this rule takes away. `contentsOf[3, 4]` compiled
+		// before it and does not after, and that is the rule `#` and `.` have
+		// always been read by: a label stands a SPACE in front of its value,
+		// and written flush it carries the name on instead. `esfmt` writes the
+		// space, and nothing in the standard library, the fixtures, the
+		// examples or the documentation was ever written without it.
+		//
+		// The `unknown-name` for the label read as a receiver is the Enricher's
+		// and stands behind this one; `diagnosticsOf` stops at the Parser for a
+		// Program the Parser refused, which is what an `essence check` does too.
+		it("reads a List written flush behind a label as an index", () => {
+			expect(
+				codesOf(
+					program(
+						"constant readings = [1, 2]",
+						"constant more = readings::append(contentsOf[3, 4])",
+						"Terminal.print(more)",
+					),
+				),
+			).toEqual(["foreign-syntax"])
+		})
+	})
+
 	// NOTE: The other half of every rule above — the Essence that is written in
 	// the same characters, which none of them may touch. Each of these compiled
 	// before the family was written and has to compile after it.
@@ -1431,6 +1860,67 @@ describe("Foreign syntax", () => {
 						"type Point = { x: Integer }",
 						"constant origin = Point~>{ x = 0 }",
 						"Terminal.print(origin.x)",
+					),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: Every place a `[` is written behind a value in this repository,
+		// swept over the standard library, the fixtures, the examples and every
+		// Essence sample in the documentation: a labelled Argument and the rows
+		// of a table test, each of them written with the space. Nothing there
+		// writes one flush, which is what the index rule is narrowed to.
+		it("keeps a List written a space behind a label", () => {
+			expect(
+				codesOf(
+					program(
+						"constant readings = [1, 2]",
+						"constant more = readings::append(contentsOf [3, 4])",
+						"constant shared = more::everyItem(alsoIn [1, 2])",
+						"Terminal.print(more::contains(everyItemOf [1, 3]))",
+						"Terminal.print(shared::length())",
+					),
+				),
+			).toEqual([])
+		})
+
+		it("keeps the rows of a table test", () => {
+			expect(
+				codesOf(
+					[
+						"implementation {",
+						"\tfunction double(_ n: Integer) -> Integer {",
+						"\t\t<- n::multiply(with 2)",
+						"\t}",
+						"}",
+						"tests {",
+						'\ttest "doubles" across [',
+						"\t\t{ n = 1, doubled = 2 },",
+						"\t] ({ n, doubled }: { n: Integer, doubled: Integer }) {",
+						"\t\texpect double(n)::is(doubled)",
+						"\t}",
+						"}",
+					].join("\n"),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: The three bracket forms that are not a List at all, and a List
+		// opening a Statement of its own on the line under a value — which is
+		// the reading the index rule leaves untouched, since nothing carries an
+		// Expression across a line break.
+		it("keeps a Dictionary, its update, the empty one and a List on its own line", () => {
+			expect(
+				codesOf(
+					program(
+						'constant ages = ["ada" = 36]',
+						'constant older = [ages with "ada" = 37]',
+						"constant none: Dictionary<String, Integer> = [=]",
+						"constant items = [1, 2]",
+						"[3, 4]::map((_ n: Integer) -> Integer { <- n })",
+						'Terminal.print(older::value(at "ada"))',
+						"Terminal.print(none::isEmpty())",
+						"Terminal.print(items::length())",
 					),
 				),
 			).toEqual([])

@@ -283,6 +283,11 @@ function validateImplementationNode(
 		case "CaseValue":
 		case "Start":
 		case "Complete":
+		// NOTE: Never reached — the Validator runs on a Program the Enricher
+		// reported nothing about, and a refused value only ever stands in one
+		// it did. Named all the same, so the switch stays total and nothing has
+		// to guess what a Node kind left out of it would have done.
+		case "RefusedValue":
 			// NOTE: The one position where what an Expression ANSWERS with
 			// decides whether it may stand at all — a Statement drops the
 			// value, and for work that is the whole of what went wrong. Asked
@@ -353,6 +358,10 @@ function validateExpression(
 		case "IntegerValue":
 		case "BooleanValue":
 		case "Self":
+		// NOTE: Never reached, for the reason the Statement walk gives — and
+		// there would be nothing to validate either way: what stands here was
+		// refused where it was written.
+		case "RefusedValue":
 			// these nodes dont need any validation
 			return node
 	}

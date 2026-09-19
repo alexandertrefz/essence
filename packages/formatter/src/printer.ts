@@ -2130,6 +2130,15 @@ export class Printer {
 					"." + node.steps.map((step) => step.content).join("."),
 				)
 
+			// NOTE: Never printed. A refused value only ever stands in a tree
+			// the Parser reported an error on, and the safety gate refuses to
+			// format a file with any Diagnostic in it — so this arm exists for
+			// the switch rather than for a reader. What it prints is the base
+			// alone, because the brackets it was refused for were read past and
+			// are nowhere in the tree to print back.
+			case "RefusedValue":
+				return this.printExpression(node.base)
+
 			default:
 				return this.printValue(node)
 		}

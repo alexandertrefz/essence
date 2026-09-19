@@ -1347,6 +1347,15 @@ function walkNode(
 		case "Complete":
 			walkNode(node.expression, scope, context)
 			return
+		// NOTE: And into what was written in front of a refusal. Of every walk
+		// in this Server this is the one where missing a Node writes a WRONG
+		// answer rather than none: the name inside `primes[0]` is an occurrence
+		// a reader can see, and a rename that skipped it would leave the file
+		// naming two things where it named one. The index is also what colours
+		// the document — see `findSemanticTokens`.
+		case "RefusedValue":
+			walkNode(node.base, scope, context)
+			return
 		case "CaseValue":
 			// NOTE: The Case's name resolves through the Choice — only the
 			// (optional) Choice prefix is a Type reference of its own, along with
@@ -2709,6 +2718,10 @@ function walkTypedNode(
 		case "Start":
 		case "Complete":
 			walkTypedNode(node.expression, context)
+			return
+		// NOTE: The typed half of the same, for the reason above.
+		case "RefusedValue":
+			walkTypedNode(node.base, context)
 			return
 		case "Match":
 			walkTypedNode(node.value, context)

@@ -234,6 +234,7 @@ export function enrichNode(
 		case "CaseValue":
 		case "Start":
 		case "Complete":
+		case "RefusedValue":
 			return [enrichExpression(node, scope)]
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
@@ -342,6 +343,45 @@ function enrichCalleeExpression(
 			return enrichStart(node, scope)
 		case "Complete":
 			return enrichComplete(node, scope)
+		case "RefusedValue":
+			return enrichRefusedValue(node, scope)
+	}
+}
+
+// NOTE: A value the Parser refused WHERE IT WAS WRITTEN and reported on there —
+// `primes[0]`, and whatever else joins it. The base is enriched exactly as it
+// would have been, so the Type is worked out and a rename still reaches the
+// name; what is thrown away is that Type, which is an Error from here on.
+//
+// That Error is the whole of the recovery. Every reader of a value asks whether
+// its Type is one before it says anything — `first::add(1)` is answered with
+// silence rather than with a near miss for a Method nobody reached for — so one
+// habit is answered once, at the brackets a reader can see.
+//
+// NOTE: And what the base's own enrichment says is dropped with it. What stands
+// in front of the brackets is decided by where the Parser cut the Expression
+// rather than by what the reader meant: `readings::append(contentsOf[3, 4])`
+// writes a LABEL flush against a `[`, and the label is read as the value the
+// brackets index — so the second report was `'contentsOf' is not declared`,
+// about a name nobody wrote as a name. A base whose own report would have been
+// true — `undeclared[0]` — is silenced with it, deliberately: the refusal stops
+// the reader at this Expression either way, and two reports about one written
+// thing is one more than a reader can act on. The CLI never saw either, because
+// a `foreign-syntax` from the Parser stops the compile before the Enricher runs;
+// the editor enriches regardless, which is where the cascade showed up.
+function enrichRefusedValue(
+	node: parser.RefusedValueNode,
+	scope: enricher.Scope,
+): common.typed.RefusedValueNode {
+	let { result: base } = collectDiagnostics(() =>
+		enrichExpression(node.base, scope),
+	)
+
+	return {
+		nodeType: "RefusedValue",
+		base,
+		position: node.position,
+		type: { type: "Error" },
 	}
 }
 
@@ -7958,6 +7998,12 @@ function writtenKeyLookup(
 		case "Start":
 		case "Complete":
 			return writtenKeyLookup(node.expression, check)
+		// NOTE: The walk stops at a refused value rather than carrying on into
+		// what was written in front of it. What this looks for is a lookup to
+		// report a redundant guard about, and a second Diagnostic inside text
+		// that has already been refused is the cascade the refusal recovers to
+		// avoid.
+		case "RefusedValue":
 		case "Identifier":
 		case "Self":
 		case "StringValue":

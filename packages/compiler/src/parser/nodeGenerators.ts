@@ -379,6 +379,17 @@ export function self(position: common.Position): parser.SelfNode {
 	}
 }
 
+export function refusedValue(
+	base: parser.ExpressionNode,
+	position: common.Position,
+): parser.RefusedValueNode {
+	return {
+		nodeType: "RefusedValue",
+		base,
+		position,
+	}
+}
+
 export function identifier(
 	content: string,
 	position: common.Position,

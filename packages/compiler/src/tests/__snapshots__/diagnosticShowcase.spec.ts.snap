@@ -885,10 +885,26 @@ Error: 'class' declares nothing in Essence
 ────╯
 
 [foreign-syntax]
-Error: A call writes no Type Arguments
-    ╭─┤ ForeignSyntax.es:60:27 │
+Error: A value is not indexed with brackets
+    ╭─┤ ForeignSyntax.es:61:25 │
     │
- 60 │     constant identity = twice<Integer>(2)
+ 61 │     constant first = primes[0]
+    │                            ─┬─  
+    │                             ╰─── nothing reads a value with brackets
+    │ 
+    │ Help 1: Write 'primes::item(at 0)' for a List, and 'primes::character(at 0)' for a String.
+    │ Help 2: Write 'primes::value(at 0)' for a Dictionary, whose keys are values of its own key Type rather than positions.
+    │ Help 3: A negative position counts back from the end, and 'firstItem()' and 'lastItem()' name the two ends of a List.
+    │ 
+    │ Note 1: Nothing carries an Expression on into brackets: what stands here is 'primes' and then a List of its own — two Statements, and a reading of an item in neither.
+    │ Note 2: A position or a key can always name nothing, so each of these answers an Optional — and each takes a 'defaultingTo:' entry that answers a value in its place.
+────╯
+
+[foreign-syntax]
+Error: A call writes no Type Arguments
+    ╭─┤ ForeignSyntax.es:66:27 │
+    │
+ 66 │     constant identity = twice<Integer>(2)
     │                              ────┬────  
     │                                  ╰────── these are worked out from the Arguments
     │ 
@@ -898,7 +914,7 @@ Error: A call writes no Type Arguments
     │ Note: Every Type Argument is inferred at the call, which is why a Generic Parameter is declared 'infer' — there is no spelling that pins one.
 ────╯
 
-─── 14 errors
+─── 15 errors
 "
 `;
 

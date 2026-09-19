@@ -59,6 +59,31 @@ function rename(source: string, cursor: common.Cursor, newName: string) {
 }
 
 describe("Rename", () => {
+	// NOTE: A file being edited is a file that does not compile, so every walk
+	// here runs over trees with refusals in them. This is the one walk where
+	// missing a Node writes a WRONG answer rather than none: the name in front
+	// of a refused index is an occurrence a reader can see, and skipping it
+	// would leave the file naming two things where it named one.
+	it("should reach the name a refused index was written on", () => {
+		let source = [
+			"implementation {",
+			"\tconstant primes = [2, 3, 5]",
+			"\tconstant first = primes[0]",
+			"\tTerminal.print(primes::length())",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 11 }, "numbers")).toBe(
+			[
+				"implementation {",
+				"\tconstant numbers = [2, 3, 5]",
+				"\tconstant first = numbers[0]",
+				"\tTerminal.print(numbers::length())",
+				"}",
+			].join("\n"),
+		)
+	})
+
 	it("should rename a Variable across declaration, reference and assignment", () => {
 		let source = [
 			"implementation {",

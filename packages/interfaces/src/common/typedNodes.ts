@@ -348,6 +348,28 @@ export type ExpressionNode =
 	| CaseValueNode
 	| StartNode
 	| CompleteNode
+	| RefusedValueNode
+
+// NOTE: A value the Parser refused where it was written — `primes[0]` — typed.
+// The Type is an Error and can be nothing else: that is what this Node is FOR.
+// Every reader of a value asks whether its Type is one before it says anything,
+// so a Declaration that binds one is answered with silence at every line that
+// reads the name, and one habit is answered once, at the brackets a reader can
+// see.
+//
+// `base` is what was written in FRONT of the refused text, enriched exactly as
+// it would have been — so a rename still reaches the name written there, and a
+// mistake inside it is still reported in its own right.
+//
+// Nothing downstream of the Enricher ever sees one: a refused value only ever
+// stands in a tree that carries a reported error, and neither the Validator nor
+// the Simplifier is reached for such a tree.
+export interface RefusedValueNode {
+	nodeType: "RefusedValue"
+	base: ExpressionNode
+	position: Position
+	type: ErrorType
+}
 
 // NOTE: `start expr`, typed. `type` is the `Started<Value>` of the operand's
 // `Future<Value>` — putting work in flight neither runs it to its end nor waits

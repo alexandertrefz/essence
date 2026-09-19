@@ -120,6 +120,7 @@ function simplifyImplementationNode(
 		case "CaseValue":
 		case "Start":
 		case "Complete":
+		case "RefusedValue":
 			return simplifyExpression(node)
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
@@ -204,6 +205,14 @@ function simplifyExpression(
 				type: node.type,
 				position: node.position,
 			}
+		// NOTE: Never reached. A refused value carries an Error Type, Error
+		// Types gate codegen, and nothing is simplified for a Program that was
+		// reported on. It stands for the value written in front of the brackets
+		// it was refused at, and that is what the arm answers with — an arm that
+		// threw would turn an impossible tree into a crash rather than into the
+		// Diagnostic the Program already has.
+		case "RefusedValue":
+			return simplifyExpression(node.base)
 	}
 }
 

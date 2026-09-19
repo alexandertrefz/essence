@@ -504,6 +504,135 @@ function foreignSyntaxRefusal(
 	return null
 }
 
+// NOTE: `primes[0]`, `ages["ada"]`, `matrix[0][1]` — reading an item by writing
+// its position in brackets, which is the one habit here that is a SHAPE rather
+// than a lexeme: every character of it is Essence, and what is foreign is that
+// one value stands flush in front of another.
+//
+// `receiver` is the value in front of the brackets as it was WRITTEN, where
+// that is a name or a path of them — `primes`, `box.items`, `@.items` — and
+// null where an Expression stands there instead. `key` is what was written
+// INSIDE them where that is a single value, and null where it is anything else.
+// The Helps put both back in front of the reader, and write a schematic name
+// where there is none to put.
+//
+// NOTE: No `essence-spelling`. Which Method reads an item is decided by the
+// receiver's TYPE — `item(at:)` for a List, `value(at:)` for a Dictionary,
+// `character(at:)` for a String — and the Parser knows no Types at all. A fix
+// that guessed one of the three would trade this refusal for an
+// `unknown-method` two thirds of the time, so the three are offered as Helps
+// and the reader picks the one they meant.
+// NOTE: The value in front of the brackets spelled back out, where it is a name
+// or a path of names — `primes`, `box.items`, `@.items`. Null for everything
+// else, which is every shape whose spelling the Parser does not hold: a call, a
+// Literal, a Method chain. A Help built on one of those would have to invent the
+// text it named, and a schematic name says "yours goes here" where an invented
+// one says nothing at all.
+function writtenReceiver(node: parser.ExpressionNode): string | null {
+	switch (node.nodeType) {
+		case "Identifier":
+			return node.content
+		case "Self":
+			return "@"
+		case "Lookup": {
+			let base = writtenReceiver(node.base)
+
+			return base === null ? null : `${base}.${node.member.content}`
+		}
+		default:
+			return null
+	}
+}
+
+function indexRefusal(
+	receiver: string | null,
+	key: { text: string; keyed: boolean } | null,
+	position: common.Position,
+): ForeignRefusal {
+	// NOTE: `collection` rather than `value` for the value that has no name of
+	// its own, because one of the three Methods offered below is itself called
+	// `value` and `'value::value(at 0)'` reads as a rule about a Keyword rather
+	// than as a name to substitute.
+	let written = receiver ?? "collection"
+	let subject =
+		receiver === null ? "the value it stands behind" : `'${receiver}'`
+	// NOTE: A written String key says the collection is a Dictionary and says
+	// it loudly, because a List and a String are read by POSITION and a
+	// position is an Integer and nothing else. So the Helps are ordered by what
+	// was written, and the position Methods are never handed the String key: a
+	// Help that offers a call which resolves to nothing sends a reader from one
+	// refusal to the next.
+	let keyed = key?.keyed === true
+	let at = keyed ? "0" : (key?.text ?? "0")
+
+	return {
+		code: "foreign-syntax",
+		message: "A value is not indexed with brackets",
+		label: "nothing reads a value with brackets",
+		position,
+		notes: [
+			`Nothing carries an Expression on into brackets: what stands here is ${subject} and then a List of its own — two Statements, and a reading of an item in neither.`,
+			"A position or a key can always name nothing, so each of these answers an Optional — and each takes a 'defaultingTo:' entry that answers a value in its place.",
+		],
+		helps: keyed
+			? [
+					`Write '${written}::value(at ${key?.text})' for a Dictionary, which is the collection a String keys.`,
+					`A List and a String are read by position instead: '${written}::item(at 0)' and '${written}::character(at 0)'.`,
+				]
+			: [
+					`Write '${written}::item(at ${at})' for a List, and '${written}::character(at ${at})' for a String.`,
+					`Write '${written}::value(at ${at})' for a Dictionary, whose keys are values of its own key Type rather than positions.`,
+					`A negative position counts back from the end, and 'firstItem()' and 'lastItem()' name the two ends of a List.`,
+				],
+	}
+}
+
+// NOTE: `primes[0] = 5` — the same habit with an `=` behind it, which is a
+// different mistake and was answered as two: the refusal about the brackets, and
+// then `Expected an Expression but found '='` from the Statement loop reading
+// what was left. Every Help it printed named a Method that READS.
+//
+// Nothing in this language changes a collection in place, so the answer is a
+// whole Statement rather than a call: the Method answers a new collection, and
+// the name is written again. `at` and `value` are what was written where that is
+// one value each, and a `…` where the reader's own goes — the same rule the
+// reading refusal follows about the key.
+//
+// No `essence-spelling` here either, and for the reason there is none there: a
+// List is rebuilt with `replace(_:at:)` and a Dictionary with `set(_:to:)`, and
+// which of the two this is depends on a Type the Parser does not have.
+function indexWriteRefusal(
+	receiver: string | null,
+	key: { text: string; keyed: boolean } | null,
+	value: string | null,
+	position: common.Position,
+): ForeignRefusal {
+	let written = receiver ?? "collection"
+	let keyed = key?.keyed === true
+	let at = key?.text ?? "0"
+	let put = value ?? "…"
+
+	return {
+		code: "foreign-syntax",
+		message: "A value is not written into with brackets",
+		label: "nothing writes into a value with brackets",
+		position,
+		notes: [
+			`Nothing changes a collection in place: a Method that changes one answers a NEW collection, which is why '${written}' is written again.`,
+			`A name written again is a 'variable' — a 'constant' is bound once.`,
+		],
+		helps: keyed
+			? [
+					`Write '${written} = ${written}::set(${at}, to ${put})' for a Dictionary, which is the collection a String keys.`,
+					`Or '${written} = [${written} with ${at} = ${put}]', which is the same Dictionary spelled as a Literal.`,
+				]
+			: [
+					`Write '${written} = ${written}::replace(${put}, at ${at})' for a List.`,
+					`Write '${written} = ${written}::set(${at}, to ${put})' for a Dictionary, whose keys are values of its own key Type rather than positions.`,
+				],
+	}
+}
+
 // NOTE: An Expression that can only ever be a VALUE, which is what tells a
 // Dictionary's key from a Record's member name. Everything else — a name, a
 // member read, a call — may be either the base of an update or, for a name, a
@@ -3962,6 +4091,29 @@ class DescentParser {
 						end: argumentList.position.end,
 					},
 				)
+			} else if (
+				token?.type === TokenType.SymbolLeftBracket &&
+				isAdjacent(expression.position, token.position)
+			) {
+				// NOTE: `primes[0]` — the postfix form every other language
+				// reads an item with, and the one Token that can stand here
+				// without ending the Expression in this one. ADJACENCY is the
+				// whole rule, and it is the rule a label is already read by:
+				// `append(contentsOf [1, 2])` passes a List under a label and
+				// `normalize(as #ComposedCanonical)` a bare Case, both with the
+				// space that says the bracket or the sigil opens a value of its
+				// own. Written flush, neither does.
+				let refused = this.refuseIndexBrackets(expression)
+
+				// NOTE: A `[` whose `]` never arrives is left where it is.
+				// Reading past it would swallow the rest of the file to answer
+				// a habit, and what wants reporting there is the List Literal
+				// that was never closed.
+				if (refused === null) {
+					break
+				}
+
+				expression = refused
 			} else {
 				break
 			}
@@ -4080,6 +4232,188 @@ class DescentParser {
 				return offset + 1
 			}
 		}
+	}
+
+	// NOTE: `primes[0]` — reported at the brackets and READ PAST, which is the
+	// recovery `parseForeignDeclarationStatement` makes for a `const` and for
+	// the same reason: a thrown refusal takes the Declaration with it, and a
+	// Constant nothing declares is reported again at every line that reads it.
+	// What is handed back stands for a value that has been refused, and the
+	// Enricher types it `Error` so that nothing downstream says a second thing
+	// about a mistake that has been answered.
+	//
+	// Null where the brackets never close, which is the one shape this leaves
+	// alone — see the caller.
+	protected refuseIndexBrackets(
+		expression: parser.ExpressionNode,
+	): parser.RefusedValueNode | null {
+		let opening = this.tokens.peek()
+		let length = this.balancedBracketLength()
+
+		if (opening === undefined || length === null) {
+			return null
+		}
+
+		let key = this.writtenIndexKey(length)
+		let end = expression.position.end
+
+		// NOTE: `matrix[0][1]` is one habit written twice over, so the whole run
+		// of brackets is read past and answered once. Each of them stands flush
+		// against the one in front of it, which is the rule that made the first
+		// of them an index at all.
+		while (true) {
+			let bracket = this.tokens.peek()
+
+			if (
+				bracket?.type !== TokenType.SymbolLeftBracket ||
+				bracket.position.start.line !== end.line ||
+				bracket.position.start.column !== end.column
+			) {
+				break
+			}
+
+			let group = this.balancedBracketLength()
+
+			if (group === null) {
+				break
+			}
+
+			for (let step = 0; step < group; step++) {
+				end = this.tokens.next().position.end
+			}
+		}
+
+		let written = { start: opening.position.start, end }
+
+		// NOTE: An `=` behind the brackets is a WRITE, which is a different
+		// mistake with different Methods behind it — and the one shape here that
+		// is refused rather than read past: what follows the `=` is the value
+		// the reader meant to store, and reading on would answer it as a
+		// Statement of its own. The throw takes the whole Statement, which is
+		// what `refuseMemberAssignment` does about `user.name = "Ada"`.
+		//
+		// `==` is left alone: it is two Tokens, the lexeme is not an `=`, and
+		// what it says is answered by the operator table a line further on.
+		if (this.foreignLexeme()?.text === "=") {
+			this.refuseForeignText(
+				indexWriteRefusal(
+					writtenReceiver(expression),
+					key,
+					this.writtenAssignedValue(),
+					{ start: expression.position.start, end },
+				),
+			)
+		}
+
+		this.reportForeignText(
+			indexRefusal(writtenReceiver(expression), key, written),
+		)
+
+		return generators.refusedValue(expression, {
+			start: expression.position.start,
+			end,
+		})
+	}
+
+	// NOTE: How many Tokens the bracket group at the cursor was written across,
+	// counting its own two, or null where its `]` never arrives. Only brackets
+	// are counted: they nest inside each other in every text this is asked
+	// about, and a `]` written inside a String is one Token rather than a
+	// bracket.
+	protected balancedBracketLength(): number | null {
+		let depth = 0
+
+		for (let offset = 0; ; offset++) {
+			let token = this.tokens.peek(offset)
+
+			if (token === undefined) {
+				return null
+			}
+
+			if (token.type === TokenType.SymbolLeftBracket) {
+				depth++
+			} else if (token.type === TokenType.SymbolRightBracket) {
+				depth--
+
+				if (depth === 0) {
+					return offset + 1
+				}
+			}
+		}
+	}
+
+	// NOTE: What was written between the brackets, where that is ONE value a
+	// Help can put back in front of the reader — `primes[0]`, `ages["ada"]`,
+	// `items[i]`. Read off the Token rather than parsed, because a parse would
+	// report on what it read and the whole point of the refusal is that the
+	// brackets are not read at all.
+	//
+	// `keyed` says a String was written, which is what tells a Dictionary's key
+	// from a List's position — and a String is only spelled back out where it
+	// holds neither a quote nor an escape, since what the Lexer hands over is
+	// the decoded text and quoting it again would print something else.
+	protected writtenIndexKey(
+		length: number,
+	): { text: string; keyed: boolean } | null {
+		if (length !== 3) {
+			return null
+		}
+
+		let written = this.tokens.peek(1) as Token
+
+		if (
+			written.type === TokenType.LiteralNumber ||
+			written.type === TokenType.Identifier
+		) {
+			return { text: written.value, keyed: false }
+		}
+
+		if (
+			written.type !== TokenType.LiteralString ||
+			written.value.includes('"') ||
+			written.value.includes("\\")
+		) {
+			return null
+		}
+
+		return { text: `"${written.value}"`, keyed: true }
+	}
+
+	// NOTE: And what was written to the RIGHT of the `=`, on the same terms: one
+	// Token, read rather than parsed, and only where it is the whole of what is
+	// left of the Statement — the next Token stands on another line. Anything
+	// longer is an Expression of the reader's own, and a Help that quoted half of
+	// it would print something they never wrote; `…` says "yours goes here".
+	//
+	// Asked with the cursor standing ON the `=`, which is where the brackets left
+	// it.
+	protected writtenAssignedValue(): string | null {
+		let written = this.tokens.peek(1)
+		let following = this.tokens.peek(2)
+
+		if (
+			written === undefined ||
+			following?.position.start.line === written.position.start.line
+		) {
+			return null
+		}
+
+		if (
+			written.type === TokenType.LiteralNumber ||
+			written.type === TokenType.Identifier
+		) {
+			return written.value
+		}
+
+		if (
+			written.type !== TokenType.LiteralString ||
+			written.value.includes('"') ||
+			written.value.includes("\\")
+		) {
+			return null
+		}
+
+		return `"${written.value}"`
 	}
 
 	// NOTE: The refusal made as a Diagnostic rather than thrown, for the sites
@@ -7325,15 +7659,24 @@ class DescentParser {
 			return false
 		}
 
-		// NOTE: '#' and '.' both continue the Identifier when they are written
-		// flush against it — `Choice#Case` and `order.isPaid` — and both open an
-		// Expression of their own when a space stands between: `label #Case`
-		// passes a bare Case, `label .price` passes a member path. The space is
-		// the whole difference, and it is the same rule the prefixed Case
-		// construction is read by.
+		// NOTE: '#', '.' and '[' all continue the Identifier when they are
+		// written flush against it — `Choice#Case`, `order.isPaid` and the
+		// `primes[0]` that is refused as an index — and each opens an Expression
+		// of its own when a space stands between: `label #Case` passes a bare
+		// Case, `label .price` a member path, `contentsOf [1, 2]` a List. The
+		// space is the whole difference, and it is the same rule the prefixed
+		// Case construction is read by.
+		//
+		// NOTE: The `[` is here so that `Terminal.print(primes[0])` is answered
+		// about the index rather than about the Argument it is not: read as a
+		// label, `primes` labelled a List and the report was
+		// `argument-label-mismatch` about a label nobody wrote. Read as an
+		// Expression, the brackets are met where the Expression ENDS, which is
+		// where they are refused and named.
 		if (
 			following!.type === TokenType.SymbolHash ||
-			following!.type === TokenType.SymbolDot
+			following!.type === TokenType.SymbolDot ||
+			following!.type === TokenType.SymbolLeftBracket
 		) {
 			return !isAdjacent(token.position, following!.position)
 		}

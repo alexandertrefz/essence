@@ -889,6 +889,12 @@ function findProbeReceiverInNode(
 		case "Start":
 		case "Complete":
 			return findProbeReceiverInNode(node.expression)
+		// NOTE: And straight through a refused value, for the same reason: what
+		// stands in front of the brackets was read where it stands, and a
+		// reader completing inside it is asking about the value they wrote
+		// rather than about the brackets it was refused at.
+		case "RefusedValue":
+			return findProbeReceiverInNode(node.base)
 		case "ProtocolDeclarationStatement":
 			return null
 		// NOTE: No path-key reading for a Method's Arguments, for the reason
