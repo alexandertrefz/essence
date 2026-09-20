@@ -1457,7 +1457,7 @@ Error: This Argument is missing 1 member the default does not fill in
    │ 
    │ Help: Write 'port' into this Record.
    │ 
-   │ Note 1: Parameter 'using' is { host: String, port: Integer, retries: Integer }.
+   │ Note 1: Parameter 'using' is Options.
    │ Note 2: Its default fills in 'retries'; every other member must be written.
 ───╯
 ```
@@ -1826,7 +1826,7 @@ Error: A path key reaches into a member no default fills in
    │ 
    │ Help: Write the whole member: 'server = { … }'.
    │ 
-   │ Note 1: Parameter 'using' is { server: { host: String, port: Integer }, retries: Integer }.
+   │ Note 1: Parameter 'using' is Options.
    │ Note 2: Its default fills in 'retries', and 'server' is not one of them — so there is nothing under this key to merge with.
 ───╯
 ```
@@ -1960,14 +1960,14 @@ Taught on: [Dictionaries › Writing a dictionary](/docs/language/dictionaries#w
 ```
 [partial-type-mismatch]
 Error: This is not a Partial of the value it updates
-   ╭─┤ Point.es:3:32 │
+   ╭─┤ Point.es:3:36 │
    │
  3 │     constant moved = { point with x = "one" }
-   │                        ──┬──      ────┬────  
-   │                          ╰────────────│────── this is a { x: Integer, y: Integer }
-   │                                       │      
-   │                                       ╰────── this is a { x: String }
-   │ 
+   │                        ──┬──          ──┬──
+   │                          ╰──────────────│──── this is a { x: Integer, y: Integer }
+   │                                         │
+   │                                         ╰──── this is a String, and the value it updates declares an Integer
+   │
    │ Note: An update may only set members the original already has, with the Types it declared for them.
 ───╯
 ```
@@ -2794,7 +2794,7 @@ Error: This payload does not fit Case '#Circle'
    │
  7 │     constant shape: Shape = #Circle({ radius = "big" })
    │                                     ─────────┬────────  
-   │                                              ╰────────── this is a { radius: { radius: String } }
+   │                                              ╰────────── 'radius' is a { radius: String }, and '#Circle' declares an Integer
    │ 
    │ Note: '#Circle' carries a { radius: Integer }.
 ───╯

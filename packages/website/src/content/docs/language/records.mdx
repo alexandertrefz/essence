@@ -135,17 +135,17 @@ Error: This value does not fit the declared Type of Constant 'screen'
    │
  4 │     constant screen: Size = { width = 1920 }
    │                             ────────┬───────
-   │                                     ╰───────── this is a { width: Integer }
+   │                                     ╰───────── 'height' is missing
    │
-   │ Note: 'screen' is declared as { width: Integer, height: Integer }.
+   │ Note: 'screen' is declared as Size.
 ───╯
 ```
 
 </div>
 
-The note spells the shape out and never says `Size`: the compiler does not keep a record type's name for display. A member of the wrong type, `{ width = "wide", height = 1080 }`, is refused with the same code.
+The note says `Size`, and the label names the member rather than printing either shape back at you. A member of the wrong type, `{ width = "wide", height = 1080 }`, is refused with the same code and points at the value: `this is a String, and Size declares an Integer`.
 
-TypeScript's optional member has no counterpart. `?` is a name character, as it is in a parameter name on [Functions](/docs/language/functions), so `nickname?: String` declares a required member named `nickname?`. Leaving it out is the same `assignment-type-mismatch`, even though the note prints the shape as `{ name: String, nickname?: String }`. A member that may hold no value is an [`Optional`](/docs/language/optional). A member a call may leave out is one a parameter's default fills in, as "Record parameters with defaults" below shows.
+TypeScript's optional member has no counterpart. `?` is a name character, as it is in a parameter name on [Functions](/docs/language/functions), so `nickname?: String` declares a required member named `nickname?`. Leaving it out is the same `assignment-type-mismatch`, reported against a member named `nickname?`. A member that may hold no value is an [`Optional`](/docs/language/optional). A member a call may leave out is one a parameter's default fills in, as "Record parameters with defaults" below shows.
 
 ## Structural typing
 
@@ -303,7 +303,7 @@ Every literal, member read and update is checked where it is written, and these 
 | --- | --- | --- |
 | `partial-type-mismatch` | `{ order with shipped = true }`, a member `order` does not have; `{ order with paid = "yes" }`, a member of the wrong type; `{ config with server = { port = 8080 } }`, a replacement that is not a whole `Server` | This is not a Partial of the value it updates |
 | [`duplicate-member`](/docs/reference/diagnostics#duplicate-member) | `{ x = 1, y = 2, x = 3 }`; `{ config with server = fallback, server.port = 3 }` | Member 'x' is already defined; Member 'server.port' and 'server' both write 'server' |
-| `unknown-member` | `here.z`, where `here` is a `Point` | `{ x: Integer, y: Integer }` has no member 'z' |
+| `unknown-member` | `here.z`, where `here` is a `Point` | Point has no member 'z' |
 | [`uncombinable-types`](/docs/reference/diagnostics#uncombinable-types) | `{ base with host }`, where `host` holds a `String` | Strings can not be combined |
 | [`shorthand-in-combination`](/docs/reference/diagnostics#shorthand-in-combination) | `{ base with host, port = 8080 }` | A bare member name is not a key in an update |
 | [`path-key-outside-combination`](/docs/reference/diagnostics#path-key-outside-combination) | `{ name = "api", server.port = 1 }`, a path in a literal that updates nothing | A path key reaches into nothing here |
@@ -314,20 +314,20 @@ Every literal, member read and update is checked where it is written, and these 
 
 </div>
 
-The first is the most common. A Partial, as in TypeScript's `Partial<T>`, is a record with some of the original's members, of the same types. The error's labels show both shapes, so the member at fault can be read off them:
+The first is the most common. A Partial, as in TypeScript's `Partial<T>`, is a record with some of the original's members, of the same types. The error names the member at fault and points at it:
 
 <div class="error-output">
 
 ```
 [partial-type-mismatch]
 Error: This is not a Partial of the value it updates
-   ╭─┤ update.es:5:34 │
+   ╭─┤ update.es:5:44 │
    │
  5 │     constant shipped = { order with shipped = true }
-   │                          ──┬──      ───────┬──────
-   │                            ╰───────────────│──────── this is a { item: String, quantity: Integer, paid: Boolean }
-   │                                            │
-   │                                            ╰──────── this is a { shipped: Boolean }
+   │                          ──┬──                ──┬─
+   │                            ╰────────────────────│─── this is an Order
+   │                                                 │
+   │                                                 ╰─── 'shipped' is not a member of Order
    │
    │ Note: An update may only set members the original already has, with the Types it declared for them.
 ───╯
@@ -335,7 +335,7 @@ Error: This is not a Partial of the value it updates
 
 </div>
 
-`order` has no `shipped` member, and an update only sets members the original already has.
+`order` has no `shipped` member, and an update only sets members the original already has. Where the member exists but carries the wrong type, the label says so in the same place: `this is a String, and Order declares a Boolean`.
 
 ## Record parameters with defaults
 
@@ -389,7 +389,7 @@ Error: This Argument is missing 1 member the default does not fill in
     │
     │ Help: Write 'host' into this Record.
     │
-    │ Note 1: Parameter 'using' is { host: String, retries: Integer, timeout: Integer }.
+    │ Note 1: Parameter 'using' is Options.
     │ Note 2: Its default fills in 'retries', 'timeout'; every other member must be written.
 ────╯
 ```

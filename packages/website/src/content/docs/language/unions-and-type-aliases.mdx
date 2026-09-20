@@ -250,7 +250,7 @@ Error: This value has no members to look up
    │
  7 │     Terminal.print(input.target)
    │                    ──┬──  
-   │                      ╰──── this is a { x: Integer, y: Integer, target: String } | { key: String, target: String }
+   │                      ╰──── this is a Click | KeyPress
    │ 
    │ Note: Only Records, Cases and Namespaces have members.
 ───╯
@@ -352,7 +352,7 @@ implementation {
 }
 ```
 
-That compiles, but no union is left in it. Both aliases name `{ degrees: Integer }`, so the union collapses to that one record type. A match over `reading` has one outcome:
+That compiles, but no union is left in it. Both aliases name `{ degrees: Integer }`, so the union collapses to that one record type, printed under the name written first. A match over `reading` has one outcome:
 
 <div class="error-output">
 
@@ -363,7 +363,7 @@ Error: Match Expressions require a Union Type
    │
  7 │     Terminal.print(match reading -> String {
    │                          ───┬───  
-   │                             ╰───── this is a { degrees: Integer }
+   │                             ╰───── this is a Celsius
    │ 
    │ Note: Matching a Type with only one possible shape has only one outcome.
 ───╯
