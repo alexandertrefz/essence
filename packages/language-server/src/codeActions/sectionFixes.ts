@@ -199,20 +199,31 @@ export function moduleSpecifierActions(
 }
 
 const variableKeyword = "variable"
+const constantHelpPrefix = "Declare it as a Constant"
 
 // NOTE: The mirror of `constantToVariableAction`, answering the other direction:
 // a name the export block publishes has to be a Constant, so the Declaration the
 // Diagnostic points back at is the one to rewrite.
 //
-// Never preferred. A Variable is declared as one because something assigns to
-// it, and every one of those assignments is a `constant-reassignment` the moment
-// this lands — which is exactly the conversation the fix is for, and not
-// something an Editor may start on its own.
+// Offered only where the Diagnostic's own Help offers it, which is the contract
+// `moduleSpecifierActions` above is written to as well. A Variable that anything
+// in the Module ASSIGNS to has the clause withheld, because rewriting the
+// Declaration answers `constant-reassignment` at every one of those assignments
+// — whose Help asks for the `variable` back, and the two codes close a loop with
+// this fix as its only door.
+//
+// Never preferred even then. The Declaration is somebody's statement that the
+// value changes, and reading that back is a conversation rather than an edit an
+// Editor may make on its own.
 export function variableToConstantAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
 	lines: Array<string>,
 ): CodeActionEntry | null {
+	if (!diagnostic.helps.some((help) => help.startsWith(constantHelpPrefix))) {
+		return null
+	}
+
 	let declarationPosition = diagnostic.labels.find(
 		(label) => label.kind === "secondary",
 	)?.position

@@ -1150,6 +1150,84 @@ export {}
 		)
 	})
 
+	// NOTE: Three shapes, three answers. A declaration the block publishes under
+	// ANOTHER name is asked for by that name — adding this one would publish one
+	// function twice. A Module publishing nothing has no block to add to. And a
+	// name that is no declaration at all is a near miss against what the Module
+	// really exports, which nothing but the linker holds.
+	it("answers a refused entry from the dependency's own surface", () => {
+		let library = (exports: string) =>
+			`implementation {
+	function area(_ side: Integer) -> Integer {
+		<- side::multiply(with side)
+	}
+}
+${exports}`
+
+		let helpsFor = (exports: string, name: string): Array<string> =>
+			withProject(
+				{
+					"Main.es": `import {\n\tfrom "./Library.es" { ${name} }\n}\n\nimplementation {}\n`,
+					"Library.es": library(exports),
+				},
+				(directory) =>
+					linkedAt(
+						directory,
+						linkProject(directory, "Main.es"),
+						"Main.es",
+					).diagnostics[0]?.helps as Array<string>,
+			)
+
+		expect(
+			helpsFor("\nexport {\n\tarea as squareArea\n}\n", "area"),
+		).toEqual([
+			"./Library.es exports it as 'squareArea' — import that name instead.",
+		])
+
+		expect(helpsFor("\nexport {}\n", "area")).toEqual([
+			"Open an 'export { … }' block in ./Library.es and list 'area' in it.",
+		])
+
+		expect(helpsFor("\nexport {\n\tarea\n}\n", "aera")).toEqual([
+			"Did you mean 'area'?",
+			"Check the spelling, and that the specifier names the file you meant.",
+		])
+	})
+
+	// NOTE: And the Note says the `as` rule out loud where that rule is the
+	// answer — a reader looking at a block that plainly lists the declaration
+	// has no other way of knowing why it is still private here. A block that
+	// simply leaves the name out gets the one Note it always had.
+	it("names the 'as' rule in the not-exported Note", () => {
+		withProject(
+			{
+				"Main.es": `import {\n\tfrom "./Library.es" { area }\n}\n\nimplementation {}\n`,
+				"Library.es": `implementation {
+	function area(_ side: Integer) -> Integer {
+		<- side::multiply(with side)
+	}
+}
+
+export {
+	area as squareArea
+}
+`,
+			},
+			(directory) => {
+				expect(
+					linkedAt(
+						directory,
+						linkProject(directory, "Main.es"),
+						"Main.es",
+					).diagnostics[0]?.notes,
+				).toEqual([
+					"A name is private unless the Module's 'export { … }' block lists it.",
+					"An 'as' on an export entry renames the declaration for everyone, so a name the block lists under another one stays private under this one.",
+				])
+			},
+		)
+	})
+
 	// NOTE: All three collisions are the one Diagnostic, because they are the one
 	// mistake: the name an entry binds is taken. The entry is what gives way, so
 	// whatever held the name still means what it did — a builtin stays the
@@ -1916,6 +1994,96 @@ export {
 						"export-of-unknown-name",
 						"'nowhere' is not declared in this Module",
 					],
+				])
+			},
+		)
+	})
+
+	// NOTE: Nothing writes to `counter` above, so rewriting the Declaration is a
+	// real answer and the Help offers it. The moment something does, it stops
+	// being one: `constant-reassignment` answers every assignment and asks for
+	// the `variable` back, which closes a loop between the two codes with the
+	// Quick Fix as its only door. The clause is withheld rather than reworded,
+	// and the fix reads this text back, so withholding it withholds the fix.
+	it("withholds the Constant Help where the Variable is assigned", () => {
+		let helpsFor = (body: string): Array<string> =>
+			withProject(
+				{
+					"Main.es": `implementation {\n\tvariable counter = 0\n\n${body}}\n\nexport {\n\tcounter\n}\n`,
+				},
+				(directory) =>
+					linkedAt(
+						directory,
+						linkProject(directory, "Main.es"),
+						"Main.es",
+					).diagnostics[0]?.helps as Array<string>,
+			)
+
+		expect(helpsFor("\tTerminal.inspect(counter::toString())\n")).toEqual([
+			"Declare it as a Constant, or export a Function that answers with its value.",
+		])
+
+		// NOTE: Inside a Function body, which is an assignment as much as one at
+		// the top level is — and the shape a Module that publishes a counter
+		// actually has.
+		expect(
+			helpsFor(
+				"\tfunction bump() -> Integer {\n\t\tcounter = counter::add(1)\n\t\t<- counter\n\t}\n",
+			),
+		).toEqual(["Export a Function that answers with its value."])
+	})
+
+	// NOTE: A `from "…" { … }` group is an answer only where there is something
+	// to forward FROM — and then the specifier is in hand, so it is spelled
+	// rather than left as a `…` the reader has to fill from nowhere.
+	it("offers forwarding only where a dependency has the name", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Money.es" { Money }
+}
+
+implementation {
+	function doubled(_ price: Money) -> Money {
+		<- { cents = price.cents::multiply(with 2) }
+	}
+}
+
+export {
+	doubled
+	Money
+	nowhere
+}
+`,
+				"Money.es": `implementation {
+	type Money = { cents: Integer }
+}
+
+export {
+	Money
+}
+`,
+			},
+			(directory) => {
+				let diagnostics = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"Main.es",
+				).diagnostics
+
+				expect(codesOf(diagnostics)).toEqual([
+					"export-of-unknown-name",
+					"export-of-unknown-name",
+				])
+
+				expect(diagnostics[0]?.helps).toEqual([
+					`Forward it from the Module that declares it: 'from "./Money.es" { Money }'.`,
+				])
+
+				// NOTE: No Module in reach declares it, so forwarding would name
+				// a file that does not exist.
+				expect(diagnostics[1]?.helps).toEqual([
+					"Declare 'nowhere' in this Module, or remove the entry.",
 				])
 			},
 		)

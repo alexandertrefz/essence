@@ -628,6 +628,14 @@ export function removeImportAction(
 // Program saying something else: every use of the name would quietly read that
 // other declaration instead. `as` is the answer to those, which is what the
 // Diagnostic's Help says and what no edit can choose a name for.
+//
+// NOTE: Never preferred, even so. Two entries binding one name from two
+// different Modules are two different functions, and dropping the second leaves
+// every call in the file reading the FIRST — a Program that compiles and answers
+// something else, which an Editor applying a preferred fix without asking must
+// not produce. It also points the opposite way from the Help beside it, which
+// asks for the rename that keeps both. So the removal is offered as what it is:
+// one of the two readings, and the one the reader has to choose.
 export function removeDuplicateImportAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -658,7 +666,7 @@ export function removeDuplicateImportAction(
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
-		isPreferred: true,
+		isPreferred: false,
 		edits: [edit],
 	}
 }

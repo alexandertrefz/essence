@@ -14,6 +14,7 @@ import { enrichPrograms, topLevelScope } from "../enricher/index"
 import { invalidateNamespacesInScope } from "../enricher/resolvers"
 import { countTypeDeclaration } from "../enricher/scope"
 import { patternBindings } from "../helpers/patterns"
+import { closestMatch } from "../helpers/suggest"
 import type { Module, ModuleGraph } from "./graph"
 
 // NOTE: What a top level declaration was written as, which is what decides the
@@ -497,12 +498,36 @@ function reportDuplicateImport(
 	})
 }
 
+// NOTE: The name the dependency publishes the DECLARATION under, where that is
+// not the name it was declared with. An `as` on an export entry renames the
+// declaration for everyone, so `export { area as squareArea }` leaves `area`
+// private and an importer asking for it has to ask for the other name — telling
+// them to add `area` to the block would publish one function twice. Matched on
+// the declaration's Position, which is what the surface records against each
+// public name.
+function exportedAs(
+	surface: ExportSurface,
+	declaration: Declaration,
+): string | null {
+	return (
+		Object.entries(surface.declarations).find(
+			([, position]) =>
+				position.start.line === declaration.position.start.line &&
+				position.start.column === declaration.position.start.column,
+		)?.[0] ?? null
+	)
+}
+
 function reportMissingExport(
 	source: parser.IdentifierNode,
 	specifier: string,
-	declared: boolean,
+	declaration: Declaration | null,
+	surface: ExportSurface,
 ): void {
-	if (declared) {
+	if (declaration !== null) {
+		let alias = exportedAs(surface, declaration)
+		let publishes = Object.keys(surface.kinds).length !== 0
+
 		reportError(
 			`'${source.content}' is not exported by ${specifier}`,
 			source.position,
@@ -514,17 +539,42 @@ function reportMissingExport(
 						"declared in that Module, but private",
 					),
 				],
+				// NOTE: The `as` rule only where it is the ANSWER. A reader
+				// looking at a block that plainly lists the declaration has no
+				// other way of knowing why the name is still private here —
+				// while on a block that simply leaves it out, the sentence is
+				// about a spelling nobody wrote.
 				notes: [
 					"A name is private unless the Module's 'export { … }' block lists it.",
+					...(alias === null
+						? []
+						: [
+								"An 'as' on an export entry renames the declaration for everyone, so a name the block lists under another one stays private under this one.",
+							]),
 				],
+				// NOTE: Three answers, in the order they stop being wrong. A
+				// declaration the block already publishes under another name is
+				// asked for by THAT name — adding this one would publish one
+				// function twice. A Module publishing nothing at all has no
+				// block to add to, so the Help asks for the block. Otherwise
+				// the entry goes in the block that is there.
 				helps: [
-					`Add '${source.content}' to the 'export { … }' block of ${specifier}.`,
+					alias !== null
+						? `${specifier} exports it as '${alias}' — import that name instead.`
+						: publishes
+							? `Add '${source.content}' to the 'export { … }' block of ${specifier}.`
+							: `Open an 'export { … }' block in ${specifier} and list '${source.content}' in it.`,
 				],
 			},
 		)
 
 		return
 	}
+
+	// NOTE: The names the Module really publishes are in hand, so a near miss is
+	// answered rather than left to the reader — `aera` beside an exported `area`
+	// was a report with nothing in it but a spelling check.
+	let suggestion = closestMatch(source.content, Object.keys(surface.kinds))
 
 	reportError(
 		`${specifier} declares nothing named '${source.content}'`,
@@ -536,8 +586,22 @@ function reportMissingExport(
 				"The name is matched against what that Module exports, under the names it exports them as — an 'as' on its export entry renames it for everyone.",
 			],
 			helps: [
+				...(suggestion === null
+					? []
+					: [`Did you mean '${suggestion}'?`]),
 				"Check the spelling, and that the specifier names the file you meant.",
 			],
+			// NOTE: The name the Module does publish, for the Quick Fix that
+			// writes it — the Editor has no export surface of its own to read,
+			// and this is the payload every other near miss is answered with.
+			...(suggestion === null
+				? {}
+				: {
+						data: {
+							kind: "suggestion" as const,
+							suggestion,
+						},
+					}),
 		},
 	)
 }
@@ -785,8 +849,12 @@ function linkGroup(
 	options: LinkOptions,
 ): Array<LinkedModule> {
 	let states = new Map<string, ModuleState>()
-	let declares = (filePath: string, name: string): boolean =>
-		declarations.get(filePath)?.has(name) ?? false
+	// NOTE: The Declaration rather than a yes: a name a dependency declares and
+	// publishes under ANOTHER one is the difference between "add it to the
+	// block" and "import the name it is published as", and only the Position on
+	// the Declaration can tell the two apart.
+	let declares = (filePath: string, name: string): Declaration | null =>
+		declarations.get(filePath)?.get(name) ?? null
 
 	for (let module of group) {
 		let state: ModuleState = {
@@ -1087,7 +1155,7 @@ function tablesOffered(surface: ExportSurface, exportedName: string): number {
 function seedImports(
 	state: ModuleState,
 	states: Map<string, ModuleState>,
-	declares: (filePath: string, name: string) => boolean,
+	declares: (filePath: string, name: string) => Declaration | null,
 	surfaceFor: (filePath: string) => ExportSurface | null,
 ): boolean {
 	let bound = false
@@ -1162,6 +1230,7 @@ function seedImports(
 				entry.name,
 				entry.source.path,
 				declares(dependencyPath, exportedName),
+				surface,
 			)
 			bindAsError(state.scope, localName, entry.name.position)
 			binding.state = "refused"
@@ -1248,13 +1317,55 @@ function reportCyclicConstantImport(entry: parser.ImportNode): void {
 	)
 }
 
+// NOTE: Whether anything in this Module writes to `name` — the whole Program,
+// because an assignment inside a Function body is as much an assignment as one
+// at the top level, and either is what makes rewriting the Declaration to a
+// Constant a refused edit rather than a fix.
+function isAssignedIn(module: Module, name: string): boolean {
+	let found = false
+
+	let visit = (node: unknown): void => {
+		if (found || node === null || typeof node !== "object") {
+			return
+		}
+
+		if (Array.isArray(node)) {
+			for (let entry of node) {
+				visit(entry)
+			}
+
+			return
+		}
+
+		let record = node as Record<string, unknown>
+
+		if (record["nodeType"] === "VariableAssignmentStatement") {
+			let target = record["name"] as Record<string, unknown> | undefined
+
+			if (target?.["content"] === name) {
+				found = true
+
+				return
+			}
+		}
+
+		for (let value of Object.values(record)) {
+			visit(value)
+		}
+	}
+
+	visit(module.program.implementation)
+
+	return found
+}
+
 // NOTE: Both mistakes an export block can make on its own: a name this Module
 // never declared, and a Variable — mutable state one Module writes and another
 // reads is not something a `from` clause can express. A re-export is checked
 // against the Module it forwards from, under the same two codes an import is.
 function reportExportProblems(
 	state: ModuleState,
-	declares: (filePath: string, name: string) => boolean,
+	declares: (filePath: string, name: string) => Declaration | null,
 	surfaceFor: (filePath: string) => ExportSurface | null,
 ): void {
 	for (let entry of state.exports.values()) {
@@ -1275,6 +1386,7 @@ function reportExportProblems(
 					entry.name,
 					entry.source.path,
 					declares(dependencyPath, entry.name.content),
+					surface,
 				)
 			}
 
@@ -1284,6 +1396,14 @@ function reportExportProblems(
 		let declared = state.declarations.get(entry.name.content)
 
 		if (declared === undefined) {
+			let forwardableFrom =
+				[...state.module.resolutions].find(
+					([, dependencyPath]) =>
+						surfaceFor(dependencyPath)?.kinds[
+							entry.name.content
+						] !== undefined,
+				)?.[0] ?? null
+
 			reportError(
 				`'${entry.name.content}' is not declared in this Module`,
 				entry.name.position,
@@ -1298,8 +1418,18 @@ function reportExportProblems(
 					notes: [
 						"An entry with no 'from' clause exports something this Module's implementation declares.",
 					],
+					// NOTE: The forwarding Help only where there is something to
+					// forward FROM. A `from "…" { … }` group is an answer when
+					// one of this Module's dependencies exports the name — and
+					// then the specifier is in hand, so the Help spells it
+					// rather than a `…` the reader has to fill from nowhere.
+					// Where no dependency has it, forwarding names a Module that
+					// does not exist, and the two things left to do are to
+					// declare the name or to stop exporting it.
 					helps: [
-						`Write '${entry.name.content}' in a 'from "…" { … }' group to forward it from the Module that declares it.`,
+						forwardableFrom === null
+							? `Declare '${entry.name.content}' in this Module, or remove the entry.`
+							: `Forward it from the Module that declares it: 'from "${forwardableFrom}" { ${entry.name.content} }'.`,
 					],
 				},
 			)
@@ -1320,9 +1450,18 @@ function reportExportProblems(
 					notes: [
 						"A Variable another Module can read is state two files share and neither owns — which of them last wrote it is not something either one states.",
 					],
-					helps: [
-						"Declare it as a Constant, or export a Function that answers with its value.",
-					],
+					// NOTE: "Declare it as a Constant" is withheld where anything
+					// in this Module ASSIGNS to the name, because following it
+					// answers `constant-reassignment` at every one of those
+					// assignments — whose own Help asks for the `variable` back.
+					// A closed loop between two codes is worse than one Help
+					// that leaves something out, and the Quick Fix reads this
+					// text back, so withholding the clause withholds the fix.
+					helps: isAssignedIn(state.module, entry.name.content)
+						? ["Export a Function that answers with its value."]
+						: [
+								"Declare it as a Constant, or export a Function that answers with its value.",
+							],
 				},
 			)
 		}

@@ -4521,6 +4521,21 @@ Add the name to that module's `export { … }` block.
 
 Quick Fix: **Export 'area' from ./Geometry.es**, which edits the other file.
 
+Two shapes get a different Help, because adding the name would be the wrong edit for both. A module that publishes the declaration under another name is asking to be imported by *that* name — adding this one would publish one function twice — and a second Note says why a block that plainly lists the declaration still keeps this name private:
+
+<div class="error-output">
+
+```
+   │ Help: ./Geometry.es exports it as 'squareArea' — import that name instead.
+   │ 
+   │ Note 1: A name is private unless the Module's 'export { … }' block lists it.
+   │ Note 2: An 'as' on an export entry renames the declaration for everyone, so a name the block lists under another one stays private under this one.
+```
+
+</div>
+
+A module with no export block at all — or an empty one — has nothing to add to, so the Help asks for the block: **Open an 'export { … }' block in ./Geometry.es and list 'area' in it.**
+
 Taught on: [Modules › Importing names](/docs/language/modules#importing-names)
 
 ### `unknown-export`
@@ -4547,6 +4562,30 @@ Error: ./Geometry.es declares nothing named 'volume'
 </div>
 
 Fix the name or the path.
+
+A near miss against what the module really publishes is answered, and offered as a Quick Fix:
+
+<div class="error-output">
+
+```
+[unknown-export]
+Error: ./Geometry.es declares nothing named 'aera'
+   ╭─┤ Main.es:2:25 │
+   │
+ 2 │     from "./Geometry.es" { aera }
+   │                            ──┬─  
+   │                              ╰─── no such name in that Module
+   │ 
+   │ Help 1: Did you mean 'area'?
+   │ Help 2: Check the spelling, and that the specifier names the file you meant.
+   │ 
+   │ Note: The name is matched against what that Module exports, under the names it exports them as — an 'as' on its export entry renames it for everyone.
+───╯
+```
+
+</div>
+
+Quick Fix: **Change to 'area'**.
 
 Taught on: [Modules › Exporting names](/docs/language/modules#exporting-names)
 
@@ -4579,7 +4618,7 @@ Error: 'area' is already declared here
 
 Import it under another name: `from "./Geometry.es" { area as tileArea }`.
 
-Quick Fix: **Remove the duplicate import of 'area'**, when the name is imported twice.
+Quick Fix: **Remove the duplicate import of 'area'**, when the name is imported twice — offered, never applied on its own. Two entries binding one name from two different modules are two different functions, and dropping the second leaves every call in the file reading the first.
 
 Taught on: [Modules › Importing names](/docs/language/modules#importing-names)
 
@@ -4598,7 +4637,7 @@ Error: 'volume' is not declared in this Module
    │          ───┬──  
    │             ╰──── nothing here declares this name
    │ 
-   │ Help: Write 'volume' in a 'from "…" { … }' group to forward it from the Module that declares it.
+   │ Help: Declare 'volume' in this Module, or remove the entry.
    │ 
    │ Note: An entry with no 'from' clause exports something this Module's implementation declares.
 ───╯
@@ -4606,7 +4645,9 @@ Error: 'volume' is not declared in this Module
 
 </div>
 
-Declare the name, or forward it from the module that declares it with a `from` group inside the export block: `export { from "./Solids.es" { volume } }`.
+Declare the name, or stop exporting it.
+
+Where one of this module's own dependencies publishes the name, forwarding is an answer and the Help spells the specifier rather than a placeholder: **Forward it from the Module that declares it: 'from "./Money.es" { Money }'.**
 
 Quick Fix: **Forward 'volume' from ./Solids.es**, when a module in the workspace exports the name.
 
@@ -4642,6 +4683,8 @@ Error: Variable 'count' can not be exported
 Declare it as a constant, `constant count = 0`, or export a function that returns its value: `function currentCount() -> Integer { <- count }` and `export { currentCount }`.
 
 Quick Fix: **Declare 'count' as a Constant**.
+
+Where something in the module *assigns* to the variable, the first half is withheld and so is the fix — `Help: Export a Function that answers with its value.` Rewriting the declaration there answers [`constant-reassignment`](#constant-reassignment) at every assignment, and that diagnostic asks for the `variable` back.
 
 Taught on: [Modules › Exporting names](/docs/language/modules#exporting-names)
 

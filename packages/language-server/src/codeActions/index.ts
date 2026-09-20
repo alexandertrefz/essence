@@ -650,6 +650,10 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 			removeDocumentationTagAction(context.diagnostic, context.lines),
 		),
 	],
+	// NOTE: The near miss the LINKER found, against the names a dependency
+	// really publishes — a surface the Editor holds none of its own, so the
+	// candidate travels on the Diagnostic exactly as every other one does.
+	"unknown-export": spellingFix,
 	"unknown-member": spellingFix,
 	"unknown-method": (context) => [
 		...namespaceImportActions(context.diagnostic, context.imports),

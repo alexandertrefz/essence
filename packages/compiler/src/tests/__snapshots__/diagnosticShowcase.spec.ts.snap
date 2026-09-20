@@ -3387,7 +3387,7 @@ Error: 'nowhere' is not declared in this Module
     │     ───┬───  
     │        ╰───── nothing here declares this name
     │ 
-    │ Help: Write 'nowhere' in a 'from "…" { … }' group to forward it from the Module that declares it.
+    │ Help: Declare 'nowhere' in this Module, or remove the entry.
     │ 
     │ Note: An entry with no 'from' clause exports something this Module's implementation declares.
 ────╯

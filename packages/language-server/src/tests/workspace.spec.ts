@@ -1426,7 +1426,13 @@ describe("Workspace", () => {
 			expect(removal?.title).toBe(
 				"Remove the duplicate import of 'Rectangle'",
 			)
-			expect(removal?.isPreferred).toBe(true)
+			// NOTE: Offered, never preferred. The two entries name two different
+			// Modules' `Rectangle`, so dropping the second leaves every use in
+			// the file reading the FIRST — a Program that compiles and answers
+			// something else, which is not an edit an Editor may make without
+			// being asked. It points the other way from the Diagnostic's own
+			// Help besides, which asks for the `as` that keeps both.
+			expect(removal?.isPreferred).toBe(false)
 
 			expect(fixed.split("\n")).toEqual([
 				"import {",
@@ -1871,6 +1877,37 @@ describe("Workspace", () => {
 
 			expect(result.split("\n")[1]).toBe("\tconstant counter = 1")
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
+		})
+
+		// NOTE: And withholds it where something assigns to the Variable, which
+		// is the shape that made this fix the only door of a two-code loop: it
+		// answered `constant-reassignment` at every assignment, and that Help
+		// asks for the `variable` back. The Diagnostic withholds the clause and
+		// the fix reads the Help back, so one decision covers both.
+		it("should not offer the Constant where the Variable is assigned", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Main.es": [
+					"implementation {",
+					"\tvariable counter = 1",
+					"",
+					"\tfunction bump() -> Integer {",
+					"\t\tcounter = counter::add(1)",
+					"\t\t<- counter",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tcounter",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			expect(
+				fixesFor(workspace, pathOf("Main.es"), 11, "counter").map(
+					(fix) => fix.diagnosticCode,
+				),
+			).not.toContain("export-of-variable")
 		})
 	})
 
