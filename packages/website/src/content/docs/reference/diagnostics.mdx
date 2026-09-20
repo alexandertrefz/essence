@@ -209,6 +209,7 @@ Error: This String Literal is never closed
  2 │     constant body = "{\"a\": 1}"
    │                     ▲  
    │                     ╰── opened here, and a '{' inside it opens a hole
+   │ 
  4 │ }
    │  │ 
    │  ╰─ the input ends here
@@ -1238,7 +1239,7 @@ Error: 'times' is the Parameter its own default is written on
    │                                                        │    
    │                                                        ╰──── read here
    │ 
-   │ Help: Write the value out, or rename the Parameter so it does not spell what the default reads.
+   │ Help: Write the value out.
    │ 
    │ Note: A Parameter is bound to the value its default works out, so the default can not read it.
 ───╯
@@ -2030,11 +2031,11 @@ Error: This is not a Partial of the value it updates
    ╭─┤ Point.es:3:36 │
    │
  3 │     constant moved = { point with x = "one" }
-   │                        ──┬──          ──┬──
+   │                        ──┬──          ──┬──  
    │                          ╰──────────────│──── this is a { x: Integer, y: Integer }
-   │                                         │
+   │                                         │    
    │                                         ╰──── this is a String, and the value it updates declares an Integer
-   │
+   │ 
    │ Note: An update may only set members the original already has, with the Types it declared for them.
 ───╯
 ```
@@ -2345,7 +2346,7 @@ Error: 'tag' is called on a value whose Type is not fully known here
     │                         │   
     │                         ╰─── 'tag' is looked up in its Namespaces
     │ 
-    │ Help: Annotate what the receiver comes from — 'constant items: List<Integer> = []' — so its Type is decided before the call.
+    │ Help: Annotate what the receiver comes from — 'constant items: List<Integer> = []', for instance — so its Type is decided before the call.
     │ 
     │ Note 1: 'Numbers' declares 'tag'.
     │ Note 2: 'Words' declares 'tag'.
@@ -3685,13 +3686,13 @@ Taught on: [Patterns › Patterns that cannot decline](/docs/language/patterns#p
 ```
 [redundant-pattern-binder]
 Error: A Matcher's Pattern can not name the whole value
-   ╭─┤ Point.es:4:18 │
+   ╭─┤ Point.es:5:17 │
    │
- 4 │          case { x, y } as whole {
-   │                        ────┬───  
-   │                            ╰───── '@' already names it
+ 5 │        case { x, y } as whole {
+   │                      ────┬───  
+   │                          ╰───── '@' already names it
    │ 
-   │ Help: Write '@' where 'whole' was meant.
+   │ Help: Drop the 'as whole' and write '@' where 'whole' was meant.
    │ 
    │ Note: Inside an arm, '@' is the scrutinee narrowed to what the Matcher established — which is exactly what this would name a second time.
 ───╯
@@ -4049,11 +4050,11 @@ Error: Future<Integer> can not be interpolated into a String
    ╭─┤ Report.es:8:27 │
    │
  8 │     Terminal.print("answer: {fetched()}")
-   │                              ────┬────
+   │                              ────┬────  
    │                                  ╰────── this is Future<Integer>, which is not Printable
-   │
+   │ 
    │ Help: This describes work that has not run — add 'complete'.
-   │
+   │ 
    │ Note 1: Future<Integer> does not conform to 'Printable'.
    │ Note 2: Integer is what a Future<Integer> answers with, once something waits for it.
 ───╯
@@ -5517,7 +5518,7 @@ Error: This test is 'tagged' twice
 
 </div>
 
-Write every tag on one `tagged`, separated by commas: `tagged slow, network`.
+Write every tag on one `tagged`, separated by commas: `tagged slow, network`. Any other modifier written twice is answered `Remove one of them.` — `tagged` is the only one that means something more when it is written again.
 
 Quick Fix: **Merge into one 'tagged'**. Another modifier written twice gets **Remove the second 'focused'**.
 
