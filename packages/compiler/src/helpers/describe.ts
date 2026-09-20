@@ -136,6 +136,16 @@ export function describeType(type: common.Type): string {
 		// members ARE is the mismatch report's business — `describeRecordShape`
 		// is what spells one out, and a mismatch between two Records says which
 		// member differs rather than printing either.
+		//
+		// NOTE: The spelling is the DECLARING file's, which two Modules
+		// declaring a `Shape` apiece make visible: "this is a Shape" refused by
+		// "declared as Shape" is two Types under one word, and a file that
+		// imported one of them `as OtherShape` is told neither name it can
+		// read. Known and left, because a name is what the reader asked about
+		// and the Type carries no Module to qualify it with — a Record's is not
+		// its identity the way a Case's `choice` is. What the two Records
+		// DISAGREE about is still named member by member, which is the sentence
+		// that resolves it. The same holds of a Union's name, and always has.
 		case "Record":
 			if (type.name !== undefined) {
 				return type.name
