@@ -24,6 +24,51 @@ export function displayGenericName(name: common.GenericName): string {
 	return name.replace(/\u200B\d+$/, "")
 }
 
+// NOTE: A Match is the answer wherever the members can be told apart — it is the
+// one way to narrow a Union before a call, and a value of two DECLARED Types
+// really is decided by one. It is not the answer for a Union of Type PARAMETERS,
+// and offering one there was a closed loop: Types erase before a Match runs, so
+// the first Case accepts every value that reaches it, `erased-case-conflict`
+// refuses the second, and that report's own reorder clause swaps the arms and
+// produces its own mirror image.
+//
+// A Union of Type Parameters is a signature that wanted ONE of them. The
+// Parameters are bounded by the Protocol whose Method is being called — that is
+// what made the call resolvable at all — so the bound is in hand and the
+// signature can be spelled. The value's own name is used where it has one, which
+// is every call written on a Parameter.
+//
+// Written here rather than beside either of its readers: the Enricher refuses
+// the CALL that can not be dispatched and the Validator refuses the MATCH a
+// reader writes instead, and one answer said two ways is how two answers start.
+export function undispatchableHelps(
+	memberTypes: Array<common.Type>,
+	valueName: string | null,
+): Array<string> {
+	let parameters = memberTypes.filter(
+		(memberType): memberType is common.GenericUse =>
+			memberType.type === "GenericUse",
+	)
+
+	if (parameters.length !== memberTypes.length) {
+		return [
+			"Narrow the value with a Match Expression before calling the Method.",
+		]
+	}
+
+	let bounds = new Set(parameters.map((parameter) => parameter.constraint))
+	let bound = bounds.size === 1 ? [...bounds][0] : undefined
+	let declaration = `<infer Item${bound === undefined ? "" : ` is ${bound}`}>`
+	let spelling =
+		valueName === null
+			? `'${declaration}', with the Parameter declared as an 'Item'`
+			: `'${declaration}(_ ${valueName}: Item)'`
+
+	return [
+		`Take one Type Parameter in place of the Union — ${spelling} — since Types erase before a Match runs, and a Match is the only thing that narrows.`,
+	]
+}
+
 // NOTE: The nominal identity of a Choice — what tells two Modules' same-named
 // Choices apart, and the whole of what `matchTypes` compares a Case by. It is
 // the Module's canonical path and the name the declaration wrote, because the

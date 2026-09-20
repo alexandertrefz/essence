@@ -204,6 +204,72 @@ describe("Two Cases a Signature can not tell apart", () => {
 	})
 })
 
+describe("Two Cases naming Type Parameters", () => {
+	// NOTE: The closed loop this report had. Neither Case is narrower than the
+	// other — Types erase before a Match runs, so each accepts every value that
+	// reaches it — and the clause that said "write this Case above the other
+	// one" moved the report to the other Case, whose own Help moved it back. A
+	// reader could swap the arms forever.
+	let source = `implementation {
+		function describe<infer First is Printable, infer Second is Printable>(_ value: First | Second) -> String {
+			<- match value -> String {
+				case First { <- "first" }
+				case Second { <- "second" }
+			}
+		}
+	}`
+
+	it("should name the signature rather than an order to write them in", () => {
+		expect(firstAnalysed(source, "erased-case-conflict").helps).toEqual([
+			"Take one Type Parameter in place of the Union — '<infer Item is Printable>(_ value: Item)' — since Types erase before a Match runs, and a Match is the only thing that narrows.",
+		])
+	})
+
+	// NOTE: The same sentence `undispatchable-method` says about the call this
+	// Match was written to replace, out of the same builder — the two reports
+	// are one mistake met at two stages, and one answer said two ways is how two
+	// answers start. A signature taking one Type Parameter has nothing left for
+	// a Match to ask about, which is the point: the Match was standing in for
+	// the narrowing the Union could never do.
+	it("should compile when the signature is written that way", () => {
+		expect(
+			compiles(`implementation {
+		function describe<infer Item is Printable>(_ value: Item) -> String {
+			<- value::toString()
+		}
+	}`),
+		).toBe(true)
+	})
+
+	// NOTE: And the reorder clause stands where it is TRUE: a Case naming a
+	// declared Type really is narrower than the Generic Case that swallowed it,
+	// and moving it up is an edit that ends.
+	it("should keep the reorder clause where this Case is narrower", () => {
+		let narrower = `implementation {
+		function describe<infer Item is Printable>(_ value: Item | Integer) -> String {
+			<- match value -> String {
+				case Item { <- "item" }
+				case Integer { <- "number" }
+			}
+		}
+	}`
+
+		expect(firstAnalysed(narrower, "erased-case-conflict").helps).toEqual([
+			"Write this Case above 'case Item', which can only ever be the last one.",
+		])
+		expect(
+			compiles(`implementation {
+		function describe<infer Item is Printable>(_ value: Item | Integer) -> String {
+			<- match value -> String {
+				case Integer { <- "number" }
+				case Item { <- "item" }
+			}
+		}
+	}`),
+		).toBe(true)
+	})
+})
+
 describe("A Case an empty container crosses into", () => {
 	// NOTE: A Match narrows nothing here — its Cases are picked by the same
 	// erased question the dispatch branches were. What decides an empty

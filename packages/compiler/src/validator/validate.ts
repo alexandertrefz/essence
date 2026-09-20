@@ -20,6 +20,7 @@ import {
 	recordMismatchEvidence,
 	returnAsynchronyHelps,
 	undecidedSlotEvidence,
+	undispatchableHelps,
 	withArticle,
 } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
@@ -1715,9 +1716,26 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 						`Types erase before a Match runs, so the Generic Case '${describeType(claimingHandler.matcher)}' narrows nothing and accepts every value that reaches it.`,
 					)
 
-					helps = [
-						`Write this Case above 'case ${describeType(claimingHandler.matcher)}', which can only ever be the last one.`,
-					]
+					// NOTE: Reordering is an answer only where THIS Case is
+					// narrower than the one covering it. Where both Cases name
+					// Type Parameters neither is narrower — both accept every
+					// value that reaches them — so "write it above" moved the
+					// report to the other Case, whose own Help moved it back,
+					// and a reader could swap the two arms forever. What is
+					// wrong there is the signature rather than the order of the
+					// arms, and it is the same thing `undispatchable-method`
+					// says about the call this Match was written to replace.
+					helps =
+						handler.matcher.type === "GenericUse"
+							? undispatchableHelps(
+									[claimingHandler.matcher, handler.matcher],
+									node.value.nodeType === "Identifier"
+										? node.value.content
+										: null,
+								)
+							: [
+									`Write this Case above 'case ${describeType(claimingHandler.matcher)}', which can only ever be the last one.`,
+								]
 				} else if (!matchesType(claimingMatcher, runtimeMatcher)) {
 					// NOTE: The earlier test does not accept this one's Type at
 					// all, so what it claimed it claimed through erasure.

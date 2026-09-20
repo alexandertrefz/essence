@@ -25,6 +25,7 @@ import {
 	describeType,
 	displayChoiceName,
 	displayGenericName,
+	undispatchableHelps,
 	recordMismatchEvidence,
 	undecidedSlotAnnotation,
 	undecidedSlotEvidence,
@@ -14927,7 +14928,9 @@ function resolveUnionMethodDispatch(
 					catchAllCases.map(
 						(dispatchCase) => dispatchCase.memberType,
 					),
-					node.base,
+					node.base.nodeType === "Identifier"
+						? node.base.content
+						: null,
 				),
 			},
 		)
@@ -15082,47 +15085,6 @@ function orderDispatchCasesBySpecificity(
 // coexist in one dispatched Union.
 function isRuntimeCatchAllType(type: common.Type): boolean {
 	return type.type === "GenericUse" || type.type === "Unknown"
-}
-
-// NOTE: A Match is the answer wherever the members can be told apart — it is the
-// one way to narrow a Union before a call, and a value of two DECLARED Types
-// really is decided by one. It is not the answer for a Union of Type PARAMETERS,
-// and offering it there was a closed loop: Types erase before a Match runs, so
-// the first Case accepts every value that reaches it, `erased-case-conflict`
-// refuses the second, and that report's own Help swaps the arms and produces its
-// own mirror image.
-//
-// A Union of Type Parameters is a signature that wanted ONE of them. Both
-// Parameters are bounded by the Protocol whose Method is being called — that is
-// what made the call resolvable at all — so the bound is in hand here and the
-// signature can be spelled. The receiver's own name is used where it has one,
-// which is every call written on a Parameter.
-function undispatchableHelps(
-	memberTypes: Array<common.Type>,
-	base: parser.ExpressionNode,
-): Array<string> {
-	let parameters = memberTypes.filter(
-		(memberType): memberType is common.GenericUse =>
-			memberType.type === "GenericUse",
-	)
-
-	if (parameters.length !== memberTypes.length) {
-		return [
-			"Narrow the value with a Match Expression before calling the Method.",
-		]
-	}
-
-	let bounds = new Set(parameters.map((parameter) => parameter.constraint))
-	let bound = bounds.size === 1 ? [...bounds][0] : undefined
-	let declaration = `<infer Item${bound === undefined ? "" : ` is ${bound}`}>`
-	let spelling =
-		base.nodeType === "Identifier"
-			? `'${declaration}(_ ${base.content}: Item)'`
-			: `'${declaration}', with the Parameter declared as an 'Item'`
-
-	return [
-		`Take one Type Parameter in place of the Union — ${spelling} — since Types erase before a Match runs, and a Match is the only thing that narrows.`,
-	]
 }
 
 // NOTE: An Identifier callee names itself and a `Namespace.method` Lookup
