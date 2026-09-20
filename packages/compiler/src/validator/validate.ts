@@ -1,4 +1,4 @@
-import type { common, parser } from "@essence-lang/interfaces"
+import type { common, enricher, parser } from "@essence-lang/interfaces"
 
 import {
 	collectDiagnostics,
@@ -65,20 +65,58 @@ type MatchHandler = common.typed.MatchNode["handlers"][number]
 // validated at a time.
 let witnessScopes: Array<Set<string>> = []
 
-// NOTE: Whether each enclosing Function's body may write `complete`, innermost
-// last — a body may where it answers a Future, and the top level may outright.
-// Module state for the same reason `witnessScopes` is: the alternative is
-// threading it through every `validate…` function, and only one Program is
-// validated at a time.
+// NOTE: Whether each enclosing body may write `complete`, innermost last — a
+// body may where it answers a Future, and the top level may outright. Module
+// state for the same reason `witnessScopes` is: the alternative is threading it
+// through every `validate…` function, and only one Program is validated at a
+// time.
 //
 // Read wherever a report is about to offer the word. `complete` written in a body
 // that answers no Future is `complete-outside-future`, so a Help offering it
 // there — and the Quick Fix keyed on the same data, which WRITES it — walked the
 // reader from one refusal into the next.
-let waitingBodies: Array<boolean> = []
+//
+// The Enricher answers the same question off the Scope chain, in `bodyCanWait`
+// there, and the two have to agree: the Enricher's barriers — a Parameter's
+// default, a test's name, a benchmark body, a property body — are pushed here
+// too, because a report is offered the word by whichever stage raised it and a
+// reader reads one list.
+// `true` is a body that may; every other entry says WHY it may not, in the
+// Enricher's own vocabulary, because a Help that withholds the word has to name
+// an edit and "declare the enclosing Function '-> Future<…>'" is no edit inside
+// a property body.
+let waitingBodies: Array<true | enricher.CompletionBarrier | "plain-body"> = []
 
 function bodyCanWait(): boolean {
-	return waitingBodies.at(-1) ?? true
+	return (waitingBodies.at(-1) ?? true) === true
+}
+
+// NOTE: Which of the four barriers refused, for the Helps that name the edit it
+// leaves — null for a body that simply answers something other than a Future,
+// whose edit is to its own Declaration.
+function completionBarrier(): enricher.CompletionBarrier | null {
+	let top = waitingBodies.at(-1)
+
+	return top === undefined || top === true || top === "plain-body"
+		? null
+		: top
+}
+
+// NOTE: Runs `walk` with one more body on the stack, and pops it whatever
+// happens — every push in this file goes through here so that a refusal thrown
+// mid-walk can not leave the stack claiming the wrong answer for the rest of
+// the Program.
+function insideBody(
+	state: true | enricher.CompletionBarrier | "plain-body",
+	walk: () => void,
+): void {
+	waitingBodies.push(state)
+
+	try {
+		walk()
+	} finally {
+		waitingBodies.pop()
+	}
 }
 
 // NOTE: Where each top-level Namespace is declared — its index in the top-level
@@ -249,9 +287,24 @@ function validateTestsNode(node: common.typed.TestsNode): void {
 			validateGenerator(parameter.generator)
 		}
 
-		for (let child of node.body) {
-			validateImplementationNode(child, null)
-		}
+		// NOTE: A `test` body is run once and awaited, so it may wait; a
+		// property body runs once per generated value and a benchmark body is
+		// timed over many runs, and neither can. The same three answers the
+		// Enricher's barriers give, said here so that a report the Validator
+		// raises in one of these bodies does not offer a word the Enricher
+		// would refuse two lines up.
+		insideBody(
+			node.form === "benchmark"
+				? "benchmark-body"
+				: node.properties === null
+					? true
+					: "property-body",
+			() => {
+				for (let child of node.body) {
+					validateImplementationNode(child, null)
+				}
+			},
+		)
 
 		return
 	}
@@ -1245,7 +1298,7 @@ function validateFunctionDefinition(
 	// says only that a `complete` is ALREADY written. A `-> Future<…>` body that
 	// has not written its first one is exactly the body a report is most likely
 	// to be offering the word to, and it may have it.
-	waitingBodies.push(node.returnType.type === "Future")
+	waitingBodies.push(node.returnType.type === "Future" ? true : "plain-body")
 
 	try {
 		// NOTE: A default runs when the Function is CALLED, in the frame the
@@ -1255,9 +1308,16 @@ function validateFunctionDefinition(
 		// was checked at all while this walked only the body: a call with the
 		// wrong Arguments, a Match missing a Case, a name read above its
 		// Declaration.
-		for (let defaultValue of parameterDefaults(node.parameters)) {
-			validateExpression(defaultValue)
-		}
+		//
+		// Everything but waiting: a default is filled in before any of the
+		// body's own asynchrony begins, which is the Enricher's
+		// `parameter-default` barrier, so `complete` is refused there however
+		// the Function around it is declared.
+		insideBody("parameter-default", () => {
+			for (let defaultValue of parameterDefaults(node.parameters)) {
+				validateExpression(defaultValue)
+			}
+		})
 
 		node.body.map((bodyNode) => validateImplementationNode(bodyNode, node))
 	} finally {
@@ -1886,7 +1946,12 @@ function checkDefineAnswer(
 				...undecided.notes,
 			],
 			helps: [
-				...asynchronyHelps(node.type, value.type, bodyCanWait()),
+				...asynchronyHelps(
+					node.type,
+					value.type,
+					bodyCanWait(),
+					completionBarrier(),
+				),
 				...record.helps,
 				...evidence.helps,
 				...undecided.helps,
@@ -3095,7 +3160,12 @@ function reportDeclarationMismatch(
 				...evidence.notes,
 			],
 			helps: [
-				...asynchronyHelps(declaredType, value.type, bodyCanWait()),
+				...asynchronyHelps(
+					declaredType,
+					value.type,
+					bodyCanWait(),
+					completionBarrier(),
+				),
 				...record.helps,
 				...evidence.helps,
 			],
@@ -3171,6 +3241,7 @@ function validateVariableAssignmentStatement(
 						node.name.type,
 						node.value.type,
 						bodyCanWait(),
+						completionBarrier(),
 					),
 					...record.helps,
 					...undecided.helps,
@@ -4435,6 +4506,7 @@ function reportArgumentMismatch(
 							parameter.type,
 							argumentNode.value.type,
 							bodyCanWait(),
+							completionBarrier(),
 						)),
 				...(record?.helps ?? []),
 				...evidence.helps,

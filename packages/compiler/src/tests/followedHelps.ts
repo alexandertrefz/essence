@@ -1,6 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
-import { analyseSource } from "../analysis"
+import { type AnalysisOptions, analyseSource } from "../analysis"
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
 import { parse, parseWithDiagnostics } from "../parser/index"
@@ -56,8 +56,11 @@ export function firstOf(
 // The whole pipeline, so that a Help followed into a Validator refusal fails
 // here rather than reading as a success — `analyseSource` is the one
 // description of what every stage has to say about one source.
-export function compiles(source: string): boolean {
-	return !containsErrors(analyseSource(source).diagnostics)
+export function compiles(
+	source: string,
+	options: AnalysisOptions = {},
+): boolean {
+	return !containsErrors(analysedDiagnosticsFor(source, options))
 }
 
 // NOTE: The Enricher alone, for the reports that never reach the Validator — a
@@ -74,10 +77,15 @@ export function enrichedDiagnosticsFor(
 // NOTE: Every stage, for the Helps the VALIDATOR writes — a Match's Cases, a
 // bounded Function stored as a value. The Enricher reports none of them, so a
 // test that asked it alone would find nothing and say the reporter had stopped.
+//
+// `tests` is off unless a probe asks for it, the way `esc check` has it off: a
+// `tests { … }` section is walked only where something is going to run it, and a
+// spec about a report inside one has to say so or find an empty list.
 export function analysedDiagnosticsFor(
 	source: string,
+	options: AnalysisOptions = {},
 ): Array<common.Diagnostic> {
-	return analyseSource(source).diagnostics
+	return analyseSource(source, undefined, options).diagnostics
 }
 
 // NOTE: `firstOf` over the whole pipeline, with the same insistence on naming
@@ -104,8 +112,13 @@ export function firstAnalysed(
 // — the same list `esc` prints and the editor underlines. A cascade is tested by
 // writing the whole list down, so a report that comes back is a failure rather
 // than something the next reader finds.
-export function codesOfSource(source: string): Array<common.DiagnosticCode> {
-	return analysedDiagnosticsFor(source).map((diagnostic) => diagnostic.code)
+export function codesOfSource(
+	source: string,
+	options: AnalysisOptions = {},
+): Array<common.DiagnosticCode> {
+	return analysedDiagnosticsFor(source, options).map(
+		(diagnostic) => diagnostic.code,
+	)
 }
 
 // NOTE: The Helps of the first report carrying this code, which is `firstAnalysed`

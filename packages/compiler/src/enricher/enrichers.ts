@@ -17,6 +17,7 @@ import {
 	asynchronyHelps,
 	booleanQuestionFor,
 	asynchronyState,
+	barredCompletion,
 	choiceIdentity,
 	countOf,
 	describeParameter,
@@ -146,12 +147,13 @@ import {
 	suggestionInScope,
 } from "./resolvers"
 import {
-	bodyWaits,
+	bodyCanWait,
 	childScope,
 	completionBarrierIn,
 	completionContextIn,
 	countTypeDeclaration,
 	declarationWasAbandoned,
+	expectedReturnTypeIn,
 	modulePathOf,
 	scopeMap,
 	typeDeclarationCount,
@@ -2530,7 +2532,11 @@ function interpolationAnswer(
 	data?: common.DiagnosticData
 } {
 	let erased = eraseRefinements(type)
-	let waiting = unwaitedWorkReport(erased, bodyWaits(scope))
+	let waiting = unwaitedWorkReport(
+		erased,
+		bodyCanWait(scope),
+		completionBarrierIn(scope),
+	)
 
 	if (waiting !== null) {
 		return waiting
@@ -4056,87 +4062,12 @@ function reportMisplacedComplete(
 	})
 }
 
-// NOTE: What a position that can not suspend has to be told, per position. The
-// four used to share one Note listing all four and one Help offering all three
-// edits, and only one line of each was ever about the reader: a property body
-// was told to complete the work "above this position", where the generated value
-// it completes does not exist yet, and then to move it into a completing
-// Function, which is a Future again in a position that still can not wait.
-//
-// A property body is the one with no edit at all — a generated value can only be
-// waited on by machinery the runner does not have — so what it is offered is the
-// other test form rather than a spelling that would be refused. The other three
-// all reach the same answer from a different direction: the work is completed
-// where waiting IS allowed, and the position reads the Constant.
-function barredCompletion(barrier: enricher.CompletionBarrier | null): {
-	note: string
-	helps: Array<string>
-} {
-	switch (barrier) {
-		case "parameter-default":
-			return {
-				note: "A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins.",
-				helps: [
-					"Complete the work above this Declaration, into a Constant the default reads.",
-				],
-			}
-		case "test-name":
-			return {
-				note: "A test's name is worked out before the run — the whole section is walked once with no test selected, so that a '--filter' matches what a reader sees.",
-				helps: [
-					"Complete the work above this test, into a Constant the name reads.",
-				],
-			}
-		case "benchmark-body":
-			return {
-				note: "A benchmark body is timed over many runs, and waiting for work inside it would time the waiting.",
-				helps: [
-					"Complete the work above the benchmark, into a Constant the body reads.",
-				],
-			}
-		case "property-body":
-			return {
-				note: "A property body runs once per generated value, and nothing in a 'for any' run can wait — the value this would complete does not exist until the run that made it.",
-				helps: [
-					"Assert on the answer in a 'test' of its own, which is run once and awaited.",
-				],
-			}
-		default:
-			// NOTE: No barrier named, which is a Scope that answered nothing at
-			// all rather than one of the four. Nothing is known about the
-			// position, so nothing is claimed about it.
-			return {
-				note: "'complete' suspends, and this position is filled in before any asynchrony around it begins.",
-				helps: [],
-			}
-	}
-}
-
-// NOTE: Whether a `complete` written HERE would stand. Two ways it does: the
-// body already waits — it is the top level, or one the Parser marked as
-// completing — or it declares `-> Future<…>` and simply has not written its first
-// `complete` yet, which is the shape every async body passes through while it is
-// being written. Asked wherever a report is about to offer the word, so that it
-// is offered nowhere it would be refused by `complete-outside-future`.
-//
-// The question `bodyWaits` answers is the other one — whether the body ALREADY
-// waits — and the two must not be confused: a body that declares `-> Future<…>`
-// and has written no `complete` yet may wait and does not.
-export function bodyCanWait(scope: enricher.Scope): boolean {
-	let context = completionContextOf(scope)
-
-	if (context === "top-level" || context?.type === "Future") {
-		return true
-	}
-
-	return findExpectedReturnType(scope)?.type === "Future"
-}
-
-// NOTE: Kept as a local name because half this file reads it, while the walk
-// itself lives beside `modulePathOf` in `scope.ts` — the Resolver asks the same
-// question about a bound it is about to refuse, and the two must not answer it
-// two ways.
+// NOTE: Kept as local names because half this file reads them, while the walks
+// themselves live beside `modulePathOf` in `scope.ts` — the Resolver asks the
+// same questions about a bound it is about to refuse, and the two must not
+// answer them two ways.
 const completionContextOf = completionContextIn
+const findExpectedReturnType = expectedReturnTypeIn
 
 function enrichMatch(
 	node: parser.MatchNode,
@@ -8503,23 +8434,6 @@ function enrichReturnStatement(
 	}
 }
 
-// NOTE: The nearest Scope that has an answer, which a Scope carrying the
-// barrier `null` is — a `<-` inside a Function whose own return Type is still
-// being worked out has no expected Type, and the enclosing Function's is not it.
-function findExpectedReturnType(scope: enricher.Scope): common.Type | null {
-	let searchScope: enricher.Scope | null = scope
-
-	while (searchScope !== null) {
-		if (searchScope.expectedReturnType !== undefined) {
-			return searchScope.expectedReturnType
-		}
-
-		searchScope = searchScope.parent
-	}
-
-	return null
-}
-
 function enrichFunctionStatement(
 	node: parser.FunctionStatementNode,
 	scope: enricher.Scope,
@@ -12786,8 +12700,9 @@ function asynchronyEvidence(
 	scope: enricher.Scope,
 	spelling: { inner: string; call: string; through: string | null },
 ): { notes: Array<string>; helps: Array<string> } {
-	let context = completionContextOf(scope)
-	let waits = context === "top-level" || context?.type === "Future"
+	let waits = bodyCanWait(scope)
+	let barrier = completionBarrierIn(scope)
+	let barred = barredCompletion(barrier)
 	let state = asynchronyState(
 		held.kind === "future" ? "unstarted" : "in-flight",
 	)
@@ -12808,7 +12723,9 @@ function asynchronyEvidence(
 						"'complete' takes the whole chain behind it, so a 'complete' written in front of this call would wait for the call rather than for the receiver.",
 					]
 				: [
-						"'complete' only stands in a body that answers a Future, and this position is not one.",
+						barrier === null
+							? "'complete' only stands in a body that answers a Future, and this position is not one."
+							: barred.note,
 					]),
 		],
 		helps: waits
@@ -12818,7 +12735,16 @@ function asynchronyEvidence(
 				]
 			: [
 					...reaching,
-					"Or declare the enclosing Function '-> Future<…>', which is what lets its body wait.",
+					// NOTE: The edit the position itself admits, which for the
+					// four barriers is not the enclosing Declaration — a
+					// property body has no enclosing Function to declare, and a
+					// Parameter's default is filled in before its Function's own
+					// asynchrony begins either way.
+					...(barred.helps.length > 0
+						? barred.helps
+						: [
+								"Or declare the enclosing Function '-> Future<…>', which is what lets its body wait.",
+							]),
 				],
 	}
 }
@@ -13805,6 +13731,10 @@ function overloadRefusalReport(
 		// word wherever the word stands, and by reaching through the Future
 		// wherever it does not. Defaulted for the callers that do not ask.
 		canWait?: boolean
+		// NOTE: And which of the four barriers said no, where one did — the edit
+		// a property body is left with is not the edit a plain Function is left
+		// with, and `barredCompletion` is the one place that knows which.
+		barrier?: enricher.CompletionBarrier | null
 	},
 ): {
 	labels: [common.DiagnosticLabel, ...Array<common.DiagnosticLabel>]
@@ -13915,6 +13845,7 @@ function overloadRefusalReport(
 		detail.expectedType,
 		detail.argumentType,
 		call.canWait !== false,
+		call.barrier ?? null,
 	)
 	// NOTE: And which member of a written Record the closest candidate turned
 	// away, as Notes alone — which is what handing it no Node asks for. The two
@@ -14092,6 +14023,7 @@ function reportNoMatchingOverload(
 			name: `'${node.member.content}'`,
 			passed: () => writtenArgumentTypes(node.arguments, typer),
 			canWait: bodyCanWait(scope),
+			barrier: completionBarrierIn(scope),
 		},
 	)
 
@@ -15327,6 +15259,7 @@ function resolveFunctionInvocation(
 				name: callee,
 				passed: () => writtenArgumentTypes(node.arguments, typer),
 				canWait: bodyCanWait(scope),
+				barrier: completionBarrierIn(scope),
 			},
 		)
 
@@ -16232,7 +16165,7 @@ function heldCaseSubject(
 				? [
 						`Match what it holds rather than the ${describeType(valueType)} around it.`,
 					]
-				: bodyWaits(scope)
+				: bodyCanWait(scope)
 					? [
 							`Wait for it first — 'constant answered = complete …' — and match 'answered'.`,
 						]

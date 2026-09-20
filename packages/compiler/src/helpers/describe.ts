@@ -1,4 +1,4 @@
-import type { common } from "@essence-lang/interfaces"
+import type { common, enricher } from "@essence-lang/interfaces"
 
 import { primary, secondary } from "../diagnostics/index"
 import { closestMatch } from "./suggest"
@@ -1248,13 +1248,25 @@ export function asynchronyHelps(
 	// Defaulted, because most positions are inside a body that can wait and the
 	// ones that are not have to look it up.
 	canWait: boolean = true,
+	// NOTE: And WHY it may not, where the answer is one of the four barriers
+	// rather than an ordinary body. "Declare the enclosing Function
+	// '-> Future<…>'" is no edit at all inside a property body, which has no
+	// enclosing Function, and none inside a Parameter's default, which is filled
+	// in before the Function's own asynchrony begins — so where a barrier
+	// answered, the edit it names is the barrier's own.
+	barrier: enricher.CompletionBarrier | null = null,
 ): Array<string> {
 	let mismatch = asynchronyMismatch(expected, actual)
 
 	if (!canWait && (mismatch === "unstarted" || mismatch === "in-flight")) {
-		return [
-			"'complete' only stands in a body that answers a Future, and this one does not — reach through it with '::map((value) { … })', which answers another Future, or declare the enclosing Function '-> Future<…>'.",
-		]
+		return barrier === null
+			? [
+					"'complete' only stands in a body that answers a Future, and this one does not — reach through it with '::map((value) { … })', which answers another Future, or declare the enclosing Function '-> Future<…>'.",
+				]
+			: [
+					"'complete' only stands in a body that answers a Future, and this position is not one — reach through it with '::map((value) { … })', which answers another Future.",
+					...barredCompletion(barrier).helps,
+				]
 	}
 
 	switch (mismatch) {
@@ -1302,6 +1314,68 @@ export function returnAsynchronyHelps(
 	}
 }
 
+// NOTE: What a position that can not suspend has to be told, per position. The
+// four used to share one Note listing all four and one Help offering all three
+// edits, and only one line of each was ever about the reader: a property body
+// was told to complete the work "above this position", where the generated value
+// it completes does not exist yet, and then to move it into a completing
+// Function, which is a Future again in a position that still can not wait.
+//
+// A property body is the one with no edit at all — a generated value can only be
+// waited on by machinery the runner does not have — so what it is offered is the
+// other test form rather than a spelling that would be refused. The other three
+// all reach the same answer from a different direction: the work is completed
+// where waiting IS allowed, and the position reads the Constant.
+//
+// Here rather than in the Enricher because `complete-outside-future` is not the
+// only report that stands in one of these positions. Every report that has to
+// WITHHOLD the word stands in one too, and each of them used to end in "declare
+// the enclosing Function '-> Future<…>'" — which a property body has not got at
+// all, and which changes nothing for a Parameter's default.
+export function barredCompletion(barrier: enricher.CompletionBarrier | null): {
+	note: string
+	helps: Array<string>
+} {
+	switch (barrier) {
+		case "parameter-default":
+			return {
+				note: "A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins.",
+				helps: [
+					"Complete the work above this Declaration, into a Constant the default reads.",
+				],
+			}
+		case "test-name":
+			return {
+				note: "A test's name is worked out before the run — the whole section is walked once with no test selected, so that a '--filter' matches what a reader sees.",
+				helps: [
+					"Complete the work above this test, into a Constant the name reads.",
+				],
+			}
+		case "benchmark-body":
+			return {
+				note: "A benchmark body is timed over many runs, and waiting for work inside it would time the waiting.",
+				helps: [
+					"Complete the work above the benchmark, into a Constant the body reads.",
+				],
+			}
+		case "property-body":
+			return {
+				note: "A property body runs once per generated value, and nothing in a 'for any' run can wait — the value this would complete does not exist until the run that made it.",
+				helps: [
+					"Assert on the answer in a 'test' of its own, which is run once and awaited.",
+				],
+			}
+		default:
+			// NOTE: No barrier named, which is a Scope that answered nothing at
+			// all rather than one of the four. Nothing is known about the
+			// position, so nothing is claimed about it.
+			return {
+				note: "'complete' suspends, and this position is filled in before any asynchrony around it begins.",
+				helps: [],
+			}
+	}
+}
+
 // NOTE: A Future or a Started where a value was wanted, which is the forgotten
 // `complete` wearing another Diagnostic's clothes: a hole told that
 // `Future<Integer>` is not Printable, an Argument told that it does not conform
@@ -1321,6 +1395,10 @@ export function returnAsynchronyHelps(
 export function unwaitedWorkReport(
 	type: common.Type,
 	waits: boolean,
+	// NOTE: And which of the four barriers said no, where one did — see
+	// `barredCompletion`. Null is an ordinary body that answers something other
+	// than a Future, whose edit is to its own Declaration.
+	barrier: enricher.CompletionBarrier | null = null,
 ): {
 	notes: Array<string>
 	helps: Array<string>
@@ -1333,6 +1411,7 @@ export function unwaitedWorkReport(
 	let state = asynchronyState(
 		type.type === "Future" ? "unstarted" : "in-flight",
 	)
+	let barred = barredCompletion(barrier)
 
 	return {
 		notes: [
@@ -1344,14 +1423,18 @@ export function unwaitedWorkReport(
 			...(waits
 				? []
 				: [
-						"'complete' only stands in a body that answers a Future, and this position is not one.",
+						barrier === null
+							? "'complete' only stands in a body that answers a Future, and this position is not one."
+							: barred.note,
 					]),
 		],
 		helps: waits
 			? asynchronyHelps(type.valueType, type)
-			: [
-					"Declare the enclosing Function '-> Future<…>', which is what lets its body wait, and add 'complete' where the value is read.",
-				],
+			: barrier === null
+				? [
+						"Declare the enclosing Function '-> Future<…>', which is what lets its body wait, and add 'complete' where the value is read.",
+					]
+				: barred.helps,
 		...(waits ? { data: asynchronyData(type.valueType, type) } : {}),
 	}
 }

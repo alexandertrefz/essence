@@ -60,8 +60,9 @@ import {
 } from "../helpers/types"
 import { recordAnnotation } from "./annotations"
 import {
-	bodyWaits,
+	bodyCanWait,
 	childScope,
+	completionBarrierIn,
 	declarationWasAbandoned,
 	modulePathOf,
 } from "./scope"
@@ -4951,7 +4952,8 @@ function missingConformance(
 
 	let unwaited = unwaitedWorkReport(
 		eraseRefinements(culprit),
-		bodyWaits(scope),
+		bodyCanWait(scope),
+		completionBarrierIn(scope),
 	)
 
 	if (unwaited !== null) {

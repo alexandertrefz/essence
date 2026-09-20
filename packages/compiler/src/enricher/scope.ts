@@ -55,16 +55,55 @@ export function completionContextIn(
 	return undefined
 }
 
-// NOTE: Whether a `complete` written HERE would stand — the one question three
-// reports about a forgotten one ask, and the reason each of them can offer the
-// word rather than guess. A completing body answers with its own Future and a
-// Program's top level is awaited by the emitted Module; a Parameter's default, a
-// test name, a benchmark and a property body are barriers, and a body that
-// declared anything else is simply not one.
-export function bodyWaits(scope: enricher.Scope): boolean {
+// NOTE: Whether this body ALREADY waits, which is what the Parser's `complete`
+// mark says: a completing body answers with its own Future and a Program's top
+// level is awaited by the emitted Module. A Parameter's default, a test name, a
+// benchmark and a property body are barriers, and a body that declared anything
+// else is simply not one.
+//
+// Not the question a report about a forgotten `complete` asks — which is why
+// this is private to the file: `bodyCanWait` below is the one every reporter
+// reads, and reaching for this one instead is the mistake it exists to stop.
+function bodyWaits(scope: enricher.Scope): boolean {
 	let context = completionContextIn(scope)
 
 	return context === "top-level" || context?.type === "Future"
+}
+
+// NOTE: The nearest Scope that has an answer about what a `<-` is measured
+// against, which a Scope carrying `null` is — a `<-` inside a Function whose own
+// return Type is still being worked out has no expected Type, and the enclosing
+// Function's is not it.
+export function expectedReturnTypeIn(
+	scope: enricher.Scope,
+): common.Type | null {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.expectedReturnType !== undefined) {
+			return current.expectedReturnType
+		}
+	}
+
+	return null
+}
+
+// NOTE: Whether a `complete` written HERE would STAND — the one question every
+// report about a forgotten one asks, and the reason each of them can offer the
+// word rather than guess. Two ways it stands: the body already waits, or it
+// declares `-> Future<…>` and has simply not written its first `complete` yet,
+// which is the shape every async body passes through while it is being written.
+//
+// That second way is the whole difference from `bodyWaits`, and it is the one a
+// report meets: a body declaring `-> Future<…>` with nothing completed in it was
+// told to "declare the enclosing Function '-> Future<…>'", which its author had
+// already done. The Validator asks the same question off its own stack of
+// enclosing bodies, in `bodyCanWait` there, and the two answer alike by
+// construction — it pushes the DECLARED Type for exactly this reason.
+export function bodyCanWait(scope: enricher.Scope): boolean {
+	return bodyWaits(scope) || expectedReturnTypeIn(scope)?.type === "Future"
 }
 
 // NOTE: The position a barrier belongs to, for the reports that have to name it
