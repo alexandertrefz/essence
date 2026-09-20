@@ -1,7 +1,11 @@
 import type { common } from "@essence-lang/interfaces"
 
 import { displayChoiceName } from "../helpers/describe"
-import { resolveOverloadedMethodName } from "../helpers/types"
+import {
+	resolveOverloadedMethodName,
+	withoutRecordNames,
+	withoutRecordNamesInSignature,
+} from "../helpers/types"
 import type { ExportSurface } from "../modules/link"
 import { printSignature, printType } from "../printType"
 import {
@@ -299,7 +303,19 @@ function describeWith(
 	context: DescribeContext,
 	printing: Set<common.Type>,
 ): Descriptor {
-	let shown = printType(type)
+	// NOTE: Spelled WITHOUT a Record's Alias name, at every depth — the one
+	// place in the toolchain where naming one is the wrong answer. Whoever
+	// reads a `shown` is a JavaScript author: it is what a generated `.d.ts`
+	// comment says, what a refused Argument is measured against ("expected …,
+	// got an empty Map") and what an Overload listing spells out, and none of
+	// them can look `Standing` up in a file they were never handed. The shape
+	// is the thing they have to build.
+	//
+	// The `.d.ts` still prints the name wherever the Module EXPORTS one: its
+	// naming table is keyed by this very spelling, so the declaration and each
+	// use of it meet on the shape and come back out as the word — which is the
+	// name a JavaScript author does have.
+	let shown = printType(withoutRecordNames(type))
 
 	if (printing.has(type)) {
 		return {
@@ -681,7 +697,10 @@ function signatureWith(
 			...(parameter.hasDefault ? { optional: true as const } : {}),
 		})),
 		returns: describeWith(signature.returnType, context, printing),
-		shown: printSignature(signature),
+		// NOTE: Spelled by shape rather than by Alias name, for the reason
+		// `describeWith` is — this string is read by a JavaScript author, and
+		// `(_ Point) -> Point` names two Types they were never handed.
+		shown: printSignature(withoutRecordNamesInSignature(signature)),
 	}
 }
 
@@ -1128,7 +1147,10 @@ function describeOverloads(
 		return {
 			name: overloadName,
 			emitted: emit(overloadName),
-			signature: printSignature(overload, `${qualifier}${overloadName}`),
+			signature: printSignature(
+				withoutRecordNamesInSignature(overload),
+				`${qualifier}${overloadName}`,
+			),
 			of: describeSignature(overload, context),
 		}
 	})

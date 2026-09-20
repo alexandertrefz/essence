@@ -69,14 +69,24 @@ export function printType(type: common.Type): string {
 			)}>`
 		case "GenericDictionary":
 			return "Dictionary"
-		case "Record": {
-			let members = Object.entries(type.members).map(
-				([memberName, memberType]) =>
-					`${memberName}: ${printType(memberType)}`,
-			)
+		// NOTE: A Record reached through an Alias prints as the Alias — the
+		// Union arm's rule one Type over, and for the same reason: a Hover over
+		// a value of `Standing` answers the word its Declaration wrote, and
+		// nine members spelled out drown every place a Type is shown beside
+		// something else. `printRecordWithMembers` is the descriptive form, for
+		// the Hover where the Alias itself is the subject.
+		case "Record":
+			if (type.name !== undefined) {
+				return type.name
+			}
 
-			return members.length === 0 ? "{}" : `{ ${members.join(", ")} }`
-		}
+			if (type.alias !== undefined) {
+				return `${type.alias.name}<${type.alias.typeArguments
+					.map(printType)
+					.join(", ")}>`
+			}
+
+			return printRecordWithMembers(type)
 		case "Function":
 		case "SimpleMethod":
 		case "StaticMethod":
@@ -153,6 +163,19 @@ export function caseHeader(caseType: common.CaseType): string {
 	}
 
 	return `${choiceName}#${caseType.name}`
+}
+
+// NOTE: A Record with its members spelled out, whatever it is called — the
+// Record's own twin of `printCaseWithPayload` below, and for the same occasion:
+// a Hover over the Alias's own Declaration, where `Standing: Standing` is what
+// naming it would answer. Everywhere a value of one is shown, `printType`'s
+// terse form is exactly right.
+export function printRecordWithMembers(type: common.RecordType): string {
+	let members = Object.entries(type.members).map(
+		([memberName, memberType]) => `${memberName}: ${printType(memberType)}`,
+	)
+
+	return members.length === 0 ? "{}" : `{ ${members.join(", ")} }`
 }
 
 // NOTE: A Case with its payload shape spelled out — for Hovers where the

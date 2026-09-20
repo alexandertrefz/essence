@@ -490,7 +490,7 @@ Error: This default makes two Overloads accept the same Record
     │
  60 │              (using options: Options = { retries = 3 }) -> String {
     │                                        ───────┬───────  
-    │                                               ╰───────── a Record written without 'retries' still fits { host: String, retries: Integer }
+    │                                               ╰───────── a Record written without 'retries' still fits Options
     │ 
  64 │ ╭─▶          (using options: { host: String }) -> String {
     ┆ ┆   
@@ -1835,7 +1835,7 @@ Error: This value does not fit the declared Type of Constant 'order'
     │                                                            ───┬──  
     │                                                               ╰──── this is a (_: …) -> …
     │ 
-    │ Note: 'order' is declared as (_: { name: String, price: Integer, maker: { town: String }, tags: List<String>, nickname: Optional<String> }, _: { name: String, price: Integer, maker: { town: String }, tags: List<String>, nickname: Optional<String> }) -> Ordering.
+    │ Note: 'order' is declared as (_: Product, _: Product) -> Ordering.
 ────╯
 
 [path-step-not-a-record]
@@ -1948,7 +1948,7 @@ Error: A path key reaches into a member no default fills in
     │ 
     │ Help: Write the whole member: 'server = { … }'.
     │ 
-    │ Note 1: Parameter 'using' is { retries: Integer, server: { host: String, port: Integer } }.
+    │ Note 1: Parameter 'using' is Options.
     │ Note 2: Its default fills in 'retries', and 'server' is not one of them — so there is nothing under this key to merge with.
 ────╯
 
@@ -1989,7 +1989,7 @@ Error: A path key reaches into a member no default fills in
     │ 
     │ Help: Write the whole member: 'origin = { … }'.
     │ 
-    │ Note 1: Case '#Get' is { origin: { host: String, port: Integer }, limits: { host: String, port: Integer } }.
+    │ Note 1: Case '#Get' is { origin: Server, limits: Server }.
     │ Note 2: Its default fills in 'limits', and 'origin' is not one of them — so there is nothing under this key to merge with.
 ────╯
 
@@ -2055,7 +2055,7 @@ Error: This value does not fit the declared Type of Constant 'blank'
     │ │           
     │ ╰─────────── this is a { name: String }
     │ 
-    │ Note: 'blank' is declared as { name: String, server: { host: String, port: Integer, tls: { enabled: Boolean } } }.
+    │ Note: 'blank' is declared as Config.
 ────╯
 
 [path-key-outside-combination]
@@ -2316,7 +2316,7 @@ Error: This Argument is missing 2 members the default does not fill in
     │ 
     │ Help: Write 'host', 'tls' into this Record.
     │ 
-    │ Note 1: Parameter 'using' is { host: String, retries: Integer, tls: Boolean }.
+    │ Note 1: Parameter 'using' is Options.
     │ Note 2: Its default fills in 'retries'; every other member must be written.
 ────╯
 
@@ -2328,7 +2328,7 @@ Error: This Argument does not fit Parameter 'using'
     │                                                  ────────────┬───────────  
     │                                                              ╰───────────── this is a { host: Integer, tls: Boolean }
     │ 
-    │ Note: Parameter 'using' is { host: String, retries: Integer, tls: Boolean }.
+    │ Note: Parameter 'using' is Options.
 ────╯
 
 [argument-type-mismatch]
@@ -2339,7 +2339,7 @@ Error: This Argument does not fit Parameter 'using'
     │                                      ────────────────────┬───────────────────  
     │                                                          ╰───────────────────── this is a { host: String, tls: Boolean, timeout: Integer }
     │ 
-    │ Note: Parameter 'using' is { host: String, retries: Integer, tls: Boolean }.
+    │ Note: Parameter 'using' is Options.
 ────╯
 
 [argument-type-mismatch]
@@ -2350,9 +2350,9 @@ Error: This Argument does not fit Parameter 'using'
     │                                                  ───┬───  
     │                                                     ╰───── this is a { host: String, tls: Boolean }
     │ 
-    │ Help: Write the Record at the call, or pass a value of Type { host: String, retries: Integer, tls: Boolean }.
+    │ Help: Write the Record at the call, or pass a value of Type Options.
     │ 
-    │ Note 1: Parameter 'using' is { host: String, retries: Integer, tls: Boolean }.
+    │ Note 1: Parameter 'using' is Options.
     │ Note 2: Its default fills in 'retries', which only an Argument WRITTEN as a Record literal may leave out — every other Record carries whatever its value holds, not only what its Type names.
 ────╯
 
@@ -2662,7 +2662,7 @@ Error: This value does not fit the declared return Type
     │           ────┬────  
     │               ╰────── this is a { x: Integer }
     │ 
-    │ Note: The Function returns { x: Integer, y: Integer }.
+    │ Note: The Function returns Point.
 ────╯
 
 [missing-return]
@@ -2675,7 +2675,7 @@ Error: Not every path through this Function returns
     │ │           
     │ ╰─────────── this path falls off the end
     │ 
-    │ Note: The declared return Type is { x: Integer, y: Integer }, so every path must yield one.
+    │ Note: The declared return Type is Point, so every path must yield one.
 ────╯
 
 [unknown-name]

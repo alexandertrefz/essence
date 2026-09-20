@@ -64,7 +64,20 @@ export function isSpellableType(type: common.Type): boolean {
 			return (
 				isSpellableType(type.keyType) && isSpellableType(type.valueType)
 			)
+		// NOTE: A Record Alias prints under its own name, and an applied generic
+		// one under that name with its Arguments — the Union's rule below asked
+		// one Type over, because `printType` now answers both the same way.
+		// What its members are made of stops mattering once the name is what
+		// gets written: `Standing` parses wherever the Alias is in scope.
 		case "Record":
+			if (type.name !== undefined) {
+				return true
+			}
+
+			if (type.alias !== undefined) {
+				return type.alias.typeArguments.every(isSpellableType)
+			}
+
 			return Object.values(type.members).every(isSpellableType)
 		// NOTE: A Choice prints under its own name and an applied Alias under
 		// its own with the Arguments spelled out; a bare structural Union is

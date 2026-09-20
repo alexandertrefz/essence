@@ -5482,8 +5482,16 @@ export function resolveAliasedType(
 		// A copy, not a mutation — the resolved Type may be a shared Scope
 		// object. An already named or aliased Union (a Choice, `Number`,
 		// `Optional<Integer>`, another Alias) keeps its original spelling.
+		//
+		// NOTE: And an anonymous RECORD takes it for the same reason and under
+		// the same rule — `Standing` rather than nine members spelled out at
+		// every mention of it. `type Score = Standing` keeps printing
+		// `Standing`, the way `type Sure = Number` keeps printing `Number`:
+		// what a second name for one Type buys a reader is nothing, and the
+		// name their Declarations agree on is the one they wrote first.
 		if (
-			resolvedType.type === "UnionType" &&
+			(resolvedType.type === "UnionType" ||
+				resolvedType.type === "Record") &&
 			resolvedType.name === undefined &&
 			resolvedType.alias === undefined
 		) {
@@ -5566,15 +5574,15 @@ function applyGenericAlias(
 
 	let appliedType = applyGenericBindings(aliasType.aliasedType, bindings)
 
-	// NOTE: An applied alias whose body is an anonymous Union carries the
-	// applied spelling as its display alias, so `Optional<Integer>` prints as
-	// written rather than as its target's members. The Type Arguments are kept
-	// as Types — a later substitution rewrites them alongside the members, so
-	// the spelling never goes stale. Display-only, like every Union name. A
-	// body that is already named or aliased keeps its own spelling, the way
-	// `type Sure = Number` keeps printing `Number`.
+	// NOTE: An applied alias whose body is an anonymous Union or Record carries
+	// the applied spelling as its display alias, so `Optional<Integer>` and
+	// `Pair<Integer>` print as written rather than as their targets' members.
+	// The Type Arguments are kept as Types — a later substitution rewrites them
+	// alongside the members, so the spelling never goes stale. Display-only,
+	// like every Union name. A body that is already named or aliased keeps its
+	// own spelling, the way `type Sure = Number` keeps printing `Number`.
 	if (
-		appliedType.type === "UnionType" &&
+		(appliedType.type === "UnionType" || appliedType.type === "Record") &&
 		appliedType.name === undefined &&
 		appliedType.alias === undefined
 	) {

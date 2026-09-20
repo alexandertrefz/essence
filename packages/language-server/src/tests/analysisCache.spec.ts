@@ -1110,7 +1110,7 @@ describe("the Server's request loop", () => {
 				(entry) => entry.label === "halved",
 			)
 
-			expect(halved?.detail).toBe("() -> { cents: Integer }")
+			expect(halved?.detail).toBe("() -> Amount")
 		} finally {
 			await session.dispose()
 			files.dispose()

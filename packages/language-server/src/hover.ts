@@ -164,12 +164,24 @@ function isInMargin(text: string, cursor: common.Cursor): boolean {
 // annotation containing it spans — every compound form needs a bracket or an
 // operator. Offered LAST so that an exact-span tie resolves to the annotation,
 // which is the most specific thing that can be said about its own span.
+//
+// NOTE: An annotation NAMING a Record Alias answers with its members, the way
+// the Alias's own Declaration does. The cursor is on the word: answering
+// `Rectangle` over a `Rectangle` the reader is already looking at tells them
+// nothing, and what an annotation is asked is what the name stands for. A value
+// OF one still answers with the name, which is the split — the name where the
+// shape would drown the line, the shape where the name is already on it.
 function visitAnnotations(
 	annotations: Array<common.TypeAnnotation>,
 	state: State,
 ) {
 	for (let annotation of annotations) {
-		consider(state, annotation.position, annotation.type, null)
+		consider(
+			state,
+			annotation.position,
+			aliasedRecordShape(annotation.type) ?? annotation.type,
+			null,
+		)
 	}
 }
 
@@ -337,7 +349,15 @@ function visitModuleSections(
 				continue
 			}
 
-			consider(state, identifier.position, type, null)
+			// NOTE: And a Record Alias for the same reason one Type over — an
+			// entry binding `Rectangle` under a cursor on the word `Rectangle`
+			// reads back as the members it stands for.
+			consider(
+				state,
+				identifier.position,
+				aliasedRecordShape(type) ?? type,
+				null,
+			)
 		}
 	}
 
@@ -565,7 +585,13 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			// refinement, so its base is one level further in — `NonEmptyList<Item>`
 			// reads back as `List<Item>`, which is exactly as much as the
 			// non-generic one says.
-			let declaredType = refinedAliasBase(node.type) ?? node.type
+			//
+			// NOTE: And a RECORD Alias reads back as its members, on the same
+			// rule and for the same reason — see `aliasedRecordShape`.
+			let declaredType =
+				refinedAliasBase(node.type) ??
+				aliasedRecordShape(node.type) ??
+				node.type
 
 			consider(
 				state,
@@ -945,6 +971,33 @@ function refinedAliasBase(type: common.Type): common.Type | null {
 	}
 
 	return null
+}
+
+// NOTE: A Record Alias's shape, for the Alias's OWN Declaration — the rule
+// `refinedAliasBase` follows one Type over, and for the same reason:
+// `Standing: Standing` is what naming it would answer on the line that declares
+// it, and the members are what a reader came to this line to see. Everywhere a
+// VALUE of one is hovered, the name is exactly right and `printType` gives it.
+//
+// The OUTERMOST spelling alone is dropped. A member that is an Alias of its own
+// stays named — `team: Team` is what `Standing` declares, and expanding `Team`
+// here would answer a Declaration the cursor is not on.
+//
+// Null for every other Type, and for a Record nobody named: `printType` already
+// spells that one's members out, so there is nothing to put in its place.
+//
+// A GENERIC Alias is answered whatever its body says about itself — the body of
+// one is held unapplied and is never stamped, so there is no name on it to ask
+// about, and `Pair: Pair` is the answer without this.
+function aliasedRecordShape(type: common.Type): common.Type | null {
+	if (type.type === "GenericAlias") {
+		return type.aliasedType.type === "Record" ? type.aliasedType : null
+	}
+
+	return type.type === "Record" &&
+		(type.name !== undefined || type.alias !== undefined)
+		? { type: "Record", members: type.members }
+		: null
 }
 
 // NOTE: A Namespace's own Type Parameter, rendered as declared — `infer Item`,

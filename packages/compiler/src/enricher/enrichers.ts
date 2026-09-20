@@ -16196,11 +16196,31 @@ function provenPatternType(
 		return required
 	}
 
-	let narrowed = unionArmsOf(valueType).flatMap((arm) =>
-		arm.type === "Record" || arm.type === "Case"
-			? [{ ...arm, members: { ...arm.members, ...required.members } }]
-			: [],
-	)
+	// NOTE: A narrowed Record is a Record the PATTERN built, so the spread that
+	// builds one clears the Alias spelling the arm was reached under: what a
+	// Pattern proves about a `Standing` is that Record with the members the
+	// Pattern required written over the ones `Standing` declares, and a shape
+	// with a member `Standing` never mentions is not a Standing. Left standing,
+	// the name would have a Diagnostic claim the Alias declares it. A Case keeps
+	// its own — a Case is nominal, and narrowing one leaves it the Case it was.
+	let narrowed = unionArmsOf(valueType).flatMap<common.Type>((arm) => {
+		if (arm.type === "Record") {
+			return [
+				{
+					type: "Record",
+					members: { ...arm.members, ...required.members },
+				},
+			]
+		}
+
+		if (arm.type === "Case") {
+			return [
+				{ ...arm, members: { ...arm.members, ...required.members } },
+			]
+		}
+
+		return []
+	})
 
 	return narrowed.length === 0 ? required : buildUnion(narrowed)
 }

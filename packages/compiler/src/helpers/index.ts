@@ -101,4 +101,5 @@ export {
 	typeMentionsGeneric,
 	unfreshenBindings,
 	unionMembersKeepingNames,
+	withoutRecordNames,
 } from "./types"

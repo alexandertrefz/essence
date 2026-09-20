@@ -21,12 +21,24 @@ export type ConformanceMethodMap = Record<string, string>
 // sorted, so two structurally identical Types always produce the same key
 // regardless of the order their properties were built in. The NUL separator
 // keeps the Protocol name from colliding with the serialised Type.
+//
+// NOTE: What a Record is CALLED is left out of it, because two Aliases of one
+// shape are one Type here as everywhere: conforming is a question about the
+// members, and a key that told `Standing` from the shape it stands for would
+// ask it twice and answer the same — and would leave the cycle guard unable to
+// recognise the question it is already inside.
 export function conformanceKey(
 	protocolName: string,
 	type: common.Type,
 ): string {
 	return `${protocolName}\u0000${stableSerialize(type)}`
 }
+
+// NOTE: The display fields a Record may carry, which nothing structural reads —
+// see `common.RecordType`. Dropped by name rather than by rebuilding the Type,
+// because the walk below is generic and a rebuild would have to enumerate every
+// shape there is.
+const displayFields = new Set(["name", "alias"])
 
 function stableSerialize(value: unknown): string {
 	// NOTE: A Choice's payload may name the Choice, so the walk can lead back
@@ -75,7 +87,13 @@ function stableSerialize(value: unknown): string {
 				)
 			}
 
+			// NOTE: A Record's display fields are skipped here rather than at the
+			// call above, so the key costs one comparison per object instead of
+			// a second walk over the whole Type on a path conformance solving
+			// takes for every Argument of every generic call.
+			let spelled = (value as Record<string, unknown>).type === "Record"
 			let entries = Object.entries(value as Record<string, unknown>)
+				.filter(([key]) => !(spelled && displayFields.has(key)))
 				.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
 				.map(([key, val]) => `${JSON.stringify(key)}:${serialize(val)}`)
 

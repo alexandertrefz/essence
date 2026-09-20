@@ -4,6 +4,7 @@ import {
 	derivedEnumerableNamespaceName,
 	derivedEquatableNamespaceName,
 } from "../../enricher/resolvers"
+import { withoutRecordNames } from "../../helpers/types"
 import { runtimeNamespaceNames } from "../../rewriter/runtimeNamespaces"
 import type { OptimiserPass } from "../index"
 import type { DeclaredNamespaces } from "../namespaces"
@@ -109,8 +110,16 @@ function poolKeyOf(
 			// Matcher written in three Handlers of one Match is one descriptor
 			// — which is where this earns most, because that object was
 			// rebuilt at every test of every turn.
+			//
+			// NOTE: Keyed by what the Rewriter will EMIT, which is the Type
+			// without a Record's display spelling on it — the same shape
+			// reached once through an Alias and once written out is one
+			// descriptor and has to be one constant, or the band declares two
+			// consts holding byte-identical objects.
 			return node.kind === "type-descriptor"
-				? `descriptor:${serializeKey(node.descriptor)}`
+				? `descriptor:${serializeKey(
+						withoutRecordNames(node.descriptor),
+					)}`
 				: null
 		default:
 			return null

@@ -125,13 +125,25 @@ export function describeType(type: common.Type): string {
 			)}>`
 		case "GenericDictionary":
 			return "Dictionary"
+		// NOTE: A Record reached through an Alias is named, on the rule a Union
+		// is named by and for the reason a message about nine members spelled
+		// out is no message at all: a reader asked to act on a `Standing` is
+		// asked about the Declaration they wrote, not about its shape. What the
+		// members ARE is the mismatch report's business — `describeRecordShape`
+		// is what spells one out, and a mismatch between two Records says which
+		// member differs rather than printing either.
 		case "Record":
-			return `{ ${Object.entries(type.members)
-				.map(
-					([memberName, memberType]) =>
-						`${memberName}: ${describeType(memberType)}`,
-				)
-				.join(", ")} }`
+			if (type.name !== undefined) {
+				return type.name
+			}
+
+			if (type.alias !== undefined) {
+				return `${type.alias.name}<${type.alias.typeArguments
+					.map(describeType)
+					.join(", ")}>`
+			}
+
+			return describeRecordShape(type)
 		case "Function":
 		case "SimpleMethod":
 		case "StaticMethod":
@@ -185,6 +197,20 @@ function describeFunctionSignature(functionType: common.BaseFunction): string {
 		.join(", ")
 
 	return `(${parameters}) -> ${describeType(functionType.returnType)}`
+}
+
+// NOTE: A Record with its members spelled out, whatever it is called — the
+// descriptive form `printCaseWithPayload` is for a Case, and the one place a
+// named Record still shows its shape: a mismatch is about the members, and a
+// report that answered `Standing` on both sides would name the difference
+// nowhere. An empty Record is `{}` rather than `{  }`.
+export function describeRecordShape(type: common.RecordType): string {
+	let members = Object.entries(type.members).map(
+		([memberName, memberType]) =>
+			`${memberName}: ${describeType(memberType)}`,
+	)
+
+	return members.length === 0 ? "{}" : `{ ${members.join(", ")} }`
 }
 
 // NOTE: A Parameter is identified by its label where it has one, and by its

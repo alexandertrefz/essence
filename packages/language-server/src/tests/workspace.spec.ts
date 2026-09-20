@@ -470,7 +470,7 @@ describe("Workspace", () => {
 				"{ width: Integer, height: Integer }",
 			)
 			expect(hoverAt(3, "RectangleMeasurable")?.content).toBe(
-				"namespace RectangleMeasurable for { width: Integer, height: Integer }",
+				"namespace RectangleMeasurable for Rectangle",
 			)
 		})
 	})

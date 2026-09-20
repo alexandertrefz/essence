@@ -1835,7 +1835,7 @@ export {
 
 				expect(codesOf(main.diagnostics)).toEqual(["unknown-method"])
 				expect(main.diagnostics[0]?.helps).toContain(
-					"'Measurable' in ./Geometry.es declares 'area' for { width: Integer, height: Integer } — import it.",
+					"'Measurable' in ./Geometry.es declares 'area' for Rectangle — import it.",
 				)
 			},
 		)

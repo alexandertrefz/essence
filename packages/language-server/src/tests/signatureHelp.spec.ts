@@ -441,7 +441,7 @@ describe("Signature Help for a standard library Method", () => {
 				let help = findSignatureHelp(source, { line: 7, column: 10 })
 
 				expect(help?.signatures[0].label).toBe(
-					"connect(using: { host: String, retries: Integer }) -> String",
+					"connect(using: Options) -> String",
 				)
 			})
 

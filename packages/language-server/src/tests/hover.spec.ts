@@ -47,12 +47,8 @@ describe("Hover", () => {
 			"}",
 		].join("\n")
 
-		expect(hover(source, { line: 10, column: 32 })).toBe(
-			"server: { host: String, port: Integer, tls: { enabled: Boolean } }",
-		)
-		expect(hover(source, { line: 10, column: 39 })).toBe(
-			"tls: { enabled: Boolean }",
-		)
+		expect(hover(source, { line: 10, column: 32 })).toBe("server: Server")
+		expect(hover(source, { line: 10, column: 39 })).toBe("tls: Tls")
 	})
 
 	// NOTE: A path key in a Literal MERGED into a default has no synthesized
@@ -1398,9 +1394,7 @@ describe("A Record Parameter with a default", () => {
 	})
 
 	it("should print the Parameter's Type as it always did", () => {
-		expect(hover(source, { line: 4, column: 19 })).toBe(
-			"using: { host: String, retries: Integer }",
-		)
+		expect(hover(source, { line: 4, column: 19 })).toBe("using: Options")
 	})
 
 	// NOTE: And which of them a path key may reach INTO, which is the other
@@ -1503,14 +1497,12 @@ describe("Hover inside a Case payload default", () => {
 
 		it("describes the path as the Function it stands for", () => {
 			expect(hover(source, { line: 5, column: 33 })).toBe(
-				"(_ { name: String, maker: { town: String } }) -> String",
+				"(_ Product) -> String",
 			)
 		})
 
 		it("describes each step as the member it reads", () => {
-			expect(hover(source, { line: 5, column: 36 })).toBe(
-				"maker: { town: String }",
-			)
+			expect(hover(source, { line: 5, column: 36 })).toBe("maker: Maker")
 			expect(hover(source, { line: 5, column: 41 })).toBe("town: String")
 		})
 

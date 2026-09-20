@@ -116,6 +116,21 @@ export function asynchronyMismatch(
 // Every question asked this way is monotone — "is there an X anywhere" or
 // "collect every X" — so a second visit to a shared object could only find what
 // the first one already did.
+//
+// NOTE: The one field it does NOT follow is a display `alias`, on the two Types
+// that carry one. Walking whatever is there is what makes this cover shapes
+// nobody has added yet, and a display spelling is the one thing on a Type that
+// is not part of it: the Type Arguments an `alias` holds are already standing
+// wherever they were substituted TO, so following them finds nothing new about
+// a Type and finds plenty about a Type Parameter the body never used.
+// `type Box<Held> = { value: Integer }` applied as `Box<NonZeroInteger>` holds a
+// refinement in its spelling and none in its members — enough, followed, to fail
+// the Rewriter's erasure assertion on a Program that erased everything it had.
+// The same goes for an Error Argument silencing a second Diagnostic and for an
+// unbound Parameter holding an Argument back. A plain `name` is a string and was
+// never walked into.
+const displaySpelling = "alias"
+
 function typeWalkFinds(
 	type: common.Type,
 	found: (record: Record<string, unknown>) => boolean,
@@ -143,7 +158,12 @@ function typeWalkFinds(
 			return true
 		}
 
-		return Object.values(record).some(walk)
+		let spelled = record.type === "Record" || record.type === "UnionType"
+
+		return Object.entries(record).some(
+			([key, member]) =>
+				!(spelled && key === displaySpelling) && walk(member),
+		)
 	}
 
 	return walk(type)
@@ -742,16 +762,45 @@ export function applyGenericBindings(
 				([name, memberType]) =>
 					[name, applyGenericBindings(memberType, bindings)] as const,
 			)
+			let aliasArguments = type.alias?.typeArguments.map((typeArgument) =>
+				applyGenericBindings(typeArgument, bindings),
+			)
 
 			if (
 				entries.every(
 					([name, memberType]) => memberType === type.members[name],
-				)
+				) &&
+				(aliasArguments === undefined ||
+					aliasArguments.every(
+						(typeArgument, index) =>
+							typeArgument === type.alias?.typeArguments[index],
+					))
 			) {
 				return type
 			}
 
-			return { type: "Record", members: Object.fromEntries(entries) }
+			// NOTE: The two display fields follow the rule they follow on a
+			// Union, one branch up, and for the same reasons: a plain `name`
+			// may well spell out the very Type Parameters being replaced, so
+			// it is dropped rather than kept stale, while an `alias` carries
+			// its Type Arguments as Types and substitutes right along —
+			// `Pair<Item>` heals into `Pair<Integer>`. A Parameter-free named
+			// Record comes back member by member unchanged and survives
+			// through the identity check above, which is what keeps `Standing`
+			// spelled `Standing` everywhere a substitution passes it by.
+			let substituted: common.RecordType = {
+				type: "Record",
+				members: Object.fromEntries(entries),
+			}
+
+			if (type.alias !== undefined && aliasArguments !== undefined) {
+				substituted.alias = {
+					name: type.alias.name,
+					typeArguments: aliasArguments,
+				}
+			}
+
+			return substituted
 		}
 		case "Case": {
 			let entries = Object.entries(type.members).map(
@@ -1598,6 +1647,11 @@ function withoutRefinements(type: common.Type): common.Type {
 				? type
 				: { type: "Dictionary", keyType, valueType }
 		}
+		// NOTE: A rebuilt Record drops its own display spelling for the same
+		// reason the Union below drops its arms' — a `Standing` whose
+		// `NonZeroInteger` member erased to an Integer declares something
+		// `Standing` does not, and a shape is not the Alias it stopped being.
+		// One holding no refinement anywhere comes back as itself and keeps it.
 		case "Record": {
 			let members: Record<string, common.Type> = {}
 			let stripped = false
@@ -1622,6 +1676,230 @@ function withoutRefinements(type: common.Type): common.Type {
 		default:
 			return type
 	}
+}
+
+// NOTE: The Type with a Record's display spelling taken off it, however deep one
+// sits — what a Type looks like to anything that is not a reader. A descriptor is
+// DATA the runtime consults, and `Standing` says nothing about a value that
+// `{ team: …, played: … }` does not; emitted, it would put a name the runtime has
+// never heard of into every Program that matches on an Alias, and split the
+// constant pool between two spellings of one shape. So the Rewriter strips it on
+// the way out, which is also what keeps the emitted JavaScript byte for byte what
+// it was before Records could be named at all.
+//
+// A Union's own `name` and `alias` are deliberately LEFT — they reach an emitted
+// descriptor today, inert, and taking them out here would change the output this
+// is written to keep identical. The one new field is the one that goes.
+//
+// NOTE: Identity-preserving, like every walk here: a Type holding no named Record
+// comes back as itself, so the common descriptor allocates nothing. The visiting
+// set is the back-edge guard `resolveUnknownSlots` carries, for the same reason —
+// a Choice's payload may name the Choice.
+export function withoutRecordNames(type: common.Type): common.Type {
+	let visiting = new Set<common.Type>()
+
+	let strip = (type: common.Type): common.Type => {
+		if (visiting.has(type)) {
+			return type
+		}
+
+		visiting.add(type)
+
+		try {
+			switch (type.type) {
+				case "Record":
+				case "Case": {
+					let members: Record<string, common.Type> = {}
+					let changed = false
+
+					for (let [name, memberType] of Object.entries(
+						type.members,
+					)) {
+						members[name] = strip(memberType)
+						changed ||= members[name] !== memberType
+					}
+
+					if (type.type === "Case") {
+						let typeArguments = strippedArguments(
+							type.typeArguments,
+							strip,
+						)
+
+						return changed || typeArguments !== type.typeArguments
+							? {
+									...type,
+									members,
+									...(typeArguments === undefined
+										? {}
+										: { typeArguments }),
+								}
+							: type
+					}
+
+					return changed ||
+						type.name !== undefined ||
+						type.alias !== undefined
+						? { type: "Record", members }
+						: type
+				}
+				case "List": {
+					let itemType = strip(type.itemType)
+
+					return itemType === type.itemType
+						? type
+						: { type: "List", itemType }
+				}
+				case "Future": {
+					let valueType = strip(type.valueType)
+
+					return valueType === type.valueType
+						? type
+						: { type: "Future", valueType }
+				}
+				case "Started": {
+					let valueType = strip(type.valueType)
+
+					return valueType === type.valueType
+						? type
+						: { type: "Started", valueType }
+				}
+				case "Dictionary": {
+					let keyType = strip(type.keyType)
+					let valueType = strip(type.valueType)
+
+					return keyType === type.keyType &&
+						valueType === type.valueType
+						? type
+						: { type: "Dictionary", keyType, valueType }
+				}
+				// NOTE: The Type ARGUMENTS of a Union's or a Case's applied
+				// spelling are stripped alongside its members, because a
+				// spelling is printed too: `Optional<Standing>` is the word a
+				// reader recognises in a Diagnostic and `Optional<{ … }>` is
+				// what the embedding boundary has to say, and both are read off
+				// these. A Refinement's are stripped for the same reason, and
+				// its base along with them.
+				case "UnionType": {
+					let types = type.types.map((arm) =>
+						arm.type === "GenericUse" ? arm : strip(arm),
+					)
+					let alias = strippedArguments(
+						type.alias?.typeArguments,
+						strip,
+					)
+
+					if (
+						types.every(
+							(arm, index) => arm === type.types[index],
+						) &&
+						alias === type.alias?.typeArguments
+					) {
+						return type
+					}
+
+					return {
+						...type,
+						types,
+						...(type.alias === undefined || alias === undefined
+							? {}
+							: {
+									alias: {
+										...type.alias,
+										typeArguments: alias,
+									},
+								}),
+					}
+				}
+				case "Refinement": {
+					let base = strip(type.base)
+					let typeArguments = strippedArguments(
+						type.typeArguments,
+						strip,
+					)
+
+					return base === type.base &&
+						typeArguments === type.typeArguments
+						? type
+						: {
+								...type,
+								base,
+								...(typeArguments === undefined
+									? {}
+									: { typeArguments }),
+							}
+				}
+				// NOTE: Walked through as well, because a Function Type is DATA
+				// in a descriptor like any other and a Record standing in one of
+				// its Parameters is still a Record nobody can name at run time.
+				// The one field `isValueOfType` reads of a Function is that it
+				// is one, so what is left in the signature is bytes — and bytes
+				// that differ from the ones this was emitting before.
+				case "Function":
+				case "SimpleMethod":
+				case "StaticMethod": {
+					let signature = strippedSignature(type, strip)
+
+					return signature === type ? type : { ...type, ...signature }
+				}
+				default:
+					return type
+			}
+		} finally {
+			visiting.delete(type)
+		}
+	}
+
+	return strip(type)
+}
+
+// NOTE: The same answer for a signature, which is what the embedding boundary
+// asks — `printSignature` takes a `BaseFunction`, and a `BaseFunction` carries no
+// `type` field to discriminate on, so the walk above can not hand one back. This
+// is that walk's Function case, shared rather than written twice.
+export function withoutRecordNamesInSignature(
+	signature: common.BaseFunction,
+): common.BaseFunction {
+	return strippedSignature(signature, withoutRecordNames)
+}
+
+// NOTE: A list of Type Arguments stripped, answering the very list it was given
+// where nothing changed — which is how each branch above tells a Type it has to
+// rebuild from one it can hand back.
+function strippedArguments<Argument extends common.Type>(
+	typeArguments: Array<Argument> | undefined,
+	strip: (type: common.Type) => common.Type,
+): Array<Argument> | undefined {
+	if (typeArguments === undefined) {
+		return undefined
+	}
+
+	let stripped = typeArguments.map(
+		(typeArgument) => strip(typeArgument) as Argument,
+	)
+
+	return stripped.every(
+		(typeArgument, index) => typeArgument === typeArguments[index],
+	)
+		? typeArguments
+		: stripped
+}
+
+function strippedSignature<Signature extends common.BaseFunction>(
+	signature: Signature,
+	strip: (type: common.Type) => common.Type,
+): Signature {
+	let parameterTypes = signature.parameterTypes.map((parameter) => {
+		let type = strip(parameter.type)
+
+		return type === parameter.type ? parameter : { ...parameter, type }
+	})
+	let returnType = strip(signature.returnType)
+
+	return parameterTypes.every(
+		(parameter, index) => parameter === signature.parameterTypes[index],
+	) && returnType === signature.returnType
+		? signature
+		: { ...signature, parameterTypes, returnType }
 }
 
 // NOTE: `stored` with every Unknown slot `value` has an answer for filled in —

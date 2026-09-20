@@ -16,7 +16,7 @@ import {
 	derivedPrintableNamespaceName,
 } from "../enricher/resolvers"
 import { openArgumentHoles } from "../helpers/defaults"
-import { typeContainsRefinement } from "../helpers/types"
+import { typeContainsRefinement, withoutRecordNames } from "../helpers/types"
 import {
 	defaultOptimiserOptions,
 	type OptimiserOptions,
@@ -8334,17 +8334,29 @@ function convertObjectToObjectExpression(
 // out of the tree before the Rewriter sees it — which is exactly why this is
 // worth having: it is the assertion that the erasure was complete, and it names
 // the Compiler, not the reader, when it is not.
+//
+// NOTE: And it strips a Record's display spelling on the way, because the walk
+// above writes out whatever fields a Type is holding: `Standing` is what a
+// reader calls a shape and says nothing to `isValueOfType`, so a Program
+// matching on an Alias would ship the name as dead bytes and pool two spellings
+// of one shape as two constants. Stripped BEFORE the assertion, so the Type
+// Arguments a spelling carries are not held to an erasure that is about the
+// members — `Box<NonZeroInteger>` erases to `{ value: Integer }`, and the
+// refinement left in what the reader CALLS it is not a refinement anything
+// emits.
 function typeDescriptorExpression(
 	type: common.Type,
 	where: string,
 ): estree.ObjectExpression {
-	if (typeContainsRefinement(type)) {
+	let descriptor = withoutRecordNames(type)
+
+	if (typeContainsRefinement(descriptor)) {
 		throw new Error(
 			`Internal Compiler Error: a checked refinement reached ${where} — refinements are erased in the Optimiser stage and can not be emitted.`,
 		)
 	}
 
-	return convertObjectToObjectExpression(type)
+	return convertObjectToObjectExpression(descriptor)
 }
 // #endregion
 

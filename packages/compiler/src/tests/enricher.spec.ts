@@ -545,6 +545,11 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
+			// NOTE: Every level keeps the Alias it was reached under. An update
+			// may only write members the original already declares, so what
+			// comes back is the very Record that went in — a `Config` whose
+			// `port` is 8080 is a Config, and that is what a Diagnostic about
+			// it goes on to name.
 			it("should answer the Type of the value updated", () => {
 				let value = lastConstantValue(`implementation {
 					${config}
@@ -553,15 +558,18 @@ describe("Enricher", () => {
 
 				expect(value.type).toEqual({
 					type: "Record",
+					name: "Config",
 					members: {
 						name: { type: "String" },
 						server: {
 							type: "Record",
+							name: "Server",
 							members: {
 								host: { type: "String" },
 								port: { type: "Integer" },
 								tls: {
 									type: "Record",
+									name: "Tls",
 									members: { enabled: { type: "Boolean" } },
 								},
 							},
@@ -3819,7 +3827,7 @@ describe("Enricher", () => {
 				expect(diagnostics).toHaveLength(1)
 				expect(diagnostics[0].code).toBe("ambiguous-conformance")
 				expect(diagnostics[0].message).toBe(
-					"More than one Namespace makes { x: Number, y: Number } conform to 'Showable'",
+					"More than one Namespace makes Vector conform to 'Showable'",
 				)
 				expect(diagnostics[0].notes).toEqual([
 					"'VectorShowable' conforms to 'Showable'.",

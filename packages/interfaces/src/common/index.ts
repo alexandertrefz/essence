@@ -627,9 +627,33 @@ export type StartedType = {
 	valueType: Type
 }
 
+// NOTE: `name` and `alias` are the two display fields a `UnionType` carries,
+// stamped on the Record a Type Alias is reached THROUGH — `type Standing = { … }`
+// stamps the first, an applied generic Alias (`Pair<Integer>`) the second. They
+// mean exactly what they mean on a Union and are ignored in exactly the same
+// places: assignability, dispatch, exhaustiveness, every emitted descriptor and
+// every structural key look straight past them, and only a Diagnostic, a Hover
+// and Signature Help ever read one. Two Aliases of one shape stay one Type — an
+// `A` fits a `B` and prints as whichever of the two it was declared under.
+//
+// NOTE: A Record the Program BUILDS carries neither — a Literal, an update that
+// settles a slot, a merge, a narrowing and a Pattern's destructuring are each a
+// new object, so the spelling heals by construction rather than by anybody
+// remembering to clear it. What keeps that true is that the sites building one
+// write `{ type: "Record", members }` out rather than spreading the Record they
+// came from, and the one that does spread clears the fields where it spreads.
+//
+// NOTE: Absent rather than empty, for the reason `UnionType.unitChoice` is: a
+// Type nothing named stays structurally what it was, which is what keeps
+// `matchTypes`' `lhs === rhs` fast path and the snapshot cache undisturbed.
 export type RecordType = {
 	type: "Record"
 	members: Record<string, Type>
+	name?: string
+	alias?: {
+		name: string
+		typeArguments: Array<Type | GenericUse>
+	}
 }
 
 // NOTE: The `= { … }` a Case's payload shape may carry — which of the payload's

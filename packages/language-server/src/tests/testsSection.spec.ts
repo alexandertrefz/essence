@@ -201,7 +201,7 @@ describe("The tests section", () => {
 
 		it("should answer a name a suite's setup declared", () => {
 			expect(hover(source, cursorAt(source, "rows", 2))).toBe(
-				"rows: List<{ scored: Integer, points: Integer }>",
+				"rows: List<Row>",
 			)
 		})
 
@@ -210,7 +210,7 @@ describe("The tests section", () => {
 		// the Matcher matched, so below it the value IS what the Case carried.
 		it("should answer a require-bound name with the Matcher's Type", () => {
 			expect(hover(source, cursorAt(source, "row.scored", 1))).toBe(
-				"row: { scored: Integer, points: Integer }",
+				"row: Row",
 			)
 			expect(
 				hover(source, cursorWithin(source, "row.scored", "scored", 1)),
@@ -225,7 +225,7 @@ describe("The tests section", () => {
 
 		it("should answer a Statement of the tests section itself", () => {
 			expect(hover(source, cursorAt(source, "rows: List<Row>"))).toBe(
-				"rows: List<{ scored: Integer, points: Integer }>",
+				"rows: List<Row>",
 			)
 		})
 	})
