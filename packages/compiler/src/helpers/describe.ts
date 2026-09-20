@@ -465,14 +465,42 @@ function refusedSlotIn(
 // and `{ items: List<Unknown> }` as `{ items: List<Integer> }`, so the reader is
 // shown the shape they have to write and not a `List<Integer>` that answers a
 // different Declaration.
-function spelledWithDecidedSlots(type: common.Type): common.Type {
+// `written` is the value the blank REFUSED, walked alongside so that a slot
+// standing opposite a Type that would have decided it is spelled from THAT
+// rather than from an example: `variable rows = [[]]` refused `[["a"], []]`, and
+// `List<List<Integer>>` named an item Type the reader never mentioned while the
+// Label one line above said what they wrote. Null where there is nothing to read
+// — a capture is refused with no value opposite it, and a value of another shape
+// entirely pairs with nothing.
+//
+// `invented` comes back set wherever an example had to stand in, so the Help can
+// call an example an example instead of printing a Type the reader is meant to
+// copy.
+function spelledWithDecidedSlots(
+	type: common.Type,
+	written: common.Type | null = null,
+	invented: { any: boolean } = { any: false },
+): common.Type {
 	switch (type.type) {
 		case "Unknown":
+			// NOTE: Anything but another blank, since one blank decides no
+			// other — `rows = [[]]` over a `List<List<Unknown>>` leaves the
+			// reader exactly where they started.
+			if (written !== null && written.type !== "Unknown") {
+				return written
+			}
+
+			invented.any = true
+
 			return { type: "Integer" }
 		case "List":
 			return {
 				type: "List",
-				itemType: spelledWithDecidedSlots(type.itemType),
+				itemType: spelledWithDecidedSlots(
+					type.itemType,
+					written?.type === "List" ? written.itemType : null,
+					invented,
+				),
 			}
 		// NOTE: Spelled through, the way the walk above looks through one — the
 		// annotation an author writes for a `constant f = Async.deferred(() { <-
@@ -481,38 +509,72 @@ function spelledWithDecidedSlots(type: common.Type): common.Type {
 		case "Future":
 			return {
 				type: "Future",
-				valueType: spelledWithDecidedSlots(type.valueType),
+				valueType: spelledWithDecidedSlots(
+					type.valueType,
+					written?.type === "Future" ? written.valueType : null,
+					invented,
+				),
 			}
 		case "Started":
 			return {
 				type: "Started",
-				valueType: spelledWithDecidedSlots(type.valueType),
+				valueType: spelledWithDecidedSlots(
+					type.valueType,
+					written?.type === "Started" ? written.valueType : null,
+					invented,
+				),
 			}
-		case "Dictionary":
+		case "Dictionary": {
+			let other = written?.type === "Dictionary" ? written : null
+
 			return {
 				type: "Dictionary",
+				// NOTE: A key the value decides is read off it like any other
+				// slot; a key nothing decides is a String, which is what every
+				// Dictionary written by hand is keyed by.
 				keyType:
 					type.keyType.type === "Unknown"
-						? { type: "String" }
-						: spelledWithDecidedSlots(type.keyType),
-				valueType: spelledWithDecidedSlots(type.valueType),
+						? keyExample(other, invented)
+						: spelledWithDecidedSlots(
+								type.keyType,
+								other?.keyType ?? null,
+								invented,
+							),
+				valueType: spelledWithDecidedSlots(
+					type.valueType,
+					other?.valueType ?? null,
+					invented,
+				),
 			}
-		case "Record":
+		}
+		case "Record": {
+			let other = written?.type === "Record" ? written : null
+
 			return {
 				type: "Record",
 				members: Object.fromEntries(
 					Object.entries(type.members).map(([name, memberType]) => [
 						name,
-						spelledWithDecidedSlots(memberType),
+						spelledWithDecidedSlots(
+							memberType,
+							other?.members[name] ?? null,
+							invented,
+						),
 					]),
 				),
 			}
+		}
 		// NOTE: An arm at a time, so a blank standing in one arm of a Union is
 		// spelled where it stands and the arms beside it are spelled as they are.
+		// Nothing pairs with an arm — the value was measured against the whole
+		// Union and turned away by all of them at once — so each is spelled on its
+		// own, which is what the one-sided walk in `refusedSlotIn` does too.
 		case "UnionType":
 			return {
 				...type,
-				types: type.types.map(spelledWithDecidedSlots),
+				types: type.types.map((arm) =>
+					spelledWithDecidedSlots(arm, null, invented),
+				),
 			}
 		// NOTE: The Type ARGUMENTS as well as the base, because they are what a
 		// refinement is printed from: `describeType` spells one as its name and
@@ -521,12 +583,34 @@ function spelledWithDecidedSlots(type: common.Type): common.Type {
 		case "Refinement":
 			return {
 				...type,
-				base: spelledWithDecidedSlots(type.base),
-				typeArguments: type.typeArguments?.map(spelledWithDecidedSlots),
+				base: spelledWithDecidedSlots(
+					type.base,
+					written?.type === "Refinement" ? written.base : written,
+					invented,
+				),
+				typeArguments: type.typeArguments?.map((typeArgument) =>
+					spelledWithDecidedSlots(typeArgument, null, invented),
+				),
 			}
 		default:
 			return type
 	}
+}
+
+// NOTE: A Dictionary's KEY, which is the one blank with an example of its own —
+// every Dictionary anybody writes by hand is keyed by a String, so that is what
+// stands where the value decides nothing.
+function keyExample(
+	written: common.DictionaryType | null,
+	invented: { any: boolean },
+): common.Type {
+	if (written !== null && written.keyType.type !== "Unknown") {
+		return written.keyType
+	}
+
+	invented.any = true
+
+	return { type: "String" }
 }
 
 // NOTE: What a mismatch has to say when the Type it EXPECTED carries a slot
@@ -558,7 +642,10 @@ export function undecidedSlotEvidence(
 	}
 
 	let dictionary = container === "Dictionary"
-	let spelling = describeType(spelledWithDecidedSlots(expected))
+	let invented = { any: false }
+	let spelling = describeType(
+		spelledWithDecidedSlots(expected, written, invented),
+	)
 
 	return {
 		notes: [
@@ -572,11 +659,18 @@ export function undecidedSlotEvidence(
 			// it — a Record update names the value it updates by Expression, a
 			// `<-` and a `define` arm answer a position rather than a name — and
 			// the Type is what has to be written wherever that Declaration is.
+			//
+			// NOTE: And an example is called one. Where the refused value pairs
+			// with the blank, the Type printed here is the reader's OWN and is
+			// written down as it stands; where it does not — a String refused by
+			// a `List<Unknown>` pairs with nothing — the Type is made up, and
+			// the Help used to print `List<Integer>` one line under a Label
+			// reading "this is a String" as though it were the answer.
 			`${
 				name === null
 					? `Annotate the Declaration that creates it — '${spelling}'`
 					: `Annotate the Declaration — 'variable ${name}: ${spelling}'`
-			} — so what is written into it is judged against the ${dictionary ? "Types" : "Type"} it holds.`,
+			}${invented.any ? ", for instance" : ""} — so what is written into it is judged against the ${dictionary ? "Types" : "Type"} it holds.`,
 		],
 	}
 }
@@ -1061,6 +1155,44 @@ function lastStep(path: string): string {
 
 // #endregion
 
+// NOTE: The question a value of this Type answers with a Boolean. Every Type has
+// `::is(…)` through Equatable, and the four shapes written where a Boolean was
+// wanted each have a better one: an Optional is asked whether it holds anything,
+// a String and a List whether they carry anything, a number where it stands.
+// Named rather than described, because the whole of the reader's next edit is one
+// Method call and the NAME of it is the part they have not got.
+//
+// Two reports ask it — a Condition with no truth in it, and a `where` clause that
+// answers a value instead of a question — and one answer keeps them saying the
+// same thing about the same Type.
+export function booleanQuestionFor(type: common.Type): string {
+	if (type.type === "Refinement") {
+		return booleanQuestionFor(type.base)
+	}
+
+	// NOTE: An Optional is a Choice, so it arrives as its Union — under its own
+	// name where the Declaration is reached directly, and under the Alias's where
+	// `Optional<Integer>` was applied.
+	if (
+		type.type === "UnionType" &&
+		(type.name === "Optional" || type.alias?.name === "Optional")
+	) {
+		return "hasValue()"
+	}
+
+	switch (type.type) {
+		case "String":
+			return "hasCharacters()"
+		case "List":
+			return "hasItems()"
+		case "Integer":
+		case "Rational":
+			return "isGreaterThan(0)"
+		default:
+			return "is(…)"
+	}
+}
+
 // NOTE: What a Future or a Started IS, in the clause every report about a
 // forgotten `complete` opens with. Three reports say it now — a Type mismatch in
 // an ordinary position, one in return position, and a Method call on the
@@ -1081,7 +1213,15 @@ export function asynchronyState(mismatch: AsynchronyMismatch): string {
 export function asynchronyData(
 	expected: common.Type,
 	actual: common.Type,
+	// NOTE: See `asynchronyHelps`. The fix this data offers WRITES the word, so
+	// it is withheld wherever the word would be refused — a Quick Fix must never
+	// hand the reader a second Diagnostic in place of the first.
+	canWait: boolean = true,
 ): common.DiagnosticData | undefined {
+	if (!canWait) {
+		return undefined
+	}
+
 	let mismatch = asynchronyMismatch(expected, actual)
 
 	return mismatch === "unstarted" || mismatch === "in-flight"
@@ -1098,8 +1238,26 @@ export function asynchronyData(
 export function asynchronyHelps(
 	expected: common.Type,
 	actual: common.Type,
+	// NOTE: Whether the body around this position may write `complete` at all.
+	// `false` swaps the word out: a `complete` in a body that answers no Future
+	// is `complete-outside-future`, so offering it there — and offering a Quick
+	// Fix that writes it — sent the reader from one refusal to the next. What is
+	// offered instead is the pair `asynchronyEvidence` offers on the same
+	// footing: reach through the Future, or declare the body one that waits.
+	//
+	// Defaulted, because most positions are inside a body that can wait and the
+	// ones that are not have to look it up.
+	canWait: boolean = true,
 ): Array<string> {
-	switch (asynchronyMismatch(expected, actual)) {
+	let mismatch = asynchronyMismatch(expected, actual)
+
+	if (!canWait && (mismatch === "unstarted" || mismatch === "in-flight")) {
+		return [
+			"'complete' only stands in a body that answers a Future, and this one does not — reach through it with '::map((value) { … })', which answers another Future, or declare the enclosing Function '-> Future<…>'.",
+		]
+	}
+
+	switch (mismatch) {
 		case "unstarted":
 			return [`${asynchronyState("unstarted")} — add 'complete'.`]
 		case "in-flight":

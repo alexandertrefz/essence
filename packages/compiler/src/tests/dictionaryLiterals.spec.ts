@@ -732,8 +732,10 @@ describe("Dictionary literals", () => {
 			// blank spells one. A value can not be shown with it: the same Help
 			// answers a Declaration whose blank sits inside something else, where
 			// the initialiser is no Literal at all.
+			// NOTE: An example, and marked as one — a capture is refused with no
+			// value standing opposite it, so both slot Types here are made up.
 			expect(diagnostic.helps).toEqual([
-				"Annotate the declaration — 'variable ages: Dictionary<String, Integer>' — so the Function is checked against the Types it will hold.",
+				"Annotate the declaration — 'variable ages: Dictionary<String, Integer>', for instance — so the Function is checked against the Types it will hold.",
 			])
 		})
 

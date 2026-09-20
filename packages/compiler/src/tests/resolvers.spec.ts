@@ -516,7 +516,7 @@ describe("Resolvers", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("undecided-receiver-type")
 			expect(diagnostics[0].helps).toContain(
-				"Annotate what the receiver comes from — 'constant items: List<Integer> = []' — so its Type is decided before the call.",
+				"Annotate what the receiver comes from — 'constant items: List<Integer> = []', for instance — so its Type is decided before the call.",
 			)
 		})
 

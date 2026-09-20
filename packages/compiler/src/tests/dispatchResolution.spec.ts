@@ -1542,8 +1542,12 @@ describe("What a refused call is told", () => {
 		expect(diagnostics[0]!.notes).toContain(
 			"An empty List Literal leaves its item Type unknown until a write decides it, and nothing has written into this one — the 'Unknown' here is a blank, not a Type.",
 		)
+		// NOTE: `List<String>`, read off the `["a"]` the blank refused — and no
+		// hedge, because nothing here is an example. The blank used to be filled
+		// with `Integer` whatever stood opposite it, which named an item Type
+		// the reader never wrote one line under a Label saying what they had.
 		expect(diagnostics[0]!.helps).toEqual([
-			"Annotate the Declaration that creates it — 'List<Integer>' — so what is written into it is judged against the Type it holds.",
+			"Annotate the Declaration that creates it — 'List<String>' — so what is written into it is judged against the Type it holds.",
 		])
 	})
 
