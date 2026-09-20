@@ -8,12 +8,18 @@ import { parse, parseWithDiagnostics } from "../parser/index"
 // NOTE: The three things a test about a Help does — report a probe, read the
 // Help off it, and COMPILE what it printed. They were written inside
 // `knownAnswers.spec.ts`, which is where the first reporters to earn them were
-// tested; the Help audit needs the same three from a second spec, so they moved
-// here rather than being written a second way.
+// tested; the Help audit needs the same three from every spec it wrote, so they
+// moved here rather than being written a second way.
 //
 // A Help is a promise that what it prints works when it is followed, and a
 // report that breaks that promise is worse than one that says nothing — so the
 // spellings a Help spells are compiled here rather than compared as text.
+//
+// ONE file, because two of them is two answers to "does this compile?": the
+// audit briefly had a second harness whose `compiles` stopped after the
+// Enricher, and a Help followed into a Validator refusal read there as a
+// success. `compiles` runs every stage, through `analyseSource`, and the
+// Enricher-only readers below say so in their names.
 
 export function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	return enrich(parse(source)).diagnostics
@@ -92,4 +98,21 @@ export function firstAnalysed(
 	}
 
 	return found
+}
+
+// NOTE: Every code one source is refused with, in the order a reader meets them
+// — the same list `esc` prints and the editor underlines. A cascade is tested by
+// writing the whole list down, so a report that comes back is a failure rather
+// than something the next reader finds.
+export function codesOfSource(source: string): Array<common.DiagnosticCode> {
+	return analysedDiagnosticsFor(source).map((diagnostic) => diagnostic.code)
+}
+
+// NOTE: The Helps of the first report carrying this code, which is `firstAnalysed`
+// with the one thing a spec about a Help wants off it.
+export function helpsOfCode(
+	source: string,
+	code: common.DiagnosticCode,
+): Array<string> {
+	return firstAnalysed(source, code).helps ?? []
 }

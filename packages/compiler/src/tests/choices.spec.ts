@@ -19,7 +19,7 @@ import { printType } from "../printType"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
-import { compiles } from "./helpPromises"
+import { compiles } from "./followedHelps"
 
 // NOTE: The full pipeline minus bundling, mirroring codeGeneration.spec — a
 // Choice is only implemented once every stage agrees on it.

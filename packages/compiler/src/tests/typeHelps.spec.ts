@@ -3,9 +3,9 @@ import { describe, expect, it } from "bun:test"
 import {
 	codesOfSource,
 	compiles,
-	compilesCompletely,
+	enrichedDiagnosticsFor,
 	helpsOfCode,
-} from "./helpPromises"
+} from "./followedHelps"
 
 // NOTE: One promise per report: a Help names an edit the reader can make HERE,
 // and following it reaches a Program that compiles or a GENUINELY different
@@ -17,6 +17,27 @@ import {
 // found was a Help that was perfectly true somewhere else — a Match that narrows
 // a Union of DECLARED Types, a `complete` in a body that waits — and a condition
 // that stops being tested is a condition that quietly stops holding.
+
+describe("The harness these Helps are compiled by", () => {
+	// NOTE: The audit ran in four branches and briefly had two harnesses, one of
+	// which stopped after the Enricher — so a Help followed into a Validator
+	// refusal read there as a Help that works. There is one now, and it runs
+	// every stage: this Program is one the Enricher has nothing to say about and
+	// the Validator refuses, which is the difference between the two in a line.
+	let unreturned = `implementation {
+		function half(_ number: Integer) -> Integer {
+			if number::isGreaterThan(0) {
+				<- 1
+			}
+		}
+	}`
+
+	it("refuses what only the Validator refuses", () => {
+		expect(enrichedDiagnosticsFor(unreturned)).toEqual([])
+		expect(codesOfSource(unreturned)).toEqual(["missing-return"])
+		expect(compiles(unreturned)).toBe(false)
+	})
+})
 
 describe("A member path with no Function around it", () => {
 	let source = `implementation {
@@ -248,7 +269,7 @@ describe("A Namespace specifier that names something else", () => {
 
 		expect(codesOfSource(source)).toEqual(["not-a-namespace"])
 		expect(
-			compilesCompletely(`implementation {
+			compiles(`implementation {
 		constant total = 1
 
 		Terminal.print("hello"::append("!"))
@@ -492,7 +513,7 @@ describe("Reports that knew the fix and said nothing", () => {
 			"Ask a question that answers a Boolean — '::hasValue()' reads an Optional<Integer>.",
 		])
 		expect(
-			compilesCompletely(`implementation {
+			compiles(`implementation {
 		constant found: Optional<Integer> = #Value(1)
 
 		if found::hasValue() {
@@ -588,7 +609,7 @@ describe("Reports that knew the fix and said nothing", () => {
 			"Or give every branch one — an 'if' with no 'else' leaves the path around it falling through.",
 		])
 		expect(
-			compilesCompletely(`implementation {
+			compiles(`implementation {
 		function sign(of number: Integer) -> String {
 			if number::isGreaterThan(0) {
 				<- "positive"
