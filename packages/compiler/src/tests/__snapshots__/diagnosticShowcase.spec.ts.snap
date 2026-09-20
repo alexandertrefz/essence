@@ -247,7 +247,7 @@ Error: The default for Case '#Get' is not a Record Literal
     │                                                     ───────┬───────  
     │                                                            ╰───────── this names a value rather than writing one
     │ 
-    │ Help: Write the members out: '= { … }'.
+    │ Help: Write the members out — '= { url = …, headers = … }' names every member of '#Get', and a default may fill in any of them.
     │ 
     │ Note 1: Which members a default fills in is read off the ones it writes, so the default itself is spelled out even where the values in it are names.
     │ Note 2: A payload default is spliced into every construction of its Case, and a construction may stand in a Module that never named the Choice — so the value travels with the Case Type, and a name read where the Case is built would be a name that is not there.
@@ -339,7 +339,7 @@ Error: A generic Choice can not default a payload
     │                                               ──────┬─────  
     │                                                     ╰─────── this default
     │ 
-    │ Help: Write the member at each construction, or declare a Choice for the Type this default is a value of.
+    │ Help: Write the member at each construction, or declare a Choice that takes no Type Parameters — one whose payload Types are written out, where a default has something to be checked against.
     │ 
     │ Note: 'Box' abstracts over 1 Type Parameter, and a value written here can bind none of them — every use site decides them, and each would want a default of its own.
 ────╯

@@ -137,6 +137,7 @@ import {
 	scopeWithGenerics,
 	silentCheckedConformances,
 	solveConformance,
+	typeParameterBoundReport,
 	suggestionData,
 	suggestionHelps,
 	suggestionInScope,
@@ -2413,7 +2414,7 @@ function enrichInterpolatedStringValue(
 				// (an Error-typed hole, an unknown Protocol) — stay silent to
 				// avoid a cascade, exactly as `resolveConformances` does.
 				if (solved.chain.length > 0) {
-					let waiting = interpolatedAsynchrony(expression.type, scope)
+					let answer = interpolationAnswer(expression.type, scope)
 
 					reportError(
 						`${describeType(expression.type)} can not be interpolated into a String`,
@@ -2426,13 +2427,11 @@ function enrichInterpolatedStringValue(
 									`this is ${describeType(expression.type)}, which is not Printable`,
 								),
 							],
-							notes: [...solved.chain, ...(waiting?.notes ?? [])],
-							helps: waiting?.helps ?? [
-								"Interpolate only Printable values; match an Optional or a Union apart first and interpolate each Case.",
-							],
-							...(waiting?.data === undefined
+							notes: [...solved.chain, ...answer.notes],
+							helps: answer.helps,
+							...(answer.data === undefined
 								? {}
-								: { data: waiting.data }),
+								: { data: answer.data }),
 						},
 					)
 				}
@@ -2483,15 +2482,43 @@ function enrichInterpolatedStringValue(
 //
 // Null for every other hole, which leaves `interpolation-not-printable` exactly
 // as it was for an Optional and a bare Union.
-function interpolatedAsynchrony(
+// NOTE: What a hole that can not print its value is told, which is three
+// different things:
+//
+// - A Future or a Started is the forgotten `complete` above.
+// - A Type PARAMETER is a missing BOUND, and the Union Help is unfollowable for
+//   one: `Item` is no Union to match apart and no Optional to unwrap, and a
+//   reader who tried had nothing to write a Case for. Whose Parameter it is
+//   decides the rest, which `typeParameterBoundReport` is the one description of.
+// - Everything else — an Optional, a bare structural Union — keeps the Help the
+//   hole has always had, which is the one it was written for.
+function interpolationAnswer(
 	type: common.Type,
 	scope: enricher.Scope,
 ): {
 	notes: Array<string>
 	helps: Array<string>
 	data?: common.DiagnosticData
-} | null {
-	return unwaitedWorkReport(eraseRefinements(type), bodyWaits(scope))
+} {
+	let erased = eraseRefinements(type)
+	let waiting = unwaitedWorkReport(erased, bodyWaits(scope))
+
+	if (waiting !== null) {
+		return waiting
+	}
+
+	if (erased.type === "GenericUse") {
+		let bound = typeParameterBoundReport(erased.name, "Printable", scope)
+
+		return { notes: bound.notes, helps: bound.helps }
+	}
+
+	return {
+		notes: [],
+		helps: [
+			"Interpolate only Printable values; match an Optional or a Union apart first and interpolate each Case.",
+		],
+	}
 }
 
 // NOTE: A hole renders its value through the very `toString` a `Printable`
@@ -3638,11 +3665,18 @@ type ResolvedMatcher = {
 // NOTE: `handledMatchers` is what the arms ABOVE retired, which is what a
 // wildcard stands for. An assertion has no arms above it and hands an empty
 // list, so `is _` stands for the whole of what was asserted.
+//
+// NOTE: `armIndex` is which arm this is, and it exists for ONE report: a Match
+// written on a Future has one mistake — the subject — and it used to be reported
+// once per arm, each saying the same sentence about a different Case name. It is
+// said on the first arm and nowhere else. An assertion has one Matcher and hands
+// 0, which is the arm it is.
 function resolveMatcher(
 	node: parser.MatcherNode,
 	valueType: common.Type,
 	handledMatchers: Array<common.Type>,
 	scope: enricher.Scope,
+	armIndex = 0,
 ): ResolvedMatcher {
 	if (node.nodeType === "LiteralMatcher") {
 		// NOTE: A literal Matcher binds `@` to the literal's own Type — inside
@@ -3670,7 +3704,7 @@ function resolveMatcher(
 
 	if (node.nodeType === "CaseMatcher") {
 		let literals: Record<string, common.typed.ExpressionNode> = {}
-		let matcher = resolveCaseMatcherType(node, valueType, scope)
+		let matcher = resolveCaseMatcherType(node, valueType, scope, armIndex)
 		// NOTE: What the payload Pattern requires — beside the Matcher rather
 		// than inside it, so the Case stays the arm it is and only the Handler
 		// becomes conditional. It also says what the arm PROVED, which is what
@@ -3798,8 +3832,16 @@ function enrichStart(
 					),
 				],
 				tags: ["unnecessary"],
+				// NOTE: The Note has to agree with the message above it. The
+				// one it always printed explains a value that is NOT work, and
+				// a `Started` is work — it was already started, which is the
+				// opposite complaint, and a reader told "a value that is not a
+				// Future describes no work to run" about one had been handed a
+				// contradiction to resolve on their own.
 				notes: [
-					"'start' puts a Future in flight and answers the one run of it — a value that is not a Future describes no work to run.",
+					type.type === "Started"
+						? "A Started is one run of a Future, and it belongs to whoever started it — there is no second run to ask for."
+						: "'start' puts a Future in flight and answers the one run of it — a value that is not a Future describes no work to run.",
 				],
 				helps: ["Drop the 'start'."],
 			},
@@ -4002,7 +4044,7 @@ function enrichMatch(
 	return {
 		nodeType: "Match",
 		value,
-		handlers: node.handlers.map((handler) => {
+		handlers: node.handlers.map((handler, index) => {
 			// NOTE: `expectedReturnType` is what a Handler's `<-` yields — a
 			// bare Case there resolves against the Match's declared return
 			// Type first.
@@ -4021,6 +4063,7 @@ function enrichMatch(
 					value.type,
 					handledMatchers,
 					scope,
+					index,
 				)
 
 			// NOTE: Only an unconditional Handler retires a Type. A literal
@@ -7876,7 +7919,19 @@ function reportCaseDefaultNotARecordLiteral(
 				"Which members a default fills in is read off the ones it writes, so the default itself is spelled out even where the values in it are names.",
 				CASE_DEFAULT_NOTE,
 			],
-			helps: ["Write the members out: '= { … }'."],
+			// NOTE: The member NAMES, which this site holds, rather than the
+			// bare `'= { … }'` it printed — a shape with nothing in it says
+			// only "a Record goes here", which the message above already said.
+			// The values stay the `…` they are: which of them a reader meant is
+			// the one thing this can not know, and a plausible-looking number
+			// would be a guess wearing the Compiler's voice.
+			helps: [
+				`Write the members out — '= { ${Object.keys(caseType.members)
+					.map((member) => `${member} = …`)
+					.join(
+						", ",
+					)} }' names every member of '#${caseType.name}', and a default may fill in any of them.`,
+			],
 		},
 	)
 }
@@ -15724,6 +15779,7 @@ function spelledCases(cases: Array<common.CaseType>): string {
 function heldCaseSubject(
 	valueType: common.Type,
 	caseName: string,
+	scope: enricher.Scope,
 ): { notes: Array<string>; helps: Array<string> } {
 	for (let held of heldValuesOf(valueType)) {
 		let declares = unionArmsOf(held.type).some(
@@ -15734,22 +15790,44 @@ function heldCaseSubject(
 			continue
 		}
 
+		// NOTE: Waiting is not something every body may do, and the Help said
+		// otherwise: written in a body that answers anything but a Future, the
+		// `complete` it asks for is refused, so the edit takes TWO steps and the
+		// declaration is the first of them. The same "may this body wait?" rule
+		// every other report about a forgotten `complete` follows.
+		let waits = held.kind !== "future" && held.kind !== "started"
+
 		return {
 			notes: [
 				`'#${caseName}' is a Case of ${describeType(held.type)}, which is what ${withArticle(describeType(valueType))} holds.`,
 			],
-			helps:
-				held.kind === "future" || held.kind === "started"
+			helps: waits
+				? [
+						`Match what it holds rather than the ${describeType(valueType)} around it.`,
+					]
+				: bodyWaits(scope)
 					? [
 							`Wait for it first — 'constant answered = complete …' — and match 'answered'.`,
 						]
 					: [
-							`Match what it holds rather than the ${describeType(valueType)} around it.`,
+							`Declare the enclosing Function '-> Future<…>', which is what lets its body wait, then wait for it first — 'constant answered = complete …' — and match 'answered'.`,
 						],
 		}
 	}
 
 	return { notes: [], helps: [] }
+}
+
+// NOTE: Whether the subject HOLDS a Union declaring this Case, which is the
+// question `heldCaseSubject` answers with a report — asked on its own by the
+// arms that stay silent, so that what one arm reports and the rest suppress is
+// decided by one rule rather than two.
+function holdsCaseNamed(valueType: common.Type, caseName: string): boolean {
+	return heldValuesOf(valueType).some((held) =>
+		unionArmsOf(held.type).some(
+			(member) => member.type === "Case" && member.name === caseName,
+		),
+	)
 }
 
 function resolveBareCaseReference(
@@ -17086,6 +17164,7 @@ function resolveCaseMatcherType(
 	node: parser.CaseMatcherNode,
 	valueType: common.Type,
 	scope: enricher.Scope,
+	armIndex: number,
 ): common.Type {
 	if (node.choice !== null) {
 		let declaredCase = resolveCaseReference(
@@ -17195,7 +17274,19 @@ function resolveCaseMatcherType(
 		// Case at all and so is answered with a list of nothing. Asked with
 		// the same question `unknown-method` asks of a receiver, and it says
 		// the same thing: the value is one level out.
-		let held = heldCaseSubject(valueType, node.caseName.content)
+		// NOTE: A subject that HOLDS the Choice is one mistake about the whole
+		// Match, and every arm would say it over again about a different Case
+		// name. Said on the first arm, and the rest answer with the Error they
+		// would have answered with anyway.
+		let held =
+			armIndex === 0
+				? heldCaseSubject(valueType, node.caseName.content, scope)
+				: null
+
+		if (held === null && holdsCaseNamed(valueType, node.caseName.content)) {
+			return { type: "Error" }
+		}
+
 		let suggestion = caseSuggestion(node.caseName.content, memberCaseNames)
 
 		// NOTE: The name alone, not the whole Matcher — a Quick Fix rewrites
@@ -17213,7 +17304,7 @@ function resolveCaseMatcherType(
 					),
 				],
 				notes: [
-					...held.notes,
+					...(held?.notes ?? []),
 					...(memberCaseNames.length === 0
 						? []
 						: [
@@ -17223,7 +17314,7 @@ function resolveCaseMatcherType(
 							]),
 				],
 				...suggestion,
-				helps: [...held.helps, ...suggestion.helps],
+				helps: [...(held?.helps ?? []), ...suggestion.helps],
 			},
 		)
 	} else {

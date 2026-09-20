@@ -457,6 +457,12 @@ export function resolveChoiceDeclarationStatementType(
 		reportError("A Choice must declare at least one Case", node.position, {
 			code: "empty-choice",
 			labels: [primary(node.position, "this Choice declares none")],
+			// NOTE: A Choice IS its Cases — a Union of none is a Type no value
+			// can ever have, so there is nothing to do with the declaration but
+			// fill it in or take it out.
+			helps: [
+				`Write a Case — 'choice ${node.name.content} { First }' — or drop the declaration.`,
+			],
 		})
 	}
 
@@ -514,8 +520,15 @@ export function resolveChoiceDeclarationStatementType(
 						notes: [
 							`'${node.name.content}' abstracts over ${countOf(node.generics.length, "Type Parameter")}, and a value written here can bind none of them — every use site decides them, and each would want a default of its own.`,
 						],
+						// NOTE: The second clause used to read "declare a Choice
+						// for the Type this default is a value of", which is a
+						// Choice of what the MEMBER holds — `1` is an Integer,
+						// and a Choice of Integers defaults nothing. What
+						// actually admits the default is a Choice that abstracts
+						// over nothing, which is where the payload Types are
+						// written out and a value can be checked against them.
 						helps: [
-							"Write the member at each construction, or declare a Choice for the Type this default is a value of.",
+							`Write the member at each construction, or declare a Choice that takes no Type Parameters — one whose payload Types are written out, where a default has something to be checked against.`,
 						],
 					},
 				)
@@ -1574,6 +1587,13 @@ export function resolveIdentifierType(
 					labels: [primary(node.position, "this names a Protocol")],
 					notes: [
 						`A Protocol is only usable as a Generic bound ('<infer T is ${name}>') or in a conformance clause ('is ${name}').`,
+					],
+					// NOTE: What a reader reaching for a Protocol by name
+					// wanted is a value that CONFORMS to it, which is what a
+					// bounded Parameter carries — the Note names the two
+					// positions and this names the edit in the nearer one.
+					helps: [
+						`Name a value instead, and bound the Type Parameter that takes it: '<infer T is ${name}>'.`,
 					],
 				},
 			)
@@ -4602,6 +4622,13 @@ function solveNamespaceConformance(
 					(candidate) =>
 						`'${candidate.name}' conforms to '${protocolName}'.`,
 				),
+				// NOTE: The choice is made by SPECIFICITY, not at the call —
+				// nothing written here can pick between two Namespaces, which
+				// is what "can not be chosen here" says. So the edit is at one
+				// of the declarations, and there are exactly two of them.
+				helps: [
+					`Drop the conformance from one of them, or narrow one target Type so it is the more specific for ${describeType(binding)}.`,
+				],
 			},
 		)
 
@@ -4907,6 +4934,39 @@ function namespaceDeclaringGeneric(
 	return null
 }
 
+// NOTE: What to say about a Type PARAMETER that carries no bound, wherever the
+// want of one is noticed — a call that binds it, a String's hole that has to
+// print it. WHOSE Parameter it is decides everything, and the two answers have
+// nothing in common, so this is the one place that chooses between them.
+//
+// `bounded` is what a Quick Fix keys on: the edit it makes is
+// `<infer Item is P>`, the one spelling a Namespace's Parameter does not have.
+export function typeParameterBoundReport(
+	parameter: string,
+	protocolName: string,
+	scope: enricher.Scope,
+): { notes: Array<string>; helps: Array<string>; bounded: boolean } {
+	let namespaceType = namespaceDeclaringGeneric(parameter, scope)
+
+	if (namespaceType === null) {
+		return {
+			notes: [],
+			helps: [`Declare it as '<infer ${parameter} is ${protocolName}>'.`],
+			bounded: true,
+		}
+	}
+
+	return {
+		...namespaceParameterBound(
+			namespaceType,
+			parameter,
+			protocolName,
+			scope,
+		),
+		bounded: false,
+	}
+}
+
 // NOTE: What there is to say about a bound a NAMESPACE's Type Parameter can not
 // carry. `<infer Item is Comparable>` on a Namespace is refused outright, so the
 // Function's Help sends a reader into `protocol-bound-namespace-generic`, whose
@@ -5033,25 +5093,11 @@ export function resolveConformances(
 					},
 				})
 			} else {
-				// NOTE: WHOSE Type Parameter it is decides what can be said
-				// about it, and the two answers have nothing in common. A
-				// Function's is bounded where it is declared; a Namespace's can
-				// not be bounded at all — `protocol-bound-namespace-generic`
-				// refuses that spelling — so the Help below and the Quick Fix
-				// reading its data both belong to the Function alone.
-				let namespaceType = namespaceDeclaringGeneric(
+				let bound = typeParameterBoundReport(
 					binding.name,
+					generic.constraint,
 					scope,
 				)
-				let namespaceBound =
-					namespaceType === null
-						? null
-						: namespaceParameterBound(
-								namespaceType,
-								binding.name,
-								generic.constraint,
-								scope,
-							)
 
 				reportError(
 					`Type Parameter '${binding.name}' does not conform to '${generic.constraint}'`,
@@ -5066,21 +5112,16 @@ export function resolveConformances(
 						],
 						notes: [
 							`'${binding.name}' carries no '${generic.constraint}' bound of its own, so it can not satisfy one.`,
-							...(namespaceBound?.notes ?? []),
+							...bound.notes,
 						],
-						helps:
-							namespaceBound === null
-								? [
-										`Declare it as '<infer ${binding.name} is ${generic.constraint}>'.`,
-									]
-								: namespaceBound.helps,
+						helps: bound.helps,
 						// NOTE: The Type Parameter the bound has to be written
 						// on, beside the Protocol it has to be bound by — a
 						// Quick Fix edits the DECLARATION, which is nowhere near
 						// the call this is reported at. Withheld for a
 						// Namespace's Parameter: the edit it makes is the one
 						// spelling the language does not have.
-						...(namespaceBound === null
+						...(bound.bounded
 							? {
 									data: {
 										kind: "required-protocol" as const,
@@ -5397,6 +5438,12 @@ export function checkProtocolConformance(
 					],
 					notes: [
 						"A conformance says what a Type can do, so there has to be a Type.",
+					],
+					// NOTE: The head is the edit, and which Type goes in it is
+					// the reader's — every Method here is written for one, so
+					// the name is in front of them and not in front of this.
+					helps: [
+						`Give this Namespace a target Type: 'namespace ${namespaceType.name} for … is ${identifier.content}'.`,
 					],
 				},
 			)
@@ -5966,6 +6013,12 @@ function resolveIdentifierTypeDeclarationType(
 					labels: [primary(node.position, "this names a Protocol")],
 					notes: [
 						`A Protocol is only usable as a Generic bound ('<infer T is ${name}>') or in a conformance clause ('is ${name}').`,
+					],
+					// NOTE: A Protocol in a Type position is nearly always a
+					// Parameter that meant to be bounded by it — the Type is
+					// then the Parameter, and the Protocol moves to the bound.
+					helps: [
+						`Write a Type Parameter bounded by it — '<infer T is ${name}>' — and name 'T' here.`,
 					],
 				},
 			)

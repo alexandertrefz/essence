@@ -2690,7 +2690,34 @@ Error: 'Colour' declares no Case '#Purple'
 
 A case that carries a payload is listed with it — `'#Value(item)'` — so the note is a list you can write from, and a long list stops at eight with "and N more". A case carries one value, so a payload of several members is listed as the [record](/docs/language/records) it is: `'#Rect({ width, height })'`, which is what you write where the list stands. An [overload](/docs/reference/syntax-glossary#overload) whose candidates accept different choices gets one note each, and the message names none of them.
 
-Where nothing decides the choice, the message is "No Choice in scope declares a Case '#Purple'", a note names the choices that declare the nearest case name, and the Help says to annotate the value so that a choice has a say. A `match` written on a value that *holds* the choice — a [future](/docs/language/asynchrony) answering one — is told so, and told to wait for it first.
+Where nothing decides the choice, the message is "No Choice in scope declares a Case '#Purple'", a note names the choices that declare the nearest case name, and the Help says to annotate the value so that a choice has a say.
+
+A `match` written on a value that *holds* the choice — a
+[future](/docs/language/asynchrony) answering one — is told so, and told to wait
+for it first. That is **one** report about the subject rather than one per arm:
+every case of such a `match` is refused, and each would otherwise say the same
+sentence about a different case name. Where the enclosing body cannot wait the
+Help names both steps, because `complete` is refused in a body that answers
+anything but a future:
+
+<div class="error-output">
+
+```
+[unknown-case]
+Error: The matched value has no Case '#Red'
+    ╭─┤ Name.es:15:10 │
+    │
+ 15 │          case #Red { <- "red" }
+    │                ─┬─  
+    │                 ╰─── no such Case in this Union
+    │ 
+    │ Help: Declare the enclosing Function '-> Future<…>', which is what lets its body wait, then wait for it first — 'constant answered = complete …' — and match 'answered'.
+    │ 
+    │ Note: '#Red' is a Case of Colour, which is what a Future<Colour> holds.
+────╯
+```
+
+</div>
 
 Fix the case name.
 
@@ -2726,6 +2753,10 @@ Error: Case '#Red' is declared by more than one Choice
 Prefix the case with its choice: `Colour#Red`.
 
 Quick Fix: **Prefix with 'Colour#'**, one for each choice that declares the case.
+Where the choice is generic the prefix alone leaves
+[`undecided-type-arguments`](#undecided-type-arguments) behind, by design: the
+prefix says *which* choice, and which type arguments it is applied with is a
+second question only the position can answer.
 
 Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
 
@@ -2849,7 +2880,7 @@ Taught on: [Patterns › In a case payload](/docs/language/patterns#in-a-case-pa
 ```
 [case-default-not-a-literal]
 Error: This value in a payload default is not a literal
-   ╭─┤ Request.es:7:55 │
+   ╭─┤ Attempt.es:7:55 │
    │
  7 │        Get { url: String, retries: Integer } = { retries = standardRetries() },
    │                                                            ────────┬────────  
@@ -2864,6 +2895,18 @@ Error: This value in a payload default is not a literal
 </div>
 
 Write the value, `{ retries = 3 }`, or name a constant of this module: `constant standardRetries = 3`, then `{ retries = standardRetries }`.
+
+A default that names a constant rather than writing a record reports the same code
+with a message of its own, `The default for Case '#Get' is not a Record Literal`:
+which members a default fills in is read off the ones it writes, so the default
+itself is spelled out even where the values inside it are names. Its Help names
+the members the case carries — `Write the members out — '= { url = …, retries = … }'
+names every member of '#Get', and a default may fill in any of them.` — and leaves
+the values as the `…` they are.
+
+The choice above is named `Attempt` rather than `Request`, which the standard
+library's `Http` already declares: a program that reuses the name reports
+[`duplicate-type`](#duplicate-type) before it reaches this.
 
 Taught on: [Choices and `match` › Defaults for a payload](/docs/language/choices-and-match#defaults-for-a-payload)
 
@@ -2882,7 +2925,7 @@ Error: A generic Choice can not default a payload
    │                                              ──────┬──────  
    │                                                    ╰──────── this default
    │ 
-   │ Help: Write the member at each construction, or declare a Choice for the Type this default is a value of.
+   │ Help: Write the member at each construction, or declare a Choice that takes no Type Parameters — one whose payload Types are written out, where a default has something to be checked against.
    │ 
    │ Note: 'Holder' abstracts over 1 Type Parameter, and a value written here can bind none of them — every use site decides them, and each would want a default of its own.
 ───╯
@@ -2890,7 +2933,10 @@ Error: A generic Choice can not default a payload
 
 </div>
 
-Write the member at each construction instead.
+Write the member at each construction instead, or declare the choice without type
+parameters — `choice Holder { Full { item: Integer, count: Integer } = { count = 1 }, Bare }`
+— where the payload types are written out and a default has something to be
+checked against.
 
 Taught on: [Choices and `match` › Defaults for a payload](/docs/language/choices-and-match#defaults-for-a-payload)
 
@@ -3840,7 +3886,32 @@ Error: Future<Integer> can not be interpolated into a String
 
 The word is named only where it may stand — inside a body that answers a future, and at a program's top level. Anywhere else the note says so, and the Help is to declare the enclosing function `-> Future<…>` **and** write the `complete` in the hole: the declaration alone leaves the hole holding a future, which reports exactly as before.
 
-Quick Fix: **Wait for it with 'complete'**, where the word may stand. There is none for any other unprintable hole: what to write there is a `match`, which is a restructuring.
+A hole holding a **type parameter** is a missing bound rather than a union to
+match apart — `Item` is neither an `Optional` to unwrap nor a union to take
+apart, so the Help is the bound instead, and where the parameter it names is a
+namespace's the Help is the `where` on one of its conformances:
+
+<div class="error-output">
+
+```
+[interpolation-not-printable]
+Error: Item can not be interpolated into a String
+   ╭─┤ Boxes.es:7:18 │
+   │
+ 7 │          <- "a box of {@.item}"
+   │                        ───┬──  
+   │                           ╰──── this is Item, which is not Printable
+   │ 
+   │ Help: Add 'where Item is Printable' to 'is Printable' on this Namespace.
+   │ 
+   │ Note 1: Type Parameter 'Item' does not conform to 'Printable'.
+   │ Note 2: A Namespace's own Type Parameters take no bounds, and a 'where' condition reaches the Methods that fulfil its conformance.
+───╯
+```
+
+</div>
+
+Quick Fix: **Wait for it with 'complete'**, where the word may stand. There is none for any other unprintable hole: what to write there is a `match` or a bound, and neither is an edit to the hole.
 
 Taught on: [Unions and type aliases › Using a union before a match](/docs/language/unions-and-type-aliases#using-a-union-before-a-match)
 
@@ -5966,7 +6037,11 @@ Warning: This is not a Future, so there is nothing to start
 
 </div>
 
-Drop the word. A `Started` reports the same code with a message of its own, `This is already in flight`: the run belongs to whoever started it, and there is no second run to ask for.
+Drop the word. A `Started` reports the same code with a message of its own, `This
+is already in flight`, and a note of its own — `A Started is one run of a Future,
+and it belongs to whoever started it — there is no second run to ask for.` The
+note above it is about a value that is **not** work, which is the opposite
+complaint, so the two are not shared.
 
 Quick Fix: **Drop the 'start'**.
 
