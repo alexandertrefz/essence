@@ -41,7 +41,8 @@ afterAll(() => {
 // here rather than in a reader's editor.
 //
 // The four questions, per fix, applied ALONE to the original text:
-//   (i)   the error count did not rise, and neither did the total
+//   (i)   it raised no report the file did not already carry, and neither
+//         count rose
 //   (ii)  the Diagnostic it was offered FOR is gone, or has moved on to a
 //         different code — never the identical code and message in the same
 //         place, which is the definition of a loop
@@ -117,6 +118,42 @@ const ALLOWED: Array<Allowance> = [
 			"payload-type-mismatch",
 			"incomplete-record-argument",
 		],
+	},
+	{
+		code: "unknown-where-generic",
+		title: "Declare it as '",
+		reason: "Declaring the name answers WHERE the condition's subject comes from; whether the Namespace can witness a condition about it is the next question, and one the reader can only be asked once the name is there.",
+		followUp: ["unwitnessable-where-condition"],
+	},
+	{
+		code: "undeclared-conformance",
+		title: "Declare the conformance: '",
+		reason: "Writing the conformance down is what the derived Methods were used without; whether the Namespace actually holds up its end is then checked for the first time, and a Namespace that does not is a second, truthful report rather than this fix failing.",
+		followUp: ["nonconforming-namespace"],
+	},
+	{
+		code: "unknown-member",
+		title: "Change to '",
+		reason: "The member is spelled the way the Record declares it, and what stands behind the corrected name is a new question: in 'ForeignNames.es' it is reached as a Function though it holds a String, and in 'Patterns.es' the corrected binder then declares a name the block above it has already declared.",
+		followUp: ["not-a-function", "duplicate-variable"],
+	},
+	{
+		code: "foreign-syntax",
+		title: "Write '#Empty' instead of 'null'",
+		reason: "'#Empty' is the Case a reader coming from 'null' means, and it carries no payload to decide its Type Argument with — so a bare '#Empty' in a position that decides nothing is asked WHICH Optional it is, which is the question 'null' was hiding.",
+		followUp: ["undecided-type-arguments"],
+	},
+	{
+		code: "missing-case",
+		title: "Add missing Cases",
+		reason: "Each Case is written with an empty body, which is the hole the reader fills in — a Function whose Match now has an armed Case that returns nothing is short a return, and that is the scaffold reporting rather than the fix failing.",
+		followUp: ["missing-return"],
+	},
+	{
+		code: "literal-match-shape",
+		title: "Add a 'case _'",
+		reason: "As above, for the catch-all arm: its body is the hole, so a Function that returns out of its Match is short a return until the reader writes one.",
+		followUp: ["missing-return"],
 	},
 ]
 
@@ -235,6 +272,29 @@ function identityOf(diagnostic: common.Diagnostic): string {
 	].join(" ")
 }
 
+// NOTE: A Diagnostic as "the same report", which is what a report the fix
+// RAISED is told from one the file was already carrying. The code and the
+// message, deliberately without the position: an edit that writes a line moves
+// every report below it down one, and a report that moved is not a new one,
+// while a second `unknown-name` about a name nothing declares is — which is the
+// fix the counting rule below used to let through, answering its own report and
+// leaving an unrelated one in its place.
+function reportKey(diagnostic: common.Diagnostic): string {
+	return `${diagnostic.code} ${diagnostic.message}`
+}
+
+// NOTE: What the fix left behind that the file did not already say. Shared by
+// both paths: a scaffold's holes are read off this list and matched against the
+// codes its allowance names, and a fix with no allowance may leave none at all.
+function freshReports(
+	before: Array<common.Diagnostic>,
+	after: Array<common.Diagnostic>,
+): Array<common.Diagnostic> {
+	let standing = new Set(before.map(reportKey))
+
+	return after.filter((diagnostic) => !standing.has(reportKey(diagnostic)))
+}
+
 // NOTE: The Diagnostic an action answers, as the identity a chain is followed
 // by — the code and where it was raised. Null where the action answers none,
 // which no quickfix does.
@@ -320,35 +380,38 @@ describe("Every Quick Fix on every broken file", () => {
 					let text = applyEdits(showcase.source, entry.edits)
 					let after = analyse(text, undefined, { tests: true })
 
-					// (i) Neither count may rise, unless the fix is a scaffold
-					// that says which hole it leaves.
-					if (allowance === undefined) {
-						expect([where, errorsIn(after)]).toEqual([
-							where,
-							expect.any(Number),
-						])
-						expect(errorsIn(after)).toBeLessThanOrEqual(
-							errorsIn(before),
-						)
-						expect(after.length).toBeLessThanOrEqual(before.length)
-					} else {
-						// NOTE: A scaffold may leave MORE than it found, and
-						// what it leaves has to be the hole it named.
-						let fresh = after
-							.map((diagnostic) => diagnostic.code)
-							.filter(
-								(code) =>
-									!before
-										.map((diagnostic) => diagnostic.code)
-										.includes(code),
-							)
+					// (i) It raised no report the file was not already
+					// carrying — and, where it is no scaffold, neither count
+					// rose either.
+					//
+					// NOTE: Counts alone said nothing about WHICH reports were
+					// counted: a fix that answered the report it was offered
+					// for and left an unrelated one in its place went four for
+					// four and passed. What a fix may leave is what its
+					// allowance names, and nothing is what everything else may
+					// leave.
+					let fresh = freshReports(before, after)
+					let permitted = allowance?.followUp ?? []
 
+					expect([
+						where,
+						fresh
+							.filter(
+								(diagnostic) =>
+									!permitted.includes(diagnostic.code),
+							)
+							.map(reportKey),
+					]).toEqual([where, []])
+
+					if (allowance === undefined) {
 						expect([
 							where,
-							fresh.filter(
-								(code) => !allowance.followUp.includes(code),
-							),
-						]).toEqual([where, []])
+							errorsIn(after) <= errorsIn(before),
+						]).toEqual([where, true])
+						expect([where, after.length <= before.length]).toEqual([
+							where,
+							true,
+						])
 					}
 
 					// (ii) The report it answered is gone, or has become a
@@ -437,13 +500,11 @@ describe("Every Quick Fix on every broken file", () => {
 
 					if (allowance === undefined) {
 						for (let index = 1; index < counts.length; index++) {
-							expect([where, counts[index]]).toEqual([
+							expect([
 								where,
-								expect.any(Number),
-							])
-							expect(counts[index]).toBeLessThanOrEqual(
-								counts[index - 1] as number,
-							)
+								(counts[index] as number) <=
+									(counts[index - 1] as number),
+							]).toEqual([where, true])
 						}
 					}
 				}
