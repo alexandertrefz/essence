@@ -1692,23 +1692,22 @@ describe("Workspace", () => {
 			])
 
 			// NOTE: The bound is satisfied, which is this half of the loop shut.
-			// What is left is the OTHER half: the Linker's `usedNames` does not
-			// count a Type reached through a derived conformance as used, so the
-			// entry the fix just wrote reports as unused. The test below is the
-			// end-to-end one, and it is skipped until that lands.
+			// The OTHER half is the Linker's: `usedNames` now counts a named Type
+			// the tree RESOLVED to, so the entry this fix just wrote is not read
+			// back as unused. The test below is the end-to-end one.
 			expect(codesAfter(workspace, mainPath, result)).not.toContain(
 				"unsatisfied-bound",
 			)
 		})
 
-		// NOTE: SKIPPED ON PURPOSE, and enabling it is the integration step. The
-		// import this writes satisfies the bound and is then reported as unused,
-		// because `usedNames` in `modules/link.ts` counts the names a Module
-		// SPELLS and a derived conformance is reached without spelling one.
-		// Obeying `unused-import`'s "Remove the entry." brings the original
-		// report back, which is the loop this pair exists to close — so the
-		// assertion is written now and turned on when the Linker half lands.
-		it.skip("should leave a Program with nothing left to report", () => {
+		// NOTE: Both halves of the catch-22 in one Program, which is the only
+		// place either half can be proved shut. `unsatisfied-bound` asks for the
+		// import, and `usedNames` in `modules/link.ts` counts the Type that
+		// import brings in — a derived conformance is reached without spelling
+		// the name, and counting only the names a Module SPELLS reported the
+		// entry as unused, whose "Remove the entry." brought the original report
+		// straight back. Nothing is left to report, and that is the loop shut.
+		it("should leave a Program with nothing left to report", () => {
 			let { workspace, pathOf } = makeWorkspace({
 				"Parser.es": [
 					"implementation {",
