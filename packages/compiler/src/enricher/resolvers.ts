@@ -2740,6 +2740,42 @@ export const enumerableProtocolName = "Enumerable"
 
 export const enumerableMethodName = "cases"
 
+// NOTE: The names this enrichment looked up IN SCOPE to derive a conformance,
+// and the one thing a Module can read a name through without writing it
+// anywhere. `outcome::is(#Failure(…))` derives Equatable for the Choice the
+// receiver belongs to, and deriving it means finding the Choice BY NAME in this
+// Module's Scope — so an import that carries a Choice reaching the file only as
+// a Type Argument is load-bearing, with no Identifier and no Namespace name left
+// behind to say so.
+//
+// Read back by the linker's unused-import check, which is the one question in
+// the Compiler that has to know how a name was REACHED rather than what it
+// resolved to. A Set per collection, installed around one Program's enrichment;
+// a nested load — the standard library, on the first compile of a process —
+// records into whichever collection is open, which over-counts a name in a file
+// that does not import it and can only make this quieter.
+let derivedTypeNames: Set<string> | null = null
+
+export function collectDerivedTypeNames<Result>(run: () => Result): {
+	result: Result
+	names: Set<string>
+} {
+	let outer = derivedTypeNames
+	let names = new Set<string>()
+
+	derivedTypeNames = names
+
+	try {
+		return { result: run(), names }
+	} finally {
+		derivedTypeNames = outer
+	}
+}
+
+function noteDerivedTypeName(name: string): void {
+	derivedTypeNames?.add(name)
+}
+
 // NOTE: The identity of the Choice a receiver belongs to, or null when it
 // belongs to none — a single Case names its own Choice, and a Union names one
 // only when every member is a Case of it. The IDENTITY rather than the written
@@ -2856,6 +2892,8 @@ function declaredChoiceAliasOf(
 	// Module's same-named Choice is no more this Choice than a shadowed one is.
 	let declared = findTypeInScope(displayChoiceName(identity), scope)
 
+	noteDerivedTypeName(displayChoiceName(identity))
+
 	if (declared === null || declared.type !== "GenericAlias") {
 		return null
 	}
@@ -2905,6 +2943,11 @@ function choiceTypeOf(
 	// Scope's key and the identity is what the Cases are held to, exactly as in
 	// `declaredChoiceAliasOf`.
 	let declared = findTypeInScope(displayChoiceName(identity), scope)
+
+	// NOTE: Recorded whatever the lookup answered. A name that resolves to
+	// nothing here is a name this Module was reaching for, which is exactly what
+	// the unused-import check is asking about.
+	noteDerivedTypeName(displayChoiceName(identity))
 
 	if (declared === null) {
 		return null

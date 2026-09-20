@@ -941,7 +941,11 @@ function linkGroup(
 	return [...states.values()].map((state, index) => {
 		let { diagnostics } = collectDiagnostics(() => {
 			reportExportProblems(state, declares, surfaceFor)
-			reportUnusedImports(state, enriched[index]!.program)
+			reportUnusedImports(
+				state,
+				enriched[index]!.program,
+				enriched[index]!.derivedTypeNames,
+			)
 
 			if (group.length > 1) {
 				reportCyclicSideEffects(state, group)
@@ -1479,8 +1483,15 @@ function reportExportProblems(
 // implicit dispatch: `rect::area()` never spells `RectangleMeasurable`, and the
 // only trace of it is the Namespace name on the resolved Invocation — which is
 // the LOCAL name, because a Namespace import binds a copy carrying it.
-function usedNames(module: Module, program: common.typed.Program): Set<string> {
-	let names = new Set<string>()
+function usedNames(
+	module: Module,
+	program: common.typed.Program,
+	// NOTE: The names the Enricher looked up in this Module's Scope to DERIVE a
+	// conformance, which is the one way a Module reads an imported name without
+	// writing it anywhere. See `collectDerivedTypeNames`.
+	derivedTypeNames: Set<string>,
+): Set<string> {
+	let names = new Set(derivedTypeNames)
 
 	let visit = (node: unknown): void => {
 		if (Array.isArray(node)) {
@@ -1548,23 +1559,16 @@ function usedNames(module: Module, program: common.typed.Program): Set<string> {
 			names.add(record["name"])
 		}
 
-		// NOTE: A named Type the tree RESOLVED to, which is the one shape a
-		// Module can read an import through without writing it anywhere. A
-		// Choice reaching this file as a Type Argument of an imported generic
-		// — `parse` answering `Result<Integer, Problem>` — leaves no Identifier
-		// and no Namespace name behind, and yet the import is load-bearing:
-		// `choiceTypeOf` looks the Choice up BY NAME in this Module's Scope to
-		// derive its Equatable, so `outcome::is(#Failure(…))` stops compiling
-		// the moment the entry goes. A Type object is told from a typed Node by
-		// its discriminator — Nodes carry `nodeType` and a `type` that is the
-		// resolved Type object, Types carry `type` as the string naming which
-		// Type they are.
-		if (
-			typeof record["type"] === "string" &&
-			typeof record["name"] === "string"
-		) {
-			names.add(record["name"])
-		}
+		// NOTE: A named Type the tree RESOLVED to used to count as a use, which
+		// answered the right question far too widely: EVERY Type object
+		// anywhere in either tree carries a name, so an import whose Type
+		// merely flows through — `import { Standing, make }` where only
+		// `make()` is called, and `Standing` is what it answers — was never
+		// reported although removing the entry compiles. What that rule was
+		// written for is the Choice reaching this file as a Type Argument,
+		// whose Equatable is derived by looking the Choice up BY NAME: that
+		// lookup is recorded where it happens now, and arrives here as
+		// `derivedTypeNames`.
 
 		for (let value of Object.values(record)) {
 			visit(value)
@@ -1587,6 +1591,7 @@ function usedNames(module: Module, program: common.typed.Program): Set<string> {
 function reportUnusedImports(
 	state: ModuleState,
 	program: common.typed.Program,
+	derivedTypeNames: Set<string>,
 ): void {
 	let bound = state.imports.filter((binding) => binding.state === "bound")
 
@@ -1609,7 +1614,7 @@ function reportUnusedImports(
 		return
 	}
 
-	let used = usedNames(state.module, program)
+	let used = usedNames(state.module, program, derivedTypeNames)
 
 	for (let binding of bound) {
 		if (used.has(binding.localName)) {

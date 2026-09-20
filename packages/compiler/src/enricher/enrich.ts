@@ -38,6 +38,7 @@ import {
 } from "./enrichers"
 import { exampleSuite, exampleTestsOf } from "./examples"
 import {
+	collectDerivedTypeNames,
 	invalidateNamespacesInScope,
 	referencedTypeNames,
 	resolveChoiceDeclarationStatementType,
@@ -477,6 +478,7 @@ export const enrichPrograms = (
 	program: common.typed.Program
 	diagnostics: Array<common.Diagnostic>
 	annotations: Array<common.TypeAnnotation>
+	derivedTypeNames: Set<string>
 }> => {
 	if (options.annotationsFor === undefined) {
 		return enrichProgramsInner(inputs, options).map((entry) => ({
@@ -505,6 +507,11 @@ const enrichProgramsInner = (
 ): Array<{
 	program: common.typed.Program
 	diagnostics: Array<common.Diagnostic>
+	// NOTE: The Types this Program found BY NAME to derive a conformance with,
+	// which is the one way a Module reads an imported name without writing it.
+	// See `collectDerivedTypeNames`; the linker's unused-import check is the
+	// only reader.
+	derivedTypeNames: Set<string>
 }> => {
 	// NOTE: The hoist spans every file, so it runs BEFORE any Program's
 	// collection is open — a Diagnostic reported from inside it would land in
@@ -538,8 +545,8 @@ const enrichProgramsInner = (
 	)
 
 	return inputs.map(({ program, scope, source }) => {
-		let { result, diagnostics } = collectDiagnostics(
-			(): common.typed.Program => {
+		let { result: collected, names } = collectDerivedTypeNames(() =>
+			collectDiagnostics((): common.typed.Program => {
 				for (let node of program.implementation.nodes) {
 					for (let diagnostic of hoistDiagnostics.get(node) ?? []) {
 						report(diagnostic)
@@ -558,10 +565,14 @@ const enrichProgramsInner = (
 					exports: null,
 					position: program.position,
 				}
-			},
+			}),
 		)
 
-		return { program: result, diagnostics }
+		return {
+			program: collected.result,
+			diagnostics: collected.diagnostics,
+			derivedTypeNames: names,
+		}
 	})
 }
 

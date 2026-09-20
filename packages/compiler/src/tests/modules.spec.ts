@@ -2017,6 +2017,59 @@ export {
 		)
 	})
 
+	// NOTE: And the shape it was wrong about in the OTHER direction. A Type
+	// whose values merely flow through the file — `make()` answers a `Standing`
+	// and nothing here ever names one — was counted as a use, because every
+	// resolved Type object anywhere in either tree carries a name and the rule
+	// above read all of them. Nothing derives a conformance off `Standing`, so
+	// removing the entry compiles, and an import a reader can delete is exactly
+	// what this Warning is for.
+	it("warns about a Type import whose values only flow through", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Standings.es" {
+		Standing
+		make
+	}
+}
+
+implementation {
+	constant standing = make()
+
+	Terminal.inspect(standing.points::toString())
+}
+`,
+				"Standings.es": `implementation {
+	type Standing = { points: Integer }
+
+	function make() -> Standing {
+		<- { points = 0 }
+	}
+}
+
+export {
+	Standing
+	make
+}
+`,
+			},
+			(directory) => {
+				expect(
+					reportsOf(
+						linkedAt(
+							directory,
+							linkProject(directory, "Main.es"),
+							"Main.es",
+						).diagnostics,
+					),
+				).toEqual([
+					["unused-import", "'Standing' is imported and never used"],
+				])
+			},
+		)
+	})
+
 	it("refuses an export of a Variable and of a name the Module does not declare", () => {
 		withProject(
 			{
