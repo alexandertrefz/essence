@@ -1689,9 +1689,12 @@ describe("Workspace", () => {
 			expect(codesAfter(workspace, mainPath, result)).toEqual([])
 		})
 
-		// NOTE: Dropping a self-EXPORT changes what the Module publishes, which
-		// is not something an Editor may decide on its own.
-		it("should offer the removal of a self-export without preferring it", () => {
+		// NOTE: A self-EXPORT is the forwarding spelling of something the Module
+		// is entitled to publish, so the fix writes the names bare rather than
+		// dropping the group: deleting it would take the Module's whole public
+		// surface with it, which is the one thing the writer did not ask for.
+		// Still never preferred — what a Module publishes is a decision.
+		it("should write a self-export's names as bare entries", () => {
 			let { workspace, pathOf } = makeWorkspace({
 				"Main.es": [
 					"implementation {",
@@ -1706,10 +1709,59 @@ describe("Workspace", () => {
 			})
 
 			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
 			let [fix] = fixesFor(workspace, mainPath, 6, '"./Main.es"')
 
 			expect(fix.diagnosticCode).toBe("self-import")
+			expect(fix.title).toBe("Write 'thing' as a bare entry")
 			expect(fix.isPreferred).toBe(false)
+
+			let result = applied(source, fix)
+
+			expect(result).toBe(
+				[
+					"implementation {",
+					"\tconstant thing = 1",
+					"}",
+					"",
+					"export {",
+					"\tthing",
+					"}",
+					"",
+				].join("\n"),
+			)
+
+			expect(codesAfter(workspace, mainPath, result)).toEqual([])
+		})
+
+		// NOTE: And an `as` survives the edit. A bare entry renames the same way
+		// a forwarded one does, so the Module goes on publishing the name it
+		// published.
+		it("should keep an 'as' when it writes a self-export bare", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Main.es": [
+					"implementation {",
+					"\tconstant thing = 1",
+					"\tconstant other = 2",
+					"}",
+					"",
+					"export {",
+					'\tfrom "./Main.es" { thing as first other }',
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let [fix] = fixesFor(workspace, mainPath, 7, '"./Main.es"')
+
+			expect(fix.title).toBe("Write the names as bare entries")
+
+			let result = applied(source, fix)
+
+			expect(result).toContain("\tthing as first\n\tother\n")
+			expect(codesAfter(workspace, mainPath, result)).toEqual([])
 		})
 
 		it("should write the relative specifier a package-shaped one meant", () => {

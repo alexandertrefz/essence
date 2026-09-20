@@ -1409,6 +1409,24 @@ function usedNames(module: Module, program: common.typed.Program): Set<string> {
 			names.add(record["name"])
 		}
 
+		// NOTE: A named Type the tree RESOLVED to, which is the one shape a
+		// Module can read an import through without writing it anywhere. A
+		// Choice reaching this file as a Type Argument of an imported generic
+		// — `parse` answering `Result<Integer, Problem>` — leaves no Identifier
+		// and no Namespace name behind, and yet the import is load-bearing:
+		// `choiceTypeOf` looks the Choice up BY NAME in this Module's Scope to
+		// derive its Equatable, so `outcome::is(#Failure(…))` stops compiling
+		// the moment the entry goes. A Type object is told from a typed Node by
+		// its discriminator — Nodes carry `nodeType` and a `type` that is the
+		// resolved Type object, Types carry `type` as the string naming which
+		// Type they are.
+		if (
+			typeof record["type"] === "string" &&
+			typeof record["name"] === "string"
+		) {
+			names.add(record["name"])
+		}
+
 		for (let value of Object.values(record)) {
 			visit(value)
 		}

@@ -4381,6 +4381,38 @@ Write the path from this file: `from "./Geometry.es" { area }`.
 
 Quick Fix: **Write './Geometry.es'**.
 
+Four things are refused under this one code, and each says something different:
+
+| What was written | What is reported | What the Help asks for |
+| --- | --- | --- |
+| `/Users/ada/shop/Geometry.es` | is an absolute path | the path from this module, beginning with `./` or `../` and ending in `.es` |
+| `Geometry.es`, `lodash` | is not a relative path | the same — and a `.es` specifier missing only its `./` is offered `./Geometry.es` as a Quick Fix |
+| `./Geometry`, `./shapes/` | does not name a `.es` file | `./Geometry.es`, as a Quick Fix; a specifier ending in `/` is asked to name the file itself |
+| `./clock.js`, `./data.json` | does not name a `.es` file | nothing to edit — see below |
+
+A specifier that already carries an extension names a file of some other kind, and no edit to the specifier makes it a module: `./clock.js.es` is a file nobody has. There is no Essence import for JavaScript at all. The interop runs the other way round — a JavaScript program embeds a built Essence one, with `essence build --embed` — so this branch offers no Quick Fix.
+
+<div class="error-output">
+
+```
+[invalid-module-specifier]
+Error: Module specifier './clock.js' does not name a '.es' file
+   ╭─┤ Main.es:2:7 │
+   │
+ 2 │     from "./clock.js" { now }
+   │          ──────┬─────  
+   │                ╰─────── the extension is part of the path
+   │ 
+   │ Help: Essence imports '.es' Modules and nothing else — reach a JavaScript file from the JavaScript side instead, by embedding this Program with 'essence build --embed'.
+   │ 
+   │ Note: A specifier is read exactly as written — no extension is appended and no directory is tried — so what it names is what is read.
+───╯
+```
+
+</div>
+
+A path that lands inside the standard library is refused too, under the same code and a message of its own — `The standard library is not importable`. Everything it declares is in scope in every program already, so the Help asks for the whole `from "…" { … }` group to go.
+
 Taught on: [Modules › Specifiers are relative paths](/docs/language/modules#specifiers-are-relative-paths)
 
 ### `module-not-found`
@@ -4425,7 +4457,7 @@ Error: A Module can not import itself
    │          ─────┬─────  
    │               ╰─────── this path names the file it is written in
    │ 
-   │ Help: Remove the entry, or point it at the Module that declares the name.
+   │ Help: Remove the whole 'from "./Main.es" { … }' group — every name it asks for is in scope here already.
    │ 
    │ Note: Everything a Module declares is in scope inside it already, whether or not it is exported.
 ───╯
@@ -4433,9 +4465,32 @@ Error: A Module can not import itself
 
 </div>
 
-Remove the entry, or point it at the module you meant.
+The whole group goes, not one entry: the report is on the specifier, and every name under it comes from the file it names.
 
 Quick Fix: **Remove the entry for "./Main.es"**.
+
+An `export { … }` block can name its own file the same way, and there the answer is the opposite one. Those names are declared here — the block has written the forwarding form of something it is entitled to publish — so they are written as bare entries instead, and the module goes on exporting them.
+
+<div class="error-output">
+
+```
+[self-import]
+Error: A Module can not import itself
+   ╭─┤ Main.es:8:7 │
+   │
+ 8 │     from "./Main.es" { area }
+   │          ─────┬─────  
+   │               ╰─────── this path names the file it is written in
+   │ 
+   │ Help: Write 'area' as a bare entry: 'export { area }'.
+   │ 
+   │ Note: Everything a Module declares is in scope inside it already, whether or not it is exported.
+───╯
+```
+
+</div>
+
+Quick Fix: **Write 'area' as a bare entry**.
 
 Taught on: [Modules › Specifiers are relative paths](/docs/language/modules#specifiers-are-relative-paths)
 

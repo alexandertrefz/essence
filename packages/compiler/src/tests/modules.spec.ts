@@ -663,6 +663,95 @@ ${moduleProgram()}`,
 		)
 	})
 
+	// NOTE: Appending '.es' is an answer for exactly one of the shapes that
+	// reaches this report. A specifier already carrying an extension names a
+	// file of another kind, and './clock.js.es' is a file nobody has — so the
+	// Help says what is true and spells no edit, which is also what keeps the
+	// Editor from offering one: `moduleSpecifierActions` reads the fix back out
+	// of the Help text.
+	it("offers an extension only where appending one could be right", () => {
+		let helpFor = (specifier: string): string =>
+			withProject(
+				{
+					"Main.es": `import {\n\tfrom "${specifier}" { Name }\n}\n\n${moduleProgram()}`,
+				},
+				(directory) =>
+					moduleAt(
+						directory,
+						loadModuleGraph(
+							path.join(directory, "Main.es"),
+							diskModuleHost,
+						),
+						"Main.es",
+					).diagnostics[0]?.helps[0] as string,
+			)
+
+		expect(helpFor("./Geometry")).toBe("Write './Geometry.es'.")
+
+		for (let specifier of ["./clock.js", "./clock.mjs", "./clock.ts"]) {
+			expect(helpFor(specifier)).toBe(
+				"Essence imports '.es' Modules and nothing else — reach a JavaScript file from the JavaScript side instead, by embedding this Program with 'essence build --embed'.",
+			)
+		}
+
+		expect(helpFor("./data.json")).toBe(
+			"Name a '.es' Module — an import block reads no other kind of file.",
+		)
+		expect(helpFor("./shapes/")).toBe(
+			"Name the file itself, ending in '.es'.",
+		)
+
+		// NOTE: One edit, one Diagnostic. A package specifier only told to begin
+		// with './' is sent to `./lodash`, which is refused a second time for
+		// the extension — so both halves of the path are named at once and what
+		// follows the edit is `module-not-found`, a different thing to know.
+		expect(helpFor("lodash")).toBe(
+			"Write the path from this Module to the file, beginning with './' or '../' and ending in '.es'.",
+		)
+	})
+
+	// NOTE: "Remove the entry" loops on both of these: they are reported on the
+	// SPECIFIER, and an entry in this language is a NAME — a reader who deletes
+	// one is left with the same group and the same report. The export side wants
+	// the opposite edit besides, because the Module DECLARES those names and
+	// dropping the group would take its whole public surface with it.
+	it("asks for the whole group where the group is what is wrong", () => {
+		let helpFor = (source: string): string =>
+			withProject(
+				{ "Main.es": source },
+				(directory) =>
+					moduleAt(
+						directory,
+						loadModuleGraph(
+							path.join(directory, "Main.es"),
+							diskModuleHost,
+						),
+						"Main.es",
+					).diagnostics[0]?.helps[0] as string,
+			)
+
+		expect(
+			helpFor(
+				`import {\n\tfrom "./Main.es" { area }\n}\n\n${moduleProgram()}`,
+			),
+		).toBe(
+			`Remove the whole 'from "./Main.es" { … }' group — every name it asks for is in scope here already.`,
+		)
+
+		expect(
+			helpFor(`implementation {
+	function area(_ side: Integer) -> Integer {
+		<- side::multiply(with side)
+	}
+}
+
+export {
+	from "./Main.es" { area }
+}
+`),
+		).toBe(`Write 'area' as a bare entry: 'export { area }'.`)
+	})
+
 	it("reports a specifier naming the standard library", () => {
 		withProject({ "Main.es": moduleProgram() }, (directory) => {
 			let specifier = path
@@ -684,6 +773,12 @@ ${moduleProgram()}`,
 			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
 				"invalid-module-specifier",
 			])
+			// NOTE: The group, for the reason the two above are: deleting the
+			// one name this entry asks for leaves `from "…" { }` behind and
+			// reports the very same thing again.
+			expect(diagnostics[0].helps[0]).toBe(
+				`Remove the whole 'from "${specifier}" { … }' group — every name it asks for is a builtin.`,
+			)
 			expect(diagnostics[0].message).toBe(
 				"The standard library is not importable",
 			)
@@ -1676,6 +1771,114 @@ export {
 						"Main.es",
 					).diagnostics,
 				).toEqual([])
+			},
+		)
+	})
+
+	// NOTE: The shape the Warning used to be WRONG about. `Problem` is written
+	// nowhere in `Main.es` but the import entry: it reaches the file as a Type
+	// ARGUMENT of an imported Function's answer, and the `::is` below derives
+	// its Equatable off the Choice — which `choiceTypeOf` finds by looking the
+	// name up in THIS Module's Scope. Remove the entry the Warning asked to
+	// remove and the file stops compiling, which is the one thing an
+	// `unnecessary` tag and a preferred "remove it" fix may never be attached
+	// to.
+	it("counts a Type reached only as a Type Argument as a use", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Parsing.es" {
+		Problem
+		parse
+	}
+}
+
+implementation {
+	constant outcome = parse("abc")
+
+	Terminal.inspect(outcome::is(#Failure(#NotANumber))::toString())
+}
+`,
+				"Parsing.es": `implementation {
+	choice Problem {
+		NotANumber,
+		OutOfRange,
+	}
+
+	function parse(_ text: String) -> Result<Integer, Problem> {
+		if text::hasItems() {
+			<- #Value(text::length())
+		} else {
+			<- #Failure(#NotANumber)
+		}
+	}
+}
+
+export {
+	Problem
+	parse
+}
+`,
+			},
+			(directory) => {
+				expect(
+					linkedAt(
+						directory,
+						linkProject(directory, "Main.es"),
+						"Main.es",
+					).diagnostics,
+				).toEqual([])
+			},
+		)
+	})
+
+	// NOTE: And the other side of it — a Type import nothing in the file reads,
+	// through an annotation or through a resolved Type, is still reported. The
+	// rule above over-collects on purpose, and this is what says it does not
+	// over-collect everything.
+	it("still warns about a Type import nothing reaches", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Shapes.es" {
+		Colour
+		louder
+	}
+}
+
+implementation {
+	Terminal.inspect(louder("hi"))
+}
+`,
+				"Shapes.es": `implementation {
+	choice Colour {
+		Red,
+		Green,
+	}
+
+	function louder(_ text: String) -> String {
+		<- text::uppercase()
+	}
+}
+
+export {
+	Colour
+	louder
+}
+`,
+			},
+			(directory) => {
+				expect(
+					reportsOf(
+						linkedAt(
+							directory,
+							linkProject(directory, "Main.es"),
+							"Main.es",
+						).diagnostics,
+					),
+				).toEqual([
+					["unused-import", "'Colour' is imported and never used"],
+				])
 			},
 		)
 	})

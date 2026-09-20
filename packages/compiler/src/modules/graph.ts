@@ -59,22 +59,65 @@ export type ModuleGraph = {
 	diagnostics: Array<common.Diagnostic>
 }
 
+// NOTE: The group a specifier was written on, rather than the specifier alone:
+// what a refused one has to say depends on which SECTION it stands in and on
+// the names under it — an entry an import block can simply drop is one an export
+// block has to keep, under another spelling.
+type WrittenSpecifier = {
+	source: parser.ModuleSpecifierNode
+	section: "import" | "export"
+	names: Array<string>
+}
+
 // NOTE: Both sections, imports first, in written order — one specifier per
 // group, since a group writes its specifier once however many names it holds,
 // and a refused one is refused once.
-function specifiersOf(
-	program: parser.Program,
-): Array<parser.ModuleSpecifierNode> {
+function specifiersOf(program: parser.Program): Array<WrittenSpecifier> {
 	return [
-		...(program.imports?.groups ?? []),
-		...(program.exports?.groups ?? []),
-	].map((group) => group.source)
+		...(program.imports?.groups ?? []).map((group) => ({
+			source: group.source,
+			section: "import" as const,
+			names: group.entries.map((entry) => entry.name.content),
+		})),
+		...(program.exports?.groups ?? []).map((group) => ({
+			source: group.source,
+			section: "export" as const,
+			names: group.entries.map((entry) => entry.name.content),
+		})),
+	]
+}
+
+// NOTE: The extensions a reader reaches for when they mean a file this language
+// can not import. Essence reads `.es` and nothing else, and the interop runs the
+// OTHER way — a JavaScript Program embeds a built Essence one — so `./clock.js`
+// is not one edit away from compiling and no Help may pretend it is.
+const javaScriptExtensions = [
+	".js",
+	".mjs",
+	".cjs",
+	".jsx",
+	".ts",
+	".mts",
+	".cts",
+	".tsx",
+]
+
+// NOTE: Anything else written behind a dot. A specifier naming one is not a
+// Module either, and `Write '<specifier>.es'` would name a file that could only
+// ever be `./data.json.es` — so the extensionless spelling is the one case that
+// Help is certainly right for, and the only one it is offered for.
+function extensionOf(specifier: string): string | null {
+	let name = specifier.slice(specifier.lastIndexOf("/") + 1)
+	let dot = name.lastIndexOf(".")
+
+	return dot <= 0 ? null : name.slice(dot)
 }
 
 function reportRejection(
 	reason: SpecifierRejection,
-	source: parser.ModuleSpecifierNode,
+	written: WrittenSpecifier,
 ): void {
+	let { source, section, names } = written
 	let specifier = source.path
 	let position = source.position
 
@@ -95,7 +138,7 @@ function reportRejection(
 						"An absolute path names a place on the machine it was written on, so a checkout that moves stops compiling.",
 					],
 					helps: [
-						"Write the path from this Module to the file, beginning with './' or '../'.",
+						"Write the path from this Module to the file, beginning with './' or '../' and ending in '.es'.",
 					],
 				},
 			)
@@ -117,10 +160,18 @@ function reportRejection(
 					notes: [
 						"Package specifiers are reserved: today a Module names its dependencies by where they sit relative to it, and nothing is searched for.",
 					],
+					// NOTE: The second branch says '.es' out loud, because the
+					// specifier that gets here without one is a PACKAGE name —
+					// `lodash` — and a Help that asks only for a './' sends the
+					// reader to `./lodash`, which is refused again for the
+					// extension and then resolves to a file that was never going
+					// to be there. One edit, one Diagnostic: what follows a
+					// './lodash.es' is `module-not-found`, which is the next
+					// genuinely different thing to know.
 					helps: [
 						specifier.endsWith(".es")
 							? `Write './${specifier}' if the file sits beside this one.`
-							: "Write the path from this Module to the file, beginning with './' or '../'.",
+							: "Write the path from this Module to the file, beginning with './' or '../' and ending in '.es'.",
 					],
 				},
 			)
@@ -139,10 +190,25 @@ function reportRejection(
 					notes: [
 						"A specifier is read exactly as written — no extension is appended and no directory is tried — so what it names is what is read.",
 					],
+					// NOTE: Three answers, because appending '.es' is right for
+					// exactly one of them. A specifier that already carries an
+					// extension names a file of some other kind, and
+					// './clock.js.es' is not a file anybody has — so the Help
+					// says what is true instead, and says nothing a Quick Fix
+					// could read back as an edit. JavaScript gets its own
+					// sentence because it is the one other kind with an answer:
+					// the interop runs the other way round, from a JavaScript
+					// Program embedding a built Essence one.
 					helps: [
 						specifier.endsWith("/")
 							? "Name the file itself, ending in '.es'."
-							: `Write '${specifier}.es'.`,
+							: javaScriptExtensions.includes(
+										extensionOf(specifier) ?? "",
+								  )
+								? "Essence imports '.es' Modules and nothing else — reach a JavaScript file from the JavaScript side instead, by embedding this Program with 'essence build --embed'."
+								: extensionOf(specifier) === null
+									? `Write '${specifier}.es'.`
+									: "Name a '.es' Module — an import block reads no other kind of file.",
 					],
 				},
 			)
@@ -161,8 +227,14 @@ function reportRejection(
 				notes: [
 					"The standard library is one shared declaration space rather than a graph of Modules, and everything it declares is already in scope in every Program.",
 				],
+				// NOTE: The GROUP rather than "the entry". This Diagnostic is
+				// reported on the specifier, and an entry in this language is a
+				// NAME — so a reader who deletes one is left with the same
+				// `from "…" { }` and the same report. What has to go is the
+				// whole group, and the Help says so in the text it is written
+				// in.
 				helps: [
-					"Remove the entry — the name it asks for is a builtin.",
+					`Remove the whole 'from "${specifier}" { … }' group — every name it asks for is a builtin.`,
 				],
 			})
 
@@ -180,8 +252,20 @@ function reportRejection(
 				notes: [
 					"Everything a Module declares is in scope inside it already, whether or not it is exported.",
 				],
+				// NOTE: The two sections want opposite things. An import group
+				// naming this file asks for names that are in scope already, so
+				// the whole group goes. An export group naming this file is
+				// PUBLISHING names this Module declares, which is something it
+				// is entitled to do — it has only written it the forwarding way
+				// — so the answer is to write them bare rather than to stop
+				// exporting them. "Point it at the Module that declares the
+				// name" was unfollowable there: this Module is that Module.
 				helps: [
-					"Remove the entry, or point it at the Module that declares the name.",
+					section === "import"
+						? `Remove the whole 'from "${specifier}" { … }' group — every name it asks for is in scope here already.`
+						: names.length === 1
+							? `Write '${names[0]}' as a bare entry: 'export { ${names[0]} }'.`
+							: "Write the names as bare entries in the 'export { … }' block — this Module declares them itself.",
 				],
 			})
 
@@ -215,7 +299,8 @@ function resolveDependencies(
 	let dependencies: Array<Module> = []
 	let named = new Set<string>()
 
-	for (let source of specifiersOf(module.program)) {
+	for (let written of specifiersOf(module.program)) {
+		let source = written.source
 		let resolution = resolutions.get(source.path)
 
 		if (resolution === undefined) {
@@ -224,7 +309,7 @@ function resolveDependencies(
 		}
 
 		if (resolution.kind === "rejected") {
-			reportRejection(resolution.reason, source)
+			reportRejection(resolution.reason, written)
 
 			continue
 		}

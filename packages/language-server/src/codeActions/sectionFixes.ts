@@ -1,7 +1,12 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { isSamePosition } from "../positions"
-import { removeLinesEdit, sliceOf } from "./geometry"
+import {
+	indentationOf,
+	opensItsLine,
+	removeLinesEdit,
+	sliceOf,
+} from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { findVariableDeclaration } from "./lookups"
 
@@ -63,15 +68,17 @@ function groupOf(
 	return null
 }
 
-// NOTE: The whole group goes, since the specifier is the group's: every name
-// under it comes from the file the entry names, and that file is this one.
+// NOTE: One action per section, because the two sections mean opposite things by
+// the same group. An IMPORT group naming this file asks for names that are in
+// scope inside it already, so the whole group goes and the Program provably
+// answers what it answered before — preferred, and the whole group rather than
+// one entry, since the specifier the Diagnostic is reported on is the group's.
 //
-// Preferred for an IMPORT and not for an export, which is the difference between
-// the two sections here. Everything a Module declares is in scope inside it
-// already, so dropping a self-import provably leaves the Program answering what
-// it answered before; dropping a self-EXPORT changes what the Module publishes,
-// and what the writer meant there is almost certainly to export the names
-// directly rather than to stop exporting them.
+// An EXPORT group naming this file publishes names this Module DECLARES, written
+// the forwarding way. Deleting it takes the Module's public surface with it,
+// which is the one thing the writer did not ask for — so the names are written
+// bare instead, which is the edit the Help spells. Never preferred: what a
+// Module publishes is a decision, and an Editor does not make it on its own.
 export function removeSelfImportAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -83,13 +90,51 @@ export function removeSelfImportAction(
 		return null
 	}
 
+	if (found.section === "import") {
+		return {
+			title: `Remove the entry for ${sliceOf(lines, diagnostic.position)}`,
+			kind: "quickfix",
+			diagnosticCode: diagnostic.code,
+			diagnosticPosition: diagnostic.position,
+			isPreferred: true,
+			edits: [removeLinesEdit(lines, found.group.position)],
+		}
+	}
+
+	let entries = found.group.entries
+
+	if (entries.length === 0) {
+		return null
+	}
+
+	// NOTE: An `as` is kept. A bare entry renames the same way a forwarded one
+	// does, so `area as squareArea` says the same thing on either side of this
+	// edit and the Module goes on publishing the name it published.
+	let written = entries.map((entry) =>
+		entry.alias === null
+			? entry.name.content
+			: `${entry.name.content} as ${entry.alias.content}`,
+	)
+
+	// NOTE: Laid out the way the group was — one name per line under the
+	// group's own indentation where it stood on a line of its own, and beside
+	// each other where it shared its line with something else.
+	let separator = opensItsLine(lines, found.group.position.start)
+		? `\n${indentationOf(lines, found.group.position.start.line)}`
+		: " "
+
 	return {
-		title: `Remove the entry for ${sliceOf(lines, diagnostic.position)}`,
+		title:
+			written.length === 1
+				? `Write '${written[0]}' as a bare entry`
+				: "Write the names as bare entries",
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
-		isPreferred: found.section === "import",
-		edits: [removeLinesEdit(lines, found.group.position)],
+		isPreferred: false,
+		edits: [
+			{ range: found.group.position, newText: written.join(separator) },
+		],
 	}
 }
 
