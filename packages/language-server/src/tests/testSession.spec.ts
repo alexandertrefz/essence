@@ -350,6 +350,132 @@ describe("A session asked for one test while a run is in flight", () => {
 		}
 	}, 60_000)
 
+	// NOTE: And it is answered with the number of THAT cycle rather than of the
+	// run it landed behind. The number is the whole of what ties a gesture to
+	// what arrives — a Test Explorer registers the run it opened under it — so
+	// answering with the cycle already in flight hands the reader that cycle's
+	// batch: the whole file, narrowed to nothing, while the run they asked for
+	// arrives under a number nobody is listening on.
+	it("answers a deferred request with the number of the cycle that runs it", async () => {
+		let file = path.join(root, "DeferredNumber.tests.es")
+
+		writeFileSync(file, twoTests)
+
+		let { session, ends, waitFor } = watching(file)
+
+		try {
+			session.run({ files: [file] })
+
+			await waitFor(1)
+
+			let beta = session
+				.records()
+				.find((record) => record.name === "beta")?.id
+
+			expect(beta).toBeString()
+
+			session.run({ files: [file] })
+
+			let answered = session.run({
+				ids: [beta as string],
+				files: [file],
+			})
+
+			await waitFor(3)
+
+			let narrowed = ends().at(-1)
+
+			expect(narrowed?.ids).toEqual([beta as string])
+			expect(answered).toBe(narrowed?.run as number)
+		} finally {
+			await session.dispose()
+			rmSync(file, { force: true })
+		}
+	}, 60_000)
+
+	// NOTE: And a promise the session can not keep is ended rather than left
+	// standing. The file a deferred request named stops being a test file while
+	// the run in flight finishes — deleted, or its `tests` block taken out — so
+	// the cycle that was promised the number has nothing to run at all. Nothing
+	// is reported, because nothing ran; but the number was answered with, and a
+	// client waits on it until something ends it.
+	it("ends a promised cycle that has nothing left to run", async () => {
+		let file = path.join(root, "DeferredGone.tests.es")
+
+		writeFileSync(file, twoTests)
+
+		let notifications: Array<TestRunNotification> = []
+		let files = [file]
+		let session = createTestSession({
+			settingsFor: projectSettings(),
+			testFiles: () => files,
+			dependentsOf: (filePath) => [filePath],
+			overlays: () => ({}),
+			notify: (notification) => notifications.push(notification),
+			onResults: () => {},
+			debounce: 20,
+		})
+
+		try {
+			session.run({ files: [file] })
+
+			let promised = session.run({ files: [file] })
+
+			expect(promised).toBe(2)
+
+			// NOTE: Gone before the cycle it was promised to could start.
+			files = []
+
+			let deadline = Date.now() + 30_000
+			let ended = () =>
+				notifications.find(
+					(notification) =>
+						notification.kind === "end" &&
+						notification.run === promised,
+				)
+
+			while (ended() === undefined && Date.now() < deadline) {
+				await new Promise((resolve) => setTimeout(resolve, 25))
+			}
+
+			expect(ended()).toMatchObject({
+				kind: "end",
+				reason: "request",
+				files: [],
+				counts: { passed: 0, failed: 0, skipped: 0, deselected: 0 },
+			})
+		} finally {
+			await session.dispose()
+			rmSync(file, { force: true })
+		}
+	}, 60_000)
+
+	// NOTE: And so does a session SWITCHED OFF while it owes one. What the
+	// setting declines is running tests; it does not turn a number somebody was
+	// told to wait for into a number nothing will ever say again.
+	it("ends a promised cycle when the session is switched off", async () => {
+		let file = path.join(root, "DeferredOffPromise.tests.es")
+
+		writeFileSync(file, twoTests)
+
+		let { session, ends } = watching(file)
+
+		try {
+			session.run({ files: [file] })
+
+			let promised = session.run({ files: [file] })
+
+			expect(promised).toBe(2)
+
+			session.setEnabled(false)
+
+			expect(ends().map((end) => end.run)).toContain(promised as number)
+		} finally {
+			await session.dispose()
+			rmSync(file, { force: true })
+		}
+	}, 60_000)
+
 	it("keeps an accept a deferred request asked for", async () => {
 		let file = path.join(root, "DeferredSnapshot.tests.es")
 

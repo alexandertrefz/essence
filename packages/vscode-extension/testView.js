@@ -190,6 +190,12 @@ export function createTestView(options) {
 	// so the notification routinely arrives BEFORE the response naming the cycle
 	// it belongs to.
 	let requested = null
+	// NOTE: The cycle numbers the Server has PROMISED but not yet started. A
+	// request that lands while a cycle is in flight is deferred and answered
+	// with the number of the cycle that will run it, so its number exists before
+	// anything carries it — and another cycle can start, and end, in between.
+	// Held so that such a number is not read as an older cycle that died.
+	let promised = new Set()
 	let tagProfiles = new Map()
 
 	function log(line) {
@@ -625,6 +631,7 @@ export function createTestView(options) {
 			// waiting; the results still arrive, and the next batch draws them.
 			if (cycle !== null) {
 				runs.delete(cycle)
+				promised.delete(cycle)
 			}
 
 			testRun.end()
@@ -650,14 +657,15 @@ export function createTestView(options) {
 
 		if (requested === testRun) {
 			requested = null
-			// NOTE: A request made while a cycle is already going is answered
-			// with THAT cycle's number — the Server folds the two together
-			// rather than starting a second Worker — so a run may already be
-			// registered under it. Two runs can not both be the one that ends,
-			// and the one a reader pressed is the one to keep; the other is a
-			// cycle nobody asked for, and its results land in this one.
+			// NOTE: Two gestures made while one cycle is in flight are deferred
+			// into the same cycle and answered with the same number, so a run
+			// may already be registered under it. Two runs can not both be the
+			// one that ends, and the one pressed last is the one to keep.
 			runs.get(answer.run)?.end()
 			runs.set(answer.run, testRun)
+			// NOTE: Remembered as promised until that cycle starts, since a
+			// deferred request is answered before anything carries its number.
+			promised.add(answer.run)
 		}
 	}
 
@@ -944,11 +952,21 @@ export function createTestView(options) {
 			return
 		}
 
+		// NOTE: A number the Server is speaking about is not owed any more —
+		// whether this is its own cycle starting, or the end that closes out a
+		// cycle which found nothing left to run.
+		promised.delete(notification.run)
+
 		// NOTE: A cycle that never ended — the session was switched off, or a
 		// Worker died — would leave VS Code spinning forever. A newer cycle
 		// starting is the news that no older one is coming back.
+		//
+		// NOTE: Unless it has not come yet. A deferred request is answered with
+		// the number of the cycle that will run it, and a cycle asked for in the
+		// window before that one starts takes a higher number and runs first —
+		// so a promised number is a run still owed rather than a run that died.
 		for (let [number, open] of runs) {
-			if (number < notification.run) {
+			if (number < notification.run && !promised.has(number)) {
 				open.end()
 				runs.delete(number)
 			}

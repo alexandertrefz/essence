@@ -310,6 +310,45 @@ export function startSession() {
 
 			return found
 		},
+		// NOTE: The run a cycle IN FLIGHT carries — started, not yet ended —
+		// which is the state a request has to land in for the session to defer
+		// it rather than start a cycle of its own. A test that means to ask
+		// what a deferred request is answered with waits for this rather than
+		// sleeping towards it: how long a compile takes is a fact about the
+		// machine, and the window a sleep would aim at is the very thing the
+		// question is about.
+		//
+		// The deadline throws, for the reason `waitForTestRuns` above gives.
+		waitForRunInFlight: async (timeout = 60_000) => {
+			let deadline = Date.now() + timeout
+			let flying = () => {
+				let ended = new Set(
+					testRuns
+						.filter((notification) => notification.kind === "end")
+						.map((notification) => notification.run),
+				)
+
+				return testRuns.find(
+					(notification) =>
+						notification.kind === "start" &&
+						!ended.has(notification.run),
+				)?.run
+			}
+
+			while (flying() === undefined && Date.now() < deadline) {
+				await new Promise((resolve) => setTimeout(resolve, 5))
+			}
+
+			let found = flying()
+
+			if (found === undefined) {
+				throw new Error(
+					`no test run was in flight within ${timeout} ms`,
+				)
+			}
+
+			return found
+		},
 		// NOTE: The same question asked of a run NOBODY numbered — one an edit
 		// caused rather than one a request answered with an ordinal. A session
 		// defers a cycle it was asked for while another was in flight and arms

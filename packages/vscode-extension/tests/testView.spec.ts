@@ -927,23 +927,47 @@ describe("the runs it keeps", () => {
 		})
 	})
 
-	// NOTE: A request made while a cycle is already going is answered with THAT
-	// cycle's number. Registering over the run already showing it would leave
-	// that one spinning with nothing left holding it.
+	// NOTE: Two gestures made while one cycle is in flight are deferred into the
+	// same cycle and answered with the same number. Registering over the run
+	// already showing it would leave that one spinning with nothing left holding
+	// it.
 	it("ends the run it displaces when a request joins a cycle", async () => {
-		let session = live()
+		let session = live(() => ({ run: 4 }))
 
-		session.view.handle(batch({ kind: "start", run: 4, reason: "change" }))
+		await session.view.runIds([], [FILE])
 
 		let joined = stub.runs.at(-1)!
-
-		session.answer = () => ({ run: 4 })
 
 		await session.view.runIds([], [FILE])
 
 		expect(joined.ends).toBe(1)
 		expect(stub.runs.at(-1)).not.toBe(joined)
 		expect(stub.runs.at(-1)!.ends).toBe(0)
+	})
+
+	// NOTE: A number the Server has promised is a run still owed rather than a
+	// run that died. A request deferred behind a cycle in flight is answered
+	// with the number of the cycle that will RUN it, and a gesture made in the
+	// window before that cycle starts is a cycle of its own — a higher number,
+	// started and ended first. Reading the promised number as stale there would
+	// close the reader's run over somebody else's batch, which is the whole
+	// thing the number exists to prevent.
+	it("keeps a run whose promised cycle has not started yet", async () => {
+		let session = live(() => ({ run: 5 }))
+
+		await session.view.runIds([], [FILE])
+
+		let promised = stub.runs.at(-1)!
+
+		session.view.handle(batch({ kind: "start", run: 6, reason: "change" }))
+		session.view.handle(batch({ run: 6, reason: "change" }))
+
+		expect(promised.ends).toBe(0)
+
+		session.view.handle(batch({ kind: "start", run: 5, reason: "request" }))
+		session.view.handle(batch({ run: 5, reason: "request" }))
+
+		expect(promised.ends).toBe(1)
 	})
 
 	// NOTE: A cycle that never ended — a Worker died, the session was switched

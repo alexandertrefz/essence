@@ -204,6 +204,17 @@ export type RunTestsParams = {
 export type RunTestsResult = {
 	// NOTE: The cycle the results will arrive under, or null where the session
 	// is off or nothing matched.
+	//
+	// NOTE: It is THIS request's cycle, always — never the number of a run that
+	// happens to be in flight. A request landing mid-cycle is deferred rather
+	// than cancelling the compile in front of it, and what it is answered with
+	// is the number that deferred cycle will carry: a client ties the run it
+	// opened to this number, so naming the cycle already going would hand a
+	// reader who asked for one test the batch of a cycle nobody asked for. The
+	// number is therefore handed out before anything carries it — which is why
+	// a cycle asked for in between can start and end first, and why a promised
+	// cycle left with nothing to run still ends under its number rather than
+	// going quiet.
 	run: number | null
 }
 

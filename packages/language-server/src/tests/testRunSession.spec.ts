@@ -227,11 +227,53 @@ describe("The Server's live test session", () => {
 			{ files: [pathOf("Season.tests.es")] },
 		)
 
-		expect(result.run).toBe(2)
+		expect(result.run).not.toBeNull()
 
-		let runs = await session.waitForTestRuns(2)
+		// NOTE: Waited for by the NUMBER the request answered with rather than
+		// by its ordinal among the runs that have ended. Opening a file ends
+		// two runs of the same text — the scan's, and the cycle the overlay
+		// asked for, which the scan's own run deferred — so "the second run to
+		// end" is a run of the session's own whenever the machine is slow
+		// enough for that deferred window to fire before the request lands, and
+		// the reason asserted below would then be about a batch nobody asked
+		// for.
+		let ended = await session.waitForTestRun(result.run as number)
 
-		expect(runs[1]).toMatchObject({ reason: "request" })
+		expect(ended).toMatchObject({ reason: "request" })
+	}, 60_000)
+
+	// NOTE: The ordering a loaded machine falls into, forced: the edit arms a
+	// cycle, and the request goes out once that cycle has STARTED. Such a
+	// request is deferred rather than cancelling the compile in flight — and
+	// what it is answered with has to be the number of the cycle that will run
+	// it, not of the one it landed behind. The number is the whole of what ties
+	// a gesture to what arrives, so answering with the run in flight shows a
+	// reader who asked for one file the batch of a cycle they never asked for.
+	it("answers a request that landed mid-cycle with the cycle that runs it", async () => {
+		let { session, pathOf } = await openWorkspace(
+			{ "Season.tests.es": passing },
+			"Season.tests.es",
+		)
+
+		await session.waitForTestRuns(1)
+		await session.change(pathOf("Season.tests.es"), failing)
+
+		let flying = await session.waitForRunInFlight()
+
+		let { result } = await session.request<{ run: number | null }>(
+			{ method: "essence/runTests" },
+			{ files: [pathOf("Season.tests.es")] },
+		)
+
+		expect(result.run).not.toBeNull()
+		expect(result.run).not.toBe(flying)
+
+		let ended = await session.waitForTestRun(result.run as number)
+
+		expect(ended).toMatchObject({
+			reason: "request",
+			files: [pathOf("Season.tests.es")],
+		})
 	}, 60_000)
 
 	// NOTE: The whole round trip of a structural identity: the lens spells one

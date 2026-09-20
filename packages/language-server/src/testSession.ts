@@ -157,6 +157,10 @@ type PendingRequest = {
 	whole: boolean
 	update: boolean
 	requested: boolean
+	// NOTE: The number the cycle that takes all of this will carry, taken the
+	// moment the first of them was deferred so that whoever asked can be
+	// answered with it. Null until something is waiting.
+	run: number | null
 }
 
 function freshPending(): PendingRequest {
@@ -166,6 +170,7 @@ function freshPending(): PendingRequest {
 		whole: false,
 		update: false,
 		requested: false,
+		run: null,
 	}
 }
 
@@ -496,11 +501,50 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		}
 	}
 
+	// NOTE: The number a cycle will carry. A cycle that was PROMISED one while it
+	// waited for the run in flight keeps it — answering a deferred request with
+	// the number of the run it landed behind is answering with somebody else's
+	// batch (see `start`).
+	function numberFor(reserved: number | null): number {
+		if (reserved !== null) {
+			return reserved
+		}
+
+		runCounter += 1
+
+		return runCounter
+	}
+
+	// NOTE: The end a promised cycle owes its number where it will never run.
+	// Nothing ran, so there is nothing to report — but a client that opened a
+	// run under the number it was answered with waits on it until something
+	// ends it, and every other cycle's end names a different number.
+	function endPromise(run: number): void {
+		options.notify({
+			version: TEST_RUN_VERSION,
+			run,
+			kind: "end",
+			reason: "request",
+			files: [],
+			ids: [],
+			events: [],
+			sites: [],
+			counts: { passed: 0, failed: 0, skipped: 0, deselected: 0 },
+			duration: 0,
+			compiled: true,
+			coverage: emptyCoverage,
+		})
+	}
+
 	function start(
 		entries: Array<string>,
 		reason: TestRunNotification["reason"],
 		ids: Array<string>,
 		update = false,
+		// NOTE: The number this cycle was already promised, where it is the one
+		// a deferred request was answered with. Null everywhere else, which is
+		// every cycle nobody is waiting on by number.
+		reserved: number | null = null,
 	): number | null {
 		if (disposed || entries.length === 0) {
 			return null
@@ -538,13 +582,22 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 
 			pending.update ||= update
 			pending.requested ||= reason === "request"
+			// NOTE: And the number of THAT cycle is what this is answered with,
+			// rather than the number of the run it landed behind. The number is
+			// the whole of what ties a gesture to what arrives — a Test
+			// Explorer registers the run it opened under it, and the Server
+			// says so in `RUN_TESTS_REQUEST` — so naming the cycle in flight
+			// hands a reader who clicked Run above one test the batch of a
+			// cycle nobody asked for: the whole file, narrowed to nothing,
+			// while the tests they named arrive under a number that has nobody
+			// listening on it. Taken once per pending cycle, and carried across
+			// a window that defers again.
+			pending.run ??= numberFor(reserved)
 
-			return inFlight.run
+			return pending.run
 		}
 
-		runCounter += 1
-
-		let run = runCounter
+		let run = numberFor(reserved)
 		// NOTE: One read of the open buffers, shared by the request the Worker
 		// compiles and the attribution built from what it answers — so the text
 		// an entry's table is measured in is exactly the text it ran.
@@ -702,12 +755,24 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 					? [...waiting.ids]
 					: null
 
-			start(
+			// NOTE: As the number whoever was deferred was already answered
+			// with. This cycle IS that request, so it carries the number that
+			// request is being waited for under.
+			let started = start(
 				entries,
 				waiting.requested ? "request" : "change",
 				asked ?? ids ?? [],
 				waiting.update,
+				waiting.run,
 			)
+
+			// NOTE: A promised cycle with nothing left to run still owes its
+			// number an end — a file deleted, or its `tests` block taken out,
+			// while the run in front of it finished leaves the cycle with no
+			// entries at all.
+			if (started === null && waiting.requested && waiting.run !== null) {
+				endPromise(waiting.run)
+			}
 		}, debounce)
 	}
 
@@ -851,6 +916,14 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			enabled = next
 
 			if (!enabled) {
+				// NOTE: Including the cycle a deferred request was promised.
+				// A session switched off runs nothing by itself and nothing it
+				// was asked for either, so the number somebody was told to wait
+				// for is closed here or it is never spoken of again.
+				if (pending.requested && pending.run !== null) {
+					endPromise(pending.run)
+				}
+
 				dirty.clear()
 				pending = freshPending()
 
