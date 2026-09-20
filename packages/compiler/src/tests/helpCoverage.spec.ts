@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import * as path from "node:path"
 
 import type { common } from "@essence-lang/interfaces"
@@ -14,8 +14,8 @@ import { COMPILE_CHECKED_HELP_CODES } from "./followedHelps"
 //
 // Prose is not parsed to find them: what is read is the reference page, which is
 // captured from the real Compiler and is the one place every code's real text is
-// written down. A code whose entry there shows a `Write '…'` Help is a code that
-// owes a compiled test.
+// written down. A code whose entry there shows a Help with a spelling in it is a
+// code that owes a compiled test.
 //
 // The registry is `COMPILE_CHECKED_HELP_CODES`, maintained by the specs that do
 // the compiling. This holds it to the page both ways, and prints what is left.
@@ -24,6 +24,23 @@ const DOCS = path.join(
 	import.meta.dir,
 	"../../../website/src/content/docs/reference/diagnostics.mdx",
 )
+
+// NOTE: What a Help that SPELLS something looks like on the page. It used to be
+// the word "Write" followed by a quote, which is one of the shapes a Help takes
+// and not the one most of them take: the audit's review counted 39 codes that
+// print code inside a Help this could not see — "Add 'case Colour#Blue'", "Take
+// the payload apart instead: '#Rectangle({ width, height })'", "Compare instead:
+// 'body::is("…")'" — and every one of them is a promise about a spelling in
+// exactly the way `Write '…'` is.
+//
+// So: a quoted run that reads as CODE rather than as an English aside. Code is
+// what holds a separator, a bracket, a sigil, a path or a digit; a Help that
+// quotes a bare word ("Remove this 'Red'") is left out unless it says to write
+// it. The line between the two is not a sharp one, and it is drawn on the side
+// of catching too much — an entry on the printed list that turns out to be
+// prose costs a reader one look, and one that is missing costs them the promise.
+const SPELLS_SOMETHING =
+	/Help[ 0-9]*: .*(?:Write '|'[^']*(?:::|->|<-|[#(){}[\]=@.\\/]|[0-9])[^']*')/
 
 // NOTE: Read off the captured reports rather than off the prose around them —
 // a `### \`code\`` heading opens an entry, and every `Help:` line under it until
@@ -43,7 +60,7 @@ function codesPromisingASpelling(): Array<common.DiagnosticCode> {
 
 		if (
 			current !== null &&
-			/Help[ 0-9]*: .*Write '/.test(line) &&
+			SPELLS_SOMETHING.test(line) &&
 			!codes.includes(current)
 		) {
 			codes.push(current)
@@ -51,6 +68,38 @@ function codesPromisingASpelling(): Array<common.DiagnosticCode> {
 	}
 
 	return codes
+}
+
+// NOTE: The specs that compile what a Help spells — the ones importing
+// `compiles` from the shared harness. The registry is a list of codes and
+// nothing holds a list of codes to anything, so what is checked is that each
+// entry is WRITTEN DOWN in one of these: delete the spec that earned an entry
+// and the entry fails here rather than going on claiming a test that is gone.
+//
+// Registration at run time would say it better — the spec that compiles a Help
+// would record its code as it ran — but the suite runs one process per file, so
+// a registry filled in by `choices.spec.ts` is empty by the time this file reads
+// it. Reading the specs as text is what survives `--parallel`.
+function specsCompilingHelps(): Array<{
+	name: string
+	source: string
+}> {
+	return readdirSync(import.meta.dir)
+		.filter((name) => name.endsWith(".spec.ts"))
+		.sort()
+		.map((name) => ({
+			name,
+			source: readFileSync(path.join(import.meta.dir, name), "utf8"),
+		}))
+		.filter(({ source }) => {
+			let importing =
+				/import \{([\s\S]*?)\} from "\.\/followedHelps"/.exec(source)
+
+			return (
+				importing !== null &&
+				/\bcompiles\b/.test(importing[1] as string)
+			)
+		})
 }
 
 describe("Helps that spell something to write", () => {
@@ -71,6 +120,23 @@ describe("Helps that spell something to write", () => {
 		).toEqual([])
 	})
 
+	// NOTE: An entry whose code is written down in no spec that compiles a Help
+	// is an entry with nothing behind it — the registry would go on saying a
+	// Help is compiled somewhere after the spec that compiled it was deleted or
+	// renamed, which is the one thing a registry maintained by hand does on its
+	// own.
+	it("has every entry written down in a spec that compiles Helps", () => {
+		let specs = specsCompilingHelps()
+
+		expect(specs.map((spec) => spec.name).length).toBeGreaterThan(0)
+		expect(
+			COMPILE_CHECKED_HELP_CODES.filter(
+				(code) =>
+					!specs.some((spec) => spec.source.includes(`"${code}"`)),
+			),
+		).toEqual([])
+	})
+
 	// NOTE: Printed rather than failed, deliberately. The uncovered codes are
 	// work, not breakage: each is a Help that WORKS as far as anybody has
 	// checked and that nothing compiles, and turning the list red would only
@@ -85,7 +151,5 @@ describe("Helps that spell something to write", () => {
 				`TODO — Helps that spell an edit and are not compiled anywhere (${uncovered.length}):\n  ${uncovered.join("\n  ")}`,
 			)
 		}
-
-		expect(uncovered.length).toBeLessThanOrEqual(promising.length)
 	})
 })
