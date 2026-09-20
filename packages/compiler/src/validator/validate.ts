@@ -1257,14 +1257,17 @@ function validateFunctionInvocation(
 
 	// NOTE: An Argument the Enricher could not type is an Argument that fits
 	// nothing, so measuring the call against its Signature answers the hole
-	// rather than the call — and a hole in ONE Argument moves every Argument
-	// after it, so the whole call stands down rather than the position that
-	// carries it. The mistake has been reported where the Argument was written.
-	if (
-		node.arguments.some((argumentNode) =>
-			typeContainsError(argumentNode.value.type),
-		)
-	) {
+	// rather than the call — and a hole in a POSITIONAL Argument moves every
+	// Argument after it, so the whole call stands down rather than the position
+	// that carries it. The mistake has been reported where the Argument was
+	// written.
+	//
+	// NOTE: A LABELLED Argument can not move anything: it is matched by its
+	// label, so the Arguments around it line up whatever it came to. Where
+	// every hole is labelled, the rest of the call is still measured, and the
+	// second mistake in `f(first undeclared, second 99)` is reported in the same
+	// run as the first.
+	if (holesShiftTheCall(node.arguments)) {
 		return node
 	}
 
@@ -4195,6 +4198,21 @@ function matchCommittedArguments(
 	})
 
 	return seeded.type === "Match" ? seeded : matched
+}
+
+// NOTE: Whether an Argument the Enricher could not type stands where it moves
+// the ones around it — which is every POSITIONAL one. A labelled Argument is
+// matched by its label before its Type is looked at, so a hole under a label
+// leaves every other Argument exactly where it was and the call can still be
+// judged on them.
+function holesShiftTheCall(
+	argumentNodes: Array<common.typed.ArgumentNode>,
+): boolean {
+	return argumentNodes.some(
+		(argumentNode) =>
+			argumentNode.name === null &&
+			typeContainsError(argumentNode.value.type),
+	)
 }
 
 function reportArityMismatch(

@@ -449,6 +449,36 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["untyped-namespace-method@3", "unknown-name@9"],
 	},
+	// NOTE: A hole in a POSITIONAL Argument moves every Argument after it, so
+	// the rest of the call can not be measured — the `99` may be standing where
+	// the signature's first Parameter is. The call stands down whole.
+	{
+		name: "an undeclared positional Argument beside one of the wrong Type",
+		source: `implementation {
+	function pair(_ a: Integer, _ b: String) -> String {
+		<- b
+	}
+
+	constant result = pair(undeclared, 99)
+}
+`,
+		expected: ["unknown-name@6"],
+	},
+	// NOTE: And a hole under a LABEL moves nothing — a labelled Argument is
+	// matched by its label before its Type is looked at — so the second mistake
+	// is found in the same run as the first.
+	{
+		name: "an undeclared labelled Argument beside one of the wrong Type",
+		source: `implementation {
+	function pair(first a: Integer, second b: String) -> String {
+		<- b
+	}
+
+	constant result = pair(first undeclared, second 99)
+}
+`,
+		expected: ["unknown-name@6", "argument-type-mismatch@6"],
+	},
 	// NOTE: A static Property dropped out of a Namespace body, read with `.`
 	// below it, beside a member of the same Namespace that really is not there.
 	// The `::` side of the lookup has always stood down for a dropped member;
