@@ -775,6 +775,21 @@ describe("Property tests", () => {
 			expect(codesOf(sectionOf("n"))).toEqual(["property-parameters"])
 		})
 
+		// NOTE: `for any (Integer)` is a reader who wrote the TYPE and left the
+		// NAME out — the Parser reads the one word written as the name, so the
+		// Help would otherwise ask for 'for any (Integer: Integer)', naming a
+		// Parameter after a builtin. What the word resolves to is what says
+		// which of the two halves is missing.
+		it("asks for a name where the one word written is a Type", () => {
+			expect(analyse(sectionOf("Integer")).diagnostics[0]?.helps).toEqual(
+				["Write a name for it: 'for any (value: Integer)'."],
+			)
+
+			expect(analyse(sectionOf("n")).diagnostics[0]?.helps).toEqual([
+				"Write the Type: 'for any (n: Integer)'.",
+			])
+		})
+
 		it("refuses a Pattern where a name belongs", () => {
 			expect(codesOf(sectionOf("{ name }: { name: String }"))).toEqual([
 				"property-parameters",

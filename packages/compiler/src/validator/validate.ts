@@ -3463,6 +3463,34 @@ function checkNamespaceIsDeclared(
 	)
 }
 
+// NOTE: The `require` line that takes THIS value apart, or null where there is
+// nothing to take apart. The first Case of the Choice or Union, because any of
+// them is a shape the line could ask for and the first is the one a reader
+// reads first; a payload is bound only where the Case declares members, since
+// `#Empty(item)` is refused. The value is NAMED where a name is what was
+// written — the one spelling a reader reads straight back — and written as a
+// schematic otherwise, because this stage holds Nodes rather than the text they
+// were read from.
+function takingItApart(value: common.typed.ExpressionNode): string | null {
+	let members =
+		value.type.type === "UnionType"
+			? flattenUnionMembers(value.type)
+			: [value.type]
+	let first = members.find((member) => member.type === "Case")
+
+	if (first === undefined || first.type !== "Case") {
+		return null
+	}
+
+	let matcher =
+		Object.keys(first.members).length === 0
+			? `#${first.name}`
+			: `#${first.name}(…)`
+	let named = value.nodeType === "Identifier" ? value.content : "…"
+
+	return `Or take it apart instead: 'require ${matcher} = ${named}'.`
+}
+
 // NOTE: `expect EXPR` asks the same question an `if` does — is this true — and
 // is refused for the same reason where the answer is not a Boolean: Essence has
 // no truthiness, so there is nothing for an assertion over a Standing to mean.
@@ -3481,6 +3509,15 @@ function validateAssertion(
 		node.value.type.type !== "Boolean" &&
 		node.value.type.type !== "Error"
 	) {
+		// NOTE: Taking a value apart is an answer only where it HAS parts. An
+		// Integer has no Cases, and the Help sent a reader to
+		// `require #Value(item) = value` — which answers `unknown-case` about
+		// `#Value` and `unknown-name` about `item`, two reports for a line the
+		// Help itself wrote. So it is offered only for a Choice or a Union, and
+		// spelled with a Case the value really holds, binding a payload only
+		// where that Case carries one.
+		let taking = takingItApart(node.value)
+
 		reportError("An assertion has to be a Boolean", node.value.position, {
 			code: "expect-not-boolean",
 			labels: [
@@ -3494,7 +3531,7 @@ function validateAssertion(
 			],
 			helps: [
 				"Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.",
-				"Or take it apart instead: 'require #Value(item) = value'.",
+				...(taking === null ? [] : [taking]),
 			],
 		})
 	}

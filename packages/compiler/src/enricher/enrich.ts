@@ -10,6 +10,7 @@ import {
 	reportWarning,
 	secondary,
 } from "../diagnostics/index"
+import { patternBindings } from "../helpers/patterns"
 import {
 	closePendingRefinementCopies,
 	openPendingRefinementCopies,
@@ -1853,6 +1854,37 @@ function isStatementOfTests(
 	return node.nodeType !== "Test" && node.nodeType !== "Suite"
 }
 
+// NOTE: Whether the test's NAME reads the row the table binds. A table test's
+// name is what tells forty tests apart, so it usually does — and that is what
+// makes widening the row Parameter's Type a decision rather than a free edit:
+// the name prints the row, so the widened Type has to stay Printable.
+//
+// The row's name is the Parameter's internal name; a Pattern Parameter binds
+// several, and any of them being read is the row being read.
+function nameReadsTheRow(
+	name: parser.StringValueNode | parser.InterpolatedStringValueNode,
+	table: parser.TestTableNode,
+): boolean {
+	if (name.nodeType !== "InterpolatedStringValue") {
+		return false
+	}
+
+	let parameter = table.parameters[0]?.internalName
+	let bound =
+		parameter === undefined || parameter === null
+			? []
+			: parameter.nodeType === "Pattern"
+				? patternBindings(parameter).map((one) => one.name.content)
+				: [parameter.content]
+
+	return name.segments.some(
+		(segment) =>
+			segment.kind === "expression" &&
+			segment.expression.nodeType === "Identifier" &&
+			bound.includes(segment.expression.content),
+	)
+}
+
 const enrichTest = (
 	node: parser.TestNode,
 	scope: enricher.Scope,
@@ -1883,7 +1915,13 @@ const enrichTest = (
 	let table =
 		node.table === null
 			? null
-			: enrichTestTable(node.table, scope, bodyScope)
+			: enrichTestTable(
+					node.table,
+					scope,
+					bodyScope,
+					modifiers.skipped !== null,
+					nameReadsTheRow(node.name, node.table),
+				)
 	// NOTE: Beside the table for the same reason, and never with one: a table
 	// runs a row a reader wrote and a property runs a value the runner made up,
 	// so a test asking for both is asking for two runs of one body.

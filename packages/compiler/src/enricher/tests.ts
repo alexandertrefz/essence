@@ -281,6 +281,7 @@ function resolveSkipReason(
 			"skipped",
 			"one reason and nothing else",
 			"A test is skipped for one reason. Two of them is two skips.",
+			"Remove the extra reason — 'skipped' carries one.",
 		)
 	}
 
@@ -367,17 +368,23 @@ function refuseArguments(
 	}
 }
 
+// NOTE: `help` where the shared sentence would loop. "Write one reason and
+// nothing else here" is anchored on the SECOND reason — the reader is standing
+// on the thing that has to go, so writing a reason there writes a third — and
+// the only edit that answers it is a deletion. Every other caller wants a value
+// of a shape written where this one stands, which is what the template says.
 function refuseArgument(
 	argument: parser.TestModifierArgumentNode,
 	modifier: string,
 	wanted: string,
 	note: string,
+	help?: string,
 ): void {
 	reportError(`'${modifier}' takes ${wanted}`, argument.position, {
 		code: "malformed-modifier",
 		labels: [primary(argument.position, `this is not ${wanted}`)],
 		notes: [note],
-		helps: [`Write ${wanted} here.`],
+		helps: [help ?? `Write ${wanted} here.`],
 	})
 }
 

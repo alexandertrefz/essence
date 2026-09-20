@@ -788,6 +788,45 @@ function indexWriteRefusal(
 	}
 }
 
+// NOTE: The value the `require` line was written over, spelled back. A name and
+// a run of members read off one are the two shapes that ARE their own spelling,
+// and between them they are what almost every such line has on its right. This
+// stage holds Nodes rather than the text they were read from, so anything else
+// is written as the schematic it is — `…::is(3)` says "your value here" without
+// naming something the reader did not write.
+function writtenValueText(value: parser.ExpressionNode): string {
+	if (value.nodeType === "Identifier") {
+		return value.content
+	}
+
+	if (value.nodeType === "Lookup") {
+		let base = writtenValueText(value.base)
+
+		return base === "…" ? "…" : `${base}.${value.member.content}`
+	}
+
+	return "…"
+}
+
+// NOTE: The literal a `LiteralMatcher` holds, written the way it was read, for
+// the comparison `literal-in-require`'s Help spells. A Rational is the one that
+// is not its own spelling — `0.75` and `3/4` are one Node — so it is written as
+// the fraction, which is the printed form everywhere else here.
+function literalMatcherText(matcher: parser.LiteralMatcherNode): string {
+	let value = matcher.value
+
+	switch (value.nodeType) {
+		case "StringValue":
+			return JSON.stringify(value.value)
+		case "IntegerValue":
+			return value.value
+		case "RationalValue":
+			return `${value.numerator}/${value.denominator}`
+		case "BooleanValue":
+			return String(value.value)
+	}
+}
+
 // NOTE: An Expression that can only ever be a VALUE, which is what tells a
 // Dictionary's key from a Record's member name. Everything else — a name, a
 // member read, a call — may be either the base of an update or, for a name, a
@@ -4008,7 +4047,18 @@ class DescentParser {
 					notes: [
 						"'require MATCHER = EXPR' takes a value apart by its shape — a Case, a Type, a Pattern. A written value is not a shape: what it asks is whether the two are equal, and that is what 'Equatable::is' answers.",
 					],
-					helps: ["Compare instead: 'require x::is(3)'."],
+					// NOTE: Built from the two things that were WRITTEN, the
+					// way the Quick Fix on this very Diagnostic builds its
+					// edit — a hardcoded 'require x::is(3)' asked a reader
+					// looking at `require "Lions" = name` to find themselves in
+					// it. The value is spelled where it is a name, which is what
+					// a `require` line left of `=` almost always has on its
+					// right; anything else is a schematic and says so, since the
+					// Parser holds Nodes rather than the text they were read
+					// from.
+					helps: [
+						`Compare instead: '${writtenValueText(value)}::is(${literalMatcherText(matcher)})'.`,
+					],
 				},
 			)
 		}

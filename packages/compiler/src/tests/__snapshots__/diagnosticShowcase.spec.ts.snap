@@ -74,8 +74,7 @@ Error: An assertion has to be a Boolean
     │               ──┬──  
     │                 ╰──── this is a { team: String, points: Integer }
     │ 
-    │ Help 1: Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.
-    │ Help 2: Or take it apart instead: 'require #Value(item) = value'.
+    │ Help: Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.
     │ 
     │ Note: Essence has no truthiness — an assertion is a Boolean Expression, and the standard library's own Methods are the vocabulary it is written in.
 ────╯
@@ -88,8 +87,7 @@ Error: An assertion has to be a Boolean
     │                ─────┬────  
     │                     ╰────── this is a String
     │ 
-    │ Help 1: Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.
-    │ Help 2: Or take it apart instead: 'require #Value(item) = value'.
+    │ Help: Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.
     │ 
     │ Note: Essence has no truthiness — an assertion is a Boolean Expression, and the standard library's own Methods are the vocabulary it is written in.
 ────╯
@@ -3024,7 +3022,7 @@ Error: This row does not fit the row Parameter
     │                              ──┬──  
     │                                ╰──── this is a String
     │ 
-    │ Help: Write a row of Type Integer, or widen the row Parameter's Type to one this row is a value of.
+    │ Help: Write a row of Type Integer, or widen the row Parameter's Type to one this row is a value of — a widened Type has to stay Printable, since this test's name interpolates the row.
     │ 
     │ Note: The row Parameter is declared as Integer, and that is the Type the body — and an interpolated name — reads every row under.
 ────╯
@@ -3037,7 +3035,8 @@ Error: Colour#Red can not be recorded as a snapshot
     │               ─────┬────  
     │                    ╰────── this is Colour#Red, which is not Printable
     │ 
-    │ Help: Render it yourself and snapshot the String, or take it apart and snapshot each Case.
+    │ Help 1: Declare a 'Printable' conformance for 'Colour' and annotate the value at it — a bare Case binds the Case, not the Choice.
+    │ Help 2: Or snapshot a String you build yourself.
     │ 
     │ Note 1: A snapshot records what a value LOOKS like, which is what 'Printable::toString' answers — so a value with no such answer has nothing to record.
     │ Note 2: Colour#Red does not conform to 'Printable'.
@@ -3257,7 +3256,7 @@ Error: A written value has no parts to name
     │                          │       
     │                          ╰─────── the value it asks about
     │ 
-    │ Help: Compare instead: 'require x::is(3)'.
+    │ Help: Compare instead: 'lions.points::is(3)'.
     │ 
     │ Note: 'require MATCHER = EXPR' takes a value apart by its shape — a Case, a Type, a Pattern. A written value is not a shape: what it asks is whether the two are equal, and that is what 'Equatable::is' answers.
 ────╯

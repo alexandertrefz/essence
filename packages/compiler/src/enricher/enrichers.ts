@@ -4452,6 +4452,16 @@ export function enrichTestTable(
 	node: parser.TestTableNode,
 	scope: enricher.Scope,
 	bodyScope: enricher.Scope,
+	// NOTE: Whether the test carrying this table is SKIPPED, which is the one
+	// thing about the enclosing item a table needs to know: an empty table is
+	// reported because nothing would say the test had stopped running, and a
+	// `skipped "…"` is exactly the reader saying it out loud.
+	skipped: boolean = false,
+	// NOTE: Whether the test's NAME reads a row, which decides one clause of
+	// the row mismatch Help below: a widened row Parameter has to stay Printable
+	// where the name interpolates it, and a reader who widens without knowing
+	// that lands on `interpolation-not-printable` pointing at the name.
+	nameReadsTheRow: boolean = false,
 ): common.typed.TestTableNode {
 	let parameter = node.parameters[0]
 
@@ -4486,7 +4496,13 @@ export function enrichTestTable(
 		parameter?.type === undefined || parameter.type === null
 			? null
 			: resolveType(parameter.type, scope)
-	let rows = enrichTableRows(node.value, declaredType, scope)
+	let rows = enrichTableRows(
+		node.value,
+		declaredType,
+		scope,
+		skipped,
+		nameReadsTheRow,
+	)
 	let type = declaredType ?? listItemTypeOf(rows.map((row) => row.type))
 	let pattern =
 		parameter?.internalName?.nodeType === "Pattern"
@@ -4546,13 +4562,21 @@ function enrichTableRows(
 	node: parser.ExpressionNode,
 	declaredType: common.Type | null,
 	scope: enricher.Scope,
+	skipped: boolean,
+	nameReadsTheRow: boolean,
 ): Array<common.typed.ExpressionNode> {
 	if (node.nodeType === "ListValue") {
 		// NOTE: No rows is no tests, and a test that never exists is exactly
 		// what `skipped "reason"` demands a reason for. Nothing in a report
 		// says it: no line, no count, no failure — the test is simply not
 		// there, and a reader who wrote it believes it ran.
-		if (node.values.length === 0) {
+		//
+		// NOTE: Which is why a test that IS skipped is left alone. The Help
+		// below asks for a `skipped "…"`, and a reader who wrote one had it
+		// reported right back at them — the modifier was never read here. A
+		// skipped test running no rows is a reader who said so, and the reason
+		// they wrote is the line a report does carry.
+		if (node.values.length === 0 && !skipped) {
 			reportError(
 				"A table test with no rows in it runs no test",
 				node.position,
@@ -4593,7 +4617,7 @@ function enrichTableRows(
 				!typeContainsError(row.type) &&
 				!fitsWritten(declaredType, row)
 			) {
-				reportRowTypeMismatch(row, declaredType)
+				reportRowTypeMismatch(row, declaredType, nameReadsTheRow)
 			}
 
 			return row
@@ -4624,6 +4648,7 @@ function enrichTableRows(
 function reportRowTypeMismatch(
 	row: common.typed.ExpressionNode,
 	declaredType: common.Type,
+	nameReadsTheRow: boolean,
 ): void {
 	let record = recordMismatchEvidence(declaredType, row.type, row, {
 		subject: "the row Parameter's Type",
@@ -4652,7 +4677,11 @@ function reportRowTypeMismatch(
 				...record.helps,
 				`Write a row of Type ${describeType(
 					declaredType,
-				)}, or widen the row Parameter's Type to one this row is a value of.`,
+				)}, or widen the row Parameter's Type to one this row is a value of${
+					nameReadsTheRow
+						? " — a widened Type has to stay Printable, since this test's name interpolates the row"
+						: ""
+				}.`,
 			],
 			data: record.data,
 		},
@@ -4751,11 +4780,20 @@ function enrichTestProperty(
 	)
 
 	if (parameter.type === null) {
+		// NOTE: `for any (Integer)` is a reader who wrote the TYPE and left the
+		// name out — the Parser reads the one word written as the name, so the
+		// Help would otherwise ask for 'for any (Integer: Integer)', which names
+		// a Parameter after a builtin. What the name resolves to is what says
+		// which of the two halves is missing.
+		let wroteAType = findTypeInScope(name, scope) !== null
+
 		reportPropertyParameters(
 			parameter.position,
 			"A generated Parameter has to write its Type",
 			"nothing here says what to generate",
-			`Write the Type: 'for any (${name}: Integer)'.`,
+			wroteAType
+				? `Write a name for it: 'for any (value: ${name})'.`
+				: `Write the Type: 'for any (${name}: Integer)'.`,
 			"The Type is the whole of what a generator is derived from.",
 		)
 
@@ -5828,6 +5866,19 @@ function refuseUngeneratableType(
 // of its members. It is built as the interpolation an author could have written
 // (`"{value}"`), which is the one lowering of `toString` the whole Compiler
 // already has, witness and all.
+// NOTE: A value that is a Function, under every spelling the Type union has for
+// one. It is the one shape `snapshot-not-printable` can not offer a conformance
+// to: a Namespace targets a Type a reader can NAME, and none of these is one.
+function isFunctionType(type: common.Type): boolean {
+	return (
+		type.type === "Function" ||
+		type.type === "SimpleMethod" ||
+		type.type === "StaticMethod" ||
+		type.type === "OverloadedMethod" ||
+		type.type === "OverloadedStaticMethod"
+	)
+}
+
 function enrichSnapshotValue(
 	node: parser.ExpressionNode,
 	scope: enricher.Scope,
@@ -5856,9 +5907,44 @@ function enrichSnapshotValue(
 					"A snapshot records what a value LOOKS like, which is what 'Printable::toString' answers — so a value with no such answer has nothing to record.",
 					...solved.chain,
 				],
-				helps: [
-					"Render it yourself and snapshot the String, or take it apart and snapshot each Case.",
-				],
+				// NOTE: The conformance, first, because it is the answer that
+				// works for every value. The two alternatives that stood here
+				// alone were unfollowable for anything with no Cases — a
+				// Function value has none to take apart, and "render it
+				// yourself" is the whole of what declaring the conformance is,
+				// written where nothing else can reach it.
+				// NOTE: The conformance first, because it is the answer that
+				// works for every value that can carry one — and the one the
+				// docs have always given. The two alternatives that stood here
+				// alone were unfollowable for a value with no Cases: "take it
+				// apart and snapshot each Case" has nothing to take apart, and
+				// "render it yourself" is what declaring the conformance IS,
+				// written where nothing else can reach it.
+				//
+				// NOTE: Withheld for a Function value, which is the one shape
+				// that can carry no conformance — `namespace … for (_: Integer)
+				// -> Integer` does not parse, and never will, because a
+				// Namespace targets a Type a reader can name.
+				//
+				// NOTE: And a bare Case gets the Choice's name rather than its
+				// own, for the reason `unsatisfied-bound` gives at the same
+				// fork: `namespace X for Colour#Red` does not parse, because a
+				// Namespace targets a Type and one Case of a Choice is not one.
+				// Both edits are named, since the value has to be SEEN as the
+				// Choice before a conformance to it can answer.
+				helps: isFunctionType(expression.type)
+					? [
+							"Snapshot a String you build yourself — a Function value has no Type a Namespace can be declared for.",
+						]
+					: expression.type.type === "Case"
+						? [
+								`Declare a 'Printable' conformance for '${displayChoiceName(expression.type.choice)}' and annotate the value at it — a bare Case binds the Case, not the Choice.`,
+								"Or snapshot a String you build yourself.",
+							]
+						: [
+								`Declare a 'Printable' conformance for it — 'namespace … for ${describeType(expression.type)} is Printable { … }'.`,
+								"Or snapshot a String you build yourself.",
+							],
 			},
 		)
 	}

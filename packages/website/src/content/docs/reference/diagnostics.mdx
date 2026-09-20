@@ -4889,8 +4889,7 @@ Error: An assertion has to be a Boolean
    │               ────┬────  
    │                   ╰────── this is an Integer
    │ 
-   │ Help 1: Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.
-   │ Help 2: Or take it apart instead: 'require #Value(item) = value'.
+   │ Help: Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.
    │ 
    │ Note: Essence has no truthiness — an assertion is a Boolean Expression, and the standard library's own Methods are the vocabulary it is written in.
 ───╯
@@ -5006,7 +5005,7 @@ Error: A written value has no parts to name
    │                       │    
    │                       ╰──── the value it asks about
    │ 
-   │ Help: Compare instead: 'require x::is(3)'.
+   │ Help: Compare instead: 'points::is(3)'.
    │ 
    │ Note: 'require MATCHER = EXPR' takes a value apart by its shape — a Case, a Type, a Pattern. A written value is not a shape: what it asks is whether the two are equal, and that is what 'Equatable::is' answers.
 ───╯
@@ -5350,7 +5349,7 @@ Error: A table test with no rows in it runs no test
 
 </div>
 
-Write the rows. If there are none for now, mark the test `skipped` with the reason.
+Write the rows. If there are none for now, mark the test `skipped` with the reason — `test "doubles" skipped "no rows yet" across [] (number: Integer) { … }` is accepted, and the skip is what the report carries instead.
 
 Taught on: [Tests › Table tests](/docs/language/tests#table-tests)
 
@@ -5398,7 +5397,7 @@ Error: This row does not fit the row Parameter
    │                                        ──┬──  
    │                                          ╰──── this is a String
    │ 
-   │ Help: Write a row of Type Integer, or widen the row Parameter's Type to one this row is a value of.
+   │ Help: Write a row of Type Integer, or widen the row Parameter's Type to one this row is a value of — a widened Type has to stay Printable, since this test's name interpolates the row.
    │ 
    │ Note: The row Parameter is declared as Integer, and that is the Type the body — and an interpolated name — reads every row under.
 ───╯
@@ -5425,7 +5424,8 @@ Error: Colour can not be recorded as a snapshot
     │               ────┬────  
     │                   ╰────── this is Colour, which is not Printable
     │ 
-    │ Help: Render it yourself and snapshot the String, or take it apart and snapshot each Case.
+    │ Help 1: Declare a 'Printable' conformance for it — 'namespace … for Colour is Printable { … }'.
+    │ Help 2: Or snapshot a String you build yourself.
     │ 
     │ Note 1: A snapshot records what a value LOOKS like, which is what 'Printable::toString' answers — so a value with no such answer has nothing to record.
     │ Note 2: Colour does not conform to 'Printable'.
@@ -5435,6 +5435,8 @@ Error: Colour can not be recorded as a snapshot
 </div>
 
 Declare the conformance, `namespace Colours for Colour is Printable {}`, or snapshot a string you build yourself.
+
+Two shapes are answered differently, because the conformance cannot be written for either. A **bare case** is not a type a namespace can target — `namespace X for Colour#Red` does not parse — so both edits are named: `Declare a 'Printable' conformance for 'Colour' and annotate the value at it — a bare Case binds the Case, not the Choice.` A **function value** has no such type at all, and gets the one answer that is left: `Snapshot a String you build yourself — a Function value has no Type a Namespace can be declared for.`
 
 Taught on: [Tests › Snapshots](/docs/language/tests#snapshots)
 
@@ -5489,6 +5491,8 @@ Error: A generated Parameter has to write its Type
 </div>
 
 Write a type for each parameter: `for any (a: Integer, b: Integer)`.
+
+Where the one word written *is* a type — `for any (Integer)` — the missing half is the name, and the Help asks for that instead: `Write a name for it: 'for any (value: Integer)'.`
 
 Taught on: [Tests › Property tests](/docs/language/tests#property-tests)
 

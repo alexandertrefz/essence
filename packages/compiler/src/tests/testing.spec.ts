@@ -858,8 +858,48 @@ describe("Tests Section", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("literal-in-require")
+			// NOTE: Built from what was WRITTEN — the name on the right and the
+			// literal on the left — the way the Quick Fix on this very
+			// Diagnostic builds its edit. The hardcoded 'require x::is(3)' it
+			// used to print asked a reader looking at `require "Lions" = name`
+			// to find themselves in it.
 			expect(diagnostics[0].helps).toEqual([
-				"Compare instead: 'require x::is(3)'.",
+				"Compare instead: 'first::is(3)'.",
+			])
+		})
+
+		it("should spell the literal a String Matcher wrote", () => {
+			let { diagnostics } = parse(
+				`implementation {}
+
+				tests {
+					test "reads" {
+						require "Lions" = name
+					}
+				}`,
+			)
+
+			expect(diagnostics[0].helps).toEqual([
+				`Compare instead: 'name::is("Lions")'.`,
+			])
+		})
+
+		// NOTE: And says so where the right-hand side is no name. The Parser
+		// holds Nodes rather than the text they were read from, so anything
+		// else is written as the schematic it is.
+		it("should write a schematic where the value is no name", () => {
+			let { diagnostics } = parse(
+				`implementation {}
+
+				tests {
+					test "reads" {
+						require 3 = scores::first()
+					}
+				}`,
+			)
+
+			expect(diagnostics[0].helps).toEqual([
+				"Compare instead: '…::is(3)'.",
 			])
 		})
 

@@ -428,6 +428,22 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["malformed-modifier"])
 		})
 
+		// NOTE: The shared template "Write one reason and nothing else here" is
+		// anchored on the SECOND reason — the reader stands on the thing that
+		// has to go, so writing a reason there writes a third. Only a deletion
+		// answers it, and the Help says so.
+		it("should ask for the extra reason to go", () => {
+			expect(
+				diagnosticsOf(
+					`implementation {}
+
+					tests {
+						test "one" skipped "a", "b" { expect true }
+					}`,
+				)[0]?.helps,
+			).toEqual(["Remove the extra reason — 'skipped' carries one."])
+		})
+
 		it("should refuse a tagged that names nothing", () => {
 			expect(
 				codesOf(
@@ -570,6 +586,28 @@ describe("Tests Section Semantics", () => {
 		})
 	})
 
+	// NOTE: The escape hatch the Help has always named, and which nothing read
+	// until now: `enrichTableRows` never looked at the Modifiers, so a reader who
+	// wrote the `skipped "…"` it asked for had the same report back.
+	describe("a table with no rows", () => {
+		let table = (modifiers: string) =>
+			`implementation {}
+
+			tests {
+				test "one"${modifiers} across [] (n: Integer) {
+					expect n::is(n)
+				}
+			}`
+
+		it("should be refused where the test is not skipped", () => {
+			expect(codesOf(table(""))).toEqual(["table-without-rows"])
+		})
+
+		it("should be allowed where the test says why", () => {
+			expect(codesOf(table(` skipped "no rows yet"`))).toEqual([])
+		})
+	})
+
 	describe("expect and require", () => {
 		it("should demand a Boolean", () => {
 			expect(
@@ -583,6 +621,66 @@ describe("Tests Section Semantics", () => {
 					}`,
 				),
 			).toEqual(["expect-not-boolean"])
+		})
+
+		// NOTE: Taking a value apart is an answer only where it HAS parts. The
+		// clause used to be unconditional and hardcoded, so an Integer was sent
+		// to `require #Value(item) = value` — which answers `unknown-case` about
+		// `#Value` and `unknown-name` about `item`, two reports for a line the
+		// Help itself wrote.
+		it("should offer taking apart only what has Cases", () => {
+			expect(
+				diagnosticsOf(
+					`implementation {}
+
+					tests {
+						test "one" {
+							expect 1
+						}
+					}`,
+				)[0]?.helps,
+			).toEqual([
+				"Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.",
+			])
+		})
+
+		// NOTE: And spells a Case the value really holds, binding a payload only
+		// where that Case carries one — beside the NAME the assertion was
+		// written over, which is the spelling the reader reads straight back.
+		it("should spell a Case the asserted value has", () => {
+			let helps = (source: string) =>
+				diagnosticsOf(
+					`implementation {
+						choice Outcome {
+							Won,
+							Lost { by: Integer },
+						}
+
+						function play() -> Outcome {
+							<- #Won
+						}
+					}
+
+					tests {
+						test "one" {
+							${source}
+						}
+					}`,
+				)[0]?.helps
+
+			expect(
+				helps("constant result = play()\n\t\t\t\t\t\t\texpect result"),
+			).toEqual([
+				"Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.",
+				"Or take it apart instead: 'require #Won = result'.",
+			])
+
+			// NOTE: No name was written, so the value is a schematic rather than
+			// a plausible one this stage would have had to invent.
+			expect(helps("expect play()")).toEqual([
+				"Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.",
+				"Or take it apart instead: 'require #Won = …'.",
+			])
 		})
 
 		it("should demand a Boolean of a require as well", () => {
