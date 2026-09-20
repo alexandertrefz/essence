@@ -413,10 +413,16 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				return
 			}
 
+			// NOTE: The NAME's Type, for the keyword as well as for the name —
+			// one declaration says one thing. The Statement's own Type is the
+			// shape a Record Alias stands for, and the binding's is the Alias:
+			// a reader hovering `constant` was told `t: { name: String, code:
+			// String }` and, one character to the right, `t: Team`. The name's
+			// is the one the rest of the file reads the Constant at.
 			consider(
 				state,
 				node.headPosition,
-				node.type,
+				node.name.type,
 				node.name.content,
 				node.documentation,
 			)

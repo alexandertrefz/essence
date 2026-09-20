@@ -723,6 +723,24 @@ describe("Hover of Type annotations", () => {
 // NOTE: All of these had a Position in the typed AST already — Hover simply
 // never offered them as candidates, so the enclosing declaration answered.
 describe("Hover of declaration parts", () => {
+	// NOTE: One declaration, one answer. The keyword and the name are two
+	// places to point at the same Constant, and they used to disagree about a
+	// Record Alias: the Statement carries the shape the Alias stands for and
+	// the binding carries the Alias, so `constant` said `{ name: String }` and
+	// `t`, one character along, said `Team`.
+	it("should answer the same on the keyword as on the name", () => {
+		let source = [
+			"implementation {",
+			"\ttype Team = { name: String }",
+			"",
+			'\tconstant t: Team = { name = "Rovers" }',
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 4, column: 3 })).toBe("t: Team")
+		expect(hover(source, { line: 4, column: 11 })).toBe("t: Team")
+	})
+
 	it("should describe a Type Parameter as it was declared", () => {
 		let source = [
 			"implementation {",
