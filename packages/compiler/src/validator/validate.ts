@@ -723,6 +723,16 @@ function isBoundFunctionType(type: common.Type): boolean {
 // answer there is the recovery rather than a bug. `boxes::sort()` beside a
 // Namespace that failed to conform resolved no witness, and the arity rail
 // called that a Compiler bug in a file whose real mistake was two lines up.
+//
+// NOTE: Which means they are quiet on EXACTLY the Programs this stage newly
+// walks. Before the Validator ran over a Program the stages in front of it had
+// reported on, `alreadyReported` was false for every Program it ever saw and
+// the rails watched all of them; now it is true for every broken one, and the
+// rails watch only the files that were clean to begin with. Nothing stands
+// behind them on a broken Program, and nothing is meant to: what does the
+// watching there is `analysisFuzz.spec`, which breaks real sources at hundreds
+// of sites and holds the whole walk to "never throws, never blames itself, and
+// never answers about a hole".
 function railsStandDown(): boolean {
 	return alreadyReported
 }

@@ -578,3 +578,43 @@ describe("a name nothing declares, in a Program that parsed", () => {
 		}
 	})
 })
+
+// NOTE: The mutant that found this, written down whole rather than left to a
+// sweep to rediscover. A Type Alias the file never declared leaves `Seat` an
+// Error, the Dictionary keyed by it never binds `List.of`'s `ItemType`, and the
+// bound the key position carries is checked against a Type Parameter still
+// wearing the name the freshening gave it for the span of that one call.
+//
+// Two things were wrong with the report. The reader was shown `ItemType57` —
+// only the separator is invisible — for a Parameter their file spells
+// `ItemType`. And the counter is process-wide, so the same file analysed twice
+// in one session named a different Parameter each time: a Diagnostic that is
+// not a function of the source it is about.
+describe("a bound checked against a Type Parameter mid-inference", () => {
+	let source = `implementation {
+	constant seats: List<Seat> = List.of(integersFrom 0, through 9)
+		::map((number) { <- { row = number, seat = 1 } })
+
+	constant noSeats: Dictionary<Seat, Integer> = [=]
+
+	constant taken: Dictionary<Seat, Integer> = seats::reduce(
+		startingWith noSeats,
+		(dictionary, seat) { <- dictionary::set(seat, to 1) },
+	)
+}
+`
+
+	it("names the Type Parameter the source wrote", () => {
+		expect(
+			analyseSource(source)
+				.diagnostics.filter(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+				.map((diagnostic) => diagnostic.message),
+		).toEqual(["Type Parameter 'ItemType' does not conform to 'Equatable'"])
+	})
+
+	it("says the same thing twice in one process", () => {
+		expect(fingerprints(source)).toEqual(fingerprints(source))
+	})
+})
