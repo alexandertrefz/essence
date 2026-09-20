@@ -22,6 +22,7 @@ import {
 	countOf,
 	describeType,
 	displayChoiceName,
+	displayGenericName,
 	recordMismatchEvidence,
 	undecidedSlotEvidence,
 	unwaitedWorkReport,
@@ -4592,7 +4593,7 @@ export function solveConformance(
 		return {
 			ok: false,
 			chain: [
-				`Type Parameter '${binding.name}' does not conform to '${protocolName}'.`,
+				`Type Parameter '${displayGenericName(binding.name)}' does not conform to '${protocolName}'.`,
 			],
 		}
 	}
@@ -5248,14 +5249,30 @@ export function resolveConformances(
 					},
 				})
 			} else {
+				// NOTE: Under the name the SOURCE wrote. A callee's Generics
+				// are alpha-renamed for the span of one invocation — `ItemType`
+				// becomes `ItemType`, a zero-width space and a counter — and a
+				// Parameter that never bound is still carrying the fresh name
+				// when it arrives here. Only the separator is invisible, so the
+				// report read `Type Parameter 'ItemType57'`; and the counter is
+				// process-wide, so the same file analysed twice in one process
+				// named a different Parameter each time. See
+				// `displayGenericName`.
+				//
+				// NOTE: The same name is what the rest of the report is built
+				// from. `typeParameterBoundReport` looks the Parameter up in
+				// Scope, where a fresh name is not, and the Quick Fix behind
+				// `data` edits the DECLARATION — which is written under the name
+				// the source wrote and under no other.
+				let shown = displayGenericName(binding.name)
 				let bound = typeParameterBoundReport(
-					binding.name,
+					shown,
 					generic.constraint,
 					scope,
 				)
 
 				reportError(
-					`Type Parameter '${binding.name}' does not conform to '${generic.constraint}'`,
+					`Type Parameter '${shown}' does not conform to '${generic.constraint}'`,
 					position,
 					{
 						code: "unsatisfied-bound",
@@ -5266,7 +5283,7 @@ export function resolveConformances(
 							),
 						],
 						notes: [
-							`'${binding.name}' carries no '${generic.constraint}' bound of its own, so it can not satisfy one.`,
+							`'${shown}' carries no '${generic.constraint}' bound of its own, so it can not satisfy one.`,
 							...bound.notes,
 						],
 						helps: bound.helps,
@@ -5281,7 +5298,7 @@ export function resolveConformances(
 									data: {
 										kind: "required-protocol" as const,
 										protocol: generic.constraint,
-										parameter: binding.name,
+										parameter: shown,
 									},
 								}
 							: {}),
