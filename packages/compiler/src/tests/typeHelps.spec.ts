@@ -155,6 +155,26 @@ describe("A Type Parameter nothing bound", () => {
 		).toBe(true)
 	})
 
+	// NOTE: And a literal in the call is not on its own a reason to name one:
+	// this signature writes `B` in the callee's OWN answer Type and nowhere in
+	// the step's, so the literal's missing `-> Type` has nothing to do with `B`
+	// and a reader who wrote one in got the identical code and the identical
+	// report back. The name has to be one the literal ANSWERS.
+	it("keeps the general pair for a name the literal does not answer", () => {
+		let elsewhere = `implementation {
+		function make<infer A, infer B>(_ step: (_ n: Integer) -> A) -> Dictionary<String, B> {
+			<- [=]
+		}
+
+		constant made = make((n) { <- n })
+	}`
+
+		expect(helpsOfCode(elsewhere, "uninferable-type-parameter")).toEqual([
+			"Give the Type Parameter a place among the Parameters, so that an Argument binds it.",
+			"Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.",
+		])
+	})
+
 	// NOTE: And the pair it used to print stands where it is TRUE — a signature
 	// naming a Type Parameter only in its answer Type is unbindable from any
 	// call, and there the two ends really are the reader's to hold.

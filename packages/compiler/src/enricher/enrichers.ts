@@ -24,6 +24,7 @@ import {
 	describeSignature,
 	describeType,
 	displayChoiceName,
+	displayGenericName,
 	recordMismatchEvidence,
 	undecidedSlotAnnotation,
 	undecidedSlotEvidence,
@@ -12112,7 +12113,32 @@ function reportUnboundGenerics(
 		return
 	}
 
+	// NOTE: What the literal's ANSWER Type is asked to be — the return Type of
+	// the Parameter Type it was matched against, `Step<State, Answer>` for
+	// `loop`'s step. It is what decides which of the unbound names the literal's
+	// missing `-> Type` would actually bind: a signature can write a Type
+	// Parameter somewhere else entirely, and telling that reader to write the
+	// literal's return Type leaves them looking at the identical code and the
+	// identical report.
+	let literalAnswers =
+		literal === null
+			? null
+			: (recordedContextualFunctionType(literal.value)?.expectedType
+					?.returnType ?? null)
+
+	// NOTE: By the names as they are SHOWN. Inference alpha-renames a callee's
+	// Generics for the span of one call — `Answer` is `Answer` and a counter
+	// behind an invisible separator inside the Types — and the report spells the
+	// name the signature wrote.
+	let answeredNames = new Set(
+		[...genericNamesMentioned(literalAnswers ?? { type: "Unknown" })].map(
+			displayGenericName,
+		),
+	)
+
 	for (let name of unboundGenerics) {
+		let boundByTheLiteral = answeredNames.has(displayGenericName(name))
+
 		reportError(
 			`Type Parameter '${name}' could not be inferred`,
 			position,
@@ -12134,22 +12160,30 @@ function reportUnboundGenerics(
 				// from anywhere. So: the two ends a reader can actually hold.
 				//
 				// NOTE: Neither end is the reader's to hold where the call
-				// passes a Function literal that wrote no `-> Type`. The
+				// passes a Function literal that wrote no `-> Type` AND this
+				// name is what the literal's answer Type would bind. The
 				// Parameter has its place among the Parameters already —
 				// `Result::andThen` writes `Other` in the step's own answer
 				// Type — and the signature it has its place in belongs to the
 				// standard library, which is not a file the reader edits. What
 				// IS theirs is the annotation the literal left off, and it is
 				// the only thing that binds the Parameter.
-				helps:
-					literal === null
-						? [
-								"Give the Type Parameter a place among the Parameters, so that an Argument binds it.",
-								"Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.",
-							]
-						: [
-								`Write the Function literal's return Type — '-> Type' after its Parameter list — which is what binds '${name}'.`,
-							],
+				//
+				// NOTE: Read off the literal's expected answer Type rather than
+				// off the presence of a literal, because a signature is free to
+				// write a Type Parameter the literal never mentions —
+				// `make<infer A, infer B>(_ step: (_ n: Integer) -> A) ->
+				// Dictionary<String, B>` has nothing whatever to say about `B`
+				// in the literal, and a reader who wrote the `-> Type` it asked
+				// for got the same report back.
+				helps: boundByTheLiteral
+					? [
+							`Write the Function literal's return Type — '-> Type' after its Parameter list — which is what binds '${name}'.`,
+						]
+					: [
+							"Give the Type Parameter a place among the Parameters, so that an Argument binds it.",
+							"Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.",
+						],
 			},
 		)
 	}
