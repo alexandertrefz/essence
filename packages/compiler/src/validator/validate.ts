@@ -1315,7 +1315,15 @@ function validateIdentifier(
 function matchIsJudgeable(node: common.typed.MatchNode): boolean {
 	return (
 		!typeContainsError(node.value.type) &&
-		!node.handlers.some((handler) => typeContainsError(handler.matcher)) &&
+		// NOTE: The RUNTIME Matcher, which is the Matcher with the Handler's
+		// payload requirements grafted onto it — that is the Type every verdict
+		// below is computed from, and a requirement naming a member nothing
+		// declares leaves its hole there rather than in the Matcher itself.
+		// `case #Going({ missing as … })` really can never match, and saying so
+		// answers the hole one column over from the report that explains it.
+		!node.handlers.some((handler) =>
+			typeContainsError(runtimeMatcherOf(handler)),
+		) &&
 		!partiallyRead(node.position)
 	)
 }
@@ -3251,11 +3259,15 @@ function validateReturnStatement(
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.ReturnStatementNode {
 	if (currentFunctionContext === null) {
-		// NOTE: Silent where the Parser did not read the line whole — see
-		// `partiallyRead`. A `function` head the recovery dropped leaves its
-		// body's `<-` standing at the top level, and saying so names the one
-		// thing about those lines that is not wrong.
-		if (!partiallyRead(node.position)) {
+		// NOTE: Silent wherever the Parser abandoned ANYTHING, which is the one
+		// check here that asks about the whole file rather than about its own
+		// lines. A `<-` stands outside a Function only because the head that
+		// opened one is missing — `function f() -> Integer` without its `{`
+		// drops the head and leaves the body where the top level is — and the
+		// head is dropped a LINE ABOVE the `<-` it orphans, so asking about the
+		// Statement's own span answers no. There is nothing else a dropped
+		// Statement could be, and the syntax error already says where it was.
+		if (abandonedLines.size === 0) {
 			reportError("There is nothing here to return from", node.position, {
 				code: "top-level-return",
 				labels: [

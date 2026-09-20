@@ -344,6 +344,43 @@ const declarationKeywordTokenTypes = new Set([
 // collected from the body's own level and no deeper — a `NAME(` one brace
 // further in is a CALL the body makes, and a name a body calls is a name this
 // has no business answering for.
+// NOTE: A Parameter is declared by the name in front of its `:`, and a
+// Parameter list goes down with the head it is written on — so `text` in
+// `function exclaimed(_ text: NonEmptyString)` is as undeclared as `exclaimed`
+// itself once that head is dropped, and every line of the body reading it would
+// say so.
+//
+// Inside the brackets and outside every brace, which is where a Parameter's own
+// name is and where nothing else is: a `{ x: Integer }` written as a Parameter's
+// TYPE names members rather than bindings, and a `type Point = { x: Integer }`
+// has no brackets at all.
+function abandonedParameterNames(tokens: Array<Token>): Array<string> {
+	let names: Array<string> = []
+	let parens = 0
+	let braces = 0
+
+	for (let [step, token] of tokens.entries()) {
+		if (token.type === TokenType.SymbolLeftParen) {
+			parens++
+		} else if (token.type === TokenType.SymbolRightParen) {
+			parens--
+		} else if (token.type === TokenType.SymbolLeftBrace) {
+			braces++
+		} else if (token.type === TokenType.SymbolRightBrace) {
+			braces--
+		} else if (
+			parens > 0 &&
+			braces === 0 &&
+			isIdentifierToken(token) &&
+			tokens[step + 1]?.type === TokenType.SymbolColon
+		) {
+			names.push(token.value)
+		}
+	}
+
+	return names
+}
+
 function abandonedDeclarationNames(tokens: Array<Token>): Array<string> {
 	let index = 0
 
@@ -360,9 +397,11 @@ function abandonedDeclarationNames(tokens: Array<Token>): Array<string> {
 		return []
 	}
 
+	let parameterNames = abandonedParameterNames(tokens)
+
 	if (index === 0) {
 		return tokens[1]?.type === TokenType.SymbolLeftParen
-			? [name!.value]
+			? [name!.value, ...parameterNames]
 			: []
 	}
 
@@ -371,7 +410,7 @@ function abandonedDeclarationNames(tokens: Array<Token>): Array<string> {
 		opening === TokenType.KeywordNamespace ||
 		opening === TokenType.KeywordProtocol ||
 		opening === TokenType.KeywordChoice
-	let names = [name!.value]
+	let names = [name!.value, ...parameterNames]
 
 	if (!declaresMembers) {
 		return names

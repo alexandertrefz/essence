@@ -94,6 +94,31 @@ describe("Parser recovery", () => {
 		).not.toContain("multiplyWith")
 	})
 
+	// NOTE: A Parameter list goes down with the head it is written on, so its
+	// names are as undeclared as the Function's own — and the body reading them
+	// is exactly what survives a dropped head.
+	it("should record a dropped Function's Parameters", () => {
+		expect(
+			recoveryOf(`implementation {
+	function exclaimed(_ text: String) -> String
+		<- text::append("!")
+	}
+}`).declarations,
+		).toEqual(["exclaimed", "text"])
+	})
+
+	// NOTE: And nothing a Type names. A `{ x: Integer }` declares members
+	// rather than bindings, and a `type` Declaration has no Parameter list at
+	// all — recording either would silence a genuine mistake about a name
+	// spelled the same way somewhere else in the file.
+	it("should not record the members a dropped Type names", () => {
+		expect(
+			recoveryOf(`implementation {
+	type Point = { x: Integer y: Integer }
+}`).declarations,
+		).toEqual(["Point"])
+	})
+
 	it("should record a dropped Choice's Cases", () => {
 		expect(
 			recoveryOf(`implementation {
