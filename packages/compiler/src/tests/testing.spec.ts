@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { parseWithDiagnostics } from "../parser/index"
+import { compiles } from "./followedHelps"
 
 // NOTE: The `tests { … }` section and everything only written in it — the two
 // items, their Modifiers and the two assertions. This covers the GRAMMAR
@@ -881,6 +882,145 @@ describe("Tests Section", () => {
 
 			expect(diagnostics[0].helps).toEqual([
 				`Compare instead: 'name::is("Lions")'.`,
+			])
+		})
+
+		// NOTE: Read off the SOURCE, not built back up out of the Node. A
+		// String Node holds the value its escapes STAND FOR, so a Help written
+		// from one gives the reader back a String with the escapes taken out —
+		// and `\\{` is the escape that matters most, because the `{` it stands
+		// for opens an interpolation hole and the line it is written into no
+		// longer closes its String. Followed, this Help used to answer an
+		// `unclosed-string`.
+		it("should spell a String Matcher's escapes as they were written", () => {
+			let source = `implementation {
+				constant body = "a"
+			}
+
+			tests {
+				test "reads" {
+					require "\\{\\"a\\": 1\\}" = body
+				}
+			}`
+
+			expect(parse(source).diagnostics[0]?.helps).toEqual([
+				`Compare instead: 'body::is("\\{\\"a\\": 1\\}")'.`,
+			])
+			expect(
+				compiles(
+					`implementation {
+				constant body = "a"
+			}
+
+			tests {
+				test "reads" {
+					require body::is("\\{\\"a\\": 1\\}")
+				}
+			}`,
+					{ tests: true },
+				),
+			).toBe(true)
+		})
+
+		it("should spell a backslash the way it was written", () => {
+			let source = `implementation {
+				constant path = "a"
+			}
+
+			tests {
+				test "reads" {
+					require "a\\\\b" = path
+				}
+			}`
+
+			expect(parse(source).diagnostics[0]?.helps).toEqual([
+				`Compare instead: 'path::is("a\\\\b")'.`,
+			])
+			expect(
+				compiles(
+					`implementation {
+				constant path = "a"
+			}
+
+			tests {
+				test "reads" {
+					require path::is("a\\\\b")
+				}
+			}`,
+					{ tests: true },
+				),
+			).toBe(true)
+		})
+
+		// NOTE: A Rational has two spellings for one Node, and the one the
+		// reader wrote is the one they are handed back — `0.75` read as
+		// `75/100` was neither what they wrote nor the fraction in its lowest
+		// terms.
+		it("should spell a Rational Matcher the way it was written", () => {
+			let source = `implementation {
+				constant ratio = 0.5
+			}
+
+			tests {
+				test "reads" {
+					require 0.75 = ratio
+				}
+			}`
+
+			expect(parse(source).diagnostics[0]?.helps).toEqual([
+				"Compare instead: 'ratio::is(0.75)'.",
+			])
+			expect(
+				compiles(
+					`implementation {
+				constant ratio = 0.5
+			}
+
+			tests {
+				test "reads" {
+					require ratio::is(0.75)
+				}
+			}`,
+					{ tests: true },
+				),
+			).toBe(true)
+		})
+
+		it("should compile the comparison it spells for a Number", () => {
+			expect(
+				compiles(
+					`implementation {
+				constant first = 3
+			}
+
+			tests {
+				test "reads" {
+					require first::is(3)
+				}
+			}`,
+					{ tests: true },
+				),
+			).toBe(true)
+		})
+
+		// NOTE: A String written across two lines is text this can not print
+		// back — a Help is one line — so it is written as the schematic it is
+		// rather than as a spelling that would be neither the reader's nor
+		// valid.
+		it("should write a schematic where the literal spans lines", () => {
+			let { diagnostics } = parse(
+				`implementation {}
+
+				tests {
+					test "reads" {
+						require "line one
+line two" = body
+					}
+				}`,
+			)
+
+			expect(diagnostics[0]?.helps).toEqual([
+				"Compare instead: 'body::is(…)'.",
 			])
 		})
 

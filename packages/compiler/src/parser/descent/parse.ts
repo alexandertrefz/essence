@@ -901,23 +901,27 @@ function writtenValueText(value: parser.ExpressionNode): string {
 	return "…"
 }
 
-// NOTE: The literal a `LiteralMatcher` holds, written the way it was read, for
-// the comparison `literal-in-require`'s Help spells. A Rational is the one that
-// is not its own spelling — `0.75` and `3/4` are one Node — so it is written as
-// the fraction, which is the printed form everywhere else here.
-function literalMatcherText(matcher: parser.LiteralMatcherNode): string {
-	let value = matcher.value
-
-	switch (value.nodeType) {
-		case "StringValue":
-			return JSON.stringify(value.value)
-		case "IntegerValue":
-			return value.value
-		case "RationalValue":
-			return `${value.numerator}/${value.denominator}`
-		case "BooleanValue":
-			return String(value.value)
+// NOTE: The text a span was read from, which is what a Help that tells the
+// reader to WRITE something back has to be built out of. A Node is not the text
+// it came from: a String Node holds the value the escapes stand for, so writing
+// one back out escapes what the reader escaped and leaves what they did not —
+// `require "\{…\}" = body` came back as `body::is("{…}")`, where the `{` opens
+// an interpolation hole and the line no longer closes its String.
+//
+// Empty where the span reaches past the text, which nothing in a parsed Program
+// does; the caller answers that with a schematic rather than with a lie.
+function writtenText(lines: Array<string>, position: common.Position): string {
+	if (position.start.line !== position.end.line) {
+		return ""
 	}
+
+	let line = lines[position.start.line - 1]
+
+	if (line === undefined || position.end.column - 1 > line.length) {
+		return ""
+	}
+
+	return line.slice(position.start.column - 1, position.end.column - 1)
 }
 
 // NOTE: An Expression that can only ever be a VALUE, which is what tells a
@@ -1095,8 +1099,16 @@ class DescentParser {
 	// `parser.Recovery.headLines`.
 	private abandonedHeadLines = new Set<number>()
 
+	// NOTE: The source, kept as its lines, for the Helps that spell a piece of
+	// the reader's own text back at them. A Node is not the text it was read
+	// from — every escape a String holds is already gone by the time it is one —
+	// so a Help built out of Nodes tells the reader to write something they did
+	// not write. See `writtenText`.
+	private sourceLines: Array<string>
+
 	constructor(source: string, options: ParserOptions = {}) {
 		this.tokens = new TokenStream(source)
+		this.sourceLines = source.split("\n")
 		this.allowDeclarationsHeader = options.allowDeclarationsHeader ?? false
 		this.insideTestBody = options.insideTestBody ?? false
 
@@ -4331,7 +4343,10 @@ class DescentParser {
 					// Parser holds Nodes rather than the text they were read
 					// from.
 					helps: [
-						`Compare instead: '${writtenValueText(value)}::is(${literalMatcherText(matcher)})'.`,
+						`Compare instead: '${writtenValueText(value)}::is(${
+							writtenText(this.sourceLines, matcher.position) ||
+							"…"
+						})'.`,
 					],
 				},
 			)
