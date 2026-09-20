@@ -641,6 +641,15 @@ function coercedSettingValue(
 
 		let written = Number(node.value)
 
+		// NOTE: And only where reading it back gives the digits that were
+		// written. `Number` rounds past 2^53 — "99999999999999999999" comes
+		// back as 100000000000000000000 — and a Help that offers a number
+		// nobody wrote is a Help that changes what the file says, which is the
+		// one thing this exists to stop.
+		if (!Number.isSafeInteger(written)) {
+			return null
+		}
+
 		return written >= shape.atLeast ? String(written) : null
 	}
 
@@ -648,8 +657,14 @@ function coercedSettingValue(
 	// are names rather than paths in two of the three, and neither is checked
 	// here: what this answers is the SHAPE, and a name that is not a pass or a
 	// tag is the list reader's own report to make once the brackets are there.
+	// NOTE: An EMPTY String is not a list of one: `"skipTags": ""` says the
+	// author wants nothing skipped, and `[""]` is a tag no test can carry.
+	// Offered as the example instead, which is what says out loud that the
+	// brackets are the missing part.
 	if (shape.kind === "list") {
-		return node.type === "string" ? JSON.stringify([node.value]) : null
+		return node.type === "string" && node.value !== ""
+			? JSON.stringify([node.value])
+			: null
 	}
 
 	return null
@@ -1031,7 +1046,18 @@ function readTable(
 // character. Empty for the verdicts that say a character can not stand where it
 // does rather than that one is missing: what to write in its place is not
 // something the parser knows.
-function parseErrorHelp(error: ParseError): Array<string> {
+//
+// NOTE: And only for the FIRST refusal of the file. jsonc recovers generously,
+// and what it says after the first is about text it has already lost track of:
+// `{ test: 1 }` is one unquoted key, and its third error asks for "the value the
+// key holds" at the `}`, with the value written two characters to the left. One
+// mistake is one edit — the rest of the list is the recovery talking, and each
+// of those reports keeps its label and the Note that says what the file is.
+function parseErrorHelp(error: ParseError, first: boolean): Array<string> {
+	if (!first) {
+		return []
+	}
+
 	switch (printParseErrorCode(error.error)) {
 		case "PropertyNameExpected":
 			return ["Write a quoted key here."]
@@ -1157,7 +1183,7 @@ export function parseProjectConfiguration(
 				],
 				// NOTE: And the edit is the Token jsonc says it expected, at
 				// the offset the Label already points at.
-				parseErrorHelp(error),
+				parseErrorHelp(error, error === errors[0]),
 			)
 		}
 

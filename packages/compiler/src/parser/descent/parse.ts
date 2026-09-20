@@ -1041,6 +1041,15 @@ class DescentParser {
 	// directly in a suite are its setup, and there is no test there for an
 	// assertion to belong to.
 	protected insideTestBody = false
+	// NOTE: Whether the Expression being read stands in an ARGUMENT list, which
+	// is the one position that hands a Function literal its Types. A literal
+	// passed to a Method reads its Parameter and return Types off the Parameter
+	// it is passed to; the same literal written into a Declaration reads them
+	// off nothing, and a Help that spelled the untyped form there sent the
+	// reader to `uninferable-parameter-type`. Cleared inside every block, so a
+	// path written in a literal's BODY is judged by where that body stands
+	// rather than by the call around it.
+	protected insideArgumentList = false
 	// NOTE: The value an update being read is written ON — the `config` of
 	// `{ config with … }` — spelled, or null where it is not one a Help can
 	// print back. The key readers are several calls below the `with` and the
@@ -5341,8 +5350,17 @@ class DescentParser {
 				notes: [
 					"A path is the Function that reads those members off its Argument, so there is nothing here for a call to be made on.",
 				],
+				// NOTE: The untyped literal only where a literal READS its
+				// Types — an Argument list, and nowhere else. Written into a
+				// Declaration or a return, `(_ item) { … }` is refused for
+				// having no Parameter Type, which is a second report rather
+				// than an answer, so there the Types are spelled as the holes
+				// they are. Exactly what `path-without-context` says about the
+				// same literal in the same positions.
 				helps: [
-					`Write the Function literal instead: '${this.pathFunctionLiteral(steps, spelling)}'.`,
+					this.insideArgumentList
+						? `Write the Function literal instead: '${this.pathFunctionLiteral(steps, spelling)}'.`
+						: `Write the Function literal instead, with the Parameter and return Types a path leaves out — '${this.pathFunctionLiteral(steps, spelling, true)}', filling each '<Type>' in.`,
 				],
 			},
 		)
@@ -5359,6 +5377,9 @@ class DescentParser {
 	protected pathFunctionLiteral(
 		steps: Array<parser.IdentifierNode>,
 		spelling: string,
+		// NOTE: With the two Types written as holes, for a position that hands
+		// a literal neither of them.
+		typed = false,
 	): string {
 		let path = steps.map((step) => step.content).join(".")
 		let called = spelling === "::" ? this.tokens.peek(2) : null
@@ -5371,7 +5392,9 @@ class DescentParser {
 					? `::${called.value}${this.writtenCallArguments(3)}`
 					: "::…()"
 
-		return `(_ item) { <- item.${path}${call} }`
+		return typed
+			? `(_ item: <Type>) -> <Type> { <- item.${path}${call} }`
+			: `(_ item) { <- item.${path}${call} }`
 	}
 
 	// NOTE: The Argument list at `at`, where it is empty or holds ONE Token a
@@ -8397,6 +8420,18 @@ class DescentParser {
 	}
 
 	protected parseArgument(opening: Token): parser.ArgumentNode {
+		let outerInsideArgumentList = this.insideArgumentList
+
+		this.insideArgumentList = true
+
+		try {
+			return this.parseArgumentValue(opening)
+		} finally {
+			this.insideArgumentList = outerInsideArgumentList
+		}
+	}
+
+	protected parseArgumentValue(opening: Token): parser.ArgumentNode {
 		if (isIdentifierToken(this.tokens.peek())) {
 			if (this.argumentIsLabelled()) {
 				let name = this.parseIdentifier()
@@ -8739,6 +8774,13 @@ class DescentParser {
 	protected parseBlock(): BlockResult {
 		this.enterNesting()
 
+		// NOTE: A block is a position of its own — what a Statement inside one
+		// is written into says nothing about the Argument list the block itself
+		// may stand in.
+		let outerInsideArgumentList = this.insideArgumentList
+
+		this.insideArgumentList = false
+
 		try {
 			// NOTE: `(n: Integer) => n` — the one habit that is written where a
 			// BLOCK belongs, which is why it is answered here rather than beside
@@ -8772,6 +8814,7 @@ class DescentParser {
 			}
 		} finally {
 			this.nestingDepth--
+			this.insideArgumentList = outerInsideArgumentList
 		}
 	}
 

@@ -3155,6 +3155,25 @@ function enrichLookup(
 	}
 }
 
+// NOTE: The base of a Lookup as the reader wrote it — a name, or a run of
+// members read off one — and null for everything else. Exactly the two shapes
+// that ARE their own spelling, which is the same line `writtenValueText` draws
+// in the Parser and for the same reason: a Help prints the reader's own text or
+// it prints nothing.
+function spelledLookupBase(base: parser.ExpressionNode): string | null {
+	if (base.nodeType === "Identifier") {
+		return base.content
+	}
+
+	if (base.nodeType === "Lookup") {
+		let inner = spelledLookupBase(base.base)
+
+		return inner === null ? null : `${inner}.${base.member.content}`
+	}
+
+	return null
+}
+
 // NOTE: What a Lookup that finds no member is answered with — see
 // `MemberAccessContext`. The Method question is a thunk because the Namespace
 // walk behind it is what a Method call costs, and a Lookup that finds its member
@@ -3182,6 +3201,7 @@ function memberAccessContext(
 			end: node.member.position.start,
 		},
 		isCalled,
+		spelledBase: spelledLookupBase(node.base),
 		methodNamed: (name) => {
 			let declaring = namespacesDeclaringMethod(
 				name,

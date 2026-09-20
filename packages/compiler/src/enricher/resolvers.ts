@@ -738,6 +738,11 @@ export type MemberAccessContext = {
 	// `names.length`. The two get different Helps and different fixes — the
 	// second has to grow the parentheses the first already wrote.
 	isCalled: boolean
+	// NOTE: The base as it was WRITTEN — `box`, `box.inner` — and null where it
+	// is anything a Help can not print back. A member read off a call or off a
+	// Literal has no spelling the reader would recognise, and a Help built from
+	// one would be a sentence about text nobody wrote.
+	spelledBase: string | null
 	methodNamed: (name: string) => common.MethodType | null
 }
 
@@ -6564,8 +6569,11 @@ function typeApplicationHelp(name: string, parameterCount: number): string {
 // NOTE: `Self` is what a Protocol calls its conforming Type; the two other
 // places that reject the name report it identically, so they share this.
 export function reportReservedTypeName(position: common.Position | null): void {
+	// NOTE: A reserved TYPE name, and the Note says which. "No declaration may
+	// take it" was wider than the rule: a constant, a Function, a Case and a
+	// member called `Self` all compile, because none of them is a Type.
 	let notes = [
-		"'Self' is what a Protocol calls the Type conforming to it, so no declaration may take it.",
+		"'Self' is what a Protocol calls the Type conforming to it, so no Type may be declared under it.",
 	]
 	// NOTE: One Help, and it names no replacement: which name the declaration
 	// should have is the one thing this knows nothing about. It said nothing at
@@ -6601,6 +6609,16 @@ function reportUnknownMember(
 	memberNames: Array<string>,
 	access: MemberAccessContext | null = null,
 ): void {
+	// NOTE: `box.hits++` is a Lookup whose MEMBER is `hits++` — a `.` ends a
+	// name and a `+` does not — so the increment arrives inside the member name
+	// and the Record has no such member. Answered as the operator it is, the
+	// way the bare `hits++` already was: "Did you mean 'hits'?" was a Help that
+	// drops what the line was written to do, and a reader who took it wrote a
+	// Statement that reads a member and counts nothing.
+	if (reportMemberOperator(memberName, memberPosition, memberNames, access)) {
+		return
+	}
+
 	let suggestion = closestMatch(memberName, memberNames)
 
 	reportError(
@@ -6626,6 +6644,70 @@ function reportUnknownMember(
 			...suggestionData(suggestion),
 		},
 	)
+}
+
+// NOTE: The operator hiding at the end of a member name, answered as the
+// foreign syntax it is rather than as a member nothing declares. True where it
+// reported, so the caller says nothing further.
+//
+// Only where the name without the operator IS a member: `hits++` on a Record
+// holding `hits` is the habit, and `total+` on one that has no `total` is a
+// reader who meant something this can not guess at.
+function reportMemberOperator(
+	memberName: string,
+	memberPosition: common.Position,
+	memberNames: Array<string>,
+	access: MemberAccessContext | null,
+): boolean {
+	let operator = foreignOperatorIn(memberName)
+
+	if (
+		operator === null ||
+		!memberName.endsWith(operator) ||
+		memberName.length === operator.length
+	) {
+		return false
+	}
+
+	let read = memberName.slice(0, -operator.length)
+
+	if (!memberNames.includes(read)) {
+		return false
+	}
+
+	// NOTE: And the edit is a REBUILD rather than an assignment: a Record's
+	// member can not be assigned — `box.hits = …` is its own refusal — so what
+	// goes back into the binding is the Record that differs from it, which is
+	// the sentence `foreign-syntax` writes about the same line. Spelled only
+	// where the base is one name: a deeper path rebuilds a level per step, and
+	// a Help is one line.
+	let base = access?.spelledBase ?? null
+
+	if (base === null || base.includes(".")) {
+		reportOperatorNotSupported(operator, memberPosition, [])
+
+		return true
+	}
+
+	// NOTE: The counting half of the table's own sentence, read back out of it
+	// rather than spelled a second time here: `compoundAssignmentHelps` answers
+	// "Write 'x = x::add(1)'." and what this needs is the `x::add(1)`, which is
+	// what stands between the ` = ` and the closing quote. One table, one
+	// answer to what `++` means.
+	let assignment = compoundAssignmentHelps(operator, `${base}.${read}`, null)
+	let written = assignment?.[0]?.match(/ = (.+)'\.$/)?.[1] ?? null
+
+	reportOperatorNotSupported(
+		operator,
+		memberPosition,
+		written === null
+			? []
+			: [
+					`Write '${base} = { ${base} with ${read} = ${written} }' — a Record's member is not assigned, it is built anew.`,
+				],
+	)
+
+	return true
 }
 
 // NOTE: Every name of one kind that is visible from `scope`, innermost first

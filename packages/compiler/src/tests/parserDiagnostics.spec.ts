@@ -1464,6 +1464,31 @@ describe("Parser AST", () => {
 			])
 		})
 
+		// NOTE: And the Types are spelled as holes where the position hands a
+		// literal neither of them. A path written into a Declaration is not in
+		// an Argument list, so the untyped literal offered above is refused
+		// there for having no Parameter Type — the reader followed one report
+		// into another. The same sentence `path-without-context` writes, for
+		// the same literal in the same position.
+		it("spells both Types where the path stands in no Argument list", () => {
+			let source = `implementation {
+	constant orders = [{ order = { total = 1 } }]
+	constant reach = .order.total::toString()
+	Terminal.inspect(orders)
+}`
+
+			expect(helpsOf(source)).toEqual([
+				"Write the Function literal instead, with the Parameter and return Types a path leaves out — '(_ item: <Type>) -> <Type> { <- item.order.total::toString() }', filling each '<Type>' in.",
+			])
+			expect(
+				compiles(`implementation {
+	constant orders = [{ order = { total = 1 } }]
+	constant reach = (_ item: { order: { total: Integer } }) -> String { <- item.order.total::toString() }
+	Terminal.inspect(orders)
+}`),
+			).toBe(true)
+		})
+
 		it("prints the Argument a called path was written with", () => {
 			expect(helpsOf("implementation { call(.total(2)) }")).toEqual([
 				"Write the Function literal instead: '(_ item) { <- item.total(2) }'.",

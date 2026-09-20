@@ -1014,6 +1014,41 @@ describe("Foreign syntax", () => {
 			).toBe(true)
 		})
 
+		// NOTE: And the same habit written on a MEMBER. `box.hits++` is a
+		// Lookup whose member is `hits++` — a `.` ends a name and a `+` does
+		// not — so it used to be answered "'{ hits: Integer }' has no member
+		// 'hits++'. Did you mean 'hits'?", which is a Help that drops what the
+		// line was written to do. The edit is a rebuild rather than an
+		// assignment, because a Record's member can not be assigned.
+		it("spells the member a postfix increment counts", () => {
+			let source = program("variable box = { hits = 0 }", "box.hits++")
+
+			expect(codesOf(source)).toEqual(["operator-not-supported"])
+			expect(helpsOf(source)).toEqual([
+				"Write 'box = { box with hits = box.hits::add(1) }' — a Record's member is not assigned, it is built anew.",
+			])
+			expect(
+				compiles(
+					program(
+						"variable box = { hits = 0 }",
+						"box = { box with hits = box.hits::add(1) }",
+						"Terminal.inspect(box.hits::toString())",
+					),
+				),
+			).toBe(true)
+		})
+
+		// NOTE: A member name that merely ENDS in punctuation is not the
+		// habit — what says it is one is that the name without it IS a member.
+		it("leaves a member nothing declares to the member report", () => {
+			let source = program(
+				"constant box = { hits = 0 }",
+				"Terminal.inspect(box.total++::toString())",
+			)
+
+			expect(codesOf(source)).toEqual(["unknown-member"])
+		})
+
 		// NOTE: The right operand is spelled only where it is one Token and the
 		// whole of what is left of the Statement. Anything longer is an
 		// Expression of the reader's own, and half of one printed back is worse
@@ -1063,13 +1098,32 @@ describe("Foreign syntax", () => {
 			])
 		})
 
+		// NOTE: Built from the two operands the line already holds, like every
+		// other Help in this family. The table's own sentence spells `x` and
+		// `d` — a reader looking at `held ?? fallback` had to work out which of
+		// their two names each stood for, and the sentence is only reached now
+		// where one of them is not written plainly enough to print back.
 		it("refuses the nullish operator with the Optional's own Method", () => {
-			let source = program("constant n = 1", "constant m = n ?? 2")
+			let source = program(
+				"constant held: Optional<Integer> = #Value(1)",
+				"constant fallback = 0",
+				"constant total = held ?? fallback",
+			)
 
 			expect(codesOf(source)).toEqual(["operator-not-supported"])
 			expect(helpsOf(source)).toEqual([
-				"Write 'x::value(defaultingTo d)' — a value that may be missing is an Optional.",
+				"Write 'held::value(defaultingTo fallback)' — a value that may be missing is an Optional.",
 			])
+			expect(
+				compiles(
+					program(
+						"constant held: Optional<Integer> = #Value(1)",
+						"constant fallback = 0",
+						"constant total = held::value(defaultingTo fallback)",
+						"Terminal.inspect(total::toString())",
+					),
+				),
+			).toBe(true)
 		})
 
 		// NOTE: A Statement ends at the end of its Expression, so a `-` opening

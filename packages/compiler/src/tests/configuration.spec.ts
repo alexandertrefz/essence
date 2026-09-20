@@ -258,6 +258,35 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		])
 	})
 
+	// NOTE: An empty String is not a list of one. `"skipTags": ""` says nothing
+	// is to be skipped, and `[""]` is a tag no test can carry — a Help that
+	// offered it was asking the author to write down a rule that matches
+	// nothing and then accepting it in silence.
+	it("offers the example rather than a list holding an empty name", () => {
+		let configuration = parse(`{ "test": { "skipTags": "" } }`)
+		let [diagnostic] = diagnosticsOf(configuration)
+
+		expect(configuration.test.skipTags).toEqual([])
+		expect(diagnostic.helps).toEqual([
+			"Write it as a list of tag names — '[\"slow\"]', say.",
+		])
+	})
+
+	// NOTE: And a number too big to read back is not the number that was
+	// written. `Number` rounds past 2^53, so the Help offered a value nobody
+	// had typed — and its Quick Fix would have written it into the file.
+	it("offers the example rather than a number it rounded", () => {
+		let configuration = parse(
+			`{ "test": { "cases": "99999999999999999999" } }`,
+		)
+		let [diagnostic] = diagnosticsOf(configuration)
+
+		expect(configuration.test.cases).toBeNull()
+		expect(diagnostic.helps).toEqual([
+			"Write it as a whole number of at least 1 — '200', say.",
+		])
+	})
+
 	it("reports a Boolean written as a String", () => {
 		let configuration = parse(`{ "test": { "contracts": "yes" } }`)
 		let [diagnostic] = diagnosticsOf(configuration)
@@ -382,6 +411,27 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		])
 		expect(diagnostic.helps).toEqual([
 			"Write the '}' that closes the object.",
+		])
+	})
+
+	// NOTE: And the edit is offered for the FIRST refusal alone. jsonc recovers
+	// generously and goes on reporting about text it has lost track of:
+	// `{ test: 1 }` is one unquoted key, and the third report asked the reader
+	// to "write the value the key holds" at the `}`, with the value written two
+	// characters to its left. Every report keeps its label and its Notes.
+	it("offers the edit for the first refusal alone", () => {
+		let configuration = parse(`{ test: 1 }`)
+		let diagnostics = diagnosticsOf(configuration)
+
+		expect(
+			diagnostics.map((diagnostic) => [
+				diagnostic.labels[0]?.message,
+				diagnostic.helps,
+			]),
+		).toEqual([
+			["this is not JSON", []],
+			["a quoted key was expected here", []],
+			["a value was expected here", []],
 		])
 	})
 

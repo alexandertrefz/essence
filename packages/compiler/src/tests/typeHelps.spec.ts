@@ -4,6 +4,7 @@ import {
 	codesOfSource,
 	compiles,
 	enrichedDiagnosticsFor,
+	firstAnalysed,
 	helpsOfCode,
 } from "./followedHelps"
 
@@ -659,6 +660,40 @@ describe("Reports that knew the fix and said nothing", () => {
 		function show<infer Item is Printable>(_ item: Item) -> String {
 			<- item::toString()
 		}
+	}`),
+		).toBe(true)
+	})
+})
+
+// NOTE: The one Note in this family that claimed more than the rule does. It
+// said no DECLARATION may take the name, and the Compiler refuses only the
+// forms that declare a TYPE — a Constant, a Function, a Case or a member called
+// `Self` compiles, and a reader looking at one was told their Program could not
+// be the Program in front of them.
+describe("The name a Protocol reserves", () => {
+	it("says which declarations the name is taken for", () => {
+		expect(
+			firstAnalysed(
+				`implementation {
+		type Self = { name: String }
+	}`,
+				"reserved-type-name",
+			).notes,
+		).toEqual([
+			"'Self' is what a Protocol calls the Type conforming to it, so no Type may be declared under it.",
+		])
+	})
+
+	it("leaves a value of the name alone", () => {
+		expect(
+			compiles(`implementation {
+		constant Self = 1
+
+		function twice(_ Self: Integer) -> Integer {
+			<- Self::multiply(with 2)
+		}
+
+		Terminal.inspect(twice(Self)::toString())
 	}`),
 		).toBe(true)
 	})

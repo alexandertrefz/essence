@@ -182,6 +182,14 @@ export function compoundAssignmentHelps(
 			return [
 				`Write '${target} = ${target}::remainder(dividingBy ${written})'.`,
 			]
+		// NOTE: `??` is no assignment, and it is answered here all the same:
+		// both operands are written on the line, which is the one thing this
+		// function is for. The table's own sentence spells `x` and `d`, and a
+		// reader looking at `held ?? fallback` had to work out which was which.
+		case "??":
+			return [
+				`Write '${target}::value(defaultingTo ${written})' — a value that may be missing is an Optional.`,
+			]
 		// NOTE: `++` and `--` carry their amount in the operator, so the right
 		// operand is not read from the text and is never `…`.
 		case "++":

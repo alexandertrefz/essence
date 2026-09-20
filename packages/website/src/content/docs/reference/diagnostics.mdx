@@ -1096,13 +1096,13 @@ Error: 'Self' is a reserved Type name
    │ 
    │ Help: Choose another name.
    │ 
-   │ Note: 'Self' is what a Protocol calls the Type conforming to it, so no declaration may take it.
+   │ Note: 'Self' is what a Protocol calls the Type conforming to it, so no Type may be declared under it.
 ───╯
 ```
 
 </div>
 
-Choose another name. Every declaration form is held to this: a type alias, a generic parameter, a `choice`, a `protocol` and a `namespace`. A protocol is the one the name is reserved for — every signature inside one may say `Self`, meaning the type conforming, and a protocol of that name stands where the word resolves.
+Choose another name. Every form that declares a TYPE is held to this: a type alias, a generic parameter, a `choice`, a `protocol` and a `namespace`. A constant, a function, a case or a member of the name compiles — none of them is a type. A protocol is the one the name is reserved for — every signature inside one may say `Self`, meaning the type conforming, and a protocol of that name stands where the word resolves.
 
 ### `use-before-declaration`
 
@@ -6468,7 +6468,7 @@ Warning: essence.json could not be read as JSON
 
 </div>
 
-Write what the label says was expected. The help names that token where the parser names one — a `}`, a `]`, a `:`, a `,`, a quoted key, a value, the `*/` of a comment — and is absent for the verdicts that say a character cannot stand where it does rather than that one is missing.
+Write what the label says was expected. The help names that token where the parser names one — a `}`, a `]`, a `:`, a `,`, a quoted key, a value, the `*/` of a comment — and is absent for the verdicts that say a character cannot stand where it does rather than that one is missing. It is offered for the first refusal alone: the parser recovers generously, and what it asks for after that is about text it has already lost track of.
 
 Taught on: [essence.json › Mistakes are Warnings](/docs/reference/project-file#mistakes-are-warnings)
 

@@ -248,7 +248,14 @@ type RefactorAllowance = {
 	// NOTE: Matched by PREFIX on the title, and pinned to the fixtures it is
 	// allowed on: a rewrite that starts raising the count somewhere else is a
 	// new fact and fails here rather than riding in on an old reason.
+	//
+	// NOTE: A prefix wide enough to catch a rewrite nobody wrote it for is an
+	// allowance that excuses the wrong thing — "Make '" would cover a "Make it
+	// a Constant" nobody has written yet — so `for` narrows it to the shape the
+	// reason is about: the title reads "Make 'X' Generatable", and nothing else
+	// that starts with those five characters is excused.
 	title: string
+	for?: RegExp
 	fixtures: Array<string>
 	reason: string
 	// NOTE: How many errors it may ADD. One scaffold body is one hole.
@@ -263,6 +270,7 @@ type RefactorAllowance = {
 const REFACTOR_ALLOWED: Array<RefactorAllowance> = [
 	{
 		title: "Make '",
+		for: /^Make '.+' Generatable$/,
 		fixtures: [
 			"CaseDefaults.es",
 			"MemberPaths.es",
@@ -292,6 +300,7 @@ function refactorAllowanceFor(
 	let found = REFACTOR_ALLOWED.find(
 		(allowance) =>
 			entry.title.startsWith(allowance.title) &&
+			(allowance.for === undefined || allowance.for.test(entry.title)) &&
 			allowance.fixtures.includes(fixture),
 	)
 
