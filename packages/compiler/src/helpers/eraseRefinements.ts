@@ -176,11 +176,32 @@ function rebuild(
 
 	seen.set(value, mapped)
 
+	// NOTE: A rebuilt Record is no longer the Alias it was written as, so its
+	// display spelling goes with the refinement that forced the rebuild. Only a
+	// BEARING value is rebuilt at all — anything else comes back as itself,
+	// keeping a spelling that is still true — so arriving here IS the proof
+	// that a member erased: a `Bag` whose `count` was a `NonZeroInteger`
+	// declares an Integer now, and a Diagnostic calling that shape `Bag` would
+	// answer the reader with the very word they wrote. `withoutRefinements` in
+	// `helpers/types.ts` drops it on a rebuild for the same reason.
+	//
+	// NOTE: A Union's `name` and `alias` STAY, deliberately. A Type descriptor
+	// is written into the emitted JavaScript field by field, so dropping them
+	// here would change the bytes every Program holding a refinement under an
+	// aliased Union emits — a Record's spelling never reaches emission at all,
+	// because the Rewriter takes it off through `withoutRecordNames`. A Case's
+	// `name` is not a spelling either: it is WHICH Case a value is.
+	let spelled = record.type === "Record"
+
 	// NOTE: Rebuilt key by key in the order the keys were written, which is not
 	// a detail: a Record's members are emitted in the order they were declared,
 	// and the emitted literal's key order is what the runtime's Record equality
 	// and its printer read.
 	for (let [key, child] of Object.entries(record)) {
+		if (spelled && (key === "name" || key === "alias")) {
+			continue
+		}
+
 		mapped[key] = rebuild(child, bearing, seen)
 	}
 

@@ -7161,6 +7161,34 @@ describe("Enricher", () => {
 				})
 			})
 
+			// NOTE: What the refusal offers INSTEAD has to be a Matcher the
+			// reader can write, and the erased Alias is not one: 'Bag' is the
+			// word they just wrote, and the shape underneath it — `count` a
+			// plain Integer — is what the emitted check could ask about.
+			// `eraseRefinements` drops a rebuilt Record's display spelling so
+			// that both sentences say the shape.
+			it("should offer the erased shape rather than the Alias it stopped being", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					type Bag = { count: NonZeroInteger }
+					type Other = { label: String }
+
+					constant thing: Bag | Other = { label = "x" }
+
+					constant told = match thing -> String {
+						case Bag { <- "bag" }
+						case Other { <- "other" }
+					}
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].helps).toEqual([
+					"Match on '{ count: Integer }' and prove the predicate inside the arm, the way every 'Bag' is proven: an 'if' condition, a Case naming a written value, or a written value.",
+				])
+				expect(diagnostics[0].notes).toEqual([
+					"A refinement's predicate erases before the Program runs, so the emitted check could only ask about '{ count: Integer }' — and the arm would run for values the predicate refuses.",
+				])
+			})
+
 			it("should refuse a refinement in a payload Pattern's annotation", () => {
 				expect(
 					refusal(`implementation {

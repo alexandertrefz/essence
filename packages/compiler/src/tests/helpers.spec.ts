@@ -3624,6 +3624,55 @@ describe("Helpers", () => {
 				expect(eraseRefinements(plain)).toBe(plain)
 			})
 
+			// NOTE: An erased Record is not the Alias it was written as — a
+			// `Bag` whose `count` was a `NonZeroInteger` declares a plain
+			// Integer now — so the display spelling goes with the refinement.
+			// It is what a Matcher refusal reads to say what the emitted check
+			// could ask about instead, and naming the shape `Bag` there
+			// answered the reader with the word they had just written.
+			it("should drop a rebuilt Record's display spelling", () => {
+				expect(
+					eraseRefinements({
+						type: "Record",
+						name: "Bag",
+						members: { count: nonZero },
+					}),
+				).toEqual({
+					type: "Record",
+					members: { count: integer },
+				})
+			})
+
+			// NOTE: The other half of that rule: a spelling stays true as long
+			// as the members it describes do, and a Record holding no
+			// refinement is never rebuilt at all.
+			it("should keep the spelling of a Record it does not rebuild", () => {
+				let named: Type = {
+					type: "Record",
+					name: "Bag",
+					members: { count: integer },
+				}
+
+				expect(eraseRefinements(named)).toBe(named)
+			})
+
+			// NOTE: A Union's spelling stays, unlike a Record's, and the reason
+			// is emission rather than truth: a Type descriptor is written into
+			// the JavaScript field by field, so dropping `name` here would
+			// change the bytes every Program with a refinement under an
+			// aliased Union emits. A Record's spelling never gets that far —
+			// the Rewriter takes it off through `withoutRecordNames`.
+			it("should keep a rebuilt Union's spelling, which is emitted", () => {
+				let erased = eraseRefinements({
+					type: "UnionType",
+					name: "Reading",
+					types: [nonZero, string],
+				}) as common.UnionType
+
+				expect(erased.name).toBe("Reading")
+				expect(erased.types).toEqual([integer, string])
+			})
+
 			// NOTE: Every field of every Node, which is what a reflective walk
 			// buys and a hand written one has to remember: a Constant's declared
 			// Type, the Type its value carries, a Match Handler's Matcher — and
