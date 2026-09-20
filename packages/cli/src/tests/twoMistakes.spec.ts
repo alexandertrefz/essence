@@ -429,6 +429,26 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["syntax-error@4"],
 	},
+	// NOTE: A Namespace with no target Type can not hold a Method that takes
+	// one, so the Method is refused where it is written and left carrying an
+	// Error receiver. Every call of it then counted one Parameter more than the
+	// reader can see — the Namespace's mistake reported a second time, as
+	// something wrong with a call that is written exactly right.
+	{
+		name: "a Method in an untyped Namespace and a name nothing declares",
+		source: `implementation {
+	namespace Maths {
+		doubled(_ n: Integer) -> Integer {
+			<- n::multiply(with 2)
+		}
+	}
+
+	Terminal.print(Maths.doubled(2)::toString())
+	Terminal.print(undeclared)
+}
+`,
+		expected: ["untyped-namespace-method@3", "unknown-name@9"],
+	},
 	// NOTE: And the files that hold ONE mistake, which is what says the pairs
 	// above are pairs rather than a Compiler that reports everything twice.
 	{
@@ -463,9 +483,7 @@ const PROGRAMS: Array<TwoMistakes> = [
 	},
 ]
 
-async function readingsOf(
-	filePath: string,
-): Promise<{
+async function readingsOf(filePath: string): Promise<{
 	check: Array<string>
 	editor: Array<string>
 	embed: Array<string>

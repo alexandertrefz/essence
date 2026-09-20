@@ -1245,6 +1245,16 @@ function validateFunctionInvocation(
 		return node
 	}
 
+	// NOTE: And a SIGNATURE the Enricher could not establish measures nothing
+	// either. A Method in a Namespace with no target Type is refused where it
+	// is written and left carrying an Error receiver, so every call of it
+	// counted one Parameter more than the reader can see and answered with
+	// `argument-count-mismatch` — the Namespace's mistake, reported again as
+	// something wrong with a call that is written exactly right.
+	if (typeContainsError(functionType)) {
+		return node
+	}
+
 	// NOTE: An Argument the Enricher could not type is an Argument that fits
 	// nothing, so measuring the call against its Signature answers the hole
 	// rather than the call — and a hole in ONE Argument moves every Argument
