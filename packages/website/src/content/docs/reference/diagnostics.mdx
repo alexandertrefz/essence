@@ -1593,13 +1593,15 @@ Error: An If Condition has to be a Boolean
    │        ──┬──  
    │          ╰──── this is an Integer
    │ 
+   │ Help: Ask a question that answers a Boolean — '::isGreaterThan(0)' reads an Integer.
+   │ 
    │ Note: Essence has no truthiness — only a Boolean can be a Condition.
 ───╯
 ```
 
 </div>
 
-Ask a question that returns a `Boolean`: `if count::isGreaterThan(0) { … }`.
+Ask a question that returns a `Boolean`: `if count::isGreaterThan(0) { … }`. The help names one the value's own type has — `::hasValue()` for an [optional](/docs/language/optionals), `::hasCharacters()` for a string, `::hasItems()` for a list.
 
 Taught on: [Conditions › The condition is a Boolean](/docs/language/conditions#the-condition-is-a-boolean)
 
@@ -1651,6 +1653,9 @@ Error: Not every path through this Function returns
    │ │           
    │ ╰─────────── this path falls off the end
    │ 
+   │ Help 1: Write a '<-' answering a String at the end of the body.
+   │ Help 2: Or give every branch one — an 'if' with no 'else' leaves the path around it falling through.
+   │ 
    │ Note: The declared return Type is String, so every path must yield one.
 ───╯
 ```
@@ -1659,7 +1664,7 @@ Error: Not every path through this Function returns
 
 Return on every path, for example with the `else` branch: `if … { <- "negative" } else { <- "not negative" }`.
 
-Quick Fix: **Add an empty else branch**.
+Quick Fix: **Add an else branch to fill in** — it writes the branch and leaves the value to you, so this report stays until you write one. The title says so: the fix moves the hole into the open rather than closing it.
 
 Taught on: [Functions › Every path returns](/docs/language/functions#every-path-returns)
 
@@ -1700,9 +1705,21 @@ Give it a path that returns without calling itself, such as `if @::isLessThanOrE
 ```
 [recursive-type-declaration]
 Error: Type 'Node' names itself
+   ╭─┤ Node.es:2:38 │
+   │
+ 2 │     type Node = { value: Integer, next: Node }
+   │                                         ──┬─  
+   │                                           ╰─── this names the declaration being made
+   │ 
+   │ Help: Recursive Type declarations are not part of the language yet — break the cycle.
+   │ 
+   │ Note: A Type declaration is substituted wherever it is named, so a declaration that names itself would never finish resolving.
+───╯
 ```
 
 </div>
+
+A choice that names itself reports the same code, with `Choice 'Tree' names itself` and a note about payloads being substituted eagerly at each use.
 
 Break the cycle. A `List` does not break it: a member typed `List<Node>` still names `Node`, and reports this code too. To hold a tree, keep its nodes in a list and give each node the positions of its children in that list, as in `type Node = { value: Integer, children: List<Integer> }`. Or key the nodes in a dictionary.
 
@@ -1722,6 +1739,9 @@ Error: There is nothing here to return from
  2 │     <- 42
    │     ──┬──  
    │       ╰──── this is outside any Function
+   │ 
+   │ Help 1: Drop the '<-' and write the value on its own, or as a 'constant'.
+   │ Help 2: Or move the Statement into a Function, which is the only thing a '<-' answers for.
 ───╯
 ```
 
@@ -1745,6 +1765,9 @@ Error: This Expression is not a Function
  4 │     Terminal.print(total())
    │                    ──┬──  
    │                      ╰──── this is an Integer
+   │ 
+   │ Help 1: Remove the '()' — the name already reads the value.
+   │ Help 2: Or call a Method on it with '::', which is how a Method is reached.
 ───╯
 ```
 
@@ -1994,6 +2017,29 @@ Error: List takes exactly 1 Type Argument
  2 │     constant items: List<Integer, String> = []
    │                     ──────────┬──────────  
    │                               ╰──────────── 2 Type Arguments given
+   │ 
+   │ Help: Write 'List<…>', with the Type you mean in place of each '…'.
+───╯
+```
+
+</div>
+
+A generic type named with no arguments at all reports the same code, with the count it takes as a note:
+
+<div class="error-output">
+
+```
+[wrong-type-argument-count]
+Error: Type 'Optional' was given the wrong number of Type Arguments
+   ╭─┤ Found.es:2:18 │
+   │
+ 2 │     constant found: Optional = #Empty
+   │                     ────┬───  
+   │                         ╰───── 0 Type Arguments given
+   │ 
+   │ Help: Write 'Optional<…>', with the Type you mean in place of each '…'.
+   │ 
+   │ Note: 'Optional' takes 1 Type Parameter.
 ───╯
 ```
 
@@ -2019,6 +2065,8 @@ Error: This Type takes no Type Arguments
  2 │     constant count: Integer<String> = 1
    │                     ───────┬───────  
    │                            ╰───────── the Type Arguments have nowhere to go
+   │ 
+   │ Help: Remove the Type Arguments — 'Integer' stands on its own.
 ───╯
 ```
 
@@ -2124,7 +2172,8 @@ Error: A 'where' clause can not refine Boolean
    │                ───┬───  
    │                   ╰───── this is Boolean
    │ 
-   │ Help: Drop the 'where' clause from 'Yes'.
+   │ Help 1: Drop the 'where' clause from 'Yes', which leaves the Alias naming Boolean and nothing more.
+   │ Help 2: Or write the refinement on a base one can be checked against — an Integer, a Rational, a String, an applied List or an applied Dictionary.
    │ 
    │ Note: A checked refinement is written on an Integer, a Rational, a String, an applied List or an applied Dictionary — 'List<String>', never a bare 'List'.
 ───╯
@@ -2132,7 +2181,9 @@ Error: A 'where' clause can not refine Boolean
 
 </div>
 
-Refine one of those bases with a method called on `@`: `type Small = Integer where @::isLessThan(10)`.
+Refine one of those bases with a method called on `@`: `type Small = Integer where @::isLessThan(10)`. Dropping the clause compiles, and it answers a different declaration — "a `Boolean` that is true" becomes "any `Boolean`" — so the help says what that costs and names the bases the intent survives on.
+
+A `where` clause that is not one call on `@` is a different message under the same code — `This is not a predicate a refinement can be checked by`, with `Call the Method on '@' directly.` as its help — and a bare `List` or `Dictionary` base is a third wording, `A 'where' clause can not refine List`.
 
 Taught on: [Checked refinements › What the predicate may say](/docs/language/checked-refinements#what-the-predicate-may-say)
 
@@ -2150,6 +2201,8 @@ Error: This predicate is not a Boolean
  2 │     type Small = Integer where @::absolute()
    │                                ──────┬──────  
    │                                      ╰──────── this is NonNegativeInteger
+   │ 
+   │ Help: Call a Method on '@' that answers a Boolean — '@::isGreaterThan(0)', for instance.
    │ 
    │ Note: A 'where' clause is a question about the value being refined, so it has to answer 'true' or 'false'.
 ───╯
@@ -2365,6 +2418,8 @@ Error: No Namespace provides Methods for this value
    │                     │     
    │                     ╰───── 'toString' is looked up in its Namespaces
    │ 
+   │ Help: Bound the Type Parameter by a Protocol that declares 'toString' — '<infer Item is Printable>' at the Declaration that introduces it.
+   │ 
    │ Note: No Namespace in scope targets Item.
 ───╯
 ```
@@ -2419,7 +2474,7 @@ Error: 'toString' can not be dispatched on this value
    │           ──┬──  
    │             ╰──── this is a First | Second
    │ 
-   │ Help: Narrow the value with a Match Expression before calling the Method.
+   │ Help: Take one Type Parameter in place of the Union — '<infer Item is Printable>(_ value: Item)' — since Types erase before a Match runs, and a Match is the only thing that narrows.
    │ 
    │ Note: 2 member Types of the Union are indistinguishable at runtime: First, Second.
 ───╯
@@ -2427,7 +2482,7 @@ Error: 'toString' can not be dispatched on this value
 
 </div>
 
-Take one type parameter instead of a union of two: `describe<infer Item is Printable>(_ value: Item)`.
+Take one type parameter instead of a union of two: `describe<infer Item is Printable>(_ value: Item)`. A match cannot help here — types erase before one runs, so a case naming a type parameter accepts every value that reaches it — and the help offers one only where the union's members can be told apart at runtime.
 
 ### `untyped-namespace-method`
 
@@ -2469,11 +2524,11 @@ Error: 'origin' is a static Method
     │
  12 │     Terminal.print(here::origin())
     │                    ──┬─  ───┬──  
-    │                      ╰──────│──── this is a { x: Integer, y: Integer }
+    │                      ╰──────│──── this is a Point
     │                             │    
     │                             ╰──── a static Method is called on its Namespace, not on a value
     │ 
-    │ Help: Write 'Points.origin(…)', passing the value as an Argument if it needs one.
+    │ Help: Write 'Points.origin(…)' without the value — the signature takes no receiver.
     │ 
     │ Note: 'Points' declares 'origin' as static.
 ────╯
@@ -2483,7 +2538,7 @@ Error: 'origin' is a static Method
 
 Call it on its namespace with `.`: `Points.origin()`.
 
-Quick Fix: **Write 'Points.origin(…)' passing the value** or **Write 'Points.origin(…)' without the value**.
+Quick Fix: **Write 'Points.origin(…)' without the value**. A static takes no receiver, so the value the call was written on either belongs among the arguments or does not belong at all, and the signature's arity decides which — only the shape it accepts is offered, and where both shapes fit the help keeps its hedge and neither fix is preferred.
 
 Taught on: [Namespaces and methods › Statics and the dot](/docs/language/namespaces-and-methods#statics-and-the-dot)
 
@@ -2842,12 +2897,20 @@ Error: This payload does not fit Case '#Circle'
 
 Write the payload the case declares: `#Circle({ radius = 3 })`.
 
+The label reads `'radius' is a { radius: String }` because of the one-member
+shorthand: a case of exactly one member takes that member's value directly, so
+`{ radius = "big" }` was read as the value OF `radius` and wrapped back up. The
+doubling in the label is that wrapping, not something you wrote.
+
 A case of **several** members gets a second Help — `The one-member shorthand
 '#Case(value)' only applies to single-member Cases.` — because the shorthand is
 what a reader writing `#Rectangle(2)` reached for, and it is the one thing the
 member diff above cannot say. A single-member case gets no such Help: the
 shorthand would have accepted the value, so what is wrong is the value itself,
-which the note names the type of.
+which the note names the type of. Neither does a payload that already spells the
+case's members out — a `#Rectangle({ width = "wide", height = 2 })` names every
+member the case declares and got one value wrong, so nothing there reached for
+the shorthand.
 
 Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
 
@@ -3022,11 +3085,25 @@ Compare where the type arguments are known, for example in a function that takes
 ```
 [undecided-type-arguments]
 Error: Nothing decides the Type Arguments of 'Holder#Bare'
+   ╭─┤ Left.es:7:18 │
+   │
+ 7 │     constant left = Holder#Bare
+   │                     ─────┬─────  
+   │                          ╰─────── no Type Arguments here, and nothing around it decides them
+   │ 
+   │ Help 1: Annotate the Declaration this is written into with 'Holder<…>', which is what decides them.
+   │ Help 2: Or apply the Type Arguments here — 'Holder<…>#Bare', with the Type you mean in place of each '…'.
+   │ 
+   │ Note 1: 'Holder' takes 1 Type Parameter: 'Item'.
+   │ Note 2: A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.
+───╯
 ```
 
 </div>
 
-Write the type arguments at the case, `Holder<Integer>#Bare`, or annotate the constant: `constant empty: Holder<Integer> = Holder#Bare`. The Help printed with this error writes the choice's own parameter, as in `Holder<Item>`. Write the type you mean in its place.
+Write the type arguments at the case, `Holder<Integer>#Bare`, or annotate the constant: `constant empty: Holder<Integer> = Holder#Bare`. The helps show the application with a blank per argument, and the notes name the choice's own parameters — those names belong to the declaration and are in scope nowhere else, so writing one back is [`unknown-type`](/docs/reference/diagnostics#unknown-type).
+
+Where a payload already decided some of the arguments, those are spelled and only the undecided ones are blank: a `#Stopped({ value = "x" })` of a `Progress<State, Result>` reads `Progress<…, String>`. The parentheses stay on wherever the case carries a payload, so the spelling in the help is one that compiles.
 
 Taught on: [Generics › A choice applies its type arguments](/docs/language/generics#a-choice-applies-its-type-arguments)
 
@@ -3425,7 +3502,7 @@ Error: This 'define' has no 'otherwise' arm
 
 End it with an `otherwise` arm: `as "wait" otherwise`.
 
-Quick Fix: **Add an empty 'otherwise' arm**.
+Quick Fix: **Add an 'otherwise' arm to fill in** — it writes `as {} otherwise`, which parses and is visibly not an answer. Wherever the `define` has a type to answer, the hole is reported as an arm that answers `{}`; the title says the value is still yours to write.
 
 Taught on: [Conditions › `otherwise` is mandatory](/docs/language/conditions#otherwise-is-mandatory)
 
@@ -3488,6 +3565,8 @@ Error: Nothing decides what this 'define' answers
 </div>
 
 Write the type on the `define`, `define -> Optional<Integer> { … }`, or annotate the constant: `constant fetched: Optional<Integer> = define { … }`. A `define` passed directly as an argument needs the arrow, because an argument position passes no type down.
+
+This program reports three times, not once: each arm is also asked what decides its own type arguments, and the bare `#Value` is also a case two choices in scope declare. The report above comes first — it is written highest in the file — and its helps are the ones that answer all three. The other two are [`undecided-type-arguments`](/docs/reference/diagnostics#undecided-type-arguments) and [`ambiguous-case`](/docs/reference/diagnostics#ambiguous-case), and writing the answer type on the `define` clears them with it.
 
 Taught on: [Conditions › What a `define` returns](/docs/language/conditions#what-a-define-returns)
 
@@ -3637,6 +3716,28 @@ Error: Type Parameter 'Item' could not be inferred
 
 The two helps are the only ways out, because no syntax pins a type argument at a call: `empty<Integer>()` is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax). Annotating the constant does not help either. Give the function a parameter whose type mentions the type parameter, so that the compiler infers it from the argument: `emptyLike<infer Item>(_ sample: List<Item>)`.
 
+A call that passes a function literal with no `-> Type` gets a different help, because neither of those two is the reader's to make: the type parameter already has its place among the parameters — `loop`'s `Answer` is written in the step's own answer type — and the signature it has that place in belongs to the standard library.
+
+<div class="error-output">
+
+```
+[uninferable-type-parameter]
+Error: Type Parameter 'Answer' could not be inferred
+   ╭─┤ Never.es:2:19 │
+   │
+ 2 │ ╭─▶     constant never = loop(startingWith 0,
+ 3 │ ├─▶        step (state) { <- #Continue(state::add(1)) })
+   │ │                                                          
+   │ ╰────────────────────────────────────────────────────────── nothing here determines what it binds to
+   │ 
+   │ Help: Write the Function literal's return Type — '-> Type' after its Parameter list — which is what binds 'Answer'.
+───╯
+```
+
+</div>
+
+Write it: `step (state) -> Step<Integer, Integer> { <- #Continue(state::add(1)) }`.
+
 Taught on: [Generics › Only the arguments bind](/docs/language/generics#only-the-arguments-bind)
 
 ### `uninferable-parameter-type`
@@ -3654,7 +3755,7 @@ Error: The Type of Parameter 'number' could not be inferred
    │                        ───┬──  
    │                           ╰──── this Parameter has no Type
    │ 
-   │ Help: Write the Parameter's Type explicitly.
+   │ Help: Write the Parameter's Type and the Function's return Type — a literal outside Argument position takes neither from around it.
    │ 
    │ Note: Only a Function passed as an Argument takes its Types from the surrounding context.
 ───╯
@@ -3662,7 +3763,7 @@ Error: The Type of Parameter 'number' could not be inferred
 
 </div>
 
-Write the type: `(_ number: Integer) -> Integer { … }`.
+Write the type: `(_ number: Integer) -> Integer { … }`. Both halves are named in one report, because a literal written outside argument position is missing both — writing only the parameter's type reaches [`missing-return-type`](/docs/reference/diagnostics#missing-return-type) on the next run.
 
 Taught on: [Functions as values › Literals written as arguments](/docs/language/functions-as-values#literals-written-as-arguments)
 
@@ -3681,7 +3782,7 @@ Error: A member path stands where no Function is expected
    │                      ───┬──  
    │                         ╰──── this path names no value
    │ 
-   │ Help: Write the Function literal instead: '(_ item: SomeType) { <- item.price }'.
+   │ Help: Write the Function literal instead, with the Parameter and return Types a path leaves out — '(_ item: <Type>) -> <Type> { <- item.price }', filling each '<Type>' in.
    │ 
    │ Note 1: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
    │ Note 2: This position expects no particular Type.
@@ -3690,7 +3791,7 @@ Error: A member path stands where no Function is expected
 
 </div>
 
-Pass the path where a function is expected, as in `products::map(.price)`, or write a function literal.
+Pass the path where a function is expected, as in `products::map(.price)`, or write a function literal. Outside argument position a literal takes no types from around it, so it has to write both of its own: `(_ item: Product) -> Integer { <- item.price }`. Where the position names a type that is not a function at all the help changes — nothing a function literal can say fits an `Integer`, so it offers the member read instead.
 
 Taught on: [Functions as values › Member paths](/docs/language/functions-as-values#member-paths)
 
@@ -3713,7 +3814,7 @@ Error: 'items' is captured before its item Type is decided
    │           ──┬──  
    │             ╰──── captured here as a List<Unknown>
    │ 
-   │ Help: Annotate the declaration — 'variable items: List<Integer>' — so the Function is checked against the Type it will hold.
+   │ Help: Annotate the declaration — 'variable items: List<Integer>', for instance — so the Function is checked against the Type it will hold.
    │ 
    │ Note: An empty List Literal leaves its item Type unknown until an assignment decides it, and this Function was checked before that happened.
 ───╯
@@ -3721,7 +3822,7 @@ Error: 'items' is captured before its item Type is decided
 
 </div>
 
-Annotate the variable: `variable items: List<Integer> = []`. The help spells that annotation from the declaration you wrote — its keyword, and its type with the blank filled in at the depth the blank sits — so a `constant f = Async.deferred(() { <- [] })` is told to write `constant f: Future<List<Integer>>`.
+Annotate the variable: `variable items: List<Integer> = []`. The help spells that annotation from the declaration you wrote — its keyword, and its type with the blank filled in at the depth the blank sits — so a `constant f = Async.deferred(() { <- [] })` is told to write `constant f: Future<List<Integer>>`. The item type itself is an example and says so: nothing was refused here, so there is no written value to read the blank off.
 
 ### `uninferable-return-type`
 
@@ -3738,13 +3839,14 @@ Error: The return Type could not be inferred from the body
    │                                     ───┬──  
    │                                        ╰──── the body's Type is not determined here
    │ 
-   │ Help: Give the Function an explicit '-> Type'.
+   │ Help 1: Return the value with '<-' — a body whose last line is a value answers with nothing.
+   │ Help 2: Or give the Function an explicit '-> Type'.
 ───╯
 ```
 
 </div>
 
-Return the value, `(number) { <- number::multiply(with 2) }`, or write the return type with `->`.
+Return the value, `(number) { <- number::multiply(with 2) }`, or write the return type with `->`. The first help is offered only where the body's last line is a value; a body that does return and still answers nothing has the annotation and nothing else.
 
 Taught on: [Coming from JavaScript › Functions](/docs/getting-started/coming-from-javascript#functions)
 
