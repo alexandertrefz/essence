@@ -3,8 +3,8 @@ import { describe, expect, it } from "bun:test"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
-import { enrich } from "../enricher/index"
 import { parseWithDiagnostics } from "../parser/index"
+import { compiles } from "./followedHelps"
 
 // NOTE: The Diagnostics the Lexer and the Parser report about a Program that
 // is wrong in a way they can still read past — a Number holding letters, a
@@ -20,19 +20,6 @@ function helpsOf(source: string): Array<string> {
 	return parseWithDiagnostics(source).diagnostics.flatMap(
 		(diagnostic) => diagnostic.helps,
 	)
-}
-
-// NOTE: What a Help promises, checked by compiling it. Enriched as well as
-// parsed, because a Help that reads cleanly and then fails a name lookup has
-// sent a reader from one refusal to the next.
-function compiles(source: string): boolean {
-	let parsed = parseWithDiagnostics(source)
-
-	if (containsErrors(parsed.diagnostics)) {
-		return false
-	}
-
-	return !containsErrors(enrich(parsed.program).diagnostics)
 }
 
 function declaredValue(

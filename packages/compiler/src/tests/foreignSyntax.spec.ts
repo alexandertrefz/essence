@@ -6,6 +6,7 @@ import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
 import { operatorNote } from "../helpers/foreign"
 import { parseWithDiagnostics } from "../parser/index"
+import { compiles } from "./followedHelps"
 
 // NOTE: What a reader arriving from another language writes, and what the
 // Compiler says about it. One spec for the whole family, because the family is
@@ -70,20 +71,6 @@ function spanOf(source: string, position: common.Position): string {
 // something written in one; every refusal asked here stands at a span.
 function refusedSpan(source: string): string {
 	return spanOf(source, onlyDiagnostic(source).position as common.Position)
-}
-
-// NOTE: What a Help promises, checked by compiling it. A Help built out of the
-// reader's own text is only worth more than a placeholder where what it spells
-// holds together, so the ones printed below are written back into the probe
-// they came from and compiled here.
-function compiles(source: string): boolean {
-	let parsed = parseWithDiagnostics(source)
-
-	if (containsErrors(parsed.diagnostics)) {
-		return false
-	}
-
-	return !containsErrors(enrich(parsed.program).diagnostics)
 }
 
 // NOTE: Written as one line per Statement with a real tab, so a span read back

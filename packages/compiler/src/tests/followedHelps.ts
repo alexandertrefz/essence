@@ -21,7 +21,9 @@ import { parse, parseWithDiagnostics } from "../parser/index"
 // success. `compiles` runs every stage, through `analyseSource`, and the
 // Enricher-only readers below say so in their names.
 
-export function diagnosticsFor(source: string): Array<common.Diagnostic> {
+// NOTE: Not exported: `firstOf` below is what a spec reaches for, and an export
+// nobody imports is a promise to keep a reader for.
+function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	return enrich(parse(source)).diagnostics
 }
 
