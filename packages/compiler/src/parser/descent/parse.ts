@@ -2206,7 +2206,15 @@ class DescentParser {
 	// shape it has always had. Sorted, so that one source parses to one Program
 	// however the recovery met it and a snapshot of a broken file is stable.
 	protected recovery(): parser.Recovery | undefined {
-		if (this.abandonedLines.size === 0) {
+		// NOTE: Either set, because a DROPPED BINDER abandons a name without
+		// abandoning any text — the Matcher around it parsed whole, and what
+		// was refused is the one clause inside it. Keyed off the lines alone,
+		// the name never reached the Enricher and the body's read of it
+		// reported a second time as a name nobody declared.
+		if (
+			this.abandonedLines.size === 0 &&
+			this.abandonedDeclarations.size === 0
+		) {
 			return undefined
 		}
 
@@ -5781,9 +5789,23 @@ class DescentParser {
 				notes: [
 					"Inside an arm, '@' is the scrutinee narrowed to what the Matcher established — which is exactly what this would name a second time.",
 				],
-				helps: [`Write '@' where '${name.content}' was meant.`],
+				// NOTE: BOTH edits, because the binder is what is refused and
+				// rewriting the body alone leaves it standing. The Quick Fix has
+				// always made the pair of edits; the Help named only one.
+				helps: [
+					`Drop the 'as ${name.content}' and write '@' where '${name.content}' was meant.`,
+				],
 			},
 		)
+
+		// NOTE: Recorded as ABANDONED, which is what it is: the binder was
+		// written, it was refused, and the body below goes on reading the name
+		// it would have bound. Without this the arm reported a second time —
+		// `unknown-name '<name>'`, once per read — for a name the reader DID
+		// declare, which is this mistake said again in words about a different
+		// one. `declarationWasAbandoned` is the question every "no such name"
+		// report already asks.
+		this.abandonedDeclarations.add(name.content)
 
 		return null
 	}

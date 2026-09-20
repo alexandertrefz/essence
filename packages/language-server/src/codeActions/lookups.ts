@@ -87,6 +87,38 @@ export function findHandler(
 	return found
 }
 
+// NOTE: The Match a Matcher belongs to, for a fix whose edit is about the WHOLE
+// Match while the Diagnostic names one of its Cases — putting a Guard on a Case
+// takes values away from it, and where those values go is the Match's business.
+// `findMatch` answers for a Position that IS a Match's; this answers for one
+// inside it.
+export function findMatchHolding(
+	program: parser.Program,
+	matcherPosition: common.Position,
+): parser.MatchNode | null {
+	let found: parser.MatchNode | null = null
+
+	walk(program, (node) => {
+		if (node.nodeType !== "Match") {
+			return true
+		}
+
+		if (
+			node.handlers.some((handler) =>
+				isSamePosition(handler.matcher.position, matcherPosition),
+			)
+		) {
+			found = node
+
+			return false
+		}
+
+		return true
+	})
+
+	return found
+}
+
 export function findConstantDeclaration(
 	program: parser.Program,
 	namePosition: common.Position,

@@ -966,8 +966,12 @@ describe("Validator", () => {
 			expect(diagnostics[0].notes[1]).toBe(
 				"A Function's Signature erases before a Match runs, so a Function-typed member is only ever checked for being callable — which makes these two Matchers ask the same question.",
 			)
+			// NOTE: No Guard clause, in either position. On this Case one
+			// changes nothing, and on the Case above it leaves no Case claiming
+			// the Type at all — `missing-case`, whose own two answers are both
+			// swallowed by the Case that decides first and report this again.
 			expect(diagnostics[0].helps).toEqual([
-				"Tell the two Cases apart by a member that survives to runtime, or give this one a Guard.",
+				"Tell the two Cases apart by a member that survives to runtime — a member whose Type is not a Function.",
 			])
 		})
 

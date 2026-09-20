@@ -2744,13 +2744,20 @@ Error: Case '#Circle' requires a payload
    │                             ───┬───  
    │                                ╰───── no payload was given
    │ 
+   │ Help: Write the payload, filling each member in: '#Circle({ radius = … })'.
+   │ 
    │ Note: '#Circle' carries a { radius: Integer }.
 ───╯
 ```
 
 </div>
 
-Pass the payload, `#Circle({ radius = 1 })`, or `#Circle(1)` for a payload of one member.
+Pass the payload, `#Circle({ radius = 1 })`, or `#Circle(1)` for a payload of one
+member. The Help spells the shape with the member names the note has just given
+the types of, and leaves the values as the `…` they are. A case whose default
+fills **every** member in gets a different Help — `Its default fills every member
+in — write '#Circle({})'.` — because a bare `#Circle` is a payload-free case's
+spelling and stays one, however much of the payload is defaulted.
 
 Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
 
@@ -2999,7 +3006,7 @@ Warning: This Case can never match
     │               ──┬─  
     │                 ╰─── an earlier Case already answers for every Type this one matches
     │ 
-    │ Help: Remove this Case, or write it above the one that covers it.
+    │ Help: Remove this Case — the Case above answers for every value it would take, in whichever order the two are written.
     │ 
     │ Note: Cases are tried in order, and the first one that fits wins.
 ────╯
@@ -3007,7 +3014,36 @@ Warning: This Case can never match
 
 </div>
 
-Delete the second `case #Red`, since the first one already handles `#Red`. When the two cases differ, move the narrower one above the case that covers it.
+Delete the second `case #Red`, since the first one already handles `#Red`. Two
+matchers that ask the same question swallow each other in whichever order they
+are written, so reordering is not offered for them. Where the covered case is
+**narrower**, the Help is `Remove this Case, or write it above the one that covers it.`
+
+A case that overlaps no member at all reports under the same code, with its own Help:
+
+<div class="error-output">
+
+```
+[unreachable-case]
+Warning: This Case can never match
+    ╭─┤ Describe.es:5:9 │
+    │
+  4 │        constant described = match value -> String {
+    │                                   ──┬──  
+    │                                     ╰──── this is an Integer | Boolean
+    │ 
+  5 │          case String { <- "never" }
+    │               ───┬──  
+    │                  ╰──── String is not a member of the matched Union
+    │ 
+    │ Help: Remove this Case, or name a member of Integer | Boolean.
+────╯
+```
+
+</div>
+
+Removal is always safe for that one: a case the exhaustiveness check never
+counted cannot be the case holding exhaustiveness up.
 
 Quick Fix: **Remove unreachable Case**.
 
@@ -3043,6 +3079,65 @@ Error: This Case can never match
 
 Write the generic case last.
 
+Two record types that differ only in a function member's **signature** report the
+same code with a different Help, because reordering cannot help there:
+
+<div class="error-output">
+
+```
+[erased-case-conflict]
+Error: This Case can never match
+    ╭─┤ Show.es:8:9 │
+    │
+  7 │          case Handler { <- "a handler" }
+    │               ───┬───  
+    │                  ╰───── this Case runs first
+    │ 
+  8 │          case Logger { <- "a logger" }
+    │               ───┬──  
+    │                  ╰──── an earlier Case already answers for every Type this one matches
+    │ 
+    │ Help: Tell the two Cases apart by a member that survives to runtime — a member whose Type is not a Function.
+    │ 
+    │ Note 1: Cases are tried in order, and the first one that fits wins.
+    │ Note 2: A Function's Signature erases before a Match runs, so a Function-typed member is only ever checked for being callable — which makes these two Matchers ask the same question.
+────╯
+```
+
+</div>
+
+No guard helps, in either position: on the later case it changes nothing, because
+the earlier one decides first and never reaches it; on the earlier case it takes
+that case's claim away and leaves no case making it, which is
+[`missing-case`](#missing-case) — and both of that report's answers are swallowed
+by the case that decides first. Two matchers asking one erased question admit no
+exhaustive `match` at all, so the only edit is to make them ask two.
+
+The same conflict is reported about a method call's **dispatch branches**, where
+the namespaces stand in for the cases and the receiver is underlined instead:
+
+<div class="error-output">
+
+```
+[erased-case-conflict]
+Error: The branch for Logger can never run
+    ╭─┤ Show.es:19:13 │
+    │
+ 19 │        <- value::describe()
+    │           ──┬──  ────┬───  
+    │             ╰────────│───── this is a Handler | Logger
+    │                      │     
+    │                      ╰───── Handler answers for every value it would take
+    │ 
+    │ Help: Tell the two member Types apart by something that survives to runtime — a member whose Type is not a Function.
+    │ 
+    │ Note 1: A branch is picked by the receiver's Type at runtime, and the first one that fits wins.
+    │ Note 2: A Function's Signature does not survive to be checked — a member Type naming a callback is only ever asked whether the value is callable, which makes two of them ask the same question.
+────╯
+```
+
+</div>
+
 Taught on: [Generics › Types erase before a match](/docs/language/generics#types-erase-before-a-match)
 
 ### `empty-list-overlap`
@@ -3075,7 +3170,18 @@ Warning: This Case never sees an empty List
 
 Guard the cases with `where @::hasItems()`, and handle the empty list in a case of its own, such as a final `case _`.
 
-Quick Fix: **Guard it with 'where @::hasItems()'**, on the case that runs first.
+The same warning is reported about a method call's **dispatch branches**, where
+there is no `match` to guard yet. Its Help spells the whole shape — the guards,
+the case of its own, and the call moved inside each arm — because a `match`
+written without the guards is picked by the same erased question the branches
+were, and reports this again in the `match`'s own wording.
+
+Quick Fix: **Guard the Cases with 'where @::hasItems()' and add a 'case _'** guards
+every case that names a list and writes the arm those guards make necessary. It
+writes both halves because either alone is worse than neither: guarding one case
+moves the warning one case down, and guarding them all without the arm turns a
+warning into a `missing-case` error. Where the `match` already ends in `case _`,
+only the guards are written, and the title says so.
 
 Taught on: [Generics › Types erase before a match](/docs/language/generics#types-erase-before-a-match)
 
@@ -3107,7 +3213,12 @@ Warning: This Case never sees an empty Dictionary
 
 </div>
 
-Guard both cases, as in `case Dictionary<String, Integer> where @::hasEntries() { … }`, and handle the empty dictionary in a final `case _ { … }`.
+Guard both cases, as in `case Dictionary<String, Integer> where @::hasEntries() { … }`, and handle the empty dictionary in a final `case _ { … }`. A method call's
+**dispatch branches** report it too, with the shape
+[`empty-list-overlap`](#empty-list-overlap) spells, asking the dictionary's own
+question.
+
+Quick Fix: **Guard the Cases with 'where @::hasEntries()' and add a 'case _'**.
 
 Quick Fix: **Guard it with 'where @::hasEntries()'**, on the case that runs first.
 
@@ -3155,6 +3266,8 @@ Error: Match Expressions require a Union Type
    │                            ──┬──  
    │                              ╰──── this is a Boolean
    │ 
+   │ Help: Ask about the value with an 'if', or choose between answers with a 'define'.
+   │ 
    │ Note: Matching a Type with only one possible shape has only one outcome.
 ───╯
 ```
@@ -3194,6 +3307,12 @@ Error: This Match has no Case for the rest of the values
 </div>
 
 End the `match` with `case _`: `case 0 { … } case 1 { … } case _ { … }`.
+
+The other three shapes carry their own Helps, each built from what this match is:
+
+- **A case that names no value.** Where the match already ends in a case for the rest, the Help asks for the value or for a removal — moving this case below the last one only makes that one the case naming no value, which is this report one case further down. Where the match has no end yet, the Help offers the move.
+- **A case that names a value of another type.** `Name an Integer, or remove this Case.` A case compared across types is never true, so removing it changes nothing about what the match answers.
+- **A case that names a value and still carries a guard.** `Take the Guard off, and ask its question inside the Handler with an 'if'.`
 
 Quick Fix: **Add a 'case _' for the rest of the values**. A guard on a case that names a value gets **Drop the Guard**.
 

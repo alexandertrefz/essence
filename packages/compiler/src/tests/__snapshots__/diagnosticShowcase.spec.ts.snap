@@ -1706,6 +1706,8 @@ Warning: This Case can never match
  35 │        case String  { <- "never" }
     │             ───┬──  
     │                ╰──── String is not a member of the matched Union
+    │ 
+    │ Help: Remove this Case, or name a member of Integer | Boolean.
 ────╯
 
 [match-on-non-union]
@@ -1715,6 +1717,8 @@ Error: Match Expressions require a Union Type
  41 │     constant only = match "essence" -> String {
     │                           ────┬────  
     │                               ╰────── this is a String
+    │ 
+    │ Help: Ask about the value with an 'if', or choose between answers with a 'define'.
     │ 
     │ Note: Matching a Type with only one possible shape has only one outcome.
 ────╯
@@ -2794,6 +2798,8 @@ Warning: This Case can never match
  22 │        case { x, y } as whole { <- x }
     │             ────┬───  
     │                 ╰───── { x: Integer, y: Unknown } is not a member of the matched Union
+    │ 
+    │ Help: Remove this Case, or name a member of { x: Integer } | { key: String }.
 ────╯
 
 [redundant-pattern-binder]
@@ -2804,7 +2810,7 @@ Error: A Matcher's Pattern can not name the whole value
     │                      ────┬───  
     │                          ╰───── '@' already names it
     │ 
-    │ Help: Write '@' where 'whole' was meant.
+    │ Help: Drop the 'as whole' and write '@' where 'whole' was meant.
     │ 
     │ Note: Inside an arm, '@' is the scrutinee narrowed to what the Matcher established — which is exactly what this would name a second time.
 ────╯

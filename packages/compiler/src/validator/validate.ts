@@ -983,8 +983,15 @@ function validateDispatchCases(
 							"A branch is picked by the receiver's Type at runtime, and the first one that fits wins.",
 							"A Function's Signature does not survive to be checked — a member Type naming a callback is only ever asked whether the value is callable, which makes two of them ask the same question.",
 						],
+						// NOTE: The Match clause is gone. A dispatch branch and a
+						// Match Case are picked the same way, so a Match written
+						// over these two member Types reports the very same
+						// conflict one line further down — the reader followed
+						// the Help and met it again wearing the Match's wording.
+						// A Signature is not a runtime question anywhere, and
+						// telling the members apart is the only answer there is.
 						helps: [
-							"Tell the two member Types apart by something that survives to runtime, or narrow the value with a Match Expression before calling the Method.",
+							"Tell the two member Types apart by something that survives to runtime — a member whose Type is not a Function.",
 						],
 					},
 				)
@@ -1027,8 +1034,17 @@ function validateDispatchCases(
 								? "Key and value Types erase before a branch is picked, so a Dictionary is placed by the entries it holds — and an empty Dictionary holds none, which makes it a value of every Dictionary Type there is."
 								: "Item Types erase before a branch is picked, so a List is placed by the items it holds — and an empty List holds none, which makes it a value of every List Type there is.",
 						],
+						// NOTE: A Match alone narrows nothing here — its Cases are
+						// picked by the same erased question the branches were,
+						// so the reader who wrote one met this report again in
+						// the Match's own wording. What decides an empty
+						// container is a GUARD, which is why the Help spells the
+						// whole shape: guarded Cases, and a Case of its own for
+						// the empty value that reaches none of them.
 						helps: [
-							"Narrow the value with a Match Expression before calling the Method.",
+							dictionary
+								? "Guard the Cases of a Match with 'where @::hasEntries()', answer for the empty Dictionary in a Case of its own, and call the Method inside each arm."
+								: "Guard the Cases of a Match with 'where @::hasItems()', answer for the empty List in a Case of its own, and call the Method inside each arm.",
 						],
 					},
 				)
@@ -1463,6 +1479,22 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 								`this is ${withArticle(describeType(node.value.type))}`,
 							),
 						],
+						// NOTE: Removal is safe here and nowhere else in this
+						// function: this Case overlaps NO member, so taking it
+						// out changes nothing about what the Match answers for
+						// — a Case the exhaustiveness check never counted can
+						// not be the one holding exhaustiveness up. The Quick
+						// Fix that removes it was already offered and the Help
+						// naming it was not.
+						//
+						// The second clause is for the Matcher that names
+						// something the Union does not hold, which is as often a
+						// name written from memory as it is a Case nobody needs.
+						helps: [
+							handler.memberTypes === null
+								? `Remove this Case, or name a member of ${describeType(node.value.type)}.`
+								: "Remove this Case — no value this Match can be given passes it.",
+						],
 					},
 				)
 
@@ -1500,8 +1532,16 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				let notes = [
 					"Cases are tried in order, and the first one that fits wins.",
 				]
+				// NOTE: Reordering is only an answer where the covered Matcher
+				// is NARROWER than the one covering it. Two Matchers that ask
+				// the same question — a `case #Red` written twice — swallow each
+				// other whichever way round they are written, so "write it above"
+				// moved the report to the other Case and left the reader circling
+				// between two spellings of one duplicate.
 				let helps = [
-					"Remove this Case, or write it above the one that covers it.",
+					matchesType(runtimeMatcher, claimingMatcher)
+						? "Remove this Case — the Case above answers for every value it would take, in whichever order the two are written."
+						: "Remove this Case, or write it above the one that covers it.",
 				]
 				// NOTE: The two reasons that are ERASURE rather than dead code.
 				// A Case shadowed by a Type that covers it is a Case nobody
@@ -1541,8 +1581,19 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 							: "A Function's Signature erases before a Match runs, so a Function-typed member is only ever checked for being callable — which makes these two Matchers ask the same question.",
 					)
 
+					// NOTE: A Guard is no answer here, in either position, and
+					// the clause offering one is gone. On THIS Case it changes
+					// nothing — the earlier one decides first and never reaches
+					// it, which is what the Label already says. On the Case
+					// ABOVE it takes that Case's claim away and no Case is left
+					// to make it: `missing-case`, whose own answers are a Case
+					// for the Type (covered by the other one — this report
+					// again) or a `case _` (covered by the other one — this
+					// report again). Two Matchers asking one erased question
+					// admit no exhaustive Match at all, so the only edit is to
+					// make them ask two.
 					helps = [
-						"Tell the two Cases apart by a member that survives to runtime, or give this one a Guard.",
+						"Tell the two Cases apart by a member that survives to runtime — a member whose Type is not a Function.",
 					]
 				}
 
@@ -1627,6 +1678,15 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				],
 				notes: [
 					"Matching a Type with only one possible shape has only one outcome.",
+				],
+				// NOTE: The two forms that DO ask about a value with one shape,
+				// which is what a reader reaching for `match` here wanted. Named
+				// in the order they answer: a question with two answers is an
+				// `if`, and one with several is a `define`. An Integer or a
+				// String never reaches this — a Match that names a value is a
+				// literal Match, and this is what is left.
+				helps: [
+					"Ask about the value with an 'if', or choose between answers with a 'define'.",
 				],
 			},
 		)
@@ -1935,6 +1995,14 @@ function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 		)
 	let takesValuesApart = `A Match on ${withArticle(describeType(scrutinee))} takes the VALUE apart: every Case names a value, and the last one answers for every value the Cases above it did not name.`
 	let lastIndex = node.handlers.length - 1
+	let last = node.handlers[lastIndex]
+	// NOTE: Whether the Match ALREADY ends in a Case for the rest, which is what
+	// decides the Help below — the same question the final check asks, asked once
+	// and read twice so the two can not disagree.
+	let endsInACaseForTheRest =
+		last !== undefined &&
+		isUnconditionalHandler(last) &&
+		acceptsAllAtRuntime(last.matcher, node.value.type)
 
 	for (let index = 0; index < lastIndex; index++) {
 		let handler = node.handlers[index]
@@ -1953,8 +2021,17 @@ function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 						matchedValue(),
 					],
 					notes: [takesValuesApart],
+					// NOTE: `'case 0'` was an example of a value, and it is a
+					// dead end on a Match over Strings — a Case naming an
+					// Integer there is refused two clauses down. And "move it to
+					// the end" is only an edit where there is no end yet: a
+					// Match that already closes with `case _` has this Case
+					// moved BELOW it, which makes the `case _` the one that does
+					// not name a value and reports in its place.
 					helps: [
-						"Write the value this Case is about — 'case 0' — or move it to the end, where 'case _' answers for the rest.",
+						endsInACaseForTheRest
+							? "Write the value this Case is about, or remove it — the last Case already answers for every value the Cases above it do not name."
+							: "Write the value this Case is about, or move it to the end, where it answers for every value the Cases above it do not name.",
 					],
 				},
 			)
@@ -2011,27 +2088,28 @@ function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 					notes: [
 						"A Case of such a Match is compared to the matched value, and a comparison across Types can never be true.",
 					],
+					// NOTE: The Type a value written here has to BE, which the
+					// Label has just said this one is not. Removal is the other
+					// answer and is always safe: a Case comparing across Types
+					// is never true, so the Cases below it already answer for
+					// everything it would have.
+					helps: [
+						`Name ${withArticle(describeType(scrutinee))}, or remove this Case.`,
+					],
 				},
 			)
 		}
 	}
 
-	let last = node.handlers[lastIndex]
-
 	// NOTE: A Match with no Handlers at all is a Parser error, and this runs on a
 	// tree the Parser accepted.
-	if (last === undefined) {
-		return
-	}
-
-	// NOTE: Unconditional, and accepting every value that can arrive — `case _`,
-	// or a Case naming the matched Type itself, which is the same question spelled
-	// out. Both are indistinguishable by the time a Match is typed, and both are
-	// total, so both are the end of a Match on values.
-	if (
-		isUnconditionalHandler(last) &&
-		acceptsAllAtRuntime(last.matcher, node.value.type)
-	) {
+	//
+	// NOTE: `endsInACaseForTheRest` is the answer to "unconditional, and
+	// accepting every value that can arrive" — `case _`, or a Case naming the
+	// matched Type itself, which is the same question spelled out. Both are
+	// indistinguishable by the time a Match is typed, and both are total, so
+	// both are the end of a Match on values.
+	if (last === undefined || endsInACaseForTheRest) {
 		return
 	}
 
@@ -2564,13 +2642,25 @@ function validateCaseValue(
 				// a bare Case name meaning exactly one thing on both sides of
 				// the JavaScript boundary. So a fully defaulted Case has an
 				// empty payload to write, and this is where to say so.
+				//
+				// NOTE: Every other one gets the SHAPE, spelled with the member
+				// names the Note has just named the Types of — the two halves of
+				// one answer, and a reader holding both writes the payload
+				// without looking the Case up. The values are the reader's, so
+				// they stand as the `…` this says it is.
 				helps:
 					node.type.payloadDefault?.members.length ===
 					Object.keys(node.type.members).length
 						? [
 								`Its default fills every member in — write '#${node.type.name}({})'.`,
 							]
-						: [],
+						: [
+								`Write the payload, filling each member in: '#${node.type.name}({ ${Object.keys(
+									node.type.members,
+								)
+									.map((member) => `${member} = …`)
+									.join(", ")} })'.`,
+							],
 			},
 		)
 	} else if (

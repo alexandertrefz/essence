@@ -3477,16 +3477,51 @@ describe("Code Actions", () => {
 			let [fix] = quickFixes(lines)
 			let result = applied(lines, fix)
 
-			expect(fix.title).toBe("Guard it with 'where @::hasItems()'")
-			// NOTE: The empty List the Cases stop answering for wants a Case of
-			// its own, and that Case is the reader's to write — which is why
-			// the `missing-case` below is expected rather than a regression.
+			// NOTE: EVERY Case that names a List, and the `case _` the Guards
+			// make necessary. Guarding one Case reported the same Warning one
+			// Case further down, and guarding them all without the arm turned a
+			// WARNING into an ERROR — `missing-case`, whose own first Help was
+			// to write back the Cases the Guards had just stopped claiming.
+			expect(fix.title).toBe(
+				"Guard the Cases with 'where @::hasItems()' and add a 'case _'",
+			)
 			expect(fix.isPreferred).toBe(false)
 			expect(result[3]).toBe(
 				'\t\tcase List<String> where @::hasItems() { <- "strings" }',
 			)
+			expect(result[4]).toBe(
+				'\t\tcase List<Integer> where @::hasItems() { <- "integers" }',
+			)
+			expect(result[5]).toBe("\t\tcase _ {}")
 
+			// NOTE: The Warning is gone and no ERROR stands in its place. What
+			// is left is the empty arm's own hole, which is the reader's to fill
+			// and is what every scaffolding fix here leaves.
 			expect(codesOf(result)).not.toContain("empty-list-overlap")
+			expect(codesOf(result)).not.toContain("missing-case")
+			expect(refusalOf(result)).toBeNull()
+		})
+
+		// NOTE: A Match that already ends in a wildcard has somewhere for the
+		// empty List to land, so the arm is not written a second time — a
+		// `case _` under a `case _` is an unreachable Case.
+		it("should write no arm where the Match already ends in one", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant value: List<String> | List<Integer> = [1]",
+				"\tconstant described = match value -> String {",
+				'\t\tcase List<String> { <- "strings" }',
+				'\t\tcase List<Integer> { <- "integers" }',
+				'\t\tcase _ { <- "empty" }',
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Guard the Cases with 'where @::hasItems()'")
+			expect(codesOf(result)).toEqual([])
 		})
 
 		// NOTE: The dispatch branches of a Method Invocation report the same
@@ -3526,12 +3561,19 @@ describe("Code Actions", () => {
 			let [fix] = quickFixes(lines)
 			let result = applied(lines, fix)
 
-			expect(fix.title).toBe("Guard it with 'where @::hasEntries()'")
+			expect(fix.title).toBe(
+				"Guard the Cases with 'where @::hasEntries()' and add a 'case _'",
+			)
 			expect(result[3]).toBe(
 				'\t\tcase Dictionary<String, Integer> where @::hasEntries() { <- "one" }',
 			)
+			expect(result[4]).toBe(
+				'\t\tcase Dictionary<Integer, String> where @::hasEntries() { <- "two" }',
+			)
+			expect(result[5]).toBe("\t\tcase _ {}")
 
 			expect(codesOf(result)).not.toContain("empty-dictionary-overlap")
+			expect(codesOf(result)).not.toContain("missing-case")
 		})
 	})
 

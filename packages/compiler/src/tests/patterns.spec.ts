@@ -141,8 +141,10 @@ describe("Patterns", () => {
 			}`
 
 			expect(codesOf(source)).toContain("redundant-pattern-binder")
+			// NOTE: Both edits. Rewriting the body alone leaves the binder
+			// standing, which is what is refused.
 			expect(helpsOf(source)).toContain(
-				"Write '@' where 'whole' was meant.",
+				"Drop the 'as whole' and write '@' where 'whole' was meant.",
 			)
 		})
 
