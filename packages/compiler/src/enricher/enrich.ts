@@ -93,6 +93,33 @@ export type TopLevelScopeOptions = {
 	recovery?: parser.Recovery
 }
 
+// NOTE: WHERE a dropped Declaration's silence reaches, decided here because
+// this is the stage that knows the rule. The rule is the language's own: a
+// `function`, `overload function`, `type`, `choice`, `namespace` or `protocol`
+// written at the top level of a section is HOISTED — `hoistDeclarations` runs
+// over an implementation's and a tests block's own Statements, and `isHoistable`
+// lists exactly those six kinds — so it is in scope across the whole file and
+// above its own line. Everything else is in scope inside the block it was
+// written in, from its own position down: Constants, Variables, Parameters,
+// Pattern binders, and a Declaration of ANY kind written inside a body.
+//
+// So a dropped hoisted Declaration buys a file-wide silence, and every other
+// dropped Declaration buys a silence over exactly the text it would have been
+// readable from. Without the second half, a `total` dropped out of one
+// Function's body silenced a genuinely undeclared `total` in the next Function
+// along, which is one syntax error being allowed to hide a mistake it did not
+// cause.
+function abandonedDeclaration(
+	record: parser.AbandonedDeclaration,
+): enricher.AbandonedDeclaration {
+	return {
+		name: record.name,
+		position: record.position,
+		enclosing: record.enclosing,
+		hoists: record.hoistable && record.atSectionLevel,
+	}
+}
+
 // NOTE: The Scope a Program's top level is enriched in: the builtins first, and
 // then whatever the Program declares itself, in ONE table per kind. One Scope
 // rather than a builtin Scope with a child holding the declarations, because a
@@ -133,7 +160,7 @@ export function topLevelScope(
 			options.recovery === undefined ||
 			options.recovery.declarations.length === 0
 				? undefined
-				: new Set(options.recovery.declarations),
+				: options.recovery.declarations.map(abandonedDeclaration),
 		// NOTE: The builtins are declared in TypeScript, not in Essence —
 		// there is no source Position to point a Diagnostic at.
 		declarations: scopeMap(),

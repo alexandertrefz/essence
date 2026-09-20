@@ -1666,7 +1666,7 @@ export function resolveIdentifierType(
 		// `declarationWasAbandoned`. A near miss would offer the reader another
 		// name for the one they already wrote, and a foreign-habit guess would
 		// answer a word that was never the problem.
-		if (declarationWasAbandoned(scope, name)) {
+		if (declarationWasAbandoned(scope, name, node.position)) {
 			return { type: "Error" }
 		}
 
@@ -6163,7 +6163,7 @@ function resolveIdentifierTypeDeclarationType(
 	if (result === null) {
 		// NOTE: Silent for a Type whose Declaration the Parser dropped, for the
 		// reason a value name is — see `declarationWasAbandoned`.
-		if (declarationWasAbandoned(scope, name)) {
+		if (declarationWasAbandoned(scope, name, node.position)) {
 			return { type: "Error" }
 		}
 
@@ -6292,7 +6292,7 @@ export function resolveGenericTypeDeclarationType(
 		if (result === null) {
 			// NOTE: Silent for a Type whose Declaration the Parser dropped — see
 			// `declarationWasAbandoned`.
-			if (!declarationWasAbandoned(scope, name)) {
+			if (!declarationWasAbandoned(scope, name, node.baseType.position)) {
 				reportError(
 					`Type '${name}' is not declared`,
 					node.baseType.position,

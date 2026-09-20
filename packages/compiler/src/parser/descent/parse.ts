@@ -329,6 +329,33 @@ const declarationKeywordTokenTypes = new Set([
 	TokenType.KeywordStatic,
 ])
 
+// NOTE: The six openings whose Declaration is HOISTED — the same list
+// `isHoistable` in the Enricher is written over, which is where the rule lives.
+// A run opening with one of them may have declared a name that was in scope
+// ABOVE its own line, so the silence it buys can not be bounded from above; a
+// `constant`, a `variable` or a `static` is in scope from its own line down and
+// nowhere else.
+// NOTE: Whether `cursor` stands inside `span`, inclusive of both ends.
+function positionHolds(span: common.Position, cursor: common.Cursor): boolean {
+	let afterStart =
+		cursor.line > span.start.line ||
+		(cursor.line === span.start.line && cursor.column >= span.start.column)
+	let beforeEnd =
+		cursor.line < span.end.line ||
+		(cursor.line === span.end.line && cursor.column <= span.end.column)
+
+	return afterStart && beforeEnd
+}
+
+const hoistableKeywordTokenTypes = new Set([
+	TokenType.KeywordFunction,
+	TokenType.KeywordOverload,
+	TokenType.KeywordType,
+	TokenType.KeywordChoice,
+	TokenType.KeywordNamespace,
+	TokenType.KeywordProtocol,
+])
+
 // NOTE: The names a Statement the Parser abandoned would have declared, read
 // off its Tokens — see `parser.Recovery`. Empty where its opening says nothing
 // about a name, which is every Statement that declares none and a few that do:
@@ -1026,9 +1053,21 @@ class DescentParser {
 	// at, which is the level its sibling readings stand on.
 	private furthestFailureDepth = 0
 	// NOTE: What the recovery walked past, which is handed to the Program as its
-	// `Recovery` — see `recordAbandoned`. Sets, because one Statement is dropped
-	// once however many Tokens it was written across, and a name is a name.
-	private abandonedDeclarations = new Set<string>()
+	// `Recovery` — see `recordAbandoned`. The lines are a Set, because one
+	// Statement is dropped once however many Tokens it was written across; the
+	// Declarations are a list, because the same name dropped in two different
+	// bodies is two different silences and each is owed its own span.
+	//
+	// `enclosing` is null while the record is PENDING — the block it stands in
+	// has not closed yet, and the block that claims it is the first one to close
+	// around it, which is the innermost. See `claimAbandonedDeclarations`.
+	private abandonedDeclarations: Array<{
+		name: string
+		position: common.Position
+		enclosing: common.Position | null
+		hoistable: boolean
+		atSectionLevel: boolean
+	}> = []
 	private abandonedLines = new Set<number>()
 
 	constructor(source: string, options: ParserOptions = {}) {
@@ -1127,7 +1166,10 @@ class DescentParser {
 		let nodes = this.parseStatementList(() =>
 			this.parseImplementationNode(),
 		)
-		let closingPosition = this.parseClosingBrace(header.leftBrace.position)
+		let closingPosition = this.parseClosingBrace(
+			header.leftBrace.position,
+			true,
+		)
 
 		let implementation = generators.implementationSection(nodes, {
 			start: header.keyword.position.start,
@@ -1594,7 +1636,7 @@ class DescentParser {
 		let leftBrace = this.tokens.next()
 
 		let nodes = this.parseStatementList(() => this.parseTestsNode())
-		let closingPosition = this.parseClosingBrace(leftBrace.position)
+		let closingPosition = this.parseClosingBrace(leftBrace.position, true)
 
 		return generators.testsSection(nodes, {
 			start: keyword.position.start,
@@ -2268,8 +2310,82 @@ class DescentParser {
 			}
 		}
 
-		for (let declared of abandonedDeclarationNames(abandoned)) {
-			this.abandonedDeclarations.add(declared)
+		let opening = abandoned[0]
+
+		if (opening === undefined) {
+			return
+		}
+
+		let hoistable = hoistableKeywordTokenTypes.has(opening.type)
+
+		// NOTE: Deduplicated, because one run declares a name once however many
+		// of its Tokens say so — a Choice's Case written with a payload names
+		// itself twice over, and two records for it would be two identical
+		// silences.
+		for (let declared of new Set(abandonedDeclarationNames(abandoned))) {
+			this.recordAbandonedDeclaration(
+				declared,
+				opening.position,
+				hoistable,
+			)
+		}
+	}
+
+	// NOTE: One name, pending the block that will claim it. Every record is
+	// written down here so that there is one place the shape is built and one
+	// place the claim can be explained.
+	protected recordAbandonedDeclaration(
+		name: string,
+		position: common.Position,
+		hoistable: boolean,
+	): void {
+		this.abandonedDeclarations.push({
+			name,
+			position,
+			enclosing: null,
+			hoistable,
+			atSectionLevel: false,
+		})
+	}
+
+	// NOTE: A block has just closed, so every record still pending inside it
+	// stands in THIS block — the innermost one that encloses it, because a
+	// nested block closes before the block around it and the first claim wins.
+	// Claiming as blocks close is what makes the span exact without the Parser
+	// having to know where it is: the `{` it was opened at and the `}` it was
+	// closed at are both in hand right here.
+	//
+	// `section` says this block is an `implementation { … }`, `declarations
+	// { … }` or `tests { … }` — the only blocks whose own Statements are
+	// hoisted. It rides on the record rather than being worked out later,
+	// because a Statement's DEPTH is exactly what the stages behind the Parser
+	// can no longer see.
+	protected claimAbandonedDeclarations(
+		openingPosition: common.Position | null,
+		closingPosition: common.Position,
+		section: boolean,
+	): void {
+		if (openingPosition === null) {
+			return
+		}
+
+		let enclosing = {
+			start: openingPosition.start,
+			end: closingPosition.end,
+		}
+
+		for (let record of this.abandonedDeclarations) {
+			// NOTE: Pending AND inside this block. A block that closes is not
+			// necessarily a block the pending records stand in — a Statement
+			// dropped at the top level is still pending when the NEXT
+			// Function's body closes below it, and that body never held it.
+			if (
+				record.enclosing === null &&
+				positionHolds(enclosing, record.position.start)
+			) {
+				record.enclosing = enclosing
+				record.atSectionLevel = section
+			}
 		}
 	}
 
@@ -2285,13 +2401,42 @@ class DescentParser {
 		// reported a second time as a name nobody declared.
 		if (
 			this.abandonedLines.size === 0 &&
-			this.abandonedDeclarations.size === 0
+			this.abandonedDeclarations.length === 0
 		) {
 			return undefined
 		}
 
+		// NOTE: A record no block ever claimed stood outside every block this
+		// Parser got to close — a file with no `implementation {` header at all,
+		// or one whose blocks were all torn open. There is nothing tighter to
+		// say than the file, so it is the file, and it counts as section level:
+		// that is the widest silence, and it is what a file this broken had.
+		let wholeFile = {
+			start: { line: 1, column: 1 },
+			end: this.tokens.endPosition().end,
+		}
+
 		return {
-			declarations: [...this.abandonedDeclarations].sort(),
+			declarations: this.abandonedDeclarations
+				.map((record) => ({
+					name: record.name,
+					position: record.position,
+					enclosing: record.enclosing ?? wholeFile,
+					hoistable: record.hoistable,
+					atSectionLevel:
+						record.enclosing === null || record.atSectionLevel,
+				}))
+				.sort(
+					(left, right) =>
+						left.position.start.line - right.position.start.line ||
+						left.position.start.column -
+							right.position.start.column ||
+						(left.name < right.name
+							? -1
+							: left.name > right.name
+								? 1
+								: 0),
+				),
 			lines: [...this.abandonedLines].sort((left, right) => left - right),
 		}
 	}
@@ -2340,13 +2485,25 @@ class DescentParser {
 	// end of the input is where a missing `}` is *noticed*; the `{` is where
 	// the mistake is, and pointing at both is the difference between "there
 	// is a brace missing somewhere" and "this block was never closed".
+	//
+	// NOTE: `section` marks the three blocks whose own Statements are hoisted —
+	// `implementation`, `declarations` and `tests`. Every block close funnels
+	// through here, which is what makes this the one place an abandoned
+	// Declaration can be told which block it stood in; see
+	// `claimAbandonedDeclarations`.
 	protected parseClosingBrace(
 		openingPosition: common.Position | null = null,
+		section: boolean = false,
 	): common.Position {
 		let token = this.tokens.peek()
 
 		if (token !== undefined && token.type === TokenType.SymbolRightBrace) {
 			this.tokens.next()
+			this.claimAbandonedDeclarations(
+				openingPosition,
+				token.position,
+				section,
+			)
 
 			return token.position
 		}
@@ -2359,7 +2516,11 @@ class DescentParser {
 			this.suppressDiagnostics = true
 		}
 
-		return this.tokens.endPosition()
+		let endPosition = this.tokens.endPosition()
+
+		this.claimAbandonedDeclarations(openingPosition, endPosition, section)
+
+		return endPosition
 	}
 
 	// NOTE: Where the brace is missing, which is not where its absence is
@@ -5951,7 +6112,14 @@ class DescentParser {
 		// declare, which is this mistake said again in words about a different
 		// one. `declarationWasAbandoned` is the question every "no such name"
 		// report already asks.
-		this.abandonedDeclarations.add(name.content)
+		//
+		// NOTE: The binder is written BEFORE the arm's own `{`, so the block
+		// that claims it is the MATCH block rather than the arm. That is wider
+		// than the binder ever was: a read of the same name in a SIBLING arm is
+		// silenced too. It is deliberate — the alternative is teaching the claim
+		// about a block that has not been opened yet — and the cost is one arm's
+		// worth of over-silence inside one Match Expression, not the file.
+		this.recordAbandonedDeclaration(name.content, name.position, false)
 
 		return null
 	}

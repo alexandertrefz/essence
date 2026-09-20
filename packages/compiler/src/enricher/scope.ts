@@ -148,30 +148,79 @@ export function unimportedNamespacesOf(
 	return []
 }
 
-// NOTE: Whether the Parser abandoned a Declaration of this name — the same
+// NOTE: What the Parser abandoned on the way to this Program — the same
 // parent-chain walk `modulePathOf` makes, and for the same reason: a name read
 // deep inside a body has to reach what the Program's top level was told.
+function abandonedDeclarationsIn(
+	scope: enricher.Scope,
+): ReadonlyArray<enricher.AbandonedDeclaration> {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.abandonedDeclarations !== undefined) {
+			return current.abandonedDeclarations
+		}
+	}
+
+	return []
+}
+
+// NOTE: Whether `cursor` stands inside `span`, inclusive of both ends.
+function spanHolds(span: common.Position, cursor: common.Cursor): boolean {
+	return notBefore(cursor, span.start) && notBefore(span.end, cursor)
+}
+
+function notBefore(cursor: common.Cursor, than: common.Cursor): boolean {
+	return (
+		cursor.line > than.line ||
+		(cursor.line === than.line && cursor.column >= than.column)
+	)
+}
+
+// NOTE: Whether the Parser abandoned a Declaration of this name that THIS read
+// could have seen.
 //
 // It is the one question every "no such name" report asks before it reports.
 // A Declaration the Parser dropped is a Declaration this Program was written
 // with, so a read of what it bound is not a mistake the reader made — it is the
 // syntax error, once more, one line further down. Answering the read as an
 // Error and saying nothing is what keeps one mistake to one Diagnostic.
+//
+// NOTE: And the read's POSITION is what keeps it to one mistake in the other
+// direction. A hoisted Declaration is in scope file-wide, so a dropped one
+// silences every read of its name; anything else is in scope inside the block it
+// was written in and from its own position down, so a dropped one silences
+// exactly the reads it would have answered. A `total` dropped out of one
+// Function's body used to silence a genuinely undeclared `total` in the next
+// Function along — the syntax error hiding a mistake it did not cause, which is
+// the opposite of what reporting everything in one run is for.
 export function declarationWasAbandoned(
 	scope: enricher.Scope,
 	name: string,
+	readPosition: common.Position,
 ): boolean {
-	for (
-		let current: enricher.Scope | null = scope;
-		current !== null;
-		current = current.parent
-	) {
-		if (current.abandonedDeclarations?.has(name) === true) {
-			return true
-		}
-	}
+	return abandonedDeclarationsIn(scope).some(
+		(record) =>
+			record.name === name &&
+			(record.hoists ||
+				(spanHolds(record.enclosing, readPosition.start) &&
+					notBefore(readPosition.start, record.position.start))),
+	)
+}
 
-	return false
+// NOTE: The same question asked about a MEMBER name — a Method or a static
+// Property read off a Namespace, a Protocol or a Union's Cases. It is file-wide
+// and deliberately so: a member name is not lexical. A Method dropped out of a
+// Namespace's body is read from OUTSIDE that body, everywhere in the file the
+// Namespace reaches, so bounding the silence by where the run stood would
+// answer every one of those calls as a mistake the reader made.
+export function memberDeclarationWasAbandoned(
+	scope: enricher.Scope,
+	name: string,
+): boolean {
+	return abandonedDeclarationsIn(scope).some((record) => record.name === name)
 }
 
 // NOTE: A fresh child Scope nested under `parent`, with every map empty — the

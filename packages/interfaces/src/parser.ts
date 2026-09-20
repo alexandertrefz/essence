@@ -11,6 +11,37 @@ import type { Documentation, Position } from "./common/index"
 // the Program does — into the Enricher for the names, and through a Module
 // graph to the Validator for the lines — and a second value threaded alongside
 // is a second thing every caller has to remember to carry.
+// NOTE: One name an abandoned Statement declared, and WHERE it stood — because
+// the silence a dropped Declaration buys is owed to the reads that Declaration
+// would have answered and to no others. A `total` dropped out of one Function's
+// body says nothing about a `total` read in the next Function along: that read
+// resolved to nothing before the mistake and resolves to nothing without it, so
+// answering it silently hands one syntax error the power to hide every genuine
+// undeclared name in the file that happens to be spelled the same way.
+export type AbandonedDeclaration = {
+	name: string
+	// NOTE: Where the abandoned run begins. A Declaration is in scope from its
+	// own line downward, so a read ABOVE this one could never have seen it —
+	// unless it hoists, which is what `hoistable` is for.
+	position: Position
+	// NOTE: The span of the innermost block the run stands in, claimed by the
+	// Parser as that block closes. A read outside it could not have seen the
+	// Declaration however the file had parsed.
+	enclosing: Position
+	// NOTE: Whether the run opened with one of the six keywords whose
+	// Declaration is HOISTED — `function`, `overload function`, `type`,
+	// `choice`, `namespace`, `protocol`. Hoisting is what puts a Declaration in
+	// scope above its own line, so a hoisted one's silence can not be bounded
+	// from above.
+	hoistable: boolean
+	// NOTE: Whether the run stood at the top level of a section block, which is
+	// the only place hoisting happens — the Enricher hoists an implementation's
+	// and a tests block's own Statements and nothing deeper. A `type` written
+	// inside a body is hoistable by keyword and hoisted by nobody, so the two
+	// halves are recorded apart and the Enricher decides.
+	atSectionLevel: boolean
+}
+
 export type Recovery = {
 	// NOTE: The names an abandoned Statement declared, as far as its opening
 	// Tokens say: `constant NAME`, `function NAME`, `namespace NAME`,
@@ -19,7 +50,7 @@ export type Recovery = {
 	// shape says nothing about a name contributes none, which is the whole of
 	// what this being incomplete costs: a read of such a name is answered
 	// exactly as it always was.
-	declarations: Array<string>
+	declarations: Array<AbandonedDeclaration>
 	// NOTE: Every line the Parser abandoned text on. A construct written
 	// across one of them is a construct it did not read whole, so what that
 	// construct LACKS says nothing: a Function missing the `<-` that was

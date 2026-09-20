@@ -154,6 +154,7 @@ import {
 	countTypeDeclaration,
 	declarationWasAbandoned,
 	expectedReturnTypeIn,
+	memberDeclarationWasAbandoned,
 	modulePathOf,
 	scopeMap,
 	typeDeclarationCount,
@@ -12774,8 +12775,9 @@ function reportUnknownMethod(
 ): void {
 	// NOTE: A Method the Parser dropped out of its Namespace is a Method this
 	// Program declares, so every call of it is the syntax error once more rather
-	// than a name the reader got wrong — see `declarationWasAbandoned`.
-	if (declarationWasAbandoned(scope, node.member.content)) {
+	// than a name the reader got wrong — see `memberDeclarationWasAbandoned`,
+	// which is the FILE-WIDE question because a member name is not lexical.
+	if (memberDeclarationWasAbandoned(scope, node.member.content)) {
 		return
 	}
 
@@ -14618,7 +14620,7 @@ function resolveUnionMethodDispatch(
 			// away on the Namespace over both Cases.
 			// NOTE: Silent for a Method the Parser dropped out of its Namespace,
 			// for the reason `reportUnknownMethod` is.
-			if (declarationWasAbandoned(scope, node.member.content)) {
+			if (memberDeclarationWasAbandoned(scope, node.member.content)) {
 				return resolveFailedMethodInvocation()
 			}
 
@@ -15994,6 +15996,17 @@ function resolveCaseReference(
 	let choiceType = findTypeInScope(choice.content, scope)
 
 	if (choiceType === null) {
+		// NOTE: Silent for a Choice whose Declaration the Parser dropped, for
+		// the reason every other read of a dropped name is — see
+		// `declarationWasAbandoned`. This is the SECOND way a Choice's name is
+		// read; the bare `#Case` path had the question and this one did not, so
+		// a dropped `choice Signal { … }` answered `Signal#Red` with "Type
+		// 'Signal' is not declared" — the syntax error, said again about a Type
+		// the file declares.
+		if (declarationWasAbandoned(scope, choice.content, choice.position)) {
+			return { type: "Error" }
+		}
+
 		reportError(
 			`Type '${choice.content}' is not declared`,
 			choice.position,
@@ -16228,7 +16241,7 @@ function resolveBareCaseReference(
 	// NOTE: A Case the Parser dropped along with the `choice` block that
 	// declared it is a Case this Program has, so writing it is not a mistake the
 	// reader made — see `declarationWasAbandoned`.
-	if (declarationWasAbandoned(scope, caseName.content)) {
+	if (declarationWasAbandoned(scope, caseName.content, caseName.position)) {
 		return { type: "Error" }
 	}
 

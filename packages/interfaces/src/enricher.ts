@@ -11,6 +11,18 @@ export type UnimportedNamespace = {
 	namespace: common.NamespaceType
 }
 
+// NOTE: One Declaration the Parser dropped, as the Enricher consults it — the
+// Parser's own record (`parser.AbandonedDeclaration`) with its two halves of
+// hoisting already decided. `hoists` is what says the silence is file-wide
+// rather than bounded by `enclosing` and `position`; see `topLevelScope`, which
+// is where the language rule behind it is written down.
+export type AbandonedDeclaration = {
+	name: string
+	position: common.Position
+	enclosing: common.Position
+	hoists: boolean
+}
+
 // NOTE: The four positions a `complete` can not be written in, each because of
 // something about WHEN the position runs rather than about the word. A
 // Parameter's default is filled in by the callee before its own asynchrony
@@ -141,16 +153,17 @@ export type Scope = {
 	// name whatever its file imports, because all of it is emitted above the
 	// Program too.
 	preludeNames?: ReadonlySet<string>
-	// NOTE: The names a Statement the Parser ABANDONED would have declared — see
-	// `parser.Recovery`. Set on the top level Scope and read through the parent
-	// chain, by the reports about a name that resolved to nothing and by nothing
-	// else: a name whose Declaration was dropped resolves to an Error, silently,
-	// so that one syntax error is answered once rather than again at every line
-	// that reads what it took away.
+	// NOTE: The names a Statement the Parser ABANDONED would have declared, and
+	// the text each one's silence covers — see `parser.Recovery` and
+	// `declarationWasAbandoned`. Set on the top level Scope and read through the
+	// parent chain, by the reports about a name that resolved to nothing and by
+	// nothing else: a name whose Declaration was dropped resolves to an Error,
+	// silently, so that one syntax error is answered once rather than again at
+	// every line that reads what it took away.
 	//
 	// Absent — the default — for every Program that parsed, which is nearly all
 	// of them.
-	abandonedDeclarations?: ReadonlySet<string>
+	abandonedDeclarations?: ReadonlyArray<AbandonedDeclaration>
 	// NOTE: The names a Parameter's `= expression` default may NOT read, and
 	// where each one is written. A default may read `@`, the Parameters to its
 	// left and everything the Declaration is written inside; what is barred is

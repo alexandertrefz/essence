@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import type { common } from "@essence-lang/interfaces"
+import type { common, parser } from "@essence-lang/interfaces"
 
 import { enrich } from "../enricher/index"
 import { parseWithDiagnostics } from "../parser/index"
@@ -12,16 +12,20 @@ import { parseWithDiagnostics } from "../parser/index"
 // That cascade is what this spec is about; `parser.Recovery` is the record it
 // is answered from.
 
-function recoveryOf(source: string): {
-	declarations: Array<string>
-	lines: Array<number>
-} {
+function recoveryOf(source: string): parser.Recovery {
 	return (
 		parseWithDiagnostics(source).program.recovery ?? {
 			declarations: [],
 			lines: [],
 		}
 	)
+}
+
+// NOTE: The names alone, which is what most of this spec is about — WHERE each
+// one reaches is the subject of "Where a dropped Declaration's silence reaches"
+// below.
+function declaredNamesOf(source: string): Array<string> {
+	return recoveryOf(source).declarations.map((declared) => declared.name)
 }
 
 function enricherCodesOf(source: string): Array<string> {
@@ -44,27 +48,27 @@ describe("Parser recovery", () => {
 
 	it("should record the name a dropped Constant declared", () => {
 		expect(
-			recoveryOf(`implementation {
+			declaredNamesOf(`implementation {
 	constant limit Integer = 10
-}`).declarations,
+}`),
 		).toEqual(["limit"])
 	})
 
 	it("should record the name a dropped Function declared", () => {
 		expect(
-			recoveryOf(`implementation {
+			declaredNamesOf(`implementation {
 	function twice(_ n Integer) -> Integer {
 		<- n::multiplyWith(2)
 	}
-}`).declarations,
+}`),
 		).toEqual(["twice"])
 	})
 
 	it("should record the name a dropped Type Alias declared", () => {
 		expect(
-			recoveryOf(`implementation {
+			declaredNamesOf(`implementation {
 	type Point = { x: Integer y: Integer }
-}`).declarations,
+}`),
 		).toEqual(["Point"])
 	})
 
@@ -72,12 +76,12 @@ describe("Parser recovery", () => {
 	// calls them by name — so each is recorded beside the Namespace's own.
 	it("should record a dropped Namespace's Methods", () => {
 		expect(
-			recoveryOf(`implementation {
+			declaredNamesOf(`implementation {
 	namespace Boxes Integer {
 		doubled() -> Integer { <- @::multiplyWith(2) }
 		static origin = 0
 	}
-}`).declarations,
+}`),
 		).toEqual(["Boxes", "doubled", "origin"])
 	})
 
@@ -86,11 +90,11 @@ describe("Parser recovery", () => {
 	// recording it would silence a genuine mistake anywhere else in the file.
 	it("should not record the names a dropped Namespace's bodies call", () => {
 		expect(
-			recoveryOf(`implementation {
+			declaredNamesOf(`implementation {
 	namespace Boxes Integer {
 		doubled() -> Integer { <- @::multiplyWith(2) }
 	}
-}`).declarations,
+}`),
 		).not.toContain("multiplyWith")
 	})
 
@@ -99,11 +103,11 @@ describe("Parser recovery", () => {
 	// is exactly what survives a dropped head.
 	it("should record a dropped Function's Parameters", () => {
 		expect(
-			recoveryOf(`implementation {
+			declaredNamesOf(`implementation {
 	function exclaimed(_ text: String) -> String
 		<- text::append("!")
 	}
-}`).declarations,
+}`),
 		).toEqual(["exclaimed", "text"])
 	})
 
@@ -113,17 +117,17 @@ describe("Parser recovery", () => {
 	// spelled the same way somewhere else in the file.
 	it("should not record the members a dropped Type names", () => {
 		expect(
-			recoveryOf(`implementation {
+			declaredNamesOf(`implementation {
 	type Point = { x: Integer y: Integer }
-}`).declarations,
+}`),
 		).toEqual(["Point"])
 	})
 
 	it("should record a dropped Choice's Cases", () => {
 		expect(
-			recoveryOf(`implementation {
+			declaredNamesOf(`implementation {
 	choice Colour { #Red #Green( }
-}`).declarations,
+}`),
 		).toEqual(["Colour", "Green", "Red"])
 	})
 
@@ -223,7 +227,10 @@ describe("A Program that abandoned a Statement and a binder", () => {
 	it("should record both, the name and the lines", () => {
 		let recovery = recoveryOf(source)
 
-		expect(recovery.declarations).toEqual(["limit", "whole"])
+		expect(recovery.declarations.map((declared) => declared.name)).toEqual([
+			"limit",
+			"whole",
+		])
 		expect(recovery.lines).toEqual([2])
 	})
 
@@ -231,5 +238,126 @@ describe("A Program that abandoned a Statement and a binder", () => {
 	// the body below reads both of them.
 	it("should say nothing about either name it took away", () => {
 		expect(enricherCodesOf(source)).toEqual([])
+	})
+})
+
+// NOTE: The other half of the rule, and the one this whole record exists to get
+// right: the silence is owed to the reads the dropped Declaration would have
+// ANSWERED, and to no others. A Constant dropped out of one Function's body was
+// never in scope in the next Function along, so a read of the same name there
+// resolved to nothing before the mistake and resolves to nothing without it —
+// reporting it is not a cascade, it is the second mistake in the file, and one
+// run that reports every mistake is the point.
+describe("Where a dropped Declaration's silence reaches", () => {
+	it("should stay silent below the run in the block it was written in", () => {
+		expect(
+			enricherCodesOf(`implementation {
+	function subtotal() -> Integer {
+		variable total 0
+		<- total
+	}
+}`),
+		).toEqual([])
+	})
+
+	it("should report the same name read in another body", () => {
+		expect(
+			enricherCodesOf(`implementation {
+	function subtotal() -> Integer {
+		variable total 0
+		<- total
+	}
+
+	function report() -> String {
+		<- total::toString()
+	}
+}`),
+		).toEqual(["unknown-name"])
+	})
+
+	it("should report the same name read at the top level", () => {
+		expect(
+			enricherCodesOf(`implementation {
+	function helper() -> Integer {
+		constant shipping 5
+		<- 0
+	}
+
+	Terminal.print(shipping::toString())
+}`),
+		).toEqual(["unknown-name"])
+	})
+
+	// NOTE: A `type` is hoistable by KEYWORD and hoisted by nobody when it is
+	// written inside a body — `hoistDeclarations` runs over a section's own
+	// Statements and nothing deeper. So a dropped one is in scope exactly where
+	// it was written, and the Parameter annotation below reads a Type this file
+	// does not have.
+	it("should report a Type dropped inside a body and named outside it", () => {
+		expect(
+			enricherCodesOf(`implementation {
+	function make() -> Integer {
+		type Point { x: Integer }
+		<- 1
+	}
+
+	function use(_ p: Point) -> Integer {
+		<- 1
+	}
+}`),
+		).toEqual(["unknown-type"])
+	})
+
+	// NOTE: And the hoisted case, which is why `hoistable` is recorded at all: a
+	// top-level `choice` is in scope across the whole file and ABOVE its own
+	// line, so a dropped one silences every read of its name wherever it stands.
+	it("should stay silent file-wide for a dropped top-level Choice", () => {
+		expect(
+			enricherCodesOf(`implementation {
+	constant early: Signal = Signal#Red
+
+	choice Signal {
+		Red,
+		Amber
+		Green,
+	}
+}`),
+		).toEqual([])
+	})
+
+	// NOTE: `ChoiceName#CaseName` reads the Choice's name through a path of its
+	// own, which had no such question to ask — so a dropped `choice` answered
+	// its every qualified Case with "Type 'Signal' is not declared", the syntax
+	// error said again about a Type the file declares.
+	it("should stay silent for a qualified Case of a dropped Choice", () => {
+		expect(
+			enricherCodesOf(`implementation {
+	choice Signal {
+		Red,
+		Amber
+		Green,
+	}
+
+	constant s: Signal = Signal#Red
+}`),
+		).toEqual([])
+	})
+
+	// NOTE: A Namespace's members are NOT lexical — a Method dropped out of a
+	// Namespace's body is called from outside that body, everywhere the
+	// Namespace reaches — so their silence stays file-wide. See
+	// `memberDeclarationWasAbandoned`.
+	it("should stay silent for a dropped Method called outside its Namespace", () => {
+		expect(
+			enricherCodesOf(`implementation {
+	namespace Duration for Integer {
+		seconds() ->  {
+			<- @::remainder(dividingBy 60)
+		}
+	}
+
+	Terminal.print("{3600::seconds()}")
+}`),
+		).toEqual([])
 	})
 })
