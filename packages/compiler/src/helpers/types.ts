@@ -1703,6 +1703,13 @@ function withoutRefinements(type: common.Type): common.Type {
 // comes back as itself, so the common descriptor allocates nothing. The visiting
 // set is the back-edge guard `resolveUnknownSlots` carries, for the same reason —
 // a Choice's payload may name the Choice.
+//
+// A back edge is answered with the type UNSTRIPPED, which is defence rather than
+// an answer that arises: the only Types that lead back to themselves go through
+// a Choice, whose Cases carry no display spelling, and a Record that named itself
+// would have been refused as a recursive Alias long before this. What the guard
+// is really for is that a Language Server which walks into a cycle stops
+// answering at all.
 export function withoutRecordNames(type: common.Type): common.Type {
 	let visiting = new Set<common.Type>()
 
@@ -1848,6 +1855,25 @@ export function withoutRecordNames(type: common.Type): common.Type {
 					let signature = strippedSignature(type, strip)
 
 					return signature === type ? type : { ...type, ...signature }
+				}
+				// NOTE: An Overload set is those signatures in a list, and a
+				// Record standing in one of them is as nameless as one in a
+				// plain Function's. Nothing emits an Overload set today — the
+				// descriptor path can not reach here — but this walk answers
+				// the embedding boundary too, which PRINTS what it is given,
+				// and a list of the shapes it happens to be asked about is the
+				// kind of list that goes quietly out of date.
+				case "OverloadedMethod":
+				case "OverloadedStaticMethod": {
+					let overloads = type.overloads.map((overload) =>
+						strippedSignature(overload, strip),
+					)
+
+					return overloads.every(
+						(overload, index) => overload === type.overloads[index],
+					)
+						? type
+						: { ...type, overloads }
 				}
 				default:
 					return type

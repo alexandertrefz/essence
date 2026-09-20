@@ -2388,19 +2388,27 @@ function graftRequirement(
 		return type
 	}
 
-	return {
-		...type,
-		members: {
-			...type.members,
-			[step]: graftRequirement(
-				Object.hasOwn(type.members, step)
-					? type.members[step]!
-					: { type: "Unknown" },
-				path.slice(1),
-				requiredType,
-			),
-		},
+	let members = {
+		...type.members,
+		[step]: graftRequirement(
+			Object.hasOwn(type.members, step)
+				? type.members[step]!
+				: { type: "Unknown" },
+			path.slice(1),
+			requiredType,
+		),
 	}
+
+	// NOTE: A grafted Record is built fresh rather than spread over, because a
+	// member narrowed by a requirement is a shape no Alias declared: a
+	// `Standing` whose `points` a Pattern requires to be a `NonZeroInteger` is
+	// not what `Standing` says, and this Type is PRINTED — the reachability
+	// report reads it through `describeType`. A Case keeps its own name, which
+	// is not a spelling of its members but WHICH Case a value is, and is what
+	// the emitted tag asks about.
+	return type.type === "Record"
+		? { type: "Record", members }
+		: { ...type, members }
 }
 
 // NOTE: Whether the check emitted for `matcher` answers TRUE for EVERY value of

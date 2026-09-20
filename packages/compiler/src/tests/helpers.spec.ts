@@ -53,6 +53,7 @@ import {
 	typeContainsRefinement,
 	typeContainsUnknown,
 	typeMentionsGeneric,
+	withoutRecordNames,
 } from "../helpers/types"
 
 const TokenType = lexer.TokenType
@@ -3822,6 +3823,65 @@ describe("Helpers", () => {
 				union.types.push(node)
 
 				expect(eraseRefinements(union)).toBe(union)
+			})
+		})
+
+		// NOTE: What a Record is CALLED never reaches the emitted Program: the
+		// runtime has never heard of `Standing`, a descriptor carrying it would
+		// be dead bytes in every Program that matches on an Alias, and the pool
+		// would hold two spellings of one shape as two constants. So the
+		// Rewriter takes it off on the way out, and the walk has to find it
+		// wherever a Record can stand.
+		describe("withoutRecordNames", () => {
+			const named: Type = {
+				type: "Record",
+				name: "Standing",
+				members: { points: integer },
+			}
+			const shape: Type = {
+				type: "Record",
+				members: { points: integer },
+			}
+
+			it("should take a Record's spelling off, however deep it sits", () => {
+				expect(withoutRecordNames(named)).toEqual(shape)
+				expect(
+					withoutRecordNames({ type: "List", itemType: named }),
+				).toEqual({ type: "List", itemType: shape })
+			})
+
+			// NOTE: An Overload set is a list of signatures and a Record can
+			// stand in any of them. Nothing emits one today — this is the walk
+			// answering about a shape rather than about the callers it happens
+			// to have.
+			it("should strip one standing in an Overload's signature", () => {
+				expect(
+					withoutRecordNames({
+						type: "OverloadedMethod",
+						overloads: [
+							{
+								parameterTypes: [{ name: "of", type: named }],
+								generics: [],
+								returnType: integer,
+							},
+						],
+					}),
+				).toEqual({
+					type: "OverloadedMethod",
+					overloads: [
+						{
+							parameterTypes: [{ name: "of", type: shape }],
+							generics: [],
+							returnType: integer,
+						},
+					],
+				})
+			})
+
+			it("should hand back a Type naming no Record as itself", () => {
+				let plain: Type = { type: "List", itemType: integer }
+
+				expect(withoutRecordNames(plain)).toBe(plain)
 			})
 		})
 	})
