@@ -3126,6 +3126,7 @@ function enrichLookup(
 				base: node.base.position,
 			},
 			memberAccessContext(node, base.type, scope, isCalled),
+			scope,
 		)
 
 	return {
@@ -6658,10 +6659,16 @@ function memberTypeInIrrefutablePosition(
 	let type = subjectType
 
 	for (let step of binding.steps) {
-		type = lookupTypeOf(type, step.name.content, {
-			member: step.name.position,
-			base: step.name.position,
-		})
+		type = lookupTypeOf(
+			type,
+			step.name.content,
+			{
+				member: step.name.position,
+				base: step.name.position,
+			},
+			null,
+			scope,
+		)
 
 		// NOTE: An annotation on an INTERMEDIATE step constrains that step and
 		// nothing below it, so it is checked here and then stepped past — the

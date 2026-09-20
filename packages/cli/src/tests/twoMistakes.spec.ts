@@ -449,6 +449,25 @@ const PROGRAMS: Array<TwoMistakes> = [
 `,
 		expected: ["untyped-namespace-method@3", "unknown-name@9"],
 	},
+	// NOTE: A static Property dropped out of a Namespace body, read with `.`
+	// below it, beside a member of the same Namespace that really is not there.
+	// The `::` side of the lookup has always stood down for a dropped member;
+	// the `.` side never did, so the one syntax error reported again at every
+	// read of what it took away.
+	{
+		name: "a dropped static Property and a member nothing declares",
+		source: `implementation {
+	namespace Config {
+		static limit = 10
+		static broken 20
+	}
+
+	Terminal.print(Config.broken::toString())
+	Terminal.print(Config.missing::toString())
+}
+`,
+		expected: ["syntax-error@4", "unknown-member@8"],
+	},
 	// NOTE: And the files that hold ONE mistake, which is what says the pairs
 	// above are pairs rather than a Compiler that reports everything twice.
 	{

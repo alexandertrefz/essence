@@ -64,6 +64,7 @@ import {
 	childScope,
 	completionBarrierIn,
 	declarationWasAbandoned,
+	memberDeclarationWasAbandoned,
 	modulePathOf,
 } from "./scope"
 
@@ -741,11 +742,17 @@ export type MemberAccessContext = {
 
 // NOTE: The result Type of a Lookup, computed from its base's already enriched
 // Type. The member and base Positions are all it needs to point the Diagnostics.
+//
+// NOTE: `scope` is handed in only where the base can BE a Namespace, which is
+// the Lookup enricher and a Pattern's member path. A record path key steps
+// through Records by its own Type, and a member path is guarded to Records and
+// Cases before it gets here, so neither can reach the branch that reads it.
 export function lookupTypeOf(
 	baseType: common.Type,
 	memberName: string,
 	positions: { member: common.Position; base: common.Position },
 	access: MemberAccessContext | null = null,
+	scope: enricher.Scope | null = null,
 ): common.Type {
 	if (baseType.type === "Error") {
 		return baseType
@@ -756,6 +763,25 @@ export function lookupTypeOf(
 			return baseType.properties[memberName]
 		} else if (Object.hasOwn(baseType.methods, memberName)) {
 			return baseType.methods[memberName]
+		} else if (
+			scope !== null &&
+			memberDeclarationWasAbandoned(scope, memberName)
+		) {
+			// NOTE: A member the Parser dropped out of a Namespace body is a
+			// member this Program declares, so reading it is the syntax error
+			// once more rather than a name the reader got wrong. The `::` side
+			// has asked this since the recovery was written; the `.` side never
+			// did, so one `static broken 20` reported twice — where it was
+			// written, and again at every `Config.broken` below it.
+			//
+			// NOTE: FILE-WIDE, like every other question about a member name. A
+			// Namespace's Type carries no source span, so there is nothing to
+			// ask whether the dropped run stood inside, and a span worked back
+			// from the name would be a guess. What that costs is a genuinely
+			// misspelled member of ANOTHER Namespace that happens to share the
+			// dropped name — the same price `reportUnknownMethod` has always
+			// paid for the same reason.
+			return { type: "Error" }
 		} else {
 			reportUnknownMember(
 				memberName,
