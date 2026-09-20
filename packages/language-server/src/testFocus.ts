@@ -50,9 +50,11 @@ function focusDiagnostic(
 			"A focused test silences every other test of the run, so a run " +
 				"nobody narrowed has not answered the question it was asked.",
 		],
+		// NOTE: Single quotes, as every other Help here spells a keyword and a
+		// flag. Backticks are Markdown, and a Diagnostic is read in a terminal.
 		helps: [
-			"Remove `focused` before this lands, or narrow the run with " +
-				"--filter or --tag while you are iterating.",
+			"Remove 'focused' before this lands, or narrow the run with " +
+				"'--filter' or '--tag' while you are iterating.",
 		],
 	}
 }

@@ -89,7 +89,7 @@ import {
 	supportsUnicode,
 	visibleLength,
 } from "../theme"
-import { within } from "./harness"
+import { within, withFiles } from "./harness"
 
 // NOTE: A directory of this run's own, so that a spec compiling a fixture
 // neither answers out of the user's bundle cache nor fills it. It is set before
@@ -2788,4 +2788,77 @@ describe("essence init", () => {
 				}),
 		)
 	})
+})
+
+// NOTE: The three reports about a path on the command line. Each of them had
+// the answer in hand and printed none: the directory listing is a `readdirSync`
+// away, the advice about a directory was written into the MESSAGE rather than
+// into a Help, and a permissions refusal said nothing at all.
+describe("a path that can not be read", () => {
+	it("should answer a near miss against the files beside it", () =>
+		withFiles(
+			{ "src/Main.es": "implementation {}\n" },
+			async (directory) => {
+				let { code, out, err } = await capture(() =>
+					run(
+						[
+							"check",
+							"--no-color",
+							path.join(directory, "src/Mian.es"),
+						],
+						PROGRAM,
+					),
+				)
+
+				expect(code).not.toBe(EXIT_SUCCESS)
+				expect(`${out}${err}`).toContain("No such file")
+				expect(`${out}${err}`).toContain("Did you mean")
+				expect(`${out}${err}`).toContain("Main.es")
+			},
+		))
+
+	it("should ask for the path where nothing is near it", () =>
+		withFiles(
+			{ "src/Main.es": "implementation {}\n" },
+			async (directory) => {
+				let { code, out, err } = await capture(() =>
+					run(
+						[
+							"check",
+							"--no-color",
+							path.join(directory, "src/Completely-Different.es"),
+						],
+						PROGRAM,
+					),
+				)
+
+				expect(code).not.toBe(EXIT_SUCCESS)
+				expect(`${out}${err}`).toContain(
+					"Help: Check the path, and that the file is saved where it says.",
+				)
+			},
+		))
+
+	// NOTE: The advice moved out of the message, which is the one line a report
+	// repeats everywhere, and into the Help every other Diagnostic here puts it
+	// in.
+	it("should offer the glob for a directory as a Help", () =>
+		withFiles(
+			{ "src/Main.es": "implementation {}\n" },
+			async (directory) => {
+				let { code, out, err } = await capture(() =>
+					run(
+						["check", "--no-color", path.join(directory, "src")],
+						PROGRAM,
+					),
+				)
+
+				expect(code).not.toBe(EXIT_SUCCESS)
+				expect(`${out}${err}`).toContain("is a directory")
+				expect(`${out}${err}`).toContain(
+					"Pass the source files inside it instead",
+				)
+				expect(`${out}${err}`).toContain("src/*.es")
+			},
+		))
 })

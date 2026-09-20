@@ -4777,6 +4777,8 @@ Taught on: [Modules › Importing names](/docs/language/modules#importing-names)
 
 **Error.** An imported module has errors of its own, reported on the import line — in the editor, so you see it without opening the other file, and in the terminal, which prints the other file's own errors beside it. It is why a module nothing is wrong with does not compile.
 
+It is reported against **direct** dependencies only. With `Main.es` importing `Middle.es` importing `Bottom.es`, and the error in `Bottom.es`, the report lands on `Middle.es`'s import line. `Main.es` gets nothing — in the editor it is clean, while `essence check Main.es` still refuses, because the terminal reports every module of the graph and the error in `Bottom.es` is among them.
+
 Fix the errors in the imported module.
 
 Taught on: [Editor setup › Errors in closed files, and rename refusals](/docs/guides/editor-setup#errors-in-closed-files-and-rename-refusals)
@@ -5267,7 +5269,7 @@ Error: This test is still focused
    │     ──┬─  
    │       ╰─── only focused tests ran
    │ 
-   │ Help: Remove `focused` before this lands, or narrow the run with --filter or --tag while you are iterating.
+   │ Help: Remove 'focused' before this lands, or narrow the run with '--filter' or '--tag' while you are iterating.
    │ 
    │ Note: A focused test silences every other test of the run, so a run nobody narrowed has not answered the question it was asked.
 ───╯
@@ -5276,6 +5278,8 @@ Error: This test is still focused
 </div>
 
 Remove `focused` before you commit. While you iterate, narrow the run with `--filter` or `--tag` instead.
+
+The two reports differ by one word, deliberately: the terminal says `only focused tests ran`, because it reports after the run, and the editor says `only focused tests run`, because it reports before there is one. The editor's is a Warning on the `focused` keyword; the terminal's is an Error on the `test` keyword, and it names every focused test of the run at once.
 
 Quick Fix: **Remove 'focused'**.
 
@@ -5948,12 +5952,16 @@ Problems with the run itself rather than with a program. These reports have no s
 
 ```
 [file-not-found]
-Error: No such file: Missing.es
+Error: No such file: src/Mian.es
+
+Help: Did you mean 'src/Main.es'?
 ```
 
 </div>
 
-Check the path.
+Check the path. A near miss against the `.es` files beside the path is answered; where there is none, the Help asks for the path and where the file is saved.
+
+Two things differ by command, and neither is a mistake. `essence check` and `essence build` print the path **as it was typed**, while `essence test` prints the absolute one it resolved. And a directory named where a file belongs is refused by `check` and `build` — see [`not-a-file`](#not-a-file) — while `essence test src` reads it as a directory to scan and prints `no tests in src`, exiting `0`.
 
 Taught on: [Running tests](/docs/guides/running-tests)
 
@@ -5965,7 +5973,9 @@ Taught on: [Running tests](/docs/guides/running-tests)
 
 ```
 [not-a-file]
-Error: src is a directory. Pass the source files inside it instead, for example src/*.es
+Error: src is a directory
+
+Help: Pass the source files inside it instead — 'src/*.es'.
 ```
 
 </div>
@@ -5983,11 +5993,15 @@ Taught on: [Command line › The shape of an invocation](/docs/reference/cli#the
 ```
 [unreadable-file]
 Error: Not allowed to read Locked.es
+
+Help: Check the file's permissions.
 ```
 
 </div>
 
 Fix the file's permissions.
+
+`essence format --check` does not go through the diagnostic system at all: a file it cannot read is reported as `Missing.es: could not be read.`, with no code and no Help.
 
 ### `bundle-failed`
 

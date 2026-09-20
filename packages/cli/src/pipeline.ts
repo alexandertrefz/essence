@@ -1,3 +1,4 @@
+import { readdirSync } from "node:fs"
 import * as path from "node:path"
 import { gzipSync } from "node:zlib"
 
@@ -19,6 +20,7 @@ import {
 	isStdlibDocument,
 	parseDocument,
 } from "@essence-lang/compiler/documents"
+import { closestMatch } from "@essence-lang/compiler/helpers"
 import type { ExportSurface } from "@essence-lang/compiler/modules"
 import type { MutationSite } from "@essence-lang/compiler/mutation"
 import {
@@ -401,41 +403,93 @@ class Timeline {
 	}
 }
 
+// NOTE: The near miss for a path that could not be read, spelled the way the
+// path was. Matched on the FILE NAME rather than on the whole path, because a
+// path shares its directories with every candidate — comparing
+// `/long/way/down/src/Xyz.es` against `/long/way/down/src/Main.es` is mostly
+// comparing the part the two agree on, and then everything reads as a near
+// miss. The directory is put back on the answer, so what the reader is offered
+// is a path they can pass straight back. An unreadable directory answers
+// nothing, which is the same as having no candidates at all.
+function nearestSource(fileName: string): string | null {
+	let directory = path.dirname(fileName)
+
+	try {
+		let candidate = closestMatch(
+			path.basename(fileName),
+			readdirSync(directory).filter((entry) => entry.endsWith(".es")),
+		)
+
+		return candidate === null
+			? null
+			: directory === "."
+				? candidate
+				: path.join(directory, candidate)
+	} catch {
+		return null
+	}
+}
+
+// NOTE: A Help on each of the three, because the answer is in hand at every one
+// of them and none of them had one. What a reader is told to do with a
+// directory used to be written into the MESSAGE, which is the one line a report
+// repeats everywhere — the advice belongs where every other Diagnostic here
+// puts it.
 function readError(error: unknown, fileName: string): common.Diagnostic {
 	let code = (error as NodeJS.ErrnoException | undefined)?.code
 
 	if (code === "ENOENT") {
-		return placelessDiagnostic(
-			"error",
-			`No such file: ${fileName}`,
-			"file-not-found",
-		)
+		let suggestion = nearestSource(fileName)
+
+		return {
+			...placelessDiagnostic(
+				"error",
+				`No such file: ${fileName}`,
+				"file-not-found",
+			),
+			helps:
+				suggestion === null
+					? [
+							"Check the path, and that the file is saved where it says.",
+						]
+					: [`Did you mean '${suggestion}'?`],
+		}
 	}
 
 	if (code === "EISDIR") {
-		return placelessDiagnostic(
-			"error",
-			`${fileName} is a directory. Pass the source files inside it ` +
-				`instead, for example ${fileName}/*.es`,
-			"not-a-file",
-		)
+		return {
+			...placelessDiagnostic(
+				"error",
+				`${fileName} is a directory`,
+				"not-a-file",
+			),
+			helps: [
+				`Pass the source files inside it instead — '${fileName}/*.es'.`,
+			],
+		}
 	}
 
 	if (code === "EACCES") {
-		return placelessDiagnostic(
-			"error",
-			`Not allowed to read ${fileName}`,
-			"unreadable-file",
-		)
+		return {
+			...placelessDiagnostic(
+				"error",
+				`Not allowed to read ${fileName}`,
+				"unreadable-file",
+			),
+			helps: ["Check the file's permissions."],
+		}
 	}
 
-	return placelessDiagnostic(
-		"error",
-		`Could not read ${fileName}: ${
-			error instanceof Error ? error.message : String(error)
-		}`,
-		"unreadable-file",
-	)
+	return {
+		...placelessDiagnostic(
+			"error",
+			`Could not read ${fileName}: ${
+				error instanceof Error ? error.message : String(error)
+			}`,
+			"unreadable-file",
+		),
+		helps: ["Check the path and the file's permissions."],
+	}
 }
 
 // NOTE: What the front of the pipeline produced: the Modules to report about,
