@@ -444,6 +444,35 @@ describe("One mistake, one report", () => {
 		).toEqual(["not-a-function"])
 	})
 
+	// NOTE: A body refused in its OWN right answers for the literal around it,
+	// and the two reports about a Type that could not be read off it stand down.
+	// `.length` is a Method read as a member under every return Type there is.
+	it("reports a refused body once, not three times", () => {
+		expect(
+			codesOfSource(`implementation {
+		constant words = ["a", "bb"]
+
+		constant lengths = words::map((w) { <- w.length })
+	}`),
+		).toEqual(["method-called-with-dot"])
+	})
+
+	// NOTE: The other side of that gate, and the one silence has to stop at. A
+	// bare Case in return position is refused by the inference pass BECAUSE
+	// there is no return Type yet — the real pass silences it for the same
+	// reason — so counting it as a refused body left this Program reporting
+	// nothing at all while the Compiler could not say what the literal answers.
+	it("still reports a return Type it could not read off a bare Case", () => {
+		expect(
+			codesOfSource(`implementation {
+		function half(_ text: String) -> Result<Integer, String> {
+			<- Integer.parse(text)::toResult(failingWith "not a number")::andThen((value) {
+				<- #Value(value)
+			})
+		}
+	}`),
+		).toEqual(["uninferable-return-type"])
+	})
 })
 
 describe("Reports that knew the fix and said nothing", () => {

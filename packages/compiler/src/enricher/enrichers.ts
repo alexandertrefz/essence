@@ -10547,6 +10547,23 @@ function unionOfTypes(types: Array<common.Type>): common.Type | null {
 // its own Parameters from.
 let inferReturnTypeFromBodyDepth = 0
 
+// NOTE: What this pass MANUFACTURES rather than finds. The body is read with no
+// `expectedReturnType` — that is the whole point of it — so a bare Case standing
+// in return position has no position to say which Choice declares its name or
+// what its Type Arguments are, and says so both times. Those are not refusals of
+// the body: the real pass silences the same two for the same reason, in
+// `positionWasRefused`, once the return Type has come back Error.
+//
+// Counting them as a refusal is what left `((value) { <- #Value(value) })`
+// reporting NOTHING AT ALL — this pass refusing the body, so `uninferable-return-
+// type` stood down, and the real pass silencing the bare Case, so nothing was
+// said about a return Type the Compiler could not read. Kept to the two codes a
+// missing return Type is the cause of: everything else a body is refused for is
+// reported again at the line it stands on, which is what `refused` is for.
+const undecidedWithoutAReturnType: ReadonlySet<common.DiagnosticCode> = new Set(
+	["ambiguous-case", "undecided-type-arguments"],
+)
+
 // NOTE: Working out what a Function literal returns means enriching its body —
 // the Type of `<- total` can not be known without the Constants the body itself
 // declares. The body is enriched twice as a result — once here to find the Type,
@@ -10635,7 +10652,18 @@ function inferReturnTypeFromBody(
 		// about to be told about at the line it stands on. That is the whole of
 		// what `refused` says, and it is asked of the same body this pass just
 		// read rather than guessed at from an Error Type.
-		if (refused !== undefined && containsErrors(diagnostics)) {
+		//
+		// All but the two this pass manufactures for itself: those the real pass
+		// silences, so counting them here would leave the reader with nothing.
+		if (
+			refused !== undefined &&
+			containsErrors(
+				diagnostics.filter(
+					(diagnostic) =>
+						!undecidedWithoutAReturnType.has(diagnostic.code),
+				),
+			)
+		) {
 			refused.body = true
 		}
 
