@@ -1895,6 +1895,24 @@ Error: A member path steps through Records only
 "
 `;
 
+exports[`Diagnostic Showcase Namespaces.es should render the same report every time 1`] = `
+"[at-in-static-method]
+Error: There is no '@' in a static Method
+    ╭─┤ Namespaces.es:19:7 │
+    │
+ 19 │          <- @::multiply(with 2)
+    │             ▲  
+    │             ╰── this Method is called on the Namespace
+    │ 
+    │ Help: Take the value as a Parameter, or drop 'static' to make this an instance Method — then every call writes its receiver, 'value::name(…)' rather than 'Namespace.name(…)'.
+    │ 
+    │ Note: '@' is the receiver of an instance Method, and a static Method is called without one.
+────╯
+
+─── 1 error
+"
+`;
+
 exports[`Diagnostic Showcase NestingLevels.es should render the same report every time 1`] = `
 "[ambiguous-nesting-level]
 Warning: This Argument fits the receiver and what it holds

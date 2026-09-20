@@ -3,9 +3,11 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { keywordBefore, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import {
+	enclosingNamespace,
 	findProtocolExtension,
 	findStaticMethodName,
 	findTypeParameter,
+	readsNamespaceMember,
 } from "./lookups"
 
 // NOTE: The Diagnostics a DECLARATION'S HEAD carries — the Type Parameter list,
@@ -113,6 +115,23 @@ export function dropStaticAction(
 	let name = findStaticMethodName(program, diagnostic.position)
 
 	if (name === null) {
+		return null
+	}
+
+	// NOTE: And withheld altogether where this file CALLS the Method. Dropping
+	// the Keyword changes how every call is written — `Namespace.name(…)`
+	// becomes `value::name(…)` — so a file calling it once is refused once more
+	// than it was, and one calling it five times five times more, each at a
+	// line the reader was not looking at and none of them mentioned by the
+	// lightbulb they pressed. The Diagnostic's Help says what dropping costs
+	// and says it either way; what is withheld is the button that does it in
+	// one click.
+	let namespace = enclosingNamespace(program, diagnostic.position)
+
+	if (
+		namespace !== null &&
+		readsNamespaceMember(program, namespace.name.content, name.content)
+	) {
 		return null
 	}
 

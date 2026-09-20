@@ -338,6 +338,39 @@ export function findStaticMethodName(
 	return found
 }
 
+// NOTE: Whether this file writes `Namespace.name` anywhere — the spelling a
+// static Method is CALLED by, and the one thing that changes under a fix which
+// stops it being static. A Lookup is what both a call and a bare reference are
+// read as, so the one question covers the two.
+//
+// This file only. A Namespace another Module imports is called in that Module
+// with the same spelling, and nothing here can see it; the fix that asks this is
+// withheld on what it CAN see, which is the file the reader is looking at.
+export function readsNamespaceMember(
+	program: parser.Program,
+	namespace: string,
+	member: string,
+): boolean {
+	let found = false
+
+	walk(program, (node) => {
+		if (
+			node.nodeType === "Lookup" &&
+			node.base.nodeType === "Identifier" &&
+			node.base.content === namespace &&
+			node.member.content === member
+		) {
+			found = true
+
+			return false
+		}
+
+		return true
+	})
+
+	return found
+}
+
 // NOTE: The `is X where …` clause one of whose conditions stands at this
 // Position, looked for in Protocols alone — a Namespace's conformance is the
 // one place a `where` belongs, and this answers the Diagnostic that refuses it

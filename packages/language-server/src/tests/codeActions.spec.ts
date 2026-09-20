@@ -3311,6 +3311,61 @@ describe("Code Actions", () => {
 			expect(applied(lines, fix)[2]).toBe("\t\toverload made {")
 		})
 
+		// NOTE: The fix changes how the Method is CALLED, so a call it does
+		// not touch is a call that stops compiling — one
+		// `argument-count-mismatch` per call site, each at a line the reader
+		// was not looking at when they pressed the lightbulb. It is therefore
+		// not offered at all where this file calls the Method; the Help that
+		// says what dropping costs is there either way, for a reader who means
+		// to do it by hand.
+		it("should stay silent where the Method is called", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Counters for { count: Integer } {",
+				"\t\tstatic doubled () -> Integer {",
+				"\t\t\t<- @.count",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant first = Counters.doubled()",
+				"}",
+			]
+
+			expect(titles(quickFixes(lines))).toEqual([])
+			expect(
+				analyse(lines.join("\n")).flatMap(
+					(diagnostic) => diagnostic.helps,
+				),
+			).toEqual([
+				"Take the value as a Parameter, or drop 'static' to make this an instance Method — then every call writes its receiver, 'value::name(…)' rather than 'Namespace.name(…)'.",
+			])
+		})
+
+		// NOTE: A Method of the same name on ANOTHER Namespace is another
+		// Method — what makes a call a call of this one is the Namespace it is
+		// reached through.
+		it("should offer the fix where the call names another Namespace", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Counters for { count: Integer } {",
+				"\t\tstatic doubled () -> Integer {",
+				"\t\t\t<- @.count",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace Totals for { count: Integer } {",
+				"\t\tstatic doubled () -> Integer {",
+				"\t\t\t<- 2",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant first = Totals.doubled()",
+				"}",
+			]
+
+			expect(titles(quickFixes(lines))).toEqual(["Drop 'static'"])
+		})
+
 		// NOTE: `keywordBefore` looks along the name's own line, so a Keyword
 		// the Parser read from the line above is one this refuses to touch —
 		// deleting a span that does not read `static ` would eat whatever does
