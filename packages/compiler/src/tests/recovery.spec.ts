@@ -200,3 +200,36 @@ describe("Reads of a dropped Declaration", () => {
 		).toEqual(["unknown-name"])
 	})
 })
+
+// NOTE: The two kinds of abandonment in ONE Program, because they are recorded
+// two different ways and were written in two different branches. A dropped
+// STATEMENT abandons text, which is what the lines are read off; a dropped
+// PATTERN BINDER abandons a name while the Matcher around it parses whole, so it
+// leaves no line at all. A `recovery()` keyed on the lines alone answered
+// `undefined` for the second, and the binder's name then reported once per read
+// as a name nobody declared.
+describe("A Program that abandoned a Statement and a binder", () => {
+	let source = `implementation {
+	constant limit Integer = 10
+
+	constant point: { x: Integer, y: Integer } | String = { x = 1, y = 2 }
+
+	Terminal.print(match point -> String {
+		case { x, y } as whole { <- "{whole.x} and {y} under {limit}" }
+		case String { <- "a string" }
+	})
+}`
+
+	it("should record both, the name and the lines", () => {
+		let recovery = recoveryOf(source)
+
+		expect(recovery.declarations).toEqual(["limit", "whole"])
+		expect(recovery.lines).toEqual([2])
+	})
+
+	// NOTE: Two mistakes, two reports — and nothing about either name, though
+	// the body below reads both of them.
+	it("should say nothing about either name it took away", () => {
+		expect(enricherCodesOf(source)).toEqual([])
+	})
+})
