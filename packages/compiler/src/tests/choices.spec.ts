@@ -19,6 +19,7 @@ import { printType } from "../printType"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
+import { compiles } from "./helpPromises"
 
 // NOTE: The full pipeline minus bundling, mirroring codeGeneration.spec — a
 // Choice is only implemented once every stage agrees on it.
@@ -1188,10 +1189,23 @@ describe("Choices", () => {
 					"'Progress' takes 2 Type Parameters: 'State', 'Result'.",
 					"A payload binds only the Type Parameters its own members mention — the rest are applied, at the construction or by the position around it.",
 				])
+				// NOTE: The Argument the payload DECIDED is spelled out and the
+				// one it left is an ellipsis. Both used to be the Choice's own
+				// Parameter names — `Progress<State, Result>` copied out of a
+				// Help is `unknown-type` twice over, since those names belong to
+				// the declaration and are in scope nowhere else.
 				expect(helpsOf(source)).toEqual([
-					"Annotate the declaration: 'constant left: Progress<State, Result> = #Stopped(…)'.",
-					"Or apply the Type Arguments: 'Progress<State, Result>#Stopped(…)'.",
+					"Annotate the Declaration this is written into with 'Progress<…, String>', which is what decides them.",
+					"Or apply the Type Arguments here — 'Progress<…, String>#Stopped(…)', with the Type you mean in place of each '…'.",
 				])
+
+				// NOTE: And the spelling with its blank filled in compiles, which
+				// is the whole of what a Help promises.
+				expect(
+					compiles(`implementation { ${progressChoice}
+					constant done = Progress<Integer, String>#Stopped({ value = "x" })
+				}`),
+				).toBe(true)
 			})
 
 			// NOTE: The other flavour — a payload that mentions no Type Parameter
@@ -1368,9 +1382,15 @@ describe("Choices", () => {
 					"Nothing decides the Type Arguments of '#Blank'",
 				])
 				expect(helpsOf(source)).toEqual([
-					"Annotate the declaration: 'constant left: Box<Value> = #Blank'.",
-					"Or apply the Type Arguments: 'Box<Value>#Blank'.",
+					"Annotate the Declaration this is written into with 'Box<…>', which is what decides them.",
+					"Or apply the Type Arguments here — 'Box<…>#Blank', with the Type you mean in place of each '…'.",
 				])
+
+				expect(
+					compiles(`implementation { ${blankBox}
+					constant blank = Box<Integer>#Blank
+				}`),
+				).toBe(true)
 			})
 
 			// NOTE: And a bare `#Empty` is answered by the ambiguity rail rather
@@ -1923,15 +1943,35 @@ describe("Choices", () => {
 				).toEqual(["undecided-type-arguments"])
 			})
 
-			it("names the Choice's own Type Parameters in both ways out", () => {
+			it("shows an application, with a blank per Argument, in both ways out", () => {
 				expect(
 					helpsOf(`implementation { ${holder}
 						constant left = Holder#Bare
 					}`),
 				).toEqual([
-					"Annotate the declaration: 'constant left: Holder<Item> = Holder#Bare'.",
-					"Or apply the Type Arguments: 'Holder<Item>#Bare'.",
+					"Annotate the Declaration this is written into with 'Holder<…>', which is what decides them.",
+					"Or apply the Type Arguments here — 'Holder<…>#Bare', with the Type you mean in place of each '…'.",
 				])
+			})
+
+			// NOTE: And the parentheses stay on where the Case CARRIES a payload.
+			// The prefixed rail dropped them, so `Holder#Full` written out of the
+			// Help met `missing-payload` on the very next run.
+			it("keeps the payload on a Case that takes one", () => {
+				expect(
+					helpsOf(`implementation { ${holder}
+						constant full = Holder#Full({ value = 1 })
+					}`),
+				).toEqual([
+					"Annotate the Declaration this is written into with 'Holder<…>', which is what decides them.",
+					"Or apply the Type Arguments here — 'Holder<…>#Full(…)', with the Type you mean in place of each '…'.",
+				])
+
+				expect(
+					compiles(`implementation { ${holder}
+						constant full = Holder<Integer>#Full({ value = 1 })
+					}`),
+				).toBe(true)
 			})
 
 			it("takes the decision from an annotation", async () => {

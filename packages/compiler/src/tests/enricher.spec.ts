@@ -4984,8 +4984,12 @@ describe("Enricher", () => {
 				expect(diagnostic.notes).toContain(
 					"'NestedTag' declares 'tag'.",
 				)
+				// NOTE: An example, and said to be one. Nothing was refused here
+				// for holding the wrong thing, so the Type in the annotation is
+				// made up — and a Help that prints one without hedging reads as
+				// the answer rather than as the shape.
 				expect(diagnostic.helps).toEqual([
-					"Annotate what the receiver comes from — 'constant items: List<Integer> = []' — so its Type is decided before the call.",
+					"Annotate what the receiver comes from — 'constant items: List<Integer> = []', for instance — so its Type is decided before the call.",
 				])
 			})
 
@@ -5503,12 +5507,45 @@ describe("Enricher", () => {
 				constant made = 5::make(7)
 			}`)
 
+			// NOTE: `make` takes exactly the one Argument the call wrote, so the
+			// value has nowhere to go and the Help says so outright. The hedge
+			// it used to carry — "if it needs one" — was the report declining to
+			// read an arity it had in hand, and the two Quick Fixes keyed on the
+			// same data offered the reader a choice one half of which was
+			// `argument-count-mismatch`.
 			expect(diagnostics[0].helps).toEqual([
-				"Write 'Maker.make(…)', passing the value as an Argument if it needs one.",
+				"Write 'Maker.make(…)' without the value — the signature takes no receiver.",
 			])
 			expect(diagnostics[0].data).toEqual({
 				kind: "static-owner",
 				namespace: "Maker",
+				acceptsValue: false,
+				acceptsWithoutValue: true,
+			})
+		})
+
+		// NOTE: And the other way round — a static whose first Parameter IS the
+		// value the call was written on. One Argument written, two Parameters to
+		// fill, so the receiver belongs among them.
+		it("should name the shape a longer signature accepts", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Spans for Integer {
+					static distance(_ from: Integer, to end: Integer) -> Integer {
+						<- end::subtract(from)
+					}
+				}
+
+				constant span = 5::distance(to 7)
+			}`)
+
+			expect(diagnostics[0].helps).toEqual([
+				"Write 'Spans.distance(…)', passing the value as its first Argument.",
+			])
+			expect(diagnostics[0].data).toEqual({
+				kind: "static-owner",
+				namespace: "Spans",
+				acceptsValue: true,
+				acceptsWithoutValue: false,
 			})
 		})
 

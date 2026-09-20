@@ -87,6 +87,15 @@ export function printType(type: common.Type): string {
 			}
 
 			return printRecordWithMembers(type)
+		// NOTE: A Function prints as the signature a DECLARATION writes, which is
+		// not the spelling a Type Declaration accepts — a Parameter's Type
+		// follows its name here and follows a colon there, so `(_ Integer) ->
+		// Integer` read back into source is refused at the `)`. Kept as it is
+		// because nothing writes it back: `isSpellableType` answers no for every
+		// Function, so the Inlay Hint that shows one carries no edit and the
+		// refactor that applies hints never offers it. Changing the spelling
+		// would re-capture `__golden__/stdlibExhaustive.txt`, which is a record
+		// of behaviour and not a thing to rewrite for a rendering.
 		case "Function":
 		case "SimpleMethod":
 		case "StaticMethod":

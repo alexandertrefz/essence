@@ -5939,6 +5939,11 @@ function applyGenericAlias(
 				notes: [
 					`'${aliasType.name}' takes ${countOf(aliasType.generics.length, "Type Parameter")}.`,
 				],
+				// NOTE: The shape to write, with a blank per Parameter. The Note
+				// says how MANY there are and leaves the reader to work out what
+				// that looks like — which is the whole of the edit for the bare
+				// spelling, where no brackets were written to correct.
+				helps: [typeApplicationHelp(aliasType.name, generics.length)],
 			},
 		)
 	}
@@ -6101,6 +6106,7 @@ function resolveIdentifierTypeDeclarationType(
 					),
 				],
 				notes: [`'${result.type}' takes 1 Type Parameter.`],
+				helps: [typeApplicationHelp(result.type, 1)],
 			},
 		)
 
@@ -6213,6 +6219,7 @@ export function applyTypeArguments(
 						`${countOf(typeArguments.length, "Type Argument")} given`,
 					),
 				],
+				helps: [typeApplicationHelp("List", 1)],
 			})
 
 			return {
@@ -6249,6 +6256,7 @@ export function applyTypeArguments(
 						`${countOf(typeArguments.length, "Type Argument")} given`,
 					),
 				],
+				helps: [typeApplicationHelp(name, 1)],
 			})
 		}
 
@@ -6278,6 +6286,7 @@ export function applyTypeArguments(
 						`${countOf(typeArguments.length, "Type Argument")} given`,
 					),
 				],
+				helps: [typeApplicationHelp("Dictionary", 2)],
 			})
 
 			return {
@@ -6312,9 +6321,25 @@ export function applyTypeArguments(
 	reportError("This Type takes no Type Arguments", position, {
 		code: "type-not-generic",
 		labels: [primary(position, "the Type Arguments have nowhere to go")],
+		// NOTE: The Type without them, which is the whole edit — this Type is
+		// already as applied as it gets, and the brackets are what has to go.
+		helps: [
+			`Remove the Type Arguments — '${describeType(baseType)}' stands on its own.`,
+		],
 	})
 
 	return { type: "Error" }
+}
+
+// NOTE: The application a Type wants, with a blank per Type Parameter. Written
+// from the Type's own name and its own arity, so `Optional` reads back as
+// `Optional<…>` and `Dictionary` as `Dictionary<…, …>` — a count in a Note leaves
+// the reader to work the shape out, and the bare spelling that raises this wrote
+// no brackets at all to correct.
+function typeApplicationHelp(name: string, parameterCount: number): string {
+	let blanks = Array.from({ length: parameterCount }, () => "…").join(", ")
+
+	return `Write '${name}<${blanks}>', with the Type you mean in place of each '…'.`
 }
 
 /***********/
@@ -6472,6 +6497,21 @@ export function findProtocolInScope(
 	}
 }
 
+// NOTE: The Protocols in scope that declare a Method of this name, alphabetically
+// — the bounds a Type Parameter could be given so that the call resolves at all.
+// An unbounded Parameter reaches no Namespace whatsoever, and a bound is the only
+// thing that gives it one, so this is the half of that refusal a reader can act
+// on.
+export function protocolsDeclaringMethod(
+	methodName: string,
+	scope: enricher.Scope,
+): Array<string> {
+	return allProtocolsInScope(scope)
+		.filter((protocol) => Object.hasOwn(protocol.methods, methodName))
+		.map((protocol) => protocol.name)
+		.sort()
+}
+
 // NOTE: Every Protocol a Scope can see, the nearest declaration of a name
 // winning — the shadowing rule the Namespace enumeration follows. Asked only
 // where a Method call found nothing written, so that a Protocol's provided
@@ -6581,11 +6621,27 @@ function namespaceCacheIsCurrent(
 // and answering with a Namespace of that name from further out would type-check
 // the call against something the emitted code can not reach — the nearer
 // binding is what the name compiles to.
+// NOTE: And the specifiers it has refused. A `::<total>append("!")` whose `total`
+// names an Integer is ONE mistake, and the lookup behind it comes back empty —
+// which read as "no Namespace targets this value" and printed a second report
+// saying so, about a receiver whose Namespace was right there (`"hello"::append`
+// compiles). Remembered on the Node, so a caller can tell an empty answer it has
+// already been told about from an empty answer that is news.
+let refusedSpecifiers = new WeakSet<parser.IdentifierNode>()
+
+export function specifierWasRefused(
+	identifier: parser.IdentifierNode | null | undefined,
+): boolean {
+	return identifier != null && refusedSpecifiers.has(identifier)
+}
+
 function reportSpecifierIsNotANamespace(
 	identifier: parser.IdentifierNode,
 	value: common.Type,
 	declarationPosition: common.Position | null,
 ): void {
+	refusedSpecifiers.add(identifier)
+
 	reportError(
 		`'${identifier.content}' is not a Namespace`,
 		identifier.position,

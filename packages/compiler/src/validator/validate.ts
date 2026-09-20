@@ -12,6 +12,7 @@ import { caseDefaults, parameterDefaults } from "../helpers/defaults"
 import {
 	asynchronyData,
 	asynchronyHelps,
+	booleanQuestionFor,
 	countOf,
 	describeParameter,
 	describeSignature,
@@ -63,6 +64,22 @@ type MatchHandler = common.typed.MatchNode["handlers"][number]
 // threading it through every `validate…` function, and only one Program is
 // validated at a time.
 let witnessScopes: Array<Set<string>> = []
+
+// NOTE: Whether each enclosing Function's body may write `complete`, innermost
+// last — a body may where it answers a Future, and the top level may outright.
+// Module state for the same reason `witnessScopes` is: the alternative is
+// threading it through every `validate…` function, and only one Program is
+// validated at a time.
+//
+// Read wherever a report is about to offer the word. `complete` written in a body
+// that answers no Future is `complete-outside-future`, so a Help offering it
+// there — and the Quick Fix keyed on the same data, which WRITES it — walked the
+// reader from one refusal into the next.
+let waitingBodies: Array<boolean> = []
+
+function bodyCanWait(): boolean {
+	return waitingBodies.at(-1) ?? true
+}
 
 // NOTE: Where each top-level Namespace is declared — its index in the top-level
 // statement list, and the Position of its name. A Namespace is emitted as a
@@ -1109,7 +1126,13 @@ function validateFunctionInvocation(
 		functionType.type !== "OverloadedMethod" &&
 		functionType.type !== "OverloadedStaticMethod"
 	) {
-		if (functionType.type !== "Error") {
+		// NOTE: Silent where the Enricher already refused this call. It reports the
+		// same sentence at the callee's own name, which is the narrower span of the
+		// two, and it answers the Invocation with an Error to say so — the ordinary
+		// reading of a hole, and the one every other check here makes. Both stages
+		// run on every file, so without this a reader met one mistake twice, a line
+		// apart, with the Helps on only one of them.
+		if (functionType.type !== "Error" && node.type.type !== "Error") {
 			reportError("This Expression is not a Function", node.position, {
 				code: "not-a-function",
 				labels: [
@@ -1117,6 +1140,10 @@ function validateFunctionInvocation(
 						node.position,
 						`this is ${withArticle(describeType(functionType))}`,
 					),
+				],
+				helps: [
+					"Remove the '()' — the name already reads the value.",
+					"Or call a Method on it with '::', which is how a Method is reached.",
 				],
 			})
 		}
@@ -1214,6 +1241,11 @@ function validateFunctionDefinition(
 
 	executingTopLevelIndex = null
 	initialisingProperty = null
+	// NOTE: The declared Type rather than the Parser's `completing` mark, which
+	// says only that a `complete` is ALREADY written. A `-> Future<…>` body that
+	// has not written its first one is exactly the body a report is most likely
+	// to be offering the word to, and it may have it.
+	waitingBodies.push(node.returnType.type === "Future")
 
 	try {
 		// NOTE: A default runs when the Function is CALLED, in the frame the
@@ -1231,6 +1263,7 @@ function validateFunctionDefinition(
 	} finally {
 		executingTopLevelIndex = enclosingIndex
 		initialisingProperty = enclosingProperty
+		waitingBodies.pop()
 		witnessScopes.pop()
 	}
 
@@ -1853,12 +1886,14 @@ function checkDefineAnswer(
 				...undecided.notes,
 			],
 			helps: [
-				...asynchronyHelps(node.type, value.type),
+				...asynchronyHelps(node.type, value.type, bodyCanWait()),
 				...record.helps,
 				...evidence.helps,
 				...undecided.helps,
 			],
-			data: asynchronyData(node.type, value.type) ?? record.data,
+			data:
+				asynchronyData(node.type, value.type, bodyCanWait()) ??
+				record.data,
 		},
 	)
 }
@@ -2724,7 +2759,15 @@ function validateCaseValue(
 					// NOTE: A single-member Case would have accepted the value
 					// through the shorthand, so the hint only helps where it can
 					// not: a multi-member Case needs the whole Record spelled out.
-					...(Object.keys(node.type.members).length > 1
+					// NOTE: And only where the payload was not ALREADY written
+					// as that Record. `#Rectangle({ width = "wide", height = 2 })`
+					// spells every member the Case declares and got one value
+					// wrong; telling its author that the shorthand does not apply
+					// answers a question nobody asked. The guard counted members
+					// and looked at nothing else, so the sentence came out for
+					// every multi-member mismatch there is.
+					...(Object.keys(node.type.members).length > 1 &&
+					!payloadSpellsTheCasesMembers(node.type, node.value)
 						? [
 								"The one-member shorthand '#Case(value)' only applies to single-member Cases.",
 							]
@@ -2737,6 +2780,28 @@ function validateCaseValue(
 	}
 
 	return node
+}
+
+// NOTE: Whether the payload names the Case's own members — which is what tells a
+// payload that tried the one-member shorthand from one that wrote the Record out
+// and got a value wrong. Names only: the Types are exactly what disagreed, and a
+// payload that spells `width` and `height` at a Case declaring `width` and
+// `height` is a payload nobody took a shortcut with.
+function payloadSpellsTheCasesMembers(
+	caseType: common.CaseType,
+	value: common.typed.ExpressionNode,
+): boolean {
+	if (value.type.type !== "Record") {
+		return false
+	}
+
+	let declared = Object.keys(caseType.members)
+	let written = Object.keys(value.type.members)
+
+	return (
+		declared.length === written.length &&
+		declared.every((name) => written.includes(name))
+	)
 }
 
 // NOTE: A payload written as a Record Literal for a Case that defaults its
@@ -3030,11 +3095,13 @@ function reportDeclarationMismatch(
 				...evidence.notes,
 			],
 			helps: [
-				...asynchronyHelps(declaredType, value.type),
+				...asynchronyHelps(declaredType, value.type, bodyCanWait()),
 				...record.helps,
 				...evidence.helps,
 			],
-			data: asynchronyData(declaredType, value.type) ?? record.data,
+			data:
+				asynchronyData(declaredType, value.type, bodyCanWait()) ??
+				record.data,
 		},
 	)
 }
@@ -3100,14 +3167,21 @@ function validateVariableAssignmentStatement(
 					...evidence.notes,
 				],
 				helps: [
-					...asynchronyHelps(node.name.type, node.value.type),
+					...asynchronyHelps(
+						node.name.type,
+						node.value.type,
+						bodyCanWait(),
+					),
 					...record.helps,
 					...undecided.helps,
 					...evidence.helps,
 				],
 				data:
-					asynchronyData(node.name.type, node.value.type) ??
-					record.data,
+					asynchronyData(
+						node.name.type,
+						node.value.type,
+						bodyCanWait(),
+					) ?? record.data,
 			},
 		)
 	}
@@ -3415,6 +3489,14 @@ function validateReturnStatement(
 				labels: [
 					primary(node.position, "this is outside any Function"),
 				],
+				// NOTE: Both ends, because which one is meant is the reader's
+				// to say: a `<-` written at the top level is either a value the
+				// Program wanted to keep — a Declaration — or a body that lost
+				// its head.
+				helps: [
+					"Drop the '<-' and write the value on its own, or as a 'constant'.",
+					"Or move the Statement into a Function, which is the only thing a '<-' answers for.",
+				],
 			})
 		}
 	} else if (
@@ -3492,6 +3574,14 @@ function validateReturnStatement(
 					...evidence.helps,
 					...undecided.helps,
 				],
+				// NOTE: The word is offered here even in a body that can not
+				// yet wait, unlike every other position. `<- Async.deferred(…)`
+				// in a `-> Integer` body is a body that has not decided to be
+				// asynchronous at all, and writing the word is the first of
+				// three steps that converge — `complete-outside-future` next,
+				// then `unused-future`, then a clean Program. That chain is
+				// tested; the other positions have no such chain, and offering
+				// the word there simply ended in a refusal.
 				data:
 					asynchronyData(expected, node.expression.type) ??
 					record.data,
@@ -3671,10 +3761,18 @@ function validateCondition(
 			notes: [
 				"Essence has no truthiness — only a Boolean can be a Condition.",
 			],
+			helps: [booleanQuestionHelp(condition.type)],
 		})
 	}
 
 	validateExpression(condition)
+}
+
+// NOTE: The Help a Condition that is not a Boolean gets. `booleanQuestionFor`
+// lives beside the other Diagnostic vocabulary, because the refinement clause in
+// the Enricher asks the same question of the same Types.
+function booleanQuestionHelp(type: common.Type): string {
+	return `Ask a question that answers a Boolean — '::${booleanQuestionFor(type)}' reads ${withArticle(describeType(type))}.`
 }
 
 function validateDefiniteReturn(
@@ -3716,6 +3814,16 @@ function validateDefiniteReturn(
 				definition.completing === true
 					? `This body waits, so its '<-' answers with ${describeType(returnType)}; every path must yield one.`
 					: `The declared return Type is ${describeType(returnType)}, so every path must yield one.`,
+			],
+			// NOTE: A path that falls off the end is answered either by giving
+			// it a value or by giving the branching an `else`, and the two are
+			// different Programs — an `if` with no `else` returns from one path
+			// and walks out of the other, and which of those the reader meant is
+			// theirs to say. Both are named; neither is spelled with a value,
+			// because what to answer with is the judgement this can not make.
+			helps: [
+				`Write a '<-' answering ${withArticle(describeType(returnType))} at the end of the body.`,
+				"Or give every branch one — an 'if' with no 'else' leaves the path around it falling through.",
 			],
 		})
 	}
@@ -4323,7 +4431,11 @@ function reportArgumentMismatch(
 				...spelling.helps,
 				...(parameter === undefined
 					? []
-					: asynchronyHelps(parameter.type, argumentNode.value.type)),
+					: asynchronyHelps(
+							parameter.type,
+							argumentNode.value.type,
+							bodyCanWait(),
+						)),
 				...(record?.helps ?? []),
 				...evidence.helps,
 			],
@@ -4333,6 +4445,7 @@ function reportArgumentMismatch(
 					: (asynchronyData(
 							parameter.type,
 							argumentNode.value.type,
+							bodyCanWait(),
 						) ?? record?.data),
 		},
 	)

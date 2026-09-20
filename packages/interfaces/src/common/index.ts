@@ -285,7 +285,20 @@ export type DiagnosticData =
 	// write `Namespace.make(value, …)` for a `value::make(…)`. ONE name rather
 	// than every candidate: the Namespace that declares the static is the one
 	// the call has to name, and the Help names that one too.
-	| { kind: "static-owner"; namespace: string }
+	// NOTE: And which of the two rewrites the SIGNATURE would accept — passing
+	// the receiver along as an Argument, or dropping it. A static takes no
+	// receiver, so the value the call was written on either belongs among the
+	// Arguments or does not belong at all, and the arity is the one thing that
+	// says which: `p::origin()` reaching an `origin()` wants it gone, and
+	// `a::distance(to b)` reaching a `distance(_ a: Point, to b: Point)` wants
+	// it kept. Both were offered whatever the arity, so one of the two always
+	// ended in `argument-count-mismatch`.
+	| {
+			kind: "static-owner"
+			namespace: string
+			acceptsValue: boolean
+			acceptsWithoutValue: boolean
+	  }
 	// NOTE: The Type Parameter a `where` condition named and the Namespace
 	// never declared — carried as written, since what a fix inserts into the
 	// Generic list is the very name the condition reads.

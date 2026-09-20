@@ -15,6 +15,7 @@ import { providedMethodProtocol } from "../helpers/conformance"
 import {
 	asynchronyData,
 	asynchronyHelps,
+	booleanQuestionFor,
 	asynchronyState,
 	choiceIdentity,
 	countOf,
@@ -135,8 +136,10 @@ import {
 	resolveSelfType,
 	resolveType,
 	scopeWithGenerics,
+	protocolsDeclaringMethod,
 	silentCheckedConformances,
 	solveConformance,
+	specifierWasRefused,
 	typeParameterBoundReport,
 	suggestionData,
 	suggestionHelps,
@@ -486,6 +489,20 @@ function requiredParameters(
 	)
 }
 
+// NOTE: Whether the position this construction stands in was itself refused. A
+// bare Case asks the position two questions — WHICH Choice declares the name, and
+// what the Choice's Type Arguments are — and an Error is a position that answered
+// neither because something else about it has already been reported. Asking the
+// reader to answer them is asking them to fix a Program whose refusal is
+// somewhere else entirely: the `#Failure("odd")` and the `#Value(…)` in a
+// literal whose return Type nothing could read are not two more mistakes.
+//
+// An unknown Case is none of this — a name no Choice declares is wrong under
+// every position, refused or not — so that report is left alone.
+function positionWasRefused(expectedType: common.Type | null): boolean {
+	return expectedType?.type === "Error"
+}
+
 function enrichCaseValue(
 	node: parser.CaseValueNode,
 	scope: enricher.Scope,
@@ -541,7 +558,11 @@ function enrichCaseValue(
 
 		type = instantiateCaseFromPayload(type, value, scope, node.position)
 
-		if (choiceGenerics !== undefined && payloadStandsForCase(type, value)) {
+		if (
+			choiceGenerics !== undefined &&
+			payloadStandsForCase(type, value) &&
+			!positionWasRefused(context)
+		) {
 			type = reportUndecidedPayloadTypeArguments(
 				node,
 				type,
@@ -1048,18 +1069,16 @@ function reportUndecidedPayloadTypeArguments(
 		return caseType
 	}
 
-	let undecided = choiceGenerics
-		.filter((_, index) => {
-			let typeArgument = caseType.typeArguments?.[index]
+	let hasUndecided = choiceGenerics.some((_, index) => {
+		let typeArgument = caseType.typeArguments?.[index]
 
-			return (
-				typeArgument !== undefined &&
-				mentionsUnsolvedTypeParameter(typeArgument)
-			)
-		})
-		.map((generic) => generic.name)
+		return (
+			typeArgument !== undefined &&
+			mentionsUnsolvedTypeParameter(typeArgument)
+		)
+	})
 
-	if (undecided.length === 0) {
+	if (!hasUndecided) {
 		return caseType
 	}
 
@@ -1069,7 +1088,8 @@ function reportUndecidedPayloadTypeArguments(
 		node.caseName.content,
 		choiceGenerics,
 		node.position,
-		undecided,
+		true,
+		choiceGenerics.map((_, index) => caseType.typeArguments?.[index]),
 	)
 }
 
@@ -2749,12 +2769,26 @@ function reportUninferableCapture(
 					? "An empty Dictionary Literal leaves its key and value Types unknown until an assignment decides them, and this Function was checked before that happened."
 					: "An empty List Literal leaves its item Type unknown until an assignment decides it, and this Function was checked before that happened.",
 			],
+			// NOTE: An example, and said to be one. Nothing was refused here — a
+			// capture is turned away for being read before anything decided it —
+			// so there is no value to read the blank off, and the Type printed is
+			// made up. A reader shown `List<Integer>` with no hedge reasonably
+			// reads it as the answer.
 			helps: [
-				`Annotate the declaration — '${annotation.annotation}' — so the Function is checked against the ${dictionary ? "Types" : "Type"} it will hold.`,
+				`Annotate the declaration — '${annotation.annotation}', for instance — so the Function is checked against the ${dictionary ? "Types" : "Type"} it will hold.`,
 			],
 		},
 	)
+
+	capturesReportedUndecided.add(node)
 }
+
+// NOTE: The captures already refused for being read before their Type was
+// decided. The call AROUND such a capture has an undecided receiver, so every
+// Type Parameter that receiver would have bound is unbound too —
+// `items::length()` over a `variable items = []` reported the capture and then
+// reported `ItemType` on top of it, which is the same mistake counted twice.
+let capturesReportedUndecided = new WeakSet<parser.IdentifierNode>()
 
 function enrichListValue(
 	node: parser.ListValueNode,
@@ -3354,11 +3388,50 @@ function reportPathWithoutContext(
 				"A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.",
 				pathContextNote(expected),
 			],
-			helps: [
-				`Write the Function literal instead: '(_ item: SomeType) { <- item${memberPathSpelling(node)} }'.`,
-			],
+			helps: pathWithoutContextHelps(node, expected),
 		},
 	)
+}
+
+// NOTE: The edit a reader can make HERE, which depends on what the position
+// wants. A position naming no Function wants a VALUE, and no Function literal
+// fits it however its Types are written — so the offer there is to read the
+// members off something rather than to write a Function nothing accepts.
+//
+// Everywhere else the literal IS the edit, and it is spelled with BOTH its
+// Types. A Function literal only takes its Types from the surrounding context
+// where it stands as an Argument, which is the one position this Diagnostic is
+// never raised in — so a literal written from this report must write its
+// Parameter Type and its `-> Type` or meet `missing-return-type` on the next
+// run. The old Help wrote neither, and its `SomeType` was a name no Program
+// declares: a reader who filled it in met the second report for the return
+// Type, which is two round trips for one edit. `<Type>` is a blank and says so.
+function pathWithoutContextHelps(
+	node: parser.MemberPathNode,
+	expected: common.Type | null,
+): Array<string> {
+	let spelling = memberPathSpelling(node)
+
+	if (expected !== null && expected.type !== "Function") {
+		return [
+			`This position expects ${withArticle(describeType(expected))} rather than a Function — read the members off a value instead, writing what this answers with in place of '<value>': '<value>${spelling}'.`,
+		]
+	}
+
+	// NOTE: And a literal of the arity the position asks for, where it asks for
+	// one a path can not have. A one-Parameter spelling offered there is refused
+	// for the very reason this report was raised — Note 2 has just finished
+	// saying the position takes two — so the count is named and the Parameters
+	// are left to the reader, whose own names they are.
+	if (expected !== null && expected.parameterTypes.length !== 1) {
+		return [
+			`Write the Function literal instead, with ${countOf(expected.parameterTypes.length, "Parameter")} and a return Type, reading '${spelling.slice(1)}' off the one you mean.`,
+		]
+	}
+
+	return [
+		`Write the Function literal instead, with the Parameter and return Types a path leaves out — '(_ item: <Type>) -> <Type> { <- item${spelling} }', filling each '<Type>' in.`,
+	]
 }
 
 // NOTE: What the position DOES ask for, which is the half of the refusal that
@@ -4021,6 +4094,26 @@ function barredCompletion(barrier: enricher.CompletionBarrier | null): {
 				helps: [],
 			}
 	}
+}
+
+// NOTE: Whether a `complete` written HERE would stand. Two ways it does: the
+// body already waits — it is the top level, or one the Parser marked as
+// completing — or it declares `-> Future<…>` and simply has not written its first
+// `complete` yet, which is the shape every async body passes through while it is
+// being written. Asked wherever a report is about to offer the word, so that it
+// is offered nowhere it would be refused by `complete-outside-future`.
+//
+// The question `bodyWaits` answers is the other one — whether the body ALREADY
+// waits — and the two must not be confused: a body that declares `-> Future<…>`
+// and has written no `complete` yet may wait and does not.
+export function bodyCanWait(scope: enricher.Scope): boolean {
+	let context = completionContextOf(scope)
+
+	if (context === "top-level" || context?.type === "Future") {
+		return true
+	}
+
+	return findExpectedReturnType(scope)?.type === "Future"
 }
 
 // NOTE: Kept as a local name because half this file reads it, while the walk
@@ -11905,6 +11998,26 @@ function selectOverload(
 	return firstArgumentMatch.selected
 }
 
+// NOTE: The one written Argument that is a Function literal with no `-> Type` of
+// its own. Null where the call passes none, and null where it passes several —
+// with two of them nothing here can say WHICH one leaves the Parameter standing,
+// and a Help that names the wrong literal is worse than the general one.
+function unannotatedLiteralArgument(
+	writtenArguments: Array<parser.ArgumentNode>,
+): parser.FunctionValueNode | null {
+	let literals = writtenArguments
+		.map((argument) => argument.value)
+		.filter(
+			(value): value is parser.FunctionValueNode =>
+				value.nodeType === "FunctionValue" &&
+				value.value.returnType === null,
+		)
+
+	return literals.length === 1
+		? (literals[0] as parser.FunctionValueNode)
+		: null
+}
+
 // NOTE: Silent when an Argument already typed as Error — that Argument's own
 // Diagnostic has been reported, and it is exactly why nothing bound the Type
 // Parameter: `matchTypes` short-circuits an Error to a match without binding
@@ -11916,8 +12029,35 @@ function reportUnboundGenerics(
 	position: common.Position,
 	typer: ArgumentTyper,
 	receiver: parser.ExpressionNode | null = null,
+	// NOTE: The call's own written Arguments. A Function literal among them is
+	// what decides both halves of this report — whether there is anything to say
+	// at all, and, where there is, which edit binds the Parameter. Defaulted for
+	// the sites that pass none, which report exactly as they did.
+	writtenArguments: Array<parser.ArgumentNode> = [],
 ): void {
 	if (typer.hasErrorArgument() || unboundGenerics.length === 0) {
+		return
+	}
+
+	// NOTE: And silent over a receiver that has already been refused for being
+	// read before its own Type was decided. What that receiver would have bound
+	// is unbound BECAUSE of it, and there is no second edit to make.
+	if (
+		receiver?.nodeType === "Identifier" &&
+		capturesReportedUndecided.has(receiver)
+	) {
+		return
+	}
+
+	let literal = unannotatedLiteralArgument(writtenArguments)
+
+	// NOTE: One mistake, one report. A literal whose own return Type could not be
+	// read has ALREADY been refused for exactly that, and every Type Parameter
+	// written in its answer Type is unbound because of it — `Result::andThen`'s
+	// `Other` is not a second thing the reader got wrong. Only the literal that
+	// answered NOTHING silences this; a literal that simply left its `-> Type`
+	// off still reports here, because there the missing annotation is news.
+	if (literal !== null && literalsAnsweringNothing.has(literal.value)) {
 		return
 	}
 
@@ -11970,10 +12110,24 @@ function reportUnboundGenerics(
 				// by the ARGUMENTS and by nothing else, which is what leaves a
 				// signature that names one only in its answer Type unbindable
 				// from anywhere. So: the two ends a reader can actually hold.
-				helps: [
-					"Give the Type Parameter a place among the Parameters, so that an Argument binds it.",
-					"Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.",
-				],
+				//
+				// NOTE: Neither end is the reader's to hold where the call
+				// passes a Function literal that wrote no `-> Type`. The
+				// Parameter has its place among the Parameters already —
+				// `Result::andThen` writes `Other` in the step's own answer
+				// Type — and the signature it has its place in belongs to the
+				// standard library, which is not a file the reader edits. What
+				// IS theirs is the annotation the literal left off, and it is
+				// the only thing that binds the Parameter.
+				helps:
+					literal === null
+						? [
+								"Give the Type Parameter a place among the Parameters, so that an Argument binds it.",
+								"Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.",
+							]
+						: [
+								`Write the Function literal's return Type — '-> Type' after its Parameter list — which is what binds '${name}'.`,
+							],
 			},
 		)
 	}
@@ -12824,6 +12978,10 @@ function reportStaticMethodOnValue(
 	staticNamespaces: Map<string, common.NamespaceType>,
 ): void {
 	let namespaceNames = [...staticNamespaces.keys()]
+	let accepted = staticCallArities(
+		staticNamespaces.get(namespaceNames[0])?.methods[node.member.content],
+		node.arguments.length,
+	)
 
 	reportError(
 		memberType === null
@@ -12846,8 +13004,17 @@ function reportStaticMethodOnValue(
 				(name) =>
 					`'${name}' declares '${node.member.content}' as static.`,
 			),
+			// NOTE: The hedge goes wherever the signature settles it. A static
+			// takes no receiver, so the value this was written ON either
+			// belongs among the Arguments or does not belong at all, and the
+			// arity says which — asked here so that the Help and the two Quick
+			// Fixes keyed on the same answer agree.
 			helps: [
-				`Write '${namespaceNames[0]}.${node.member.content}(…)', passing the value as an Argument if it needs one.`,
+				staticCallHelp(
+					namespaceNames[0],
+					node.member.content,
+					accepted,
+				),
 			],
 			// NOTE: The first Namespace, which is the one the Help writes too —
 			// a static is reached through the Namespace that declares it, and a
@@ -12855,12 +13022,73 @@ function reportStaticMethodOnValue(
 			data: {
 				kind: "static-owner",
 				namespace: namespaceNames[0],
+				...accepted,
 			},
 		},
 	)
 }
 
+// NOTE: Which of the two rewrites the static's own signature accepts. The
+// receiver is not a Parameter of a static, so a `value::make(1)` is either
+// `Namespace.make(value, 1)` or `Namespace.make(1)` — and offering both whatever
+// the arity meant one of them always ended in `argument-count-mismatch`, which is
+// a fix that trades one refusal for another.
+//
+// Every Overload is asked, since one accepting the shape is what makes it
+// writable. A signature accepts a count between the Parameters it requires and
+// the Parameters it has; nothing found — a Method the lookup could not reach —
+// answers yes to both, which is the hedge this replaces and the safe way to be
+// wrong.
+function staticCallArities(
+	method: common.Type | undefined,
+	writtenArguments: number,
+): { acceptsValue: boolean; acceptsWithoutValue: boolean } {
+	let signatures = method === undefined ? null : signaturesOf(method)
+
+	if (signatures === null || signatures.length === 0) {
+		return { acceptsValue: true, acceptsWithoutValue: true }
+	}
+
+	let accepts = (count: number) =>
+		signatures.some(
+			(signature) =>
+				count <= signature.parameterTypes.length &&
+				count >=
+					signature.parameterTypes.filter(
+						(parameter) => !parameter.hasDefault,
+					).length,
+		)
+
+	return {
+		acceptsValue: accepts(writtenArguments + 1),
+		acceptsWithoutValue: accepts(writtenArguments),
+	}
+}
+
+// NOTE: And the Help built from that answer. Where only one of the two shapes
+// fits, the Help names it outright; where both do — an Overload set that takes
+// either count, or a Method nothing could be read off — it keeps the hedge it
+// always had, which is honest exactly there.
+function staticCallHelp(
+	namespace: string,
+	methodName: string,
+	accepted: { acceptsValue: boolean; acceptsWithoutValue: boolean },
+): string {
+	let call = `${namespace}.${methodName}`
+
+	if (accepted.acceptsValue && !accepted.acceptsWithoutValue) {
+		return `Write '${call}(…)', passing the value as its first Argument.`
+	}
+
+	if (accepted.acceptsWithoutValue && !accepted.acceptsValue) {
+		return `Write '${call}(…)' without the value — the signature takes no receiver.`
+	}
+
+	return `Write '${call}(…)', passing the value as an Argument if it needs one.`
+}
+
 // NOTE: One entry a refused call was measured against, as a report names it.
+// `signature` is what the Arguments were matched against and `receiverParameters`// NOTE: One entry a refused call was measured against, as a report names it.
 // `signature` is what the Arguments were matched against and `receiverParameters`
 // is how much of its front the call did not write: the receiver occupies the
 // first Parameter of every non-static Method signature, but a `::` call writes it
@@ -13489,6 +13717,11 @@ function overloadRefusalReport(
 		// pair its Arguments with has typed none of them, and the Types are read
 		// out here rather than under the probe that threw its Diagnostics away.
 		passed: () => Array<common.Type>
+		// NOTE: Whether the body this call stands in may write `complete` — see
+		// `bodyCanWait`. A refused Argument that is a Future is answered by the
+		// word wherever the word stands, and by reaching through the Future
+		// wherever it does not. Defaulted for the callers that do not ask.
+		canWait?: boolean
 	},
 ): {
 	labels: [common.DiagnosticLabel, ...Array<common.DiagnosticLabel>]
@@ -13595,7 +13828,11 @@ function overloadRefusalReport(
 	// and it reads as a plain mismatch between `Future<Integer>` and `Integer`
 	// until this says otherwise. Written in the Validator's own words, which is
 	// where the reader meets the same sentence on every other position.
-	let asynchrony = asynchronyHelps(detail.expectedType, detail.argumentType)
+	let asynchrony = asynchronyHelps(
+		detail.expectedType,
+		detail.argumentType,
+		call.canWait !== false,
+	)
 	// NOTE: And which member of a written Record the closest candidate turned
 	// away, as Notes alone — which is what handing it no Node asks for. The two
 	// Labels here are spoken for: one points at the Argument and one at the
@@ -13632,7 +13869,11 @@ function overloadRefusalReport(
 		data:
 			detail.argumentIndex < candidate.receiverParameters
 				? undefined
-				: asynchronyData(detail.expectedType, detail.argumentType),
+				: asynchronyData(
+						detail.expectedType,
+						detail.argumentType,
+						call.canWait !== false,
+					),
 	}
 }
 
@@ -13767,6 +14008,7 @@ function reportNoMatchingOverload(
 			callee: node.member.position,
 			name: `'${node.member.content}'`,
 			passed: () => writtenArgumentTypes(node.arguments, typer),
+			canWait: bodyCanWait(scope),
 		},
 	)
 
@@ -13882,9 +14124,35 @@ function reportUndecidedReceiverType(
 				`${describeType(undecidedType)} is matched by all of them, so which one runs would be decided by a Type nothing has decided.`,
 			],
 			helps: [
-				"Annotate what the receiver comes from — 'constant items: List<Integer> = []' — so its Type is decided before the call.",
+				"Annotate what the receiver comes from — 'constant items: List<Integer> = []', for instance — so its Type is decided before the call.",
 			],
 		},
+	)
+}
+
+// NOTE: The one shape of this refusal the Compiler knows the answer to. A Type
+// Parameter with no bound reaches no Namespace at all — that is what being
+// unbounded MEANS — and a Program written `<infer Item>` is one word away from a
+// Program where the call resolves. The Protocols that declare the Method are
+// looked up rather than guessed at, so the bound offered is one that answers this
+// very call; several are offered in turn where several would, which is the same
+// rule `ambiguous-case` follows about naming only one candidate.
+//
+// Empty for every other receiver — a bound is not an edit that means anything to
+// a String — and empty where nothing in scope declares the name, since there
+// would be nothing to bound it BY.
+function unboundedParameterHelps(
+	baseType: common.Type,
+	methodName: string,
+	scope: enricher.Scope,
+): Array<string> {
+	if (baseType.type !== "GenericUse" || baseType.constraint !== undefined) {
+		return []
+	}
+
+	return protocolsDeclaringMethod(methodName, scope).map(
+		(protocolName) =>
+			`Bound the Type Parameter by a Protocol that declares '${methodName}' — '<infer ${baseType.name} is ${protocolName}>' at the Declaration that introduces it.`,
 	)
 }
 
@@ -13936,6 +14204,16 @@ function resolveMethodInvocation(
 		node.namespaceSpecifier,
 		scope,
 	)
+
+	// NOTE: One mistake, one report. A specifier that names something other than
+	// a Namespace has been refused as such, and the empty lookup it leaves behind
+	// is that refusal and not a second one — running the search on regardless
+	// reported `no-namespace-for-value` about a receiver whose own Namespace
+	// answers the Method perfectly well, which is a sentence that is simply not
+	// true.
+	if (specifierWasRefused(node.namespaceSpecifier)) {
+		return resolveFailedMethodInvocation()
+	}
 
 	let { instanceNamespaces: matchingNamespaces, staticNamespaces } =
 		partitionInstanceMethodNamespaces(
@@ -13993,11 +14271,18 @@ function resolveMethodInvocation(
 						notes: [
 							`No Namespace in scope targets ${describeType(baseType)}.`,
 						],
-						helps: unimportedNamespaceHelps(
-							node.member.content,
-							baseType,
-							scope,
-						),
+						helps: [
+							...unboundedParameterHelps(
+								baseType,
+								node.member.content,
+								scope,
+							),
+							...unimportedNamespaceHelps(
+								node.member.content,
+								baseType,
+								scope,
+							),
+						],
 					},
 				)
 			}
@@ -14123,6 +14408,7 @@ function resolveMethodInvocation(
 			node.position,
 			typer,
 			node.base,
+			node.arguments,
 		)
 
 		// NOTE: The Overload was selected while this Namespace was probed; what
@@ -14493,6 +14779,7 @@ function resolveUnionMethodDispatch(
 				node.position,
 				typer,
 				node.base,
+				node.arguments,
 			)
 		}
 
@@ -14561,9 +14848,12 @@ function resolveUnionMethodDispatch(
 						)
 						.join(", ")}.`,
 				],
-				helps: [
-					"Narrow the value with a Match Expression before calling the Method.",
-				],
+				helps: undispatchableHelps(
+					catchAllCases.map(
+						(dispatchCase) => dispatchCase.memberType,
+					),
+					node.base,
+				),
 			},
 		)
 
@@ -14719,6 +15009,47 @@ function isRuntimeCatchAllType(type: common.Type): boolean {
 	return type.type === "GenericUse" || type.type === "Unknown"
 }
 
+// NOTE: A Match is the answer wherever the members can be told apart — it is the
+// one way to narrow a Union before a call, and a value of two DECLARED Types
+// really is decided by one. It is not the answer for a Union of Type PARAMETERS,
+// and offering it there was a closed loop: Types erase before a Match runs, so
+// the first Case accepts every value that reaches it, `erased-case-conflict`
+// refuses the second, and that report's own Help swaps the arms and produces its
+// own mirror image.
+//
+// A Union of Type Parameters is a signature that wanted ONE of them. Both
+// Parameters are bounded by the Protocol whose Method is being called — that is
+// what made the call resolvable at all — so the bound is in hand here and the
+// signature can be spelled. The receiver's own name is used where it has one,
+// which is every call written on a Parameter.
+function undispatchableHelps(
+	memberTypes: Array<common.Type>,
+	base: parser.ExpressionNode,
+): Array<string> {
+	let parameters = memberTypes.filter(
+		(memberType): memberType is common.GenericUse =>
+			memberType.type === "GenericUse",
+	)
+
+	if (parameters.length !== memberTypes.length) {
+		return [
+			"Narrow the value with a Match Expression before calling the Method.",
+		]
+	}
+
+	let bounds = new Set(parameters.map((parameter) => parameter.constraint))
+	let bound = bounds.size === 1 ? [...bounds][0] : undefined
+	let declaration = `<infer Item${bound === undefined ? "" : ` is ${bound}`}>`
+	let spelling =
+		base.nodeType === "Identifier"
+			? `'${declaration}(_ ${base.content}: Item)'`
+			: `'${declaration}', with the Parameter declared as an 'Item'`
+
+	return [
+		`Take one Type Parameter in place of the Union — ${spelling} — since Types erase before a Match runs, and a Match is the only thing that narrows.`,
+	]
+}
+
 // NOTE: An Identifier callee names itself and a `Namespace.method` Lookup
 // spells both halves; anything else that answers with a Function has no one
 // name to give, and the Position the Diagnostic carries says which call is
@@ -14788,6 +15119,8 @@ function resolveFunctionInvocation(
 				selected.inferred.unboundGenerics,
 				node.position,
 				typer,
+				null,
+				node.arguments,
 			)
 
 			// NOTE: What selecting this candidate reported was held back until
@@ -14868,6 +15201,8 @@ function resolveFunctionInvocation(
 				selected.inferred.unboundGenerics,
 				node.position,
 				typer,
+				null,
+				node.arguments,
 			)
 
 			// NOTE: What selecting this candidate reported was held back until it
@@ -14908,6 +15243,7 @@ function resolveFunctionInvocation(
 				callee: node.name.position,
 				name: callee,
 				passed: () => writtenArgumentTypes(node.arguments, typer),
+				canWait: bodyCanWait(scope),
 			},
 		)
 
@@ -14938,6 +15274,14 @@ function resolveFunctionInvocation(
 							node.name.position,
 							`this is ${withArticle(describeType(type))}`,
 						),
+					],
+					// NOTE: The parentheses are what made this a call, so they
+					// are what goes — the name beside them reads a value, which
+					// is what it already holds. A Method is the other reading,
+					// and it is reached with `::` rather than by calling a name.
+					helps: [
+						"Remove the '()' — the name already reads the value.",
+						"Or call a Method on it with '::', which is how a Method is reached.",
 					],
 				},
 			)
@@ -15833,6 +16177,11 @@ function holdsCaseNamed(valueType: common.Type, caseName: string): boolean {
 function resolveBareCaseReference(
 	caseName: parser.IdentifierNode,
 	scope: enricher.Scope,
+	// NOTE: See `positionWasRefused`. Which of two Choices was meant is the
+	// position's answer to give, so a position that is itself an Error has no
+	// ambiguity to report — but a name NO Choice declares is still a name no
+	// Choice declares.
+	refusedPosition: boolean = false,
 ): common.CaseType | common.ErrorType {
 	let casesInScope = findCaseTypesInScope(scope)
 	let candidates = casesInScope.filter(
@@ -15852,7 +16201,7 @@ function resolveBareCaseReference(
 
 	if (candidates.length === 0) {
 		reportUnknownBareCase(caseName, casesInScope)
-	} else {
+	} else if (!refusedPosition) {
 		reportAmbiguousCase(caseName, candidates, "in scope")
 	}
 
@@ -15998,7 +16347,9 @@ function resolveCaseValueType(
 	payloadTypeUnder: PayloadReader = () => null,
 ): common.CaseType | common.ErrorType {
 	if (node.choice === null) {
-		if (expectedType !== null) {
+		let refused = positionWasRefused(expectedType)
+
+		if (expectedType !== null && !refused) {
 			let contextual = resolveCaseInExpectedType(
 				node.caseName,
 				expectedType,
@@ -16013,7 +16364,7 @@ function resolveCaseValueType(
 			noteExpectedChoice(node.caseName, expectedType)
 		}
 
-		let bareCase = resolveBareCaseReference(node.caseName, scope)
+		let bareCase = resolveBareCaseReference(node.caseName, scope, refused)
 
 		// NOTE: A unit Case of a generic Choice carries no payload to read a Type
 		// Argument off, so a bare `#Bare` nothing around decides is exactly as
@@ -16032,12 +16383,17 @@ function resolveCaseValueType(
 			bareCase.choiceGenerics !== undefined &&
 			Object.keys(bareCase.members).length === 0
 		) {
+			if (refused) {
+				return { type: "Error" }
+			}
+
 			return reportUndecidedTypeArguments(
 				`#${node.caseName.content}`,
 				displayChoiceName(bareCase.choice),
 				node.caseName.content,
 				bareCase.choiceGenerics,
 				node.position,
+				false,
 			)
 		}
 
@@ -16117,6 +16473,7 @@ function resolvePrefixedCaseValueType(
 		node.caseName.content,
 		declaredCase.choiceGenerics,
 		node.position,
+		Object.keys(declaredCase.members).length > 0,
 	)
 }
 
@@ -16128,24 +16485,51 @@ function resolvePrefixedCaseValueType(
 // rail keeps naming the Alias the reader wrote where one stood in for the
 // Choice.
 //
-// NOTE: The Choice's own Parameter names stand in for the Arguments in both
-// helps — they are what the declaration calls them, so the reader has a name to
-// replace rather than an ellipsis to decode.
+// NOTE: The Choice's own Parameter names are what the NOTES name, and nothing
+// else: they are the declaration's names, they are not in scope at the
+// construction, and a reader who copied `Result<ValueType, FailureType>` out of a
+// Help met `unknown-type` twice for their trouble. So the Helps spell an
+// application instead — every Argument the payload already decided written out,
+// and an ellipsis where the reader has to choose — which is text that parses.
+//
+// `takesPayload` keeps the parentheses on where the Case carries members. The
+// prefixed rail used to drop them, so `Holder#Full` copied out of a Help was
+// `missing-payload` on the next run.
 function reportUndecidedTypeArguments(
 	construction: string,
 	choiceName: string,
 	caseName: string,
 	choiceGenerics: Array<common.GenericDeclaration>,
 	position: common.Position,
-	// NOTE: The payload rail's extra — the Parameters the payload did NOT
-	// decide, so the label can say which half of the application is missing
-	// rather than claim there is nothing here at all. Absent for the two rails
-	// that carry no payload to decide anything with, whose label is unchanged.
-	undecided?: Array<common.GenericName>,
+	takesPayload: boolean,
+	// NOTE: The payload rail's extra — what the payload bound each Type
+	// Parameter to, one entry per Parameter, so the Helps can spell the half the
+	// reader is not being asked about and the label can say which half is
+	// missing. Absent for the two rails that carry no payload to decide anything
+	// with, where every Argument is the reader's to write.
+	payloadArguments?: Array<common.Type | undefined>,
 ): common.ErrorType {
 	let parameterNames = choiceGenerics.map((generic) => generic.name)
-	let application = `${choiceName}<${parameterNames.join(", ")}>`
-	let payloadSuffix = undecided === undefined ? "" : "(…)"
+	let spellings = parameterNames.map((_, index) => {
+		let typeArgument = payloadArguments?.[index]
+
+		return typeArgument === undefined ||
+			mentionsUnsolvedTypeParameter(typeArgument)
+			? null
+			: describeType(typeArgument)
+	})
+	let undecided =
+		payloadArguments === undefined
+			? undefined
+			: parameterNames.filter(
+					(_, index) =>
+						payloadArguments[index] !== undefined &&
+						spellings[index] === null,
+				)
+	let application = `${choiceName}<${spellings
+		.map((spelling) => spelling ?? "…")
+		.join(", ")}>`
+	let payloadSuffix = takesPayload ? "(…)" : ""
 
 	reportError(
 		`Nothing decides the Type Arguments of '${construction}'`,
@@ -16162,8 +16546,8 @@ function reportUndecidedTypeArguments(
 					: "A payload binds only the Type Parameters its own members mention — the rest are applied, at the construction or by the position around it.",
 			],
 			helps: [
-				`Annotate the declaration: 'constant left: ${application} = ${construction}'.`,
-				`Or apply the Type Arguments: '${application}#${caseName}${payloadSuffix}'.`,
+				`Annotate the Declaration this is written into with '${application}', which is what decides them.`,
+				`Or apply the Type Arguments here — '${application}#${caseName}${payloadSuffix}', with the Type you mean in place of each '…'.`,
 			],
 		},
 	)
@@ -17779,7 +18163,18 @@ function resolveContextualParameterTypes(
 							? "Only a Function passed as an Argument takes its Types from the surrounding context."
 							: `The expected Function Type takes ${countOf(expectedFunction.parameterTypes.length, "Parameter")}, so there is nothing for Parameter ${index + 1} to infer from.`,
 					],
-					helps: ["Write the Parameter's Type explicitly."],
+					// NOTE: A literal nothing types from the outside is missing
+					// its return Type too, and the return Type is asked for only
+					// once every Parameter has one — so a reader who writes the
+					// Parameter's Type and stops meets `missing-return-type` on
+					// the next run, which is two round trips for one
+					// under-annotated literal. Both halves are named here, where
+					// the first of them is reported.
+					helps: [
+						node.returnType === null && expectedFunction === null
+							? "Write the Parameter's Type and the Function's return Type — a literal outside Argument position takes neither from around it."
+							: "Write the Parameter's Type explicitly.",
+					],
 				},
 			)
 
@@ -17792,6 +18187,84 @@ function resolveContextualParameterTypes(
 			documentation,
 		}
 	})
+}
+
+// NOTE: The Function literals whose return Type could not be read off their
+// body. One mistake, and the call AROUND such a literal is full of consequences
+// of it: `Result::andThen`'s `Other` is written in the step's own answer Type, so
+// a literal answering nothing leaves `Other` unbound, leaves the `#Failure(…)` in
+// its body measured against an Error, and leaves the `#Value(…)` beside it with
+// no Choice to pick from. Each of those reported in its own words, and only the
+// first of the four named an edit that helps.
+//
+// Remembered by Node rather than by Type, because the call that reports is a
+// stage away from the literal that failed and an Error Type says only that
+// SOMETHING went wrong. A WeakSet over Parser Nodes holds nothing once a run's
+// tree is gone, so a long-lived Language Server keeps no more than the trees it
+// is already keeping.
+let literalsAnsweringNothing = new WeakSet<parser.FunctionDefinitionNode>()
+
+// NOTE: Whether the body's last line is a VALUE rather than a `<-` — the usual
+// cause of a return Type nothing can read, and the one thing the report about it
+// could not say before. Asked as "is the last line a Statement", because the
+// Parser spells every Statement form out and an Expression is what is left over.
+function endsInAnUnreturnedValue(
+	body: Array<parser.ImplementationNode>,
+): boolean {
+	let last = body.at(-1)
+
+	if (last === undefined) {
+		return false
+	}
+
+	switch (last.nodeType) {
+		case "ConstantDeclarationStatement":
+		case "VariableDeclarationStatement":
+		case "VariableAssignmentStatement":
+		case "NamespaceDefinitionStatement":
+		case "ProtocolDeclarationStatement":
+		case "TypeAliasStatement":
+		case "ChoiceDeclarationStatement":
+		case "IfElseStatement":
+		case "IfStatement":
+		case "ReturnStatement":
+		case "FunctionStatement":
+		case "OverloadedFunctionStatement":
+		case "ExpectStatement":
+		case "RequireStatement":
+			return false
+		default:
+			return true
+	}
+}
+
+// NOTE: The annotation a literal outside Argument position has to write, spelled
+// out where the Compiler can spell it. The body is read for the Diagnostic alone
+// — `inferReturnTypeFromBody` drops what that pass reports — which is a thing
+// this stage refuses to do for the PROGRAM on purpose: a Type nothing constrains
+// is hard to follow across a Program, and is easy to read once, here, to say what
+// the missing annotation would have been.
+//
+// Withheld where what came back can not be written down. `describeType` collapses
+// a nested Function to `(_: …) -> …` and prints a blank as `Unknown`, and neither
+// is a Type a reader can type back in — so the schematic stands there instead,
+// and says it is one.
+function returnTypeHelp(
+	node: parser.FunctionDefinitionNode,
+	parameterTypes: Array<common.Parameter>,
+	scope: enricher.Scope,
+): string {
+	let inferred = inferReturnTypeFromBody(node, parameterTypes, scope)
+	let spelling =
+		inferred === null || typeContainsError(inferred)
+			? null
+			: describeType(inferred)
+
+	return spelling === null ||
+		spelling.includes("…") ||
+		spelling.includes("Unknown")
+		? "Write the return Type after the Parameter list — '-> <Type>', naming what this body's '<-' answers with."
+		: `Write the return Type after the Parameter list — '-> ${spelling}', which is what this body answers with.`
 }
 
 function resolveContextualReturnType(
@@ -17829,6 +18302,7 @@ function resolveContextualReturnType(
 				notes: [
 					"Only a Function passed as an Argument takes its Types from the surrounding context.",
 				],
+				helps: [returnTypeHelp(node, parameterTypes, scope)],
 			},
 		)
 
@@ -17855,7 +18329,21 @@ function resolveContextualReturnType(
 
 		let position = functionLiteralPosition(node)
 		let message = "The return Type could not be inferred from the body"
-		let helps = ["Give the Function an explicit '-> Type'."]
+		// NOTE: A body that forgets `<-` is the usual cause, and the annotation
+		// this asked for does not fix it — it moves the report to
+		// `missing-return` one run later, which is the same mistake said in
+		// another stage's words. `::reduce` reports it as `missing-return`
+		// straight away, so the Compiler can say it here too. The annotation
+		// stays, second: a body that DOES return and still answers nothing has
+		// no other way out.
+		let helps = endsInAnUnreturnedValue(node.body)
+			? [
+					"Return the value with '<-' — a body whose last line is a value answers with nothing.",
+					"Or give the Function an explicit '-> Type'.",
+				]
+			: ["Give the Function an explicit '-> Type'."]
+
+		literalsAnsweringNothing.add(node)
 
 		if (position === null) {
 			reportError(message, null, {
@@ -18058,7 +18546,16 @@ function refinementSkeletonAdmissible(
 				notes: [
 					"A checked refinement is written on an Integer, a Rational, a String, an applied List or an applied Dictionary — 'List<String>', never a bare 'List'.",
 				],
-				helps: [`Drop the 'where' clause from '${node.name.content}'.`],
+				// NOTE: Dropping the clause compiles, and it quietly answers a
+				// DIFFERENT Declaration: "a Boolean that is true" becomes "any
+				// Boolean", which is the Type the reader was refining their
+				// way out of. So the edit says what it costs, and the other
+				// half names what can carry the clause instead — the intent
+				// survives a change of base, and it survives nothing else.
+				helps: [
+					`Drop the 'where' clause from '${node.name.content}', which leaves the Alias naming ${described} and nothing more.`,
+					"Or write the refinement on a base one can be checked against — an Integer, a Rational, a String, an applied List or an applied Dictionary.",
+				],
 			},
 		)
 
@@ -18102,6 +18599,16 @@ export function resolveRefinementConjuncts(
 					],
 					notes: [
 						"A 'where' clause is a question about the value being refined, so it has to answer 'true' or 'false'.",
+					],
+					// NOTE: A question of '@' ITSELF, never of what the clause
+					// answers. `@::absolute()` is a perfectly good call, and the
+					// comparison a reader would chain onto it is refused by the
+					// next rail along — a predicate is ONE call on '@', which is
+					// what the Note beside this says. So the Method named is one
+					// the refined base has, and writing it in place of the call
+					// is the whole edit.
+					helps: [
+						`Call a Method on '@' that answers a Boolean — '@::${booleanQuestionFor(base)}', for instance.`,
 					],
 				},
 			)

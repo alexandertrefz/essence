@@ -598,6 +598,8 @@ Error: A Define Condition has to be a Boolean
     │                     ──┬──  
     │                       ╰──── this is an Integer
     │ 
+    │ Help: Ask a question that answers a Boolean — '::isGreaterThan(0)' reads an Integer.
+    │ 
     │ Note: Essence has no truthiness — only a Boolean can be a Condition.
 ────╯
 
@@ -633,8 +635,8 @@ Error: Nothing decides the Type Arguments of '#Empty'
     │           ───┬──  
     │              ╰──── no Type Arguments here, and nothing around it decides them
     │ 
-    │ Help 1: Annotate the declaration: 'constant left: Optional<ItemType> = #Empty'.
-    │ Help 2: Or apply the Type Arguments: 'Optional<ItemType>#Empty'.
+    │ Help 1: Annotate the Declaration this is written into with 'Optional<…>', which is what decides them.
+    │ Help 2: Or apply the Type Arguments here — 'Optional<…>#Empty', with the Type you mean in place of each '…'.
     │ 
     │ Note 1: 'Optional' takes 1 Type Parameter: 'ItemType'.
     │ Note 2: A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.
@@ -667,8 +669,8 @@ Error: Nothing decides the Type Arguments of '#Empty'
     │           ───┬──  
     │              ╰──── no Type Arguments here, and nothing around it decides them
     │ 
-    │ Help 1: Annotate the declaration: 'constant left: Optional<ItemType> = #Empty'.
-    │ Help 2: Or apply the Type Arguments: 'Optional<ItemType>#Empty'.
+    │ Help 1: Annotate the Declaration this is written into with 'Optional<…>', which is what decides them.
+    │ Help 2: Or apply the Type Arguments here — 'Optional<…>#Empty', with the Type you mean in place of each '…'.
     │ 
     │ Note 1: 'Optional' takes 1 Type Parameter: 'ItemType'.
     │ Note 2: A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.
@@ -1476,6 +1478,8 @@ Error: Type 'Step' was given the wrong number of Type Arguments
     │                        ──────┬──────  
     │                              ╰──────── 1 Type Argument given
     │ 
+    │ Help: Write 'Step<…, …>', with the Type you mean in place of each '…'.
+    │ 
     │ Note: 'Step' takes 2 Type Parameters.
 ────╯
 
@@ -1501,8 +1505,7 @@ Error: Type Parameter 'Answer' could not be inferred
     │ │                                                          
     │ ╰────────────────────────────────────────────────────────── nothing here determines what it binds to
     │ 
-    │ Help 1: Give the Type Parameter a place among the Parameters, so that an Argument binds it.
-    │ Help 2: Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.
+    │ Help: Write the Function literal's return Type — '-> Type' after its Parameter list — which is what binds 'Answer'.
 ────╯
 
 [unsatisfied-bound]
@@ -1787,7 +1790,7 @@ Error: A member path stands where no Function is expected
     │                      ───┬──  
     │                         ╰──── this path names no value
     │ 
-    │ Help: Write the Function literal instead: '(_ item: SomeType) { <- item.price }'.
+    │ Help: Write the Function literal instead, with the Parameter and return Types a path leaves out — '(_ item: <Type>) -> <Type> { <- item.price }', filling each '<Type>' in.
     │ 
     │ Note 1: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
     │ Note 2: This position expects no particular Type.
@@ -1801,7 +1804,7 @@ Error: A member path stands where no Function is expected
     │                             ──┬──  
     │                               ╰──── this path names no value
     │ 
-    │ Help: Write the Function literal instead: '(_ item: SomeType) { <- item.name }'.
+    │ Help: This position expects a String rather than a Function — read the members off a value instead, writing what this answers with in place of '<value>': '<value>.name'.
     │ 
     │ Note 1: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
     │ Note 2: This position expects a String.
@@ -1826,7 +1829,7 @@ Error: A member path stands where no Function is expected
     │                                                            ───┬──  
     │                                                               ╰──── this path names no value
     │ 
-    │ Help: Write the Function literal instead: '(_ item: SomeType) { <- item.price }'.
+    │ Help: Write the Function literal instead, with 2 Parameters and a return Type, reading 'price' off the one you mean.
     │ 
     │ Note 1: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
     │ Note 2: This position expects a Function of 2 Parameters, and a path reads its members off exactly one.
@@ -2576,7 +2579,8 @@ Error: A 'where' clause can not refine Boolean
     │                ───┬───  
     │                   ╰───── this is Boolean
     │ 
-    │ Help: Drop the 'where' clause from 'Yes'.
+    │ Help 1: Drop the 'where' clause from 'Yes', which leaves the Alias naming Boolean and nothing more.
+    │ Help 2: Or write the refinement on a base one can be checked against — an Integer, a Rational, a String, an applied List or an applied Dictionary.
     │ 
     │ Note: A checked refinement is written on an Integer, a Rational, a String, an applied List or an applied Dictionary — 'List<String>', never a bare 'List'.
 ────╯
@@ -2589,7 +2593,8 @@ Error: A 'where' clause can not refine List
     │                    ──┬─  
     │                      ╰─── this is List
     │ 
-    │ Help: Drop the 'where' clause from 'Several'.
+    │ Help 1: Drop the 'where' clause from 'Several', which leaves the Alias naming List and nothing more.
+    │ Help 2: Or write the refinement on a base one can be checked against — an Integer, a Rational, a String, an applied List or an applied Dictionary.
     │ 
     │ Note: A checked refinement is written on an Integer, a Rational, a String, an applied List or an applied Dictionary — 'List<String>', never a bare 'List'.
 ────╯
@@ -2640,6 +2645,8 @@ Error: This predicate is not a Boolean
  47 │     type Sized = Integer where @::absolute()
     │                                ──────┬──────  
     │                                      ╰──────── this is NonNegativeInteger
+    │ 
+    │ Help: Call a Method on '@' that answers a Boolean — '@::isGreaterThan(0)', for instance.
     │ 
     │ Note: A 'where' clause is a question about the value being refined, so it has to answer 'true' or 'false'.
 ────╯
@@ -2734,6 +2741,9 @@ Error: Not every path through this Function returns
  18 │ ├─▶     }
     │ │           
     │ ╰─────────── this path falls off the end
+    │ 
+    │ Help 1: Write a '<-' answering a Point at the end of the body.
+    │ Help 2: Or give every branch one — an 'if' with no 'else' leaves the path around it falling through.
     │ 
     │ Note: The declared return Type is Point, so every path must yield one.
 ────╯
