@@ -85,6 +85,8 @@ These twenty-two JavaScript habits cause most first-hour reports, and they are n
 
 The parser reports these. A syntax error does not hide the rest of the file: the parser drops the statement it could not read and carries on, and the stages after it check what is left. What a dropped statement declared is not reported as undeclared, and a construct it was written inside is not judged for what is missing from it — one mistake gets one report.
 
+Where that silence applies is where the dropped declaration would have been readable: the block it was written in, from its own line down. A name dropped inside one function's body is not in scope in the next function along, so a read of it there is reported like any other name nothing declares. A top-level `function`, `type`, `choice`, `namespace` or `protocol` is in scope across the whole file wherever it stands, so dropping one of those is silent file-wide. Methods and static properties are the one thing that is never scoped this way: a method dropped out of a namespace body is called from outside that body, so every call of it by that name stays silent.
+
 ### `syntax-error`
 
 **Error.** The parser expected one thing and found another. The message names both.

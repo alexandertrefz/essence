@@ -82,6 +82,8 @@ Every stage runs, whatever the one before it found, and one report holds all of 
 
 The stages recover rather than stopping: `parse` drops the statement it could not read and carries on with the rest of the file, and `enrich` types what is left and marks what it could not. What a later stage says about a hole an earlier one left, it does not say at all — a name whose declaration was dropped is not reported as undeclared, and a function missing the `<-` that went with it is not reported as falling off the end. One mistake gets one report.
 
+That silence reaches exactly as far as the dropped declaration would have: the block it was written in, from its own line down. A `total` dropped out of one function's body says nothing about a `total` read in the next function along — that read is answered like any other name nothing declares, because the declaration was never in scope there to begin with. The exception is a declaration that is in scope across the whole file wherever it stands: a top-level `function`, `type`, `choice`, `namespace` or `protocol`. Dropping one of those buys silence file-wide, since every read of the name really was a read of what the file declares.
+
 Warnings never stop anything: a file with only Warnings checks with exit code 0, and it builds and runs.
 
 `check` covers more than the file you name:
