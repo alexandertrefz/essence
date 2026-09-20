@@ -1766,6 +1766,62 @@ export {
 		)
 	})
 
+	// NOTE: And the other side of that stand-down. A Recovery is also written
+	// for a refused Pattern binder, which abandons a NAME while the Matcher
+	// around it parses whole — no text went missing, so every line that reads an
+	// import is still there to be counted. Asking whether the RECORD existed
+	// switched the Warning off for a Module the Parser read from end to end.
+	it("still counts an import in a Module that only dropped a binder", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Library.es" {
+		kept
+		unread
+	}
+}
+
+implementation {
+	constant point: { x: Integer } | String = { x = 1 }
+
+	constant read = match point -> Integer {
+		case { x } as whole { <- x }
+		case String { <- 0 }
+	}
+
+	Terminal.inspect(kept()::toString())
+}
+`,
+				"Library.es": `implementation {
+	function kept() -> Integer {
+		<- 1
+	}
+
+	function unread() -> Integer {
+		<- 2
+	}
+}
+
+export {
+	kept
+	unread
+}
+`,
+			},
+			(directory) => {
+				let main = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"Main.es",
+				)
+
+				expect(
+					main.diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["redundant-pattern-binder", "unused-import"])
+			},
+		)
+	})
+
 	// NOTE: The case the check exists for. An imported Namespace used only through
 	// `shape::area()` has no Identifier occurrence anywhere in the file — the only
 	// trace of it is the Namespace name on the resolved Invocation, and reading

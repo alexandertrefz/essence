@@ -1590,13 +1590,22 @@ function reportUnusedImports(
 ): void {
 	let bound = state.imports.filter((binding) => binding.state === "bound")
 
-	// NOTE: And silent for a Module the Parser did not read whole. Every use
-	// this counts is read off a tree, and a Statement the recovery dropped is
-	// in neither of them — so the one line that reads an import can go missing
-	// and leave the entry looking unread. It is the over-collection above
-	// carried one step further, and for the same reason: a Warning that fires
-	// on a name the Module does use is worse than one that stays silent.
-	if (bound.length === 0 || state.module.program.recovery !== undefined) {
+	// NOTE: And silent for a Module the Parser abandoned TEXT in. Every use this
+	// counts is read off a tree, and a Statement the recovery dropped is in
+	// neither of them — so the one line that reads an import can go missing and
+	// leave the entry looking unread. It is the over-collection above carried
+	// one step further, and for the same reason: a Warning that fires on a name
+	// the Module does use is worse than one that stays silent.
+	//
+	// NOTE: The LINES rather than the record, because a Recovery is also
+	// written for a dropped Pattern binder, which abandons a NAME while the
+	// Matcher around it parses whole. No text went missing there, so no line
+	// that reads an import did either — asking whether the record exists
+	// switched the Warning off for a Module the Parser read from end to end.
+	if (
+		bound.length === 0 ||
+		(state.module.program.recovery?.lines.length ?? 0) > 0
+	) {
 		return
 	}
 
