@@ -5841,7 +5841,7 @@ Error: The rows of a table test have to be written here
     │                                    ───┬───  
     │                                       ╰───── this is not a written List
     │ 
-    │ Help: Write the rows as a List: 'across [ … ] (row: Row)'. A row itself can be any Expression.
+    │ Help: Write the rows as a List: 'across [ … ] (number: Integer)'. A row itself can be any Expression.
     │ 
     │ Note: Every row is a test of its own — it carries its row number in the identity a stored snapshot and the Editor's own results are keyed by — so the rows have to be countable before anything runs.
 ────╯
@@ -5897,7 +5897,7 @@ Error: A table test takes one row at a time
    │                                                       │             
    │                                                       ╰───────────── 2 Parameters for one row
    │ 
-   │ Help: Write one Parameter: '(row: Row)', or take the row apart where it is bound: '({ scored, conceded }: Row)'.
+   │ Help: Write one Parameter: '(row: { a: Integer, b: Integer })', or take the row apart where it is bound: '({ a, b }: { a: Integer, b: Integer })'.
    │ 
    │ Note: Each item of the List is one row, and one row is one value — a test that wanted several values per row would say so by writing a Record.
 ───╯

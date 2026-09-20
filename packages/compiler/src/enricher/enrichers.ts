@@ -4535,6 +4535,59 @@ function assertionNode(
 		: { nodeType, value, matcher, snapshot, position }
 }
 
+// NOTE: The one Parameter a table test should have, spelled out of the rows the
+// reader WROTE. `Row` was an invented Type — a name nothing in the file declares
+// — and a reader who wrote it back was answered with `unknown-type 'Row'`; the
+// last such name among the Helps this Compiler prints.
+//
+// The first row's Type is the row Type: every row is measured against the same
+// Parameter, so one of them says what that Parameter takes. Refinements come off
+// it — `[1, 2]` proves each item is a NonZeroInteger, which is a fact about the
+// rows rather than about what the Parameter has to admit — and a Record row also
+// says what taking it apart would bind. Where the rows say nothing usable, the
+// spelling is a schematic and says so.
+function oneRowParameterHelp(rows: Array<common.typed.ExpressionNode>): string {
+	let first = rows[0]
+	let rowType =
+		first === undefined || typeContainsError(first.type)
+			? null
+			: eraseRefinements(first.type)
+
+	if (rowType === null) {
+		return "Write one Parameter: '(row: <Type>)', filling '<Type>' in with the Type one row has — or take the row apart where it is bound, '({ … }: <Type>)', where a row is a Record."
+	}
+
+	let spelled = describeType(rowType)
+
+	if (rowType.type !== "Record") {
+		return `Write one Parameter: '(row: ${spelled})'.`
+	}
+
+	return `Write one Parameter: '(row: ${spelled})', or take the row apart where it is bound: '({ ${Object.keys(
+		rowType.members,
+	).join(", ")} }: ${spelled})'.`
+}
+
+// NOTE: The Parameter list as the reader wrote it, for the Help that asks them
+// to write the ROWS — what is missing there is the List, and handing back their
+// own '(number: Integer)' says so without inventing anything. A schematic where
+// the Parameter has no written Type, which is the one thing this can not read
+// off the source.
+function rowParameterSpelling(
+	node: parser.TestTableNode,
+	declaredType: common.Type | null,
+): string {
+	let parameter = node.parameters[0]
+	let name =
+		parameter?.internalName?.nodeType === "Identifier"
+			? parameter.internalName.content
+			: "row"
+
+	return declaredType === null || typeContainsError(declaredType)
+		? `(${name}: <Type>)`
+		: `(${name}: ${describeType(declaredType)})`
+}
+
 // NOTE: `across [ … ] (row: Row)` — the rows a table test runs for, and the one
 // name the body reads a row under.
 //
@@ -4564,6 +4617,33 @@ export function enrichTestTable(
 ): common.typed.TestTableNode {
 	let parameter = node.parameters[0]
 
+	// NOTE: Null where the Parameter list was just refused, which silences the
+	// row check with it. A table that names two Parameters has no row Type: the
+	// FIRST of them is not it, and measuring every row against that one reported
+	// `table-row-type-mismatch` about a Type the reader never wrote for the row
+	// — one mistake, said twice, the second time in words about the first
+	// Parameter's Type. One report, and the row Types are read once the list
+	// says which Parameter is the row.
+	let declaredType =
+		node.parameters.length !== 1 ||
+		parameter?.type === undefined ||
+		parameter.type === null
+			? null
+			: resolveType(parameter.type, scope)
+	let rows = enrichTableRows(
+		node.value,
+		declaredType,
+		scope,
+		skipped,
+		nameReadsTheRow,
+		rowParameterSpelling(node, declaredType),
+	)
+
+	// NOTE: Reported once the rows have been read, because the rows are where
+	// the Help gets the row's TYPE from — a table naming two Parameters has
+	// declared none, and the Help used to invent one. The rows themselves report
+	// nothing extra here: a Parameter list this refuses leaves `declaredType`
+	// null, which is what a row is measured against.
 	if (node.parameters.length !== 1) {
 		reportError(
 			node.parameters.length === 0
@@ -4584,33 +4664,10 @@ export function enrichTestTable(
 				notes: [
 					"Each item of the List is one row, and one row is one value — a test that wanted several values per row would say so by writing a Record.",
 				],
-				helps: [
-					"Write one Parameter: '(row: Row)', or take the row apart where it is bound: '({ scored, conceded }: Row)'.",
-				],
+				helps: [oneRowParameterHelp(rows)],
 			},
 		)
 	}
-
-	// NOTE: Null where the Parameter list was just refused, which silences the
-	// row check with it. A table that names two Parameters has no row Type: the
-	// FIRST of them is not it, and measuring every row against that one reported
-	// `table-row-type-mismatch` about a Type the reader never wrote for the row
-	// — one mistake, said twice, the second time in words about the first
-	// Parameter's Type. One report, and the row Types are read once the list
-	// says which Parameter is the row.
-	let declaredType =
-		node.parameters.length !== 1 ||
-		parameter?.type === undefined ||
-		parameter.type === null
-			? null
-			: resolveType(parameter.type, scope)
-	let rows = enrichTableRows(
-		node.value,
-		declaredType,
-		scope,
-		skipped,
-		nameReadsTheRow,
-	)
 	// NOTE: And Error for the bindings where the list was refused, which is what
 	// every other dropped Declaration binds. Reading the row Type off the rows
 	// there only moved the report: the two names bound whatever the rows held,
@@ -4680,6 +4737,9 @@ function enrichTableRows(
 	scope: enricher.Scope,
 	skipped: boolean,
 	nameReadsTheRow: boolean,
+	// NOTE: The Parameter list written after the rows, spelled back into the
+	// Help that asks for the rows — see `rowParameterSpelling`.
+	parameterSpelling: string = "(row: <Type>)",
 ): Array<common.typed.ExpressionNode> {
 	if (node.nodeType === "ListValue") {
 		// NOTE: No rows is no tests, and a test that never exists is exactly
@@ -4750,7 +4810,7 @@ function enrichTableRows(
 				"Every row is a test of its own — it carries its row number in the identity a stored snapshot and the Editor's own results are keyed by — so the rows have to be countable before anything runs.",
 			],
 			helps: [
-				"Write the rows as a List: 'across [ … ] (row: Row)'. A row itself can be any Expression.",
+				`Write the rows as a List: 'across [ … ] ${parameterSpelling}'. A row itself can be any Expression.`,
 			],
 		},
 	)

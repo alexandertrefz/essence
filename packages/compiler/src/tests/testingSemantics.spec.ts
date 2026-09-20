@@ -12,6 +12,7 @@ import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
+import { compiles } from "./followedHelps"
 
 // NOTE: What a tests section MEANS — the Scopes it opens, the vocabulary its
 // Modifiers are read against, what an assertion demands of what it asserts, and
@@ -40,6 +41,10 @@ function analyse(
 	}
 
 	return { program: enriched.program, diagnostics }
+}
+
+function helpsOf(source: string): Array<string> {
+	return analyse(source).diagnostics.flatMap((diagnostic) => diagnostic.helps)
 }
 
 function codesOf(source: string): Array<string> {
@@ -1095,6 +1100,84 @@ describe("Tests Section Semantics", () => {
 					}`,
 				),
 			).toEqual(["table-without-rows"])
+		})
+
+		// NOTE: Spelled out of the ROWS the reader wrote. `Row` was a Type
+		// nothing declares — a reader who wrote it back was answered with
+		// `unknown-type 'Row'` — and the rows are where the Parameter's Type
+		// comes from in a table that has not declared one.
+		it("should spell the row Type the written rows have", () => {
+			let source = `implementation {}
+
+					tests {
+						test "adds" across [{ a = 1, b = 2 }] (a: Integer, b: Integer) {
+							expect a::isGreaterThan(b)
+						}
+					}`
+
+			expect(helpsOf(source)).toEqual([
+				"Write one Parameter: '(row: { a: Integer, b: Integer })', or take the row apart where it is bound: '({ a, b }: { a: Integer, b: Integer })'.",
+			])
+			expect(
+				compiles(
+					`implementation {}
+
+					tests {
+						test "adds" across [{ a = 1, b = 2 }] ({ a, b }: { a: Integer, b: Integer }) {
+							expect a::isLessThan(b)
+						}
+					}`,
+					{ tests: true },
+				),
+			).toBe(true)
+		})
+
+		// NOTE: And no clause about taking the row apart where a row is no
+		// Record: there is nothing to take apart, and the clause named members
+		// nobody had written.
+		it("should offer no destructuring where a row is one value", () => {
+			expect(
+				helpsOf(`implementation {}
+
+					tests {
+						test "rows" across [1, 2] (a: Integer, b: Integer) {
+							expect a::isLessThan(b)
+						}
+					}`),
+			).toEqual(["Write one Parameter: '(row: Integer)'."])
+		})
+
+		// NOTE: The rows are what this Help can not read — that IS the report —
+		// so what it hands back is the Parameter list the reader wrote, and the
+		// rows are the hole.
+		it("should spell the reader's own Parameter where the rows are not written", () => {
+			let source = `implementation {
+						constant scorelines: List<Integer> = [1, 2]
+					}
+
+					tests {
+						test "rows" across scorelines (n: Integer) {
+							expect n::isGreaterThan(0)
+						}
+					}`
+
+			expect(helpsOf(source)).toEqual([
+				"Write the rows as a List: 'across [ … ] (n: Integer)'. A row itself can be any Expression.",
+			])
+			expect(
+				compiles(
+					`implementation {
+						constant scorelines: List<Integer> = [1, 2]
+					}
+
+					tests {
+						test "rows" across [1, 2] (n: Integer) {
+							expect n::isGreaterThan(0)
+						}
+					}`,
+					{ tests: true },
+				),
+			).toBe(true)
 		})
 
 		it("should refuse a row taken by several Parameters", () => {
