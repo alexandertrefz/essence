@@ -1,9 +1,13 @@
 import type { common } from "@essence-lang/interfaces"
 
+import { primary, secondary } from "../diagnostics/index"
+import { closestMatch } from "./suggest"
 import {
 	type AsynchronyMismatch,
 	asynchronyMismatch,
 	decidesAnUndecidedSlot,
+	flattenUnionMembers,
+	matchesType,
 } from "./types"
 
 // NOTE: The spelling a Generic is SHOWN under. `createFreshenedInference`
@@ -599,6 +603,463 @@ export function undecidedSlotAnnotation(
 		annotation: `${keyword} ${name}: ${describeType(spelledWithDecidedSlots(type))}`,
 	}
 }
+
+// #region Record mismatches
+
+// NOTE: What a mismatch between two RECORDS says instead of printing both of
+// them. Two nine-member shapes on two lines is a diff the reader is asked to do
+// by eye, and the one thing the Compiler knows and they do not — WHICH member
+// disagrees — is the thing neither line says. So the members are compared here
+// and the disagreements are what the report carries: a Label on each one that is
+// written down, a Note for the ones past the Labels, and the members nobody
+// wrote listed once.
+//
+// Empty for every mismatch that is not between two Records, which is what lets
+// the sites spread it without asking first — a String where a Standing was
+// wanted is two Types and reads as two Types, and with a Record Alias's name on
+// one of them it reads well.
+export type RecordMismatchEvidence = {
+	// NOTE: The Label the report LEADS with, in place of the "this is a …" one
+	// its site would have written over the whole value — and the Position the
+	// Diagnostic itself takes, so an Editor underlines the member rather than
+	// the Literal around it. Null where nothing was written down to point at: a
+	// value that is not a Literal, and a refusal that is only about members
+	// NOBODY wrote.
+	lead: common.DiagnosticLabel | null
+	labels: Array<common.DiagnosticLabel>
+	notes: Array<string>
+	helps: Array<string>
+	// NOTE: For the fix that writes a near miss over the name it was meant to
+	// be. Carried only for a SINGLE misspelled member: two of them are two
+	// edits, and which one an Editor would apply without asking is not a
+	// question a Diagnostic can answer.
+	data: common.DiagnosticData | undefined
+}
+
+// NOTE: How many disagreeing members get a Label and how many more get a Note.
+// Past that the count stands in for them: a report naming fifteen members is one
+// nobody reads to the end, and the fifteen are usually one mistake — a value of
+// another Type entirely — which the first three already say.
+const labelledMembers = 3
+const notedMembers = 6
+
+type MemberDifference = {
+	// NOTE: The member's path from the outermost Record — `points`, or
+	// `team.code` for one a nested Literal got wrong. Read by nothing but the
+	// sentences, which is why it is a string rather than a list of steps.
+	path: string
+	// NOTE: Where the VALUE of the member was written, or null for a member
+	// reached through something that is not a Literal. Never the member's NAME:
+	// a typed Record keys its members by name and holds no Position for one, and
+	// the only Records that carry a name Position are the levels a dotted key
+	// was desugared into (see `typed.RecordValueNode.memberPositions`).
+	position: common.Position | null
+	label: string
+	note: string
+	// NOTE: Set on a member the Record does not declare at all, to the name it
+	// was measured against — what a fix would write over it.
+	suggestion?: string
+}
+
+export function recordMismatchEvidence(
+	expected: common.Type,
+	written: common.Type,
+	value: common.typed.ExpressionNode | null,
+	options: {
+		// NOTE: Members a default fills in, which are not missing however
+		// little the value writes. `partial` is the whole of that rule rather
+		// than a list of names: an update and a payload default may leave out
+		// ANY member, so what refuses one is only what it writes.
+		filled?: ReadonlyArray<string>
+		partial?: boolean
+		// NOTE: What the sentences call the expected Record where it has no
+		// Alias to be called by and the POSITION has a name of its own — a
+		// Case's payload is `{ origin: Server, limits: Server }` and is called
+		// `'#Get'` everywhere else in its own report. Top level only: a member
+		// one step in is named by its own Alias or by nothing, and the position
+		// says nothing about it.
+		subject?: string
+	} = {},
+): RecordMismatchEvidence {
+	let source = recordShapeOf(written)
+
+	if (source === null) {
+		return emptyRecordMismatch()
+	}
+
+	let target = closestRecordShape(expected, source)
+
+	if (target === null) {
+		return emptyRecordMismatch()
+	}
+
+	let literal =
+		value !== null && value.nodeType === "RecordValue" ? value : null
+	let subject = recordSubject(target.shape, options.subject)
+	let differences = memberDifferences(
+		target.shape,
+		source,
+		literal,
+		"",
+		subject,
+	)
+	let missing = missingMemberNames(target.shape, source, differences, options)
+
+	if (differences.length === 0 && missing.length === 0) {
+		return emptyRecordMismatch()
+	}
+
+	let labelled = differences
+		.slice(0, labelledMembers)
+		.filter((difference) => difference.position !== null)
+	let noted = differences.slice(labelled.length)
+	let listed = noted.slice(0, notedMembers)
+	let [lead, ...rest] = labelled
+	let misspelled = differences.filter(
+		(difference) => difference.suggestion !== undefined,
+	)
+	// NOTE: A refusal that is ONLY about members nobody wrote has nothing
+	// inside the Literal to point at, so the Literal itself is what the Label
+	// takes — and it says which members, because "this is a { team: { name:
+	// String, code: String } }" over a Record the reader is looking at is the
+	// shape printed back at them with the answer left out. The Note that would
+	// have said the same is then not written: one sentence, in the place the
+	// arrow lands.
+	let missingLead =
+		lead === undefined && literal !== null && missing.length > 0
+
+	return {
+		lead:
+			lead !== undefined
+				? primary(lead.position as common.Position, lead.label)
+				: missingLead
+					? primary(
+							(literal as common.typed.RecordValueNode).position,
+							missingClause(missing),
+						)
+					: null,
+		labels: rest.map((difference) =>
+			secondary(difference.position as common.Position, difference.label),
+		),
+		notes: [
+			// NOTE: Which arm the differences below are about, wherever the
+			// position holds more than one Record. Without it a list of members
+			// reads as a list of everything wrong with the value, when it is the
+			// list of everything wrong with it AS ONE of the shapes it could be.
+			...(target.among > 1
+				? [
+						`Compared against ${subject}, the closest of the ${countOf(target.among, "Record")} this Union holds.`,
+					]
+				: []),
+			...listed.map((difference) => difference.note),
+			...(noted.length > listed.length
+				? [
+						`And ${countOf(noted.length - listed.length, "more member")} ${
+							noted.length - listed.length === 1
+								? "differs"
+								: "differ"
+						}.`,
+					]
+				: []),
+			...(missing.length === 0 || missingLead
+				? []
+				: [`${missingClause(missing)}.`]),
+		],
+		helps:
+			misspelled.length === 1
+				? [`Did you mean '${misspelled[0]!.suggestion}'?`]
+				: [],
+		data:
+			misspelled.length === 1 && misspelled[0]!.position !== null
+				? {
+						kind: "record-member",
+						member: lastStep(misspelled[0]!.path),
+						suggestion: misspelled[0]!.suggestion as string,
+					}
+				: undefined,
+	}
+}
+
+function emptyRecordMismatch(): RecordMismatchEvidence {
+	return { lead: null, labels: [], notes: [], helps: [], data: undefined }
+}
+
+// NOTE: The members nobody wrote, as one clause — a Label reads it without a
+// full stop and a Note with one, and the two are never both written, so the
+// sentence is built once and punctuated by whoever takes it.
+function missingClause(missing: Array<string>): string {
+	return missing.length === 1
+		? `'${missing[0]}' is missing`
+		: `${missing.map((name) => `'${name}'`).join(", ")} are missing`
+}
+
+// NOTE: The Record inside a Type, or null where there is none. A refinement is
+// looked through because what its base declares is what a value of it has to
+// write — the predicate is a separate refusal with a report of its own, which
+// `refinementEvidence` writes.
+function recordShapeOf(type: common.Type): common.RecordType | null {
+	while (type.type === "Refinement") {
+		type = type.base
+	}
+
+	return type.type === "Record" ? type : null
+}
+
+// NOTE: Which Record the value is compared AGAINST, when the position holds a
+// Union of them. A value is turned away by every arm at once, and diffing
+// against all of them would list a member each arm disagrees about differently —
+// so it is diffed against the one it is closest to, and the report says which,
+// because "compared against Circle" is the sentence that makes a list of three
+// differences readable.
+//
+// Fewest differences wins, and the FIRST arm on a tie: the arms are compared in
+// declaration order, so a tie answers with the one written first, which is the
+// one a reader would have looked at.
+function closestRecordShape(
+	expected: common.Type,
+	source: common.RecordType,
+): { shape: common.RecordType; among: number } | null {
+	let direct = recordShapeOf(expected)
+
+	if (direct !== null) {
+		return { shape: direct, among: 1 }
+	}
+
+	let type = expected
+
+	while (type.type === "Refinement") {
+		type = type.base
+	}
+
+	if (type.type !== "UnionType") {
+		return null
+	}
+
+	let closest: { shape: common.RecordType; differences: number } | null = null
+	let among = 0
+
+	for (let arm of flattenUnionMembers(type)) {
+		let shape = arm.type === "GenericUse" ? null : recordShapeOf(arm)
+
+		if (shape === null) {
+			continue
+		}
+
+		among++
+
+		let differences =
+			memberDifferences(shape, source, null, "", "").length +
+			missingMemberNames(shape, source, [], {}).length
+
+		if (closest === null || differences < closest.differences) {
+			closest = { shape, differences }
+		}
+	}
+
+	return closest === null ? null : { shape: closest.shape, among }
+}
+
+// NOTE: Every member the value writes that the Record does not take — one it
+// does not declare at all, and one it declares at another Type. In WRITTEN
+// order, because that is the order the reader's eye runs along the line the
+// Labels sit under.
+//
+// A member both sides hold as a Record of their own is walked INTO where the
+// value wrote a Literal there, so `team.code` is named at the depth it is wrong
+// at rather than the whole `team` being called the wrong shape. One step at a
+// time and no further than the Literals go: what a value reached some other way
+// holds is not something a Record Literal's members can be pointed at.
+function memberDifferences(
+	target: common.RecordType,
+	source: common.RecordType,
+	literal: common.typed.RecordValueNode | null,
+	prefix: string,
+	subject: string,
+): Array<MemberDifference> {
+	let differences: Array<MemberDifference> = []
+
+	for (let [name, writtenType] of Object.entries(source.members)) {
+		let path = `${prefix}${name}`
+		let position = memberPosition(literal, name)
+
+		if (!Object.hasOwn(target.members, name)) {
+			let suggestion = closestMatch(name, Object.keys(target.members))
+
+			differences.push({
+				path,
+				position,
+				// NOTE: The Label says what is wrong here and the near miss is
+				// left to the Help, the way `unknown-member` splits the same
+				// two facts — a Label repeating a Help is a line the reader
+				// reads twice. A member too far down to get a Label carries
+				// both in its Note, since it has no Help of its own.
+				label: `'${path}' is not a member of ${subject}`,
+				note:
+					suggestion === null
+						? `'${path}' is not a member of ${subject}.`
+						: `'${path}' is not a member of ${subject} — '${suggestion}' is.`,
+				...(suggestion === null ? {} : { suggestion }),
+			})
+
+			continue
+		}
+
+		let declaredType = target.members[name] as common.Type
+
+		if (matchesType(declaredType, writtenType)) {
+			continue
+		}
+
+		let nested = nestedDifferences(
+			declaredType,
+			writtenType,
+			literal,
+			name,
+			path,
+		)
+
+		if (nested !== null) {
+			differences.push(...nested)
+
+			continue
+		}
+
+		// NOTE: "this is" only where the arrow lands on the member ALONE. A
+		// single-member Case takes a whole Record through its shorthand —
+		// `#Circle({ radius = "big" })` is `radius = { radius = "big" }` — and
+		// the member's Position is then the Literal's own, so a Label reading
+		// "this is …" would be talking about a span that holds more than what it
+		// is about. Naming the member is what a Note does anyway, so the Label
+		// says the same thing there.
+		let named = position !== null && position === literal?.position
+
+		differences.push({
+			path,
+			position,
+			label: named
+				? `'${path}' is ${withArticle(describeType(writtenType))}, and ${subject} declares ${withArticle(describeType(declaredType))}`
+				: `this is ${withArticle(describeType(writtenType))}, and ${subject} declares ${withArticle(describeType(declaredType))}`,
+			note: `'${path}' is ${withArticle(describeType(writtenType))}; ${subject} declares ${withArticle(describeType(declaredType))}.`,
+		})
+	}
+
+	return differences
+}
+
+// NOTE: The differences one step further in, or null where there is no step to
+// take — the member is not a Record on both sides, the value did not write a
+// Literal there, or the two Records disagree about nothing the members can
+// explain. The last of those is what keeps a walk from answering with silence: a
+// member refused for something deeper than its own members is named at its own
+// level, which is what the caller does with a null.
+function nestedDifferences(
+	declaredType: common.Type,
+	writtenType: common.Type,
+	literal: common.typed.RecordValueNode | null,
+	name: string,
+	path: string,
+): Array<MemberDifference> | null {
+	let target = recordShapeOf(declaredType)
+	let source = recordShapeOf(writtenType)
+	let member = literal?.members[name]
+
+	if (
+		target === null ||
+		source === null ||
+		member === undefined ||
+		member.nodeType !== "RecordValue"
+	) {
+		return null
+	}
+
+	let nested = memberDifferences(
+		target,
+		source,
+		member,
+		`${path}.`,
+		recordSubject(target),
+	)
+	let missing = missingMemberNames(target, source, nested, {})
+
+	if (nested.length === 0) {
+		return missing.length === 0 ? null : []
+	}
+
+	return nested
+}
+
+// NOTE: The members the Record declares and the value does not write. Not a
+// refusal at all where the position takes a PARTIAL — an update, a payload
+// default — and not one for a member a default fills in, which is the same rule
+// `missingRecordMembers` answers for an Argument and is asked here in the same
+// words.
+//
+// A member a misspelling already accounts for is left out: `goalAgainst` written
+// where `goalsAgainst` was declared is ONE edit, and a report that also lists
+// `goalsAgainst` as missing sends the reader to write a tenth member.
+function missingMemberNames(
+	target: common.RecordType,
+	source: common.RecordType,
+	differences: Array<MemberDifference>,
+	options: { filled?: ReadonlyArray<string>; partial?: boolean },
+): Array<string> {
+	if (options.partial === true) {
+		return []
+	}
+
+	let accounted = new Set([
+		...(options.filled ?? []),
+		...differences.flatMap((difference) =>
+			difference.suggestion === undefined ? [] : [difference.suggestion],
+		),
+	])
+
+	return Object.keys(target.members).filter(
+		(name) => !accounted.has(name) && !Object.hasOwn(source.members, name),
+	)
+}
+
+// NOTE: Where a member of a written Literal stands. The desugared levels a
+// dotted key built carry their keys' Positions and nothing else does, so the
+// value's own Position is what the rest are pointed at — the same order
+// `reportUnmergedPathKey` reads the two in.
+function memberPosition(
+	literal: common.typed.RecordValueNode | null,
+	name: string,
+): common.Position | null {
+	if (literal === null) {
+		return null
+	}
+
+	return (
+		literal.memberPositions?.[name] ??
+		literal.members[name]?.position ??
+		null
+	)
+}
+
+// NOTE: What the sentences call the Record a value was measured against — its
+// Alias where it has one, and what the POSITION calls it where the Record has no
+// name of its own: "the value it updates", "the declared return Type". Every
+// site knows that much, and the last fallback is for the two that are about
+// nothing a reader wrote. Never the shape: naming every member in a sentence
+// ABOUT one of them is the wall this whole report exists to take down.
+function recordSubject(type: common.RecordType, written?: string): string {
+	if (type.name !== undefined || type.alias !== undefined) {
+		return describeType(type)
+	}
+
+	return written ?? "the expected Record"
+}
+
+// NOTE: The member a path ends at, which is the name a fix writes over — a
+// nested one is spelled from the outside in for the reader and edited where it
+// stands.
+function lastStep(path: string): string {
+	return path.slice(path.lastIndexOf(".") + 1)
+}
+
+// #endregion
 
 // NOTE: What a Future or a Started IS, in the clause every report about a
 // forgotten `complete` opens with. Three reports say it now — a Type mismatch in

@@ -1880,6 +1880,97 @@ describe("Code Actions", () => {
 		})
 	})
 
+	// NOTE: A Record Literal's misspelled member, which reports as a MISMATCH
+	// rather than as `unknown-member`: the Diagnostic stands at the member's
+	// value, because a typed Record holds no Position for a member's name, so
+	// the fix finds the name in the written AST and writes over that.
+	describe("a misspelled Record member", () => {
+		const STANDING = [
+			"implementation {",
+			"\ttype Standing = { played: Integer, points: Integer }",
+			"",
+		]
+
+		it("should write the near miss over the name that was misspelled", () => {
+			let lines = [
+				...STANDING,
+				"\tconstant blank: Standing = { played = 0, pointsFor = 0 }",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Change to 'points'")
+			expect(fix.diagnosticCode).toBe("assignment-type-mismatch")
+			expect(fix.isPreferred).toBe(true)
+
+			let result = applied(lines, fix)
+
+			expect(result[3]).toBe(
+				"\tconstant blank: Standing = { played = 0, points = 0 }",
+			)
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should answer an Argument the same way", () => {
+			let lines = [
+				...STANDING,
+				"\tfunction total(_ standing: Standing) -> Integer {",
+				"\t\t<- standing.points",
+				"\t}",
+				"",
+				"\tconstant sum = total({ played = 1, pointsFor = 2 })",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Change to 'points'")
+			expect(fix.diagnosticCode).toBe("argument-type-mismatch")
+			expect(result[7]).toBe(
+				"\tconstant sum = total({ played = 1, points = 2 })",
+			)
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: The member an update writes and the Record does not declare —
+		// the one position where an extra member is a refusal on its own, since
+		// width subtyping admits one everywhere else.
+		it("should answer an update's key", () => {
+			let lines = [
+				...STANDING,
+				"\tconstant base: Standing = { played = 0, points = 0 }",
+				"\tconstant grown = { base with pointz = 1 }",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Change to 'points'")
+			expect(fix.diagnosticCode).toBe("partial-type-mismatch")
+			expect(result[4]).toBe(
+				"\tconstant grown = { base with points = 1 }",
+			)
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A member that is no near miss of anything carries no payload, so
+		// there is nothing to offer and nothing is offered — a fix that guessed
+		// would write a name the reader never meant.
+		it("should offer nothing for a member that is not a near miss", () => {
+			expect(
+				quickFixes([
+					...STANDING,
+					"\tconstant base: Standing = { played = 0, points = 0 }",
+					"\tconstant grown = { base with elevation = 1 }",
+					"}",
+				]),
+			).toEqual([])
+		})
+	})
+
 	describe("missing-return", () => {
 		it("should add an else branch when the body ends in an If", () => {
 			let lines = [

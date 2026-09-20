@@ -155,6 +155,77 @@ describe("Hover", () => {
 		expect(hover(source, { line: 4, column: 19 })).toBe("something: Value")
 	})
 
+	// NOTE: The split a Record Alias gets: the name where a VALUE of one is
+	// hovered, and the members where the cursor is on the word itself — on the
+	// Declaration, on an annotation naming it, and on the import entry that
+	// bound it. `Standing: Standing` is what naming it would answer there.
+	it("should describe a value of a Record Alias by the Alias's name", () => {
+		let source = [
+			"implementation {",
+			"\ttype Team = { name: String, code: String }",
+			"\ttype Standing = { team: Team, points: Integer }",
+			'\tconstant blank: Standing = { team = { name = "a", code = "b" }, points = 0 }',
+			"\tTerminal.inspect(blank)",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 5, column: 19 })).toBe("blank: Standing")
+	})
+
+	it("should describe the Alias's own Declaration by its members", () => {
+		let source = [
+			"implementation {",
+			"\ttype Team = { name: String, code: String }",
+			"\ttype Standing = { team: Team, points: Integer }",
+			"}",
+		].join("\n")
+
+		// NOTE: One level only — `team` stays `Team`, since expanding it here
+		// would answer a Declaration the cursor is not on.
+		expect(hover(source, { line: 3, column: 8 })).toBe(
+			"Standing: { team: Team, points: Integer }",
+		)
+	})
+
+	it("should describe an annotation naming a Record Alias by its members", () => {
+		let source = [
+			"implementation {",
+			"\ttype Point = { x: Integer, y: Integer }",
+			"\tconstant here: Point = { x = 0, y = 0 }",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 17 })).toBe(
+			"{ x: Integer, y: Integer }",
+		)
+	})
+
+	it("should describe a generic Record Alias by its body", () => {
+		let source = [
+			"implementation {",
+			"\ttype Pair<Held> = { first: Held, second: Held }",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 8 })).toBe(
+			"Pair: { first: Held, second: Held }",
+		)
+	})
+
+	it("should describe an applied generic Record Alias as applied", () => {
+		let source = [
+			"implementation {",
+			"\ttype Pair<Held> = { first: Held, second: Held }",
+			"\tconstant both: Pair<Integer> = { first = 1, second = 2 }",
+			"\tTerminal.inspect(both)",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 4, column: 19 })).toBe(
+			"both: Pair<Integer>",
+		)
+	})
+
 	it("should describe an anonymous Union Type member by member", () => {
 		let source = [
 			"implementation {",

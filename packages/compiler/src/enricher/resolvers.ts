@@ -22,6 +22,7 @@ import {
 	countOf,
 	describeType,
 	displayChoiceName,
+	recordMismatchEvidence,
 	undecidedSlotEvidence,
 	withArticle,
 } from "../helpers/describe"
@@ -189,12 +190,14 @@ function unappliedGenericHelps(type: common.Type): Array<string> {
 
 // NOTE: The result Type of a Combination, computed from its operands' already
 // enriched Types. It only needs the operand Positions, to point the Diagnostics
-// at.
+// at — and the RIGHT operand's Node, where the caller has one, so a refusal can
+// point at the member that caused it rather than at the whole update.
 export function combinationTypeOf(
 	lhsType: common.Type,
 	rhsType: common.Type,
 	lhsPosition: common.Position,
 	rhsPosition: common.Position,
+	rhs?: common.typed.ExpressionNode,
 ): common.Type {
 	if (lhsType.type === "Error" || rhsType.type === "Error") {
 		return { type: "Error" }
@@ -275,25 +278,41 @@ export function combinationTypeOf(
 	// the two sentences that make it answerable are the ones a Variable's own
 	// assignment is refused with.
 	let undecided = undecidedSlotEvidence(combined, rhsType, null)
-
-	reportError("This is not a Partial of the value it updates", rhsPosition, {
-		code: "partial-type-mismatch",
-		labels: [
-			primary(
-				rhsPosition,
-				`this is ${withArticle(describeType(rhsType))}`,
-			),
-			secondary(
-				lhsPosition,
-				`this is ${withArticle(describeType(lhsType))}`,
-			),
-		],
-		notes: [
-			"An update may only set members the original already has, with the Types it declared for them.",
-			...undecided.notes,
-		],
-		helps: undecided.helps,
+	// NOTE: A PARTIAL, so a member the update leaves out is not missing from it
+	// — leaving members out is the whole of what an update is for. Only what it
+	// WRITES can be wrong, which is the same rule `isPartialOf` just refused it
+	// by.
+	let record = recordMismatchEvidence(combined, rhsType, rhs ?? null, {
+		partial: true,
+		subject: "the value it updates",
 	})
+
+	reportError(
+		"This is not a Partial of the value it updates",
+		record.lead?.position ?? rhsPosition,
+		{
+			code: "partial-type-mismatch",
+			labels: [
+				record.lead ??
+					primary(
+						rhsPosition,
+						`this is ${withArticle(describeType(rhsType))}`,
+					),
+				...record.labels,
+				secondary(
+					lhsPosition,
+					`this is ${withArticle(describeType(lhsType))}`,
+				),
+			],
+			notes: [
+				"An update may only set members the original already has, with the Types it declared for them.",
+				...record.notes,
+				...undecided.notes,
+			],
+			helps: [...record.helps, ...undecided.helps],
+			data: record.data,
+		},
+	)
 
 	return lhsType
 }

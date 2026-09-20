@@ -44,6 +44,7 @@ import {
 	findHandlerBefore,
 	findMethodInvocation,
 	findNodeAt,
+	findRecordMemberName,
 	type Handler,
 	handlerBodyEnd,
 	walkHandler,
@@ -222,6 +223,51 @@ export function suggestionAction(
 		edits: [
 			{ range: diagnostic.position, newText: diagnostic.data.suggestion },
 		],
+	}
+}
+
+// NOTE: The same near miss, one step further out: a Record Literal's member
+// whose name the Type does not declare. The Diagnostic stands at the member's
+// VALUE — a mismatch is reported there because a typed Record holds no Position
+// for a member's NAME — so the span to write over is found in the written AST
+// rather than taken off the report, which is the one difference from
+// `suggestionAction` above. Everything else is that fix: the span is held to
+// standing on a whole name, and it is preferred, because a misspelled member is
+// one edit and the reader can see it is the right one.
+//
+// Null where the name is no longer there. The analysis is fresh and the
+// Diagnostic may not be — a client echoes one back keystrokes later — and a
+// member the reader has since renamed is one this must not write over.
+export function recordMemberAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+	lines: Array<string>,
+): CodeActionEntry | null {
+	if (diagnostic.data?.kind !== "record-member") {
+		return null
+	}
+
+	let { member, suggestion } = diagnostic.data
+	let name = findRecordMemberName(program, diagnostic.position, member)
+
+	if (name === null) {
+		return null
+	}
+
+	if (
+		sliceOf(lines, name.position) !== member ||
+		!isWordBounded(lines, name.position)
+	) {
+		return null
+	}
+
+	return {
+		title: `Change to '${suggestion}'`,
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [{ range: name.position, newText: suggestion }],
 	}
 }
 

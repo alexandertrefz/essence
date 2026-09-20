@@ -218,6 +218,13 @@ export type DiagnosticData =
 	// Parameter's Type or the Case declares them, so that a scaffold writes
 	// them in the order the reader would have.
 	| { kind: "missing-members"; names: Array<string> }
+	// NOTE: A member a Record Literal writes that its Type does not declare,
+	// and the member it was a near miss for. Not a `suggestion`, which is the
+	// payload for a Diagnostic reported AT the name that was misspelled: a
+	// mismatch is reported at the member's VALUE, because a typed Record holds
+	// no Position for a member's name, so the fix is handed the name to find
+	// rather than a span to write over.
+	| { kind: "record-member"; member: string; suggestion: string }
 	// NOTE: EVERY requirement the Namespace has not written, not the one the
 	// conformance check tripped over — a check stops at the first disagreement
 	// because one is enough to refuse, and a fix that writes the stubs would

@@ -28,7 +28,7 @@ import {
 	conformanceKey,
 } from "../helpers/conformance"
 import { recordDefaultNesting } from "../helpers/defaults"
-import { describeType } from "../helpers/describe"
+import { describeRecordShape, describeType } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
 import { stripPosition, stripPositionFromArray } from "../helpers/nodes"
 import { closestMatch } from "../helpers/suggest"
@@ -125,6 +125,50 @@ describe("Helpers", () => {
 	// signature a Type Annotation would spell, rather than as the bare word
 	// "Function" that named both sides of every mismatch alike.
 	describe("describeType", () => {
+		// NOTE: A Record Alias is named for the same reason a Union one is: a
+		// message about nine members spelled out is no message at all, and the
+		// name is what the reader's own Declaration says. `describeRecordShape`
+		// is what the mismatch report spells the members with.
+		it("should print a Record under its Alias's name", () => {
+			expect(
+				describeType({
+					type: "Record",
+					name: "Standing",
+					members: { points: { type: "Integer" } },
+				}),
+			).toBe("Standing")
+			expect(
+				describeType({
+					type: "Record",
+					alias: {
+						name: "Pair",
+						typeArguments: [{ type: "Integer" }],
+					},
+					members: { first: { type: "Integer" } },
+				}),
+			).toBe("Pair<Integer>")
+		})
+
+		it("should spell a Record nobody named", () => {
+			expect(
+				describeType({
+					type: "Record",
+					members: { points: { type: "Integer" } },
+				}),
+			).toBe("{ points: Integer }")
+			expect(describeType({ type: "Record", members: {} })).toBe("{}")
+		})
+
+		it("should spell the members of a named one where asked", () => {
+			expect(
+				describeRecordShape({
+					type: "Record",
+					name: "Standing",
+					members: { points: { type: "Integer" } },
+				}),
+			).toBe("{ points: Integer }")
+		})
+
 		it("should print a Function under the signature an Annotation spells", () => {
 			let doubler: FunctionType = {
 				type: "Function",

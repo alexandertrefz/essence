@@ -22,6 +22,7 @@ import {
 	describeSignature,
 	describeType,
 	displayChoiceName,
+	recordMismatchEvidence,
 	undecidedSlotAnnotation,
 	undecidedSlotEvidence,
 	withArticle,
@@ -1265,6 +1266,7 @@ export function enrichCombination(
 			rhs.type,
 			node.lhs.position,
 			node.rhs.position,
+			rhs,
 		),
 	}
 }
@@ -1412,6 +1414,17 @@ function reportUnsettableEntries(
 		}
 
 		if (valueType !== null && !fitsWritten(valueType, entry.value)) {
+			// NOTE: A Dictionary of Records is where an entry's value is one,
+			// and the member that refused it is as much the point here as it is
+			// anywhere else. Notes alone: the two Labels say which entry and
+			// which Dictionary, and an arrow into the entry would be a third
+			// thing to read before either of those has been read.
+			let record = recordMismatchEvidence(
+				valueType,
+				entry.value.type,
+				null,
+			)
+
 			reportError(
 				"This is not a value the Dictionary holds",
 				entry.value.position,
@@ -1429,7 +1442,9 @@ function reportUnsettableEntries(
 					],
 					notes: [
 						"An update may only set keys of the Dictionary's key Type, with the Type it declared for its values.",
+						...record.notes,
 					],
+					helps: record.helps,
 				},
 			)
 		}
@@ -1666,6 +1681,7 @@ function enrichPathCombination(
 			rhs.type,
 			node.lhs.position,
 			node.rhs.position,
+			rhs,
 		),
 	}
 }
@@ -1781,6 +1797,7 @@ function pathUpdate(
 				inner.type,
 				step.position,
 				inner.position,
+				inner,
 			),
 		}
 	}
@@ -4608,25 +4625,38 @@ function reportRowTypeMismatch(
 	row: common.typed.ExpressionNode,
 	declaredType: common.Type,
 ): void {
-	reportError("This row does not fit the row Parameter", row.position, {
-		code: "table-row-type-mismatch",
-		labels: [
-			primary(
-				row.position,
-				`this is ${withArticle(describeType(row.type))}`,
-			),
-		],
-		notes: [
-			`The row Parameter is declared as ${describeType(
-				declaredType,
-			)}, and that is the Type the body — and an interpolated name — reads every row under.`,
-		],
-		helps: [
-			`Write a row of Type ${describeType(
-				declaredType,
-			)}, or widen the row Parameter's Type to one this row is a value of.`,
-		],
+	let record = recordMismatchEvidence(declaredType, row.type, row, {
+		subject: "the row Parameter's Type",
 	})
+
+	reportError(
+		"This row does not fit the row Parameter",
+		record.lead?.position ?? row.position,
+		{
+			code: "table-row-type-mismatch",
+			labels: [
+				record.lead ??
+					primary(
+						row.position,
+						`this is ${withArticle(describeType(row.type))}`,
+					),
+				...record.labels,
+			],
+			notes: [
+				`The row Parameter is declared as ${describeType(
+					declaredType,
+				)}, and that is the Type the body — and an interpolated name — reads every row under.`,
+				...record.notes,
+			],
+			helps: [
+				...record.helps,
+				`Write a row of Type ${describeType(
+					declaredType,
+				)}, or widen the row Parameter's Type to one this row is a value of.`,
+			],
+			data: record.data,
+		},
+	)
 }
 
 // NOTE: `for any (a: Integer, b: NonEmptyList<String>)` — the Parameters a
@@ -6463,6 +6493,12 @@ function reportPatternMemberMismatch(
 	declared: common.Type,
 	actual: common.Type,
 ): void {
+	// NOTE: Notes and no Labels — there is no written value here at all. What
+	// stands at this step is a member READ off the subject, so there is no
+	// Literal whose members could be pointed at, and the only span in hand is
+	// the name the Pattern wrote.
+	let record = recordMismatchEvidence(declared, actual, null)
+
 	reportError(
 		`This value does not fit the declared Type of member '${name.content}'`,
 		name.position,
@@ -6476,7 +6512,9 @@ function reportPatternMemberMismatch(
 			],
 			notes: [
 				`'${name.content}' is declared as ${describeType(declared)}.`,
+				...record.notes,
 			],
+			helps: record.helps,
 		},
 	)
 }
@@ -7479,24 +7517,38 @@ function enrichCasePayloadDefault(
 	}
 
 	if (!isPartialOf(payloadType, value.type)) {
+		// NOTE: A PARTIAL, so what the default leaves out is not missing from
+		// it — filling some members in is what a payload default IS. Only what
+		// it writes can be wrong, which is the second half of the sentence in
+		// the note below, said member by member.
+		let record = recordMismatchEvidence(payloadType, value.type, value, {
+			partial: true,
+			subject: `'#${caseType.name}'`,
+		})
+
 		reportError(
 			`This default does not fit Case '#${caseType.name}'`,
-			choiceCase.defaultValue.position,
+			record.lead?.position ?? choiceCase.defaultValue.position,
 			{
 				code: "default-type-mismatch",
 				labels: [
-					primary(
-						choiceCase.defaultValue.position,
-						`this is ${withArticle(describeType(value.type))}`,
-					),
+					record.lead ??
+						primary(
+							choiceCase.defaultValue.position,
+							`this is ${withArticle(describeType(value.type))}`,
+						),
+					...record.labels,
 				],
 				notes: [
 					`'#${caseType.name}' carries ${withArticle(describeType(payloadType))}.`,
+					...record.notes,
 					"A payload default may fill in only some of those members; it may not name one the payload does not declare, nor give one a value of another Type.",
 				],
 				helps: [
+					...record.helps,
 					`Write the members of ${describeType(payloadType)} this default means to fill in.`,
 				],
+				data: record.data,
 			},
 		)
 
@@ -9038,25 +9090,39 @@ function enrichParameterDefault(
 			node.externalName?.content ??
 			null
 
+		// NOTE: Not a partial — the reading above took every default that is
+		// one — so a member the Parameter declares and this does not write IS
+		// missing from it, and is named with the rest.
+		let record = recordMismatchEvidence(type, valueType, value, {
+			subject: "the Parameter's Type",
+		})
+
 		reportError(
 			name === null
 				? "This default does not fit its Parameter"
 				: `This default does not fit Parameter '${name}'`,
-			node.defaultValue.position,
+			record.lead?.position ?? node.defaultValue.position,
 			{
 				code: "default-type-mismatch",
 				labels: [
-					primary(
-						node.defaultValue.position,
-						`this is ${withArticle(describeType(valueType))}`,
-					),
+					record.lead ??
+						primary(
+							node.defaultValue.position,
+							`this is ${withArticle(describeType(valueType))}`,
+						),
+					...record.labels,
 				],
 				notes: [
 					name === null
 						? `The Parameter is ${describeType(type)}.`
 						: `Parameter '${name}' is ${describeType(type)}.`,
+					...record.notes,
 				],
-				helps: [`Write a value of Type ${describeType(type)}.`],
+				helps: [
+					...record.helps,
+					`Write a value of Type ${describeType(type)}.`,
+				],
+				data: record.data,
 			},
 		)
 	}
@@ -13358,6 +13424,18 @@ function overloadRefusalReport(
 	// until this says otherwise. Written in the Validator's own words, which is
 	// where the reader meets the same sentence on every other position.
 	let asynchrony = asynchronyHelps(detail.expectedType, detail.argumentType)
+	// NOTE: And which member of a written Record the closest candidate turned
+	// away, as Notes alone — which is what handing it no Node asks for. The two
+	// Labels here are spoken for: one points at the Argument and one at the
+	// callee that refused it, and those are what a report about a CALL says
+	// before it says anything about a Record. A third arrow into the middle of
+	// the Argument would be pointing at a member while the Label around it is
+	// still explaining which Overload was being tried.
+	let record = recordMismatchEvidence(
+		detail.expectedType,
+		detail.argumentType,
+		null,
+	)
 
 	return {
 		labels: [
@@ -13372,8 +13450,8 @@ function overloadRefusalReport(
 				`${candidate.name} takes ${withArticle(describeType(detail.expectedType))} as ${parameterName}`,
 			),
 		],
-		notes: [...notes, ...undecided.notes],
-		helps: [...asynchrony, ...undecided.helps],
+		notes: [...notes, ...record.notes, ...undecided.notes],
+		helps: [...asynchrony, ...record.helps, ...undecided.helps],
 		// NOTE: And the DATA for the fix that writes the word, for an Argument
 		// the caller wrote and never for the RECEIVER of a `::` call. `complete`
 		// takes the whole postfix chain behind it, so the word written in front

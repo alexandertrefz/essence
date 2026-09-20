@@ -6,6 +6,7 @@ import {
 	caseHeader,
 	describeSignature,
 	printCaseWithPayload,
+	printRecordWithMembers,
 	printSignatureSummary,
 	printType,
 	signaturesOf,
@@ -405,6 +406,58 @@ describe("printType", () => {
 					valueType: genericUse("Value"),
 				}),
 			).toBe("Dictionary<Key, Value>")
+		})
+	})
+
+	// NOTE: A Record Alias prints as the word the Declaration wrote, on the rule
+	// a named Union prints by — and the shape stays reachable, for the one
+	// Hover where the Alias itself is the subject.
+	describe("a named Record", () => {
+		let team: common.RecordType = {
+			type: "Record",
+			name: "Team",
+			members: { name: string, code: string },
+		}
+		let standing: common.RecordType = {
+			type: "Record",
+			name: "Standing",
+			members: { team, points: integer },
+		}
+
+		it("should print under its Alias's name", () => {
+			expect(printType(standing)).toBe("Standing")
+		})
+
+		it("should print an applied generic Alias as applied", () => {
+			expect(
+				printType({
+					type: "Record",
+					alias: { name: "Pair", typeArguments: [integer] },
+					members: { first: integer, second: integer },
+				}),
+			).toBe("Pair<Integer>")
+		})
+
+		it("should print inside the Types that hold one", () => {
+			expect(printType({ type: "List", itemType: standing })).toBe(
+				"List<Standing>",
+			)
+		})
+
+		it("should spell a Record nobody named", () => {
+			expect(printType({ type: "Record", members: { x: integer } })).toBe(
+				"{ x: Integer }",
+			)
+			expect(printType({ type: "Record", members: {} })).toBe("{}")
+		})
+
+		// NOTE: The descriptive form, and one level only: a member that is an
+		// Alias of its own stays named, because expanding it would answer a
+		// Declaration the reader is not looking at.
+		it("should spell its members out where it is the subject", () => {
+			expect(printRecordWithMembers(standing)).toBe(
+				"{ team: Team, points: Integer }",
+			)
 		})
 	})
 })

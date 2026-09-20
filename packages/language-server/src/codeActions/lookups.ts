@@ -199,6 +199,47 @@ export function findCaseValueOfPayload(
 	return found
 }
 
+// NOTE: The NAME Node of a Record Literal's member, found by the member's own
+// name and by where its VALUE was written. A mismatch between two Records is
+// reported at the value — a typed Record keys its members by name and holds no
+// Position for one — so the name a fix writes over is recovered here, out of the
+// written AST, where every member is still an Identifier with a span of its own.
+//
+// Both halves are asked because neither settles it alone: one name is written in
+// as many Literals as use it, and two members share a Position only when one of
+// them is no longer there. A shorthand member (`{ x }`) is one Node at ONE
+// Position for the name and the value, which answers both halves and is the very
+// span a rename of it would take.
+export function findRecordMemberName(
+	program: parser.Program,
+	valuePosition: common.Position,
+	member: string,
+): parser.IdentifierNode | null {
+	let found: parser.IdentifierNode | null = null
+
+	walk(program, (node) => {
+		if (node.nodeType !== "RecordValue") {
+			return true
+		}
+
+		for (let written of Object.values(node.members)) {
+			if (
+				written.name.content === member &&
+				written.value !== null &&
+				isSamePosition(written.value.position, valuePosition)
+			) {
+				found = written.name
+
+				return false
+			}
+		}
+
+		return true
+	})
+
+	return found
+}
+
 // NOTE: The bracket-list entry whose KEY stands at this Position — a
 // `duplicate-key` names the key, and the whole entry is what a fix takes out.
 // The walk reaches an update's key list as well as a Literal's, because both

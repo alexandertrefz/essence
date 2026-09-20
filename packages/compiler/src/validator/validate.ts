@@ -16,6 +16,7 @@ import {
 	describeParameter,
 	describeSignature,
 	describeType,
+	recordMismatchEvidence,
 	returnAsynchronyHelps,
 	undecidedSlotEvidence,
 	withArticle,
@@ -1757,30 +1758,37 @@ function checkDefineAnswer(
 
 	let evidence = refinementEvidence(node.type, value)
 	let undecided = undecidedSlotEvidence(node.type, value.type, null)
+	let record = recordMismatchEvidence(node.type, value.type, value, {
+		subject: "the Type this 'define' has",
+	})
 
 	reportError(
 		"This arm does not answer with the Type this 'define' has",
-		value.position,
+		record.lead?.position ?? value.position,
 		{
 			code: "return-type-mismatch",
 			labels: [
-				primary(
-					value.position,
-					`this is ${withArticle(describeType(value.type))}`,
-				),
+				record.lead ??
+					primary(
+						value.position,
+						`this is ${withArticle(describeType(value.type))}`,
+					),
+				...record.labels,
 				...evidence.labels,
 			],
 			notes: [
 				`This 'define' answers ${describeType(node.type)}.`,
+				...record.notes,
 				...evidence.notes,
 				...undecided.notes,
 			],
 			helps: [
 				...asynchronyHelps(node.type, value.type),
+				...record.helps,
 				...evidence.helps,
 				...undecided.helps,
 			],
-			data: asynchronyData(node.type, value.type),
+			data: asynchronyData(node.type, value.type) ?? record.data,
 		},
 	)
 }
@@ -2583,23 +2591,36 @@ function validateCaseValue(
 			casePayloadType(node.type, node.value),
 			null,
 		)
+		// NOTE: A payload shape is a Record nobody declared under a name, so
+		// the sentences call it what the rest of this report calls it — the
+		// Case whose payload it is.
+		let record = recordMismatchEvidence(
+			payloadType,
+			casePayloadType(node.type, node.value),
+			node.value,
+			{ subject: `'#${node.type.name}'` },
+		)
 
 		reportError(
 			`This payload does not fit Case '#${node.type.name}'`,
-			node.value.position,
+			record.lead?.position ?? node.value.position,
 			{
 				code: "payload-type-mismatch",
 				labels: [
-					primary(
-						node.value.position,
-						`this is ${withArticle(describeType(node.value.type))}`,
-					),
+					record.lead ??
+						primary(
+							node.value.position,
+							`this is ${withArticle(describeType(node.value.type))}`,
+						),
+					...record.labels,
 				],
 				notes: [
 					`'#${node.type.name}' carries ${withArticle(describeType(payloadType))}.`,
+					...record.notes,
 					...undecided.notes,
 				],
 				helps: [
+					...record.helps,
 					// NOTE: A single-member Case would have accepted the value
 					// through the shorthand, so the hint only helps where it can
 					// not: a multi-member Case needs the whole Record spelled out.
@@ -2610,6 +2631,7 @@ function validateCaseValue(
 						: []),
 					...undecided.helps,
 				],
+				data: record.data,
 			},
 		)
 	}
@@ -2884,28 +2906,35 @@ function reportDeclarationMismatch(
 ): void {
 	let evidence = refinementEvidence(declaredType, value)
 	let subject = name === null ? "the Pattern" : `${kind} '${name}'`
+	let record = recordMismatchEvidence(declaredType, value.type, value, {
+		subject: "the declared Type",
+	})
 
 	reportError(
 		`This value does not fit the declared Type of ${subject}`,
-		value.position,
+		record.lead?.position ?? value.position,
 		{
 			code: "assignment-type-mismatch",
 			labels: [
-				primary(
-					value.position,
-					`this is ${withArticle(describeType(value.type))}`,
-				),
+				record.lead ??
+					primary(
+						value.position,
+						`this is ${withArticle(describeType(value.type))}`,
+					),
+				...record.labels,
 				...evidence.labels,
 			],
 			notes: [
 				`${name === null ? "The Pattern" : `'${name}'`} is declared as ${describeType(declaredType)}.`,
+				...record.notes,
 				...evidence.notes,
 			],
 			helps: [
 				...asynchronyHelps(declaredType, value.type),
+				...record.helps,
 				...evidence.helps,
 			],
-			data: asynchronyData(declaredType, value.type),
+			data: asynchronyData(declaredType, value.type) ?? record.data,
 		},
 	)
 }
@@ -2930,16 +2959,25 @@ function validateVariableAssignmentStatement(
 			node.name.content,
 		)
 
+		let record = recordMismatchEvidence(
+			node.name.type,
+			node.value.type,
+			node.value,
+			{ subject: `Variable '${node.name.content}'` },
+		)
+
 		reportError(
 			`This value does not fit Variable '${node.name.content}'`,
-			node.value.position,
+			record.lead?.position ?? node.value.position,
 			{
 				code: "assignment-type-mismatch",
 				labels: [
-					primary(
-						node.value.position,
-						`this is ${withArticle(describeType(node.value.type))}`,
-					),
+					record.lead ??
+						primary(
+							node.value.position,
+							`this is ${withArticle(describeType(node.value.type))}`,
+						),
+					...record.labels,
 					// NOTE: Null for a builtin, which was declared in
 					// TypeScript and has no Essence source to point at.
 					...(node.declarationPosition === null
@@ -2957,15 +2995,19 @@ function validateVariableAssignmentStatement(
 								`'${node.name.content}' is declared as ${declaredType}.`,
 							]
 						: []),
+					...record.notes,
 					...undecided.notes,
 					...evidence.notes,
 				],
 				helps: [
 					...asynchronyHelps(node.name.type, node.value.type),
+					...record.helps,
 					...undecided.helps,
 					...evidence.helps,
 				],
-				data: asynchronyData(node.name.type, node.value.type),
+				data:
+					asynchronyData(node.name.type, node.value.type) ??
+					record.data,
 			},
 		)
 	}
@@ -3304,10 +3346,21 @@ function validateReturnStatement(
 			node.expression.type,
 			null,
 		)
+		let record = recordMismatchEvidence(
+			expected,
+			node.expression.type,
+			node.expression,
+			{ subject: "the declared return Type" },
+		)
 
 		reportError(
 			"This value does not fit the declared return Type",
-			node.expression.position,
+			// NOTE: The member that was refused, where the value is a written
+			// Record Literal and one member is what refused it — an Editor
+			// underlines the `points = "0"` rather than the two hundred
+			// characters around it. The whole value where there is no such
+			// member to name.
+			record.lead?.position ?? node.expression.position,
 			{
 				code: "return-type-mismatch",
 				// NOTE: The declared return Type has no Position of its own —
@@ -3315,14 +3368,17 @@ function validateReturnStatement(
 				// `-> Type` would have gone — so it is stated as a note
 				// rather than pointed at.
 				labels: [
-					primary(
-						node.expression.position,
-						`this is ${withArticle(describeType(node.expression.type))}`,
-					),
+					record.lead ??
+						primary(
+							node.expression.position,
+							`this is ${withArticle(describeType(node.expression.type))}`,
+						),
+					...record.labels,
 					...evidence.labels,
 				],
 				notes: [
 					`The Function returns ${describeType(expected)}.`,
+					...record.notes,
 					...evidence.notes,
 					...undecided.notes,
 				],
@@ -3332,10 +3388,13 @@ function validateReturnStatement(
 						node.expression.type,
 						currentFunctionContext.completing === true,
 					),
+					...record.helps,
 					...evidence.helps,
 					...undecided.helps,
 				],
-				data: asynchronyData(expected, node.expression.type),
+				data:
+					asynchronyData(expected, node.expression.type) ??
+					record.data,
 			},
 		)
 	}
@@ -4084,23 +4143,42 @@ function reportArgumentMismatch(
 
 	let evidence = refinementEvidence(parameter?.type, argumentNode.value)
 	let spelling = partialSpellingEvidence(parameter, argumentNode)
+	// NOTE: The members a partial default fills in are not missing from this
+	// Argument, however little it writes — the merge supplies them. Which is
+	// the same list `missingMembersOf` read a moment ago, asked here of the
+	// Argument that got PAST that reading and is refused for what it wrote.
+	let record =
+		parameter === undefined
+			? null
+			: recordMismatchEvidence(
+					parameter.type,
+					argumentNode.value.type,
+					argumentNode.value,
+					{
+						filled: parameter.defaultMembers,
+						subject: "the Parameter's Type",
+					},
+				)
 
 	reportError(
 		`This Argument does not fit ${name}`,
-		argumentNode.value.position,
+		record?.lead?.position ?? argumentNode.value.position,
 		{
 			code: "argument-type-mismatch",
 			labels: [
-				primary(
-					argumentNode.value.position,
-					`this is ${withArticle(describeType(argumentNode.value.type))}`,
-				),
+				record?.lead ??
+					primary(
+						argumentNode.value.position,
+						`this is ${withArticle(describeType(argumentNode.value.type))}`,
+					),
+				...(record?.labels ?? []),
 				...evidence.labels,
 			],
 			notes: [
 				...(parameter === undefined
 					? []
 					: [`${name} is ${describeType(parameter.type)}.`]),
+				...(record?.notes ?? []),
 				...spelling.notes,
 				...evidence.notes,
 			],
@@ -4109,12 +4187,16 @@ function reportArgumentMismatch(
 				...(parameter === undefined
 					? []
 					: asynchronyHelps(parameter.type, argumentNode.value.type)),
+				...(record?.helps ?? []),
 				...evidence.helps,
 			],
 			data:
 				parameter === undefined
 					? undefined
-					: asynchronyData(parameter.type, argumentNode.value.type),
+					: (asynchronyData(
+							parameter.type,
+							argumentNode.value.type,
+						) ?? record?.data),
 		},
 	)
 }

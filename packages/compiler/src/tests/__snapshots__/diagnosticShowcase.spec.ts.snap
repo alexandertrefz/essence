@@ -307,11 +307,11 @@ Error: 'attempts' is not a Constant of this Module
 
 [default-type-mismatch]
 Error: This default does not fit Case '#Get'
-    ╭─┤ CaseDefaults.es:42:25 │
+    ╭─┤ CaseDefaults.es:42:37 │
     │
  42 │        Get { url: String } = { retries = 0 },
-    │                              ───────┬───────  
-    │                                     ╰───────── this is a { retries: Integer }
+    │                                          ▲  
+    │                                          ╰── 'retries' is not a member of '#Get'
     │ 
     │ Help: Write the members of { url: String } this default means to fill in.
     │ 
@@ -321,11 +321,11 @@ Error: This default does not fit Case '#Get'
 
 [default-type-mismatch]
 Error: This default does not fit Case '#Get'
-    ╭─┤ CaseDefaults.es:48:43 │
+    ╭─┤ CaseDefaults.es:48:55 │
     │
  48 │        Get { url: String, retries: Integer } = { retries = "none" },
-    │                                                ──────────┬─────────  
-    │                                                          ╰─────────── this is a { retries: String }
+    │                                                            ───┬──  
+    │                                                               ╰──── this is a String, and '#Get' declares an Integer
     │ 
     │ Help: Write the members of { url: String, retries: Integer } this default means to fill in.
     │ 
@@ -2053,7 +2053,7 @@ Error: This value does not fit the declared Type of Constant 'blank'
     ┆ ┆   
  24 │ ├─▶     }
     │ │           
-    │ ╰─────────── this is a { name: String }
+    │ ╰─────────── 'server' is missing
     │ 
     │ Note: 'blank' is declared as Config.
 ────╯
@@ -2322,22 +2322,22 @@ Error: This Argument is missing 2 members the default does not fill in
 
 [argument-type-mismatch]
 Error: This Argument does not fit Parameter 'using'
-    ╭─┤ RecordDefaults.es:18:47 │
+    ╭─┤ RecordDefaults.es:18:56 │
     │
  18 │     Terminal.print(connect("essence.lang", using { host = 1, tls = true }))
-    │                                                  ────────────┬───────────  
-    │                                                              ╰───────────── this is a { host: Integer, tls: Boolean }
+    │                                                           ▲  
+    │                                                           ╰── this is an Integer, and Options declares a String
     │ 
     │ Note: Parameter 'using' is Options.
 ────╯
 
 [argument-type-mismatch]
 Error: This Argument does not fit Parameter 'using'
-    ╭─┤ RecordDefaults.es:22:33 │
+    ╭─┤ RecordDefaults.es:22:69 │
     │
  22 │        connect("essence.lang", using { host = "h", tls = true, timeout = 30 }),
-    │                                      ────────────────────┬───────────────────  
-    │                                                          ╰───────────────────── this is a { host: String, tls: Boolean, timeout: Integer }
+    │                                                                          ─┐  
+    │                                                                           ╰── 'timeout' is not a member of Options
     │ 
     │ Note: Parameter 'using' is Options.
 ────╯
@@ -2384,6 +2384,61 @@ Error: Case '#Blank' requires a payload
 ────╯
 
 ─── 6 errors
+"
+`;
+
+exports[`Diagnostic Showcase RecordMismatch.es should render the same report every time 1`] = `
+"[return-type-mismatch]
+Error: This value does not fit the declared return Type
+    ╭─┤ RecordMismatch.es:37:18 │
+    │
+ 37 │          goalAgainst = 0,
+    │                        ▲  
+    │                        ╰── 'goalAgainst' is not a member of Standing
+ 38 │          points = "0",
+    │                   ─┬─  
+    │                    ╰─── this is a String, and Standing declares an Integer
+    │ 
+    │ Help: Did you mean 'goalsAgainst'?
+    │ 
+    │ Note: The Function returns Standing.
+────╯
+
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'nested'
+    ╭─┤ RecordMismatch.es:46:36 │
+    │
+ 46 │        team = { name = "Rovers", code = 1 },
+    │                                         ▲  
+    │                                         ╰── this is an Integer, and Team declares a String
+    │ 
+    │ Note: 'nested' is declared as Standing.
+────╯
+
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'short'
+    ╭─┤ RecordMismatch.es:59:29 │
+    │
+ 59 │     constant short: Standing = { team = { name = "Rovers", code = "ROV" } }
+    │                                ──────────────────────┬─────────────────────  
+    │                                                      ╰─────────────────────── 'played', 'won', 'drawn', 'lost', 'goalsFor', 'goalsAgainst', 'points', 'form' are missing
+    │ 
+    │ Note: 'short' is declared as Standing.
+────╯
+
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'shape'
+    ╭─┤ RecordMismatch.es:66:57 │
+    │
+ 66 │     constant shape: Circle | Rect = { radius = 1, filled = 1 }
+    │                                                            ▲  
+    │                                                            ╰── this is an Integer, and Circle declares a Boolean
+    │ 
+    │ Note 1: 'shape' is declared as Circle | Rect.
+    │ Note 2: Compared against Circle, the closest of the 2 Records this Union holds.
+────╯
+
+─── 4 errors
 "
 `;
 
@@ -2660,7 +2715,7 @@ Error: This value does not fit the declared return Type
     │
  12 │        <- { x = 0 }
     │           ────┬────  
-    │               ╰────── this is a { x: Integer }
+    │               ╰────── 'y' is missing
     │ 
     │ Note: The Function returns Point.
 ────╯

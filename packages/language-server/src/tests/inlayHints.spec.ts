@@ -92,6 +92,33 @@ describe("Inlay Hints", () => {
 		expect(hintsOf(source)[0].label).toBe(": { firstName: String }")
 	})
 
+	// NOTE: A Hint is offered as an applied EDIT, so what it shows has to parse
+	// back as what it says — `Standing` does, wherever the Alias is in scope,
+	// and it is what a reader would have written.
+	it("should annotate a Record reached through its Alias by name", () => {
+		let source = [
+			"implementation {",
+			"\ttype Standing = { played: Integer, points: Integer }",
+			"",
+			"\tfunction blank() -> Standing {",
+			"\t\t<- { played = 0, points = 0 }",
+			"\t}",
+			"",
+			"\tconstant start = blank()",
+			"}",
+		].join("\n")
+
+		expect(
+			hintsOf(source).filter((hint) => hint.position.line === 8),
+		).toEqual([
+			{
+				position: { line: 8, column: 16 },
+				label: ": Standing",
+				kind: "type",
+			},
+		])
+	})
+
 	it("should annotate declarations inside Function bodies", () => {
 		let source = [
 			"implementation {",

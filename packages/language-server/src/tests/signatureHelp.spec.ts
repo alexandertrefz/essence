@@ -437,6 +437,16 @@ describe("Signature Help for a standard library Method", () => {
 				)
 			})
 
+			// NOTE: The Alias's name rather than its members — a signature is
+			// shown beside the call the reader is typing, and three members
+			// spelled out there push the Parameter they are looking for off the
+			// line.
+			it("should name a Record Parameter by its Alias", () => {
+				let help = findSignatureHelp(source, { line: 7, column: 10 })
+
+				expect(help?.signatures[0].label).toContain("using: Options")
+			})
+
 			it("should leave the Parameter itself unmarked", () => {
 				let help = findSignatureHelp(source, { line: 7, column: 10 })
 

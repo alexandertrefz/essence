@@ -56,6 +56,7 @@ import {
 	removeToStringAction,
 	splitSnapshotActions,
 	staticCallActions,
+	recordMemberAction,
 	suggestionAction,
 	unreachableCaseAction,
 	updateBracketsAction,
@@ -429,6 +430,18 @@ export type FixProvider = (context: FixContext) => Array<CodeActionEntry>
 const spellingFix: FixProvider = ({ diagnostic, lines }) =>
 	listed(suggestionAction(diagnostic, lines, (suggestion) => suggestion))
 
+// NOTE: And the same again for a Record Literal's misspelled member, which
+// every mismatch code can carry: one Literal is refused by a return, an
+// assignment, an Argument, a payload and a table row alike, and a member spelled
+// wrong is wrong the same way in each. The asynchrony fix sits beside it rather
+// than above it — the two `data` payloads are mutually exclusive by
+// construction, since nothing is both a Future and a Record, so at most one of
+// the two ever answers.
+const mismatchFixes: FixProvider = ({ diagnostic, program, lines }) => [
+	...listed(waitForValueAction(diagnostic)),
+	...listed(recordMemberAction(diagnostic, program, lines)),
+]
+
 // NOTE: An unknown name has two answers and nothing in the Diagnostic chooses
 // between them: it is either misspelled, or spelled right and imported
 // nowhere. Both are offered, and the order is part of the offer — the imports
@@ -481,10 +494,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	// the report — `waitForValueAction` answers nothing where there is none.
 	// An Argument is where a reader meets this most: `show(work)` is the shape
 	// a missing `complete` takes in everyday code.
-	"argument-type-mismatch": ({ diagnostic }) =>
-		listed(waitForValueAction(diagnostic)),
-	"assignment-type-mismatch": ({ diagnostic }) =>
-		listed(waitForValueAction(diagnostic)),
+	"argument-type-mismatch": mismatchFixes,
+	"assignment-type-mismatch": mismatchFixes,
 	"at-in-static-method": ({ diagnostic, program, lines }) =>
 		listed(dropStaticAction(diagnostic, program, lines)),
 	"case-default-without-payload": ({ diagnostic, lines }) =>
@@ -497,6 +508,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		contradictoryModifierActions(diagnostic, lines),
 	"declarations-outside-stdlib": ({ diagnostic, lines }) =>
 		listed(implementationHeaderAction(diagnostic, lines)),
+	"default-type-mismatch": mismatchFixes,
 	"default-on-function-literal": ({ diagnostic, lines }) =>
 		listed(removeDefaultAction(diagnostic, lines)),
 	"default-on-protocol-requirement": ({ diagnostic, lines }) =>
@@ -578,6 +590,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	// answer is wanted.
 	"no-matching-overload": ({ diagnostic }) =>
 		listed(waitForArgumentAction(diagnostic)),
+	"partial-type-mismatch": mismatchFixes,
+	"payload-type-mismatch": mismatchFixes,
 	"nonconforming-namespace": implementProtocolAction,
 	"not-exported": ({ diagnostic, imports }) =>
 		listed(exportNameAction(diagnostic, imports)),
@@ -589,8 +603,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(removeLabelAction(diagnostic, lines)),
 	"redundant-pattern-binder": ({ diagnostic, program, lines }) =>
 		listed(binderToScrutineeAction(diagnostic, program, lines)),
-	"return-type-mismatch": ({ diagnostic }) =>
-		listed(waitForValueAction(diagnostic)),
+	"return-type-mismatch": mismatchFixes,
 	"self-import": ({ diagnostic, program, lines }) =>
 		listed(removeSelfImportAction(diagnostic, program, lines)),
 	"shorthand-in-combination": ({ diagnostic, program, lines }) =>
@@ -600,6 +613,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"similar-tags": spellingFix,
 	"snapshot-after-matcher": ({ diagnostic, lines }) =>
 		splitSnapshotActions(diagnostic, lines),
+	"table-row-type-mismatch": mismatchFixes,
 	"static-method-on-value": ({ diagnostic, program, lines }) =>
 		staticCallActions(diagnostic, program, lines),
 	"unclosed-string": ({ diagnostic, lines }) =>

@@ -158,11 +158,19 @@ function typeWalkFinds(
 			return true
 		}
 
-		let spelled = record.type === "Record" || record.type === "UnionType"
+		// NOTE: Asked of the FIELD before it is asked of the Type, so that every
+		// Type but a spelled one walks exactly as it always did — `entries`
+		// allocates a pair per field where `values` allocates a value, and this
+		// runs over every Type the Enricher resolves.
+		if (
+			record[displaySpelling] === undefined ||
+			(record.type !== "Record" && record.type !== "UnionType")
+		) {
+			return Object.values(record).some(walk)
+		}
 
 		return Object.entries(record).some(
-			([key, member]) =>
-				!(spelled && key === displaySpelling) && walk(member),
+			([key, member]) => key !== displaySpelling && walk(member),
 		)
 	}
 
