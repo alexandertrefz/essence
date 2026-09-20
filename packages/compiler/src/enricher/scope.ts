@@ -56,6 +56,32 @@ export function unimportedNamespacesOf(
 	return []
 }
 
+// NOTE: Whether the Parser abandoned a Declaration of this name — the same
+// parent-chain walk `modulePathOf` makes, and for the same reason: a name read
+// deep inside a body has to reach what the Program's top level was told.
+//
+// It is the one question every "no such name" report asks before it reports.
+// A Declaration the Parser dropped is a Declaration this Program was written
+// with, so a read of what it bound is not a mistake the reader made — it is the
+// syntax error, once more, one line further down. Answering the read as an
+// Error and saying nothing is what keeps one mistake to one Diagnostic.
+export function declarationWasAbandoned(
+	scope: enricher.Scope,
+	name: string,
+): boolean {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.abandonedDeclarations?.has(name) === true) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // NOTE: A fresh child Scope nested under `parent`, with every map empty — the
 // shape every block, body and Handler needs before it seeds its own bindings.
 // `overrides` pre-populates the few fields a caller wants set (a seeded `types`

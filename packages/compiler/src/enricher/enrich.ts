@@ -86,6 +86,10 @@ export type TopLevelScopeOptions = {
 	shadowedBuiltins?: ShadowedBuiltins
 	modulePath?: string
 	unimportedNamespaces?: () => Array<enricher.UnimportedNamespace>
+	// NOTE: What the Parser abandoned on its way to this Program — see
+	// `Scope.abandonedDeclarations`. Handed over as the Program's own record, so
+	// that every way into a Scope reads it off the one thing that carries it.
+	recovery?: parser.Recovery
 }
 
 // NOTE: The Scope a Program's top level is enriched in: the builtins first, and
@@ -122,6 +126,13 @@ export function topLevelScope(
 		// table afterwards, which is what makes the snapshot the only way to
 		// tell the two apart later.
 		preludeNames: new Set(Object.keys(members)),
+		// NOTE: Left absent where the Parser abandoned nothing, which is nearly
+		// every Program — the reports that read it then have nothing to ask.
+		abandonedDeclarations:
+			options.recovery === undefined ||
+			options.recovery.declarations.length === 0
+				? undefined
+				: new Set(options.recovery.declarations),
 		// NOTE: The builtins are declared in TypeScript, not in Essence —
 		// there is no source Position to point a Diagnostic at.
 		declarations: scopeMap(),
@@ -182,7 +193,10 @@ export const enrich = (
 
 	let { result, diagnostics } = collectDiagnostics(
 		(): common.typed.Program => {
-			let scope = topLevelScope(options)
+			let scope = topLevelScope({
+				...options,
+				recovery: program.recovery,
+			})
 
 			// NOTE: The tests section is enriched AFTER the implementation and
 			// against the Scope the implementation filled, because that is the

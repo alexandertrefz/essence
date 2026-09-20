@@ -123,6 +123,16 @@ export type Scope = {
 	// name whatever its file imports, because all of it is emitted above the
 	// Program too.
 	preludeNames?: ReadonlySet<string>
+	// NOTE: The names a Statement the Parser ABANDONED would have declared — see
+	// `parser.Recovery`. Set on the top level Scope and read through the parent
+	// chain, by the reports about a name that resolved to nothing and by nothing
+	// else: a name whose Declaration was dropped resolves to an Error, silently,
+	// so that one syntax error is answered once rather than again at every line
+	// that reads what it took away.
+	//
+	// Absent — the default — for every Program that parsed, which is nearly all
+	// of them.
+	abandonedDeclarations?: ReadonlySet<string>
 	// NOTE: The names a Parameter's `= expression` default may NOT read, and
 	// where each one is written. A default may read `@`, the Parameters to its
 	// left and everything the Declaration is written inside; what is barred is

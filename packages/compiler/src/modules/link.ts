@@ -793,7 +793,10 @@ function linkGroup(
 			module,
 			scope:
 				options.scopeFor?.(module) ??
-				topLevelScope({ modulePath: module.filePath }),
+				topLevelScope({
+					modulePath: module.filePath,
+					recovery: module.program.recovery,
+				}),
 			declarations: declarations.get(module.filePath) ?? new Map(),
 			exports: exportedEntries(module.program),
 			imports: [],

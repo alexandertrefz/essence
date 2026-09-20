@@ -9,6 +9,7 @@ export function program(
 	imports: parser.ImportSectionNode | null = null,
 	exports: parser.ExportSectionNode | null = null,
 	tests: parser.TestsSectionNode | null = null,
+	recovery?: parser.Recovery,
 ): parser.Program {
 	return {
 		nodeType: "Program",
@@ -17,6 +18,9 @@ export function program(
 		implementation,
 		tests,
 		exports,
+		// NOTE: Left off entirely where the Parser abandoned nothing — see
+		// `parser.Program.recovery`.
+		...(recovery === undefined ? {} : { recovery }),
 		position,
 	}
 }

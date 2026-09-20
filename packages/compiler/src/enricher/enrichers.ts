@@ -142,6 +142,7 @@ import {
 import {
 	childScope,
 	countTypeDeclaration,
+	declarationWasAbandoned,
 	modulePathOf,
 	scopeMap,
 	typeDeclarationCount,
@@ -12353,6 +12354,13 @@ function reportUnknownMethod(
 	namespaces: Map<string, common.NamespaceType>,
 	scope: enricher.Scope,
 ): void {
+	// NOTE: A Method the Parser dropped out of its Namespace is a Method this
+	// Program declares, so every call of it is the syntax error once more rather
+	// than a name the reader got wrong — see `declarationWasAbandoned`.
+	if (declarationWasAbandoned(scope, node.member.content)) {
+		return
+	}
+
 	let held = heldValueEvidence(node, baseType, namespaces, scope)
 	// NOTE: The near miss is the LAST thing tried, and is not tried at all where
 	// the value holds the answer: a guess by edit distance standing beside a
@@ -14040,6 +14048,12 @@ function resolveUnionMethodDispatch(
 			// everyday case: `firstItem()::hasValu()` reaches here because no
 			// Case declares the name, and the Method it meant is one letter
 			// away on the Namespace over both Cases.
+			// NOTE: Silent for a Method the Parser dropped out of its Namespace,
+			// for the reason `reportUnknownMethod` is.
+			if (declarationWasAbandoned(scope, node.member.content)) {
+				return resolveFailedMethodInvocation()
+			}
+
 			let coveringLookup = resolveMethodLookupNamespacesForReceiverType(
 				unionType,
 				node.namespaceSpecifier,
@@ -15554,6 +15568,13 @@ function resolveBareCaseReference(
 
 	if (candidates.length === 1) {
 		return candidates[0]
+	}
+
+	// NOTE: A Case the Parser dropped along with the `choice` block that
+	// declared it is a Case this Program has, so writing it is not a mistake the
+	// reader made — see `declarationWasAbandoned`.
+	if (declarationWasAbandoned(scope, caseName.content)) {
+		return { type: "Error" }
 	}
 
 	if (candidates.length === 0) {

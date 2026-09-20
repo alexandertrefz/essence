@@ -651,6 +651,17 @@ export class TokenStream {
 		return { index: this.index, braceDepth: this.braceDepth }
 	}
 
+	// NOTE: The Tokens between two saved offsets, which is what a recovery reads
+	// to learn what it just walked past — see `Recovery`. Absolute indices
+	// rather than a `peek` offset, because the reading has already moved on by
+	// the time the question is asked.
+	between(from: number, to: number): Array<Token> {
+		return this.tokens.slice(
+			Math.max(from, 0),
+			Math.min(to, this.tokens.length),
+		)
+	}
+
 	restore(state: TokenStreamState) {
 		this.index = state.index
 		this.braceDepth = state.braceDepth

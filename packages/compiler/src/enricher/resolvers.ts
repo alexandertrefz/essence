@@ -55,7 +55,7 @@ import {
 	typeMentionsGeneric,
 } from "../helpers/types"
 import { recordAnnotation } from "./annotations"
-import { childScope, modulePathOf } from "./scope"
+import { childScope, declarationWasAbandoned, modulePathOf } from "./scope"
 
 // NOTE: Type-declaration and signature resolution. Expressions are no longer
 // typed here — enrichment is the only Expression walker, and a Node's Type is
@@ -1530,6 +1530,15 @@ export function resolveIdentifierType(
 	let result = resolved?.type ?? null
 
 	if (result === null) {
+		// NOTE: Ahead of every reading of the name, because none of them is worth
+		// making about a Declaration the Parser dropped — see
+		// `declarationWasAbandoned`. A near miss would offer the reader another
+		// name for the one they already wrote, and a foreign-habit guess would
+		// answer a word that was never the problem.
+		if (declarationWasAbandoned(scope, name)) {
+			return { type: "Error" }
+		}
+
 		if (findProtocolInScope(name, scope) !== null) {
 			reportError(
 				`Protocol '${name}' can not be used as a value`,
@@ -5617,6 +5626,12 @@ function resolveIdentifierTypeDeclarationType(
 	let result = findTypeInScope(name, scope)
 
 	if (result === null) {
+		// NOTE: Silent for a Type whose Declaration the Parser dropped, for the
+		// reason a value name is — see `declarationWasAbandoned`.
+		if (declarationWasAbandoned(scope, name)) {
+			return { type: "Error" }
+		}
+
 		if (findProtocolInScope(name, scope) !== null) {
 			reportError(
 				`Protocol '${name}' can not be used as a Type`,
@@ -5733,16 +5748,24 @@ export function resolveGenericTypeDeclarationType(
 		let result = findTypeInScope(name, scope)
 
 		if (result === null) {
-			reportError(
-				`Type '${name}' is not declared`,
-				node.baseType.position,
-				{
-					code: "unknown-type",
-					labels: [primary(node.baseType.position, "no such Type")],
-					helps: suggestionHelps(name, scope, "types"),
-					...suggestionData(suggestionInScope(name, scope, "types")),
-				},
-			)
+			// NOTE: Silent for a Type whose Declaration the Parser dropped — see
+			// `declarationWasAbandoned`.
+			if (!declarationWasAbandoned(scope, name)) {
+				reportError(
+					`Type '${name}' is not declared`,
+					node.baseType.position,
+					{
+						code: "unknown-type",
+						labels: [
+							primary(node.baseType.position, "no such Type"),
+						],
+						helps: suggestionHelps(name, scope, "types"),
+						...suggestionData(
+							suggestionInScope(name, scope, "types"),
+						),
+					},
+				)
+			}
 
 			return { type: "Error" }
 		}

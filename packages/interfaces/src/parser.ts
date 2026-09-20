@@ -1,5 +1,33 @@
 import type { Documentation, Position } from "./common/index"
 
+// NOTE: What the Parser could not read, kept so that no later stage reports the
+// same mistake a second time in its own words. A dropped Statement leaves two
+// holes: the names it would have declared, which every read of them would
+// otherwise be answered as undeclared, and the LINES it was written across,
+// which is what tells a later stage that what it is judging is not what was
+// written.
+//
+// It rides on the Program rather than beside it because it travels everywhere
+// the Program does — into the Enricher for the names, and through a Module
+// graph to the Validator for the lines — and a second value threaded alongside
+// is a second thing every caller has to remember to carry.
+export type Recovery = {
+	// NOTE: The names an abandoned Statement declared, as far as its opening
+	// Tokens say: `constant NAME`, `function NAME`, `namespace NAME`,
+	// `type NAME`, `choice NAME`, `protocol NAME`, `static NAME`, and the
+	// `NAME(…)` a Method in a Namespace body opens with. A Statement whose
+	// shape says nothing about a name contributes none, which is the whole of
+	// what this being incomplete costs: a read of such a name is answered
+	// exactly as it always was.
+	declarations: Array<string>
+	// NOTE: Every line the Parser abandoned text on. A construct written
+	// across one of them is a construct it did not read whole, so what that
+	// construct LACKS says nothing: a Function missing the `<-` that was
+	// dropped out of it has not fallen off the end, and a `define` whose arms
+	// were dropped was not written without cases.
+	lines: Array<number>
+}
+
 export type Program = {
 	nodeType: "Program"
 	// NOTE: `declarations { … }` is the standard library's opt-in program form —
@@ -30,6 +58,12 @@ export type Program = {
 	// Program nothing.
 	tests: TestsSectionNode | null
 	exports: ExportSectionNode | null
+	// NOTE: What the Parser abandoned on its way to this Program — see
+	// `Recovery`. ABSENT rather than empty for a Program that parsed, which is
+	// nearly every Program: a file with nothing wrong with it has the shape it
+	// has always had, and the record only turns up where there is something in
+	// it to read.
+	recovery?: Recovery
 	position: Position
 }
 

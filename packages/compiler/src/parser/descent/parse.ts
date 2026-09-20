@@ -311,6 +311,121 @@ const statementStartTokenTypes = new Set([
 	TokenType.KeywordRequire,
 ])
 
+// NOTE: The Keywords a Declaration opens with, each followed by the name it
+// declares. `overload function` and `static` reach their name one Token further
+// in, which is why the walk below skips rather than indexes.
+const declarationKeywordTokenTypes = new Set([
+	TokenType.KeywordConstant,
+	TokenType.KeywordVariable,
+	TokenType.KeywordFunction,
+	TokenType.KeywordNamespace,
+	TokenType.KeywordProtocol,
+	TokenType.KeywordType,
+	TokenType.KeywordChoice,
+	TokenType.KeywordOverload,
+	TokenType.KeywordStatic,
+])
+
+// NOTE: The names a Statement the Parser abandoned would have declared, read
+// off its Tokens — see `parser.Recovery`. Empty where its opening says nothing
+// about a name, which is every Statement that declares none and a few that do:
+// the point is to be RIGHT about the names it answers, never to answer about
+// all of them. A name this misses is a name read exactly as it always was.
+//
+// NOTE: A Method written in a Namespace body opens with its own name and a `(`,
+// which no Statement outside a Namespace does — a bare `name(…)` at the top
+// level is a call, and a call declares nothing. So the shape is only read as a
+// Declaration where it can be one: behind a `(`, and with no Keyword in front
+// of it that would have claimed the name itself.
+//
+// NOTE: A dropped `namespace`, `protocol` or `choice` takes its MEMBERS down
+// with it, and each of those is a name the rest of the file reads. They are
+// collected from the body's own level and no deeper — a `NAME(` one brace
+// further in is a CALL the body makes, and a name a body calls is a name this
+// has no business answering for.
+function abandonedDeclarationNames(tokens: Array<Token>): Array<string> {
+	let index = 0
+
+	while (
+		tokens[index] !== undefined &&
+		declarationKeywordTokenTypes.has(tokens[index]!.type)
+	) {
+		index++
+	}
+
+	let name = tokens[index]
+
+	if (!isIdentifierToken(name)) {
+		return []
+	}
+
+	if (index === 0) {
+		return tokens[1]?.type === TokenType.SymbolLeftParen
+			? [name!.value]
+			: []
+	}
+
+	let opening = tokens[0]!.type
+	let declaresMembers =
+		opening === TokenType.KeywordNamespace ||
+		opening === TokenType.KeywordProtocol ||
+		opening === TokenType.KeywordChoice
+	let names = [name!.value]
+
+	if (!declaresMembers) {
+		return names
+	}
+
+	// NOTE: One brace in from where the Declaration was written, which is the
+	// body's own level. The `{ … }` of a Type written in a signature, and every
+	// block a Method body opens, are deeper than that and are stepped over
+	// whole.
+	let depth = 0
+
+	for (let step = index + 1; step < tokens.length; step++) {
+		let token = tokens[step]!
+
+		if (token.type === TokenType.SymbolLeftBrace) {
+			depth++
+
+			continue
+		}
+
+		if (token.type === TokenType.SymbolRightBrace) {
+			depth--
+
+			continue
+		}
+
+		if (depth !== 1) {
+			continue
+		}
+
+		if (
+			token.type === TokenType.SymbolHash &&
+			isIdentifierToken(tokens[step + 1])
+		) {
+			names.push(tokens[step + 1]!.value)
+		}
+
+		if (
+			token.type === TokenType.KeywordStatic &&
+			isIdentifierToken(tokens[step + 1])
+		) {
+			names.push(tokens[step + 1]!.value)
+		}
+
+		if (
+			isIdentifierToken(token) &&
+			tokens[step + 1]?.type === TokenType.SymbolLeftParen
+		) {
+			names.push(token.value)
+		}
+	}
+
+	return names
+}
+
 // NOTE: Whether two Positions are written flush against each other, with
 // neither whitespace nor a line break between them. Some of the grammar reads
 // several Tokens as one lexeme — `1_000`, `1/2` — and only their adjacency
@@ -780,6 +895,11 @@ class DescentParser {
 	// NOTE: The `speculationDepth` the speculation that recorded it was ENTERED
 	// at, which is the level its sibling readings stand on.
 	private furthestFailureDepth = 0
+	// NOTE: What the recovery walked past, which is handed to the Program as its
+	// `Recovery` — see `recordAbandoned`. Sets, because one Statement is dropped
+	// once however many Tokens it was written across, and a name is a name.
+	private abandonedDeclarations = new Set<string>()
+	private abandonedLines = new Set<number>()
 
 	constructor(source: string, options: ParserOptions = {}) {
 		this.tokens = new TokenStream(source)
@@ -838,6 +958,7 @@ class DescentParser {
 				imports,
 				exports,
 				tests,
+				this.recovery(),
 			)
 		}
 
@@ -863,6 +984,11 @@ class DescentParser {
 			return generators.program(
 				generators.implementationSection([], position),
 				position,
+				"implementation",
+				null,
+				null,
+				null,
+				this.recovery(),
 			)
 		}
 
@@ -932,6 +1058,7 @@ class DescentParser {
 			imports,
 			exports,
 			tests,
+			this.recovery(),
 		)
 	}
 
@@ -1962,6 +2089,51 @@ class DescentParser {
 			!this.tokens.isAtEnd()
 		) {
 			this.tokens.next()
+		}
+
+		this.recordAbandoned(startState.index)
+	}
+
+	// NOTE: What the recovery just walked past, written down for the stages
+	// behind the Parser — see `parser.Recovery`. Read off the Tokens rather
+	// than off the Node that was never built, because the Node is exactly what
+	// a dropped Statement does not leave behind.
+	//
+	// NOTE: A speculation that is thrown away must leave nothing behind, and
+	// this is reached only from the Statement loops, which run outside every
+	// speculation: a reading given back for another attempt has not abandoned
+	// anything, and recording it would make a name the Program declares read as
+	// one it does not.
+	protected recordAbandoned(fromIndex: number): void {
+		let abandoned = this.tokens.between(fromIndex, this.tokens.save().index)
+
+		for (let token of abandoned) {
+			for (
+				let line = token.position.start.line;
+				line <= token.position.end.line;
+				line++
+			) {
+				this.abandonedLines.add(line)
+			}
+		}
+
+		for (let declared of abandonedDeclarationNames(abandoned)) {
+			this.abandonedDeclarations.add(declared)
+		}
+	}
+
+	// NOTE: The record handed to the Program — see `parser.Recovery`. Undefined
+	// where nothing was abandoned, which is what keeps a Program that parsed the
+	// shape it has always had. Sorted, so that one source parses to one Program
+	// however the recovery met it and a snapshot of a broken file is stable.
+	protected recovery(): parser.Recovery | undefined {
+		if (this.abandonedLines.size === 0) {
+			return undefined
+		}
+
+		return {
+			declarations: [...this.abandonedDeclarations].sort(),
+			lines: [...this.abandonedLines].sort((left, right) => left - right),
 		}
 	}
 
@@ -5212,6 +5384,12 @@ class DescentParser {
 		) {
 			this.tokens.next()
 		}
+
+		// NOTE: An arm is text the Parser abandoned exactly as a Statement is,
+		// and it costs the stages behind it the same thing: a `define` that lost
+		// an arm was not written without cases. It declares nothing, so the
+		// lines are the whole of what this leaves behind.
+		this.recordAbandoned(startState.index)
 	}
 
 	// NOTE: Skips to the next arm's `as`, or to the `}` that closes the
