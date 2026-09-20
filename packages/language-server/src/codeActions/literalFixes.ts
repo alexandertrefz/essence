@@ -1,4 +1,7 @@
-import { mixedRationalSpellings } from "@essence-lang/compiler/helpers"
+import {
+	holeHoldsAnEscape,
+	mixedRationalSpellings,
+} from "@essence-lang/compiler/helpers"
 import type { common } from "@essence-lang/interfaces"
 
 import { endOfLine, lineAt, sliceOf } from "./geometry"
@@ -47,6 +50,19 @@ export function closeStringAction(
 	// something that does not hold. An EVEN run is `\\`, a written backslash,
 	// and closes as any other character does.
 	if (trailingBackslashes(lineAt(lines, end.line), end.column) % 2 === 1) {
+		return null
+	}
+
+	// NOTE: And a String whose `{` opened a hole is refused for the same reason
+	// and withheld for the same reason: `"{\"a\": 1}"` answered this fix with
+	// the very Diagnostic it was applied to, so the fix ran again and wrote a
+	// third quote, and a fourth. The report says what is actually missing there
+	// — the `\{` and the `\}` — and asked the same question of the same line.
+	if (
+		holeHoldsAnEscape(
+			lineAt(lines, opening.start.line).slice(opening.start.column - 1),
+		)
+	) {
 		return null
 	}
 
@@ -246,6 +262,17 @@ export function documentationSeparatorAction(
 	}
 
 	let start = diagnostic.position.start
+	// NOTE: JSDoc writes `@param name - text`, and the hyphen is ITS separator
+	// — so a fix that only inserts the em dash left `@param _ — - the number`,
+	// with both languages' punctuation standing in one line. The run is
+	// REPLACED where one was written: it is the same separator, spelled the way
+	// the reader's last language spells it. A hyphen inside the text is left
+	// alone; only a run at the head of it is one of these.
+	let separator = /^[-–]\s+/.exec(written)?.[0] ?? ""
+	let end = {
+		line: start.line,
+		column: start.column + separator.length,
+	}
 
 	return {
 		title: `Insert the '${emDash}' separator`,
@@ -253,7 +280,7 @@ export function documentationSeparatorAction(
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
 		isPreferred: true,
-		edits: [{ range: { start, end: start }, newText: `${emDash} ` }],
+		edits: [{ range: { start, end }, newText: `${emDash} ` }],
 	}
 }
 

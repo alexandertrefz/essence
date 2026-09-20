@@ -229,6 +229,54 @@ describe("Parser Recovery", () => {
 		expect(diagnostics[0].helps[0]).toBe(
 			`Add the missing '"' at the end of line 2.`,
 		)
+		// NOTE: And that is the WHOLE of what is offered. The other reading was
+		// a second Help — "add it at the end of the input instead" — and
+		// following it reached no Program: the quote written there closes a
+		// String holding every line below, and the quotes standing in those
+		// lines close it early all over again, so a reader who took it was
+		// answered `unclosed-string` a second time about the same two lines.
+		// The reading is true and is said as a Note.
+		expect(diagnostics[0].helps).toHaveLength(1)
+		expect(diagnostics[0].notes[1]).toContain(
+			"at the end of line 2 the lines below are Statements, and at the end of the input they are text",
+		)
+	})
+
+	// NOTE: `"{\"a\": 1}"` — JSON written with the quotes escaped and the braces
+	// left alone. The `{` opens a hole, and the quote this used to ask for is
+	// not what is missing: writing one leaves the same refusal standing, which
+	// is how the Quick Fix behind it wrote a second quote, and a third.
+	it("should answer the hole a String's '{' opened", () => {
+		let { diagnostics } = parseWithDiagnostics(
+			`implementation {
+	constant body = "{\\"a\\": 1}"
+	Terminal.print(body)
+}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].code).toBe("unclosed-string")
+		expect(diagnostics[0].labels[1]?.message).toBe(
+			"opened here, and a '{' inside it opens a hole",
+		)
+		expect(diagnostics[0].helps).toEqual([
+			"Write '\\{' and '\\}' for the braces that stand for themselves.",
+		])
+	})
+
+	// NOTE: A hole holding a NAME is a hole somebody meant to open, and the
+	// String really is one quote short. Nothing changes for it.
+	it("should keep the missing quote where the hole holds a name", () => {
+		let { diagnostics } = parseWithDiagnostics(
+			`implementation {
+	constant name = "Ada"
+	constant greeting = "Hello, {name}
+}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].code).toBe("unclosed-string")
+		expect(diagnostics[0].helps).toEqual(["Add the missing '\"'."])
 	})
 
 	// NOTE: An EVEN number of forgotten quotes leaves nothing unterminated at

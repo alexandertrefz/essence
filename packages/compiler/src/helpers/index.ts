@@ -51,6 +51,7 @@ export {
 	refutablePatternMembers,
 } from "./patterns"
 export { bodyDefinitelyReturns } from "./returns"
+export { holeHoldsAnEscape } from "./stringHoles"
 export { closestMatch, editDistance } from "./suggest"
 export {
 	answersForBase,

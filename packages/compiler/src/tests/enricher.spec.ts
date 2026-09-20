@@ -5193,6 +5193,33 @@ describe("Enricher", () => {
 			expect(diagnostics[0].helps).toEqual([
 				"Write '@param right — …' as line 2 of the run.",
 			])
+			expect(diagnostics[0].notes).toHaveLength(1)
+		})
+
+		// NOTE: Two reports on one block — a misnamed line and a Parameter with
+		// none — are one missing line seen from both ends, and the ORDER they
+		// are answered in shows. Writing this line first leaves the name
+		// standing twice until the misnamed one is put right, and a reader who
+		// took the Quick Fix on this report alone was left looking at two
+		// '@param by' lines with nothing saying why.
+		it("should say which line to put right first", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				§§ Scales a number.
+				§§
+				§§ @returns — the scaled number
+				§§ @param by — the factor
+				function scale(_ number: Integer, by factor: Integer) -> Integer {
+					<- number::multiply(with factor)
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"misnamed-documentation-parameter",
+				"undocumented-parameter",
+			])
+			expect(diagnostics[1].notes[1]).toBe(
+				"'by' is already written on line 1 of the run, where it documents Parameter 1 — put that line right first, and the run reads in Parameter order.",
+			)
 		})
 
 		// NOTE: The Help and the `data` must name the same thing — the Help is

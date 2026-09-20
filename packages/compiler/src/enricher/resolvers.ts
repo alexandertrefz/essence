@@ -8284,6 +8284,18 @@ function reportPositionalDocumentation(
 	for (let problem of problems) {
 		if (problem.kind === "undocumented") {
 			let parameter = signature[problem.index]!
+			// NOTE: Where this Parameter's name is ALREADY written on the run,
+			// at a line that documents another Parameter, the two reports on
+			// this block are one missing line seen from both ends — and the
+			// order they are answered in shows. Writing this line first leaves
+			// the name standing twice until the misnamed one is put right, and
+			// nothing said so: a reader who took the Quick Fix on this report
+			// alone was left looking at two '@param by' lines. The order is what
+			// this says, so that either way round reads as a sequence rather
+			// than as a fix that half worked.
+			let alreadyWritten = tags.findIndex(
+				(tag) => tag.name === written[problem.index],
+			)
 
 			reportWarning(
 				"This Parameter has no '@param' line",
@@ -8301,7 +8313,13 @@ function reportPositionalDocumentation(
 							`Parameter ${problem.index + 1} is undocumented`,
 						),
 					],
-					notes: [positionalRule],
+					notes:
+						alreadyWritten === -1
+							? [positionalRule]
+							: [
+									positionalRule,
+									`'${written[problem.index]}' is already written on line ${alreadyWritten + 1} of the run, where it documents Parameter ${alreadyWritten + 1} — put that line right first, and the run reads in Parameter order.`,
+								],
 					helps: [
 						`Write '@param ${written[problem.index]} — …' as line ${problem.index + 1} of the run.`,
 					],

@@ -6,6 +6,7 @@ import {
 	reportWarning,
 	secondary,
 } from "../../diagnostics/index"
+import { holeHoldsAnEscape } from "../../helpers/stringHoles"
 import { Lexer, UnterminatedStringError } from "../../lexer/index"
 import {
 	type DocumentationLine,
@@ -254,6 +255,15 @@ function quoteAt(cursor: common.Cursor): common.Position {
 	}
 }
 
+// NOTE: What was written from a cursor to the end of its line — the text of a
+// String that never closed, as far as the line it opened on carries it. One line
+// is the whole of what is read, because that is the line the Quick Fix would
+// write its quote at the end of, and the two have to be asked the same question
+// about the same text.
+function lineFrom(source: string, cursor: common.Cursor): string {
+	return (source.split("\n")[cursor.line - 1] ?? "").slice(cursor.column - 1)
+}
+
 export type TokenStreamState = {
 	index: number
 	braceDepth: number
@@ -421,6 +431,33 @@ export class TokenStream {
 		let swallower = error.swallower
 
 		if (swallower === null) {
+			// NOTE: `"{\"a\": 1}"` — JSON, written with the quotes escaped the
+			// way another language wants them and the braces left alone. The
+			// `{` opened a hole, and the quote this asks for is not what is
+			// missing: writing one leaves the same refusal standing, which is
+			// why the Quick Fix withholds itself here too. See
+			// `holeHoldsAnEscape`.
+			if (holeHoldsAnEscape(lineFrom(source, error.openedAt))) {
+				reportError("This String Literal is never closed", position, {
+					code: "unclosed-string",
+					labels: [
+						primary(position, "the input ends here"),
+						secondary(
+							quoteAt(error.openedAt),
+							"opened here, and a '{' inside it opens a hole",
+						),
+					],
+					notes: [
+						"A '{' inside a String opens a hole, which holds an Expression — so the text between the braces is read as one, and a quote written inside it opens a String of its own.",
+					],
+					helps: [
+						"Write '\\{' and '\\}' for the braces that stand for themselves.",
+					],
+				})
+
+				return
+			}
+
 			reportError("This String Literal is never closed", position, {
 				code: "unclosed-string",
 				labels: [
@@ -466,11 +503,18 @@ export class TokenStream {
 				],
 				notes: [
 					`A String Literal may span lines, and the line breaks are part of it — so the quote on line ${swallower.closedAt.line} closed the one opened on line ${swallower.openedAt.line}, and the String that quote was written to open is the one that ran to the end of the input.`,
-					`One '"' is missing either way. It is reported against the String that spans lines, because a String written to span them is not usually followed, on the line it closes, by a second one that never closes at all.`,
+					// NOTE: The other reading is said here rather than offered
+					// as a Help, which is what it used to be: "add it at the end
+					// of the input instead" is an edit that reaches no Program.
+					// The quote written there closes a String holding every line
+					// below it, and the quotes standing in those lines close it
+					// early all over again — so a reader who followed it was
+					// answered `unclosed-string` a second time, about the same
+					// two lines, with no spelling of that reading anywhere.
+					`One '"' is missing either way, and where it goes decides which String is which: at the end of line ${swallower.openedAt.line} the lines below are Statements, and at the end of the input they are text. It is reported against the String that spans lines, because a String written to span them is not usually followed, on the line it closes, by a second one that never closes at all.`,
 				],
 				helps: [
 					`Add the missing '"' at the end of line ${swallower.openedAt.line}.`,
-					`Or, if line ${swallower.openedAt.line} was meant to carry the lines below it, add it at the end of the input instead.`,
 				],
 			},
 		)

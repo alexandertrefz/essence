@@ -2092,6 +2092,37 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).not.toContain("unclosed-string")
 		})
 
+		// NOTE: `"{\"a\": 1}"` — JSON, whose `{` opened a hole. The quote this
+		// writes is not what is missing there: the file it produced carried the
+		// very Diagnostic it was applied to, so the fix ran again and wrote a
+		// third quote, and a fourth. The report says what to write instead.
+		it("should withhold the quote where a '{' opened a hole", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant body = "{\\"a\\": 1}"',
+				"\tTerminal.print(body)",
+				"}",
+			]
+
+			expect(titles(quickFixes(lines))).toEqual([])
+		})
+
+		// NOTE: A hole holding a NAME is a hole somebody meant to open, and the
+		// String really is one quote short.
+		it("should still close a String whose hole holds a name", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant name = "Ada"',
+				'\tconstant greeting = "Hello, {name}',
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result[2]).toBe('\tconstant greeting = "Hello, {name}"')
+			expect(codesOf(result)).not.toContain("unclosed-string")
+		})
+
 		// NOTE: An EVEN number of forgotten quotes leaves nothing unterminated —
 		// the count comes out right and the Lexer runs out of nothing — so this
 		// report comes from the Parser rather than the Lexer. It carries the
@@ -2376,6 +2407,40 @@ describe("Code Actions", () => {
 			expect(result[1]).toBe("\t§§ @param subject — who to greet")
 			expect(codesOf(result)).not.toContain(
 				"missing-documentation-separator",
+			)
+		})
+
+		// NOTE: JSDoc writes `@param name - text`, and the hyphen is ITS
+		// separator. Inserting the em dash in front of it left both languages'
+		// punctuation standing in one line — `§§ @param _ — - the number`.
+		it("should replace the hyphen another language separates with", () => {
+			let lines = [
+				"implementation {",
+				"\t§§ @param subject - who to greet",
+				"\tfunction greet (subject: String) -> String { <- subject }",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result[1]).toBe("\t§§ @param subject — who to greet")
+			expect(codesOf(result)).not.toContain(
+				"missing-documentation-separator",
+			)
+		})
+
+		// NOTE: Only a run at the HEAD of the text is that separator. A hyphen
+		// inside the description is punctuation the reader wrote.
+		it("should leave a hyphen inside the text where it stands", () => {
+			let lines = [
+				"implementation {",
+				"\t§§ @param subject the well-known name",
+				"\tfunction greet (subject: String) -> String { <- subject }",
+				"}",
+			]
+
+			expect(applied(lines, quickFixes(lines)[0])[1]).toBe(
+				"\t§§ @param subject — the well-known name",
 			)
 		})
 
@@ -4328,6 +4393,62 @@ describe("Code Actions", () => {
 				"\t\t§§ @param height — how far",
 			)
 			expect(codesOf(applied(lines, fixes[0]))).toEqual([])
+		})
+
+		// NOTE: An empty `§§` is the blank line of a block — it holds the prose
+		// apart from the tags. Taking the last tag out stranded it, and the
+		// block was left ending on a separator with nothing behind it.
+		it("should take the stranded separator with the last tag", () => {
+			let lines = [
+				"implementation {",
+				"\t§§ A price in whole cents.",
+				"\t§§",
+				"\t§§ @param amount — how much",
+				"\ttype Cents = Integer",
+				"",
+				"\tconstant price: Cents = 495",
+				"\tTerminal.inspect(price)",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result).toEqual([
+				"implementation {",
+				"\t§§ A price in whole cents.",
+				"\ttype Cents = Integer",
+				"",
+				"\tconstant price: Cents = 495",
+				"\tTerminal.inspect(price)",
+				"}",
+			])
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: And it is KEPT where a tag still stands above the removal: that
+		// block has two halves left to hold apart.
+		it("should keep a separator that still separates something", () => {
+			let lines = [
+				"implementation {",
+				"\t§§ Greets.",
+				"\t§§",
+				"\t§§ @param subject — who to greet",
+				"\t§§ @param loudly — and how",
+				"\tfunction greet(subject: String) -> String { <- subject }",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result).toEqual([
+				"implementation {",
+				"\t§§ Greets.",
+				"\t§§",
+				"\t§§ @param subject — who to greet",
+				"\tfunction greet(subject: String) -> String { <- subject }",
+				"}",
+			])
+			expect(codesOf(result)).toEqual([])
 		})
 	})
 

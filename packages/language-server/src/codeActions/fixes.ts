@@ -1890,13 +1890,31 @@ export function removeDocumentationTagAction(
 			{
 				range: wholeLines(
 					lines,
-					tagLine,
+					strandedSeparatorAbove(lines, tagLine),
 					documentationSectionEnd(lines, tagLine),
 				),
 				newText: "",
 			},
 		],
 	}
+}
+
+// NOTE: A `§§` written EMPTY is the blank line of a Documentation block — it
+// separates the prose above it from the tags below. Taking the last tag out
+// strands it: the block ends on a separator with nothing behind it, which is
+// how `§§ A price in whole cents. / §§ / type Cents = Integer` was left. So the
+// removal starts one line higher where the line above is a bare separator and
+// the run being removed reaches the end of the block.
+//
+// The separator is kept wherever a tag still stands below the removal, which is
+// the block that still has two halves to keep apart.
+function strandedSeparatorAbove(lines: Array<string>, tagLine: number): number {
+	let above = documentationBody(lineAt(lines, tagLine - 1))
+	let below = documentationBody(
+		lineAt(lines, documentationSectionEnd(lines, tagLine) + 1),
+	)
+
+	return above?.trim() === "" && below === null ? tagLine - 1 : tagLine
 }
 
 // NOTE: `require MATCHER = EXPR matches snapshot` split in two — the require

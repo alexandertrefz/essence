@@ -2779,11 +2779,10 @@ Error: This String Literal is never closed
     │  │ 
     │  ╰─ and the input ends inside that one
     │ 
-    │ Help 1: Add the missing '"' at the end of line 20.
-    │ Help 2: Or, if line 20 was meant to carry the lines below it, add it at the end of the input instead.
+    │ Help: Add the missing '"' at the end of line 20.
     │ 
     │ Note 1: A String Literal may span lines, and the line breaks are part of it — so the quote on line 21 closed the one opened on line 20, and the String that quote was written to open is the one that ran to the end of the input.
-    │ Note 2: One '"' is missing either way. It is reported against the String that spans lines, because a String written to span them is not usually followed, on the line it closes, by a second one that never closes at all.
+    │ Note 2: One '"' is missing either way, and where it goes decides which String is which: at the end of line 20 the lines below are Statements, and at the end of the input they are text. It is reported against the String that spans lines, because a String written to span them is not usually followed, on the line it closes, by a second one that never closes at all.
 ────╯
 
 ─── 1 error
