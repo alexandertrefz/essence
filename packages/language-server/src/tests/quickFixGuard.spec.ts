@@ -40,7 +40,7 @@ afterAll(() => {
 // This asks the same questions of all of them at once, so the next one fails
 // here rather than in a reader's editor.
 //
-// The four questions, per fix, applied ALONE to the original text:
+// The five questions, per fix, applied ALONE to the original text:
 //   (i)   it raised no report the file did not already carry, and neither
 //         count rose
 //   (ii)  the Diagnostic it was offered FOR is gone, or has moved on to a
@@ -49,9 +49,15 @@ afterAll(() => {
 //   (iii) the result still PARSES, unless the original did not
 //   (iv)  the same-titled fix is not offered again on the identical Diagnostic,
 //         followed up to eight rounds with the count never rising
+//   (v)   every edit it makes stands on the lines the Diagnostic stands on, or
+//         on their neighbours — a fix answers the report the reader asked about
+//         and does not rewrite the rest of their file on the way past
 //
 // Deterministic and with no timing assertion: the corpus is a sorted directory
-// listing and every edit is a function of the text it is applied to.
+// listing and every edit is a function of the text it is applied to. The
+// questions are asked by `answerFailures` and `chainFailures`, which the mutants
+// at the foot of this file are asked in turn: a guard that has never caught
+// anything is a guard nobody has a reason to believe.
 
 // NOTE: Codes the Parser and the Lexer raise, which is what "does it still
 // parse" is asked with — a fix that leaves a buffer the Parser can not read has
@@ -156,6 +162,68 @@ const ALLOWED: Array<Allowance> = [
 		followUp: ["missing-return"],
 	},
 ]
+
+type ReachAllowance = {
+	// NOTE: Keyed the way an Allowance is — the code the fix answers and the
+	// title it is offered under, by prefix.
+	code: common.DiagnosticCode
+	title: string
+	reason: string
+	// NOTE: How far the fix may write — "elsewhere in the file" where the
+	// answer lives at a declaration the reader may have put anywhere in it,
+	// "another file" for the one kind of fix that reaches a second Module.
+	reach: "elsewhere in the file" | "another file"
+}
+
+// NOTE: The fixes that legitimately write somewhere OTHER than the lines the
+// report stands on, and why each does. Everything else edits what it
+// underlines, give or take the line above and the line below — the rule that
+// tells a fix from a rewrite of the reader's file, and the one the survey's
+// mutants got past: an honest edit carrying a renamed binding, a deleted
+// comment or a renamed Case rode along unnoticed because only the count was
+// read.
+const REACH_ALLOWED: Array<ReachAllowance> = [
+	{
+		code: "not-exported",
+		title: "Export '",
+		reason: "The name is missing from the OTHER Module's export block, which is where the fix writes — the report stands on the import that asked for it, and a Module that keeps a name private can only be answered where it keeps it.",
+		reach: "another file",
+	},
+	{
+		code: "export-of-variable",
+		title: "Declare '",
+		reason: "The report stands on the export entry and the answer is the DECLARATION it names: a Variable nothing assigns to becomes a Constant where it is written, which is as far up the file as the reader put it.",
+		reach: "elsewhere in the file",
+	},
+	{
+		code: "undocumented-parameter",
+		title: "Add a '@param",
+		reason: "A Parameter is documented in the comment block ABOVE the Function, and the report stands on the Parameter itself — the two are as far apart as the Signature is long.",
+		reach: "elsewhere in the file",
+	},
+	{
+		code: "misplaced-tests-section",
+		title: "Move the 'tests { … }' block to the end",
+		reason: "Moving a section is a cut and a paste, and the paste is at the end of the file by definition — that the block does not belong where it stands is the whole report.",
+		reach: "elsewhere in the file",
+	},
+]
+
+let reachEarned = new Set<ReachAllowance>()
+
+function reachAllowanceFor(entry: CodeActionEntry): ReachAllowance | undefined {
+	let found = REACH_ALLOWED.find(
+		(allowance) =>
+			allowance.code === entry.diagnosticCode &&
+			entry.title.startsWith(allowance.title),
+	)
+
+	if (found !== undefined) {
+		reachEarned.add(found)
+	}
+
+	return found
+}
 
 type RefactorAllowance = {
 	// NOTE: Matched by PREFIX on the title, and pinned to the fixtures it is
@@ -327,6 +395,209 @@ function parsesIn(diagnostics: Array<common.Diagnostic>): boolean {
 	return !diagnostics.some((diagnostic) => SYNTAX_CODES.has(diagnostic.code))
 }
 
+// NOTE: One line of slack on each side, because an edit that writes a line ABOVE
+// the report — a Type a declaration was short of, a conformance, the closing
+// quote of the String that ran on — stands on the neighbouring line and is as
+// local as an edit gets.
+const NEARBY_LINES = 1
+
+// NOTE: Where a fix may write. The reader asked about ONE report, and an edit
+// somewhere else in their file is a change they did not ask for and will not
+// read — the Help audit's mutants walked in exactly here, riding along with an
+// honest edit: a binding renamed throughout, every documentation comment
+// deleted, a Choice Case renamed. Each of them left the counts alone.
+//
+// Answered with the lines the report stands on rather than with its columns: a
+// fix commonly rewrites the whole line it underlines part of, and no mutant this
+// is written against is a matter of columns. INSIDE those lines rather than
+// overlapping them, because an edit that rewrites the file from its first line
+// to its last overlaps everything — which is the shape three of the mutants
+// take.
+function reachesTooFar(
+	entry: CodeActionEntry,
+	edit: CodeActionEdit,
+): "another file" | "elsewhere in the file" | null {
+	let position = entry.diagnosticPosition
+
+	if (edit.filePath !== undefined || edit.createFile === true) {
+		return "another file"
+	}
+
+	if (position === null) {
+		return null
+	}
+
+	let inside =
+		edit.range.start.line >= position.start.line - NEARBY_LINES &&
+		edit.range.end.line <= position.end.line + NEARBY_LINES
+
+	return inside ? null : "elsewhere in the file"
+}
+
+// NOTE: The guard's own questions, as a function rather than as a wall of
+// assertions, so that the mutants at the foot of this file can be asked them
+// too. It answers the list of questions the fix FAILED, empty where it passed
+// all of them — a guard nothing has ever been caught by is a guard nobody has
+// any reason to believe.
+function answerFailures(
+	source: string,
+	entry: CodeActionEntry,
+	before: Array<common.Diagnostic>,
+): Array<string> {
+	let failures: Array<string> = []
+	let allowance = allowanceFor(entry)
+	let after = analyse(applyEdits(source, entry.edits), undefined, {
+		tests: true,
+	})
+
+	// (i) It raised no report the file was not already carrying — and, where
+	// it is no scaffold, neither count rose either.
+	//
+	// NOTE: Counts alone said nothing about WHICH reports were counted: a fix
+	// that answered the report it was offered for and left an unrelated one in
+	// its place went four for four and passed. What a fix may leave is what its
+	// allowance names, and nothing is what everything else may leave.
+	let permitted = allowance?.followUp ?? []
+
+	for (let diagnostic of freshReports(before, after)) {
+		if (!permitted.includes(diagnostic.code)) {
+			failures.push(`(i) raised '${reportKey(diagnostic)}'`)
+		}
+	}
+
+	if (allowance === undefined) {
+		if (errorsIn(after) > errorsIn(before)) {
+			failures.push(
+				`(i) the error count rose from ${errorsIn(before)} to ${errorsIn(after)}`,
+			)
+		}
+
+		if (after.length > before.length) {
+			failures.push(
+				`(i) the report count rose from ${before.length} to ${after.length}`,
+			)
+		}
+	}
+
+	// (ii) The report it answered is gone, or has become a different one in
+	// that place. Found by code AND POSITION, because a showcase file carries
+	// several reports of one code and a fix answers exactly one of them.
+	if (entry.diagnosticCode !== null && entry.diagnosticPosition !== null) {
+		let answered = before.find(
+			(diagnostic) =>
+				diagnostic.code === entry.diagnosticCode &&
+				diagnostic.position !== null &&
+				diagnostic.position.start.line ===
+					entry.diagnosticPosition!.start.line &&
+				diagnostic.position.start.column ===
+					entry.diagnosticPosition!.start.column,
+		)
+
+		if (
+			answered !== undefined &&
+			after.map(identityOf).includes(identityOf(answered))
+		) {
+			failures.push(`(ii) left '${identityOf(answered)}' where it was`)
+		}
+	}
+
+	// (iii) It still parses, unless it did not before.
+	if (parsesIn(before) && !parsesIn(after)) {
+		failures.push("(iii) the result no longer parses")
+	}
+
+	// (v) And it wrote where the report stands.
+	failures.push(...reachFailures(entry))
+
+	return failures
+}
+
+// NOTE: Split out because the Module group asks this one question on its own:
+// there the answer is read off the whole graph, and an edit landing in a second
+// file is the fix working rather than the fix reaching.
+function reachFailures(entry: CodeActionEntry): Array<string> {
+	let failures: Array<string> = []
+
+	for (let edit of entry.edits) {
+		let reach = reachesTooFar(entry, edit)
+
+		if (reach === null) {
+			continue
+		}
+
+		let allowance = reachAllowanceFor(entry)
+
+		if (
+			allowance === undefined ||
+			(reach === "another file" && allowance.reach !== "another file")
+		) {
+			failures.push(
+				`(v) wrote ${reach}: ${
+					edit.filePath === undefined
+						? `lines ${edit.range.start.line}-${edit.range.end.line}`
+						: path.basename(edit.filePath)
+				}`,
+			)
+		}
+	}
+
+	return failures
+}
+
+// NOTE: The fourth question, which is about the fix being offered AGAIN rather
+// than about what one application left behind — so it rolls the text forward
+// under its own edits rather than judging one result.
+function chainFailures(source: string, entry: CodeActionEntry): Array<string> {
+	let failures: Array<string> = []
+	let text = source
+	let counts = [analyse(text, undefined, { tests: true }).length]
+	let title = entry.title
+	let identity = keyOf(entry)
+	let applying: CodeActionEntry | undefined = entry
+
+	for (let round = 0; round < 8; round++) {
+		if (applying === undefined) {
+			break
+		}
+
+		text = applyEdits(text, applying.edits)
+		counts.push(analyse(text, undefined, { tests: true }).length)
+
+		let again: CodeActionEntry | undefined = actionsOn(text).find(
+			(candidate) =>
+				candidate.kind === "quickfix" &&
+				candidate.title === title &&
+				keyOf(candidate) === identity,
+		)
+
+		// NOTE: A fix offered again on the identical Diagnostic, after it was
+		// applied, is the loop. One round is enough to say so.
+		if (again !== undefined) {
+			failures.push(`(iv) offered again in round ${round}`)
+
+			break
+		}
+
+		applying = again
+	}
+
+	// NOTE: And the count never climbs along the way, allowance or not — a
+	// scaffold leaves ONE hole, not a hole per round.
+	if (allowanceFor(entry) === undefined) {
+		for (let index = 1; index < counts.length; index++) {
+			if ((counts[index] as number) > (counts[index - 1] as number)) {
+				failures.push(
+					`(iv) the report count climbed to ${counts[index]} in round ${index}`,
+				)
+
+				break
+			}
+		}
+	}
+
+	return failures
+}
+
 // NOTE: A path with no import or export block beside it is analysed on its own,
 // which is what every single-file fixture here is. The refactorings need one.
 const DOCUMENT = "file:///repo/Showcase.es"
@@ -375,77 +646,12 @@ describe("Every Quick Fix on every broken file", () => {
 
 			it("answers every fix it offers without making things worse", () => {
 				for (let entry of entries) {
-					let allowance = allowanceFor(entry)
 					let where = `${showcase.name} · ${entry.title}`
-					let text = applyEdits(showcase.source, entry.edits)
-					let after = analyse(text, undefined, { tests: true })
-
-					// (i) It raised no report the file was not already
-					// carrying — and, where it is no scaffold, neither count
-					// rose either.
-					//
-					// NOTE: Counts alone said nothing about WHICH reports were
-					// counted: a fix that answered the report it was offered
-					// for and left an unrelated one in its place went four for
-					// four and passed. What a fix may leave is what its
-					// allowance names, and nothing is what everything else may
-					// leave.
-					let fresh = freshReports(before, after)
-					let permitted = allowance?.followUp ?? []
 
 					expect([
 						where,
-						fresh
-							.filter(
-								(diagnostic) =>
-									!permitted.includes(diagnostic.code),
-							)
-							.map(reportKey),
+						answerFailures(showcase.source, entry, before),
 					]).toEqual([where, []])
-
-					if (allowance === undefined) {
-						expect([
-							where,
-							errorsIn(after) <= errorsIn(before),
-						]).toEqual([where, true])
-						expect([where, after.length <= before.length]).toEqual([
-							where,
-							true,
-						])
-					}
-
-					// (ii) The report it answered is gone, or has become a
-					// different one in that place. Found by code AND POSITION,
-					// because a showcase file carries several reports of one
-					// code and a fix answers exactly one of them.
-					if (
-						entry.diagnosticCode !== null &&
-						entry.diagnosticPosition !== null
-					) {
-						let answered = before.find(
-							(diagnostic) =>
-								diagnostic.code === entry.diagnosticCode &&
-								diagnostic.position !== null &&
-								diagnostic.position.start.line ===
-									entry.diagnosticPosition!.start.line &&
-								diagnostic.position.start.column ===
-									entry.diagnosticPosition!.start.column,
-						)
-
-						if (answered !== undefined) {
-							expect([
-								where,
-								after
-									.map(identityOf)
-									.includes(identityOf(answered)),
-							]).toEqual([where, false])
-						}
-					}
-
-					// (iii) It still parses, unless it did not before.
-					if (parsesIn(before)) {
-						expect([where, parsesIn(after)]).toEqual([where, true])
-					}
 				}
 			})
 
@@ -455,58 +661,11 @@ describe("Every Quick Fix on every broken file", () => {
 			it("never offers the same fix again on the same report", () => {
 				for (let entry of entries) {
 					let where = `${showcase.name} · ${entry.title}`
-					let text = showcase.source
-					let counts = [
-						analyse(text, undefined, { tests: true }).length,
-					]
-					let title = entry.title
-					let identity = keyOf(entry)
-					let applying: CodeActionEntry | undefined = entry
 
-					for (let round = 0; round < 8; round++) {
-						if (applying === undefined) {
-							break
-						}
-
-						text = applyEdits(text, applying.edits)
-						counts.push(
-							analyse(text, undefined, { tests: true }).length,
-						)
-
-						let again: CodeActionEntry | undefined = actionsOn(
-							text,
-						).find(
-							(candidate) =>
-								candidate.kind === "quickfix" &&
-								candidate.title === title &&
-								keyOf(candidate) === identity,
-						)
-
-						// NOTE: A fix offered again on the identical
-						// Diagnostic, after it was applied, is the loop. One
-						// round is enough to say so.
-						expect([where, round, again === undefined]).toEqual([
-							where,
-							round,
-							true,
-						])
-
-						applying = again
-					}
-
-					// NOTE: And the count never climbs along the way, allowance
-					// or not — a scaffold leaves ONE hole, not a hole per round.
-					let allowance = allowanceFor(entry)
-
-					if (allowance === undefined) {
-						for (let index = 1; index < counts.length; index++) {
-							expect([
-								where,
-								(counts[index] as number) <=
-									(counts[index - 1] as number),
-							]).toEqual([where, true])
-						}
-					}
+					expect([
+						where,
+						chainFailures(showcase.source, entry),
+					]).toEqual([where, []])
 				}
 			})
 		})
@@ -678,6 +837,13 @@ describe("Every Quick Fix on the Module showcase", () => {
 					where,
 					after.filter((code) => code.endsWith("syntax-error")),
 				]).toEqual([where, []])
+
+				// NOTE: And it wrote where the report stands, or where its
+				// allowance says it may. This is the one group where a fix
+				// reaches a SECOND file, which is exactly why the rule is
+				// asked here as well: "it is a Module fix" is not a reason to
+				// stop reading where the edits land.
+				expect([where, reachFailures(entry)]).toEqual([where, []])
 			}
 		})
 	}
@@ -701,5 +867,184 @@ describe("The allowlist", () => {
 				(allowance) => !refactorsEarned.has(allowance),
 			).map((allowance) => allowance.title),
 		).toEqual([])
+	})
+
+	it("has every reach allowance still earned", () => {
+		expect(
+			REACH_ALLOWED.filter(
+				(allowance) => !reachEarned.has(allowance),
+			).map((allowance) => `${allowance.code} · ${allowance.title}`),
+		).toEqual([])
+	})
+})
+
+// NOTE: The guard's own guard. Everything above asks questions of the fixes the
+// Server really offers, and every one of them passes — which says as much about
+// the questions as about the fixes, and is exactly what an audit is entitled to
+// disbelieve. So the questions are asked of fixes that are deliberately, and
+// differently, WRONG: each mutant below is an honest fix carrying something no
+// reader asked for, and each has to be caught.
+//
+// They are the seven the Help audit's review built by hand against this spec,
+// three of which it got past — the three that ride along with an honest edit and
+// change something else in the file. Those are the reason question (v) exists,
+// and they are asked here so that it can not quietly stop working.
+describe("The guard itself", () => {
+	// NOTE: Written here rather than read out of the corpus: a mutant has to
+	// know what it is corrupting — a comment, a binding, a Case — and a fixture
+	// is free to stop carrying any of the three. One misspelled name, in the
+	// middle of the file so that an edit at either end of it is plainly
+	// somewhere else.
+	const SUBJECT = [
+		"implementation {",
+		"\t§ A note the reader wrote, which no fix has any business deleting.",
+		"\tchoice Light {",
+		"\t\tRed,",
+		"\t\tGreen,",
+		"\t}",
+		"",
+		"\tconstant lit: Light = #Red",
+		'\tconstant greeting = "hello"',
+		"",
+		"\tTerminal.print(greetingg)",
+		"",
+		"\tTerminal.inspect(lit)",
+		"}",
+		"",
+	].join("\n")
+
+	let lines = SUBJECT.split("\n")
+	let whole = wholeOf(SUBJECT)
+	let end = whole.end
+	let before = analyse(SUBJECT, undefined, { tests: true })
+	let honest = actionsOn(SUBJECT).find(
+		(entry) => entry.kind === "quickfix",
+	) as CodeActionEntry
+
+	function verdict(entry: CodeActionEntry): Array<string> {
+		return [
+			...answerFailures(SUBJECT, entry, before),
+			...chainFailures(SUBJECT, entry),
+		]
+	}
+
+	function mutant(edits: Array<CodeActionEdit>): CodeActionEntry {
+		return { ...honest, edits }
+	}
+
+	function rewritten(replace: (text: string) => string): CodeActionEntry {
+		return mutant([
+			{
+				range: whole,
+				newText: replace(applyEdits(SUBJECT, honest.edits)),
+			},
+		])
+	}
+
+	it("has an honest fix to mutate", () => {
+		expect(honest).toBeDefined()
+		expect(honest.title).toBe("Change to 'greeting'")
+		expect(allowanceFor(honest)).toBeUndefined()
+		expect(reachAllowanceFor(honest)).toBeUndefined()
+	})
+
+	// NOTE: The control. A guard that failed everything would catch all seven
+	// below and be worth nothing.
+	it("passes the honest fix", () => {
+		expect(verdict(honest)).toEqual([])
+	})
+
+	it("catches a fix that declares nothing for a name it writes", () => {
+		expect(
+			verdict(
+				mutant([
+					...honest.edits,
+					{
+						range: {
+							start: { line: 14, column: 1 },
+							end: { line: 14, column: 1 },
+						},
+						newText: "\tconstant boom = undeclaredNameHere\n",
+					},
+				]),
+			),
+		).toEqual([
+			"(i) raised 'unknown-name 'undeclaredNameHere' is not declared'",
+			"(v) wrote elsewhere in the file: lines 14-14",
+		])
+	})
+
+	it("catches a fix that changes nothing at all", () => {
+		expect(verdict(mutant([{ range: whole, newText: SUBJECT }]))).toEqual([
+			"(ii) left 'unknown-name 11:17 'greetingg' is not declared' where it was",
+			"(v) wrote elsewhere in the file: lines 1-15",
+			"(iv) offered again in round 0",
+		])
+	})
+
+	it("catches a fix that leaves the file unparseable", () => {
+		expect(
+			verdict(
+				mutant([
+					...honest.edits,
+					{
+						range: { start: end, end },
+						newText: "\nimplementation {\n",
+					},
+				]),
+			),
+		).toEqual([
+			"(i) raised 'unexpected-token Unexpected 'implementation' after the end of the Program'",
+			"(iii) the result no longer parses",
+			"(v) wrote elsewhere in the file: lines 15-15",
+		])
+	})
+
+	it("catches a fix that deletes the file", () => {
+		expect(verdict(mutant([{ range: whole, newText: "" }]))).toEqual([
+			"(i) raised 'syntax-error Expected 'implementation' but found end of input.'",
+			"(iii) the result no longer parses",
+			"(v) wrote elsewhere in the file: lines 1-15",
+		])
+	})
+
+	// NOTE: The three that got past the counting guard, each of which leaves a
+	// file the Compiler is just as happy with and the reader no longer
+	// recognises. They are caught by where they WRITE, so the verdict is read
+	// for that question by name rather than for any failure at all.
+	it("catches a fix that deletes the reader's comments", () => {
+		let deletions = lines.flatMap((line, index) =>
+			line.trimStart().startsWith("§")
+				? [
+						{
+							range: {
+								start: { line: index + 1, column: 1 },
+								end: {
+									line: index + 1,
+									column: line.length + 1,
+								},
+							},
+							newText: "",
+						},
+					]
+				: [],
+		)
+
+		expect(deletions.length).toBeGreaterThan(0)
+		expect(verdict(mutant([...deletions, ...honest.edits]))).toEqual([
+			"(v) wrote elsewhere in the file: lines 2-2",
+		])
+	})
+
+	it("catches a fix that renames an unrelated binding", () => {
+		expect(
+			verdict(rewritten((text) => text.replaceAll("lit", "chosen"))),
+		).toEqual(["(v) wrote elsewhere in the file: lines 1-15"])
+	})
+
+	it("catches a fix that renames a Case", () => {
+		expect(
+			verdict(rewritten((text) => text.replaceAll("Red", "Crimson"))),
+		).toEqual(["(v) wrote elsewhere in the file: lines 1-15"])
 	})
 })
