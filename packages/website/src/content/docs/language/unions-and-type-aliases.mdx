@@ -121,7 +121,7 @@ Two more forms have their own pages. An alias for a function type is on [Functio
 
 Aliases hoist: a program can use an alias above the line that declares it, the same as in TypeScript.
 
-The name of a union alias shows up in error messages. Assign `1/2` to `subject` and the note reads `'subject' is declared as Greetable.` The name of a record alias does not. Give `here` a wrong value and the note reads `'here' is declared as { x: Integer, y: Integer }.` Either way the name is for display. Whether a value fits is decided by the type.
+The name of an alias shows up in error messages. Assign `1/2` to `subject` and the note reads `'subject' is declared as Greetable.` A record alias reads the same way: give `here` a wrong value and the note reads `'here' is declared as Point.`, and the label under the member that does not fit says `Point declares an Integer`. The name is for display. Whether a value fits is decided by the type, so a record written member by member still fits `Point` without ever naming it.
 
 ## An alias is not a new type
 

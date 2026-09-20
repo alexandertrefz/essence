@@ -449,7 +449,9 @@ Error: This value has no members to look up
    │
  7 │     constant { x } = input
    │                ▲
-   │                ╰── this is a { x: Integer, y: Integer } | { x: Integer, delta: Integer }
+   │                ╰── this is a Click | KeyPress
+   │
+   │ Help: A Method is called with '::' rather than '.' — write '::x(…)' if 'x' is one.
    │
    │ Note: Only Records, Cases and Namespaces have members.
 ───╯
@@ -464,7 +466,7 @@ Two more errors meet a pattern in a declaration:
 | Code | Written | The compiler says |
 | --- | --- | --- |
 | [`duplicate-variable`](/docs/reference/diagnostics#duplicate-variable) | `constant { width as measure, height as measure } = size` | Variable 'measure' is already declared |
-| `unknown-member` | `constant { widht, height } = size` | `{ width: Integer, height: Integer }` has no member 'widht', with the Help "Did you mean 'width'?" |
+| `unknown-member` | `constant { widht, height } = size` | `Size` has no member 'widht', with the Help "Did you mean 'width'?" |
 
 ## What is not a pattern
 
