@@ -256,9 +256,10 @@ export const commands: Array<CommandSpec> = [
 				"the same file, and its Diagnostics are reported under its own " +
 				"name. A dependency named on the command line as well is " +
 				"compiled once and gets an output of its own.",
-			"Compilation stops at the first stage that reports an Error, and " +
-				"every Diagnostic that stage found is shown. Warnings never stop " +
-				"a build.",
+			"Every stage that reads the source runs, whatever the one before " +
+				"it found, so one report holds every mistake in the file. " +
+				"Nothing is built out of a Program that has an Error in it. " +
+				"Warnings never stop a build.",
 			"A project that always builds the same way writes it down once " +
 				`instead, in the ${PROJECT_FILE} at its root — "out", ` +
 				'"sourcemap", "minify", "embed", "optimise" and ' +
