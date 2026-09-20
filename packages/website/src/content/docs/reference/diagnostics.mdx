@@ -5546,6 +5546,117 @@ Error: 'tagged' takes a bare name
 
 Write a tag as a bare name: `tagged slow`.
 
+Five more shapes report the same code, each with its own message, label and
+Help. `tagged` with nothing after it names no tag, and a `tagged` that selects
+nothing is a modifier that does nothing:
+
+<div class="error-output">
+
+```
+[malformed-modifier]
+Error: This is tagged with nothing
+   ╭─┤ Table.es:4:25 │
+   │
+ 4 │     test "ranks the table" tagged {
+   │                            ───┬──  
+   │                               ╰──── this names no tag
+   │ 
+   │ Help: Write the tags after it: tagged slow, network.
+   │ 
+   │ Note: A tag is what the command line selects on — 'essence test --tag slow' — so a 'tagged' naming none selects nothing.
+───╯
+```
+
+</div>
+
+A tag with a capital in it is a second tag. `--tag` and `--skip-tag` match
+exactly, so the spelling nobody selects is the one that quietly stops running:
+
+<div class="error-output">
+
+```
+[malformed-modifier]
+Error: The tag 'Slow' is not lower case
+   ╭─┤ Table.es:4:32 │
+   │
+ 4 │     test "ranks the table" tagged Slow {
+   │                                   ──┬─  
+   │                                     ╰─── this has a capital in it
+   │ 
+   │ Help: Write it as 'slow'.
+   │ 
+   │ Note: A tag is matched exactly by '--tag' and '--skip-tag', so two spellings of one tag are two tags.
+───╯
+```
+
+</div>
+
+`skipped` takes a string, and nothing else stands for a reason:
+
+<div class="error-output">
+
+```
+[malformed-modifier]
+Error: 'skipped' takes a String saying why
+   ╭─┤ Table.es:4:33 │
+   │
+ 4 │     test "ranks the table" skipped 3 {
+   │                                    ▲  
+   │                                    ╰── this is not a String saying why
+   │ 
+   │ Help: Write a String saying why here.
+   │ 
+   │ Note: The reason is what the report repeats on every run, so it is written for whoever reads that report.
+───╯
+```
+
+</div>
+
+A second reason is a second skip, and the edit is a deletion — the reader is
+standing on the thing that has to go, so this shape asks for that rather than
+for a reason to be written where one already is:
+
+<div class="error-output">
+
+```
+[malformed-modifier]
+Error: 'skipped' takes one reason and nothing else
+   ╭─┤ Table.es:4:44 │
+   │
+ 4 │     test "ranks the table" skipped "waiting", "and waiting" {
+   │                                               ──────┬──────  
+   │                                                     ╰──────── this is not one reason and nothing else
+   │ 
+   │ Help: Remove the extra reason — 'skipped' carries one.
+   │ 
+   │ Note: A test is skipped for one reason. Two of them is two skips.
+───╯
+```
+
+</div>
+
+And `focused` says all of what it says by being written, so anything after it is
+read by nothing:
+
+<div class="error-output">
+
+```
+[malformed-modifier]
+Error: 'focused' takes nothing
+   ╭─┤ Table.es:4:33 │
+   │
+ 4 │     test "ranks the table" focused "now" {
+   │                                    ──┬──  
+   │                                      ╰──── nothing reads this
+   │ 
+   │ Help: Remove it.
+   │ 
+   │ Note: 'focused' says one thing about the test, and says all of it by being written.
+───╯
+```
+
+</div>
+
 Taught on: [Tests › Modifiers](/docs/language/tests#modifiers)
 
 ### `skipped-without-reason`
