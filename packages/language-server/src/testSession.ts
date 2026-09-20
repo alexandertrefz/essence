@@ -532,7 +532,13 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			counts: { passed: 0, failed: 0, skipped: 0, deselected: 0 },
 			duration: 0,
 			compiled: true,
-			coverage: emptyCoverage,
+			// NOTE: No files, because nothing ran — and the session's Choices
+			// all the same, because `choices` REPLACES what the client holds
+			// while `files` is laid over it. An empty summary here told the
+			// client that no Choice is reached anywhere, and the marks a real
+			// run had put on the reader's Choices went out with the cycle that
+			// never ran. This is what `finish` sends, for the same reason.
+			coverage: { files: [], choices: coverage.choices },
 		})
 	}
 

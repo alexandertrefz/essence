@@ -267,6 +267,22 @@ describe("The Server's live test session", () => {
 
 		expect(result.run).not.toBeNull()
 		expect(result.run).not.toBe(flying)
+		// NOTE: And it really was DEFERRED, which is the whole subject. A
+		// request the session takes STRAIGHT AWAY is started from inside the
+		// request handler — the `start` notification is written to the
+		// connection before the response is — so a number no `start` has
+		// mentioned by the time the answer arrives is a cycle that does not
+		// exist yet, which is what being deferred means. Ordering, not timing:
+		// the two messages travel one stream and arrive in the order they were
+		// written. Without this the test holds just as well on a machine where
+		// the run in flight had already finished, where nothing is deferred and
+		// everything below is about an ordinary request.
+		expect(
+			session
+				.testRuns()
+				.filter((notification) => notification.kind === "start")
+				.map((notification) => notification.run),
+		).not.toContain(result.run as number)
 
 		let ended = await session.waitForTestRun(result.run as number)
 

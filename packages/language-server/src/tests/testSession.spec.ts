@@ -393,6 +393,60 @@ describe("A session asked for one test while a run is in flight", () => {
 		}
 	}, 60_000)
 
+	// NOTE: TWO gestures deferred behind one cycle, which is what a reader
+	// produces by clicking Run on a file and then on one test inside it while
+	// the first cycle is still compiling. Both are answered with the number of
+	// the ONE cycle that will carry them, and that cycle runs the SUPERSET: a
+	// whole-file request outranks a narrowing, so the folded cycle runs the file
+	// whole rather than only the test named last. That is the safe fold — a test
+	// nobody asked for runs, which costs time, where narrowing would leave a
+	// test the other gesture asked for untested — and it is worth pinning
+	// because the cycle is answered to a reader who asked for one test and
+	// arrives carrying every test in the file.
+	it("folds two deferred gestures into one cycle both listen on", async () => {
+		let file = path.join(root, "DeferredPair.tests.es")
+
+		writeFileSync(file, twoTests)
+
+		let { session, ends, waitFor } = watching(file)
+
+		try {
+			session.run({ files: [file] })
+
+			await waitFor(1)
+
+			let beta = session
+				.records()
+				.find((record) => record.name === "beta")?.id
+
+			expect(beta).toBeString()
+
+			// NOTE: The cycle these two land behind.
+			session.run({ files: [file] })
+
+			let wide = session.run({ files: [file] })
+			let narrow = session.run({ ids: [beta as string], files: [file] })
+
+			expect(wide).toBe(3)
+			expect(narrow).toBe(3)
+
+			await waitFor(3)
+
+			let folded = ends().at(-1)
+
+			expect(folded?.run).toBe(3)
+			expect(folded?.reason).toBe("request")
+			// NOTE: Run whole — no narrowing — which is what makes the number
+			// safe for the reader who asked for the file and for the reader who
+			// asked for one test in it.
+			expect(folded?.ids).toEqual([])
+			expect(folded?.counts.passed).toBe(2)
+		} finally {
+			await session.dispose()
+			rmSync(file, { force: true })
+		}
+	}, 60_000)
+
 	// NOTE: And a promise the session can not keep is ended rather than left
 	// standing. The file a deferred request named stops being a test file while
 	// the run in flight finishes — deleted, or its `tests` block taken out — so
@@ -443,6 +497,16 @@ describe("A session asked for one test while a run is in flight", () => {
 				reason: "request",
 				files: [],
 				counts: { passed: 0, failed: 0, skipped: 0, deselected: 0 },
+			})
+			// NOTE: And it carries the session's own Choices rather than an
+			// empty summary. A client REPLACES what it holds for `choices` with
+			// what an end carries — `files` is laid over, `choices` is not — so
+			// a cycle that never ran once wiped every Choice mark a real run had
+			// put there, and the reader watched their coverage disappear because
+			// they clicked Run twice.
+			expect(ended()?.coverage).toEqual({
+				files: [],
+				choices: session.coverage().choices,
 			})
 		} finally {
 			await session.dispose()

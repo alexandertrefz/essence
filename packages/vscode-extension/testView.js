@@ -665,6 +665,13 @@ export function createTestView(options) {
 			runs.set(answer.run, testRun)
 			// NOTE: Remembered as promised until that cycle starts, since a
 			// deferred request is answered before anything carries its number.
+			//
+			// NOTE: For every answer, not only for a deferred one, because the
+			// answer does not say which it was — `RunTestsResult` carries the
+			// number and nothing else. It costs nothing: a cycle that started
+			// straight away deletes its own number as its `start` arrives, and
+			// until then it is the newest number there is, so nothing sweeps on
+			// it either way.
 			promised.add(answer.run)
 		}
 	}
@@ -959,16 +966,24 @@ export function createTestView(options) {
 
 		// NOTE: A cycle that never ended — the session was switched off, or a
 		// Worker died — would leave VS Code spinning forever. A newer cycle
-		// starting is the news that no older one is coming back.
+		// STARTING is the news that no older one is coming back.
 		//
 		// NOTE: Unless it has not come yet. A deferred request is answered with
 		// the number of the cycle that will run it, and a cycle asked for in the
 		// window before that one starts takes a higher number and runs first —
 		// so a promised number is a run still owed rather than a run that died.
-		for (let [number, open] of runs) {
-			if (number < notification.run && !promised.has(number)) {
-				open.end()
-				runs.delete(number)
+		//
+		// NOTE: On a start and on nothing else. An END says the cycle it names
+		// is over and says nothing whatever about the ones before it: a promised
+		// cycle that found nothing to run ends under its own number without ever
+		// starting, and sweeping there closed out a lower-numbered cycle that
+		// was still compiling.
+		if (notification.kind === "start") {
+			for (let [number, open] of runs) {
+				if (number < notification.run && !promised.has(number)) {
+					open.end()
+					runs.delete(number)
+				}
 			}
 		}
 
@@ -1037,12 +1052,20 @@ export function createTestView(options) {
 			.map((id) => items.get(id))
 			.filter((item) => item !== undefined)
 
+		// NOTE: Both halves, always. The ids say WHICH tests and the files say
+		// where they live, and the Server can only work the second out from the
+		// results of a run it has already done — so a lens pressed before
+		// anything has run, or while `essence.tests.enabled` is off (which
+		// clears what the session remembers), sent ids the Server could match
+		// against nothing and ran no test at all. The setting switches off the
+		// automatic runs; a run asked for in so many words is exactly what it
+		// leaves working.
 		await ask(
 			enqueue(
 				controller.createTestRun(new vscode.TestRunRequest(covered)),
 				covered,
 			),
-			covered.length === 0 ? { ids: [], files } : { ids, files: [] },
+			{ ids: covered.length === 0 ? [] : ids, files },
 			undefined,
 		)
 	}
@@ -1062,9 +1085,12 @@ export function createTestView(options) {
 				controller.createTestRun(new vscode.TestRunRequest(covered)),
 				covered,
 			),
-			covered.length === 0
-				? { ids: [], files, update: true }
-				: { ids, files: [], update: true },
+			// NOTE: Both halves, for the reason the Run lens sends both.
+			{
+				ids: covered.length === 0 ? [] : ids,
+				files,
+				update: true,
+			},
 			undefined,
 		)
 	}
@@ -1082,6 +1108,11 @@ export function createTestView(options) {
 		}
 
 		runs.clear()
+		// NOTE: And nothing is owed any more either — the numbers were promised
+		// by a session that no longer exists, and the next one counts from one,
+		// so a number left here would be read as a promise about somebody
+		// else's cycle.
+		promised.clear()
 		requested = null
 		// NOTE: A tag is a tag some test carries, and no test carries anything
 		// any more.
@@ -1090,11 +1121,16 @@ export function createTestView(options) {
 	}
 
 	function dispose() {
+		// NOTE: Every open run, promised or running: the extension is going
+		// away, and a run left open is a spinner VS Code keeps turning with
+		// nothing behind it.
 		for (let run of runs.values()) {
 			run.end()
 		}
 
 		runs.clear()
+		promised.clear()
+		requested = null
 
 		for (let profile of tagProfiles.values()) {
 			profile.dispose()

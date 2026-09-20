@@ -910,9 +910,26 @@ describe("the runs it keeps", () => {
 
 		expect(session.asked.at(-1)).toEqual({
 			ids: [one.id],
-			files: [],
+			files: [FILE],
 			update: true,
 		})
+	})
+
+	// NOTE: The ids say WHICH tests and the file says where they live, and the
+	// Server works the second out from the results of a run it has already
+	// done — so a lens that sent ids alone ran nothing at all whenever the
+	// session remembers nothing: before the first run, and while
+	// `essence.tests.enabled` is off, which is the one state where a lens is
+	// the only way a test runs.
+	it("names the file as well as the tests a lens asks for", async () => {
+		let session = live(() => ({ run: 4 }))
+		let one = site({ name: "renders" })
+
+		session.view.handle(batch({ sites: [one] }))
+
+		await session.view.runIds([one.id], [FILE])
+
+		expect(session.asked.at(-1)).toEqual({ ids: [one.id], files: [FILE] })
 	})
 
 	it("accepts a whole file where it knows no id", async () => {
