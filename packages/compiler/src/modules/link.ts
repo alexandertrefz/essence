@@ -1433,7 +1433,13 @@ function reportUnusedImports(
 ): void {
 	let bound = state.imports.filter((binding) => binding.state === "bound")
 
-	if (bound.length === 0) {
+	// NOTE: And silent for a Module the Parser did not read whole. Every use
+	// this counts is read off a tree, and a Statement the recovery dropped is
+	// in neither of them — so the one line that reads an import can go missing
+	// and leave the entry looking unread. It is the over-collection above
+	// carried one step further, and for the same reason: a Warning that fires
+	// on a name the Module does use is worse than one that stays silent.
+	if (bound.length === 0 || state.module.program.recovery !== undefined) {
 		return
 	}
 

@@ -1552,6 +1552,47 @@ export {
 		)
 	})
 
+	// NOTE: And silent about a Module the Parser did not read whole. Every use
+	// the check counts is read off a tree, and a Statement the recovery dropped
+	// is in neither of them — so the one line reading an import can go missing
+	// and leave the entry looking unread. It only became reachable once the
+	// Enricher started running over a Program the Parser had reported on.
+	it("says nothing about an import when the Parser dropped a Statement", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Library.es" { kept }
+}
+
+implementation {
+	constant shown = kept()::toString(
+}
+`,
+				"Library.es": `implementation {
+	function kept() -> Integer {
+		<- 1
+	}
+}
+
+export {
+	kept
+}
+`,
+			},
+			(directory) => {
+				let main = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"Main.es",
+				)
+
+				expect(
+					main.diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["syntax-error"])
+			},
+		)
+	})
+
 	// NOTE: The case the check exists for. An imported Namespace used only through
 	// `shape::area()` has no Identifier occurrence anywhere in the file — the only
 	// trace of it is the Namespace name on the resolved Invocation, and reading
