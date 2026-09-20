@@ -13,6 +13,7 @@ import {
 	secondary,
 } from "../../diagnostics/index"
 import {
+	compoundAssignmentHelps,
 	foreignOperatorAccount,
 	foreignPunctuationLead,
 	foreignWord,
@@ -4400,7 +4401,7 @@ class DescentParser {
 		// a `-` opening the next line is a negative Number and not a subtraction
 		// anybody wrote. Every habit answered here is written flush behind its
 		// left operand or one blank away from it.
-		let foreign = this.foreignTextAhead()
+		let foreign = this.foreignTextAhead(expression)
 
 		if (
 			foreign !== null &&
@@ -4656,10 +4657,11 @@ class DescentParser {
 	// it would print something they never wrote; `…` says "yours goes here".
 	//
 	// Asked with the cursor standing ON the `=`, which is where the brackets left
-	// it.
-	protected writtenAssignedValue(): string | null {
-		let written = this.tokens.peek(1)
-		let following = this.tokens.peek(2)
+	// it — `at` is how far behind the cursor the value stands, which a compound
+	// assignment moves along by the Tokens its operator was glued out of.
+	protected writtenAssignedValue(at = 1): string | null {
+		let written = this.tokens.peek(at)
+		let following = this.tokens.peek(at + 1)
 
 		if (
 			written === undefined ||
@@ -8527,6 +8529,10 @@ class DescentParser {
 		// operand — and the second is answered by the Enricher, which has the
 		// operand in hand and can name it.
 		whole: boolean
+		// NOTE: How many Tokens the lexeme was glued out of, so that a caller
+		// can read what stands BEHIND it — the right operand of a compound
+		// assignment, which `+=` hides two Tokens deep.
+		tokens: number
 	} | null {
 		let first = this.tokens.peek(from)
 
@@ -8547,6 +8553,7 @@ class DescentParser {
 		}
 		let whole = lead.length === first.value.length
 		let wholeFirst = whole
+		let consumed = 1
 
 		for (let offset = from + 1; whole; offset++) {
 			let token = this.tokens.peek(offset)
@@ -8568,12 +8575,14 @@ class DescentParser {
 			text += next
 			end = { line: end.line, column: end.column + next.length }
 			whole = next.length === token.value.length
+			consumed++
 		}
 
 		return {
 			text,
 			position: { start: first.position.start, end },
 			whole: wholeFirst,
+			tokens: consumed,
 		}
 	}
 
@@ -8582,7 +8591,15 @@ class DescentParser {
 	// Essence's own lexemes are answered `null` here rather than excluded Token by
 	// Token, which is what keeps `match x -> T` and `<- value` whole while leaving
 	// `a - b` and `a < b` refused.
-	protected foreignTextAhead(): ForeignRefusal | null {
+	//
+	// NOTE: `left` is the Expression the operator was written BEHIND, where the
+	// caller has read one. It is what a compound assignment's Help is spelled
+	// out of — `tally += 5` is short for `tally = tally::add(5)`, and a Help
+	// that names neither `tally` nor `5` sends a reader to two undeclared names
+	// and an amount they never wrote.
+	protected foreignTextAhead(
+		left?: parser.ExpressionNode,
+	): ForeignRefusal | null {
 		let lexeme = this.foreignLexeme()
 
 		if (lexeme === null || essenceLexemes.has(lexeme.text)) {
@@ -8601,7 +8618,21 @@ class DescentParser {
 			return null
 		}
 
-		return { ...account, position: lexeme.position }
+		let target = left === undefined ? null : writtenReceiver(left)
+		let compound =
+			target === null
+				? null
+				: compoundAssignmentHelps(
+						lexeme.text,
+						target,
+						this.writtenAssignedValue(lexeme.tokens),
+					)
+
+		return {
+			...account,
+			...(compound === null ? {} : { helps: [...compound] }),
+			position: lexeme.position,
+		}
 	}
 
 	// NOTE: The verdict on the Token standing BEHIND the cursor — the same

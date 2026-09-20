@@ -72,6 +72,20 @@ function refusedSpan(source: string): string {
 	return spanOf(source, onlyDiagnostic(source).position as common.Position)
 }
 
+// NOTE: What a Help promises, checked by compiling it. A Help built out of the
+// reader's own text is only worth more than a placeholder where what it spells
+// holds together, so the ones printed below are written back into the probe
+// they came from and compiled here.
+function compiles(source: string): boolean {
+	let parsed = parseWithDiagnostics(source)
+
+	if (containsErrors(parsed.diagnostics)) {
+		return false
+	}
+
+	return !containsErrors(enrich(parsed.program).diagnostics)
+}
+
 // NOTE: Written as one line per Statement with a real tab, so a span read back
 // out of the source is read out of the text a reader would have written.
 function program(...lines: Array<string>): string {
@@ -955,6 +969,49 @@ describe("Foreign syntax", () => {
 			expect(helpsOf(source)).toEqual(["Write 'count = count::add(1)'."])
 		})
 
+		// NOTE: The binding and the amount are the reader's own. `count` and `1`
+		// used to be printed whatever was written, so `tally += 5` was answered
+		// with two names nothing declares and an amount nobody asked for.
+		it("spells a compound assignment with the operands that were written", () => {
+			let source = program("variable tally = 0", "tally += 5")
+
+			expect(codesOf(source)).toEqual(["operator-not-supported"])
+			expect(helpsOf(source)).toEqual(["Write 'tally = tally::add(5)'."])
+			expect(
+				compiles(
+					program("variable tally = 0", "tally = tally::add(5)"),
+				),
+			).toBe(true)
+		})
+
+		// NOTE: `count++` is one Identifier, so it is the Enricher that meets it
+		// and the binding is in hand there too. The amount is in the operator
+		// rather than in the text, which is why nothing is read behind it.
+		it("spells the binding a postfix increment counts", () => {
+			let source = program("variable hits = 0", "hits++")
+
+			expect(codesOf(source)).toEqual(["operator-not-supported"])
+			expect(helpsOf(source)).toEqual(["Write 'hits = hits::add(1)'."])
+			expect(
+				compiles(program("variable hits = 0", "hits = hits::add(1)")),
+			).toBe(true)
+		})
+
+		// NOTE: The right operand is spelled only where it is one Token and the
+		// whole of what is left of the Statement. Anything longer is an
+		// Expression of the reader's own, and half of one printed back is worse
+		// than the `…` that says theirs goes here.
+		it("writes '…' where the amount is an Expression of its own", () => {
+			let source = program(
+				"variable tally = 0",
+				"constant other = 2",
+				"tally += other::add(1)",
+			)
+
+			expect(codesOf(source)).toEqual(["operator-not-supported"])
+			expect(helpsOf(source)).toEqual(["Write 'tally = tally::add(…)'."])
+		})
+
 		// NOTE: What is written here is a REASSIGNMENT, so the Help has to
 		// answer an Integer: `divide(by:)` answers a fraction, and the counter
 		// it would be written back into is not one.
@@ -965,6 +1022,27 @@ describe("Foreign syntax", () => {
 			expect(helpsOf(source)).toEqual([
 				"Write 'count = count::quotient(dividingBy 2)', which answers a whole number.",
 				"Or 'count::divide(by 2)' where the answer is a fraction, which is a Rational rather than an Integer.",
+			])
+			expect(
+				compiles(
+					program(
+						"variable count = 10",
+						"count = count::quotient(dividingBy 2)",
+					),
+				),
+			).toBe(true)
+		})
+
+		// NOTE: There is no Method to offer for these four, and a Help that
+		// says so is a rule wearing an action's clothes. The rule is a Note.
+		it("answers a bitwise operator with a Note and no Help", () => {
+			let source = program("constant masked = 6 & 3")
+
+			expect(codesOf(source)).toEqual(["operator-not-supported"])
+			expect(helpsOf(source)).toEqual([])
+			expect(notesOf(source)).toEqual([
+				operatorNote,
+				"Essence has no bitwise operations, and no Method stands in for one.",
 			])
 		})
 

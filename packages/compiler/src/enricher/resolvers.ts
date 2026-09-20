@@ -30,6 +30,7 @@ import {
 import { eraseRefinements } from "../helpers/eraseRefinements"
 import {
 	type ForeignWord,
+	compoundAssignmentHelps,
 	foreignOperatorAccount,
 	foreignOperatorIn,
 	foreignWord,
@@ -1311,6 +1312,20 @@ function reportForeignName(
 	let operator = foreignOperatorIn(name)
 
 	if (operator !== null) {
+		// NOTE: `count++` is one Identifier too — a `+` ends no name — so the
+		// binding being counted is in hand and the Help can write the
+		// reassignment out with it. Only the POSTFIX form arrives whole:
+		// `count += 1` is broken in two by the `=`, and the Parser answers that
+		// one with the right operand in hand as well.
+		let counted =
+			name.endsWith(operator) && name.length > operator.length
+				? compoundAssignmentHelps(
+						operator,
+						name.slice(0, -operator.length),
+						null,
+					)
+				: null
+
 		// NOTE: `!ready` is one Identifier, so the operand is in hand and the
 		// Help can name it — which is the difference between being told the rule
 		// and being shown the line. Only a PREFIX operator has one to name: an
@@ -1319,9 +1334,11 @@ function reportForeignName(
 		reportOperatorNotSupported(
 			operator,
 			node.position,
-			operator === "!" && name.startsWith("!") && name.length > 1
-				? [`Write '${name.slice(1)}::negate()'.`]
-				: [],
+			counted !== null
+				? [...counted]
+				: operator === "!" && name.startsWith("!") && name.length > 1
+					? [`Write '${name.slice(1)}::negate()'.`]
+					: [],
 		)
 
 		return true

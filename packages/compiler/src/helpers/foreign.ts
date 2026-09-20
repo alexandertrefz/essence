@@ -70,9 +70,18 @@ const operatorHelps: ReadonlyMap<string, ReadonlyArray<string>> = new Map([
 	],
 	["||", ["Write 'a::or(b)' — both sides are worked out."]],
 	["!", ["Write 'x::negate()'."]],
-	["+=", ["Write 'count = count::add(1)'."]],
-	["-=", ["Write 'count = count::subtract(1)'."]],
-	["*=", ["Write 'count = count::multiply(with 2)'."]],
+	// NOTE: The compound assignments are the one family whose table entry is a
+	// SCHEMATIC rather than a spelling: what they are short for names the
+	// binding twice, so a Help that spells it has to spell the reader's own
+	// name or none at all. `count` read as one, and `tally += 5` was answered
+	// `Write 'count = count::add(1)'` — two undeclared names and the wrong
+	// amount. Every site that meets one has the operands in hand and builds the
+	// sentence with `compoundAssignmentHelps`; these stand for the one that
+	// somehow does not, and they say `x` and `n` the way the rest of the table
+	// does.
+	["+=", ["Write 'x = x::add(n)'."]],
+	["-=", ["Write 'x = x::subtract(n)'."]],
+	["*=", ["Write 'x = x::multiply(with n)'."]],
 	// NOTE: `quotient`, not `divide`, because what is written here is a
 	// reassignment: `divide(by:)` answers a fraction, and a counter it is
 	// written back into is an Integer. The Help that does not type-check is the
@@ -80,13 +89,13 @@ const operatorHelps: ReadonlyMap<string, ReadonlyArray<string>> = new Map([
 	[
 		"/=",
 		[
-			"Write 'count = count::quotient(dividingBy 2)', which answers a whole number.",
-			"Or 'count::divide(by 2)' where the answer is a fraction, which is a Rational rather than an Integer.",
+			"Write 'x = x::quotient(dividingBy n)', which answers a whole number.",
+			"Or 'x::divide(by n)' where the answer is a fraction, which is a Rational rather than an Integer.",
 		],
 	],
-	["%=", ["Write 'count = count::remainder(dividingBy 2)'."]],
-	["++", ["Write 'count = count::add(1)'."]],
-	["--", ["Write 'count = count::subtract(1)'."]],
+	["%=", ["Write 'x = x::remainder(dividingBy n)'."]],
+	["++", ["Write 'x = x::add(1)'."]],
+	["--", ["Write 'x = x::subtract(1)'."]],
 	[
 		"??",
 		[
@@ -96,9 +105,11 @@ const operatorHelps: ReadonlyMap<string, ReadonlyArray<string>> = new Map([
 ])
 
 // NOTE: The operators that carry no Method at all. They are answered with the
-// same code and the same note as the rest, because what a reader needs to hear
-// is the same sentence: this is not how Essence says things. The Help says there
-// is nothing to say, which is better than silence.
+// same code as the rest, because what a reader needs to hear is the same
+// sentence: this is not how Essence says things. What is said about them is a
+// NOTE rather than a Help, though — "Essence has no bitwise operations" is a
+// rule in an action's clothes, and a reader who follows a Help is owed an edit
+// they can make where they are standing.
 //
 // NOTE: `|` is not here, and neither is `?.`. A `|` written between two values
 // is Essence's own Union lexeme wherever a Type is read, so it is excluded from
@@ -106,27 +117,80 @@ const operatorHelps: ReadonlyMap<string, ReadonlyArray<string>> = new Map([
 // be reached. A `?.` never forms as a lexeme either: a `.` ends a name, so
 // `user?.name` arrives as `user?` and is answered by the postfix rule, which
 // has the operand in hand and can name it.
-const unsupportedOperators: ReadonlyMap<
-	string,
-	ReadonlyArray<string>
-> = new Map([
-	["&", ["Essence has no bitwise operations."]],
-	["^", ["Essence has no bitwise operations."]],
-	["<<", ["Essence has no bitwise operations."]],
-	[">>", ["Essence has no bitwise operations."]],
+const unsupportedOperators: ReadonlySet<string> = new Set([
+	"&",
+	"^",
+	"<<",
+	">>",
 ])
+
+// NOTE: What stands in a Help's place for those four. It says the whole of what
+// is true — the language has none of this, and there is nothing to write
+// instead — which is what makes a Help unnecessary rather than merely absent.
+export const bitwiseNote =
+	"Essence has no bitwise operations, and no Method stands in for one."
 
 // NOTE: Whether a written text is an operator this language deliberately has
 // none of, and what to write instead. Null for everything else, which is what
-// makes this the whole test at every site that asks it.
+// makes this the whole test at every site that asks it; an EMPTY list is an
+// operator that is answered with a Note alone.
 export function foreignOperatorHelps(
 	operator: string,
 ): ReadonlyArray<string> | null {
-	return (
-		operatorHelps.get(operator) ??
-		unsupportedOperators.get(operator) ??
-		null
-	)
+	let helps = operatorHelps.get(operator)
+
+	if (helps !== undefined) {
+		return helps
+	}
+
+	return unsupportedOperators.has(operator) ? [] : null
+}
+
+// NOTE: The compound assignments, spelled with the operands the reader wrote.
+// `tally += 5` is short for `tally = tally::add(5)`, and the whole of what makes
+// that Help worth printing is that it names `tally` and `5` rather than a
+// binding nobody declared. Null for every other operator, which is what lets a
+// site ask this of whatever it met and print the table's own answer otherwise.
+//
+// `amount` is null where the right operand is not one piece of text this site
+// can hand over — a call, a parenthesised Expression, a second line — and the
+// Help writes `…` in its place rather than a number nobody wrote.
+export function compoundAssignmentHelps(
+	operator: string,
+	target: string,
+	amount: string | null,
+): ReadonlyArray<string> | null {
+	let written = amount ?? "…"
+
+	switch (operator) {
+		case "+=":
+			return [`Write '${target} = ${target}::add(${written})'.`]
+		case "-=":
+			return [`Write '${target} = ${target}::subtract(${written})'.`]
+		case "*=":
+			return [`Write '${target} = ${target}::multiply(with ${written})'.`]
+		// NOTE: `quotient`, not `divide`, because what is written here is a
+		// reassignment: `divide(by:)` answers a fraction, and a counter it is
+		// written back into is an Integer. The Help that does not type-check is
+		// the one that sends a reader from this refusal to the next.
+		case "/=":
+			return [
+				`Write '${target} = ${target}::quotient(dividingBy ${written})', which answers a whole number.`,
+				`Or '${target}::divide(by ${written})' where the answer is a fraction, which is a Rational rather than an Integer.`,
+			]
+		case "%=":
+			return [
+				`Write '${target} = ${target}::remainder(dividingBy ${written})'.`,
+			]
+		// NOTE: `++` and `--` carry their amount in the operator, so the right
+		// operand is not read from the text and is never `…`.
+		case "++":
+			return [`Write '${target} = ${target}::add(1)'.`]
+		case "--":
+			return [`Write '${target} = ${target}::subtract(1)'.`]
+		default:
+			return null
+	}
 }
 
 // NOTE: The characters an Essence name never holds and another language's
@@ -209,7 +273,9 @@ export function foreignOperatorAccount(
 		code: "operator-not-supported",
 		message: `Essence has no '${operator}' operator`,
 		label: "this is not a Method call",
-		notes: [operatorNote],
+		notes: unsupportedOperators.has(operator)
+			? [operatorNote, bitwiseNote]
+			: [operatorNote],
 		helps: leadingHelps.length === 0 ? [...helps] : [...leadingHelps],
 	}
 }

@@ -858,6 +858,8 @@ Error: Essence has no '+' operator
 
 The helps name the method for the operator that was written. The [operator table](/docs/getting-started/coming-from-javascript#operators) has all of them in one place.
 
+A compound assignment is spelled with the operands that were written: `tally += 5` is answered `Write 'tally = tally::add(5)'`, and `hits++` with `Write 'hits = hits::add(1)'`. Where the right operand is an expression of its own rather than one literal or name, the help writes `…` in its place. `&`, `^`, `<<` and `>>` carry no help at all — there is no method to write instead, and that is said as a note: `Essence has no bitwise operations, and no Method stands in for one.`
+
 `!ready` and `a+b` report this from the enricher rather than the parser: neither character ends a name, so each is read as one name and is not refused until nothing declares it.
 
 There is no Quick Fix. The rewrite moves the left operand in front of a `::` and the right one into an argument list, which is a restructuring rather than a substitution — and the parser refuses at the operator, with only the left operand read.

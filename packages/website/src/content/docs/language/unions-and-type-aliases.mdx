@@ -92,7 +92,7 @@ Error: This value does not fit Variable 'total'
 
 </div>
 
-There is no intersection type. `type Both = Point & Named` is refused as [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported), `Essence has no '&' operator`, whose help says Essence has no bitwise operations either. Records are structural, so write the combined shape out: `type Both = { x: Integer, y: Integer, name: String }`.
+There is no intersection type. `type Both = Point & Named` is refused as [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported), `Essence has no '&' operator`, whose note says Essence has no bitwise operations either. Records are structural, so write the combined shape out: `type Both = { x: Integer, y: Integer, name: String }`.
 
 ## Naming a type with `type`
 
