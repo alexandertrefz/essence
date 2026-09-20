@@ -203,7 +203,7 @@ Each source becomes one self-contained ES module. The parts of Essence's runtime
 
 Every module a source imports is compiled into the same file. A module named on the command line as well as imported gets an output of its own.
 
-A build runs nine stages, and the report times each one: `read`, `parse`, `enrich`, `validate`, `simplify`, `optimise`, `generate`, `bundle` and `write`. `enrich` is the stage that infers types. Compilation stops at the first stage that reports an Error, and shows every Diagnostic that stage found. Warnings never stop a build. `build` drops the `tests { … }` block, so an error inside a test does not stop it either; [`check`](/docs/reference/cli#check) reports it.
+A build runs nine stages, and the report times each one: `read`, `parse`, `enrich`, `validate`, `simplify`, `optimise`, `generate`, `bundle` and `write`. `enrich` is the stage that infers types. The four that read the source all run, whatever the ones before them found, so one report holds every mistake in the file; the five that produce the output run only when none of them reported an Error. Warnings never stop a build. `build` drops the `tests { … }` block, so an error inside a test does not stop it either; [`check`](/docs/reference/cli#check) reports it.
 
 Building an unchanged source again reuses the bundle it emitted last time, from the cache described under Caches and environment variables. The report then leaves out the rows from `simplify` to `bundle`.
 
@@ -398,10 +398,11 @@ Error: No overload of 'is' accepts these Arguments
 
 ─── 1 error
   ✖ greeting.es 1 error
-    stopped while inferring types
 ```
 
 </div>
+
+Nothing follows the count: every stage ran, so the report is the whole of what is wrong with the file. `essence build` of a file that does not compile writes nothing and says `stopped before building` instead, which is the one thing a `check` has nothing to add.
 
 `essence check greeting.es` exits with 1, and `essence build greeting.es` still writes `greeting.js` and exits with 0.
 
@@ -726,7 +727,8 @@ A glob that matches nothing is refused by `build`, `run`, `check`, `watch` and `
       "stages": {
         "read": 0.178,
         "parse": 1.949,
-        "enrich": 22.056
+        "enrich": 22.056,
+        "validate": 0.641
       },
       "diagnostics": [
         {
@@ -760,7 +762,7 @@ A glob that matches nothing is refused by `build`, `run`, `check`, `watch` and `
 | `files[].ok` | boolean | Whether this file succeeded |
 | `files[].bytes`, `files[].gzipBytes` | number or `null` | The output's size, plain and gzipped |
 | `files[].durationMs` | number | Wall time for this file |
-| `files[].stages` | object | Milliseconds per stage that ran, keyed by stage name |
+| `files[].stages` | object | Milliseconds per stage that ran, keyed by stage name. No field names a stage that refused the file: the four stages that read the source all run, and the five that produce the output run only when none of them reported an Error. |
 | `files[].diagnostics` | array | Each entry has `file`, `severity`, `message`, `code`, `line`, `column`, `endLine` and `endColumn`. The position fields are `null` for a Diagnostic with no place in a file, such as `file-not-found`. |
 | `error` | string | Only on a refused command line: the message |
 

@@ -83,7 +83,7 @@ These twenty-two JavaScript habits cause most first-hour reports, and they are n
 
 ## Syntax
 
-The parser reports these. A file with a syntax error stops at the parser, so the file's other errors appear once the syntax error is fixed.
+The parser reports these. A syntax error does not hide the rest of the file: the parser drops the statement it could not read and carries on, and the stages after it check what is left. What a dropped statement declared is not reported as undeclared, and a construct it was written inside is not judged for what is missing from it — one mistake gets one report.
 
 ### `syntax-error`
 
@@ -4677,7 +4677,7 @@ Taught on: [Modules › Importing names](/docs/language/modules#importing-names)
 
 ### `dependency-has-errors`
 
-**Error.** An imported module has errors of its own. The editor reports this on the import line, so you see it without opening the other file. The terminal prints the other file's errors instead.
+**Error.** An imported module has errors of its own, reported on the import line — in the editor, so you see it without opening the other file, and in the terminal, which prints the other file's own errors beside it. It is why a module nothing is wrong with does not compile.
 
 Fix the errors in the imported module.
 

@@ -69,7 +69,7 @@ The first line says the file has no errors. Below it, one row per stage shows wh
 | `enrich` | Resolves every name and infers the type of every expression. |
 | `validate` | Checks the typed program against the language's rules, such as whether a value fits its declared type. |
 
-A check stops after `validate`, so it is the fastest way to find out whether a program is valid. When a stage refuses the program, the report's last line says where it stopped: `stopped while parsing`, `stopped while inferring types` for the `enrich` stage, or `stopped while validating`. Step 4 shows two of them.
+A check stops after `validate`, so it is the fastest way to find out whether a program is valid. Every stage runs, whatever the one before it found, so one check finds a syntax error, a type error and a rule the program breaks all at once — in the order the lines are written. Step 4 breaks the file two ways.
 
 </StepItem>
 
@@ -172,12 +172,11 @@ Error: This value does not fit the declared Type of Constant 'sum'
 
 ─── 1 error
   ✖ hello.es 1 error
-    stopped while validating
 ```
 
 </div>
 
-Two lines say what is wrong: the value is a `Rational`, and `sum` is declared as `Integer`. The last line is `stopped while validating`: the file was read, parsed and enriched, and the `validate` stage refused it.
+Two lines say what is wrong: the value is a `Rational`, and `sum` is declared as `Integer`. Nothing follows the count, because nothing was cut short: every stage ran, and this is the whole of what the compiler has to say about the file.
 
 `assignment-type-mismatch` is the error's code. Every error prints its code in brackets, and the code does not change between releases. The [Diagnostics reference](/docs/reference/diagnostics#assignment-type-mismatch) has an entry for each one.
 
@@ -202,12 +201,11 @@ Error: Essence has no '+' operator
 
 ─── 1 error
   ✖ hello.es 1 error
-    stopped while parsing
 ```
 
 </div>
 
-`+` is not an operator in Essence. The compiler names the operator you wrote and reports [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported), with a help for each method that stands in its place. This time the report ends `stopped while parsing`, the `parse` stage. `constant sum = 1 + 2` is refused the same way.
+`+` is not an operator in Essence. The compiler names the operator you wrote and reports [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported), with a help for each method that stands in its place. `constant sum = 1 + 2` is refused the same way. A syntax error no longer hides what the later stages would have said: the parser drops the statement it could not read, and the rest of the file is still checked.
 
 Three JavaScript habits to leave behind:
 

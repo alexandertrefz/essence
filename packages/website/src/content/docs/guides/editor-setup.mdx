@@ -8,7 +8,7 @@ steps: 3
 minutes: 11
 ---
 
-Editor support for Essence rests on one program, the language server. A language server is a process an editor asks about your code: its errors, the type under the cursor, what to complete next. Essence's server runs the same compiler stages as `essence check` and the same formatter as `essence format`. The editor and the command line never disagree about a program. VS Code gets the server through an extension. Any other editor that speaks the Language Server Protocol (LSP) starts it as `essence lsp`.
+Editor support for Essence rests on one program, the language server. A language server is a process an editor asks about your code: its errors, the type under the cursor, what to complete next. Essence's server runs the very same analysis as `essence check` — one description of it, shared, and a test over every deliberately broken file in the compiler's corpus that says the two answer alike — and the same formatter as `essence format`. What your editor underlines in a file is what `essence check` prints about it, error for error. VS Code gets the server through an extension. Any other editor that speaks the Language Server Protocol (LSP) starts it as `essence lsp`.
 
 <Steps>
 
@@ -275,7 +275,7 @@ The server announces these capabilities when it starts. Diagnostics need none, b
 
 ## Errors in closed files, and rename refusals
 
-**A file you have not opened can show errors.** The analysis of an open file reaches the modules it imports. What it finds in one of them is published under that module's own URI, so the error appears in that file while it is closed. The importing file gets [`dependency-has-errors`](/docs/reference/diagnostics#dependency-has-errors) on the specifier that names the broken module.
+**A file you have not opened can show errors.** The analysis of an open file reaches the modules it imports. What it finds in one of them is published under that module's own URI, so the error appears in that file while it is closed. The importing file gets [`dependency-has-errors`](/docs/reference/diagnostics#dependency-has-errors) on the specifier that names the broken module — the same Diagnostic `essence check` prints, since the two run one analysis.
 
 **Rename refuses some names.** It refuses a name the compiler declares itself, such as [`Boolean`](/docs/library/boolean) or [`Terminal`](/docs/library/terminal), and any name in one of the standard library's own source files. It also refuses a name declared outside every workspace folder. That refusal reads "'…' is declared outside this workspace, so its other uses can not be found." The server never indexed the uses outside the workspace, so a rename there would leave them naming something that no longer exists. Linked editing refuses compiler-declared names and standard-library files as well.
 

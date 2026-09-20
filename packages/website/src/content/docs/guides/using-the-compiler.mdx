@@ -70,16 +70,19 @@ Error: This value does not fit the declared Type of Constant 'name'
 
 ─── 1 error
   ✖ greeting.es 1 error
-    stopped while validating
 ```
 
 </div>
 
-The last line names the stage that refused the file: it was read, parsed and enriched, and `validate` found the error. `essence check` exits with code 1.
+Every stage ran, so the report is the whole of what is wrong with the file. `essence check` exits with code 1.
 
 `assignment-type-mismatch`, in brackets on the first line, is the error's code. The code stays the same from release to release, and the message text can change. A script, an editor or a search can rely on the code, and the [Diagnostics reference](/docs/reference/diagnostics#assignment-type-mismatch) explains it under that name.
 
-Compilation stops at the first stage that reports an Error, and shows every Error that stage found. Two errors that `validate` finds come out together, in one report. An error that `enrich` finds, such as a call to a method that does not exist, hides them until it is fixed. Its report ends with `stopped while inferring types`. A syntax error hides both, because a file that does not parse never reaches `enrich`. Its report ends with `stopped while parsing`. Warnings never stop anything: a file with only Warnings checks with exit code 0, and it builds and runs.
+Every stage runs, whatever the one before it found, and one report holds all of it. A syntax error, a call to a method that does not exist and a function that forgets to return come out together, in the order the lines are written — one run to find them rather than one run each.
+
+The stages recover rather than stopping: `parse` drops the statement it could not read and carries on with the rest of the file, and `enrich` types what is left and marks what it could not. What a later stage says about a hole an earlier one left, it does not say at all — a name whose declaration was dropped is not reported as undeclared, and a function missing the `<-` that went with it is not reported as falling off the end. One mistake gets one report.
+
+Warnings never stop anything: a file with only Warnings checks with exit code 0, and it builds and runs.
 
 `check` covers more than the file you name:
 
@@ -238,11 +241,11 @@ Hello, Essence!
 
 Saving `Settings.es` rebuilt `greeting.es`, the source that imports it, and ran it again. `--execute`, or `-e`, runs the output after every successful rebuild. [`--clear`](/docs/reference/cli#watch--clear) clears the screen before each rebuild.
 
-Now save a mistake. Change the line in `Settings.es` to `constant name: Integer = "Essence"`. `watch` prints the same report `check` would, naming `Settings.es`, and ends with:
+Now save a mistake. Change the line in `Settings.es` to `constant name: Integer = "Essence"`. `watch` prints the same report `check` would — the mistake under `Settings.es`, and `greeting.es` saying that a module it imports did not compile — and ends with:
 
 ```
-─── 1 error
-  ✖ 00:50:20  greeting.es  1 error
+─── 2 errors
+  ✖ 00:50:20  greeting.es  2 errors
 
   · watching for changes  r rebuild · c clear · q quit
 ```
@@ -285,9 +288,9 @@ $ essence check greeting.es --json
   "version": "0.5.0",
   "command": "check",
   "ok": false,
-  "errors": 1,
+  "errors": 2,
   "warnings": 0,
-  "durationMs": 25.313,
+  "durationMs": 34.816,
   "files": [
     {
       "input": "greeting.es",
@@ -295,12 +298,12 @@ $ essence check greeting.es --json
       "ok": false,
       "bytes": null,
       "gzipBytes": null,
-      "durationMs": 24.829,
+      "durationMs": 34.367,
       "stages": {
-        "read": 0.112,
-        "parse": 1.751,
-        "enrich": 21.985,
-        "validate": 0.699
+        "read": 0.103,
+        "parse": 1.784,
+        "enrich": 31.627,
+        "validate": 0.653
       },
       "diagnostics": [
         {
@@ -312,6 +315,16 @@ $ essence check greeting.es --json
           "column": 27,
           "endLine": 2,
           "endColumn": 36
+        },
+        {
+          "file": "greeting.es",
+          "severity": "error",
+          "message": "./Settings.es has errors of its own",
+          "code": "dependency-has-errors",
+          "line": 2,
+          "column": 7,
+          "endLine": 2,
+          "endColumn": 22
         }
       ]
     }
@@ -319,7 +332,9 @@ $ essence check greeting.es --json
 }
 ```
 
-The JSON document is the only thing on stdout. Each entry carries its stage timings and a `diagnostics` array. Every item in that array has a code, a severity, a message and a span, which is what a bot that annotates a pull request needs. An item's `file` is the file the problem is in, so here it is `Settings.es` while `input` is `greeting.es`.
+The JSON document is the only thing on stdout. Each entry carries its stage timings and a `diagnostics` array. Every item in that array has a code, a severity, a message and a span, which is what a bot that annotates a pull request needs. An item's `file` is the file the problem is in, so the first is `Settings.es` while `input` is `greeting.es`. The second is `greeting.es` answering for itself: a module whose dependency did not compile did not compile either, and `dependency-has-errors` is where it says so.
+
+There is no field naming a stage that refused the file, because none of them refuses: every stage runs and every stage reports. `stages` holds the time each one took.
 
 Colour follows stderr. It is on when stderr is a terminal and off when stderr is piped. Redirecting only stdout to a file keeps it on. `NO_COLOR` turns colour off and `FORCE_COLOR` turns it on. [`--color`](/docs/reference/cli#global--color) forces it on, even over `NO_COLOR`, for a CI log that renders colour.
 
