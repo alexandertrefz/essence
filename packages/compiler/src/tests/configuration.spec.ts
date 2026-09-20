@@ -173,6 +173,75 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		expect(diagnostic.helps).toEqual(['Did you mean "exclude"?'])
 	})
 
+	// NOTE: `"exclusions"` is three edits from `"exclude"` — past the near-miss
+	// rule, and rightly so — and the whole report was two Notes and nothing to
+	// do about them. The key reads as nothing, and taking it out is the edit.
+	it("says what to do with a key that resembles nothing", () => {
+		for (let written of [
+			'{ "exclusions": ["build"] }',
+			'{ "zzqqxx": 1 }',
+		]) {
+			let [diagnostic] = diagnosticsOf(parse(written))
+
+			expect(diagnostic.code).toBe("unknown-setting")
+			expect(diagnostic.helps).toEqual([
+				"Remove the key, or write one of the settings above.",
+			])
+		}
+	})
+
+	// NOTE: `"test.cases": 200` — a setting written FLAT, the way a flag or a
+	// dotted property spells one. The catalogue is a tree, so the key names a
+	// real setting and names it whole; what is missing is the object around it.
+	it("nests a setting written as a dotted key", () => {
+		let [diagnostic] = diagnosticsOf(parse(`{\n\t"test.cases": 200\n}`))
+
+		expect(diagnostic.code).toBe("unknown-setting")
+		expect(diagnostic.helps).toEqual([
+			'Write it nested: "test": { "cases": 200 }.',
+		])
+		expect(
+			parse(`{\n\t"test": {\n\t\t"cases": 200\n\t}\n}`).test.cases,
+		).toBe(200)
+	})
+
+	// NOTE: A dotted key whose parts name nothing is an unknown key like any
+	// other, and is answered as one.
+	it("leaves a dotted key that names no setting to the ordinary answer", () => {
+		expect(diagnosticsOf(parse(`{ "test.nope": 1 }`))[0].helps).toEqual([
+			"Remove the key, or write one of the settings above.",
+		])
+	})
+
+	// NOTE: The example in the catalogue is the CATALOGUE's, never the author's,
+	// and printing it as the answer said something the file did not:
+	// `"minify": "false"` was answered `Write it as true or false: true`, which
+	// turns minification ON, and `"cases": "50"` was answered `200`.
+	it("writes the author's own value back in the shape the setting takes", () => {
+		let coercions: Array<[string, string]> = [
+			['{ "build": { "minify": "false" } }', "true or false: false"],
+			['{ "build": { "minify": 0 } }', "true or false: false"],
+			['{ "build": { "minify": 1 } }', "true or false: true"],
+			['{ "test": { "cases": "50" } }', "at least 1: 50"],
+			['{ "test": { "skipTags": "wip" } }', 'tag names: ["wip"]'],
+			['{ "exclude": "fixtures" }', 'paths: ["fixtures"]'],
+		]
+
+		for (let [written, ending] of coercions) {
+			let [diagnostic] = diagnosticsOf(parse(written))
+
+			expect(diagnostic.helps[0]?.endsWith(ending)).toBe(true)
+		}
+	})
+
+	// NOTE: And where the written value says nothing about what was meant, the
+	// catalogue's example is offered AS an example rather than as the answer.
+	it("offers the catalogue's value as an example where nothing coerces", () => {
+		expect(
+			diagnosticsOf(parse(`{ "test": { "cases": "many" } }`))[0].helps,
+		).toEqual(["Write it as a whole number of at least 1 — '200', say."])
+	})
+
 	it("reports a setting of the wrong shape and falls back", () => {
 		let configuration = parse(`{ "test": { "skipTags": "slow" } }`)
 		let [diagnostic] = diagnosticsOf(configuration)
@@ -304,8 +373,15 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		)
 		expect(diagnostic.position?.start.line).toBe(4)
 		expect(diagnostic.labels[0]?.message).toBe("a '}' was expected here")
+		// NOTE: The rule is a Note and the EDIT is the Help. "The file is JSON
+		// with comments allowed" used to be the Help, and it is not an edit
+		// anybody makes — jsonc already says which Token it wanted, which is.
 		expect(diagnostic.notes).toEqual([
 			"Every setting is at its default until the file reads.",
+			"The file is JSON with comments and trailing commas allowed, as tsconfig.json is.",
+		])
+		expect(diagnostic.helps).toEqual([
+			"Write the '}' that closes the object.",
 		])
 	})
 
@@ -368,6 +444,45 @@ describe("essence.json — what a reader could do about a mistake", () => {
 
 	it("offers nothing for a key that resembles no setting", () => {
 		expect(edited(`{\n\t"zzzz": 1\n}\n`)).toEqual([])
+	})
+
+	// NOTE: A setting written FLAT is the same edit a moved one is — the
+	// property comes out and goes back in at the path its own name spells.
+	it("nests a setting written as a dotted key", () => {
+		expect(edited(`{\n\t"test.cases": 200\n}\n`)).toEqual([
+			{
+				setting: "test.cases",
+				text: `{\n\t"test": {\n\t\t"cases": 200\n\t}\n}\n`,
+			},
+		])
+	})
+
+	// NOTE: And the shape a written value can be read as is one span rewritten.
+	// The Help and this edit come out of one computation, so a reader is never
+	// offered one number and shown another.
+	it("writes the author's own value back in the setting's shape", () => {
+		expect(
+			edited(`{\n\t"build": {\n\t\t"minify": "false"\n\t}\n}\n`),
+		).toEqual([
+			{
+				setting: "build.minify",
+				text: `{\n\t"build": {\n\t\t"minify": false\n\t}\n}\n`,
+			},
+		])
+		expect(
+			edited(`{\n\t"test": {\n\t\t"skipTags": "wip"\n\t}\n}\n`),
+		).toEqual([
+			{
+				setting: "test.skipTags",
+				text: `{\n\t"test": {\n\t\t"skipTags": ["wip"]\n\t}\n}\n`,
+			},
+		])
+	})
+
+	it("offers nothing where the written value coerces to nothing", () => {
+		expect(edited(`{\n\t"test": {\n\t\t"cases": "many"\n\t}\n}\n`)).toEqual(
+			[],
+		)
 	})
 
 	// NOTE: The table it leaves behind goes with it — `"test": { }` is a pair

@@ -517,6 +517,56 @@ function keyPathOf(parents: Array<string>, name: string): string {
 	return [...parents, name].join(".")
 }
 
+// NOTE: `"test.cases": 200` — a setting written FLAT, the way a command-line
+// flag or a dotted property spells one. The catalogue is a TREE, so a key like
+// this names a real setting and names it whole; what is missing is the object
+// around it. Null for every key that is not one, which is what lets both the
+// report and the edit ask this of whatever they are holding.
+//
+// The parts are walked from the top rather than from where the key stands,
+// because a flat key spells the path from the root: `"test.cases"` is the same
+// setting written inside `"test"` or outside it.
+function nestedSettingPath(keyPath: Array<string>): Array<string> | null {
+	let parts = keyPath.flatMap((part) => part.split("."))
+
+	if (parts.length === keyPath.length) {
+		return null
+	}
+
+	let level: Record<string, Setting> | null = (
+		projectSettings.shape as { members: Record<string, Setting> }
+	).members
+
+	for (let [index, part] of parts.entries()) {
+		let found: Setting | undefined = level?.[part]
+
+		if (found === undefined) {
+			return null
+		}
+
+		if (index === parts.length - 1) {
+			return parts
+		}
+
+		level = found.shape.kind === "table" ? found.shape.members : null
+	}
+
+	return null
+}
+
+// NOTE: The path spelled as the object it is — `"test": { "cases": 200 }` — so
+// that what the Help prints is the text a reader writes rather than a
+// description of it.
+function nestedSpelling(parts: Array<string>, value: unknown): string {
+	return parts.reduceRight(
+		(inner, part, index) =>
+			index === parts.length - 1
+				? `${JSON.stringify(part)}: ${inner}`
+				: `${JSON.stringify(part)}: { ${inner} }`,
+		JSON.stringify(value),
+	)
+}
+
 // NOTE: The one Diagnostic every wrong shape gets. It names the setting, says
 // what was written instead, spells one right value, and ends on what is in
 // force meanwhile — the last being the point: a setting that did not read is a
@@ -528,6 +578,15 @@ function wrongShape(
 	node: JsonNode,
 	written: string = describeNode(node),
 ): void {
+	// NOTE: The value that WAS written, written the way the setting takes it.
+	// The example is the CATALOGUE's and never the author's, so printing it as
+	// the answer said something the file did not: `"minify": "false"` was
+	// answered `Write it as true or false: true`, which turns minification ON,
+	// and `"cases": "50"` was answered `200`. Where the written value says what
+	// was meant, that is what the Help spells; where it does not, the example
+	// is offered AS an example.
+	let coerced = coercedSettingValue(setting.shape, node)
+
 	warning(
 		reading,
 		"setting-shape",
@@ -535,8 +594,65 @@ function wrongShape(
 		node,
 		`written as ${written}`,
 		[setting.fallback],
-		[`Write it as ${describeShape(setting.shape)}: ${setting.example}`],
+		[
+			coerced === null
+				? `Write it as ${describeShape(setting.shape)} — '${setting.example}', say.`
+				: `Write it as ${describeShape(setting.shape)}: ${coerced}`,
+		],
+		coerced === null
+			? undefined
+			: {
+					kind: "essence-spelling",
+					position: spanOf(reading, node),
+					spelling: coerced,
+				},
 	)
+}
+
+// NOTE: What the author wrote, read as the value they meant, or null where the
+// text says nothing about it — `"cases": "many"` is not a number in a String,
+// it is a word, and `"out": ["dist"]` is a list where a path goes with no
+// telling whether the rest of the list was meant to go too.
+//
+// Deliberately narrow. A coercion that guesses is a Help that changes what a
+// file says, which is the very thing this exists to stop.
+function coercedSettingValue(
+	shape: SettingShape,
+	node: JsonNode,
+): string | null {
+	if (shape.kind === "boolean") {
+		// NOTE: `0` and `1` and nothing else among the numbers. Every other
+		// number is truthy in the language this habit comes from and means
+		// nothing in this one.
+		if (node.type === "number") {
+			return node.value === 0 ? "false" : node.value === 1 ? "true" : null
+		}
+
+		return node.type === "string" &&
+			(node.value === "true" || node.value === "false")
+			? node.value
+			: null
+	}
+
+	if (shape.kind === "integer") {
+		if (node.type !== "string" || !/^[0-9]+$/.test(String(node.value))) {
+			return null
+		}
+
+		let written = Number(node.value)
+
+		return written >= shape.atLeast ? String(written) : null
+	}
+
+	// NOTE: One String where a list of them goes is a list of one. The items
+	// are names rather than paths in two of the three, and neither is checked
+	// here: what this answers is the SHAPE, and a name that is not a pass or a
+	// tag is the list reader's own report to make once the brackets are there.
+	if (shape.kind === "list") {
+		return node.type === "string" ? JSON.stringify([node.value]) : null
+	}
+
+	return null
 }
 
 // NOTE: The keys of a `property` node: `[key, value]`. A property with no value
@@ -772,6 +888,8 @@ function readTable(
 				parents.length === 0
 					? "at the top of essence.json"
 					: `under "${parents.join(".")}"`
+			let nested = nestedSettingPath([...parents, name])
+			let near = suggestion !== null && suggestion !== name
 
 			warning(
 				reading,
@@ -783,12 +901,26 @@ function readTable(
 					`The settings ${where} are ${names.map((each) => `"${each}"`).join(", ")}.`,
 					"Nothing was read from this key.",
 				],
-				suggestion === null || suggestion === name
-					? []
-					: [`Did you mean "${suggestion}"?`],
-				suggestion === null || suggestion === name
-					? undefined
-					: { kind: "suggestion", suggestion },
+				// NOTE: Three answers, in the order they are likely. A key that
+				// spells a PATH is a setting written flat and is nested; a key
+				// one edit from a real one is a misspelling; and a key that is
+				// neither is a key nothing reads, which is worth saying as an
+				// edit rather than leaving the reader to infer from two Notes.
+				// The last used to be silence: `"exclusions"` is three edits
+				// from `"exclude"` — past the near-miss rule, and rightly so —
+				// so the whole report was two sentences and nothing to do.
+				nested !== null
+					? [
+							`Write it nested: ${nestedSpelling(nested, getNodeValue(property.value))}.`,
+						]
+					: near
+						? [`Did you mean "${suggestion}"?`]
+						: [
+								"Remove the key, or write one of the settings above.",
+							],
+				near && nested === null
+					? { kind: "suggestion", suggestion: suggestion as string }
+					: undefined,
 			)
 
 			continue
@@ -893,6 +1025,38 @@ function readTable(
 // NOTE: What jsonc-parser says about a syntax error, as a sentence. Its codes
 // are `PropertyNameExpected` and the like — readable, but not to a reader who
 // did not write the parser.
+// NOTE: The edit jsonc's own verdict names, where it names one. More than half
+// of these errors say exactly which Token was expected at the offset, and what
+// a reader does about that is write it — one Help per shape, spelling the
+// character. Empty for the verdicts that say a character can not stand where it
+// does rather than that one is missing: what to write in its place is not
+// something the parser knows.
+function parseErrorHelp(error: ParseError): Array<string> {
+	switch (printParseErrorCode(error.error)) {
+		case "PropertyNameExpected":
+			return ["Write a quoted key here."]
+		case "ValueExpected":
+			return ["Write the value the key holds."]
+		case "ColonExpected":
+			return ["Write the ':' between the key and its value."]
+		case "CommaExpected":
+			return ["Write the ',' that separates this from the one above it."]
+		case "CloseBraceExpected":
+			return ["Write the '}' that closes the object."]
+		case "CloseBracketExpected":
+			return ["Write the ']' that closes the list."]
+		case "EndOfFileExpected":
+			return ["Remove what stands after the object."]
+		case "InvalidCommentToken":
+		case "UnexpectedEndOfComment":
+			return ["Close the comment with '*/', or write it as a '//' line."]
+		case "UnexpectedEndOfString":
+			return ["Write the '\"' that closes the String."]
+		default:
+			return []
+	}
+}
+
 function describeParseError(error: ParseError): string {
 	switch (printParseErrorCode(error.error)) {
 		case "InvalidSymbol":
@@ -983,10 +1147,17 @@ export function parseProjectConfiguration(
 				`${PROJECT_FILE_NAME} could not be read as JSON`,
 				node,
 				describeParseError(error),
-				["Every setting is at its default until the file reads."],
 				[
+					"Every setting is at its default until the file reads.",
+					// NOTE: The rule, moved out of the Help it used to be.
+					// "The file is JSON with comments allowed" is not an edit
+					// anybody makes; it is what a reader has to know to make
+					// one, which is what a Note is for.
 					"The file is JSON with comments and trailing commas allowed, as tsconfig.json is.",
 				],
+				// NOTE: And the edit is the Token jsonc says it expected, at
+				// the offset the Label already points at.
+				parseErrorHelp(error),
 			)
 		}
 
@@ -1073,7 +1244,10 @@ export function parseProjectConfiguration(
 // itself would be a second reader of the format, kept in step with this one by
 // hand.
 export type SettingEdit = {
-	code: Extract<common.DiagnosticCode, "unknown-setting" | "moved-setting">
+	code: Extract<
+		common.DiagnosticCode,
+		"unknown-setting" | "moved-setting" | "setting-shape"
+	>
 	// NOTE: The Diagnostic this answers, by the span it was reported at — which
 	// is what lets an Editor find its own copy of that Diagnostic again.
 	position: common.Position
@@ -1165,7 +1339,27 @@ function settingEdit(
 		}
 	}
 
-	if (diagnostic.code !== "moved-setting") {
+	// NOTE: A shape the written value can be read as is one span rewritten —
+	// `"false"` becomes `false`, `"50"` becomes `50`, `"wip"` becomes
+	// `["wip"]`. The payload is only there where the coercion held, so a
+	// setting whose value says nothing about what was meant carries no edit.
+	if (
+		diagnostic.code === "setting-shape" &&
+		diagnostic.data?.kind === "essence-spelling"
+	) {
+		return {
+			code: "setting-shape",
+			position,
+			range: position,
+			newText: diagnostic.data.spelling,
+			setting: diagnostic.message.split('"')[1] ?? "",
+		}
+	}
+
+	if (
+		diagnostic.code !== "moved-setting" &&
+		diagnostic.code !== "unknown-setting"
+	) {
 		return null
 	}
 
@@ -1175,6 +1369,27 @@ function settingEdit(
 
 	if (found === undefined) {
 		return null
+	}
+
+	// NOTE: `"test.cases": 200` — a setting written FLAT, which is the same
+	// EDIT a moved one is: the property comes out and goes back in at the path
+	// its name spells. The near-miss rename above has already answered every
+	// unknown key that is one, so what reaches here is a key that is a path or
+	// a key that is nothing.
+	if (diagnostic.code === "unknown-setting") {
+		let nested = nestedSettingPath(found.keyPath)
+
+		return nested === null
+			? null
+			: movedPropertyEdit(
+					"unknown-setting",
+					position,
+					sourceText,
+					tree,
+					found,
+					nested,
+					cursorAt,
+				)
 	}
 
 	let movedTo = movedSettings[found.keyPath.join(".")]
@@ -1187,8 +1402,29 @@ function settingEdit(
 		return null
 	}
 
-	let destination = movedTo.split(".")
+	return movedPropertyEdit(
+		"moved-setting",
+		position,
+		sourceText,
+		tree,
+		found,
+		movedTo.split("."),
+		cursorAt,
+	)
+}
 
+// NOTE: One property out and back in at another path — the whole of what both a
+// moved setting and a flat one need doing to them. Shared so that the two can
+// not drift: they are one edit, differing in how the destination was worked out.
+function movedPropertyEdit(
+	code: SettingEdit["code"],
+	position: common.Position,
+	sourceText: string,
+	tree: JsonNode,
+	found: KeyedProperty,
+	destination: Array<string>,
+	cursorAt: (offset: number) => common.Cursor,
+): SettingEdit | null {
 	// NOTE: Withheld where the key it would move to is already written. Both
 	// values are the author's and only one of them can survive the move, so the
 	// choice between them is theirs rather than an Editor's.
@@ -1209,10 +1445,10 @@ function settingEdit(
 	)
 
 	return {
-		code: "moved-setting",
+		code,
 		position,
 		...replacement(sourceText, written, cursorAt),
-		setting: movedTo,
+		setting: destination.join("."),
 	}
 }
 
