@@ -121,7 +121,9 @@ describe("a Record that does not fit another", () => {
 		let error = onlyError(source)
 
 		it("says the member is not declared and offers nothing", () => {
-			expect(labelsOf(error)).toEqual(["'point' is not a member of Standing"])
+			expect(labelsOf(error)).toEqual([
+				"'point' is not a member of Standing",
+			])
 			expect(error.helps).toEqual([])
 			expect(error.data).toBeUndefined()
 		})

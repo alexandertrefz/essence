@@ -3,13 +3,13 @@ import {
 	describeType,
 	flattenUnionMembers,
 } from "@essence-lang/compiler/helpers"
-import { printType } from "@essence-lang/compiler/printType"
 import type { common } from "@essence-lang/interfaces"
 
 import { typedAssertionExpressions } from "../assertionChildren"
 import { defineExpressions } from "../defineArmChildren"
 import { typedHandlerExpressions } from "../matchHandlerChildren"
 import { typedProgramBodies } from "../sections"
+import { spellTypeAt } from "../spellableTypes"
 import { isWritableMatcher } from "./fixes"
 import { containsRange, indentationOf, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
@@ -79,12 +79,13 @@ export function matchOnValueActions(
 		})
 	}
 
-	return found === null ? [] : scaffoldFor(found, lines)
+	return found === null ? [] : scaffoldFor(found, lines, enrichedProgram)
 }
 
 function scaffoldFor(
 	scaffold: Scaffold,
 	lines: Array<string>,
+	program: common.typed.Program,
 ): Array<CodeActionEntry> {
 	let { value, answers } = scaffold
 	let matchers = flattenUnionMembers(value.type as common.UnionType).map(
@@ -117,6 +118,19 @@ function scaffoldFor(
 	// arrow would be a syntax error rather than a hole.
 	let answered =
 		answers === null || answers.type === "Error" ? value.type : answers
+	// NOTE: Spelled where the arrow is going to be written, so the Alias the
+	// scaffold declares is one this file can read — an answer Type naming a
+	// Record another Module declares is an `unknown-type` over a Match that has
+	// holes in it already. Where the Type has no spelling here at all there is
+	// no Match to write, and the scaffold is not offered.
+	let answerType = spellTypeAt(answered, {
+		program,
+		cursor: value.position.end,
+	})
+
+	if (answerType === null) {
+		return []
+	}
 
 	return [
 		{
@@ -149,7 +163,7 @@ function scaffoldFor(
 						start: value.position.end,
 						end: value.position.end,
 					},
-					newText: ` -> ${printType(answered)} {\n${handlers}${indentation}}`,
+					newText: ` -> ${answerType} {\n${handlers}${indentation}}`,
 				},
 			],
 		},

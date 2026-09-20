@@ -5353,6 +5353,44 @@ describe("Code Actions", () => {
 				"\tconstant kept = [1]::removeEvery(where (item) -> Boolean { <- true })",
 			)
 		})
+
+		// NOTE: The TITLE quotes what will be written, which is the Hint's edit
+		// and not always the Hint's label: an Alias the position can not
+		// resolve is shown under its name and written as the shape. A title
+		// reading one and an edit writing the other would be the refactoring
+		// promising an annotation it does not make.
+		it("should quote the annotation it writes where the two differ", () => {
+			let lines = [
+				"implementation {",
+				"	type Box = { a: Integer }",
+				"",
+				"	function make() -> Box {",
+				"		<- { a = 1 }",
+				"	}",
+				"",
+				"	function inner() -> Integer {",
+				"		type Box = { b: String }",
+				"",
+				"		constant made = make()",
+				'		constant own: Box = { b = "x" }',
+				"",
+				"		<- 1",
+				"	}",
+				"}",
+			]
+
+			let [refactor] = actionsOf(lines, {
+				start: { line: 11, column: 1 },
+				end: { line: 11, column: 1 },
+			})
+
+			expect(refactor.title).toBe(
+				"Add explicit Type annotation ': { a: Integer }'",
+			)
+			expect(applied(lines, refactor)[10]).toBe(
+				"\t\tconstant made: { a: Integer } = make()",
+			)
+		})
 	})
 
 	// NOTE: The Match a reader is about to write, scaffolded from the value the

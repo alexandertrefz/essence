@@ -20,22 +20,28 @@ import { walk } from "./lookups"
 // this used to offer regardless were the worst edits in the editor: `: List<
 // Unknown>` and `: NonEmptyList<Error>` added `unknown-type` on top of whatever
 // was already wrong, and a Function Type stopped the file parsing outright.
+//
+// NOTE: The EDIT's own text, in the title as well as in the edit. A hint's
+// LABEL may name an Alias this position can not resolve — `: Result<Integer,
+// Problem>` in a file that imported no `Problem` — and the edit behind it
+// spells the shape instead, so a title quoting the label would promise one
+// annotation and write another.
 export function annotationActions(
 	enrichedProgram: common.typed.Program,
 	range: common.Position,
 ): Array<CodeActionEntry> {
 	return findInlayHints(enrichedProgram, range)
-		.filter((hint) => hint.textEdit !== null)
-		.map((hint) => ({
-			title: `Add explicit Type annotation '${hint.label.trim()}'`,
+		.flatMap((hint) => (hint.textEdit === null ? [] : [hint.textEdit]))
+		.map((edit) => ({
+			title: `Add explicit Type annotation '${edit.newText.trim()}'`,
 			kind: "refactor.rewrite" as const,
 			diagnosticCode: null,
 			diagnosticPosition: null,
 			isPreferred: false,
 			edits: [
 				{
-					range: { start: hint.position, end: hint.position },
-					newText: hint.label,
+					range: { start: edit.position, end: edit.position },
+					newText: edit.newText,
 				},
 			],
 		}))

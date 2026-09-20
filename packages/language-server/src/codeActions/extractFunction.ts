@@ -1,9 +1,8 @@
-import { printType } from "@essence-lang/compiler/printType"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import type { Declaration, DeclarationKind, ProgramIndex } from "../rename"
 import { scopeAt } from "../rename"
-import { isSpellableType } from "../spellableTypes"
+import { type SpellingScope, spellTypeAt } from "../spellableTypes"
 import {
 	closesItsLine,
 	containsRange,
@@ -126,9 +125,16 @@ export function extractFunctionActions(
 	}
 
 	let written: Array<{ name: string; type: string }> = []
+	// NOTE: Where the extracted Function lands — the end of the Statement the
+	// selection was lifted out of — which is the Scope its annotations are read
+	// in.
+	let spelledAt: SpellingScope = {
+		program: enrichedProgram,
+		cursor: enclosing.statement.position.end,
+	}
 
 	for (let parameter of parameters) {
-		let type = typeAt(enrichedProgram, parameter.position)
+		let type = typeAt(enrichedProgram, parameter.position, spelledAt)
 
 		if (type === null) {
 			return []
@@ -143,6 +149,7 @@ export function extractFunctionActions(
 		? typeAt(
 				enrichedProgram,
 				(last as parser.ReturnStatementNode).expression.position,
+				spelledAt,
 			)
 		: "{}"
 
@@ -309,17 +316,21 @@ function isLocal(kind: DeclarationKind): boolean {
 	return kind === "constant" || kind === "variable" || kind === "parameter"
 }
 
+// NOTE: Spelled where the Function is going to be WRITTEN rather than where the
+// value stands, which for an Alias is the difference between a name in reach
+// and an `unknown-type`: the extracted Function is written beside the one it
+// came out of, and a name declared inside that body is out of reach there.
+// Where the position can not read the name, the shape underneath it is written
+// instead, and a Type with no spelling at all turns the whole extraction away,
+// exactly as it always did.
 function typeAt(
 	program: common.typed.Program,
 	position: common.Position,
+	at: SpellingScope,
 ): string | null {
 	let node = typedExpressionAt(program, position)
 
-	if (node === null || !isSpellableType(node.type)) {
-		return null
-	}
-
-	return printType(node.type)
+	return node === null ? null : spellTypeAt(node.type, at)
 }
 
 function readsSelf(node: parser.ImplementationNode): boolean {

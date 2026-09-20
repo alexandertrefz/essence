@@ -1,8 +1,8 @@
-import { printType } from "@essence-lang/compiler/printType"
+import { displayChoiceName, matchesType } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { isValidIdentifierName } from "../rename"
-import { isSpellableType } from "../spellableTypes"
+import { type SpellingScope, spellTypeAt, typeInScope } from "../spellableTypes"
 import {
 	closesItsLine,
 	indentationOf,
@@ -346,12 +346,14 @@ function columnType(
 			return null
 		}
 
+		// NOTE: Spelled where the table is going to STAND, which is where the
+		// test it replaces stands — a column Type naming an Alias this file
+		// can not resolve is a row Parameter nothing compiles.
+		let at = { program: enrichedProgram, cursor: cell.position.start }
 		let spelling =
 			node.type.type === "Case"
-				? caseSpelling(node.type)
-				: isSpellableType(node.type)
-					? printType(node.type)
-					: null
+				? caseSpelling(node.type, at)
+				: spellTypeAt(node.type, at)
 
 		if (spelling === null || (written !== null && spelling !== written)) {
 			return null
@@ -369,19 +371,58 @@ function columnType(
 // are written back with it. A Case that bound none, or one whose Arguments have
 // no spelling, has no column Type to write and the table is not offered: what
 // the rows are of is exactly what a row Parameter has to say.
-function caseSpelling(type: common.CaseType): string | null {
+function caseSpelling(type: common.CaseType, at: SpellingScope): string | null {
+	// NOTE: The name a reader WROTE, never the identity — a Case of a Module's
+	// Choice carries the declaring file's path in front of its name, and that
+	// is no spelling at all. The Choice still has to be the one this position
+	// resolves the word to, which is the rule every written Type follows here.
+	let name = displayChoiceName(type.choice)
+
+	if (!namesChoiceAt(name, type, at)) {
+		return null
+	}
+
 	let applied = type.typeArguments ?? []
 
 	if (applied.length > 0) {
-		return applied.every(isSpellableType)
-			? `${type.choice}<${applied.map(printType).join(", ")}>`
+		let written = applied.map((typeArgument) =>
+			spellTypeAt(typeArgument, at),
+		)
+
+		return written.every((spelling) => spelling !== null)
+			? `${name}<${written.join(", ")}>`
 			: null
 	}
 
 	// NOTE: A Case of a generic Choice that bound nothing — a bare `#Empty` no
 	// application ever reached — has no spelling at all, since its Choice's
 	// name alone is a Type short of its Arguments.
-	return (type.choiceGenerics ?? []).length === 0 ? type.choice : null
+	return (type.choiceGenerics ?? []).length === 0 ? name : null
+}
+
+// NOTE: Whether the word names THIS Choice where the table is written. The
+// question a Case asks is not the equality every other spelling is held to: the
+// cell holds one Case and the column is written as the whole Choice, so what
+// the name has to resolve to is a Type the Case FITS — the Union standing over
+// it, and never another Module's Choice of the same name, whose Cases are
+// Cases of that one.
+function namesChoiceAt(
+	name: string,
+	type: common.CaseType,
+	at: SpellingScope,
+): boolean {
+	let found = typeInScope(name, at)
+
+	if (found === null) {
+		return false
+	}
+
+	// NOTE: A GENERIC Choice's name resolves to the DECLARATION rather than to
+	// any application of it — `Optional` names a Generic Alias here, and no
+	// Case of it fits one — so the word naming that Declaration is the whole of
+	// what can be asked. The Arguments written after it are spelled on their
+	// own terms, which is where a Type this file can not read is caught.
+	return found.type === "GenericAlias" || matchesType(found, type)
 }
 
 // NOTE: What the callee calls its own Parameters, one per written Argument and

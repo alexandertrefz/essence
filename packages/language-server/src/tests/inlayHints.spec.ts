@@ -1,9 +1,15 @@
-import { describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import * as path from "node:path"
 
+import { canonicalPath } from "@essence-lang/compiler/documents"
 import { enrich } from "@essence-lang/compiler/enricher"
 import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
+import type { common } from "@essence-lang/interfaces"
 
-import { findInlayHints } from "../inlayHints"
+import { analyseDocument } from "../analyse"
+import { findInlayHints, type InlayHint } from "../inlayHints"
 
 function allHintsOf(source: string) {
 	let { program } = parseWithDiagnostics(source)
@@ -719,5 +725,251 @@ describe("Inlay Hints around start and complete", () => {
 			label: " -> Integer",
 			kind: "type",
 		})
+	})
+})
+
+// NOTE: A Hint's LABEL and its EDIT are two different sentences about one Type,
+// and this is where they part company: the label names the Alias the Type was
+// declared under wherever the reader is standing, and the edit may only write a
+// name the position can resolve. Every one of these applies the edit and
+// analyses what it left behind, because "does it parse and link" is the whole
+// of what an applied Hint promises.
+describe("Inlay Hints that write a name", () => {
+	let directories: Array<string> = []
+
+	afterEach(() => {
+		for (let directory of directories) {
+			rmSync(directory, { recursive: true, force: true })
+		}
+
+		directories = []
+	})
+
+	function makeFiles(
+		files: Record<string, string>,
+	): (name: string) => string {
+		let root = canonicalPath(
+			mkdtempSync(path.join(tmpdir(), "essence-module-hints-")),
+		)
+
+		directories.push(root)
+
+		for (let [name, contents] of Object.entries(files)) {
+			writeFileSync(path.join(root, name), contents)
+		}
+
+		return (name: string) => canonicalPath(path.join(root, name))
+	}
+
+	// NOTE: The Hints of a LINKED Module, which is the only way the import
+	// block's own Types are in the Program at all — a Hint over `origin()`
+	// names a Record another file declares, and whether this file can write
+	// that name is a question about what came across.
+	function moduleHints(files: Record<string, string>, entry: string) {
+		let pathOf = makeFiles(files)
+		let filePath = pathOf(entry)
+		let { enrichedProgram } = analyseDocument(
+			files[entry] as string,
+			filePath,
+		)
+
+		return {
+			hints: findInlayHints(enrichedProgram as common.typed.Program),
+			filePath,
+		}
+	}
+
+	function applied(source: string, hints: Array<InlayHint>): string {
+		let lines = source.split("\n")
+		let edits = hints
+			.flatMap((hint) => (hint.textEdit === null ? [] : [hint.textEdit]))
+			.sort(
+				(a, b) =>
+					b.position.line - a.position.line ||
+					b.position.column - a.position.column,
+			)
+
+		for (let edit of edits) {
+			let index = edit.position.line - 1
+			let column = edit.position.column - 1
+			let line = lines[index] ?? ""
+
+			lines[index] =
+				line.slice(0, column) + edit.newText + line.slice(column)
+		}
+
+		return lines.join("\n")
+	}
+
+	const shapes = [
+		"implementation {",
+		"\ttype Point = { x: Integer, y: Integer }",
+		"\ttype Reading = Integer | String",
+		"",
+		"\tchoice Edge {",
+		"\t\tLeft,",
+		"\t\tRight,",
+		"\t}",
+		"",
+		"\tfunction origin() -> Point {",
+		"\t\t<- { x = 0, y = 0 }",
+		"\t}",
+		"",
+		"\tfunction read() -> Reading {",
+		"\t\t<- 1",
+		"\t}",
+		"",
+		"\tfunction side() -> Edge {",
+		"\t\t<- #Left",
+		"\t}",
+		"}",
+		"",
+		"export {",
+		"\torigin",
+		"\tread",
+		"\tside",
+		"}",
+		"",
+	].join("\n")
+
+	it("should show an Alias it can not write and apply the shape instead", () => {
+		let main = [
+			"import {",
+			'\tfrom "./Shapes.es" { origin }',
+			"}",
+			"",
+			"implementation {",
+			"\tconstant p = origin()",
+			"",
+			"\tTerminal.inspect(p.x)",
+			"}",
+			"",
+		].join("\n")
+		let { hints, filePath } = moduleHints(
+			{ "Shapes.es": shapes, "Main.es": main },
+			"Main.es",
+		)
+
+		expect(hints.map((hint) => hint.label)).toEqual([": Point"])
+		expect(hints[0]?.textEdit?.newText).toBe(": { x: Integer, y: Integer }")
+		expect(
+			analyseDocument(applied(main, hints), filePath).diagnostics,
+		).toEqual([])
+	})
+
+	// NOTE: A Union Alias goes the same way and always did — its arms are Types
+	// in their own right, so the pipe list is a spelling this file can read.
+	it("should apply a Union Alias it can not write as its arms", () => {
+		let main = [
+			"import {",
+			'\tfrom "./Shapes.es" { read }',
+			"}",
+			"",
+			"implementation {",
+			"\tconstant r = read()",
+			"",
+			"\tTerminal.inspect(r)",
+			"}",
+			"",
+		].join("\n")
+		let { hints, filePath } = moduleHints(
+			{ "Shapes.es": shapes, "Main.es": main },
+			"Main.es",
+		)
+
+		expect(hints.map((hint) => hint.label)).toEqual([": Reading"])
+		expect(hints[0]?.textEdit?.newText).toBe(": Integer | String")
+		expect(
+			analyseDocument(applied(main, hints), filePath).diagnostics,
+		).toEqual([])
+	})
+
+	// NOTE: A Choice has no shape underneath it — its arms are Cases, and a
+	// Case is not a Type a Declaration writes — so where its name is out of
+	// reach there is nothing to write at all. The Hint still SHOWS what the
+	// value is, which is the same bargain a Function Type's Hint strikes.
+	it("should offer no edit for a Choice whose name is out of reach", () => {
+		let main = [
+			"import {",
+			'\tfrom "./Shapes.es" { side }',
+			"}",
+			"",
+			"implementation {",
+			"\tconstant s = side()",
+			"",
+			"\tTerminal.inspect(s)",
+			"}",
+			"",
+		].join("\n")
+		let { hints } = moduleHints(
+			{ "Shapes.es": shapes, "Main.es": main },
+			"Main.es",
+		)
+
+		expect(hints.map((hint) => hint.label)).toEqual([": Edge"])
+		expect(hints[0]?.textEdit).toBeNull()
+	})
+
+	// NOTE: The name that DID come across is written as the reader would write
+	// it. Spelling the shape here instead would answer an Alias this file names
+	// with the members it was declared to stand for.
+	it("should write an imported Alias that is in scope", () => {
+		let main = [
+			"import {",
+			'\tfrom "./Shapes.es" {',
+			"\t\tPoint",
+			"\t\torigin",
+			"\t}",
+			"}",
+			"",
+			"implementation {",
+			"\tconstant p = origin()",
+			"",
+			"\tTerminal.inspect(p.x)",
+			"}",
+			"",
+		].join("\n")
+		let exporting = shapes.replace("export {", "export {\n\tPoint")
+		let { hints, filePath } = moduleHints(
+			{ "Shapes.es": exporting, "Main.es": main },
+			"Main.es",
+		)
+
+		expect(hints[0]?.textEdit?.newText).toBe(": Point")
+		expect(
+			analyseDocument(applied(main, hints), filePath).diagnostics,
+		).toEqual([])
+	})
+
+	// NOTE: One file, two Declarations, one word: the inner `Box` is what `Box`
+	// names inside that body, so the Hint over a value of the OUTER one has to
+	// write the shape there and the name outside it. A scope check that only
+	// asked whether the word is declared SOMEWHERE would write `Box` in both
+	// places and mean the wrong Type in one.
+	it("should write the shape where the name is shadowed", () => {
+		let source = [
+			"implementation {",
+			"\ttype Box = { a: Integer }",
+			"",
+			"\tfunction make() -> Box {",
+			"\t\t<- { a = 1 }",
+			"\t}",
+			"",
+			"\tfunction inner() -> Integer {",
+			"\t\ttype Box = { b: String }",
+			"",
+			"\t\tconstant made = make()",
+			'\t\tconstant own: Box = { b = "x" }',
+			"",
+			"\t\t<- 1",
+			"\t}",
+			"",
+			"\tconstant outside = make()",
+			"}",
+		].join("\n")
+		let edits = allHintsOf(source).map((hint) => hint.textEdit?.newText)
+
+		expect(edits).toEqual([": { a: Integer }", ": Box"])
+		expect(analyseDocument(applyHints(source)).diagnostics).toEqual([])
 	})
 })

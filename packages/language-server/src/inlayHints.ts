@@ -6,7 +6,7 @@ import { typedAssertionExpressions } from "./assertionChildren"
 import { defineExpressions } from "./defineArmChildren"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { typedProgramBodies } from "./sections"
-import { isSpellableType } from "./spellableTypes"
+import { spellTypeAt } from "./spellableTypes"
 
 // NOTE: Inlay Hints annotate whatever carries no Type annotation with the Type
 // it was inferred as — Constant and Variable declarations, and the Parameters
@@ -53,16 +53,30 @@ type InlayHintEdit = {
 // on top of whatever was already wrong and, for a Function Type, stopped the
 // file parsing. The hint still SHOWS what was inferred, which is information;
 // it simply carries no edit, exactly as a recorded value does.
+//
+// NOTE: The label and the edit are built from the same Type and are not always
+// the same TEXT, which is the one place the two part company: a label names an
+// Alias wherever the reader is standing, and an edit may only write a name the
+// position can resolve. `: Point` over a file that imports no `Point` is shown
+// as it stands and applied as `: { x: Integer, y: Integer }` — the same Type,
+// spelled the way this file can read it — and where not even the shape can be
+// written, the hint carries no edit at all. `spellTypeAt` is what decides.
 function typeHint(
 	position: common.Cursor,
-	label: string,
+	prefix: string,
 	type: common.Type,
+	program: common.typed.Program,
 ): InlayHint {
+	let written = spellTypeAt(type, { program, cursor: position })
+
 	return {
 		position,
-		label,
+		label: `${prefix}${printType(type)}`,
 		kind: "type",
-		textEdit: isSpellableType(type) ? { position, newText: label } : null,
+		textEdit:
+			written === null
+				? null
+				: { position, newText: `${prefix}${written}` },
 	}
 }
 
@@ -70,36 +84,41 @@ export function findInlayHints(
 	program: common.typed.Program,
 	range: common.Position | null = null,
 ): Array<InlayHint> {
-	let hints: Array<InlayHint> = []
+	let hints: Hints = { list: [], program }
 
 	for (let body of typedProgramBodies(program)) {
 		visitBody(body, hints)
 	}
 
 	if (range === null) {
-		return hints
+		return hints.list
 	}
 
-	return hints.filter(
+	return hints.list.filter(
 		(hint) =>
 			hint.position.line >= range.start.line &&
 			hint.position.line <= range.end.line,
 	)
 }
 
+// NOTE: The list being filled and the Program it is read off, carried together
+// through the walk — what a Hint's edit may WRITE is a question about the
+// Scopes standing where the Hint sits, and the Program is where those are read.
+type Hints = {
+	list: Array<InlayHint>
+	program: common.typed.Program
+}
+
 function visitBody(
 	nodes: Array<common.typed.ImplementationNode>,
-	hints: Array<InlayHint>,
+	hints: Hints,
 ) {
 	for (let node of nodes) {
 		visitNode(node, hints)
 	}
 }
 
-function visitNode(
-	node: common.typed.ImplementationNode,
-	hints: Array<InlayHint>,
-) {
+function visitNode(node: common.typed.ImplementationNode, hints: Hints) {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
@@ -122,11 +141,12 @@ function visitNode(
 				node.type.type !== "Error" &&
 				!writesItsOwnType(node.value)
 			) {
-				hints.push(
+				hints.list.push(
 					typeHint(
 						node.name.position.end,
-						`: ${printType(node.type)}`,
+						": ",
 						node.type,
+						hints.program,
 					),
 				)
 			}
@@ -300,7 +320,7 @@ function writesItsOwnType(value: common.typed.ExpressionNode): boolean {
 // the Parameter list, where the `-> Type` would have been written.
 function visitFunctionDefinition(
 	definition: common.typed.FunctionDefinitionNode,
-	hints: Array<InlayHint>,
+	hints: Hints,
 ) {
 	for (let parameter of definition.parameters) {
 		// NOTE: `parameter.position` stops at the Type and does NOT cover a
@@ -315,11 +335,12 @@ function visitFunctionDefinition(
 			parameter.inferredType !== null &&
 			parameter.inferredType.type !== "Error"
 		) {
-			hints.push(
+			hints.list.push(
 				typeHint(
 					parameter.position.end,
-					`: ${printType(parameter.inferredType)}`,
+					": ",
 					parameter.inferredType,
+					hints.program,
 				),
 			)
 		}
@@ -333,11 +354,12 @@ function visitFunctionDefinition(
 		definition.inferredReturnType !== null &&
 		definition.inferredReturnType.type !== "Error"
 	) {
-		hints.push(
+		hints.list.push(
 			typeHint(
 				definition.parameterListPosition.end,
-				` -> ${printType(definition.inferredReturnType)}`,
+				" -> ",
 				definition.inferredReturnType,
+				hints.program,
 			),
 		)
 	}
@@ -347,7 +369,7 @@ function visitFunctionDefinition(
 
 function visitArguments(
 	nodeArguments: Array<common.typed.ArgumentNode>,
-	hints: Array<InlayHint>,
+	hints: Hints,
 ) {
 	for (let argument of nodeArguments) {
 		visitNode(argument.value, hints)

@@ -16,6 +16,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { isSamePosition } from "../positions"
 import { programNodes, typedProgramNodes } from "../sections"
+import { type SpellingScope, spellTypeAt } from "../spellableTypes"
 import {
 	closingBraceOf,
 	indentationOf,
@@ -101,6 +102,7 @@ export function implementProtocolAction(
 		lines,
 		"quickfix",
 		diagnostic,
+		spelledAt(conformer, enrichedProgram),
 	)
 }
 
@@ -154,6 +156,7 @@ export function implementProtocolActions(
 					lines,
 					"refactor.rewrite",
 					null,
+					spelledAt(conformer, enrichedProgram),
 				),
 			)
 		}
@@ -169,12 +172,13 @@ function entryFor(
 	lines: Array<string>,
 	kind: "quickfix" | "refactor.rewrite",
 	diagnostic: (common.Diagnostic & { position: common.Position }) | null,
+	at: SpellingScope | null,
 ): Array<CodeActionEntry> {
 	if (methods.length === 0) {
 		return []
 	}
 
-	let edit = stubsEdit(conformer, protocol, methods, lines)
+	let edit = stubsEdit(conformer, protocol, methods, lines, at)
 
 	if (edit === null) {
 		return []
@@ -195,11 +199,25 @@ function entryFor(
 	]
 }
 
+// NOTE: Where the stubs are going to STAND — inside the Namespace, one line
+// above its closing brace — which is the Scope their signatures are read in.
+// Null where no typed Program was handed in: the names are then written as the
+// Protocol spells them, which is what this always did.
+function spelledAt(
+	conformer: Conformer,
+	program: common.typed.Program | null,
+): SpellingScope | null {
+	return program === null
+		? null
+		: { program, cursor: conformer.node.position.end }
+}
+
 function stubsEdit(
 	conformer: Conformer,
 	protocol: common.ProtocolType,
 	methods: Array<string>,
 	lines: Array<string>,
+	at: SpellingScope | null,
 ): CodeActionEdit | null {
 	let { node } = conformer
 	let end = node.position.end
@@ -228,7 +246,7 @@ function stubsEdit(
 	// the requirement and says nothing a reader wrote.
 	let self = sliceOf(lines, node.targetType.position)
 	let stubs = methods
-		.map((name) => stubFor(name, protocol, self, member))
+		.map((name) => stubFor(name, protocol, self, member, at))
 		.join("\n")
 
 	// NOTE: A blank line in front of the first stub where the Namespace
@@ -257,6 +275,7 @@ function stubFor(
 	protocol: common.ProtocolType,
 	self: string,
 	indentation: string,
+	at: SpellingScope | null,
 ): string {
 	// NOTE: Bound to a Type that PRINTS as the written target and is nothing
 	// else — a GenericUse is exactly "a Type standing under a name", which is
@@ -279,6 +298,7 @@ function stubFor(
 					`${indentation}\t${signatureOf(
 						isStatic ? overload : withoutSelf(overload),
 						"",
+						at,
 					)} {}\n`,
 			)
 			.join("\n")
@@ -290,12 +310,27 @@ function stubFor(
 	let signature = signatureOf(
 		isStatic ? requirement : withoutSelf(requirement),
 		name,
+		at,
 	)
 
 	return `${indentation}${isStatic ? "static " : ""}${signature} {}\n`
 }
 
-function signatureOf(signature: common.BaseFunction, name: string): string {
+// NOTE: Every Type in the signature is spelled as the NAMESPACE can read it,
+// not as the Protocol declares it: a requirement naming a Record another Module
+// declares is written as the shape where this file has no word for it, which is
+// the same Type and needs nothing imported. A Type with no spelling here at all
+// is written as the Protocol spells it and left to the reader — a stub is a
+// hole with a signature on it, and one name to correct is a better answer than
+// no stubs at all.
+function signatureOf(
+	signature: common.BaseFunction,
+	name: string,
+	at: SpellingScope | null,
+): string {
+	let spelled = (type: common.Type): string =>
+		spellTypeAt(type, at) ?? printType(type)
+
 	// NOTE: `Self` is never declared — it is the target Type, which the head
 	// already names, and `describeSignature` drops it for the same reason.
 	let declared = signature.generics.filter(
@@ -321,11 +356,11 @@ function signatureOf(signature: common.BaseFunction, name: string): string {
 		// names it, which is what `_: Type` says.
 		.map(
 			(parameter) =>
-				`${parameter.name ?? "_"}: ${printType(parameter.type)}`,
+				`${parameter.name ?? "_"}: ${spelled(parameter.type)}`,
 		)
 		.join(", ")
 
-	return `${name}${generics}(${parameters}) -> ${printType(signature.returnType)}`
+	return `${name}${generics}(${parameters}) -> ${spelled(signature.returnType)}`
 }
 
 // NOTE: Whether this clause is answered by the Choice itself. A Namespace over
