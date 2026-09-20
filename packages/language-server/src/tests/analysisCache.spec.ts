@@ -1415,11 +1415,12 @@ describe("the Server's request loop", () => {
 			await session.open(files.pathOf("Importer.es"), importer)
 			await session.settle()
 
-			// NOTE: The graph's answer holds the first of these and not the
-			// second, so this is the file's own.
+			// NOTE: The graph's answer holds the syntax error and not the
+			// mismatch, so a list holding both is the file's own. In file
+			// order, which puts the mismatch above the Statement that broke.
 			expect(session.codesFor(files.pathOf("Plain.es"))).toEqual([
-				"syntax-error",
 				"assignment-type-mismatch",
+				"syntax-error",
 			])
 
 			let mark = session.publishMark()
@@ -1439,8 +1440,8 @@ describe("the Server's request loop", () => {
 					),
 			).toEqual([])
 			expect(session.codesFor(files.pathOf("Plain.es"))).toEqual([
-				"syntax-error",
 				"assignment-type-mismatch",
+				"syntax-error",
 			])
 		} finally {
 			await session.dispose()

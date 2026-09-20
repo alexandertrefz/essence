@@ -1,10 +1,10 @@
 import {
-	collectDiagnostics,
-	containsErrors,
-	placelessDiagnostic,
-	primary,
-	reportError,
-} from "@essence-lang/compiler/diagnostics"
+	analyseEnriched,
+	analyseLinkedModules,
+	type Cancellation,
+	internalError,
+	isCancelled,
+} from "@essence-lang/compiler/analysis"
 import {
 	canonicalPath,
 	isStdlibDocument,
@@ -14,7 +14,6 @@ import {
 	type LinkedGraph,
 	type ModuleHost,
 } from "@essence-lang/compiler/modules"
-import { validate } from "@essence-lang/compiler/validator"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import {
@@ -25,6 +24,11 @@ import {
 } from "./compilation"
 import type { ModuleView } from "./moduleLink"
 import type { ProgramIndex } from "./rename"
+
+// NOTE: Re-exported rather than re-declared: what a cancellation is and what an
+// unexpected throw becomes are the shared analysis' answers, and every handler
+// in this Server already reaches for them through here.
+export { type Cancellation, internalError, isCancelled }
 
 // NOTE: Either Program is null when the stage that builds it threw — the
 // Diagnostics then hold the Internal Compiler Error and nothing else.
@@ -78,10 +82,10 @@ type AnalysisOptions = {
 	tests?: boolean
 }
 
-// NOTE: The pipeline stages are fault-tolerant, so parsing and enrichment
-// always run — broken statements are dropped from the AST, and the remaining
-// Program is still analysed. Validation only runs when the Enricher reported
-// no errors, since the Validator relies on a fully enriched Program.
+// NOTE: Every stage runs, always — see `@essence-lang/compiler/analysis`, which
+// is the one description of what analysing a source means and which `esc` runs
+// too. Broken Statements are dropped from the AST, the rest is enriched, and
+// the Validator judges what the two of them established.
 // NOTE: `documentPath` is what tells a standard library source apart from an
 // ordinary Program — see `./documents`. Absent, the document is an ordinary
 // one, which is what every caller outside the Language Server is.
@@ -239,72 +243,25 @@ function analyseModuleGraph(
 	}
 }
 
-// NOTE: Every Module of a linked graph, judged: its own Diagnostics, then the
-// Validator's, then what its dependencies came to. The Diagnostics of a Module
-// depend on that Module and on what IT reaches — never on the entry the graph
-// was loaded from — which is what lets the Workspace keep the answer for every
-// Module a single graph touched rather than only for the one that was asked
-// about. Two passes, because a Module can only be told it depends on a broken
-// one once every Module has been judged, and a cycle means a Module may depend
-// on one that comes after it.
-//
-// NOTE: Null when the work was abandoned. A cancelled analysis produces NOTHING
-// — half a pass is a Module judged against dependencies that were never judged,
-// and a Diagnostic list is not a thing that can be half right.
+// NOTE: Every Module of a linked graph, judged — the shared analysis' answer,
+// keyed the way this Server wants it. The graph carries its Modules in a Map;
+// what the analysis takes is the list, because `esc` holds one too.
 export function analyseLinkedGraph(
 	linked: LinkedGraph,
 	options: { cancellation?: Cancellation } = {},
 ): Map<string, Array<common.Diagnostic>> | null {
-	let failed = new Set<string>()
-	let analyses = new Map<string, Array<common.Diagnostic>>()
-
-	for (let [filePath, module] of linked.modules) {
-		if (isCancelled(options.cancellation)) {
-			return null
-		}
-
-		let diagnostics = [...module.diagnostics]
-
-		if (!containsErrors(diagnostics)) {
-			try {
-				diagnostics.push(...validate(module.program))
-			} catch (error) {
-				diagnostics.push(internalError(error))
-			}
-		}
-
-		if (containsErrors(diagnostics)) {
-			failed.add(filePath)
-		}
-
-		analyses.set(filePath, diagnostics)
-	}
-
-	for (let [filePath, module] of linked.modules) {
-		if (isCancelled(options.cancellation)) {
-			return null
-		}
-
-		analyses
-			.get(filePath)!
-			.push(
-				...brokenDependencyDiagnostics(
-					module.module.program,
-					(specifier) =>
-						failed.has(
-							module.module.resolutions.get(specifier) ?? "",
-						),
-				),
-			)
-	}
-
-	return analyses
+	return analyseLinkedModules([...linked.modules.values()], options)
 }
 
 // NOTE: The other half of the pipeline: a Program that is no Module, analysed
 // as the single declaration space it is. Split out for the same reason the graph
 // pass above is — the Workspace runs it to fill its cache, and a second copy of
 // "what does analysing a document mean" is a second thing to keep in step.
+//
+// NOTE: The enrichment runs HERE rather than inside the shared analysis, so
+// that it goes through this Server's counted door — see `./compilation`. What
+// is shared is the judgement: that every stage runs, what the Validator is told
+// to stand down on, and the order the three stages' Diagnostics come out in.
 export function analyseEnrichedDocument(
 	program: parser.Program,
 	parserDiagnostics: Array<common.Diagnostic>,
@@ -322,83 +279,15 @@ export function analyseEnrichedDocument(
 	diagnostics: Array<common.Diagnostic>
 	annotations: Array<common.TypeAnnotation>
 } {
-	let enriched = enrichDocument(program, documentPath, options)
-	let diagnostics = [...parserDiagnostics, ...enriched.diagnostics]
-
-	if (!containsErrors(enriched.diagnostics)) {
-		diagnostics.push(...validate(enriched.program))
-	}
+	let analysed = analyseEnriched(
+		program,
+		parserDiagnostics,
+		enrichDocument(program, documentPath, options),
+	)
 
 	return {
-		enrichedProgram: enriched.program,
-		diagnostics,
-		annotations: enriched.annotations,
+		enrichedProgram: analysed.program,
+		diagnostics: analysed.diagnostics,
+		annotations: analysed.annotations,
 	}
-}
-
-// NOTE: Structurally the LSP's own CancellationToken, so a handler can pass the
-// one it was handed straight down without wrapping it. Read rather than awaited:
-// every stage below is synchronous, so the only thing a token can do is stop the
-// NEXT one from starting.
-export type Cancellation = {
-	isCancellationRequested: boolean
-}
-
-export function isCancelled(cancellation: Cancellation | undefined): boolean {
-	return cancellation?.isCancellationRequested === true
-}
-
-export function internalError(error: unknown): common.Diagnostic {
-	return placelessDiagnostic(
-		"error",
-		`Internal Compiler Error: ${
-			error instanceof Error ? error.message : String(error)
-		}`,
-		"internal-error",
-	)
-}
-
-// NOTE: One Diagnostic per broken dependency rather than per entry naming it:
-// six names imported from one file is one thing to go and fix, and six
-// underlines saying so is the report burying itself. Reported on the specifier
-// of the FIRST entry that names it, in written order, since that is the one a
-// reader's eye lands on.
-function brokenDependencyDiagnostics(
-	program: parser.Program,
-	hasErrors: (specifier: string) => boolean,
-): Array<common.Diagnostic> {
-	let reported = new Set<string>()
-	let sources: Array<parser.ModuleSpecifierNode> = [
-		...(program.imports?.groups ?? []),
-		...(program.exports?.groups ?? []),
-	].map((group) => group.source)
-
-	let { diagnostics } = collectDiagnostics(() => {
-		for (let source of sources) {
-			if (reported.has(source.path) || !hasErrors(source.path)) {
-				continue
-			}
-
-			reported.add(source.path)
-
-			reportError(
-				`${source.path} has errors of its own`,
-				source.position,
-				{
-					code: "dependency-has-errors",
-					labels: [
-						primary(source.position, "this Module did not compile"),
-					],
-					notes: [
-						"What a Module exports is read off a Module that compiled. Until that one does, a name this file asks for may resolve to an Error, or not resolve at all.",
-					],
-					helps: [
-						`Open ${source.path} — its own Diagnostics say what is wrong there.`,
-					],
-				},
-			)
-		}
-	})
-
-	return diagnostics
 }

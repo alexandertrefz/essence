@@ -189,16 +189,40 @@ describe("LSP", () => {
 			).toEqual(["A value is not indexed with brackets"])
 		})
 
-		it("should not run the Validator when the Enricher reported errors", () => {
+		// NOTE: The Validator runs whatever the Enricher found, so a Type error
+		// and a Validator error in one file are one run's worth of report. It
+		// used to take two: the Enricher's Diagnostic hid the Validator's, and
+		// the second only appeared once the first was fixed.
+		it("should run the Validator when the Enricher reported errors", () => {
 			let diagnostics = analyse(`implementation {
 				constant a = undeclaredVariable
 				constant b: String = true
 			}`)
 
-			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"'undeclaredVariable' is not declared",
-			)
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"unknown-name",
+				"assignment-type-mismatch",
+			])
+		})
+
+		// NOTE: The order a report comes out in is the order the lines are
+		// written, whichever stage found each of them — a Validator Diagnostic
+		// above a syntax error where that is where they stand.
+		it("should report every stage in file order", () => {
+			let diagnostics = analyse(`implementation {
+				constant a: String = true
+				constant b = (
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([
+				["assignment-type-mismatch", 2],
+				["syntax-error", 4],
+			])
 		})
 	})
 

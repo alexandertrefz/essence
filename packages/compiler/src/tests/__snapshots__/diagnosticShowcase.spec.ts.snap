@@ -1,5 +1,70 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
+exports[`Diagnostic Showcase AmbiguousCase.es should render the same report every time 1`] = `
+"[ambiguous-case]
+Error: Case '#Red' is declared by more than one Choice
+    ╭─┤ AmbiguousCase.es:26:18 │
+    │
+ 26 │     constant red = #Red
+    │                     ─┬─  
+    │                      ╰─── 2 Choices in scope declare it
+    │ 
+    │ Help 1: Write 'Colour#Red' to pick 'Colour'.
+    │ Help 2: Write 'Shade#Red' to pick 'Shade'.
+    │ 
+    │ Note 1: 'Colour' declares '#Red'.
+    │ Note 2: 'Shade' declares '#Red'.
+────╯
+
+[ambiguous-case]
+Error: Case '#Value' is declared by more than one Choice
+    ╭─┤ AmbiguousCase.es:33:22 │
+    │
+ 33 │     constant carried = #Value(3)
+    │                         ──┬──  
+    │                           ╰──── 2 Choices in scope declare it
+    │ 
+    │ Help 1: Write 'Optional<…>#Value' with its Type Arguments to pick 'Optional'.
+    │ Help 2: Write 'Result<…>#Value' with its Type Arguments to pick 'Result'.
+    │ 
+    │ Note 1: 'Optional' declares '#Value'.
+    │ Note 2: 'Result' declares '#Value'.
+────╯
+
+[ambiguous-case]
+Error: Case '#Value' is declared by more than one Choice
+    ╭─┤ AmbiguousCase.es:38:68 │
+    │
+ 38 │     constant expected: Optional<Integer> | Result<Integer, String> = #Value(1)
+    │                                                                       ──┬──  
+    │                                                                         ╰──── 2 Choices in the expected Type declare it
+    │ 
+    │ Help 1: Write 'Optional#Value' to pick 'Optional'.
+    │ Help 2: Write 'Result#Value' to pick 'Result'.
+    │ 
+    │ Note 1: 'Optional' declares '#Value'.
+    │ Note 2: 'Result' declares '#Value'.
+────╯
+
+[ambiguous-case]
+Error: Case '#Red' is declared by more than one Choice
+    ╭─┤ AmbiguousCase.es:44:10 │
+    │
+ 44 │          case #Red  { <- "red" }
+    │                ─┬─  
+    │                 ╰─── 2 Choices in the matched Union declare it
+    │ 
+    │ Help 1: Write 'Colour#Red' to pick 'Colour'.
+    │ Help 2: Write 'Shade#Red' to pick 'Shade'.
+    │ 
+    │ Note 1: 'Colour' declares '#Red'.
+    │ Note 2: 'Shade' declares '#Red'.
+────╯
+
+─── 4 errors
+"
+`;
+
 exports[`Diagnostic Showcase Assertions.es should render the same report every time 1`] = `
 "[expect-not-boolean]
 Error: An assertion has to be a Boolean
@@ -30,6 +95,148 @@ Error: An assertion has to be a Boolean
 ────╯
 
 ─── 2 errors
+"
+`;
+
+exports[`Diagnostic Showcase Asynchrony.es should render the same report every time 1`] = `
+"[complete-outside-future]
+Error: 'complete' waits, and nothing here can wait
+    ╭─┤ Asynchrony.es:17:6 │
+    │
+ 17 │        <- complete Async.deferred(() { <- 1 })
+    │           ──────────────────┬─────────────────  
+    │                             ╰─────────────────── this Function returns Integer
+    │ 
+    │ Help: Declare the return Type 'Future<Integer>'.
+    │ 
+    │ Note: A body that writes 'complete' suspends, so it hands back a Future the caller completes in its turn — which is what its declared Type has to say.
+────╯
+
+[complete-outside-future]
+Error: 'complete' waits, and nothing here can wait
+    ╭─┤ Asynchrony.es:23:37 │
+    │
+ 23 │     function padded(_ width: Integer = complete Async.deferred(() { <- 2 })) -> Integer {
+    │                                        ──────────────────┬─────────────────  
+    │                                                          ╰─────────────────── this suspends, and this position can not
+    │ 
+    │ Help: Complete the work above this position, into a Constant it reads, or move it into a Function declared '-> Future<…>'.
+    │ 
+    │ Note: A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins. A test's name is worked out before the run, a benchmark body is timed over many runs, and a property body runs once per generated value.
+────╯
+
+[needless-complete]
+Warning: This is not work to wait for
+    ╭─┤ Asynchrony.es:30:20 │
+    │
+ 30 │     constant waited = complete 3
+    │                                ▲  
+    │                                ╰── this is an Integer
+    │ 
+    │ Help: Drop the 'complete'.
+    │ 
+    │ Note: 'complete' waits for what a Future or a Started answers with — a value that is neither is already the answer.
+────╯
+
+[needless-start]
+Warning: This is not a Future, so there is nothing to start
+    ╭─┤ Asynchrony.es:34:21 │
+    │
+ 34 │     constant running = start 4
+    │                              ▲  
+    │                              ╰── this is an Integer
+    │ 
+    │ Help: Drop the 'start'.
+    │ 
+    │ Note: 'start' puts a Future in flight and answers the one run of it — a value that is not a Future describes no work to run.
+────╯
+
+[complete-outside-future]
+Error: 'complete' waits, and nothing here can wait
+    ╭─┤ Asynchrony.es:44:22 │
+    │
+ 44 │        constant counted = complete Async.deferred(() { <- 5 })
+    │                           ──────────────────┬─────────────────  
+    │                                             ╰─────────────────── this suspends, and this position can not
+    │ 
+    │ Help: Complete the work above this position, into a Constant it reads, or move it into a Function declared '-> Future<…>'.
+    │ 
+    │ Note: A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins. A test's name is worked out before the run, a benchmark body is timed over many runs, and a property body runs once per generated value.
+────╯
+
+[complete-outside-future]
+Error: 'complete' waits, and nothing here can wait
+    ╭─┤ Asynchrony.es:52:21 │
+    │
+ 52 │        constant padded = complete Async.deferred(() { <- width })
+    │                          ────────────────────┬───────────────────  
+    │                                              ╰───────────────────── this suspends, and this position can not
+    │ 
+    │ Help: Complete the work above this position, into a Constant it reads, or move it into a Function declared '-> Future<…>'.
+    │ 
+    │ Note: A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins. A test's name is worked out before the run, a benchmark body is timed over many runs, and a property body runs once per generated value.
+────╯
+
+─── 4 errors, 2 warnings
+"
+`;
+
+exports[`Diagnostic Showcase AsynchronyStatements.es should render the same report every time 1`] = `
+"[unused-future]
+Error: Nothing here runs
+    ╭─┤ AsynchronyStatements.es:22:2 │
+    │
+ 22 │     headline()
+    │     ─────┬────  
+    │          ╰────── this is a Future<Integer>, and its value goes nowhere
+    │ 
+    │ Help 1: Did you mean 'complete', to wait for it — or 'start', to put it in flight and carry on?
+    │ Help 2: Or, where the call was written for what it does rather than for what it answers, hold its answer in a Constant.
+    │ 
+    │ Note: A Future describes work. Building one runs none of it — 'start' puts it in flight and 'complete' waits for what it answers with.
+────╯
+
+[unobserved-started]
+Advice: Nothing waits for this
+    ╭─┤ AsynchronyStatements.es:27:2 │
+    │
+ 27 │     start headline()
+    │     ────────┬───────  
+    │             ╰───────── this runs, and nobody reads its answer
+    │ 
+    │ Help: Hold it in a Constant and 'complete' it where the answer is wanted, if the answer is wanted at all.
+    │ 
+    │ Note: A Started can be completed any number of times, from anywhere — holding it under a name is what makes that possible later.
+────╯
+
+[unused-future]
+Error: Nothing here runs
+    ╭─┤ AsynchronyStatements.es:33:2 │
+    │
+ 33 │     Terminal.inspect(headline())
+    │     ──────────────┬─────────────  
+    │                   ╰─────────────── this is a Future<Integer>, and its value goes nowhere
+    │ 
+    │ Help 1: Did you mean 'complete', to wait for it — or 'start', to put it in flight and carry on?
+    │ Help 2: Or, where the call was written for what it does rather than for what it answers, hold its answer in a Constant.
+    │ 
+    │ Note: A Future describes work. Building one runs none of it — 'start' puts it in flight and 'complete' waits for what it answers with.
+────╯
+
+[unobserved-started]
+Advice: Nothing waits for this
+    ╭─┤ AsynchronyStatements.es:38:2 │
+    │
+ 38 │     Terminal.inspect(start headline())
+    │     ─────────────────┬────────────────  
+    │                      ╰────────────────── this answers a run, and nobody reads what it answers with
+    │ 
+    │ Help: Hold it in a Constant and 'complete' it where the answer is wanted, if the answer is wanted at all.
+    │ 
+    │ Note: A Started can be completed any number of times, from anywhere — holding it under a name is what makes that possible later.
+────╯
+
+─── 2 errors, 2 remarks
 "
 `;
 
@@ -344,6 +551,165 @@ Error: Case '#Up' carries no payload to default
 "
 `;
 
+exports[`Diagnostic Showcase Define.es should render the same report every time 1`] = `
+"[define-without-cases]
+Warning: This 'define' has no cases
+    ╭─┤ Define.es:17:21 │
+    │
+ 17 │ ╭─▶     constant unrated = define {
+    ┆ ┆   
+ 19 │ ├─▶     }
+    │ │           
+    │ ╰─────────── nothing here is decided by cases
+    │ 
+    │ Help: Write the 'otherwise' value on its own, or add the arms this 'define' was going to ask.
+    │ 
+    │ Note: A 'define' answers with the value of the first arm whose Condition holds — and the 'otherwise' arm is the one that holds when none of them did.
+────╯
+
+[return-type-mismatch]
+Error: This arm does not answer with the Type this 'define' has
+    ╭─┤ Define.es:24:6 │
+    │
+ 24 │        as "A" if score::isGreaterThanOrEqualTo(90)
+    │           ─┬─  
+    │            ╰─── this is a String
+    │ 
+    │ Note: This 'define' answers Integer.
+────╯
+
+[return-type-mismatch]
+Error: This arm does not answer with the Type this 'define' has
+    ╭─┤ Define.es:32:6 │
+    │
+ 32 │        as 1 if score::isGreaterThanOrEqualTo(90)
+    │           ▲  
+    │           ╰── this is an Integer
+    │ 
+    │ Note: This 'define' answers String.
+────╯
+
+[condition-not-boolean]
+Error: A Define Condition has to be a Boolean
+    ╭─┤ Define.es:39:16 │
+    │
+ 39 │        as "some" if score
+    │                     ──┬──  
+    │                       ╰──── this is an Integer
+    │ 
+    │ Note: Essence has no truthiness — only a Boolean can be a Condition.
+────╯
+
+─── 3 errors, 1 warning
+"
+`;
+
+exports[`Diagnostic Showcase DefineAnswers.es should render the same report every time 1`] = `
+"[define-without-answer-type]
+Error: Nothing decides what this 'define' answers
+    ╭─┤ DefineAnswers.es:21:21 │
+    │
+ 21 │ ╭─▶     constant fetched = define {
+ 22 │ │          as #Empty if skipped
+    │ │             ───┬──  
+    │ │                ╰──── this arm has none of its own to lend it
+    ┆ ┆   
+ 24 │ ├─▶     }
+    │ │           
+    │ ╰─────────── this 'define' has no answer Type
+    │ 
+    │ Help 1: Write the answer Type on the 'define' itself: 'define -> Type { … }' — it is pushed into every arm.
+    │ Help 2: Or annotate the Declaration it stands in, where it stands in one. An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.
+    │ 
+    │ Note: A 'define' takes its answer Type from its arrow, from the position it stands in, or from what its arms answer with — and an arm that decides no Type Arguments of its own leaves nothing to take.
+────╯
+
+[undecided-type-arguments]
+Error: Nothing decides the Type Arguments of '#Empty'
+    ╭─┤ DefineAnswers.es:22:6 │
+    │
+ 22 │        as #Empty if skipped
+    │           ───┬──  
+    │              ╰──── no Type Arguments here, and nothing around it decides them
+    │ 
+    │ Help 1: Annotate the declaration: 'constant left: Optional<ItemType> = #Empty'.
+    │ Help 2: Or apply the Type Arguments: 'Optional<ItemType>#Empty'.
+    │ 
+    │ Note 1: 'Optional' takes 1 Type Parameter: 'ItemType'.
+    │ Note 2: A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.
+────╯
+
+[define-without-answer-type]
+Error: Nothing decides what this 'define' answers
+    ╭─┤ DefineAnswers.es:29:25 │
+    │
+ 29 │ ╭─▶     constant total = count(define {
+ 30 │ │          as #Empty if skipped
+    │ │             ───┬──  
+    │ │                ╰──── this arm has none of its own to lend it
+    ┆ ┆   
+ 32 │ ├─▶     })
+    │ │            
+    │ ╰──────────── this 'define' has no answer Type
+    │ 
+    │ Help 1: Write the answer Type on the 'define' itself: 'define -> Type { … }' — it is pushed into every arm.
+    │ Help 2: Or annotate the Declaration it stands in, where it stands in one. An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.
+    │ 
+    │ Note: A 'define' takes its answer Type from its arrow, from the position it stands in, or from what its arms answer with — and an arm that decides no Type Arguments of its own leaves nothing to take.
+────╯
+
+[undecided-type-arguments]
+Error: Nothing decides the Type Arguments of '#Empty'
+    ╭─┤ DefineAnswers.es:30:6 │
+    │
+ 30 │        as #Empty if skipped
+    │           ───┬──  
+    │              ╰──── no Type Arguments here, and nothing around it decides them
+    │ 
+    │ Help 1: Annotate the declaration: 'constant left: Optional<ItemType> = #Empty'.
+    │ Help 2: Or apply the Type Arguments: 'Optional<ItemType>#Empty'.
+    │ 
+    │ Note 1: 'Optional' takes 1 Type Parameter: 'ItemType'.
+    │ Note 2: A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.
+────╯
+
+─── 4 errors
+"
+`;
+
+exports[`Diagnostic Showcase DefineSyntax.es should render the same report every time 1`] = `
+"[define-without-otherwise]
+Error: This 'define' has no 'otherwise' arm
+    ╭─┤ DefineSyntax.es:13:19 │
+    │
+ 13 │ ╭─▶     constant grade = define {
+    ┆ ┆   
+ 15 │ ├─▶     }
+    │ │           
+    │ ╰─────────── every value here has a condition on it
+    │ 
+    │ Help: Write the last arm as 'as <value> otherwise'.
+    │ 
+    │ Note: A 'define' answers with a value wherever it stands, so one of its arms has to be the one that always holds.
+────╯
+
+[unreachable-define-arm]
+Error: This arm stands below the 'otherwise' arm
+    ╭─┤ DefineSyntax.es:22:3 │
+    │
+ 22 │        as "low" if score::isLessThan(10)
+    │        ────────────────┬────────────────  
+    │                        ╰────────────────── nothing here can ever be reached
+    │ 
+    │ Help: Move this arm above the 'otherwise' arm, or delete it.
+    │ 
+    │ Note: The 'otherwise' arm is the one that always holds, so a 'define' answers there whenever it gets that far.
+────╯
+
+─── 2 errors
+"
+`;
+
 exports[`Diagnostic Showcase DerivedConformance.es should render the same report every time 1`] = `
 "[undeclared-conformance]
 Error: Namespace 'Offered' writes 'cases' without declaring 'is Enumerable'
@@ -385,6 +751,188 @@ Error: Namespace 'Compared' writes 'is' without declaring 'is Equatable'
 ────╯
 
 ─── 3 errors
+"
+`;
+
+exports[`Diagnostic Showcase Dictionaries.es should render the same report every time 1`] = `
+"[duplicate-key]
+Error: This key is written twice
+    ╭─┤ Dictionaries.es:12:33 │
+    │
+ 12 │     constant twice = ["alex" = 39, "alex" = 40]
+    │                       ───┬──       ───┬──  
+    │                          ╰────────────│──── first written here
+    │                                       │    
+    │                                       ╰──── written a second time here
+    │ 
+    │ Help: Keep one entry for the key.
+    │ 
+    │ Note: A Dictionary holds one value per key, so the second entry would take the first one's place and nothing would say the first was ever there.
+────╯
+
+[duplicate-key]
+Error: This key is written twice
+    ╭─┤ Dictionaries.es:13:32 │
+    │
+ 13 │     constant halves = [1/2 = "a", 2/4 = "b"]
+    │                        ─┬─        ─┬─  
+    │                         ╰──────────│─── first written here
+    │                                    │   
+    │                                    ╰─── written a second time here
+    │ 
+    │ Help: Keep one entry for the key.
+    │ 
+    │ Note: A Dictionary holds one value per key, so the second entry would take the first one's place and nothing would say the first was ever there.
+────╯
+
+[wrong-update-brackets]
+Error: A Record is updated in braces
+    ╭─┤ Dictionaries.es:18:19 │
+    │
+ 18 │     constant moved = [config with port = 90]
+    │                      ────┬──────┬───────────  
+    │                          ╰──────│───────────── this is a { port: Integer, host: String }
+    │                                 │             
+    │                                 ╰───────────── this update is written in brackets
+    │ 
+    │ Help: Write the update in braces: '{ base with member = value }'.
+    │ 
+    │ Note: A Record's keys are the member names it declares, and a Dictionary's are values of its key Type — so the two are written differently and never interchangeably.
+────╯
+
+[wrong-update-brackets]
+Error: A Dictionary is updated in brackets
+    ╭─┤ Dictionaries.es:19:20 │
+    │
+ 19 │     constant merged = { ages with ages }
+    │                       ────┬────┬────────  
+    │                           ╰────│────────── this is a Dictionary<String, Integer>
+    │                                │          
+    │                                ╰────────── this update is written in braces
+    │ 
+    │ Help: Write the update in brackets: '[base with "key" = value]'.
+    │ 
+    │ Note: A Record's keys are the member names it declares, and a Dictionary's are values of its key Type — so the two are written differently and never interchangeably.
+────╯
+
+[partial-type-mismatch]
+Error: This is not a key the Dictionary can hold
+    ╭─┤ Dictionaries.es:23:33 │
+    │
+ 23 │     constant wrongKey = [ages with 1 = 40]
+    │                          ──┬─      ▲  
+    │                            ╰───────│── this is a Dictionary<String, Integer>
+    │                                    │  
+    │                                    ╰── this is an Integer
+    │ 
+    │ Note: An update may only set keys of the Dictionary's key Type, with the Type it declared for its values.
+────╯
+
+[partial-type-mismatch]
+Error: This is not a value the Dictionary holds
+    ╭─┤ Dictionaries.es:24:43 │
+    │
+ 24 │     constant wrongValue = [ages with "kim" = "seven"]
+    │                            ──┬─              ───┬───  
+    │                              ╰──────────────────│───── this is a Dictionary<String, Integer>
+    │                                                 │     
+    │                                                 ╰───── this is a String
+    │ 
+    │ Note: An update may only set keys of the Dictionary's key Type, with the Type it declared for its values.
+────╯
+
+[partial-type-mismatch]
+Error: This is not a Dictionary the update can merge in
+    ╭─┤ Dictionaries.es:28:29 │
+    │
+ 28 │     constant both = [ages with names]
+    │                      ──┬─      ──┬──  
+    │                        ╰─────────│──── this is a Dictionary<String, Integer>
+    │                                  │    
+    │                                  ╰──── this is a Dictionary<String, String>
+    │ 
+    │ Help: Write the entries to set instead: '[base with "key" = value]'.
+    │ 
+    │ Note: A whole-value update merges one Dictionary into another, so what is merged in has to hold the same key and value Types. The Argument wins on a key both hold.
+────╯
+
+[redundant-key-check]
+Warning: This key is looked up twice
+    ╭─┤ Dictionaries.es:34:5 │
+    │
+ 34 │     if ages::hasKey("alex") {
+    │        ──────────┬─────────  
+    │                  ╰─────────── asked here
+ 35 │        constant age = ages::value(at "alex", defaultingTo 0)
+    │                       ───────────────────┬──────────────────  
+    │                                          ╰──────────────────── and answered here
+    │ 
+    │ Help: Ask 'value(at:)' once and match its Optional, or use 'value(at:defaultingTo:)' or 'update(at:with:)'.
+    │ 
+    │ Note: 'hasKey' is a lookup of its own — it asks the Dictionary for the key's value and answers whether it found one.
+────╯
+
+─── 7 errors, 1 warning
+"
+`;
+
+exports[`Diagnostic Showcase DictionarySyntax.es should render the same report every time 1`] = `
+"[syntax-error]
+Error: An update says what it changes
+    ╭─┤ DictionarySyntax.es:11:29 │
+    │
+ 11 │     constant unchanged = [ages with]
+    │                                ──┬─  
+    │                                  ╰─── nothing follows this 'with'
+    │ 
+    │ Help 1: Write the entries the update sets, or the Dictionary it merges in.
+    │ Help 2: Or drop the update and write the Dictionary on its own.
+    │ 
+    │ Note: A Dictionary update writes either the entries it sets — '[ages with "kim" = 7]' — or a whole Dictionary to merge in — '[ages with other]'.
+────╯
+
+[syntax-error]
+Error: A key that is a value belongs to a Dictionary
+    ╭─┤ DictionarySyntax.es:15:22 │
+    │
+ 15 │     constant braced = { "alex" = 39 }
+    │                         ───┬──  
+    │                            ╰──── this key is a value, not a member name
+    │ 
+    │ Help 1: Write it in brackets: '["a" = 1]'.
+    │ Help 2: Or name the member, if a Record is what was meant: '{ a = 1 }'.
+    │ 
+    │ Note: Braces write a Record, whose keys are the member names it declares. A key that is a value is a Dictionary's, and a Dictionary is written in brackets.
+────╯
+
+[wrong-update-brackets]
+Error: A key that is a value belongs to a Dictionary
+    ╭─┤ DictionarySyntax.es:19:31 │
+    │
+ 19 │     constant older = { ages with "alex" = 40 }
+    │                                  ───┬──  
+    │                                     ╰──── this key is a value, not a member name
+    │ 
+    │ Help 1: Write the update in brackets: '[base with "a" = 1]'.
+    │ Help 2: Or name the member, if a Record is what was meant: '{ base with a = 1 }'.
+    │ 
+    │ Note: Braces update a Record, whose keys are the member names it declares. A key that is a value is a Dictionary's, and a Dictionary is updated in brackets.
+────╯
+
+[dictionary-entry-syntax]
+Error: A Dictionary entry is written with '='
+    ╭─┤ DictionarySyntax.es:23:27 │
+    │
+ 23 │     constant colons = ["alex": 39]
+    │                              ▲  
+    │                              ╰── expected '=' and found ':'
+    │ 
+    │ Help: Write '=' in place of ':'.
+    │ 
+    │ Note: An entry is 'key = value', and a Dictionary is a bracket list of them: '["a" = 1, "b" = 2]'.
+────╯
+
+─── 4 errors
 "
 `;
 
@@ -514,6 +1062,19 @@ Warning: This '@param' does not name the Parameter at its position
 
 [unknown-documentation-parameter]
 Warning: This '@param' names a Parameter that does not exist
+    ╭─┤ Documentation.es:24:12 │
+    │
+ 24 │     §§ @param subject — who to greet
+    │               ───┬───  
+    │                  ╰───── what this documents takes no Parameters
+    │ 
+    │ Help: Remove the tag — there is no Parameter for it to describe.
+    │ 
+    │ Note: A '§§' block documents whatever is declared below it. A '@param' belongs above something that takes Parameters — a Function, a Method, or a Declaration holding a Function literal.
+────╯
+
+[unknown-documentation-parameter]
+Warning: This '@param' names a Parameter that does not exist
     ╭─┤ Documentation.es:30:12 │
     │
  30 │     §§ @param loudly — how loud to shout it
@@ -537,19 +1098,6 @@ Warning: This Parameter has no '@param' line
     │ Help: Write '@param and — …' as line 2 of the run.
     │ 
     │ Note: A '@param' line documents the Parameter at its own position — the first line the first Parameter — and names it the way the signature does: its label, or '_' where it carries none.
-────╯
-
-[unknown-documentation-parameter]
-Warning: This '@param' names a Parameter that does not exist
-    ╭─┤ Documentation.es:24:12 │
-    │
- 24 │     §§ @param subject — who to greet
-    │               ───┬───  
-    │                  ╰───── what this documents takes no Parameters
-    │ 
-    │ Help: Remove the tag — there is no Parameter for it to describe.
-    │ 
-    │ Note: A '§§' block documents whatever is declared below it. A '@param' belongs above something that takes Parameters — a Function, a Method, or a Declaration holding a Function literal.
 ────╯
 
 ─── 6 warnings
@@ -1024,6 +1572,114 @@ Error: An overloaded Function can not be used as a value
 "
 `;
 
+exports[`Diagnostic Showcase KnownAnswers.es should render the same report every time 1`] = `
+"[unknown-method]
+Error: No Method named 'add' for this value
+    ╭─┤ KnownAnswers.es:25:25 │
+    │
+ 25 │     Terminal.print(primes::add(1)::toString())
+    │                    ───┬──  ─┬─  
+    │                       ╰─────│─── this is a List<Integer>
+    │                             │   
+    │                             ╰─── no Method of this name
+    │ 
+    │ Help 1: Call '::add(…)' on each item — '::map((item) { <- item::add(…) })'.
+    │ Help 2: Or read one out with '::item(at …, defaultingTo …)' and call '::add(…)' on it.
+    │ 
+    │ Note 1: 'add' is a Method of Integer, which is what a List<Integer> holds — a Method of its items rather than of the List itself.
+    │ Note 2: Searched Namespaces 'List', 'IntegerList', 'NumberList', 'KeyedNumberList', 'GroupedList'.
+────╯
+
+[unknown-method]
+Error: No Method named 'add' for Optional#Value
+    ╭─┤ KnownAnswers.es:29:38 │
+    │
+ 29 │     Terminal.print(primes::firstItem()::add(1)::toString())
+    │                    ─────────┬─────────  ─┬─  
+    │                             ╰────────────│─── this is an Optional<Integer>
+    │                                          │   
+    │                                          ╰─── Optional#Value has no Method of this name
+    │ 
+    │ Help 1: Read the value out with '::value(defaultingTo …)' and call '::add(…)' on it, or reach through it with '::map((value) { <- value::add(…) })'.
+    │ Help 2: Or take it apart with a 'match', and call '::add(…)' on the payload.
+    │ 
+    │ Note 1: 'add' is a Method of Integer, and 'Optional#Value' carries one.
+    │ Note 2: Every member of the Union must provide 'add' — the receiver's Type is only known at runtime.
+────╯
+
+[unknown-method]
+Error: No Method named 'add' for this value
+    ╭─┤ KnownAnswers.es:34:28 │
+    │
+ 34 │     Terminal.print(fetched()::add(1)::toString())
+    │                    ────┬────  ─┬─  
+    │                        ╰───────│─── this is a Future<Integer>
+    │                                │   
+    │                                ╰─── no Method of this name
+    │ 
+    │ Help 1: Wait for it on a line of its own — 'constant answered = complete …' — and call '::add(…)' on 'answered'.
+    │ Help 2: Or reach through it with '::map((value) { <- value::add(…) })', which answers another Future.
+    │ 
+    │ Note 1: 'add' is a Method of Integer. This describes work that has not run — the Integer is what a Future<Integer> answers with, once something waits for it.
+    │ Note 2: 'complete' takes the whole chain behind it, so a 'complete' written in front of this call would wait for the call rather than for the receiver.
+    │ Note 3: Searched Namespace 'Future'.
+────╯
+
+[unknown-case]
+Error: 'Rounding' declares no Case '#Floor'
+    ╭─┤ KnownAnswers.es:39:36 │
+    │
+ 39 │     Terminal.print(7/2::round(toward #Floor)::toString())
+    │                                       ──┬──  
+    │                                         ╰──── no such Case
+    │ 
+    │ Note: This position takes a Rounding: '#Nearest', '#NearestEven', '#Down', '#Up', '#TowardZero'.
+────╯
+
+[unknown-case]
+Error: No Choice in scope declares a Case '#Truncated'
+    ╭─┤ KnownAnswers.es:43:35 │
+    │
+ 43 │     constant options = { division = #Truncated }
+    │                                      ────┬────  
+    │                                          ╰────── no such Case
+    │ 
+    │ Help 1: Did you mean '#Truncating'?
+    │ Help 2: Annotate the value, or pass it where a Choice is expected, so the Case resolves against that Choice's own Cases.
+    │ 
+    │ Note: 'Division' declares '#Truncating'.
+────╯
+
+[unknown-name]
+Error: 'noon' is not declared
+    ╭─┤ KnownAnswers.es:53:24 │
+    │
+ 53 │          <- @::isGreaterThan(noon)
+    │                              ──┬─  
+    │                                ╰─── no such Variable or Constant
+    │ 
+    │ Help: Write 'Clock.noon'.
+    │ 
+    │ Note: A static is reached through its Namespace, inside the Namespace too.
+────╯
+
+[unknown-name]
+Error: 'width' is not declared
+    ╭─┤ KnownAnswers.es:61:7 │
+    │
+ 61 │          <- width
+    │             ──┬──  
+    │               ╰──── no such Variable or Constant
+    │ 
+    │ Help: Write '@.width'.
+    │ 
+    │ Note: 'width' is a member of { width: Integer }, and a member is read off the value rather than named on its own.
+────╯
+
+─── 7 errors
+"
+`;
+
 exports[`Diagnostic Showcase Match.es should render the same report every time 1`] = `
 "[missing-case]
 Error: This Match Expression does not handle every Case
@@ -1146,6 +1802,17 @@ Error: A member path stands where no Function is expected
     │ Note 2: This position expects a String.
 ────╯
 
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'name'
+    ╭─┤ MemberPaths.es:22:26 │
+    │
+ 22 │     constant name: String = .name
+    │                             ──┬──  
+    │                               ╰──── this is a (_: …) -> …
+    │ 
+    │ Note: 'name' is declared as String.
+────╯
+
 [path-without-context]
 Error: A member path stands where no Function is expected
     ╭─┤ MemberPaths.es:25:57 │
@@ -1158,6 +1825,17 @@ Error: A member path stands where no Function is expected
     │ 
     │ Note 1: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
     │ Note 2: This position expects a Function of 2 Parameters, and a path reads its members off exactly one.
+────╯
+
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'order'
+    ╭─┤ MemberPaths.es:25:57 │
+    │
+ 25 │     constant order: (_: Product, _: Product) -> Ordering = .price
+    │                                                            ───┬──  
+    │                                                               ╰──── this is a (_: …) -> …
+    │ 
+    │ Note: 'order' is declared as (_: { name: String, price: Integer, maker: { town: String }, tags: List<String>, nickname: Optional<String> }, _: { name: String, price: Integer, maker: { town: String }, tags: List<String>, nickname: Optional<String> }) -> Ordering.
 ────╯
 
 [path-step-not-a-record]
@@ -1186,7 +1864,76 @@ Error: A member path steps through Records only
     │ Note: Only a Record or a Case has members a path can step through. An Optional, a Union, a Choice or a List is decided before it is read, and deciding it is a Match rather than a dot.
 ────╯
 
-─── 5 errors
+─── 7 errors
+"
+`;
+
+exports[`Diagnostic Showcase NestingLevels.es should render the same report every time 1`] = `
+"[ambiguous-nesting-level]
+Warning: This Argument fits the receiver and what it holds
+    ╭─┤ NestingLevels.es:22:32 │
+    │
+ 22 │     constant isEmpty = nested::is(#Empty)
+    │                                ─┐ ───┬──  
+    │                                 ╰────│──── this takes an Optional<Integer> as well
+    │                                      │    
+    │                                      ╰──── read as an Optional<Optional<Integer>> here
+    │ 
+    │ Help 1: Write '#Value(…)' around the Argument to ask whether the receiver holds it.
+    │ Help 2: Name it in a Constant annotated 'Optional<Optional<Integer>>' to go on asking about the receiver.
+    │ 
+    │ Note: A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.
+────╯
+
+[ambiguous-nesting-level]
+Warning: This Argument fits the receiver and what it holds
+    ╭─┤ NestingLevels.es:26:38 │
+    │
+ 26 │     constant isNotEmpty = nested::isNot(#Empty)
+    │                                   ──┬── ───┬──  
+    │                                     ╰──────│──── this takes an Optional<Integer> as well
+    │                                            │    
+    │                                            ╰──── read as an Optional<Optional<Integer>> here
+    │ 
+    │ Help 1: Write '#Value(…)' around the Argument to ask whether the receiver holds it.
+    │ Help 2: Name it in a Constant annotated 'Optional<Optional<Integer>>' to go on asking about the receiver.
+    │ 
+    │ Note: A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.
+────╯
+
+[ambiguous-nesting-level]
+Warning: This Argument fits the receiver and what it holds
+    ╭─┤ NestingLevels.es:31:34 │
+    │
+ 31 │     constant hasFailed = failed::is(#Failure("gone"))
+    │                                  ─┐ ────────┬───────  
+    │                                   ╰─────────│───────── this takes a Result<Integer, String> as well
+    │                                             │         
+    │                                             ╰───────── read as a Result<Result<Integer, String>, String> here
+    │ 
+    │ Help 1: Write '#Value(…)' around the Argument to ask whether the receiver holds it.
+    │ Help 2: Name it in a Constant annotated 'Result<Result<Integer, String>, String>' to go on asking about the receiver.
+    │ 
+    │ Note: A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.
+────╯
+
+[ambiguous-nesting-level]
+Warning: This Argument fits the receiver and what it holds
+    ╭─┤ NestingLevels.es:37:35 │
+    │
+ 37 │     constant spelledOut = nested::is(Optional<Optional<Integer>>#Empty)
+    │                                   ─┐ ────────────────┬────────────────  
+    │                                    ╰─────────────────│────────────────── this takes an Optional<Integer> as well
+    │                                                      │                  
+    │                                                      ╰────────────────── read as an Optional<Optional<Integer>> here
+    │ 
+    │ Help 1: Write '#Value(…)' around the Argument to ask whether the receiver holds it.
+    │ Help 2: Name it in a Constant annotated 'Optional<Optional<Integer>>' to go on asking about the receiver.
+    │ 
+    │ Note: A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.
+────╯
+
+─── 4 warnings
 "
 `;
 
@@ -1298,7 +2045,20 @@ Error: This descend updates nothing
 `;
 
 exports[`Diagnostic Showcase PathKeys.es should render the same report every time 1`] = `
-"[path-key-outside-combination]
+"[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'blank'
+    ╭─┤ PathKeys.es:21:27 │
+    │
+ 21 │ ╭─▶     constant blank: Config = {
+    ┆ ┆   
+ 24 │ ├─▶     }
+    │ │           
+    │ ╰─────────── this is a { name: String }
+    │ 
+    │ Note: 'blank' is declared as { name: String, server: { host: String, port: Integer, tls: { enabled: Boolean } } }.
+────╯
+
+[path-key-outside-combination]
 Error: A path key reaches into nothing here
     ╭─┤ PathKeys.es:23:3 │
     │
@@ -1339,7 +2099,7 @@ Error: A path key updates a value it can name
     │ Note: A path reaches into the value one level at a time, so the value is read once for each level it reaches through. A name, '@', or a chain of member reads over one of those reads the same value every time; anything worked out on the spot would be worked out again for each level.
 ────╯
 
-─── 3 errors
+─── 4 errors
 "
 `;
 
@@ -1425,35 +2185,7 @@ Error: 'Shape#Rectangle' has no single value to bind
 `;
 
 exports[`Diagnostic Showcase Protocols.es should render the same report every time 1`] = `
-"[recursive-protocol]
-Error: Protocol 'Listed' extends itself through 'Sorted'
-    ╭─┤ Protocols.es:70:21 │
-    │
- 70 │     protocol Listed is Sorted {
-    │                        ───┬──  
-    │                           ╰──── this leads back to 'Listed'
-    │ 
-    │ Help: Break the cycle — drop one of the extensions.
-    │ 
-    │ Note 1: 'Listed' extends 'Sorted', which extends 'Listed' again.
-    │ Note 2: A Protocol's surface is its own Methods together with every ancestor's, so one that extends itself would never finish resolving.
-────╯
-
-[recursive-protocol]
-Error: Protocol 'Sorted' extends itself through 'Listed'
-    ╭─┤ Protocols.es:74:21 │
-    │
- 74 │     protocol Sorted is Listed {
-    │                        ───┬──  
-    │                           ╰──── this leads back to 'Sorted'
-    │ 
-    │ Help: Break the cycle — drop one of the extensions.
-    │ 
-    │ Note 1: 'Sorted' extends 'Listed', which extends 'Sorted' again.
-    │ Note 2: A Protocol's surface is its own Methods together with every ancestor's, so one that extends itself would never finish resolving.
-────╯
-
-[method-not-on-protocol]
+"[method-not-on-protocol]
 Error: 'Sized' has no Method named 'toString'
     ╭─┤ Protocols.es:19:10 │
     │
@@ -1539,6 +2271,34 @@ Error: An overloaded Protocol Method can not carry a body
     │ Help: Write 'combine' as a requirement, and give each conforming Namespace a body of its own.
     │ 
     │ Note: A provided Method is emitted once, under the Protocol's name and the Method's — and an entry of an 'overload' block is named for its slot in a Method Type the Protocol has no conformer to resolve against.
+────╯
+
+[recursive-protocol]
+Error: Protocol 'Listed' extends itself through 'Sorted'
+    ╭─┤ Protocols.es:70:21 │
+    │
+ 70 │     protocol Listed is Sorted {
+    │                        ───┬──  
+    │                           ╰──── this leads back to 'Listed'
+    │ 
+    │ Help: Break the cycle — drop one of the extensions.
+    │ 
+    │ Note 1: 'Listed' extends 'Sorted', which extends 'Listed' again.
+    │ Note 2: A Protocol's surface is its own Methods together with every ancestor's, so one that extends itself would never finish resolving.
+────╯
+
+[recursive-protocol]
+Error: Protocol 'Sorted' extends itself through 'Listed'
+    ╭─┤ Protocols.es:74:21 │
+    │
+ 74 │     protocol Sorted is Listed {
+    │                        ───┬──  
+    │                           ╰──── this leads back to 'Sorted'
+    │ 
+    │ Help: Break the cycle — drop one of the extensions.
+    │ 
+    │ Note 1: 'Sorted' extends 'Listed', which extends 'Sorted' again.
+    │ Note 2: A Protocol's surface is its own Methods together with every ancestor's, so one that extends itself would never finish resolving.
 ────╯
 
 ─── 8 errors
@@ -1893,6 +2653,71 @@ Warning: This 'defaultingTo' Argument can never be read
 "
 `;
 
+exports[`Diagnostic Showcase Staged.es should render the same report every time 1`] = `
+"[return-type-mismatch]
+Error: This value does not fit the declared return Type
+    ╭─┤ Staged.es:12:6 │
+    │
+ 12 │        <- { x = 0 }
+    │           ────┬────  
+    │               ╰────── this is a { x: Integer }
+    │ 
+    │ Note: The Function returns { x: Integer, y: Integer }.
+────╯
+
+[missing-return]
+Error: Not every path through this Function returns
+    ╭─┤ Staged.es:16:2 │
+    │
+ 16 │ ╭─▶     function shifted(_ point: Point) -> Point {
+    ┆ ┆   
+ 18 │ ├─▶     }
+    │ │           
+    │ ╰─────────── this path falls off the end
+    │ 
+    │ Note: The declared return Type is { x: Integer, y: Integer }, so every path must yield one.
+────╯
+
+[unknown-name]
+Error: 'undeclared' is not declared
+    ╭─┤ Staged.es:21:17 │
+    │
+ 21 │     Terminal.print(undeclared)
+    │                    ─────┬────  
+    │                         ╰────── no such Variable or Constant
+────╯
+
+─── 3 errors
+"
+`;
+
+exports[`Diagnostic Showcase SwallowedString.es should render the same report every time 1`] = `
+"[unclosed-string]
+Error: This String Literal is never closed
+    ╭─┤ SwallowedString.es:20:22 │
+    │
+ 20 │     constant greeting = "Hello
+    │                         ▲  
+    │                         ╰── opened here
+ 21 │     constant name = "Ada"
+    │                     ▲  
+    │                     ╰── closed by this quote, which reads as the start of another String
+    │ 
+ 25 │ }
+    │  │ 
+    │  ╰─ and the input ends inside that one
+    │ 
+    │ Help 1: Add the missing '"' at the end of line 20.
+    │ Help 2: Or, if line 20 was meant to carry the lines below it, add it at the end of the input instead.
+    │ 
+    │ Note 1: A String Literal may span lines, and the line breaks are part of it — so the quote on line 21 closed the one opened on line 20, and the String that quote was written to open is the one that ran to the end of the input.
+    │ Note 2: One '"' is missing either way. It is reported against the String that spans lines, because a String written to span them is not usually followed, on the line it closes, by a second one that never closes at all.
+────╯
+
+─── 1 error
+"
+`;
+
 exports[`Diagnostic Showcase Syntax.es should render the same report every time 1`] = `
 "[syntax-error]
 Error: Expected '=' but found '42'.
@@ -1901,6 +2726,18 @@ Error: Expected '=' but found '42'.
  14 │     constant answer 42
     │                     ─┐  
     │                      ╰── expected '='
+────╯
+
+[unreachable-case]
+Warning: This Case can never match
+    ╭─┤ Syntax.es:22:8 │
+    │
+ 21 │     constant read = match point -> Integer {
+    │                           ──┬──  
+    │                             ╰──── this is a { x: Integer } | { key: String }
+ 22 │        case { x, y } as whole { <- x }
+    │             ────┬───  
+    │                 ╰───── { x: Integer, y: Unknown } is not a member of the matched Union
 ────╯
 
 [redundant-pattern-binder]
@@ -2009,7 +2846,7 @@ Error: This block is never closed
     │ Help: Add the missing '}'.
 ────╯
 
-─── 9 errors
+─── 9 errors, 1 warning
 "
 `;
 
@@ -2627,757 +3464,5 @@ Warning: This Statement runs in an order the cycle does not state
 ───╯
 
 ─── 1 warning
-"
-`;
-
-exports[`Diagnostic Showcase Dictionaries.es should render the same report every time 1`] = `
-"[duplicate-key]
-Error: This key is written twice
-    ╭─┤ Dictionaries.es:12:33 │
-    │
- 12 │     constant twice = ["alex" = 39, "alex" = 40]
-    │                       ───┬──       ───┬──  
-    │                          ╰────────────│──── first written here
-    │                                       │    
-    │                                       ╰──── written a second time here
-    │ 
-    │ Help: Keep one entry for the key.
-    │ 
-    │ Note: A Dictionary holds one value per key, so the second entry would take the first one's place and nothing would say the first was ever there.
-────╯
-
-[duplicate-key]
-Error: This key is written twice
-    ╭─┤ Dictionaries.es:13:32 │
-    │
- 13 │     constant halves = [1/2 = "a", 2/4 = "b"]
-    │                        ─┬─        ─┬─  
-    │                         ╰──────────│─── first written here
-    │                                    │   
-    │                                    ╰─── written a second time here
-    │ 
-    │ Help: Keep one entry for the key.
-    │ 
-    │ Note: A Dictionary holds one value per key, so the second entry would take the first one's place and nothing would say the first was ever there.
-────╯
-
-[wrong-update-brackets]
-Error: A Record is updated in braces
-    ╭─┤ Dictionaries.es:18:19 │
-    │
- 18 │     constant moved = [config with port = 90]
-    │                      ────┬──────┬───────────  
-    │                          ╰──────│───────────── this is a { port: Integer, host: String }
-    │                                 │             
-    │                                 ╰───────────── this update is written in brackets
-    │ 
-    │ Help: Write the update in braces: '{ base with member = value }'.
-    │ 
-    │ Note: A Record's keys are the member names it declares, and a Dictionary's are values of its key Type — so the two are written differently and never interchangeably.
-────╯
-
-[wrong-update-brackets]
-Error: A Dictionary is updated in brackets
-    ╭─┤ Dictionaries.es:19:20 │
-    │
- 19 │     constant merged = { ages with ages }
-    │                       ────┬────┬────────  
-    │                           ╰────│────────── this is a Dictionary<String, Integer>
-    │                                │          
-    │                                ╰────────── this update is written in braces
-    │ 
-    │ Help: Write the update in brackets: '[base with "key" = value]'.
-    │ 
-    │ Note: A Record's keys are the member names it declares, and a Dictionary's are values of its key Type — so the two are written differently and never interchangeably.
-────╯
-
-[partial-type-mismatch]
-Error: This is not a key the Dictionary can hold
-    ╭─┤ Dictionaries.es:23:33 │
-    │
- 23 │     constant wrongKey = [ages with 1 = 40]
-    │                          ──┬─      ▲  
-    │                            ╰───────│── this is a Dictionary<String, Integer>
-    │                                    │  
-    │                                    ╰── this is an Integer
-    │ 
-    │ Note: An update may only set keys of the Dictionary's key Type, with the Type it declared for its values.
-────╯
-
-[partial-type-mismatch]
-Error: This is not a value the Dictionary holds
-    ╭─┤ Dictionaries.es:24:43 │
-    │
- 24 │     constant wrongValue = [ages with "kim" = "seven"]
-    │                            ──┬─              ───┬───  
-    │                              ╰──────────────────│───── this is a Dictionary<String, Integer>
-    │                                                 │     
-    │                                                 ╰───── this is a String
-    │ 
-    │ Note: An update may only set keys of the Dictionary's key Type, with the Type it declared for its values.
-────╯
-
-[partial-type-mismatch]
-Error: This is not a Dictionary the update can merge in
-    ╭─┤ Dictionaries.es:28:29 │
-    │
- 28 │     constant both = [ages with names]
-    │                      ──┬─      ──┬──  
-    │                        ╰─────────│──── this is a Dictionary<String, Integer>
-    │                                  │    
-    │                                  ╰──── this is a Dictionary<String, String>
-    │ 
-    │ Help: Write the entries to set instead: '[base with "key" = value]'.
-    │ 
-    │ Note: A whole-value update merges one Dictionary into another, so what is merged in has to hold the same key and value Types. The Argument wins on a key both hold.
-────╯
-
-[redundant-key-check]
-Warning: This key is looked up twice
-    ╭─┤ Dictionaries.es:34:5 │
-    │
- 34 │     if ages::hasKey("alex") {
-    │        ──────────┬─────────  
-    │                  ╰─────────── asked here
- 35 │        constant age = ages::value(at "alex", defaultingTo 0)
-    │                       ───────────────────┬──────────────────  
-    │                                          ╰──────────────────── and answered here
-    │ 
-    │ Help: Ask 'value(at:)' once and match its Optional, or use 'value(at:defaultingTo:)' or 'update(at:with:)'.
-    │ 
-    │ Note: 'hasKey' is a lookup of its own — it asks the Dictionary for the key's value and answers whether it found one.
-────╯
-
-─── 7 errors, 1 warning
-"
-`;
-
-exports[`Diagnostic Showcase DictionarySyntax.es should render the same report every time 1`] = `
-"[syntax-error]
-Error: An update says what it changes
-    ╭─┤ DictionarySyntax.es:11:29 │
-    │
- 11 │     constant unchanged = [ages with]
-    │                                ──┬─  
-    │                                  ╰─── nothing follows this 'with'
-    │ 
-    │ Help 1: Write the entries the update sets, or the Dictionary it merges in.
-    │ Help 2: Or drop the update and write the Dictionary on its own.
-    │ 
-    │ Note: A Dictionary update writes either the entries it sets — '[ages with "kim" = 7]' — or a whole Dictionary to merge in — '[ages with other]'.
-────╯
-
-[syntax-error]
-Error: A key that is a value belongs to a Dictionary
-    ╭─┤ DictionarySyntax.es:15:22 │
-    │
- 15 │     constant braced = { "alex" = 39 }
-    │                         ───┬──  
-    │                            ╰──── this key is a value, not a member name
-    │ 
-    │ Help 1: Write it in brackets: '["a" = 1]'.
-    │ Help 2: Or name the member, if a Record is what was meant: '{ a = 1 }'.
-    │ 
-    │ Note: Braces write a Record, whose keys are the member names it declares. A key that is a value is a Dictionary's, and a Dictionary is written in brackets.
-────╯
-
-[wrong-update-brackets]
-Error: A key that is a value belongs to a Dictionary
-    ╭─┤ DictionarySyntax.es:19:31 │
-    │
- 19 │     constant older = { ages with "alex" = 40 }
-    │                                  ───┬──  
-    │                                     ╰──── this key is a value, not a member name
-    │ 
-    │ Help 1: Write the update in brackets: '[base with "a" = 1]'.
-    │ Help 2: Or name the member, if a Record is what was meant: '{ base with a = 1 }'.
-    │ 
-    │ Note: Braces update a Record, whose keys are the member names it declares. A key that is a value is a Dictionary's, and a Dictionary is updated in brackets.
-────╯
-
-[dictionary-entry-syntax]
-Error: A Dictionary entry is written with '='
-    ╭─┤ DictionarySyntax.es:23:27 │
-    │
- 23 │     constant colons = ["alex": 39]
-    │                              ▲  
-    │                              ╰── expected '=' and found ':'
-    │ 
-    │ Help: Write '=' in place of ':'.
-    │ 
-    │ Note: An entry is 'key = value', and a Dictionary is a bracket list of them: '["a" = 1, "b" = 2]'.
-────╯
-
-─── 4 errors
-"
-`;
-
-exports[`Diagnostic Showcase Define.es should render the same report every time 1`] = `
-"[define-without-cases]
-Warning: This 'define' has no cases
-    ╭─┤ Define.es:17:21 │
-    │
- 17 │ ╭─▶     constant unrated = define {
-    ┆ ┆   
- 19 │ ├─▶     }
-    │ │           
-    │ ╰─────────── nothing here is decided by cases
-    │ 
-    │ Help: Write the 'otherwise' value on its own, or add the arms this 'define' was going to ask.
-    │ 
-    │ Note: A 'define' answers with the value of the first arm whose Condition holds — and the 'otherwise' arm is the one that holds when none of them did.
-────╯
-
-[return-type-mismatch]
-Error: This arm does not answer with the Type this 'define' has
-    ╭─┤ Define.es:24:6 │
-    │
- 24 │        as "A" if score::isGreaterThanOrEqualTo(90)
-    │           ─┬─  
-    │            ╰─── this is a String
-    │ 
-    │ Note: This 'define' answers Integer.
-────╯
-
-[return-type-mismatch]
-Error: This arm does not answer with the Type this 'define' has
-    ╭─┤ Define.es:32:6 │
-    │
- 32 │        as 1 if score::isGreaterThanOrEqualTo(90)
-    │           ▲  
-    │           ╰── this is an Integer
-    │ 
-    │ Note: This 'define' answers String.
-────╯
-
-[condition-not-boolean]
-Error: A Define Condition has to be a Boolean
-    ╭─┤ Define.es:39:16 │
-    │
- 39 │        as "some" if score
-    │                     ──┬──  
-    │                       ╰──── this is an Integer
-    │ 
-    │ Note: Essence has no truthiness — only a Boolean can be a Condition.
-────╯
-
-─── 3 errors, 1 warning
-"
-`;
-
-exports[`Diagnostic Showcase DefineAnswers.es should render the same report every time 1`] = `
-"[undecided-type-arguments]
-Error: Nothing decides the Type Arguments of '#Empty'
-    ╭─┤ DefineAnswers.es:22:6 │
-    │
- 22 │        as #Empty if skipped
-    │           ───┬──  
-    │              ╰──── no Type Arguments here, and nothing around it decides them
-    │ 
-    │ Help 1: Annotate the declaration: 'constant left: Optional<ItemType> = #Empty'.
-    │ Help 2: Or apply the Type Arguments: 'Optional<ItemType>#Empty'.
-    │ 
-    │ Note 1: 'Optional' takes 1 Type Parameter: 'ItemType'.
-    │ Note 2: A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.
-────╯
-
-[define-without-answer-type]
-Error: Nothing decides what this 'define' answers
-    ╭─┤ DefineAnswers.es:21:21 │
-    │
- 21 │ ╭─▶     constant fetched = define {
- 22 │ │          as #Empty if skipped
-    │ │             ───┬──  
-    │ │                ╰──── this arm has none of its own to lend it
-    ┆ ┆   
- 24 │ ├─▶     }
-    │ │           
-    │ ╰─────────── this 'define' has no answer Type
-    │ 
-    │ Help 1: Write the answer Type on the 'define' itself: 'define -> Type { … }' — it is pushed into every arm.
-    │ Help 2: Or annotate the Declaration it stands in, where it stands in one. An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.
-    │ 
-    │ Note: A 'define' takes its answer Type from its arrow, from the position it stands in, or from what its arms answer with — and an arm that decides no Type Arguments of its own leaves nothing to take.
-────╯
-
-[undecided-type-arguments]
-Error: Nothing decides the Type Arguments of '#Empty'
-    ╭─┤ DefineAnswers.es:30:6 │
-    │
- 30 │        as #Empty if skipped
-    │           ───┬──  
-    │              ╰──── no Type Arguments here, and nothing around it decides them
-    │ 
-    │ Help 1: Annotate the declaration: 'constant left: Optional<ItemType> = #Empty'.
-    │ Help 2: Or apply the Type Arguments: 'Optional<ItemType>#Empty'.
-    │ 
-    │ Note 1: 'Optional' takes 1 Type Parameter: 'ItemType'.
-    │ Note 2: A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.
-────╯
-
-[define-without-answer-type]
-Error: Nothing decides what this 'define' answers
-    ╭─┤ DefineAnswers.es:29:25 │
-    │
- 29 │ ╭─▶     constant total = count(define {
- 30 │ │          as #Empty if skipped
-    │ │             ───┬──  
-    │ │                ╰──── this arm has none of its own to lend it
-    ┆ ┆   
- 32 │ ├─▶     })
-    │ │            
-    │ ╰──────────── this 'define' has no answer Type
-    │ 
-    │ Help 1: Write the answer Type on the 'define' itself: 'define -> Type { … }' — it is pushed into every arm.
-    │ Help 2: Or annotate the Declaration it stands in, where it stands in one. An Argument position hands nothing down: a call picks its Overload BY the Arguments, so no Parameter Type is decided before they are read.
-    │ 
-    │ Note: A 'define' takes its answer Type from its arrow, from the position it stands in, or from what its arms answer with — and an arm that decides no Type Arguments of its own leaves nothing to take.
-────╯
-
-─── 4 errors
-"
-`;
-
-exports[`Diagnostic Showcase DefineSyntax.es should render the same report every time 1`] = `
-"[define-without-otherwise]
-Error: This 'define' has no 'otherwise' arm
-    ╭─┤ DefineSyntax.es:13:19 │
-    │
- 13 │ ╭─▶     constant grade = define {
-    ┆ ┆   
- 15 │ ├─▶     }
-    │ │           
-    │ ╰─────────── every value here has a condition on it
-    │ 
-    │ Help: Write the last arm as 'as <value> otherwise'.
-    │ 
-    │ Note: A 'define' answers with a value wherever it stands, so one of its arms has to be the one that always holds.
-────╯
-
-[unreachable-define-arm]
-Error: This arm stands below the 'otherwise' arm
-    ╭─┤ DefineSyntax.es:22:3 │
-    │
- 22 │        as "low" if score::isLessThan(10)
-    │        ────────────────┬────────────────  
-    │                        ╰────────────────── nothing here can ever be reached
-    │ 
-    │ Help: Move this arm above the 'otherwise' arm, or delete it.
-    │ 
-    │ Note: The 'otherwise' arm is the one that always holds, so a 'define' answers there whenever it gets that far.
-────╯
-
-─── 2 errors
-"
-`;
-
-exports[`Diagnostic Showcase AmbiguousCase.es should render the same report every time 1`] = `
-"[ambiguous-case]
-Error: Case '#Red' is declared by more than one Choice
-    ╭─┤ AmbiguousCase.es:26:18 │
-    │
- 26 │     constant red = #Red
-    │                     ─┬─  
-    │                      ╰─── 2 Choices in scope declare it
-    │ 
-    │ Help 1: Write 'Colour#Red' to pick 'Colour'.
-    │ Help 2: Write 'Shade#Red' to pick 'Shade'.
-    │ 
-    │ Note 1: 'Colour' declares '#Red'.
-    │ Note 2: 'Shade' declares '#Red'.
-────╯
-
-[ambiguous-case]
-Error: Case '#Value' is declared by more than one Choice
-    ╭─┤ AmbiguousCase.es:33:22 │
-    │
- 33 │     constant carried = #Value(3)
-    │                         ──┬──  
-    │                           ╰──── 2 Choices in scope declare it
-    │ 
-    │ Help 1: Write 'Optional<…>#Value' with its Type Arguments to pick 'Optional'.
-    │ Help 2: Write 'Result<…>#Value' with its Type Arguments to pick 'Result'.
-    │ 
-    │ Note 1: 'Optional' declares '#Value'.
-    │ Note 2: 'Result' declares '#Value'.
-────╯
-
-[ambiguous-case]
-Error: Case '#Value' is declared by more than one Choice
-    ╭─┤ AmbiguousCase.es:38:68 │
-    │
- 38 │     constant expected: Optional<Integer> | Result<Integer, String> = #Value(1)
-    │                                                                       ──┬──  
-    │                                                                         ╰──── 2 Choices in the expected Type declare it
-    │ 
-    │ Help 1: Write 'Optional#Value' to pick 'Optional'.
-    │ Help 2: Write 'Result#Value' to pick 'Result'.
-    │ 
-    │ Note 1: 'Optional' declares '#Value'.
-    │ Note 2: 'Result' declares '#Value'.
-────╯
-
-[ambiguous-case]
-Error: Case '#Red' is declared by more than one Choice
-    ╭─┤ AmbiguousCase.es:44:10 │
-    │
- 44 │          case #Red  { <- "red" }
-    │                ─┬─  
-    │                 ╰─── 2 Choices in the matched Union declare it
-    │ 
-    │ Help 1: Write 'Colour#Red' to pick 'Colour'.
-    │ Help 2: Write 'Shade#Red' to pick 'Shade'.
-    │ 
-    │ Note 1: 'Colour' declares '#Red'.
-    │ Note 2: 'Shade' declares '#Red'.
-────╯
-
-─── 4 errors
-"
-`;
-
-exports[`Diagnostic Showcase NestingLevels.es should render the same report every time 1`] = `
-"[ambiguous-nesting-level]
-Warning: This Argument fits the receiver and what it holds
-    ╭─┤ NestingLevels.es:22:32 │
-    │
- 22 │     constant isEmpty = nested::is(#Empty)
-    │                                ─┐ ───┬──  
-    │                                 ╰────│──── this takes an Optional<Integer> as well
-    │                                      │    
-    │                                      ╰──── read as an Optional<Optional<Integer>> here
-    │ 
-    │ Help 1: Write '#Value(…)' around the Argument to ask whether the receiver holds it.
-    │ Help 2: Name it in a Constant annotated 'Optional<Optional<Integer>>' to go on asking about the receiver.
-    │ 
-    │ Note: A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.
-────╯
-
-[ambiguous-nesting-level]
-Warning: This Argument fits the receiver and what it holds
-    ╭─┤ NestingLevels.es:26:38 │
-    │
- 26 │     constant isNotEmpty = nested::isNot(#Empty)
-    │                                   ──┬── ───┬──  
-    │                                     ╰──────│──── this takes an Optional<Integer> as well
-    │                                            │    
-    │                                            ╰──── read as an Optional<Optional<Integer>> here
-    │ 
-    │ Help 1: Write '#Value(…)' around the Argument to ask whether the receiver holds it.
-    │ Help 2: Name it in a Constant annotated 'Optional<Optional<Integer>>' to go on asking about the receiver.
-    │ 
-    │ Note: A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.
-────╯
-
-[ambiguous-nesting-level]
-Warning: This Argument fits the receiver and what it holds
-    ╭─┤ NestingLevels.es:31:34 │
-    │
- 31 │     constant hasFailed = failed::is(#Failure("gone"))
-    │                                  ─┐ ────────┬───────  
-    │                                   ╰─────────│───────── this takes a Result<Integer, String> as well
-    │                                             │         
-    │                                             ╰───────── read as a Result<Result<Integer, String>, String> here
-    │ 
-    │ Help 1: Write '#Value(…)' around the Argument to ask whether the receiver holds it.
-    │ Help 2: Name it in a Constant annotated 'Result<Result<Integer, String>, String>' to go on asking about the receiver.
-    │ 
-    │ Note: A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.
-────╯
-
-[ambiguous-nesting-level]
-Warning: This Argument fits the receiver and what it holds
-    ╭─┤ NestingLevels.es:37:35 │
-    │
- 37 │     constant spelledOut = nested::is(Optional<Optional<Integer>>#Empty)
-    │                                   ─┐ ────────────────┬────────────────  
-    │                                    ╰─────────────────│────────────────── this takes an Optional<Integer> as well
-    │                                                      │                  
-    │                                                      ╰────────────────── read as an Optional<Optional<Integer>> here
-    │ 
-    │ Help 1: Write '#Value(…)' around the Argument to ask whether the receiver holds it.
-    │ Help 2: Name it in a Constant annotated 'Optional<Optional<Integer>>' to go on asking about the receiver.
-    │ 
-    │ Note: A call reaches the first entry its Arguments fit, and the entry taking the receiver's own Type is written first — so this asks whether the receiver IS the Argument, not whether it holds it.
-────╯
-
-─── 4 warnings
-"
-`;
-
-exports[`Diagnostic Showcase Asynchrony.es should render the same report every time 1`] = `
-"[complete-outside-future]
-Error: 'complete' waits, and nothing here can wait
-    ╭─┤ Asynchrony.es:17:6 │
-    │
- 17 │        <- complete Async.deferred(() { <- 1 })
-    │           ──────────────────┬─────────────────  
-    │                             ╰─────────────────── this Function returns Integer
-    │ 
-    │ Help: Declare the return Type 'Future<Integer>'.
-    │ 
-    │ Note: A body that writes 'complete' suspends, so it hands back a Future the caller completes in its turn — which is what its declared Type has to say.
-────╯
-
-[complete-outside-future]
-Error: 'complete' waits, and nothing here can wait
-    ╭─┤ Asynchrony.es:23:37 │
-    │
- 23 │     function padded(_ width: Integer = complete Async.deferred(() { <- 2 })) -> Integer {
-    │                                        ──────────────────┬─────────────────  
-    │                                                          ╰─────────────────── this suspends, and this position can not
-    │ 
-    │ Help: Complete the work above this position, into a Constant it reads, or move it into a Function declared '-> Future<…>'.
-    │ 
-    │ Note: A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins. A test's name is worked out before the run, a benchmark body is timed over many runs, and a property body runs once per generated value.
-────╯
-
-[needless-complete]
-Warning: This is not work to wait for
-    ╭─┤ Asynchrony.es:30:20 │
-    │
- 30 │     constant waited = complete 3
-    │                                ▲  
-    │                                ╰── this is an Integer
-    │ 
-    │ Help: Drop the 'complete'.
-    │ 
-    │ Note: 'complete' waits for what a Future or a Started answers with — a value that is neither is already the answer.
-────╯
-
-[needless-start]
-Warning: This is not a Future, so there is nothing to start
-    ╭─┤ Asynchrony.es:34:21 │
-    │
- 34 │     constant running = start 4
-    │                              ▲  
-    │                              ╰── this is an Integer
-    │ 
-    │ Help: Drop the 'start'.
-    │ 
-    │ Note: 'start' puts a Future in flight and answers the one run of it — a value that is not a Future describes no work to run.
-────╯
-
-[complete-outside-future]
-Error: 'complete' waits, and nothing here can wait
-    ╭─┤ Asynchrony.es:44:22 │
-    │
- 44 │        constant counted = complete Async.deferred(() { <- 5 })
-    │                           ──────────────────┬─────────────────  
-    │                                             ╰─────────────────── this suspends, and this position can not
-    │ 
-    │ Help: Complete the work above this position, into a Constant it reads, or move it into a Function declared '-> Future<…>'.
-    │ 
-    │ Note: A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins. A test's name is worked out before the run, a benchmark body is timed over many runs, and a property body runs once per generated value.
-────╯
-
-[complete-outside-future]
-Error: 'complete' waits, and nothing here can wait
-    ╭─┤ Asynchrony.es:52:21 │
-    │
- 52 │        constant padded = complete Async.deferred(() { <- width })
-    │                          ────────────────────┬───────────────────  
-    │                                              ╰───────────────────── this suspends, and this position can not
-    │ 
-    │ Help: Complete the work above this position, into a Constant it reads, or move it into a Function declared '-> Future<…>'.
-    │ 
-    │ Note: A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins. A test's name is worked out before the run, a benchmark body is timed over many runs, and a property body runs once per generated value.
-────╯
-
-─── 4 errors, 2 warnings
-"
-`;
-
-exports[`Diagnostic Showcase AsynchronyStatements.es should render the same report every time 1`] = `
-"[unused-future]
-Error: Nothing here runs
-    ╭─┤ AsynchronyStatements.es:22:2 │
-    │
- 22 │     headline()
-    │     ─────┬────  
-    │          ╰────── this is a Future<Integer>, and its value goes nowhere
-    │ 
-    │ Help 1: Did you mean 'complete', to wait for it — or 'start', to put it in flight and carry on?
-    │ Help 2: Or, where the call was written for what it does rather than for what it answers, hold its answer in a Constant.
-    │ 
-    │ Note: A Future describes work. Building one runs none of it — 'start' puts it in flight and 'complete' waits for what it answers with.
-────╯
-
-[unobserved-started]
-Advice: Nothing waits for this
-    ╭─┤ AsynchronyStatements.es:27:2 │
-    │
- 27 │     start headline()
-    │     ────────┬───────  
-    │             ╰───────── this runs, and nobody reads its answer
-    │ 
-    │ Help: Hold it in a Constant and 'complete' it where the answer is wanted, if the answer is wanted at all.
-    │ 
-    │ Note: A Started can be completed any number of times, from anywhere — holding it under a name is what makes that possible later.
-────╯
-
-[unused-future]
-Error: Nothing here runs
-    ╭─┤ AsynchronyStatements.es:33:2 │
-    │
- 33 │     Terminal.inspect(headline())
-    │     ──────────────┬─────────────  
-    │                   ╰─────────────── this is a Future<Integer>, and its value goes nowhere
-    │ 
-    │ Help 1: Did you mean 'complete', to wait for it — or 'start', to put it in flight and carry on?
-    │ Help 2: Or, where the call was written for what it does rather than for what it answers, hold its answer in a Constant.
-    │ 
-    │ Note: A Future describes work. Building one runs none of it — 'start' puts it in flight and 'complete' waits for what it answers with.
-────╯
-
-[unobserved-started]
-Advice: Nothing waits for this
-    ╭─┤ AsynchronyStatements.es:38:2 │
-    │
- 38 │     Terminal.inspect(start headline())
-    │     ─────────────────┬────────────────  
-    │                      ╰────────────────── this answers a run, and nobody reads what it answers with
-    │ 
-    │ Help: Hold it in a Constant and 'complete' it where the answer is wanted, if the answer is wanted at all.
-    │ 
-    │ Note: A Started can be completed any number of times, from anywhere — holding it under a name is what makes that possible later.
-────╯
-
-─── 2 errors, 2 remarks
-"
-`;
-
-exports[`Diagnostic Showcase SwallowedString.es should render the same report every time 1`] = `
-"[unclosed-string]
-Error: This String Literal is never closed
-    ╭─┤ SwallowedString.es:20:22 │
-    │
- 20 │     constant greeting = "Hello
-    │                         ▲  
-    │                         ╰── opened here
- 21 │     constant name = "Ada"
-    │                     ▲  
-    │                     ╰── closed by this quote, which reads as the start of another String
-    │ 
- 25 │ }
-    │  │ 
-    │  ╰─ and the input ends inside that one
-    │ 
-    │ Help 1: Add the missing '"' at the end of line 20.
-    │ Help 2: Or, if line 20 was meant to carry the lines below it, add it at the end of the input instead.
-    │ 
-    │ Note 1: A String Literal may span lines, and the line breaks are part of it — so the quote on line 21 closed the one opened on line 20, and the String that quote was written to open is the one that ran to the end of the input.
-    │ Note 2: One '"' is missing either way. It is reported against the String that spans lines, because a String written to span them is not usually followed, on the line it closes, by a second one that never closes at all.
-────╯
-
-─── 1 error
-"
-`;
-
-exports[`Diagnostic Showcase KnownAnswers.es should render the same report every time 1`] = `
-"[unknown-method]
-Error: No Method named 'add' for this value
-    ╭─┤ KnownAnswers.es:25:25 │
-    │
- 25 │     Terminal.print(primes::add(1)::toString())
-    │                    ───┬──  ─┬─  
-    │                       ╰─────│─── this is a List<Integer>
-    │                             │   
-    │                             ╰─── no Method of this name
-    │ 
-    │ Help 1: Call '::add(…)' on each item — '::map((item) { <- item::add(…) })'.
-    │ Help 2: Or read one out with '::item(at …, defaultingTo …)' and call '::add(…)' on it.
-    │ 
-    │ Note 1: 'add' is a Method of Integer, which is what a List<Integer> holds — a Method of its items rather than of the List itself.
-    │ Note 2: Searched Namespaces 'List', 'IntegerList', 'NumberList', 'KeyedNumberList', 'GroupedList'.
-────╯
-
-[unknown-method]
-Error: No Method named 'add' for Optional#Value
-    ╭─┤ KnownAnswers.es:29:38 │
-    │
- 29 │     Terminal.print(primes::firstItem()::add(1)::toString())
-    │                    ─────────┬─────────  ─┬─  
-    │                             ╰────────────│─── this is an Optional<Integer>
-    │                                          │   
-    │                                          ╰─── Optional#Value has no Method of this name
-    │ 
-    │ Help 1: Read the value out with '::value(defaultingTo …)' and call '::add(…)' on it, or reach through it with '::map((value) { <- value::add(…) })'.
-    │ Help 2: Or take it apart with a 'match', and call '::add(…)' on the payload.
-    │ 
-    │ Note 1: 'add' is a Method of Integer, and 'Optional#Value' carries one.
-    │ Note 2: Every member of the Union must provide 'add' — the receiver's Type is only known at runtime.
-────╯
-
-[unknown-method]
-Error: No Method named 'add' for this value
-    ╭─┤ KnownAnswers.es:34:28 │
-    │
- 34 │     Terminal.print(fetched()::add(1)::toString())
-    │                    ────┬────  ─┬─  
-    │                        ╰───────│─── this is a Future<Integer>
-    │                                │   
-    │                                ╰─── no Method of this name
-    │ 
-    │ Help 1: Wait for it on a line of its own — 'constant answered = complete …' — and call '::add(…)' on 'answered'.
-    │ Help 2: Or reach through it with '::map((value) { <- value::add(…) })', which answers another Future.
-    │ 
-    │ Note 1: 'add' is a Method of Integer. This describes work that has not run — the Integer is what a Future<Integer> answers with, once something waits for it.
-    │ Note 2: 'complete' takes the whole chain behind it, so a 'complete' written in front of this call would wait for the call rather than for the receiver.
-    │ Note 3: Searched Namespace 'Future'.
-────╯
-
-[unknown-case]
-Error: 'Rounding' declares no Case '#Floor'
-    ╭─┤ KnownAnswers.es:39:36 │
-    │
- 39 │     Terminal.print(7/2::round(toward #Floor)::toString())
-    │                                       ──┬──  
-    │                                         ╰──── no such Case
-    │ 
-    │ Note: This position takes a Rounding: '#Nearest', '#NearestEven', '#Down', '#Up', '#TowardZero'.
-────╯
-
-[unknown-case]
-Error: No Choice in scope declares a Case '#Truncated'
-    ╭─┤ KnownAnswers.es:43:35 │
-    │
- 43 │     constant options = { division = #Truncated }
-    │                                      ────┬────  
-    │                                          ╰────── no such Case
-    │ 
-    │ Help 1: Did you mean '#Truncating'?
-    │ Help 2: Annotate the value, or pass it where a Choice is expected, so the Case resolves against that Choice's own Cases.
-    │ 
-    │ Note: 'Division' declares '#Truncating'.
-────╯
-
-[unknown-name]
-Error: 'noon' is not declared
-    ╭─┤ KnownAnswers.es:53:24 │
-    │
- 53 │          <- @::isGreaterThan(noon)
-    │                              ──┬─  
-    │                                ╰─── no such Variable or Constant
-    │ 
-    │ Help: Write 'Clock.noon'.
-    │ 
-    │ Note: A static is reached through its Namespace, inside the Namespace too.
-────╯
-
-[unknown-name]
-Error: 'width' is not declared
-    ╭─┤ KnownAnswers.es:61:7 │
-    │
- 61 │          <- width
-    │             ──┬──  
-    │               ╰──── no such Variable or Constant
-    │ 
-    │ Help: Write '@.width'.
-    │ 
-    │ Note: 'width' is a member of { width: Integer }, and a member is read off the value rather than named on its own.
-────╯
-
-─── 7 errors
 "
 `;

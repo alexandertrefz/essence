@@ -289,12 +289,10 @@ export function renderSingleReport(
 	}
 
 	if (!outcome.ok) {
-		if (outcome.failedStage !== null) {
-			lines.push(
-				`${INDENT}${INDENT}${palette.muted(
-					`stopped while ${stageVerb(outcome.failedStage)}`,
-				)}`,
-			)
+		let stopped = stoppedLine(outcome)
+
+		if (stopped !== null) {
+			lines.push(`${INDENT}${INDENT}${palette.muted(stopped)}`)
 		}
 
 		if (outcome.stack !== null && context.verbose) {
@@ -368,6 +366,26 @@ export function renderWatchLine(
 	return `${INDENT}${symbol} ${time}  ${input}${target}${size}  ${palette.muted(
 		formatDuration(outcome.duration),
 	)}`
+}
+
+// NOTE: What a failed compile stopped short of, or nothing at all where it
+// stopped short of nothing.
+//
+// A stage NAME is only ever said where a stage refused: the file could not be
+// read, or the emitter gave up. The stages that read the source no longer
+// refuse anything — every one of them runs and every one of them reports — so
+// what the reader is holding after an error in their Program is the complete
+// answer, and "stopped while inferring types" would now be a lie about a report
+// the Validator also contributed to.
+//
+// What IS worth saying is that the file the command was going to write was not
+// written. A `check` writes none, and has nothing to add.
+function stoppedLine(outcome: CompileOutcome): string | null {
+	if (outcome.failedStage !== null) {
+		return `stopped while ${stageVerb(outcome.failedStage)}`
+	}
+
+	return outcome.outputFileName === null ? null : "stopped before building"
 }
 
 function stageVerb(stage: StageName): string {

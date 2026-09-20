@@ -1,4 +1,4 @@
-import type { common } from "@essence-lang/interfaces"
+import type { common, parser } from "@essence-lang/interfaces"
 
 import {
 	collectDiagnostics,
@@ -93,8 +93,40 @@ let initialisingProperty: {
 	unbound: Map<string, common.Position>
 } | null = null
 
+// NOTE: The lines the Parser abandoned text on — see `parser.Recovery`. A
+// construct written across one of them was not read whole, so what it LACKS
+// says nothing about what the reader wrote: the `<-` that would have made a
+// Function return was dropped out of it, the arm that would have given a
+// `define` its cases was, and reporting the absence is reporting the syntax
+// error again in words that name the wrong mistake.
+// Module state for the reason `witnessScopes` is.
+let abandonedLines: ReadonlySet<number> = new Set()
+
+// NOTE: Whether anything has already been reported about this Program. The
+// three rails below state invariants the EMITTED JavaScript rests on, and every
+// one of them rests in turn on a Program that parsed and enriched cleanly: a
+// witness that was never built because its Namespace does not conform is a
+// missing conformance Argument, and answering that with an Internal Compiler
+// Error is the Compiler blaming itself for a mistake the reader has already
+// been told about. Nothing is emitted from a Program with an Error in it, so
+// there is nothing left for the rails to protect.
+// Module state for the reason `witnessScopes` is.
+let alreadyReported = false
+
+export type ValidateOptions = {
+	// NOTE: What the Parser abandoned on its way to this Program — see
+	// `parser.Recovery`. The typed Program does not carry it: it is the PARSER's
+	// record, and the one caller that runs both stages has it in hand.
+	recovery?: parser.Recovery
+	// NOTE: Whether the Parser or the Enricher reported an Error about this
+	// Program — see `alreadyReported`. Left off by a caller that knows there was
+	// none, which is every spec that validates a Program it just asserted clean.
+	reported?: boolean
+}
+
 export const validate = (
 	program: common.typed.Program,
+	options: ValidateOptions = {},
 ): Array<common.Diagnostic> => {
 	// NOTE: A fresh stack per run. Each frame is popped in a `finally`, so this
 	// is the guarantee rather than the mechanism: no Program is ever checked
@@ -103,6 +135,8 @@ export const validate = (
 	topLevelNamespaces = collectTopLevelNamespaces(program.implementation.nodes)
 	executingTopLevelIndex = null
 	initialisingProperty = null
+	abandonedLines = new Set(options.recovery?.lines ?? [])
+	alreadyReported = options.reported === true
 
 	let { diagnostics } = collectDiagnostics(() => {
 		for (let [index, node] of program.implementation.nodes.entries()) {
@@ -135,6 +169,29 @@ export const validate = (
 	})
 
 	return diagnostics
+}
+
+// NOTE: Whether the Parser abandoned text on any line this construct is written
+// across — see `abandonedLines`. Lines rather than spans, because a Statement
+// dropped out of a body leaves a hole the body's own span no longer reaches:
+// `<- item:isGreaterThan(2)` keeps the `<- item` and drops the rest of the line,
+// and the Return Statement that survives ends before the text that went.
+//
+// Asked by every check whose verdict is about a construct being WHOLE. A check
+// that judges what IS written — a Condition that is not a Boolean, a Rational
+// over zero — is none of its business and does not ask.
+function partiallyRead(position: common.Position): boolean {
+	if (abandonedLines.size === 0) {
+		return false
+	}
+
+	for (let line = position.start.line; line <= position.end.line; line++) {
+		if (abandonedLines.has(line)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 function reportInternalError(error: unknown, position: common.Position): void {
@@ -538,12 +595,15 @@ function isBoundFunctionType(type: common.Type): boolean {
 // call it is about, rather than as a `ReferenceError` or a wrong answer out of
 // the emitted Program.
 //
-// NOTE: The Language Server runs the Validator whenever the ENRICHER was
-// clean, which a Program the Parser already broke can be — so one of these can
-// report beside the Diagnostic that explains it. That is accepted: a
-// double-report on a Program that does not compile costs a line of output,
-// while gating the check on there being no other Diagnostic at all would take
-// the net away from every Program that has one.
+// NOTE: And every one of them stands down on a Program that has ALREADY been
+// reported on — see `alreadyReported`. The invariants are about what the
+// emitter will be handed, and nothing is emitted from such a Program; what they
+// answer there is the recovery rather than a bug. `boxes::sort()` beside a
+// Namespace that failed to conform resolved no witness, and the arity rail
+// called that a Compiler bug in a file whose real mistake was two lines up.
+function railsStandDown(): boolean {
+	return alreadyReported
+}
 
 // NOTE: The Type Parameters of the Signature an Invocation resolved to — one
 // entry per Overload, so a Method that has several is asked about the one the
@@ -591,8 +651,10 @@ function invokedSignatureGenerics(
 // NOTE: An Error anywhere in what the Invocation was resolved FROM is why a
 // witness would be missing — a Type Parameter bound to an Error is skipped on
 // purpose, so that the one mistake is reported once, where it was made — and
-// the count says nothing then. The Validator only runs when the Enricher was
-// clean, so this is reachable only for a Program the Parser already broke.
+// the count says nothing then. A witness can go missing without an Error to
+// show for it, though — a conformance that was refused leaves the Signature's
+// bound standing and no Argument to answer it — which is what
+// `railsStandDown` is for.
 function checkConformanceArity(
 	node:
 		| common.typed.MethodInvocationNode
@@ -600,7 +662,11 @@ function checkConformanceArity(
 	calleeType: common.Type | undefined,
 	describeCallee: () => string,
 ): void {
-	if (calleeType === undefined || typeContainsError(calleeType)) {
+	if (
+		railsStandDown() ||
+		calleeType === undefined ||
+		typeContainsError(calleeType)
+	) {
 		return
 	}
 
@@ -659,6 +725,7 @@ function checkCommittedOverload(
 	describeCallee: () => string,
 ): void {
 	if (
+		railsStandDown() ||
 		node.overloadedMethodIndex === null ||
 		typeContainsError(node.type) ||
 		node.arguments.some((argumentNode) =>
@@ -727,6 +794,10 @@ function checkWitnessScope(
 	conformances: Array<common.Conformance>,
 	describeSite: () => string,
 ): void {
+	if (railsStandDown()) {
+		return
+	}
+
 	for (let conformance of conformances) {
 		if (conformance.source.kind === "namespace") {
 			checkWitnessScope(conformance.source.conditions, describeSite)
@@ -1026,6 +1097,19 @@ function validateFunctionInvocation(
 		return node
 	}
 
+	// NOTE: An Argument the Enricher could not type is an Argument that fits
+	// nothing, so measuring the call against its Signature answers the hole
+	// rather than the call — and a hole in ONE Argument moves every Argument
+	// after it, so the whole call stands down rather than the position that
+	// carries it. The mistake has been reported where the Argument was written.
+	if (
+		node.arguments.some((argumentNode) =>
+			typeContainsError(argumentNode.value.type),
+		)
+	) {
+		return node
+	}
+
 	if (
 		functionType.type === "Function" ||
 		functionType.type === "StaticMethod"
@@ -1218,8 +1302,35 @@ function validateIdentifier(
 	return node
 }
 
+// NOTE: Whether anything this Match is judged BY is a hole — the value it
+// matches, or a Matcher the Enricher could not resolve. Every verdict below is
+// a comparison between the two, and a comparison against an Error answers the
+// mistake that left it rather than the Cases the reader wrote: a Case naming a
+// Choice whose Declaration went missing is not unreachable, it is unresolved,
+// and calling it dead would grey out the four Cases beside it too.
+//
+// The SHAPE is a second way to be judging something that was not written, and
+// it is a separate question: a Handler the Parser dropped leaves a Match that
+// handles fewer Cases than the file does.
+function matchIsJudgeable(node: common.typed.MatchNode): boolean {
+	return (
+		!typeContainsError(node.value.type) &&
+		!node.handlers.some((handler) => typeContainsError(handler.matcher)) &&
+		!partiallyRead(node.position)
+	)
+}
+
 function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	validateExpression(node.value)
+
+	if (!matchIsJudgeable(node)) {
+		// NOTE: The Handlers' BODIES are still walked — everything below the
+		// early return covers them, and a mistake written inside a Handler is
+		// its own, whatever the Match around it came to.
+		validateMatchHandlers(node)
+
+		return node
+	}
 
 	if (node.value.type.type === "UnionType") {
 		// NOTE: Flattened, so that a Union member that is itself a Union — a
@@ -1502,6 +1613,17 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		)
 	}
 
+	validateMatchHandlers(node)
+
+	return node
+}
+
+// NOTE: What every Handler is made of, judged whatever the Match around it came
+// to. Split out because a Match nothing can be said ABOUT still holds Handlers
+// whose bodies are ordinary Statements — the reader's own — and skipping them
+// with the exhaustiveness verdict would take a whole branch of the Program out
+// of the Validator's reach for want of one resolved Case name.
+function validateMatchHandlers(node: common.typed.MatchNode): void {
 	for (let handler of node.handlers) {
 		// NOTE: A Guard decides, per value, whether its Handler runs — it is a
 		// Condition, and is held to what every other Condition is held to.
@@ -1544,8 +1666,6 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 
 		validateDefiniteReturn(handlerContext, node.position)
 	}
-
-	return node
 }
 
 // NOTE: Nothing here walks sub-Expressions on its own — every Validator recurs
@@ -1587,7 +1707,11 @@ function validateDefine(
 // well-formed: it has the one arm every `define` must have, and this is a
 // judgment about what that arm is worth rather than about how it was written.
 function reportCaselessDefine(node: common.typed.DefineNode): void {
-	if (node.arms.length > 0) {
+	// NOTE: And silent for a `define` the Parser did not read whole — see
+	// `partiallyRead`. A ladder whose arms were dropped has no cases HERE and
+	// every one of them in the file, which is the syntax error above wearing a
+	// Warning's clothes.
+	if (node.arms.length > 0 || partiallyRead(node.position)) {
 		return
 	}
 
@@ -2370,6 +2494,18 @@ function validateCaseValue(
 		return node
 	}
 
+	// NOTE: A payload judged against a Case whose own members the Enricher could
+	// not establish — or a payload VALUE it could not — is judged against a hole,
+	// and every answer that comes back names Types the reader never wrote. The
+	// two shape checks above it stand down with it: which of them applies is
+	// decided by the very members that are missing.
+	if (
+		typeContainsError(node.type) ||
+		(node.value !== null && typeContainsError(node.value.type))
+	) {
+		return node
+	}
+
 	let payloadType: common.RecordType = {
 		type: "Record",
 		members: node.type.members,
@@ -2889,13 +3025,20 @@ function isDirectSelfCall(
 function checkInfiniteRecursion(
 	name: common.typed.IdentifierNode,
 	definition: common.typed.FunctionDefinitionNode,
+	position: common.Position,
 	identity: MethodIdentity,
 ): void {
 	let returns = collectTopLevelReturns(definition.body)
 
 	// NOTE: No return of its own — a native Method, or one that answers only
 	// from inside a `match` — says nothing here.
-	if (returns.length === 0) {
+	//
+	// NOTE: And neither does a Method the Parser did not read whole — see
+	// `partiallyRead`. "Every returning path" is a claim about the paths that
+	// were WRITTEN, and the base case may well be the Statement that was
+	// dropped; `position` is the Method's own span, because a path that went
+	// missing leaves no Node behind to ask about.
+	if (returns.length === 0 || partiallyRead(position)) {
 		return
 	}
 
@@ -2964,11 +3107,16 @@ function validateProtocolDeclarationStatement(
 		}
 
 		validateFunctionDefinition(method.method.value, method.method.position)
-		checkInfiniteRecursion(method.name, method.method.value, {
-			namespaceName: node.name.content,
-			methodName: method.name.content,
-			overloadIndex: null,
-		})
+		checkInfiniteRecursion(
+			method.name,
+			method.method.value,
+			method.method.position,
+			{
+				namespaceName: node.name.content,
+				methodName: method.name.content,
+				overloadIndex: null,
+			},
+		)
 	}
 
 	return node
@@ -3030,11 +3178,16 @@ function validateNamespaceDefinitionStatement(
 				method.method.value,
 				method.method.position,
 			)
-			checkInfiniteRecursion(method.name, method.method.value, {
-				namespaceName: node.name.content,
-				methodName: method.name.content,
-				overloadIndex: null,
-			})
+			checkInfiniteRecursion(
+				method.name,
+				method.method.value,
+				method.method.position,
+				{
+					namespaceName: node.name.content,
+					methodName: method.name.content,
+					overloadIndex: null,
+				},
+			)
 		} else {
 			for (let index = 0; index < method.methods.length; index++) {
 				let overloadedMethod = method.methods[index]
@@ -3043,11 +3196,16 @@ function validateNamespaceDefinitionStatement(
 					overloadedMethod.value,
 					overloadedMethod.position,
 				)
-				checkInfiniteRecursion(method.name, overloadedMethod.value, {
-					namespaceName: node.name.content,
-					methodName: method.name.content,
-					overloadIndex: method.overloadIndices[index],
-				})
+				checkInfiniteRecursion(
+					method.name,
+					overloadedMethod.value,
+					overloadedMethod.position,
+					{
+						namespaceName: node.name.content,
+						methodName: method.name.content,
+						overloadIndex: method.overloadIndices[index],
+					},
+				)
 			}
 		}
 	}
@@ -3093,10 +3251,18 @@ function validateReturnStatement(
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.ReturnStatementNode {
 	if (currentFunctionContext === null) {
-		reportError("There is nothing here to return from", node.position, {
-			code: "top-level-return",
-			labels: [primary(node.position, "this is outside any Function")],
-		})
+		// NOTE: Silent where the Parser did not read the line whole — see
+		// `partiallyRead`. A `function` head the recovery dropped leaves its
+		// body's `<-` standing at the top level, and saying so names the one
+		// thing about those lines that is not wrong.
+		if (!partiallyRead(node.position)) {
+			reportError("There is nothing here to return from", node.position, {
+				code: "top-level-return",
+				labels: [
+					primary(node.position, "this is outside any Function"),
+				],
+			})
+		}
 	} else if (
 		!fitsExpectedType(
 			returnedTypeOf(
@@ -3323,6 +3489,13 @@ function validateDefiniteReturn(
 		return
 	}
 
+	// NOTE: A body the Parser did not read whole is a body whose `<-` may be
+	// exactly what went missing — see `partiallyRead`. Falling off the end is a
+	// claim about every path through what was WRITTEN, and this is not that.
+	if (partiallyRead(position)) {
+		return
+	}
+
 	if (!bodyDefinitelyReturns(definition.body)) {
 		reportError("Not every path through this Function returns", position, {
 			code: "missing-return",
@@ -3347,10 +3520,35 @@ function validateDefiniteReturn(
 // is still refused. The Enricher admits the same literals as it matches
 // Arguments, and this is that question asked again over the finished tree, at
 // every position the Enricher does not resolve one against the other.
+// NOTE: A hole on either side is answered as a FIT, which is the whole of how
+// this Validator stays quiet about mistakes it has already been told about. The
+// Enricher writes an Error wherever it could not establish a Type and reports
+// why, once, where the reading failed; a value of that Type then fits nothing,
+// and every position it travels to would refuse it again in words about Types
+// the reader never wrote. One hole, one Diagnostic.
+//
+// Asked here rather than at the six positions that call this, because they all
+// want the same answer: a Constant's annotation, a Variable's, a Property's, an
+// assignment, a `<-` and a `define` arm each measure a written value against a
+// written Type, and none of them has anything to say when one of the two is a
+// hole.
+//
+// NOTE: The two sides are asked DIFFERENT questions, and the difference is what
+// keeps this from swallowing mismatches that are real. An Error anywhere in the
+// EXPECTED Type means the annotation did not resolve, so there is nothing left
+// to hold the value to. On the VALUE's side only a Type that IS an Error
+// counts: an Error buried inside one is a slot nothing bound, which
+// `Result::flatten` leaves behind on a Program the Enricher had no complaint
+// about — the value is a Union of Results either way, and a `String` annotation
+// over it is a mismatch the Error has no part in.
 function fitsExpectedType(
 	expected: common.Type,
 	value: common.typed.ExpressionNode,
 ): boolean {
+	if (typeContainsError(expected) || value.type.type === "Error") {
+		return true
+	}
+
 	return fitsWritten(expected, value)
 }
 

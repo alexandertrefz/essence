@@ -5,6 +5,7 @@ import { type common, lexer, type parser } from "@essence-lang/interfaces"
 // node generators in ../nodeGenerators.
 import {
 	collectDiagnostics,
+	inSourceOrder,
 	markDiagnostics,
 	primary,
 	reportError,
@@ -8771,38 +8772,6 @@ export type ParseResult = {
 // parser recovers and always produces a Program (broken Statements are
 // dropped). `parseWithDiagnostics` is the full form the compiler driver
 // uses; `parse` is the convenience form for callers that only need the AST.
-// NOTE: The Lexer reads the whole file before the Parser reads a Token of it,
-// so everything the Lexer had to say stood above everything the Parser did,
-// whatever line each of them was about: a bad escape on line 6 printed over a
-// `let` on line 2. Reading a report is reading a file, so they come out in the
-// order the lines do. A STABLE sort, so two Diagnostics about one Position stay
-// in the order the stage that found them made them.
-function inSourceOrder(
-	diagnostics: Array<common.Diagnostic>,
-): Array<common.Diagnostic> {
-	return diagnostics
-		.map((diagnostic, index) => ({ diagnostic, index }))
-		.sort((left, right) => {
-			let here = left.diagnostic.position
-			let there = right.diagnostic.position
-
-			if (here === null || there === null) {
-				return here === there
-					? left.index - right.index
-					: here === null
-						? -1
-						: 1
-			}
-
-			return (
-				here.start.line - there.start.line ||
-				here.start.column - there.start.column ||
-				left.index - right.index
-			)
-		})
-		.map(({ diagnostic }) => diagnostic)
-}
-
 export function parseWithDiagnostics(
 	chunk: string,
 	options?: ParserOptions,

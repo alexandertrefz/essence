@@ -534,7 +534,7 @@
 		"prefix": "narrow",
 		"body": [
 			"if ${1:value}::${2:isNot}(${3:0}) {",
-			"\t<- ${0:proven}(${1:value})",
+			"\tconstant ${4:answer} = ${0:proven}(${1:value})",
 			"}"
 		],
 		"description": "A refinement doorway — the branch that proved the predicate is the only one reaching the operation demanding it."

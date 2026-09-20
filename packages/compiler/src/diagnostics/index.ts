@@ -168,6 +168,46 @@ export function containsErrors(diagnostics: Array<common.Diagnostic>): boolean {
 	return diagnostics.some((diagnostic) => diagnostic.severity === "error")
 }
 
+// NOTE: Reading a report is reading a file, so the Diagnostics come out in the
+// order the lines do — whichever stage found each of them. Left alone a report
+// is ordered by STAGE, because each stage reads the file whole before the next
+// one starts: the Lexer's bad escape on line 6 printed above the Parser's `let`
+// on line 2, and now that every stage runs, a Type error on line 3 would print
+// above a syntax error on line 40.
+//
+// A STABLE sort, so two Diagnostics about one Position stay in the order the
+// stages made them — which is the order that reads best, since the earlier
+// stage is the one that explains the later.
+//
+// A placeless Diagnostic goes first. It is about the compilation rather than
+// about the source — a file that could not be read, a bundle that failed — so
+// there is no line to put it beside and the top is where it is seen.
+export function inSourceOrder(
+	diagnostics: Array<common.Diagnostic>,
+): Array<common.Diagnostic> {
+	return diagnostics
+		.map((diagnostic, index) => ({ diagnostic, index }))
+		.sort((left, right) => {
+			let here = left.diagnostic.position
+			let there = right.diagnostic.position
+
+			if (here === null || there === null) {
+				return here === there
+					? left.index - right.index
+					: here === null
+						? -1
+						: 1
+			}
+
+			return (
+				here.start.line - there.start.line ||
+				here.start.column - there.start.column ||
+				left.index - right.index
+			)
+		})
+		.map(({ diagnostic }) => diagnostic)
+}
+
 // NOTE: Whether a verdict of this code already stands about this line — and,
 // where `message` is given, that verdict and no other. The one question a report
 // asks about the ones made in front of it, and it has two callers.

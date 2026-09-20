@@ -1705,8 +1705,14 @@ describe("CLI on a Module graph", () => {
 			expect(
 				dependency?.diagnostics.map((diagnostic) => diagnostic.code),
 			).toEqual(["return-type-mismatch"])
-			expect(entry?.diagnostics).toEqual([])
-			expect(outcome.diagnostics).toHaveLength(1)
+			// NOTE: The entry's own Diagnostic says why IT did not compile,
+			// which is a thing about the entry rather than a second telling of
+			// the dependency's mistake. It is what the Editor shows over the
+			// import, and `esc` and the Editor answer about a file alike.
+			expect(
+				entry?.diagnostics.map((diagnostic) => diagnostic.code),
+			).toEqual(["dependency-has-errors"])
+			expect(outcome.diagnostics).toHaveLength(2)
 
 			let rendered = stripAnsi(
 				renderDiagnosticsFor(outcome, plainReport()) ?? "",
@@ -1730,13 +1736,22 @@ describe("CLI on a Module graph", () => {
 			])
 
 			expect(report.ok).toBe(false)
-			expect(report.errors).toBe(1)
 			expect(report.files).toHaveLength(2)
 
 			let diagnostics = report.files.flatMap((file) => file.diagnostics)
 
-			expect(diagnostics).toHaveLength(1)
-			expect(path.basename(diagnostics[0]!.file)).toBe("Dep.es")
+			// NOTE: Dep.es's own mistake, reported once however many entries
+			// reach it, and Main.es's own answer for why it did not compile.
+			expect(
+				diagnostics.map((diagnostic) => [
+					path.basename(diagnostic.file),
+					diagnostic.code,
+				]),
+			).toEqual([
+				["Dep.es", "return-type-mismatch"],
+				["Main.es", "dependency-has-errors"],
+			])
+			expect(report.errors).toBe(2)
 			expect(report.files.map((file) => file.ok)).toEqual([false, false])
 		})
 	})
@@ -1749,11 +1764,15 @@ describe("CLI on a Module graph", () => {
 
 			expect(report.files).toHaveLength(1)
 			expect(path.basename(report.files[0]!.input)).toBe("Main.es")
-			expect(report.files[0]!.diagnostics).toHaveLength(1)
-			expect(path.basename(report.files[0]!.diagnostics[0]!.file)).toBe(
-				"Dep.es",
-			)
-			expect(report.files[0]!.diagnostics[0]!.line).toBe(4)
+			expect(
+				report.files[0]!.diagnostics.map((diagnostic) => [
+					path.basename(diagnostic.file),
+					diagnostic.line,
+				]),
+			).toEqual([
+				["Dep.es", 4],
+				["Main.es", 2],
+			])
 		})
 	})
 

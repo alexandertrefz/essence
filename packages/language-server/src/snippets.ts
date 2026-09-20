@@ -692,9 +692,14 @@ export const snippets: Array<Snippet> = [
 		prefix: "narrow",
 		description:
 			"A refinement doorway — the branch that proved the predicate is the only one reaching the operation demanding it.",
+		// NOTE: The doorway HOLDS its answer rather than returning it. This is
+		// offered wherever a Statement may stand, and the top of a section is
+		// one of those places — a `<-` written there is a `top-level-return`,
+		// which makes this a scaffold that writes a Diagnostic into the
+		// reader's file.
 		body: [
 			"if ${1:value}::${2:isNot}(${3:0}) {",
-			"\t<- ${0:proven}(${1:value})",
+			"\tconstant ${4:answer} = ${0:proven}(${1:value})",
 			"}",
 		],
 		contexts: ["implementation"],

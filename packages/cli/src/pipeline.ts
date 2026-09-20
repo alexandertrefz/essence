@@ -1,6 +1,10 @@
 import * as path from "node:path"
 import { gzipSync } from "node:zlib"
 
+import {
+	analyseEnriched,
+	analyseLinkedModules,
+} from "@essence-lang/compiler/analysis"
 import type {
 	BundleOutput,
 	ModuleSources,
@@ -22,7 +26,6 @@ import {
 	type OptimiserOptions,
 } from "@essence-lang/compiler/optimiser"
 import type { EmitTarget } from "@essence-lang/compiler/rewriter/emitTarget"
-import { validate } from "@essence-lang/compiler/validator"
 import type { common } from "@essence-lang/interfaces"
 
 import {
@@ -469,9 +472,16 @@ function unreadableFront(
 	}
 }
 
-// NOTE: The graph the entry names, enriched. Every file it reaches is read,
-// parsed and linked through the Session, so a batch loads each of them once
+// NOTE: The graph the entry names, read, parsed, linked and judged. Every file
+// it reaches goes through the Session, so a batch loads each of them once
 // however many of its entries reach it.
+//
+// NOTE: Every stage runs, whatever the one before it found. The Parser recovers
+// and hands on what it could read, the Linker types what is left, and the
+// Validator judges what those two established — which is what makes one run
+// report a syntax error, a Type error and a missing return together instead of
+// one of the three per run. `@essence-lang/compiler/analysis` is the one
+// description of that, and the Editor runs it over the same graph.
 async function linkGraph(
 	request: CompileRequest,
 	timeline: Timeline,
@@ -485,57 +495,40 @@ async function linkGraph(
 		return unreadableFront(request, read.filePath, read.error)
 	}
 
-	let parsed = await timeline.run("parse", () =>
-		session.modules(request.inputFileName),
-	)
-	let modules = parsed.map<CompiledModule>((module) => ({
-		fileName: module.filePath,
-		sourceText: module.sourceText,
-		diagnostics: [...module.diagnostics],
-	}))
-	let front: Front = {
-		entryPath: read.filePath,
-		sourceText: read.sourceText,
-		modules,
-		programs: null,
-		surface: null,
-		diagnostics: [],
-		failedStage: null,
-	}
-
-	// NOTE: A specifier that names nothing is a parse-stage answer as much as a
-	// syntax error is: the graph resolved every entry while it was reading the
-	// files, and linking a graph with a hole in it would report the same
-	// mistake again as a name that is not in scope.
-	if (containsErrors(modules.flatMap((module) => module.diagnostics))) {
-		return { ...front, failedStage: "parse" }
-	}
+	// NOTE: Run for its own sake and for the timing. What it produces is held by
+	// the Session, and the link below reads it back — the Modules this reports
+	// about are the LINKED ones, whose Diagnostics carry the parse stage's with
+	// them.
+	await timeline.run("parse", () => session.modules(request.inputFileName))
 
 	let linked = await timeline.run("enrich", () =>
 		session.linked(request.inputFileName),
 	)
+	let analyses = await timeline.run("validate", () =>
+		analyseLinkedModules(linked),
+	)
 
-	front.modules = linked.map<CompiledModule>((module) => ({
-		fileName: module.module.filePath,
-		sourceText: module.module.sourceText,
-		diagnostics: [...module.diagnostics],
-	}))
-
-	if (containsErrors(front.modules.flatMap((module) => module.diagnostics))) {
-		return { ...front, failedStage: "enrich" }
-	}
-
-	// NOTE: The ENTRY's Surface, found by name rather than taken off the end of
-	// the list. The entry is last — everything ahead of it is something it
-	// depends on — but a Descriptor describing a dependency instead would be a
-	// Module a host binds nothing of, and reading the one thing that says which
-	// file this is costs nothing.
 	return {
-		...front,
+		entryPath: read.filePath,
+		sourceText: read.sourceText,
+		modules: linked.map<CompiledModule>((module) => ({
+			fileName: module.module.filePath,
+			sourceText: module.module.sourceText,
+			diagnostics: analyses?.get(module.module.filePath) ?? [
+				...module.diagnostics,
+			],
+		})),
 		programs: linked.map((module) => module.program),
+		// NOTE: The ENTRY's Surface, found by name rather than taken off the end
+		// of the list. The entry is last — everything ahead of it is something
+		// it depends on — but a Descriptor describing a dependency instead would
+		// be a Module a host binds nothing of, and reading the one thing that
+		// says which file this is costs nothing.
 		surface:
 			linked.find((module) => module.module.filePath === read.filePath)
 				?.surface ?? null,
+		diagnostics: [],
+		failedStage: null,
 	}
 }
 
@@ -564,39 +557,35 @@ async function enrichDeclarations(
 	let parsed = await timeline.run("parse", () =>
 		parseDocument(read.sourceText, request.inputFileName),
 	)
-	let module: CompiledModule = {
-		fileName: read.filePath,
-		sourceText: read.sourceText,
-		diagnostics: [...parsed.diagnostics],
-	}
-	let front: Front = {
-		entryPath: read.filePath,
-		sourceText: read.sourceText,
-		modules: [module],
-		programs: null,
-		surface: null,
-		diagnostics: [],
-		failedStage: null,
-	}
-
-	if (containsErrors(module.diagnostics)) {
-		return { ...front, failedStage: "parse" }
-	}
-
 	let enriched = await timeline.run("enrich", () =>
 		enrichDocument(parsed.program, request.inputFileName, {
 			...modeOf(request),
 			source: read.sourceText,
 		}),
 	)
+	// NOTE: Every stage runs here too, for the reason `linkGraph` gives — and
+	// the seam matters most of all in this file, since `esc check` on a standard
+	// library source and the Editor's view of it are what a Compiler developer
+	// checks their own transcription against.
+	let analysed = await timeline.run("validate", () =>
+		analyseEnriched(parsed.program, parsed.diagnostics, enriched),
+	)
 
-	module.diagnostics.push(...enriched.diagnostics)
-
-	if (containsErrors(module.diagnostics)) {
-		return { ...front, failedStage: "enrich" }
+	return {
+		entryPath: read.filePath,
+		sourceText: read.sourceText,
+		modules: [
+			{
+				fileName: read.filePath,
+				sourceText: read.sourceText,
+				diagnostics: analysed.diagnostics,
+			},
+		],
+		programs: [analysed.program],
+		surface: null,
+		diagnostics: [],
+		failedStage: null,
 	}
-
-	return { ...front, programs: [enriched.program] }
 }
 
 export async function compileFile(
@@ -652,18 +641,18 @@ export async function compileFile(
 
 		let programs = front.programs
 
-		// NOTE: Validation runs over the whole graph, and only once nothing in
-		// it has reported an error — a Module that failed to enrich carries
-		// Types that were never established, and validating those answers about
-		// the failure rather than about the source.
-		await timeline.run("validate", () => {
-			for (let [index, program] of programs.entries()) {
-				modules[index]?.diagnostics.push(...validate(program))
-			}
-		})
-
+		// NOTE: Every stage that has anything to say about the SOURCE has now
+		// run, so this is the whole of what is wrong with it — one report per
+		// mistake, whichever stage found it. What is left is the emitter, and an
+		// Error anywhere stops it: nothing is built out of a Program that does
+		// not compile.
+		//
+		// NOTE: And `failedStage` is null, because no stage refused. The report
+		// says "stopped before building" where there was something to build; for
+		// a `check` there is nothing to add, since what the reader is holding is
+		// the complete answer.
 		if (containsErrors(modules.flatMap((module) => module.diagnostics))) {
-			return finish(false, "validate")
+			return finish(false, null)
 		}
 
 		// NOTE: `check` stops here — everything past this point exists only to

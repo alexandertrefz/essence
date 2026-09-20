@@ -8,6 +8,7 @@
 		"generate:natives": "bun run src/tools/generateNatives.ts"
 	},
 	"exports": {
+		"./analysis": "./src/analysis.ts",
 		"./lexer": "./src/lexer/index.ts",
 		"./parser": "./src/parser/index.ts",
 		"./enricher": "./src/enricher/index.ts",

@@ -5,14 +5,11 @@ import * as path from "node:path"
 import { fixturePath } from "@essence-lang/fixtures"
 import type { common } from "@essence-lang/interfaces"
 
-import { containsErrors } from "../diagnostics/index"
+import { analyseSource } from "../analysis"
 import { renderDiagnostics } from "../diagnostics/render"
-import { enrich } from "../enricher/index"
 import { loadModuleGraph } from "../modules/graph"
 import { diskModuleHost } from "../modules/host"
 import { linkModuleGraph } from "../modules/link"
-import { parseWithDiagnostics } from "../parser/index"
-import { validate } from "../validator/index"
 
 // NOTE: The files in `packages/fixtures/files/diagnostics/` are deliberately
 // broken — they are the one place where the Compiler's error output can be
@@ -22,35 +19,21 @@ import { validate } from "../validator/index"
 
 const SHOWCASE_DIRECTORY = fixturePath("diagnostics")
 
+// NOTE: The SHARED analysis, which is what `esc` and the Editor run — a
+// showcase of the Compiler's output that ran a pipeline of its own would
+// showcase a report nobody is ever handed.
+//
+// NOTE: Analysed WITH the tests, which is what `essence test` asks for and no
+// other command does — a showcase of what a tests section may not say needs the
+// one compile mode that reads one. Every file that writes no `tests { … }`
+// block is unaffected: the flag decides whether a section is enriched, and
+// there is nothing to enrich.
 function analyse(source: string): Array<common.Diagnostic> {
-	let { program, diagnostics: parserDiagnostics } =
-		parseWithDiagnostics(source)
-
-	if (containsErrors(parserDiagnostics)) {
-		return parserDiagnostics
-	}
-
-	// NOTE: Enriched WITH the tests, which is what `essence test` asks for and
-	// no other command does — a showcase of what a tests section may not say
-	// needs the one compile mode that reads one. Every file that writes no
-	// `tests { … }` block is unaffected: the flag decides whether a section is
-	// enriched, and there is nothing to enrich.
-	let { program: enriched, diagnostics: enricherDiagnostics } = enrich(
-		program,
-		{ tests: true },
-	)
-	let diagnostics = [...parserDiagnostics, ...enricherDiagnostics]
-
-	if (containsErrors(enricherDiagnostics)) {
-		return diagnostics
-	}
-
-	return [...diagnostics, ...validate(enriched)]
+	return analyseSource(source, undefined, { tests: true }).diagnostics
 }
 
-// NOTE: One file per Compiler stage — the Enricher never runs when the Parser
-// reported errors, and the Validator never runs when the Enricher did, so a
-// single file could only ever showcase the earliest stage that fails in it.
+// NOTE: A file may showcase SEVERAL stages at once, because every one of them
+// runs whatever the one before it found — which is what `Staged.es` is for.
 let showcaseFiles = readdirSync(SHOWCASE_DIRECTORY)
 	.filter((fileName) => fileName.endsWith(".es"))
 	.sort()
