@@ -5609,6 +5609,13 @@ describe("Enricher", () => {
 				"There is no '@' in a static Method",
 			)
 			expect(diagnostics[0].position?.start.line).toBe(4)
+			// NOTE: What dropping 'static' COSTS, said out loud. It changes how
+			// the Method is CALLED, so a reader who takes that half without
+			// knowing lands on `argument-count-mismatch` at every existing call
+			// site — each note naming a Parameter they never wrote.
+			expect(diagnostics[0].helps).toEqual([
+				"Take the value as a Parameter, or drop 'static' to make this an instance Method — then every call writes its receiver, 'value::name(…)' rather than 'Namespace.name(…)'.",
+			])
 		})
 
 		it("should reject '@' in an overloaded static Method body", () => {

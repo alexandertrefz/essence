@@ -6059,7 +6059,7 @@ Error: There is no '@' in a static Method
    │             ▲  
    │             ╰── this Method is called on the Namespace
    │ 
-   │ Help: Take the value as a Parameter, or drop 'static' to make this an instance Method.
+   │ Help: Take the value as a Parameter, or drop 'static' to make this an instance Method — then every call writes its receiver, 'value::name(…)' rather than 'Namespace.name(…)'.
    │ 
    │ Note: '@' is the receiver of an instance Method, and a static Method is called without one.
 ───╯
@@ -6069,7 +6069,7 @@ Error: There is no '@' in a static Method
 
 Take the value as a parameter, or return a value built in the body: `static origin() -> Point { <- { x = 0, y = 0 } }`. Remove `static` instead when the method is meant to run on a value.
 
-Quick Fix: **Drop 'static'**.
+Quick Fix: **Drop 'static'** — never applied on its own, because it changes how the method is *called*. Every existing `Namespace.name(…)` becomes [`argument-count-mismatch`](#argument-count-mismatch) until it is rewritten as `value::name(…)`, and the note on each one names a parameter you never wrote.
 
 Taught on: [Namespaces and methods › The receiver, `@`](/docs/language/namespaces-and-methods#the-receiver-)
 

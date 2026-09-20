@@ -1968,8 +1968,16 @@ export function resolveSelfType(
 			notes: [
 				"'@' is the receiver of an instance Method, and a static Method is called without one.",
 			],
+			// NOTE: What dropping 'static' COSTS, said out loud. It is a
+			// change to how the Method is called, not only to how it is
+			// written: every existing call reads `Namespace.name(…)` and a
+			// Method with a receiver is reached as `value::name(…)`, so a
+			// reader who takes the second half without knowing that lands on
+			// `argument-count-mismatch` at every call site — each one naming a
+			// Parameter the reader never wrote. Taking the value as a Parameter
+			// is the half that changes nothing else, so it is still first.
 			helps: [
-				"Take the value as a Parameter, or drop 'static' to make this an instance Method.",
+				"Take the value as a Parameter, or drop 'static' to make this an instance Method — then every call writes its receiver, 'value::name(…)' rather than 'Namespace.name(…)'.",
 			],
 		})
 
