@@ -42,6 +42,18 @@ implementation {
 		case String { <- @ }
 	}
 
+	§ empty-list-overlap — a Warning, at the Case that can not be reached with
+	§ the value it was written for. Item Types erase before the Match runs, so
+	§ the Cases are told apart by the items the value holds — and an empty List
+	§ holds none, which makes it a List of Integers as much as a List of
+	§ Strings.
+	constant lists: List<Integer> | List<String> = [1, 2]
+
+	constant kind = match lists -> String {
+		case List<Integer> { <- "numbers" }
+		case List<String> { <- "words" }
+	}
+
 	§ literal-match-shape — a Match on an Integer DOES name a value, so its Cases
 	§ are written values and the last one answers for the rest. This one's first
 	§ Case names a value and can still decline it, which would let the value it

@@ -40,6 +40,15 @@ implementation {
 		}
 	}
 
+	§ nonconforming-namespace — the Namespace says it conforms and the Method
+	§ the Protocol asks for is not written, so a call reaching 'Counted'
+	§ through 'Sized' would have nothing to run.
+	namespace Counted for { items: List<Integer> } is Sized {
+		total() -> Integer {
+			<- @.items::length()
+		}
+	}
+
 	§ where-on-protocol-extension — a Protocol declares no Type Parameters, so
 	§ a condition has nothing to bound.
 	protocol Ordered is Comparable where Item is Comparable {

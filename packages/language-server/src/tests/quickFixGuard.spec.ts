@@ -91,13 +91,14 @@ type Allowance = {
 // allowlist nobody checks is how a guard rots into a list of things that used
 // to be true.
 //
-// The scaffolds the fixers named that the corpus does NOT reach — `Implement
-// 'X'` for a missing requirement, `Make 'X' Generatable` as a Quick Fix rather
-// than as the rewrite below, `Add '<generic>'` for an unknown `where` name, the
-// `define` arm and the `else` branch — are deliberately absent. An allowance for
-// a fix nothing here offers is a claim about the Compiler that nothing checks;
-// the day a fixture reaches one, this spec fails and whoever wrote the fixture
-// writes the reason down.
+// The scaffolds the fixers named that the corpus does NOT reach — `Make 'X'
+// Generatable` as a Quick Fix rather than as the rewrite below, `Add
+// '<generic>'` for an unknown `where` name, the `define` arm and the `else`
+// branch — are deliberately absent. An allowance for a fix nothing here offers
+// is a claim about the Compiler that nothing checks; the day a fixture reaches
+// one, this spec fails and whoever wrote the fixture writes the reason down,
+// which is what happened to `Implement 'X'` below when the corpus grew a
+// Namespace that declares a conformance it does not keep.
 const ALLOWED: Array<Allowance> = [
 	{
 		code: "ambiguous-case",
@@ -161,6 +162,18 @@ const ALLOWED: Array<Allowance> = [
 		reason: "As above, for the catch-all arm: its body is the hole, so a Function that returns out of its Match is short a return until the reader writes one.",
 		followUp: ["missing-return"],
 	},
+	{
+		code: "empty-list-overlap",
+		title: "Guard the Cases with 'where @::hasItems()'",
+		reason: "The guard is what makes the Cases tell an empty List from a full one, and the Case that answers for the empty one is written with an empty body — the reader decides what an empty List means here, and nothing else can.",
+		followUp: ["missing-return"],
+	},
+	{
+		code: "nonconforming-namespace",
+		title: "Implement '",
+		reason: "The Methods the Protocol asks for are written with their Signatures and empty bodies, which is the scaffold: what each of them answers is the reader's to write, and a body that answers nothing is short its return until they do.",
+		followUp: ["missing-return"],
+	},
 ]
 
 type ReachAllowance = {
@@ -199,6 +212,12 @@ const REACH_ALLOWED: Array<ReachAllowance> = [
 		code: "undocumented-parameter",
 		title: "Add a '@param",
 		reason: "A Parameter is documented in the comment block ABOVE the Function, and the report stands on the Parameter itself — the two are as far apart as the Signature is long.",
+		reach: "elsewhere in the file",
+	},
+	{
+		code: "nonconforming-namespace",
+		title: "Implement '",
+		reason: "The report stands on the conformance clause in the Namespace's header and the Methods are written into its BODY, which is as far below as the Methods already there are long.",
 		reach: "elsewhere in the file",
 	},
 	{

@@ -1727,11 +1727,28 @@ Error: Match Expressions require a Union Type
     │ Note: Matching a Type with only one possible shape has only one outcome.
 ────╯
 
+[empty-list-overlap]
+Warning: This Case never sees an empty List
+    ╭─┤ Match.es:54:8 │
+    │
+ 53 │        case List<Integer> { <- "numbers" }
+    │             ──────┬──────  
+    │                   ╰──────── this Case runs first
+ 54 │        case List<String> { <- "words" }
+    │             ──────┬─────  
+    │                   ╰─────── an empty List<String> fits the Case above too
+    │ 
+    │ Help: Guard the Cases with 'where @::hasItems()' and answer for the empty List in a Case of its own.
+    │ 
+    │ Note 1: Cases are tried in order, and the first one that fits wins.
+    │ Note 2: Item Types erase before a Match runs, so a List Matcher asks about the items the value holds — and an empty List holds none, which makes it a value of every List Type there is.
+────╯
+
 [literal-match-shape]
 Error: This Case names a value and can still decline it
-    ╭─┤ Match.es:52:8 │
+    ╭─┤ Match.es:64:8 │
     │
- 52 │        case 0 where count::isNot(1) { <- "zero" }
+ 64 │        case 0 where count::isNot(1) { <- "zero" }
     │             ▲       ───────┬───────  
     │             ╰──────────────│───────── this Case names the value
     │                            │         
@@ -1745,12 +1762,12 @@ Error: This Case names a value and can still decline it
 
 [literal-match-shape]
 Error: This Match has no Case for the rest of the values
-    ╭─┤ Match.es:58:21 │
+    ╭─┤ Match.es:70:21 │
     │
- 58 │     constant partial = match count -> String {
+ 70 │     constant partial = match count -> String {
     │                              ──┬──  
     │                                ╰──── this is an Integer
- 59 │        case 0 { <- "zero" }
+ 71 │        case 0 { <- "zero" }
     │             ▲  
     │             ╰── this Case names a value, not the rest of them
     │ 
@@ -1760,7 +1777,7 @@ Error: This Match has no Case for the rest of the values
     │ Note 2: There are more values of Integer than a Match can write down, so the last Case is what makes it answer for all of them.
 ────╯
 
-─── 4 errors, 1 warning
+─── 4 errors, 2 warnings
 "
 `;
 
@@ -2241,11 +2258,22 @@ Error: 'Sizes' can not be read from a provided Method
     │ Note: A provided Method is emitted once, above every Program that reaches 'Measured' — so its body can name the standard library and nothing the Program declares.
 ────╯
 
+[nonconforming-namespace]
+Error: Namespace 'Counted' does not conform to 'Sized'
+    ╭─┤ Protocols.es:46:52 │
+    │
+ 46 │     namespace Counted for { items: List<Integer> } is Sized {
+    │                                                       ──┬──  
+    │                                                         ╰──── Method 'size' is missing
+    │ 
+    │ Help: Write 'size' as 'Sized' declares it, or drop the 'is Sized'.
+────╯
+
 [where-on-protocol-extension]
 Error: A Protocol extension can not carry a 'where' clause
-    ╭─┤ Protocols.es:45:39 │
+    ╭─┤ Protocols.es:54:39 │
     │
- 45 │     protocol Ordered is Comparable where Item is Comparable {
+ 54 │     protocol Ordered is Comparable where Item is Comparable {
     │                                          ─────────┬────────  
     │                                                   ╰────────── this condition has nothing to bound
     │ 
@@ -2256,11 +2284,11 @@ Error: A Protocol extension can not carry a 'where' clause
 
 [unwritable-provided-method]
 Error: A static Protocol Method can not carry a body
-    ╭─┤ Protocols.es:53:16 │
+    ╭─┤ Protocols.es:62:16 │
     │
- 53 │ ╭─▶        static create() -> Self {
+ 62 │ ╭─▶        static create() -> Self {
     ┆ ┆   
- 55 │ ├─▶        }
+ 64 │ ├─▶        }
     │ │              
     │ ╰────────────── this body has no receiver to run on
     │ 
@@ -2271,11 +2299,11 @@ Error: A static Protocol Method can not carry a body
 
 [unwritable-provided-method]
 Error: An overloaded Protocol Method can not carry a body
-    ╭─┤ Protocols.es:58:4 │
+    ╭─┤ Protocols.es:67:4 │
     │
- 58 │ ╭─▶          (_ other: Self) -> Self {
+ 67 │ ╭─▶          (_ other: Self) -> Self {
     ┆ ┆   
- 60 │ ├─▶          }
+ 69 │ ├─▶          }
     │ │                
     │ ╰──────────────── this body has no name of its own to be emitted under
     │ 
@@ -2286,9 +2314,9 @@ Error: An overloaded Protocol Method can not carry a body
 
 [recursive-protocol]
 Error: Protocol 'Listed' extends itself through 'Sorted'
-    ╭─┤ Protocols.es:70:21 │
+    ╭─┤ Protocols.es:79:21 │
     │
- 70 │     protocol Listed is Sorted {
+ 79 │     protocol Listed is Sorted {
     │                        ───┬──  
     │                           ╰──── this leads back to 'Listed'
     │ 
@@ -2300,9 +2328,9 @@ Error: Protocol 'Listed' extends itself through 'Sorted'
 
 [recursive-protocol]
 Error: Protocol 'Sorted' extends itself through 'Listed'
-    ╭─┤ Protocols.es:74:21 │
+    ╭─┤ Protocols.es:83:21 │
     │
- 74 │     protocol Sorted is Listed {
+ 83 │     protocol Sorted is Listed {
     │                        ───┬──  
     │                           ╰──── this leads back to 'Sorted'
     │ 
@@ -2312,7 +2340,7 @@ Error: Protocol 'Sorted' extends itself through 'Listed'
     │ Note 2: A Protocol's surface is its own Methods together with every ancestor's, so one that extends itself would never finish resolving.
 ────╯
 
-─── 8 errors
+─── 9 errors
 "
 `;
 
@@ -3499,6 +3527,89 @@ Warning: 'area' is imported and never used
 ───╯
 
 ─── 4 errors, 1 warning
+"
+`;
+
+exports[`Module Diagnostic Showcase Mirror.es should render the same report every time: Mirror.es 1`] = `
+"[self-import]
+Error: A Module can not import itself
+   ╭─┤ Mirror.es:4:7 │
+   │
+ 4 │     from "./Mirror.es" { mirrored }
+   │          ──────┬──────  
+   │                ╰──────── this path names the file it is written in
+   │ 
+   │ Help: Remove the whole 'from "./Mirror.es" { … }' group — every name it asks for is in scope here already.
+   │ 
+   │ Note: Everything a Module declares is in scope inside it already, whether or not it is exported.
+───╯
+
+[unknown-export]
+Error: ./Shapes.es declares nothing named 'aera'
+    ╭─┤ Mirror.es:11:3 │
+    │
+ 11 │        aera
+    │        ──┬─  
+    │          ╰─── no such name in that Module
+    │ 
+    │ Help 1: Did you mean 'area'?
+    │ Help 2: Check the spelling, and that the specifier names the file you meant.
+    │ 
+    │ Note: The name is matched against what that Module exports, under the names it exports them as — an 'as' on its export entry renames it for everyone.
+────╯
+
+[duplicate-import]
+Error: 'area' is already declared here
+    ╭─┤ Mirror.es:16:3 │
+    │
+ 15 │        area
+    │        ──┬─  
+    │          ╰─── first declared here
+ 16 │        area
+    │        ──┬─  
+    │          ╰─── this binds 'area' a second time
+    │ 
+    │ Help: Write 'as' on the entry to bind it under another name — 'area as …'.
+    │ 
+    │ Note: An import binds a name in this Module exactly as a declaration does, so two of them can not share one.
+────╯
+
+─── 3 errors
+"
+`;
+
+exports[`Module Diagnostic Showcase Mirror.es should render the same report every time: Shapes.es 1`] = `
+"[export-of-variable]
+Error: Variable 'counter' can not be exported
+    ╭─┤ Shapes.es:18:2 │
+    │
+  8 │     variable counter = 0
+    │              ───┬───  
+    │                 ╰───── declared here
+    │ 
+ 18 │     counter
+    │     ───┬───  
+    │        ╰───── this is a Variable
+    │ 
+    │ Help: Declare it as a Constant, or export a Function that answers with its value.
+    │ 
+    │ Note: A Variable another Module can read is state two files share and neither owns — which of them last wrote it is not something either one states.
+────╯
+
+[export-of-unknown-name]
+Error: 'nowhere' is not declared in this Module
+    ╭─┤ Shapes.es:19:2 │
+    │
+ 19 │     nowhere
+    │     ───┬───  
+    │        ╰───── nothing here declares this name
+    │ 
+    │ Help: Declare 'nowhere' in this Module, or remove the entry.
+    │ 
+    │ Note: An entry with no 'from' clause exports something this Module's implementation declares.
+────╯
+
+─── 2 errors
 "
 `;
 

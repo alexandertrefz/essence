@@ -99,6 +99,15 @@ const MODULE_SHOWCASES: Array<{ entry: string; reports: Array<string> }> = [
 		entry: "Ping.es",
 		reports: ["Ping.es", "Pong.es"],
 	},
+	// NOTE: The three refusals an import BLOCK earns on its own — a Module
+	// asking itself for a name, a name the other Module does not declare, and a
+	// name asked for twice. All three are reported where the entry is written
+	// rather than where the name lives, which is how one file showcases them
+	// all.
+	{
+		entry: "Mirror.es",
+		reports: ["Shapes.es", "Mirror.es"],
+	},
 ]
 
 describe("Module Diagnostic Showcase", () => {
