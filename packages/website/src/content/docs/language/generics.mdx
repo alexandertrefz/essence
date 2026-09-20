@@ -106,10 +106,10 @@ Error: A call writes no Type Arguments
    │                          ────────┬────────  
    │                                  ╰────────── these are worked out from the Arguments
    │ 
-   │ Help 1: Write 'paired(…)' and let the Arguments decide.
-   │ Help 2: Where the Arguments do not decide, give the Type Parameter a place among the Parameters.
+   │ Help: Write 'paired(…)' and let the Arguments decide.
    │ 
-   │ Note: Every Type Argument is inferred at the call, which is why a Generic Parameter is declared 'infer' — there is no spelling that pins one.
+   │ Note 1: Every Type Argument is inferred at the call, which is why a Generic Parameter is declared 'infer' — there is no spelling that pins one.
+   │ Note 2: Where the Arguments do not decide one, the Type Parameter wants a place among the Parameters — a call reads it off an Argument or not at all.
 ───╯
 ```
 

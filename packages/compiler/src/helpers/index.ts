@@ -33,6 +33,7 @@ export {
 	requiredParameterCount,
 	withArticle,
 } from "./describe"
+export { mixedRationalSpellings } from "./mixedRational"
 export {
 	conformanceParameterName,
 	isSynthesizedName,

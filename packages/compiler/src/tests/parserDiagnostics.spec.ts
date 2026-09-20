@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
+import { enrich } from "../enricher/index"
 import { parseWithDiagnostics } from "../parser/index"
 
 // NOTE: The Diagnostics the Lexer and the Parser report about a Program that
@@ -13,6 +14,25 @@ import { parseWithDiagnostics } from "../parser/index"
 
 function firstNode(source: string): parser.ImplementationNode | undefined {
 	return parseWithDiagnostics(source).program.implementation.nodes[0]
+}
+
+function helpsOf(source: string): Array<string> {
+	return parseWithDiagnostics(source).diagnostics.flatMap(
+		(diagnostic) => diagnostic.helps,
+	)
+}
+
+// NOTE: What a Help promises, checked by compiling it. Enriched as well as
+// parsed, because a Help that reads cleanly and then fails a name lookup has
+// sent a reader from one refusal to the next.
+function compiles(source: string): boolean {
+	let parsed = parseWithDiagnostics(source)
+
+	if (containsErrors(parsed.diagnostics)) {
+		return false
+	}
+
+	return !containsErrors(enrich(parsed.program).diagnostics)
 }
 
 function declaredValue(
@@ -1419,6 +1439,221 @@ describe("Parser AST", () => {
 		expect(node?.position).toEqual({
 			start: { line: 1, column: 31 },
 			end: { line: 1, column: 50 },
+		})
+	})
+
+	// NOTE: The Helps that used to print an EXAMPLE where the reader's own text
+	// was in hand. Each named something nothing in the file declared — a Type
+	// called `SomeType`, a Case called `#Rectangle`, a value called `base` — so
+	// a reader who followed one arrived at a report about a name they had never
+	// written. Every Help asserted here is written back into its own probe and
+	// compiled: a promise like this is only worth making where it holds.
+	describe("Helps built from the text that was written", () => {
+		it("spells the reader's own path and call in the Function literal", () => {
+			let source = `implementation {
+	constant names = [{ title = "Ada" }]::map(.title::uppercase())
+	Terminal.inspect(names)
+}`
+
+			expect(helpsOf(source)).toEqual([
+				"Write the Function literal instead: '(_ item) { <- item.title::uppercase() }'.",
+			])
+			expect(
+				compiles(`implementation {
+	constant names = [{ title = "Ada" }]::map((_ item) { <- item.title::uppercase() })
+	Terminal.inspect(names)
+}`),
+			).toBe(true)
+		})
+
+		// NOTE: Unannotated on purpose. A literal handed to a Method reads its
+		// Parameter's Type off the Argument it is passed, and the annotation
+		// this used to print named a Type nothing declares.
+		it("leaves the offered literal's Parameter unannotated", () => {
+			expect(
+				helpsOf("implementation { call(.total::rounded()) }"),
+			).toEqual([
+				"Write the Function literal instead: '(_ item) { <- item.total::rounded() }'.",
+			])
+		})
+
+		it("prints the Argument a called path was written with", () => {
+			expect(helpsOf("implementation { call(.total(2)) }")).toEqual([
+				"Write the Function literal instead: '(_ item) { <- item.total(2) }'.",
+			])
+		})
+
+		// NOTE: `'(n: Integer)'` declares a LABELLED Parameter, so a reader who
+		// followed this Help and then called what they had written was answered
+		// `This Argument is not labelled 'n'`.
+		it("writes the arrow literal's Parameter unlabelled", () => {
+			let source = `implementation {
+	constant double = (n: Integer) => n
+	Terminal.inspect(double(2))
+}`
+
+			expect(helpsOf(source)).toEqual([
+				"Write '(_ n: Integer) -> Integer { <- n }'.",
+			])
+			expect(
+				compiles(`implementation {
+	constant double = (_ n: Integer) -> Integer { <- n }
+	Terminal.inspect(double(2))
+}`),
+			).toBe(true)
+		})
+
+		// NOTE: A `=>` behind a String or a Number is the hash rocket and not an
+		// arrow: no language writes a Parameter list as a Literal.
+		it("answers a hash rocket as the Dictionary entry it is", () => {
+			let source = `implementation {
+	constant ages = ["kim" => 7, "ada" => 36]
+	Terminal.inspect(ages)
+}`
+			let { diagnostics } = parseWithDiagnostics(source)
+
+			expect(diagnostics[0]?.code).toBe("dictionary-entry-syntax")
+			expect(diagnostics[0]?.helps).toEqual([
+				"Write '=' in place of '=>'.",
+			])
+			expect(
+				compiles(`implementation {
+	constant ages = ["kim" = 7, "ada" = 36]
+	Terminal.inspect(ages)
+}`),
+			).toBe(true)
+		})
+
+		// NOTE: A NAME on the left is genuinely both habits at once — `x => x`
+		// is a Function in one language and a key in another — so the Function
+		// literal is what stays answered there.
+		it("leaves a named left operand to the Function literal", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				"implementation { constant ages = [key => 7] }",
+			)
+
+			expect(diagnostics[0]?.code).toBe("foreign-syntax")
+			expect(diagnostics[0]?.message).toBe(
+				"A Function literal has no '=>'",
+			)
+		})
+
+		// NOTE: "or drop the key" was a dead end where the key is the ONLY one:
+		// `{ config with server.{ } }` dropped down to `{ config with }`.
+		it("names the value an only descend would leave behind", () => {
+			let source = `implementation {
+	constant config = { server = { port = 80 } }
+	constant same = { config with server.{ } }
+	Terminal.inspect(same)
+}`
+
+			expect(helpsOf(source)).toEqual([
+				"Write the members to update inside it.",
+				"Or drop the key — and where it is the only one, drop the update with it and write 'config' on its own.",
+			])
+			expect(
+				compiles(`implementation {
+	constant config = { server = { port = 80 } }
+	constant same = config
+	Terminal.inspect(same)
+}`),
+			).toBe(true)
+		})
+
+		// NOTE: Each report used to offer a Record holding only its OWN name, so
+		// a reader who followed one dropped every other key without being told.
+		it("gathers every bare key into the Record it offers", () => {
+			let source = `implementation {
+	constant base = { port = 80, host = "localhost" }
+	constant port = 8080
+	constant host = "example.com"
+	constant server = { base with port, host }
+	Terminal.inspect(server)
+}`
+			let merged =
+				"Or merge a whole Record: '{ base with { port, host } }'."
+
+			expect(helpsOf(source)).toEqual([
+				"Write 'port = port'.",
+				merged,
+				"Write 'host = host'.",
+				merged,
+			])
+			expect(
+				compiles(`implementation {
+	constant base = { port = 80, host = "localhost" }
+	constant port = 8080
+	constant host = "example.com"
+	constant server = { base with { port, host } }
+	Terminal.inspect(server)
+}`),
+			).toBe(true)
+		})
+
+		// NOTE: The Help and the Quick Fix read one computation now. `'3/4' or
+		// '0.75'` was printed whatever was written, so `2.5/3` — five sixths —
+		// was answered with a Help that quietly changed the number while the fix
+		// beside it offered `5/6`.
+		it("offers the value the two mixed spellings say between them", () => {
+			expect(helpsOf("implementation { constant a = 1.5/2 }")).toEqual([
+				"Write it as '3/4' — or as '0.75', which is the same value written the other way.",
+			])
+			expect(helpsOf("implementation { constant a = 2.5/3 }")).toEqual([
+				"Write it as '5/6', which is the value the two spellings say between them.",
+			])
+		})
+
+		// NOTE: Two shapes reach one refusal. A trailing comma is dropped; a
+		// SECOND value can not be, and the Record that carries both is spelled
+		// with the Case the reader wrote rather than with `#Rectangle`.
+		it("tells a trailing comma from a second payload", () => {
+			expect(
+				helpsOf("implementation { constant x = Optional#Value(1,) }"),
+			).toEqual(["Drop the ','."])
+
+			let two = `implementation {
+	choice Shape {
+		Rect { width: Integer, height: Integer },
+		Dot,
+	}
+
+	constant s: Shape = #Rect(2, 3)
+	Terminal.inspect(s)
+}`
+
+			expect(helpsOf(two)).toEqual([
+				"Carry the values as one Record: '#Rect({ … })', with a member for each of them.",
+			])
+			expect(
+				compiles(`implementation {
+	choice Shape {
+		Rect { width: Integer, height: Integer },
+		Dot,
+	}
+
+	constant s: Shape = #Rect({ width = 2, height = 3 })
+	Terminal.inspect(s)
+}`),
+			).toBe(true)
+		})
+
+		// NOTE: The literal is often passed to nothing at all, or to a Method of
+		// the standard library — so "write the default on the Function this is
+		// passed to" was an edit in a Declaration the reader has not got. The
+		// Help is the edit the Quick Fix beside it makes.
+		it("offers the removal the Quick Fix makes", () => {
+			let source = `implementation {
+	constant double = (_ number: Integer = 1) -> Integer { <- number::multiply(with 2) }
+	Terminal.inspect(double(2))
+}`
+
+			expect(helpsOf(source)).toEqual(["Remove the default."])
+			expect(
+				compiles(`implementation {
+	constant double = (_ number: Integer) -> Integer { <- number::multiply(with 2) }
+	Terminal.inspect(double(2))
+}`),
+			).toBe(true)
 		})
 	})
 })

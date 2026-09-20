@@ -20,6 +20,7 @@ import {
 	operatorNote,
 	semicolonAccount,
 } from "../../helpers/foreign"
+import { mixedRationalSpellings } from "../../helpers/mixedRational"
 import { matcherNames } from "../../helpers/patterns"
 import * as generators from "../nodeGenerators"
 import {
@@ -512,6 +513,41 @@ function isAdjacent(left: common.Position, right: common.Position): boolean {
 // because those are the ones somebody reaches for on purpose; every other Token
 // standing there is a Program that went wrong somewhere else, and claiming it
 // meant to write an entry would send the reader after the wrong edit.
+// NOTE: What a Dictionary entry is, said once for the three sites that say it.
+const dictionaryEntryNote =
+	"An entry is 'key = value', and a Dictionary is a bracket list of them: '[\"a\" = 1, \"b\" = 2]'."
+
+// NOTE: A key's separator written the way another language writes one. Spelled
+// here for the two sites that meet one: the Dictionary reader, which gets there
+// with the key already read, and the Expression tail, where a `=>` is refused
+// before the brackets are ever understood to hold entries at all.
+function dictionaryEntryRefusal(
+	separator: string,
+	position: common.Position,
+): ForeignRefusal {
+	return {
+		code: "dictionary-entry-syntax",
+		message: "A Dictionary entry is written with '='",
+		label: `expected '=' and found '${separator}'`,
+		position,
+		notes: [dictionaryEntryNote],
+		helps: [`Write '=' in place of '${separator}'.`],
+	}
+}
+
+// NOTE: Whether the Expression a `=>` was written behind can only have been a
+// Dictionary's KEY. No language writes a Parameter list as a String or a Number,
+// so `"kim" => 7` is the hash rocket however much the arrow looks like a
+// Function literal's. A NAME is left out on purpose: `x => x` is a Function in
+// one language and a key in another, and there is no telling which was meant.
+function writtenDictionaryKey(node: parser.ExpressionNode): boolean {
+	return (
+		node.nodeType === "StringValue" ||
+		node.nodeType === "IntegerValue" ||
+		node.nodeType === "RationalValue"
+	)
+}
+
 function writtenSeparatorLexeme(
 	found: Token,
 	next: Token | undefined,
@@ -632,7 +668,14 @@ function foreignSyntaxRefusal(
 			// `uninferable-parameter-type` and `missing-return-type` standing
 			// behind the edit it offered, which is the same refusal twice more
 			// for a reader who followed it.
-			helps: ["Write '(n: Integer) -> Integer { <- n }'."],
+			//
+			// NOTE: And the Parameter is written `_ n` rather than `n`, because
+			// a Parameter with no `_` in front of it is LABELLED: a reader who
+			// followed `'(n: Integer) -> Integer { <- n }'` and then called what
+			// they had written was answered `This Argument is not labelled 'n'`.
+			// The name it takes inside the body is the same either way, so the
+			// `_` costs the Help nothing and saves the call.
+			helps: ["Write '(_ n: Integer) -> Integer { <- n }'."],
 		}
 	}
 
@@ -945,6 +988,13 @@ class DescentParser {
 	// directly in a suite are its setup, and there is no test there for an
 	// assertion to belong to.
 	protected insideTestBody = false
+	// NOTE: The value an update being read is written ON — the `config` of
+	// `{ config with … }` — spelled, or null where it is not one a Help can
+	// print back. The key readers are several calls below the `with` and the
+	// Expression in front of it is nowhere in their reach, and a descend that
+	// updates nothing is answered by naming it: dropping the only key drops the
+	// update, and what is left is that value on its own.
+	protected updatedValue: string | null = null
 	// NOTE: How many speculations are on the stack. It is what tells the
 	// readings of ONE piece of text — the alternatives a construction is tried
 	// as — from the readings of the text inside one of them, which is the whole
@@ -4770,19 +4820,24 @@ class DescentParser {
 					code: "foreign-syntax",
 					notes: [
 						"Every Type Argument is inferred at the call, which is why a Generic Parameter is declared 'infer' — there is no spelling that pins one.",
+						// NOTE: A NOTE rather than a second Help, because the
+						// Parser can not tell whether it is true here: what the
+						// Arguments decide is read out of a signature the
+						// Declaration carries, and nothing at a call has seen
+						// one. Printed as a Help it was an edit offered to
+						// readers whose Arguments decide perfectly well — and
+						// the edit is in another Declaration besides, which is
+						// not an edit a reader makes where they are standing.
+						//
+						// The annotation on the binding is NOT the other end
+						// either: it does not reach back into the call, and
+						// offering it here answered a reader with
+						// `uninferable-type-parameter` and its own Help pointing
+						// straight back at the brackets they had just taken out.
+						"Where the Arguments do not decide one, the Type Parameter wants a place among the Parameters — a call reads it off an Argument or not at all.",
 					],
 					helps: [
 						`Write '${expression.content}(…)' and let the Arguments decide.`,
-						// NOTE: The Arguments are what decide, so a call that
-						// can not be read from them is a signature question
-						// rather than a call one — and this is where a reader
-						// who reached for the brackets finds that out. The
-						// annotation on the binding is NOT the other end: it
-						// does not reach back into the call, and offering it
-						// here answered a reader with `uninferable-type-
-						// parameter` and its own Help pointing straight back at
-						// the brackets they had just taken out.
-						"Where the Arguments do not decide, give the Type Parameter a place among the Parameters.",
 					],
 					data: {
 						kind: "essence-spelling",
@@ -5013,7 +5068,7 @@ class DescentParser {
 			steps.push(this.parseIdentifier())
 		}
 
-		this.refusePathPostfix()
+		this.refusePathPostfix(steps)
 
 		return generators.memberPath(steps, {
 			start: dot.position.start,
@@ -5026,7 +5081,7 @@ class DescentParser {
 	// postfix loop: the loop would build an Invocation over the path and every
 	// message from there on would be about the call rather than about the path
 	// that can not carry one.
-	protected refusePathPostfix(): void {
+	protected refusePathPostfix(steps: Array<parser.IdentifierNode>): void {
 		let token = this.tokens.peek()
 
 		if (token === undefined) {
@@ -5057,10 +5112,63 @@ class DescentParser {
 					"A path is the Function that reads those members off its Argument, so there is nothing here for a call to be made on.",
 				],
 				helps: [
-					"Write the Function literal instead: '(_ item: SomeType) { <- item.price::rounded() }'.",
+					`Write the Function literal instead: '${this.pathFunctionLiteral(steps, spelling)}'.`,
 				],
 			},
 		)
+	}
+
+	// NOTE: The path and the call written on it, spelled back as the Function
+	// literal that CAN carry one. Every word of it is the reader's own but
+	// `item`, which names the Parameter — and that Parameter is left UNTYPED on
+	// purpose: a literal handed to a Method reads its Parameter's Type off the
+	// Argument it is passed, so there is nothing to write there and nothing to
+	// get wrong. The `(_ item: SomeType) { <- item.price::rounded() }` this used
+	// to print named a Type nothing declares and a Method the standard library
+	// has not got, and it printed them at a reader who had written neither.
+	protected pathFunctionLiteral(
+		steps: Array<parser.IdentifierNode>,
+		spelling: string,
+	): string {
+		let path = steps.map((step) => step.content).join(".")
+		let called = spelling === "::" ? this.tokens.peek(2) : null
+		let call =
+			spelling === "("
+				? this.writtenCallArguments(0)
+				: called !== undefined &&
+					  called !== null &&
+					  isIdentifierToken(called)
+					? `::${called.value}${this.writtenCallArguments(3)}`
+					: "::…()"
+
+		return `(_ item) { <- item.${path}${call} }`
+	}
+
+	// NOTE: The Argument list at `at`, where it is empty or holds ONE Token a
+	// Help can print back — `()`, `(2)`, `(other)`. Everything longer is an
+	// Expression of the reader's own, and `…` says theirs goes here rather than
+	// printing half of it back at them.
+	protected writtenCallArguments(at: number): string {
+		if (this.tokens.peek(at)?.type !== TokenType.SymbolLeftParen) {
+			return "(…)"
+		}
+
+		let written = this.tokens.peek(at + 1)
+
+		if (written?.type === TokenType.SymbolRightParen) {
+			return "()"
+		}
+
+		if (
+			written !== undefined &&
+			(written.type === TokenType.LiteralNumber ||
+				written.type === TokenType.Identifier) &&
+			this.tokens.peek(at + 2)?.type === TokenType.SymbolRightParen
+		) {
+			return `(${written.value})`
+		}
+
+		return "(…)"
 	}
 
 	// NOTE: The payload parens are part of the construction syntax — they are
@@ -5155,19 +5263,34 @@ class DescentParser {
 			let comma = this.tokens.peek()
 
 			if (comma?.type === TokenType.SymbolComma) {
+				// NOTE: Two shapes arrive at this one refusal and they want
+				// different edits. A comma with the `)` behind it is a
+				// separator with nothing to separate, and dropping it is the
+				// whole fix. A comma with another value behind it is a SECOND
+				// payload, and dropping it would leave two values written flush
+				// against each other — so only that one is answered with the
+				// Record, spelled with the Case the reader wrote. Both used to
+				// be told to drop the comma AND to write `#Rectangle`, which is
+				// a Case nothing in the file declares.
+				let trailing =
+					this.tokens.peek(1)?.type === TokenType.SymbolRightParen
+
 				throw new ParseError(
 					"A Case carries one value",
 					comma.position,
-					"nothing follows this ','",
+					trailing
+						? "nothing follows this ','"
+						: "a second value follows this ','",
 					{
 						code: "case-payload-is-one-value",
 						notes: [
 							"The parentheses of a Case hold the single value it carries, not a list.",
 						],
-						helps: [
-							"Drop the ','.",
-							"Or carry the values as one Record: '#Rectangle({ width = 2, height = 3 })'.",
-						],
+						helps: trailing
+							? ["Drop the ','."]
+							: [
+									`Carry the values as one Record: '#${caseName.content}({ … })', with a member for each of them.`,
+								],
 					},
 				)
 			}
@@ -6002,28 +6125,39 @@ class DescentParser {
 
 		let combinationOfKeys = (allowShorthand: boolean) =>
 			this.backtrack(() => {
-				let keyValuePairList = this.parseKeyValuePairList(
-					allowShorthand,
-					leftBrace,
-				)
-				let rightBrace = this.tokens.expectClosing(
-					TokenType.SymbolRightBrace,
-					leftBrace,
-				)
+				// NOTE: The value being updated, spelled, for the key readers
+				// below — a descend that updates nothing is answered by naming
+				// it, and the key list is several readers deep from here. Saved
+				// and put back, because an update nests inside an update.
+				let outer = this.updatedValue
+				this.updatedValue = writtenReceiver(lhs)
 
-				return generators.combination(
-					lhs,
-					generators.recordValueNode(
-						null,
-						keyValuePairList.data,
-						keyValuePairList.position,
-					),
-					{
-						start: leftBrace.position.start,
-						end: rightBrace.position.end,
-					},
-					{ bare: true },
-				)
+				try {
+					let keyValuePairList = this.parseKeyValuePairList(
+						allowShorthand,
+						leftBrace,
+					)
+					let rightBrace = this.tokens.expectClosing(
+						TokenType.SymbolRightBrace,
+						leftBrace,
+					)
+
+					return generators.combination(
+						lhs,
+						generators.recordValueNode(
+							null,
+							keyValuePairList.data,
+							keyValuePairList.position,
+						),
+						{
+							start: leftBrace.position.start,
+							end: rightBrace.position.end,
+						},
+						{ bare: true },
+					)
+				} finally {
+					this.updatedValue = outer
+				}
 			})
 
 		let keyValuePairCombination = combinationOfKeys(false)
@@ -6130,14 +6264,21 @@ class DescentParser {
 			return
 		}
 
-		for (let member of Object.values(combination.rhs.members)) {
+		// NOTE: EVERY bare key, gathered before the first report is written.
+		// One Diagnostic is raised per name, but the Record each of them offers
+		// to merge has to hold them all: `{ config with port, host }` answered
+		// the `port` report with `'{ base with { port } }'`, and a reader who
+		// followed it dropped `host` on the floor without being told.
+		let bare = Object.values(combination.rhs.members).filter(
+			(member) => member.shorthand === true && member.steps === undefined,
+		)
+		let base = writtenReceiver(combination.lhs) ?? "…"
+		let merged = `'{ ${base} with { ${bare.map((member) => member.name.content).join(", ")} } }'`
+
+		for (let member of bare) {
 			// NOTE: A bare PATH key was already refused as it was read, with
 			// the message that explains why no reading rescues it — there is
 			// no `a.b = a.b` for it to have meant.
-			if (member.shorthand !== true || member.steps !== undefined) {
-				continue
-			}
-
 			let name = member.name.content
 
 			reportError(
@@ -6156,7 +6297,7 @@ class DescentParser {
 					],
 					helps: [
 						`Write '${name} = ${name}'.`,
-						`Or merge a whole Record: '{ base with { ${name} } }'.`,
+						`Or merge a whole Record: ${merged}.`,
 					],
 				},
 			)
@@ -6408,7 +6549,21 @@ class DescentParser {
 			notes: [
 				`An update writes the members it names, so a descend with none in it says to leave '${spelling}' exactly as it is.`,
 			],
-			helps: ["Write the members to update inside it, or drop the key."],
+			// NOTE: "or drop the key" was one Help and it was a dead end where
+			// the key is the ONLY one: `{ config with server.{ } }` dropped down
+			// to `{ config with }`, which is a syntax error. The second clause
+			// says what to do there, and names the value the update was written
+			// on — dropping the last key drops the update, and the value on its
+			// own is what it was going to answer anyway.
+			helps:
+				this.updatedValue === null
+					? [
+							"Write the members to update inside it, or drop the key.",
+						]
+					: [
+							"Write the members to update inside it.",
+							`Or drop the key — and where it is the only one, drop the update with it and write '${this.updatedValue}' on its own.`,
+						],
 		})
 	}
 
@@ -6620,6 +6775,7 @@ class DescentParser {
 				position,
 				TokenType.SymbolDot,
 				"'.' can not follow a fraction",
+				(tail) => `${numerator.value}/${denominator.value}.${tail}`,
 			)
 
 			return generators.rationalValueNode(
@@ -6705,6 +6861,7 @@ class DescentParser {
 			position,
 			TokenType.SymbolSlash,
 			"'/' can not follow a decimal",
+			(tail) => `${whole.value}.${fraction.value}/${tail}`,
 		)
 
 		return generators.rationalValueNode(
@@ -6722,6 +6879,11 @@ class DescentParser {
 		literal: common.Position,
 		symbolType: lexer.TokenType,
 		label: string,
+		// NOTE: The two digit runs already read, so that the Help can say what
+		// the Literal MEANS. `'3/4' or '0.75'` was printed whatever was
+		// written, and `2.5/3` — five sixths — was answered with a Help that
+		// changed the number while the Quick Fix beside it offered `5/6`.
+		written: (tail: string) => string,
 	): void {
 		let symbol = this.tokens.peek()
 		let tailStart = this.tokens.peek(1)
@@ -6738,6 +6900,11 @@ class DescentParser {
 		this.tokens.next()
 
 		let tail = this.parseDigitRun()
+		// NOTE: The value the two spellings say between them, the fraction
+		// first. A value with no terminating decimal — `1.5/7` — has only the
+		// one, and the Help offers only the one: a rounded decimal would be a
+		// different number than the one that was written.
+		let spellings = mixedRationalSpellings(written(tail.value))
 
 		throw new ParseError(
 			"A Rational Literal is a fraction or a decimal, not both",
@@ -6748,9 +6915,16 @@ class DescentParser {
 				notes: [
 					"A fraction and a decimal are two spellings of one Rational — '3/4' and '0.75' are the same value — so a Literal written both ways says the same thing twice, and leaves it to the reader which parts belong to which.",
 				],
-				helps: [
-					"Write the fraction — '3/4' — or the decimal — '0.75'.",
-				],
+				helps:
+					spellings.length === 0
+						? [
+								"Write the fraction, or the decimal — one Rational is spelled one way or the other.",
+							]
+						: [
+								spellings.length === 1
+									? `Write it as '${spellings[0]}', which is the value the two spellings say between them.`
+									: `Write it as '${spellings[0]}' — or as '${spellings[1]}', which is the same value written the other way.`,
+							],
 			},
 		)
 	}
@@ -7078,8 +7252,6 @@ class DescentParser {
 	// `:` becomes `=`. Where nothing at all follows the key, the key is what is
 	// underlined, because the missing half is its value.
 	protected refuseDictionaryEntry(key: parser.ExpressionNode): never {
-		let note =
-			"An entry is 'key = value', and a Dictionary is a bracket list of them: '[\"a\" = 1, \"b\" = 2]'."
 		let found = this.tokens.peek()
 		let separator =
 			found === undefined
@@ -7087,15 +7259,8 @@ class DescentParser {
 				: writtenSeparatorLexeme(found, this.tokens.peek(1))
 
 		if (found !== undefined && separator !== null) {
-			throw new ParseError(
-				"A Dictionary entry is written with '='",
-				found.position,
-				`expected '=' and found '${separator}'`,
-				{
-					code: "dictionary-entry-syntax",
-					notes: [note],
-					helps: [`Write '=' in place of '${separator}'.`],
-				},
+			this.refuseForeignText(
+				dictionaryEntryRefusal(separator, found.position),
 			)
 		}
 
@@ -7105,7 +7270,7 @@ class DescentParser {
 			"this key is written with no value",
 			{
 				code: "dictionary-entry-syntax",
-				notes: [note],
+				notes: [dictionaryEntryNote],
 				helps: ["Write the value the key holds: 'key = value'."],
 			},
 		)
@@ -7828,10 +7993,21 @@ class DescentParser {
 						labels: [primary(position, "this default")],
 						notes: [
 							"A Function literal is called through the Function Type it was written for, which fixes how many Arguments every call passes, so a default here could never be reached.",
+							// NOTE: A Note rather than the Help it used to be.
+							// "Write the default on the named Function or
+							// Method this value is passed to" is an edit in
+							// somebody else's Declaration, and often in nobody's
+							// at all: a literal handed to `map` is passed to a
+							// Method of the standard library, and a literal
+							// bound to a name is passed to nothing yet. What is
+							// true of every one of them is the rule, and the
+							// rule is what this says.
+							"A default belongs to a named Function or Method, whose Parameter list is part of the Declaration a call is resolved against.",
 						],
-						helps: [
-							"Write the default on the named Function or Method this value is passed to.",
-						],
+						// NOTE: The same edit the Quick Fix makes. The two used
+						// to disagree — the fix took the default out and the
+						// Help sent the reader somewhere else entirely.
+						helps: ["Remove the default."],
 					},
 				)
 			}
@@ -8604,6 +8780,17 @@ class DescentParser {
 
 		if (lexeme === null || essenceLexemes.has(lexeme.text)) {
 			return null
+		}
+
+		// NOTE: `["kim" => 7]` — the one `=>` that is not a Function literal's
+		// arrow. Answered before the table, which would hand a reader writing a
+		// Dictionary a Function literal to write instead.
+		if (
+			lexeme.text === "=>" &&
+			left !== undefined &&
+			writtenDictionaryKey(left)
+		) {
+			return dictionaryEntryRefusal("=>", lexeme.position)
 		}
 
 		let syntax = foreignSyntaxRefusal(lexeme.text, lexeme.position)

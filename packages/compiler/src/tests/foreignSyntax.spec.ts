@@ -1221,13 +1221,24 @@ describe("Foreign syntax", () => {
 			expect(messagesOf(source)).toEqual([
 				"A call writes no Type Arguments",
 			])
-			// NOTE: The second Help is where a reader whose Arguments decide
-			// nothing goes next, and it may not send them to the annotation:
-			// the annotation does not bind a Type Parameter either, so that
-			// Help led back here through `uninferable-type-parameter`.
-			expect(helpsOf(source)[1]).toBe(
-				"Where the Arguments do not decide, give the Type Parameter a place among the Parameters.",
+			// NOTE: ONE Help, and it is the edit: take the brackets out. Where
+			// the Arguments decide nothing a reader goes to the Declaration
+			// instead, and that is said as a Note — the Parser has not seen the
+			// signature and can not know which of the two a reader is in.
+			expect(helpsOf(source)).toEqual([
+				"Write 'identity(…)' and let the Arguments decide.",
+			])
+			expect(notesOf(source)[1]).toBe(
+				"Where the Arguments do not decide one, the Type Parameter wants a place among the Parameters — a call reads it off an Argument or not at all.",
 			)
+			expect(
+				compiles(
+					program(
+						"function identity<infer T>(_ value: T) -> T { <- value }",
+						"Terminal.print(identity(1)::toString())",
+					),
+				),
+			).toBe(true)
 		})
 
 		it("refuses a String written in the other quotes", () => {

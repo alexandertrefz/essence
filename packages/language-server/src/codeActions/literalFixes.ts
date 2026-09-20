@@ -1,3 +1,4 @@
+import { mixedRationalSpellings } from "@essence-lang/compiler/helpers"
 import type { common } from "@essence-lang/interfaces"
 
 import { endOfLine, lineAt, sliceOf } from "./geometry"
@@ -180,138 +181,25 @@ export function partialDecimalActions(
 	]
 }
 
-const decimalOverFractionPattern =
-	/^(-?[0-9][0-9_]*)\.([0-9][0-9_]*)\/([0-9][0-9_]*)$/
-const fractionOverDecimalPattern =
-	/^(-?[0-9][0-9_]*)\/([0-9][0-9_]*)\.([0-9][0-9_]*)$/
-
 // NOTE: The value the two spellings say between them, written back each way.
 // Both are offered and neither is preferred: `1.5/2` is `3/4` and `0.75` alike,
 // and which of them the file should read is a matter of what it is about — a
 // ratio is a fraction and a price is a decimal.
 //
-// A value with no terminating decimal — `1.5/7` — is offered as a fraction
-// alone. There is no decimal that says it, and rounding one would answer with a
-// different number.
+// The arithmetic is the Compiler's — see `mixedRationalSpellings` — because the
+// Help printed on this Diagnostic offers the same two spellings, and a Help and
+// a fix that disagree about a number are worse than either of them alone.
 export function mixedRationalActions(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
 ): Array<CodeActionEntry> {
-	let written = sliceOf(lines, diagnostic.position)
-	let value =
-		rationalOf(decimalOverFractionPattern.exec(written), "decimal") ??
-		rationalOf(fractionOverDecimalPattern.exec(written), "fraction")
-
-	if (value === null) {
-		return []
-	}
-
-	let decimal = decimalSpelling(value)
-	let spellings = [
-		`${value.numerator}/${value.denominator}`,
-		...(decimal === null ? [] : [decimal]),
-	]
-
-	return spellings.map((spelling) =>
-		literalAction(diagnostic, spelling, {
-			range: diagnostic.position,
-			newText: spelling,
-		}),
+	return mixedRationalSpellings(sliceOf(lines, diagnostic.position)).map(
+		(spelling) =>
+			literalAction(diagnostic, spelling, {
+				range: diagnostic.position,
+				newText: spelling,
+			}),
 	)
-}
-
-type Rational = { numerator: bigint; denominator: bigint }
-
-// NOTE: The two mixed spellings read as one value. `A.B/C` is `AB` over
-// `10^len(B) · C`, and `A/B.C` is `A · 10^len(C)` over `BC` — the same
-// arithmetic either way round, with the power of ten on the side the decimal was
-// written on. Reduced to lowest terms, so that what is offered back is the
-// number rather than the digits it was typed as.
-function rationalOf(
-	written: RegExpExecArray | null,
-	side: "decimal" | "fraction",
-): Rational | null {
-	if (written === null) {
-		return null
-	}
-
-	let [whole, fraction, third] = [
-		digitsOf(written[1] as string),
-		digitsOf(written[2] as string),
-		digitsOf(written[3] as string),
-	]
-
-	let scale = 10n ** BigInt((side === "decimal" ? fraction : third).length)
-	let numerator =
-		side === "decimal"
-			? BigInt(`${whole}${fraction}`)
-			: BigInt(whole) * scale
-	let denominator =
-		side === "decimal"
-			? scale * BigInt(third)
-			: BigInt(`${fraction}${third}`)
-
-	if (denominator === 0n) {
-		return null
-	}
-
-	let divisor = greatestCommonDivisor(
-		numerator < 0n ? -numerator : numerator,
-		denominator,
-	)
-
-	return {
-		numerator: numerator / divisor,
-		denominator: denominator / divisor,
-	}
-}
-
-// NOTE: Euclid's, over a magnitude that may be zero and a denominator that is
-// not — `gcd(0, d)` is `d`, which is what canonicalises every zero as `0/1`.
-function greatestCommonDivisor(magnitude: bigint, denominator: bigint): bigint {
-	while (denominator !== 0n) {
-		;[magnitude, denominator] = [denominator, magnitude % denominator]
-	}
-
-	return magnitude
-}
-
-// NOTE: A decimal is a fraction over a power of ten, so a value has one exactly
-// where its reduced denominator divides one — which is to say where it is built
-// of twos and fives and nothing else. Null for every other value, since a
-// rounded decimal would be a different number than the one that was written.
-//
-// A whole value keeps one place — `2.0/2` is written back as `1.0` rather than
-// as `1`, which is an Integer and no longer the Rational the Literal was.
-function decimalSpelling({ numerator, denominator }: Rational): string | null {
-	let remaining = denominator
-	let twos = 0
-	let fives = 0
-
-	while (remaining % 2n === 0n) {
-		remaining /= 2n
-		twos += 1
-	}
-
-	while (remaining % 5n === 0n) {
-		remaining /= 5n
-		fives += 1
-	}
-
-	if (remaining !== 1n) {
-		return null
-	}
-
-	let places = Math.max(twos, fives, 1)
-	let scaled = (numerator * 10n ** BigInt(places)) / denominator
-	let negative = scaled < 0n
-	let digits = `${negative ? -scaled : scaled}`.padStart(places + 1, "0")
-
-	return `${negative ? "-" : ""}${digits.slice(0, -places)}.${digits.slice(-places)}`
-}
-
-function digitsOf(run: string): string {
-	return run.replaceAll("_", "")
 }
 
 // NOTE: One shape for every Literal rewritten in place: the title names the
