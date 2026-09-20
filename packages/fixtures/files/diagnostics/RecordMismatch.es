@@ -58,6 +58,22 @@ implementation {
 	§ the Literal itself carries the Label — and the Label says which members.
 	constant short: Standing = { team = { name = "Rovers", code = "ROV" } }
 
+	§ A near miss the value has ALREADY written. `goalsAgainst` is spelled
+	§ right one line above, so `goalAgainst` is a member nobody declared rather
+	§ than that one misspelled — and no rename is offered, because the member
+	§ it would write is standing there. `points` is missing all the same.
+	constant twice: Standing = {
+		team = { name = "Rovers", code = "ROV" },
+		played = 0,
+		won = 0,
+		drawn = 0,
+		lost = 0,
+		goalsFor = 0,
+		goalsAgainst = 0,
+		goalAgainst = 0,
+		form = [],
+	}
+
 	§ A Union of Records is diffed against the one the value is closest to, and
 	§ the report says which.
 	type Circle = { radius: Integer, filled: Boolean }

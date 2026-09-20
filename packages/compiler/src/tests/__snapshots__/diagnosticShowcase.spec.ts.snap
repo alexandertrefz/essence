@@ -2438,10 +2438,22 @@ Error: This value does not fit the declared Type of Constant 'short'
 ────╯
 
 [assignment-type-mismatch]
-Error: This value does not fit the declared Type of Constant 'shape'
-    ╭─┤ RecordMismatch.es:66:57 │
+Error: This value does not fit the declared Type of Constant 'twice'
+    ╭─┤ RecordMismatch.es:73:17 │
     │
- 66 │     constant shape: Circle | Rect = { radius = 1, filled = 1 }
+ 73 │        goalAgainst = 0,
+    │                      ▲  
+    │                      ╰── 'goalAgainst' is not a member of Standing
+    │ 
+    │ Note 1: 'twice' is declared as Standing.
+    │ Note 2: 'points' is missing.
+────╯
+
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'shape'
+    ╭─┤ RecordMismatch.es:82:57 │
+    │
+ 82 │     constant shape: Circle | Rect = { radius = 1, filled = 1 }
     │                                                            ▲  
     │                                                            ╰── this is an Integer, and Circle declares a Boolean
     │ 
@@ -2449,7 +2461,7 @@ Error: This value does not fit the declared Type of Constant 'shape'
     │ Note 2: Compared against Circle, the closest of the 2 Records this Union holds.
 ────╯
 
-─── 4 errors
+─── 5 errors
 "
 `;
 

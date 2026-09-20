@@ -58,10 +58,14 @@ const standing = `	type Team = { name: String, code: String }
 	type Standing = { team: Team, played: Integer, points: Integer }`
 
 describe("a Record that does not fit another", () => {
+	// NOTE: `points` is deliberately NOT written here, only near-missed. A near
+	// miss is offered against the members the value has left alone — the block
+	// below says why — so a shape writing both would be testing the withheld
+	// Help rather than the offered one.
 	describe("the finding this was written for", () => {
 		let source = implementation(`${standing}
 	function blank(of team: Team) -> Standing {
-		<- { team = team, played = 0, pointsFor = 0, points = "0" }
+		<- { team = team, pointsFor = 0, played = "0" }
 	}`)
 		let error = onlyError(source)
 
@@ -104,6 +108,26 @@ describe("a Record that does not fit another", () => {
 				member: "pointsFor",
 				suggestion: "points",
 			})
+		})
+	})
+
+	// NOTE: A near miss is a member the reader MEANT to write, and one they have
+	// written already is not that. The Quick Fix reads this Help's `data`, so
+	// offering `points` where `points` is standing on the line above wrote the
+	// member twice: the mismatch stayed and a `duplicate-member` joined it.
+	describe("a near miss the value already writes", () => {
+		let source = implementation(`${standing}
+	constant twice: Standing = { team = { name = "a", code = "b" }, points = 0, point = 1 }`)
+		let error = onlyError(source)
+
+		it("says the member is not declared and offers nothing", () => {
+			expect(labelsOf(error)).toEqual(["'point' is not a member of Standing"])
+			expect(error.helps).toEqual([])
+			expect(error.data).toBeUndefined()
+		})
+
+		it("still names the member nobody wrote", () => {
+			expect(error.notes).toContain("'played' is missing.")
 		})
 	})
 

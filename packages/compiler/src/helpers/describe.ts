@@ -977,7 +977,20 @@ function memberDifferences(
 		let position = memberPosition(literal, name)
 
 		if (!Object.hasOwn(target.members, name)) {
-			let suggestion = closestMatch(name, Object.keys(target.members))
+			// NOTE: Measured only against members the value has NOT written
+			// already. `goalsAgainst = 3` beside `goalAgainst = 4` is one
+			// member spelled right and a second nobody declared, and the
+			// nearest declared name to the second is the one standing a line
+			// above it — so the Help said "Did you mean 'goalsAgainst'?" and
+			// the fix that writes it turned one refusal into two, the mismatch
+			// and a `duplicate-member` over the pair. A member already written
+			// is not what an unknown one was meant to be.
+			let suggestion = closestMatch(
+				name,
+				Object.keys(target.members).filter(
+					(declared) => !Object.hasOwn(source.members, declared),
+				),
+			)
 
 			differences.push({
 				path,
