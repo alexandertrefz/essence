@@ -129,3 +129,30 @@ export function helpsOfCode(
 ): Array<string> {
 	return firstAnalysed(source, code).helps ?? []
 }
+
+// NOTE: The codes whose Helps are COMPILED somewhere — the registry the Help
+// specs maintain between them, and the one thing `helpCoverage.spec.ts` can not
+// work out for itself. A Help that spells an edit the reader is told to WRITE is
+// a promise, and the only way to keep it is to write that spelling into the
+// probe and compile the result; a Help nobody compiles is a Help that goes stale
+// the next time the spelling it names changes.
+//
+// Added to by the spec that starts compiling one. `helpCoverage.spec.ts` holds
+// it to the docs page both ways: an entry here that the page shows no "Write
+// '…'" Help for is an entry that has lost its subject, and the codes on the page
+// that are NOT here are printed as the list still to do.
+export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
+	[
+		"ambiguous-case",
+		"dictionary-entry-syntax",
+		"foreign-syntax",
+		"incomplete-record-argument",
+		"invalid-escape",
+		"method-called-with-dot",
+		"missing-documentation-separator",
+		"nonconforming-namespace",
+		"operator-not-supported",
+		"redundant-pattern-binder",
+		"unknown-name",
+		"wrong-type-argument-count",
+	]

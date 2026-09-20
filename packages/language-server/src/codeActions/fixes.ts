@@ -866,6 +866,18 @@ export function wrapInHoldingCaseActions(
 		return []
 	}
 
+	// NOTE: Withheld where the Argument WRITES its Type Arguments. Wrapping
+	// `Optional<Optional<Integer>>#Empty` puts the outer Type inside the Case
+	// that holds it, where the INNER one goes — a rewrite that turns a Program
+	// with nothing wrong with it into `assignment-type-mismatch`. The Warning's
+	// other Help is the one that answers this spelling anyway: a Case carries
+	// its Type Arguments for display and a payload-free one has no member to
+	// tell the two levels apart, so what decides it is a Constant declared
+	// beside the call.
+	if (argument.nodeType === "CaseValue" && argument.typeArguments !== null) {
+		return []
+	}
+
 	return diagnostic.data.caseNames.map((caseName) => {
 		let holding = `#${caseName}`
 
