@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 
+import { compileToMemory } from "@essence-lang/compiler/embed"
 import { fixturePath } from "@essence-lang/fixtures"
 import type { common } from "@essence-lang/interfaces"
 import { analyse } from "@essence-lang/language-server/analyse"
@@ -49,6 +50,20 @@ function editorFingerprints(filePath: string): Array<string> {
 	return analyse(readFileSync(filePath, "utf8"), filePath).map(fingerprint)
 }
 
+// NOTE: The THIRD reader of the same list — the seam a host embeds the Compiler
+// through, which is where the Vite, Bun and esbuild plugins get a build's
+// mistakes from. It used to stop at whichever stage reported first and call the
+// Validator bare underneath, so a plugin's Problems panel showed one mistake
+// where `essence check` over the very same file showed three, and a reader had
+// no way to tell which of the two was telling them the truth about their file.
+async function embedFingerprints(filePath: string): Promise<Array<string>> {
+	let result = await compileToMemory(filePath)
+
+	return result.diagnosticGroups
+		.filter((group) => group.filePath === filePath)
+		.flatMap((group) => group.diagnostics.map(fingerprint))
+}
+
 const SHOWCASE_DIRECTORY = fixturePath("diagnostics")
 
 let showcaseFiles = readdirSync(SHOWCASE_DIRECTORY)
@@ -61,12 +76,12 @@ describe("one analysis", () => {
 	})
 
 	for (let fileName of showcaseFiles) {
-		it(`answers alike for ${fileName} from the command line and the Editor`, async () => {
+		it(`answers alike for ${fileName} from the command line, the Editor and an embedding host`, async () => {
 			let filePath = path.join(SHOWCASE_DIRECTORY, fileName)
+			let fromCheck = await checkFingerprints(filePath)
 
-			expect(await checkFingerprints(filePath)).toEqual(
-				editorFingerprints(filePath),
-			)
+			expect(fromCheck).toEqual(editorFingerprints(filePath))
+			expect(fromCheck).toEqual(await embedFingerprints(filePath))
 		})
 	}
 
@@ -77,10 +92,10 @@ describe("one analysis", () => {
 	// sides, and `Main.es` is where they used to disagree.
 	it("answers alike for a Module whose dependency is broken", async () => {
 		let filePath = fixturePath("diagnostics", "modules", "Main.es")
+		let fromCheck = await checkFingerprints(filePath)
 
-		expect(await checkFingerprints(filePath)).toEqual(
-			editorFingerprints(filePath),
-		)
+		expect(fromCheck).toEqual(editorFingerprints(filePath))
+		expect(fromCheck).toEqual(await embedFingerprints(filePath))
 	})
 })
 
@@ -123,6 +138,24 @@ describe("every stage in one run", () => {
 					diagnostic.position?.start.line,
 				],
 			),
+		).toEqual([
+			["return-type-mismatch", 12],
+			["missing-return", 16],
+			["unknown-name", 21],
+		])
+	})
+
+	// NOTE: And through the embedding seam, which is the one that used to stop
+	// at the first stage that reported — a host building this file was handed
+	// the `unknown-name` and nothing else.
+	it("reports all three mistakes to an embedding host, in file order", async () => {
+		let result = await compileToMemory(filePath)
+
+		expect(
+			result.diagnostics.map((diagnostic) => [
+				diagnostic.code,
+				diagnostic.position?.start.line,
+			]),
 		).toEqual([
 			["return-type-mismatch", 12],
 			["missing-return", 16],

@@ -2,6 +2,7 @@ import * as path from "node:path"
 
 import type { common } from "@essence-lang/interfaces"
 
+import { analyseLinkedModules } from "../analysis"
 import type { ModuleSources } from "../bundler/index"
 import { type CompileMode, modeKey, modeOf } from "../compileMode"
 import { containsErrors } from "../diagnostics/index"
@@ -18,7 +19,6 @@ import {
 	type EmitTarget,
 	emitTargetKey,
 } from "../rewriter/index"
-import { validate } from "../validator/index"
 import { emitBundle, type EmitModule, generateModules } from "./emit"
 import { hashGraph } from "./hash"
 
@@ -353,45 +353,43 @@ function validateGraph(
 		}
 	}
 
-	// NOTE: A specifier that names nothing is a parse-stage answer as much as a
-	// syntax error is: the graph resolved every entry while it was reading the
-	// files, and linking a graph with a hole in it would report the same mistake
-	// again as a name that is not in scope.
-	let parsed = answer(
-		emptySurface(),
-		[...front.graph.modules.values()],
-		front.graph.diagnostics,
-	)
-
-	if (containsErrors(parsed.diagnostics)) {
-		return { stopped: parsed }
+	// NOTE: A specifier that names nothing is the one stop that stands in FRONT
+	// of the judgement rather than falling out of it: the graph resolved every
+	// entry while it was reading the files, so a hole in it means there is no
+	// graph to link and nothing behind this stage to ask.
+	if (containsErrors(front.graph.diagnostics)) {
+		return {
+			stopped: answer(
+				emptySurface(),
+				[...front.graph.modules.values()],
+				front.graph.diagnostics,
+			),
+		}
 	}
 
 	let linked = linkModuleGraph(front.graph, modeOf(options))
 	let modules = [...linked.modules.values()]
 	let surface = linked.modules.get(front.entry)?.surface ?? emptySurface()
-	// NOTE: Copied rather than pointed at, because validation appends to these
-	// below and a LinkedModule's own collection is not this stage's to grow.
+	// NOTE: Every stage's verdict in ONE pass, through the same entry `esc` and
+	// the Language Server go through — see `analyseLinkedModules`. This used to
+	// stop at whichever stage reported first and then call the Validator bare
+	// underneath: a host embedding the Compiler was told about one mistake where
+	// `essence check` over the very same file listed three, and the Validator ran
+	// without the Parser's Recovery to stand its whole-construct checks down. A
+	// plugin's Problems panel disagreeing with the CLI is a bug report about the
+	// language that nobody can reproduce.
+	let analyses = analyseLinkedModules(modules)
 	let perModule = modules.map((module) => ({
 		filePath: module.module.filePath,
-		diagnostics: [...module.diagnostics],
+		diagnostics: analyses?.get(module.module.filePath) ?? [
+			...module.diagnostics,
+		],
 	}))
-	let enriched = answer(surface, perModule, linked.diagnostics)
-
-	if (containsErrors(enriched.diagnostics)) {
-		return { stopped: enriched }
-	}
-
-	// NOTE: Validation runs over the whole graph, and only once nothing in it has
-	// reported an error — a Module that failed to enrich carries Types that were
-	// never established, and validating those answers about the failure rather
-	// than about the source.
-	for (let [index, module] of modules.entries()) {
-		perModule[index]!.diagnostics.push(...validate(module.program))
-	}
-
 	let validated = answer(surface, perModule, linked.diagnostics)
 
+	// NOTE: And the stop is about EMITTING rather than about judging. Nothing is
+	// emitted from a graph with an Error in it — but by the time that is
+	// decided, every Error in it has been found.
 	if (containsErrors(validated.diagnostics)) {
 		return { stopped: validated }
 	}

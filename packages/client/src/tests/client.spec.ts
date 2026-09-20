@@ -342,6 +342,13 @@ describe("A Module that does not compile", () => {
 	// NOTE: One block per file against that file's own source. A dependency's
 	// Diagnostic rendered against the entry's text would underline whatever
 	// happens to be written at that line number in the wrong file.
+	//
+	// NOTE: And the ENTRY gets a block of its own, saying that what it imports
+	// did not compile. That is what `essence check` and the Editor both answer
+	// for this graph, and the seam a host compiles through now reads the same
+	// analysis they do — so a reader who builds through a plugin and then runs
+	// `check` is told the same thing twice rather than two different things
+	// once each.
 	it("renders a dependency's Diagnostic against the dependency", async () => {
 		await withProject(
 			{
@@ -382,7 +389,7 @@ export {
 					compileError.diagnosticGroups.map((group) =>
 						path.basename(group.filePath),
 					),
-				).toEqual(["Dep.es"])
+				).toEqual(["Dep.es", "Main.es"])
 				expect(compileError.message).toContain("<- 1")
 			},
 		)
