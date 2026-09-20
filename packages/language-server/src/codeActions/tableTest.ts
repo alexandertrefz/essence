@@ -2,6 +2,7 @@ import { printType } from "@essence-lang/compiler/printType"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { isValidIdentifierName } from "../rename"
+import { isSpellableType } from "../spellableTypes"
 import {
 	closesItsLine,
 	indentationOf,
@@ -11,7 +12,7 @@ import {
 } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { walk } from "./lookups"
-import { isSpellableType, typedExpressionAt } from "./typedLookups"
+import { typedExpressionAt } from "./typedLookups"
 
 // NOTE: A test that says one thing about several values, written as the table
 // it already is. What makes it mechanical is the narrowness: every line has to

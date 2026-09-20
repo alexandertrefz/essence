@@ -1054,7 +1054,14 @@ export function elseBranchAction(
 		// empty, so the Diagnostic stays until the reader fills it in. What
 		// the fix buys is a hole that is visible instead of a path that falls
 		// off the end invisibly.
-		title: "Add an empty else branch",
+		//
+		// Which the TITLE has to say too. Named for the Diagnostic it does not
+		// clear, it read as a fix that had simply failed — the same code, the
+		// same message and the same Function came back, which is the shape of a
+		// fix that loops. It does not loop; it moves the hole into the open and
+		// leaves the filling to the reader, and `missing-return`'s own Help
+		// names the `<-` that finishes the job.
+		title: "Add an else branch to fill in",
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
@@ -1393,40 +1400,60 @@ export function staticCallActions(
 		return []
 	}
 
-	let { namespace } = diagnostic.data
+	let { namespace, acceptsValue, acceptsWithoutValue } = diagnostic.data
 	let call = `${namespace}.${invocation.member.content}(`
 	let listed = (title: string, edits: Array<CodeActionEdit>) => ({
 		title,
 		kind: "quickfix" as const,
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
-		isPreferred: false,
+		// NOTE: Preferred where the signature leaves only one of the two
+		// standing — there is then nothing left for the reader to choose
+		// between, and the edit is simply right.
+		isPreferred: acceptsValue !== acceptsWithoutValue,
 		edits,
 	})
 
+	// NOTE: Only the shapes the signature accepts, which the Compiler worked out
+	// from its arity — see `staticCallArities`. Both used to be offered whatever
+	// the arity, so a zero-Argument static answered "passing the value" with
+	// `argument-count-mismatch` and a one-Argument static answered the other one
+	// the same way: whichever the reader picked, one of the two was a refusal.
 	return [
-		listed(`Write '${call}…)' passing the value`, [
-			{
-				range: {
-					start: invocation.base.position.start,
-					end: invocation.base.position.start,
-				},
-				newText: call,
-			},
-			{
-				range: { start: invocation.base.position.end, end: bracket },
-				newText: invocation.arguments.length === 0 ? "" : ", ",
-			},
-		]),
-		listed(`Write '${call}…)' without the value`, [
-			{
-				range: {
-					start: invocation.base.position.start,
-					end: bracket,
-				},
-				newText: call,
-			},
-		]),
+		...(acceptsValue
+			? [
+					listed(`Write '${call}…)' passing the value`, [
+						{
+							range: {
+								start: invocation.base.position.start,
+								end: invocation.base.position.start,
+							},
+							newText: call,
+						},
+						{
+							range: {
+								start: invocation.base.position.end,
+								end: bracket,
+							},
+							newText:
+								invocation.arguments.length === 0 ? "" : ", ",
+						},
+					]),
+				]
+			: []),
+		...(acceptsWithoutValue
+			? [
+					listed(`Write '${call}…)' without the value`, [
+						{
+							range: {
+								start: invocation.base.position.start,
+								end: bracket,
+							},
+							newText: call,
+						},
+					]),
+				]
+			: []),
 	]
 }
 

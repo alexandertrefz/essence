@@ -3,6 +3,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import type { Declaration, DeclarationKind, ProgramIndex } from "../rename"
 import { scopeAt } from "../rename"
+import { isSpellableType } from "../spellableTypes"
 import {
 	closesItsLine,
 	containsRange,
@@ -16,7 +17,7 @@ import type { CodeActionEntry } from "./index"
 import { enclosingStatementOf, outermostStatementOf, walkNode } from "./lookups"
 import { availableName } from "./names"
 import { renameCommand } from "./renameCommand"
-import { isSpellableType, typedExpressionAt } from "./typedLookups"
+import { typedExpressionAt } from "./typedLookups"
 
 // NOTE: Whole Statements lifted out of a Function and written as a Function
 // beside it, with the names they read turned into its Parameters. The Types

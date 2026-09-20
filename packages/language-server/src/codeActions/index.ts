@@ -330,7 +330,13 @@ export function findCodeActions(
 			...tableTestActions(program, enrichedProgram, lines, range),
 		)
 		entries.push(
-			...pathActions(program, () => indexed().scopes, lines, range),
+			...pathActions(
+				program,
+				() => indexed().scopes,
+				lines,
+				range,
+				reported,
+			),
 		)
 		entries.push(...defineActions(program, lines, range))
 		entries.push(...payloadActions(program, enrichedProgram, lines, range))

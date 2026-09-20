@@ -133,10 +133,18 @@ export function inlineDefineValueAction(
 // to read — the Diagnostic spans the `define` keyword through its closing brace,
 // and the buffer is what says the two are still there.
 //
-// Not preferred, and honest about why: the arm it writes has no value in it, so
-// the file does not compile until the reader fills one in. What the fix buys is
-// the hole in the place it belongs, at the indentation the arms above it stand
-// at.
+// Not preferred, and honest about why: the arm it writes holds a hole rather than
+// a value, so the file does not compile until the reader fills one in. What the
+// fix buys is that hole in the place it belongs, at the indentation the arms
+// above it stand at — and the title says as much, since a fix named for the
+// Diagnostic it does not clear reads as one that failed.
+//
+// The hole is `{}` and not a blank. `as  otherwise` does not PARSE, and a buffer
+// that no longer parses is a buffer whose every other report goes with it — the
+// one scaffolding fix in this family whose result was worse than the hole it
+// filled. `{}` is the unit value: it parses, it is visibly not an answer, and in
+// any position that names a Type it is refused as "this arm does not answer with
+// the Type this 'define' has", which is the report a reader can act on.
 export function otherwiseArmAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -150,7 +158,7 @@ export function otherwiseArmAction(
 	let indentation = indentationOf(lines, diagnostic.position.start.line)
 
 	return {
-		title: "Add an empty 'otherwise' arm",
+		title: "Add an 'otherwise' arm to fill in",
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
@@ -159,7 +167,7 @@ export function otherwiseArmAction(
 			insertBeforeClosingBrace(
 				diagnostic.position.end,
 				lines,
-				`${indentation}\tas  otherwise\n`,
+				`${indentation}\tas {} otherwise\n`,
 				indentation,
 			),
 		],

@@ -6,6 +6,7 @@ import { typedAssertionExpressions } from "./assertionChildren"
 import { defineExpressions } from "./defineArmChildren"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { typedProgramBodies } from "./sections"
+import { isSpellableType } from "./spellableTypes"
 
 // NOTE: Inlay Hints annotate whatever carries no Type annotation with the Type
 // it was inferred as — Constant and Variable declarations, and the Parameters
@@ -43,12 +44,25 @@ type InlayHintEdit = {
 // that annotation belongs — so accepting a Hint is inserting its own label at
 // its own position, and building the two together is what keeps them from
 // drifting apart.
-function typeHint(position: common.Cursor, label: string): InlayHint {
+//
+// A Type that can not be WRITTEN is shown and not offered. `printType` prints
+// every Type there is, including the ones no Declaration accepts — a blank as
+// `Unknown`, a poisoned slot as `Error`, a Type Parameter under a name that
+// means nothing outside the Declaration that introduced it — and the refactor
+// that applies a hint wrote those into the buffer, which added `unknown-type`
+// on top of whatever was already wrong and, for a Function Type, stopped the
+// file parsing. The hint still SHOWS what was inferred, which is information;
+// it simply carries no edit, exactly as a recorded value does.
+function typeHint(
+	position: common.Cursor,
+	label: string,
+	type: common.Type,
+): InlayHint {
 	return {
 		position,
 		label,
 		kind: "type",
-		textEdit: { position, newText: label },
+		textEdit: isSpellableType(type) ? { position, newText: label } : null,
 	}
 }
 
@@ -112,6 +126,7 @@ function visitNode(
 					typeHint(
 						node.name.position.end,
 						`: ${printType(node.type)}`,
+						node.type,
 					),
 				)
 			}
@@ -304,6 +319,7 @@ function visitFunctionDefinition(
 				typeHint(
 					parameter.position.end,
 					`: ${printType(parameter.inferredType)}`,
+					parameter.inferredType,
 				),
 			)
 		}
@@ -321,6 +337,7 @@ function visitFunctionDefinition(
 			typeHint(
 				definition.parameterListPosition.end,
 				` -> ${printType(definition.inferredReturnType)}`,
+				definition.inferredReturnType,
 			),
 		)
 	}

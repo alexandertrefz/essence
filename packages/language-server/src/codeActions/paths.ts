@@ -30,6 +30,9 @@ export function pathActions(
 	scopes: () => Array<ScopeRange>,
 	lines: Array<string>,
 	range: common.Position,
+	// NOTE: What the Compiler said about this file, so that a path it REFUSED is
+	// not offered as a literal — see `pathWasRefused`.
+	reported: Array<common.Diagnostic> = [],
 ): Array<CodeActionEntry> {
 	let entries: Array<CodeActionEntry> = []
 
@@ -53,7 +56,9 @@ export function pathActions(
 		}
 
 		if (value.nodeType === "MemberPath") {
-			let literal = writtenLiteralOf(value, scopes, lines)
+			let literal = pathWasRefused(value, reported)
+				? null
+				: writtenLiteralOf(value, scopes, lines)
 
 			if (literal !== null) {
 				entries.push(
@@ -68,6 +73,30 @@ export function pathActions(
 	}
 
 	return entries
+}
+
+// NOTE: Whether the Compiler refused this very path. The rewrite is a change of
+// SPELLING and nothing else — it writes the literal the Enricher would have
+// written — so over a path that does not work it writes a literal that does not
+// work either, and spells the mistake out in more places than the path did:
+// `.tags.length` became `(item) { <- item.tags.length }`, which is the same
+// refused step, plus a literal with no `-> Type` and a Type Parameter nothing
+// binds. One mistake in, three out.
+//
+// Asked of the reports rather than of the path, because what makes a step wrong
+// is what the Types say and this tree holds none of them.
+function pathWasRefused(
+	node: parser.MemberPathNode,
+	reported: Array<common.Diagnostic>,
+): boolean {
+	return reported.some(
+		(diagnostic) =>
+			(diagnostic.code === "path-step-not-a-record" ||
+				diagnostic.code === "path-without-context" ||
+				diagnostic.code === "path-on-computed-value") &&
+			diagnostic.position !== null &&
+			overlaps(node.position, diagnostic.position),
+	)
 }
 
 // NOTE: The path a literal stands for, or null where the literal does anything

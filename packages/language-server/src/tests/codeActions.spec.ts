@@ -1985,7 +1985,11 @@ describe("Code Actions", () => {
 
 			let [fix] = quickFixes(lines)
 
-			expect(fix.title).toBe("Add an empty else branch")
+			// NOTE: Titled for the hole it leaves rather than for the
+			// Diagnostic it does not clear — the report stays until the branch
+			// is filled in, and a fix named "Add an empty else branch" read as
+			// one that had simply failed.
+			expect(fix.title).toBe("Add an else branch to fill in")
 			expect(fix.isPreferred).toBe(false)
 
 			expect(applied(lines, fix)).toEqual([
@@ -2822,7 +2826,7 @@ describe("Code Actions", () => {
 
 			let [fix] = quickFixes(lines)
 
-			expect(fix.title).toBe("Add an empty 'otherwise' arm")
+			expect(fix.title).toBe("Add an 'otherwise' arm to fill in")
 			expect(fix.diagnosticCode).toBe("define-without-otherwise")
 			expect(fix.isPreferred).toBe(false)
 
@@ -2833,19 +2837,39 @@ describe("Code Actions", () => {
 				"\tconstant flag = true",
 				"\tconstant grade = define {",
 				"\t\tas 1 if flag",
-				"\t\tas  otherwise",
+				"\t\tas {} otherwise",
 				"\t}",
 				"}",
 			])
 
-			// NOTE: The one scaffold in this file whose hole does not PARSE —
-			// `as  otherwise` has no value in it and `esfmt` refuses the buffer
-			// outright. It is the documented shape of this fix (see the code's
-			// entry on `/docs/reference/diagnostics`), and what is pinned here
-			// is that it costs exactly the one `syntax-error`: a hole that took
-			// a second Diagnostic with it, or that hid the Diagnostics below
-			// it, would be a different fix and not this one.
-			expect(codesOf(result)).toEqual(["syntax-error"])
+			// NOTE: The hole PARSES. It used to be a blank — `as  otherwise` —
+			// and the buffer that came back was a `syntax-error` that took every
+			// other stage's reports down with it, which is a worse place to
+			// leave a reader than the report they started from. `{}` is the unit
+			// value: visibly not an answer, and refused as one wherever the
+			// position names a Type (see the arm below).
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: And the hole is not silent where the `define` has a Type to
+		// answer: the arm is refused for answering `{}`, which is the report
+		// that names what is still missing.
+		it("leaves a hole the Compiler reports where the Type is known", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction label(of score: Integer) -> String {",
+				"\t\t<- define {",
+				'\t\t\tas "high" if score::isGreaterThan(10)',
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(codesOf(applied(lines, fix))).toEqual([
+				"return-type-mismatch",
+			])
 		})
 
 		it("should stay silent where the span no longer reads as a define", () => {
@@ -3821,36 +3845,55 @@ describe("Code Actions", () => {
 			"\tconstant boxed: Box = { v = 1 }",
 		]
 
-		// NOTE: Two actions and neither preferred — a static takes no receiver,
-		// so the value the call was written on either belongs among the
-		// Arguments or does not belong at all, and nothing in the Diagnostic
-		// says which. Its own Help hedges for the same reason.
-		it("should offer the call with the value and without it", () => {
+		// NOTE: A static whose Parameters the written Arguments already fill has
+		// nowhere to put the receiver, so only the one shape is offered — and
+		// being the only one, it is preferred. Both used to be offered whatever
+		// the arity, and "passing the value" answered this very call with
+		// `argument-count-mismatch`: a fix that trades one refusal for another.
+		it("should offer only the call the signature accepts", () => {
 			let lines = [...BOXES, "\tconstant made = boxed::make(2)", "}"]
 
 			let fixes = quickFixes(lines)
 
 			expect(titles(fixes)).toEqual([
-				"Write 'Boxes.make(…)' passing the value",
 				"Write 'Boxes.make(…)' without the value",
 			])
-			expect(fixes.map((entry) => entry.isPreferred)).toEqual([
-				false,
-				false,
-			])
+			expect(fixes.map((entry) => entry.isPreferred)).toEqual([true])
 		})
 
+		// NOTE: And the other way round — a static with a Parameter left over
+		// takes the receiver into it, and the shape that drops the value is the
+		// one withheld.
 		it("should pass the value as the first Argument", () => {
-			let lines = [...BOXES, "\tconstant made = boxed::make(2)", "}"]
+			let lines = [
+				"implementation {",
+				"\ttype Box = { v: Integer }",
+				"",
+				"\tnamespace Boxes for Box {",
+				"\t\tstatic held(_ b: Box, _ v: Integer) -> Integer {",
+				"\t\t\t<- v",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant boxed: Box = { v = 1 }",
+				"\tconstant made = boxed::held(2)",
+				"}",
+			]
 
-			expect(applied(lines, quickFixes(lines)[0])[10]).toBe(
-				"\tconstant made = Boxes.make(boxed, 2)",
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Write 'Boxes.held(…)' passing the value",
+			])
+			expect(applied(lines, fixes[0])[10]).toBe(
+				"\tconstant made = Boxes.held(boxed, 2)",
 			)
+			expect(codesOf(applied(lines, fixes[0]))).toEqual([])
 		})
 
 		it("should drop the receiver where the static does not take it", () => {
 			let lines = [...BOXES, "\tconstant made = boxed::make(2)", "}"]
-			let result = applied(lines, quickFixes(lines)[1])
+			let result = applied(lines, quickFixes(lines)[0])
 
 			expect(result[10]).toBe("\tconstant made = Boxes.make(2)")
 
@@ -3885,10 +3928,22 @@ describe("Code Actions", () => {
 		// NOTE: The receiver's own text is never retyped — it is the one thing
 		// the two edits are written around.
 		it("should carry a written receiver across untouched", () => {
-			let lines = [...BOXES, "\tconstant made = { v = 9 }::make(2)", "}"]
+			let lines = [
+				"implementation {",
+				"\ttype Box = { v: Integer }",
+				"",
+				"\tnamespace Boxes for Box {",
+				"\t\tstatic held(_ b: Box, _ v: Integer) -> Integer {",
+				"\t\t\t<- v",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant made = { v = 9 }::held(2)",
+				"}",
+			]
 
-			expect(applied(lines, quickFixes(lines)[0])[10]).toBe(
-				"\tconstant made = Boxes.make({ v = 9 }, 2)",
+			expect(applied(lines, quickFixes(lines)[0])[9]).toBe(
+				"\tconstant made = Boxes.held({ v = 9 }, 2)",
 			)
 		})
 	})

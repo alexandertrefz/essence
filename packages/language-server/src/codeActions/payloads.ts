@@ -67,9 +67,19 @@ export function payloadActions(
 
 		let [name] = names
 
+		// NOTE: And never expand a payload the source ALREADY wrote as the
+		// Case's Record. `#Circle({ radius = "big" })` is refused for the
+		// String in it, and the expansion offered there wrote
+		// `{ radius = { radius = "big" } }` — the doubled shape the refusal
+		// had just finished reporting — so applying it brought the very same
+		// Diagnostic back. The enriched payload can not tell the two apart on
+		// its own: a written Record and a wrapped value are both Records by
+		// the time it sees them, and only the SOURCE says which was typed.
 		entries.push(
 			...(wrapsItsPayload(payload, name)
-				? expandActions(node.value, name)
+				? writesTheMemberItself(node.value, name)
+					? []
+					: expandActions(node.value, name)
 				: shortenActions(node.value, name, lines)),
 		)
 	})
@@ -162,6 +172,19 @@ function shortenActions(
 // Position and holds that value under the Case's one member name — a written
 // Literal's member always stands inside the braces it is written in, so the two
 // can not be confused.
+// NOTE: Whether the SOURCE wrote the Case's member out — `{ radius = … }` — as
+// opposed to handing the member's value over on its own. Read off the Parser AST,
+// which is the only tree that still knows: the Enricher wraps a bare value in a
+// Record of exactly this shape, and after that the two read alike.
+function writesTheMemberItself(
+	value: parser.ExpressionNode,
+	name: string,
+): boolean {
+	return (
+		value.nodeType === "RecordValue" && Object.hasOwn(value.members, name)
+	)
+}
+
 function wrapsItsPayload(
 	node: common.typed.CaseValueNode,
 	name: string,

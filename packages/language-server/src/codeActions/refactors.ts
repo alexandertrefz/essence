@@ -14,23 +14,31 @@ import { walk } from "./lookups"
 // would be written and reads as the annotation would read. Offering it as a
 // refactor makes the hint applicable rather than only visible, and adds no
 // inference of its own.
+//
+// Only the hints that carry an edit. A hint whose Type can not be written down
+// shows what was inferred and offers nothing — see `typeHint` — and the ones
+// this used to offer regardless were the worst edits in the editor: `: List<
+// Unknown>` and `: NonEmptyList<Error>` added `unknown-type` on top of whatever
+// was already wrong, and a Function Type stopped the file parsing outright.
 export function annotationActions(
 	enrichedProgram: common.typed.Program,
 	range: common.Position,
 ): Array<CodeActionEntry> {
-	return findInlayHints(enrichedProgram, range).map((hint) => ({
-		title: `Add explicit Type annotation '${hint.label.trim()}'`,
-		kind: "refactor.rewrite" as const,
-		diagnosticCode: null,
-		diagnosticPosition: null,
-		isPreferred: false,
-		edits: [
-			{
-				range: { start: hint.position, end: hint.position },
-				newText: hint.label,
-			},
-		],
-	}))
+	return findInlayHints(enrichedProgram, range)
+		.filter((hint) => hint.textEdit !== null)
+		.map((hint) => ({
+			title: `Add explicit Type annotation '${hint.label.trim()}'`,
+			kind: "refactor.rewrite" as const,
+			diagnosticCode: null,
+			diagnosticPosition: null,
+			isPreferred: false,
+			edits: [
+				{
+					range: { start: hint.position, end: hint.position },
+					newText: hint.label,
+				},
+			],
+		}))
 }
 
 // NOTE: The Formatter never rewrites between `{ x }` and `{ x = x }` — the
