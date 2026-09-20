@@ -5656,6 +5656,27 @@ export function checkProtocolConformance(
 							`Method '${result.methodName}' is missing`,
 						),
 					],
+					// NOTE: The whole list, named rather than left to the Quick
+					// Fix alone — a reader reading the report in a terminal has
+					// no fix to apply, and what a conformance OWES is the one
+					// thing this report knows and never said.
+					helps: [
+						`Write ${missingRequirements(
+							protocol,
+							namespaceType,
+							providers,
+						)
+							.map((methodName) => `'${methodName}'`)
+							.join(", ")} as '${protocol.name}' declares ${
+							missingRequirements(
+								protocol,
+								namespaceType,
+								providers,
+							).length === 1
+								? "it"
+								: "them"
+						}, or drop the 'is ${protocol.name}'.`,
+					],
 					// NOTE: The whole list, where the Label names the one the
 					// check stopped at — a fix that writes the stubs writes
 					// them all at once, and a Namespace that declares a
@@ -5686,6 +5707,14 @@ export function checkProtocolConformance(
 							identifier.position,
 							`Method '${result.methodName}' does not match the Protocol's signature`,
 						),
+					],
+					// NOTE: A Method to CORRECT rather than one to write, so no
+					// stub is offered and the Help says where the shape it has
+					// to take is written down. Which part of the signature
+					// differs is a comparison this site does not make — it knows
+					// only that they do not match.
+					helps: [
+						`Write '${result.methodName}' with the signature '${protocol.name}' declares for it.`,
 					],
 				},
 			)

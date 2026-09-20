@@ -249,6 +249,73 @@ describe("A conformance condition that can not be added", () => {
 	})
 })
 
+describe("A conformance a Namespace does not fulfil", () => {
+	// NOTE: The Label names the requirement the check stopped at; the Help names
+	// every one the conformance owes, which is what a reader in a terminal —
+	// with no Quick Fix to apply — was never told.
+	it("should name every requirement the conformance owes", () => {
+		let source = `implementation {
+			protocol Measured {
+				size() -> Integer
+				name() -> String
+			}
+
+			type Box = { side: Integer }
+
+			namespace Boxes for Box is Measured {}
+
+			Terminal.print("ok")
+		}`
+
+		expect(firstOf(source, "nonconforming-namespace").helps).toEqual([
+			"Write 'size', 'name' as 'Measured' declares them, or drop the 'is Measured'.",
+		])
+
+		expect(
+			compiles(`implementation {
+				protocol Measured {
+					size() -> Integer
+					name() -> String
+				}
+
+				type Box = { side: Integer }
+
+				namespace Boxes for Box is Measured {
+					size() -> Integer {
+						<- @.side
+					}
+
+					name() -> String {
+						<- "a box"
+					}
+				}
+
+				Terminal.print("ok")
+			}`),
+		).toBe(true)
+	})
+
+	// NOTE: A Method to CORRECT rather than one to write, so no stub is named
+	// and the Help says where the shape it has to take is written down.
+	it("should send a mismatched signature to the Protocol", () => {
+		let source = `implementation {
+			type Point = { x: Integer }
+
+			namespace Points for Point is Printable {
+				toString(_ prefix: String) -> String {
+					<- prefix
+				}
+			}
+
+			Terminal.print("ok")
+		}`
+
+		expect(firstOf(source, "nonconforming-namespace").helps).toEqual([
+			"Write 'toString' with the signature 'Printable' declares for it.",
+		])
+	})
+})
+
 describe("A Type in want of a conformance", () => {
 	// NOTE: The Type to do something about is the LAST link of the chain, not
 	// the one the bound was written on: a Namespace `for Result<String, Problem>`

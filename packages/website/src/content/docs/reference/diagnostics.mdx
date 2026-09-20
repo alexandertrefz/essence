@@ -2842,6 +2842,13 @@ Error: This payload does not fit Case '#Circle'
 
 Write the payload the case declares: `#Circle({ radius = 3 })`.
 
+A case of **several** members gets a second Help — `The one-member shorthand
+'#Case(value)' only applies to single-member Cases.` — because the shorthand is
+what a reader writing `#Rectangle(2)` reached for, and it is the one thing the
+member diff above cannot say. A single-member case gets no such Help: the
+shorthand would have accepted the value, so what is wrong is the value itself,
+which the note names the type of.
+
 Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
 
 ### `unbindable-case-payload`
@@ -2868,6 +2875,29 @@ Error: 'Shape#Rectangle' has no single value to bind
 </div>
 
 Take the payload apart by its members, the way JavaScript destructures an object: `case #Rectangle({ width, height })`.
+
+A binding written on a case that carries **no** payload reports the same code
+with its own message, label and Help — there is nothing to take apart, so the
+binding goes:
+
+<div class="error-output">
+
+```
+[unbindable-case-payload]
+Error: 'Shape#Dot' has no single value to bind
+    ╭─┤ Shape.es:12:13 │
+    │
+ 12 │        case #Dot(size) { <- "dot" }
+    │                  ──┬─  
+    │                    ╰─── this Case carries no value
+    │ 
+    │ Help: Drop the binding — the Matcher alone is the test.
+    │ 
+    │ Note: A binding names the value a Case carries, and this one carries none.
+────╯
+```
+
+</div>
 
 Taught on: [Patterns › In a case payload](/docs/language/patterns#in-a-case-payload)
 
@@ -3986,14 +4016,25 @@ Error: Namespace 'Points' does not conform to 'Printable'
  4 │     namespace Points for Point is Printable {}
    │                                   ────┬────  
    │                                       ╰────── Method 'toString' is missing
+   │ 
+   │ Help: Write 'toString' as 'Printable' declares it, or drop the 'is Printable'.
 ───╯
 ```
 
 </div>
 
-Write the missing method, here `toString() -> String { … }`. A choice whose cases carry no payload gets `is Printable` without writing a method.
+Write the missing method, here `toString() -> String { … }`. A choice whose cases carry no payload gets `is Printable` without writing a method. The Help names
+**every** requirement the conformance owes, not only the one the label stopped
+at — a namespace that declares a conformance and writes nothing owes all of them.
 
-Quick Fix: **Implement 'Printable'** writes an empty method for each missing requirement.
+Two other shapes report under the same code, each with its own Help:
+
+- **A method whose signature does not match.** `Write 'toString' with the signature 'Printable' declares for it.` No stub is offered: this is a method to correct rather than one to write.
+- **A method that needs a `where` condition.** `Add 'where Item is Printable' to this conformance.` — unless that type parameter already carries a bound here, in which case a second one is refused and the Help sends the conformance to a namespace of its own instead.
+
+Quick Fix: **Implement 'Printable'** writes an empty method for each missing
+requirement, as `name() -> String {}` on one line — the shape `esfmt` leaves
+alone, so what the fix wrote is what a reader commits.
 
 Taught on: [Protocols › Declaring a protocol](/docs/language/protocols#declaring-a-protocol)
 
@@ -4191,7 +4232,10 @@ Error: 'Other' is not a Type Parameter of this Namespace
 
 Fix the name, or declare the parameter in the namespace's list. The target type must then mention it, or [`unwitnessable-where-condition`](/docs/reference/diagnostics#unwitnessable-where-condition) follows.
 
-Quick Fix: **Declare it as '&lt;infer Other&gt;'**.
+Quick Fix: **Declare it as '&lt;infer Other&gt;'**. It leaves that follow-up by
+design: declaring the parameter is the edit this report asks for, and whether the
+target type mentions it is a second question about the namespace's head, which no
+edit to the condition can settle.
 
 Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
 
