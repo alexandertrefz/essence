@@ -4587,8 +4587,17 @@ export function enrichTestTable(
 		)
 	}
 
+	// NOTE: Null where the Parameter list was just refused, which silences the
+	// row check with it. A table that names two Parameters has no row Type: the
+	// FIRST of them is not it, and measuring every row against that one reported
+	// `table-row-type-mismatch` about a Type the reader never wrote for the row
+	// — one mistake, said twice, the second time in words about the first
+	// Parameter's Type. One report, and the row Types are read once the list
+	// says which Parameter is the row.
 	let declaredType =
-		parameter?.type === undefined || parameter.type === null
+		node.parameters.length !== 1 ||
+		parameter?.type === undefined ||
+		parameter.type === null
 			? null
 			: resolveType(parameter.type, scope)
 	let rows = enrichTableRows(
@@ -4598,7 +4607,15 @@ export function enrichTestTable(
 		skipped,
 		nameReadsTheRow,
 	)
-	let type = declaredType ?? listItemTypeOf(rows.map((row) => row.type))
+	// NOTE: And Error for the bindings where the list was refused, which is what
+	// every other dropped Declaration binds. Reading the row Type off the rows
+	// there only moved the report: the two names bound whatever the rows held,
+	// and the body's calls refused THEM instead — two reports about the Argument
+	// Types in place of one about the Parameter list.
+	let type =
+		node.parameters.length !== 1
+			? ({ type: "Error" } as const)
+			: (declaredType ?? listItemTypeOf(rows.map((row) => row.type)))
 	let pattern =
 		parameter?.internalName?.nodeType === "Pattern"
 			? parameter.internalName

@@ -1111,6 +1111,27 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-parameters"])
 		})
 
+		// NOTE: And says nothing else about it. A table naming two Parameters
+		// has no row Type — the FIRST of them is not it — so measuring the rows
+		// against that one reported the Parameter list a second time, in words
+		// about a Type the reader never wrote for the row. Reading the Type off
+		// the ROWS instead only moved the cascade into the body, where the
+		// Arguments refused, so the bindings carry Error, which is what every
+		// other dropped Declaration binds.
+		it("should say nothing about the rows a refused list can not type", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "rows" across ["one"] (a: Integer, b: Integer) {
+							expect a::isGreaterThan(b)
+						}
+					}`,
+				),
+			).toEqual(["table-parameters"])
+		})
+
 		// NOTE: The rows are the one thing about a table test that nothing else
 		// would ever check. A row is neither an Argument nor a Declaration, and
 		// the Type the Parameter declares reaches them as the HINT that resolves
