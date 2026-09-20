@@ -555,7 +555,7 @@ A method is a value too when you reach it on its [namespace](/docs/language/name
 
 An overloaded function, one name with several signatures, cannot be a value: `constant add = Integer.add` is [`overloaded-function-value`](/docs/reference/diagnostics#overloaded-function-value), and a literal that calls the overload you mean fixes it.
 
-A generic function whose type parameter must conform to a [protocol](/docs/language/protocols), a bound like TypeScript's `<T extends Printable>`, cannot be a value either: storing one is [`protocol-bound-function-value`](/docs/reference/diagnostics#protocol-bound-function-value).
+A generic function whose type parameter must conform to a [protocol](/docs/language/protocols), a bound like TypeScript's `<T extends Printable>`, cannot be a value either: storing one is [`protocol-bound-function-value`](/docs/reference/diagnostics#protocol-bound-function-value), and a literal that calls it for the types you mean fixes it, as it does for an overload.
 
 A [generic](/docs/language/generics) function with no bound, such as an `identity` that returns its argument, can be stored but not passed to `map`: pass `(n) { <- identity(n) }`.
 

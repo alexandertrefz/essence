@@ -329,6 +329,55 @@ export function importActions(
 	})
 }
 
+// NOTE: The import a Diagnostic NAMED, rather than one looked up from the text
+// under the cursor. `unsatisfied-bound` is reported against a call, and the name
+// it asks for appears nowhere in that call's span — the Compiler found it by
+// following the Type, which carries the Module that declared it, and said so in
+// the data.
+//
+// The specifier is worked out here because it is a fact about the file being
+// edited: `../parser/Parser.es` from one file and `./Parser.es` from another,
+// for the one Module. `insertImportEdit` answers null where the entry already
+// stands, which is what keeps this from offering an import of a name that is
+// already imported.
+//
+// Preferred, unlike `importActions`: there is no choice of Module to make on the
+// reader's behalf, because the Compiler named the one the Type came from.
+export function declarationImportAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	imports: ImportContext | null,
+): CodeActionEntry | null {
+	if (imports === null || diagnostic.data?.kind !== "import-declaration") {
+		return null
+	}
+
+	let { name, modulePath } = diagnostic.data
+
+	if (modulePath === imports.filePath) {
+		return null
+	}
+
+	let specifier = relativeSpecifier(imports.filePath, modulePath)
+	let edit = insertImportEdit(imports.documentText, imports.program, {
+		name,
+		alias: null,
+		specifier,
+	})
+
+	if (edit === null) {
+		return null
+	}
+
+	return {
+		title: `Import '${name}' from ${specifier}`,
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [edit],
+	}
+}
+
 // NOTE: The one fix in this file whose edit lands in a file the reader is not
 // looking at, because the mistake is not there either: the name IS declared in
 // the Module the entry names, and that Module keeps it private. Nothing about

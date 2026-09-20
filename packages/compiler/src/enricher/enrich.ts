@@ -1908,6 +1908,8 @@ const enrichTest = (
 
 	if (node.form === "benchmark" || node.properties !== null) {
 		bodyScope.completing = null
+		bodyScope.completingBarrier =
+			node.form === "benchmark" ? "benchmark-body" : "property-body"
 	}
 	// NOTE: Before the name and before the body: a table test binds its row in
 	// the body's Scope, and both of them read it — the name because it says
@@ -1988,7 +1990,10 @@ const enrichTest = (
 // wait for anything, and the barrier says so where a Diagnostic can point at
 // the hole in the name.
 const nameScope = (scope: enricher.Scope): enricher.Scope =>
-	childScope(scope, { completing: null })
+	childScope(scope, {
+		completing: null,
+		completingBarrier: "test-name",
+	})
 
 const enrichSuite = (
 	node: parser.SuiteNode,

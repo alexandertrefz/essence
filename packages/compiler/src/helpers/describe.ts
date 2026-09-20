@@ -1143,3 +1143,57 @@ export function returnAsynchronyHelps(
 			return []
 	}
 }
+
+// NOTE: A Future or a Started where a value was wanted, which is the forgotten
+// `complete` wearing another Diagnostic's clothes: a hole told that
+// `Future<Integer>` is not Printable, an Argument told that it does not conform
+// to a bound. Both are one word short, and both would otherwise send the reader
+// off to make Futures Printable — which compiles, and prints a description of
+// the work instead of the answer.
+//
+// `waits` is the caller's answer to "may this body write the word here", which is
+// `completionContextOf`: a completing body and a Program's top level may, and
+// every other position may not. Where it may, the Help is the shared sentence
+// every other report about a forgotten `complete` uses and the payload a Quick
+// Fix reads rides with it; where it may not, no Help carries the state and the
+// Notes say it instead, because the edit is to the enclosing Declaration.
+//
+// Null for everything that is not work, which leaves each caller's own report
+// exactly as it was.
+export function unwaitedWorkReport(
+	type: common.Type,
+	waits: boolean,
+): {
+	notes: Array<string>
+	helps: Array<string>
+	data?: common.DiagnosticData
+} | null {
+	if (type.type !== "Future" && type.type !== "Started") {
+		return null
+	}
+
+	let state = asynchronyState(
+		type.type === "Future" ? "unstarted" : "in-flight",
+	)
+
+	return {
+		notes: [
+			`${waits ? "" : `${state} — `}${describeType(
+				type.valueType,
+			)} is what ${withArticle(
+				describeType(type),
+			)} answers with, once something waits for it.`,
+			...(waits
+				? []
+				: [
+						"'complete' only stands in a body that answers a Future, and this position is not one.",
+					]),
+		],
+		helps: waits
+			? asynchronyHelps(type.valueType, type)
+			: [
+					"Declare the enclosing Function '-> Future<…>', which is what lets its body wait, and add 'complete' where the value is read.",
+				],
+		...(waits ? { data: asynchronyData(type.valueType, type) } : {}),
+	}
+}

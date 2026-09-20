@@ -561,7 +561,17 @@ function validateNoBoundFunctionValue(node: common.typed.ExpressionNode): void {
 				notes: [
 					"A bounded Function carries hidden conformance Parameters that only exist at a direct invocation.",
 				],
-				helps: ["Call it directly instead of passing it around."],
+				// NOTE: The wrap is the clause that keeps the VALUE, and it is
+				// what a reader who wrote this wanted: `(_ items: List<Integer>)
+				// -> Optional<Integer> { <- largest(of items) }` is a Function
+				// value, and the call inside it is direct, so the hidden
+				// Parameters are solved where they can be. "Call it directly"
+				// alone answered by throwing the value away, which is not an
+				// edit anybody who reached for one can make — the same pairing
+				// `overloaded-function-value` right above already offers.
+				helps: [
+					"Invoke it, or wrap the call in a Function literal written for the Types you mean.",
+				],
 			},
 		)
 	}

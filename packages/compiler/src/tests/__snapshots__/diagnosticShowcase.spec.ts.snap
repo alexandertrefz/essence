@@ -118,9 +118,9 @@ Error: 'complete' waits, and nothing here can wait
     │                                        ──────────────────┬─────────────────  
     │                                                          ╰─────────────────── this suspends, and this position can not
     │ 
-    │ Help: Complete the work above this position, into a Constant it reads, or move it into a Function declared '-> Future<…>'.
+    │ Help: Complete the work above this Declaration, into a Constant the default reads.
     │ 
-    │ Note: A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins. A test's name is worked out before the run, a benchmark body is timed over many runs, and a property body runs once per generated value.
+    │ Note: A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins.
 ────╯
 
 [needless-complete]
@@ -157,9 +157,9 @@ Error: 'complete' waits, and nothing here can wait
     │                           ──────────────────┬─────────────────  
     │                                             ╰─────────────────── this suspends, and this position can not
     │ 
-    │ Help: Complete the work above this position, into a Constant it reads, or move it into a Function declared '-> Future<…>'.
+    │ Help: Complete the work above the benchmark, into a Constant the body reads.
     │ 
-    │ Note: A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins. A test's name is worked out before the run, a benchmark body is timed over many runs, and a property body runs once per generated value.
+    │ Note: A benchmark body is timed over many runs, and waiting for work inside it would time the waiting.
 ────╯
 
 [complete-outside-future]
@@ -170,9 +170,9 @@ Error: 'complete' waits, and nothing here can wait
     │                          ────────────────────┬───────────────────  
     │                                              ╰───────────────────── this suspends, and this position can not
     │ 
-    │ Help: Complete the work above this position, into a Constant it reads, or move it into a Function declared '-> Future<…>'.
+    │ Help: Assert on the answer in a 'test' of its own, which is run once and awaited.
     │ 
-    │ Note: A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins. A test's name is worked out before the run, a benchmark body is timed over many runs, and a property body runs once per generated value.
+    │ Note: A property body runs once per generated value, and nothing in a 'for any' run can wait — the value this would complete does not exist until the run that made it.
 ────╯
 
 ─── 4 errors, 2 warnings
@@ -368,7 +368,10 @@ Error: 'Item' is bound twice in this conformance
     │                                                ──┬─  
     │                                                  ╰─── already bound to 'Comparable'
     │ 
-    │ Note: 'Item' is already required to conform to 'Comparable'.
+    │ Help: Drop this condition, or declare 'is Comparable' on a Namespace of its own where 'Item is Equatable' is the one condition.
+    │ 
+    │ Note 1: 'Item' is already required to conform to 'Comparable'.
+    │ Note 2: A conformance threads one witness per Type Parameter into the Methods that fulfil it, and one witness can not be two Protocols.
 ────╯
 
 [unsatisfied-conformance-condition]
@@ -379,7 +382,7 @@ Error: List<{ x: Integer }> does not conform to 'Comparable'
     │                        ─────────────────┬────────────────  
     │                                         ╰────────────────── this binds a Type Parameter bound to 'Comparable'
     │ 
-    │ Help: Declare a Namespace 'for List<{ x: Integer }> is Comparable'.
+    │ Help: Declare a Namespace 'for { x: Integer } is Comparable'.
     │ 
     │ Note 1: List<{ x: Integer }> does not conform to 'Comparable'.
     │ Note 2: { x: Integer } does not conform to 'Comparable'.

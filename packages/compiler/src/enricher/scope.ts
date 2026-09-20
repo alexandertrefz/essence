@@ -1,4 +1,4 @@
-import type { enricher } from "@essence-lang/interfaces"
+import type { common, enricher } from "@essence-lang/interfaces"
 
 // NOTE: A Scope map with NO prototype — `Object.create(null)` rather than `{}`.
 // The maps are keyed by names a Program writes, and `{}` inherits
@@ -29,6 +29,59 @@ export function modulePathOf(scope: enricher.Scope): string | null {
 	) {
 		if (current.modulePath !== undefined) {
 			return current.modulePath
+		}
+	}
+
+	return null
+}
+
+// NOTE: The nearest Scope with an answer about asynchrony, which a Scope
+// carrying the barrier `null` is — read outwards exactly as `modulePathOf` is,
+// and for the same reason: an `if` body and a Match Handler suspend wherever the
+// body holding them does.
+export function completionContextIn(
+	scope: enricher.Scope,
+): common.Type | "top-level" | null | undefined {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.completing !== undefined) {
+			return current.completing
+		}
+	}
+
+	return undefined
+}
+
+// NOTE: Whether a `complete` written HERE would stand — the one question three
+// reports about a forgotten one ask, and the reason each of them can offer the
+// word rather than guess. A completing body answers with its own Future and a
+// Program's top level is awaited by the emitted Module; a Parameter's default, a
+// test name, a benchmark and a property body are barriers, and a body that
+// declared anything else is simply not one.
+export function bodyWaits(scope: enricher.Scope): boolean {
+	let context = completionContextIn(scope)
+
+	return context === "top-level" || context?.type === "Future"
+}
+
+// NOTE: The position a barrier belongs to, for the reports that have to name it
+// — read off the same Scope the walk above stops at, so the two can not disagree
+// about WHICH barrier answered. Null where the context is no barrier at all.
+export function completionBarrierIn(
+	scope: enricher.Scope,
+): enricher.CompletionBarrier | null {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.completing !== undefined) {
+			return current.completing === null
+				? (current.completingBarrier ?? null)
+				: null
 		}
 	}
 

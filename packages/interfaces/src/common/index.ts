@@ -251,6 +251,16 @@ export type DiagnosticData =
 			protocol: string
 			parameter: string | null
 	  }
+	// NOTE: A Declaration another Module of the graph holds and this one has not
+	// imported, by the Module's CANONICAL path — which is what the Compiler
+	// knows about it. What an import of it would be SPELLED as is a question
+	// about the file being edited, so the specifier is worked out on the
+	// Language Server's side from the two paths.
+	| {
+			kind: "import-declaration"
+			name: string
+			modulePath: string
+	  }
 	// NOTE: A Module section standing where it does not belong, with the span
 	// of the whole block. The Parser DROPS such a section rather than carry it
 	// along broken, so the Program a fix reads holds no Node for it and this is

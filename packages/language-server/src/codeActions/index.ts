@@ -39,6 +39,7 @@ import {
 	exportNameAction,
 	forwardExportActions,
 	type ImportContext,
+	declarationImportAction,
 	importActions,
 	missingCaseAction,
 	missingMembersAction,
@@ -682,8 +683,16 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(unreachableCaseAction(diagnostic, program, lines)),
 	"unreachable-define-arm": ({ diagnostic, program, lines }) =>
 		unreachableDefineArmActions(diagnostic, program, lines),
-	"unsatisfied-bound": ({ diagnostic, program }) =>
-		listed(boundParameterAction(diagnostic, program)),
+	// NOTE: Two shapes under one code, and the data says which: a Type Parameter
+	// in want of a bound is an edit to its declaration, and a Type this Module
+	// never imported is an edit to the import block. Neither answers the other's
+	// data, so the pair is a concatenation rather than a choice.
+	"unsatisfied-bound": ({ diagnostic, program, imports }) => [
+		...listed(boundParameterAction(diagnostic, program)),
+		...listed(declarationImportAction(diagnostic, imports)),
+	],
+	"unsatisfied-conformance-condition": ({ diagnostic, imports }) =>
+		listed(declarationImportAction(diagnostic, imports)),
 	"unused-future": ({ diagnostic }) => discardedFutureActions(diagnostic),
 	"unused-import": ({ diagnostic, program, lines }) =>
 		listed(removeImportAction(diagnostic, program, lines)),

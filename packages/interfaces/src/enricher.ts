@@ -11,6 +11,19 @@ export type UnimportedNamespace = {
 	namespace: common.NamespaceType
 }
 
+// NOTE: The four positions a `complete` can not be written in, each because of
+// something about WHEN the position runs rather than about the word. A
+// Parameter's default is filled in by the callee before its own asynchrony
+// begins; a test's name is rendered once, before the run, so `--filter` matches
+// what a reader sees; a benchmark body is timed over many runs; and a property
+// body runs once per generated value. Named so a report can say the one that
+// applies.
+export type CompletionBarrier =
+	| "parameter-default"
+	| "test-name"
+	| "benchmark-body"
+	| "property-body"
+
 export type Scope = {
 	parent: Scope | null
 	members: Record<string, common.Type>
@@ -76,6 +89,11 @@ export type Scope = {
 	// Handler and an `if` body inside a completing body answer with that body's
 	// Type — and, like it, `null` is a BARRIER rather than a missing answer.
 	completing?: common.Type | "top-level" | null
+	// NOTE: WHICH barrier a `completing: null` is, set on the same Scope and
+	// meaningless anywhere else. There are four of them and they are four
+	// different mistakes — a report that listed all four left the reader to work
+	// out which one they were in, and the edit that answers each is its own.
+	completingBarrier?: CompletionBarrier
 	// NOTE: The Namespace this Scope is INSIDE, set on the Scope a Namespace
 	// declares its own name into and read through the parent chain — so every
 	// signature, property and Method body under it answers with it.

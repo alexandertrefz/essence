@@ -34,6 +34,11 @@ import type { CodeActionEdit, CodeActionEntry, FixContext } from "./index"
 //
 // Never preferred: every stub it writes has an empty body, so what it buys is
 // a hole with the right signature on it rather than a Program that compiles.
+//
+// NOTE: An empty body is written `{}`, on the signature's own line — the shape
+// `esfmt` leaves alone, and the shape the `missing-case` generator already
+// writes. Spelled over two lines it was text a reader had to reformat before
+// they could commit what the fix gave them.
 
 // NOTE: The `Self` of a Protocol's signatures, which is the conformer's target
 // Type at the declaration — `is(_ other: Self)` is written `is(_ other: Point)`
@@ -274,7 +279,7 @@ function stubFor(
 					`${indentation}\t${signatureOf(
 						isStatic ? overload : withoutSelf(overload),
 						"",
-					)} {\n${indentation}\t}\n`,
+					)} {}\n`,
 			)
 			.join("\n")
 
@@ -287,7 +292,7 @@ function stubFor(
 		name,
 	)
 
-	return `${indentation}${isStatic ? "static " : ""}${signature} {\n${indentation}}\n`
+	return `${indentation}${isStatic ? "static " : ""}${signature} {}\n`
 }
 
 function signatureOf(signature: common.BaseFunction, name: string): string {

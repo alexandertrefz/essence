@@ -24,8 +24,10 @@ import {
 	displayChoiceName,
 	recordMismatchEvidence,
 	undecidedSlotEvidence,
+	unwaitedWorkReport,
 	withArticle,
 } from "../helpers/describe"
+import { eraseRefinements } from "../helpers/eraseRefinements"
 import {
 	type ForeignWord,
 	foreignOperatorAccount,
@@ -56,7 +58,12 @@ import {
 	typeMentionsGeneric,
 } from "../helpers/types"
 import { recordAnnotation } from "./annotations"
-import { childScope, declarationWasAbandoned, modulePathOf } from "./scope"
+import {
+	bodyWaits,
+	childScope,
+	declarationWasAbandoned,
+	modulePathOf,
+} from "./scope"
 
 // NOTE: Type-declaration and signature resolution. Expressions are no longer
 // typed here — enrichment is the only Expression walker, and a Node's Type is
@@ -2468,9 +2475,20 @@ export function specializedNamespacesFor(
 // conditions); a failure carries the because-chain, outermost first, or an
 // empty chain when the failure was already reported (ambiguity, a
 // nonconforming Namespace) and must stay silent.
+//
+// NOTE: `culprit` is the LAST link of that chain — the Type that actually has no
+// conforming Namespace, which for `Result<String, Problem>` is `Problem` and not
+// the Type the report is about. It rides up unchanged as each level prepends its
+// own sentence, because a reader asked to declare a Namespace has to be told the
+// one the Compiler would accept: a Namespace `for Result<String, Problem>`
+// compiles and leaves every other Result unprintable.
 type ConformanceSolveResult =
 	| { ok: true; source: common.ConformanceSource }
-	| { ok: false; chain: Array<string> }
+	| {
+			ok: false
+			chain: Array<string>
+			culprit?: { type: common.Type; protocolName: string }
+	  }
 
 type ScopeConformanceState = {
 	memo: Map<string, ConformanceSolveResult>
@@ -4567,6 +4585,7 @@ function solveNamespaceConformance(
 			chain: [
 				`${describeType(binding)} does not conform to '${protocolName}'.`,
 			],
+			culprit: { type: binding, protocolName },
 		}
 	}
 
@@ -4698,6 +4717,11 @@ function solveNamespaceConformance(
 								`${describeType(binding)} does not conform to '${protocolName}'.`,
 								...solved.chain,
 							],
+				// NOTE: The level below names the Type to do something about,
+				// and this one only explains how the ask reached it.
+				...(solved.culprit === undefined
+					? {}
+					: { culprit: solved.culprit }),
 			}
 		}
 
@@ -4732,6 +4756,224 @@ function orderConditions(
 	return [...conditions].sort(
 		(a, b) => order.indexOf(a.generic) - order.indexOf(b.generic),
 	)
+}
+
+// NOTE: What to say about a concrete Type with no conforming Namespace. Four
+// answers, because four different things are actually wrong, and the plain
+// "declare a Namespace" is only the last of them:
+//
+// - A bare Case binds the CASE. `namespace X for Colour#Red is Enumerable` does
+//   not parse and never will — a Namespace targets a Type, and one Case of a
+//   Choice is not one — so what the reader edits is the value's annotation.
+// - A Future is one word short, not a Type in want of a conformance. Declaring
+//   `for Future<String> is Printable` COMPILES and prints a description of the
+//   work, which is the one outcome nobody wanted; the shared asynchrony sentence
+//   is what every other report about a forgotten `complete` says.
+// - A Type declared in another Module of this graph is already conforming —
+//   through a DERIVED conformance, which is in scope only where the Type is. The
+//   edit is an import, and the Namespace the old Help asked for is a second
+//   conformance for a Type that has one.
+// - Everything else owes a Namespace. Where the Type is a Choice whose Cases
+//   carry no payload the body of it may be EMPTY, since declaring the
+//   conformance is the whole of what such a Choice needs — a fact worth saying,
+//   because writing `toString` by hand is what a reader otherwise sets out to do.
+function missingConformance(
+	culprit: common.Type,
+	protocolName: string,
+	scope: enricher.Scope,
+): {
+	notes: Array<string>
+	helps: Array<string>
+	data?: common.DiagnosticData
+} {
+	if (culprit.type === "Case") {
+		return {
+			notes: [],
+			helps: [
+				`Annotate the value at '${displayChoiceName(culprit.choice)}': a bare Case binds the Case, not the Choice.`,
+			],
+		}
+	}
+
+	let unwaited = unwaitedWorkReport(
+		eraseRefinements(culprit),
+		bodyWaits(scope),
+	)
+
+	if (unwaited !== null) {
+		return unwaited
+	}
+
+	let foreign = foreignChoiceModule(culprit, scope)
+
+	if (foreign !== null) {
+		return {
+			notes: [
+				`A Choice conforms to '${protocolName}' wherever it is in scope, and '${foreign.name}' is not in scope here.`,
+			],
+			helps: [
+				`'${foreign.name}' is declared in ${foreign.fileName} — import it here, so its derived '${protocolName}' is in scope.`,
+			],
+			// NOTE: The import a Quick Fix writes. The Module is named by its
+			// canonical path rather than by a specifier, because the specifier
+			// is a question about the file being edited and the Language Server
+			// is the half that holds it.
+			data: {
+				kind: "import-declaration",
+				name: foreign.name,
+				modulePath: foreign.modulePath,
+			},
+		}
+	}
+
+	return {
+		notes: [],
+		helps: [
+			protocolName === printableProtocolName &&
+			choiceCasesArePayloadFree(culprit)
+				? `Declare a Namespace 'for ${describeType(culprit)} is ${protocolName}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
+				: `Declare a Namespace 'for ${describeType(culprit)} is ${protocolName}'.`,
+		],
+		// NOTE: No Parameter, because the Type that failed is a concrete one —
+		// what this asks for is a Namespace declaring the conformance, which is
+		// a Declaration rather than an edit to a span, and no fix answers it.
+		// The Protocol is carried all the same: it is the fact, and what is done
+		// with it is not this site's to decide.
+		data: {
+			kind: "required-protocol",
+			protocol: protocolName,
+			parameter: null,
+		},
+	}
+}
+
+// NOTE: The Choice this Type is, when it was declared in a DIFFERENT Module of
+// this graph — read off the nominal identity every Case carries, which is the
+// declaring Module's canonical path and the written name. A Choice reached
+// through an imported Function's return Type is in hand without its name ever
+// being in scope, and that is the whole of the catch-22 this answers: the
+// conformance a Choice derives travels with the Type and is found by the name.
+//
+// Null for a Choice of this Module, for one the Program named itself (a single
+// file compile and the standard library identify a Choice by its bare name, so
+// there is no path to compare), and for everything that is not a Choice.
+function foreignChoiceModule(
+	type: common.Type,
+	scope: enricher.Scope,
+): { name: string; modulePath: string; fileName: string } | null {
+	let identity = choiceIdentityOf(type)
+	let separator = identity === null ? -1 : identity.lastIndexOf("#")
+
+	if (identity === null || separator < 0) {
+		return null
+	}
+
+	let modulePath = identity.slice(0, separator)
+
+	if (modulePath === "" || modulePath === modulePathOf(scope)) {
+		return null
+	}
+
+	return {
+		name: identity.slice(separator + 1),
+		modulePath,
+		fileName: modulePath.slice(modulePath.lastIndexOf("/") + 1),
+	}
+}
+
+// NOTE: The Namespace whose OWN Type Parameters declare this name, or null where
+// the name belongs to a Function or a Method. One walk answers both halves: a
+// Namespace's Generics live in the very Scope that carries `namespace`, and a
+// Method's own `<infer T>` sits in a Scope of its own inside that one — so the
+// nearest Scope declaring the name is asked, and nothing above it. A `where`
+// condition's bound reaches a fulfilling Method through a Scope of its own too,
+// which is why a Parameter that IS bounded here never gets this far.
+function namespaceDeclaringGeneric(
+	name: string,
+	scope: enricher.Scope,
+): common.NamespaceType | null {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.types[name] === undefined) {
+			continue
+		}
+
+		return current.namespace?.type ?? null
+	}
+
+	return null
+}
+
+// NOTE: What there is to say about a bound a NAMESPACE's Type Parameter can not
+// carry. `<infer Item is Comparable>` on a Namespace is refused outright, so the
+// Function's Help sends a reader into `protocol-bound-namespace-generic`, whose
+// own Help sends them back — the loop this replaces. What carries a bound here
+// is a `where` on one of the Namespace's conformances, and a `where` reaches the
+// Methods that FULFIL that conformance and no others.
+//
+// So a Method that answers no requirement of any conformance has no spelling at
+// all today, and where the condition the reader needs is already written the
+// truth is that nothing more can be added: a Note says so and no Help is
+// offered, because every edit this could name is one the Compiler would refuse.
+function namespaceParameterBound(
+	namespaceType: common.NamespaceType,
+	parameter: string,
+	protocolName: string,
+	scope: enricher.Scope,
+): { notes: Array<string>; helps: Array<string> } {
+	let declared = namespaceType.conformsTo ?? []
+	let conditionsOf = (name: string) =>
+		namespaceType.conformanceConditions?.[name] ?? []
+	let carrying = declared.filter((name) =>
+		conditionsOf(name).some(
+			(condition) =>
+				condition.generic === parameter &&
+				protocolGrants(condition.protocol, protocolName, scope),
+		),
+	)
+	let first = carrying[0]
+
+	if (first !== undefined) {
+		return {
+			notes: [
+				`'is ${first} where ${parameter} is ${protocolName}' is declared here already, and a 'where' reaches the Methods that fulfil '${first}' and no others — a Method that fulfils nothing can not be bounded.`,
+			],
+			helps: [],
+		}
+	}
+
+	// NOTE: A conformance that already binds this Parameter to something else is
+	// no place for the condition either — `conflicting-where-condition` refuses
+	// a second bound on one Parameter, and says where the conformance belongs.
+	let open = declared.filter(
+		(name) =>
+			!conditionsOf(name).some(
+				(condition) => condition.generic === parameter,
+			),
+	)
+
+	if (open.length === 0) {
+		return {
+			notes: [
+				`A Namespace's own Type Parameters take no bounds — a 'where' on one of its conformances carries them, and reaches the Methods that fulfil that Protocol.`,
+			],
+			helps: [],
+		}
+	}
+
+	return {
+		notes: [
+			"A Namespace's own Type Parameters take no bounds, and a 'where' condition reaches the Methods that fulfil its conformance.",
+		],
+		helps: [
+			`Add 'where ${parameter} is ${protocolName}' to ${open
+				.map((name) => `'is ${name}'`)
+				.join(" or ")} on this Namespace.`,
+		],
+	}
 }
 
 export function resolveConformances(
@@ -4791,6 +5033,26 @@ export function resolveConformances(
 					},
 				})
 			} else {
+				// NOTE: WHOSE Type Parameter it is decides what can be said
+				// about it, and the two answers have nothing in common. A
+				// Function's is bounded where it is declared; a Namespace's can
+				// not be bounded at all — `protocol-bound-namespace-generic`
+				// refuses that spelling — so the Help below and the Quick Fix
+				// reading its data both belong to the Function alone.
+				let namespaceType = namespaceDeclaringGeneric(
+					binding.name,
+					scope,
+				)
+				let namespaceBound =
+					namespaceType === null
+						? null
+						: namespaceParameterBound(
+								namespaceType,
+								binding.name,
+								generic.constraint,
+								scope,
+							)
+
 				reportError(
 					`Type Parameter '${binding.name}' does not conform to '${generic.constraint}'`,
 					position,
@@ -4804,19 +5066,29 @@ export function resolveConformances(
 						],
 						notes: [
 							`'${binding.name}' carries no '${generic.constraint}' bound of its own, so it can not satisfy one.`,
+							...(namespaceBound?.notes ?? []),
 						],
-						helps: [
-							`Declare it as '<infer ${binding.name} is ${generic.constraint}>'.`,
-						],
+						helps:
+							namespaceBound === null
+								? [
+										`Declare it as '<infer ${binding.name} is ${generic.constraint}>'.`,
+									]
+								: namespaceBound.helps,
 						// NOTE: The Type Parameter the bound has to be written
 						// on, beside the Protocol it has to be bound by — a
 						// Quick Fix edits the DECLARATION, which is nowhere near
-						// the call this is reported at.
-						data: {
-							kind: "required-protocol",
-							protocol: generic.constraint,
-							parameter: binding.name,
-						},
+						// the call this is reported at. Withheld for a
+						// Namespace's Parameter: the edit it makes is the one
+						// spelling the language does not have.
+						...(namespaceBound === null
+							? {
+									data: {
+										kind: "required-protocol" as const,
+										protocol: generic.constraint,
+										parameter: binding.name,
+									},
+								}
+							: {}),
 					},
 				)
 			}
@@ -4847,16 +5119,15 @@ export function resolveConformances(
 			continue
 		}
 
-		// NOTE: The Help a Case gets is a different one, because the one below
-		// can not be written: `namespace X for Colour#Red is Enumerable` does
-		// not parse, and never will — a Namespace targets a Type, and one Case
-		// of a Choice is not one it can be declared for. What a bare `#Red`
-		// binds is the Case; a value annotated at the CHOICE binds the Choice,
-		// which is the Type the conformance is about.
-		let help =
-			binding.type === "Case"
-				? `Annotate the value at '${displayChoiceName(binding.choice)}': a bare Case binds the Case, not the Choice.`
-				: `Declare a Namespace 'for ${describeType(binding)} is ${generic.constraint}'.`
+		// NOTE: The Type the reader has to do something about is the LAST link
+		// of the chain, not the one the bound was written on — for a
+		// `Result<String, Problem>` that is `Problem`, and a Namespace declared
+		// `for Result<String, Problem>` answers this one call while leaving
+		// every other Result unprintable. A single-level chain's culprit is the
+		// binding itself, which is how the plain case comes out unchanged.
+		let culprit = result.culprit?.type ?? binding
+		let culpritProtocol = result.culprit?.protocolName ?? generic.constraint
+		let missing = missingConformance(culprit, culpritProtocol, scope)
 
 		// NOTE: A single-level chain is the plain "no Namespace conforms" case
 		// and keeps the `unsatisfied-bound` Diagnostic. A multi-level chain is
@@ -4876,19 +5147,12 @@ export function resolveConformances(
 					],
 					notes: [
 						`No Namespace in scope makes ${describeType(binding)} conform to '${generic.constraint}'.`,
+						...missing.notes,
 					],
-					helps: [help],
-					// NOTE: No Parameter, because the Type that failed is a
-					// concrete one — what this asks for is a Namespace declaring
-					// the conformance, which is a Declaration rather than an edit
-					// to a span, and no fix answers it. The Protocol is carried
-					// all the same: it is the fact, and what is done with it is
-					// not this site's to decide.
-					data: {
-						kind: "required-protocol",
-						protocol: generic.constraint,
-						parameter: null,
-					},
+					helps: missing.helps,
+					...(missing.data === undefined
+						? {}
+						: { data: missing.data }),
 				},
 			)
 		} else {
@@ -4903,8 +5167,11 @@ export function resolveConformances(
 							`this binds a Type Parameter bound to '${generic.constraint}'`,
 						),
 					],
-					notes: result.chain,
-					helps: [help],
+					notes: [...result.chain, ...missing.notes],
+					helps: missing.helps,
+					...(missing.data === undefined
+						? {}
+						: { data: missing.data }),
 				},
 			)
 		}
@@ -5225,6 +5492,14 @@ export function checkProtocolConformance(
 						},
 					)
 				} else {
+					// NOTE: One bound per Type Parameter per conformance,
+					// because a conformance threads ONE hidden witness per
+					// Parameter into the Methods that fulfil it and one witness
+					// can not be two Protocols. So the second bound is not an
+					// edit to this clause at all — it belongs to a conformance
+					// of its own, which is a Namespace of its own. The same
+					// answer `nonconforming-namespace` gives when adding the
+					// condition it asks for would land here.
 					reportError(
 						`'${condition.generic.content}' is bound twice in this conformance`,
 						condition.generic.position,
@@ -5238,6 +5513,10 @@ export function checkProtocolConformance(
 							],
 							notes: [
 								`'${condition.generic.content}' is already required to conform to '${rejection.protocol}'.`,
+								"A conformance threads one witness per Type Parameter into the Methods that fulfil it, and one witness can not be two Protocols.",
+							],
+							helps: [
+								`Drop this condition, or declare 'is ${identifier.content}' on a Namespace of its own where '${condition.generic.content} is ${condition.protocol.content}' is the one condition.`,
 							],
 						},
 					)
@@ -5291,6 +5570,14 @@ export function checkProtocolConformance(
 		}
 
 		if (result.kind === "needs-condition") {
+			// NOTE: The condition this clause already carries for the same Type
+			// Parameter, which is what decides whether "add it here" is an edit
+			// at all: a second bound on one Parameter is refused by
+			// `conflicting-where-condition`, so writing it leaves this report
+			// standing and adds one. Where the Parameter is already spoken for,
+			// the conformance is what moves — onto a Namespace of its own.
+			let existing = assumptions.get(result.genericName)
+
 			reportError(
 				`Namespace '${namespaceType.name}' does not conform to '${protocol.name}'`,
 				identifier.position,
@@ -5303,7 +5590,10 @@ export function checkProtocolConformance(
 						),
 					],
 					helps: [
-						`Add 'where ${result.genericName} is ${result.protocolName}' to this conformance.`,
+						existing === undefined ||
+						existing === result.protocolName
+							? `Add 'where ${result.genericName} is ${result.protocolName}' to this conformance.`
+							: `'${result.genericName}' already carries '${existing}' here, and a Type Parameter takes one bound per conformance — declare 'is ${protocol.name} where ${result.genericName} is ${result.protocolName}' on a Namespace of its own.`,
 					],
 				},
 			)

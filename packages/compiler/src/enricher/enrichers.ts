@@ -25,6 +25,7 @@ import {
 	recordMismatchEvidence,
 	undecidedSlotAnnotation,
 	undecidedSlotEvidence,
+	unwaitedWorkReport,
 	withArticle,
 } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
@@ -141,7 +142,10 @@ import {
 	suggestionInScope,
 } from "./resolvers"
 import {
+	bodyWaits,
 	childScope,
+	completionBarrierIn,
+	completionContextIn,
 	countTypeDeclaration,
 	declarationWasAbandoned,
 	modulePathOf,
@@ -1953,6 +1957,7 @@ export function enrichMethodFunctionDefinition(
 	// `enrichFunctionDefinition` puts one there: a default is the emitted
 	// Method's own and suspends nothing.
 	newScope.completing = null
+	newScope.completingBarrier = "parameter-default"
 
 	let { parameters, bindings } = enrichParameterList(
 		method.value.parameters,
@@ -1961,6 +1966,7 @@ export function enrichMethodFunctionDefinition(
 	)
 
 	newScope.completing = completing ? returnType : null
+	delete newScope.completingBarrier
 
 	return {
 		nodeType: "FunctionDefinition",
@@ -2077,6 +2083,7 @@ function enrichFunctionDefinition(
 	// place while the Parameters are read, and the body's own standing is
 	// written over it afterwards.
 	newScope.completing = null
+	newScope.completingBarrier = "parameter-default"
 
 	let { parameters, bindings } = enrichParameterList(
 		node.parameters,
@@ -2085,6 +2092,7 @@ function enrichFunctionDefinition(
 	)
 
 	newScope.completing = completing ? returnType : null
+	delete newScope.completingBarrier
 
 	return {
 		nodeType: "FunctionDefinition",
@@ -2483,42 +2491,7 @@ function interpolatedAsynchrony(
 	helps: Array<string>
 	data?: common.DiagnosticData
 } | null {
-	let erased = eraseRefinements(type)
-
-	if (erased.type !== "Future" && erased.type !== "Started") {
-		return null
-	}
-
-	let context = completionContextOf(scope)
-	let waits = context === "top-level" || context?.type === "Future"
-	let state = asynchronyState(
-		erased.type === "Future" ? "unstarted" : "in-flight",
-	)
-
-	// NOTE: The state sentence is said ONCE. Where the word may be written it
-	// opens the Help that writes it, which is the shared wording every other
-	// report about a forgotten `complete` uses; where it may not, no Help
-	// carries it and the Note says it instead.
-	return {
-		notes: [
-			`${waits ? "" : `${state} — `}${describeType(
-				erased.valueType,
-			)} is what ${withArticle(
-				describeType(erased),
-			)} answers with, once something waits for it.`,
-			...(waits
-				? []
-				: [
-						"'complete' only stands in a body that answers a Future, and this position is not one.",
-					]),
-		],
-		helps: waits
-			? asynchronyHelps(erased.valueType, erased)
-			: [
-					"Declare the enclosing Function '-> Future<…>', which is what lets its body wait.",
-				],
-		...(waits ? { data: asynchronyData(erased.valueType, erased) } : {}),
-	}
+	return unwaitedWorkReport(eraseRefinements(type), bodyWaits(scope))
 }
 
 // NOTE: A hole renders its value through the very `toString` a `Printable`
@@ -3925,6 +3898,7 @@ function reportMisplacedComplete(
 	// name, a benchmark body, a property test's body — has nowhere to put the
 	// word, and the only advice is to move it.
 	let declared = context === null || context === undefined ? null : context
+	let barred = barredCompletion(completionBarrierIn(scope))
 
 	reportError("'complete' waits, and nothing here can wait", node.position, {
 		code: "complete-outside-future",
@@ -3938,42 +3912,80 @@ function reportMisplacedComplete(
 		],
 		notes:
 			declared === null
-				? [
-						"A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins. A test's name is worked out before the run, a benchmark body is timed over many runs, and a property body runs once per generated value.",
-					]
+				? [barred.note]
 				: [
 						"A body that writes 'complete' suspends, so it hands back a Future the caller completes in its turn — which is what its declared Type has to say.",
 					],
 		helps:
 			declared === null
-				? [
-						"Complete the work above this position, into a Constant it reads, or move it into a Function declared '-> Future<…>'.",
-					]
+				? barred.helps
 				: [
 						`Declare the return Type 'Future<${describeType(declared)}>'.`,
 					],
 	})
 }
 
-// NOTE: The nearest Scope with an answer, which a Scope carrying the barrier
-// `null` is — read outwards exactly as `expectedReturnType` is, and for the same
-// reason: an `if` body and a Match Handler suspend wherever the body holding
-// them does.
-function completionContextOf(
-	scope: enricher.Scope,
-): common.Type | "top-level" | null | undefined {
-	let searchScope: enricher.Scope | null = scope
-
-	while (searchScope !== null) {
-		if (searchScope.completing !== undefined) {
-			return searchScope.completing
-		}
-
-		searchScope = searchScope.parent
+// NOTE: What a position that can not suspend has to be told, per position. The
+// four used to share one Note listing all four and one Help offering all three
+// edits, and only one line of each was ever about the reader: a property body
+// was told to complete the work "above this position", where the generated value
+// it completes does not exist yet, and then to move it into a completing
+// Function, which is a Future again in a position that still can not wait.
+//
+// A property body is the one with no edit at all — a generated value can only be
+// waited on by machinery the runner does not have — so what it is offered is the
+// other test form rather than a spelling that would be refused. The other three
+// all reach the same answer from a different direction: the work is completed
+// where waiting IS allowed, and the position reads the Constant.
+function barredCompletion(barrier: enricher.CompletionBarrier | null): {
+	note: string
+	helps: Array<string>
+} {
+	switch (barrier) {
+		case "parameter-default":
+			return {
+				note: "A Parameter's default is filled in by the Function itself, before any of its own asynchrony begins.",
+				helps: [
+					"Complete the work above this Declaration, into a Constant the default reads.",
+				],
+			}
+		case "test-name":
+			return {
+				note: "A test's name is worked out before the run — the whole section is walked once with no test selected, so that a '--filter' matches what a reader sees.",
+				helps: [
+					"Complete the work above this test, into a Constant the name reads.",
+				],
+			}
+		case "benchmark-body":
+			return {
+				note: "A benchmark body is timed over many runs, and waiting for work inside it would time the waiting.",
+				helps: [
+					"Complete the work above the benchmark, into a Constant the body reads.",
+				],
+			}
+		case "property-body":
+			return {
+				note: "A property body runs once per generated value, and nothing in a 'for any' run can wait — the value this would complete does not exist until the run that made it.",
+				helps: [
+					"Assert on the answer in a 'test' of its own, which is run once and awaited.",
+				],
+			}
+		default:
+			// NOTE: No barrier named, which is a Scope that answered nothing at
+			// all rather than one of the four. Nothing is known about the
+			// position, so nothing is claimed about it.
+			return {
+				note: "'complete' suspends, and this position is filled in before any asynchrony around it begins.",
+				helps: [],
+			}
 	}
-
-	return undefined
 }
+
+// NOTE: Kept as a local name because half this file reads it, while the walk
+// itself lives beside `modulePathOf` in `scope.ts` — the Resolver asks the same
+// question about a bound it is about to refuse, and the two must not answer it
+// two ways.
+const completionContextOf = completionContextIn
 
 function enrichMatch(
 	node: parser.MatchNode,
@@ -6834,8 +6846,20 @@ function enrichNamespaceDefinitionStatement(
 	// conditional conformance (`is Comparable where Item is Comparable`) is
 	// where a Namespace-level bound belongs, so its conformance parameter can
 	// be threaded into exactly the fulfilling Methods rather than all of them.
+	//
+	// NOTE: The Help names a conformance this Namespace ALREADY declares. Naming
+	// the bound Protocol instead read as an instruction to declare `is Comparable`
+	// — which a Namespace that implements no `compare` does not, so following it
+	// reported a missing requirement and sent the reader back here. Where nothing
+	// is declared there is no name to give and the shape is written as the
+	// schematic it is.
 	for (let generic of node.generics) {
 		if (generic.constraint !== null) {
+			let conformances = node.conformsTo.map(
+				(clause) => clause.protocol.content,
+			)
+			let bound = `where ${generic.name.content} is ${generic.constraint.content}`
+
 			reportError(
 				"A Namespace's Type Parameters can not carry Protocol bounds",
 				generic.constraint.position,
@@ -6847,8 +6871,15 @@ function enrichNamespaceDefinitionStatement(
 							"this bound is not supported here",
 						),
 					],
+					notes: [
+						"A 'where' condition reaches the Methods that fulfil its conformance, which is the part a bound on the Namespace itself could never say.",
+					],
 					helps: [
-						`Bound it per conformance: 'is ${generic.constraint.content} where ${generic.name.content} is ${generic.constraint.content}'.`,
+						conformances.length === 0
+							? `Declare a conformance on this Namespace and bound it there — 'is …' with a Protocol of your own, then '${bound}'.`
+							: `Bound it on a conformance this Namespace declares: '${conformances
+									.map((name) => `is ${name} ${bound}`)
+									.join("' or '")}'.`,
 					],
 				},
 			)

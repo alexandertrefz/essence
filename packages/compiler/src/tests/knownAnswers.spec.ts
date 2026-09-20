@@ -2,9 +2,9 @@ import { describe, expect, it } from "bun:test"
 
 import type { common } from "@essence-lang/interfaces"
 
-import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
-import { parse, parseWithDiagnostics } from "../parser/index"
+import { parse } from "../parser/index"
+import { compiles, firstOf } from "./followedHelps"
 
 // NOTE: Three reporters that knew the answer and said something else. A Method
 // the receiver has not got may be a Method of what it HOLDS, a Case no Choice in
@@ -12,45 +12,10 @@ import { parse, parseWithDiagnostics } from "../parser/index"
 // not declared may be a static of the Namespace it was written inside. Each of
 // them used to end in a guess by edit distance.
 //
-// Every Help printed here is compiled below, in `compiles`. A Help is a promise
-// that what it prints works when it is followed, and a report that breaks that
-// promise is worse than one that says nothing.
-function diagnosticsFor(source: string): Array<common.Diagnostic> {
-	return enrich(parse(source)).diagnostics
-}
-
-function firstOf(
-	source: string,
-	code: common.DiagnosticCode,
-): common.Diagnostic {
-	let found = diagnosticsFor(source).find(
-		(diagnostic) => diagnostic.code === code,
-	)
-
-	if (found === undefined) {
-		throw new Error(
-			`No '${code}' reported; got ${diagnosticsFor(source)
-				.map((diagnostic) => diagnostic.code)
-				.join(", ")}.`,
-		)
-	}
-
-	return found
-}
-
-// NOTE: What a Help promises, checked by compiling it. Every Program here is the
-// probe from the test above it with the Help's own spelling written into it, so
-// a Help that stops compiling fails the test that prints it rather than a
-// reader's afternoon.
-function compiles(source: string): boolean {
-	let parsed = parseWithDiagnostics(source)
-
-	if (containsErrors(parsed.diagnostics)) {
-		return false
-	}
-
-	return !containsErrors(enrich(parsed.program).diagnostics)
-}
+// Every Help printed here is compiled, in `compiles`. A Help is a promise that
+// what it prints works when it is followed, and a report that breaks that
+// promise is worse than one that says nothing. The three helpers live in
+// `./followedHelps` since the Help audit's own spec came to need the same three.
 
 const future = [
 	"	function fetched() -> Future<Integer> {",
@@ -418,8 +383,12 @@ ${future}
 			expect(diagnostic.notes[2]).toBe(
 				"'complete' only stands in a body that answers a Future, and this position is not one.",
 			)
+			// NOTE: And the declaration alone is not the whole edit — a body
+			// declared `-> Future<…>` still holds an uncompleted hole, which
+			// reports exactly as before. The Help says both halves for that
+			// reason.
 			expect(diagnostic.helps).toEqual([
-				"Declare the enclosing Function '-> Future<…>', which is what lets its body wait.",
+				"Declare the enclosing Function '-> Future<…>', which is what lets its body wait, and add 'complete' where the value is read.",
 			])
 			expect(diagnostic.data).toBeUndefined()
 		})

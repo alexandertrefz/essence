@@ -4657,8 +4657,7 @@ describe("Code Actions", () => {
 				"\ttype Point = { x: Integer }",
 				"",
 				"\tnamespace Point for Point is Printable {",
-				"\t\ttoString() -> String {",
-				"\t\t}",
+				"\t\ttoString() -> String {}",
 				"\t}",
 				"}",
 			])
@@ -4705,14 +4704,11 @@ describe("Code Actions", () => {
 				'\t\t\t<- "square"',
 				"\t\t}",
 				"",
-				"\t\tarea() -> Integer {",
-				"\t\t}",
+				"\t\tarea() -> Integer {}",
 				"",
-				"\t\tscaled(by: Integer) -> Square {",
-				"\t\t}",
+				"\t\tscaled(by: Integer) -> Square {}",
 				"",
-				"\t\tstatic blank() -> Square {",
-				"\t\t}",
+				"\t\tstatic blank() -> Square {}",
 				"\t}",
 				"}",
 			])
@@ -4746,11 +4742,9 @@ describe("Code Actions", () => {
 			expect(fix.title).toBe("Implement 'Titled'")
 			expect(result.slice(11)).toEqual([
 				"\tnamespace Book for Book is Titled {",
-				"\t\tname() -> String {",
-				"\t\t}",
+				"\t\tname() -> String {}",
 				"",
-				"\t\ttitle() -> String {",
-				"\t\t}",
+				"\t\ttitle() -> String {}",
 				"\t}",
 				"}",
 			])
@@ -4776,8 +4770,7 @@ describe("Code Actions", () => {
 
 			expect(result.slice(3)).toEqual([
 				"\tnamespace Point for Point is Equatable {",
-				"\t\tis(_: Point) -> Boolean {",
-				"\t\t}",
+				"\t\tis(_: Point) -> Boolean {}",
 				"\t}",
 				"}",
 			])
@@ -4818,19 +4811,15 @@ describe("Code Actions", () => {
 			expect(result.slice(15)).toEqual([
 				"\tnamespace Square for Square is Scaled {",
 				"\t\toverload scaled {",
-				"\t\t\t(by: Integer) -> Square {",
-				"\t\t\t}",
+				"\t\t\t(by: Integer) -> Square {}",
 				"",
-				"\t\t\t(_: Integer, and: Integer) -> Square {",
-				"\t\t\t}",
+				"\t\t\t(_: Integer, and: Integer) -> Square {}",
 				"\t\t}",
 				"",
 				"\t\toverload static of {",
-				"\t\t\t(_: Integer) -> Square {",
-				"\t\t\t}",
+				"\t\t\t(_: Integer) -> Square {}",
 				"",
-				"\t\t\t() -> Square {",
-				"\t\t\t}",
+				"\t\t\t() -> Square {}",
 				"\t\t}",
 				"\t}",
 				"}",
@@ -4880,7 +4869,7 @@ describe("Code Actions", () => {
 			expect(refactor.title).toBe("Implement 'Printable'")
 			expect(refactor.diagnosticCode).toBeNull()
 			expect(applied(lines, refactor)[4]).toBe(
-				"\t\ttoString() -> String {",
+				"\t\ttoString() -> String {}",
 			)
 		})
 

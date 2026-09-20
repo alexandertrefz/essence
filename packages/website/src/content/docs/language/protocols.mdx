@@ -482,7 +482,7 @@ Error: { value: { grams: Integer } } does not conform to 'Comparable'
 
 A few conditions are refused:
 
-- A bound on the namespace's own type parameter, `namespace Boxes<infer Item is Printable>`, is [`protocol-bound-namespace-generic`](/docs/reference/diagnostics#protocol-bound-namespace-generic). Bound it per conformance instead: `is Printable where Item is Printable`.
+- A bound on the namespace's own type parameter, `namespace Boxes<infer Item is Printable>`, is [`protocol-bound-namespace-generic`](/docs/reference/diagnostics#protocol-bound-namespace-generic). Bound it on a conformance the namespace declares instead: `is Printable where Item is Printable`. The condition reaches the methods that fulfil that conformance and no others, so a method beside the requirements can not be bounded this way — or any other way today.
 - A condition on a type parameter the namespace does not declare is [`unknown-where-generic`](/docs/reference/diagnostics#unknown-where-generic).
 - The same type parameter bound twice in one clause is [`conflicting-where-condition`](/docs/reference/diagnostics#conflicting-where-condition).
 - A condition on a type parameter the target type never mentions is [`unwitnessable-where-condition`](/docs/reference/diagnostics#unwitnessable-where-condition). The target type is what proves the condition at each call.

@@ -1622,6 +1622,141 @@ describe("Workspace", () => {
 			}).diagnostics.map((diagnostic) => diagnostic.code)
 		}
 
+		// NOTE: The catch-22 the Help audit found. `Problem` is a Choice another
+		// Module declares, and the equality a Choice DERIVES is in reach only
+		// where its name is — so `unsatisfied-bound` fired over a call whose own
+		// span holds no mention of it, and asked for a Namespace, which is a
+		// second conformance for a Type that already has one. The edit is an
+		// import, and the Compiler is the half that knows which Module: it reads
+		// the Type's nominal identity, which carries the declaring Module's path.
+		it("should answer an unreachable derived conformance with the import", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Parser.es": [
+					"implementation {",
+					"\tchoice Problem {",
+					"\t\tNotANumber,",
+					"\t}",
+					"",
+					"\tfunction parse(_ text: String) -> Result<Integer, Problem> {",
+					"\t\t<- match Integer.parse(text) -> Result<Integer, Problem> {",
+					"\t\t\tcase #Value(number) { <- Result<Integer, Problem>#Value(number) }",
+					"\t\t\tcase #Empty { <- Result<Integer, Problem>#Failure(#NotANumber) }",
+					"\t\t}",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tProblem",
+					"\tparse",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./Parser.es" { parse }',
+					"}",
+					"",
+					"implementation {",
+					'\tconstant outcome = parse("seven")',
+					'\tTerminal.print("{outcome::is(#Failure(#NotANumber))}")',
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let source = workspace.sourceOf(mainPath) ?? ""
+			let reported = analyseDocument(source, mainPath, {
+				host: workspace.host,
+			}).diagnostics.find(
+				(diagnostic) => diagnostic.code === "unsatisfied-bound",
+			)
+
+			expect(reported?.helps).toEqual([
+				"'Problem' is declared in Parser.es — import it here, so its derived 'Equatable' is in scope.",
+			])
+
+			let [fix] = fixesFor(workspace, mainPath, 7, "outcome::is")
+
+			expect(fix.title).toBe("Import 'Problem' from ./Parser.es")
+			expect(fix.isPreferred).toBe(true)
+
+			let result = applied(source, fix)
+
+			expect(result.split("\n").slice(0, 5)).toEqual([
+				"import {",
+				'\tfrom "./Parser.es" {',
+				"\t\tProblem",
+				"\t\tparse",
+				"\t}",
+			])
+
+			// NOTE: The bound is satisfied, which is this half of the loop shut.
+			// What is left is the OTHER half: the Linker's `usedNames` does not
+			// count a Type reached through a derived conformance as used, so the
+			// entry the fix just wrote reports as unused. The test below is the
+			// end-to-end one, and it is skipped until that lands.
+			expect(codesAfter(workspace, mainPath, result)).not.toContain(
+				"unsatisfied-bound",
+			)
+		})
+
+		// NOTE: SKIPPED ON PURPOSE, and enabling it is the integration step. The
+		// import this writes satisfies the bound and is then reported as unused,
+		// because `usedNames` in `modules/link.ts` counts the names a Module
+		// SPELLS and a derived conformance is reached without spelling one.
+		// Obeying `unused-import`'s "Remove the entry." brings the original
+		// report back, which is the loop this pair exists to close — so the
+		// assertion is written now and turned on when the Linker half lands.
+		it.skip("should leave a Program with nothing left to report", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Parser.es": [
+					"implementation {",
+					"\tchoice Problem {",
+					"\t\tNotANumber,",
+					"\t}",
+					"",
+					"\tfunction parse(_ text: String) -> Result<Integer, Problem> {",
+					"\t\t<- match Integer.parse(text) -> Result<Integer, Problem> {",
+					"\t\t\tcase #Value(number) { <- Result<Integer, Problem>#Value(number) }",
+					"\t\t\tcase #Empty { <- Result<Integer, Problem>#Failure(#NotANumber) }",
+					"\t\t}",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tProblem",
+					"\tparse",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./Parser.es" {',
+					"\t\tProblem",
+					"\t\tparse",
+					"\t}",
+					"}",
+					"",
+					"implementation {",
+					'\tconstant outcome = parse("seven")',
+					'\tTerminal.print("{outcome::is(#Failure(#NotANumber))}")',
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+
+			expect(
+				codesAfter(
+					workspace,
+					mainPath,
+					workspace.sourceOf(mainPath) ?? "",
+				),
+			).toEqual([])
+		})
+
 		it("should remove the whole entry of a self-import", () => {
 			let { workspace, pathOf } = makeWorkspace({
 				"Main.es": [

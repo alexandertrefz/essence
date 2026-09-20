@@ -3657,7 +3657,18 @@ Error: { x: Integer } does not conform to 'Comparable'
 
 Pass a type that conforms, or declare a namespace that makes this type conform, as the Help shows.
 
-Quick Fix: **Declare it as '&lt;infer Item is Comparable&gt;'** adds the bound to a type parameter that this file declares.
+The Help is written for whatever the type turns out to be, and five shapes read
+differently:
+
+- **A bare case.** `Annotate the value at 'Colour': a bare Case binds the Case, not the Choice.` — `namespace X for Colour#Red is …` is not a spelling, so what moves is the value's annotation.
+- **A choice another module declares.** `'Problem' is declared in Parser.es — import it here, so its derived 'Equatable' is in scope.` A choice derives equality wherever it is in scope, so the edit is an import rather than a second conformance. A **Quick Fix** writes the entry.
+- **A future.** `This describes work that has not run — add 'complete'.` Making futures `Printable` compiles and prints a description of the work, which is why the report never asks for it.
+- **A choice whose cases carry no payload.** The namespace's body may be empty: declaring `namespace Problems for Problem is Printable {}` is the whole of what such a choice needs.
+- **An unbounded type parameter.** `Declare it as '<infer Item is Comparable>'`, with a **Quick Fix** that writes the bound onto a declaration in this file.
+
+A namespace's own type parameters are the exception to the last one: they take no
+bounds at all, and the report says what does carry one. See
+[`protocol-bound-namespace-generic`](#protocol-bound-namespace-generic).
 
 Taught on: [Protocols › Declared, not structural](/docs/language/protocols#declared-not-structural)
 
@@ -3708,7 +3719,7 @@ Error: Future<Integer> can not be interpolated into a String
 
 </div>
 
-The word is named only where it may stand — inside a body that answers a future, and at a program's top level. Anywhere else the note says so and the Help is to declare the enclosing function `-> Future<…>`.
+The word is named only where it may stand — inside a body that answers a future, and at a program's top level. Anywhere else the note says so, and the Help is to declare the enclosing function `-> Future<…>` **and** write the `complete` in the hole: the declaration alone leaves the hole holding a future, which reports exactly as before.
 
 Quick Fix: **Wait for it with 'complete'**, where the word may stand. There is none for any other unprintable hole: what to write there is a `match`, which is a restructuring.
 
@@ -3894,7 +3905,7 @@ Error: A Function with Protocol-bound Type Parameters can not be used as a value
    │                        ───┬───  
    │                           ╰───── this Function is stored, not called
    │ 
-   │ Help: Call it directly instead of passing it around.
+   │ Help: Invoke it, or wrap the call in a Function literal written for the Types you mean.
    │ 
    │ Note: A bounded Function carries hidden conformance Parameters that only exist at a direct invocation.
 ───╯
@@ -3946,13 +3957,24 @@ Error: A Namespace's Type Parameters can not carry Protocol bounds
    │                                   ─────┬────  
    │                                        ╰────── this bound is not supported here
    │ 
-   │ Help: Bound it per conformance: 'is Comparable where Item is Comparable'.
+   │ Help: Declare a conformance on this Namespace and bound it there — 'is …' with a Protocol of your own, then 'where Item is Comparable'.
+   │ 
+   │ Note: A 'where' condition reaches the Methods that fulfil its conformance, which is the part a bound on the Namespace itself could never say.
 ───╯
 ```
 
 </div>
 
 Move the bound into a conditional conformance: `namespace Boxes<infer Item> for { value: Item } is Printable where Item is Printable`.
+
+Where the namespace already declares a conformance the Help names it, because the
+condition belongs on one this namespace owes rather than on one it would then be
+reported for not writing.
+
+A `where` reaches the methods that **fulfil** that conformance and no others. A
+method that fulfils nothing — an extra method beside the requirements — can not be
+bounded at all today; `unsatisfied-bound` says so in a note where that is the
+shape, and offers no Help, because every spelling would be refused.
 
 Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
 
@@ -3998,13 +4020,17 @@ Error: 'Item' is bound twice in this conformance
    │                                                ──┬─  
    │                                                  ╰─── already bound to 'Comparable'
    │ 
-   │ Note: 'Item' is already required to conform to 'Comparable'.
+   │ Help: Drop this condition, or declare 'is Comparable' on a Namespace of its own where 'Item is Equatable' is the one condition.
+   │ 
+   │ Note 1: 'Item' is already required to conform to 'Comparable'.
+   │ Note 2: A conformance threads one witness per Type Parameter into the Methods that fulfil it, and one witness can not be two Protocols.
 ───╯
 ```
 
 </div>
 
-Keep one condition for each type parameter.
+Keep one condition for each type parameter. A namespace that needs a second bound
+on the same parameter declares that conformance on a namespace of its own.
 
 Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
 
@@ -4050,7 +4076,7 @@ Error: List<{ x: Integer }> does not conform to 'Comparable'
    │                    ─────────────────┬────────────────  
    │                                     ╰────────────────── this binds a Type Parameter bound to 'Comparable'
    │ 
-   │ Help: Declare a Namespace 'for List<{ x: Integer }> is Comparable'.
+   │ Help: Declare a Namespace 'for { x: Integer } is Comparable'.
    │ 
    │ Note 1: List<{ x: Integer }> does not conform to 'Comparable'.
    │ Note 2: { x: Integer } does not conform to 'Comparable'.
@@ -4059,7 +4085,10 @@ Error: List<{ x: Integer }> does not conform to 'Comparable'
 
 </div>
 
-Make the item type conform to the protocol, as the Help shows.
+Make the item type conform to the protocol, as the Help shows. The Help names the
+**last** link of the chain — the type that actually has no conforming namespace,
+which the notes walk down to. A namespace declared for the outer type answers the
+one call and leaves every other list of that record unsorted.
 
 Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
 

@@ -1,0 +1,95 @@
+import type { common } from "@essence-lang/interfaces"
+
+import { analyseSource } from "../analysis"
+import { containsErrors } from "../diagnostics/index"
+import { enrich } from "../enricher/index"
+import { parse, parseWithDiagnostics } from "../parser/index"
+
+// NOTE: The three things a test about a Help does — report a probe, read the
+// Help off it, and COMPILE what it printed. They were written inside
+// `knownAnswers.spec.ts`, which is where the first reporters to earn them were
+// tested; the Help audit needs the same three from a second spec, so they moved
+// here rather than being written a second way.
+//
+// A Help is a promise that what it prints works when it is followed, and a
+// report that breaks that promise is worse than one that says nothing — so the
+// spellings a Help spells are compiled here rather than compared as text.
+
+export function diagnosticsFor(source: string): Array<common.Diagnostic> {
+	return enrich(parse(source)).diagnostics
+}
+
+// NOTE: Throws rather than answering null, and names every code that WAS
+// reported: a probe that stopped reporting what it was written for is a test
+// that has to say what it got instead, or the next reader spends the afternoon
+// finding out.
+export function firstOf(
+	source: string,
+	code: common.DiagnosticCode,
+): common.Diagnostic {
+	let found = diagnosticsFor(source).find(
+		(diagnostic) => diagnostic.code === code,
+	)
+
+	if (found === undefined) {
+		throw new Error(
+			`No '${code}' reported; got ${diagnosticsFor(source)
+				.map((diagnostic) => diagnostic.code)
+				.join(", ")}.`,
+		)
+	}
+
+	return found
+}
+
+// NOTE: What a Help promises, checked by compiling it. Every Program a test
+// passes here is the probe from the test above it with the Help's own spelling
+// written into it, so a Help that stops compiling fails the test that prints it
+// rather than a reader's afternoon.
+//
+// The whole pipeline, so that a Help followed into a Validator refusal fails
+// here rather than reading as a success — `analyseSource` is the one
+// description of what every stage has to say about one source.
+export function compiles(source: string): boolean {
+	return !containsErrors(analyseSource(source).diagnostics)
+}
+
+// NOTE: The Enricher alone, for the reports that never reach the Validator — a
+// probe whose point is a Type error stops there, and running the Validator over
+// a Program the Enricher gave up on only adds what it could not judge.
+export function enrichedDiagnosticsFor(
+	source: string,
+): Array<common.Diagnostic> {
+	let parsed = parseWithDiagnostics(source)
+
+	return [...parsed.diagnostics, ...enrich(parsed.program).diagnostics]
+}
+
+// NOTE: Every stage, for the Helps the VALIDATOR writes — a Match's Cases, a
+// bounded Function stored as a value. The Enricher reports none of them, so a
+// test that asked it alone would find nothing and say the reporter had stopped.
+export function analysedDiagnosticsFor(
+	source: string,
+): Array<common.Diagnostic> {
+	return analyseSource(source).diagnostics
+}
+
+// NOTE: `firstOf` over the whole pipeline, with the same insistence on naming
+// what WAS reported when the probe stops reporting what it was written for.
+export function firstAnalysed(
+	source: string,
+	code: common.DiagnosticCode,
+): common.Diagnostic {
+	let all = analysedDiagnosticsFor(source)
+	let found = all.find((diagnostic) => diagnostic.code === code)
+
+	if (found === undefined) {
+		throw new Error(
+			`No '${code}' reported; got ${all
+				.map((diagnostic) => diagnostic.code)
+				.join(", ")}.`,
+		)
+	}
+
+	return found
+}
