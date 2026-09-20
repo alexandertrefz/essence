@@ -631,6 +631,11 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(documentationLineAction(diagnostic, lines)),
 	"unexpected-payload": ({ diagnostic, program, lines }) =>
 		listed(bareCaseAction(diagnostic, program, lines)),
+	// NOTE: What stands after the end of a Program is text to delete, and the
+	// span is the one the report already underlines — so the removal is the
+	// same `essence-spelling` edit a stray `;` carries.
+	"unexpected-token": ({ diagnostic, lines }) =>
+		listed(essenceSpellingAction(diagnostic, lines)),
 	"ungeneratable-type": makeGeneratableAction,
 	"uninferred-namespace-parameter": ({ diagnostic, program, lines }) =>
 		listed(inferParameterAction(diagnostic, program, lines)),

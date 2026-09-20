@@ -1225,6 +1225,17 @@ class DescentParser {
 				notes: [
 					"A Program is one 'implementation { … }' block, framed by an optional 'import { … }' block above it and an optional 'tests { … }' and 'export { … }' block below it.",
 				],
+				// NOTE: The span the primary Label stands on is what there is
+				// to delete, so the edit is one the report already knows and
+				// said nothing about. The `essence-spelling` payload with an
+				// empty spelling is the same "remove this" a `;` carries, which
+				// is where the Quick Fix behind it comes from.
+				helps: [`Remove the ${describeToken(token)}.`],
+				data: {
+					kind: "essence-spelling",
+					position: token.position,
+					spelling: "",
+				},
 			},
 		)
 	}
@@ -2078,7 +2089,17 @@ class DescentParser {
 						),
 						secondary(firstPosition, "first defined here"),
 					],
-					helps,
+					// NOTE: The edit the two Labels already spell out between
+					// them, said rather than left to be worked out: the second
+					// writing is the one that goes, because the first is the one
+					// the value is read as having. Callers that have something
+					// sharper to say pass their own.
+					helps:
+						helps.length === 0
+							? [
+									`Remove the second '${entry.name.content}', or give it a name of its own.`,
+								]
+							: helps,
 				},
 			)
 		}
@@ -6667,6 +6688,13 @@ class DescentParser {
 					labels: [
 						primary(position, "defined a second time here"),
 						secondary(clash.position, "first defined here"),
+					],
+					// NOTE: The edit the two Labels spell out between them,
+					// said rather than left to be worked out — and the second
+					// writing is the one that goes, because the Record a reader
+					// gets is the one the first key made.
+					helps: [
+						`Remove the second '${key}', or give it a name of its own.`,
 					],
 				})
 

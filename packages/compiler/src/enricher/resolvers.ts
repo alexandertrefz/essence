@@ -454,6 +454,15 @@ export function resolveChoiceDeclarationStatementType(
 	node: parser.ChoiceDeclarationStatementNode,
 	scope: enricher.Scope,
 ): common.UnionType | common.GenericAliasType {
+	// NOTE: Checked here as well as in `declareTypeInScope`, for the reason a
+	// Type Alias is: hoisting resolves speculatively and declares the name
+	// without ever reaching the declaration check, so `choice Self { … }`
+	// compiled while `type Self = …` was refused — and what the Note said about
+	// both was that no declaration may take the name.
+	if (node.name.content === "Self") {
+		reportReservedTypeName(node.name.position)
+	}
+
 	if (node.cases.length === 0) {
 		reportError("A Choice must declare at least one Case", node.position, {
 			code: "empty-choice",
@@ -498,6 +507,13 @@ export function resolveChoiceDeclarationStatementType(
 							choiceCase.name.position,
 							"declared a second time here",
 						),
+					],
+					// NOTE: The Case the Choice HAS is the first one — this
+					// declaration is skipped below — so the edit is to take
+					// this one out, and saying so is the difference between a
+					// report and a report a reader can act on.
+					helps: [
+						`Remove this '${choiceCase.name.content}', or give it a name of its own.`,
 					],
 				},
 			)
@@ -820,7 +836,16 @@ export function lookupTypeOf(
 				),
 			],
 			notes: ["Only Records, Cases and Namespaces have members."],
-			helps: methodSeparatorHelps(memberName, access),
+			// NOTE: Offered for a member READ here, where `unknown-member`
+			// withholds it. That one stands on a value that HAS members, so a
+			// `.` is how one of them is reached and a Method is only a guess.
+			// This value has none at all, so whatever was written after the `.`
+			// is not a member under any reading — and a Method is the only
+			// thing it can have been. `n.toFixed` used to be answered with the
+			// rule and nothing to do about it.
+			helps: [
+				`A Method is called with '::' rather than '.' — write '::${memberName}(…)' if '${memberName}' is one.`,
+			],
 		})
 
 		return { type: "Error" }
@@ -961,6 +986,12 @@ type BarredName = enricher.BarredParameterName & {
 function reportBarredDefaultName(
 	node: parser.IdentifierNode,
 	barred: BarredName,
+	// NOTE: Whether the name ALSO stands outside the Parameter list, which is
+	// the whole of what makes "rename the Parameter" an edit rather than a dead
+	// end: renaming it leaves the default reading the name it always read, and
+	// that name has to resolve to something. Without one, a reader who followed
+	// the clause was answered `'times' is not declared`.
+	boundOutside: boolean,
 ): void {
 	let name = node.content
 
@@ -999,9 +1030,11 @@ function reportBarredDefaultName(
 				notes: [
 					"A Parameter is bound to the value its default works out, so the default can not read it.",
 				],
-				helps: [
-					`Write the value out, or rename the Parameter so it does not spell what the default reads.`,
-				],
+				helps: boundOutside
+					? [
+							`Write the value out, or rename the Parameter so it does not spell what the default reads — '${name}' is declared outside the list too.`,
+						]
+					: ["Write the value out."],
 			},
 		)
 
@@ -1025,6 +1058,28 @@ function reportBarredDefaultName(
 			],
 		},
 	)
+}
+
+// NOTE: Whether the name a barred default reads is bound somewhere OUTSIDE the
+// Parameter list as well — the `constant times` written above the Function. The
+// barrier is ignored on this walk on purpose: the question is not what the
+// default may read where it stands, it is what the default WOULD read if the
+// Parameter that shadows the name were renamed.
+function boundOutsideTheParameterList(
+	name: string,
+	scope: enricher.Scope,
+): boolean {
+	let searchScope: enricher.Scope | null = scope
+
+	while (searchScope !== null) {
+		if (Object.hasOwn(searchScope.members, name)) {
+			return true
+		}
+
+		searchScope = searchScope.parent
+	}
+
+	return false
 }
 
 function findVariableOrBarredName(
@@ -1288,7 +1343,13 @@ function reportForeignName(
 	// where there is no member to name, which is `user?` standing on its own.
 	if (name.length > 1 && (name.endsWith("!") || name.endsWith("?"))) {
 		let value = name.slice(0, -1)
-		let reached = context.readMember ?? "member"
+		// NOTE: The `map` clause is offered only where a member was BEING
+		// reached — `user?.name` hands `name` down and the Help writes
+		// `map(.name)`. `user!` standing on its own reaches for nothing, and
+		// `map(.member)` was a path into a member called `member`: on an
+		// `Optional<Integer>` following it reached `path-step-not-a-record`,
+		// which is a report about a name nobody wrote.
+		let reached = context.readMember ?? null
 
 		reportError(
 			`Essence has no '${name.slice(-1)}' after a value`,
@@ -1300,7 +1361,9 @@ function reportForeignName(
 					"A value that may be missing is an Optional, which is taken apart rather than reached into or asserted away.",
 				],
 				helps: [
-					`Write '${value}::map(.${reached})' to reach through one, and '${value}::value(defaultingTo d)' for the value or a fallback.`,
+					reached === null
+						? `Write '${value}::value(defaultingTo d)' for the value or a fallback.`
+						: `Write '${value}::map(.${reached})' to reach through one, and '${value}::value(defaultingTo d)' for the value or a fallback.`,
 					"Or take it apart with a 'match', which is the only way to the value itself.",
 				],
 			},
@@ -1567,6 +1630,13 @@ export type NameContext = {
 	// the postfix habits offer the reader the member they were reaching for
 	// rather than the word "member".
 	readMember?: string | null
+	// NOTE: Written as the WHOLE of a String's hole — `"use { and } carefully"`.
+	// A hole holds an Expression, so the braces a reader meant to print read as
+	// one, and the word between them reads as a name. Only a hole holding
+	// nothing but a name is marked: a hole holding a call or a path is one
+	// somebody meant to open, and the name inside it is undeclared for an
+	// ordinary reason.
+	inStringHole?: boolean
 }
 
 export function resolveIdentifierType(
@@ -1578,7 +1648,11 @@ export function resolveIdentifierType(
 	let resolved = findVariableOrBarredName(name, scope)
 
 	if (resolved?.found === "barred") {
-		reportBarredDefaultName(node, resolved.barred)
+		reportBarredDefaultName(
+			node,
+			resolved.barred,
+			boundOutsideTheParameterList(name, scope),
+		)
 
 		return { type: "Error" }
 	}
@@ -1649,11 +1723,37 @@ export function resolveIdentifierType(
 								`A bare member name in a Record Literal is the member AND its value, so '${name}' is read here as well as written.`,
 							]
 						: []),
+					// NOTE: `"use { and } carefully"` — the braces opened a
+					// HOLE, and a hole holds an Expression, so the word between
+					// them is read as a name. A reader who meant the braces to
+					// stand for themselves was told their prose was not
+					// declared and nothing else. See `inStringHole`.
+					...(context.inStringHole === true
+						? [
+								`A '{' inside a String opens a hole, which holds an Expression — so '${name}' is read as a name rather than printed.`,
+							]
+						: []),
 					...(reached?.notes ?? []),
 				],
-				helps: leads
-					? [...nearMiss, ...(reached?.helps ?? []).map(following)]
-					: [...(reached?.helps ?? []), ...nearMiss],
+				// NOTE: The braces come LAST where anything else was found, for
+				// the reason the near miss leads the Namespace reach: a hole
+				// holding a name one edit away from a Constant is a hole
+				// somebody meant to open and mistyped, and a hole holding a
+				// word nothing in the file resembles is prose that was never
+				// meant to be read at all.
+				helps: [
+					...(leads
+						? [
+								...nearMiss,
+								...(reached?.helps ?? []).map(following),
+							]
+						: [...(reached?.helps ?? []), ...nearMiss]),
+					...(context.inStringHole === true
+						? [
+								"Write '\\{' and '\\}' where the braces stand for themselves.",
+							]
+						: []),
+				],
 				...(reached?.spelling === undefined || leads
 					? suggestionData(suggestion)
 					: {
@@ -2233,6 +2333,16 @@ export function resolveProtocolDeclarationStatementType(
 		ignoreExtensions?: boolean
 	} = {},
 ): common.ProtocolType {
+	// NOTE: And a Protocol may not BE `Self`, which is the name it is reserved
+	// for: every signature inside one may say `Self`, meaning the Type
+	// conforming, and a Protocol of that name stands where that word resolves.
+	// Checked in the resolver rather than beside the Scope declaration for the
+	// reason a Type Alias is — hoisting resolves speculatively and the
+	// declaration check is skipped for everything it hoisted.
+	if (node.name.content === "Self") {
+		reportReservedTypeName(node.name.position)
+	}
+
 	// NOTE: `Self` stands for the conforming Namespace's target Type — inside
 	// the signatures it is an ordinary GenericUse, substituted wherever the
 	// Protocol is used against a concrete Type.
@@ -6369,12 +6479,17 @@ export function reportReservedTypeName(position: common.Position | null): void {
 	let notes = [
 		"'Self' is what a Protocol calls the Type conforming to it, so no declaration may take it.",
 	]
+	// NOTE: One Help, and it names no replacement: which name the declaration
+	// should have is the one thing this knows nothing about. It said nothing at
+	// all before, and the edit is worth saying even where the word is not.
+	let helps = ["Choose another name."]
 
 	if (position === null) {
 		reportError("'Self' is a reserved Type name", null, {
 			code: "reserved-type-name",
 			labels: [],
 			notes,
+			helps,
 		})
 
 		return
@@ -6384,6 +6499,7 @@ export function reportReservedTypeName(position: common.Position | null): void {
 		code: "reserved-type-name",
 		labels: [primary(position, "this name is taken")],
 		notes,
+		helps,
 	})
 }
 

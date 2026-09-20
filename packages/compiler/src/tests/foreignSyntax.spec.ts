@@ -233,14 +233,44 @@ describe("Foreign syntax", () => {
 			expect(onlyDiagnostic(source).data).toBeUndefined()
 		})
 
-		it("says nothing about Methods where the member was only read", () => {
+		// NOTE: One mistake, one report. `w.length` inside a literal handed to
+		// `map` was answered three times — the `.` it is about, and then
+		// `uninferable-return-type` and `uninferable-type-parameter`, which
+		// restate it in vaguer words about a Type that could not be read off a
+		// body already refused. Both are gated at their source now.
+		it("reports a Method reached with '.' inside a literal once", () => {
+			let source = program(
+				'constant words = ["a", "bb"]',
+				"Terminal.inspect(words::map((w) { <- w.length }))",
+			)
+
+			expect(codesOf(source)).toEqual(["method-called-with-dot"])
+			expect(
+				compiles(
+					program(
+						'constant words = ["a", "bb"]',
+						"Terminal.inspect(words::map((w) { <- w::length() }))",
+					),
+				),
+			).toBe(true)
+		})
+
+		// NOTE: Said for a member READ too, where a value has no members at all.
+		// `n.toFixed` used to be answered with the rule and nothing to do about
+		// it: an Integer is not a Record, so whatever stands behind the `.` is
+		// not a member under any reading, and a Method is the only thing it can
+		// have been. The silence belongs to `unknown-member`, one test down,
+		// where the value HAS members and a `.` is how one of them is reached.
+		it("says it for a member read off a value with no members", () => {
 			let source = program(
 				'constant s = "ada"',
 				"Terminal.print(s.charAt)",
 			)
 
 			expect(codesOf(source)).toEqual(["type-without-members"])
-			expect(helpsOf(source)).toEqual([])
+			expect(helpsOf(source)).toEqual([
+				"A Method is called with '::' rather than '.' — write '::charAt(…)' if 'charAt' is one.",
+			])
 		})
 
 		it("adds the sentence to a Record's unknown member that was called", () => {
@@ -1356,7 +1386,6 @@ describe("Foreign syntax", () => {
 
 		// NOTE: The member is what the reader was reaching FOR, and the Lookup
 		// around the name is the only thing that has it — see `enrichLookupBase`.
-		// `.member` is what is left where there is no member to name.
 		it("names the member a postfix habit was reaching for", () => {
 			expect(
 				helpsOf(
@@ -1368,7 +1397,13 @@ describe("Foreign syntax", () => {
 			).toBe(
 				"Write 'user::map(.name)' to reach through one, and 'user::value(defaultingTo d)' for the value or a fallback.",
 			)
+		})
 
+		// NOTE: And the `map` clause is WITHHELD where there is none. `.member`
+		// used to stand in for it, which is a path into a member of that name:
+		// on an `Optional<Integer>` following it reached `path-step-not-a-record`
+		// — a second report, about a word the Help itself had made up.
+		it("offers only the fallback where nothing was being reached for", () => {
 			expect(
 				helpsOf(
 					program(
@@ -1377,7 +1412,7 @@ describe("Foreign syntax", () => {
 					),
 				)[0],
 			).toBe(
-				"Write 'user::map(.member)' to reach through one, and 'user::value(defaultingTo d)' for the value or a fallback.",
+				"Write 'user::value(defaultingTo d)' for the value or a fallback.",
 			)
 		})
 	})

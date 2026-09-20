@@ -767,12 +767,19 @@ const foreignWords: ReadonlyMap<string, ForeignWord> = new Map([
 			helps: ["Write 'complete' in place of 'await'."],
 		},
 	],
+	// NOTE: The one habit whose answer is not written where the habit stands. An
+	// `import` block goes ABOVE the implementation, and the Help read as an
+	// edit to make here — written in place of the `require` it answers, it is a
+	// `syntax-error`. So it says where the block goes, and the names in it are
+	// `…` rather than a path and a value nothing in the reader's file spells.
 	[
 		"require",
 		{
 			spelling: null,
 			note: "A Module is named by a relative path to an '.es' file, in an 'import' block above the implementation.",
-			helps: ["Write 'import { from \"./Money.es\" { twice } }'."],
+			helps: [
+				"Write the block above the implementation — 'import { from \"….es\" { … } }' — and name what it brings in where this call stands.",
+			],
 		},
 	],
 ])

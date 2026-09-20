@@ -2418,7 +2418,16 @@ function enrichInterpolatedStringValue(
 				return segment
 			}
 
-			let expression = enrichExpression(segment.expression, scope)
+			// NOTE: A hole holding nothing but a NAME is the one that may not
+			// have been meant as a hole at all — `"use { and } carefully"`. The
+			// name resolves the same way wherever it is written; what the
+			// context changes is what a name nothing declares is answered with.
+			let expression =
+				segment.expression.nodeType === "Identifier"
+					? enrichIdentifierExpression(segment.expression, scope, {
+							inStringHole: true,
+						})
+					: enrichExpression(segment.expression, scope)
 
 			reportRedundantInterpolatedToString(expression, scope)
 
@@ -6861,6 +6870,17 @@ function enrichNamespaceDefinitionStatement(
 	// their own, so this is only about a `@param` written above `namespace`.
 	reportDocumentationParameters(node.documentation, [])
 
+	// NOTE: `namespace Self for Integer { … }` — a Namespace is named where a
+	// Type is named and is reached the same way, `Self.twice` reading as a
+	// static of it, so it takes the reserved name as surely as a Choice or an
+	// Alias does. It compiled. Reported HERE rather than in the resolver the
+	// Choice and the Alias use, because a Namespace's Type is resolved more
+	// than once — hoisting retries a Namespace whose conformance clause waits
+	// on a Protocol — and this pass runs exactly once per declaration.
+	if (node.name.content === "Self") {
+		reportReservedTypeName(node.name.position)
+	}
+
 	function enrichProperties(
 		properties: Record<string, parser.NamespacePropertyNode>,
 		namespaceType: common.NamespaceType,
@@ -10529,11 +10549,18 @@ function inferReturnTypeFromBody(
 	node: parser.FunctionDefinitionNode,
 	parameterTypes: Array<common.Parameter>,
 	scope: enricher.Scope,
+	// NOTE: Set where the body was refused in its own right, which the caller
+	// reads as "this one is already answered". `words::map((w) { <- w.length })`
+	// reported THREE times — `method-called-with-dot` about the `.`, and then
+	// `uninferable-return-type` and `uninferable-type-parameter` about a Type
+	// that could not be read off a body whose Type is Error. One mistake, and
+	// the two reports that restate it are the two that say least.
+	refused?: { body: boolean },
 ): common.Type | null {
 	inferReturnTypeFromBodyDepth += 1
 
 	try {
-		let { result } = collectDiagnostics(() => {
+		let { result, diagnostics } = collectDiagnostics(() => {
 			let inferenceScope = childScope(scope)
 
 			// NOTE: Declared through the same path the real pass uses, rather
@@ -10595,6 +10622,15 @@ function inferReturnTypeFromBody(
 				? answer
 				: { type: "Future" as const, valueType: answer }
 		})
+
+		// NOTE: The Diagnostics of this pass are DROPPED — it reads a body that
+		// the real pass reads again — so an error here is one the reader is
+		// about to be told about at the line it stands on. That is the whole of
+		// what `refused` says, and it is asked of the same body this pass just
+		// read rather than guessed at from an Error Type.
+		if (refused !== undefined && containsErrors(diagnostics)) {
+			refused.body = true
+		}
 
 		return result
 	} finally {
@@ -10708,8 +10744,20 @@ function makeArgumentTyper(
 	>()
 	let sawErrorArgument = false
 
+	// NOTE: And a Function literal whose BODY was refused counts as one too. It
+	// is typed `(String) -> Error` rather than `Error` — the Parameters read
+	// fine, it is what the body answers that did not — so the gate that keeps
+	// `uninferable-type-parameter` off an already-reported Argument did not
+	// catch it, and `words::map((w) { <- w.length })` was answered three times
+	// about one `.`. Only the RETURN position is read: an Error anywhere else
+	// inside a Type is not a report anybody made about this Argument, and the
+	// `loop` whose callback never answers `#Done` really does leave a Type
+	// Parameter unbound with nothing else said about it.
 	function noteErrors(type: common.Type): common.Type {
-		if (type.type === "Error") {
+		if (
+			type.type === "Error" ||
+			(type.type === "Function" && type.returnType.type === "Error")
+		) {
 			sawErrorArgument = true
 		}
 
@@ -18321,10 +18369,24 @@ function resolveContextualReturnType(
 	// mention. `mentionsUnsolvedTypeParameter` tells the two apart by the fresh
 	// name only a call still matching can produce.
 	if (mentionsUnsolvedTypeParameter(expectedFunction.returnType)) {
-		let inferred = inferReturnTypeFromBody(node, parameterTypes, scope)
+		let refused = { body: false }
+		let inferred = inferReturnTypeFromBody(
+			node,
+			parameterTypes,
+			scope,
+			refused,
+		)
 
 		if (inferred !== null) {
 			return inferred
+		}
+
+		// NOTE: A body that was refused in its own right is answered where it
+		// was refused. Saying here that its Type could not be read is the same
+		// mistake restated in vaguer words, one line further from it — which is
+		// what the Parameter-Type gate above this does for the same reason.
+		if (refused.body) {
+			return { type: "Error" }
 		}
 
 		let position = functionLiteralPosition(node)

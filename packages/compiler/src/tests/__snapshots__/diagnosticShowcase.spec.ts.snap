@@ -431,7 +431,7 @@ Error: 'times' is the Parameter its own default is written on
     │                                            │    
     │                                            ╰──── read here
     │ 
-    │ Help: Write the value out, or rename the Parameter so it does not spell what the default reads.
+    │ Help: Write the value out.
     │ 
     │ Note: A Parameter is bound to the value its default works out, so the default can not read it.
 ────╯
@@ -1213,7 +1213,7 @@ Error: Essence has no '!' after a value
     │                    ──┬──  
     │                      ╰──── this is read as one name
     │ 
-    │ Help 1: Write 'user::map(.member)' to reach through one, and 'user::value(defaultingTo d)' for the value or a fallback.
+    │ Help 1: Write 'user::value(defaultingTo d)' for the value or a fallback.
     │ Help 2: Or take it apart with a 'match', which is the only way to the value itself.
     │ 
     │ Note: A value that may be missing is an Optional, which is taken apart rather than reached into or asserted away.

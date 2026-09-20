@@ -2411,6 +2411,40 @@ describe("Enricher", () => {
 			)
 		})
 
+		// NOTE: `"use { and } carefully"` — the braces opened a HOLE, and a hole
+		// holds an Expression, so the word between them is read as a name. A
+		// reader who meant the braces to print was told their prose was not
+		// declared and nothing else.
+		it("should answer a name that is a whole String hole", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				Terminal.print("use { and } carefully")
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unknown-name")
+			expect(diagnostics[0].helps[0]).toBe(
+				"Write '\\{' and '\\}' where the braces stand for themselves.",
+			)
+			expect(diagnostics[0].notes[0]).toBe(
+				"A '{' inside a String opens a hole, which holds an Expression — so 'and' is read as a name rather than printed.",
+			)
+		})
+
+		// NOTE: And nothing is added where the hole holds a name that really is
+		// a name — the reader meant the hole, and misspelled what goes in it.
+		it("should leave a misspelled name in a hole to the near miss", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant name = "Ada"
+				Terminal.print("Hello, {naem}")
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].helps).toEqual([
+				"Did you mean 'name'?",
+				"Write '\\{' and '\\}' where the braces stand for themselves.",
+			])
+		})
+
 		it("should reserve Self as a Generic name", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				function identity <Self>(_ value: Self) -> Self {
@@ -2433,6 +2467,31 @@ describe("Enricher", () => {
 			expect(diagnostics[0].message).toBe(
 				"'Self' is a reserved Type name",
 			)
+			expect(diagnostics[0].helps).toEqual(["Choose another name."])
+		})
+
+		// NOTE: The Note has always said that NO declaration may take the name,
+		// and only a Type Alias and a Generic were held to it: a Choice, a
+		// Protocol and a Namespace called `Self` all compiled. Each of the three
+		// is named where a Type is named and reached the way one is, and a
+		// Protocol is the declaration the name is reserved FOR — every signature
+		// inside one says `Self` meaning the Type conforming, and a Protocol of
+		// that name stands where the word resolves.
+		it("should reserve Self for every declaration form", () => {
+			for (let declaration of [
+				"choice Self { Red, Green }",
+				"protocol Self { size() -> Integer }",
+				"namespace Self for Integer { twice() -> Integer { <- @ } }",
+			]) {
+				let diagnostics = diagnosticsFor(
+					`implementation {\n\t${declaration}\n}`,
+				)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.message),
+				).toEqual(["'Self' is a reserved Type name"])
+				expect(diagnostics[0].helps).toEqual(["Choose another name."])
+			}
 		})
 	})
 
