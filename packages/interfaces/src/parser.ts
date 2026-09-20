@@ -57,6 +57,15 @@ export type Recovery = {
 	// dropped out of it has not fallen off the end, and a `define` whose arms
 	// were dropped was not written without cases.
 	lines: Array<number>
+	// NOTE: The lines of the abandoned runs that could have OPENED A BODY — a
+	// run beginning `function`, `overload`, `static`, or the bare `NAME(` a
+	// Method in a Namespace body opens with. These are the only runs that can
+	// leave a `<-` standing outside a Function: `function f() -> Integer`
+	// without its `{` drops the head and leaves the body where the top level
+	// is. A dropped `constant`, `variable`, `type` or `choice` takes no body
+	// down with it, so a `<-` below one is a `<-` the reader wrote at the top
+	// level and is owed its report.
+	headLines: Array<number>
 }
 
 export type Program = {

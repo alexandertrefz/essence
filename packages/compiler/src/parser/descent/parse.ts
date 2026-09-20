@@ -410,6 +410,28 @@ function abandonedParameterNames(tokens: Array<Token>): Array<string> {
 	return names
 }
 
+// NOTE: Whether an abandoned run could have OPENED A BODY, which is the only
+// way a `<-` ends up standing outside a Function — see
+// `parser.Recovery.headLines`. `function` and `overload` open one directly,
+// `static` opens one for a static Method, and the bare `NAME(` is the shape a
+// Method inside a Namespace body is written in, which is exactly what
+// `abandonedDeclarationNames` already recognises as a Declaration.
+function abandonedRunOpensBody(tokens: Array<Token>): boolean {
+	let opening = tokens[0]
+
+	if (opening === undefined) {
+		return false
+	}
+
+	return (
+		opening.type === TokenType.KeywordFunction ||
+		opening.type === TokenType.KeywordOverload ||
+		opening.type === TokenType.KeywordStatic ||
+		(isIdentifierToken(opening) &&
+			tokens[1]?.type === TokenType.SymbolLeftParen)
+	)
+}
+
 function abandonedDeclarationNames(tokens: Array<Token>): Array<string> {
 	let index = 0
 
@@ -1069,6 +1091,9 @@ class DescentParser {
 		atSectionLevel: boolean
 	}> = []
 	private abandonedLines = new Set<number>()
+	// NOTE: The lines of the abandoned runs that could have opened a BODY — see
+	// `parser.Recovery.headLines`.
+	private abandonedHeadLines = new Set<number>()
 
 	constructor(source: string, options: ParserOptions = {}) {
 		this.tokens = new TokenStream(source)
@@ -2299,6 +2324,7 @@ class DescentParser {
 	// one it does not.
 	protected recordAbandoned(fromIndex: number): void {
 		let abandoned = this.tokens.between(fromIndex, this.tokens.save().index)
+		let opensBody = abandonedRunOpensBody(abandoned)
 
 		for (let token of abandoned) {
 			for (
@@ -2307,6 +2333,10 @@ class DescentParser {
 				line++
 			) {
 				this.abandonedLines.add(line)
+
+				if (opensBody) {
+					this.abandonedHeadLines.add(line)
+				}
 			}
 		}
 
@@ -2438,6 +2468,9 @@ class DescentParser {
 								: 0),
 				),
 			lines: [...this.abandonedLines].sort((left, right) => left - right),
+			headLines: [...this.abandonedHeadLines].sort(
+				(left, right) => left - right,
+			),
 		}
 	}
 

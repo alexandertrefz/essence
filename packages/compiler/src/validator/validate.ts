@@ -158,6 +158,24 @@ let initialisingProperty: {
 // Module state for the reason `witnessScopes` is.
 let abandonedLines: ReadonlySet<number> = new Set()
 
+// NOTE: The lines of the abandoned runs that could have opened a BODY — see
+// `parser.Recovery.headLines`. Only such a run can leave a `<-` standing
+// outside a Function, so only such a run stands `top-level-return` down.
+// Module state for the reason `witnessScopes` is.
+let abandonedHeadLines: ReadonlySet<number> = new Set()
+
+// NOTE: The line the last top-level Statement that is NOT itself a top-level
+// `<-` ended on, advanced as the Statements are walked. A dropped head can only
+// have orphaned a `<-` that stands BELOW everything the Parser did read there,
+// so a head abandoned at or above this line took no body down that this `<-`
+// could have been written inside.
+//
+// The "not itself a `<-`" is what a run of orphaned Returns needs: one dropped
+// head leaves several of them, all from the same missing `{`, and letting the
+// first one advance the floor would report every one after it.
+// Module state for the reason `witnessScopes` is.
+let topLevelStatementFloor = 0
+
 // NOTE: Whether anything has already been reported about this Program. The
 // three rails below state invariants the EMITTED JavaScript rests on, and every
 // one of them rests in turn on a Program that parsed and enriched cleanly: a
@@ -192,6 +210,8 @@ export const validate = (
 	executingTopLevelIndex = null
 	initialisingProperty = null
 	abandonedLines = new Set(options.recovery?.lines ?? [])
+	abandonedHeadLines = new Set(options.recovery?.headLines ?? [])
+	topLevelStatementFloor = 0
 	alreadyReported = options.reported === true
 
 	let { diagnostics } = collectDiagnostics(() => {
@@ -208,6 +228,8 @@ export const validate = (
 			} catch (error) {
 				reportInternalError(error, node.position)
 			}
+
+			raiseTopLevelStatementFloor(node)
 		}
 
 		// NOTE: Only a compile that ASKED for the tests carries a section here
@@ -221,10 +243,29 @@ export const validate = (
 			} catch (error) {
 				reportInternalError(error, node.position)
 			}
+
+			raiseTopLevelStatementFloor(node)
 		}
 	})
 
 	return diagnostics
+}
+
+// NOTE: One top-level Statement has been walked — see `topLevelStatementFloor`.
+// A `<-` written at the top level does not move the floor: it is exactly the
+// Statement a dropped head orphans, and a head drops ONE `{` however many
+// Returns end up standing outside it.
+function raiseTopLevelStatementFloor(
+	node: common.typed.ImplementationNode | common.typed.TestsNode,
+): void {
+	if (node.nodeType === "ReturnStatement") {
+		return
+	}
+
+	topLevelStatementFloor = Math.max(
+		topLevelStatementFloor,
+		node.position.end.line,
+	)
 }
 
 // NOTE: Whether the Parser abandoned text on any line this construct is written
@@ -3541,20 +3582,49 @@ function validateIfStatement(
 	return node
 }
 
+// NOTE: Whether a run that could have opened a body was abandoned in the window
+// a `<-` on `line` could have been orphaned from: below everything the Parser
+// read at the top level, and at or above the `<-` itself. Both ends matter — a
+// head dropped BELOW the `<-` orphans nothing above it, and a head dropped above
+// a top-level Statement the Parser read whole left that Statement standing at
+// the top level, so the `<-` under it is at the top level too.
+function aHeadWasAbandonedAbove(line: number): boolean {
+	for (let headLine of abandonedHeadLines) {
+		if (headLine > topLevelStatementFloor && headLine <= line) {
+			return true
+		}
+	}
+
+	return false
+}
+
 function validateReturnStatement(
 	node: common.typed.ReturnStatementNode,
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.ReturnStatementNode {
 	if (currentFunctionContext === null) {
-		// NOTE: Silent wherever the Parser abandoned ANYTHING, which is the one
-		// check here that asks about the whole file rather than about its own
-		// lines. A `<-` stands outside a Function only because the head that
-		// opened one is missing — `function f() -> Integer` without its `{`
-		// drops the head and leaves the body where the top level is — and the
-		// head is dropped a LINE ABOVE the `<-` it orphans, so asking about the
-		// Statement's own span answers no. There is nothing else a dropped
-		// Statement could be, and the syntax error already says where it was.
-		if (abandonedLines.size === 0) {
+		// NOTE: Silent where a dropped HEAD above this `<-` could have taken
+		// the body it belongs in down with it — see `aHeadWasAbandonedAbove`.
+		// A `<-` stands outside a Function only because the head that opened
+		// one is missing, and the head is dropped a LINE ABOVE the `<-` it
+		// orphans, so asking about the Statement's own span answers no.
+		//
+		// NOTE: And silent where the `<-` itself stands on a line the Parser
+		// did not read whole, which is the question every other check here
+		// asks. That is the OTHER way a `<-` ends up at the top level: a
+		// Function literal written `(n) { <- … }` with its `{` dropped leaves
+		// the Return where the Statement around it was, and the run that was
+		// abandoned opens with whatever that Statement opens with.
+		//
+		// NOTE: It used to be silent wherever the Parser abandoned ANYTHING,
+		// which stood the check down for the whole file: a `constant limit 10`
+		// dropped two lines above a `<- 42` the reader really did write at the
+		// top level took the report with it, though a dropped Constant can not
+		// leave a body without a head. One mistake was hiding a second.
+		if (
+			!partiallyRead(node.position) &&
+			!aHeadWasAbandonedAbove(node.position.start.line)
+		) {
 			reportError("There is nothing here to return from", node.position, {
 				code: "top-level-return",
 				labels: [
