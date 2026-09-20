@@ -1642,6 +1642,13 @@ describe("Code Generation", () => {
 			).toEqual(['[ "Ulm", "Kiel" ]'])
 		})
 
+		// NOTE: The Help used to annotate the Parameter it offered with
+		// `SomeType`, a Type nothing declares — and the Type it wanted there is
+		// the one thing this site has not got, since what is missing IS the
+		// context that would name it. So the first Help is the other real
+		// answer, moving the path to a position that names a Function, and the
+		// second writes the blanks out: a literal standing outside Argument
+		// position takes no Types from around it and has to write both.
 		it("refuses a path where no Function is expected", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				${product}
@@ -1650,6 +1657,10 @@ describe("Code Generation", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("path-without-context")
+			expect(diagnostics[0].helps).toEqual([
+				"Pass the path where a Function of one Parameter is expected — '::map(.price)'.",
+				"Or write the Function literal, with the Parameter and return Types a path leaves out — '(_ item: <Type>) -> <Type> { <- item.price }', filling each '<Type>' in.",
+			])
 		})
 
 		it("refuses a path where a Function of two Parameters is expected", () => {

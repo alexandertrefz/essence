@@ -3415,6 +3415,12 @@ function reportPathWithoutContext(
 // run. The old Help wrote neither, and its `SomeType` was a name no Program
 // declares: a reader who filled it in met the second report for the return
 // Type, which is two round trips for one edit. `<Type>` is a blank and says so.
+//
+// Where the position names nothing at all there is a cheaper edit than writing
+// either Type, and it comes first: move the path to a position that DOES name a
+// Function of one Parameter, which is what a path is for. It is offered only
+// there — a position wanting a value, or a Function of another arity, does not
+// take a '::map' any more than it takes the path.
 function pathWithoutContextHelps(
 	node: parser.MemberPathNode,
 	expected: common.Type | null,
@@ -3439,7 +3445,8 @@ function pathWithoutContextHelps(
 	}
 
 	return [
-		`Write the Function literal instead, with the Parameter and return Types a path leaves out — '(_ item: <Type>) -> <Type> { <- item${spelling} }', filling each '<Type>' in.`,
+		`Pass the path where a Function of one Parameter is expected — '::map(${spelling})'.`,
+		`Or write the Function literal, with the Parameter and return Types a path leaves out — '(_ item: <Type>) -> <Type> { <- item${spelling} }', filling each '<Type>' in.`,
 	]
 }
 

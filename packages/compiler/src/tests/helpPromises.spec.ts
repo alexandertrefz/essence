@@ -23,11 +23,32 @@ describe("A member path with no Function around it", () => {
 		constant price = .price
 	}`
 
-	it("spells both of the literal's Types", () => {
+	// NOTE: Two answers where the position names nothing at all. The move comes
+	// first because it needs no Type written — a path is for the positions that
+	// name a Function of one Parameter, and this one names none. The literal is
+	// second, with both of its Types spelled as the blanks they are.
+	it("offers the move first and spells both of the literal's Types", () => {
 		expect(codesOfSource(source)).toEqual(["path-without-context"])
 		expect(helpsOfCode(source, "path-without-context")).toEqual([
-			"Write the Function literal instead, with the Parameter and return Types a path leaves out — '(_ item: <Type>) -> <Type> { <- item.price }', filling each '<Type>' in.",
+			"Pass the path where a Function of one Parameter is expected — '::map(.price)'.",
+			"Or write the Function literal, with the Parameter and return Types a path leaves out — '(_ item: <Type>) -> <Type> { <- item.price }', filling each '<Type>' in.",
 		])
+	})
+
+	// NOTE: And it is withheld where the position DOES name a Type — a `::map`
+	// answers a List, which fits an Integer position no better than the path did.
+	it("withholds the move where the position names a Type", () => {
+		let returned = `implementation {
+		function priceOf() -> Integer {
+			<- .price
+		}
+	}`
+
+		expect(
+			helpsOfCode(returned, "path-without-context").some((help) =>
+				help.startsWith("Pass the path"),
+			),
+		).toBe(false)
 	})
 
 	// NOTE: The Help used to write `(_ item: SomeType) { … }`, and BOTH halves of
@@ -422,6 +443,7 @@ describe("One mistake, one report", () => {
 	}`),
 		).toEqual(["not-a-function"])
 	})
+
 })
 
 describe("Reports that knew the fix and said nothing", () => {

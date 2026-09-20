@@ -1791,7 +1791,8 @@ Error: A member path stands where no Function is expected
     │                      ───┬──  
     │                         ╰──── this path names no value
     │ 
-    │ Help: Write the Function literal instead, with the Parameter and return Types a path leaves out — '(_ item: <Type>) -> <Type> { <- item.price }', filling each '<Type>' in.
+    │ Help 1: Pass the path where a Function of one Parameter is expected — '::map(.price)'.
+    │ Help 2: Or write the Function literal, with the Parameter and return Types a path leaves out — '(_ item: <Type>) -> <Type> { <- item.price }', filling each '<Type>' in.
     │ 
     │ Note 1: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
     │ Note 2: This position expects no particular Type.

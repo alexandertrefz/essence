@@ -126,6 +126,8 @@ Error: Unexpected '}' after the end of the Program
    │ ▲  
    │ ╰── nothing may follow here
    │ 
+   │ Help: Remove the '}'.
+   │ 
    │ Note: A Program is one 'implementation { … }' block, framed by an optional 'import { … }' block above it and an optional 'tests { … }' and 'export { … }' block below it.
 ───╯
 ```
@@ -133,6 +135,8 @@ Error: Unexpected '}' after the end of the Program
 </div>
 
 Delete it. A file holds one `implementation { … }` block, with an optional `import { … }` block above it, and optional `export { … }` and `tests { … }` blocks below it, in that order.
+
+Quick Fix: **Remove the '}'** — the span the label points at is what goes.
 
 Taught on: [Programs and values › The shape of a file](/docs/language/programs-and-values#the-shape-of-a-file)
 
@@ -180,19 +184,44 @@ Error: This String Literal is never closed
    │  │ 
    │  ╰─ and the input ends inside that one
    │ 
-   │ Help 1: Add the missing '"' at the end of line 2.
-   │ Help 2: Or, if line 2 was meant to carry the lines below it, add it at the end of the input instead.
+   │ Help: Add the missing '"' at the end of line 2.
    │ 
    │ Note 1: A String Literal may span lines, and the line breaks are part of it — so the quote on line 3 closed the one opened on line 2, and the String that quote was written to open is the one that ran to the end of the input.
-   │ Note 2: One '"' is missing either way. It is reported against the String that spans lines, because a String written to span them is not usually followed, on the line it closes, by a second one that never closes at all.
+   │ Note 2: One '"' is missing either way, and where it goes decides which String is which: at the end of line 2 the lines below are Statements, and at the end of the input they are text. It is reported against the String that spans lines, because a String written to span them is not usually followed, on the line it closes, by a second one that never closes at all.
 ───╯
 ```
 
 </div>
 
-Add the closing `"`. For a literal brace, write `\{` and `\}`: `"\{\"a\": 1\}"` prints `{"a": 1}`.
+Add the closing `"`. Only the one reading is offered as an edit: writing the quote at the end of the input instead closes a string holding every line below it, and the quotes standing in those lines close it early all over again, so it reaches no program. The other reading is the second note.
 
-Quick Fix: **Add the missing '"'**.
+A string whose `{` opened a hole is a different mistake, and is answered as one — the quote is not what is missing there, and writing one leaves the same report standing:
+
+<div class="error-output">
+
+```
+[unclosed-string]
+Error: This String Literal is never closed
+   ╭─┤ Body.es:4:2 │
+   │
+ 2 │     constant body = "{\"a\": 1}"
+   │                     ▲  
+   │                     ╰── opened here, and a '{' inside it opens a hole
+ 4 │ }
+   │  │ 
+   │  ╰─ the input ends here
+   │ 
+   │ Help: Write '\{' and '\}' for the braces that stand for themselves.
+   │ 
+   │ Note: A '{' inside a String opens a hole, which holds an Expression — so the text between the braces is read as one, and a quote written inside it opens a String of its own.
+───╯
+```
+
+</div>
+
+For a literal brace, write `\{` and `\}`: `"\{\"a\": 1\}"` prints `{"a": 1}`.
+
+Quick Fix: **Add the missing '"'** — withheld for the hole, where it would produce a file carrying the very report it answers.
 
 Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
 
@@ -291,7 +320,7 @@ Error: A Rational Literal is a fraction or a decimal, not both
    │                      ──┬──  
    │                        ╰──── '/' can not follow a decimal
    │ 
-   │ Help: Write the fraction — '3/4' — or the decimal — '0.75'.
+   │ Help: Write it as '3/4' — or as '0.75', which is the same value written the other way.
    │ 
    │ Note: A fraction and a decimal are two spellings of one Rational — '3/4' and '0.75' are the same value — so a Literal written both ways says the same thing twice, and leaves it to the reader which parts belong to which.
 ───╯
@@ -299,7 +328,7 @@ Error: A Rational Literal is a fraction or a decimal, not both
 
 </div>
 
-Write one spelling: `3/4` or `0.75`. Both are the same exact `Rational`, and both print as `3/4`.
+Write one spelling: `3/4` or `0.75`. Both are the same exact `Rational`, and both print as `3/4`. The help spells the value the two spellings say between them, out of the same arithmetic the quick fix uses — `2.5/3` is five sixths, so it is answered `Write it as '5/6'` and offers no decimal, there being none that says it.
 
 Quick Fix: **Write it as '3/4'** or **Write it as '0.75'**, each writing the value in one spelling.
 
@@ -469,7 +498,7 @@ Error: A bare member name is not a key in an update
    │                                     ╰─── this names no value to set
    │ 
    │ Help 1: Write 'port = port'.
-   │ Help 2: Or merge a whole Record: '{ base with { port } }'.
+   │ Help 2: Or merge a whole Record: '{ base with { port, host } }'.
    │ 
    │ Note: An update's key list always spells its values, because a bare name after 'with' is already the value being merged in.
 ───╯
@@ -477,7 +506,7 @@ Error: A bare member name is not a key in an update
 
 </div>
 
-Write each value, `{ base with port = port, host = host }`, or merge a record literal that uses the shorthand: `{ base with { port, host } }`.
+Write each value, `{ base with port = port, host = host }`, or merge a record literal that uses the shorthand: `{ base with { port, host } }`. One report stands per bare name, and each of them offers the same record — holding **every** bare key, so that following one does not drop the others in silence.
 
 Quick Fix: **Write 'port = port'**.
 
@@ -506,7 +535,7 @@ Error: A Dictionary entry is written with '='
 
 </div>
 
-Write each entry as `key = value`: `["kim" = 7]`.
+Write each entry as `key = value`: `["kim" = 7]`. Ruby's hash rocket reports this code too: `["kim" => 7]` is answered `expected '=' and found '=>'`. A `=>` behind a NAME is left to [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) and its function literal — `x => x` is a function in one language and a key in another, and no language writes a parameter list as a string or a number.
 
 Taught on: [Dictionaries › Writing a dictionary](/docs/language/dictionaries#writing-a-dictionary)
 
@@ -552,7 +581,8 @@ Error: This descend updates nothing
    │                                   ─────┬────  
    │                                        ╰────── no member is written here
    │ 
-   │ Help: Write the members to update inside it, or drop the key.
+   │ Help 1: Write the members to update inside it.
+   │ Help 2: Or drop the key — and where it is the only one, drop the update with it and write 'config' on its own.
    │ 
    │ Note: An update writes the members it names, so a descend with none in it says to leave 'server' exactly as it is.
 ───╯
@@ -560,7 +590,7 @@ Error: This descend updates nothing
 
 </div>
 
-Write the members to change inside the braces, `{ config with server.{ port = 8080 } }`, or remove the key.
+Write the members to change inside the braces, `{ config with server.{ port = 8080 } }`, or remove the key. Dropping the only key leaves `{ config with }`, which is a syntax error — so the second help names the value the update was written on, which is what an update setting nothing was going to answer anyway.
 
 Taught on: [Records › When the compiler refuses a record](/docs/language/records#when-the-compiler-refuses-a-record)
 
@@ -579,7 +609,7 @@ Error: A member path reads members and nothing else
    │                                                  ▲  
    │                                                  ╰── '::' can not follow a path
    │ 
-   │ Help: Write the Function literal instead: '(_ item: SomeType) { <- item.price::rounded() }'.
+   │ Help: Write the Function literal instead: '(_ item) { <- item.price::toString() }'.
    │ 
    │ Note: A path is the Function that reads those members off its Argument, so there is nothing here for a call to be made on.
 ───╯
@@ -587,7 +617,7 @@ Error: A member path reads members and nothing else
 
 </div>
 
-Write a function literal instead: `[{ price = 3 }]::map((item) { <- item.price::toString() })`.
+Write a function literal instead: `[{ price = 3 }]::map((item) { <- item.price::toString() })`. The help spells the path and the call that were written, and leaves the offered parameter unannotated: a literal handed to a method reads its parameter's type off the argument it is passed.
 
 Taught on: [Functions as values › Member paths](/docs/language/functions-as-values#member-paths)
 
@@ -606,15 +636,16 @@ Error: A Function literal can not carry a default
    │                                            ▲  
    │                                            ╰── this default
    │ 
-   │ Help: Write the default on the named Function or Method this value is passed to.
+   │ Help: Remove the default.
    │ 
-   │ Note: A Function literal is called through the Function Type it was written for, which fixes how many Arguments every call passes, so a default here could never be reached.
+   │ Note 1: A Function literal is called through the Function Type it was written for, which fixes how many Arguments every call passes, so a default here could never be reached.
+   │ Note 2: A default belongs to a named Function or Method, whose Parameter list is part of the Declaration a call is resolved against.
 ───╯
 ```
 
 </div>
 
-Remove the default. Write it on the named function or method the literal is passed to.
+Remove the default. Where one is wanted, declare a named function or method — a literal is often passed to nothing at all, or to a method of the standard library, so there is no other declaration to write it on.
 
 Quick Fix: **Remove the default**.
 
@@ -664,8 +695,7 @@ Error: A Case carries one value
    │          ▲  
    │          ╰── nothing follows this ','
    │ 
-   │ Help 1: Drop the ','.
-   │ Help 2: Or carry the values as one Record: '#Rectangle({ width = 2, height = 3 })'.
+   │ Help: Drop the ','.
    │ 
    │ Note: The parentheses of a Case hold the single value it carries, not a list.
 ───╯
@@ -673,7 +703,7 @@ Error: A Case carries one value
 
 </div>
 
-Drop the comma. Several values are carried as one record: `#Rectangle({ width = 2, height = 3 })`.
+Drop the comma. A comma with a SECOND value behind it is a different report from the same code — dropping it there would leave two values written flush against each other, so the help offers the record instead, named for the case that was written: `#Rect(2, 3)` is answered `Carry the values as one Record: '#Rect({ … })', with a member for each of them.`
 
 Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
 
@@ -956,12 +986,14 @@ Error: Case '#Red' is declared more than once
  5 │        Red,
    │        ─┬─  
    │         ╰─── declared a second time here
+   │ 
+   │ Help: Remove this 'Red', or give it a name of its own.
 ───╯
 ```
 
 </div>
 
-Remove or rename the second one.
+Remove or rename the second one. The choice has the FIRST — the second declaration is skipped — so it is the one the help points at.
 
 Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
 
@@ -1009,6 +1041,8 @@ Error: Property 'retries' is already defined
  4 │        static retries = 5
    │               ───┬───  
    │                  ╰───── defined a second time here
+   │ 
+   │ Help: Remove the second 'retries', or give it a name of its own.
 ───╯
 ```
 
@@ -1032,12 +1066,14 @@ Error: Member 'x' is already defined
    │                        ╰──────│── first defined here
    │                               │  
    │                               ╰── defined a second time here
+   │ 
+   │ Help: Remove the second 'x', or give it a name of its own.
 ───╯
 ```
 
 </div>
 
-Remove one of the two members.
+Remove one of the two members. The record a reader gets is the one the FIRST key made, so the second is what the help points at.
 
 Taught on: [Records › When the compiler refuses a record](/docs/language/records#when-the-compiler-refuses-a-record)
 
@@ -1056,13 +1092,15 @@ Error: 'Self' is a reserved Type name
    │          ──┬─  
    │            ╰─── this name is taken
    │ 
+   │ Help: Choose another name.
+   │ 
    │ Note: 'Self' is what a Protocol calls the Type conforming to it, so no declaration may take it.
 ───╯
 ```
 
 </div>
 
-Choose another name.
+Choose another name. Every declaration form is held to this: a type alias, a generic parameter, a `choice`, a `protocol` and a `namespace`. A protocol is the one the name is reserved for — every signature inside one may say `Self`, meaning the type conforming, and a protocol of that name stands where the word resolves.
 
 ### `use-before-declaration`
 
@@ -1100,7 +1138,7 @@ Taught on: [Namespaces and methods › Where a namespace can be used](/docs/lang
 
 ### `unknown-name`
 
-**Error.** A name is used that nothing in scope declares. The Help suggests the closest name when there is one. A word between braces in a string lands here too, since it is read as a name in a hole: `"use { and } carefully"` reports `'and' is not declared`.
+**Error.** A name is used that nothing in scope declares. The Help suggests the closest name when there is one. A word between braces in a string lands here too, since it is read as a name in a hole: `"use { and } carefully"` reports `'and' is not declared`, with a note saying so and the help `Write '\{' and '\}' where the braces stand for themselves.` That help comes LAST where anything else was found: a hole holding a name one edit from a constant is a hole somebody meant to open and mistyped, while a hole holding a word nothing resembles is prose that was never meant to be read.
 
 A name that is a [case of a choice in scope](/docs/language/choices-and-match) is answered here rather than left to the near miss: the notes name every choice that declares it, and the fix writes the `#` in front of it. A JavaScript operator or keyword is answered by [`operator-not-supported`](/docs/reference/diagnostics#operator-not-supported) or [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) instead.
 
@@ -1343,7 +1381,9 @@ Error: This value has no members to look up
 
 </div>
 
-The help appears where the member was called. `charAt` is no method of a `String`, which is why this is not [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot): write `text::charAt(0)` and the next report lists what a `String` does answer — `character(at:)`, here.
+The help appears for a member that was called and for one that was only read: a value with no members at all has nothing behind the `.` that could be one, so a method is what it can have been. (The silence belongs to [`unknown-member`](/docs/reference/diagnostics#unknown-member), where the value *has* members and a `.` is how one of them is reached.)
+
+`charAt` is no method of a `String`, which is why this is not [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot): write `text::charAt(0)` and the next report is [`unknown-method`](/docs/reference/diagnostics#unknown-method), `No Method named 'charAt' for this value`, with `Searched Namespace 'String'.` The `String` method for a character at a position is [`character(at:)`](/docs/library/string#character).
 
 Taught on: [Method calls › Statics and the dot](/docs/language/method-calls#statics-and-the-dot)
 
@@ -3784,7 +3824,8 @@ Error: A member path stands where no Function is expected
    │                      ───┬──  
    │                         ╰──── this path names no value
    │ 
-   │ Help: Write the Function literal instead, with the Parameter and return Types a path leaves out — '(_ item: <Type>) -> <Type> { <- item.price }', filling each '<Type>' in.
+   │ Help 1: Pass the path where a Function of one Parameter is expected — '::map(.price)'.
+   │ Help 2: Or write the Function literal, with the Parameter and return Types a path leaves out — '(_ item: <Type>) -> <Type> { <- item.price }', filling each '<Type>' in.
    │ 
    │ Note 1: A member path is a Function the Compiler writes for you, so it needs a Parameter Type to read the members off — and only a position expecting a Function of one Parameter names one.
    │ Note 2: This position expects no particular Type.
@@ -3793,7 +3834,7 @@ Error: A member path stands where no Function is expected
 
 </div>
 
-Pass the path where a function is expected, as in `products::map(.price)`, or write a function literal. Outside argument position a literal takes no types from around it, so it has to write both of its own: `(_ item: Product) -> Integer { <- item.price }`. Where the position names a type that is not a function at all the help changes — nothing a function literal can say fits an `Integer`, so it offers the member read instead.
+Pass the path where a function is expected, as in `products::map(.price)`, or write a function literal. Outside argument position a literal takes no types from around it, so it has to write both of its own: `(_ item: Product) -> Integer { <- item.price }`. The help writes each of them as `<Type>` rather than naming one — a type is exactly what this position does not name, which is why the path was refused. Where the position names a type that is not a function at all the help changes — nothing a function literal can say fits an `Integer`, so it offers the member read instead, and the `::map` clause goes with it.
 
 Taught on: [Functions as values › Member paths](/docs/language/functions-as-values#member-paths)
 
@@ -4634,7 +4675,7 @@ Warning: This '@param' tag is not separated from its text
 
 Write ` — ` between the name and the text: `§§ @param _ — the number to double`.
 
-Quick Fix: **Insert the '—' separator**.
+Quick Fix: **Insert the '—' separator** — which REPLACES a JSDoc hyphen where one was written, so that `@param _ - the number` becomes `@param _ — the number` rather than carrying both languages' punctuation. A hyphen inside the description is left alone; only a run at the head of the text is that separator.
 
 Taught on: [Documentation comments › `missing-documentation-separator`](/docs/language/documentation-comments#missing-documentation-separator)
 
@@ -4664,7 +4705,7 @@ Warning: This '@param' names a Parameter that does not exist
 
 Remove the line, or add the parameter it describes.
 
-Quick Fix: **Remove the '@param' line**. Above an `overload` block, a close name gets **Change to '@param x'** as well.
+Quick Fix: **Remove the '@param' line**. Above an `overload` block, a close name gets **Change to '@param x'** as well. Removing the LAST tag takes the block's empty `§§` separator with it, rather than leaving a block that ends on a separator with nothing behind it.
 
 Taught on: [Documentation comments › `unknown-documentation-parameter`](/docs/language/documentation-comments#unknown-documentation-parameter)
 
@@ -4722,6 +4763,8 @@ Warning: This Parameter has no '@param' line
 </div>
 
 Add a line for it: `§§ @param by — the factor to scale it by`.
+
+Where another `@param` line on the same block already spells this parameter's name, the two reports are one missing line seen from both ends, and the order they are answered in shows: a second note says which line to put right first, so that taking this fix alone does not leave two lines of the same name with nothing saying why.
 
 Quick Fix: **Add a '@param by' line**.
 
@@ -6214,6 +6257,8 @@ Warning: "exclusions" is not a setting
    │     ──────┬─────  
    │           ╰─────── not a setting
    │ 
+   │ Help: Remove the key, or write one of the settings above.
+   │ 
    │ Note 1: The settings at the top of essence.json are "$schema", "exclude", "test", "build".
    │ Note 2: Nothing was read from this key.
 ───╯
@@ -6221,9 +6266,9 @@ Warning: "exclusions" is not a setting
 
 </div>
 
-Fix the key's spelling.
+`"exclusions"` is three edits from `"exclude"`, which is past the near-miss rule — so the help is the one edit that always holds. A key that IS a near miss is answered `Did you mean "exclude"?` instead, with a quick fix behind it; and a key that spells a PATH is a setting written flat, which is nested rather than renamed: `"test.cases": 200` is answered `Write it nested: "test": { "cases": 200 }.`
 
-Quick Fix: **Change to "exclude"** when the key is a near miss.
+Quick Fix: **Change to "exclude"** when the key is a near miss, or **Nest it** when the key spells a path.
 
 Taught on: [essence.json › Mistakes are Warnings](/docs/reference/project-file#mistakes-are-warnings)
 
@@ -6250,7 +6295,9 @@ Warning: "test.skipTags" is not a list of tag names
 
 </div>
 
-Write the shape the Help shows: `"skipTags": ["slow"]`.
+Write the shape the help shows. The value in it is the one that was WRITTEN, read as the value it means: `"skipTags": "wip"` is answered `["wip"]`, `"minify": "false"` is answered `false`, and `"cases": "50"` is answered `50`. Where the written value says nothing about what was meant — `"cases": "many"` — the catalogue's own value is offered as an example instead: `Write it as a whole number of at least 1 — '200', say.`
+
+Quick Fix: **Write it as …**, wherever the value coerces — the same computation the help prints, so the two never disagree about a number.
 
 Taught on: [essence.json › Mistakes are Warnings](/docs/reference/project-file#mistakes-are-warnings)
 
@@ -6299,15 +6346,16 @@ Warning: essence.json could not be read as JSON
    │ ▲───  
    │ ╰───── a ']' was expected here
    │ 
-   │ Help: The file is JSON with comments and trailing commas allowed, as tsconfig.json is.
+   │ Help: Write the ']' that closes the list.
    │ 
-   │ Note: Every setting is at its default until the file reads.
+   │ Note 1: Every setting is at its default until the file reads.
+   │ Note 2: The file is JSON with comments and trailing commas allowed, as tsconfig.json is.
 ───╯
 ```
 
 </div>
 
-Fix the syntax at the place the label points to.
+Write what the label says was expected. The help names that token where the parser names one — a `}`, a `]`, a `:`, a `,`, a quoted key, a value, the `*/` of a comment — and is absent for the verdicts that say a character cannot stand where it does rather than that one is missing.
 
 Taught on: [essence.json › Mistakes are Warnings](/docs/reference/project-file#mistakes-are-warnings)
 
