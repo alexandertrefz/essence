@@ -781,7 +781,9 @@ function total(rest, sum) {
 
 **Mutual recursion is out of scope.** Two functions that answer with each other still use the host's stack, and so does every non-tail call. On Node and Deno that is about ten thousand frames. [Iteration](/docs/language/iteration) covers what to reach for instead.
 
-**Debugging.** Stepping still stops on the lines you wrote, and a turn steps from the tail call back to the first statement of the body. The call stack shows one frame where the source shows recursion, so a crash inside a looped function names it once rather than ten thousand times.
+**Debugging.** `essence dap` builds every debug session with the optimiser off, so a session steps through the recursion as it was written, one frame per turn. In a build that carries a [source map](/docs/reference/cli#build--sourcemap), a turn still points at the line the tail call was written on — stepping it stops on the assignments and then on the line that reads as the call, and steps back to the top of the body rather than into a new frame. The call stack shows one frame where the source shows recursion, so a crash inside a looped function names it once rather than ten thousand times.
+
+**A function that answers with a call to itself on every path** is refused before this pass runs, by the `infinite-recursion` error. There is no base case to leave the loop through, and the compiler says so rather than emitting a `while (true)` that never ends.
 
 **What it costs and what it buys.** The `while` and the assignments add between 120 and 390 bytes to a bundle per looped function. No fixture and no example in this repository writes a self tail call, so every one of them builds byte for byte what it built before — and no method of the standard library is looped either, because the library writes its walks on `loop` and `reduce` for exactly the reason this pass exists.
 

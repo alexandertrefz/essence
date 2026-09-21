@@ -6667,6 +6667,26 @@ describe("Optimiser", () => {
 			).toEqual(["25"])
 		})
 
+		it("never sees a Function that recurses on every path", () => {
+			// NOTE: `infinite-recursion` is a Validator rule and reasons about
+			// the SOURCE, so it is decided long before this pass runs and the
+			// pass changes nothing about it. It is asked here because the
+			// question a reader has is exactly whether a loop hid it: a Method
+			// answering with a call to itself on every path would be a `while
+			// (true)` that never leaves, which is what the Diagnostic is for.
+			let diagnostics = validatedDiagnostics(`implementation {
+	namespace Looping for Integer {
+		forever(_ n: Integer) -> Integer { <- @::forever(n::add(1)) }
+	}
+
+	Terminal.print(1::forever(0))
+}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+				"infinite-recursion",
+			)
+		})
+
 		it("declines a completing body", async () => {
 			// NOTE: `complete self(…)` puts the call inside the wait, so it is
 			// an Argument and never an answer — a completing body holds no tail
