@@ -3,7 +3,7 @@ import { createDictionary, set as setAt } from "./Dictionary"
 import { createInteger } from "./Integer"
 import { anyIs } from "./internalHelpers"
 import type { EquatableWitness } from "./keyEncoding"
-import { createList, viewOf } from "./List"
+import { createList, runsOf, viewOf } from "./List"
 import {
 	type RandomnessType,
 	below,
@@ -481,11 +481,16 @@ function inside(narrowing: Narrowing, value: AnyType): boolean {
 	// answers and what a `minimumLength` narrowing means about one. The box
 	// carries that count for the generation it sees, so nothing has to be walked
 	// to read it.
+	//
+	// NOTE: A List is counted through `runsOf`, for the reason `List.length`
+	// counts that way: counting is not reading, and there is no item here to
+	// read. The trimming reader would decide a representation question for a
+	// caller that only wants the count.
 	let length =
 		key === "String"
 			? [...(value as unknown as { value: string }).value].length
 			: key === "List"
-				? viewOf(value as Parameters<typeof viewOf>[0]).total
+				? runsOf(value as Parameters<typeof runsOf>[0]).total
 				: key === "Dictionary"
 					? (value as AnyDictionary).length
 					: null

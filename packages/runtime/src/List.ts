@@ -97,6 +97,13 @@ export type ListView<ItemType extends AnyType> = {
 // because a push only ever EXTENDS an Array: the positions a box has already
 // answered for are frozen for good, since the copying paths only ever write
 // Arrays of their own.
+//
+// NOTE: THE READING view — the two runs and the fixed counts, with the
+// receiver's runs trimmed to what it views where THE HALF RULE below says to
+// trim them. Every native that reads a List's items reads it through here,
+// whether it visits one of them or all of them: what the rule asks is not how
+// much a caller is about to read but how much of an Array a box is keeping
+// alive, which is a question about the box rather than about the caller.
 export function viewOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListView<ItemType> {
@@ -165,17 +172,18 @@ function trimUnderHalfRule<ItemType extends AnyType>(
 }
 
 // NOTE: The same two runs and the same fixed counts, read WITHOUT writing
-// anything back. Trimming as `viewOf` does is right for a walk that is about to
-// visit every item anyway, and wrong for everything below that visits none: the
-// EDITS, whose whole business is answering with a shorter view of the runs they
-// were handed, and `length`, which the stdlib's edits ask before they slice.
-// Read through `viewOf`, a chain of shrinking answers trims its parent's Array
-// at every step and each O(1) shrink is a whole copy again — draining a
-// front-built List one item at a time would stay quadratic, which is the very
-// thing the shrink is for. So they fix their counts here and leave the
-// receiver's representation exactly as they found it — with the one exception
-// `upgradedForSuffix` below is, which MOVES a box's seam rather than trimming a
-// run, once, so that the rest of a drain from the front is windows.
+// anything back — for everything that asks a List a question about itself
+// rather than about its items. `length`, which the stdlib's edits ask before
+// they slice; the EDITS, which decide from the counts alone which window they
+// can answer with; and the walks that neither shrink their receiver nor hold on
+// to it. Counting is not reading, and a count has no business deciding a
+// representation question for whoever reads next.
+//
+// NOTE: The edits reach the trimming that matters for them THROUGH their
+// answer, in `sharedWindowOf`, which asks THE HALF RULE about the counts the
+// answer will view. Trimming the receiver here instead would trim it for a
+// window that keeps almost all of it, and a chain of such windows trims at every
+// step, which is the quadratic shrink the rule exists to stop.
 export function runsOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListView<ItemType> {

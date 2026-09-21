@@ -8,6 +8,7 @@ import {
 	createList,
 	insert,
 	is,
+	item__overload$1 as item,
 	length,
 	type ListType,
 	materialise,
@@ -17,9 +18,14 @@ import {
 	slice,
 	toString as listToString,
 } from "../List"
-import { replace__overload$1 as replace } from "../NonEmptyList"
+import {
+	firstItem,
+	lastItem,
+	replace__overload$1 as replace,
+} from "../NonEmptyList"
 import { createString } from "../String"
 import { getStringRepresentation } from "../Terminal"
+import { typeKeySymbol } from "../type"
 
 // NOTE: The four edits that answer with a shorter, longer or altered List —
 // `slice`, `remove(at:)`, `insert(_:at:)` and `NonEmptyList::replace(_:at:)`.
@@ -54,6 +60,19 @@ const itemsOf = (originalList: ListType<IntegerType>): Array<number> => {
 	}
 
 	return items
+}
+
+// NOTE: The item a position names, unwrapped — `item(at:)` answers an Optional
+// for every position, and nothing below is about the Optional.
+const itemAt = (
+	originalList: ListType<IntegerType>,
+	position: number,
+): number | null => {
+	let answer = item(originalList, integer(position))
+
+	return answer[typeKeySymbol] === "Optional#Empty"
+		? null
+		: Number(answer.item.value)
 }
 
 // NOTE: What each edit MEANS, written against a plain JavaScript Array — the
@@ -799,5 +818,266 @@ describe("draining from the front", () => {
 			33, 44, 55, 66,
 		])
 		expect(itemsOf(drained)).toEqual([44, 55, 66])
+	})
+})
+
+// NOTE: THE ITEMS A WALK MOVES, counted from outside the runtime rather than
+// timed. Every Array a box of the chain holds that has not been seen before was
+// BUILT by somebody — the seed, the one upgrade, or a trim under the half rule —
+// and building it moved as many items as it is long. Summing their lengths over
+// a whole walk is the claim the half rule makes, said as a number: a walk over
+// n items moves a few times n, where trimming at every read moved half of n
+// times n.
+//
+// NOTE: A count rather than a clock. What the half rule promises is WORK, and a
+// claim about work holds on a machine under any load at all — where the
+// wall-clock ceilings in `listPerformance.spec.ts` have to sit an order of
+// magnitude above the linear figure to be safe, and can only catch a
+// regression that costs more than that.
+//
+// NOTE: The seed's own runs are recorded before the walk and charged nothing:
+// the Program built them, and what is being measured is what taking the List
+// apart adds to that.
+const itemsMovedBy = (
+	seed: ListType<IntegerType>,
+	turn: (originalList: ListType<IntegerType>) => ListType<IntegerType>,
+	turns: number,
+): number => {
+	let seen = new Set<Array<IntegerType>>()
+	let moved = 0
+
+	const record = (originalList: ListType<IntegerType>): void => {
+		for (let run of [originalList.value, originalList.front]) {
+			if (run !== undefined && !seen.has(run)) {
+				seen.add(run)
+				moved += run.length
+			}
+		}
+	}
+
+	record(seed)
+	moved = 0
+
+	let walked = seed
+
+	for (let index = 0; index < turns; index++) {
+		let next = turn(walked)
+
+		// NOTE: BOTH boxes, because either of them may have been trimmed: the
+		// receiver where the turn read it or cut a window from it, and the
+		// answer where it was read in its turn.
+		record(walked)
+		record(next)
+		walked = next
+	}
+
+	return moved
+}
+
+describe("what a walk over a List moves", () => {
+	// NOTE: Twenty thousand items, which is where a quadratic walk stands two
+	// thousand times clear of a linear one and no arithmetic is needed to tell
+	// them apart. The ceiling is five times the length: the dearest of the
+	// shapes below moves three times it, and a walk that trimmed at every turn
+	// moves ten thousand times it.
+	const ITEMS = 20_000
+	const CEILING = ITEMS * 5
+
+	const flat = (): ListType<IntegerType> =>
+		createList(Array.from({ length: ITEMS }, (_, index) => integer(index)))
+
+	const prepended = (): ListType<IntegerType> => {
+		let built = createList<IntegerType>([])
+
+		for (let index = ITEMS - 1; index >= 0; index--) {
+			built = prepend(built, integer(index))
+		}
+
+		return built
+	}
+
+	const lengthOf = (originalList: ListType<IntegerType>): number =>
+		Number(length(originalList).value)
+
+	// NOTE: `firstItem()` is `@::item(at 0)` and `removeFirst()` is
+	// `@::slice(from 1)`, so the two lines of the canonical walk are these two
+	// natives — and the walk is written BOTH ways round, because which of the
+	// two the turn reaches first used to decide whether it stayed linear.
+	const headTail = (originalList: ListType<IntegerType>) => {
+		item(originalList, integer(0))
+
+		return slice(originalList, integer(1), length(originalList))
+	}
+
+	const headTailDerivingFirst = (originalList: ListType<IntegerType>) => {
+		let next = slice(originalList, integer(1), length(originalList))
+
+		item(originalList, integer(0))
+
+		return next
+	}
+
+	const initLast = (originalList: ListType<IntegerType>) => {
+		item(originalList, integer(-1))
+
+		return slice(
+			originalList,
+			integer(0),
+			integer(lengthOf(originalList) - 1),
+		)
+	}
+
+	// NOTE: The palindrome shape — both ends read, both ends dropped — in the
+	// two spellings a Program has for it: one `slice` taking an item off each
+	// end, and `removeFirst()` followed by `removeLast()`.
+	const bothEnds = (originalList: ListType<IntegerType>) => {
+		item(originalList, integer(0))
+		item(originalList, integer(-1))
+
+		return slice(
+			originalList,
+			integer(1),
+			integer(lengthOf(originalList) - 1),
+		)
+	}
+
+	const bothEndsInTwoSlices = (originalList: ListType<IntegerType>) => {
+		item(originalList, integer(0))
+		item(originalList, integer(-1))
+
+		let dropped = slice(originalList, integer(1), length(originalList))
+
+		return slice(dropped, integer(0), integer(lengthOf(dropped) - 1))
+	}
+
+	const walks: Array<{
+		name: string
+		seed: () => ListType<IntegerType>
+		turn: (originalList: ListType<IntegerType>) => ListType<IntegerType>
+		turns: number
+	}> = [
+		{ name: "head/tail", seed: flat, turn: headTail, turns: ITEMS - 1 },
+		{
+			name: "head/tail with its two lines the other way round",
+			seed: flat,
+			turn: headTailDerivingFirst,
+			turns: ITEMS - 1,
+		},
+		{
+			name: "head/tail over a prepend-built List",
+			seed: prepended,
+			turn: headTail,
+			turns: ITEMS - 1,
+		},
+		{ name: "init/last", seed: flat, turn: initLast, turns: ITEMS - 1 },
+		{
+			name: "init/last over a prepend-built List",
+			seed: prepended,
+			turn: initLast,
+			turns: ITEMS - 1,
+		},
+		{
+			name: "both ends in one slice",
+			seed: flat,
+			turn: bothEnds,
+			turns: ITEMS / 2 - 1,
+		},
+		{
+			name: "both ends in two slices",
+			seed: flat,
+			turn: bothEndsInTwoSlices,
+			turns: ITEMS / 2 - 1,
+		},
+		{
+			name: "remove(at 0)",
+			seed: flat,
+			turn: (originalList) => {
+				item(originalList, integer(0))
+
+				return remove(originalList, integer(0))
+			},
+			turns: ITEMS - 1,
+		},
+		{
+			name: "remove(at 0) over a prepend-built List",
+			seed: prepended,
+			turn: (originalList) => {
+				item(originalList, integer(0))
+
+				return remove(originalList, integer(0))
+			},
+			turns: ITEMS - 1,
+		},
+		{
+			// NOTE: The proven halves of the pair, which read the two ends off
+			// the view rather than through the Optional `item(at:)` answers.
+			name: "the proven firstItem",
+			seed: flat,
+			turn: (originalList) => {
+				firstItem(originalList)
+
+				return slice(originalList, integer(1), length(originalList))
+			},
+			turns: ITEMS - 1,
+		},
+		{
+			name: "the proven lastItem",
+			seed: flat,
+			turn: (originalList) => {
+				lastItem(originalList)
+
+				return slice(
+					originalList,
+					integer(0),
+					integer(lengthOf(originalList) - 1),
+				)
+			},
+			turns: ITEMS - 1,
+		},
+		{
+			name: "two items a turn",
+			seed: flat,
+			turn: (originalList) => {
+				item(originalList, integer(0))
+				item(originalList, integer(1))
+
+				return slice(originalList, integer(2), length(originalList))
+			},
+			turns: ITEMS / 2 - 1,
+		},
+	]
+
+	for (let walk of walks) {
+		test(`the ${walk.name} walk moves a few items per item, not a few thousand`, () => {
+			expect(itemsMovedBy(walk.seed(), walk.turn, walk.turns)).toBeLessThan(
+				CEILING,
+			)
+		})
+	}
+
+	// NOTE: The other half of the claim, and the reason the rule is a HALF rule
+	// rather than "never trim": a window that keeps only a little of a long run
+	// still releases it, so nothing indexed for the rest of a Program holds a
+	// parent it can not reach. Two items of twenty thousand, read at a position
+	// and nothing more.
+	test("a short window releases its parent when it is read", () => {
+		let receiver = flat()
+		let answer = slice(receiver, integer(0), integer(2))
+
+		expect(answer.value).toBe(receiver.value)
+		expect(itemAt(answer, 1)).toBe(1)
+		expect(answer.value).not.toBe(receiver.value)
+		expect(answer.value.length).toBe(2)
+	})
+
+	// NOTE: And the same for a window cut from the far end of a long run, which
+	// is the other way a box ends up holding much more than it views.
+	test("a short window of a two-run box releases both parents when it is read", () => {
+		let receiver = prepend(flat(), integer(-1))
+		let answer = slice(receiver, integer(0), integer(2))
+
+		expect(itemAt(answer, 1)).toBe(0)
+		expect(answer.front?.length).toBe(1)
+		expect(answer.value.length).toBe(1)
 	})
 })

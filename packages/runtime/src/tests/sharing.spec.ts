@@ -181,8 +181,9 @@ describe("branching at both ends", () => {
 		expect(itemsOf(w)).toEqual([0, 1, 2, 3])
 		expect(itemsOf(x)).toEqual([1, 2])
 
-		// NOTE: Asked a second time, because the first ask trims a stale box
-		// and the answer has to survive that.
+		// NOTE: Asked a second time, because the first ask may trim a stale box
+		// — the half rule decides whether it does — and the answer has to
+		// survive that either way.
 		expect(itemsOf(y)).toEqual([0, 1, 2])
 		expect(itemsOf(x)).toEqual([1, 2])
 	})
@@ -302,8 +303,10 @@ describe("reentrancy", () => {
 
 describe("stale views", () => {
 	// NOTE: A box left behind by an append holds its chain's high-water Array
-	// until it is read. The first read trims that away and stores the trimmed
-	// Array back, so every read after it is handed the same Array.
+	// until something asks it for ONE Array. `materialise` is that ask — what it
+	// answers is the box's logical items and nothing else — so it trims whatever
+	// the half rule left in place, stores the trimmed Array back, and every
+	// `materialise` after it is handed the same Array.
 	test("a stale box is trimmed once and answers one Array ever after", () => {
 		let list = integers(1, 2, 3)
 
