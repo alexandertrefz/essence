@@ -571,9 +571,29 @@ export function append(
 	// bytes, back when the Module bundle ceiling had five bytes of room; the
 	// ceiling has the room its own rule asks for now, and a test threshold is
 	// no reason for one Method to spell what every other one calls.
-	return isAsciiIn(originalString) && isAsciiIn(otherString)
-		? createAsciiString(joined)
-		: createString(joined)
+	if (isAsciiIn(originalString) && isAsciiIn(otherString)) {
+		return createAsciiString(joined)
+	}
+
+	// NOTE: The answer is marked NOT ASCII, which is the same argument in the
+	// other direction: a unit at or above 128, or a carriage return, is in one
+	// of the two operands and a join holds every unit of both. So the join is
+	// one the scan would refuse, and saying so costs nothing where scanning for
+	// it costs the whole String.
+	//
+	// NOTE: That is what keeps a token built one character at a time linear.
+	// An engine joins two Strings into a rope and resolves it the first time
+	// anything READS a unit — so the ASCII scan of the growing token flattened
+	// the rope every turn, and a Program appending 80,000 non-ASCII characters
+	// measured 203 ms against 34 for its ASCII twin, which never scanned
+	// because `true` already rode along. With the mark riding along both ways
+	// the two measure alike, and the rope is resolved once, by whatever finally
+	// reads the text.
+	let string = createString(joined) as MeasuredString
+
+	string[isAsciiKey] = false
+
+	return string
 }
 
 // NOTE: Whether a run of the part's characters stands at a position of the
@@ -950,9 +970,20 @@ function startsIn(
 	insensitive: boolean,
 ): boolean {
 	if (bothAscii(originalString, prefix)) {
-		return foldedText(originalString, insensitive).startsWith(
-			foldedText(prefix, insensitive),
-		)
+		let text = originalString.value
+		let needle = foldedText(prefix, insensitive)
+
+		// NOTE: Only the receiver's FIRST `needle.length` units are folded,
+		// where the whole receiver used to be. A prefix test must cost the
+		// prefix: a drain asking `starts(with:)` per turn folded the rest of
+		// its String every turn otherwise, which is the same n² the copying
+		// was. Cutting first and folding after is the same answer because
+		// lower-casing ASCII maps each unit to one unit, which is what lets
+		// this route answer for the receiver at all.
+		return insensitive
+			? needle.length <= text.length &&
+					text.slice(0, needle.length).toLowerCase() === needle
+			: text.startsWith(needle)
 	}
 
 	let view = viewOf(originalString)
@@ -973,9 +1004,16 @@ function endsIn(
 	insensitive: boolean,
 ): boolean {
 	if (bothAscii(originalString, suffix)) {
-		return foldedText(originalString, insensitive).endsWith(
-			foldedText(suffix, insensitive),
-		)
+		let text = originalString.value
+		let needle = foldedText(suffix, insensitive)
+
+		// NOTE: The receiver's LAST `needle.length` units, folded, for the
+		// reason `starts` gives — a suffix test costs the suffix.
+		return insensitive
+			? needle.length <= text.length &&
+					text.slice(text.length - needle.length).toLowerCase() ===
+						needle
+			: text.endsWith(needle)
 	}
 
 	let view = viewOf(originalString)
