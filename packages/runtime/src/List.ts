@@ -138,6 +138,37 @@ export function viewOf<ItemType extends AnyType>(
 	let view = runsOf(originalList)
 
 	trimUnderHalfRule(originalList, view)
+
+	return view
+}
+
+// NOTE: THE WALKER'S VIEW — `viewOf` for a native that hands the raw run to code
+// that may call back into Essence, which every native taking a Function or a
+// conformance does. A run can now CHANGE mid-walk, not only grow:
+// `list::reduce(startingWith list, (acc, item) { <- acc::replace(item, at 0) })`
+// seeds the accumulator with the walked List again, and its first `replace`
+// would write the very Array the walk is reading. Sealing the log is what
+// refuses that: the writes below copy instead, and the walk answers the items
+// the List held at entry — which is what it answered when every write copied.
+//
+// NOTE: Sealed for good rather than for the walk's length. A walk is linear work
+// anyway, so the one copy the next write then makes is paid for, and there is no
+// pinning to unwind on a path that leaves early. `sealedRunsOf` is the same
+// thing for the walks that must not trim, and `materialise` seals for itself,
+// because what it hands back is the box's own Array.
+//
+// NOTE: THE AUDIT this rests on is finite and mechanical: a native that takes a
+// Function or a conformance and reads its receiver's items says `walkOf` or
+// `sealedRunsOf`. `viewOf` is left to the readers that visit ONE item —
+// `item(at:)`, `firstItem`, `lastItem` — which hand no Array to anybody, and
+// which must not seal, or "read the cell before, write this one" would copy the
+// whole table every turn. Every one of these walks is held against a callback
+// that writes the List being walked, in `positionalWrites.spec.ts`.
+export function walkOf<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+): ListView<ItemType> {
+	let view = viewOf(originalList)
+
 	sealWrites(originalList)
 
 	return view
@@ -701,7 +732,7 @@ export function is<ItemType extends AnyType>(
 		is: (first: ItemType, second: ItemType) => BooleanType
 	},
 ): BooleanType {
-	let original = viewOf(originalList)
+	let original = walkOf(originalList)
 	let other = viewOf(otherList)
 
 	if (original.total !== other.total) {
@@ -881,7 +912,7 @@ export function map<ItemType extends AnyType, Other extends AnyType>(
 	originalList: ListType<ItemType>,
 	transform: (item: ItemType) => Other,
 ): ListType<Other> {
-	let view = viewOf(originalList)
+	let view = walkOf(originalList)
 	let transformed: Array<Other> = []
 
 	for (let index = view.frontCount - 1; index >= 0; index--) {
@@ -903,7 +934,7 @@ export function reduce__overload$1<
 	startingValue: Answer,
 	combine: (accumulator: Answer, item: ItemType) => Answer,
 ): Answer {
-	let view = viewOf(originalList)
+	let view = walkOf(originalList)
 	let accumulator = startingValue
 
 	for (let index = view.frontCount - 1; index >= 0; index--) {
@@ -931,7 +962,7 @@ export function reduce__overload$2<
 	startingValue: Answer,
 	combine: (accumulator: Answer, item: ItemType) => StepType<Answer, Answer>,
 ): Answer {
-	let view = viewOf(originalList)
+	let view = walkOf(originalList)
 	let accumulator = startingValue
 
 	for (let index = view.frontCount - 1; index >= 0; index--) {
@@ -967,7 +998,7 @@ export function accumulate<ItemType extends AnyType, Answer extends AnyType>(
 	startingValue: Answer,
 	combine: (accumulator: Answer, item: ItemType) => Answer,
 ): ListType<Answer> {
-	let view = viewOf(originalList)
+	let view = walkOf(originalList)
 	let accumulator = startingValue
 	let running: Array<Answer> = [accumulator]
 
@@ -988,7 +1019,7 @@ export function everyItem__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	keepFunction: (item: ItemType) => BooleanType,
 ): ListType<ItemType> {
-	let view = viewOf(originalList)
+	let view = walkOf(originalList)
 	let keptList: Array<ItemType> = []
 
 	for (let index = view.frontCount - 1; index >= 0; index--) {
@@ -1019,7 +1050,7 @@ export function partition__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	check: (item: ItemType) => BooleanType,
 ): RecordType & { accepted: ListType<ItemType>; refused: ListType<ItemType> } {
-	let view = viewOf(originalList)
+	let view = walkOf(originalList)
 	let accepted: Array<ItemType> = []
 	let refused: Array<ItemType> = []
 
@@ -1075,18 +1106,18 @@ export function positionFromEnd(
 // stay O(1) to index — so the view decides which run holds the item and the
 // item is read straight out of it.
 //
-// NOTE: `runsOf` rather than `viewOf`, and that is load-bearing rather than
+// NOTE: `viewOf` rather than `walkOf`, and that is load-bearing rather than
 // tidy. Reading one position hands no Array to anybody, so there is nothing to
 // seal — and sealing here would cost the language its positional writes: "read
 // the cell before, write this one" is what a DP table and a heap are, and a
 // reader that closed the run to in-place writes would put the copy back into
-// every turn of them. Trimming is `viewOf`'s other half, and is no business of a
-// reader that visits one item either.
+// every turn of them. What this TRIMS is the half rule's business, as it has
+// always been.
 export function item__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	index: IntegerType,
 ): OptionalType<ItemType> {
-	let view = runsOf(originalList)
+	let view = viewOf(originalList)
 	let length = view.total
 	let position = positionFromEnd(index.value, length)
 
@@ -1119,7 +1150,7 @@ export function lastIndex__overload$3<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	check: (item: ItemType) => BooleanType,
 ): OptionalType<IntegerType> {
-	let view = viewOf(originalList)
+	let view = walkOf(originalList)
 
 	for (let index = view.backCount - 1; index >= 0; index--) {
 		if (check(view.back[index]).value) {
@@ -1432,15 +1463,6 @@ export function replace__overload$1<ItemType extends AnyType>(
 	return writtenInBack(originalList, view, position - view.frontCount, item)
 }
 
-// NOTE: Copying is the answer BELOW this many items, and copying that little is
-// constant work — so the promise "a positional write costs the same at any size"
-// holds either way, and a short List is spared the log a long one earns. What
-// the log costs is an object and two Arrays; what the copy costs is the items.
-// A backtracking board of ten squares, written and unwritten down every branch,
-// measured 63 ms with a log per branch and 42 ms without one, against master's
-// 42 — so the line is drawn where the log stops paying for itself.
-const worthALog = 64
-
 // NOTE: THE IN-PLACE WRITE. A box may write its back run where it is CURRENT for
 // that run's log — the writes it has seen are all the writes there are — and the
 // log is not sealed. It records what stood at the position, writes over it and
@@ -1508,17 +1530,17 @@ function writtenInBack<ItemType extends AnyType>(
 		}
 	}
 
+	// NOTE: The copy is this answer's ALONE, which is the one condition a log
+	// may be minted under and the reason a log is never attached to a run whose
+	// provenance is unknown. It is minted at EVERY size rather than above one: a
+	// board of nine squares written down every branch of a nine queens search
+	// measured 34 ms with the log, 34 ms with a size floor under it, and 34 ms
+	// before any of this — so a floor bought nothing, and cost a second path
+	// through the one piece of code everything here rests on.
 	let copied = back.slice(0, count)
 
 	copied[position] = item
 
-	if (count < worthALog) {
-		return listRebuildingBack(copied, originalList, view)
-	}
-
-	// NOTE: The copy is this answer's alone, which is the one condition a log
-	// may be minted under, and the reason a log is never attached to a run whose
-	// provenance is unknown.
 	let answer = listRebuildingBack(copied, originalList, view)
 
 	answer.writes = { log: freshLog(), seen: 0 }
@@ -1544,7 +1566,7 @@ export function isSorted<ItemType extends AnyType>(
 		compare: (self: ItemType, other: ItemType) => OrderingType
 	},
 ): BooleanType {
-	let view = viewOf(originalList)
+	let view = walkOf(originalList)
 	let descending = order[typeKeySymbol] === "SortOrder#Descending"
 	let previous: ItemType | null = null
 
@@ -1726,8 +1748,8 @@ export function compare<ItemType extends AnyType>(
 		compare: (first: ItemType, second: ItemType) => OrderingType
 	},
 ): OrderingType {
-	let firstView = viewOf(first)
-	let secondView = viewOf(second)
+	let firstView = walkOf(first)
+	let secondView = walkOf(second)
 	let shared = Math.min(firstView.total, secondView.total)
 
 	for (let index = 0; index < shared; index++) {
@@ -1765,7 +1787,7 @@ export function join<ItemType extends AnyType>(
 		toString: (value: ItemType) => StringType
 	},
 ): StringType {
-	let view = viewOf(originalList)
+	let view = walkOf(originalList)
 	let pieces: Array<string> = []
 
 	for (let index = view.frontCount - 1; index >= 0; index--) {
@@ -1796,7 +1818,7 @@ export function toString<ItemType extends AnyType>(
 		toString: (value: ItemType) => StringType
 	},
 ): StringType {
-	let view = viewOf(originalList)
+	let view = walkOf(originalList)
 	let pieces: Array<string> = []
 
 	for (let index = view.frontCount - 1; index >= 0; index--) {
@@ -2108,7 +2130,7 @@ function keptByMembership<ItemType extends AnyType>(
 	keeping: boolean,
 ): ListType<ItemType> {
 	let other = keySetOver(otherList, itself, conformance)
-	let view = viewOf(originalList)
+	let view = walkOf(originalList)
 	let kept: Array<ItemType> = []
 
 	for (let index = view.frontCount - 1; index >= 0; index--) {
@@ -2138,7 +2160,7 @@ function firstAtEachKey<ItemType extends AnyType, Key extends AnyType>(
 	keyOf: (item: ItemType) => Key,
 	conformance: EquatableWitness<Key>,
 ): ListType<ItemType> {
-	let view = viewOf(originalList)
+	let view = walkOf(originalList)
 	let seen = freshKeySet(conformance)
 	let kept: Array<ItemType> = []
 
@@ -2322,7 +2344,7 @@ export function split__overload$3<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	check: (item: ItemType) => BooleanType,
 ): ListType<ListType<ItemType>> {
-	let view = viewOf(originalList)
+	let view = walkOf(originalList)
 	let pieces: Array<ListType<ItemType>> = []
 	let piece: Array<ItemType> = []
 
@@ -2386,7 +2408,7 @@ export function runs<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	check: (item: ItemType) => BooleanType,
 ): ListType<ListType<ItemType>> {
-	let view = viewOf(originalList)
+	let view = walkOf(originalList)
 	let stretches: Array<ListType<ItemType>> = []
 	let current: Array<ItemType> = []
 

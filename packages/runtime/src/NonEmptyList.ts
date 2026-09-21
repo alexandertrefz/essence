@@ -18,7 +18,7 @@
 // Namespace's target bought. The proof is spent HERE, which is why neither of
 // those two could be written in Essence: the language has no way to be told it
 // holds.
-import { append__overload$2, type ListType, runsOf } from "./List"
+import { append__overload$2, type ListType, viewOf } from "./List"
 import type { AnyType } from "./type"
 
 // NOTE: The logical first and last item, which is one comparison away from
@@ -26,15 +26,14 @@ import type { AnyType } from "./type"
 // has been prepended to holds its first items in a second run, stored reversed,
 // and its last item is the back run's when there is one at all.
 //
-// NOTE: `runsOf` rather than `viewOf`, for the reason `List.item(at:)` reads
+// NOTE: `viewOf` rather than `walkOf`, for the reason `List.item(at:)` reads
 // that way: these visit ONE item and hand no Array to anybody, so there is
-// nothing to trim and nothing to seal — and a reader that sealed would put the
-// copy back into every turn of a heap, which reads its least item and writes
-// two cells per sift.
+// nothing to seal — and a reader that sealed would put the copy back into every
+// turn of a heap, which reads its least item and writes two cells per sift.
 export function firstItem<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ItemType {
-	let view = runsOf(originalList)
+	let view = viewOf(originalList)
 
 	return view.frontCount > 0 ? view.front[view.frontCount - 1] : view.back[0]
 }
@@ -42,7 +41,7 @@ export function firstItem<ItemType extends AnyType>(
 export function lastItem<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ItemType {
-	let view = runsOf(originalList)
+	let view = viewOf(originalList)
 
 	return view.backCount > 0 ? view.back[view.backCount - 1] : view.front[0]
 }
