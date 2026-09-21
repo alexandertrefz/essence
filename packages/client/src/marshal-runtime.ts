@@ -284,6 +284,52 @@ type ListBox = {
 	length?: number
 	front?: Array<unknown>
 	frontLen?: number
+	writes?: {
+		log: {
+			version: number
+			positions: Array<number>
+			items: Array<unknown>
+		}
+		seen: number
+	}
+}
+
+// NOTE: The back run AS THIS BOX SEES IT. A positional write changes that Array
+// IN PLACE and counts a version up, leaving every other box on the run behind —
+// `packages/runtime/src/listWrites.ts` is the authority, and `writes` holds the
+// log of what each write overwrote beside the version this box views. A box that
+// is behind undoes the writes made since it looked, into a copy of its own view.
+//
+// NOTE: The arithmetic is repeated here rather than imported, for the reason the
+// run layout above is repeated: a Module's runtime is inlined in its bundle, and
+// importing would reach for a second copy of it. Read-only, for the reason
+// nothing else here writes back — the runtime repairs such a box wherever IT
+// reads one, so a box this side leaves alone loses nothing by it.
+function backRunSeenBy(list: ListBox): Array<unknown> {
+	let writes = list.writes
+
+	if (writes === undefined || writes.seen === writes.log.version) {
+		return list.value
+	}
+
+	let count = list.length ?? list.value.length
+	let own = list.value.slice(0, count)
+	let positions = writes.log.positions
+	let items = writes.log.items
+
+	for (
+		let version = writes.log.version - 1;
+		version >= writes.seen;
+		version--
+	) {
+		let position = positions[version]
+
+		if (position < count) {
+			own[position] = items[version]
+		}
+	}
+
+	return own
 }
 
 // NOTE: What a binding knows that a Descriptor does not — today the one thing:
@@ -2159,7 +2205,7 @@ export function createInterpreter(
 		item: Outbound,
 	): Array<unknown> {
 		let list = value as ListBox
-		let back = list.value
+		let back = backRunSeenBy(list)
 		let backCount = list.length ?? back.length
 		let front = list.front
 		let frontCount =

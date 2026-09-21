@@ -124,8 +124,57 @@ function describeEssenceValues(...values: Array<unknown>): string {
 			// with the other boxes of the chain and can hold items this box
 			// never had, so what is shown is the view and never the Array: a
 			// box viewing four items may not be drawn as five.
+			// NOTE: A box the chain has WRITTEN PAST holds an Array whose
+			// items have moved on — a positional write changes a run in place
+			// and counts a version up, and `writes` is the log of what each
+			// write overwrote beside the version this box views
+			// (runtime/src/listWrites.ts is the authority). Undoing back to
+			// this box's version is how it says what it holds, and it is done
+			// into a copy: the runtime repairs such a box where it reads one,
+			// and looking at a paused Program may not write to it.
+			// NOTE: A box the chain has WRITTEN PAST holds an Array
+			// whose items have moved on — a positional write changes a
+			// run in place and counts a version up, and `writes` is the
+			// log of what each write overwrote beside the version this
+			// box views (runtime/src/listWrites.ts is the authority).
+			// Undoing back to this box's version is how it says what it
+			// holds, and it is done into a COPY: the runtime repairs such
+			// a box wherever it reads one, and looking at a paused
+			// Program may not write to it.
+			//
+			// NOTE: Inlined for the reason everything here is inlined —
+			// this source is evaluated in the debuggee, where nothing
+			// else of this module exists.
 			let back = record.value as Array<unknown>
 			let backCount = (record.length as number | undefined) ?? back.length
+			let writes = record.writes as
+				| {
+						log: {
+							version: number
+							positions: Array<number>
+							items: Array<unknown>
+						}
+						seen: number
+				  }
+				| undefined
+
+			if (writes !== undefined && writes.seen !== writes.log.version) {
+				let undone = back.slice(0, backCount)
+
+				for (
+					let version = writes.log.version - 1;
+					version >= writes.seen;
+					version--
+				) {
+					let position = writes.log.positions[version]
+
+					if (position < backCount) {
+						undone[position] = writes.log.items[version]
+					}
+				}
+
+				back = undone
+			}
 			let front = (record.front as Array<unknown> | undefined) ?? []
 			let frontCount =
 				(record.frontLen as number | undefined) ?? front.length
@@ -326,6 +375,37 @@ function essenceListItems(list: unknown): Array<unknown> {
 	let record = list as Record<string, never>
 	let back = (record.value as Array<unknown> | undefined) ?? []
 	let backCount = (record.length as number | undefined) ?? back.length
+	let writes = record.writes as
+		| {
+				log: {
+					version: number
+					positions: Array<number>
+					items: Array<unknown>
+				}
+				seen: number
+		  }
+		| undefined
+
+	// NOTE: The same undoing the renderer does, and inlined for the same
+	// reason — a box the chain has written past says what it holds by undoing
+	// the writes made since it looked, into a copy.
+	if (writes !== undefined && writes.seen !== writes.log.version) {
+		let undone = back.slice(0, backCount)
+
+		for (
+			let version = writes.log.version - 1;
+			version >= writes.seen;
+			version--
+		) {
+			let position = writes.log.positions[version]
+
+			if (position < backCount) {
+				undone[position] = writes.log.items[version]
+			}
+		}
+
+		back = undone
+	}
 	let front = (record.front as Array<unknown> | undefined) ?? []
 	let frontCount = (record.frontLen as number | undefined) ?? front.length
 	let items: Array<unknown> = []

@@ -105,6 +105,45 @@ type ListBox = {
 	length?: number
 	front?: Array<unknown>
 	frontLen?: number
+	writes?: {
+		log: {
+			version: number
+			positions: Array<number>
+			items: Array<unknown>
+		}
+		seen: number
+	}
+}
+
+// NOTE: A positional write changes a run Array IN PLACE and counts a version up,
+// so a box left behind on that run has to undo the writes made since it looked
+// before its items are read. `marshal-runtime.ts` says why at length, and
+// `packages/runtime/src/listWrites.ts` is the authority.
+function backRunSeenBy(box: ListBox): Array<unknown> {
+	let writes = box.writes
+
+	if (writes === undefined || writes.seen === writes.log.version) {
+		return box.value
+	}
+
+	let count = box.length ?? box.value.length
+	let own = box.value.slice(0, count)
+	let positions = writes.log.positions
+	let items = writes.log.items
+
+	for (
+		let version = writes.log.version - 1;
+		version >= writes.seen;
+		version--
+	) {
+		let position = positions[version]
+
+		if (position < count) {
+			own[position] = items[version]
+		}
+	}
+
+	return own
 }
 
 type Kind = "bigint" | "number"
@@ -230,7 +269,7 @@ function labelsValue(
 
 function cellsOf(answer: unknown): Array<Cell> {
 	let box = answer as ListBox
-	let back = box.value
+	let back = backRunSeenBy(box)
 	let backCount = box.length ?? back.length
 	let front = box.front
 	let frontCount = front === undefined ? 0 : (box.frontLen ?? front.length)
