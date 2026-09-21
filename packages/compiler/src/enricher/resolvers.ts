@@ -2781,6 +2781,13 @@ type ConformanceSolveResult =
 			// name it is about to write down is the whole path or only the last
 			// step of one.
 			memberPath?: string
+			// NOTE: Set where the refusal is the CYCLE GUARD's and not a real
+			// answer — the question was already open further up the recursion.
+			// A composite asking about its own members has to tell the two
+			// apart: a member that truly has no conformance takes the
+			// composite's away, while one the guard closed the loop on is a
+			// RECURSIVE Type, which is a fine Program and must keep compiling.
+			cycle?: true
 	  }
 
 type ScopeConformanceState = {
@@ -3227,6 +3234,12 @@ function runtimeTagOf(type: common.Type): string | null {
 	}
 }
 
+// NOTE: Which hidden conformance Argument a payload member's own witness arrives
+// in, or null where the member is compared by the universal structural rule and
+// no witness is wanted. The slots the Type Parameters take are decided by
+// declaration order and come first; a routed member takes the next one free.
+type MemberRouter = (type: common.Type) => number | null
+
 // NOTE: How one payload member is compared — structurally when it names no Type
 // Parameter, through the witness at its declaration-order index when it is a
 // bare Parameter, and recursively for the composites (a List itemwise, a Record
@@ -3240,9 +3253,20 @@ function describeMember(
 	generics: Set<string>,
 	bindings: GenericBindings,
 	position: common.Position | null,
+	// NOTE: DECISION 3 — one rule for every derived composite: it asks its
+	// members. A member naming no Type Parameter used to be the end of the walk
+	// and is now the one place it can begin again: a `tag: Tag` compares by
+	// whatever `Tags` writes, a `children: List<Tag>` itemwise through that same
+	// `is`, and a `price: Money` through the Record routing one level down. The
+	// router answers the slot such a member's witness arrives in, or null where
+	// the member really is compared structurally — which is every member of
+	// every Choice that existed before this, so their descriptors do not move.
+	route: MemberRouter = () => null,
 ): common.DescriptorNode {
 	if (!typeMentionsGenerics(type, generics)) {
-		return { k: "eq" }
+		let slot = route(type)
+
+		return slot === null ? { k: "eq" } : { k: "w", i: slot }
 	}
 
 	switch (type.type) {
@@ -3257,6 +3281,7 @@ function describeMember(
 					generics,
 					bindings,
 					position,
+					route,
 				),
 			}
 		// NOTE: Each slot described on its own, because each is decided on its
@@ -3273,6 +3298,7 @@ function describeMember(
 					generics,
 					bindings,
 					position,
+					route,
 				),
 				value: describeMember(
 					type.valueType,
@@ -3280,6 +3306,7 @@ function describeMember(
 					generics,
 					bindings,
 					position,
+					route,
 				),
 			}
 		case "Record":
@@ -3291,6 +3318,7 @@ function describeMember(
 					generics,
 					bindings,
 					position,
+					route,
 				),
 			}
 		case "Case":
@@ -3302,6 +3330,7 @@ function describeMember(
 					generics,
 					bindings,
 					position,
+					route,
 				),
 			}
 		case "UnionType":
@@ -3311,6 +3340,7 @@ function describeMember(
 				generics,
 				bindings,
 				position,
+				route,
 			)
 		// NOTE: A refinement compares exactly as its base does — the evidence is
 		// not a part the runtime ever hears of, which is what `runtimeShapeOf`
@@ -3325,6 +3355,7 @@ function describeMember(
 				generics,
 				bindings,
 				position,
+				route,
 			)
 		default:
 			return { k: "eq" }
@@ -3368,6 +3399,7 @@ function describeUnion(
 	generics: Set<string>,
 	bindings: GenericBindings,
 	position: common.Position | null,
+	route: MemberRouter = () => null,
 ): common.DescriptorNode {
 	let arms: Array<UnionArm> = flattenUnionMembers(type).map((armType) => ({
 		type: armType,
@@ -3438,6 +3470,7 @@ function describeUnion(
 			generics,
 			bindings,
 			position,
+			route,
 		)
 
 		// NOTE: An arm mentioning a Parameter is the fallback (`null`) — no
@@ -3667,6 +3700,7 @@ function describeMembers(
 	generics: Set<string>,
 	bindings: GenericBindings,
 	position: common.Position | null,
+	route: MemberRouter = () => null,
 ): Record<string, common.DescriptorNode> {
 	let described: Record<string, common.DescriptorNode> = {}
 
@@ -3677,10 +3711,87 @@ function describeMembers(
 			generics,
 			bindings,
 			position,
+			route,
 		)
 	}
 
 	return described
+}
+
+// NOTE: DECISION 3, and it is the SAME rule one level down from a Record's: a
+// derived `is` asks the members its Cases declare. The Type Parameters keep the
+// slots their declaration order gives them, and every payload member that names
+// none — `tag: Tag`, `children: List<Tag>`, `price: Money` — takes the next slot
+// free where its own Type's conformance is not the structural one.
+//
+// `types` is the Type per slot AFTER the Parameters, in the order the walk met
+// them, which is the order the conditions are solved in and the order the hidden
+// Arguments arrive in. `refused` is the member whose Type has no conformance at
+// all, which withholds the derive exactly as an unconforming Type Argument does.
+type ChoiceMemberRouting = {
+	route: MemberRouter
+	types: Array<common.Type>
+}
+
+function choiceMemberRouting(
+	base: number,
+	scope: enricher.Scope,
+	position: common.Position,
+): ChoiceMemberRouting {
+	let types: Array<common.Type> = []
+
+	return {
+		types,
+		route: (type) => {
+			let solved = memberConformance(
+				type,
+				equatableProtocolName,
+				scope,
+				position,
+			)
+
+			// NOTE: A member with NO conformance takes a slot too, and that
+			// is how decision 3's other half is refused in the words the rest
+			// of the language already uses: the slot becomes a bounded Generic
+			// pinned to the member's Type, and the ordinary conformance rail
+			// reports `unsatisfied-bound` about it at the call — which is
+			// exactly what a generic Choice handed a non-Equatable Type
+			// Argument has always done. The bounded rail refuses it one line
+			// later, where the condition fails to solve.
+			//
+			// NOTE: Two refusals are NOT that, and neither takes a slot. A
+			// refusal the solve REPORTED rather than described arrives with an
+			// empty chain, and is left alone for the reason
+			// `recordMemberRouting` leaves it alone: the Diagnostic belongs
+			// where the mistake was made. And a CYCLE is the guard closing a
+			// loop, not an answer — the question was already open further up.
+			// No Program can reach that today: this language refuses a Choice
+			// that names itself (`recursive-type-declaration`), a generic one
+			// that does (`recursive-generic-choice`), and two that name each
+			// other, all at the declaration and long before any conformance is
+			// asked for. It is written down because a Type Argument could still
+			// close a loop the declaration checker never sees, and because a
+			// composite that answered "no conformance" to its own recursion
+			// would refuse a Program that is fine.
+			if (
+				!solved.ok &&
+				(solved.cycle === true || solved.chain.length === 0)
+			) {
+				return null
+			}
+
+			if (
+				solved.ok &&
+				conformanceIsStructural(solved.source, equatableProtocolName)
+			) {
+				return null
+			}
+
+			types.push(type)
+
+			return base + types.length - 1
+		},
+	}
 }
 
 // NOTE: The compile-time plan the widened runtime helper follows for a generic
@@ -3700,6 +3811,7 @@ function derivedEquatableDescriptor(
 	alias: common.GenericAliasType,
 	typeArguments: Array<common.Type>,
 	position: common.Position | null,
+	route: MemberRouter = () => null,
 ): common.DerivedEquatableDescriptor {
 	let generics = new Set(alias.generics.map((generic) => generic.name))
 	let constrainedOrder = constrainedGenericOrder(alias)
@@ -3725,6 +3837,7 @@ function derivedEquatableDescriptor(
 			generics,
 			bindings,
 			position,
+			route,
 		)
 	}
 
@@ -3739,17 +3852,110 @@ export function derivedEquatableDescriptorFor(
 	scope: enricher.Scope,
 	position: common.Position,
 ): common.DerivedEquatableDescriptor | null {
-	let alias = declaredChoiceAliasOf(baseType, scope)
+	return choiceRouting(baseType, scope, position)?.descriptor ?? null
+}
 
-	if (alias === null || alias.generics.length === 0) {
+// NOTE: A Choice's whole compile-time plan — the descriptor its runtime helper
+// follows and the Types whose witnesses fill the slots the descriptor names
+// beyond the Type Parameters. Null for a Choice with no Alias in scope, and for
+// a non-generic Choice whose payload routes NOTHING, which is every Choice that
+// existed before decision 3: such a Choice keeps emitting the flat `choiceIs`
+// and its witness stays the plain unconditional map.
+//
+// Both rails read it — the witness the bounded call is handed and the descriptor
+// the direct call emits — so the slots they agree about are agreed about here,
+// once. The walk is deterministic (Cases in declaration order, then members in
+// theirs), which is what makes "the same descriptor" a fact rather than a hope.
+function choiceRouting(
+	baseType: common.Type,
+	scope: enricher.Scope,
+	position: common.Position,
+	// NOTE: Where a payload no descriptor can be right about is reported, and
+	// null says to build it silently — the same two readings `position` has had
+	// on the descriptor builder all along. A conformance solve reaches here
+	// speculatively and memoised, so it passes null and the settled call site
+	// passes its own.
+	descriptorPosition: common.Position | null = position,
+): {
+	// NOTE: Null for a NON-generic Choice, which is a plain Union in the Type
+	// Scope and no Alias at all — `resolveChoiceDeclarationStatementType` only
+	// builds an Alias where there are Parameters to bind. Before decision 3
+	// nothing asked a non-generic Choice anything, so nothing noticed.
+	alias: common.GenericAliasType | null
+	descriptor: common.DerivedEquatableDescriptor
+	routedTypes: Array<common.Type>
+} | null {
+	let alias = declaredChoiceAliasOf(baseType, scope)
+	let parameterSlots =
+		alias === null ? 0 : constrainedGenericOrder(alias).length
+	let routing = choiceMemberRouting(parameterSlots, scope, position)
+
+	let descriptor =
+		alias === null
+			? derivedEquatableDescriptorForCases(
+					choiceCasesOf(baseType, scope),
+					routing.route,
+				)
+			: derivedEquatableDescriptor(
+					alias,
+					choiceTypeArgumentsOf(baseType),
+					descriptorPosition,
+					routing.route,
+				)
+
+	if (parameterSlots === 0 && routing.types.length === 0) {
 		return null
 	}
 
-	return derivedEquatableDescriptor(
-		alias,
-		choiceTypeArgumentsOf(baseType),
-		position,
-	)
+	return { alias, descriptor, routedTypes: routing.types }
+}
+
+// NOTE: The Cases of a Choice with no Alias behind it — a non-generic one, whose
+// Type Scope entry is the Union of its Cases. A receiver narrowed to one Case
+// still asks about the WHOLE Choice, because that is what its equality is
+// derived for.
+function choiceCasesOf(
+	baseType: common.Type,
+	scope: enricher.Scope,
+): Array<common.Type> {
+	let choiceType = choiceTypeOf(baseType, scope)
+
+	if (choiceType === null) {
+		return []
+	}
+
+	return choiceType.type === "UnionType"
+		? flattenUnionMembers(choiceType)
+		: [choiceType]
+}
+
+// NOTE: The same plan for a Choice that takes no Type Parameters: one entry per
+// Case tag, every member described with an empty Parameter set — so the only
+// node the walk can produce is `eq`, or the `w` the ROUTER puts in its place.
+// Before decision 3 this descriptor was always empty of witnesses and was never
+// built at all; it is built now exactly when the router found one.
+function derivedEquatableDescriptorForCases(
+	cases: Array<common.Type>,
+	route: MemberRouter,
+): common.DerivedEquatableDescriptor {
+	let descriptor: common.DerivedEquatableDescriptor = {}
+
+	for (let caseType of cases) {
+		if (caseType.type !== "Case") {
+			continue
+		}
+
+		descriptor[`${caseType.choice}#${caseType.name}`] = describeMembers(
+			caseType.members,
+			[],
+			new Set(),
+			new Map(),
+			null,
+			route,
+		)
+	}
+
+	return descriptor
 }
 
 // NOTE: Every Choice is Equatable without being written as such — a Case is
@@ -3764,6 +3970,13 @@ export function derivedEquatableDescriptorFor(
 export function derivedEquatableNamespace(
 	baseType: common.Type,
 	scope: enricher.Scope,
+	// NOTE: Where the routing question is asked. It is asked silently and
+	// memoised, so every caller may pass its own — and the one funnel that does
+	// (`namespacesDeclaringMethod`) is the funnel Completion and Hover come
+	// through as well, which is what keeps what they list and what is emitted
+	// one answer rather than two. Null builds the Methods a Choice had before
+	// decision 3, for a caller that holds no Position at all.
+	position: common.Position | null = null,
 ): common.NamespaceType | null {
 	let choiceType = choiceTypeOf(baseType, scope)
 
@@ -3775,6 +3988,10 @@ export function derivedEquatableNamespace(
 		choiceType,
 		declaredChoiceAliasOf(baseType, scope),
 		choiceTypeArgumentsOf(baseType),
+		position === null
+			? []
+			: (choiceRouting(baseType, scope, position, null)?.routedTypes ??
+					[]),
 	)
 }
 
@@ -3801,6 +4018,14 @@ export function derivedEquatableNamespaceForChoice(
 	choiceType: common.Type,
 	declaredAlias: common.GenericAliasType | null = null,
 	typeArguments: Array<common.Type> = [],
+	// NOTE: DECISION 3 on the DIRECT rail. A payload member that routes needs
+	// its witness at the call, and the rail that carries one is the same rail a
+	// Type Parameter's rides: a Generic the invocation can not infer, pinned to
+	// the member's Type by its default and bounded by the Protocol. Invocation
+	// inference seeds the pin, `resolveConformances` solves it, and the witness
+	// lands in the slot the descriptor named — after the Parameters, because
+	// these Declarations stand after theirs.
+	routedTypes: Array<common.Type> = [],
 ): common.NamespaceType {
 	let isGeneric = declaredAlias !== null && declaredAlias.generics.length > 0
 
@@ -3856,6 +4081,20 @@ export function derivedEquatableNamespaceForChoice(
 					}
 				})
 			: []
+
+	// NOTE: And one more per ROUTED payload member, after them. Never `infer`:
+	// there is nothing at the call for it to be inferred FROM — the member's
+	// Type is written on the Case, not on the Arguments — so it is pinned
+	// outright and the pin is what the witness is solved for.
+	boundGenerics = [
+		...boundGenerics,
+		...routedTypes.map((memberType, index) => ({
+			name: routedMemberGenericName(index),
+			infer: false,
+			defaultType: memberType,
+			constraint: "Equatable",
+		})),
+	]
 
 	// NOTE: The Parameters are the UNAPPLIED body Union for a generic Choice, so
 	// its GenericUse members give inference something to bind the bounds to —
@@ -4197,12 +4436,14 @@ function derivedConformanceSource(
 		}
 	}
 
-	// NOTE: A non-generic Choice derives unconditionally — no witnesses, no
-	// descriptor, so its witness emission stays byte-identical to what it was
-	// before generic Choices existed.
-	let alias = declaredChoiceAliasOf(binding, scope)
+	// NOTE: A Choice that neither takes Type Parameters nor routes a payload
+	// member derives unconditionally — no witnesses, no descriptor — so its
+	// witness emission stays byte-identical to what it was before any of this.
+	// That is every Choice whose payloads are Strings, Integers, Records of
+	// those, and the rest of what the structural rule already answers for.
+	let routing = choiceRouting(binding, scope, position, null)
 
-	if (alias === null || alias.generics.length === 0) {
+	if (routing === null) {
 		return {
 			kind: "namespace",
 			name: derivedEquatableNamespaceName,
@@ -4216,11 +4457,15 @@ function derivedConformanceSource(
 	// Parameter's Type Argument does — solved recursively, in declaration order
 	// (R7) so the witnesses line up with the descriptor's `w` indices. Any
 	// failure withholds the derive, and the caller surfaces the because-chain.
-	let genericNames = alias.generics.map((generic) => generic.name)
+	let aliasGenerics = routing.alias
+	let genericNames =
+		aliasGenerics?.generics.map((generic) => generic.name) ?? []
 	let typeArguments = choiceTypeArgumentsOf(binding)
 	let conditions: Array<common.Conformance> = []
 
-	for (let name of constrainedGenericOrder(alias)) {
+	for (let name of aliasGenerics === null
+		? []
+		: constrainedGenericOrder(aliasGenerics)) {
 		let typeArgument = typeArguments[genericNames.indexOf(name)] ?? {
 			type: "Error" as const,
 		}
@@ -4243,21 +4488,43 @@ function derivedConformanceSource(
 		})
 	}
 
+	// NOTE: Then the routed payload members, in the order the descriptor walk
+	// met them — which is the order their slots were handed out, and therefore
+	// the order the hidden Arguments have to arrive in. They stand AFTER the
+	// Parameters for the same reason: a Parameter's slot is its declaration
+	// index, and nothing may be put in front of it.
+	for (let [index, memberType] of routing.routedTypes.entries()) {
+		let solved = solveConformance(memberType, protocolName, scope, position)
+
+		if (!solved.ok) {
+			return null
+		}
+
+		conditions.push({
+			genericName: routedMemberGenericName(index),
+			protocolName,
+			source: solved.source,
+		})
+	}
+
 	return {
 		kind: "namespace",
 		name: derivedEquatableNamespaceName,
 		methodMap: result.methodMap,
 		...providedMethodsOf(result),
 		conditions,
-		// NOTE: Silent — this is the witness a bounded call is handed, solved
-		// speculatively and memoised, so the call site is where a payload that
-		// can not be compared is reported.
-		derivedDescriptor: derivedEquatableDescriptor(
-			alias,
-			typeArguments,
-			null,
-		),
+		derivedDescriptor: routing.descriptor,
 	}
+}
+
+// NOTE: The name a routed payload member's witness is bound under. It is
+// bookkeeping and nothing else — the slot is decided by position, and no source
+// spells this — but a `Conformance` carries a name, and one that says what it
+// stands for is worth more than an empty string. `borrowedGenericName` keeps it
+// out of the way of anything a Program can declare, for the reason its own NOTE
+// gives.
+function routedMemberGenericName(index: number): string {
+	return borrowedGenericName(`Member${index}`)
 }
 
 // NOTE: What a Record's DECLARED members say about the Record's own conformance
@@ -5128,6 +5395,7 @@ export function solveConformance(
 	if (state.inProgress.has(key)) {
 		return {
 			ok: false,
+			cycle: true,
 			chain: [
 				`${describeType(binding)} conforming to '${protocolName}' depends on itself.`,
 			],
@@ -8454,7 +8722,7 @@ export function namespacesDeclaringMethod(
 	// answer the same question, so the one that answers it for every receiver
 	// goes first, and the other is not put on the ladder beside it.
 	if (matchingNamespaces.size === 0) {
-		let derived = derivedEquatableNamespace(baseType, scope)
+		let derived = derivedEquatableNamespace(baseType, scope, position)
 
 		if (derived !== null && Object.hasOwn(derived.methods, methodName)) {
 			matchingNamespaces.set(derivedEquatableNamespaceName, derived)

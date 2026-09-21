@@ -35,6 +35,15 @@ const tag = `type Tag = { text: String }
 	constant news: Tag = { text = "News" }
 	constant lower: Tag = { text = "news" }`
 
+// NOTE: And the Choice DECISION 3 is written against — a non-generic one whose
+// payload holds a Tag, which is the pair the finding was reported on.
+const box = `choice Box {
+		Full { tag: Tag },
+		Hollow,
+	}
+
+	namespace Boxes for Box is Equatable {}`
+
 // NOTE: And the receiver the PRINTING half is written against: a Choice whose
 // derived printing answers `Open` where the structural walk writes `Door#Open`,
 // and a Record whose Namespace writes `EUR 1999` where the walk writes
@@ -630,5 +639,204 @@ describe("A Record whose member can not compare", () => {
 				Terminal.inspect({ run = run, id = 1 })
 			}`),
 		).toEqual(["{ run = Function, id = 1 }"])
+	})
+})
+
+describe("A Case payload asks its members", () => {
+	// NOTE: DECISION 3 — one rule for every derived composite. A generic
+	// Choice's derived `is` already routed its Type Parameters through the
+	// witnesses a call hands in; a NON-generic one compared every payload
+	// structurally, so `Box#Full({ tag = a })` and `Box#Full({ tag = b })` were
+	// unequal while `Optional<Tag>#Value(a)` and `Optional<Tag>#Value(b)` were
+	// equal. Same rule, one level down: the member is routed through its own
+	// Type's conformance, through the descriptor machinery that was already
+	// there rather than a second one.
+	it("compares a non-generic Choice's payload through the member's own is", async () => {
+		expect(
+			await run(`implementation {
+				${tag}
+				${box}
+
+				Terminal.inspect(
+					Optional<Tag>#Value(news)::is(Optional<Tag>#Value(lower)),
+				)
+				Terminal.inspect(
+					Box#Full({ tag = news })::is(Box#Full({ tag = lower })),
+				)
+				Terminal.inspect(Box#Full({ tag = news })::is(Box#Hollow))
+				Terminal.inspect(
+					Box#Full({ tag = news })::isNot(Box#Full({ tag = lower })),
+				)
+			}`),
+		).toEqual(["true", "true", "false", "false"])
+	})
+
+	// NOTE: The tag still decides the Case FIRST and nominally — routing a
+	// payload must not make two different Cases carrying equal payloads equal.
+	it("still decides the Case by its tag", async () => {
+		expect(
+			await run(`implementation {
+				${tag}
+
+				choice Pair {
+					Left { tag: Tag },
+					Right { tag: Tag },
+				}
+
+				namespace Pairs for Pair is Equatable {}
+
+				Terminal.inspect(
+					Pair#Left({ tag = news })::is(Pair#Right({ tag = lower })),
+				)
+				Terminal.inspect(
+					Pair#Left({ tag = news })::is(Pair#Left({ tag = lower })),
+				)
+			}`),
+		).toEqual(["false", "true"])
+	})
+
+	// NOTE: A payload member that is a composite routes AS A WHOLE, through the
+	// conformance of the Type it is — a List through List's own `is` carrying
+	// Tag's witness, a Record through the Record routing one level further down.
+	it("routes a composite payload member through that composite's witness", async () => {
+		expect(
+			await run(`implementation {
+				${tag}
+
+				choice Bag {
+					Some { tags: List<Tag>, held: { tag: Tag } },
+					None,
+				}
+
+				namespace Bags for Bag is Equatable {}
+
+				Terminal.inspect(
+					Bag#Some({ tags = [news], held = { tag = news } })::is(
+						Bag#Some({ tags = [lower], held = { tag = lower } }),
+					),
+				)
+			}`),
+		).toEqual(["true"])
+	})
+
+	// NOTE: Both rails again, and for a Choice they are further apart than for a
+	// Record: a direct call carries the witnesses as the fabricated Method's own
+	// pinned Generics, a bounded one as the derived conformance's conditions.
+	// Same descriptor, same slots, or the Arguments shift.
+	it("answers the same through a bounded call", async () => {
+		expect(
+			await run(`implementation {
+				${tag}
+				${box}
+
+				function same<infer Item is Equatable>(_ a: Item, _ b: Item) -> Boolean {
+					<- a::is(b)
+				}
+
+				Terminal.inspect(same(Box#Full({ tag = news }), Box#Full({ tag = lower })))
+				Terminal.inspect([Box#Full({ tag = news })]::contains(Box#Full({ tag = lower })))
+				Terminal.inspect([Box#Full({ tag = news }) = 1]::hasKey(Box#Full({ tag = lower })))
+			}`),
+		).toEqual(["true", "true", "true"])
+	})
+
+	// NOTE: And a Choice whose payload routes NOTHING keeps the flat helper it
+	// always had — the whole reason the descriptor is built only where the
+	// router found a slot.
+	it("emits the flat helper where no payload member routes", () => {
+		// NOTE: Through a Parameter rather than two written Cases, so that the
+		// Optimiser's `lower-unit-case-equality` has nothing constant to fold
+		// the comparison into and the helper the witness names is still there
+		// to read.
+		let js = generate(`implementation {
+			choice Note {
+				Text { body: String },
+				Empty,
+			}
+
+			namespace Notes for Note is Equatable {}
+
+			function same(_ a: Note, _ b: Note) -> Boolean {
+				<- a::is(b)
+			}
+
+			Terminal.print(same(Note#Text({ body = "a" }), Note#Empty))
+		}`)
+
+		expect(js).not.toContain("boundChoiceIs")
+		expect(js).toContain("choiceIs")
+	})
+
+	// NOTE: Decision 3's other half. A payload member with no equality means
+	// the Choice derives none, so `namespace Handlers for Handler is Equatable
+	// {}` is refused where it is WRITTEN — `nonconforming-namespace`, the same
+	// Diagnostic a Namespace that declares a conformance and writes none of it
+	// has always had. The call is refused after it, because the bound the
+	// routing put on the derived Method has nothing to bind either.
+	//
+	// RESIDUAL: one mistake, two reports. Both sentences are true and they name
+	// two different edits, but the second is a cascade of the first and the
+	// house rule is one report per mistake. Listed in the report.
+	it("refuses a call whose payload member can not compare", () => {
+		let source = `implementation {
+			choice Handler {
+				On { run: (_ value: Integer) -> Integer },
+				Off,
+			}
+
+			namespace Handlers for Handler is Equatable {}
+
+			function same(_ a: Handler, _ b: Handler) -> Boolean {
+				<- a::is(b)
+			}
+
+			Terminal.print(same(Handler#Off, Handler#Off))
+		}`
+
+		expect(codesOf(source)).toEqual([
+			"nonconforming-namespace",
+			"unsatisfied-bound",
+		])
+	})
+
+	// NOTE: And the bounded rail refuses the same Program, through the rail
+	// that was already there: the derive is withheld, so nothing makes the
+	// Choice Equatable and the bound has nothing to bind.
+	it("refuses a bounded call over such a Choice too", () => {
+		let source = `implementation {
+			choice Handler {
+				On { run: (_ value: Integer) -> Integer },
+				Off,
+			}
+
+			namespace Handlers for Handler is Equatable {}
+
+			Terminal.print([Handler#Off]::contains(Handler#Off))
+		}`
+
+		expect(codesOf(source)).toEqual([
+			"nonconforming-namespace",
+			"nonconforming-namespace",
+		])
+	})
+
+	// NOTE: RECURSION. The brief expected a self slot here and there is nothing
+	// to build one for: this language refuses a Choice that names itself, and a
+	// generic one that does, and two that name each other — before any
+	// conformance is ever asked about. The router still tells the cycle guard's
+	// refusal from a real one, because a Type Argument could close a loop the
+	// declaration checker never sees; this test is what says the declaration is
+	// refused, so that a reader meeting the NOTE knows why it has no companion.
+	it("has no recursive Choice to route, because the language has none", () => {
+		expect(
+			codesOf(`implementation {
+				choice Tree {
+					Node { children: List<Tree> },
+					Leaf,
+				}
+
+				Terminal.print(Tree#Leaf::is(Tree#Leaf))
+			}`),
+		).toContain("recursive-type-declaration")
 	})
 })
