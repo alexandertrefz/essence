@@ -1432,27 +1432,21 @@ declarations {
 			§§ @param _ — the item to put at that position
 			§§ @param at — the position of the item to replace
 			§§ @returns — the List with the item replaced.
-			(_ item: ItemType, at index: Integer) -> List<ItemType> {
-				constant length = @::length()
+			(_ item: ItemType, at index: Integer) -> List<ItemType>
 
-				§ The guard is needed, because `remove(at:)` ignores a position
-				§ outside the List but `insert(_:at:)` clamps it. Without it
-				§ the item would be added at an end.
-				§
-				§ A negative position is resolved first, because `remove(at:)`
-				§ shortens the List before `insert(_:at:)` reads the position
-				§ again. The same negative position names a different place in
-				§ the shorter List.
-				if index::isLessThan(0::subtract(length)) {
-					<- @
-				} else if index::isLessThan(0) {
-					<- @::replace(item, at index::add(length))
-				} else if index::isGreaterThanOrEqualTo(length) {
-					<- @
-				} else {
-					<- @::remove(at index)::insert(item, at index)
-				}
-			}
+			§ Native, and the same Function `NonEmptyList::replace` is. The
+			§ body it had was `@::remove(at index)::insert(item, at index)`
+			§ behind a guard. That built the whole List twice for one item.
+			§ Even the native beside it copied the run the position fell in.
+			§ So a List written cell by cell cost its own length every turn.
+			§ Writing one cell of an accumulator is constant work now, and
+			§ `optimisations` explains what the runtime does for that.
+			§
+			§ The guard is gone with the body. It was there because
+			§ `remove(at:)` ignores a position outside the List while
+			§ `insert(_:at:)` clamps one. Without it the item was added at an
+			§ end. The native resolves the position from the end once, and
+			§ answers the receiver untouched where it names no item.
 
 			§ Written on the entry above, over the item that is already there.
 			§ The position needs no guard of its own. The `item(at:)` call

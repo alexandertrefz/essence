@@ -162,7 +162,7 @@ describe("Bundle Size", () => {
 	// person to write a line rather than for the next person to drag in a
 	// tower, and that is not what it is for.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(80_000)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(81_400)
 	})
 
 	// NOTE: 38,056 measured; a reintroduced `Number` spread was 54,849. The same
@@ -191,7 +191,7 @@ describe("Bundle Size", () => {
 	// NOTE: 63 are the transcendental registry change Everyday's note above
 	// explains, which every file that reaches the tower pays alike.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(39_100)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(40_200)
 	})
 
 	// NOTE: 47,794 measured. The two tests above watch a Dictionary being shaken
@@ -273,7 +273,7 @@ describe("Bundle Size", () => {
 	// `Irrational.es` (38,056) are byte-identical across the change. That is the
 	// claim the module split was made for, and it still holds.
 	it("charges a Dictionary Program for the container it uses", async () => {
-		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(60_200)
+		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(61_600)
 	})
 
 	// NOTE: 12,272 measured, where the same Program without the one call
@@ -310,7 +310,7 @@ describe("Bundle Size", () => {
 
 	Terminal.print(names::removeDuplicates()::join(with ", "))
 }`),
-		).toBeLessThan(13_300)
+		).toBeLessThan(14_400)
 	})
 
 	// NOTE: 10,152 measured, where the same Program calling `median` measures
@@ -332,7 +332,7 @@ describe("Bundle Size", () => {
 
 	Terminal.print(numbers::mode(defaultingTo 0)::toString())
 }`),
-		).toBeLessThan(11_200)
+		).toBeLessThan(12_300)
 	})
 
 	// NOTE: 22,358 measured, where the same Program completing an

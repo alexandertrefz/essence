@@ -7,6 +7,7 @@ import type { FutureType, StartedType } from "./Future"
 import type { HttpFailureType } from "./HttpFailure"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
+import { caughtUp } from "./listWrites"
 import type { OrderingType } from "./Ordering"
 import type { RandomnessType } from "./Randomness"
 import type { RationalType } from "./Rational"
@@ -412,6 +413,15 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 		// the box it is asked about.
 		if (type.type === "List" && type.itemType.type !== "Unknown") {
 			let list = value as ListType<AnyType>
+
+			// NOTE: A box a positional write left behind holds an Array whose
+			// items have moved on, so it catches up before this walk reads one
+			// — `listWrites.ts` is a Module of its own exactly so that this one
+			// can say that without reaching into `List.ts`. It is the one thing
+			// this test does write back, and it writes back what the box was
+			// always answering.
+			caughtUp(list)
+
 			let front = list.front
 
 			if (front !== undefined) {

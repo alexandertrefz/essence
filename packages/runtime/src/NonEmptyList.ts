@@ -18,26 +18,23 @@
 // Namespace's target bought. The proof is spent HERE, which is why neither of
 // those two could be written in Essence: the language has no way to be told it
 // holds.
-import type { IntegerType } from "./Integer"
-import {
-	append__overload$2,
-	listRebuildingBack,
-	listRebuildingFront,
-	type ListType,
-	positionFromEnd,
-	runsOf,
-	viewOf,
-} from "./List"
+import { append__overload$2, type ListType, runsOf } from "./List"
 import type { AnyType } from "./type"
 
 // NOTE: The logical first and last item, which is one comparison away from
 // either run's end rather than position zero of the backing Array — a List that
 // has been prepended to holds its first items in a second run, stored reversed,
 // and its last item is the back run's when there is one at all.
+//
+// NOTE: `runsOf` rather than `viewOf`, for the reason `List.item(at:)` reads
+// that way: these visit ONE item and hand no Array to anybody, so there is
+// nothing to trim and nothing to seal — and a reader that sealed would put the
+// copy back into every turn of a heap, which reads its least item and writes
+// two cells per sift.
 export function firstItem<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ItemType {
-	let view = viewOf(originalList)
+	let view = runsOf(originalList)
 
 	return view.frontCount > 0 ? view.front[view.frontCount - 1] : view.back[0]
 }
@@ -45,7 +42,7 @@ export function firstItem<ItemType extends AnyType>(
 export function lastItem<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ItemType {
-	let view = viewOf(originalList)
+	let view = runsOf(originalList)
 
 	return view.backCount > 0 ? view.back[view.backCount - 1] : view.front[0]
 }
@@ -97,52 +94,14 @@ export {
 	sort__overload$3,
 } from "./List"
 
-// NOTE: The one entry with no native of `List`'s to hand the work to: `List`
-// answers `replace` in Essence, so the walk is written out here. One
-// item out and one item in, and nothing at all when the position names no item —
-// which is what that four-branch body says at greater length, since a position
-// reaching back past the first item and one standing at or past the end both
-// leave the List alone. Every case keeps the length, which is the whole of why
-// the receiver's proof is still good for the answer.
-//
-// NOTE: The position is resolved from the end exactly as `slice` and `insert`
-// resolve theirs, through `List.positionFromEnd`, so an index past either end
-// stays past it.
-//
-// NOTE: One item changes, so only the RUN holding it is copied and the other
-// rides along by reference. A List built at both ends pays for the half the
-// position falls in rather than for the whole of itself, and the receiver keeps
-// the representation it arrived in — nothing here combines the runs, because
-// combining them would be the very copy this is avoiding.
-export function replace__overload$1<ItemType extends AnyType>(
-	originalList: ListType<ItemType>,
-	item: ItemType,
-	at: IntegerType,
-): ListType<ItemType> {
-	let view = runsOf(originalList)
-	let length = view.total
-	let position = positionFromEnd(at.value, length)
-
-	if (position < 0 || position >= length) {
-		return originalList
-	}
-
-	if (position < view.frontCount) {
-		let front = view.front.slice(0, view.frontCount)
-
-		// NOTE: The front run is stored reversed, so the logical position counts
-		// back from its end.
-		front[view.frontCount - 1 - position] = item
-
-		return listRebuildingFront(front, originalList, view)
-	}
-
-	let back = view.back.slice(0, view.backCount)
-
-	back[position - view.frontCount] = item
-
-	return listRebuildingBack(back, originalList, view)
-}
+// NOTE: `replace` is `List`'s own native under this Namespace's name, and the
+// two entries are ONE Function for the reason the re-exports above are: every
+// case of it keeps the length, so a receiver that had something in it answers
+// with something in it, and only what may be said about the answer differs. It
+// was written out here while `List` answered `replace` in Essence; both are the
+// native now, which is what makes a positional write constant work — `List.ts`
+// and `listWrites.ts` hold the reasoning.
+export { replace__overload$1 } from "./List"
 
 // NOTE: `indices` and `enumerate` are `List`'s own natives, under this
 // Namespace's names: there is one position and one entry for every item, so a

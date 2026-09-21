@@ -604,6 +604,8 @@ export type ListNatives = {
 	sort__overload$3: <ItemType extends AnyType, Key extends AnyType>(self: ListType<ItemType>, on: (argument0: ItemType) => Key, argument2: SortOrderType, Key__conformance: ComparableConformance<Key>) => ListType<ItemType>
 	// insert<ItemType>(_: ItemType, at: Integer) -> NonEmptyList
 	insert: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType, at: IntegerType) => ListType<ItemType>
+	// replace<ItemType>(_: ItemType, at: Integer) -> List<ItemType>
+	replace__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType, at: IntegerType) => ListType<ItemType>
 	// join<ItemType is Printable>(with: String) -> String
 	join: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: StringType, ItemType__conformance: PrintableConformance<ItemType>) => StringType
 	// partition<ItemType>(where: (_: ItemType) -> Boolean) -> { accepted: List<ItemType>, refused: List<ItemType> }
@@ -1207,7 +1209,7 @@ export const $RecordArity: AssertArities<typeof import("./Record"), {
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "repeat__overload$1" | "of__overload$2" | "of__overload$5" | "hasItems__overload$1" | "hasItems__overload$2" | "isEmpty" | "contains__overload$1" | "doesNotContain" | "hasOnlyItems" | "hasNoItems" | "starts" | "doesNotStart" | "ends" | "doesNotEnd" | "firstItem__overload$1" | "firstItem__overload$2" | "firstItem__overload$3" | "firstItem__overload$4" | "lastItem__overload$1" | "lastItem__overload$2" | "lastItem__overload$3" | "lastItem__overload$4" | "item__overload$2" | "firstIndex__overload$1" | "firstIndex__overload$2" | "firstIndex__overload$3" | "firstIndex__overload$4" | "lastIndex__overload$1" | "lastIndex__overload$2" | "lastIndex__overload$4" | "indices__overload$2" | "onlyItem__overload$1" | "onlyItem__overload$2" | "everyIndex" | "removeFirst__overload$1" | "removeFirst__overload$2" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "prepend__overload$2" | "count__overload$1" | "count__overload$2" | "replace__overload$1" | "replace__overload$2" | "partition__overload$2" | "partition__overload$3" | "split__overload$2" | "lowestItem__overload$1" | "lowestItem__overload$2" | "lowestItem__overload$3" | "lowestItem__overload$4" | "highestItem__overload$1" | "highestItem__overload$2" | "highestItem__overload$3" | "highestItem__overload$4" | "firstItems__overload$1" | "firstItems__overload$2" | "lastItems__overload$1" | "lastItems__overload$2" | "everyValue" | "pad"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "repeat__overload$1" | "of__overload$2" | "of__overload$5" | "hasItems__overload$1" | "hasItems__overload$2" | "isEmpty" | "contains__overload$1" | "doesNotContain" | "hasOnlyItems" | "hasNoItems" | "starts" | "doesNotStart" | "ends" | "doesNotEnd" | "firstItem__overload$1" | "firstItem__overload$2" | "firstItem__overload$3" | "firstItem__overload$4" | "lastItem__overload$1" | "lastItem__overload$2" | "lastItem__overload$3" | "lastItem__overload$4" | "item__overload$2" | "firstIndex__overload$1" | "firstIndex__overload$2" | "firstIndex__overload$3" | "firstIndex__overload$4" | "lastIndex__overload$1" | "lastIndex__overload$2" | "lastIndex__overload$4" | "indices__overload$2" | "onlyItem__overload$1" | "onlyItem__overload$2" | "everyIndex" | "removeFirst__overload$1" | "removeFirst__overload$2" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "prepend__overload$2" | "count__overload$1" | "count__overload$2" | "replace__overload$2" | "partition__overload$2" | "partition__overload$3" | "split__overload$2" | "lowestItem__overload$1" | "lowestItem__overload$2" | "lowestItem__overload$3" | "lowestItem__overload$4" | "highestItem__overload$1" | "highestItem__overload$2" | "highestItem__overload$3" | "highestItem__overload$4" | "firstItems__overload$1" | "firstItems__overload$2" | "lastItems__overload$1" | "lastItems__overload$2" | "everyValue" | "pad"> = true
 export const $ListArity: AssertArities<typeof import("./List"), {
 	repeat__overload$2: 2
 	of__overload$1: 2
@@ -1242,6 +1244,7 @@ export const $ListArity: AssertArities<typeof import("./List"), {
 	sort__overload$2: 2
 	sort__overload$3: 4
 	insert: 3
+	replace__overload$1: 3
 	join: 3
 	partition__overload$1: 2
 	pair: 2

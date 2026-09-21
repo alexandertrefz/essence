@@ -30,7 +30,7 @@ import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
 import type { EquatableWitness } from "./keyEncoding"
 import type { ListType } from "./List"
-import { append__overload$1, createList, runsOf } from "./List"
+import { append__overload$1, createList, sealedRunsOf } from "./List"
 import type { AnyType } from "./type"
 
 // NOTE: One item into its group, which is the whole of what `group` does with
@@ -65,7 +65,7 @@ export function group<ItemType extends AnyType, Key extends AnyType>(
 	keyOf: (item: ItemType) => Key,
 	conformance: EquatableWitness<Key>,
 ): DictionaryType<Key, ListType<ItemType>> {
-	let view = runsOf(originalList)
+	let view = sealedRunsOf(originalList)
 	let store = freshStore<Key, ListType<ItemType>>()
 
 	for (let position = view.frontCount - 1; position >= 0; position--) {
@@ -93,7 +93,7 @@ export function tally<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	conformance: EquatableWitness<ItemType>,
 ): DictionaryType<ItemType, IntegerType> {
-	let view = runsOf(originalList)
+	let view = sealedRunsOf(originalList)
 	let store = freshStore<ItemType, IntegerType>()
 
 	for (let position = view.frontCount - 1; position >= 0; position--) {
@@ -138,7 +138,7 @@ export function index<ItemType extends AnyType, Key extends AnyType>(
 	keyOf: (item: ItemType) => Key,
 	conformance: EquatableWitness<Key>,
 ): DictionaryType<Key, ItemType> {
-	let view = runsOf(originalList)
+	let view = sealedRunsOf(originalList)
 	let store = freshStore<Key, ItemType>()
 
 	for (let position = view.frontCount - 1; position >= 0; position--) {

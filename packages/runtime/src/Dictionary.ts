@@ -6,7 +6,7 @@ import { anyIs } from "./internalHelpers"
 import type { EncodedKey, EquatableWitness } from "./keyEncoding"
 import { canonicalEncoding, encodeKey } from "./keyEncoding"
 import type { ListType } from "./List"
-import { createList, runsOf } from "./List"
+import { createList, sealedRunsOf } from "./List"
 import type { OptionalType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
 import type { OrderingType } from "./Ordering"
@@ -649,7 +649,7 @@ export function of__overload$1<Key extends AnyType, Value extends AnyType>(
 	entries: ListType<EntryRecord<Key, Value>>,
 	conformance: EquatableWitness<Key>,
 ): DictionaryType<Key, Value> {
-	let view = runsOf(entries)
+	let view = sealedRunsOf(entries)
 	let store = emptyStore<Key, Value>()
 
 	registerDictionaryKind()

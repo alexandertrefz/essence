@@ -10,6 +10,8 @@ import {
 	freshKeySet,
 	hasKey,
 } from "./keyEncoding"
+import type { LoggedRun } from "./listWrites"
+import { caughtUp, freshLog } from "./listWrites"
 import type { OptionalType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
 import { equal, greater, less, type OrderingType } from "./Ordering"
@@ -38,12 +40,20 @@ import { type AnyType, typeKeySymbol } from "./type"
 // Array is indistinguishable from a copied one for as long as every box answers
 // exactly the items its view holds — which is what the stamping discipline
 // below is for.
+//
+// NOTE: `writes` is the back run's UNDO LOG and the version of it this box
+// views, and it is how a positional write can change that Array in place
+// instead of copying it — `listWrites.ts` holds the reasoning. It is absent for
+// every box that has never met such a write, which is nearly all of them, and
+// the front run never has one: every front Array in this file is built fresh,
+// so nothing has ever been written into one under a second box's feet.
 export type ListType<ItemType extends AnyType> = {
 	[typeKeySymbol]: "List"
 	value: Array<ItemType>
 	length?: number
 	front?: Array<ItemType>
 	frontLen?: number
+	writes?: LoggedRun<ItemType>
 }
 
 // NOTE: TAKES OWNERSHIP of the Array it is handed. The box stores that Array
@@ -100,16 +110,35 @@ export type ListView<ItemType extends AnyType> = {
 //
 // NOTE: THE READING view — the two runs and the fixed counts, with the
 // receiver's runs trimmed to what it views where THE HALF RULE below says to
-// trim them. Every native that reads a List's items reads it through here,
+// trim them. Every native that reads a List's ITEMS reads it through here,
 // whether it visits one of them or all of them: what the rule asks is not how
 // much a caller is about to read but how much of an Array a box is keeping
 // alive, which is a question about the box rather than about the caller.
+//
+// NOTE: THE SECOND REENTRANCY RULE, which a positional write in place needs.
+// A run can now also CHANGE mid-walk: `list::reduce(startingWith list, (acc,
+// item) { <- acc::replace(item, at 0) })` seeds the accumulator with the walked
+// List again, and its first `replace` would write the very Array the walk is
+// reading. So this reader SEALS the run's log — the writes below refuse a sealed
+// log for good and copy instead. Every reader that hands a raw run to code that
+// may call back into Essence has to seal: this one, `materialise`, and the
+// handful of walks that read through `runsOf` and ask a witness or a key
+// Function about each item, which say `sealedRunsOf` instead.
+//
+// NOTE: The POSITIONAL readers must not seal, and that is what keeps the sieve
+// and the DP table linear: `item(at:)`, `firstItem` and `lastItem` read a
+// position and hand no Array to anybody, so they read through `runsOf`. A
+// sealing `item(at:)` would make "read the cell before, write this one" copy the
+// whole table every turn, which is the very cliff the log is here to close —
+// and a reader that visits ONE item has no more business trimming a run than
+// sealing it, so what the half rule decides is no longer asked there.
 export function viewOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListView<ItemType> {
 	let view = runsOf(originalList)
 
 	trimUnderHalfRule(originalList, view)
+	sealWrites(originalList)
 
 	return view
 }
@@ -160,6 +189,11 @@ function trimUnderHalfRule<ItemType extends AnyType>(
 
 		originalList.value = trimmed
 		originalList.length = view.backCount
+		// NOTE: The trimmed Array is this box's alone and the log it was
+		// carrying describes the Array it just let go of, so the log goes with
+		// it. What that costs is one copy at the box's next positional write,
+		// which mints a log for the fresh Array that write makes.
+		originalList.writes = undefined
 		view.back = trimmed
 	}
 
@@ -188,6 +222,15 @@ function trimUnderHalfRule<ItemType extends AnyType>(
 export function runsOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListView<ItemType> {
+	// NOTE: THE ONE PLACE A BOX LEFT BEHIND CATCHES UP. A positional write may
+	// have changed the back run under this box since it last looked, and every
+	// reader in the runtime asks for its runs here or through `viewOf` and
+	// `materialise`, which ask here too — so a box that is behind repairs itself
+	// before a single item of it is read. The three readers that reach a box's
+	// fields without a view — `append`'s two entries and `prepend` — say so
+	// themselves.
+	caughtUp(originalList)
+
 	let backCount = originalList.length ?? originalList.value.length
 	let front = originalList.front
 
@@ -226,6 +269,14 @@ export function runsOf<ItemType extends AnyType>(
 export function materialise<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): Array<ItemType> {
+	// NOTE: What this hands back is the box's OWN Array, and the caller may walk
+	// it while calling user code — `sort(on:)` reads its key off every item, and
+	// the Rewriter's inlined walks read their items here. So a box that is behind
+	// catches up first and a box that is current is sealed, for the reason
+	// `viewOf` seals. The two paths that build a fresh Array below need neither:
+	// nothing else holds what they answer with.
+	caughtUp(originalList)
+
 	let backCount = originalList.length ?? originalList.value.length
 	let front = originalList.front
 
@@ -233,6 +284,9 @@ export function materialise<ItemType extends AnyType>(
 		if (backCount !== originalList.value.length) {
 			originalList.value = originalList.value.slice(0, backCount)
 			originalList.length = backCount
+			originalList.writes = undefined
+		} else {
+			sealWrites(originalList)
 		}
 
 		return originalList.value
@@ -255,8 +309,38 @@ export function materialise<ItemType extends AnyType>(
 	originalList.length = combined.length
 	originalList.front = undefined
 	originalList.frontLen = undefined
+	originalList.writes = undefined
 
 	return combined
+}
+
+// NOTE: A run handed to code that may call back into Essence can not be written
+// in place any more, for the reason `viewOf` gives. Sealing the log says so, and
+// says it about the ARRAY rather than about this box: every box sharing that
+// Array reads the same log, so one of them being walked closes the Array to all
+// of them. A box that carries no log is already closed — there is nothing for a
+// write to write into in place.
+function sealWrites(originalList: ListType<AnyType>): void {
+	let writes = originalList.writes
+
+	if (writes !== undefined) {
+		writes.log.sealed = true
+	}
+}
+
+// NOTE: `runsOf` for the walks that must NOT trim the receiver and DO hand its
+// runs to user code — the set-shaped natives here, which ask an item's own
+// witness or a key Function about every item, and the walks `GroupedList` and
+// `Dictionary.of(entries:)` are. Trimming is wrong for them for the reason
+// `runsOf` gives; sealing is right for them for the reason `viewOf` gives.
+export function sealedRunsOf<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+): ListView<ItemType> {
+	let view = runsOf(originalList)
+
+	sealWrites(originalList)
+
+	return view
 }
 
 // NOTE: The logical item at a position of a FIXED view — one comparison to
@@ -347,6 +431,15 @@ function stampClosed<ItemType extends AnyType>(
 	}
 }
 
+// NOTE: AND WHAT ELSE A BOX OWES BEFORE IT SHARES A BACK RUN: the run's log and
+// the version of it the receiver views, carried across unchanged. A box holding
+// a logged Array without saying which version it views would read whatever the
+// next in-place write leaves there — the one way this scheme can corrupt a value
+// rather than merely slow it down. The pair is never written to once built, so
+// the two boxes share the one object. The FRONT run needs none of this: every
+// front Array in this file is built fresh and no positional write ever lands in
+// one.
+//
 // NOTE: THE WHOLE OF WHAT IS SHAREABLE. Shrinking `frontLen` by k drops the
 // first k logical items, because the front run is stored reversed; shrinking
 // the back view by k drops the last k. So the sub-lists a box can answer with
@@ -382,7 +475,12 @@ function sharedWindowOf<ItemType extends AnyType>(
 	let length = end - view.frontCount
 
 	if (frontLen === 0) {
-		return { [typeKeySymbol]: "List", value: view.back, length }
+		return {
+			[typeKeySymbol]: "List",
+			value: view.back,
+			length,
+			writes: originalList.writes,
+		}
 	}
 
 	return {
@@ -391,6 +489,7 @@ function sharedWindowOf<ItemType extends AnyType>(
 		length,
 		front: view.front,
 		frontLen,
+		writes: originalList.writes,
 	}
 }
 
@@ -430,6 +529,9 @@ function upgradedForSuffix<ItemType extends AnyType>(
 	originalList.length = 0
 	originalList.front = front
 	originalList.frontLen = view.backCount
+	// NOTE: Both runs are fresh Arrays of this box's own, so whatever log the
+	// old back run carried describes an Array this box no longer holds.
+	originalList.writes = undefined
 
 	return {
 		front,
@@ -527,6 +629,7 @@ export function listRebuildingFront<ItemType extends AnyType>(
 		length: view.backCount,
 		front,
 		frontLen: view.frontCount,
+		writes: originalList.writes,
 	}
 }
 
@@ -557,13 +660,18 @@ export function listRebuildingBack<ItemType extends AnyType>(
 // since appending leaves the front alone. The `frontLen` comes with it, so a
 // later prepend to the receiver may push onto that shared front without the
 // answer's view growing by an item that was never added to it.
+// NOTE: The `writes` is the BACK run's, so it is handed in rather than read off
+// the source: the two callers reach here with the source's own back Array on the
+// path that pushed onto it, and with a fresh copy on the path that could not.
+// A fresh Array is nobody else's, so it arrives with none.
 function listSharingFrontOf<ItemType extends AnyType>(
 	value: Array<ItemType>,
 	length: number,
 	source: ListType<ItemType>,
+	writes: LoggedRun<ItemType> | undefined,
 ): ListType<ItemType> {
 	if (source.front === undefined) {
-		return { [typeKeySymbol]: "List", value, length }
+		return { [typeKeySymbol]: "List", value, length, writes }
 	}
 
 	return {
@@ -572,6 +680,7 @@ function listSharingFrontOf<ItemType extends AnyType>(
 		length,
 		front: source.front,
 		frontLen: source.frontLen,
+		writes,
 	}
 }
 
@@ -643,6 +752,12 @@ export function prepend__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	item: ItemType,
 ): ListType<ItemType> {
+	// NOTE: Reads the box's fields rather than a view, so it catches a box that
+	// is behind up itself — the answer keeps the receiver's BACK run whichever
+	// branch it takes, and an Array that has been written under the receiver has
+	// to be repaired before a second box is given it.
+	caughtUp(originalList)
+
 	let backCount = originalList.length ?? originalList.value.length
 	let front = originalList.front
 
@@ -655,6 +770,7 @@ export function prepend__overload$1<ItemType extends AnyType>(
 			length: backCount,
 			front: [item],
 			frontLen: 1,
+			writes: originalList.writes,
 		}
 	}
 
@@ -669,6 +785,7 @@ export function prepend__overload$1<ItemType extends AnyType>(
 			length: backCount,
 			front,
 			frontLen: frontCount + 1,
+			writes: originalList.writes,
 		}
 	}
 
@@ -682,6 +799,7 @@ export function prepend__overload$1<ItemType extends AnyType>(
 		length: backCount,
 		front: copiedFront,
 		frontLen: frontCount + 1,
+		writes: originalList.writes,
 	}
 }
 
@@ -705,20 +823,30 @@ export function append__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	item: ItemType,
 ): ListType<ItemType> {
+	// NOTE: Reads the box's fields rather than a view, so it catches a box that
+	// is behind up itself, for the reason `prepend` does — and a box that is
+	// behind must not push onto the Array it is behind ON.
+	caughtUp(originalList)
+
 	let count = originalList.length ?? originalList.value.length
 
 	if (count === originalList.value.length) {
 		originalList.length = count
 		originalList.value.push(item)
 
-		return listSharingFrontOf(originalList.value, count + 1, originalList)
+		return listSharingFrontOf(
+			originalList.value,
+			count + 1,
+			originalList,
+			originalList.writes,
+		)
 	}
 
 	let copied = originalList.value.slice(0, count)
 
 	copied.push(item)
 
-	return listSharingFrontOf(copied, count + 1, originalList)
+	return listSharingFrontOf(copied, count + 1, originalList, undefined)
 }
 
 // NOTE: The same tip-or-copy on the receiver's back, and then the other List's
@@ -729,19 +857,24 @@ export function append__overload$2<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	contentsOf: ListType<ItemType>,
 ): ListType<ItemType> {
+	caughtUp(originalList)
+
 	let count = originalList.length ?? originalList.value.length
 	let target: Array<ItemType>
+	let writes: LoggedRun<ItemType> | undefined
 
 	if (count === originalList.value.length) {
 		originalList.length = count
 		target = originalList.value
+		writes = originalList.writes
 	} else {
 		target = originalList.value.slice(0, count)
+		writes = undefined
 	}
 
 	pushItemsOf(contentsOf, target)
 
-	return listSharingFrontOf(target, target.length, originalList)
+	return listSharingFrontOf(target, target.length, originalList, writes)
 }
 
 export function map<ItemType extends AnyType, Other extends AnyType>(
@@ -941,11 +1074,19 @@ export function positionFromEnd(
 // NOTE: Reading a position does NOT combine the runs — an upgraded List has to
 // stay O(1) to index — so the view decides which run holds the item and the
 // item is read straight out of it.
+//
+// NOTE: `runsOf` rather than `viewOf`, and that is load-bearing rather than
+// tidy. Reading one position hands no Array to anybody, so there is nothing to
+// seal — and sealing here would cost the language its positional writes: "read
+// the cell before, write this one" is what a DP table and a heap are, and a
+// reader that closed the run to in-place writes would put the copy back into
+// every turn of them. Trimming is `viewOf`'s other half, and is no business of a
+// reader that visits one item either.
 export function item__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	index: IntegerType,
 ): OptionalType<ItemType> {
-	let view = viewOf(originalList)
+	let view = runsOf(originalList)
 	let length = view.total
 	let position = positionFromEnd(index.value, length)
 
@@ -1246,6 +1387,143 @@ export function insert<ItemType extends AnyType>(
 	}
 
 	return createList(items)
+}
+
+// NOTE: ONE ITEM OUT AND ONE ITEM IN, and nothing at all when the position names
+// no item — a position reaching back past the first item and one standing at or
+// past the end both leave the List alone, which is what the four-branch Essence
+// body this replaces said at greater length. Every case keeps the length, which
+// is why `NonEmptyList` may answer this with the proof its receiver carried and
+// why the two Namespaces are one Function.
+//
+// NOTE: Native, and the reason is the whole of `listWrites.ts`. `List::replace`
+// was `@::remove(at index)::insert(item, at index)` in Essence — two whole fills
+// per write — and `NonEmptyList::replace` copied the run the position fell in.
+// Either way one positional write cost the List, so the accumulator a sieve, a
+// DP table, a heap, a board or a histogram is was quadratic: filling 40,000
+// cells measured 2,739 ms, and a sieve to 30,000 measured 2,447 ms against
+// 0.9 ms of JavaScript. Both are 25 ms here, and 640,000 cells are 117 ms.
+export function replace__overload$1<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	item: ItemType,
+	at: IntegerType,
+): ListType<ItemType> {
+	let view = runsOf(originalList)
+	let length = view.total
+	let position = positionFromEnd(at.value, length)
+
+	if (position < 0 || position >= length) {
+		return originalList
+	}
+
+	// NOTE: The front run is stored reversed, so the logical position counts
+	// back from its end — and a front run is never written in place: every front
+	// Array in this file is built fresh, and a List a Program writes positions
+	// into is one built flat. So this half is what it always was, the touched run
+	// copied and the other one shared.
+	if (position < view.frontCount) {
+		let front = view.front.slice(0, view.frontCount)
+
+		front[view.frontCount - 1 - position] = item
+
+		return listRebuildingFront(front, originalList, view)
+	}
+
+	return writtenInBack(originalList, view, position - view.frontCount, item)
+}
+
+// NOTE: Copying is the answer BELOW this many items, and copying that little is
+// constant work — so the promise "a positional write costs the same at any size"
+// holds either way, and a short List is spared the log a long one earns. What
+// the log costs is an object and two Arrays; what the copy costs is the items.
+// A backtracking board of ten squares, written and unwritten down every branch,
+// measured 63 ms with a log per branch and 42 ms without one, against master's
+// 42 — so the line is drawn where the log stops paying for itself.
+const worthALog = 64
+
+// NOTE: THE IN-PLACE WRITE. A box may write its back run where it is CURRENT for
+// that run's log — the writes it has seen are all the writes there are — and the
+// log is not sealed. It records what stood at the position, writes over it and
+// counts one version up; the answer views the new version and the receiver is
+// left viewing the old one, which is exactly what `listWrites.ts` catches up.
+//
+// NOTE: A box with NO log copies once, and the COPY gets the log. Every box that
+// exists today holds a bare Array — a literal the Optimiser wrote out, a fresh
+// one a native handed to `createList`, the bridge's — and could never learn of a
+// write into it, so there is nothing to attach a log to but an Array this write
+// makes. The sieve pays that one copy and then writes in place for good.
+//
+// NOTE: The log is BOUNDED by the run's length: past that the next write copies
+// and mints a fresh log, so what a chain holds is at most the Array and about as
+// much again, and the copies amortise to constant work per write. The old Array
+// and its old log are left exactly as they are, since whoever is behind on them
+// still catches up through them — a log is never reset where it stands.
+function writtenInBack<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	view: ListView<ItemType>,
+	position: number,
+	item: ItemType,
+): ListType<ItemType> {
+	let back = view.back
+	let count = view.backCount
+	let writes = originalList.writes
+
+	if (
+		writes !== undefined &&
+		writes.seen === writes.log.version &&
+		!writes.log.sealed &&
+		writes.log.version < count
+	) {
+		let log = writes.log
+
+		log.positions.push(position)
+		log.items.push(back[position])
+		log.version++
+		back[position] = item
+
+		stampClosed(originalList, view)
+
+		let seen = { log, seen: log.version }
+
+		// NOTE: The two shapes the rest of this file builds, written out here
+		// rather than one shape with the front fields left undefined: a flat box
+		// is what a Program writes positions into, and every read of one is a
+		// read of the same shape `createList` and the Optimiser's literal make.
+		if (view.frontCount === 0) {
+			return {
+				[typeKeySymbol]: "List",
+				value: back,
+				length: count,
+				writes: seen,
+			}
+		}
+
+		return {
+			[typeKeySymbol]: "List",
+			value: back,
+			length: count,
+			front: view.front,
+			frontLen: view.frontCount,
+			writes: seen,
+		}
+	}
+
+	let copied = back.slice(0, count)
+
+	copied[position] = item
+
+	if (count < worthALog) {
+		return listRebuildingBack(copied, originalList, view)
+	}
+
+	// NOTE: The copy is this answer's alone, which is the one condition a log
+	// may be minted under, and the reason a log is never attached to a run whose
+	// provenance is unknown.
+	let answer = listRebuildingBack(copied, originalList, view)
+
+	answer.writes = { log: freshLog(), seen: 0 }
+
+	return answer
 }
 
 // NOTE: The ordering asked rather than imposed, and native because every
@@ -1795,15 +2073,17 @@ function itself<ItemType extends AnyType>(item: ItemType): ItemType {
 	return item
 }
 
-// NOTE: Every key of a List, in one set. `runsOf` rather than `viewOf`, for the
-// reason `GroupedList` gives: this walk visits each item once and has no reason
-// to trim the caller's List for it.
+// NOTE: Every key of a List, in one set. `sealedRunsOf` rather than `viewOf`,
+// for the reason `GroupedList` gives — this walk visits each item once and has
+// no reason to trim the caller's List for it — and sealing rather than a bare
+// `runsOf`, because the key Function and the item's own witness are user code
+// running while the run Array is held.
 function keySetOver<ItemType extends AnyType, Key extends AnyType>(
 	originalList: ListType<ItemType>,
 	keyOf: (item: ItemType) => Key,
 	conformance: EquatableWitness<Key>,
 ): KeySet<Key> {
-	let view = runsOf(originalList)
+	let view = sealedRunsOf(originalList)
 	let set = freshKeySet(conformance)
 
 	for (let index = view.frontCount - 1; index >= 0; index--) {
@@ -1883,13 +2163,14 @@ function firstAtEachKey<ItemType extends AnyType, Key extends AnyType>(
 
 // NOTE: The same walk, stopped at the first key it has already met — which is
 // the whole of what `hasDuplicates` asks, and the reason it is not
-// `removeDuplicates()::length()` compared against the receiver's.
+// `removeDuplicates()::length()` compared against the receiver's. It seals as
+// `keySetOver` does, and for the same reason.
 function meetsAKeyTwice<ItemType extends AnyType, Key extends AnyType>(
 	originalList: ListType<ItemType>,
 	keyOf: (item: ItemType) => Key,
 	conformance: EquatableWitness<Key>,
 ): BooleanType {
-	let view = runsOf(originalList)
+	let view = sealedRunsOf(originalList)
 	let seen = freshKeySet(conformance)
 
 	for (let index = view.frontCount - 1; index >= 0; index--) {
@@ -1908,7 +2189,8 @@ function meetsAKeyTwice<ItemType extends AnyType, Key extends AnyType>(
 }
 
 // NOTE: The subset question. The receiver is indexed and the ARGUMENT is
-// walked, so the answer is settled at the first item that is not there. The
+// walked, so the answer is settled at the first item that is not there. Both
+// sides are sealed — the receiver by `keySetOver` and the Argument here. The
 // empty List asks nothing of the receiver, which is what makes the answer
 // `true` before either List is read.
 export function contains__overload$2<ItemType extends AnyType>(
@@ -1916,7 +2198,7 @@ export function contains__overload$2<ItemType extends AnyType>(
 	otherList: ListType<ItemType>,
 	conformance: EquatableWitness<ItemType>,
 ): BooleanType {
-	let others = runsOf(otherList)
+	let others = sealedRunsOf(otherList)
 
 	if (others.total === 0) {
 		return createBoolean(true)
@@ -1991,6 +2273,9 @@ export function hasDuplicates__overload$2<
 	return meetsAKeyTwice(originalList, keyOf, conformance)
 }
 
+// NOTE: Sealed like the set-shaped natives above: the tally asks each item's
+// own witness while the run Array is held.
+//
 // NOTE: The item counted highest, and the sixth Method resting on
 // `keyEncoding.ts` rather than on a container. It is here beside the
 // set-shaped natives because it is one of them with a tally instead of a
@@ -2006,7 +2291,7 @@ export function hasDuplicates__overload$2<
 export function mode<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ItemType {
-	let view = runsOf(originalList)
+	let view = sealedRunsOf(originalList)
 	let count = freshKeyCount<ItemType>()
 
 	for (let index = view.frontCount - 1; index >= 0; index--) {
