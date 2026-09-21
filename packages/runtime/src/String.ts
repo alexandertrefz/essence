@@ -19,38 +19,244 @@ export function createString(value: string): StringType {
 	return { [typeKeySymbol]: "String", value }
 }
 
-// NOTE: The escapes are the String Literal's own spellings, so what a quoted
-// rendering shows is unambiguous: an embedded quote no longer reads as the
-// closing one, a backslash as an escape it never was, and a line break no
-// longer splits the one value across two lines of output. The remaining
-// control characters have no Essence spelling of their own, so they render as
-// their code point.
-const stringEscapes: { [character: string]: string } = {
-	"\\": "\\\\",
-	'"': '\\"',
-	"\n": "\\n",
-	"\r": "\\r",
-	"\t": "\\t",
+// NOTE: A code point in the spelling a String Literal reads back — upper case,
+// which is how the Unicode standard names one.
+function codePointEscape(code: number): string {
+	return `\\u{${code.toString(16).toUpperCase()}}`
+}
+
+// NOTE: THE ESCAPE SET, as one mark per code unit over the whole Basic
+// Multilingual Plane — the C0 controls, DEL and the C1 controls; the four
+// characters a Literal has to escape for its own sake (`"`, `\`, `{` and `}`);
+// the bidi controls; the two line separators; the byte order mark; and the
+// surrogates, which `escapeOf` then judges as a pair or as half of one.
+//
+// NOTE: A TABLE OVER ALL OF IT rather than over the ASCII range with a ladder
+// of ranges above, and the 64 KiB is bought deliberately. `charCodeAt` answers
+// nothing above U+FFFF, so a table this wide needs no range test at all and the
+// scan becomes ONE indexed load per code unit with no branch to predict. That
+// is worth 15% on English text and 2x on Japanese against the same table read
+// behind a `code < 0xA0` test: 94.8 -> 80.8 ms over 200,000 paragraphs, and
+// 7.6 -> 3.9 ms over 200,000 Japanese names. It is allocated zeroed and filled
+// with about two thousand writes, once.
+//
+// NOTE: Built on FIRST USE and not when the module is loaded, the way
+// `graphemeSegmenter` below is. A table built at the top of this file was tried
+// and reverted: stopping a debug session on entry paused inside the table's own
+// loop, a frame no `.es` line maps to, so `stopOnEntry` landed on nothing and
+// `dap.spec.ts` went red. This module is carried by every Program that prints a
+// String at all, and it stays free of top-level side effects — a Program that
+// never quotes one never builds this.
+const arabicLetterMark = 0x061c
+const byteOrderMark = 0xfeff
+const firstSurrogate = 0xd800
+const highSurrogateEnd = 0xdbff
+const lastSurrogate = 0xdfff
+const replacementCharacter = 0xfffd
+
+let escapeMarks: Uint8Array | null = null
+
+function markedEscapes(): Uint8Array {
+	if (escapeMarks === null) {
+		let marks = new Uint8Array(0x10000)
+
+		// NOTE: The set as the ranges it is made of, in order: the C0
+		// controls; the quote; the backslash; the two braces; DEL and the C1
+		// controls; the Arabic letter mark; the two bidi marks; the line and
+		// paragraph separators with the embeddings and overrides behind them;
+		// the four isolates; the surrogates; and the byte order mark.
+		//
+		// NOTE: The INVISIBLE ones are here because they change how the text
+		// around them is READ. A value that reorders the line it is printed on
+		// can make a report say something other than what it holds, which is
+		// the source-spoofing trick pointed at a reader; a value carrying an
+		// invisible line break splits one printed value across two lines. The
+		// byte order mark earns its place by being invisible alone: it arrives
+		// on the front of pasted text often enough to be worth naming.
+		//
+		// NOTE: What is deliberately NOT here is the zero-width joiner U+200D
+		// and the non-joiner beside it. They are invisible too, and they are
+		// what holds an emoji sequence together: escaping one would take a
+		// printed sequence apart into characters nobody wrote. An invisible
+		// character that changes how its neighbours READ is spelled; one that
+		// changes how they DRAW is left where it is.
+		//
+		// NOTE: Written inside this Function rather than beside it, so that a
+		// module a Program merely prints a String through allocates nothing at
+		// all until something asks it to quote one.
+		for (let [first, last] of [
+			[0x00, 0x1f],
+			[0x22, 0x22],
+			[0x5c, 0x5c],
+			[0x7b, 0x7b],
+			[0x7d, 0x7d],
+			[0x7f, 0x9f],
+			[arabicLetterMark, arabicLetterMark],
+			[0x200e, 0x200f],
+			[0x2028, 0x202e],
+			[0x2066, 0x2069],
+			[firstSurrogate, lastSurrogate],
+			[byteOrderMark, byteOrderMark],
+		] as Array<[number, number]>) {
+			for (let code = first; code <= last; code++) {
+				marks[code] = 1
+			}
+		}
+
+		escapeMarks = marks
+	}
+
+	return escapeMarks
+}
+
+// NOTE: HOW a marked code unit is written, asked only of the ones the scan
+// below has already marked. It answers no question about WHICH ones those are
+// — that is the scan's, in one place — so nothing here re-tests a range and a
+// character that reaches it always has an answer, but for the one code unit
+// that does not: half of a well-formed surrogate pair, which is written as
+// itself so the character the pair spells prints as one.
+//
+// NOTE: The seven with a spelling of their own. `{` and `}` are among them
+// because a bare `{` in quoted output OPENS AN INTERPOLATION HOLE when the text
+// is read back: `"a\{b\}"::quote()` printed `"a{b}"`, and pasting that into a
+// Program was a syntax error rather than the value it came from.
+function escapeOf(value: string, index: number, code: number): string | null {
+	switch (code) {
+		case 0x5c:
+			return "\\\\"
+		case 0x22:
+			return '\\"'
+		case 0x0a:
+			return "\\n"
+		case 0x0d:
+			return "\\r"
+		case 0x09:
+			return "\\t"
+		case 0x7b:
+			return "\\{"
+		case 0x7d:
+			return "\\}"
+	}
+
+	return code >= firstSurrogate && code <= lastSurrogate
+		? surrogateEscapeAt(value, index, code)
+		: codePointEscape(code)
+}
+
+// NOTE: A LONE SURROGATE — half of a character, which no String the language
+// can build holds: `String.of(codePoint:)` answers nothing for one, no Literal
+// can spell one, and segmenting never splits a pair. One can only have arrived
+// across the embedding boundary from a JavaScript host.
+//
+// It is written as the REPLACEMENT CHARACTER's escape rather than as its own,
+// for two reasons. Its own would be `\u{D800}`, which the Lexer refuses — a
+// printer whose output can not be read back is the bug this escape was added to
+// fix. And U+FFFD is what it really becomes the moment the text is encoded:
+// writing a lone surrogate out as UTF-8 substitutes exactly that, so what is
+// printed is what the terminal would have shown anyway, named instead of
+// silent. A replacement character that was really there prints as itself, so
+// the two are still told apart.
+//
+// A whole pair is waved through, so the character it spells prints as itself.
+function surrogateEscapeAt(
+	value: string,
+	index: number,
+	code: number,
+): string | null {
+	if (code <= highSurrogateEnd) {
+		let behind = value.charCodeAt(index + 1)
+
+		return behind > highSurrogateEnd && behind <= lastSurrogate
+			? null
+			: codePointEscape(replacementCharacter)
+	}
+
+	let front = index > 0 ? value.charCodeAt(index - 1) : 0
+
+	return front >= firstSurrogate && front <= highSurrogateEnd
+		? null
+		: codePointEscape(replacementCharacter)
 }
 
 // NOTE: A String written the way a Program would write it down — the text in
-// quotes, with anything a Literal has to escape escaped. It is here rather than
-// beside its callers because it is the one answer to one question, and four
-// readers ask it: `List.toString`, `Optional.toString`, the structural
-// rendering `Terminal.inspect` and `Record.toString` share, and the `quote`
-// native at the foot of this file, which hands the same text to a Program.
+// quotes, with everything a Literal has to escape escaped, and nothing else. It
+// is here rather than beside its callers because it is the one answer to one
+// question, and four readers ask it: `List.toString`, `Optional.toString`, the
+// structural rendering `Terminal.inspect` and `Record.toString` share, and the
+// `quote` native at the foot of this file, which hands the same text to a
+// Program.
 //
-// NOTE: Named apart from that native because the two answer different Types.
-// This one takes and answers the JavaScript text, so a reader inside the
+// NOTE: THE PROMISE IT MAKES is that its answer READS BACK. Whatever it prints,
+// pasted into a source file as it stands, is a String Literal the Lexer accepts
+// and decodes to the very value it was handed. That is why the braces are
+// escaped, why a control character is named by its code point rather than
+// written raw — `\u{1B}` was already what this printed, and was already text
+// the Lexer refused, twice over — and why the one value that can not be written
+// back, a lone surrogate, is named as what it encodes to. `roundTrip.spec.ts`
+// in the Compiler holds it to that over generated text, with this Function and
+// the real Lexer standing in one process.
+//
+// NOTE: Named apart from the `quote` native because the two answer different
+// Types. This one takes and answers the JavaScript text, so a reader inside the
 // runtime puts it straight into a rendering it is already building.
+//
+// NOTE: Scanned rather than matched, and what the scan COSTS is worth saying
+// plainly, because the first version of this NOTE said the opposite. The
+// regular expression it used to run could not see a lone surrogate or judge a
+// pair, so it had to go — but what replaced it READS EVERY CODE UNIT, and the
+// slicing is the free half. Text with nothing to escape comes back as one
+// slice and pays for the whole scan.
+//
+// So the scan is ONE question per code unit and nothing else: a mark read out
+// of a table that covers every code unit `charCodeAt` can answer, with no range
+// test in front of it. Everything a reader might reach for instead is worse. A
+// call per code unit — which is what the first version did, a seven-arm switch
+// and two range tests before it could say "no" for an ordinary letter — cost
+// 1.6x to 3.7x against the regular expression; a table read behind a
+// `code < 0xA0` test cost a further 15% on English and 2x on Japanese.
+//
+// WHAT IT COSTS NOW, over 200,000 Strings, best of seven, one module per
+// process, every answer consumed, against the regular expression this replaced:
+//
+//     "item-N", 11 characters        5.0 -> 3.2 ms    0.64x  faster
+//     a 43-character sentence        7.0 -> 7.8 ms    1.11x
+//     a 540-character paragraph     46.3 -> 79.3 ms   1.71x
+//     24 characters of Japanese      5.4 -> 3.9 ms    0.71x  faster
+//     1 MB that is all controls     60.2 -> 21.2 ms   0.35x  faster
+//
+// The paragraph row is the floor of the approach rather than the shape of this
+// loop: a loop that reads every code unit of that corpus and does NOTHING with
+// them takes 64 ms, so 1.38x of it is the reading alone. `String.replace` gets
+// under that by scanning inside the engine, which is the one thing a rule that
+// has to judge a surrogate PAIR can not do.
+//
+// NOTE: The set lives in that table and nowhere else — `escapeOf` is asked only
+// what a marked code unit is written as, never whether it is one. One
+// membership test in one place is what `escapeSet.spec.ts` pins against the
+// documented sentence.
 export function quotedText(value: string): string {
-	return `"${value.replace(
-		// oxlint-disable-next-line no-control-regex -- matching control characters is this function's job
-		/[\\"\n\r\t\u0000-\u001F\u007F-\u009F]/g,
-		(character) =>
-			stringEscapes[character] ??
-			`\\u{${character.charCodeAt(0).toString(16).toUpperCase()}}`,
-	)}"`
+	let marked = markedEscapes()
+	let quoted = ""
+	let runStart = -1
+
+	for (let index = 0; index < value.length; index++) {
+		let code = value.charCodeAt(index)
+
+		if (marked[code] === 0) {
+			continue
+		}
+
+		let escape = escapeOf(value, index, code)
+
+		if (escape === null) {
+			continue
+		}
+
+		quoted += value.slice(runStart < 0 ? 0 : runStart, index) + escape
+		runStart = index + 1
+	}
+
+	return runStart < 0 ? `"${value}"` : `"${quoted}${value.slice(runStart)}"`
 }
 
 // NOTE: THE ONE RULE for a value rendered INSIDE a structure: a String is

@@ -25,8 +25,9 @@ describe("rendering a String", () => {
 		)
 	})
 
-	// NOTE: The remaining control characters have no Essence spelling of their
-	// own, so they render as their code point.
+	// NOTE: The remaining control characters have no spelling of their own, so
+	// they render as their code point — which is a spelling a Program can now
+	// write down as well as read back.
 	test("a control character renders as its code point", () => {
 		expect(getStringRepresentation(createString("\u0000"))).toBe('"\\u{0}"')
 		expect(getStringRepresentation(createString("\u009F"))).toBe(
@@ -34,9 +35,60 @@ describe("rendering a String", () => {
 		)
 	})
 
+	// NOTE: A BARE BRACE in quoted output opens an interpolation hole when the
+	// text is read back, so `"a\{b\}"::quote()` printed `"a{b}"` and pasting
+	// that into a Program was a syntax error rather than the value it came
+	// from. `roundTrip.spec.ts` in the Compiler holds the whole promise, with
+	// this printer and the real Lexer standing in one process.
+	test("a brace renders as the escape that writes one", () => {
+		expect(getStringRepresentation(createString("a{b}"))).toBe('"a\\{b\\}"')
+	})
+
+	// NOTE: The invisible characters that change how the text around them is
+	// READ, which is what makes a printed value a trap: a bidi override
+	// reorders the line it is printed on — the source-spoofing trick, pointed
+	// at a report — U+2028 breaks the line in two, and a byte order mark simply
+	// hides. Each is spelled instead.
+	test("a character that reorders or hides renders as its code point", () => {
+		expect(getStringRepresentation(createString("a\u202Eb"))).toBe(
+			'"a\\u{202E}b"',
+		)
+		expect(getStringRepresentation(createString("a\u2028b"))).toBe(
+			'"a\\u{2028}b"',
+		)
+		expect(getStringRepresentation(createString("\uFEFFa"))).toBe(
+			'"\\u{FEFF}a"',
+		)
+	})
+
+	// NOTE: And the invisible ones that change how their neighbours DRAW are
+	// left alone. A zero-width joiner holds an emoji sequence together, and
+	// escaping it would take a printed sequence apart into the characters
+	// nobody wrote.
+	test("a joiner inside an emoji sequence is left alone", () => {
+		expect(
+			getStringRepresentation(createString("\u{1F469}\u200D\u{1F4BB}")),
+		).toBe('"\u{1F469}\u200D\u{1F4BB}"')
+	})
+
+	// NOTE: A lone surrogate is half of a character and no Literal spells one,
+	// so there is no escape that reads back to it. It renders as the
+	// replacement character's escape — what encoding the text would turn it
+	// into anyway, named rather than silent.
+	test("a lone surrogate renders as the replacement character", () => {
+		expect(getStringRepresentation(createString("a\uD800b"))).toBe(
+			'"a\\u{FFFD}b"',
+		)
+		expect(getStringRepresentation(createString("\uD83D\uDE00"))).toBe(
+			'"\u{1F600}"',
+		)
+	})
+
 	test("plain text renders unchanged inside its quotes", () => {
 		expect(getStringRepresentation(createString("hello"))).toBe('"hello"')
-		expect(getStringRepresentation(createString("a{b}"))).toBe('"a{b}"')
+		expect(getStringRepresentation(createString("caf\u00E9 \u65E5"))).toBe(
+			'"caf\u00E9 \u65E5"',
+		)
 	})
 
 	test("a Record member renders with the same escapes", () => {

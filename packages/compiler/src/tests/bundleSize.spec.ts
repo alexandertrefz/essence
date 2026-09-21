@@ -214,12 +214,32 @@ describe("Bundle Size", () => {
 	// become twelve times dearer than the copy it replaced; the third closed a
 	// comparison that could be written in place while it was being made.
 	//
+	// NOTE: 1,788 of them are the QUOTED PRINTER becoming one that reads back.
+	// `quotedText` was a single regular expression; it is a scan now, because a
+	// regular expression can not see a lone surrogate or judge a pair, and
+	// because what it printed could not be read back at all — a brace came out
+	// bare, so `"a\{b\}"::quote()` printed `"a{b}"`, whose `{` opens an
+	// interpolation hole when the text is pasted into a Program, and a control
+	// character came out as `\u{1B}`, which the Lexer refused twice over. Every
+	// Program that renders a String inside a List, a Record, a Case or an
+	// Optional links it, which is why the three figures below move together and
+	// why `HelloWorld.es` does not move at all: it prints a String and never
+	// quotes one.
+	//
+	// NOTE: 340 of those 1,788 are the escape table the scan reads, and they
+	// bought the scan back from a call per code unit: the paragraph row of the
+	// printer's own measurements went from 3.7x the regular expression to 1.7x,
+	// and short Strings and Japanese are now FASTER than it was. The table is
+	// built on first use and not at module load — a table built at module load
+	// was tried, and `stopOnEntry` paused inside its loop on a frame no `.es`
+	// line maps to, which is what `markedEscapes` is shaped around.
+	//
 	// NOTE: The ceiling stands about a kilobyte above the measured figure rather
 	// than a handful of bytes above it, because a gate with twenty bytes of
 	// headroom fails for the next person to write a line rather than for the
 	// next person to drag in a tower, and that is not what it is for.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(86_000)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(87_400)
 	})
 
 	// NOTE: 39,165 measured; a reintroduced `Number` spread was 54,849 against
@@ -248,13 +268,16 @@ describe("Bundle Size", () => {
 	//
 	// NOTE: 63 are the transcendental registry change Everyday's note above
 	// explains, which every file that reaches the tower pays alike.
+	//
+	// NOTE: 1,788 more are the quoted printer Everyday's note above explains,
+	// which every Program that renders a String inside a structure pays alike.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
 		// NOTE: 1,047 are `list-in-place-writes`, which Everyday's note above
 		// accounts for. This file names no List at all and still pays, because a
 		// conformance witness carries `List`'s own Methods with it — the very thing
 		// the note above this one is about. 62 more are the review fixes to the
 		// two List changes, which Everyday's note accounts for as well.
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(40_200)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(41_600)
 	})
 
 	// NOTE: 47,794 measured. The two tests above watch a Dictionary being shaken
@@ -352,11 +375,15 @@ describe("Bundle Size", () => {
 	// `list-in-place-writes` (the 1,356 the note inside the test accounts for),
 	// the character view's builder (112, the floor's own note) and 64 of review
 	// fixes to the two List changes.
+	//
+	// NOTE: 1,801 more are the quoted printer Everyday's note above explains —
+	// the same code, and thirteen bytes over what the other two pay, which is
+	// esbuild naming the imports of a larger module graph.
 	it("charges a Dictionary Program for the container it uses", async () => {
 		// NOTE: 1,356 are `list-in-place-writes`, which Everyday's note accounts
 		// for; `Dictionary.of(entries:)` walks a List of entry Records and seals it,
 		// which is where this file meets them.
-		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(61_800)
+		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(63_400)
 	})
 
 	// NOTE: 13,675 measured, the 133 above accounting for the rise, where the

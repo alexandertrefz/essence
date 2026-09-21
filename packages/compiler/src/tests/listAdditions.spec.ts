@@ -339,8 +339,8 @@ describe("The extrema with no key", () => {
 				Terminal.inspect(tied::highestItem(on .n)::toString())
 			}`),
 		).toEqual([
-			'"Value({ tag = \\"a\\", n = 1 })"',
-			'"Value({ tag = \\"a\\", n = 1 })"',
+			'"Value(\\{ tag = \\"a\\", n = 1 \\})"',
+			'"Value(\\{ tag = \\"a\\", n = 1 \\})"',
 		])
 	})
 

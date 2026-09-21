@@ -506,7 +506,7 @@ describe("the set-shaped Methods", () => {
 				Terminal.inspect(proven::removeDuplicates()::lastItem()::toString())
 				Terminal.inspect(rows::removeDuplicates(on .id)::firstItem()::toString())
 			}`),
-		).toEqual(['"1"', '"{ id = 1 }"'])
+		).toEqual(['"1"', '"\\{ id = 1 \\}"'])
 	})
 })
 

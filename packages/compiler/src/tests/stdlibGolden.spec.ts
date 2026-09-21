@@ -113,7 +113,32 @@ function labelOf(line: string): string {
 	let text = line.startsWith('"') ? line.slice(1, -1) : line
 	let separator = text.indexOf(" => ")
 
-	return separator === -1 ? text : text.slice(0, separator)
+	return unescaped(separator === -1 ? text : text.slice(0, separator))
+}
+
+// NOTE: A label comes back through the quoted printer, so it arrives SPELLED —
+// `Record.is(_ {})` is printed `Record.is(_ \{\})`, because a bare brace in quoted
+// output would open an interpolation hole if the line were pasted back into a
+// Program. The signatures it is compared against are read off the Declarations
+// and hold the braces themselves, so the spelling is undone here: this reads a
+// printed String Literal and wants the text that was in it.
+function unescaped(label: string): string {
+	let text = ""
+	let index = 0
+
+	while (index < label.length) {
+		if (label[index] !== "\\") {
+			text += label[index]
+			index++
+
+			continue
+		}
+
+		text += label[index + 1]
+		index += 2
+	}
+
+	return text
 }
 
 // NOTE: The one Namespace this harness can not cover, and the reason is the
