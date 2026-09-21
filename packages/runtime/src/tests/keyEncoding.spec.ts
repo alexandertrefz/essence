@@ -617,3 +617,84 @@ describe("a callback that edits the List being walked", () => {
 		expect(materialise(answer).length).toBe(3)
 	})
 })
+
+// NOTE: The brand on a CONDITIONAL conformance means "structural if the
+// conditions are", and `boundConformance` settles that with `every`. Today the
+// rule is latent rather than live: `List` is the only Namespace the Rewriter
+// brands conditionally, and `List<ItemType> is Equatable where ItemType is
+// Equatable` has exactly ONE condition — so `every` and `some` answer alike for
+// every Program that can be written, and no end-to-end test can tell them
+// apart. `some` in its place survived the whole encoding suite.
+//
+// It is worth a guard all the same, because the day a second Namespace joins
+// that set the difference is a soundness hole rather than a nicety: a
+// two-condition conformance branded because ONE of its conditions is structural
+// sends a key down the encoded path while the other condition's written `is` is
+// what the Program asked for. So the rule is held here directly, over a
+// conformance the language can not spell yet, with both conditions branded,
+// each one alone, and neither.
+describe("a conditional conformance branded across two conditions", () => {
+	// NOTE: Two Methods, because the currying is the other half of what
+	// `boundConformance` does and it must not change with the brand: whatever
+	// the conditions say about `structural`, both entries come back as
+	// Functions that were handed the conditions as trailing Arguments.
+	const twoConditions = (first: unknown, second: unknown) =>
+		boundConformance(
+			{
+				is: (...args: Array<unknown>) => args,
+				isNot: (...args: Array<unknown>) => args,
+				structural: true,
+			},
+			[first, second],
+		)
+
+	const branded = { is: equality.is, structural: true as const }
+	const written = { is: equality.is }
+
+	test("is branded when both conditions are", () => {
+		expect(twoConditions(branded, branded).structural).toBe(true)
+	})
+
+	test("is not branded when only the first condition is", () => {
+		expect(twoConditions(branded, written).structural).toBeUndefined()
+	})
+
+	test("is not branded when only the second condition is", () => {
+		expect(twoConditions(written, branded).structural).toBeUndefined()
+	})
+
+	test("is not branded when neither condition is", () => {
+		expect(twoConditions(written, written).structural).toBeUndefined()
+	})
+
+	// NOTE: And a map that never carried the brand does not gain one from its
+	// conditions — the brand is the NAMESPACE's claim, which the conditions can
+	// only take away.
+	test("is not branded when the method map never claimed it", () => {
+		expect(
+			boundConformance({ is: (...args: Array<unknown>) => args }, [
+				branded,
+				branded,
+			]).structural,
+		).toBeUndefined()
+	})
+
+	// NOTE: The currying, unchanged in the branded case and the refused one
+	// alike. Both conditions arrive behind the call's own Arguments, in order.
+	test("curries both conditions onto every Method either way", () => {
+		for (let [first, second] of [
+			[branded, branded],
+			[branded, written],
+		]) {
+			let witness = twoConditions(first, second)
+
+			for (let name of ["is", "isNot"]) {
+				expect(
+					(witness[name] as (...args: Array<unknown>) => unknown)(
+						"receiver",
+					),
+				).toEqual(["receiver", first, second])
+			}
+		}
+	})
+})
