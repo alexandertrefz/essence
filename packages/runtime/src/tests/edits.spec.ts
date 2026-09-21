@@ -1055,6 +1055,26 @@ describe("what a walk over a List moves", () => {
 		})
 	}
 
+	// NOTE: THE FRONT half of the rule, which no other test here reaches: a
+	// window keeping less than half of a long FRONT run. The front is stored
+	// reversed, so what the trim must keep is the run's LOW end and what the
+	// box's head is standing at is its high one — a trim that took the wrong
+	// slice of it would answer an item nobody put there, or nothing at all.
+	test("a window of a long front run is trimmed and still answers its items", () => {
+		let deep = prependedOnly([11, 22, 33, 44, 55, 66, 77, 88])
+		let answer = slice(deep, integer(6), integer(8))
+
+		expect(answer.front).toBe(deep.front)
+		expect(itemAt(answer, 0)).toBe(77)
+		expect(answer.front).not.toBe(deep.front)
+		expect(answer.front?.length).toBe(2)
+		expect(itemsOf(answer)).toEqual([77, 88])
+		expect(itemAt(answer, 1)).toBe(88)
+		expect(itemAt(answer, -1)).toBe(88)
+		expect(itemAt(answer, 2)).toBeNull()
+		expect(itemsOf(deep)).toEqual([11, 22, 33, 44, 55, 66, 77, 88])
+	})
+
 	// NOTE: The other side of the rule's subject. Cutting a short window out of
 	// a box that views the WHOLE of its run must move nothing at all: the run is
 	// already as short as the receiver can make it, and the answer's own

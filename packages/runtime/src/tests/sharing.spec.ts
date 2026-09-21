@@ -752,7 +752,8 @@ const referenceSlice = (
 	let count = items.length
 	let resolvedFrom = from < 0 ? from + count : from
 	let resolvedTo = to < 0 ? to + count : to
-	let start = resolvedFrom < 0 ? 0 : resolvedFrom > count ? count : resolvedFrom
+	let start =
+		resolvedFrom < 0 ? 0 : resolvedFrom > count ? count : resolvedFrom
 	let end = resolvedTo < 0 ? 0 : resolvedTo > count ? count : resolvedTo
 
 	return end <= start ? [] : items.slice(start, end)
@@ -850,29 +851,60 @@ const expectAnswers = (held: Held): void => {
 }
 
 describe("a random chain of List operations against an Array model", () => {
-	// NOTE: Eighty turns over a pool that starts with four boxes, which is deep
+	// NOTE: Eighty turns over a pool that starts with five boxes, which is deep
 	// enough for a box to be a window of a window of a window and for every
 	// operation to have been asked of every shape the chain reaches. The whole
 	// run of twelve seeds is well under a second.
 	const TURNS = 80
 
-	// NOTE: The positions an operation is given — inside, at both ends, and past
-	// both of them, in the two spellings a position has.
+	// NOTE: The positions an operation is given — the two ends, their
+	// neighbours, one past each end, and one drawn anywhere inside, each in the
+	// two spellings a position has. Drawn from a list rather than from the whole
+	// span, because the ends are where an off-by-one lives and a flat draw over
+	// a range twice the List's length spends most of its turns outside it.
 	const positionIn = (draw: () => number, items: Array<number>): number => {
-		let span = items.length + 2
-		let position = Math.floor(draw() * (span * 2 + 1)) - span
+		let count = items.length
+		let candidates = [
+			0,
+			1,
+			2,
+			count - 2,
+			count - 1,
+			count,
+			count + 1,
+			Math.floor(draw() * (count + 1)),
+			-1,
+			-2,
+			-count,
+			-count - 1,
+			-Math.floor(draw() * (count + 1)) - 1,
+		]
 
-		return position
+		return candidates[Math.floor(draw() * candidates.length)] as number
 	}
 
 	for (let seed of CHAIN_SEEDS) {
 		test(`every box a chain builds keeps answering for itself, at seed ${seed.toString(16)}`, () => {
 			let draw = seededRandom(seed)
+			// NOTE: The last seed is built by TWELVE prepends, so its front run
+			// is long enough for a window of it to view less than half — which
+			// is the only way the FRONT half of the half rule ever fires, and
+			// no shorter shape here reaches it.
+			let prepended = createList<IntegerType>([])
+
+			for (let value = 12; value >= 1; value--) {
+				prepended = prepend(prepended, createInteger(BigInt(value)))
+			}
+
 			let pool: Array<Held> = [
 				{ list: integers(), items: [] },
 				{ list: integers(1), items: [1] },
 				{ list: integers(1, 2, 3, 4, 5), items: [1, 2, 3, 4, 5] },
 				{ list: upgraded(), items: [1, 2, 3, 4, 5] },
+				{
+					list: prepended,
+					items: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+				},
 			]
 
 			const pick = (): Held =>
@@ -899,6 +931,33 @@ describe("a random chain of List operations against an Array model", () => {
 					return {
 						list: prepend(held.list, createInteger(BigInt(value))),
 						items: [value, ...held.items],
+					}
+				},
+				// NOTE: A FRESH long front run with a window keeping a few
+				// items off its far end — built rather than drawn, because it
+				// is the one shape the FRONT half of the half rule fires for
+				// and a pool that mixes appends and slices reaches it about
+				// once in a thousand turns. Everything derived from it in
+				// later turns is drawn as usual.
+				() => {
+					let list = createList<IntegerType>([])
+					let items: Array<number> = []
+					let count = Math.floor(draw() * 8) + 5
+
+					for (let value = count; value >= 1; value--) {
+						list = prepend(list, createInteger(BigInt(value)))
+						items.unshift(value)
+					}
+
+					let keep = Math.floor(draw() * 3) + 1
+
+					return {
+						list: slice(
+							list,
+							createInteger(BigInt(-keep)),
+							createInteger(BigInt(count)),
+						),
+						items: items.slice(count - keep),
 					}
 				},
 				() => {
@@ -983,6 +1042,25 @@ describe("a random chain of List operations against an Array model", () => {
 						items: held.items.filter((item) => item % 2 === 0),
 					}
 				},
+				// NOTE: `lastItems(k)` — a window keeping a few items off the
+				// FAR end, which is the one shape that leaves a box viewing
+				// less than half of a long front run and so the only one that
+				// fires the front half of the half rule.
+				() => {
+					let held = pick()
+					let keep = Math.floor(draw() * 4) + 1
+
+					return {
+						list: slice(
+							held.list,
+							createInteger(BigInt(-keep)),
+							createInteger(BigInt(held.items.length)),
+						),
+						items: held.items.slice(
+							Math.max(0, held.items.length - keep),
+						),
+					}
+				},
 				() => {
 					let held = pick()
 
@@ -995,7 +1073,11 @@ describe("a random chain of List operations against an Array model", () => {
 					let held = pick()
 
 					return {
-						list: sortByOwnOrder(held.list, ascending, integerOrder),
+						list: sortByOwnOrder(
+							held.list,
+							ascending,
+							integerOrder,
+						),
 						items: [...held.items].sort(
 							(first, second) => first - second,
 						),
@@ -1047,7 +1129,9 @@ describe("a random chain of List operations against an Array model", () => {
 			]
 
 			for (let turn = 0; turn < TURNS; turn++) {
-				pool.push((turns[Math.floor(draw() * turns.length)] as () => Held)())
+				pool.push(
+					(turns[Math.floor(draw() * turns.length)] as () => Held)(),
+				)
 
 				// NOTE: Every box, in an order the draw decides — because what
 				// a read may do to a box is trim it, and a trim under one box is
@@ -1088,31 +1172,32 @@ describe("a random chain of List operations against an Array model", () => {
 // when a run is replaced under a box, so it is exactly the kind of change that
 // could make a walk read the wrong Array halfway through.
 describe("a callback that edits the List being walked", () => {
-	const shapes: Array<[string, () => ListType<IntegerType>, Array<number>]> = [
-		["a flat box", () => integers(1, 2, 3, 4, 5), [1, 2, 3, 4, 5]],
-		["an upgraded box", upgraded, [1, 2, 3, 4, 5]],
+	const shapes: Array<[string, () => ListType<IntegerType>, Array<number>]> =
 		[
-			"a shared window",
-			() =>
-				slice(
-					integers(0, 1, 2, 3, 4, 5, 6),
-					createInteger(1n),
-					createInteger(6n),
-				),
-			[1, 2, 3, 4, 5],
-		],
-		[
-			"a stale box",
-			() => {
-				let seed = integers(1, 2, 3, 4, 5)
+			["a flat box", () => integers(1, 2, 3, 4, 5), [1, 2, 3, 4, 5]],
+			["an upgraded box", upgraded, [1, 2, 3, 4, 5]],
+			[
+				"a shared window",
+				() =>
+					slice(
+						integers(0, 1, 2, 3, 4, 5, 6),
+						createInteger(1n),
+						createInteger(6n),
+					),
+				[1, 2, 3, 4, 5],
+			],
+			[
+				"a stale box",
+				() => {
+					let seed = integers(1, 2, 3, 4, 5)
 
-				append(seed, createInteger(9n))
+					append(seed, createInteger(9n))
 
-				return seed
-			},
-			[1, 2, 3, 4, 5],
-		],
-	]
+					return seed
+				},
+				[1, 2, 3, 4, 5],
+			],
+		]
 
 	for (let [name, build, items] of shapes) {
 		test(`a fold over ${name} seeded with itself answers its items twice`, () => {
