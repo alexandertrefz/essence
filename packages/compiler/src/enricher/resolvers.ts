@@ -14,6 +14,9 @@ import { oneBoundOnly } from "../helpers/bounds"
 import {
 	computeConformanceMethodMap,
 	conformanceKey,
+	derivedEnumerableNamespaceName,
+	derivedEquatableNamespaceName,
+	derivedPrintableNamespaceName,
 	missingRequirements,
 	providedMethodProtocol,
 } from "../helpers/conformance"
@@ -2814,23 +2817,16 @@ function conformanceStateFor(scope: enricher.Scope): ScopeConformanceState {
 	return state
 }
 
-// NOTE: The Namespace name the derived equality answers to. It contains a `_`,
-// which the Lexer reads as a Symbol rather than an Identifier character, so no
-// Essence source can spell this name and it can never collide with a written
-// Namespace. The Rewriter recognises it and emits the runtime helpers instead
-// of a member read — there is no object anywhere with this name.
-export const derivedEquatableNamespaceName = "Choice_Equatable"
-
-// NOTE: The Namespace name the derived printing answers to, under the same rule
-// as the one above: the `_` keeps it unspellable from Essence, and the Rewriter
-// turns the one reference to it into the runtime helper.
-export const derivedPrintableNamespaceName = "Choice_Printable"
-
-// NOTE: The Namespace name the derived Case listing answers to, under the same
-// rule as the two above: the `_` keeps it unspellable from Essence, and the
-// Rewriter turns a reference to it into the runtime helper, curried with the
-// tags the Choice's Cases carry.
-export const derivedEnumerableNamespaceName = "Choice_Enumerable"
+// NOTE: The three fabricated Namespace names moved to `helpers/conformance.ts`,
+// where the two lists that read them live — a name spelled beside its readers is
+// a name the Rewriter's brand and the Enricher's routing can not disagree about.
+// They are re-exported under their own names, so every site that reaches them
+// through this module still does.
+export {
+	derivedEnumerableNamespaceName,
+	derivedEquatableNamespaceName,
+	derivedPrintableNamespaceName,
+}
 
 // NOTE: The Protocol printing is derived for. Named once and exported, because
 // three places ask whether a conformance is that one — the two below and the

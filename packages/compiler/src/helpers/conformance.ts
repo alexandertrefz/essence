@@ -7,6 +7,214 @@ import {
 	resolveOverloadedMethodName,
 } from "./types"
 
+// NOTE: The Namespace name the derived equality of a Choice answers to. It
+// contains a `_`, which the Lexer reads as a Symbol rather than an Identifier
+// character, so no Essence source can spell this name and it can never collide
+// with a written Namespace. The Rewriter recognises it and emits the runtime
+// helpers instead of a member read — there is no object anywhere with this name.
+//
+// NOTE: The five names live HERE, beside the two lists that read them, rather
+// than in the Enricher that fabricates them: the Rewriter's brand and the
+// Enricher's routing have to name the same Namespaces, and a name spelled twice
+// is two places that can disagree. `resolvers.ts` re-exports the three Choice
+// ones, so every site that imported them from there still does.
+export const derivedEquatableNamespaceName = "Choice_Equatable"
+
+// NOTE: The Namespace name the derived printing answers to, under the same rule
+// as the one above: the `_` keeps it unspellable from Essence, and the Rewriter
+// turns the one reference to it into the runtime helper.
+export const derivedPrintableNamespaceName = "Choice_Printable"
+
+// NOTE: The Namespace name the derived Case listing answers to, under the same
+// rule as the two above: the `_` keeps it unspellable from Essence, and the
+// Rewriter turns a reference to it into the runtime helper, curried with the
+// tags the Choice's Cases carry.
+export const derivedEnumerableNamespaceName = "Choice_Enumerable"
+
+// NOTE: And the two a Record answers to when its DECLARED members do not all
+// compare — or print — the way the universal structural walk does. A Record
+// whose members are all structural keeps naming the builtin `Record` Namespace
+// and emits exactly what it always did; only a Record that ROUTES a member
+// through that member's own conformance arrives under one of these, curried
+// with the routed member names and handed the member witnesses as its trailing
+// conformance Arguments. Unspellable from Essence for the same reason.
+export const recordEquatableNamespaceName = "Record_Equatable"
+
+export const recordPrintableNamespaceName = "Record_Printable"
+
+// NOTE: The Protocol a composite's members are asked about, named once for the
+// reason every other Protocol name here is: the routing rule is read in four
+// places and a typo in any of them would silently route nothing.
+export const equatableProtocolName = "Equatable"
+
+// NOTE: The standard library's own Namespaces whose `Equatable::is` is
+// STRUCTURAL — it asks what the value IS and nothing else, which is exactly what
+// the Dictionary runtime's canonical key encoding stands in for. A String is its
+// characters, an Integer is its number, a Rational is its reduced pair, a
+// Boolean is one of two values, `Number` covers the three numeric kinds by the
+// same rule, and a Record is its members compared by that same universal rule.
+//
+// The equality the language DERIVES for a Choice is on the list under the name
+// the Enricher fabricates for it: it compares the tag and then the payload by
+// the universal rule, and no Namespace wrote it. A Namespace that writes an
+// `is` for its Choice REPLACES the derivation, so its witness arrives under the
+// Namespace's own name and is not branded — unless the Namespace is one of the
+// library's own, which is what the second list below is for. A conditional
+// witness — a generic Choice's, or a Record that routes a member — is judged by
+// that second list and never by this one.
+//
+// A refinement of one of those is not on the list and does not need to be: it
+// declares no `is` of its own, so its conformance RESOLVES to the base
+// Namespace's and arrives here under the base's name — `NonEmptyString` emits
+// `String`'s witness. What a user Namespace writes never resolves to one of
+// these, which is the whole point: `namespace Loose for NonEmptyString is
+// Equatable` arrives as `Loose`, is not branded, and the runtime scans its slots
+// through the witness instead of trusting an encoding that would call two of its
+// keys distinct.
+//
+// NOTE: `Record` is on the list and `Record_Equatable` is on NEITHER. The
+// builtin Namespace's `is` compares every member through `anyIs` whatever its
+// own Namespace writes, which is the structural rule; the routed witness asks a
+// member's own `is`, which by construction is one that is not.
+export const structurallyEquatableNamespaces = new Set([
+	"String",
+	"Integer",
+	"Rational",
+	"Boolean",
+	"Number",
+	"Record",
+	derivedEquatableNamespaceName,
+])
+
+// NOTE: And the Namespaces whose `Equatable::is` is structural exactly when what
+// they HOLD is compared structurally. `List::is` is the items compared pairwise
+// through the item's own witness, so `List<ItemType> is Equatable where
+// ItemType is Equatable` is structural if and only if the witness solving that
+// `where` is — recursively, since a nested List's witness is decided by the same
+// rule. A `List<NonEmptyString>` under a `namespace Loose for NonEmptyString is
+// Equatable` is the case this has to refuse: `Loose` is not branded, so the List
+// holding it is not either, and the runtime scans.
+//
+// A GENERIC CHOICE is the same rule met on the other kind of container, and
+// there are three spellings of it here. `Optional` and `Result` WRITE their
+// `is` in the standard library rather than deriving it — and each writes the
+// derivation: the tag decides the Case, and the payload is compared through the
+// Type Argument's own witness, which is `where ItemType is Equatable` solved.
+// They are named for the same reason `String` and `Integer` are named above: the
+// library's own `is` is a Method this Compiler knows the meaning of. The third
+// is the DERIVED witness of a Choice a Program declares, which arrives under the
+// fabricated name and is conditional whenever the Choice is generic OR one of
+// its payload members routes — `boundChoiceIs` walks a descriptor that asks a
+// witness at every such member and compares the rest by the universal rule.
+//
+// A Namespace a PROGRAM writes for its own Choice is still refused, because it
+// arrives under its own name and is on neither list. So is `Dictionary`, whose
+// `is` is structural under the same conditions but whose keys the runtime
+// encoder declines outright: spelling a Dictionary would make `Dictionary.ts`
+// and `keyEncoding.ts` a real cycle, and every `removeDuplicates` Program would
+// carry the store. And so is `Record_…` — a Record that ROUTES is conditional
+// on a member whose own `is` is by construction not the structural one, which is
+// the whole reason it routes.
+//
+// The brand for such a Namespace is CONDITIONAL, and it is resolved where the
+// condition witnesses are: `boundConformance` reads it off the method map, asks
+// each of them, and only then puts it on the witness it builds. That is also
+// the one place the answer CAN be settled — a generic Function's `List<T>`
+// witness is built from a `T` witness forwarded in at the call, which the
+// Compiler has no name for here.
+export const conditionallyStructuralNamespaces = new Set([
+	"List",
+	"Optional",
+	"Result",
+	derivedEquatableNamespaceName,
+])
+
+// NOTE: The same question asked of PRINTING, and it is a DIFFERENT list — which
+// is the half of this that is silent when it is wrong. Structural-for-printing
+// means "the structural walk already renders a value of this Type exactly as its
+// own `toString` answers", so a member on this list can be left to the walk and
+// a member off it has to be routed through its Namespace.
+//
+// `Algebraic` and `Transcendental` are here and are NOT on the equality list
+// above: the walk calls their `toString` outright, while their `is` is written
+// in Essence over a comparison the key encoding can not stand in for. The
+// asymmetry reads like a typo and is not one.
+//
+// A STRING is on the list even though the two readings differ — `"x"::toString()`
+// is `x` and the walk writes `"x"`. Inside a composite the quoted form is what
+// every reader already gets (`[ "a" ]`, `{ name = "a" }`), so routing a String
+// member would take the quotes away rather than restore anything.
+//
+// Every written Namespace is off the list by not being on it, and so are the two
+// that read a Case: `Choice_Printable` answers `Open` where the walk writes
+// `Door#Open`, and `Optional`/`Result` answer `Value(3)` where it writes
+// `Optional#Value(3)`.
+export const structurallyPrintableNamespaces = new Set([
+	"String",
+	"Integer",
+	"Rational",
+	"Algebraic",
+	"Transcendental",
+	"Boolean",
+	"Number",
+	"Record",
+])
+
+// NOTE: And printing's conditional pair. A List renders as its items rendered,
+// with the padding a Record's walk already passes (`[1, 2]`, which is what
+// `List::toString` answers); a Dictionary renders as its entries, keys quoted.
+// Either is structural exactly when what it holds is.
+export const conditionallyStructuralPrintableNamespaces = new Set([
+	"List",
+	"Dictionary",
+])
+
+// NOTE: Whether a SOLVED conformance is the structural one — the question the
+// Enricher asks of every declared member of a Record or a Case payload before
+// deciding to route it, and the question the Rewriter's brand is decided by.
+// One rule, read from one pair of lists, because a routed member and an encoded
+// Dictionary key are the same claim seen from two sides.
+//
+// A `parameter` source is never structural: it is the enclosing Function's own
+// witness, decided by a CALLER, and routing is the answer that is right whatever
+// that caller hands in.
+//
+// NOTE: The two answers are one answer, and that is the point of one pair of
+// lists: a member left UNROUTED is compared by `anyIs`, which IS the structural
+// comparison a Dictionary's encoding stands in for, and a composite that routes
+// ANYTHING carries a condition whose witness is by construction not branded — so
+// the composite is not branded either and its keys scan through the very
+// comparison that runs. Neither side can drift while both read this.
+export function conformanceIsStructural(
+	source: common.ConformanceSource,
+	protocolName: string,
+): boolean {
+	if (source.kind === "parameter") {
+		return false
+	}
+
+	let unconditional =
+		protocolName === equatableProtocolName
+			? structurallyEquatableNamespaces
+			: structurallyPrintableNamespaces
+	let conditional =
+		protocolName === equatableProtocolName
+			? conditionallyStructuralNamespaces
+			: conditionallyStructuralPrintableNamespaces
+
+	let named =
+		source.conditions.length > 0
+			? conditional.has(source.name)
+			: unconditional.has(source.name)
+
+	return (
+		named &&
+		source.conditions.every((condition) =>
+			conformanceIsStructural(condition.source, protocolName),
+		)
+	)
+}
+
 // NOTE: Maps each Protocol Method's *emitted* name (with `__overload$N`
 // suffixes for overloaded Protocol Methods) to the fulfilling Namespace
 // Method's emitted name. This is the single source of truth for both

@@ -11,10 +11,12 @@ import {
 	PRELUDE_SPECIFIER,
 } from "../bundler/index"
 import {
+	conditionallyStructuralNamespaces,
 	derivedEnumerableNamespaceName,
 	derivedEquatableNamespaceName,
 	derivedPrintableNamespaceName,
-} from "../enricher/resolvers"
+	structurallyEquatableNamespaces,
+} from "../helpers/conformance"
 import { openArgumentHoles } from "../helpers/defaults"
 import { typeContainsRefinement, withoutRecordNames } from "../helpers/types"
 import {
@@ -3572,86 +3574,16 @@ function rewriteCaseValue(
 	}
 }
 
-// NOTE: The standard library's own Namespaces whose `Equatable::is` is
-// STRUCTURAL — it asks what the value IS and nothing else, which is exactly what
-// the Dictionary runtime's canonical key encoding stands in for. A String is its
-// characters, an Integer is its number, a Rational is its reduced pair, a
-// Boolean is one of two values, `Number` covers the three numeric kinds by the
-// same rule, and a Record is its members compared by that same universal rule —
-// `Record::is` never asks a member's own Namespace, which is what makes its
-// witness structural rather than merely the library's (see `Record.es`).
+// NOTE: Whether this witness names a Namespace whose `is` is the STRUCTURAL
+// one, and is the EQUATABLE one — a Namespace conforms to several Protocols and
+// only the Equatable witness is ever handed to a Dictionary. `Equatable`
+// declares exactly `is` and `isNot`, so the two names it fulfils, wherever they
+// come from, are what identify it.
 //
-// The equality the language DERIVES for a Choice is on the list under the name
-// the Enricher fabricates for it: it compares the tag and then the payload by
-// the universal rule, and no Namespace wrote it. A Namespace that writes an
-// `is` for its Choice REPLACES the derivation, so its witness arrives under the
-// Namespace's own name and is not branded — unless the Namespace is one of the
-// library's own, which is what the second list below is for.
-//
-// A refinement of one of those is not on the list and does not need to be: it
-// declares no `is` of its own, so its conformance RESOLVES to the base
-// Namespace's and arrives here under the base's name — `NonEmptyString` emits
-// `String`'s witness. What a user Namespace writes never resolves to one of
-// these, which is the whole point: `namespace Loose for NonEmptyString is
-// Equatable` arrives as `Loose`, is not branded, and the runtime scans its slots
-// through the witness instead of trusting an encoding that would call two of its
-// keys distinct.
-const structurallyEquatableNamespaces = new Set([
-	"String",
-	"Integer",
-	"Rational",
-	"Boolean",
-	"Number",
-	"Record",
-	derivedEquatableNamespaceName,
-])
-
-// NOTE: And the Namespaces whose `Equatable::is` is structural exactly when what
-// they HOLD is compared structurally. `List::is` is the items compared pairwise
-// through the item's own witness, so `List<ItemType> is Equatable where
-// ItemType is Equatable` is structural if and only if the witness solving that
-// `where` is — recursively, since a nested List's witness is decided by the same
-// rule. A `List<NonEmptyString>` under a `namespace Loose for NonEmptyString is
-// Equatable` is the case this has to refuse: `Loose` is not branded, so the List
-// holding it is not either, and the runtime scans.
-//
-// A GENERIC CHOICE is the same rule met on the other kind of container, and
-// there are three spellings of it here. `Optional` and `Result` WRITE their
-// `is` in the standard library rather than deriving it — and each writes the
-// derivation: the tag decides the Case, and the payload is compared through the
-// Type Argument's own witness, which is `where ItemType is Equatable` solved.
-// They are named for the same reason `String` and `Integer` are named above: the
-// library's own `is` is a Method this Compiler knows the meaning of. The third
-// is the DERIVED witness of a Choice a Program declares, which arrives under the
-// fabricated name and is conditional exactly when the Choice is generic —
-// `boundChoiceIs` walks a descriptor that asks a Type Argument's witness at
-// every member naming a Type Parameter and compares the rest by the universal
-// rule.
-//
-// A Namespace a PROGRAM writes for its own Choice is still refused, because it
-// arrives under its own name and is on neither list. So is `Dictionary`, whose
-// `is` is structural under the same conditions but whose keys the runtime
-// encoder declines outright: spelling a Dictionary would make `Dictionary.ts`
-// and `keyEncoding.ts` a real cycle, and every `removeDuplicates` Program would
-// carry the store.
-//
-// The brand for such a Namespace is CONDITIONAL, and it is resolved where the
-// condition witnesses are: `boundConformance` reads it off the method map, asks
-// each of them, and only then puts it on the witness it builds. That is also
-// the one place the answer CAN be settled — a generic Function's `List<T>`
-// witness is built from a `T` witness forwarded in at the call, which the
-// Compiler has no name for here.
-const conditionallyStructuralNamespaces = new Set([
-	"List",
-	"Optional",
-	"Result",
-	derivedEquatableNamespaceName,
-])
-
-// NOTE: Whether this witness is one of those, and is the EQUATABLE one — a
-// Namespace conforms to several Protocols and only the Equatable witness is ever
-// handed to a Dictionary. `Equatable` declares exactly `is` and `isNot`, so the
-// two names it fulfils, wherever they come from, are what identify it.
+// The two lists live in `helpers/conformance.ts`, beside the Enricher's routing
+// rule that reads them too: a member left unrouted because its conformance is
+// structural and a Dictionary key encoded because it is are the same claim, and
+// two copies of the list would be two places that can disagree about it.
 //
 // A conditional conformance is refused unless its Namespace is on the second
 // list, where the brand means "structural if the conditions are". Nothing else
