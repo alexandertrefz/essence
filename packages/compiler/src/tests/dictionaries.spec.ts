@@ -590,13 +590,14 @@ describe("Dictionary", () => {
 			])
 		})
 
-		// NOTE: A generic Choice's derived witness is conditional on its Type
-		// Arguments' witnesses, and a conditional witness is never branded —
-		// the Type Argument may carry a written `is` the payload has to be
-		// compared by. Such a key takes the scan path, and answers the same
-		// things there. The Integer witness curried onto it is branded, which
-		// is why the assertion reads the derived witness alone.
-		it("leaves a generic Choice key on the scan path", async () => {
+		// NOTE: A generic Choice's derived witness is CONDITIONAL on its Type
+		// Arguments' witnesses, so the brand rides on its method map and
+		// `boundConformance` settles it at run time, branding the witness it
+		// builds only where every condition arrived branded. Here the one Type
+		// Argument is an Integer, so the key is found in one step. The scan
+		// cases live under "Keys of a generic Choice" below, where a Type
+		// Argument carries an `is` a Program wrote.
+		it("finds a generic Choice key in one step under branded Arguments", async () => {
 			let source = `implementation {
 				choice Wrap<Item> { Some { item: Item }, None }
 
@@ -616,7 +617,7 @@ describe("Dictionary", () => {
 			)
 
 			expect(witness).toContain("boundChoiceIs")
-			expect(witness).not.toContain("structural")
+			expect(witness).toContain("structural: true")
 			expect(await run(source)).toEqual([
 				"Optional#Value(1)",
 				"Optional#Empty",
@@ -875,6 +876,225 @@ describe("Dictionary", () => {
 				"Optional#Value(1)",
 				"Optional#Empty",
 			])
+		})
+	})
+
+	// NOTE: A GENERIC CHOICE'S KEYS, which is the same rule as a List's met on
+	// the other kind of container. `Optional<ItemType> is Equatable where
+	// ItemType is Equatable` compares two Cases by their tag and then their
+	// payload through the ITEM's own witness — so the canonical text may stand
+	// in for it exactly when that witness is branded, and never otherwise.
+	// `Result` carries two conditions and a user Choice carries one per Type
+	// Parameter; the rule is the same and the answer is `every`.
+	//
+	// NOTE: THE SCAN CASES STAND FIRST, and they are the ones that matter. A
+	// branded witness is a claim that the encoding says what the Program's own
+	// `is` says, and the way to get that wrong is to brand where a Namespace
+	// wrote an `is` of its own. Each of these puts a written `is` somewhere
+	// inside a generic Choice key and asserts the ANSWER — every `Loose`
+	// receiver below calls its values equal, so the Dictionary holds ONE key
+	// and only the scan path can say so.
+	describe("Keys of a generic Choice", () => {
+		const loose = `namespace Loose for NonEmptyString is Equatable {
+						is(_ other: NonEmptyString) -> Boolean {
+							<- true
+						}
+					}
+
+					constant a: NonEmptyString = "Ada"
+					constant b: NonEmptyString = "bob"`
+
+		it("leaves an Optional key on the scan path under a written payload 'is'", async () => {
+			let source = `implementation {
+				function names() -> Integer {
+					${loose}
+
+					constant seen: Dictionary<Optional<NonEmptyString>, Integer> = [=]
+
+					<- seen::set(#Value(a), to 1)::set(#Value(b), to 2)::length()
+				}
+
+				Terminal.inspect(names())
+			}`
+
+			expect(generate(source)).toContain("{ is: Loose.is }")
+			expect(await run(source)).toEqual(["1"])
+		})
+
+		// NOTE: The written `is` one container further in, so the refusal is the
+		// recursion rather than a single lookup: the List's own witness is
+		// conditional, carries `Loose`, and arrives at the Optional unbranded.
+		it("leaves an Optional key on the scan path under a written item 'is' inside a List", async () => {
+			let source = `implementation {
+				function names() -> Integer {
+					${loose}
+
+					constant seen: Dictionary<Optional<List<NonEmptyString>>, Integer> = [=]
+
+					<- seen::set(#Value([a]), to 1)::set(#Value([b]), to 2)::length()
+				}
+
+				Terminal.inspect(names())
+			}`
+
+			expect(await run(source)).toEqual(["1"])
+		})
+
+		// NOTE: A Result's SECOND condition, which is the one a witness asking
+		// `some` where it should ask `every` would let through: the value Type
+		// is branded and the failure Type is not.
+		it("leaves a Result key on the scan path under a written failure 'is'", async () => {
+			let source = `implementation {
+				function names() -> Integer {
+					${loose}
+
+					constant seen: Dictionary<Result<Integer, NonEmptyString>, Integer> = [=]
+
+					<- seen::set(#Failure(a), to 1)::set(#Failure(b), to 2)::length()
+				}
+
+				Terminal.inspect(names())
+			}`
+
+			expect(await run(source)).toEqual(["1"])
+		})
+
+		// NOTE: And its FIRST condition, so neither order of the two is the one
+		// that happens to be read.
+		it("leaves a Result key on the scan path under a written value 'is'", async () => {
+			let source = `implementation {
+				function names() -> Integer {
+					${loose}
+
+					constant seen: Dictionary<Result<NonEmptyString, Integer>, Integer> = [=]
+
+					<- seen::set(#Value(a), to 1)::set(#Value(b), to 2)::length()
+				}
+
+				Terminal.inspect(names())
+			}`
+
+			expect(await run(source)).toEqual(["1"])
+		})
+
+		// NOTE: A Choice the PROGRAM declares, whose equality is derived rather
+		// than written — the witness is `boundChoiceIs` over a descriptor, which
+		// asks the Type Arguments' witnesses at the members that name a Type
+		// Parameter and compares the rest structurally. Same rule, same answer.
+		it("leaves a user generic Choice key on the scan path under a written 'is'", async () => {
+			let source = `implementation {
+				choice Pair<LeftType, RightType> {
+					Both { left: LeftType, right: RightType },
+					Neither,
+				}
+
+				function names() -> Integer {
+					${loose}
+
+					constant seen: Dictionary<Pair<NonEmptyString, Integer>, Integer> = [=]
+
+					<- seen
+						::set(Pair<NonEmptyString, Integer>#Both({ left = a, right = 1 }), to 1)
+						::set(Pair<NonEmptyString, Integer>#Both({ left = b, right = 1 }), to 2)
+						::length()
+				}
+
+				Terminal.inspect(names())
+			}`
+
+			expect(await run(source)).toEqual(["1"])
+		})
+
+		// NOTE: A GENERIC CHOICE WHOSE OWN NAMESPACE WRITES THE `is`, which is
+		// the rule that already held for a Choice with no Type Parameters, met
+		// where the conformance is conditional. `Wrap`'s witness arrives under
+		// its own name rather than the derived one and is on neither list, so
+		// the conditions are never even asked — and here the written `is` calls
+		// every Wrap every other one, so the table holds ONE key.
+		it("leaves a generic Choice key on the scan path under its own written 'is'", async () => {
+			let source = `implementation {
+				choice Wrap<ItemType> {
+					Some { item: ItemType },
+					None,
+				}
+
+				namespace Wrap<infer ItemType> for Wrap<ItemType>
+					is Equatable where ItemType is Equatable
+				{
+					is(_ other: Wrap<ItemType>) -> Boolean {
+						<- true
+					}
+				}
+
+				constant empty: Dictionary<Wrap<Integer>, Integer> = [=]
+				constant table = empty
+					::set(Wrap<Integer>#Some({ item = 1 }), to 1)
+					::set(Wrap<Integer>#Some({ item = 2 }), to 2)
+
+				Terminal.inspect(table::length())
+			}`
+
+			// NOTE: The method map is read by name rather than the whole
+			// emitted text, because the Integer witness beside it IS branded
+			// and would answer the broader question for it.
+			expect(generate(source)).toContain(
+				"$type.boundConformance({ is: Wrap.is }, [",
+			)
+			expect(await run(source)).toEqual(["1"])
+		})
+
+		// NOTE: The witness FORWARDED through generic Functions rather than
+		// built where the Dictionary is, one hop and two — which is the shape
+		// the Rewriter has no name for and `boundConformance` settles at run
+		// time. The second pair spells the callee's Type Parameter the same as
+		// the caller's, which is the name collision `genericWitnessArity.spec.ts`
+		// is about: the witness that arrives a level too deep would be branded
+		// on the strength of the wrong conditions.
+		it("leaves a forwarded generic Choice key on the scan path under a written 'is'", async () => {
+			let source = `implementation {
+				function counted<infer KeyType is Equatable>(
+					_ first: Optional<KeyType>,
+					_ second: Optional<KeyType>,
+				) -> Integer {
+					constant seen: Dictionary<Optional<KeyType>, Integer> = [=]
+
+					<- seen::set(first, to 1)::set(second, to 2)::length()
+				}
+
+				function forwarded<infer KeyType is Equatable>(
+					_ first: Optional<KeyType>,
+					_ second: Optional<KeyType>,
+				) -> Integer {
+					<- counted(first, second)
+				}
+
+				function again<infer ItemType is Equatable>(
+					_ first: Optional<ItemType>,
+					_ second: Optional<ItemType>,
+				) -> Integer {
+					<- forwarded(first, second)
+				}
+
+				function names() -> {} {
+					${loose}
+
+					constant looseA = Optional<NonEmptyString>#Value(a)
+					constant looseB = Optional<NonEmptyString>#Value(b)
+					constant plainA = Optional<Integer>#Value(1)
+					constant plainB = Optional<Integer>#Value(2)
+
+					Terminal.inspect(counted(looseA, looseB))
+					Terminal.inspect(forwarded(looseA, looseB))
+					Terminal.inspect(again(looseA, looseB))
+					Terminal.inspect(counted(plainA, plainB))
+					Terminal.inspect(forwarded(plainA, plainB))
+					Terminal.inspect(again(plainA, plainB))
+				}
+
+				names()
+			}`
+
+			expect(await run(source)).toEqual(["1", "1", "1", "2", "2", "2"])
 		})
 	})
 

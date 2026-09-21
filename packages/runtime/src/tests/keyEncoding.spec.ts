@@ -12,7 +12,7 @@ import {
 } from "../Dictionary"
 import type { IntegerType } from "../Integer"
 import { createInteger } from "../Integer"
-import { anyIs } from "../internalHelpers"
+import { anyIs, boundChoiceIs } from "../internalHelpers"
 import type { EncodedKey } from "../keyEncoding"
 import { encodeKey } from "../keyEncoding"
 import type { ListType } from "../List"
@@ -149,6 +149,12 @@ const leaves: Array<AnyType> = [
 	createBoolean(false),
 	asValue(createCase("Colour#Red")),
 	asValue(createCase("Colour#Blue")),
+	// NOTE: The payload-free Cases of the two GENERIC Choices below. They are
+	// interned per tag, so `Wrap<Integer>#None` and `Wrap<String>#None` are one
+	// value and one text — which is why no instantiation can be told from
+	// another here, and why none has to be.
+	asValue(createCase("Wrap#None")),
+	asValue(createCase("Pair#Neither")),
 ]
 
 // NOTE: A value of the whole grammar, depth-limited. A List is drawn at every
@@ -203,8 +209,31 @@ function draw(random: () => number, depth: number): AnyType {
 	}
 
 	if (roll < 0.96) {
+		// NOTE: Three Cases carrying a payload, and two of the three are the
+		// Cases of a GENERIC Choice — one member and two. A generic Choice's
+		// derived equality asks a Type Argument's witness at each member naming
+		// a Type Parameter, so the encoding has to agree with THAT as well as
+		// with `anyIs`, and the two-member Case is where a text that forgot to
+		// name its members apart would show.
+		let shape = random()
+
+		if (shape < 0.34) {
+			return asValue(
+				createCase("Box#Full", { item: draw(random, depth - 1) }),
+			)
+		}
+
+		if (shape < 0.67) {
+			return asValue(
+				createCase("Wrap#Some", { item: draw(random, depth - 1) }),
+			)
+		}
+
 		return asValue(
-			createCase("Box#Full", { item: draw(random, depth - 1) }),
+			createCase("Pair#Both", {
+				left: draw(random, depth - 1),
+				right: draw(random, depth - 1),
+			}),
 		)
 	}
 
@@ -282,6 +311,71 @@ describe("the encoding agrees with the equality it stands in for", () => {
 			}
 		}
 	})
+
+	// NOTE: AND THE WITNESS A GENERIC CHOICE IS ACTUALLY COMPARED BY. A generic
+	// Choice's derived `is` is not `anyIs` — it is `boundChoiceIs` walking a
+	// descriptor that routes each member naming a Type Parameter through that
+	// Argument's own witness and compares the rest by the universal rule. The
+	// encoding stands in for THAT, so the two have to answer alike over every
+	// pair, exactly as `List::is` does above.
+	//
+	// NOTE: The descriptor names EVERY payload member, because a member it does
+	// not name is a member `casesEqual` never compares — so a descriptor that
+	// forgot one would call two different keys equal, and the encoding, which
+	// spells every member, would not. That is the disagreement this draws for.
+	const genericChoice = boundChoiceIs({
+		"Wrap#Some": { item: { k: "w", i: 0 } },
+		"Wrap#None": {},
+		"Pair#Both": { left: { k: "w", i: 0 }, right: { k: "w", i: 1 } },
+		"Pair#Neither": {},
+	})
+
+	test.each(seeds)(
+		"a generic Choice's derived is answers what anyIs answers, seed %i",
+		(seed) => {
+			let random = seededRandom(seed)
+			let cases: Array<AnyType> = []
+
+			while (cases.length < 60) {
+				let drawn = draw(random, 3)
+				let tag = drawn[typeKeySymbol]
+
+				if (typeof tag === "string" && tag.startsWith("Wrap#")) {
+					cases.push(drawn)
+				} else if (typeof tag === "string" && tag.startsWith("Pair#")) {
+					cases.push(drawn)
+				}
+			}
+
+			let compared = 0
+
+			for (let first = 0; first < cases.length; first++) {
+				for (let second = first; second < cases.length; second++) {
+					let left = cases[first]!
+					let right = cases[second]!
+
+					expect(
+						genericChoice(left, right, equality, equality).value,
+					).toBe(anyIs(left, right))
+
+					let encodedLeft = encodeKey(left, equality)
+					let encodedRight = encodeKey(right, equality)
+
+					if (encodedLeft === null || encodedRight === null) {
+						continue
+					}
+
+					compared++
+
+					expect(sameEncoding(encodedLeft, encodedRight)).toBe(
+						genericChoice(left, right, equality, equality).value,
+					)
+				}
+			}
+
+			expect(compared).toBeGreaterThan(200)
+		},
+	)
 
 	// NOTE: A value holding a part with no text has no text itself, which is
 	// the whole of what keeps a Dictionary correct where one key encodes and

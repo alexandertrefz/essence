@@ -335,7 +335,17 @@ describe("Bundle Size", () => {
 	// 78,120 and 38,056 they measured then. That is the claim the module split
 	// was made for, and it held.
 	//
-	// NOTE: 60,673 measured now. Between the 59,045 above and this stand
+	// NOTE: 60,806 measured now, and the 133 it rose by are the Case head
+	// remembered per tag in `keyEncoding.ts`. A Case that carries a payload
+	// spells its text afresh on every lookup because the payload is a different
+	// value every time, and the head is the part of it that never is — which is
+	// what a Dictionary keyed by an `Optional`, a `Result` or a generic Choice
+	// of a Program's own now reaches. This file pays it for a String-keyed
+	// Dictionary that encodes no Case at all, because the memo lives inside a
+	// Function every Dictionary Program reaches and a write inside a reached
+	// Function can not be shaken out.
+	//
+	// NOTE: 60,673 measured before that. Between the 59,045 above and this stand
 	// `list-window-trimming` (96, which this file reaches through `slice`),
 	// `list-in-place-writes` (the 1,356 the note inside the test accounts for),
 	// the character view's builder (112, the floor's own note) and 64 of review
@@ -344,10 +354,11 @@ describe("Bundle Size", () => {
 		// NOTE: 1,356 are `list-in-place-writes`, which Everyday's note accounts
 		// for; `Dictionary.of(entries:)` walks a List of entry Records and seals it,
 		// which is where this file meets them.
-		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(61_600)
+		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(61_800)
 	})
 
-	// NOTE: 13,542 measured, where the same Program without the one call
+	// NOTE: 13,675 measured, the 133 above accounting for the rise, where the
+	// same Program without the one call
 	// measures 5,069 — so `removeDuplicates` costs 8,473 bytes, well over the
 	// Program that calls it. It was 18,607 while the body was
 	// `@::tally()::keys()` on `GroupedList`: a List Method reached the whole
@@ -383,10 +394,11 @@ describe("Bundle Size", () => {
 }`),
 			// NOTE: 1,080 are `list-in-place-writes`, which Everyday's note accounts
 			// for.
-		).toBeLessThan(14_400)
+		).toBeLessThan(14_700)
 	})
 
-	// NOTE: 11,304 measured, where the same Program calling `median` measures
+	// NOTE: 11,437 measured, the same 133 above accounting for the rise, where
+	// the same Program calling `median` measures
 	// 2,760 — so `mode` costs 8,544 bytes, the count and the canonical key
 	// encoding it counts by, 709 of them the List arm that arrived last and
 	// that `mode` itself can not reach: it counts Integers, Rationals and
@@ -408,7 +420,7 @@ describe("Bundle Size", () => {
 			// NOTE: 1,058 are `list-in-place-writes`, which Everyday's note accounts
 			// for, and it is the smallest Program here that reaches a List — so it is
 			// the honest price of the change for anything that touches one.
-		).toBeLessThan(12_300)
+		).toBeLessThan(12_450)
 	})
 
 	// NOTE: 22,358 measured, where the same Program completing an

@@ -1179,7 +1179,7 @@ What it costs is a field on every list that has met a positional write, the log 
 
 A dictionary finds a key in one step where it can reduce that key to something a `Map` can be keyed by, and by comparing it against every live slot where it cannot. The same encoding is what the set-shaped list methods hold their seen keys in: [`removeDuplicates`](/docs/library/list#removeDuplicates), [`hasDuplicates`](/docs/library/list#hasDuplicates), [`contains(everyItemOf:)`](/docs/library/list#contains), [`everyItem(alsoIn:)`](/docs/library/list#everyItem), [`removeEvery(contentsOf:)`](/docs/library/list#removeEvery), [`mode`](/docs/library/list#mode) and the groupings.
 
-**These key types are found in one step.** String, Integer, Rational, Boolean, the covering `Number`, a record whose every member is one of these, a case of a choice whose equality the language derives, and a list whose every item is one of these, nested to any depth. A refinement counts as what it refines, so a `NonEmptyString` key and a `NonEmptyList<NonEmptyString>` key are found the same way as the types they refine.
+**These key types are found in one step.** String, Integer, Rational, Boolean, the covering `Number`, a record whose every member is one of these, a case of a choice whose equality the language derives, an `Optional` or a `Result` or a generic choice of your own whose type arguments are all one of these, and a list whose every item is one of these, nested to any depth. A refinement counts as what it refines, so a `NonEmptyString` key and a `NonEmptyList<NonEmptyString>` key are found the same way as the types they refine.
 
 **These take the scan.** Algebraic, Transcendental, a function, a dictionary, and anything holding one of those. A list of numbers is found in one step until an algebraic lands in it; that key alone then takes the scan, and the rest of the dictionary keeps its index.
 
@@ -1212,6 +1212,10 @@ implementation {
 ```
 
 A list carries that answer up from its items. `List<ItemType> is Equatable where ItemType is Equatable` compares its items with the item type's own `is`, so a list key is found in one step exactly when its items would be, and a written `is` anywhere inside it, at any depth, puts the whole key on the scan.
+
+A generic choice carries it up from its type arguments, by the same rule. `Optional<ItemType>` compares two values by their case and then their payload with the item type's own `is`, `Result<ValueType, FailureType>` does the same with two, and a choice you declare yourself compares each payload member that names a type parameter with that argument's `is` — so `Dictionary<Optional<Integer>, …>` is found in one step, and `Dictionary<Optional<NonEmptyString>, …>` under the `Loose` namespace above takes the scan. **Every** type argument has to be found in one step, so a `Result<Integer, NonEmptyString>` key under that namespace takes the scan on the strength of its failure type alone.
+
+A dictionary used as a key is the one composite that always takes the scan, whatever it holds. Its entries are organised by a store of its own, and spelling one would cost every program that merely removes duplicates from a list the whole of that store.
 
 **A list key's text is remembered on the value, under a symbol key**, as a string's NFC form and a rational's reduced form are. Spelling a key costs one pass over its items, and a lookup would otherwise spell it again every time. A list's items never change, so a remembered text cannot go stale.
 
