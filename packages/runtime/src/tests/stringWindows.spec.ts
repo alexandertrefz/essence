@@ -522,9 +522,45 @@ describe("a window answers what a copy answered", () => {
 
 // NOTE: The claims about WORK, which no clock decides. A drain over a String
 // segments it ONCE and copies a bounded number of clusters in all; the ASCII
-// drain beside it builds no character view whatever. `viewOf` is what makes
-// both askable: the Array a String's characters live in is its identity here,
-// and `segmented` says the Segmenter ran to make it.
+// drain beside it builds no character view whatever. `viewOf` is what makes the
+// copying askable: the Array a String's characters live in is its identity
+// here, and a copy is a second Array.
+//
+// NOTE: The SEGMENTING is counted where it happens, by wrapping
+// `Intl.Segmenter.prototype.segment` for the length of the drain — the whole of
+// what `clustersOf` calls to build a view. `String.ts` used to remember a flag
+// saying the Segmenter had run for an Array, and only this file ever read it: a
+// property write inside a reached Function can not be shaken out of a bundle,
+// so the claim cost 94 bytes in the floor every Program pays. Counting the call
+// costs a Program nothing, and it is the stronger claim of the two — the flag
+// said an Array HAD been segmented, where this says how many times the
+// Segmenter ran at all.
+//
+// NOTE: Restored in a `finally`, because a prototype left wrapped would follow
+// this file into every other spec the runner shares a process with.
+function whileCountingSegmentations<Answer>(body: () => Answer): {
+	answer: Answer
+	runs: number
+} {
+	let unwrapped = Intl.Segmenter.prototype.segment
+	let runs = 0
+
+	Intl.Segmenter.prototype.segment = function (
+		this: Intl.Segmenter,
+		text: string,
+	) {
+		runs++
+
+		return unwrapped.call(this, text)
+	}
+
+	try {
+		return { answer: body(), runs }
+	} finally {
+		Intl.Segmenter.prototype.segment = unwrapped
+	}
+}
+
 describe("what a drain costs", () => {
 	const CHARACTERS = 20_000
 
@@ -537,7 +573,6 @@ describe("what a drain costs", () => {
 
 	function drainWork(text: StringType) {
 		let arrays = new Set<Array<string>>()
-		let segmentations = 0
 		let clustersHeld = 0
 		let rest = text
 		let turns = 0
@@ -548,24 +583,22 @@ describe("what a drain costs", () => {
 			if (!arrays.has(view.clusters)) {
 				arrays.add(view.clusters)
 				clustersHeld += view.clusters.length
-
-				if (view.segmented) {
-					segmentations++
-				}
 			}
 
 			rest = slice(rest, createInteger(1), createInteger(1_000_000))
 			turns++
 		}
 
-		return { arrays: arrays.size, segmentations, clustersHeld, turns }
+		return { arrays: arrays.size, clustersHeld, turns }
 	}
 
 	test("a front drain segments once and copies twice the characters", () => {
-		let work = drainWork(createString("café ".repeat(CHARACTERS / 5)))
+		let { answer: work, runs } = whileCountingSegmentations(() =>
+			drainWork(createString("café ".repeat(CHARACTERS / 5))),
+		)
 
 		expect(work.turns).toBe(CHARACTERS)
-		expect(work.segmentations).toBe(1)
+		expect(runs).toBe(1)
 
 		// NOTE: One Array per halving, and the clusters they hold add up to
 		// 2n — the half rule's whole claim. Copying at every turn would be

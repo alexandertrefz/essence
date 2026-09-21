@@ -146,7 +146,6 @@ const graphemesKey = Symbol("$graphemes")
 const viewStartKey = Symbol("$viewStart")
 const viewTextKey = Symbol("$viewText")
 const viewOffsetsKey = Symbol("$viewOffsets")
-const segmentedKey = Symbol("$segmented")
 const graphemeCountKey = Symbol("$graphemeCount")
 const isAsciiKey = Symbol("$isAscii")
 const normalisedKey = Symbol("$normalised")
@@ -165,21 +164,25 @@ const normalisedKey = Symbol("$normalised")
 // of the Program, and eleven megabytes of record is what the reading would have
 // cost it.
 //
-// NOTE: The other three keys are what a window needs to cut its TEXT, and they
+// NOTE: The other two keys are what a window needs to cut its TEXT, and they
 // are shared references rather than answers of their own. `viewTextKey` is the
 // text the clusters partition, carried only where it is not the String's own
 // `value`: the clusters are of the NFC form — `is`, `compare` and every
 // position Method are — so a String written in another form has its characters
 // in a text it does not itself spell. `viewOffsetsKey` is where each cluster
-// begins in that text, and `segmentedKey` says the Segmenter RAN for this
-// Array, which nothing in the runtime reads and `viewOf` hands to the specs
-// that assert a drain segments its String ONCE.
+// begins in that text.
+//
+// NOTE: There was a sixth key, `segmentedKey`, saying the Segmenter had RUN for
+// this Array. Nothing in the runtime read it and only the drain guard did — and
+// a flag written inside a reached Function can not be shaken out of a bundle,
+// so it cost 94 bytes in the floor EVERY Program pays and 220 in one that cuts.
+// The guard counts `Intl.Segmenter.prototype.segment` from the spec instead,
+// which is the same claim for nothing at all.
 type MeasuredString = StringType & {
 	[graphemesKey]?: Array<string>
 	[viewStartKey]?: number
 	[viewTextKey]?: string
 	[viewOffsetsKey]?: Int32Array
-	[segmentedKey]?: boolean
 	[graphemeCountKey]?: number
 	[isAsciiKey]?: boolean
 	[normalisedKey]?: string
@@ -203,14 +206,12 @@ function clustersIn(string: StringType): Array<string> {
 		measured[graphemesKey] = clusters
 		measured[graphemeCountKey] = clusters.length
 
-		if (!unitPerCharacter) {
-			measured[segmentedKey] = true
-
-			// NOTE: Carried only where the NFC form is not the text the String
-			// spells, which is the only case where the two differ.
-			if (text !== string.value) {
-				measured[viewTextKey] = text
-			}
+		// NOTE: Carried only where the NFC form is not the text the String
+		// spells, which is the only case where the two differ — and only off
+		// the segmenting arm, because a String the scan accepted IS its own
+		// normal form.
+		if (!unitPerCharacter && text !== string.value) {
+			measured[viewTextKey] = text
 		}
 	}
 
@@ -284,14 +285,15 @@ function graphemesIn(string: StringType): Array<string> {
 //
 // NOTE: Exported for `NonEmptyString.ts`'s two proven ends — the same reason
 // `List.ts` exports `viewOf` for `NonEmptyList.ts` — and for the specs that
-// assert WORK: which Array a window shares, and whether the Segmenter ran to
-// make it. `hasCharacterView` below answers the question this one can not,
-// because this one BUILDS the view it reports.
+// assert WORK: which Array a window shares, and how much of it is its own.
+// `hasCharacterView` below answers the question this one can not, because this
+// one BUILDS the view it reports; and how often the Segmenter RAN is counted
+// where it is asked, by the spec, rather than remembered here for the spec's
+// sake on every String every Program makes.
 export type CharacterWindow = {
 	clusters: Array<string>
 	start: number
 	count: number
-	segmented: boolean
 }
 
 export function viewOf(string: StringType): CharacterWindow {
@@ -302,7 +304,6 @@ export function viewOf(string: StringType): CharacterWindow {
 		clusters,
 		start: measured[viewStartKey] ?? 0,
 		count: measured[graphemeCountKey]!,
-		segmented: measured[segmentedKey] === true,
 	}
 }
 
@@ -412,10 +413,6 @@ function createWindowString(
 	string[graphemeCountKey] = count
 	string[viewOffsetsKey] = offsets
 	string[viewTextKey] = text
-
-	if ((original as MeasuredString)[segmentedKey] === true) {
-		string[segmentedKey] = true
-	}
 
 	return string
 }
