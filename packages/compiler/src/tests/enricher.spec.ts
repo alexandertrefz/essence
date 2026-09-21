@@ -3163,6 +3163,94 @@ describe("Enricher", () => {
 			])
 		})
 
+		// NOTE: Every head that writes a `<…>` gets the same words, and each
+		// one is a call site of its own — so the list below is what says the
+		// rule is the language's rather than one reader's. Two BOUNDS on one
+		// Parameter is the case that used to pass in silence: the first was
+		// dropped and the body was refused for wanting what it asked for.
+		it("should refuse a Type Parameter declared twice in every head", () => {
+			let heads = [
+				"function twice<infer T is Comparable, infer T is Printable>(_ v: T) -> T {\n\t\t\t\t\t\t<- v\n\t\t\t\t\t}",
+				"namespace Twice<infer T, infer T> for List<T> {}",
+				"choice Twice<A, A> {\n\t\t\t\t\t\tOne { a: A },\n\t\t\t\t\t}",
+				"type Twice<A, A> = List<A>",
+			]
+
+			for (let head of heads) {
+				let { diagnostics } = enrichSource(
+					`implementation {\n\t\t\t\t\t${head}\n\t\t\t\t}`,
+				)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["duplicate-type-parameter"])
+			}
+		})
+
+		// NOTE: A Method's list is read apart into the Parameters it declares
+		// and the bounds it puts on the Namespace's, and the bounds are gone
+		// before any other reader sees them — so the repetition is caught where
+		// the written list still is. Per FORM: two Overloads may each name
+		// `Item`, which is not a repetition.
+		it("should refuse two bounds on one Namespace Parameter", () => {
+			let { diagnostics } = enrichSource(
+				`implementation {
+					namespace Boxes<infer Item> for { items: List<Item> } {
+						described<Item is Comparable, Item is Printable>() -> String {
+							<- "{@.items::sort()::length()}"
+						}
+					}
+				}`,
+			)
+
+			// NOTE: And the body's own report beside it, which is not a
+			// cascade: the bound that survived is the LAST, so the sort is
+			// left wanting `Comparable` — and that report is where the
+			// Protocol the body needs is named, which is what the Help above
+			// sends the reader to read.
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.message,
+				]),
+			).toEqual([
+				[
+					"duplicate-type-parameter",
+					"Type Parameter 'Item' is declared twice",
+				],
+				[
+					"unsatisfied-bound",
+					"Type Parameter 'Item' does not conform to 'Comparable'",
+				],
+			])
+			expect(diagnostics[0]!.notes?.[0]).toBe(
+				"'Item' is bounded by 'Comparable' already, and a Type Parameter carries ONE bound — a second would replace it rather than stand beside it.",
+			)
+			expect(diagnostics[0]!.helps).toEqual([
+				"Keep the one the body needs: write '<Item is Comparable>' or '<Item is Printable>', not both.",
+			])
+		})
+
+		it("should leave two Overloads naming one Parameter alone", () => {
+			let { diagnostics } = enrichSource(
+				`implementation {
+					namespace Boxes<infer Item> for { items: List<Item> } {
+						overload described {
+							<Item is Comparable>() -> Integer {
+								<- @.items::sort()::length()
+							}
+
+							<Item is Printable>(_ prefix: String) -> String {
+								<- "{prefix}{@.items}"
+							}
+						}
+					}
+				}`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([])
+		})
+
 		// NOTE: `<infer Item>` is NOT a shadow, and the report used to say it
 		// was: with `infer` the receiver binds the entry, which is how this
 		// spelling worked before a bound could be written. It is the

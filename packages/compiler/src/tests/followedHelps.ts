@@ -147,6 +147,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 	[
 		"ambiguous-case",
 		"dictionary-entry-syntax",
+		"duplicate-type-parameter",
 		"foreign-syntax",
 		"incomplete-record-argument",
 		"invalid-escape",

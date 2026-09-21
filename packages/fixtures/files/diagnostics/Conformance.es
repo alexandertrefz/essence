@@ -57,6 +57,15 @@ implementation {
 		}
 	}
 
+	§ duplicate-type-parameter — one '<…>' naming 'Item' twice. Only the last
+	§ bound would take effect, so the first is thrown away; a Type Parameter
+	§ carries one bound and the report says which two were written.
+	namespace Twice<infer Item> for { items: List<Item> } {
+		described<Item is Comparable, Item is Printable>() -> String {
+			<- "{@.items::sort()}"
+		}
+	}
+
 	§ unsatisfied-bound again, and the OTHER answer: 'toString' fulfils
 	§ 'Printable', so a bound of its own would break the promise the conformance
 	§ makes — the edit belongs on the 'where', and nothing offers the per-Method

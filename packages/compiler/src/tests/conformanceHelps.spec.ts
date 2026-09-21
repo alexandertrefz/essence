@@ -587,3 +587,57 @@ describe("A second bound wanted by a Method that carries one", () => {
 		expect(firstOf(source, "unsatisfied-bound").data).toBeUndefined()
 	})
 })
+
+// NOTE: The Help that has to say what the language can NOT do. A Type Parameter
+// carries one bound, so the two written here are not a Parameter bounded by
+// both — the second silently replaced the first until this was refused, and the
+// body was then refused for wanting what the reader had already asked for.
+//
+// Followed literally, both halves: the one the body needs compiles, and the
+// other leaves the body reported at the call that wants it, which is where the
+// Protocol it needs is named.
+describe("Two bounds on one Type Parameter", () => {
+	let source = `implementation {
+		namespace Boxes<infer Item> for { items: List<Item> } {
+			described<Item is Comparable, Item is Printable>() -> String {
+				<- "{@.items::sort()::length()}"
+			}
+		}
+
+		Terminal.print({ items = [1] }::described())
+	}`
+
+	it("should name both bounds and ask for one of them", () => {
+		expect(firstAnalysed(source, "duplicate-type-parameter").helps).toEqual(
+			[
+				"Keep the one the body needs: write '<Item is Comparable>' or '<Item is Printable>', not both.",
+			],
+		)
+	})
+
+	it("should compile with the bound the body needs", () => {
+		expect(
+			compiles(
+				source.replace(
+					"<Item is Comparable, Item is Printable>",
+					"<Item is Comparable>",
+				),
+			),
+		).toBe(true)
+	})
+
+	// NOTE: Not a Help that fails — a Help that says "the one the body needs",
+	// tested by showing the other one is not it, and that the report a reader
+	// meets then is the one that names the Protocol.
+	it("should report the missing bound where the other one is kept", () => {
+		expect(
+			firstAnalysed(
+				source.replace(
+					"<Item is Comparable, Item is Printable>",
+					"<Item is Printable>",
+				),
+				"unsatisfied-bound",
+			).message,
+		).toBe("Type Parameter 'Item' does not conform to 'Comparable'")
+	})
+})

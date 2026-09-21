@@ -1162,6 +1162,51 @@ Error: Method 'shout' is already defined
 
 Rename one of them. When both are meant to exist, write both signatures in one `overload shout { … }` block.
 
+### `duplicate-type-parameter`
+
+**Error.** One `<…>` list names the same type parameter twice. Only one of the
+two can take effect — the last one written — so the first is dropped, which is
+what this refuses to do in silence.
+
+<div class="error-output">
+
+```
+[duplicate-type-parameter]
+Error: Type Parameter 'Item' is declared twice
+   ╭─┤ Ranked.es:3:32 │
+   │
+ 3 │        describe<Item is Comparable, Item is Printable>() -> String {
+   │                 ─────────┬────────  ────────┬────────  
+   │                          ╰──────────────────│────────── first declared here
+   │                                             │          
+   │                                             ╰──────── this bound replaces the one above
+   │ 
+   │ Help: Keep the one the body needs: write '<Item is Comparable>' or '<Item is Printable>', not both.
+   │ 
+   │ Note 1: 'Item' is bounded by 'Comparable' already, and a Type Parameter carries ONE bound — a second would replace it rather than stand beside it.
+   │ Note 2: A Protocol that extends both — 'protocol Ranked is Comparable, is Printable {}' — is how a Parameter asks for two, and only Types this Program can declare that conformance for can satisfy it.
+───╯
+```
+
+</div>
+
+The same words cover every `<…>` in the language — a function's, a method's, a
+choice's, a namespace's, a type alias'. The list still parses, so `essence
+format` keeps working on the file: this is one line that is wrong, not a file
+the toolchain stops handling.
+
+**Two bounds on one parameter** is the case worth spelling out: a type parameter
+carries ONE bound today, so `<Item is Comparable, Item is Printable>` is not a
+parameter bounded by both, it is `<Item is Printable>` with a line of the
+reader's intent thrown away. Write the one the body needs; where the body needs
+the other as well, `unsatisfied-bound` names it at the call that wants it.
+
+A protocol that extends both — `protocol Ranked is Comparable, is Printable {}`
+— is how a parameter asks for two. It is not offered as a Help because it only
+works for types this program can declare the conformance for: conforming a
+standard library type to it makes every other call that used the parent
+protocols ambiguous.
+
 ### `duplicate-property`
 
 **Error.** A namespace declares the same static property twice.

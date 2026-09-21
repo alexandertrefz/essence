@@ -428,11 +428,39 @@ Error: Type Parameter 'Item' does not conform to 'Comparable'
     │ Note 2: 'Item' is 'Unbounded's own Type Parameter, so a bound on it belongs to the Method that needs it rather than to the Namespace.
 ────╯
 
+[duplicate-type-parameter]
+Error: Type Parameter 'Item' is declared twice
+    ╭─┤ Conformance.es:64:33 │
+    │
+ 64 │        described<Item is Comparable, Item is Printable>() -> String {
+    │                  ─────────┬────────  ────────┬────────  
+    │                           ╰──────────────────│────────── first declared here
+    │                                              │          
+    │                                              ╰────────── this bound replaces the one above
+    │ 
+    │ Help: Keep the one the body needs: write '<Item is Comparable>' or '<Item is Printable>', not both.
+    │ 
+    │ Note 1: 'Item' is bounded by 'Comparable' already, and a Type Parameter carries ONE bound — a second would replace it rather than stand beside it.
+    │ Note 2: A Protocol that extends both — 'protocol Ranked is Comparable, is Printable {}' — is how a Parameter asks for two, and only Types this Program can declare that conformance for can satisfy it.
+────╯
+
 [unsatisfied-bound]
 Error: Type Parameter 'Item' does not conform to 'Comparable'
-    ╭─┤ Conformance.es:71:17 │
+    ╭─┤ Conformance.es:65:9 │
     │
- 71 │          <- "{@.tag} {@.items::sort()::length()}"
+ 65 │          <- "{@.items::sort()}"
+    │               ───────┬───────  
+    │                      ╰───────── bound here to a Type Parameter bounded by 'Printable'
+    │ 
+    │ Note 1: 'Item' is bounded by 'Printable' already, and a Type Parameter carries ONE bound — a second would replace it rather than stand beside it.
+    │ Note 2: A Protocol that extends both — 'protocol Ranked is Printable, is Comparable {}' — is how a Parameter asks for two, and only Types this Program can declare that conformance for can satisfy it.
+────╯
+
+[unsatisfied-bound]
+Error: Type Parameter 'Item' does not conform to 'Comparable'
+    ╭─┤ Conformance.es:80:17 │
+    │
+ 80 │          <- "{@.tag} {@.items::sort()::length()}"
     │                       ───────┬───────  
     │                              ╰───────── bound here to an unbounded Type Parameter
     │ 
@@ -442,7 +470,7 @@ Error: Type Parameter 'Item' does not conform to 'Comparable'
     │ Note 2: 'Item' is 'Fulfilling's own Type Parameter, and this Method fulfils 'Printable' — so the bound belongs on the conformance, which promises the Method under it.
 ────╯
 
-─── 7 errors
+─── 9 errors
 "
 `;
 

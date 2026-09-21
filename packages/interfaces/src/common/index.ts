@@ -443,6 +443,7 @@ export type DiagnosticCode =
 	| "duplicate-method"
 	| "duplicate-property"
 	| "duplicate-member"
+	| "duplicate-type-parameter"
 	| "reserved-type-name"
 	| "use-before-declaration"
 	| "unknown-name"

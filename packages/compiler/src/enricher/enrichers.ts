@@ -11,6 +11,7 @@ import {
 	reportWarning,
 	secondary,
 } from "../diagnostics/index"
+import { oneBoundOnly } from "../helpers/bounds"
 import { providedMethodProtocol } from "../helpers/conformance"
 import {
 	asynchronyData,
@@ -2090,6 +2091,8 @@ function enrichFunctionDefinition(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
 ): common.typed.FunctionDefinitionNode {
+	refuseDuplicateTypeParameters(node.generics)
+
 	// NOTE: Declared Generics are registered as GenericUses so that
 	// Parameter and Return Types can reference them. They stay opaque
 	// within the body; binding to concrete Types happens at each use site
@@ -7164,6 +7167,7 @@ function enrichNamespaceDefinitionStatement(
 		}
 	}
 
+	refuseDuplicateTypeParameters(node.generics)
 	refuseMalformedMethodBounds(node, type)
 
 	// NOTE: Idempotent, and run a second time on purpose: the hoist already wove
@@ -7252,10 +7256,90 @@ function enrichNamespaceDefinitionStatement(
 // that follows sees the Namespace's Parameter and one mistake gives one
 // Diagnostic — the second of the two is even read as the bound it means, so a
 // Program carrying it still resolves everywhere else.
+// NOTE: One `<…>` naming a Type Parameter twice. Only one of the two can take
+// effect — every reader downstream keys a Generic list by name, and the LAST
+// writing wins — so the first was dropped in silence, which is how
+// `<Item is Comparable, Item is Printable>` came to mean `<Item is Printable>`
+// and refuse the sort in the body with no word about the bound the reader had
+// written.
+//
+// In the Enricher rather than in the Parser, although the Parser is the one
+// place every `<…>` comes through: the list PARSES, and a Parser error makes
+// `esfmt` leave the whole file alone. A reader who writes two bounds has a file
+// that is wrong in one line, not one the toolchain stops handling.
+//
+// Called from each head with the list exactly as written — a Method's includes
+// the entries that BOUND the Namespace's own Parameters, which are stripped
+// before anything else sees them.
+function refuseDuplicateTypeParameters(
+	generics: Array<parser.GenericDeclarationNode>,
+): void {
+	if (generics.length < 2) {
+		return
+	}
+
+	let first = new Map<string, parser.GenericDeclarationNode>()
+
+	for (let entry of generics) {
+		let name = entry.name.content
+		let seen = first.get(name)
+
+		if (seen === undefined) {
+			first.set(name, entry)
+
+			continue
+		}
+
+		// NOTE: Two BOUNDS on one Parameter is a different mistake from two
+		// declarations of it — the reader meant both to hold, and the language
+		// has no spelling for that. `oneBoundOnly` says so in the words a body
+		// wanting the second Protocol is told.
+		let carried = seen.constraint?.content ?? null
+		let wanted = entry.constraint?.content ?? null
+		let bothBounded = carried !== null && wanted !== null
+
+		reportError(
+			`Type Parameter '${name}' is declared twice`,
+			entry.position,
+			{
+				code: "duplicate-type-parameter",
+				labels: [
+					primary(
+						entry.position,
+						bothBounded
+							? "this bound replaces the one above"
+							: "declared a second time here",
+					),
+					secondary(seen.position, "first declared here"),
+				],
+				notes: bothBounded ? oneBoundOnly(name, carried!, wanted!) : [],
+				helps: bothBounded
+					? [
+							`Keep the one the body needs: write '<${name} is ${carried}>' or '<${name} is ${wanted}>', not both.`,
+						]
+					: [
+							`Remove the second '${name}', or give it a name of its own.`,
+						],
+			},
+		)
+	}
+}
+
 function refuseMalformedMethodBounds(
 	node: parser.NamespaceDefinitionStatementNode,
 	type: common.NamespaceType,
 ): void {
+	// NOTE: Every Method, whatever the Namespace declares — a list naming one
+	// Parameter twice is the same mistake in a Namespace with no Generics of its
+	// own, and the entries a generic one bounds are gone by the time any other
+	// reader sees them. Per FORM: two Overloads of one Method may each name
+	// `Item`, and that is not a repetition.
+	for (let method of Object.values(node.methods)) {
+		for (let form of methodGenericForms(method)) {
+			refuseDuplicateTypeParameters(form)
+		}
+	}
+
 	if (type.generics.length === 0) {
 		return
 	}
@@ -7265,12 +7349,22 @@ function refuseMalformedMethodBounds(
 	)
 
 	for (let [methodName, method] of Object.entries(node.methods)) {
+		// NOTE: One report per Parameter per Method, however many entries name
+		// it — across the forms of an Overload set, which share a name and a
+		// mistake, and across a list that writes one name twice, which
+		// `duplicate-type-parameter` has already said its own piece about. The
+		// same rule the conflicting-`where` report follows, and for the same
+		// reason: a reader reads one Method.
+		let reported = new Set<string>()
+
 		for (let entry of methodGenericEntries(method)) {
 			let parameter = entry.name.content
 
-			if (!declared.has(parameter)) {
+			if (!declared.has(parameter) || reported.has(parameter)) {
 				continue
 			}
+
+			reported.add(parameter)
 
 			// NOTE: `infer` is asked FIRST, and the two questions are asked in
 			// that order because the word is what decides which mistake this
@@ -7381,6 +7475,25 @@ function refuseMalformedMethodBounds(
 // NOTE: Every `<…>` entry a Namespace Method writes, across every form of it,
 // flattened — the reporting above is about entries one at a time and has no use
 // for which Overload each came from.
+function methodGenericForms(
+	method: parser.NamespaceMethods[string],
+): Array<Array<parser.GenericDeclarationNode>> {
+	switch (method.nodeType) {
+		case "SimpleMethod":
+		case "StaticMethod":
+			return [method.method.value.generics]
+		case "SimpleMethodSignature":
+		case "StaticMethodSignature":
+			return [method.signature.generics]
+		default:
+			return method.methods.map((overload) =>
+				overload.nodeType === "NativeMethodSignature"
+					? overload.generics
+					: overload.value.generics,
+			)
+	}
+}
+
 function methodGenericEntries(
 	method: parser.NamespaceMethods[string],
 ): Array<parser.GenericDeclarationNode> {
@@ -7957,6 +8070,7 @@ function enrichTypeAliasStatement(
 ): common.typed.TypeAliasStatementNode {
 	reportDocumentationParameters(node.documentation, [])
 	reportInferredTypeParameters(node.generics, "Type Alias")
+	refuseDuplicateTypeParameters(node.generics)
 
 	let type = hoistedType ?? resolveTypeAliasStatementType(node, scope)
 
@@ -8024,6 +8138,7 @@ function enrichChoiceDeclarationStatement(
 ): common.typed.ChoiceDeclarationStatementNode {
 	reportDocumentationParameters(node.documentation, [])
 	reportInferredTypeParameters(node.generics, "Choice")
+	refuseDuplicateTypeParameters(node.generics)
 
 	let type = hoistedType ?? resolveChoiceDeclarationStatementType(node, scope)
 

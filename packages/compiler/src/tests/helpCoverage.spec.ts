@@ -33,6 +33,11 @@ const DOCS = path.join(
 // 'body::is("…")'" — and every one of them is a promise about a spelling in
 // exactly the way `Write '…'` is.
 //
+// Angle brackets are in that list for the same reason: `'<Item is Comparable>'`
+// is a Type Parameter list, which is as much a spelling as a call is, and the
+// Helps about bounds are written with the word `write` in the middle of a
+// sentence as often as at the start of one.
+//
 // So: a quoted run that reads as CODE rather than as an English aside. Code is
 // what holds a separator, a bracket, a sigil, a path or a digit; a Help that
 // quotes a bare word ("Remove this 'Red'") is left out unless it says to write
@@ -40,7 +45,7 @@ const DOCS = path.join(
 // of catching too much — an entry on the printed list that turns out to be
 // prose costs a reader one look, and one that is missing costs them the promise.
 const SPELLS_SOMETHING =
-	/Help[ 0-9]*: .*(?:Write '|'[^']*(?:::|->|<-|[#(){}[\]=@.\\/]|[0-9])[^']*')/
+	/Help[ 0-9]*: .*(?:[Ww]rite '|'[^']*(?:::|->|<-|[#(){}[\]=@.\\/<>]|[0-9])[^']*')/
 
 // NOTE: Read off the captured reports rather than off the prose around them —
 // a `### \`code\`` heading opens an entry, and every `Help:` line under it until
