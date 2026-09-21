@@ -188,16 +188,46 @@ function characterAt(value: StringType, index: number): string | null {
 // compared. `value` is first because everything else is a question about the
 // same text; a window whose text was cut wrongly fails here before anything
 // subtler gets a chance to.
+//
+// NOTE: THE ORDER IS PART OF THE TEST, and it is the one thing about this file
+// that must not be tidied. A reader that walks the whole receiver —
+// `characters`, `reverse`, `split` — MATERIALISES a window: `graphemesIn`
+// copies the window's clusters out, writes a start of zero and gives up the
+// borrowed text and table. Everything asked after one of those is a question
+// about a COPY, and no copy can be read past an end it no longer has. So the
+// readers that read a window WHERE IT STANDS go first — `length`,
+// `character(at:)`, the two proven ends, the cuts, the searches and the prefix
+// and suffix tests — and the three that materialise go last, in that order.
+//
+// NOTE: It is written down because the file has already been wrong this way
+// twice. `characters` stood third, and with it there a window that read PAST
+// ITS OWN END (`characterIn` without its upper bound) passed this file and the
+// whole 10,172-test suite; the cuts stood after the `split` inside the parts
+// loop, so every cut they compared was a cut of a copy. It is the same disease
+// as the ASCII guard further down, which asked the window before anything used
+// it — a guard that asks at the wrong moment is not a guard.
 function compareWithModel(value: StringType, model: Model, note: string) {
 	expect(`${note} value ${value.value}`).toBe(`${note} value ${model.value}`)
 	expect(`${note} length ${Number(length(value).value)}`).toBe(
 		`${note} length ${model.clusters.length}`,
 	)
-	expect(
-		`${note} characters ${JSON.stringify(characters(value).value.map((one) => one.value))}`,
-	).toBe(`${note} characters ${JSON.stringify(model.clusters)}`)
 
-	for (let index of [0, 1, 2, -1, -2, 7, 500, -500]) {
+	// NOTE: The last two positions are the window's OWN end and one past it,
+	// wherever that falls — the gap between where a window stops and where the
+	// Array it borrows stops is exactly what a fixed list of positions can
+	// miss, and it is where a window reading its parent's characters shows.
+	for (let index of [
+		0,
+		1,
+		2,
+		-1,
+		-2,
+		7,
+		500,
+		-500,
+		model.clusters.length,
+		model.clusters.length + 1,
+	]) {
 		let expected =
 			model.clusters[resolveRead(index, model.clusters.length)] ?? null
 
@@ -215,18 +245,21 @@ function compareWithModel(value: StringType, model: Model, note: string) {
 		)
 	}
 
-	expect(`${note} reverse ${reverse(value).value}`).toBe(
-		`${note} reverse ${[...model.clusters].reverse().join("")}`,
-	)
+	// NOTE: The cuts stand HERE, before anything walks the receiver, because
+	// cutting a window is the whole of what this change does: the cut resolves
+	// its positions against the window's own count and reads the borrowed Array
+	// from the window's own offset. Asked after a walk they were nine cuts of a
+	// copy, which is the cut that worked before there were windows at all.
+	for (let [from, to] of CUTS) {
+		let cut = slice(value, createInteger(from), createInteger(to))
+		let expected = sliceModel(model, from, to)
+		let label = `${note} slice(${from},${to})`
 
-	// NOTE: The KEY a Dictionary would file this String under, which is its NFC
-	// form — the one answer that ties a window to `is` and `compare`, since
-	// those are decided over the same form. A window whose text is not the text
-	// its characters spell is caught here even where its own `value` reads
-	// right.
-	expect(
-		`${note} key ${String(encodeKey(value, { structural: true } as never))}`,
-	).toBe(`${note} key ${model.value.normalize("NFC")}`)
+		expect(`${label} ${cut.value}`).toBe(`${label} ${expected.value}`)
+		expect(`${label} length ${Number(length(cut).value)}`).toBe(
+			`${label} length ${expected.clusters.length}`,
+		)
+	}
 
 	for (let part of PARTS) {
 		let partModel = raw(part)
@@ -274,23 +307,38 @@ function compareWithModel(value: StringType, model: Model, note: string) {
 				)
 			}`,
 		)
+	}
+
+	// NOTE: The KEY a Dictionary would file this String under, which is its NFC
+	// form — the one answer that ties a window to `is` and `compare`, since
+	// those are decided over the same form. A window whose text is not the text
+	// its characters spell is caught here even where its own `value` reads
+	// right.
+	expect(
+		`${note} key ${String(encodeKey(value, { structural: true } as never))}`,
+	).toBe(`${note} key ${model.value.normalize("NFC")}`)
+
+	// NOTE: From here down every reader walks the whole receiver, so the value
+	// under test is a copy of its own characters from the first of them on. See
+	// the ordering NOTE above: these three go last for that reason and for no
+	// other.
+	expect(`${note} reverse ${reverse(value).value}`).toBe(
+		`${note} reverse ${[...model.clusters].reverse().join("")}`,
+	)
+
+	for (let part of PARTS) {
+		let label = `${note} ${JSON.stringify(part)}`
+
 		expect(
-			`${label} split ${JSON.stringify(split(value, other).value.map((piece) => piece.value))}`,
+			`${label} split ${JSON.stringify(split(value, createString(part)).value.map((piece) => piece.value))}`,
 		).toBe(
-			`${label} split ${JSON.stringify(splitModel(model, partModel).map((piece) => piece.join("")))}`,
+			`${label} split ${JSON.stringify(splitModel(model, raw(part)).map((piece) => piece.join("")))}`,
 		)
 	}
 
-	for (let [from, to] of CUTS) {
-		let cut = slice(value, createInteger(from), createInteger(to))
-		let expected = sliceModel(model, from, to)
-		let label = `${note} slice(${from},${to})`
-
-		expect(`${label} ${cut.value}`).toBe(`${label} ${expected.value}`)
-		expect(`${label} length ${Number(length(cut).value)}`).toBe(
-			`${label} length ${expected.clusters.length}`,
-		)
-	}
+	expect(
+		`${note} characters ${JSON.stringify(characters(value).value.map((one) => one.value))}`,
+	).toBe(`${note} characters ${JSON.stringify(model.clusters)}`)
 }
 
 // NOTE: A read is clamped nowhere — a position outside the String answers
@@ -552,6 +600,25 @@ describe("what a drain costs", () => {
 		expect(viewOf(token).clusters).not.toBe(viewOf(text).clusters)
 	})
 
+	// NOTE: The half rule is asked about the ROOT's Array and not about the
+	// window doing the cutting, and THAT is what bounds retention: a cut that is
+	// most of a window is still a small part of the Array the window borrows, and
+	// sharing it would pin the whole root for as long as the cut is held. The
+	// test above cuts from a root, where asking either question answers the same
+	// — so it is this one that holds the rule. Six thousand characters are at
+	// least half of the ten-thousand-character window and well under half of the
+	// twenty-thousand-character Array underneath it.
+	test("a cut of a window is measured against the root's Array", () => {
+		let text = createString("café ".repeat(CHARACTERS / 5))
+		let half = slice(text, createInteger(0), createInteger(CHARACTERS / 2))
+		let most = slice(half, createInteger(0), createInteger(6_000))
+
+		expect(viewOf(half).clusters).toBe(viewOf(text).clusters)
+		expect(viewOf(most).clusters).not.toBe(viewOf(text).clusters)
+		expect(viewOf(most).clusters).toHaveLength(6_000)
+		expect(viewOf(most).count).toBe(6_000)
+	})
+
 	// NOTE: A window of a window shares the ROOT's Array rather than standing
 	// on a chain of windows, so reading a character is one Array read however
 	// many cuts deep the String is.
@@ -621,6 +688,35 @@ describe("what a drain costs", () => {
 		}
 
 		expect(turns).toBe(CHARACTERS - 1)
+	})
+
+	// NOTE: The REFUSED mark rides through `append` exactly as the accepted one
+	// does, and that it does is a claim about WORK no answer can show. A join
+	// holds every unit of both sides, so a side the scan refused makes a join it
+	// would refuse — and saying so costs a property write where asking costs the
+	// whole join. An engine joins two Strings into a ROPE and resolves it the
+	// first time anything reads a unit, so without the mark the scan flattened
+	// everything built so far, every turn: 80,000 non-ASCII characters appended
+	// one at a time measured 203 ms against their ASCII twin's 34.
+	//
+	// NOTE: Asserted on EVERY turn's answer rather than on the last one, because
+	// the mark is what keeps the next turn from scanning — a turn that drops it
+	// has already paid for the walk by the time the token is finished. The count
+	// at the end is the other half: a mark is only worth carrying while it is
+	// true, and the characters of the token are still counted off the view.
+	test("a token built by appending is never scanned again", () => {
+		let token = createString("é")
+		let turns = 0
+
+		while (turns < CHARACTERS) {
+			token = append(token, createString("a"))
+			turns++
+
+			expect(remembered(token, "$isAscii")).toBeFalse()
+		}
+
+		expect(turns).toBe(CHARACTERS)
+		expect(Number(length(token).value)).toBe(CHARACTERS + 1)
 	})
 
 	// NOTE: A prefix test costs the PREFIX. Folding the whole receiver is not
