@@ -689,20 +689,33 @@ describe("Randomness", () => {
 			expect(drawnFrom(front)).toEqual(drawnFrom(flat))
 		})
 
-		// NOTE: The one claim here a stopwatch has to make. A draw costs the
-		// COUNT rather than the length, so 200 draws of ten items out of two
-		// hundred thousand is work on two thousand items — it measured 0.5 ms,
-		// against 220 ms when every draw copied the whole receiver first. The
-		// ceiling is a hundred times the first figure and a quarter of the
-		// second.
+		// NOTE: A draw costs the COUNT rather than the length, and the claim is
+		// held by counting what the draw READS rather than by timing it: the
+		// receiver's Array stands behind a Proxy that counts every position read,
+		// so 200 draws of ten items out of two hundred thousand read two thousand
+		// positions and not one more. When every draw copied the whole receiver
+		// first the same walk read forty million. This was a stopwatch once —
+		// 0.5 ms measured against a 50 ms ceiling — and a ceiling on a wall clock
+		// fails on a loaded machine while the claim is still true: it read 71.5 ms
+		// at a load of 21 with nothing about the draw changed.
 		test("draws a few items without reading the whole List", () => {
-			let items = createList(
+			let reads = 0
+			let counted = new Proxy(
 				Array.from({ length: 200_000 }, (_, index) =>
 					createInteger(index),
 				),
+				{
+					get(target, key, receiver) {
+						if (typeof key === "string" && key !== "length") {
+							reads++
+						}
+
+						return Reflect.get(target, key, receiver)
+					},
+				},
 			)
+			let items = createList(counted)
 			let source = sourceOf("a few")
-			let start = performance.now()
 			let drawn = 0
 
 			for (let turn = 0; turn < 200; turn++) {
@@ -712,7 +725,7 @@ describe("Randomness", () => {
 			}
 
 			expect(drawn).toBe(2_000)
-			expect(performance.now() - start).toBeLessThan(50)
+			expect(reads).toBe(2_000)
 		})
 
 		test("leaves the List it was given as it was", () => {
