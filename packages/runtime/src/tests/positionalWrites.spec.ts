@@ -782,6 +782,29 @@ describe("persistent use", () => {
 		expect(Number(length(stale()).value)).toBe(4)
 	})
 
+	// NOTE: A receiver whose SEAM MOVES under it. Cutting an interior window
+	// rebuilds both of the receiver's runs as fresh Arrays of its own, so the
+	// log it was carrying describes an Array it no longer holds — and a write
+	// that went on recording into that log would be telling every box still on
+	// the old Array to undo a position in a different one. This is the shape
+	// that found it: a box derived before the cut, read after two writes made
+	// past it.
+	test("a box whose seam moves lets go of the log it was carrying", () => {
+		let source = logged([0, 1, 2, 3, 4, 5, 6, 7])
+		let derived = append(source, createInteger(60n))
+		let interior = slice(source, createInteger(2n), createInteger(6n))
+
+		expect(source.writes).toBeUndefined()
+
+		let once = written(source, 91, 1)
+
+		written(once, 92, 2)
+
+		expect(itemsOf(derived)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 60])
+		expect(itemsOf(interior)).toEqual([2, 3, 4, 5])
+		expect(itemsOf(source)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
+	})
+
 	// NOTE: An upgraded receiver — two runs, and a position in each. A front
 	// run is never written in place, so this is the half that still copies, and
 	// it has to agree with the flat half item for item.
