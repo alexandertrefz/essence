@@ -6012,6 +6012,691 @@ describe("Optimiser", () => {
 		})
 	})
 
+	describe("loop-self-tail-calls", () => {
+		// NOTE: The walk the language teaches, and the one the previous campaign
+		// made linear without making it portable: on V8 it was a frame per item.
+		const walk = `implementation {
+	function total(_ rest: List<Integer>, _ sum: Integer) -> Integer {
+		<- match rest::firstItem() -> Integer {
+			case #Empty       { <- sum }
+			case #Value(head) { <- total(rest::removeFirst(), sum::add(head)) }
+		}
+	}
+
+	Terminal.print(total([1, 2, 3, 4], 0))
+}`
+
+		it("takes a tail call back to the top of the body", async () => {
+			let generated = generate(walk)
+
+			expect(generated).toContain("$tail_0:")
+			expect(generated).toContain("while (true)")
+			expect(generated).toContain("continue $tail_0")
+			// NOTE: The claim the portability rests on, asked of the emitted
+			// text: the Function does not call itself where its answer goes.
+			// This is what holds on an engine the suite never runs.
+			expect(generated).not.toContain("return total(")
+			expect(await outputOf(generated)).toEqual(["10"])
+		})
+
+		it("leaves a non-tail self call a call", async () => {
+			// NOTE: `fib` calls itself twice and neither answer is the
+			// Function's — both are Arguments of an addition. Nothing is looped.
+			let source = `implementation {
+	function fib(_ n: Integer) -> Integer {
+		if n::isLessThan(2) {
+			<- n
+		} else {
+			<- fib(n::subtract(1))::add(fib(n::subtract(2)))
+		}
+	}
+
+	Terminal.print(fib(10))
+}`
+			let generated = generate(source)
+
+			expect(generated).not.toContain("while (true)")
+			expect(await outputOf(generated)).toEqual(["55"])
+		})
+
+		it("loops the tail call of a body that also recurses", async () => {
+			// NOTE: One body, both kinds. The second call is the answer, so it
+			// becomes a turn; the first is an Argument and stays a call.
+			let source = `implementation {
+	function counted(_ n: Integer, _ seen: Integer) -> Integer {
+		if n::isLessThan(1) {
+			<- seen
+		} else {
+			if n::is(3) {
+				<- counted(1, 0)::add(counted(n::subtract(1), seen::add(1)))
+			} else {
+				<- counted(n::subtract(1), seen::add(1))
+			}
+		}
+	}
+
+	Terminal.print(counted(5, 0))
+}`
+			let generated = generate(source)
+
+			expect(generated).toContain("continue $tail_0")
+			expect(generated).toContain("counted(")
+			expect(await outputOf(generated)).toEqual(
+				await outputOf(
+					generate(source, {
+						enabled: true,
+						disabledPasses: new Set(["loop-self-tail-calls"]),
+					}),
+				),
+			)
+		})
+
+		it("rebinds every Parameter at once", async () => {
+			// NOTE: `<- swap(b, a)` swaps. Written as two assignments in order
+			// it would write `b` over `a` and then read the value it just wrote,
+			// so both names would end up holding what `b` held.
+			let source = `implementation {
+	function swap(_ a: Integer, _ b: Integer, _ turns: Integer) -> Integer {
+		if turns::isLessThan(1) {
+			<- a
+		} else {
+			<- swap(b, a, turns::subtract(1))
+		}
+	}
+
+	Terminal.print(swap(1, 2, 1))
+	Terminal.print(swap(1, 2, 2))
+}`
+
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual(["2", "1"])
+		})
+
+		it("holds nothing where no Argument can read what a turn assigns", () => {
+			// NOTE: The other half of the rule. A turn whose Arguments read
+			// nothing it rebinds needs no name of the Compiler's at all, which
+			// is what keeps a counted walk to two assignments and a `continue`.
+			let source = `implementation {
+	function countdown(_ n: Integer, _ limit: Integer) -> Integer {
+		if n::isLessThan(1) {
+			<- limit
+		} else {
+			<- countdown(0, limit)
+		}
+	}
+
+	Terminal.print(countdown(3, 7))
+}`
+
+			expect(generate(source)).not.toContain("$tail_0_t")
+		})
+
+		it("evaluates every Argument of a turn before it assigns any", async () => {
+			// NOTE: Not the values this time but the ORDER, which only an
+			// Argument that DOES something can show. A call evaluates what it
+			// wrote, left to right, and fires the defaults of the Parameters it
+			// left out only afterwards — so a turn that assigned as it went, or
+			// that held its Arguments and released them the other way round,
+			// prints these lines in another order while every answer stays the
+			// same.
+			let source = `implementation {
+	function note(_ tag: String, _ value: Integer) -> Integer {
+		Terminal.print(tag)
+
+		<- value
+	}
+
+	function walk(
+		_ turns: Integer,
+		first a: Integer = note("dflt-a", 1),
+		second b: Integer = note("dflt-b", 2),
+		third c: Integer = note("dflt-c", 4),
+	) -> Integer {
+		if turns::isLessThan(1) {
+			<- a::add(b)::add(c)
+		} else {
+			<- walk(note("arg-turns", turns::subtract(1)), second note("arg-b", 5))
+		}
+	}
+
+	Terminal.print(walk(2))
+}`
+
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual([
+				"dflt-a",
+				"dflt-b",
+				"dflt-c",
+				"arg-turns",
+				"arg-b",
+				"dflt-a",
+				"dflt-c",
+				"arg-turns",
+				"arg-b",
+				"dflt-a",
+				"dflt-c",
+				"10",
+			])
+		})
+
+		it("rebinds each labelled Argument's own Parameter", async () => {
+			// NOTE: Essence calls are labelled, and the Enricher requires the
+			// labels in DECLARATION order — `span(…, to 11, from 3)` is refused
+			// with "This Argument is not labelled 'from'". So by the time the
+			// Optimiser reads a call the position of an Argument IS its
+			// Parameter, and the two below rebind what they name.
+			let source = `implementation {
+	function span(_ turns: Integer, from low: Integer, to high: Integer) -> Integer {
+		if turns::isLessThan(1) {
+			<- high::subtract(low)
+		} else {
+			<- span(turns::subtract(1), from low::add(2), to high::add(1))
+		}
+	}
+
+	Terminal.print(span(0, from 1, to 10))
+	Terminal.print(span(3, from 1, to 10))
+}`
+
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual(["9", "6"])
+		})
+
+		it("takes a default again in the turn that left it out", async () => {
+			// NOTE: `by` defaults to `n`, and a turn that leaves it out takes
+			// that default afresh — reading the `n` THAT turn bound, which is
+			// what a real call does. A loop that carried the first turn's `step`
+			// would print 4 and 40.
+			let source = `implementation {
+	function stepping(_ n: Integer, by step: Integer = n, sum total: Integer) -> Integer {
+		if n::isLessThan(1) {
+			<- total
+		} else {
+			<- stepping(n::subtract(1), sum total::add(step))
+		}
+	}
+
+	Terminal.print(stepping(4, sum 0))
+	Terminal.print(stepping(4, by 10, sum 0))
+}`
+			let generated = generate(source)
+
+			// NOTE: The default is assigned AFTER the Parameter it reads, which
+			// is the order a call binds them in.
+			expect(generated).toContain("step = n")
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual(["10", "16"])
+		})
+
+		it("holds a written Argument that stands after one a turn left out", async () => {
+			// NOTE: `first` is left out and `second` is written, and at a real
+			// call every Argument is evaluated before any default fires — so the
+			// turn has to hold `arg-b` and take the default only afterwards. The
+			// counter is captured by the closure in the answer, so it is rebound
+			// through a slot and can NOT be the reason the Arguments are held:
+			// the omitted Argument standing in front of a written one is the
+			// whole of the reason, which is what makes this a case of that rule
+			// and not of the other one.
+			let source = `implementation {
+	function note(_ tag: String, _ value: Integer) -> Integer {
+		Terminal.print(tag)
+
+		<- value
+	}
+
+	function one(_ f: () -> Integer) -> Integer {
+		<- f()
+	}
+
+	function walk(
+		_ turns: Integer,
+		first a: Integer = note("dflt-a", 1),
+		second b: Integer = note("dflt-b", 2),
+	) -> Integer {
+		if turns::isLessThan(1) {
+			<- a::add(b)::add(one(() -> Integer { <- turns }))
+		} else {
+			<- walk(turns::subtract(1), second note("arg-b", 5))
+		}
+	}
+
+	Terminal.print(walk(2))
+}`
+			let generated = generate(source)
+
+			expect(generated).toContain("const turns = turns_p")
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual([
+				"dflt-a",
+				"dflt-b",
+				"arg-b",
+				"dflt-a",
+				"arg-b",
+				"dflt-a",
+				"6",
+			])
+		})
+
+		it("renames the Parameter a default reads and not the member", async () => {
+			// NOTE: `opts.n` reads a member of a Record that is spelled like the
+			// Parameter `n`, which the closure in the answer captures and the
+			// loop therefore rebinds through a slot. What slotting renames is the
+			// names the body READS — and a member name is not one of them: it is
+			// a key of a Record, answered by the object rather than by a binding.
+			// Renaming it emits `opts.n_p`, which is `undefined`.
+			let source = `implementation {
+	function one(_ f: () -> Integer) -> Integer {
+		<- f()
+	}
+
+	function walk(
+		_ n: Integer,
+		_ opts: { n: Integer },
+		by step: Integer = opts.n,
+	) -> Integer {
+		if n::isLessThan(1) {
+			<- step::add(one(() -> Integer { <- n }))
+		} else {
+			<- walk(n::subtract(1), opts)
+		}
+	}
+
+	Terminal.print(walk(3, { n = 7 }))
+}`
+			let generated = generate(source)
+
+			expect(generated).toContain("(n_p, opts, step = opts.n)")
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual(["7"])
+		})
+
+		it("rebuilds a Record-defaulted Parameter per turn", async () => {
+			// NOTE: A RECORD default is not a value the Parameter list can hold
+			// — it means member by member — so the Simplifier rebuilds the
+			// Parameter in a prologue. A turn that leaves it out hands it the
+			// same hole a call does, and the prologue, which the loop runs
+			// again, fills it from the default. Carrying the caller's Record
+			// would print 9.
+			let source = `implementation {
+	function defaulted(_ n: Integer, options: { retries: Integer } = { retries = 2 }) -> Integer {
+		if n::isLessThan(1) {
+			<- options.retries
+		} else {
+			<- defaulted(n::subtract(1))
+		}
+	}
+
+	Terminal.print(defaulted(3, options { retries = 9 }))
+	Terminal.print(defaulted(0, options { retries = 9 }))
+}`
+
+			expect(generate(source)).toContain("options = void 0")
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual(["2", "9"])
+		})
+
+		it("binds a Parameter Pattern again per turn", async () => {
+			// NOTE: A Pattern in a Parameter is bound by Statements at the head
+			// of the body, and the loop goes around the WHOLE body — so a turn
+			// binds them again from what it rebound.
+			let source = `implementation {
+	function patterned(
+		{ left, right }: { left: Integer, right: Integer },
+		_ turns: Integer,
+	) -> Integer {
+		if turns::isLessThan(1) {
+			<- left::subtract(right)
+		} else {
+			<- patterned({ left = right, right = left }, turns::subtract(1))
+		}
+	}
+
+	Terminal.print(patterned({ left = 1, right = 2 }, 1))
+	Terminal.print(patterned({ left = 1, right = 2 }, 2))
+}`
+
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual(["1", "-1"])
+		})
+
+		it("carries the hidden conformance Argument", async () => {
+			// NOTE: A bounded Type Parameter arrives as a Parameter of its own at
+			// the end of the list, and a turn rebinds it like any other — so a
+			// call that passed a DIFFERENT witness would be right as well,
+			// because the loop assigns what the call wrote rather than keeping
+			// what the first turn was given.
+			let source = `implementation {
+	function indexOf<infer Item is Equatable>(
+		_ rest: List<Item>,
+		seeking needle: Item,
+		startingAt index: Integer = 0,
+	) -> Integer {
+		<- match rest::firstItem() -> Integer {
+			case #Empty { <- -1 }
+			case #Value(head) {
+				if head::is(needle) {
+					<- index
+				} else {
+					<- indexOf(rest::removeFirst(), seeking needle, startingAt index::add(1))
+				}
+			}
+		}
+	}
+
+	Terminal.print(indexOf([1, 2, 3], seeking 3))
+	Terminal.print(indexOf(["a", "b"], seeking "z"))
+}`
+			let generated = generate(source)
+
+			expect(generated).toContain("continue $tail_0")
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual(["2", "-1"])
+		})
+
+		it("is not a self call to another Overload of the same name", async () => {
+			// NOTE: An Overload is a member of its own by the time the Optimiser
+			// reads it, so the call below names a different Method and the
+			// Function that makes it is left alone.
+			let source = `implementation {
+	namespace Steps for Integer {
+		overload stepped {
+			() -> Integer {
+				<- @::stepped(1)
+			}
+
+			(_ by: Integer) -> Integer {
+				<- @::add(by)
+			}
+		}
+	}
+
+	Terminal.print(3::stepped())
+}`
+			let generated = generate(source)
+
+			expect(generated).not.toContain("while (true)")
+			expect(await outputOf(generated)).toEqual(["4"])
+		})
+
+		it("declines a Function whose name a Constant shadows", async () => {
+			// NOTE: `total` inside the body is the Constant, not the Function.
+			// Reading it as a self call would turn an answer into a turn that
+			// never ends.
+			let source = `implementation {
+	function total(_ n: Integer) -> Integer {
+		constant total = 7
+
+		if n::isLessThan(1) {
+			<- total
+		} else {
+			<- total
+		}
+	}
+
+	Terminal.print(total(3))
+}`
+			let generated = generate(source)
+
+			expect(generated).not.toContain("while (true)")
+			expect(await outputOf(generated)).toEqual(["7"])
+		})
+
+		it("gives a captured Parameter a binding per turn", async () => {
+			// NOTE: A JavaScript closure captures the VARIABLE. The three
+			// closures below are built in three different turns, and each has to
+			// answer with the `n` of the turn that built it — so the Parameter is
+			// rebound through a slot and the body's name is a `const` of the
+			// turn. One shared binding would print `[ 0, 0, 0 ]`.
+			let source = `implementation {
+	function gather(_ n: Integer, _ made: List<() -> Integer>) -> List<Integer> {
+		if n::isLessThan(1) {
+			<- made::map((_ f: () -> Integer) -> Integer { <- f() })
+		} else {
+			<- gather(n::subtract(1), made::append(() -> Integer { <- n }))
+		}
+	}
+
+	Terminal.inspect(gather(3, []))
+}`
+			let generated = generate(source)
+
+			expect(generated).toContain("const n = n_p")
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual(["[ 3, 2, 1 ]"])
+		})
+
+		it("gives EVERY captured Parameter a binding per turn", async () => {
+			// NOTE: One closure over two Parameters, both of them rebound. The
+			// rule is per Parameter and not per Function, so slotting the first
+			// one the walk meets and assigning the second where it stands would
+			// answer `[ 33, 32, 31 ]` — every closure reading the last turn's
+			// `m` and its own turn's `n`.
+			let source = `implementation {
+	function gather(_ n: Integer, _ m: Integer, _ made: List<() -> Integer>) -> List<Integer> {
+		if n::isLessThan(1) {
+			<- made::map((_ f: () -> Integer) -> Integer { <- f() })
+		} else {
+			<- gather(
+				n::subtract(1),
+				m::add(10),
+				made::append(() -> Integer { <- n::add(m) }),
+			)
+		}
+	}
+
+	Terminal.inspect(gather(3, 0, []))
+}`
+			let generated = generate(source)
+
+			expect(generated).toContain("const n = n_p")
+			expect(generated).toContain("const m = m_p")
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual(["[ 3, 12, 21 ]"])
+		})
+
+		it("declines a default that builds a closure over a rebound Parameter", async () => {
+			// NOTE: A default is taken again at the head of every turn, but it is
+			// evaluated where the turn ASSIGNS — it IS what the turn assigns — so
+			// there is no `const` of the turn for a closure standing in one to
+			// capture, the way a closure in the BODY captures one. It would close
+			// over the loop's own variable, and the three closures built below
+			// would all answer 0. The Function is declined instead: a Program the
+			// pass can not say the same thing as is one it leaves alone.
+			let source = `implementation {
+	function gather(
+		_ n: Integer,
+		_ made: List<() -> Integer>,
+		_ maker: () -> Integer = () -> Integer { <- n },
+	) -> List<Integer> {
+		if n::isLessThan(1) {
+			<- made::map((_ f: () -> Integer) -> Integer { <- f() })
+		} else {
+			<- gather(n::subtract(1), made::append(maker))
+		}
+	}
+
+	Terminal.inspect(gather(3, []))
+}`
+			let generated = generate(source)
+
+			expect(generated).not.toContain("$tail_")
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual(["[ 3, 2, 1 ]"])
+		})
+
+		it("loops a Function whose default builds a closure over nothing", async () => {
+			// NOTE: The other half of that rule, and the reason it is asked about
+			// the names the literal MENTIONS rather than about the literal. This
+			// default closes over no Parameter at all, so a fresh closure per
+			// turn is the same closure a call would build, and the walk is looped
+			// like any other.
+			let source = `implementation {
+	function gather(
+		_ n: Integer,
+		_ made: List<() -> Integer>,
+		_ maker: () -> Integer = () -> Integer { <- 7 },
+	) -> List<Integer> {
+		if n::isLessThan(1) {
+			<- made::map((_ f: () -> Integer) -> Integer { <- f() })
+		} else {
+			<- gather(n::subtract(1), made::append(maker))
+		}
+	}
+
+	Terminal.inspect(gather(3, []))
+}`
+			let generated = generate(source)
+
+			expect(generated).toContain("continue $tail_0")
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual(["[ 7, 7, 7 ]"])
+		})
+
+		it("walks on the same receiver and on another", async () => {
+			// NOTE: Two Methods of one Namespace. `sameReceiver` hands `@` on
+			// unchanged, so `_self` is not assigned at all; `otherReceiver`
+			// walks a different value of the same Namespace, which is a self
+			// call with a new `@` — and inside a Match Handler `@` is the
+			// matched value, so the receiver is rebound through a slot.
+			let source = `implementation {
+	namespace Walker for List<Integer> {
+		sameReceiver(_ turns: Integer) -> Integer {
+			if turns::isLessThan(1) {
+				<- @::length()
+			} else {
+				<- @::sameReceiver(turns::subtract(1))
+			}
+		}
+
+		total(_ sum: Integer) -> Integer {
+			constant items = @
+
+			<- match items::firstItem() -> Integer {
+				case #Empty     { <- sum }
+				case #Value(it) { <- items::removeFirst()::total(sum::add(it)) }
+			}
+		}
+	}
+
+	Terminal.print([1, 2, 3]::sameReceiver(4))
+	Terminal.print([1, 2, 3]::total(0))
+}`
+			let generated = generate(source)
+
+			// NOTE: The receiver the walk hands on unchanged is neither slotted
+			// nor assigned — it is still the Parameter the Method declares. The
+			// one that walks another value of the same Namespace is rebound
+			// through a slot, because `@` inside the Handler is the matched
+			// value and an assignment by that name would land on it.
+			expect(generated).toContain("static sameReceiver(_self, turns)")
+			expect(generated).toContain("static total(_self_p, sum)")
+			expect(generated).toContain("const _self = _self_p")
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual(["3", "6"])
+		})
+
+		it("writes a define's arms out as a ladder", async () => {
+			// NOTE: A `define` stays one Expression everywhere else, because
+			// every arm IS an Expression. In Return position its arms answer
+			// where it stands, so the ones that answer with a tail call become
+			// turns — and the ladder is what gives each of them somewhere to be
+			// a Statement.
+			let source = `implementation {
+	function ladder(_ n: Integer, _ seen: Integer) -> Integer {
+		<- define {
+			as seen                                 if n::isLessThan(1)
+			as ladder(n::subtract(2), seen::add(2)) if n::isGreaterThan(9)
+			as ladder(n::subtract(1), seen::add(1)) otherwise
+		}
+	}
+
+	Terminal.print(ladder(25, 0))
+}`
+			let generated = generate(source)
+
+			expect(generated).toContain("continue $tail_0")
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual(["25"])
+		})
+
+		it("declines a completing body", async () => {
+			// NOTE: `complete self(…)` puts the call inside the wait, so it is
+			// an Argument and never an answer — a completing body holds no tail
+			// call to find. The refusal is written down anyway: a turn taken
+			// inside the current run would inherit that run's cancellation
+			// scope.
+			let source = `implementation {
+	function counted(_ n: Integer, _ sum: Integer) -> Future<Integer> {
+		constant held = complete Async.deferred(() { <- n })
+
+		if held::isLessThan(1) {
+			<- sum
+		} else {
+			<- complete counted(n::subtract(1), sum::add(n))
+		}
+	}
+
+	Terminal.print(complete counted(3, 0))
+}`
+			let generated = generate(source)
+
+			expect(generated).not.toContain("while (true)")
+			expect(await outputOf(generated)).toEqual(["6"])
+		})
+
+		it("counts every turn it takes under coverage", async () => {
+			// NOTE: `instrument-coverage` runs first, so the counters are inside
+			// the body the loop wraps and every turn runs them again. A pass
+			// that lifted the body out of the loop, or that dropped a counter
+			// standing in front of a tail call, would report a site no test
+			// reached.
+			let instrumented = generate(walk, {
+				enabled: true,
+				disabledPasses: new Set(),
+				coverage: true,
+			})
+
+			expect(instrumented).toContain("continue $tail_0")
+			expect(await outputOf(instrumented)).toEqual(["10"])
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", walk),
+			).toEqual(["10"])
+
+			for (let fixture of [
+				"Everyday.es",
+				"List.es",
+				"Match.es",
+				"Tree.es",
+				"Loops.es",
+				"Patterns.es",
+				"Generics.es",
+			]) {
+				await expectSamePrintedOutput(
+					"loop-self-tail-calls",
+					readFileSync(fixturePath(fixture), "utf8"),
+				)
+			}
+		})
+	})
+
 	describe("eliminate-dead-code", () => {
 		it("drops a Constant nothing reads", () => {
 			let generated = generate(deadCode)

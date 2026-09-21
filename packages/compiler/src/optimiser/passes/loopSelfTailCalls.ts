@@ -221,11 +221,12 @@ class Looping {
 		// something OTHER than what it means at the head of the body" — and at
 		// the head of the body a Parameter means itself.
 		let outer: ReadonlySet<string> = new Set()
+		let rebuilt = rebuiltParameters(definition.body, names)
 		let sites: Array<TailSite> = []
 
 		descendReturns(definition.body, outer, (node, shadowed) => {
 			for (let call of tailCallsOf(node.expression, identity, shadowed)) {
-				let args = alignedArguments(call, parameters)
+				let args = alignedArguments(call, parameters, rebuilt)
 
 				if (args !== null) {
 					sites.push({ shadowed, arguments: args })
@@ -239,7 +240,7 @@ class Looping {
 			return null
 		}
 
-		let plan = planOf(definition, parameters, names, sites)
+		let plan = planOf(definition, parameters, names, sites, rebuilt)
 
 		if (plan === null) {
 			return null
@@ -282,6 +283,11 @@ const selfName = "_self"
 // NOTE: What was decided about a Function's Parameters once every tail call in
 // it has been read.
 type LoopPlan = {
+	// NOTE: The Parameters as the Function DECLARES them, before any slotting —
+	// read for the one thing a turn needs of a Parameter it has no value for:
+	// the Type the hole it hands over carries. Named for that: what the Function
+	// ends up with is `plannedParameter` of each of these.
+	declaredParameters: Array<ParameterNode>
 	// NOTE: The names the BODY reads its Parameters under, which slotting never
 	// changes: a slotted Parameter's name becomes a `const` of the turn.
 	names: Array<string>
@@ -297,6 +303,30 @@ type LoopPlan = {
 	// Argument may therefore read the old value of, which is what decides
 	// whether a turn has to hold its Arguments before it assigns any of them.
 	directlyAssigned: ReadonlySet<string>
+	// NOTE: The Parameters the BODY itself writes at its head, which today is
+	// exactly the Record-defaulted ones: a PARTIAL default is not a value the
+	// Parameter list can hold, so the Simplifier leaves the Parameter required
+	// and rebuilds it member by member in a prologue. Two things follow. A turn
+	// that leaves such a Parameter out hands it `undefined` — the very thing a
+	// call that wrote no Argument hands it — and the prologue, which the loop
+	// runs again like every other Statement of the body, rebuilds it from the
+	// default. And its per-turn copy is a `let`, because the prologue assigns it.
+	rebuilt: ReadonlySet<number>
+}
+
+// NOTE: The hole a call leaves where it wrote no Argument, which is what a turn
+// assigns to a Parameter the body rebuilds for itself. It is the one place
+// `undefined` is deliberately written into emitted code, and it never becomes a
+// value: the prologue at the head of the next turn consumes it before anything
+// reads the name.
+function omittedArgument(
+	parameter: ParameterNode,
+): common.typedSimple.OmittedArgumentNode {
+	return {
+		nodeType: "Intrinsic",
+		kind: "omitted-argument",
+		type: parameter.internalName.type,
+	}
 }
 
 // NOTE: The plan, or null where this Function may not be looped at all.
@@ -305,6 +335,7 @@ function planOf(
 	parameters: Array<ParameterNode>,
 	names: Array<string>,
 	sites: Array<TailSite>,
+	rebuilt: ReadonlySet<number>,
 ): LoopPlan | null {
 	let assigned = new Set<number>()
 	let slotted = new Set<number>()
@@ -461,7 +492,42 @@ function planOf(
 		}
 	}
 
-	return { names, slots, fallbacks, directlyAssigned }
+	return {
+		declaredParameters: parameters,
+		names,
+		slots,
+		fallbacks,
+		directlyAssigned,
+		rebuilt,
+	}
+}
+
+// NOTE: The Parameters the body assigns at its own head. The Simplifier writes
+// one such assignment, and only one: a Parameter whose default is a RECORD keeps
+// no default in the Parameter list, because what it means is member by member —
+// `options.retries ?? 3` — so the Parameter is rebuilt from whatever arrived
+// before the first Statement the author wrote. Asked by NAME at the top level,
+// which is where the prologue stands and the only place such an assignment can
+// be: Essence has no assignable Parameter, so a `variable` never reaches one.
+function rebuiltParameters(
+	nodes: Array<ImplementationNode>,
+	names: Array<string>,
+): ReadonlySet<number> {
+	let rebuilt = new Set<number>()
+
+	for (let node of nodes) {
+		if (node.nodeType !== "VariableAssignmentStatement") {
+			continue
+		}
+
+		let index = names.indexOf(node.name.name)
+
+		if (index >= 0) {
+			rebuilt.add(index)
+		}
+	}
+
+	return rebuilt
 }
 
 // NOTE: Whether this turn CHANGES the Parameter at `index`. A written Argument
@@ -545,7 +611,10 @@ function perTurnCopies(
 				type: parameter.internalName.type,
 			},
 			type: parameter.internalName.type,
-			isConstant: true,
+			// NOTE: A `let` for the one Parameter the body writes itself — the
+			// prologue that rebuilds a Record default assigns the name, and a
+			// `const` would make that a TypeError rather than a merge.
+			isConstant: !plan.rebuilt.has(index),
 		})
 	}
 
@@ -746,7 +815,21 @@ function tailCallStatement(
 		let fallback = plan.fallbacks[index]
 
 		if (fallback === null || fallback === undefined) {
-			return null
+			// NOTE: No default in the Parameter list means the body rebuilds
+			// this Parameter at its head — so the turn hands it the same hole a
+			// call that wrote no Argument hands it, and the prologue does the
+			// rest. `alignedArguments` has already refused every other way a
+			// Parameter can arrive here with nothing to bind.
+			if (!plan.rebuilt.has(index)) {
+				return null
+			}
+
+			assignments.push({
+				name: target,
+				value: omittedArgument(plan.declaredParameters[index]!),
+			})
+
+			continue
 		}
 
 		assignments.push({ name: target, value: fallback })
@@ -821,6 +904,7 @@ function argumentAt(call: SelfCallNode, index: number): TailArgument {
 function alignedArguments(
 	call: SelfCallNode,
 	parameters: Array<ParameterNode>,
+	rebuilt: ReadonlySet<number>,
 ): Array<TailArgument> | null {
 	if (call.arguments.length > parameters.length) {
 		return null
@@ -831,9 +915,13 @@ function alignedArguments(
 	for (let index = 0; index < parameters.length; index++) {
 		let argument = argumentAt(call, index)
 
+		// NOTE: A Parameter left out that has neither a default to take again
+		// nor a prologue to rebuild it is one this pass can not say what a turn
+		// would bind. No Program the Enricher accepted holds one.
 		if (
 			argument.kind === "omitted" &&
-			parameters[index]!.defaultValue === null
+			parameters[index]!.defaultValue === null &&
+			!rebuilt.has(index)
 		) {
 			return null
 		}
