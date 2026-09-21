@@ -590,6 +590,12 @@ describe("what a drain costs", () => {
 	// a window. The Symbol key is found by its description, as
 	// `asciiFastPath.spec.ts` finds the same two, because whether a scan
 	// HAPPENED is not observable any other way than by timing.
+	//
+	// NOTE: Asked of the window AFTER everything a turn asks OF it, and that
+	// ordering is the test. The scan remembers its answer on the receiver, so a
+	// window asked before it is used carries nothing whatever the Methods do —
+	// which is what an earlier draft of this guard asserted, and a mutant that
+	// scanned every window walked straight through it.
 	test("a drain never scans a window for ASCII-ness", () => {
 		let rest = slice(
 			createString("café ".repeat(CHARACTERS / 5)),
@@ -600,9 +606,18 @@ describe("what a drain costs", () => {
 		let turns = 0
 
 		while (Number(length(rest).value) > 0 && turns < TURN_CAP) {
-			expect(remembered(rest, "$isAscii")).toBeUndefined()
-			rest = slice(rest, createInteger(1), createInteger(1_000_000))
+			let window = rest
+
+			startsFolded(window, createString("ZZ"), insensitive)
+			ends(window, createString("zz"))
+			character(window, createInteger(0))
+			firstCharacter(window)
+			firstIndex(window, createString("é"))
+			rest = slice(window, createInteger(1), createInteger(1_000_000))
 			turns++
+
+			expect(remembered(window, "$isAscii")).toBeUndefined()
+			expect(remembered(window, "$normalised")).toBeUndefined()
 		}
 
 		expect(turns).toBe(CHARACTERS - 1)
