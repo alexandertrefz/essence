@@ -364,10 +364,10 @@ easy to break:
 Three of `List`'s Method Generics carry a Protocol bound, and each bound is a
 statement about what the Method needs rather than a restriction to work around.
 
-`join<infer ItemType is Printable>(with separator: String) -> String` is
+`join<ItemType is Printable>(with separator: String) -> String` is
 deliberately wider than a reader might expect: joining asks nothing of the items
 but that each can say what it is, so `[1, 2, 3]::join(with ", ")` is `"1, 2, 3"`,
-not a type error. `sort<infer ItemType is Comparable>()` is the same shape for
+not a type error. `sort<ItemType is Comparable>()` is the same shape for
 ordering.
 
 `sort(on:)`, `lowestItem(on:)` and `highestItem(on:)` bound the KEY rather
@@ -375,7 +375,8 @@ than the item — `<infer Key is Comparable>` — so a List of anything can be
 ordered by anything comparable read off it. The key is what has to be ordered,
 and the item never is. Where there is no key to read the item is what has to be
 ordered instead: the keyless `lowestItem()`, `highestItem()` and `isSorted(in:)`
-bound `<infer ItemType is Comparable>`.
+bound `<ItemType is Comparable>` — the Namespace's own Parameter, bounded for
+that Method alone.
 
 `is`, `contains`, `doesNotContain`, `firstIndex(of:)`, `lastIndex(of:)`,
 `everyIndex(of:)`, `count(of:)`, `removeEvery(_ item:)`, `split(on:)`,

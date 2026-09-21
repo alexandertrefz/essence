@@ -34,7 +34,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "is<infer ValueType is Equatable, infer FailureType is Equatable>(\n\t_ other: Result<ValueType, FailureType>,\n) -> Boolean",
+							"signature": "is<ValueType is Equatable, FailureType is Equatable>(\n\t_ other: Result<ValueType, FailureType>,\n) -> Boolean",
 							"summary": "",
 							"parameters": [
 								{
@@ -49,7 +49,7 @@
 							"examples": []
 						},
 						{
-							"signature": "is<infer ValueType is Equatable>(_ other: ValueType) -> Boolean",
+							"signature": "is<ValueType is Equatable>(_ other: ValueType) -> Boolean",
 							"summary": "",
 							"parameters": [
 								{
@@ -79,7 +79,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "isNot<infer ValueType is Equatable, infer FailureType is Equatable>(\n\t_ other: Result<ValueType, FailureType>,\n) -> Boolean",
+							"signature": "isNot<ValueType is Equatable, FailureType is Equatable>(\n\t_ other: Result<ValueType, FailureType>,\n) -> Boolean",
 							"summary": "",
 							"parameters": [
 								{
@@ -94,7 +94,7 @@
 							"examples": []
 						},
 						{
-							"signature": "isNot<infer ValueType is Equatable>(_ other: ValueType) -> Boolean",
+							"signature": "isNot<ValueType is Equatable>(_ other: ValueType) -> Boolean",
 							"summary": "",
 							"parameters": [
 								{
@@ -124,7 +124,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "toString<infer ValueType is Printable, infer FailureType is Printable>()\n\t-> String",
+							"signature": "toString<ValueType is Printable, FailureType is Printable>() -> String",
 							"summary": "Answers the Result as a String, written `Value(…)` or `Failure(…)`.\n\nEach payload renders through its own `toString`, and a String payload is quoted: `#Failure(\"gone\")` answers `Failure(\"gone\")`. A String prints bare on its own and quoted inside a structure. The Method is available whenever both payloads conform to `Printable`.",
 							"parameters": [],
 							"returns": "the text `Value(…)` or `Failure(…)` around the payload.",

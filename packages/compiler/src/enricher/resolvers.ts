@@ -2078,7 +2078,7 @@ export function isStaticMethod(method: common.Type | undefined): boolean {
 // NOTE: The Namespace a Scope stands inside, walking outwards — see
 // `Scope.namespace`. A Namespace can not be written inside another, so the first
 // answer is the only one.
-function enclosingNamespaceOf(
+export function enclosingNamespaceOf(
 	scope: enricher.Scope,
 ): { name: string; type: common.NamespaceType } | null {
 	for (
@@ -2241,20 +2241,121 @@ export function resolveGenericDeclarations(
 export function scopeWithGenerics(
 	generics: Array<parser.GenericDeclarationNode>,
 	scope: enricher.Scope,
+	// NOTE: Bounds nothing wrote at this declaration but that hold here anyway —
+	// today only a Namespace's, implied by a bounded generic Choice it targets.
+	// A written bound wins, because a written one is what the reader can see.
+	implied: Map<string, string> = new Map(),
 ): enricher.Scope {
 	let types: Record<string, common.Type> = {}
 
 	for (let generic of generics) {
+		let constraint =
+			generic.constraint?.content ?? implied.get(generic.name.content)
+
 		types[generic.name.content] = {
 			type: "GenericUse",
 			name: generic.name.content,
-			...(generic.constraint !== null
-				? { constraint: generic.constraint.content }
-				: {}),
+			...(constraint === undefined ? {} : { constraint }),
 		}
 	}
 
 	return childScope(scope, { types })
+}
+
+// NOTE: The bounds a Namespace's Type Parameters carry because its TARGET Type
+// demands them. `choice SortedBox<Item is Comparable>` can not be built out of
+// anything else, so every `SortedBox<X>` there can ever be is a proof that `X`
+// is Comparable — and a `namespace Boxes<infer Item> for SortedBox<Item>` is
+// reached by nothing but such values. Refusing the `for`, or making the reader
+// restate the bound the Choice already wrote, would be asking them to prove
+// again what the receiver carries.
+//
+// The witness comes from where a per-Method bound's does: the receiver's Type at
+// the call, solved there like any other. So this is read as a bound on EVERY
+// Method of the Namespace, woven through the same rail, and costs nothing new.
+//
+// Resolved SILENTLY, and from a Scope whose Parameters are unbounded — the whole
+// question is what the target says about them, and the report it makes while
+// they are unbounded is the one this exists to answer. The real resolution runs
+// afterwards with the answer in hand.
+// NOTE: The Type Parameters a Choice DECLARES, with their bounds — looked up by
+// the Choice's own name, which every Case of it carries. Empty where the name
+// resolves to no generic Choice, which is every non-generic one.
+function declaredChoiceGenerics(
+	choiceName: string,
+	scope: enricher.Scope,
+): Array<common.GenericDeclaration> {
+	let declared = findTypeInScope(displayChoiceName(choiceName), scope)
+
+	// NOTE: A generic Choice's name is a GenericAlias, whose own `generics` ARE
+	// the declaration's Parameters, bounds and all. A non-generic one resolves
+	// to the Union of its Cases and has none.
+	return declared?.type === "GenericAlias" ? declared.generics : []
+}
+
+export function impliedTargetBounds(
+	node: parser.NamespaceDefinitionStatementNode,
+	scope: enricher.Scope,
+): Map<string, string> {
+	let bounds = new Map<string, string>()
+
+	// NOTE: A target written out as a Record or as a Signature is the common
+	// shape, and neither can resolve to a Case however its members read — so the
+	// resolution below is skipped for it. It is not a cheap question: the target
+	// is resolved a SECOND time here, silently, to break the circularity between
+	// "what bounds do the Parameters carry" and "what does the target resolve
+	// to", and the hoisting rounds ask again per round — eight resolutions per
+	// Namespace on a Program of 440 of them, 3 % of its Enricher. Only a NAMED
+	// Type can be a Choice: an application (`SortedBox<Item>`), a bare name
+	// through an Alias, or a Union of either.
+	if (
+		node.targetType === null ||
+		node.generics.length === 0 ||
+		node.targetType.nodeType === "RecordTypeDeclaration" ||
+		node.targetType.nodeType === "FunctionTypeDeclaration"
+	) {
+		return bounds
+	}
+
+	let declared = new Set(node.generics.map((generic) => generic.name.content))
+	let target = collectDiagnostics(() =>
+		resolveType(node.targetType!, scopeWithGenerics(node.generics, scope)),
+	).result
+
+	// NOTE: Every Case of the applied Choice, which is what a generic Choice's
+	// name resolves to — each carrying the Choice's own declared Parameters
+	// beside the Arguments this application bound them to.
+	for (let candidate of target.type === "UnionType"
+		? target.types
+		: [target]) {
+		if (candidate.type !== "Case") {
+			continue
+		}
+
+		// NOTE: The Choice's DECLARED Parameters, read off the declaration
+		// rather than off this application — instantiating a Case replaces
+		// `choiceGenerics` with the `typeArguments` it bound, so the bounds are
+		// only where the Choice was written down.
+		let parameters = declaredChoiceGenerics(candidate.choice, scope)
+
+		for (let [index, argument] of (
+			candidate.typeArguments ?? []
+		).entries()) {
+			let constraint = parameters[index]?.constraint
+
+			if (
+				argument.type !== "GenericUse" ||
+				!declared.has(argument.name) ||
+				constraint == null
+			) {
+				continue
+			}
+
+			bounds.set(argument.name, constraint)
+		}
+	}
+
+	return bounds
 }
 
 // NOTE: Only a Function literal in Argument position can omit an annotation,
@@ -5113,11 +5214,21 @@ function foreignChoiceModule(
 
 // NOTE: The Namespace whose OWN Type Parameters declare this name, or null where
 // the name belongs to a Function or a Method. One walk answers both halves: a
-// Namespace's Generics live in the very Scope that carries `namespace`, and a
-// Method's own `<infer T>` sits in a Scope of its own inside that one — so the
-// nearest Scope declaring the name is asked, and nothing above it. A `where`
-// condition's bound reaches a fulfilling Method through a Scope of its own too,
-// which is why a Parameter that IS bounded here never gets this far.
+// Namespace's Generics live in a Scope that carries `namespace`, and a Method's
+// own `<infer T>` sits in a Scope of its own inside that one — so the nearest
+// Scope declaring the name is asked, and nothing above it.
+//
+// A BOUNDED Namespace Generic — one a `where` condition or a per-Method bound
+// put in scope — reaches the body through a Scope of its own, and that Scope
+// carries `namespace` too, exactly so this walk still answers with the
+// Namespace. It used to answer null there, and the report took the FUNCTION
+// branch: a Method that had already bounded its Parameter and wanted a SECOND
+// Protocol was told to `Declare it as '<infer Item is Comparable>'`, which is
+// the one spelling a Namespace's own Parameter refuses. That report is now
+// answered one step earlier — a Parameter that carries a bound is told the
+// one-bound rule whoever owns it — so this walk no longer decides that case;
+// the Scope still carries the Namespace because the invariant is what the walk
+// is written against. See `withInjectedBounds`.
 function namespaceDeclaringGeneric(
 	name: string,
 	scope: enricher.Scope,
@@ -5142,51 +5253,103 @@ function namespaceDeclaringGeneric(
 // print it. WHOSE Parameter it is decides everything, and the two answers have
 // nothing in common, so this is the one place that chooses between them.
 //
-// `bounded` is what a Quick Fix keys on: the edit it makes is
-// `<infer Item is P>`, the one spelling a Namespace's Parameter does not have.
+// `bounded` is what a Quick Fix keys on, and it is the SAME decision the Helps
+// are chosen by rather than a second one taken beside them: a Function's
+// Parameter is bounded where it was DECLARED, a Namespace's on the METHOD this
+// call stands in, and `none` is every case where neither edit would be accepted
+// — a fix offered there turns one error into two, which is what it used to do.
 export function typeParameterBoundReport(
 	parameter: string,
 	protocolName: string,
 	scope: enricher.Scope,
-): { notes: Array<string>; helps: Array<string>; bounded: boolean } {
+	// NOTE: The bound the Parameter already carries, where it carries one. A
+	// Type Parameter takes ONE bound, so every edit that would write a second
+	// is refused wherever it is written — see `oneBoundOnly`.
+	carriedBound: string | null = null,
+): {
+	notes: Array<string>
+	helps: Array<string>
+	bounded: "declaration" | "method" | "none"
+} {
+	if (carriedBound !== null) {
+		return {
+			notes: oneBoundOnly(parameter, carriedBound, protocolName),
+			helps: [],
+			bounded: "none",
+		}
+	}
+
 	let namespaceType = namespaceDeclaringGeneric(parameter, scope)
 
 	if (namespaceType === null) {
 		return {
 			notes: [],
 			helps: [`Declare it as '<infer ${parameter} is ${protocolName}>'.`],
-			bounded: true,
+			bounded: "declaration",
 		}
 	}
 
-	return {
-		...namespaceParameterBound(
-			namespaceType,
-			parameter,
-			protocolName,
-			scope,
-		),
-		bounded: false,
-	}
+	return namespaceParameterBound(
+		namespaceType,
+		parameter,
+		protocolName,
+		scope,
+	)
 }
 
-// NOTE: What there is to say about a bound a NAMESPACE's Type Parameter can not
-// carry. `<infer Item is Comparable>` on a Namespace is refused outright, so the
-// Function's Help sends a reader into `protocol-bound-namespace-generic`, whose
-// own Help sends them back — the loop this replaces. What carries a bound here
-// is a `where` on one of the Namespace's conformances, and a `where` reaches the
-// Methods that FULFIL that conformance and no others.
+// NOTE: THE words for "this Parameter is bounded already", wherever the want of
+// a second bound is noticed — a call that needs one, a hole that has to print
+// one, and the `<…>` that writes two of them down. One text, because a reader
+// meeting the rule twice in two spellings has to work out whether it is one rule
+// or two.
 //
-// So a Method that answers no requirement of any conformance has no spelling at
-// all today, and where the condition the reader needs is already written the
-// truth is that nothing more can be added: a Note says so and no Help is
-// offered, because every edit this could name is one the Compiler would refuse.
+// No Help goes with them. The combined Protocol below is the only way to ask for
+// two bounds today, and it is not an edit that works from here: it needs a
+// declaration and a conformance for every Type this Parameter is ever bound to,
+// which for a library Type is not the reader's to write. So the rule is stated
+// and the reader chooses.
+export function oneBoundOnly(
+	parameter: string,
+	carried: string,
+	wanted: string,
+): Array<string> {
+	return [
+		`'${parameter}' is bounded by '${carried}' already, and a Type Parameter carries ONE bound — a second would replace it rather than stand beside it.`,
+		`A Protocol that extends both — 'protocol Ranked is ${carried}, is ${wanted} {}' — is how a Parameter asks for two, and only Types this Program can declare that conformance for can satisfy it.`,
+	]
+}
+
+// NOTE: What there is to say about a bound on a NAMESPACE's Type Parameter.
+// `<infer Item is Comparable>` on the Namespace ITSELF stays refused — it would
+// bind every Method and every receiver — so the two places that carry one are
+// the Method's own `<…>`, which reaches that Method, and a `where` on one of the
+// Namespace's conformances, which reaches the Methods that FULFIL it.
+//
+// The per-Method edit leads and is never withheld: it needs nothing declared and
+// no requirement answered, which is exactly the case a reader lands in.
+//
+// The `where` alternative is offered only where following it would actually fix
+// THIS report. A `where` reaches the Methods that fulfil the conformance and no
+// others, so it answers a bound wanted inside `toString` on an `is Printable`
+// Namespace and does nothing at all for one wanted inside a `biggest` that
+// fulfils nothing — the same Namespace, the same Parameter, two different
+// answers. Which Method is asking is what tells them apart, and the body Scope
+// carries its name for exactly this.
+//
+// NOTE: This Diagnostic used to end in a dead end — `a Namespace's own Type
+// Parameters take no bounds`, and no Help at all for a Method fulfilling
+// nothing. The Note that said so is gone rather than softened: it is no longer
+// true, and a Note that has to be read around is worse than none.
 function namespaceParameterBound(
 	namespaceType: common.NamespaceType,
 	parameter: string,
 	protocolName: string,
 	scope: enricher.Scope,
-): { notes: Array<string>; helps: Array<string> } {
+): {
+	notes: Array<string>
+	helps: Array<string>
+	bounded: "method" | "none"
+} {
 	let declared = namespaceType.conformsTo ?? []
 	let conditionsOf = (name: string) =>
 		namespaceType.conformanceConditions?.[name] ?? []
@@ -5197,46 +5360,112 @@ function namespaceParameterBound(
 				protocolGrants(condition.protocol, protocolName, scope),
 		),
 	)
+	let methodHelp = `Bound it for this Method: write '<${parameter} is ${protocolName}>' after the Method's name.`
 	let first = carrying[0]
+	// NOTE: Whether the Method this is reported inside FULFILS a conformance —
+	// asked of the Protocol's surface, which is the same question the conformance
+	// check answers and the only half of it available from a body. A Protocol's
+	// ancestors are already flattened into `methods`, so one lookup covers the
+	// chain.
+	let fulfils = (protocol: string) => {
+		let name = enclosingMethodName(scope)
+		let found = name === null ? null : findProtocolInScope(protocol, scope)
 
-	if (first !== undefined) {
+		return found !== null && Object.hasOwn(found.methods, name!)
+	}
+
+	// NOTE: The two edits are EXCLUSIVE, and which one works is decided by
+	// whether this Method answers a requirement — ASKED FIRST, because it is the
+	// answer to "is the per-Method bound a thing this Method may write at all",
+	// and every branch below inherits it. A Method that fulfils a requirement is
+	// promised by the conformance unconditionally, so a bound of its own is
+	// refused on the spot by `nonconforming-namespace` — the condition has to go
+	// on the conformance, where it holds for the promise too. A Method that
+	// fulfils nothing has no conformance to hang a condition on, and a `where`
+	// written anyway would reach every fulfilling Method and not this one.
+	// Offering both would mean offering one edit that is refused.
+	//
+	// It is ONE decision rather than two alike: `bounded` travels out with the
+	// text, and the Quick Fix is offered on it. Deciding it a second time in
+	// `resolveConformances` is how the Editor came to offer the very edit the
+	// text withheld, on a Program the text had already got right.
+	let fulfilled = declared.filter(fulfils)
+
+	if (fulfilled.length > 0) {
+		// NOTE: A conformance that already binds this Parameter to something
+		// else is no place for the condition either — `conflicting-where-condition`
+		// refuses a second bound on one Parameter, and says where the conformance
+		// belongs. Where every conformance this Method fulfils is closed that
+		// way there is no edit left to name, and nothing is offered rather than
+		// something refused.
+		let open = fulfilled.filter(
+			(name) =>
+				!conditionsOf(name).some(
+					(condition) => condition.generic === parameter,
+				),
+		)
+
 		return {
 			notes: [
-				`'is ${first} where ${parameter} is ${protocolName}' is declared here already, and a 'where' reaches the Methods that fulfil '${first}' and no others — a Method that fulfils nothing can not be bounded.`,
+				`'${parameter}' is '${namespaceType.name}'s own Type Parameter, and this Method fulfils ${fulfilled
+					.map((name) => `'${name}'`)
+					.join(
+						" and ",
+					)} — so the bound belongs on the conformance, which promises the Method under it.`,
+				...(first === undefined
+					? []
+					: [
+							`'is ${first} where ${parameter} is ${protocolName}' is declared here already, so what is missing is the Method's own promise rather than the condition.`,
+						]),
 			],
-			helps: [],
+			helps:
+				open.length === 0
+					? []
+					: [
+							`Add 'where ${parameter} is ${protocolName}' to ${open
+								.map((name) => `'is ${name}'`)
+								.join(" or ")} on this Namespace.`,
+						],
+			bounded: "none",
 		}
 	}
 
-	// NOTE: A conformance that already binds this Parameter to something else is
-	// no place for the condition either — `conflicting-where-condition` refuses
-	// a second bound on one Parameter, and says where the conformance belongs.
-	let open = declared.filter(
-		(name) =>
-			!conditionsOf(name).some(
-				(condition) => condition.generic === parameter,
-			),
-	)
-
-	if (open.length === 0) {
+	// NOTE: Where the condition the reader needs is already written, saying so
+	// is the whole of the explanation — the bound exists, and this Method is
+	// simply not one the `where` reaches. The edit is the same either way.
+	if (first !== undefined) {
 		return {
 			notes: [
-				`A Namespace's own Type Parameters take no bounds — a 'where' on one of its conformances carries them, and reaches the Methods that fulfil that Protocol.`,
+				`'is ${first} where ${parameter} is ${protocolName}' is declared here already, and a 'where' reaches the Methods that fulfil '${first}' and no others.`,
 			],
-			helps: [],
+			helps: [methodHelp],
+			bounded: "method",
 		}
 	}
 
 	return {
 		notes: [
-			"A Namespace's own Type Parameters take no bounds, and a 'where' condition reaches the Methods that fulfil its conformance.",
+			`'${parameter}' is '${namespaceType.name}'s own Type Parameter, so a bound on it belongs to the Method that needs it rather than to the Namespace.`,
 		],
-		helps: [
-			`Add 'where ${parameter} is ${protocolName}' to ${open
-				.map((name) => `'is ${name}'`)
-				.join(" or ")} on this Namespace.`,
-		],
+		helps: [methodHelp],
+		bounded: "method",
 	}
+}
+
+// NOTE: The Namespace Method a Diagnostic is being reported from inside, read
+// through the Scope chain — see `Scope.methodName`.
+function enclosingMethodName(scope: enricher.Scope): string | null {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.methodName !== undefined) {
+			return current.methodName
+		}
+	}
+
+	return null
 }
 
 export function resolveConformances(
@@ -5315,10 +5544,12 @@ export function resolveConformances(
 				// `data` edits the DECLARATION — which is written under the name
 				// the source wrote and under no other.
 				let shown = displayGenericName(binding.name)
+				let carried = binding.constraint ?? null
 				let bound = typeParameterBoundReport(
 					shown,
 					generic.constraint,
 					scope,
+					carried,
 				)
 
 				reportError(
@@ -5329,29 +5560,54 @@ export function resolveConformances(
 						labels: [
 							primary(
 								position,
-								"bound here to an unbounded Type Parameter",
+								// NOTE: A Parameter that carries a DIFFERENT
+								// bound is not unbounded, and a label that says
+								// it is sends the reader looking for a bound
+								// that is written right there.
+								carried === null
+									? "bound here to an unbounded Type Parameter"
+									: `bound here to a Type Parameter bounded by '${carried}'`,
 							),
 						],
 						notes: [
-							`'${shown}' carries no '${generic.constraint}' bound of its own, so it can not satisfy one.`,
+							...(carried === null
+								? [
+										`'${shown}' carries no '${generic.constraint}' bound of its own, so it can not satisfy one.`,
+									]
+								: []),
 							...bound.notes,
 						],
 						helps: bound.helps,
 						// NOTE: The Type Parameter the bound has to be written
 						// on, beside the Protocol it has to be bound by — a
-						// Quick Fix edits the DECLARATION, which is nowhere near
-						// the call this is reported at. Withheld for a
-						// Namespace's Parameter: the edit it makes is the one
-						// spelling the language does not have.
-						...(bound.bounded
-							? {
-									data: {
-										kind: "required-protocol" as const,
-										protocol: generic.constraint,
-										parameter: shown,
-									},
-								}
-							: {}),
+						// Quick Fix writes it somewhere that is nowhere near the
+						// call this is reported at, and WHERE depends on whose
+						// Parameter it is: a Function's own declaration, or the
+						// `<…>` of the Method this call stands in.
+						//
+						// Carried from the report above rather than decided
+						// again: `bounded` is `none` exactly where the text
+						// withheld its edit, and a Quick Fix offered there is
+						// the refused edit — applying it turned one error into
+						// two.
+						...(bound.bounded === "none"
+							? {}
+							: {
+									data:
+										bound.bounded === "declaration"
+											? {
+													kind: "required-protocol" as const,
+													protocol:
+														generic.constraint,
+													parameter: shown,
+												}
+											: {
+													kind: "method-bound" as const,
+													protocol:
+														generic.constraint,
+													parameter: shown,
+												},
+								}),
 					},
 				)
 			}
@@ -8800,15 +9056,76 @@ export function resolvedDocumentation(
 	}
 }
 
+// NOTE: One Method form's `<…>` read apart: the Type Parameters it declares for
+// ITSELF, and the BOUNDS it puts on Parameters the Namespace already declared.
+//
+// `differing<Item is Equatable>()` inside a `namespace Pairing<infer Item>` does
+// not introduce a second `Item`. There is one `Item`, the Namespace's, worked
+// out from the receiver at every call; what the Method writes is a REQUIREMENT
+// on it, for this Method alone. So the entry leaves the Method's own Generics
+// and becomes a bound woven in beside the ones a conditional conformance's
+// `where` contributes — same three views, same hidden conformance Parameter,
+// same witness. A name that is NOT one of the Namespace's stays an ordinary
+// Method Type Parameter and is untouched.
+//
+// Two spellings are refused rather than read, by `refuseMalformedMethodBounds`,
+// and neither leaves a second `Item` behind for anything downstream to see:
+//
+//   • `differing<Item>()`, with no bound at all, could only ever shadow — the
+//     entry is not `infer`, so nothing can bind it, and the Method became
+//     uncallable in silence. Dropped.
+//   • `differing<infer Item is Equatable>()`, which RESTATES what the Namespace
+//     already said. It is read as the bound it plainly means, so one mistake
+//     gives one Diagnostic rather than a cascade, and the Help drops the word.
+//     This spelling used to be the only one that worked, by declaring a second
+//     `Item` the receiver bound: two spellings for one meaning, and the one that
+//     reads like a declaration won. The standard library was converted with it.
+export type MethodGenericSplit = {
+	own: Array<parser.GenericDeclarationNode>
+	bounds: Map<string, string>
+}
+
+export function splitMethodGenerics(
+	generics: Array<parser.GenericDeclarationNode>,
+	namespaceGenerics: Array<common.GenericDeclaration>,
+): MethodGenericSplit {
+	if (namespaceGenerics.length === 0) {
+		return { own: generics, bounds: new Map() }
+	}
+
+	let declared = new Set(namespaceGenerics.map((generic) => generic.name))
+	let own: Array<parser.GenericDeclarationNode> = []
+	let bounds = new Map<string, string>()
+
+	for (let generic of generics) {
+		if (!declared.has(generic.name.content)) {
+			own.push(generic)
+
+			continue
+		}
+
+		if (generic.constraint !== null) {
+			bounds.set(generic.name.content, generic.constraint.content)
+		}
+	}
+
+	return { own, bounds }
+}
+
 // NOTE: Which Namespace Generics belong on one Method signature, ahead of the
-// Method's own. A Namespace Generic is merged in only when the resolved
-// signature — the injected `self` Parameter, the declared Parameters and the
-// return Type — actually mentions it: a Generic nothing in the signature names
-// could never be bound by inference at a call site, so carrying it would leave
-// a phantom Type Parameter (and, under a `where` clause, a hidden conformance
-// Parameter with nothing to prove it). A Method Generic of the same name
-// shadows the Namespace one outright — the Method's own declaration wins,
-// constraint, `infer` and default included, and it appears exactly once.
+// Method's own. A Namespace Generic is merged in when the resolved signature —
+// the injected `self` Parameter, the declared Parameters and the return Type —
+// mentions it, or when the Method BOUNDS it: a Generic nothing in the signature
+// names and nothing requires could never be bound by inference at a call site,
+// so carrying it would leave a phantom Type Parameter (and a hidden conformance
+// Parameter with nothing to prove it). A bounded one is retained whatever the
+// signature mentions, because its witness is passed at every call and the
+// emitted arity has to agree; where nothing can bind it the call reports that,
+// which is the honest answer rather than a silently dropped requirement.
+//
+// A Method Generic of the same name no longer shadows — `splitMethodGenerics`
+// has already taken those entries out, so what arrives here declares names the
+// Namespace does not.
 // The retained Namespace Generics keep their declaration order and LEAD the
 // Method's own, because hidden conformance Parameters, witness Arguments and
 // `boundConformance` conditions are all emitted in that order.
@@ -8819,6 +9136,7 @@ function mergeNamespaceGenerics(
 		parameterTypes: Array<common.Parameter>
 		returnType: common.Type
 	},
+	bounds: Map<string, string>,
 ): Array<common.GenericDeclaration> {
 	if (namespaceGenerics.length === 0) {
 		return methodGenerics
@@ -8831,13 +9149,23 @@ function mergeNamespaceGenerics(
 		signature.returnType,
 	]
 
-	let used = namespaceGenerics.filter(
-		(generic) =>
-			!shadowed.has(generic.name) &&
-			signatureTypes.some((type) =>
-				typeMentionsGeneric(type, generic.name),
-			),
-	)
+	let used = namespaceGenerics.flatMap((generic) => {
+		if (shadowed.has(generic.name)) {
+			return []
+		}
+
+		let constraint = bounds.get(generic.name)
+
+		if (constraint !== undefined) {
+			return [{ ...generic, constraint }]
+		}
+
+		return signatureTypes.some((type) =>
+			typeMentionsGeneric(type, generic.name),
+		)
+			? [generic]
+			: []
+	})
 
 	return [...used, ...methodGenerics]
 }
@@ -8941,6 +9269,20 @@ function normalizeMethod(
 	}
 }
 
+// NOTE: Every form of one Namespace Method read apart, in WRITTEN ORDER — one
+// entry for a non-overloaded Method, one per Overload otherwise. The index is
+// load-bearing everywhere the three views of a Method's Type Parameters are
+// kept in step, so the splits are produced once, here, from the same
+// normalisation resolution reads.
+export function methodGenericSplits(
+	node: parser.NamespaceMethods[string],
+	namespaceGenerics: Array<common.GenericDeclaration>,
+): Array<MethodGenericSplit> {
+	return normalizeMethod(node).entries.map((entry) =>
+		splitMethodGenerics(entry.generics, namespaceGenerics),
+	)
+}
+
 // NOTE: Which entries of a Namespace Method are bound to the runtime rather
 // than implemented in Essence, in written order — one flag for a
 // non-overloaded Method, one per Overload otherwise. The standard library
@@ -9016,8 +9358,16 @@ export function resolveMethodType(
 	// did: both report Diagnostics, and they are reported in the order the
 	// Method reads.
 	let resolveEntry = (entry: MethodSignatureEntry) => {
-		let methodScope = scopeWithGenerics(entry.generics, scope)
-		let entryGenerics = resolveGenericDeclarations(entry.generics, scope)
+		// NOTE: The entries that BOUND one of the Namespace's own Parameters are
+		// not Type Parameters of this Method and must not be registered as such:
+		// registered, the name would be a fresh opaque Generic in the signature's
+		// Scope, and the receiver Type — written in the Namespace's `Item` —
+		// would stop matching it. The bound reaches the same Parameter through
+		// `mergeNamespaceGenerics` instead, where it lands on the Namespace's
+		// entry and is carried into the one place the Rewriter reads.
+		let split = splitMethodGenerics(entry.generics, namespaceGenerics)
+		let methodScope = scopeWithGenerics(split.own, scope)
+		let entryGenerics = resolveGenericDeclarations(split.own, scope)
 
 		let signature = {
 			parameterTypes: [
@@ -9034,6 +9384,7 @@ export function resolveMethodType(
 				namespaceGenerics,
 				entryGenerics,
 				signature,
+				split.bounds,
 			),
 			...signature,
 			documentation: resolvedDocumentation(

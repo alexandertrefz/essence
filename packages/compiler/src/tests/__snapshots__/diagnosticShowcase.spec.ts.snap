@@ -388,7 +388,61 @@ Error: List<{ x: Integer }> does not conform to 'Comparable'
     │ Note 2: { x: Integer } does not conform to 'Comparable'.
 ────╯
 
-─── 3 errors
+[shadowed-type-parameter]
+Error: 'Item' is already this Namespace's Type Parameter
+    ╭─┤ Conformance.es:39:8 │
+    │
+ 39 │        held<Item>() -> Item {
+    │             ──┬─  
+    │               ╰─── 'Shadowing' declares 'Item' already
+    │ 
+    │ Help: Drop 'Item' from 'held's Type Parameters.
+    │ 
+    │ Note: 'Item' is worked out from the receiver at every call to 'held', so a second one here could only shadow it — and nothing would ever bind that.
+────╯
+
+[restated-inferred-parameter]
+Error: 'Item' is already inferred by this Namespace
+    ╭─┤ Conformance.es:47:9 │
+    │
+ 47 │        shown<infer Item is Printable>() -> String {
+    │              ───────────┬───────────  
+    │                         ╰───────────── 'infer' belongs on 'Restating's own declaration, where it is
+    │ 
+    │ Help: Write '<Item is Printable>' on 'shown'.
+    │ 
+    │ Note: A Method bounds a Type Parameter it shares rather than declaring one of its own, so '<Item is Printable>' is the whole of what 'shown' has to say about it.
+────╯
+
+[unsatisfied-bound]
+Error: Type Parameter 'Item' does not conform to 'Comparable'
+    ╭─┤ Conformance.es:56:7 │
+    │
+ 56 │          <- @.items::sort()
+    │             ───────┬───────  
+    │                    ╰───────── bound here to an unbounded Type Parameter
+    │ 
+    │ Help: Bound it for this Method: write '<Item is Comparable>' after the Method's name.
+    │ 
+    │ Note 1: 'Item' carries no 'Comparable' bound of its own, so it can not satisfy one.
+    │ Note 2: 'Item' is 'Unbounded's own Type Parameter, so a bound on it belongs to the Method that needs it rather than to the Namespace.
+────╯
+
+[unsatisfied-bound]
+Error: Type Parameter 'Item' does not conform to 'Comparable'
+    ╭─┤ Conformance.es:71:17 │
+    │
+ 71 │          <- "{@.tag} {@.items::sort()::length()}"
+    │                       ───────┬───────  
+    │                              ╰───────── bound here to an unbounded Type Parameter
+    │ 
+    │ Help: Add 'where Item is Comparable' to 'is Printable' on this Namespace.
+    │ 
+    │ Note 1: 'Item' carries no 'Comparable' bound of its own, so it can not satisfy one.
+    │ Note 2: 'Item' is 'Fulfilling's own Type Parameter, and this Method fulfils 'Printable' — so the bound belongs on the conformance, which promises the Method under it.
+────╯
+
+─── 7 errors
 "
 `;
 

@@ -547,8 +547,8 @@ describe("Dictionary literals", () => {
 					column: 27,
 				})?.signatures.map((signature) => signature.label),
 			).toEqual([
-				"value<ValueType, KeyType is Equatable>(at: KeyType) -> Optional<ValueType>",
-				"value<ValueType, KeyType is Equatable>(at: KeyType, defaultingTo: ValueType) -> ValueType",
+				"value<KeyType is Equatable, ValueType>(at: KeyType) -> Optional<ValueType>",
+				"value<KeyType is Equatable, ValueType>(at: KeyType, defaultingTo: ValueType) -> ValueType",
 			])
 		})
 

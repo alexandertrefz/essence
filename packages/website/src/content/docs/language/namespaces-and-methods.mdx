@@ -340,7 +340,7 @@ A target can be any type:
 - **A [union](/docs/language/unions-and-type-aliases).** Every member gets the methods, as `Greetable` below shows.
 - **An alias.** `Celsius` is another name for `Integer`, so `Temperatures` serves every `Integer`, and `5::isFreezing()` compiles.
 
-A namespace can also declare a type parameter of its own, as in `namespace Stack<infer Item> for List<Item>`. That form is on [Generics](/docs/language/generics).
+A namespace can also declare a type parameter of its own, as in `namespace Stack<infer Item> for List<Item>`, and a method may bound that parameter for itself: `biggest<Item is Comparable>()`. Both forms are on [Generics](/docs/language/generics).
 
 A namespace whose target is a union covers each member of it:
 

@@ -4144,9 +4144,19 @@ differently:
 - **A choice whose cases carry no payload.** The namespace's body may be empty: declaring `namespace Problems for Problem is Printable {}` is the whole of what such a choice needs.
 - **An unbounded type parameter.** `Declare it as '<infer Item is Comparable>'`, with a **Quick Fix** that writes the bound onto a declaration in this file.
 
-A namespace's own type parameters are the exception to the last one: they take no
-bounds at all, and the report says what does carry one. See
+A namespace's own type parameters are the exception to the last one: the bound
+goes on a method rather than on the declaration, and the report says which method
+— `Bound it for this Method: write '<Item is Comparable>' after the Method's
+name`, with a **Quick Fix** that writes it there. A method that FULFILS a
+protocol requirement is the exception to THAT: the conformance promised it
+unconditionally, so the condition belongs on the conformance (`Add 'where Item is
+Comparable' to 'is Printable' on this Namespace.`) and no per-method edit is
+offered, because one written there is refused. See
 [`protocol-bound-namespace-generic`](#protocol-bound-namespace-generic).
+
+A parameter that already carries a bound is a third answer: a type parameter
+takes ONE bound, so neither edit is offered and the notes say the rule and the
+one way around it — a protocol that extends both.
 
 Taught on: [Protocols › Declared, not structural](/docs/language/protocols#declared-not-structural)
 
@@ -4201,24 +4211,26 @@ The word is named only where it may stand — inside a body that answers a futur
 
 A hole holding a **type parameter** is a missing bound rather than a union to
 match apart — `Item` is neither an `Optional` to unwrap nor a union to take
-apart, so the Help is the bound instead, and where the parameter it names is a
-namespace's the Help is the `where` on one of its conformances:
+apart, so the Help is the bound instead. Which bound depends on the method: one
+that FULFILS a requirement is promised by the conformance, so its bound goes on
+the `where`, and any other method bounds the parameter for itself
+(`<Item is Printable>` after its name):
 
 <div class="error-output">
 
 ```
 [interpolation-not-printable]
 Error: Item can not be interpolated into a String
-   ╭─┤ Boxes.es:7:18 │
+   ╭─┤ Boxes.es:6:18 │
    │
- 7 │          <- "a box of {@.item}"
+ 6 │          <- "a box of {@.item}"
    │                        ───┬──  
    │                           ╰──── this is Item, which is not Printable
    │ 
    │ Help: Add 'where Item is Printable' to 'is Printable' on this Namespace.
    │ 
    │ Note 1: Type Parameter 'Item' does not conform to 'Printable'.
-   │ Note 2: A Namespace's own Type Parameters take no bounds, and a 'where' condition reaches the Methods that fulfil its conformance.
+   │ Note 2: 'Item' is 'Boxes's own Type Parameter, and this Method fulfils 'Printable' — so the bound belongs on the conformance, which promises the Method under it.
 ───╯
 ```
 
@@ -4467,28 +4479,98 @@ Taught on: [Functions as values › Methods and generic functions as values](/do
 Error: A Namespace's Type Parameters can not carry Protocol bounds
    ╭─┤ Boxes.es:2:32 │
    │
- 2 │     namespace Boxes<infer Item is Comparable> for List<Item> {
+ 2 │     namespace Boxes<infer Item is Comparable> for List<Item> is Printable {
    │                                   ─────┬────  
    │                                        ╰────── this bound is not supported here
    │ 
-   │ Help: Declare a conformance on this Namespace and bound it there — 'is …' with a Protocol of your own, then 'where Item is Comparable'.
+   │ Help 1: Bound it on each Method that needs it: write '<Item is Comparable>' after that Method's name.
+   │ Help 2: Or bound it on a conformance this Namespace declares: 'is Printable where Item is Comparable'.
    │ 
-   │ Note: A 'where' condition reaches the Methods that fulfil its conformance, which is the part a bound on the Namespace itself could never say.
+   │ Note 1: A bound written here would apply to every Method of 'Boxes', including the ones that do not need it.
+   │ Note 2: A 'where' condition reaches the Methods that fulfil its conformance, which is the part a bound on the Namespace itself could never say.
 ───╯
 ```
 
 </div>
 
-Move the bound into a conditional conformance: `namespace Boxes<infer Item> for { value: Item } is Printable where Item is Printable`.
+A bound written on the namespace would apply to every method it holds, and to
+every receiver of its target shape. The two places that carry one each reach
+exactly what they are about.
 
-Where the namespace already declares a conformance the Help names it, because the
-condition belongs on one this namespace owes rather than on one it would then be
-reported for not writing.
+Move it to the methods that need it: `biggest<Item is Comparable>() -> Optional<Item>`.
+The parameter is still the namespace's — still worked out from the receiver, still
+written without `infer` — and the bound holds for that method alone. This works
+whatever the namespace declares, which is why the Help leads with it.
 
-A `where` reaches the methods that **fulfil** that conformance and no others. A
-method that fulfils nothing — an extra method beside the requirements — can not be
-bounded at all today; `unsatisfied-bound` says so in a note where that is the
-shape, and offers no Help, because every spelling would be refused.
+Or move it into a conditional conformance: `namespace Boxes<infer Item> for { value: Item } is Printable where Item is Printable`.
+A `where` reaches the methods that **fulfil** that conformance and no others, so it
+bounds a whole family at once. Where the namespace already declares a conformance
+the Help names it, because the condition belongs on one this namespace owes rather
+than on one it would then be reported for not writing.
+
+Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
+
+### `shadowed-type-parameter`
+
+**Error.** A method names one of its namespace's type parameters again, with no bound.
+
+<div class="error-output">
+
+```
+[shadowed-type-parameter]
+Error: 'Item' is already this Namespace's Type Parameter
+    ╭─┤ Conformance.es:39:8 │
+    │
+ 39 │        held<Item>() -> Item {
+    │             ──┬─  
+    │               ╰─── 'Shadowing' declares 'Item' already
+    │ 
+    │ Help 1: Drop 'Item' from 'held's Type Parameters.
+    │ Help 2: Or bound it for this Method: '<Item is …>' with the Protocol 'held' needs.
+    │ 
+    │ Note: 'Item' is worked out from the receiver at every call to 'held', so a second one here could only shadow it — and nothing would ever bind that.
+────╯
+```
+
+</div>
+
+There is one `Item`, the namespace's, and the receiver decides it at every call. An
+entry that names it again with nothing to say declares a second one that carries no
+`infer` — so no call could ever bind it, the method asked for an argument of a type
+nothing produces, and every call to it answered
+[`no-matching-overload`](#no-matching-overload) instead.
+
+Drop the entry, or give it the bound that made you write it:
+`held<Item is Printable>()`.
+
+Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
+
+### `restated-inferred-parameter`
+
+**Error.** A method's bound on its namespace's type parameter restates `infer`.
+
+<div class="error-output">
+
+```
+[restated-inferred-parameter]
+Error: 'Item' is already inferred by this Namespace
+    ╭─┤ Conformance.es:47:9 │
+    │
+ 47 │        shown<infer Item is Printable>() -> String {
+    │              ───────────┬───────────  
+    │                         ╰───────────── 'infer' belongs on 'Restating's own declaration, where it is
+    │ 
+    │ Help: Write '<Item is Printable>' on 'shown'.
+    │ 
+    │ Note: A Method bounds a Type Parameter it shares rather than declaring one of its own, so '<Item is Printable>' is the whole of what 'shown' has to say about it.
+────╯
+```
+
+</div>
+
+`infer` says where a type parameter's type comes from, and the namespace already
+said it. A method bounding that parameter is adding a requirement, not declaring
+anything, so it writes the bound and nothing else. Drop the word.
 
 Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
 

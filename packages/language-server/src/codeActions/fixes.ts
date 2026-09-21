@@ -36,6 +36,7 @@ import type { CodeActionEdit, CodeActionEntry } from "./index"
 import {
 	bodyReturns,
 	enclosingNamespace,
+	enclosingNamespaceMethod,
 	findConstantDeclaration,
 	findFunctionDefinition,
 	findGenericDeclaration,
@@ -1523,6 +1524,154 @@ export function boundParameterAction(
 					end: declared.name.position.end,
 				},
 				newText: ` is ${protocol}`,
+			},
+		],
+	}
+}
+
+// NOTE: A bound on one of the NAMESPACE's Type Parameters, written onto the
+// Method the call stands in — the counterpart of `boundParameterAction`, whose
+// edit goes on a declaration. Into the Method's existing `<…>` where it has one,
+// after the last entry, and as a whole `<…>` right before the Parameter list
+// where it has none.
+//
+// Offered only where the Method does not already bound that Parameter:
+// `<Item is A is P>` is not a spelling, and which of the two a reader meant to
+// keep is not a question a Diagnostic about a call can answer.
+export function methodBoundAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+): CodeActionEntry | null {
+	if (diagnostic.data?.kind !== "method-bound") {
+		return null
+	}
+
+	let found = enclosingNamespaceMethod(program, diagnostic.position)
+
+	if (found === null) {
+		return null
+	}
+
+	let { protocol, parameter } = diagnostic.data
+	let generics = found.method.value.generics
+	let written = generics.find((generic) => generic.name.content === parameter)
+
+	if (written !== undefined) {
+		return null
+	}
+
+	let last = generics.at(-1)
+	let entry = `${parameter} is ${protocol}`
+	let edit =
+		last === undefined
+			? {
+					range: {
+						start: found.method.value.parameterListPosition.start,
+						end: found.method.value.parameterListPosition.start,
+					},
+					newText: `<${entry}>`,
+				}
+			: {
+					range: { start: last.position.end, end: last.position.end },
+					newText: `, ${entry}`,
+				}
+
+	return {
+		title: `Bound it for this Method: '<${entry}>'`,
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [edit],
+	}
+}
+
+// NOTE: A Method's `<…>` entry that re-declares one of its Namespace's Type
+// Parameters. The two shapes get the two edits their Diagnostics name: the
+// unbounded one is REMOVED, entry and separator together, and the one that
+// restates `infer` keeps the entry and loses the word.
+//
+// The whole `<…>` goes with the last entry — an empty `<>` is not a spelling.
+export function reDeclaredParameterAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+): CodeActionEntry | null {
+	let data = diagnostic.data
+
+	if (
+		data?.kind !== "shadowed-type-parameter" &&
+		data?.kind !== "restated-inferred-parameter"
+	) {
+		return null
+	}
+
+	let found = enclosingNamespaceMethod(program, diagnostic.position)
+	let generics = found?.method.value.generics ?? []
+	let index = generics.findIndex(
+		(generic) => generic.name.content === data.parameter,
+	)
+	let entry = generics[index]
+
+	if (found === null || entry === undefined) {
+		return null
+	}
+
+	if (data.kind === "restated-inferred-parameter") {
+		return {
+			title: `Write '<${data.parameter} is ${data.protocol}>'`,
+			kind: "quickfix",
+			diagnosticCode: diagnostic.code,
+			diagnosticPosition: diagnostic.position,
+			isPreferred: true,
+			edits: [
+				{
+					range: {
+						start: entry.position.start,
+						end: entry.name.position.start,
+					},
+					newText: "",
+				},
+			],
+		}
+	}
+
+	let previous = generics[index - 1]
+	let next = generics[index + 1]
+	let range =
+		generics.length === 1
+			? {
+					start: entry.position.start,
+					end: found.method.value.parameterListPosition.start,
+				}
+			: next !== undefined
+				? { start: entry.position.start, end: next.position.start }
+				: {
+						start: previous!.position.end,
+						end: entry.position.end,
+					}
+
+	// NOTE: A lone entry takes the angle brackets with it, and the span given
+	// runs from the entry to the Parameter list — which covers the `>` and
+	// whatever stands between. The `<` is one character before the entry.
+	return {
+		title: `Drop '${data.parameter}' from this Method's Type Parameters`,
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [
+			{
+				range:
+					generics.length === 1
+						? {
+								start: {
+									...range.start,
+									column: range.start.column - 1,
+								},
+								end: range.end,
+							}
+						: range,
+				newText: "",
 			},
 		],
 	}

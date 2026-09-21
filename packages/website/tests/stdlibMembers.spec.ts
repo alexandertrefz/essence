@@ -386,3 +386,55 @@ describe("the library's addresses", () => {
 		]).toEqual([])
 	})
 })
+
+/*
+ * The signatures the OVERVIEW quotes, held to the ones the library pages were
+ * generated with.
+ *
+ * "How to read a signature" shows five entries of `List` and says they are
+ * written as the sources write them — inside a `§ fragment` block, which
+ * `docsExamples.spec.ts` never compiles, because a signature without a body is
+ * not a Program. So nothing held that promise, and the page went on teaching
+ * `contains<infer ItemType is Equatable>` after the sources had stopped
+ * spelling it that way and the compiler had begun refusing it.
+ *
+ * What CAN be checked mechanically is the one thing that matters: each line the
+ * fragment quotes is a signature `list.json` carries. The manifest is generated
+ * from the sources by the same run that writes the pages, so a spelling that
+ * drifts here is a spelling the library never had.
+ */
+describe("The overview's quoted signatures", () => {
+	it("quotes List signatures the library page carries", () => {
+		let overview = readFileSync(
+			path.join(LIBRARY_DIRECTORY, "overview.mdx"),
+			"utf8",
+		)
+		let fragment = /```essence\n§ fragment\n([\s\S]*?)```/.exec(overview)
+
+		expect(fragment).not.toBeNull()
+
+		// NOTE: An entry may be broken across lines, exactly as the sources
+		// have it — a continuation is indented or is the `)` that closes the
+		// Parameter list, so the entries are gathered rather than read one line
+		// at a time.
+		let quoted: Array<string> = []
+
+		for (let line of (fragment![1] as string).split("\n")) {
+			if (/^[a-z][A-Za-z0-9]*[<(]/.test(line)) {
+				quoted.push(line)
+			} else if (quoted.length > 0 && /^[\t)]/.test(line)) {
+				quoted[quoted.length - 1] += `\n${line}`
+			}
+		}
+
+		let signatures = JSON.stringify(manifests.get("list"))
+
+		expect(quoted.length).toBeGreaterThan(3)
+		expect(
+			quoted.filter(
+				(entry) =>
+					!signatures.includes(JSON.stringify(entry).slice(1, -1)),
+			),
+		).toEqual([])
+	})
+})

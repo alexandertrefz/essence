@@ -65,43 +65,114 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		}
 	})
 
-	// NOTE: The condition is what the Function's Help would have sent a reader
-	// to write as a bound, so the conformance it belongs on is named — and the
-	// one it is named for is one this Namespace already declares, since a
-	// conformance it does not owe is a second report rather than a fix.
-	it("should name a conformance this Namespace declares", () => {
-		expect(firstOf(withoutTheWhere, "unsatisfied-bound").helps).toEqual([
-			"Add 'where Item is Comparable' to 'is Printable' on this Namespace.",
-		])
+	// NOTE: The Help that always applies, and the only one that needs nothing
+	// declared: the bound goes on the Method that needs it. Followed literally
+	// — `biggest<Item is Comparable>()` — and the result compiles, which is the
+	// whole of what these specs are for.
+	it("should send the reader to the Method that needs the bound", () => {
+		for (let source of [underAWhere, withoutTheWhere, noConformanceAtAll]) {
+			expect(firstOf(source, "unsatisfied-bound").helps[0]).toBe(
+				"Bound it for this Method: write '<Item is Comparable>' after the Method's name.",
+			)
+		}
+
+		expect(
+			compiles(
+				noConformanceAtAll.replace(
+					"biggest()",
+					"biggest<Item is Comparable>()",
+				),
+			),
+		).toBe(true)
+
+		expect(
+			compiles(
+				underAWhere.replace(
+					"biggest()",
+					"biggest<Item is Comparable>()",
+				),
+			),
+		).toBe(true)
 	})
 
-	// NOTE: THE language gap this audit found, said in a Note because there is
-	// no Help to give: a `where` reaches the Methods that fulfil its conformance
-	// and no others, so a Method that fulfils none can not be bounded at all.
-	// Anything offered here would be an edit the Compiler goes on to refuse.
-	it("should offer nothing where the condition is already written", () => {
+	// NOTE: No `where` alternative here, and that is the point of the Scope
+	// carrying the Method's name. A `where` reaches only the Methods that fulfil
+	// the conformance — `biggest` fulfils nothing, so adding it changes nothing
+	// and the report comes back unchanged. Offered where it WOULD work, which is
+	// the spec below this one.
+	it("should not offer a 'where' the reported Method would not be reached by", () => {
+		let diagnostic = firstOf(withoutTheWhere, "unsatisfied-bound")
+
+		expect(diagnostic.helps).toHaveLength(1)
+		expect(
+			compiles(
+				withoutTheWhere.replace(
+					"is Printable {",
+					"is Printable where Item is Comparable {",
+				),
+			),
+		).toBe(false)
+	})
+
+	// NOTE: The same Namespace shape, the same Parameter, asked from a Method
+	// that DOES fulfil the conformance — and now the `where` is the edit that
+	// works, and the only one offered: a fulfilling Method may not carry a bound
+	// of its own, because the conformance promised it without one.
+	it("should offer the 'where' to a Method the conformance reaches", () => {
+		let fulfilling = `implementation {
+			type Box<Item> = { item: Item }
+
+			namespace Boxes<infer Item> for Box<Item> is Printable {
+				toString() -> String {
+					<- "a box of {@.item}"
+				}
+			}
+
+			Terminal.print("{{ item = 1 }}")
+		}`
+
+		expect(
+			firstOf(fulfilling, "interpolation-not-printable").helps,
+		).toEqual([
+			"Add 'where Item is Printable' to 'is Printable' on this Namespace.",
+		])
+
+		expect(
+			compiles(
+				fulfilling.replace(
+					"is Printable {",
+					"is Printable where Item is Printable {",
+				),
+			),
+		).toBe(true)
+	})
+
+	// NOTE: Where the condition is already written, the Note says why it does
+	// not reach here — `biggest` fulfils nothing — and the Help is the same edit
+	// as everywhere else. This used to end in no Help at all, on the reading
+	// that a Method fulfilling nothing could not be bounded; it can.
+	it("should explain a 'where' that does not reach this Method", () => {
 		let diagnostic = firstOf(underAWhere, "unsatisfied-bound")
 
-		expect(diagnostic.helps).toEqual([])
 		expect(diagnostic.notes[1]).toBe(
-			"'is Printable where Item is Comparable' is declared here already, and a 'where' reaches the Methods that fulfil 'Printable' and no others — a Method that fulfils nothing can not be bounded.",
+			"'is Printable where Item is Comparable' is declared here already, and a 'where' reaches the Methods that fulfil 'Printable' and no others.",
 		)
+		expect(diagnostic.helps).toHaveLength(1)
 	})
 
-	it("should state the rule where there is no conformance to name", () => {
+	it("should name whose Type Parameter it is where nothing is declared", () => {
 		let diagnostic = firstOf(noConformanceAtAll, "unsatisfied-bound")
 
-		expect(diagnostic.helps).toEqual([])
 		expect(diagnostic.notes[1]).toBe(
-			"A Namespace's own Type Parameters take no bounds — a 'where' on one of its conformances carries them, and reaches the Methods that fulfil that Protocol.",
+			"'Item' is 'Boxes's own Type Parameter, so a bound on it belongs to the Method that needs it rather than to the Namespace.",
 		)
+		expect(diagnostic.helps).toHaveLength(1)
 	})
 
-	// NOTE: The other end of the loop. Naming the BOUND Protocol read as an
-	// instruction to declare `is Comparable`, which a Namespace with no
-	// `compare` does not — so following it reported a missing requirement and
-	// sent the reader back to the bound.
-	it("should name a declared conformance from the refusal side too", () => {
+	// NOTE: The other end of what used to be a loop. The refusal of a bound on
+	// the NAMESPACE now leads with the per-Method edit, which is one that works
+	// whatever the Namespace declares.
+	it("should send a refused Namespace bound to the Methods", () => {
 		let source = `implementation {
 			namespace Boxes<infer Item is Comparable> for List<Item> is Printable {
 				toString() -> String {
@@ -115,11 +186,12 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		expect(
 			firstOf(source, "protocol-bound-namespace-generic").helps,
 		).toEqual([
-			"Bound it on a conformance this Namespace declares: 'is Printable where Item is Comparable'.",
+			"Bound it on each Method that needs it: write '<Item is Comparable>' after that Method's name.",
+			"Or bound it on a conformance this Namespace declares: 'is Printable where Item is Comparable'.",
 		])
 	})
 
-	it("should write the shape as a schematic where nothing is declared", () => {
+	it("should offer the per-Method edit where nothing is declared", () => {
 		let source = `implementation {
 			namespace Boxes<infer Item is Comparable> for List<Item> {
 				biggest() -> Optional<Item> {
@@ -133,8 +205,16 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		expect(
 			firstOf(source, "protocol-bound-namespace-generic").helps,
 		).toEqual([
-			"Declare a conformance on this Namespace and bound it there — 'is …' with a Protocol of your own, then 'where Item is Comparable'.",
+			"Bound it on each Method that needs it: write '<Item is Comparable>' after that Method's name.",
 		])
+
+		expect(
+			compiles(
+				source
+					.replace("<infer Item is Comparable>", "<infer Item>")
+					.replace("biggest()", "biggest<Item is Comparable>()"),
+			),
+		).toBe(true)
 	})
 
 	// NOTE: A Function's Parameter is a different mistake and keeps the Help it
@@ -465,5 +545,45 @@ describe("A bounded Function used as a value", () => {
 				Terminal.print("{measure([1, 2])::value(defaultingTo 0)}")
 			}`),
 		).toBe(true)
+	})
+})
+
+// NOTE: A Method that has ALREADY bounded the Namespace's Parameter and wants a
+// second Protocol. The bound reaches its body through a Scope of its own, and
+// that Scope used to answer "no Namespace declares this name" — so the report
+// took the FUNCTION branch and told the reader to write
+// `<infer Item is Comparable>`, which is the one spelling a Namespace's own
+// Parameter refuses. The label said "unbounded" of a Parameter bounded two
+// lines up.
+describe("A second bound wanted by a Method that carries one", () => {
+	let source = `implementation {
+		namespace Boxes<infer Item> for { items: List<Item> } {
+			described<Item is Printable>() -> String {
+				<- "{@.items::sort()::length()}"
+			}
+		}
+
+		Terminal.print({ items = [1] }::described())
+	}`
+
+	it("should not offer the declaration edit a Namespace Parameter refuses", () => {
+		let diagnostic = firstOf(source, "unsatisfied-bound")
+
+		expect(diagnostic.helps).toEqual([])
+		expect(diagnostic.notes?.[0]).toBe(
+			"'Item' is bounded by 'Printable' already, and a Type Parameter carries ONE bound — a second would replace it rather than stand beside it.",
+		)
+	})
+
+	it("should say what the Parameter IS bounded by", () => {
+		expect(firstOf(source, "unsatisfied-bound").labels[0]?.message).toBe(
+			"bound here to a Type Parameter bounded by 'Printable'",
+		)
+	})
+
+	// NOTE: And no Quick Fix either — `data` is the same decision the text is
+	// made of, so an Editor can not offer what the report withheld.
+	it("should carry no Quick Fix", () => {
+		expect(firstOf(source, "unsatisfied-bound").data).toBeUndefined()
 	})
 })

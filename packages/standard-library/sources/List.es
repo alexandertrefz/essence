@@ -260,7 +260,7 @@ declarations {
 		§§
 		§§ @param _ — the List to compare with
 		§§ @returns — `true` when the Lists are equal.
-		is<infer ItemType is Equatable>(_ other: List<ItemType>) -> Boolean
+		is<ItemType is Equatable>(_ other: List<ItemType>) -> Boolean
 
 		§ The witness behind List's conditional `Comparable` conformance.
 
@@ -270,16 +270,14 @@ declarations {
 		§§
 		§§ @param to — the List to compare with
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compare<infer ItemType is Comparable>(
-			to other: List<ItemType>,
-		) -> Ordering
+		compare<ItemType is Comparable>(to other: List<ItemType>) -> Ordering
 
 		§§ Answers the List and its items as a String, in the form `[1, 2, 3]`.
 		§§
 		§§ Each item is rendered by its own `toString`, and a String item is quoted: `["a", "b"]` answers `["a", "b"]`. A String prints bare on its own and quoted inside a structure. The empty List answers `[]`. The Method is available whenever the items conform to `Printable`.
 		§§
 		§§ @returns — the String representation of the List.
-		toString<infer ItemType is Printable>() -> String
+		toString<ItemType is Printable>() -> String
 
 		§ Each quantified Method folds a Boolean. The alternative is
 		§ `firstItem(where:)::hasValue()`, which answers the same question and
@@ -344,7 +342,7 @@ declarations {
 			§§
 			§§ @param _ — the item to look for
 			§§ @returns — `true` when the item occurs.
-			<infer ItemType is Equatable>(_ item: ItemType) -> Boolean {
+			<ItemType is Equatable>(_ item: ItemType) -> Boolean {
 				<- @::hasItems(where (candidate) { <- candidate::is(item) })
 			}
 
@@ -363,7 +361,7 @@ declarations {
 			§§
 			§§ @param everyItemOf — the List whose items to look for
 			§§ @returns — `true` when every item of it occurs.
-			<infer ItemType is Equatable>(
+			<ItemType is Equatable>(
 				everyItemOf other: List<ItemType>,
 			) -> Boolean
 		}
@@ -374,9 +372,7 @@ declarations {
 		§§
 		§§ @param _ — the item to look for
 		§§ @returns — `true` when the item does not occur.
-		doesNotContain<infer ItemType is Equatable>(
-			_ item: ItemType,
-		) -> Boolean {
+		doesNotContain<ItemType is Equatable>(_ item: ItemType) -> Boolean {
 			§ This body is read as well as run. It asks `contains`
 			§ negated, over whatever item the call writes. See
 			§ DEVELOPMENT.md, Why bodies look the way they do.
@@ -431,7 +427,7 @@ declarations {
 			§§   expect [1, 2, 1]::hasDuplicates()
 			§§
 			§§ @returns — `true` when an item occurs twice.
-			<infer ItemType is Equatable>() -> Boolean
+			<ItemType is Equatable>() -> Boolean
 
 			§§ Answers whether any two items share the key the given Function reads off each one.
 			§§
@@ -469,9 +465,7 @@ declarations {
 		§§
 		§§ @param with — the leading items to look for
 		§§ @returns — `true` when the List begins with those items.
-		starts<infer ItemType is Equatable>(
-			with prefix: List<ItemType>,
-		) -> Boolean {
+		starts<ItemType is Equatable>(with prefix: List<ItemType>) -> Boolean {
 			<- @::firstItems(prefix::length())::is(prefix)
 		}
 
@@ -481,7 +475,7 @@ declarations {
 		§§
 		§§ @param with — the leading items to look for
 		§§ @returns — `true` when the List begins with other items.
-		doesNotStart<infer ItemType is Equatable>(
+		doesNotStart<ItemType is Equatable>(
 			with prefix: List<ItemType>,
 		) -> Boolean {
 			<- @::starts(with prefix)::negate()
@@ -493,9 +487,7 @@ declarations {
 		§§
 		§§ @param with — the trailing items to look for
 		§§ @returns — `true` when the List ends with those items.
-		ends<infer ItemType is Equatable>(
-			with suffix: List<ItemType>,
-		) -> Boolean {
+		ends<ItemType is Equatable>(with suffix: List<ItemType>) -> Boolean {
 			<- @::lastItems(suffix::length())::is(suffix)
 		}
 
@@ -505,7 +497,7 @@ declarations {
 		§§
 		§§ @param with — the trailing items to look for
 		§§ @returns — `true` when the List ends with other items.
-		doesNotEnd<infer ItemType is Equatable>(
+		doesNotEnd<ItemType is Equatable>(
 			with suffix: List<ItemType>,
 		) -> Boolean {
 			<- @::ends(with suffix)::negate()
@@ -538,7 +530,7 @@ declarations {
 		§§
 		§§ @param in — the direction to check for, `#Ascending` when it is left out
 		§§ @returns — `true` when no item stands out of that order.
-		isSorted<infer ItemType is Comparable>(
+		isSorted<ItemType is Comparable>(
 			in order: SortOrder = #Ascending,
 		) -> Boolean
 
@@ -700,9 +692,7 @@ declarations {
 			§§
 			§§ @param of — the item to look for
 			§§ @returns — the zero-based position, or nothing when the item is absent.
-			<infer ItemType is Equatable>(
-				of item: ItemType,
-			) -> Optional<Integer> {
+			<ItemType is Equatable>(of item: ItemType) -> Optional<Integer> {
 				<- @::firstIndex(where (candidate) { <- candidate::is(item) })
 			}
 
@@ -741,7 +731,7 @@ declarations {
 			§§ @param of — the item to look for
 			§§ @param defaultingTo — the position to answer with when the item is absent
 			§§ @returns — the zero-based position, or the fallback in its place.
-			<infer ItemType is Equatable>(
+			<ItemType is Equatable>(
 				of item: ItemType,
 				defaultingTo fallback: Integer,
 			) -> Integer {
@@ -771,9 +761,7 @@ declarations {
 			§§
 			§§ @param of — the item to look for
 			§§ @returns — the zero-based position, or nothing when the item is absent.
-			<infer ItemType is Equatable>(
-				of item: ItemType,
-			) -> Optional<Integer> {
+			<ItemType is Equatable>(of item: ItemType) -> Optional<Integer> {
 				<- @::lastIndex(where (candidate) { <- candidate::is(item) })
 			}
 
@@ -784,7 +772,7 @@ declarations {
 			§§ @param of — the item to look for
 			§§ @param defaultingTo — the position to answer with when the item is absent
 			§§ @returns — the zero-based position, or the fallback in its place.
-			<infer ItemType is Equatable>(
+			<ItemType is Equatable>(
 				of item: ItemType,
 				defaultingTo fallback: Integer,
 			) -> Integer {
@@ -930,9 +918,7 @@ declarations {
 		§§
 		§§ @param of — the item to look for
 		§§ @returns — the List of positions the item stands at.
-		everyIndex<infer ItemType is Equatable>(
-			of item: ItemType,
-		) -> List<Integer> {
+		everyIndex<ItemType is Equatable>(of item: ItemType) -> List<Integer> {
 			<- @::indices(where (candidate) { <- candidate::is(item) })
 		}
 
@@ -1035,7 +1021,7 @@ declarations {
 			§§
 			§§ @param _ — the item to remove
 			§§ @returns — the List of remaining items.
-			<infer ItemType is Equatable>(_ item: ItemType) -> List<ItemType> {
+			<ItemType is Equatable>(_ item: ItemType) -> List<ItemType> {
 				<- @::removeEvery(where (candidate) { <- candidate::is(item) })
 			}
 
@@ -1061,7 +1047,7 @@ declarations {
 			§§
 			§§ @param contentsOf — the List whose items to remove
 			§§ @returns — the List of remaining items.
-			<infer ItemType is Equatable>(
+			<ItemType is Equatable>(
 				contentsOf other: List<ItemType>,
 			) -> List<ItemType>
 		}
@@ -1244,7 +1230,7 @@ declarations {
 			§§
 			§§ @param alsoIn — the List whose items to keep
 			§§ @returns — the List of items both Lists hold.
-			<infer ItemType is Equatable>(
+			<ItemType is Equatable>(
 				alsoIn other: List<ItemType>,
 			) -> List<ItemType>
 		}
@@ -1307,7 +1293,7 @@ declarations {
 			§§
 			§§ @param in — the direction to order in, `#Ascending` when it is left out
 			§§ @returns — the ordered List.
-			<infer ItemType is Comparable>(
+			<ItemType is Comparable>(
 				in order: SortOrder = #Ascending,
 			) -> List<ItemType>
 
@@ -1364,9 +1350,7 @@ declarations {
 			§§
 			§§ @param of — the item to look for
 			§§ @returns — how many items equal it, which is never negative.
-			<infer ItemType is Equatable>(
-				of item: ItemType,
-			) -> NonNegativeInteger {
+			<ItemType is Equatable>(of item: ItemType) -> NonNegativeInteger {
 				<- @::count(where (candidate) { <- candidate::is(item) })
 			}
 
@@ -1490,7 +1474,7 @@ declarations {
 		§§
 		§§ @param with — the separator to place between the items
 		§§ @returns — the joined String. The empty List answers the empty String.
-		join<infer ItemType is Printable>(with separator: String) -> String
+		join<ItemType is Printable>(with separator: String) -> String
 
 		§ `flatten` is not here: it is not available on every List, and every
 		§ Method of this Namespace is. `NestedList` below holds it.
@@ -1630,7 +1614,7 @@ declarations {
 			§§
 			§§ @param on — the item to split at
 			§§ @returns — the List of pieces, which always holds at least one.
-			<infer ItemType is Equatable>(
+			<ItemType is Equatable>(
 				on separator: ItemType,
 			) -> NonEmptyList<List<ItemType>> {
 				<- @::split(where (candidate) { <- candidate::is(separator) })
@@ -1726,7 +1710,7 @@ declarations {
 			§§   expect fruit::lowestItem()::is("apple")
 			§§
 			§§ @returns — the item, or nothing for the empty List.
-			<infer ItemType is Comparable>() -> Optional<ItemType> {
+			<ItemType is Comparable>() -> Optional<ItemType> {
 				<- @::lowestItem(on (item) { <- item })
 			}
 
@@ -1736,7 +1720,7 @@ declarations {
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the item, or the fallback in its place.
-			<infer ItemType is Comparable>(
+			<ItemType is Comparable>(
 				defaultingTo fallback: ItemType,
 			) -> ItemType {
 				<- @::lowestItem()::value(defaultingTo fallback)
@@ -1810,7 +1794,7 @@ declarations {
 			§§   expect fruit::highestItem()::is("pear")
 			§§
 			§§ @returns — the item, or nothing for the empty List.
-			<infer ItemType is Comparable>() -> Optional<ItemType> {
+			<ItemType is Comparable>() -> Optional<ItemType> {
 				<- @::highestItem(on (item) { <- item })
 			}
 
@@ -1820,7 +1804,7 @@ declarations {
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the item, or the fallback in its place.
-			<infer ItemType is Comparable>(
+			<ItemType is Comparable>(
 				defaultingTo fallback: ItemType,
 			) -> ItemType {
 				<- @::highestItem()::value(defaultingTo fallback)
@@ -2034,7 +2018,7 @@ declarations {
 			§§   expect ["a", "b", "a"]::removeDuplicates()::is(["a", "b"])
 			§§
 			§§ @returns — the List without duplicates.
-			<infer ItemType is Equatable>() -> List<ItemType>
+			<ItemType is Equatable>() -> List<ItemType>
 
 			§§ Answers a new List keeping only the first item met at each key.
 			§§
@@ -2496,7 +2480,7 @@ declarations {
 			§§
 			§§ @param in — the direction to order in, `#Ascending` when it is left out
 			§§ @returns — the ordered List, which certainly has something in it.
-			<infer ItemType is Comparable>(
+			<ItemType is Comparable>(
 				in order: SortOrder = #Ascending,
 			) -> NonEmptyList<ItemType>
 
@@ -2636,7 +2620,7 @@ declarations {
 			§§ Ties keep the earlier item. The entry is available whenever the items conform to `Comparable`.
 			§§
 			§§ @returns — the item.
-			<infer ItemType is Comparable>() -> ItemType {
+			<ItemType is Comparable>() -> ItemType {
 				<- @::<List>lowestItem()::value(defaultingTo @::firstItem())
 			}
 		}
@@ -2665,7 +2649,7 @@ declarations {
 			§§ Ties keep the earlier item. The entry is available whenever the items conform to `Comparable`.
 			§§
 			§§ @returns — the item.
-			<infer ItemType is Comparable>() -> ItemType {
+			<ItemType is Comparable>() -> ItemType {
 				<- @::<List>highestItem()::value(defaultingTo @::firstItem())
 			}
 		}
@@ -2686,7 +2670,7 @@ declarations {
 			§§ The kept items keep the order they had. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
 			§§
 			§§ @returns — the List without duplicates, which certainly has something in it.
-			<infer ItemType is Equatable>() -> NonEmptyList<ItemType>
+			<ItemType is Equatable>() -> NonEmptyList<ItemType>
 
 			§§ Answers a new List keeping only the first item met at each key.
 			§§

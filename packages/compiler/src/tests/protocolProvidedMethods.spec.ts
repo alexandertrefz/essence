@@ -993,7 +993,7 @@ describe("Protocol-provided Methods", () => {
 				"\t\t\t<- @::length()",
 				"\t\t}",
 				"",
-				"\t\tspread<infer Item is Comparable>(",
+				"\t\tspread<Item is Comparable>(",
 				"\t\t\tto other: List<Item>",
 				"\t\t) -> Ordering {",
 				"\t\t\t<- Ordering#Greater",

@@ -251,6 +251,26 @@ export type DiagnosticData =
 			protocol: string
 			parameter: string | null
 	  }
+	// NOTE: A bound a NAMESPACE's Type Parameter needs, which is carried by the
+	// Method the call stands in rather than by a declaration — the counterpart
+	// of `required-protocol`, told apart by it because the two edits land in
+	// different places and only one of them can be right.
+	| { kind: "method-bound"; protocol: string; parameter: string }
+	// NOTE: A Method's `<…>` entry that names one of its Namespace's own Type
+	// Parameters, for the two fixes that rewrite the entry rather than the
+	// Method. The span is the entry's, so a fix has only to say what goes there:
+	// nothing, for an entry that is simply in the way, and the entry without its
+	// `infer` for one that restates the inference and has a bound to keep.
+	//
+	// It names the EDIT rather than the code that reported it — a restated
+	// `<infer Item>` carrying no bound has nothing to keep, so it is reported as
+	// the restatement it is and fixed by the removal below.
+	| { kind: "shadowed-type-parameter"; parameter: string }
+	| {
+			kind: "restated-inferred-parameter"
+			parameter: string
+			protocol: string
+	  }
 	// NOTE: A Declaration another Module of the graph holds and this one has not
 	// imported, by the Module's CANONICAL path — which is what the Compiler
 	// knows about it. What an import of it would be SPELLED as is a question
@@ -532,6 +552,8 @@ export type DiagnosticCode =
 	| "protocol-bound-function-value"
 	| "overloaded-function-value"
 	| "protocol-bound-namespace-generic"
+	| "shadowed-type-parameter"
+	| "restated-inferred-parameter"
 	| "unknown-where-generic"
 	| "conflicting-where-condition"
 	| "unwitnessable-where-condition"

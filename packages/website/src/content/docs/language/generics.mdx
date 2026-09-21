@@ -244,7 +244,40 @@ implementation {
 
 `Item` belongs to `Mapper` and binds from the receiver, here to `Integer`. `Target` belongs to `transformFirst` and binds from the call's arguments. The callback returns a `String` in the first call and a `Boolean` in the second. So the same method on the same receiver returns a different type each time.
 
-An entry of an [`overload`](/docs/reference/syntax-glossary#overload) can declare the namespace's type parameter again, with a bound, so that the entry exists only for some type arguments. The library's [`sort`](/docs/library/list#sort) is declared this way. `[3, 1, 2]::sort()` compiles, and `sort()` on a list of records is refused, because a record is not [`Comparable`](/docs/library/protocols#Comparable). Protocols covers bounds and that error.
+A method can also NAME the namespace's type parameter, with a bound, and that bounds it for that method alone:
+
+```essence
+implementation {
+	namespace Boxes<infer Item> for { items: List<Item> } {
+		biggest<Item is Comparable>() -> Optional<Item> {
+			<- @.items::sort()::lastItem()
+		}
+
+		count() -> Integer {
+			<- @.items::length()
+		}
+	}
+
+	constant scores = { items = [3, 1, 2] }
+	constant shapes = { items = [{ x = 1 }, { x = 2 }] }
+
+	Terminal.print(scores::biggest()::value(defaultingTo 0)) § 3
+	Terminal.print(shapes::count()) § 2
+}
+```
+
+There is one `Item` here, the namespace's, and the receiver decides it at every call as always. `biggest` does not declare a second one — it says what the first must conform to, for itself. So `scores::biggest()` compiles and `shapes::biggest()` is [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound): a record is not [`Comparable`](/docs/library/protocols#Comparable). `count` asks for nothing and takes both.
+
+Three rules follow from "it is the same parameter":
+
+- No `infer`. The namespace's declaration already said where `Item` comes from, and a method bounding it says nothing about that. `<infer Item is Comparable>` is [`restated-inferred-parameter`](/docs/reference/diagnostics#restated-inferred-parameter), and so is a bare `<infer Item>`: it re-states the inference and adds nothing, so the fix is to drop it.
+- No bare name. `<Item>` adds no requirement and could only shadow, so it is [`shadowed-type-parameter`](/docs/reference/diagnostics#shadowed-type-parameter).
+- One bound. `<Item is Comparable, Item is Printable>` is [`duplicate-type-parameter`](/docs/reference/diagnostics#duplicate-type-parameter): a type parameter carries one bound, so the second would replace the first rather than stand beside it.
+- A name the namespace does NOT declare is an ordinary method type parameter, as `Target` is above.
+
+An entry of an [`overload`](/docs/reference/syntax-glossary#overload) can carry such a bound while its siblings do not, so the entry exists only for some type arguments. The library's [`sort`](/docs/library/list#sort) is declared this way. Protocols covers bounds and that error.
+
+A namespace whose target is a bounded generic [choice](/docs/language/choices-and-match) needs no bound written at all. `choice SortedBox<Item is Comparable>` can not be built out of anything else, so every value a `namespace Boxes<infer Item> for SortedBox<Item>` can ever be reached by already proves it — and every method of it may sort.
 
 ## A choice applies its type arguments
 

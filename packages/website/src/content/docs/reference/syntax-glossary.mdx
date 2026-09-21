@@ -840,7 +840,7 @@ Taught on [Protocols](/docs/language/protocols).
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| The methods and statics for the type named after `for`. `is Printable` declares a conformance, and `where Item is Printable` makes that conformance hold only when the type parameter conforms. | In any block of statements. Any number of namespaces may target one type. A namespace without `for` holds statics only. | A TypeScript `namespace`. With `for`, it adds methods to every value of that type, as a prototype does in JavaScript. Nor is it unrestricted: an instance method in a namespace without `for` is [`untyped-namespace-method`](/docs/reference/diagnostics#untyped-namespace-method), and a namespace's type parameter can not carry a bound ([`protocol-bound-namespace-generic`](/docs/reference/diagnostics#protocol-bound-namespace-generic)). |
+| The methods and statics for the type named after `for`. `is Printable` declares a conformance, and `where Item is Printable` makes that conformance hold only when the type parameter conforms. | In any block of statements. Any number of namespaces may target one type. A namespace without `for` holds statics only. | A TypeScript `namespace`. With `for`, it adds methods to every value of that type, as a prototype does in JavaScript. Nor is it unrestricted: an instance method in a namespace without `for` is [`untyped-namespace-method`](/docs/reference/diagnostics#untyped-namespace-method), and a namespace's type parameter can not carry a bound on the namespace itself ([`protocol-bound-namespace-generic`](/docs/reference/diagnostics#protocol-bound-namespace-generic)) — a method bounds it for itself, `biggest<Item is Comparable>()`. |
 
 </div>
 
@@ -962,7 +962,7 @@ Taught on [Namespaces and methods](/docs/language/namespaces-and-methods).
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| A mark on a type parameter whose type is read from a call's arguments, or from the receiver in a namespace. One `is` bound may follow: `<infer Item is Comparable>`. | In the `< >` of a function, method or namespace. | TypeScript's `infer`, which pulls a type out of a conditional type. Nor is it written at a call: there are no call-site type arguments. A choice's or type alias's parameters are applied, never inferred ([`infer-on-applied-parameter`](/docs/reference/diagnostics#infer-on-applied-parameter)). |
+| A mark on a type parameter whose type is read from a call's arguments, or from the receiver in a namespace. One `is` bound may follow: `<infer Item is Comparable>`. A method bounding its namespace's own parameter writes the bound WITHOUT `infer` — `biggest<Item is Comparable>()` — because the namespace already said where the type comes from ([`restated-inferred-parameter`](/docs/reference/diagnostics#restated-inferred-parameter)). | In the `< >` of a function, method or namespace. | TypeScript's `infer`, which pulls a type out of a conditional type. Nor is it written at a call: there are no call-site type arguments. A choice's or type alias's parameters are applied, never inferred ([`infer-on-applied-parameter`](/docs/reference/diagnostics#infer-on-applied-parameter)). |
 
 </div>
 

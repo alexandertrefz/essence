@@ -134,8 +134,8 @@ A type page shows each entry's signature as the sources write it. These are thre
 firstItem() -> Optional<ItemType>
 firstItem(where check: (_: ItemType) -> Boolean) -> Optional<ItemType>
 firstItem(defaultingTo fallback: ItemType) -> ItemType
-contains<infer ItemType is Equatable>(_ item: ItemType) -> Boolean
-sort<infer ItemType is Comparable>(
+contains<ItemType is Equatable>(_ item: ItemType) -> Boolean
+sort<ItemType is Comparable>(
 	in order: SortOrder = #Ascending,
 ) -> List<ItemType>
 ```
@@ -163,7 +163,7 @@ implementation {
 
 **Defaults.** `= #Ascending` is a default value. A call that leaves the argument out gets `#Ascending`, so `sort()` is `sort(in #Ascending)`. `round` declares `toward direction: Rounding = #Nearest` the same way.
 
-**Bounds.** `<infer ItemType is Comparable>` is a type parameter with a bound. [`infer`](/docs/reference/syntax-glossary#infer) means the compiler works the type out from the call, and `is Comparable` means the entry exists only when that type conforms. So `sort()` on a list of records is refused by the entry's bound, as [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound):
+**Bounds.** `<ItemType is Comparable>` bounds the namespace's own type parameter for that one entry. `ItemType` is `List`'s, worked out from the receiver at every call; `is Comparable` means the entry exists only when that type conforms. So `sort()` on a list of records is refused by the entry's bound, as [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound):
 
 <div class="error-output">
 

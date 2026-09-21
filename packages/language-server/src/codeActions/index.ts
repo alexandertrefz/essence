@@ -30,6 +30,8 @@ import {
 	argumentLabelAction,
 	binderToScrutineeAction,
 	boundParameterAction,
+	methodBoundAction,
+	reDeclaredParameterAction,
 	choicePrefixActions,
 	declareConformanceAction,
 	declareParameterAction,
@@ -711,8 +713,13 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	// data, so the pair is a concatenation rather than a choice.
 	"unsatisfied-bound": ({ diagnostic, program, imports }) => [
 		...listed(boundParameterAction(diagnostic, program)),
+		...listed(methodBoundAction(diagnostic, program)),
 		...listed(declarationImportAction(diagnostic, imports)),
 	],
+	"shadowed-type-parameter": ({ diagnostic, program }) =>
+		listed(reDeclaredParameterAction(diagnostic, program)),
+	"restated-inferred-parameter": ({ diagnostic, program }) =>
+		listed(reDeclaredParameterAction(diagnostic, program)),
 	"unsatisfied-conformance-condition": ({ diagnostic, imports }) =>
 		listed(declarationImportAction(diagnostic, imports)),
 	"unused-future": ({ diagnostic }) => discardedFutureActions(diagnostic),

@@ -32,4 +32,43 @@ implementation {
 	§ sorted, because a Record is not Comparable. The because-chain names each
 	§ level of the failure.
 	constant ordered = [[{ x = 1 }], [{ x = 2 }]]::sort()
+
+	§ shadowed-type-parameter — 'Item' is already this Namespace's Parameter,
+	§ and a second one carries no 'infer', so nothing could ever bind it.
+	namespace Shadowing<infer Item> for { value: Item } {
+		held<Item>() -> Item {
+			<- @.value
+		}
+	}
+
+	§ restated-inferred-parameter — the bound is what this Method has to say;
+	§ 'infer' is the Namespace's own word and is already written above.
+	namespace Restating<infer Item> for { value: Item } {
+		shown<infer Item is Printable>() -> String {
+			<- "{@.value}"
+		}
+	}
+
+	§ unsatisfied-bound — 'Item' is the Namespace's, unbounded, and 'sort' needs
+	§ 'Comparable'. The Help writes the bound onto this Method.
+	namespace Unbounded<infer Item> for { items: List<Item> } {
+		ordered() -> List<Item> {
+			<- @.items::sort()
+		}
+	}
+
+	§ unsatisfied-bound again, and the OTHER answer: 'toString' fulfils
+	§ 'Printable', so a bound of its own would break the promise the conformance
+	§ makes — the edit belongs on the 'where', and nothing offers the per-Method
+	§ one the Help withholds.
+	namespace Fulfilling<infer Item, infer Tag> for {
+		items: List<Item>,
+		tag: Tag,
+	}
+		is Printable where Tag is Printable
+	{
+		toString() -> String {
+			<- "{@.tag} {@.items::sort()::length()}"
+		}
+	}
 }

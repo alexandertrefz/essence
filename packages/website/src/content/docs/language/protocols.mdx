@@ -202,7 +202,7 @@ implementation {
 }
 ```
 
-A type parameter takes exactly one bound. `<infer Item is Printable, Equatable>` does not bound `Item` twice. The comma starts a second type parameter, named `Equatable`. `Item` is then only `Printable`, so `before::is(after)` is [`method-not-on-protocol`](/docs/reference/diagnostics#method-not-on-protocol), and each call is [`uninferable-type-parameter`](/docs/reference/diagnostics#uninferable-type-parameter). TypeScript's `A & B` has no counterpart: `<infer Item is Printable & Equatable>` is a [`syntax-error`](/docs/reference/diagnostics#syntax-error), `Expected '>' but found '&'.`
+A type parameter takes exactly one bound. `<infer Item is Printable, Equatable>` does not bound `Item` twice. The comma starts a second type parameter, named `Equatable`. `Item` is then only `Printable`, so `before::is(after)` is [`method-not-on-protocol`](/docs/reference/diagnostics#method-not-on-protocol), and each call is [`uninferable-type-parameter`](/docs/reference/diagnostics#uninferable-type-parameter). Writing the name twice — `<infer Item is Printable, infer Item is Equatable>` — is [`duplicate-type-parameter`](/docs/reference/diagnostics#duplicate-type-parameter): only the last would hold, so neither is taken. TypeScript's `A & B` has no counterpart: `<infer Item is Printable & Equatable>` is a [`syntax-error`](/docs/reference/diagnostics#syntax-error), `Expected '>' but found '&'.`
 
 To demand two protocols, declare one that extends both, as `Shown` does, and bound by that. Conforming to `Shown` is declared by name like any other. With an empty body, `Labels` is refused, "Method 'toString' is missing", even though every record already prints. An `Integer` prints and compares too, and passing one is still `unsatisfied-bound`. A combined protocol suits the types you declare. A namespace that makes `Integer` conform to `Shown` makes it `Printable` a second time, so `Terminal.print(5)` becomes [`ambiguous-conformance`](/docs/reference/diagnostics#ambiguous-conformance).
 
@@ -219,7 +219,7 @@ A bounded function is not a value either. `constant say = announce` is [`protoco
 implementation {
 	namespace Shelves<infer Item> for List<Item> {
 		overload arranged {
-			<infer Item is Comparable>() -> List<Item> {
+			<Item is Comparable>() -> List<Item> {
 				<- @::sort()
 			}
 
@@ -238,7 +238,7 @@ implementation {
 }
 ```
 
-An entry of an `overload` block can carry a bound of its own. It declares the namespace's type parameter again, with `is`, before its parameter list. The bound applies to that entry alone, so `products::arranged()` is `unsatisfied-bound`: a record is not [`Comparable`](/docs/library/protocols#Comparable). Generics showed the library's [`sort`](/docs/library/list#sort) declared the same way.
+An entry of an `overload` block can carry a bound of its own. It names the namespace's type parameter again, with `is` and no `infer`, before its parameter list — the parameter is still the namespace's, still worked out from the receiver, and the entry only says what it must conform to. The bound applies to that entry alone, so `products::arranged()` is `unsatisfied-bound`: a record is not [`Comparable`](/docs/library/protocols#Comparable). Generics showed the library's [`sort`](/docs/library/list#sort) declared the same way.
 
 ## What a requirement can be
 
@@ -482,7 +482,7 @@ Error: { value: { grams: Integer } } does not conform to 'Comparable'
 
 A few conditions are refused:
 
-- A bound on the namespace's own type parameter, `namespace Boxes<infer Item is Printable>`, is [`protocol-bound-namespace-generic`](/docs/reference/diagnostics#protocol-bound-namespace-generic). Bound it on a conformance the namespace declares instead: `is Printable where Item is Printable`. The condition reaches the methods that fulfil that conformance and no others, so a method beside the requirements can not be bounded this way — or any other way today.
+- A bound on the namespace's own type parameter, `namespace Boxes<infer Item is Printable>`, is [`protocol-bound-namespace-generic`](/docs/reference/diagnostics#protocol-bound-namespace-generic). It would bound every method, including the ones that do not need it. A conformance carries one for the methods that fulfil it — `is Printable where Item is Printable` — and a method beside the requirements carries its own: `biggest<Item is Comparable>()`. See [Generics › A namespace infers from its receiver](/docs/language/generics#a-namespace-infers-from-its-receiver).
 - A condition on a type parameter the namespace does not declare is [`unknown-where-generic`](/docs/reference/diagnostics#unknown-where-generic).
 - The same type parameter bound twice in one clause is [`conflicting-where-condition`](/docs/reference/diagnostics#conflicting-where-condition).
 - A condition on a type parameter the target type never mentions is [`unwitnessable-where-condition`](/docs/reference/diagnostics#unwitnessable-where-condition). The target type is what proves the condition at each call.

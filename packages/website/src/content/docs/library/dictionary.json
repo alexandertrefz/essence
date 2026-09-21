@@ -34,7 +34,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "static of<infer KeyType is Equatable>(\n\t_ entries: List<{ key: KeyType, value: ValueType }>,\n) -> Dictionary<KeyType, ValueType>",
+							"signature": "static of<KeyType is Equatable>(\n\t_ entries: List<{ key: KeyType, value: ValueType }>,\n) -> Dictionary<KeyType, ValueType>",
 							"summary": "Answers a Dictionary built from a List of entries.\n\nTwo entries with equal keys collapse into one. The later value wins, and the key keeps the place of its first occurrence. Equality is the keys' own `is`.",
 							"parameters": [
 								{
@@ -49,7 +49,7 @@
 							"examples": []
 						},
 						{
-							"signature": "static of<infer KeyType is Equatable>(\n\t_ keys: List<KeyType>,\n\tvaluedBy valueOf: (_: KeyType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
+							"signature": "static of<KeyType is Equatable>(\n\t_ keys: List<KeyType>,\n\tvaluedBy valueOf: (_: KeyType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
 							"summary": "Answers a Dictionary of the given keys, each holding what the Function answers for it.\n\nThe Function is asked once for each key, in the order the keys stand in. A key written down twice keeps the place of its first occurrence and holds what the Function answered the second time. The empty List answers the empty Dictionary.",
 							"parameters": [
 								{
@@ -92,7 +92,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "is<infer KeyType is Equatable, infer ValueType is Equatable>(\n\t_ other: Dictionary<KeyType, ValueType>,\n) -> Boolean",
+							"signature": "is<KeyType is Equatable, ValueType is Equatable>(\n\t_ other: Dictionary<KeyType, ValueType>,\n) -> Boolean",
 							"summary": "Answers whether the two Dictionaries hold the same keys with equal values.\n\nThe order the entries stand in does not matter. Each key is found by the keys' own `is`, and each pair of values is compared by the values' own `is`. The Method is available whenever the keys and the values conform to `Equatable`.",
 							"parameters": [
 								{
@@ -122,7 +122,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "toString<infer KeyType is Printable, infer ValueType is Printable>()\n\t-> String",
+							"signature": "toString<KeyType is Printable, ValueType is Printable>() -> String",
 							"summary": "Answers the Dictionary and its entries as a String, in the form `[\"a\" = 1, \"b\" = 2]`.\n\nEach key and each value is rendered by its own `toString`, and a String is quoted: `[\"a\" = \"b\"]`. The empty Dictionary answers `[=]`. The empty List answers `[]`, so the two are never the same text. The Method is available whenever the keys and the values conform to `Printable`.",
 							"parameters": [],
 							"returns": "the String representation of the Dictionary.",
@@ -239,7 +239,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "hasKey<infer KeyType is Equatable>(_ key: KeyType) -> Boolean",
+							"signature": "hasKey<KeyType is Equatable>(_ key: KeyType) -> Boolean",
 							"summary": "Answers whether the Dictionary holds a value for the given key.\n\nEquality is the keys' own `is`. The Method is available whenever the keys conform to `Equatable`.",
 							"parameters": [
 								{
@@ -269,7 +269,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "hasValue<infer ValueType is Equatable>(_ value: ValueType) -> Boolean",
+							"signature": "hasValue<ValueType is Equatable>(_ value: ValueType) -> Boolean",
 							"summary": "Answers whether an entry of the Dictionary holds the given value.\n\nEquality is the values' own `is`. The Method is available whenever the values conform to `Equatable`.",
 							"parameters": [
 								{
@@ -409,7 +409,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "value<infer KeyType is Equatable>(at key: KeyType) -> Optional<ValueType>",
+							"signature": "value<KeyType is Equatable>(at key: KeyType) -> Optional<ValueType>",
 							"summary": "Answers the value the given key holds.\n\nEquality is the keys' own `is`. The entry is available whenever the keys conform to `Equatable`.",
 							"parameters": [
 								{
@@ -424,7 +424,7 @@
 							"examples": []
 						},
 						{
-							"signature": "value<infer KeyType is Equatable>(\n\tat key: KeyType,\n\tdefaultingTo fallback: ValueType,\n) -> ValueType",
+							"signature": "value<KeyType is Equatable>(\n\tat key: KeyType,\n\tdefaultingTo fallback: ValueType,\n) -> ValueType",
 							"summary": "Answers the value the given key holds, or the given fallback when the key holds no value.\n\nEquality is the keys' own `is`. The entry is available whenever the keys conform to `Equatable`.",
 							"parameters": [
 								{
@@ -658,7 +658,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "set<infer KeyType is Equatable>(\n\t_ key: KeyType,\n\tto value: ValueType,\n) -> NonEmptyDictionary<KeyType, ValueType>",
+							"signature": "set<KeyType is Equatable>(\n\t_ key: KeyType,\n\tto value: ValueType,\n) -> NonEmptyDictionary<KeyType, ValueType>",
 							"summary": "Answers a new Dictionary with the given key holding the given value.\n\nA key that is already there keeps its place and takes the new value. A key that is not there is added at the end. Equality is the keys' own `is`. The answer holds the entry that was set, so it is never empty.",
 							"parameters": [
 								{
@@ -695,7 +695,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "update<infer KeyType is Equatable>(\n\tat key: KeyType,\n\twith transform: (_: ValueType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
+							"signature": "update<KeyType is Equatable>(\n\tat key: KeyType,\n\twith transform: (_: ValueType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
 							"summary": "Answers a new Dictionary with the given key's value transformed.\n\nA key that holds no value answers the receiver unchanged, and the transform does not run.",
 							"parameters": [
 								{
@@ -717,7 +717,7 @@
 							"examples": []
 						},
 						{
-							"signature": "update<infer KeyType is Equatable>(\n\tat key: KeyType,\n\tdefaultingTo start: ValueType,\n\twith transform: (_: ValueType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
+							"signature": "update<KeyType is Equatable>(\n\tat key: KeyType,\n\tdefaultingTo start: ValueType,\n\twith transform: (_: ValueType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
 							"summary": "Answers a new Dictionary with the given key's value transformed, starting from the given value where the key holds no value.\n\nA key that holds no value is set to the transform of the given value.",
 							"parameters": [
 								{
@@ -761,7 +761,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "remove<infer KeyType is Equatable>(\n\tat key: KeyType,\n) -> Dictionary<KeyType, ValueType>",
+							"signature": "remove<KeyType is Equatable>(\n\tat key: KeyType,\n) -> Dictionary<KeyType, ValueType>",
 							"summary": "Answers a new Dictionary without the given key.\n\nA key that is not there answers the receiver unchanged. Equality is the keys' own `is`.",
 							"parameters": [
 								{
@@ -776,7 +776,7 @@
 							"examples": []
 						},
 						{
-							"signature": "remove<infer KeyType is Equatable>(\n\tatEvery keys: List<KeyType>,\n) -> Dictionary<KeyType, ValueType>",
+							"signature": "remove<KeyType is Equatable>(\n\tatEvery keys: List<KeyType>,\n) -> Dictionary<KeyType, ValueType>",
 							"summary": "Answers a new Dictionary without any of the given keys.\n\nA key that is not there changes nothing, and a key written down twice is removed once. The empty List answers the receiver unchanged. The entries that are left keep the order they had. Equality is the keys' own `is`.",
 							"parameters": [
 								{
@@ -932,7 +932,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "merge<infer KeyType is Equatable>(\n\twith other: Dictionary<KeyType, ValueType>,\n) -> Dictionary<KeyType, ValueType>",
+							"signature": "merge<KeyType is Equatable>(\n\twith other: Dictionary<KeyType, ValueType>,\n) -> Dictionary<KeyType, ValueType>",
 							"summary": "Answers a new Dictionary holding the entries of both, where the given Dictionary wins.\n\nA key both hold takes the given Dictionary's value. A key only the given Dictionary holds is added at the end.",
 							"parameters": [
 								{
@@ -947,7 +947,7 @@
 							"examples": []
 						},
 						{
-							"signature": "merge<infer KeyType is Equatable>(\n\twith other: Dictionary<KeyType, ValueType>,\n\tchoosing choose: (_: ValueType, _: ValueType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
+							"signature": "merge<KeyType is Equatable>(\n\twith other: Dictionary<KeyType, ValueType>,\n\tchoosing choose: (_: ValueType, _: ValueType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
 							"summary": "Answers a new Dictionary holding the entries of both, asking the given Function for the value of a key both hold.\n\nThe Function is handed the receiver's value and then the given Dictionary's value. A key only one of the two holds is taken as it stands.",
 							"parameters": [
 								{
@@ -984,7 +984,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "sort<infer KeyType is Comparable>(\n\tin order: SortOrder = #Ascending,\n) -> Dictionary<KeyType, ValueType>",
+							"signature": "sort<KeyType is Comparable>(\n\tin order: SortOrder = #Ascending,\n) -> Dictionary<KeyType, ValueType>",
 							"summary": "Answers a new Dictionary in the given direction, by the keys' own ordering.\n\nThe sort is stable. The entry is available whenever the keys conform to `Comparable`. The direction is `#Ascending` when a call names none.",
 							"parameters": [
 								{
@@ -1036,7 +1036,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "sort<infer KeyType is Comparable>(\n\tin order: SortOrder = #Ascending,\n) -> NonEmptyDictionary<KeyType, ValueType>",
+							"signature": "sort<KeyType is Comparable>(\n\tin order: SortOrder = #Ascending,\n) -> NonEmptyDictionary<KeyType, ValueType>",
 							"summary": "Answers a new Dictionary in the given direction, by the keys' own ordering.\n\nThe sort is stable. The entry is available whenever the keys conform to `Comparable`. The direction is `#Ascending` when a call names none.",
 							"parameters": [
 								{

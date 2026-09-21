@@ -34,7 +34,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "is<infer ItemType is Equatable>(\n\t_ other: Optional<ItemType>,\n) -> Boolean",
+							"signature": "is<ItemType is Equatable>(_ other: Optional<ItemType>) -> Boolean",
 							"summary": "",
 							"parameters": [
 								{
@@ -49,7 +49,7 @@
 							"examples": []
 						},
 						{
-							"signature": "is<infer ItemType is Equatable>(_ other: ItemType) -> Boolean",
+							"signature": "is<ItemType is Equatable>(_ other: ItemType) -> Boolean",
 							"summary": "",
 							"parameters": [
 								{
@@ -79,7 +79,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "isNot<infer ItemType is Equatable>(\n\t_ other: Optional<ItemType>,\n) -> Boolean",
+							"signature": "isNot<ItemType is Equatable>(_ other: Optional<ItemType>) -> Boolean",
 							"summary": "",
 							"parameters": [
 								{
@@ -94,7 +94,7 @@
 							"examples": []
 						},
 						{
-							"signature": "isNot<infer ItemType is Equatable>(_ other: ItemType) -> Boolean",
+							"signature": "isNot<ItemType is Equatable>(_ other: ItemType) -> Boolean",
 							"summary": "",
 							"parameters": [
 								{
@@ -124,7 +124,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "toString<infer ItemType is Printable>() -> String",
+							"signature": "toString<ItemType is Printable>() -> String",
 							"summary": "Answers the Optional as a String, written `Value(…)` or `Empty`.\n\nThe payload renders through its own `toString`, and a String payload is quoted: `#Value(\"a\")` answers `Value(\"a\")`. A String prints bare on its own and quoted inside a structure. The Method is available whenever the payload conforms to `Printable`.",
 							"parameters": [],
 							"returns": "the text `Value(…)` around the payload, or `Empty`.",

@@ -24,10 +24,24 @@ describe("A hole holding a Type Parameter", () => {
 		Terminal.print("{{ item = 1 }}")
 	}`
 
+	// NOTE: `toString` FULFILS this Namespace's `Printable`, so the conformance
+	// promises it unconditionally and a bound of its own is refused — the
+	// condition belongs on the conformance, and that is the only Help offered.
 	it("should ask for the bound rather than for a Match", () => {
 		expect(firstOf(source, "interpolation-not-printable").helps).toEqual([
 			"Add 'where Item is Printable' to 'is Printable' on this Namespace.",
 		])
+	})
+
+	// NOTE: The per-Method bound is not offered here because it does not work
+	// here: a Method that answers a requirement can not quietly want more of its
+	// receiver than the conformance promised.
+	it("should not offer a per-Method bound to a fulfilling Method", () => {
+		expect(
+			compiles(
+				source.replace("toString()", "toString<Item is Printable>()"),
+			),
+		).toBe(false)
 	})
 
 	it("should compile with the condition the Help names", () => {

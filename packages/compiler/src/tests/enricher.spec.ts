@@ -2746,7 +2746,7 @@ describe("Enricher", () => {
 				}
 
 				namespace ListRankable<infer Item> for List<Item> is Rankable {
-					compare <infer Item is Comparable>(to other: List<Item>) -> Ordering {
+					compare<Item is Comparable>(to other: List<Item>) -> Ordering {
 						<- Ordering#Equal
 					}
 				}
@@ -2821,7 +2821,7 @@ describe("Enricher", () => {
 				}
 
 				namespace ListRankable<infer Item> for List<Item> is Rankable {
-					compare <infer Item is Comparable>(to other: List<Item>) -> Ordering {
+					compare<Item is Comparable>(to other: List<Item>) -> Ordering {
 						<- Ordering#Equal
 					}
 				}
@@ -3087,11 +3087,11 @@ describe("Enricher", () => {
 			])
 		})
 
-		it("should let a same-named Method Generic shadow the Namespace one", () => {
+		it("should bound the Namespace's own Generic for one Method", () => {
 			let method = methodTypeFor(
 				`implementation {
 					namespace Tags<infer Item> for Integer {
-						ranked<infer Item is Comparable>(_ items: List<Item>) -> List<Item> {
+						ranked<Item is Comparable>(_ items: List<Item>) -> List<Item> {
 							<- items
 						}
 					}
@@ -3100,8 +3100,11 @@ describe("Enricher", () => {
 				"ranked",
 			)
 
-			// NOTE: Exactly one entry, and it is the METHOD's — its bound is
-			// what the signature was resolved under.
+			// NOTE: Exactly one entry, and it is the NAMESPACE's, carrying the
+			// bound this Method wrote — there is no second `Item` for it to
+			// shadow, which is the whole of the form. `infer` stays true: the
+			// Namespace's declaration is what says where the Type comes from,
+			// and a Method bounding it says nothing about that.
 			expect(genericsOf(method)).toEqual([
 				{
 					name: "Item",
@@ -3109,6 +3112,103 @@ describe("Enricher", () => {
 					defaultType: null,
 					constraint: "Comparable",
 				},
+			])
+		})
+
+		it("should refuse a re-declaration that only restates 'infer'", () => {
+			let { diagnostics } = enrichSource(
+				`implementation {
+					namespace Tags<infer Item> for Integer {
+						ranked<infer Item is Comparable>(_ items: List<Item>) -> List<Item> {
+							<- items
+						}
+					}
+				}`,
+			)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.helps?.[0],
+				]),
+			).toEqual([
+				[
+					"restated-inferred-parameter",
+					"Write '<Item is Comparable>' on 'ranked'.",
+				],
+			])
+		})
+
+		it("should refuse a re-declaration carrying no bound at all", () => {
+			let { diagnostics } = enrichSource(
+				`implementation {
+					namespace Tags<infer Item> for Integer {
+						ranked<Item>(_ items: List<Item>) -> List<Item> {
+							<- items
+						}
+					}
+				}`,
+			)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.helps?.[0],
+				]),
+			).toEqual([
+				[
+					"shadowed-type-parameter",
+					"Drop 'Item' from 'ranked's Type Parameters.",
+				],
+			])
+		})
+
+		// NOTE: `<infer Item>` is NOT a shadow, and the report used to say it
+		// was: with `infer` the receiver binds the entry, which is how this
+		// spelling worked before a bound could be written. It is the
+		// Namespace's own word written twice, and the edit is the removal.
+		it("should refuse a restated 'infer' that carries no bound", () => {
+			let { diagnostics } = enrichSource(
+				`implementation {
+					namespace Tags<infer Item> for Integer {
+						ranked<infer Item>(_ items: List<Item>) -> List<Item> {
+							<- items
+						}
+					}
+				}`,
+			)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.helps?.[0],
+					diagnostic.data?.kind,
+				]),
+			).toEqual([
+				[
+					"restated-inferred-parameter",
+					"Drop 'Item' from 'ranked's Type Parameters.",
+					"shadowed-type-parameter",
+				],
+			])
+		})
+
+		// NOTE: One Help, and the reason it is one: the second used to spell
+		// `'<Item is …>'`, which is not something a reader can write. What the
+		// Protocol is, is `unsatisfied-bound`'s to say once the entry is gone.
+		it("should offer one Help for a shadowing re-declaration", () => {
+			let { diagnostics } = enrichSource(
+				`implementation {
+					namespace Tags<infer Item> for Integer {
+						ranked<Item>(_ items: List<Item>) -> List<Item> {
+							<- items
+						}
+					}
+				}`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.helps)).toEqual([
+				["Drop 'Item' from 'ranked's Type Parameters."],
 			])
 		})
 

@@ -313,7 +313,7 @@ function definitionOf(entry: Node): Node {
  *
  * Both spans begin at the parameter list, which leaves the generics out — and
  * the generics are the half a reader most needs, because that is where the
- * bound is written: `contains<infer ItemType is Equatable>` is the difference
+ * bound is written: `contains<ItemType is Equatable>` is the difference
  * between a Method every List has and one a List of Records does not. So the
  * start is pulled back to the `<` when there is one.
  */

@@ -116,6 +116,13 @@ export type Scope = {
 	// asked whether the Namespace around it declares one — which is the whole of
 	// what `noon` needed to be told, and what it was told `loop` instead.
 	namespace?: { name: string; type: common.NamespaceType }
+	// NOTE: The Namespace Method whose BODY this Scope is, set on that body's
+	// own Scope and read through the parent chain. One Diagnostic reads it: a
+	// bound a Namespace's Type Parameter wants can be answered by a `where` on a
+	// conformance only when the Method asking fulfils that conformance, and this
+	// is what says which Method is asking. Absent everywhere else, including in
+	// a Method's signature — the question is only ever asked from a body.
+	methodName?: string
 	// NOTE: Set on a static Method's body Scope, where `@` means nothing: a
 	// static Method is called on the Namespace and is emitted without the
 	// receiver Parameter `@` lowers to. It is a BARRIER rather than the mere

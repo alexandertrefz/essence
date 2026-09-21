@@ -56,9 +56,7 @@ declarations {
 		overload is {
 			§§ @param _ — the Optional to compare against
 			§§ @returns — `true` when both are empty, or both hold equal values.
-			<infer ItemType is Equatable>(
-				_ other: Optional<ItemType>,
-			) -> Boolean {
+			<ItemType is Equatable>(_ other: Optional<ItemType>) -> Boolean {
 				<- match @ -> Boolean {
 					case #Value(item) {
 						<- match other -> Boolean {
@@ -72,7 +70,7 @@ declarations {
 
 			§§ @param _ — the bare value to compare against
 			§§ @returns — `true` when the Optional holds a value equal to it; `false` when it is empty.
-			<infer ItemType is Equatable>(_ other: ItemType) -> Boolean {
+			<ItemType is Equatable>(_ other: ItemType) -> Boolean {
 				<- match @ -> Boolean {
 					case #Value(item) { <- item::is(other) }
 					case #Empty       { <- false }
@@ -91,15 +89,13 @@ declarations {
 		overload isNot {
 			§§ @param _ — the Optional to compare against
 			§§ @returns — `true` when the two differ in Case or in value.
-			<infer ItemType is Equatable>(
-				_ other: Optional<ItemType>,
-			) -> Boolean {
+			<ItemType is Equatable>(_ other: Optional<ItemType>) -> Boolean {
 				<- @::is(other)::negate()
 			}
 
 			§§ @param _ — the bare value to compare against
 			§§ @returns — `true` when the Optional is empty or holds a different value.
-			<infer ItemType is Equatable>(_ other: ItemType) -> Boolean {
+			<ItemType is Equatable>(_ other: ItemType) -> Boolean {
 				<- @::is(other)::negate()
 			}
 		}
@@ -115,7 +111,7 @@ declarations {
 		§§ The payload renders through its own `toString`, and a String payload is quoted: `#Value("a")` answers `Value("a")`. A String prints bare on its own and quoted inside a structure. The Method is available whenever the payload conforms to `Printable`.
 		§§
 		§§ @returns — the text `Value(…)` around the payload, or `Empty`.
-		toString<infer ItemType is Printable>() -> String
+		toString<ItemType is Printable>() -> String
 
 		§ These two let a Program ask, rather than only collapse. The
 		§ alternative is to match the Optional apart at the use site, or to

@@ -301,7 +301,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "is<infer ItemType is Equatable>(_ other: List<ItemType>) -> Boolean",
+							"signature": "is<ItemType is Equatable>(_ other: List<ItemType>) -> Boolean",
 							"summary": "Answers whether the two Lists hold the same items in the same order.\n\nEach pair of items is compared with the items' own `is`. The Method is available whenever the items conform to `Equatable`.",
 							"parameters": [
 								{
@@ -331,7 +331,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "compare<infer ItemType is Comparable>(\n\tto other: List<ItemType>,\n) -> Ordering",
+							"signature": "compare<ItemType is Comparable>(to other: List<ItemType>) -> Ordering",
 							"summary": "Answers how the List orders against another one, comparing them lexicographically.\n\nThe first differing pair of items decides. On an equal prefix the shorter List comes first. The Method is available whenever the items conform to `Comparable`.",
 							"parameters": [
 								{
@@ -361,7 +361,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "toString<infer ItemType is Printable>() -> String",
+							"signature": "toString<ItemType is Printable>() -> String",
 							"summary": "Answers the List and its items as a String, in the form `[1, 2, 3]`.\n\nEach item is rendered by its own `toString`, and a String item is quoted: `[\"a\", \"b\"]` answers `[\"a\", \"b\"]`. A String prints bare on its own and quoted inside a structure. The empty List answers `[]`. The Method is available whenever the items conform to `Printable`.",
 							"parameters": [],
 							"returns": "the String representation of the List.",
@@ -664,7 +664,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "hasDuplicates<infer ItemType is Equatable>() -> Boolean",
+							"signature": "hasDuplicates<ItemType is Equatable>() -> Boolean",
 							"summary": "Answers whether any item occurs twice.\n\nThe walk stops at the first repeated item. The empty List and a List of one item answer `false`. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.",
 							"parameters": [],
 							"returns": "`true` when an item occurs twice.",
@@ -703,7 +703,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "isSorted<infer ItemType is Comparable>(\n\tin order: SortOrder = #Ascending,\n) -> Boolean",
+							"signature": "isSorted<ItemType is Comparable>(\n\tin order: SortOrder = #Ascending,\n) -> Boolean",
 							"summary": "Answers whether the items are in order.\n\nItems the order does not tell apart are in order either way. The empty List and a List of one item are both in order. The Method is available whenever the items conform to `Comparable`.",
 							"parameters": [
 								{
@@ -741,7 +741,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "contains<infer ItemType is Equatable>(_ item: ItemType) -> Boolean",
+							"signature": "contains<ItemType is Equatable>(_ item: ItemType) -> Boolean",
 							"summary": "Answers whether an item equal to the given one is in the List.\n\nEquality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.",
 							"parameters": [
 								{
@@ -756,7 +756,7 @@
 							"examples": []
 						},
 						{
-							"signature": "contains<infer ItemType is Equatable>(\n\teveryItemOf other: List<ItemType>,\n) -> Boolean",
+							"signature": "contains<ItemType is Equatable>(\n\teveryItemOf other: List<ItemType>,\n) -> Boolean",
 							"summary": "Answers whether every item of the given List occurs in this one.\n\nHow many times an item occurs is not asked, so a List holding one `1` contains every item of `[1, 1]`. The empty List has no item to look for, so every List contains its items. The walk stops at the first item that does not occur. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.",
 							"parameters": [
 								{
@@ -788,7 +788,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "doesNotContain<infer ItemType is Equatable>(\n\t_ item: ItemType,\n) -> Boolean",
+							"signature": "doesNotContain<ItemType is Equatable>(_ item: ItemType) -> Boolean",
 							"summary": "Answers whether no item equal to the given one is in the List.\n\nEquality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.",
 							"parameters": [
 								{
@@ -818,7 +818,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "starts<infer ItemType is Equatable>(\n\twith prefix: List<ItemType>,\n) -> Boolean",
+							"signature": "starts<ItemType is Equatable>(with prefix: List<ItemType>) -> Boolean",
 							"summary": "Answers whether the List begins with the items of the given one.\n\nEquality is the items' own `is`. The Method is available whenever the items conform to `Equatable`. Every List begins with the empty List.",
 							"parameters": [
 								{
@@ -850,7 +850,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "doesNotStart<infer ItemType is Equatable>(\n\twith prefix: List<ItemType>,\n) -> Boolean",
+							"signature": "doesNotStart<ItemType is Equatable>(\n\twith prefix: List<ItemType>,\n) -> Boolean",
 							"summary": "Answers whether the List does not begin with the items of the given one.\n\nEquality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.",
 							"parameters": [
 								{
@@ -880,7 +880,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "ends<infer ItemType is Equatable>(\n\twith suffix: List<ItemType>,\n) -> Boolean",
+							"signature": "ends<ItemType is Equatable>(with suffix: List<ItemType>) -> Boolean",
 							"summary": "Answers whether the List ends with the items of the given one.\n\nEquality is the items' own `is`. The Method is available whenever the items conform to `Equatable`. Every List ends with the empty List.",
 							"parameters": [
 								{
@@ -910,7 +910,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "doesNotEnd<infer ItemType is Equatable>(\n\twith suffix: List<ItemType>,\n) -> Boolean",
+							"signature": "doesNotEnd<ItemType is Equatable>(\n\twith suffix: List<ItemType>,\n) -> Boolean",
 							"summary": "Answers whether the List does not end with the items of the given one.\n\nEquality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.",
 							"parameters": [
 								{
@@ -940,7 +940,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "firstIndex<infer ItemType is Equatable>(\n\tof item: ItemType,\n) -> Optional<Integer>",
+							"signature": "firstIndex<ItemType is Equatable>(of item: ItemType) -> Optional<Integer>",
 							"summary": "Answers the position of the first item equal to the given one.\n\nEquality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.",
 							"parameters": [
 								{
@@ -970,7 +970,7 @@
 							"examples": []
 						},
 						{
-							"signature": "firstIndex<infer ItemType is Equatable>(\n\tof item: ItemType,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
+							"signature": "firstIndex<ItemType is Equatable>(\n\tof item: ItemType,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
 							"summary": "Answers the position of the first item equal to the given one, or the given fallback when the item is absent.\n\nEquality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.",
 							"parameters": [
 								{
@@ -1029,7 +1029,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "lastIndex<infer ItemType is Equatable>(\n\tof item: ItemType,\n) -> Optional<Integer>",
+							"signature": "lastIndex<ItemType is Equatable>(of item: ItemType) -> Optional<Integer>",
 							"summary": "Answers the position of the last item equal to the given one.\n\nEquality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.",
 							"parameters": [
 								{
@@ -1044,7 +1044,7 @@
 							"examples": []
 						},
 						{
-							"signature": "lastIndex<infer ItemType is Equatable>(\n\tof item: ItemType,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
+							"signature": "lastIndex<ItemType is Equatable>(\n\tof item: ItemType,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
 							"summary": "Answers the position of the last item equal to the given one, or the given fallback when the item is absent.\n\nEquality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.",
 							"parameters": [
 								{
@@ -1118,7 +1118,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "everyIndex<infer ItemType is Equatable>(\n\tof item: ItemType,\n) -> List<Integer>",
+							"signature": "everyIndex<ItemType is Equatable>(of item: ItemType) -> List<Integer>",
 							"summary": "Answers the positions of every item equal to the given one, in order.\n\nEquality is the items' own `is`. The Method is available whenever the items conform to `Equatable`. A List without the item answers no positions.",
 							"parameters": [
 								{
@@ -1150,7 +1150,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "count<infer ItemType is Equatable>(\n\tof item: ItemType,\n) -> NonNegativeInteger",
+							"signature": "count<ItemType is Equatable>(of item: ItemType) -> NonNegativeInteger",
 							"summary": "Answers how many items equal the given one.\n\nEquality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.",
 							"parameters": [
 								{
@@ -1670,7 +1670,7 @@
 							"examples": []
 						},
 						{
-							"signature": "lowestItem<infer ItemType is Comparable>() -> Optional<ItemType>",
+							"signature": "lowestItem<ItemType is Comparable>() -> Optional<ItemType>",
 							"summary": "Answers the lowest item.\n\nTies keep the earlier item. The entry is available whenever the items conform to `Comparable`.",
 							"parameters": [],
 							"returns": "the item, or nothing for the empty List.",
@@ -1679,7 +1679,7 @@
 							]
 						},
 						{
-							"signature": "lowestItem<infer ItemType is Comparable>(\n\tdefaultingTo fallback: ItemType,\n) -> ItemType",
+							"signature": "lowestItem<ItemType is Comparable>(\n\tdefaultingTo fallback: ItemType,\n) -> ItemType",
 							"summary": "Answers the lowest item, or the given fallback for the empty List.\n\nThe entry is available whenever the items conform to `Comparable`.",
 							"parameters": [
 								{
@@ -1724,7 +1724,7 @@
 							"examples": []
 						},
 						{
-							"signature": "lowestItem<infer ItemType is Comparable>() -> ItemType",
+							"signature": "lowestItem<ItemType is Comparable>() -> ItemType",
 							"summary": "Answers the lowest item, which a non-empty List always has.\n\nTies keep the earlier item. The entry is available whenever the items conform to `Comparable`.",
 							"parameters": [],
 							"returns": "the item.",
@@ -1783,7 +1783,7 @@
 							"examples": []
 						},
 						{
-							"signature": "highestItem<infer ItemType is Comparable>() -> Optional<ItemType>",
+							"signature": "highestItem<ItemType is Comparable>() -> Optional<ItemType>",
 							"summary": "Answers the highest item.\n\nTies keep the earlier item. The entry is available whenever the items conform to `Comparable`.",
 							"parameters": [],
 							"returns": "the item, or nothing for the empty List.",
@@ -1792,7 +1792,7 @@
 							]
 						},
 						{
-							"signature": "highestItem<infer ItemType is Comparable>(\n\tdefaultingTo fallback: ItemType,\n) -> ItemType",
+							"signature": "highestItem<ItemType is Comparable>(\n\tdefaultingTo fallback: ItemType,\n) -> ItemType",
 							"summary": "Answers the highest item, or the given fallback for the empty List.\n\nThe entry is available whenever the items conform to `Comparable`.",
 							"parameters": [
 								{
@@ -1837,7 +1837,7 @@
 							"examples": []
 						},
 						{
-							"signature": "highestItem<infer ItemType is Comparable>() -> ItemType",
+							"signature": "highestItem<ItemType is Comparable>() -> ItemType",
 							"summary": "Answers the highest item, which a non-empty List always has.\n\nTies keep the earlier item. The entry is available whenever the items conform to `Comparable`.",
 							"parameters": [],
 							"returns": "the item.",
@@ -2393,7 +2393,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "removeEvery<infer ItemType is Equatable>(_ item: ItemType) -> List<ItemType>",
+							"signature": "removeEvery<ItemType is Equatable>(_ item: ItemType) -> List<ItemType>",
 							"summary": "Answers a new List without every item equal to the given one.\n\nEquality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.",
 							"parameters": [
 								{
@@ -2423,7 +2423,7 @@
 							"examples": []
 						},
 						{
-							"signature": "removeEvery<infer ItemType is Equatable>(\n\tcontentsOf other: List<ItemType>,\n) -> List<ItemType>",
+							"signature": "removeEvery<ItemType is Equatable>(\n\tcontentsOf other: List<ItemType>,\n) -> List<ItemType>",
 							"summary": "Answers a new List without any item the given List holds.\n\nEvery occurrence of such an item goes, and the rest keep their order. An item of the given List that this one does not hold changes nothing. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.",
 							"parameters": [
 								{
@@ -2502,7 +2502,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "removeDuplicates<infer ItemType is Equatable>() -> List<ItemType>",
+							"signature": "removeDuplicates<ItemType is Equatable>() -> List<ItemType>",
 							"summary": "Answers a new List keeping only the first occurrence of each item.\n\nThe kept items keep the order they had. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`. The union of two Lists is `append(contentsOf other)::removeDuplicates()`.",
 							"parameters": [],
 							"returns": "the List without duplicates.",
@@ -2543,7 +2543,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "removeDuplicates<infer ItemType is Equatable>() -> NonEmptyList<ItemType>",
+							"signature": "removeDuplicates<ItemType is Equatable>() -> NonEmptyList<ItemType>",
 							"summary": "Answers a new List keeping only the first occurrence of each item.\n\nThe kept items keep the order they had. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.",
 							"parameters": [],
 							"returns": "the List without duplicates, which certainly has something in it.",
@@ -2752,7 +2752,7 @@
 							"examples": []
 						},
 						{
-							"signature": "everyItem<infer ItemType is Equatable>(\n\talsoIn other: List<ItemType>,\n) -> List<ItemType>",
+							"signature": "everyItem<ItemType is Equatable>(\n\talsoIn other: List<ItemType>,\n) -> List<ItemType>",
 							"summary": "Answers a new List of every item the given List holds too.\n\nThe kept items keep the order they had here, and an item kept once for every time it occurs. How many times the other List holds it is not asked. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.",
 							"parameters": [
 								{
@@ -2907,7 +2907,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "sort<infer ItemType is Comparable>(\n\tin order: SortOrder = #Ascending,\n) -> List<ItemType>",
+							"signature": "sort<ItemType is Comparable>(\n\tin order: SortOrder = #Ascending,\n) -> List<ItemType>",
 							"summary": "Answers a new List in the given direction, by the items' own ordering.\n\nThe sort is stable. The entry is available whenever the items conform to `Comparable`. The direction is `#Ascending` when a call names none. For any other order, use the `by:` entry.",
 							"parameters": [
 								{
@@ -2974,7 +2974,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "sort<infer ItemType is Comparable>(\n\tin order: SortOrder = #Ascending,\n) -> NonEmptyList<ItemType>",
+							"signature": "sort<ItemType is Comparable>(\n\tin order: SortOrder = #Ascending,\n) -> NonEmptyList<ItemType>",
 							"summary": "Answers a new List in the given direction, by the items' own ordering.\n\nThe sort is stable. The entry is available whenever the items conform to `Comparable`. The direction is `#Ascending` when a call names none. For any other order, use the `by:` entry.",
 							"parameters": [
 								{
@@ -3163,7 +3163,7 @@
 							"examples": []
 						},
 						{
-							"signature": "split<infer ItemType is Equatable>(\n\ton separator: ItemType,\n) -> NonEmptyList<List<ItemType>>",
+							"signature": "split<ItemType is Equatable>(\n\ton separator: ItemType,\n) -> NonEmptyList<List<ItemType>>",
 							"summary": "Answers the pieces around every item equal to the given one.\n\nThe separators are not in the answer. Two separators next to each other leave the empty piece between them, and a separator at an end leaves one there. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.",
 							"parameters": [
 								{
@@ -3312,7 +3312,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "join<infer ItemType is Printable>(with separator: String) -> String",
+							"signature": "join<ItemType is Printable>(with separator: String) -> String",
 							"summary": "Answers the items joined into one String, with the given separator between them.\n\nEach item is rendered by its own `toString`: `[1, 2, 3]::join(with \", \")` is `\"1, 2, 3\"`. The answer is the raw text, so a String item is not quoted, which is where joining differs from `toString`. For a List of Strings the Method undoes `String::split(on:)`. It is available whenever the items conform to `Printable`.",
 							"parameters": [
 								{
@@ -3706,7 +3706,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "tally<infer ItemType is Equatable>()\n\t-> Dictionary<ItemType, PositiveInteger>",
+							"signature": "tally<ItemType is Equatable>() -> Dictionary<ItemType, PositiveInteger>",
 							"summary": "Answers how many times each item occurs.\n\nThe items stand in the order they first appear. Equality is the items' own `is`.",
 							"parameters": [],
 							"returns": "the Dictionary of counts, each of which is above zero.",
@@ -3728,7 +3728,7 @@
 					"examples": [],
 					"entries": [
 						{
-							"signature": "tally<infer ItemType is Equatable>()\n\t-> NonEmptyDictionary<ItemType, PositiveInteger>",
+							"signature": "tally<ItemType is Equatable>()\n\t-> NonEmptyDictionary<ItemType, PositiveInteger>",
 							"summary": "Answers how many times each item occurs.\n\nThe items stand in the order they first appear. Equality is the items' own `is`.",
 							"parameters": [],
 							"returns": "the Dictionary of counts, which certainly has a count in it.",

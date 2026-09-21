@@ -103,11 +103,15 @@ import {
 	derivedEquatableNamespaceName,
 	derivedPrintableNamespace,
 	derivedPrintableNamespaceName,
+	enclosingNamespaceOf,
 	enumerableMethodName,
 	findCaseTypesInScope,
 	findProtocolInScope,
 	getAllNamespacesInScope,
+	impliedTargetBounds,
 	isStaticMethod,
+	methodGenericSplits,
+	type MethodGenericSplit,
 	protocolMethodBody,
 	invalidateNamespacesInScope,
 	namespacesDeclaringMethod,
@@ -1964,6 +1968,9 @@ export function enrichMethodFunctionDefinition(
 	// NOTE: A static Method is called on the Namespace, so it has no receiver
 	// and its body Scope is marked as the barrier `@` resolution stops at.
 	isStatic: boolean = false,
+	// NOTE: Written onto the body Scope for the one Diagnostic that has to know
+	// WHICH Method is asking for a bound — see `Scope.methodName`.
+	methodName: string | null = null,
 ): common.typed.FunctionDefinitionNode {
 	// NOTE: `scope` and `selfType` already carry the injected bounds when this
 	// is a fulfilling Method (the caller resolved the signature under them too),
@@ -1971,6 +1978,10 @@ export function enrichMethodFunctionDefinition(
 	// The Method's own Generics are registered as GenericUses so that Parameter
 	// and Return Types as well as the body can reference them.
 	let newScope = methodScope(method.value.generics, scope, selfType, isStatic)
+
+	if (methodName !== null) {
+		newScope.methodName = methodName
+	}
 
 	// NOTE: Read from the signature before the body so that `<-` Expressions can
 	// consult it — a bare Case resolves against the declared return Type first.
@@ -2163,8 +2174,23 @@ function withInjectedBounds(
 		}),
 	)
 
+	// NOTE: The Namespace travels onto this Scope, although the parent chain
+	// already answers with it: `namespaceDeclaringGeneric` asks the Scope that
+	// DECLARES the name and nothing above it, and this is that Scope for every
+	// bounded Namespace Generic. Left off, a Parameter bounded here reads as a
+	// Function's own.
+	//
+	// Belt and braces today, and deliberately: every name this Scope declares
+	// carries a bound, and `typeParameterBoundReport` answers a Parameter that
+	// carries one with the one-bound rule before it asks whose Parameter it is.
+	// So no report can currently tell the difference — but the Scope's own
+	// invariant is that a Scope declaring one of a Namespace's Generics carries
+	// the Namespace, and a Scope that quietly breaks it is a trap for the next
+	// reader of that walk.
+	let enclosing = enclosingNamespaceOf(scope)
 	let boundedScope = childScope(scope, {
 		types: Object.fromEntries(boundedUses.map((use) => [use.name, use])),
+		...(enclosing === null ? {} : { namespace: enclosing }),
 	})
 
 	let bindings = new Map(boundedUses.map((use) => [use.name, use]))
@@ -2176,23 +2202,41 @@ function withInjectedBounds(
 	}
 }
 
+// NOTE: One form of a Method with the `<…>` entries that BOUND the Namespace's
+// own Type Parameters taken out — they declare nothing, and everything from here
+// down reads a Method's Generics as the ones it declares. The bound itself
+// arrives on the other rail, as an injected Generic `withInjectedBounds` puts
+// into Scope already carrying it; left in, the name would be declared twice and
+// two hidden conformance Parameters would be emitted where one witness is
+// passed.
+function methodWithOwnGenerics(
+	method: parser.FunctionValueNode,
+	own: Array<parser.GenericDeclarationNode>,
+): parser.FunctionValueNode {
+	return own.length === method.value.generics.length
+		? method
+		: { ...method, value: { ...method.value, generics: own } }
+}
+
 function enrichMethodFunctionValue(
 	node: parser.SimpleMethod | parser.StaticMethod,
 	scope: enricher.Scope,
 	selfType: common.Type | null,
 	injectedGenerics: Array<common.typed.GenericDeclarationNode> = [],
+	own: Array<parser.GenericDeclarationNode> = node.method.value.generics,
 ): common.typed.FunctionValueNode {
 	let bounded = withInjectedBounds(scope, selfType, injectedGenerics)
+	let method = methodWithOwnGenerics(node.method, own)
 
 	// NOTE: The signature is resolved once and seeds the body enrichment, so the
 	// Method's annotations are walked once rather than once here and once again
 	// inside the definition.
-	let type = resolveFunctionValueType(node.method, bounded.scope)
+	let type = resolveFunctionValueType(method, bounded.scope)
 
 	return {
 		nodeType: "FunctionValue",
 		value: enrichMethodFunctionDefinition(
-			node.method,
+			method,
 			bounded.scope,
 			bounded.selfType,
 			type,
@@ -2203,6 +2247,7 @@ function enrichMethodFunctionValue(
 			// Namespace's target Type, which a static Method's Parameter and
 			// return Types may name — it simply never becomes `@`.
 			node.nodeType === "StaticMethod",
+			node.name.content,
 		),
 		position: node.method.position,
 		type,
@@ -2217,12 +2262,19 @@ function enrichMethodsFunctionValue(
 	// the ones its own entry in the resolved Method Type retained, so the two
 	// views can not drift apart.
 	injectedGenerics: Array<Array<common.typed.GenericDeclarationNode>> = [],
+	// NOTE: Also one list per Overload — a per-Method bound is written on one
+	// form's `<…>`, so which entries a form declares for itself is its own.
+	ownGenerics: Array<Array<parser.GenericDeclarationNode>> = [],
 ): Array<common.typed.FunctionValueNode> {
 	let results: Array<common.typed.FunctionValueNode> = []
 
-	for (let [index, method] of Object.values(node.methods).entries()) {
+	for (let [index, entry] of Object.values(node.methods).entries()) {
 		let injected = injectedGenerics[index] ?? []
 		let bounded = withInjectedBounds(scope, selfType, injected)
+		let method = methodWithOwnGenerics(
+			entry,
+			ownGenerics[index] ?? entry.value.generics,
+		)
 		let type = resolveFunctionValueType(method, bounded.scope)
 
 		results.push({
@@ -2234,6 +2286,7 @@ function enrichMethodsFunctionValue(
 				type,
 				injected,
 				node.nodeType === "OverloadedStaticMethod",
+				node.name.content,
 			),
 			position: method.position,
 			type,
@@ -2546,7 +2599,15 @@ function interpolationAnswer(
 	}
 
 	if (erased.type === "GenericUse") {
-		let bound = typeParameterBoundReport(erased.name, "Printable", scope)
+		// NOTE: The bound it carries goes with the question — a hole wanting
+		// `Printable` of a Parameter already bounded by `Comparable` is the
+		// one-bound rule, not a Parameter nobody bounded.
+		let bound = typeParameterBoundReport(
+			erased.name,
+			"Printable",
+			scope,
+			erased.constraint ?? null,
+		)
 
 		return { notes: bound.notes, helps: bound.helps }
 	}
@@ -7043,23 +7104,35 @@ function enrichNamespaceDefinitionStatement(
 		}
 	}
 
-	// NOTE: A bound on a Namespace's own Type Parameter is still rejected — a
-	// conditional conformance (`is Comparable where Item is Comparable`) is
-	// where a Namespace-level bound belongs, so its conformance parameter can
-	// be threaded into exactly the fulfilling Methods rather than all of them.
+	// NOTE: A bound on a Namespace's own Type Parameter is still rejected, and
+	// now for a reason the Helps can finish: a bound written HERE would apply to
+	// every Method whether it needs one or not, and a Namespace is reached by
+	// every receiver of its target shape. The two places a bound belongs both
+	// reach exactly what they are about — a Method's own `<…>`, which reaches
+	// that Method, and a conditional conformance's `where`, which reaches the
+	// Methods fulfilling it.
 	//
-	// NOTE: The Help names a conformance this Namespace ALREADY declares. Naming
-	// the bound Protocol instead read as an instruction to declare `is Comparable`
-	// — which a Namespace that implements no `compare` does not, so following it
-	// reported a missing requirement and sent the reader back here. Where nothing
-	// is declared there is no name to give and the shape is written as the
-	// schematic it is.
+	// NOTE: The per-Method Help leads, because it is the one that always
+	// applies: it needs nothing declared and no Protocol implemented. It is
+	// written as the shape rather than against a Method by name — WHICH Methods
+	// need the bound is the one thing this Diagnostic can not know, and naming
+	// the first would quietly recommend it.
+	//
+	// NOTE: The conformance Help names a conformance this Namespace ALREADY
+	// declares. Naming the bound Protocol instead read as an instruction to
+	// declare `is Comparable` — which a Namespace that implements no `compare`
+	// does not, so following it reported a missing requirement and sent the
+	// reader back here. Where nothing is declared there is no name to give and
+	// the Help is left out rather than written as a schematic: the per-Method
+	// edit above is a real one, and two Helps where one works is one too many.
 	for (let generic of node.generics) {
 		if (generic.constraint !== null) {
 			let conformances = node.conformsTo.map(
 				(clause) => clause.protocol.content,
 			)
-			let bound = `where ${generic.name.content} is ${generic.constraint.content}`
+			let parameter = generic.name.content
+			let protocolName = generic.constraint.content
+			let bound = `where ${parameter} is ${protocolName}`
 
 			reportError(
 				"A Namespace's Type Parameters can not carry Protocol bounds",
@@ -7073,19 +7146,25 @@ function enrichNamespaceDefinitionStatement(
 						),
 					],
 					notes: [
+						`A bound written here would apply to every Method of '${node.name.content}', including the ones that do not need it.`,
 						"A 'where' condition reaches the Methods that fulfil its conformance, which is the part a bound on the Namespace itself could never say.",
 					],
 					helps: [
-						conformances.length === 0
-							? `Declare a conformance on this Namespace and bound it there — 'is …' with a Protocol of your own, then '${bound}'.`
-							: `Bound it on a conformance this Namespace declares: '${conformances
-									.map((name) => `is ${name} ${bound}`)
-									.join("' or '")}'.`,
+						`Bound it on each Method that needs it: write '<${parameter} is ${protocolName}>' after that Method's name.`,
+						...(conformances.length === 0
+							? []
+							: [
+									`Or bound it on a conformance this Namespace declares: '${conformances
+										.map((name) => `is ${name} ${bound}`)
+										.join("' or '")}'.`,
+								]),
 					],
 				},
 			)
 		}
 	}
+
+	refuseMalformedMethodBounds(node, type)
 
 	// NOTE: Idempotent, and run a second time on purpose: the hoist already wove
 	// these bounds into the Namespace Type so that use sites ABOVE this
@@ -7136,6 +7215,7 @@ function enrichNamespaceDefinitionStatement(
 			type.targetType,
 			type.methods,
 			injectedGenerics,
+			type.generics,
 		),
 		position: node.position,
 		headPosition: headPositionOf(node.position, [
@@ -7162,6 +7242,164 @@ function enrichNamespaceDefinitionStatement(
 // the Namespace out of Scope entirely. The injected Declarations are built in
 // the reporting pass alone — resolving a Generic's default Type can report as
 // well, and they have nowhere to go until there are typed Nodes.
+// NOTE: The two `<…>` entries a Method may write against one of the Namespace's
+// OWN Type Parameters that are not per-Method bounds and can not be read as one.
+// Reported once, from the reporting pass, and never from the hoist: a Diagnostic
+// there keeps the whole Namespace out of Scope.
+//
+// Both are refusals of a SPELLING, not of an intention. `splitMethodGenerics`
+// has already taken the entry out of the Method's own Generics, so the analysis
+// that follows sees the Namespace's Parameter and one mistake gives one
+// Diagnostic — the second of the two is even read as the bound it means, so a
+// Program carrying it still resolves everywhere else.
+function refuseMalformedMethodBounds(
+	node: parser.NamespaceDefinitionStatementNode,
+	type: common.NamespaceType,
+): void {
+	if (type.generics.length === 0) {
+		return
+	}
+
+	let declared = new Map(
+		type.generics.map((generic) => [generic.name, generic] as const),
+	)
+
+	for (let [methodName, method] of Object.entries(node.methods)) {
+		for (let entry of methodGenericEntries(method)) {
+			let parameter = entry.name.content
+
+			if (!declared.has(parameter)) {
+				continue
+			}
+
+			// NOTE: `infer` is asked FIRST, and the two questions are asked in
+			// that order because the word is what decides which mistake this
+			// is. `<infer Item>` is not a shadow: the receiver DOES bind it —
+			// that is what `infer` asks for, and it is how this spelling worked
+			// before the bound existed. What it is, is the Namespace's own word
+			// written twice.
+			if (entry.inferred) {
+				// NOTE: `infer` says where a Parameter's Type comes from, and the
+				// Namespace already said it. Restated here the entry reads as a
+				// DECLARATION of a second Parameter — which is what it used to
+				// be, and what made the bound and the shadow two spellings of one
+				// meaning. One of them had to go, and the one that reads as what
+				// it does is the one that stayed.
+				//
+				// With a bound the entry has something to keep, so the edit keeps
+				// it and loses the word. Without one it has nothing left to say
+				// and the edit is the removal — which is why the `data` below
+				// names the EDIT rather than the code.
+				let bound = entry.constraint
+				let restated =
+					bound === null
+						? {
+								notes: [
+									`'${parameter}' is worked out from the receiver at every call to '${methodName}' already, so this entry re-states what '${node.name.content}' declares and adds nothing to it.`,
+								],
+								helps: [
+									`Drop '${parameter}' from '${methodName}'s Type Parameters.`,
+								],
+								data: {
+									kind: "shadowed-type-parameter" as const,
+									parameter,
+								},
+							}
+						: {
+								notes: [
+									`A Method bounds a Type Parameter it shares rather than declaring one of its own, so '<${parameter} is ${bound.content}>' is the whole of what '${methodName}' has to say about it.`,
+								],
+								helps: [
+									`Write '<${parameter} is ${bound.content}>' on '${methodName}'.`,
+								],
+								data: {
+									kind: "restated-inferred-parameter" as const,
+									parameter,
+									protocol: bound.content,
+								},
+							}
+
+				reportError(
+					`'${parameter}' is already inferred by this Namespace`,
+					entry.position,
+					{
+						code: "restated-inferred-parameter",
+						labels: [
+							primary(
+								entry.position,
+								`'infer' belongs on '${node.name.content}'s own declaration, where it is`,
+							),
+						],
+						...restated,
+					},
+				)
+
+				continue
+			}
+
+			if (entry.constraint === null) {
+				// NOTE: The one mistake that used to pass in silence. Nothing
+				// can bind the entry — it carries no `infer` and the receiver
+				// binds the Namespace's Parameter, not this one — so the Method
+				// asked for an Argument of a Type no call could ever produce and
+				// answered `no-matching-overload` for every call that named it,
+				// including the ones in the same file.
+				//
+				// ONE Help. The second used to be `'<Item is …>' with the
+				// Protocol this Method needs`, which is a schematic a reader can
+				// not write down: where the body needs a bound, dropping the
+				// entry reports `unsatisfied-bound`, and THAT Diagnostic names
+				// the Protocol and writes the edit.
+				reportError(
+					`'${parameter}' is already this Namespace's Type Parameter`,
+					entry.position,
+					{
+						code: "shadowed-type-parameter",
+						labels: [
+							primary(
+								entry.position,
+								`'${node.name.content}' declares '${parameter}' already`,
+							),
+						],
+						notes: [
+							`'${parameter}' is worked out from the receiver at every call to '${methodName}', so a second one here could only shadow it — and nothing would ever bind that.`,
+						],
+						helps: [
+							`Drop '${parameter}' from '${methodName}'s Type Parameters.`,
+						],
+						data: {
+							kind: "shadowed-type-parameter" as const,
+							parameter,
+						},
+					},
+				)
+			}
+		}
+	}
+}
+
+// NOTE: Every `<…>` entry a Namespace Method writes, across every form of it,
+// flattened — the reporting above is about entries one at a time and has no use
+// for which Overload each came from.
+function methodGenericEntries(
+	method: parser.NamespaceMethods[string],
+): Array<parser.GenericDeclarationNode> {
+	switch (method.nodeType) {
+		case "SimpleMethod":
+		case "StaticMethod":
+			return method.method.value.generics
+		case "SimpleMethodSignature":
+		case "StaticMethodSignature":
+			return method.signature.generics
+		default:
+			return method.methods.flatMap((overload) =>
+				overload.nodeType === "NativeMethodSignature"
+					? overload.generics
+					: overload.value.generics,
+			)
+	}
+}
+
 function weaveMethodBounds(
 	node: parser.NamespaceDefinitionStatementNode,
 	type: common.NamespaceType,
@@ -7169,11 +7407,88 @@ function weaveMethodBounds(
 	scope: enricher.Scope,
 	report: boolean,
 ): Map<string, Array<Array<common.typed.GenericDeclarationNode>>> {
-	// NOTE: Which Namespace Generic each fulfilling Method must treat as bound,
-	// gathered from every conditional conformance clause. A Method fulfilling
-	// two clauses that bound the same Generic to different Protocols is a
-	// conflict — one hidden conformance Parameter can not be two things.
-	let methodBounds = new Map<string, Map<string, string>>()
+	// NOTE: Which Namespace Generic each Method must treat as bound, ONE MAP PER
+	// OVERLOAD. Two sources feed it and they are not shaped alike: a conditional
+	// conformance's `where` reaches every form of a fulfilling Method at once,
+	// because its witness is curried onto the Method as a whole; a per-Method
+	// bound is written on ONE form's `<…>` and reaches that form only, so an
+	// overload set may bound its Parameter in one entry and leave it open in the
+	// next. Keyed by Method name and indexed by Overload, which is the index the
+	// retained Type, the typed Node and the witness list are all ordered by.
+	//
+	// A Method asked for two different bounds on one Generic is a conflict — one
+	// hidden conformance Parameter can not be two things — whichever of the two
+	// sources each side came from.
+	let methodBounds = new Map<string, Array<Map<string, string>>>()
+	let splitsOf = new Map<string, Array<MethodGenericSplit>>()
+
+	let boundsFor = (methodName: string): Array<Map<string, string>> => {
+		let existing = methodBounds.get(methodName)
+
+		if (existing !== undefined) {
+			return existing
+		}
+
+		let methodNode = node.methods[methodName]
+		let splits =
+			methodNode === undefined
+				? []
+				: methodGenericSplits(methodNode, type.generics)
+
+		splitsOf.set(methodName, splits)
+
+		// NOTE: Seeded from the Method's OWN `<…>` bounds, per form, so a
+		// conformance condition meeting one of them is read as the conflict it
+		// is rather than quietly overwriting it — and, under them, from the
+		// bounds the Namespace's TARGET Type implies, which hold for every
+		// Method alike and are what a written one would be restating.
+		let implied = impliedTargetBounds(node, scope)
+		let bounds = splits.map(
+			(split) => new Map([...implied, ...split.bounds]),
+		)
+
+		methodBounds.set(methodName, bounds)
+
+		return bounds
+	}
+
+	// NOTE: The per-Method bounds first and on their own, because a Method that
+	// fulfils no conformance at all is exactly the case this form exists for.
+	for (let methodName of Object.keys(node.methods)) {
+		boundsFor(methodName)
+	}
+
+	let refuseConflict = (
+		methodName: string,
+		generic: string,
+		existing: string,
+		wanted: string,
+		position: common.Position,
+	) => {
+		if (!report) {
+			return
+		}
+
+		reportError(
+			`Method '${methodName}' can not satisfy conflicting Protocol bounds`,
+			position,
+			{
+				code: "conflicting-where-condition",
+				labels: [
+					primary(
+						position,
+						`Method '${methodName}' would need both '${generic} is ${existing}' and '${generic} is ${wanted}'`,
+					),
+				],
+				notes: [
+					`One hidden conformance Argument stands for '${generic}' in '${methodName}', so it can carry one Protocol.`,
+				],
+				helps: [
+					`Write one bound for '${generic}' on '${methodName}', or split the Method in two.`,
+				],
+			},
+		)
+	}
 
 	for (let conformance of checkedConformances) {
 		if (conformance.conditions.length === 0) {
@@ -7190,43 +7505,32 @@ function weaveMethodBounds(
 		)
 
 		for (let methodName of fulfillingMethods) {
-			let bounds = methodBounds.get(methodName)
+			let clause = node.conformsTo.find(
+				(candidate) =>
+					candidate.protocol.content === conformance.protocolName,
+			)
 
-			if (bounds === undefined) {
-				bounds = new Map()
-				methodBounds.set(methodName, bounds)
-			}
+			for (let bounds of boundsFor(methodName)) {
+				for (let condition of conformance.conditions) {
+					let existing = bounds.get(condition.generic)
 
-			for (let condition of conformance.conditions) {
-				let existing = bounds.get(condition.generic)
-
-				if (existing !== undefined && existing !== condition.protocol) {
-					if (report) {
-						let clause = node.conformsTo.find(
-							(candidate) =>
-								candidate.protocol.content ===
-								conformance.protocolName,
-						)
-
-						reportError(
-							`Method '${methodName}' can not satisfy conflicting conformance conditions`,
+					if (
+						existing !== undefined &&
+						existing !== condition.protocol
+					) {
+						refuseConflict(
+							methodName,
+							condition.generic,
+							existing,
+							condition.protocol,
 							clause?.position ?? node.name.position,
-							{
-								code: "conflicting-where-condition",
-								labels: [
-									primary(
-										clause?.position ?? node.name.position,
-										`Method '${methodName}' would need both '${condition.generic} is ${existing}' and '${condition.generic} is ${condition.protocol}'`,
-									),
-								],
-							},
 						)
+
+						continue
 					}
 
-					continue
+					bounds.set(condition.generic, condition.protocol)
 				}
-
-				bounds.set(condition.generic, condition.protocol)
 			}
 		}
 	}
@@ -7241,14 +7545,19 @@ function weaveMethodBounds(
 	// Overload): the resolved Method Type, the typed Node the Rewriter emits
 	// from, and the witnesses `$type.boundConformance` curries onto a
 	// conformance value are all derived from ONE retained list. A Namespace
-	// Generic is retained on an Overload when its signature mentions it OR when
-	// a conditional conformance this Method fulfils bounds it — the latter is
-	// what makes the hidden conformance Parameter honest, because
-	// `boundConformance` curries a witness for every `where` condition onto
-	// EVERY fulfilling Method uniformly, whatever each Overload happens to
-	// mention. Pruning a bound Generic from one Overload would leave that
-	// Overload's emitted signature and its call sites disagreeing about how
+	// Generic is retained on an Overload when its signature mentions it, when a
+	// conditional conformance this Method fulfils bounds it, or when the
+	// Overload's own `<…>` bounds it — the two bound cases are what make the
+	// hidden conformance Parameter honest, because a witness is passed for every
+	// bound on every call. Pruning a bound Generic from one Overload would leave
+	// that Overload's emitted signature and its call sites disagreeing about how
 	// many hidden Arguments there are.
+	//
+	// NOTE: `boundConformance` curries a `where` witness onto EVERY fulfilling
+	// Method uniformly, whatever each Overload happens to mention, which is why
+	// a conformance condition fills every index of the bounds above. A
+	// per-Method bound is the other shape — written on one form, retained on
+	// that form — and the per-Overload list is what lets the two live together.
 	//
 	// NOTE: A NATIVE Method has only TWO of those three views — there is no
 	// typed Node, because there is no body to emit. The retention below still
@@ -7267,14 +7576,18 @@ function weaveMethodBounds(
 		let methodNode = node.methods[methodName]
 		let methodType = type.methods[methodName]
 
-		if (methodNode === undefined || methodType === undefined) {
+		if (
+			methodNode === undefined ||
+			methodType === undefined ||
+			bounds.every((entry) => entry.size === 0)
+		) {
 			continue
 		}
 
 		// NOTE: The Generics each form declares for itself, per Overload — what
 		// tells a retained Namespace Generic apart from a Method Generic that
 		// shadows its name, which no amount of inspecting the merged list can.
-		let ownGenerics = ownGenericNames(methodNode)
+		let ownGenerics = ownGenericNames(splitsOf.get(methodName) ?? [])
 
 		// NOTE: Force the bound Namespace Generics back onto every Overload the
 		// signature-driven merge pruned them from, and retrofit the bound onto
@@ -7303,11 +7616,13 @@ function weaveMethodBounds(
 				? [methodType.generics]
 				: methodType.overloads.map((overload) => overload.generics)
 
-		let injected = retained.map((generics, index) =>
-			node.generics
+		let injected = retained.map((generics, index) => {
+			let entryBounds = bounds[index] ?? new Map()
+
+			return node.generics
 				.filter(
 					(generic) =>
-						bounds.has(generic.name.content) &&
+						entryBounds.has(generic.name.content) &&
 						!(ownGenerics[index] ?? new Set()).has(
 							generic.name.content,
 						) &&
@@ -7324,11 +7639,11 @@ function weaveMethodBounds(
 						defaultType: generic.defaultType
 							? resolveType(generic.defaultType, scope)
 							: null,
-						constraint: bounds.get(generic.name.content)!,
+						constraint: entryBounds.get(generic.name.content)!,
 						position: generic.position,
 					}),
-				),
-		)
+				)
+		})
 
 		if (injected.some((list) => list.length > 0)) {
 			injectedGenerics.set(methodName, injected)
@@ -7341,55 +7656,40 @@ function weaveMethodBounds(
 // NOTE: The Type Parameter names each form of a Namespace Method declares for
 // ITSELF, one Set per Overload. A Method Generic shadows a Namespace Generic of
 // the same name, and once the two are merged into one list the entry no longer
-// says which it came from — this is what remembers.
+// says which it came from — this is what remembers. Read off the same splits the
+// bounds are, so an entry that BOUNDS the Namespace's Parameter counts as
+// neither: it declares nothing, and a retained Parameter must not be mistaken
+// for one the Method took over.
 function ownGenericNames(
-	method: parser.NamespaceMethods[string],
+	splits: Array<MethodGenericSplit>,
 ): Array<Set<string>> {
-	let namesOf = (generics: Array<parser.GenericDeclarationNode>) =>
-		new Set(generics.map((generic) => generic.name.content))
-
-	if (
-		method.nodeType === "SimpleMethod" ||
-		method.nodeType === "StaticMethod"
-	) {
-		return [namesOf(method.method.value.generics)]
-	}
-
-	if (
-		method.nodeType === "SimpleMethodSignature" ||
-		method.nodeType === "StaticMethodSignature"
-	) {
-		return [namesOf(method.signature.generics)]
-	}
-
-	return method.methods.map((overload) =>
-		namesOf(
-			overload.nodeType === "NativeMethodSignature"
-				? overload.generics
-				: overload.value.generics,
-		),
+	return splits.map(
+		(split) => new Set(split.own.map((generic) => generic.name.content)),
 	)
 }
 
 // NOTE: Returns a copy of a Method Type whose every Overload carries the bound
-// Namespace Generics — re-adding the ones the signature-driven merge pruned
-// because that Overload's signature never mentions them, and retrofitting the
-// bound onto the ones that survived. A conditional conformance's witnesses are
-// curried onto every fulfilling Method uniformly, so an Overload that drops one
-// would emit a signature its call sites do not agree with; retaining them is
-// what keeps the arity honest (and, as at HEAD, is what makes an unbindable
-// Type Parameter the reportable error it should be).
+// Namespace Generics ITS OWN entry of `bounds` names — re-adding the ones the
+// signature-driven merge pruned because that Overload's signature never mentions
+// them, and retrofitting the bound onto the ones that survived. A conditional
+// conformance's witnesses are curried onto every fulfilling Method uniformly, so
+// an Overload that drops one would emit a signature its call sites do not agree
+// with; retaining them is what keeps the arity honest (and is what makes an
+// unbindable Type Parameter the reportable error it should be). A per-Method
+// bound is retained on the one form that wrote it, for the same reason read the
+// other way round: its witness is passed at calls to THAT form.
 // Fresh Generic objects throughout, so the shared unbounded Namespace Generics
 // are never mutated. Idempotent: re-running retains and bounds the same set.
 function retainNamespaceBounds(
 	method: common.MethodType,
 	ownGenerics: Array<Set<string>>,
-	bounds: Map<string, string>,
+	bounds: Array<Map<string, string>>,
 	namespaceGenerics: Array<common.GenericDeclaration>,
 ): common.MethodType {
 	let apply = (
 		generics: Array<common.GenericDeclaration>,
 		own: Set<string>,
+		entryBounds: Map<string, string>,
 	): Array<common.GenericDeclaration> => {
 		let leading: Array<common.GenericDeclaration> = []
 
@@ -7404,7 +7704,7 @@ function retainNamespaceBounds(
 			let existing = generics.find(
 				(generic) => generic.name === namespaceGeneric.name,
 			)
-			let constraint = bounds.get(namespaceGeneric.name)
+			let constraint = entryBounds.get(namespaceGeneric.name)
 
 			if (existing === undefined && constraint === undefined) {
 				continue
@@ -7426,7 +7726,11 @@ function retainNamespaceBounds(
 	if (method.type === "SimpleMethod" || method.type === "StaticMethod") {
 		return {
 			...method,
-			generics: apply(method.generics, ownGenerics[0] ?? new Set()),
+			generics: apply(
+				method.generics,
+				ownGenerics[0] ?? new Set(),
+				bounds[0] ?? new Map(),
+			),
 		}
 	}
 
@@ -7434,7 +7738,11 @@ function retainNamespaceBounds(
 		...method,
 		overloads: method.overloads.map((overload, index) => ({
 			...overload,
-			generics: apply(overload.generics, ownGenerics[index] ?? new Set()),
+			generics: apply(
+				overload.generics,
+				ownGenerics[index] ?? new Set(),
+				bounds[index] ?? new Map(),
+			),
 		})),
 	}
 }
@@ -8989,6 +9297,11 @@ function enrichMethods(
 		string,
 		Array<Array<common.typed.GenericDeclarationNode>>
 	> = new Map(),
+	// NOTE: The Namespace's own Type Parameters, so that a Method's `<…>` can be
+	// read apart here exactly as resolution read it — one pure function over one
+	// parser Node, asked twice, which is what keeps the typed Node's Generics and
+	// the resolved Type's the same list.
+	namespaceGenerics: Array<common.GenericDeclaration> = [],
 ): {
 	methods: common.typed.Methods
 	nativeShims: Array<common.typed.NativeShimNode>
@@ -9039,6 +9352,9 @@ function enrichMethods(
 		}
 
 		let injected = injectedGenerics.get(memberKey) ?? []
+		let own = methodGenericSplits(memberValue, namespaceGenerics).map(
+			(split) => split.own,
+		)
 
 		if (memberValue.nodeType === "SimpleMethod") {
 			result[memberKey] = {
@@ -9049,6 +9365,7 @@ function enrichMethods(
 					scope,
 					selfType,
 					injected[0] ?? [],
+					own[0] ?? memberValue.method.value.generics,
 				),
 			}
 		} else if (memberValue.nodeType === "StaticMethod") {
@@ -9060,6 +9377,7 @@ function enrichMethods(
 					scope,
 					selfType,
 					injected[0] ?? [],
+					own[0] ?? memberValue.method.value.generics,
 				),
 			}
 		} else if (memberValue.nodeType === "OverloadedMethod") {
@@ -9071,6 +9389,7 @@ function enrichMethods(
 					scope,
 					selfType,
 					injected,
+					own,
 				),
 				// NOTE: Every Overload is bodied here, so the Node's order and
 				// the Type's are the identity.
@@ -9085,6 +9404,7 @@ function enrichMethods(
 					scope,
 					selfType,
 					injected,
+					own,
 				),
 				overloadIndices: memberValue.methods.map((_, index) => index),
 			}
@@ -9108,6 +9428,7 @@ function enrichMethods(
 			let bodiedInjected: Array<
 				Array<common.typed.GenericDeclarationNode>
 			> = []
+			let bodiedOwn: Array<Array<parser.GenericDeclarationNode>> = []
 
 			let isStatic =
 				memberValue.nodeType === "OverloadedStaticMethodSignatures"
@@ -9132,6 +9453,7 @@ function enrichMethods(
 				bodied.push(overload)
 				bodiedIndices.push(index)
 				bodiedInjected.push(injected[index] ?? [])
+				bodiedOwn.push(own[index] ?? overload.value.generics)
 			}
 
 			if (bodied.length === 0) {
@@ -9157,6 +9479,7 @@ function enrichMethods(
 					scope,
 					selfType,
 					bodiedInjected,
+					bodiedOwn,
 				),
 				overloadIndices: bodiedIndices,
 			}
@@ -20169,8 +20492,11 @@ export function resolveNamespaceDefinitionStatementType(
 	options: { deferOnPendingConformance?: ReadonlySet<string> } = {},
 ): common.NamespaceType {
 	// NOTE: Namespace Generics are visible in the target Type and in every
-	// Method signature — `namespace Boxes<infer Item> for List<Item>`.
-	let genericScope = scopeWithGenerics(node.generics, scope)
+	// Method signature — `namespace Boxes<infer Item> for List<Item>` — and
+	// carry whatever bound the target Type itself demands of them; see
+	// `impliedTargetBounds`.
+	let impliedBounds = impliedTargetBounds(node, scope)
+	let genericScope = scopeWithGenerics(node.generics, scope, impliedBounds)
 
 	let conformanceConditions: Record<
 		string,
@@ -20241,7 +20567,14 @@ export function resolveNamespaceDefinitionStatementType(
 				? null
 				: resolveType(node.targetType, genericScope),
 		name: node.name.content,
-		generics: resolveGenericDeclarations(node.generics, scope),
+		generics: resolveGenericDeclarations(node.generics, scope).map(
+			(generic) => {
+				let constraint =
+					generic.constraint ?? impliedBounds.get(generic.name)
+
+				return constraint == null ? generic : { ...generic, constraint }
+			},
+		),
 		properties,
 		methods,
 		conformsTo,

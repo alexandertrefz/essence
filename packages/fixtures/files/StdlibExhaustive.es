@@ -3179,23 +3179,23 @@ c"::quote())
 		fine::isNot(#Failure("gone")),
 	)
 	show(
-		"Result.is<FailureType is Equatable, ValueType is Equatable>(_ ValueType)",
+		"Result.is<ValueType is Equatable, FailureType is Equatable>(_ ValueType)",
 		fine::is(3),
 	)
 	show(
-		"Result.is<FailureType is Equatable, ValueType is Equatable>(_ ValueType) [different value]",
+		"Result.is<ValueType is Equatable, FailureType is Equatable>(_ ValueType) [different value]",
 		fine::is(1),
 	)
 	show(
-		"Result.is<FailureType is Equatable, ValueType is Equatable>(_ ValueType) [failed]",
+		"Result.is<ValueType is Equatable, FailureType is Equatable>(_ ValueType) [failed]",
 		wrong::is(3),
 	)
 	show(
-		"Result.isNot<FailureType is Equatable, ValueType is Equatable>(_ ValueType)",
+		"Result.isNot<ValueType is Equatable, FailureType is Equatable>(_ ValueType)",
 		fine::isNot(2),
 	)
 	show(
-		"Result.isNot<FailureType is Equatable, ValueType is Equatable>(_ ValueType) [failed]",
+		"Result.isNot<ValueType is Equatable, FailureType is Equatable>(_ ValueType) [failed]",
 		wrong::isNot(3),
 	)
 
@@ -5777,7 +5777,7 @@ c"::quote())
 	constant codes         = Dictionary.of([{ key = "a", value = "b" }])
 
 	show(
-		"Dictionary.of<ValueType, KeyType is Equatable>(_ List<\{ key: KeyType, value: ValueType \}>)",
+		"Dictionary.of<KeyType is Equatable, ValueType>(_ List<\{ key: KeyType, value: ValueType \}>)",
 		Dictionary.of([
 			{ key = "alex", value = 39 },
 			{ key = "sam", value = 25 },
@@ -5786,7 +5786,7 @@ c"::quote())
 	§ A later entry with a key already there wins, and the key keeps the place
 	§ its first occurrence gave it.
 	show(
-		"Dictionary.of<ValueType, KeyType is Equatable>(_ List<\{ key: KeyType, value: ValueType \}>) [duplicate key]",
+		"Dictionary.of<KeyType is Equatable, ValueType>(_ List<\{ key: KeyType, value: ValueType \}>) [duplicate key]",
 		Dictionary.of([
 			{ key = "alex", value = 39 },
 			{ key = "sam", value = 25 },
@@ -5794,24 +5794,24 @@ c"::quote())
 		]),
 	)
 	show(
-		"Dictionary.of<ValueType, KeyType is Equatable>(_ List<\{ key: KeyType, value: ValueType \}>) [empty]",
+		"Dictionary.of<KeyType is Equatable, ValueType>(_ List<\{ key: KeyType, value: ValueType \}>) [empty]",
 		Dictionary.of(noPairs),
 	)
 	§ The second entry is handed the keys alone and asks a Function for each
 	§ value. A key written down twice keeps its first place and the second
 	§ answer, exactly as a duplicate entry does above.
 	show(
-		"Dictionary.of<ValueType, KeyType is Equatable>(_ List<KeyType>, valuedBy: (_ KeyType) -> ValueType)",
+		"Dictionary.of<KeyType is Equatable, ValueType>(_ List<KeyType>, valuedBy: (_ KeyType) -> ValueType)",
 		Dictionary.of(["alex", "sam"], valuedBy (name) { <- name::length() }),
 	)
 	show(
-		"Dictionary.of<ValueType, KeyType is Equatable>(_ List<KeyType>, valuedBy: (_ KeyType) -> ValueType) [duplicate key]",
+		"Dictionary.of<KeyType is Equatable, ValueType>(_ List<KeyType>, valuedBy: (_ KeyType) -> ValueType) [duplicate key]",
 		Dictionary.of(["alex", "sam", "alex"], valuedBy (name) {
 			<- name::length()
 		}),
 	)
 	show(
-		"Dictionary.of<ValueType, KeyType is Equatable>(_ List<KeyType>, valuedBy: (_ KeyType) -> ValueType) [empty]",
+		"Dictionary.of<KeyType is Equatable, ValueType>(_ List<KeyType>, valuedBy: (_ KeyType) -> ValueType) [empty]",
 		Dictionary.of(noKeys, valuedBy (name) { <- name::length() }),
 	)
 	show(
@@ -5880,11 +5880,11 @@ c"::quote())
 		}),
 	)
 	show(
-		"Dictionary.hasKey<ValueType, KeyType is Equatable>(_ KeyType)",
+		"Dictionary.hasKey<KeyType is Equatable, ValueType>(_ KeyType)",
 		ages::hasKey("alex"),
 	)
 	show(
-		"Dictionary.hasKey<ValueType, KeyType is Equatable>(_ KeyType) [absent]",
+		"Dictionary.hasKey<KeyType is Equatable, ValueType>(_ KeyType) [absent]",
 		ages::hasKey("kim"),
 	)
 	§ The same question about the other half of an entry, which walks the
@@ -5938,19 +5938,19 @@ c"::quote())
 	show("Dictionary.length<KeyType, ValueType>()", ages::length())
 	show("Dictionary.length<KeyType, ValueType>() [empty]", noAges::length())
 	show(
-		"Dictionary.value<ValueType, KeyType is Equatable>(at: KeyType)",
+		"Dictionary.value<KeyType is Equatable, ValueType>(at: KeyType)",
 		ages::value(at "alex"),
 	)
 	show(
-		"Dictionary.value<ValueType, KeyType is Equatable>(at: KeyType) [absent]",
+		"Dictionary.value<KeyType is Equatable, ValueType>(at: KeyType) [absent]",
 		ages::value(at "kim"),
 	)
 	show(
-		"Dictionary.value<ValueType, KeyType is Equatable>(at: KeyType, defaultingTo: ValueType)",
+		"Dictionary.value<KeyType is Equatable, ValueType>(at: KeyType, defaultingTo: ValueType)",
 		ages::value(at "alex", defaultingTo 0),
 	)
 	show(
-		"Dictionary.value<ValueType, KeyType is Equatable>(at: KeyType, defaultingTo: ValueType) [absent]",
+		"Dictionary.value<KeyType is Equatable, ValueType>(at: KeyType, defaultingTo: ValueType) [absent]",
 		ages::value(at "kim", defaultingTo 0),
 	)
 	show("Dictionary.keys<KeyType, ValueType>()", ages::keys())
@@ -5979,61 +5979,61 @@ c"::quote())
 		noAges::firstEntry(defaultingTo { key = "nobody", value = 0 }),
 	)
 	show(
-		"Dictionary.set<ValueType, KeyType is Equatable>(_ KeyType, to: ValueType)",
+		"Dictionary.set<KeyType is Equatable, ValueType>(_ KeyType, to: ValueType)",
 		ages::set("kim", to 7),
 	)
 	§ A key that is already there keeps the place it had, wherever the new
 	§ value came from.
 	show(
-		"Dictionary.set<ValueType, KeyType is Equatable>(_ KeyType, to: ValueType) [overwrite keeps its place]",
+		"Dictionary.set<KeyType is Equatable, ValueType>(_ KeyType, to: ValueType) [overwrite keeps its place]",
 		ages::set("alex", to 40),
 	)
 	§ And a key that was REMOVED lands at the end when it comes back, which is
 	§ the other half of the same rule.
 	show(
-		"Dictionary.set<ValueType, KeyType is Equatable>(_ KeyType, to: ValueType) [set again after a removal]",
+		"Dictionary.set<KeyType is Equatable, ValueType>(_ KeyType, to: ValueType) [set again after a removal]",
 		ages::remove(at "alex")::set("alex", to 40),
 	)
 	show(
-		"Dictionary.update<ValueType, KeyType is Equatable>(at: KeyType, with: (_ ValueType) -> ValueType)",
+		"Dictionary.update<KeyType is Equatable, ValueType>(at: KeyType, with: (_ ValueType) -> ValueType)",
 		ages::update(at "alex", with (age) { <- age::add(1) }),
 	)
 	show(
-		"Dictionary.update<ValueType, KeyType is Equatable>(at: KeyType, with: (_ ValueType) -> ValueType) [absent]",
+		"Dictionary.update<KeyType is Equatable, ValueType>(at: KeyType, with: (_ ValueType) -> ValueType) [absent]",
 		ages::update(at "kim", with (age) { <- age::add(1) }),
 	)
 	show(
-		"Dictionary.update<ValueType, KeyType is Equatable>(at: KeyType, defaultingTo: ValueType, with: (_ ValueType) -> ValueType)",
+		"Dictionary.update<KeyType is Equatable, ValueType>(at: KeyType, defaultingTo: ValueType, with: (_ ValueType) -> ValueType)",
 		ages::update(at "alex", defaultingTo 0, with (age) { <- age::add(1) }),
 	)
 	show(
-		"Dictionary.update<ValueType, KeyType is Equatable>(at: KeyType, defaultingTo: ValueType, with: (_ ValueType) -> ValueType) [absent]",
+		"Dictionary.update<KeyType is Equatable, ValueType>(at: KeyType, defaultingTo: ValueType, with: (_ ValueType) -> ValueType) [absent]",
 		ages::update(at "kim", defaultingTo 0, with (age) { <- age::add(1) }),
 	)
 	show(
-		"Dictionary.remove<ValueType, KeyType is Equatable>(at: KeyType)",
+		"Dictionary.remove<KeyType is Equatable, ValueType>(at: KeyType)",
 		ages::remove(at "alex"),
 	)
 	show(
-		"Dictionary.remove<ValueType, KeyType is Equatable>(at: KeyType) [absent]",
+		"Dictionary.remove<KeyType is Equatable, ValueType>(at: KeyType) [absent]",
 		ages::remove(at "kim"),
 	)
 	§ The plural entry removes a key it is handed twice once, and leaves a key
 	§ nothing holds alone. The empty List is the receiver back.
 	show(
-		"Dictionary.remove<ValueType, KeyType is Equatable>(atEvery: List<KeyType>)",
+		"Dictionary.remove<KeyType is Equatable, ValueType>(atEvery: List<KeyType>)",
 		ages::remove(atEvery ["alex", "kim"]),
 	)
 	show(
-		"Dictionary.remove<ValueType, KeyType is Equatable>(atEvery: List<KeyType>) [repeated and absent]",
+		"Dictionary.remove<KeyType is Equatable, ValueType>(atEvery: List<KeyType>) [repeated and absent]",
 		ages::remove(atEvery ["alex", "alex", "kim"]),
 	)
 	show(
-		"Dictionary.remove<ValueType, KeyType is Equatable>(atEvery: List<KeyType>) [nothing named]",
+		"Dictionary.remove<KeyType is Equatable, ValueType>(atEvery: List<KeyType>) [nothing named]",
 		ages::remove(atEvery noKeys),
 	)
 	show(
-		"Dictionary.remove<ValueType, KeyType is Equatable>(atEvery: List<KeyType>) [every key]",
+		"Dictionary.remove<KeyType is Equatable, ValueType>(atEvery: List<KeyType>) [every key]",
 		ages::remove(atEvery ages::keys()),
 	)
 	§ Every callback here is handed the entry Record, so a Pattern takes it
@@ -6069,17 +6069,17 @@ c"::quote())
 	§ The Argument wins on a key both hold, and a key only the Argument holds
 	§ is added at the end.
 	show(
-		"Dictionary.merge<ValueType, KeyType is Equatable>(with: Dictionary<KeyType, ValueType>)",
+		"Dictionary.merge<KeyType is Equatable, ValueType>(with: Dictionary<KeyType, ValueType>)",
 		ages::merge(with raises),
 	)
 	show(
-		"Dictionary.merge<ValueType, KeyType is Equatable>(with: Dictionary<KeyType, ValueType>) [empty argument]",
+		"Dictionary.merge<KeyType is Equatable, ValueType>(with: Dictionary<KeyType, ValueType>) [empty argument]",
 		ages::merge(with noAges),
 	)
 	§ Unless the caller says otherwise. The Function is handed the receiver's
 	§ value first and the Argument's second.
 	show(
-		"Dictionary.merge<ValueType, KeyType is Equatable>(with: Dictionary<KeyType, ValueType>, choosing: (_ ValueType, _ ValueType) -> ValueType)",
+		"Dictionary.merge<KeyType is Equatable, ValueType>(with: Dictionary<KeyType, ValueType>, choosing: (_ ValueType, _ ValueType) -> ValueType)",
 		ages::merge(with raises, choosing (mine, theirs) {
 			<- mine::add(theirs)
 		}),
@@ -6087,7 +6087,7 @@ c"::quote())
 	§ Merging INTO the empty Dictionary is the Argument, entry for entry: the
 	§ receiver holds no key for the Argument to lose one to.
 	show(
-		"Dictionary.merge<ValueType, KeyType is Equatable>(with: Dictionary<KeyType, ValueType>) [empty receiver]",
+		"Dictionary.merge<KeyType is Equatable, ValueType>(with: Dictionary<KeyType, ValueType>) [empty receiver]",
 		noAges::merge(with ages),
 	)
 	§ A Dictionary is ordered, so ordering it is a question it can answer. The
@@ -6100,15 +6100,15 @@ c"::quote())
 	])
 
 	show(
-		"Dictionary.sort<ValueType, KeyType is Comparable>(in?: SortOrder)",
+		"Dictionary.sort<KeyType is Comparable, ValueType>(in?: SortOrder)",
 		scrambled::sort(),
 	)
 	show(
-		"Dictionary.sort<ValueType, KeyType is Comparable>(in?: SortOrder) [descending]",
+		"Dictionary.sort<KeyType is Comparable, ValueType>(in?: SortOrder) [descending]",
 		scrambled::sort(in #Descending),
 	)
 	show(
-		"Dictionary.sort<ValueType, KeyType is Comparable>(in?: SortOrder) [empty]",
+		"Dictionary.sort<KeyType is Comparable, ValueType>(in?: SortOrder) [empty]",
 		noAges::sort(),
 	)
 	§ Two entries whose keys compare equal keep the order they had, whichever
@@ -6166,7 +6166,7 @@ c"::quote())
 	constant threes: Dictionary<Number, String> = [3 = "integer"]
 
 	show(
-		"Dictionary.set<ValueType, KeyType is Equatable>(_ KeyType, to: ValueType) [a whole Rational is its Integer]",
+		"Dictionary.set<KeyType is Equatable, ValueType>(_ KeyType, to: ValueType) [a whole Rational is its Integer]",
 		threes::set(3/1, to "rational"),
 	)
 
@@ -6179,7 +6179,7 @@ c"::quote())
 	]
 
 	show(
-		"Dictionary.value<ValueType, KeyType is Equatable>(at: KeyType) [Record key]",
+		"Dictionary.value<KeyType is Equatable, ValueType>(at: KeyType) [Record key]",
 		seats::value(at { row = 4, seat = 1 }),
 	)
 
@@ -6240,11 +6240,11 @@ c"::quote())
 	§ A reordering answers the entries it was handed, so a proven receiver
 	§ comes out proven and its `length` is above zero without an `if`.
 	show(
-		"NonEmptyDictionary.sort<ValueType, KeyType is Comparable>(in?: SortOrder)",
+		"NonEmptyDictionary.sort<KeyType is Comparable, ValueType>(in?: SortOrder)",
 		provenAges::sort(in #Descending),
 	)
 	show(
-		"NonEmptyDictionary.sort<ValueType, KeyType is Comparable>(in?: SortOrder) [proof carried]",
+		"NonEmptyDictionary.sort<KeyType is Comparable, ValueType>(in?: SortOrder) [proof carried]",
 		provenAges::sort()::length(),
 	)
 	show(
@@ -6258,7 +6258,7 @@ c"::quote())
 	§ Setting a key answers this Type on `Dictionary` itself, whatever it was
 	§ handed, so even the empty Dictionary answers a proven one.
 	show(
-		"Dictionary.set<ValueType, KeyType is Equatable>(_ KeyType, to: ValueType) [the answer is proven]",
+		"Dictionary.set<KeyType is Equatable, ValueType>(_ KeyType, to: ValueType) [the answer is proven]",
 		noAges::set("kim", to 7)::length(),
 	)
 

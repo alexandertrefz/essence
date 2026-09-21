@@ -606,6 +606,46 @@ export function enclosingNamespace(
 	return found
 }
 
+// NOTE: The Namespace Method a range is written inside, innermost first, with
+// the Namespace around it — what a fix that writes a PER-METHOD bound starts
+// from, since `unsatisfied-bound` is reported at a call in the body rather than
+// at the head the bound goes on.
+//
+// A Method is reached as a Function value of its own, which is also what a
+// lambda inside the body is, so the innermost hit is not always the Method: the
+// answer is the outermost Function value still INSIDE the Namespace, which is
+// the one the Namespace's own Type Parameters belong to.
+export function enclosingNamespaceMethod(
+	program: parser.Program,
+	range: common.Position,
+): {
+	namespace: parser.NamespaceDefinitionStatementNode
+	method: parser.FunctionValueNode
+} | null {
+	let namespace = enclosingNamespace(program, range)
+
+	if (namespace === null) {
+		return null
+	}
+
+	let method: parser.FunctionValueNode | null = null
+
+	walk(program, (node) => {
+		if (
+			node.nodeType !== "FunctionValue" ||
+			!containsRange(node.position, range) ||
+			!containsRange(namespace.position, node.position) ||
+			(method !== null && containsRange(method.position, node.position))
+		) {
+			return
+		}
+
+		method = node
+	})
+
+	return method === null ? null : { namespace, method }
+}
+
 // NOTE: Where a Type Parameter of that name is DECLARED, looked for in every
 // head a range is written under — a Function's, a Method's, the Namespace
 // around them — because an unsatisfied bound is reported at the CALL and what

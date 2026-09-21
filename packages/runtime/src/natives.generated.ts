@@ -721,8 +721,8 @@ export type NonEmptyKeyedNumberListNatives = {
 }
 
 export type DictionaryNatives = {
-	// static of<ValueType, KeyType is Equatable>(_: List<{ key: KeyType, value: ValueType }>) -> Dictionary<KeyType, ValueType>
-	of__overload$1: <ValueType extends AnyType, KeyType extends AnyType>(argument0: ListType<RecordType & { key: KeyType; value: ValueType }>, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
+	// static of<KeyType is Equatable, ValueType>(_: List<{ key: KeyType, value: ValueType }>) -> Dictionary<KeyType, ValueType>
+	of__overload$1: <KeyType extends AnyType, ValueType extends AnyType>(argument0: ListType<RecordType & { key: KeyType; value: ValueType }>, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
 	// is<KeyType is Equatable, ValueType is Equatable>(_: Dictionary<KeyType, ValueType>) -> Boolean
 	is: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: DictionaryType<KeyType, ValueType>, KeyType__conformance: EquatableConformance<KeyType>, ValueType__conformance: EquatableConformance<ValueType>) => BooleanType
 	// toString<KeyType is Printable, ValueType is Printable>() -> String
@@ -731,8 +731,8 @@ export type DictionaryNatives = {
 	isEmpty: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => BooleanType
 	// length<KeyType, ValueType>() -> NonNegativeInteger
 	length: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => IntegerType
-	// value<ValueType, KeyType is Equatable>(at: KeyType) -> Optional<ValueType>
-	value__overload$1: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, at: KeyType, KeyType__conformance: EquatableConformance<KeyType>) => OptionalType<ValueType>
+	// value<KeyType is Equatable, ValueType>(at: KeyType) -> Optional<ValueType>
+	value__overload$1: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, at: KeyType, KeyType__conformance: EquatableConformance<KeyType>) => OptionalType<ValueType>
 	// keys<KeyType, ValueType>() -> List<KeyType>
 	keys: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<KeyType>
 	// values<KeyType, ValueType>() -> List<ValueType>
@@ -741,18 +741,18 @@ export type DictionaryNatives = {
 	entries: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => ListType<RecordType & { key: KeyType; value: ValueType }>
 	// firstEntry<KeyType, ValueType>() -> Optional<{ key: KeyType, value: ValueType }>
 	firstEntry__overload$1: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => OptionalType<RecordType & { key: KeyType; value: ValueType }>
-	// set<ValueType, KeyType is Equatable>(_: KeyType, to: ValueType) -> NonEmptyDictionary
-	set: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: KeyType, to: ValueType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
-	// remove<ValueType, KeyType is Equatable>(at: KeyType) -> Dictionary<KeyType, ValueType>
-	remove__overload$1: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, at: KeyType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
+	// set<KeyType is Equatable, ValueType>(_: KeyType, to: ValueType) -> NonEmptyDictionary
+	set: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: KeyType, to: ValueType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
+	// remove<KeyType is Equatable, ValueType>(at: KeyType) -> Dictionary<KeyType, ValueType>
+	remove__overload$1: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, at: KeyType, KeyType__conformance: EquatableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
 	// removeEvery<KeyType, ValueType>(where: (_: { key: KeyType, value: ValueType }) -> Boolean) -> Dictionary<KeyType, ValueType>
 	removeEvery: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, where: (argument0: RecordType & { key: KeyType; value: ValueType }) => BooleanType) => DictionaryType<KeyType, ValueType>
 	// everyEntry<KeyType, ValueType>(where: (_: { key: KeyType, value: ValueType }) -> Boolean) -> Dictionary<KeyType, ValueType>
 	everyEntry: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, where: (argument0: RecordType & { key: KeyType; value: ValueType }) => BooleanType) => DictionaryType<KeyType, ValueType>
 	// map<KeyType, ValueType, Other>(_: (_: { key: KeyType, value: ValueType }) -> Other) -> Dictionary<KeyType, Other>
 	map: <KeyType extends AnyType, ValueType extends AnyType, Other extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: (argument0: RecordType & { key: KeyType; value: ValueType }) => Other) => DictionaryType<KeyType, Other>
-	// sort<ValueType, KeyType is Comparable>(in: SortOrder) -> Dictionary<KeyType, ValueType>
-	sort__overload$1: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: SortOrderType, KeyType__conformance: ComparableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
+	// sort<KeyType is Comparable, ValueType>(in: SortOrder) -> Dictionary<KeyType, ValueType>
+	sort__overload$1: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: SortOrderType, KeyType__conformance: ComparableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
 	// sort<KeyType, ValueType, Key is Comparable>(on: (_: { key: KeyType, value: ValueType }) -> Key, in: SortOrder) -> Dictionary<KeyType, ValueType>
 	sort__overload$2: <KeyType extends AnyType, ValueType extends AnyType, Key extends AnyType>(self: DictionaryType<KeyType, ValueType>, on: (argument0: RecordType & { key: KeyType; value: ValueType }) => Key, argument2: SortOrderType, Key__conformance: ComparableConformance<Key>) => DictionaryType<KeyType, ValueType>
 }
@@ -770,8 +770,8 @@ export type NonEmptyDictionaryNatives = {
 	firstEntry: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>) => RecordType & { key: KeyType; value: ValueType }
 	// map<KeyType, ValueType, Other>(_: (_: { key: KeyType, value: ValueType }) -> Other) -> NonEmptyDictionary
 	map: <KeyType extends AnyType, ValueType extends AnyType, Other extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: (argument0: RecordType & { key: KeyType; value: ValueType }) => Other) => DictionaryType<KeyType, Other>
-	// sort<ValueType, KeyType is Comparable>(in: SortOrder) -> NonEmptyDictionary
-	sort__overload$1: <ValueType extends AnyType, KeyType extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: SortOrderType, KeyType__conformance: ComparableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
+	// sort<KeyType is Comparable, ValueType>(in: SortOrder) -> NonEmptyDictionary
+	sort__overload$1: <KeyType extends AnyType, ValueType extends AnyType>(self: DictionaryType<KeyType, ValueType>, argument1: SortOrderType, KeyType__conformance: ComparableConformance<KeyType>) => DictionaryType<KeyType, ValueType>
 	// sort<KeyType, ValueType, Key is Comparable>(on: (_: { key: KeyType, value: ValueType }) -> Key, in: SortOrder) -> NonEmptyDictionary
 	sort__overload$2: <KeyType extends AnyType, ValueType extends AnyType, Key extends AnyType>(self: DictionaryType<KeyType, ValueType>, on: (argument0: RecordType & { key: KeyType; value: ValueType }) => Key, argument2: SortOrderType, Key__conformance: ComparableConformance<Key>) => DictionaryType<KeyType, ValueType>
 }

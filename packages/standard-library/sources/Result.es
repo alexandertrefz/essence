@@ -56,7 +56,7 @@ declarations {
 		overload is {
 			§§ @param _ — the Result to compare against
 			§§ @returns — `true` when both are the same Case and hold equal payloads.
-			<infer ValueType is Equatable, infer FailureType is Equatable>(
+			<ValueType is Equatable, FailureType is Equatable>(
 				_ other: Result<ValueType, FailureType>,
 			) -> Boolean {
 				<- match @ -> Boolean {
@@ -79,7 +79,7 @@ declarations {
 
 			§§ @param _ — the bare value to compare against
 			§§ @returns — `true` when the Result holds a value equal to it; `false` when it failed.
-			<infer ValueType is Equatable>(_ other: ValueType) -> Boolean {
+			<ValueType is Equatable>(_ other: ValueType) -> Boolean {
 				<- match @ -> Boolean {
 					case #Value(item) { <- item::is(other) }
 					case #Failure     { <- false }
@@ -97,7 +97,7 @@ declarations {
 		overload isNot {
 			§§ @param _ — the Result to compare against
 			§§ @returns — `true` when the two differ in Case or in payload.
-			<infer ValueType is Equatable, infer FailureType is Equatable>(
+			<ValueType is Equatable, FailureType is Equatable>(
 				_ other: Result<ValueType, FailureType>,
 			) -> Boolean {
 				<- @::is(other)::negate()
@@ -105,7 +105,7 @@ declarations {
 
 			§§ @param _ — the bare value to compare against
 			§§ @returns — `true` when the Result failed or holds a different value.
-			<infer ValueType is Equatable>(_ other: ValueType) -> Boolean {
+			<ValueType is Equatable>(_ other: ValueType) -> Boolean {
 				<- @::is(other)::negate()
 			}
 		}
@@ -120,8 +120,7 @@ declarations {
 		§§ Each payload renders through its own `toString`, and a String payload is quoted: `#Failure("gone")` answers `Failure("gone")`. A String prints bare on its own and quoted inside a structure. The Method is available whenever both payloads conform to `Printable`.
 		§§
 		§§ @returns — the text `Value(…)` or `Failure(…)` around the payload.
-		toString<infer ValueType is Printable, infer FailureType is Printable>()
-			-> String
+		toString<ValueType is Printable, FailureType is Printable>() -> String
 
 		§ The two questions a Program asks before it takes a Result apart. The
 		§ quantified entry of `hasValue` stands beside the bare one as

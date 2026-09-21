@@ -77,7 +77,7 @@ declarations {
 			§§
 			§§ @param _ — the entries the Dictionary holds
 			§§ @returns — the Dictionary of those entries.
-			<infer KeyType is Equatable>(
+			<KeyType is Equatable>(
 				_ entries: List<{ key: KeyType, value: ValueType }>,
 			) -> Dictionary<KeyType, ValueType>
 
@@ -88,7 +88,7 @@ declarations {
 			§§ @param _ — the keys the Dictionary holds
 			§§ @param valuedBy — the Function answering the value of each key
 			§§ @returns — the Dictionary of those keys.
-			<infer KeyType is Equatable>(
+			<KeyType is Equatable>(
 				_ keys: List<KeyType>,
 				valuedBy valueOf: (_: KeyType) -> ValueType,
 			) -> Dictionary<KeyType, ValueType> {
@@ -104,7 +104,7 @@ declarations {
 		§§
 		§§ @param _ — the Dictionary to compare with
 		§§ @returns — `true` when the two hold the same entries.
-		is<infer KeyType is Equatable, infer ValueType is Equatable>(
+		is<KeyType is Equatable, ValueType is Equatable>(
 			_ other: Dictionary<KeyType, ValueType>,
 		) -> Boolean
 
@@ -113,8 +113,7 @@ declarations {
 		§§ Each key and each value is rendered by its own `toString`, and a String is quoted: `["a" = "b"]`. The empty Dictionary answers `[=]`. The empty List answers `[]`, so the two are never the same text. The Method is available whenever the keys and the values conform to `Printable`.
 		§§
 		§§ @returns — the String representation of the Dictionary.
-		toString<infer KeyType is Printable, infer ValueType is Printable>()
-			-> String
+		toString<KeyType is Printable, ValueType is Printable>() -> String
 
 		§§ Answers whether the Dictionary has no entries at all.
 		§§
@@ -176,7 +175,7 @@ declarations {
 		§§
 		§§ @param _ — the key to look for
 		§§ @returns — `true` when the key holds a value.
-		hasKey<infer KeyType is Equatable>(_ key: KeyType) -> Boolean {
+		hasKey<KeyType is Equatable>(_ key: KeyType) -> Boolean {
 			§ A chain rather than one call on `@`, so it stays a question of its
 			§ own. See DEVELOPMENT.md, Why bodies look the way they do.
 			<- @::value(at key)::hasValue()
@@ -200,7 +199,7 @@ declarations {
 		§§
 		§§ @param _ — the value to look for
 		§§ @returns — `true` when an entry holds the value.
-		hasValue<infer ValueType is Equatable>(_ value: ValueType) -> Boolean {
+		hasValue<ValueType is Equatable>(_ value: ValueType) -> Boolean {
 			§ A chain rather than one call on `@`, so it stays a question of its
 			§ own. See DEVELOPMENT.md, Why bodies look the way they do.
 			<- @::values()::contains(value)
@@ -254,7 +253,7 @@ declarations {
 			§§
 			§§ @param at — the key to look for
 			§§ @returns — the value in an Optional, or an empty Optional when the key holds no value.
-			<infer KeyType is Equatable>(at key: KeyType) -> Optional<ValueType>
+			<KeyType is Equatable>(at key: KeyType) -> Optional<ValueType>
 
 			§§ Answers the value the given key holds, or the given fallback when the key holds no value.
 			§§
@@ -263,7 +262,7 @@ declarations {
 			§§ @param at — the key to look for
 			§§ @param defaultingTo — the value to answer with when the key holds no value
 			§§ @returns — the value, or the fallback in its place.
-			<infer KeyType is Equatable>(
+			<KeyType is Equatable>(
 				at key: KeyType,
 				defaultingTo fallback: ValueType,
 			) -> ValueType {
@@ -327,7 +326,7 @@ declarations {
 		§§ @param _ — the key to set
 		§§ @param to — the value the key holds
 		§§ @returns — the Dictionary with that entry, which certainly has an entry.
-		set<infer KeyType is Equatable>(
+		set<KeyType is Equatable>(
 			_ key: KeyType,
 			to value: ValueType,
 		) -> NonEmptyDictionary<KeyType, ValueType>
@@ -345,7 +344,7 @@ declarations {
 			§§ @param at — the key whose value to transform
 			§§ @param with — the transform the value is handed to
 			§§ @returns — the Dictionary with the transformed value.
-			<infer KeyType is Equatable>(
+			<KeyType is Equatable>(
 				at key: KeyType,
 				with transform: (_: ValueType) -> ValueType,
 			) -> Dictionary<KeyType, ValueType> {
@@ -368,7 +367,7 @@ declarations {
 			§§ @param defaultingTo — the value to transform when the key holds no value
 			§§ @param with — the transform the value is handed to
 			§§ @returns — the Dictionary with the transformed value.
-			<infer KeyType is Equatable>(
+			<KeyType is Equatable>(
 				at key: KeyType,
 				defaultingTo start: ValueType,
 				with transform: (_: ValueType) -> ValueType,
@@ -402,7 +401,7 @@ declarations {
 			§§
 			§§ @param at — the key to remove
 			§§ @returns — the Dictionary without that entry.
-			<infer KeyType is Equatable>(
+			<KeyType is Equatable>(
 				at key: KeyType,
 			) -> Dictionary<KeyType, ValueType>
 
@@ -412,7 +411,7 @@ declarations {
 			§§
 			§§ @param atEvery — the keys to remove
 			§§ @returns — the Dictionary without those entries.
-			<infer KeyType is Equatable>(
+			<KeyType is Equatable>(
 				atEvery keys: List<KeyType>,
 			) -> Dictionary<KeyType, ValueType> {
 				§ The fold starts from the receiver, which is already a
@@ -484,7 +483,7 @@ declarations {
 			§§
 			§§ @param with — the Dictionary whose entries to add
 			§§ @returns — the merged Dictionary.
-			<infer KeyType is Equatable>(
+			<KeyType is Equatable>(
 				with other: Dictionary<KeyType, ValueType>,
 			) -> Dictionary<KeyType, ValueType> {
 				§ `@` is not the receiver inside a callback, so the Dictionary
@@ -511,7 +510,7 @@ declarations {
 			§§ @param with — the Dictionary whose entries to add
 			§§ @param choosing — the Function answering the value of a key both hold
 			§§ @returns — the merged Dictionary.
-			<infer KeyType is Equatable>(
+			<KeyType is Equatable>(
 				with other: Dictionary<KeyType, ValueType>,
 				choosing choose: (_: ValueType, _: ValueType) -> ValueType,
 			) -> Dictionary<KeyType, ValueType> {
@@ -582,7 +581,7 @@ declarations {
 			§§
 			§§ @param in — the direction to order in, `#Ascending` when it is left out
 			§§ @returns — the ordered Dictionary.
-			<infer KeyType is Comparable>(
+			<KeyType is Comparable>(
 				in order: SortOrder = #Ascending,
 			) -> Dictionary<KeyType, ValueType>
 
@@ -708,7 +707,7 @@ declarations {
 			§§
 			§§ @param in — the direction to order in, `#Ascending` when it is left out
 			§§ @returns — the ordered Dictionary, which certainly has an entry.
-			<infer KeyType is Comparable>(
+			<KeyType is Comparable>(
 				in order: SortOrder = #Ascending,
 			) -> NonEmptyDictionary<KeyType, ValueType>
 
@@ -773,8 +772,7 @@ declarations {
 		§§ The items stand in the order they first appear. Equality is the items' own `is`.
 		§§
 		§§ @returns — the Dictionary of counts, each of which is above zero.
-		tally<infer ItemType is Equatable>()
-			-> Dictionary<ItemType, PositiveInteger>
+		tally<ItemType is Equatable>() -> Dictionary<ItemType, PositiveInteger>
 
 		§§ Answers the items under the key the given Function reads off each one, one item per key.
 		§§
@@ -814,7 +812,7 @@ declarations {
 		§§ The items stand in the order they first appear. Equality is the items' own `is`.
 		§§
 		§§ @returns — the Dictionary of counts, which certainly has a count in it.
-		tally<infer ItemType is Equatable>()
+		tally<ItemType is Equatable>()
 			-> NonEmptyDictionary<ItemType, PositiveInteger>
 
 		§§ Answers the items under the key the given Function reads off each one, one item per key.
