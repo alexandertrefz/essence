@@ -31,6 +31,7 @@ import { encodeKey } from "../keyEncoding"
 import type { ListType } from "../List"
 import {
 	createList,
+	is as listIs,
 	materialise,
 	prepend__overload$1 as prepend,
 } from "../List"
@@ -42,7 +43,13 @@ import { createRecord } from "../Record"
 import type { StringType } from "../String"
 import { createString, itemText } from "../String"
 import { getStringRepresentation } from "../Terminal"
-import { type AnyType, createCase, isValueOfType, typeKeySymbol } from "../type"
+import {
+	type AnyType,
+	boundConformance,
+	createCase,
+	isValueOfType,
+	typeKeySymbol,
+} from "../type"
 
 // NOTE: `CaseInstanceType` is deliberately kept out of `AnyType` — see the NOTE
 // in `type.ts` — so a Case value is cast on the way in here exactly as the
@@ -1202,6 +1209,146 @@ describe("a witness a Namespace wrote", () => {
 		expect(lengthOf(scanned).value).toBe(2)
 		expect(scanned.store.unencoded).toBe(2)
 		expect(writtenForm(scanned)).toBe(`["${composedAccent}" = 2, 3 = 4]`)
+	})
+})
+
+// NOTE: `List<ItemType> is Equatable where ItemType is Equatable` is a
+// CONDITIONAL conformance, so the Compiler can not settle its brand where it
+// emits it: the witness solving that `where` may be one forwarded into a
+// generic Function, which has no name at the Rewriter. The brand travels in the
+// method map and `boundConformance` decides it, and the shape built here is
+// exactly the one the Rewriter emits for a List key.
+describe("the brand a conditional conformance carries", () => {
+	const branded = (conditions: Array<unknown>) =>
+		boundConformance({ is: listIs, structural: true }, conditions)
+
+	test("a List witness is branded where its item witness is", () => {
+		let witness = branded([equality])
+
+		expect(witness.structural).toBe(true)
+		expect(typeof witness.is).toBe("function")
+	})
+
+	test("a List witness is unbranded where its item witness is not", () => {
+		expect(branded([looseText]).structural).toBeUndefined()
+		expect(branded([witnessed]).structural).toBeUndefined()
+	})
+
+	// NOTE: The brand is lifted OUT of the map rather than curried through it.
+	// Curried like a Method it would have become a Function, and `encodeKey`
+	// reads it with `=== true` — so every List key would have taken the scan
+	// path and the brand would have been a byte that did nothing.
+	test("the brand is never curried as if it were a Method", () => {
+		expect(branded([equality]).structural).not.toBeInstanceOf(Function)
+	})
+
+	// NOTE: A map with nothing branding it keeps nothing, whatever its
+	// conditions carry — the brand is the Rewriter's claim about the `is`, and
+	// the conditions only say whether the claim survives.
+	test("an unbranded map stays unbranded under branded conditions", () => {
+		expect(
+			boundConformance({ is: listIs }, [equality]).structural,
+		).toBeUndefined()
+	})
+
+	// NOTE: And the recursion, spelled out: the witness for `List<List<T>>` is
+	// this built over itself, so a written `is` at the BOTTOM unbrands every
+	// layer above it.
+	test("a written 'is' at the bottom unbrands every layer above it", () => {
+		expect(branded([branded([looseText])]).structural).toBeUndefined()
+	})
+})
+
+// NOTE: And what the brand buys and refuses, end to end. A List key whose items
+// are compared by a written `is` must be found the way that `is` says, which is
+// the scan path; one whose items are compared by the standard library's own
+// equality is found under its text in one step.
+describe("a Dictionary keyed by Lists", () => {
+	// NOTE: The witness the Compiler builds for `List<NonEmptyString>` under a
+	// `namespace Loose for NonEmptyString is Equatable` — `List.is` curried
+	// with that Namespace's `is`, and unbranded because it is.
+	const looseItems = {
+		is: (first: AnyType, second: AnyType) =>
+			listIs(
+				first as ListType<AnyType>,
+				second as ListType<AnyType>,
+				looseText,
+			),
+	}
+
+	test("finds a List key in one step under the branded witness", () => {
+		let box = dictionary(
+			[createList([integer(1), integer(2)]), text("start")],
+			[createList([integer(12), integer(3)]), text("corner")],
+		)
+
+		expect(box.store.unencoded).toBe(0)
+		expect(box.store.slots[0].encoded).toEqual({ text: "l2:i1;i2;" })
+		expect(
+			textOf(
+				heldOf(
+					valueAt(
+						box,
+						createList([integer(12), integer(3)]),
+						equality,
+					),
+				) as AnyType,
+			),
+		).toBe("corner")
+	})
+
+	// NOTE: `[1, 23]` and `[12, 3]` hold the same digits in the same order and
+	// are told apart by the `;` each Integer closes with; `[[1], [2]]` and
+	// `[[1, 2]]`, and `[[]]` and `[]`, by the count in each head.
+	test("keeps apart the keys a run-together text would merge", () => {
+		let box = dictionary(
+			[createList([integer(1), integer(23)]), integer(1)],
+			[createList([integer(12), integer(3)]), integer(2)],
+			[
+				createList([
+					createList([integer(1)]),
+					createList([integer(2)]),
+				]),
+				integer(3),
+			],
+			[createList([createList([integer(1), integer(2)])]), integer(4)],
+			[createList([createList([])]), integer(5)],
+			[createList([]), integer(6)],
+		)
+
+		expect(lengthOf(box).value).toBe(6)
+		expect(box.store.unencoded).toBe(0)
+	})
+
+	// NOTE: A String item that LOOKS like an encoded List is spelled by its own
+	// length-prefixed arm, so it can not be read as the List it imitates.
+	test("keeps a String item apart from the List it imitates", () => {
+		let box = dictionary(
+			[createList([text("l1:i1;")]), integer(1)],
+			[createList([createList([integer(1)])]), integer(2)],
+		)
+
+		expect(lengthOf(box).value).toBe(2)
+	})
+
+	// NOTE: Two Lists the canonical text calls DISTINCT and the written `is`
+	// calls equal. Encoding them would have opened two slots and answered
+	// nothing for a lookup the witness holds, so the store keeps them
+	// unencoded and the scan is what finds them.
+	test("scans for a List key whose items carry a written 'is'", () => {
+		let box = createDictionary<AnyType, AnyType>(
+			[
+				[createList([text("Ada")]), integer(1)],
+				[createList([text("ada")]), integer(2)],
+			],
+			looseItems,
+		)
+
+		expect(box.store.unencoded).toBe(1)
+		expect(lengthOf(box).value).toBe(1)
+		expect(
+			heldNumber(valueAt(box, createList([text("ADA")]), looseItems)),
+		).toBe(2)
 	})
 })
 

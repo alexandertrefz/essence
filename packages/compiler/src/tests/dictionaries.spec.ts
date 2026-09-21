@@ -760,6 +760,122 @@ describe("Dictionary", () => {
 			expect(generate(source)).not.toContain("structural")
 			expect(await run(source)).toEqual(["1"])
 		})
+
+		// NOTE: `List<ItemType> is Equatable where ItemType is Equatable` is
+		// conditional, and a conditional conformance carries the brand only
+		// where its conditions do — which `boundConformance` settles, so the
+		// brand stands in the emitted map and the witness built from it is the
+		// one that has it. A List key is found under `l<count>:` and its items'
+		// own texts, which is what makes the obvious memo table for a pair of
+		// coordinates flat rather than quadratic.
+		it("finds a List key by its items, on the encoded path", async () => {
+			let source = `implementation {
+				constant none: Dictionary<List<Integer>, String> = [=]
+				constant visited = none
+					::set([1, 2], to "start")
+					::set([12, 3], to "corner")
+
+				Terminal.inspect(visited::value(at [1, 2]))
+				Terminal.inspect(visited::value(at [1, 23]))
+				Terminal.inspect(visited::hasKey([12, 3]))
+				Terminal.inspect(visited::set([1, 2], to "again")::length())
+			}`
+
+			expect(generate(source)).toContain("structural: true")
+			expect(await run(source)).toEqual([
+				'Optional#Value("start")',
+				"Optional#Empty",
+				"true",
+				"2",
+			])
+		})
+
+		// NOTE: The brand is recursive, because the condition it is asked of is
+		// itself a List's. A `List<List<Integer>>` key is branded exactly when
+		// the Integer witness at the bottom is, and the count in each head is
+		// what keeps `[[1], [2]]` and `[[1, 2]]` two keys — and `[[]]` and `[]`
+		// two more.
+		it("finds a nested List key, counts and all", async () => {
+			expect(
+				await run(`implementation {
+					constant none: Dictionary<List<List<Integer>>, String> = [=]
+					constant paths = none
+						::set([[1], [2]], to "split")
+						::set([[1, 2]], to "joined")
+						::set([[]], to "one empty")
+						::set([], to "none at all")
+
+					Terminal.inspect(paths::length())
+					Terminal.inspect(paths::value(at [[1], [2]]))
+					Terminal.inspect(paths::value(at [[]]))
+					Terminal.inspect(paths::value(at []))
+				}`),
+			).toEqual([
+				"4",
+				'Optional#Value("split")',
+				'Optional#Value("one empty")',
+				'Optional#Value("none at all")',
+			])
+		})
+
+		// NOTE: THE CASE THE BRAND EXISTS FOR. A Namespace that writes an `is`
+		// for the ITEM Type is handed to `List::is` as the item witness, so two
+		// Lists are equal exactly where that `is` says their items are — and
+		// the canonical encoding would have said something else. Here every
+		// NonEmptyString is every other one, so the two Lists are ONE key, and
+		// only the scan path can say that: the answer below is the assertion.
+		//
+		// NOTE: The brand does stand in the emitted map, because a List's is
+		// CONDITIONAL and the map is what carries it to `boundConformance` —
+		// which is where it is refused, the `Loose` witness curried onto it
+		// having none. So what is asserted of the emitted text is that the item
+		// witness arrives unbranded; the rest of the claim is the run.
+		it("leaves a List key on the scan path under a written item 'is'", async () => {
+			let source = `implementation {
+				function names() -> Integer {
+					namespace Loose for NonEmptyString is Equatable {
+						is(_ other: NonEmptyString) -> Boolean {
+							<- true
+						}
+					}
+
+					constant a: NonEmptyString = "Ada"
+					constant b: NonEmptyString = "bob"
+					constant seen = Dictionary.of([
+						{ key = [a], value = 1 },
+						{ key = [b], value = 2 },
+					])
+
+					<- seen::length()
+				}
+
+				Terminal.inspect(names())
+			}`
+
+			expect(generate(source)).toContain("{ is: Loose.is }")
+			expect(await run(source)).toEqual(["1"])
+		})
+
+		// NOTE: A refinement declares no `is` of its own, so its conformance
+		// resolves to the base Namespace's and arrives under the base's name —
+		// which holds at both ends of a List key: `NonEmptyList<T>` emits
+		// `List`'s witness and `NonEmptyString` items emit `String`'s, so the
+		// pair is branded exactly as the unrefined pair is.
+		it("finds a refined List key of refined items on the encoded path", async () => {
+			let source = `implementation {
+				constant words: NonEmptyList<NonEmptyString> = ["ada", "bob"]
+				constant rows = Dictionary.of([{ key = words, value = 1 }])
+
+				Terminal.inspect(rows::value(at ["ada", "bob"]))
+				Terminal.inspect(rows::value(at ["ada"]))
+			}`
+
+			expect(generate(source)).toContain("structural: true")
+			expect(await run(source)).toEqual([
+				"Optional#Value(1)",
+				"Optional#Empty",
+			])
+		})
 	})
 
 	// NOTE: Both conformances are conditional, so a Dictionary is printable
