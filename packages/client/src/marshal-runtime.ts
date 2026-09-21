@@ -2804,7 +2804,12 @@ export function createInterpreter(
 		let tag = (value as Record<symbol, unknown>)[typeKey]
 
 		if (typeof tag === "string") {
-			return `an Essence ${tag} value`
+			// NOTE: A Case is named the way a host reads it — `Shape#Circle`,
+			// with the Module the tag carries taken back off, which is the
+			// spelling `caseName` below hands out everywhere else on this
+			// boundary. A refusal that named the compiling machine's path told
+			// its reader nothing they could act on.
+			return `an Essence ${tag.includes("#") ? caseName(tag) : tag} value`
 		}
 
 		// NOTE: Tagged, but by another copy of the runtime — see

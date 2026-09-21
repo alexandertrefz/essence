@@ -3156,8 +3156,13 @@ export { Fetch }
 				)
 				let sources = generateModules(linked)
 
+				// NOTE: `Fetch#Get`, with no Module in front of it. The tag
+				// carries the Module that declares the Choice and a structural
+				// rendering no longer prints it — see `caseText` in the
+				// runtime's `registry.ts`. What this test is about is the baked
+				// default, which is the `headers` member.
 				expect(await runBundle(sources, directory)).toEqual([
-					'./Fetching.es#Fetch#Get { url = "/x", headers = [ "Accept" ] }',
+					'Fetch#Get { url = "/x", headers = [ "Accept" ] }',
 				])
 			},
 		)

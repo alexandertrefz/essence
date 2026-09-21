@@ -19,7 +19,7 @@ import {
 	nextWord,
 	seedOf,
 } from "./Randomness"
-import { kindOf } from "./registry"
+import { caseText, kindOf } from "./registry"
 import type { StringType } from "./String"
 import {
 	getStringRepresentation,
@@ -1642,7 +1642,12 @@ function diffValue(
 	}
 
 	if (isCase(left) && isCase(right) && sameTag(left, right)) {
-		let tag = String(left[typeKeySymbol])
+		// NOTE: The rendered text rather than the tag — `Door#Open`, not the
+		// Module the tag also carries. A failure report is read by a person, and
+		// `caseText` in `registry.ts` says why a path is no part of what they
+		// need; the two sides are already known to carry the SAME tag here, so
+		// nothing is being told apart by what is cut off.
+		let tag = caseText(String(left[typeKeySymbol]))
 
 		return diffEntries(
 			recordEntries(left),

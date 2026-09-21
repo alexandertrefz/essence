@@ -604,8 +604,8 @@ implementation {
 	Terminal.inspect(reading::isNot(#Home)) § true
 	Terminal.inspect(chosen::is(#Red)) § false
 	Terminal.print(Colour.cases()::length()) § 3
-	Terminal.inspect(Colour.cases()::firstItem()) § ./routes.es#Colour#Red
-	Terminal.inspect(reading) § ./routes.es#Route#Article("choices")
+	Terminal.inspect(Colour.cases()::firstItem()) § Colour#Red
+	Terminal.inspect(reading) § Route#Article("choices")
 }
 ```
 
@@ -615,7 +615,7 @@ A choice whose cases all carry nothing is also [`Enumerable`](/docs/library/prot
 
 A choice you declare does not print on its own. Passing `chosen` to [`Terminal.print`](/docs/library/terminal#print) is [`unsatisfied-bound`](/docs/reference/diagnostics#unsatisfied-bound). A choice whose cases all carry nothing prints its case names once a namespace declares it [`Printable`](/docs/library/protocols#Printable) with an empty body, `namespace Colour for Colour is Printable {}`. With that line, `Terminal.print(chosen)` prints `Green`. [Namespaces and methods](/docs/language/namespaces-and-methods) teaches namespaces. A choice with a payload writes its own `toString` in that namespace, which [Protocols](/docs/language/protocols) shows. If a namespace for a choice writes its own `is`, it must also say `is Equatable`, or the compiler reports [`undeclared-conformance`](/docs/reference/diagnostics#undeclared-conformance).
 
-`Terminal.inspect` takes any value. It writes a case with a tag that names the file, the choice and the case: `./routes.es#Route#Article("choices")`. A case from the standard library has no file in its tag, as `Ordering#Less` below shows. That tag is for you, not for the people using your program. To show them a case, print it through a `match` or a `toString`.
+`Terminal.inspect` takes any value. It writes a case as the choice and the case: `Route#Article("choices")`, the same form a case from the standard library is written in, such as `Ordering#Less`. Two files that both declare a `Route` are written the same way, and the two values stay distinct all the same — the file that declares a choice is part of what tells its cases apart, and no part of what is shown. That form is for you, not for the people using your program. To show them a case, print it through a `match` or a `toString`.
 
 **Compared with JavaScript.**
 

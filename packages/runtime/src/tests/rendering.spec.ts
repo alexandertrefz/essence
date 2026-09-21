@@ -2,11 +2,14 @@ import { describe, expect, test } from "bun:test"
 
 import { createDictionary } from "../Dictionary"
 import { createInteger } from "../Integer"
+import { anyIs } from "../internalHelpers"
+import { createList } from "../List"
 import { formatAsFraction } from "../Rational"
 import { createRecord } from "../Record"
 import { createString } from "../String"
 import { getStringRepresentation } from "../Terminal"
 import type { AnyType } from "../type"
+import { createCase } from "../type"
 
 describe("rendering a String", () => {
 	// NOTE: The structural rendering is for the Program's AUTHOR — an embedded
@@ -109,6 +112,13 @@ const distinct = {
 	is: () => ({ [Symbol.for("$type")]: "Boolean", value: false }) as never,
 }
 
+// NOTE: `createCase` answers a `CaseInstanceType`, which is deliberately
+// outside `AnyType` — the same cast every runtime module that builds a Case
+// makes, and for the reason `Generators.ts` gives. These are Cases at run time
+// either way.
+const caseValue = (tag: string, payload?: Record<string, AnyType>): AnyType =>
+	createCase(tag, payload) as unknown as AnyType
+
 const dictionary = (...pairs: Array<[string, number]>) =>
 	createDictionary(
 		pairs.map(
@@ -179,6 +189,80 @@ describe("rendering a Dictionary", () => {
 				"]",
 			].join("\n"),
 		)
+	})
+})
+
+// NOTE: The TEXT a Case is rendered as, which is not the tag it is stamped
+// with. A Program's Choice is identified by the Module that declares it, so its
+// Cases are tagged `"./Doors.es#Door#Open"` — and printing that put the
+// compiling machine's path into the Program's own output, so that renaming a
+// file changed what the Program said. Every value below keeps its tag; only
+// what a reader is shown changes.
+describe("rendering a Case", () => {
+	test("a Module-qualified tag prints as Choice#Case", () => {
+		expect(getStringRepresentation(caseValue("./Doors.es#Door#Open"))).toBe(
+			"Door#Open",
+		)
+	})
+
+	test("a standard library Case prints exactly as it always did", () => {
+		expect(getStringRepresentation(caseValue("Ordering#Less"))).toBe(
+			"Ordering#Less",
+		)
+	})
+
+	test("a one-member payload prints bare, under the same text", () => {
+		expect(
+			getStringRepresentation(
+				caseValue("./Shapes.es#Shape#Circle", {
+					radius: createInteger(2n),
+				}),
+			),
+		).toBe("Shape#Circle(2)")
+	})
+
+	test("a several-member payload prints as a Record, under the same text", () => {
+		expect(
+			getStringRepresentation(
+				caseValue("./Shapes.es#Shape#Square", {
+					side: createInteger(1n),
+					door: caseValue("./Doors.es#Door#Shut"),
+				}),
+			),
+		).toBe("Shape#Square { side = 1, door = Door#Shut }")
+	})
+
+	// NOTE: A Module path holding a `#` of its own is what the rule has to be
+	// read from the END for. Neither a Choice name nor a Case name can hold one,
+	// so the two separators nearest the end are always the right pair.
+	test("a Module path holding a # keeps only the last two segments", () => {
+		expect(
+			getStringRepresentation(caseValue("./o#d/Doors.es#Door#Open")),
+		).toBe("Door#Open")
+	})
+
+	test("a Case held by a Record or a List is shown the same way", () => {
+		let open = caseValue("./Doors.es#Door#Open")
+
+		expect(getStringRepresentation(createRecord({ door: open }))).toBe(
+			"{ door = Door#Open }",
+		)
+		expect(getStringRepresentation(createList([open]))).toBe(
+			"[ Door#Open ]",
+		)
+	})
+
+	// NOTE: The rendering collides and the VALUES do not, which is the whole of
+	// what decision 4 traded away: the tag keeps its Module, so nominal identity
+	// is untouched, and only the two lines a reader sees are now the same.
+	test("the tag itself is untouched — two Modules' Doors stay distinct", () => {
+		let mine = caseValue("./Mine.es#Door#Open")
+		let yours = caseValue("./Yours.es#Door#Open")
+
+		expect(getStringRepresentation(mine)).toBe(
+			getStringRepresentation(yours),
+		)
+		expect(anyIs(mine, yours)).toBe(false)
 	})
 })
 

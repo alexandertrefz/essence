@@ -391,6 +391,30 @@ describe("The structural diff", () => {
 		])
 	})
 
+	// NOTE: A Program's own Choice, whose tag carries the Module that declares
+	// it. A failure report is read by a person, so it says `Shape#Square` — and
+	// a snapshot holding one stops moving when the file is renamed. Both halves
+	// have to agree: the bracket this walk writes itself and the whole-value
+	// rendering it falls back to are two different lines of `Testing.ts`.
+	test("names a Program's own Case without its Module", () => {
+		let left = caseValue("./Shapes.es#Shape#Square", { side: integer(1) })
+		let right = caseValue("./Shapes.es#Shape#Square", { side: integer(2) })
+
+		expect(structuralDiff(left, right)).toEqual([
+			{ kind: "same", text: "Shape#Square {" },
+			{ kind: "left", text: "    side = 1," },
+			{ kind: "right", text: "    side = 2," },
+			{ kind: "same", text: "}" },
+		])
+
+		expect(
+			structuralDiff(left, caseValue("./Shapes.es#Shape#Blank")),
+		).toEqual([
+			{ kind: "left", text: "Shape#Square(1)" },
+			{ kind: "right", text: "Shape#Blank" },
+		])
+	})
+
 	test("descends into a nested Record", () => {
 		let left = createRecord({
 			home: createRecord({ team: string("Lions"), goals: integer(2) }),

@@ -189,6 +189,23 @@ describe("the in-debuggee renderer", () => {
 			createList([createInteger(1n), createInteger(2n)]),
 			createCase("Ordering#Less"),
 			createCase("Shape#Circle", { radius: createInteger(2n) }),
+			// NOTE: And the same Cases as a PROGRAM's Choice declares them —
+			// tagged with the declaring Module as well, which is the half the
+			// shown text drops. Without these the agreement held only for the
+			// standard library's own Choices, whose tags carry no Module
+			// already, so this renderer and the runtime's could have disagreed
+			// about every Choice a reader writes and nothing would have said so.
+			createCase("./Ordering.es#Ordering#Less"),
+			createCase("./Shapes.es#Shape#Circle", {
+				radius: createInteger(2n),
+			}),
+			createCase("./Shapes.es#Shape#Square", {
+				side: createInteger(1n),
+				// NOTE: The cast every runtime module that nests a Case makes —
+				// `CaseInstanceType` is deliberately outside `AnyType`, for the
+				// reason `Generators.ts` gives.
+				door: createCase("./Doors.es#Door#Shut") as never,
+			}),
 			// NOTE: Built UNREDUCED, which is the only way a Rational is worth
 			// asking about here. `createRational` settles the sign and zero and
 			// reduces nothing, so `6/2` is a value a Program really holds — and

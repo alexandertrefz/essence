@@ -520,7 +520,7 @@ Error: Result<Integer, Problem> does not conform to 'Printable'
 
 [Protocols](/docs/language/protocols) shows how a choice such as `Problem` becomes printable, and after that `print` writes `Failure(NotANumber)`. Without that, turn the reason into something printable first. `mapFailure(describe)` turns it into a `String`, as the `print` line under "Transforming and recovering" shows. A `match` can turn the whole `Result` into one, as `report` did at the top of this page.
 
-`inspect` takes any `Result`. A case of your own choice is written with the file that declares it, such as `Result#Failure(./parse.es#Problem#NotANumber)`.
+`inspect` takes any `Result`. A case of your own choice is written as the choice and the case, exactly as a standard library one is: `Result#Failure(Problem#NotANumber)`.
 
 ## What Result shares with Optional
 

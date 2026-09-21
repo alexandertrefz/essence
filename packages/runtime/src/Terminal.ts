@@ -4,7 +4,7 @@ import { materialise } from "./List"
 import { createEmpty, createValue, type OptionalType } from "./Optional"
 import { formatAsRational, type RationalType } from "./Rational"
 import type { RecordType } from "./Record"
-import { kindOf, singleLineMaxLength } from "./registry"
+import { caseText, kindOf, singleLineMaxLength } from "./registry"
 import type { StreamType } from "./Stream"
 import { createString, quotedText, type StringType } from "./String"
 import { toString as transcendentalToString } from "./Transcendental"
@@ -149,12 +149,14 @@ export function getStringRepresentation(
 		// differ between two runs of one Program.
 		return "Randomness"
 	} else if (obj[typeKeySymbol].includes("#")) {
-		// NOTE: Case values print as their tag, with the payload spelled out
-		// like a Record when the Case carries one.
+		// NOTE: Case values print as `Choice#Case`, with the payload spelled out
+		// like a Record when the Case carries one. The Module the tag also
+		// carries is cut off by `caseText`, which says why there.
 		let payloadEntries = Object.entries(obj)
+		let tag = caseText(obj[typeKeySymbol])
 
 		if (payloadEntries.length === 0) {
-			return obj[typeKeySymbol]
+			return tag
 		}
 
 		// NOTE: A ONE-member Case prints its payload bare, in parentheses,
@@ -165,7 +167,7 @@ export function getStringRepresentation(
 		// `Optional` in a Program is one of these, so the noise would be
 		// everywhere.
 		if (payloadEntries.length === 1) {
-			return `${obj[typeKeySymbol]}(${getStringRepresentation(
+			return `${tag}(${getStringRepresentation(
 				payloadEntries[0]![1] as never,
 				indentLevel,
 				rationalForm,
@@ -178,7 +180,7 @@ export function getStringRepresentation(
 			[typeKeySymbol]: "Record",
 		}
 
-		return `${obj[typeKeySymbol]} ${getStringRepresentation(
+		return `${tag} ${getStringRepresentation(
 			payload as never,
 			indentLevel,
 			rationalForm,

@@ -115,6 +115,23 @@ function describeEssenceValues(...values: Array<unknown>): string {
 		return `${out}"`
 	}
 
+	// NOTE: The text a Case is SHOWN as — `Door#Open`, with the Module the tag
+	// also carries cut off. It retells `caseText` in runtime/src/registry.ts,
+	// inlined for the reason everything here is inlined: this source is
+	// evaluated in the debuggee, where nothing else of this module exists.
+	// `src/tests/render.spec.ts` pins the two renderings together.
+	function shownTag(tag: string): string {
+		let separator = tag.lastIndexOf("#")
+
+		if (separator === -1) {
+			return tag
+		}
+
+		let choice = tag.lastIndexOf("#", separator - 1)
+
+		return choice === -1 ? tag : tag.slice(choice + 1)
+	}
+
 	function render(value: unknown, depth: number): string | null {
 		if (typeof value === "function") {
 			return "Function"
@@ -345,10 +362,11 @@ function describeEssenceValues(...values: Array<unknown>): string {
 		}
 
 		let entries = Object.entries(record)
-		let prefix = tag === "Record" ? "" : `${tag} `
+		let shown = shownTag(tag)
+		let prefix = tag === "Record" ? "" : `${shown} `
 
 		if (entries.length === 0) {
-			return tag === "Record" ? "{}" : tag
+			return tag === "Record" ? "{}" : shown
 		}
 
 		// NOTE: A ONE-member Case renders its payload bare, in parentheses —
@@ -361,7 +379,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 			tag.indexOf("#") !== -1 &&
 			entries.length === 1
 		) {
-			return `${tag}(${render(entries[0]![1], depth + 1) ?? "…"})`
+			return `${shown}(${render(entries[0]![1], depth + 1) ?? "…"})`
 		}
 
 		if (depth >= 2) {

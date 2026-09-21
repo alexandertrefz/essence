@@ -26,6 +26,39 @@ const kinds = new Map<string, RegisteredKind>()
 // it breaks at, and a second copy of the number would be two rules.
 export const singleLineMaxLength = 60
 
+// NOTE: The TEXT a STRUCTURAL rendering gives a Case — the Choice and the Case
+// and nothing in front of them. It lives beside the width above for the same
+// reason: each of the three walks named at the top of this file meets a Case,
+// and a second copy of the rule would be two answers to one question.
+//
+// NOTE: The tag itself keeps its Module. A Choice is identified by the file
+// that declares it as well as by its name — which is what keeps one Module's
+// `Door` from being another's at run time — so a tag reads
+// `"./Doors.es#Door#Open"`. But a Module path is where that file happened to
+// sit on the machine that COMPILED the Program: printing it put a build
+// machine's path in the output, made renaming a file change what a Program
+// said, and broke every snapshot holding such a value. Only the text changes
+// here; the tag a value is stamped with is untouched.
+//
+// NOTE: The last TWO segments, found from the END. Neither a Choice name nor a
+// Case name can hold a `#`, so the two separators nearest the end are the right
+// ones however many a Module path holds. A standard library Choice carries no
+// Module and its tag is already this form — `Ordering#Less` comes back
+// untouched — and a tag with no `#` at all is no Case, so it does too. Two
+// Modules that both declare a `Door` therefore both print `Door#Open`: the
+// values stay distinct, only their rendering collides.
+export function caseText(tag: string): string {
+	let separator = tag.lastIndexOf("#")
+
+	if (separator === -1) {
+		return tag
+	}
+
+	let choice = tag.lastIndexOf("#", separator - 1)
+
+	return choice === -1 ? tag : tag.slice(choice + 1)
+}
+
 // NOTE: How the printer renders a value it does not know: the same four
 // arguments `getStringRepresentation` carries, handed back so a registered
 // renderer can render what its value HOLDS through the one walk rather than
