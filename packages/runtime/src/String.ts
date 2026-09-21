@@ -271,12 +271,14 @@ function graphemesIn(string: StringType): Array<string> {
 // assert WORK: which Array a window shares, and whether the Segmenter ran to
 // make it. `hasCharacterView` below answers the question this one can not,
 // because this one BUILDS the view it reports.
-export function viewOf(string: StringType): {
+export type CharacterWindow = {
 	clusters: Array<string>
 	start: number
 	count: number
 	segmented: boolean
-} {
+}
+
+export function viewOf(string: StringType): CharacterWindow {
 	let view = viewIn(string)
 
 	return {
@@ -285,6 +287,14 @@ export function viewOf(string: StringType): {
 		count: (string as MeasuredString)[graphemeCountKey]!,
 		segmented: view.segmented,
 	}
+}
+
+// NOTE: A whole Array read as such a window, for the two walks that COLLECT
+// the characters they pass — `split` and the limited `split` — and so ask
+// `graphemesIn` for the Array anyway. It is here so that the matcher below is
+// the only comparison any of them makes.
+function wholeOf(clusters: Array<string>): CharacterWindow {
+	return { clusters, start: 0, count: clusters.length, segmented: false }
 }
 
 // NOTE: Whether this String has had its character view BUILT — the one
@@ -613,19 +623,20 @@ export function append(
 // comparing #Insensitive)` on a 10,800-character String measured 70.6 ms that
 // way and 0.1 ms this way, because this way reads three characters.
 function partMatchesAt(
-	clusters: Array<string>,
-	base: number,
-	count: number,
+	view: CharacterWindow,
 	part: Array<string>,
 	position: number,
 	insensitive: boolean,
 ): boolean {
-	if (position + part.length > count) {
+	if (position + part.length > view.count) {
 		return false
 	}
 
+	let clusters = view.clusters
+	let at = view.start + position
+
 	for (let offset = 0; offset < part.length; offset++) {
-		let character = clusters[base + position + offset]!
+		let character = clusters[at + offset]!
 
 		if (
 			(insensitive ? character.toLowerCase() : character) !== part[offset]
@@ -709,21 +720,13 @@ export function split__overload$1(
 	}
 
 	let separator = graphemesIn(splitterString)
+	let whole = wholeOf(characters)
 	let pieces: Array<Array<string>> = []
 	let current: Array<string> = []
 	let index = 0
 
 	while (index < characters.length) {
-		if (
-			partMatchesAt(
-				characters,
-				0,
-				characters.length,
-				separator,
-				index,
-				false,
-			)
-		) {
+		if (partMatchesAt(whole, separator, index, false)) {
 			pieces.push(current)
 			current = []
 			index += separator.length
@@ -825,16 +828,7 @@ function firstIndexIn(
 		position + separator.length <= view.count;
 		position++
 	) {
-		if (
-			partMatchesAt(
-				view.clusters,
-				view.start,
-				view.count,
-				separator,
-				position,
-				insensitive,
-			)
-		) {
+		if (partMatchesAt(view, separator, position, insensitive)) {
 			return position
 		}
 	}
@@ -865,16 +859,7 @@ function lastIndexIn(
 		position >= 0;
 		position--
 	) {
-		if (
-			partMatchesAt(
-				view.clusters,
-				view.start,
-				view.count,
-				separator,
-				position,
-				insensitive,
-			)
-		) {
+		if (partMatchesAt(view, separator, position, insensitive)) {
 			return position
 		}
 	}
@@ -918,16 +903,7 @@ function eachOccurrence(
 	let index = 0
 
 	while (index + separator.length <= view.count) {
-		if (
-			partMatchesAt(
-				view.clusters,
-				view.start,
-				view.count,
-				separator,
-				index,
-				insensitive,
-			)
-		) {
+		if (partMatchesAt(view, separator, index, insensitive)) {
 			visit(index)
 			index += separator.length
 		} else {
@@ -988,14 +964,7 @@ function startsIn(
 
 	let view = viewOf(originalString)
 
-	return partMatchesAt(
-		view.clusters,
-		view.start,
-		view.count,
-		foldedPart(prefix, insensitive),
-		0,
-		insensitive,
-	)
+	return partMatchesAt(view, foldedPart(prefix, insensitive), 0, insensitive)
 }
 
 function endsIn(
@@ -1024,9 +993,7 @@ function endsIn(
 	}
 
 	return partMatchesAt(
-		view.clusters,
-		view.start,
-		view.count,
+		view,
 		suffixCharacters,
 		view.count - suffixCharacters.length,
 		insensitive,
@@ -1721,6 +1688,7 @@ export function split__overload$5(
 
 	let characters = graphemesIn(originalString)
 	let separator = graphemesIn(splitterString)
+	let whole = wholeOf(characters)
 	let pieces: Array<Array<string>> = []
 	let current: Array<string> = []
 	let index = 0
@@ -1728,14 +1696,7 @@ export function split__overload$5(
 	while (index < characters.length) {
 		if (
 			pieces.length < limit - 1 &&
-			partMatchesAt(
-				characters,
-				0,
-				characters.length,
-				separator,
-				index,
-				false,
-			)
+			partMatchesAt(whole, separator, index, false)
 		) {
 			pieces.push(current)
 			current = []
@@ -1794,16 +1755,7 @@ export function replaceEvery__overload$2(
 	let index = 0
 
 	while (index < view.count) {
-		if (
-			partMatchesAt(
-				view.clusters,
-				view.start,
-				view.count,
-				separator,
-				index,
-				insensitive,
-			)
-		) {
+		if (partMatchesAt(view, separator, index, insensitive)) {
 			pieces.push(current.join(""))
 			current = []
 			index += separator.length

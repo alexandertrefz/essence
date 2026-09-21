@@ -79,7 +79,7 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("HelloWorld.es")).toBeLessThan(6_740)
 	})
 
-	// NOTE: 78,120 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 80,439 measured. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
 	//
@@ -141,6 +141,21 @@ describe("Bundle Size", () => {
 	// surface so it pays that text at every site. Read the MINIFIED figure
 	// before treating a rise from one of them as a regression: unminified,
 	// escodegen's indentation is most of it.
+	//
+	// NOTE: 2,319 of those bytes are the character WINDOW — a cut of a String
+	// sharing its parent's cluster Array by offset rather than copying it,
+	// which is what made consuming a String from the front linear (2,245 ms to
+	// 35 for the 40,000-character drain). This file reaches it through
+	// `Integer.parse` and `Rational.parse`, which slice and search. 1,334 are
+	// the pieces that did not exist: the view record and its reader (`viewIn`,
+	// `viewOf`, `startIn`, 708), the offset table and the two makers it feeds
+	// (`offsetsOf`, `createWindowString`, `cutFromView`, 889 — counted with the
+	// 263 that `graphemesIn`, `createSegmentedString` and `slice` grew by).
+	// 420 are the one matcher every grapheme search now shares, against the 305
+	// of the one it replaced, and 205 are `readsByUnit` — the question that
+	// stops a window being ASCII-scanned per turn, which was the other half of
+	// the same n². 177 are the part-folding helper, where 183 of whole-receiver
+	// folding went; `graphemeCountIn` gave back 167 and `graphemesOf` 171.
 	//
 	// NOTE: A Program carries the runtime reach of what it CALLS, not the
 	// amount of Essence inlined into it. That is why a change to a runtime
