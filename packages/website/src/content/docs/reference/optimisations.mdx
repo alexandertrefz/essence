@@ -947,6 +947,63 @@ The segmenter is built on first use, so a program that never segments a string d
 
 [`slice`](/docs/library/string#slice), [`character(at:)`](/docs/library/string#character) and [`repeat`](/docs/library/string#repeat) are natives that read the remembered view directly, rather than being written in Essence on top of `characters()`.
 
+A join that is not two ASCII strings is marked as *not* ASCII, without a scan. A join holds every code unit of both sides, so a side the scan would refuse makes a join it would refuse. Without that mark the next method scanned the whole join to ask again, and an engine resolves the rope it built for a join the first time anything reads a unit of it — so a token built one non-ASCII character at a time re-flattened everything built so far, every turn. It is linear now, like the ASCII case beside it.
+
+### `string-window-sharing`
+
+A slice of a string shares the character view it was cut from, rather than copying it. The view is the array of grapheme clusters `grapheme-caching` remembers; a window of it is that same array, an offset saying where the window's first character stands in it, and a count saying how many are its own.
+
+Its **text** is one slice of the text the clusters were cut from, between the two clusters' code-unit offsets. A table of those offsets is built once per array, on its first cut, and shared with every window of it. The clusters partition that text, so the text between two of their offsets is exactly those clusters joined — which is the string the cut answered before there were windows, byte for byte. Everything downstream is handed the same text as before: `is`, `compare`, the normalised form, printing, and the key a dictionary files the string under.
+
+This is what makes consuming a string from the front linear:
+
+```essence
+implementation {
+	constant text = "café café café "
+
+	constant consumed = loop(
+		startingWith { rest = text, count = 0 },
+		step (state) {
+			if state.rest::isEmpty() {
+				<- #Done(state.count)
+			}
+
+			<- #Continue({
+				rest = state.rest::slice(from 1),
+				count = state.count::add(1),
+			})
+		},
+	)
+
+	Terminal.print(consumed) § 15
+}
+```
+
+Each turn used to copy the remaining clusters into a new array and join them back into a new text, which is O(n) per turn and O(n²) over the loop. A 40,000-character drain of `"café "` measured 2,245 ms, where the same program over `"cafe "` was flat at 19 ms, because ASCII is cut by the intrinsic and never builds a view at all. It measures 33 ms now, and stays flat to 640,000 characters.
+
+**Sharing follows the half rule**, the one [`list-tail-sharing`](#list-tail-sharing) applies to a shared suffix: a cut shares only where it is at least half of the array it would share, and is copied otherwise. What the rule bounds is retention — a window holds the whole array of clusters, the offset table and the whole text alive, and a six-character token cut out of a five-megabyte source must not pin the source for as long as the token is held. Under the rule a window pins at most twice its own characters. It costs nothing asymptotically: a drain shares every step down to half, copies once there, and shares down to half of that, so the copies over a whole drain add up to twice the characters rather than the square of them.
+
+**A copy is exactly what a cut cost before.** It copies the window's clusters and joins them into a fresh text, rather than cutting the parent's — because an engine's sliced string keeps the string it was cut from alive, and a small window cut that way would pin the source. A tokenizer holding 250,000 six-character tokens of a five-megabyte source retains the same memory it did before this existed.
+
+**A string that has a view is never scanned for ASCII-ness again.** The scan is O(n), and every turn of a drain is a new string, so asking it per turn was the same O(n²) from the other side. A window of a string the scan refused declines a fast path it might have passed; what that costs it is the view route, which is the route it is already on.
+
+**Every reader that must not walk the window reads it where it stands.** `length()` answers from the count, so `isEmpty()` is O(1). `character(at:)`, [`firstCharacter()`](/docs/library/string#firstCharacter) and `lastCharacter()` read one cluster out of the shared array. `starts(with:)` and `ends(with:)` compare only as many characters as the part covers, and fold only those when the call folds the case — folding the whole receiver to compare a two-character prefix made a drain asking for one per turn quadratic, at 1,484 ms for 80,000 characters against 29 now. `firstIndex(of:)` costs the distance to the match. The readers that walk the whole receiver anyway — `split`, `reverse`, `separate`, the replacements — copy the window's characters once, on the first of them, and the window keeps the copy.
+
+Measured on this machine, best of three, subprocess startup of about 20 ms included in every figure. Each program consumes a string of one `é` per five characters one character at a time, against an ASCII twin of the same length:
+
+| characters | before | after | ASCII twin |
+| --- | --- | --- | --- |
+| 5,000 | 74 ms | 24 ms | 22 ms |
+| 20,000 | 585 ms | 27 ms | 23 ms |
+| 80,000 | 9,532 ms | 35 ms | 26 ms |
+| 320,000 | — | 58 ms | 34 ms |
+| 640,000 | — | 88 ms | 40 ms |
+
+The same holds for texts of combining marks, joined emoji, regional-indicator flags and CRLF line breaks, and for a hand-written tokenizer over source with non-ASCII identifiers and string contents: 50,000 characters measured 4,608 ms and now 39 ms, 100,000 measured 18,218 ms and now 47 ms, and 200,000 measures 65 ms against its ASCII twin's 42.
+
+The design costs about three kilobytes in a bundle that reaches the cutting, and 189 bytes in one that only measures strings.
+
+
 ### `rational-reduction-caching`
 
 A Rational's lowest-terms form is remembered on the value, under a symbol key. What the value stores does not change: `4/2` still holds 4 and 2, as `fold-constants` showed. Equality cross-multiplies those parts, which is why `4/2::is(2)` is `true`. Every accessor and formatter returns lowest terms, and the cache means that reduction happens once instead of once per question.

@@ -61,6 +61,7 @@ describe("Optimisation Passes", () => {
 			"interned-unit-cases",
 			"reflexive-equality-fast-path",
 			"grapheme-caching",
+			"string-window-sharing",
 			"rational-reduction-caching",
 			"hybrid-integers",
 			"list-tail-sharing",
