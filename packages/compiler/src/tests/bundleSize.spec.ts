@@ -147,8 +147,22 @@ describe("Bundle Size", () => {
 	// module moves this file while Irrational.es is unchanged to the byte, and
 	// why moving a body into Essence can shrink a String-heavy Program while
 	// growing this one.
+	//
+	// NOTE: 961 of the current figure are `list-window-trimming`: the half rule
+	// that decides when a List trims a run, and the seam move that lets a
+	// window holding neither end of a List be shared. They are in `List.ts`, so
+	// every Program reaching `slice` carries them — the canonical functional
+	// walk went from 634 ms to 36 at fifty thousand items for them, and a walk
+	// dropping an item from each end from 1203 ms to 32. HelloWorld.es is
+	// unchanged to the byte, which is what says the reach is `slice`'s and not
+	// everything's.
+	//
+	// NOTE: The ceiling is 80,000 rather than the measured figure plus a
+	// handful, because a gate with twenty bytes of headroom fails for the next
+	// person to write a line rather than for the next person to drag in a
+	// tower, and that is not what it is for.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(80_200)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(80_000)
 	})
 
 	// NOTE: 38,056 measured; a reintroduced `Number` spread was 54,849. The same
