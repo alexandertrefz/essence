@@ -64,6 +64,7 @@ describe("Optimisation Passes", () => {
 			"rational-reduction-caching",
 			"hybrid-integers",
 			"list-tail-sharing",
+			"list-window-trimming",
 		])
 	})
 

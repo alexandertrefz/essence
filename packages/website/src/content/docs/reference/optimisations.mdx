@@ -1010,17 +1010,48 @@ The seed is the list being walked, so the first `append` finds it at its tip and
 
 **`createList` takes ownership of the array it is given.** It stores the array without copying it, and a later `append` may push onto it. So no caller may keep the array it passed. Every caller in the runtime and in emitted code builds a fresh one. `build-lists-in-place` relies on the same rule, which is why it copies a seed the program already held. A host of the client package builds lists through a second constructor that copies, so an array a host keeps is never one Essence pushes onto.
 
-**Edits share the runs they do not touch.** A sub-list that still contains the seam, the point where the front run ends and the back run begins, can be returned without copying anything. Shrinking the front count drops leading items, and shrinking the back count drops trailing ones. A flat list keeps its seam at the start, so it can share only its prefixes. A `slice` at an end therefore costs a small object and no items, which makes [`removeLast()`](/docs/library/list#removeLast) free, and [`removeFirst()`](/docs/library/list#removeFirst) free on a list that was prepended to. [`remove(at:)`](/docs/library/list#remove) shares at either end the same way. [`replace(_:at:)`](/docs/library/list#replace) copies only the run the position falls in. [`insert(_:at:)`](/docs/library/list#insert) uses `prepend` and `append` at the ends. A window that misses the seam is still a copy, made once from the two runs.
+**Edits share the runs they do not touch.** A sub-list that still contains the seam, the point where the front run ends and the back run begins, can be returned without copying anything. Shrinking the front count drops leading items, and shrinking the back count drops trailing ones. A flat list keeps its seam at the start, so it can share only its prefixes. A `slice` at an end therefore costs a small object and no items, which makes [`removeLast()`](/docs/library/list#removeLast) free, and [`removeFirst()`](/docs/library/list#removeFirst) free on a list that was prepended to. [`remove(at:)`](/docs/library/list#remove) shares at either end the same way. [`replace(_:at:)`](/docs/library/list#replace) copies only the run the position falls in. [`insert(_:at:)`](/docs/library/list#insert) uses `prepend` and `append` at the ends. A window that misses the seam and keeps less than half the list is still a copy, made once from the two runs; one that keeps at least half of it makes the list move its seam into the middle of the window instead, and is then shared like any other. That is what `list-window-trimming` below is about.
 
-**A shared window is copied when it is first read, and only its own items.** The first read copies the window's items, never the whole parent array, and lets the parent go. `length` reads no items, so it leaves the window shared.
+**A shared window is copied when it is read, and only its own items.** A read copies the window's items, never the whole parent array, and lets the parent go — under the half rule described below, which is what decides when a read pays for that. `length` reads no items at all, so it leaves the window exactly as it found it.
 
 **One runtime change needed the emitted code to change too.** The inlined `map`, `everyItem` and `reduce` walks read the items through `List.materialise`, as `inline-loops` showed. They fix the count before the seed is evaluated, because the seed may append to the receiver. With `inline-loops` off, the walk goes back through the native it was written from, which reads the same two runs.
 
 This is safe because a list always returns exactly the items its view holds. Equality and ordering read both sides through their views, so `[2, 3]::prepend(1)::is([1, 2, 3])` is `true`.
 
-The design costs three things. A list viewing less than its run keeps the whole run alive until something reads it, which trims it once. A positional read of a prepended-to list pays one comparison, to find the run that holds the position. A flat list pays a small view object on each `item(at:)` and `length()`.
+The design costs three things. A list viewing less than its run keeps the whole run alive until something reads it, and a read trims it only when the view is less than half the run. A positional read of a prepended-to list pays one comparison, to find the run that holds the position. A flat list pays a small view object on each `item(at:)` and `length()`.
 
 With every pass off, so that each call reaches the runtime, a million appends to one list take about 70 ms on Bun and 75 ms on Node. A million prepends take about 69 ms and 96 ms. That is one push per item, not a copy of the list.
+
+### `list-window-trimming`
+
+A list that views less than the array it holds is keeping that whole array alive. Trimming it — copying out exactly the view and storing the shorter array back — is what lets the rest of it go. **The half rule decides when.** A run is trimmed only when the list views less than half of it. Above a half the list keeps the array it has.
+
+The rule is what keeps a chain of shrinking lists linear. [`removeFirst()`](/docs/library/list#removeFirst) answers a window one item shorter, and the canonical functional walk reads each of those windows once:
+
+```essence
+implementation {
+	function total(_ rest: List<Integer>, _ sum: Integer) -> Integer {
+		<- match rest::firstItem() -> Integer {
+			case #Empty       { <- sum }
+			case #Value(head) { <- total(rest::removeFirst(), sum::add(head)) }
+		}
+	}
+
+	Terminal.print(total(List.of(integersFrom 1, through 50_000), 0))
+}
+```
+
+Trimming at every read copies what is left at every turn, so the walk moves half of n times n items and is quadratic. Under the half rule it trims at n/2, n/4, n/8 and so on, which is n items over the whole walk — one to three items moved per item of the list, whatever the shape of the walk. Fifty thousand items measured 634 ms before and 36 ms after, and the walk is flat from there: 100,000, 200,000 and 400,000 measure 33, 41 and 54 ms, of which about 20 ms is starting the process.
+
+**The rule is asked wherever a run changes hands, not only where one is read.** Cutting a window out of a list is a use of that list, so the run it is cut from is trimmed exactly where reading it would have been. Otherwise the cost would depend on the order the two lines of a walk are written in — a turn that takes the tail before reading the head would find the untrimmed array every time, and that spelling still measured 220 ms against 35.
+
+**The rule is always asked about the list whose run it is.** A window keeping two items of a list that views its whole array is cut without moving anything: the run is already as short as its owner can make it, and the window's own smallness is settled the first time the window is read. Asking about the window's size instead would copy a whole list to hand out two items.
+
+**A window holding neither end can be shared too.** Only the windows containing a list's seam can be shared, so a window of the middle used to be copied, which made a walk dropping an item from each end — a palindrome check — quadratic on its own, at 1203 ms for 50,000 items. Such a list now moves its seam into the middle of the window, once, and every window shrinking towards that middle from either side is shared afterwards. The same walk measures 32 ms. The move costs a pass over the list, so it is made only when the window keeps at least half of it; below that the plain copy is cheaper and is what happens.
+
+This is invisible for the reason the rest of the representation is: a list always answers exactly the items its view holds, whichever array is behind it and however short that array has been made. Nothing in the language can ask whether two values are the same value, so swapping one array for a shorter one under a list cannot be observed.
+
+What it costs is retention, bounded. A list may now hold an array up to twice the length of what it views, where trimming at every read held exactly what it viewed — and in exchange no walk pays for a trim it does not need. A window that is never read at all still holds its parent, which is what a deferred copy has always cost. Reading a ten-item window of a million-item list releases the parent under this rule exactly as it did before: measured as live heap after a collection, 0.0 MB held, against 38.2 MB if positional reads never trimmed at all. The head/tail walk over 200,000 items peaks at 60 MB under the rule and 176 MB when every read trims.
 
 <SeeAlso links={[
 	{ label: "Command line: --without-optimisation", href: "/docs/reference/cli#build--without-optimisation" },
