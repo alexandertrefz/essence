@@ -64,10 +64,16 @@ async function bundleSizeOfSource(source: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: 5,740 measured, and it is the floor every Program pays: the runtime
+	// NOTE: 5,709 measured, and it is the floor every Program pays: the runtime
 	// a bundle links whatever it calls. HelloWorld.es names no number, no
 	// container and no constant — what it measures is what a `Terminal.print`
 	// and a String interpolation drag in, and what NOTHING else does.
+	//
+	// NOTE: It FELL by 31 when a String's characters moved into a view record
+	// that a window can share, and the ceiling follows a fall as it follows a
+	// rise. This Program only measures and compares Strings, and the count it
+	// asks for reaches the view and none of the cutting built on it — so what
+	// it links is one function where it used to be two.
 	//
 	// NOTE: It was 6,930 until the transcendental basis registry stopped
 	// deriving its canonical order in a top-level call, which no bundler can
@@ -76,10 +82,10 @@ describe("Bundle Size", () => {
 	// all. A ceiling here is what says the next such top-level effect is
 	// noticed by a test rather than by a reader of a bundle.
 	it("keeps the floor every Program pays", async () => {
-		expect(await bundleSizeOf("HelloWorld.es")).toBeLessThan(6_740)
+		expect(await bundleSizeOf("HelloWorld.es")).toBeLessThan(6_710)
 	})
 
-	// NOTE: 80,439 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 80,437 measured. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
 	//
