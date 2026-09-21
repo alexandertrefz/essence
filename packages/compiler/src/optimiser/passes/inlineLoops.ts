@@ -142,6 +142,10 @@ class Inlining {
 			// where it stands — lifting it into a Statement above would put
 			// the recording somewhere the assertion is not.
 			case "TestAssertionStatement":
+			// NOTE: And a turn of a looped Function holds the Arguments it
+			// evaluated and the Parameters it assigns, neither of which
+			// stands for the Statement's own answer — it has none.
+			case "TailCallStatement":
 			case "IntrinsicStatement":
 				return node
 			default:

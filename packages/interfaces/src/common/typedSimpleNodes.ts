@@ -1446,6 +1446,7 @@ export type StatementNode =
 	| ReturnStatementNode
 	| FunctionStatementNode
 	| TestAssertionStatementNode
+	| TailCallStatementNode
 	| IntrinsicStatementNode
 
 // NOTE: `expect EXPR` / `require EXPR`, and both `is MATCHER` forms. What
@@ -1592,6 +1593,36 @@ export interface ReturnStatementNode {
 	position?: Position
 }
 
+// NOTE: A Return Statement whose answer is a call of the very Function it
+// stands in, taken back to the head of that Function instead of made — the
+// Return `loop-self-tail-calls` leaves where the recursion was. It is a
+// Statement of the Program rather than an intrinsic Statement because the
+// intrinsic family is a lowered EXPRESSION with an answer to place, and this
+// places none: it ends a turn.
+//
+// NOTE: `bindings` are evaluated first, in the order the Arguments were
+// written, and `assignments` are made after all of them — which is what makes
+// the rebinding SIMULTANEOUS, so `<- swap(b, a)` swaps rather than writing `a`
+// over `b`. Only the Arguments that could read a Parameter something later
+// assigns are bound; the rest are assigned straight, and a turn that changes a
+// Parameter to what it already holds assigns nothing at all.
+//
+// NOTE: An assignment's `name` is the Parameter's emitted name, which is the
+// SLOT name where the Function was looped in slot mode — see `tailLoop`.
+export interface TailCallStatementNode {
+	nodeType: "TailCallStatement"
+	// NOTE: The label the enclosing Function's `tailLoop` declares. Spelled at
+	// both ends rather than found by the emission, because `continue` is only
+	// ever right for the loop this Statement was written for: a Statement that
+	// ended up inside another Function's loop must not compile.
+	label: string
+	bindings: Array<TailCallBinding>
+	assignments: Array<TailCallBinding>
+	position?: Position
+}
+
+export type TailCallBinding = { name: string; value: ExpressionNode }
+
 export interface FunctionStatementNode {
 	nodeType: "FunctionStatement"
 	name: IdentifierNode
@@ -1727,6 +1758,16 @@ export interface FunctionDefinitionNode {
 	// completing body is emitted as a plain Function that RETURNS a future,
 	// with everything written here inside the async closure that future runs.
 	completing?: true
+	// NOTE: The label of the loop this body is a turn of, set by
+	// `loop-self-tail-calls` and absent on every Function that pass left alone.
+	// The Rewriter wraps the whole body in `<label>: while (true) { … }`, and
+	// every `TailCallStatement` inside it ends its turn with `continue <label>`.
+	//
+	// NOTE: The wrap goes around the WHOLE body, prologue included, because a
+	// Parameter Pattern's bindings and a Record default's merge are Statements
+	// at the head of the body that a fresh call would run — so a turn has to run
+	// them too.
+	tailLoop?: string
 }
 
 export interface ParameterNode {

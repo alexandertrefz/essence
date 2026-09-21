@@ -104,6 +104,7 @@
 							"prune-dead-match-arms",
 							"elide-final-match-test",
 							"compile-record-members",
+							"loop-self-tail-calls",
 							"eliminate-dead-code",
 							"collapse-construction",
 							"collapse-combinations",

@@ -711,6 +711,78 @@ if (_self.value[$type.typeKeySymbol] === "Integer") {
 
 A `match` over five record shapes, run five million times, is about 15× faster with this pass on Bun and 10× on Node. A method called nine million times on a union of three record types is about 14× and 10× faster.
 
+### `loop-self-tail-calls`
+
+Takes a function's calls to itself in tail position back to the top of its own body, instead of making them.
+
+Essence has no loop statement, so the walk the language teaches is recursion: take the head, answer with the walk of the tail.
+
+```essence
+implementation {
+	function total(_ rest: List<Integer>, _ sum: Integer) -> Integer {
+		<- match rest::firstItem() -> Integer {
+			case #Empty       { <- sum }
+			case #Value(head) { <- total(rest::removeFirst(), sum::add(head)) }
+		}
+	}
+}
+```
+
+With this pass off, that is a self-recursive JavaScript function, and it costs a frame per item:
+
+```js
+function total(rest, sum) {
+	const _self = $es_List_firstItem__overload$1(rest);
+	if (_self[$type.typeKeySymbol] === "Optional#Empty") {
+		return sum;
+	} else {
+		const head = _self.item;
+		return total($es_List_removeFirst__overload$1(rest), …);
+	}
+}
+```
+
+With the pass on, no call is made. The arguments are evaluated, the parameters are rebound, and the body runs again:
+
+```js
+function total(rest, sum) {
+	$tail_0: while (true) {
+		const _self = $es_List_firstItem__overload$1(rest);
+		if (_self[$type.typeKeySymbol] === "Optional#Empty") {
+			return sum;
+		} else {
+			const head = _self.item;
+			const $tail_0_t0 = $es_List_removeFirst__overload$1(rest);
+			const $tail_0_t1 = …;
+			rest = $tail_0_t0;
+			sum = $tail_0_t1;
+			continue $tail_0;
+		}
+	}
+}
+```
+
+**This is what makes the shape portable.** JavaScriptCore has proper tail calls, so Bun ran the recursive version at any depth. V8 does not, so the same bundle threw `RangeError: Maximum call stack size exceeded` on Node and on Deno at about ten thousand items. With the pass on, one frame does any number of turns on every engine.
+
+**Tail position** is the answer of the function, with nothing left to do with what the call gives back. It is the operand of the `<-` that answers, and, through that, the answer of every arm of a `match`, of an `if`/`else`, and of a [`define`](/docs/language/conditions) that itself stands there. It is not an argument of another call, not a receiver: `<- total(rest, sum)::add(1)` still has the addition to do, so it is an ordinary call. Non-tail calls to itself in the same body stay calls, so a function with one of each is looped for the one and still recurses for the other.
+
+**Why it is safe.** A frame that does nothing but hand an answer straight on cannot be observed. What the pass has to preserve is that a turn is a call:
+
+- **The rebinding is simultaneous.** Every argument is evaluated before any parameter is assigned, so `<- swap(b, a)` swaps. The arguments are held under names of the compiler's own where one of them could read a parameter an earlier assignment already overwrote, and written straight where none can.
+- **Labels and order.** Essence calls are labelled, and the compiler has already put the arguments in parameter order by the time the pass reads them — the receiver first, the hidden [conformance](/docs/language/protocols) witnesses last. So each argument is matched to its parameter by position, whatever order the call wrote them in.
+- **A default is taken again.** A turn that leaves an argument out re-evaluates that parameter's default, in that turn, reading the parameters before it as that turn bound them — which is what the language promises a [default](/docs/language/functions) at every call.
+- **The whole body runs from the top**, prologue included, so a [pattern](/docs/language/patterns) in a parameter binds again and a record default is merged again.
+- **A captured parameter gets a binding per turn.** A JavaScript closure captures the variable, not its value, so a closure an earlier turn built would read the next turn's parameter. Where a function literal in the body mentions a parameter the loop rebinds, that parameter is renamed to a slot and the name the body reads becomes a `const` of the turn.
+- **A shadowed parameter gets the same treatment.** Inside a `match` arm, `@` is the matched value, so a method's receiver means something else there. Assigning it by name would land on the arm's own binding, so it is rebound through a slot too.
+
+**What it declines.** A `Future`-returning body, whose `complete self(…)` is an argument of the wait rather than the answer — such a body has no tail call to find, and taking a turn inside the current run would hand it that run's cancellation scope rather than one of its own. A call to a different [overload](/docs/language/namespaces) of the same name, which is a different function. A call to a protocol's provided method from inside that method, which goes through the conformance and may reach a body that overrode it. A function literal bound to a constant cannot call itself at all — the compiler answers that the name is not declared inside its own initialiser.
+
+**And a function literal standing in a parameter's default that reads a parameter a turn rebinds.** A default is taken again every turn, but it is evaluated where the turn *assigns* — it is what the turn assigns — so the closure it builds would close over the loop's own variable, and the per-turn binding that answers a capture in the body has nowhere to stand in front of it. Such a function is left recursive rather than looped a second way. A default that closes over nothing, `= () -> Integer { <- 7 }`, builds per turn exactly the closure a call builds per call, and is looped like any other.
+
+**Mutual recursion is out of scope.** Two functions that answer with each other still use the host's stack, and so does every non-tail call. On Node and Deno that is about ten thousand frames. [Iteration](/docs/language/iteration) covers what to reach for instead.
+
+**Debugging.** Stepping still stops on the lines you wrote, and a turn steps from the tail call back to the first statement of the body. The call stack shows one frame where the source shows recursion, so a crash inside a looped function names it once rather than ten thousand times.
+
 ### `eliminate-dead-code`
 
 Drops a constant nothing reads.

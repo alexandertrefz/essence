@@ -293,6 +293,20 @@ export function rewriteStatements(
 	return rewriteNodes(program, { statement: rewrite })
 }
 
+// NOTE: ONE Expression rather than a Program, walked by the very switch a
+// Program's Expressions are walked by. A pass that holds a single Expression —
+// a Parameter's default, an Argument it is about to move — asks its question of
+// exactly the positions named below, which is what keeps "is this Identifier a
+// reference to a BINDING?" a question answered in one place. A sweep of its own
+// over `Object.values` can not tell a Lookup's member from a name a Program
+// bound, and a rewrite made on that answer emits a name nothing answers to.
+export function rewriteExpressionsIn(
+	node: ExpressionNode,
+	rewrite: ExpressionRewrite,
+): ExpressionNode {
+	return walkExpression(node, { expression: rewrite })
+}
+
 // NOTE: One run of Statements, walked and then offered whole. Every place a body
 // can stand goes through this — which is what makes "every body, exactly once"
 // a property of this function rather than of five call sites remembering to
@@ -468,6 +482,31 @@ function walkImplementationChildren(
 			let value = walkFunctionDefinition(node.value, rewrites)
 
 			return value === node.value ? node : { ...node, value }
+		}
+		// NOTE: A turn of a looped Function holds Expressions in two runs — the
+		// Arguments it evaluates and the values it then assigns — and both are
+		// walked, in that order, because that is the order they run in and each
+		// is an ordinary Expression of the Program. Nothing here is offered as a
+		// Statement of its own: a pass that lifted one out of its place would
+		// take the turn away.
+		case "TailCallStatement": {
+			let bindings = mapArray(node.bindings, (binding) => {
+				let value = walkExpression(binding.value, rewrites)
+
+				return value === binding.value ? binding : { ...binding, value }
+			})
+			let assignments = mapArray(node.assignments, (assignment) => {
+				let value = walkExpression(assignment.value, rewrites)
+
+				return value === assignment.value
+					? assignment
+					: { ...assignment, value }
+			})
+
+			return bindings === node.bindings &&
+				assignments === node.assignments
+				? node
+				: { ...node, bindings, assignments }
 		}
 		case "IntrinsicStatement":
 			return walkIntrinsicStatementChildren(node, rewrites)

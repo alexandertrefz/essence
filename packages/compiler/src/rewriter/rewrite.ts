@@ -876,7 +876,12 @@ function rewriteStatements(
 	let statements =
 		node.nodeType === "IntrinsicStatement"
 			? rewriteIntrinsicStatement(node)
-			: [rewriteStatementByKind(node)]
+			: // NOTE: The other Statement that emits more than one — a turn of a
+				// looped Function holds what it evaluated, what it assigned and the
+				// `continue` that takes it.
+				node.nodeType === "TailCallStatement"
+				? rewriteTailCallStatement(node)
+				: [rewriteStatementByKind(node)]
 
 	return withStatementLocation(statements, node.position)
 }
@@ -899,7 +904,8 @@ function withStatementLocation(
 function rewriteStatementByKind(
 	node: Exclude<
 		common.typedSimple.ImplementationNode,
-		common.typedSimple.IntrinsicStatementNode
+		| common.typedSimple.IntrinsicStatementNode
+		| common.typedSimple.TailCallStatementNode
 	>,
 ): estree.Statement {
 	switch (node.nodeType) {
@@ -8112,7 +8118,7 @@ function completingBodyOf(
 	node: common.typedSimple.FunctionDefinitionNode,
 ): estree.BlockStatement {
 	if (node.completing !== true) {
-		return rewriteBlockStatement(node.body)
+		return tailLoopBody(node, rewriteBlockStatement(node.body))
 	}
 
 	completingDepth += 1
@@ -8147,6 +8153,95 @@ function completingBodyOf(
 			},
 		],
 	}
+}
+
+// NOTE: `$tail_0: while (true) { … }` around the whole body of a Function
+// `loop-self-tail-calls` looped, and the body untouched where it did not. Every
+// `TailCallStatement` inside ends its turn with `continue $tail_0`, so the loop
+// is left exactly where the Program answers — by a Return, or by a throw. There
+// is no way out at the bottom: a body whose last Statement is not an answer is
+// one the Simplifier gave a Return to, so control never reaches the brace.
+//
+// NOTE: `while (true)` rather than `for (;;)` for one reason: it is what a
+// reader of the emitted file sees and recognises, and the two are the same
+// program. The label is what makes the `continue` unambiguous where a lowered
+// Match has put labelled blocks between the two.
+//
+// NOTE: It goes around the WHOLE body, prologue included — a Pattern in a
+// Parameter binds at the head of the body and a turn is a call, so a turn binds
+// it again. The per-turn `const`s the pass writes for a slotted Parameter stand
+// at the very top of that body for the same reason.
+function tailLoopBody(
+	node: common.typedSimple.FunctionDefinitionNode,
+	body: estree.BlockStatement,
+): estree.BlockStatement {
+	if (node.tailLoop === undefined) {
+		return body
+	}
+
+	return {
+		type: "BlockStatement",
+		body: [
+			{
+				type: "LabeledStatement",
+				label: { type: "Identifier", name: node.tailLoop },
+				body: {
+					type: "WhileStatement",
+					test: { type: "Literal", value: true },
+					body,
+				},
+			},
+		],
+	}
+}
+
+// NOTE: One turn — the Arguments that have to be held, the Parameters the call
+// changes, and back to the top:
+//
+//   const $tail_0_t0 = removeFirst(rest);
+//   sum = sum + head;
+//   rest = $tail_0_t0;
+//   continue $tail_0;
+//
+// NOTE: The held Arguments come first and ALL of them are held where any is,
+// which is what makes the rebinding simultaneous: `<- swap(b, a)` reads both
+// names before either is written. Where nothing a turn assigns can be read by an
+// Argument of that turn, the pass holds none and the assignments are written
+// straight — which is the usual case and why an accumulator walk emits two
+// assignments and a `continue`.
+function rewriteTailCallStatement(
+	node: common.typedSimple.TailCallStatementNode,
+): Array<estree.Statement> {
+	return [
+		...node.bindings.map(
+			(binding): estree.Statement => ({
+				type: "VariableDeclaration",
+				kind: "const",
+				declarations: [
+					{
+						type: "VariableDeclarator",
+						id: { type: "Identifier", name: binding.name },
+						init: rewriteExpression(binding.value),
+					},
+				],
+			}),
+		),
+		...node.assignments.map(
+			(assignment): estree.Statement => ({
+				type: "ExpressionStatement",
+				expression: {
+					type: "AssignmentExpression",
+					operator: "=",
+					left: { type: "Identifier", name: assignment.name },
+					right: rewriteExpression(assignment.value),
+				},
+			}),
+		),
+		{
+			type: "ContinueStatement",
+			label: { type: "Identifier", name: node.label },
+		},
+	]
 }
 
 function futureModule(): estree.Identifier {

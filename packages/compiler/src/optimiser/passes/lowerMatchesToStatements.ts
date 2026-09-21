@@ -126,6 +126,10 @@ class Lowering {
 			// where it stands, and a Match inside one is written out by the
 			// walk rather than lifted above it.
 			case "TestAssertionStatement":
+			// NOTE: And a turn of a looped Function, whose Expressions are the
+			// Arguments it evaluates and the values it assigns — neither of them
+			// an answer this pass could write anywhere.
+			case "TailCallStatement":
 			case "IntrinsicStatement":
 				return node
 			default:

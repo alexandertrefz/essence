@@ -14,6 +14,7 @@ import { eliminateDeadCode } from "./passes/eliminateDeadCode"
 import { foldConstants } from "./passes/foldConstants"
 import { inlineLoops } from "./passes/inlineLoops"
 import { instrumentCoverage } from "./passes/instrumentCoverage"
+import { loopSelfTailCalls } from "./passes/loopSelfTailCalls"
 import { lowerMatchesToStatements } from "./passes/lowerMatchesToStatements"
 import { lowerScalarOperations } from "./passes/lowerScalarOperations"
 import { lowerUnitCaseEquality } from "./passes/lowerUnitCaseEquality"
@@ -139,6 +140,12 @@ export const optimiserPasses: ReadonlyArray<OptimiserPass> = [
 	pruneDeadMatchArms,
 	elideFinalMatchTest,
 	compileRecordMembers,
+	// NOTE: After every pass that shapes a Match, because the tail position it
+	// reads is a Return of the Function and a Match only holds one once
+	// `lower-matches-to-statements` has written the chain out — and before the
+	// pool and the collapses, so the Arguments a turn evaluates and the defaults
+	// it takes again are improved exactly as the call's were.
+	loopSelfTailCalls,
 	eliminateDeadCode,
 	collapseConstruction,
 	collapseCombinations,
