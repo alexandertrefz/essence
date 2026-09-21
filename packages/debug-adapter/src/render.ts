@@ -37,6 +37,84 @@ function describeEssenceValues(...values: Array<unknown>): string {
 		return typeof tag === "string" ? tag : null
 	}
 
+	// NOTE: The runtime's own `quotedText` (runtime/src/String.ts), inlined for
+	// the reason everything here is inlined: this source is evaluated in the
+	// debuggee, where nothing else of this module exists. A String used to be
+	// drawn with its quotes and nothing else, so a value holding a line break
+	// split the Variables view across two rows and a value holding a control
+	// character drew nothing at all — the one place a reader looks at a value
+	// they can not already see was the one place it was not spelled.
+	//
+	// The rule is the runtime's, character for character: the seven with a
+	// spelling of their own, the C0 and C1 controls named by their code point,
+	// the bidi controls and the separators that would reorder or break the row
+	// they are drawn in, and a lone surrogate as what encoding it produces.
+	function quoted(text: string): string {
+		let out = '"'
+
+		for (let index = 0; index < text.length; index++) {
+			let code = text.charCodeAt(index)
+			let spelled =
+				code === 0x5c
+					? "\\\\"
+					: code === 0x22
+						? '\\"'
+						: code === 0x0a
+							? "\\n"
+							: code === 0x0d
+								? "\\r"
+								: code === 0x09
+									? "\\t"
+									: code === 0x7b
+										? "\\{"
+										: code === 0x7d
+											? "\\}"
+											: null
+
+			if (spelled !== null) {
+				out += spelled
+
+				continue
+			}
+
+			let paired =
+				code >= 0xd800 &&
+				code <= 0xdbff &&
+				text.charCodeAt(index + 1) >= 0xdc00 &&
+				text.charCodeAt(index + 1) <= 0xdfff
+
+			let trailing =
+				code >= 0xdc00 &&
+				code <= 0xdfff &&
+				index > 0 &&
+				text.charCodeAt(index - 1) >= 0xd800 &&
+				text.charCodeAt(index - 1) <= 0xdbff
+
+			let lone = code >= 0xd800 && code <= 0xdfff && !paired && !trailing
+
+			if (
+				code < 0x20 ||
+				(code >= 0x7f && code <= 0x9f) ||
+				code === 0x061c ||
+				code === 0xfeff ||
+				(code >= 0x200e && code <= 0x200f) ||
+				(code >= 0x2028 && code <= 0x202e) ||
+				(code >= 0x2066 && code <= 0x2069) ||
+				lone
+			) {
+				out += `\\u{${(lone ? 0xfffd : code)
+					.toString(16)
+					.toUpperCase()}}`
+
+				continue
+			}
+
+			out += text[index]
+		}
+
+		return `${out}"`
+	}
+
 	function render(value: unknown, depth: number): string | null {
 		if (typeof value === "function") {
 			return "Function"
@@ -51,7 +129,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 		let record = value as Record<string, never>
 
 		if (tag === "String") {
-			return `"${record.value}"`
+			return quoted(record.value as unknown as string)
 		}
 
 		if (tag === "Boolean") {

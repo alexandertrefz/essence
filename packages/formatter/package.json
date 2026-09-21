@@ -31,7 +31,8 @@
 	],
 	"dependencies": {
 		"@essence-lang/compiler": "workspace:*",
-		"@essence-lang/interfaces": "workspace:*"
+		"@essence-lang/interfaces": "workspace:*",
+		"@essence-lang/runtime": "workspace:*"
 	},
 	"devDependencies": {
 		"@essence-lang/fixtures": "workspace:*",

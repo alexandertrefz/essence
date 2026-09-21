@@ -166,6 +166,20 @@ describe("the in-debuggee renderer", () => {
 		let values = [
 			createInteger(42n),
 			createString("hello"),
+			// NOTE: The Strings that make the display rule worth sharing. The
+			// renderer drew a String with its quotes and NOTHING else until
+			// `quoted` was inlined into it, so a value holding a line break
+			// split the Variables view across two rows and one holding a
+			// control character, a brace or a bidi override drew something
+			// other than what it was. Each of these is a line
+			// `Terminal.inspect` prints, so each is a line the debugger owes.
+			createString('say "hi"\n\ttwice'),
+			createString("a{b}"),
+			createString("esc\u001B[0m"),
+			createString("\u202Ereordered\u202C"),
+			createString("\uFEFFleading"),
+			createString("caf\u00E9 \u{1F600}"),
+			createString("half\uD800"),
 			createBoolean(true),
 			createRecord({}),
 			createRecord({

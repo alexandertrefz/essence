@@ -400,3 +400,99 @@ describe("the define snippet", () => {
 		expect(arm!.indexOf(" if ")).toBe(otherwise!.indexOf(" otherwise"))
 	})
 })
+
+// NOTE: The String Literal's escapes, which are three rules read in order: the
+// Unicode escape, every other shape a `\u` is written in, and the seven short
+// escapes with the catch-all behind them. Order is the whole of the rule — all
+// four begin with a backslash — so each subject below is checked against the
+// rule IN FRONT of the one it should reach as well as against that one.
+function stringPattern(needle: string): RegExp {
+	return new RegExp(
+		repository
+			.string!.patterns!.map((pattern) => pattern.match)
+			.find((match) => match !== undefined && match.includes(needle))!,
+	)
+}
+
+let unicodeEscape = stringPattern("{1,6}")
+let malformedUnicodeEscape = stringPattern("[0-9A-Fa-f]*")
+let shortEscape = stringPattern('["\\\\nrt{}]')
+
+describe("the string escape grammar", () => {
+	it("lights a well-written Unicode escape", () => {
+		for (let written of [
+			'"\\u{0}"',
+			'"\\u{1B}[0m"',
+			'"\\u{1f600}"',
+			'"\\u{10FFFF}"',
+		]) {
+			expect([written, unicodeEscape.test(written)]).toEqual([
+				written,
+				true,
+			])
+		}
+	})
+
+	// NOTE: Every shape the Compiler refuses, each reaching the invalid rule
+	// because the valid one in front of it does not match.
+	it("marks every other shape of Unicode escape illegal", () => {
+		for (let written of [
+			'"caf\\u00e9"',
+			'"\\u{}"',
+			'"\\u{1G}"',
+			'"\\u{0000041}"',
+			'"\\u{1B"',
+		]) {
+			expect([written, unicodeEscape.test(written)]).toEqual([
+				written,
+				false,
+			])
+			expect([written, malformedUnicodeEscape.test(written)]).toEqual([
+				written,
+				true,
+			])
+		}
+	})
+
+	// NOTE: An escape that never closes must not run past the quote that closes
+	// the String, or the rest of the line stops being highlighted at all.
+	//
+	// NOTE: And it stops at each of the OTHER four characters the Lexer's own
+	// scan stops at, so that what is coloured as one illegal escape is the same
+	// run of text the Compiler refuses as one. The quote alone was excluded at
+	// first, which left `"\u{a\tb"` coloured through a backslash the Lexer had
+	// already stopped at and `"\u{a{ n }b"` coloured over a hole.
+	it("stops an unclosed escape at every character the Lexer stops at", () => {
+		for (let [written, lit] of [
+			['"\\u{1B" + rest', "\\u{1B"],
+			['"\\u{a\\tb"', "\\u{a"],
+			['"\\u{a{ n }b"', "\\u{a"],
+			['"\\u{1B\r"', "\\u{1B"],
+			['"\\u{1B\nrest"', "\\u{1B"],
+		] as Array<[string, string]>) {
+			expect([written, malformedUnicodeEscape.exec(written)![0]]).toEqual(
+				[written, lit],
+			)
+		}
+	})
+
+	// NOTE: `\r` was missing from the short escapes, so a carriage return in a
+	// String was drawn as an error in every Editor while the Compiler read it
+	// perfectly well.
+	it("lights all seven short escapes", () => {
+		for (let written of [
+			'\\"',
+			"\\\\",
+			"\\n",
+			"\\r",
+			"\\t",
+			"\\{",
+			"\\}",
+		]) {
+			expect([written, shortEscape.test(written)]).toEqual([
+				written,
+				true,
+			])
+		}
+	})
+})

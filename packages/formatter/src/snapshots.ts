@@ -1,5 +1,6 @@
 import { parseDocument } from "@essence-lang/compiler/documents"
 import type { common, parser } from "@essence-lang/interfaces"
+import { quotedText } from "@essence-lang/runtime/String"
 
 import { format, type FormatResult, guarded } from "./index"
 
@@ -168,19 +169,21 @@ function writeUnguarded(
 	}
 }
 
-// NOTE: A String Literal spelling the text, with every escape the Lexer knows.
+// NOTE: A String Literal spelling the text, which is the runtime's own quoted
+// printer and not a second spelling of it: a recorded value is written back
+// into the reader's SOURCE, so what it has to be is exactly what the Lexer
+// reads back as the value — which is the promise `quotedText` makes and
+// `roundTrip.spec.ts` holds it to. This retold the escape set by hand until
+// `\u{…}` existed, and was two rules apart from the printer by then: a control
+// character went into the source RAW, and a lone surrogate went in as a
+// character no UTF-8 file can hold, so writing the file replaced it and the
+// recorded value silently stopped being the one that was recorded.
+//
 // A newline is `\n` rather than a line of its own: Essence has no multi-line
 // String Literal, so a recorded value that spans lines is spelled on one — and
 // a value long enough for that to read badly is what a STORED snapshot is for.
 function literalOf(text: string): string {
-	return `"${text
-		.replaceAll("\\", "\\\\")
-		.replaceAll('"', '\\"')
-		.replaceAll("{", "\\{")
-		.replaceAll("}", "\\}")
-		.replaceAll("\t", "\\t")
-		.replaceAll("\r", "\\r")
-		.replaceAll("\n", "\\n")}"`
+	return quotedText(text)
 }
 
 // NOTE: Every slot an INLINE recorded value stands in. A stored snapshot names

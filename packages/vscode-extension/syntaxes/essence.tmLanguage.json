@@ -203,7 +203,17 @@
 			},
 			"patterns": [
 				{
-					"match": "\\\\[\"\\\\nt{}]",
+					"comment": "'\\u{…}' takes one to six hexadecimal digits naming one Unicode scalar value. It stands before the short escapes because both begin with a backslash, and before the catch-all because a malformed one has to be told from a backslash in front of any other letter. What is judged here is the SHAPE: a grammar can not do the arithmetic that tells a surrogate or a code point above U+10FFFF from any other six digits, and the Compiler reports both.",
+					"match": "\\\\u\\{[0-9A-Fa-f]{1,6}\\}",
+					"name": "constant.character.escape.unicode.essence"
+				},
+				{
+					"comment": "Every OTHER shape a Unicode escape is written in: no braces (the JavaScript habit), braces holding nothing, a character that is not a hexadecimal digit, more than six digits, or no closing brace. Written so it stops at each of the five characters the Lexer's own scan stops at — the closing quote, a backslash, a line break, a carriage return and the '{' that opens a hole — so a malformed escape can never colour past the end of what the Compiler reads as one.",
+					"match": "\\\\u(\\{[^\"}{\\\\\\r\\n]*\\}?|[0-9A-Fa-f]*)",
+					"name": "invalid.illegal.unicode-escape.essence"
+				},
+				{
+					"match": "\\\\[\"\\\\nrt{}]",
 					"name": "constant.character.escape.essence"
 				},
 				{
