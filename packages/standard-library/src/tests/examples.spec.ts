@@ -35,6 +35,11 @@ afterAll(() => {
 	rmSync(results, { recursive: true, force: true })
 })
 
+// NOTE: An explicit budget rather than Bun's default 5,000 ms. This spawns a
+// whole `essence test` over the library and reads its report — 1,429 ms on an
+// idle machine, and several times that on a host running other work, which is
+// the only thing the default budget would ever catch. The work is bounded and
+// deterministic, so the budget is set where no load can reach it.
 it("runs every example the standard library documents", () => {
 	let answer = Bun.spawnSync(
 		[process.execPath, essence, "test", "--no-color"],
@@ -57,4 +62,4 @@ it("runs every example the standard library documents", () => {
 	// library's business and changes with every one that is written, but a run
 	// that suddenly finds NONE is the wiring having quietly come apart.
 	expect(out).not.toContain("no tests")
-})
+}, 60_000)

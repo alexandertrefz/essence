@@ -492,6 +492,14 @@ describe("essence test --mutate", () => {
 	// can wait for ever is a tool that can hang a job for ever, which is worse
 	// than no tool — so a mutant that does not come back is STOPPED, recorded
 	// as `hung`, and the run goes on.
+	//
+	// NOTE: An explicit budget, because this one WAITS: `SPIN_TIMEOUT` is two
+	// seconds the spinning mutant has to be allowed to spend before it is
+	// stopped, and the rest of the corpus is judged around it — 2,327 ms on an
+	// idle machine, against Bun's default budget of 5,000. What is left is less
+	// headroom than a busy host takes, and what would fail is not the claim but
+	// the stopwatch. The number is the one the Language Server's own long specs
+	// carry, and it is unreachable for work this bounded.
 	it("stops a mutant that never comes back, and goes on", async () => {
 		await withFiles({ "Spinning.es": SPINNING }, async (directory) => {
 			let { code, out } = await mutateWith(directory, SPIN_TIMEOUT, [
@@ -514,7 +522,7 @@ describe("essence test --mutate", () => {
 			).toBe(true)
 			expect(code).toBe(EXIT_SUCCESS)
 		})
-	})
+	}, 60_000)
 
 	// NOTE: THE reproducibility claim. One seed, one pinned corpus and a walk
 	// that is a function of the sources: two runs are the same stream, line for

@@ -1164,6 +1164,12 @@ describe("the Server's request loop", () => {
 	// NOTE: One timer restarted by every keystroke is a document that is never
 	// analysed while another one is being typed in. Nothing here is stale-wrong —
 	// it is simply never published, for as long as the typing goes on.
+	//
+	// NOTE: The explicit budget this file's other long specs carry. The burst
+	// below is twelve keystrokes 60 ms apart, so three quarters of a second is
+	// spent WAITING by design, and the whole test takes 1,005 ms on an idle
+	// machine. Against Bun's default 5,000 ms that is a stopwatch on a busy
+	// host rather than a claim about the schedule.
 	it("should analyse a document nobody is typing in during a burst elsewhere", async () => {
 		let apart = {
 			"Alone.es": `implementation {\n\tconstant alone = 1\n}\n`,
@@ -1208,7 +1214,7 @@ describe("the Server's request loop", () => {
 			await session.dispose()
 			files.dispose()
 		}
-	})
+	}, 60_000)
 
 	// NOTE: The version the list was computed against, which is what lets a client
 	// throw away a publish that raced a keystroke — the exact window a debounce

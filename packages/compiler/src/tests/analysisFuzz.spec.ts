@@ -254,12 +254,27 @@ const VALIDATOR_ONLY_CODES = new Set([
 	"unobserved-started",
 ])
 
-describe("analysing a broken Program", () => {
-	let files = corpus()
-	let mutants = files.flatMap((file) =>
-		mutantsOf(file).map((mutation) => ({ file: file.name, mutation })),
-	)
+// NOTE: ONE corpus and ONE set of mutants for every `describe` below. They are
+// a pure function of the checked-in sources, so a second copy was the same list
+// built from the same files a second time — and the blocks asking different
+// questions of the SAME mutants is the point: a mutant that throws in one of
+// them is the mutant that leaked a name in the other.
+const files = corpus()
+const mutants = files.flatMap((file) =>
+	mutantsOf(file).map((mutation) => ({ file: file.name, mutation })),
+)
 
+// NOTE: Every sweep below carries an explicit 60,000 ms instead of Bun's
+// default 5,000. None of them is a performance assertion: each walks a FIXED
+// set of a few hundred mutants and stops, so the only thing the default budget
+// ever measured was how busy the machine was — `never throws and never blames
+// itself` takes ~1,000 ms on an idle host and timed out at 6,314 ms under a
+// load average of 15, with three other test suites running beside it. A budget
+// no load can reach is the honest way to say "this is bounded work, not a
+// stopwatch", and it is the number `dap.spec.ts` and `testWatch.spec.ts`
+// already give their own long specs.
+
+describe("analysing a broken Program", () => {
 	it("has a corpus to break", () => {
 		expect(files.length).toBeGreaterThan(20)
 		expect(mutants.length).toBeGreaterThan(200)
@@ -278,7 +293,7 @@ describe("analysing a broken Program", () => {
 					.map((diagnostic) => diagnostic.code),
 			]).toEqual([file.name, []])
 		}
-	})
+	}, 60_000)
 
 	it("never throws and never blames itself", () => {
 		for (let { file, mutation } of mutants) {
@@ -298,7 +313,7 @@ describe("analysing a broken Program", () => {
 				codes.filter((code) => code === "internal-error"),
 			]).toEqual([name, []])
 		}
-	})
+	}, 60_000)
 
 	// NOTE: The no-cascade rule, measured two ways. A Validator Diagnostic
 	// standing INSIDE the span of something the Enricher typed Error is a
@@ -344,7 +359,7 @@ describe("analysing a broken Program", () => {
 
 			expect([name, doubled]).toEqual([name, []])
 		}
-	})
+	}, 60_000)
 })
 
 // NOTE: Two things the same Compiler must say the same way twice, measured over
@@ -356,10 +371,6 @@ describe("analysing a broken Program", () => {
 // process did before this analysis may either, or the same file analysed twice
 // in one session says two different things and neither of them is wrong.
 describe("the same broken Program, analysed twice", () => {
-	let mutants = corpus().flatMap((file) =>
-		mutantsOf(file).map((mutation) => ({ file: file.name, mutation })),
-	)
-
 	// NOTE: A callee's Type Parameters are alpha-renamed for the span of one
 	// invocation — `ItemType` becomes `ItemType`, a ZERO-WIDTH SPACE and a
 	// counter — and a Parameter that never binds is still carrying that name
@@ -384,7 +395,7 @@ describe("the same broken Program, analysed twice", () => {
 
 			expect([name, leaked]).toEqual([name, []])
 		}
-	})
+	}, 60_000)
 
 	// NOTE: And the whole report, three times over, in ONE process. A counter,
 	// a cache keyed on something it should not be, a Map iterated in insertion
@@ -398,7 +409,7 @@ describe("the same broken Program, analysed twice", () => {
 			expect([name, fingerprints(mutation.source)]).toEqual([name, first])
 			expect([name, fingerprints(mutation.source)]).toEqual([name, first])
 		}
-	})
+	}, 60_000)
 })
 
 // NOTE: Everything a reader sees, in the order they see it — the message, where
@@ -514,7 +525,7 @@ describe("a name nothing declares, in a Program that parsed", () => {
 	])
 
 	it("is reported where it is written", () => {
-		for (let file of corpus()) {
+		for (let file of files) {
 			let tokens = tokensOf(file.text)
 			// NOTE: The implementation only. A `tests { … }` block is left
 			// parsed and never enriched unless the compile ASKED for the tests,
@@ -576,7 +587,7 @@ describe("a name nothing declares, in a Program that parsed", () => {
 				])
 			}
 		}
-	})
+	}, 60_000)
 })
 
 // NOTE: The mutant that found this, written down whole rather than left to a

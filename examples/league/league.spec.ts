@@ -57,6 +57,11 @@ function test(
 }
 
 describe("examples/league", () => {
+	// NOTE: An explicit budget rather than Bun's default 5,000 ms, as
+	// `client-2048.spec.ts` gives its own twin. Spawning `essence test` over
+	// the example takes 1,242 ms on an idle machine and several times that on a
+	// busy one, which is the only thing the default budget ever measures — the
+	// work itself is bounded and deterministic.
 	it("passes its own tests", () => {
 		let { code, out } = test(EXAMPLE)
 
@@ -66,7 +71,7 @@ describe("examples/league", () => {
 		expect(out).toContain("is led by Riverside")
 		expect(out).not.toContain("failed")
 		expect(code).toBe(0)
-	})
+	}, 60_000)
 
 	it("still compiles and runs the program itself", () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "essence-league-"))
