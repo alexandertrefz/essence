@@ -623,6 +623,10 @@ function upgradedAroundWindow<ItemType extends AnyType>(
 	originalList.length = total - seam
 	originalList.front = front
 	originalList.frontLen = seam
+	// NOTE: Both runs are fresh Arrays of this box's own, so whatever log the
+	// old back run carried describes an Array this box no longer holds — the
+	// same debt `upgradedForSuffix` settles, and the one a moved seam owes.
+	originalList.writes = undefined
 
 	return {
 		front,

@@ -4,32 +4,46 @@ import type { common } from "@essence-lang/interfaces"
 
 import { createBoolean } from "../Boolean"
 import { keys } from "../Dictionary"
-import { tally } from "../GroupedList"
+import { group, tally } from "../GroupedList"
 import type { IntegerType } from "../Integer"
 import { compare as compareIntegers, createInteger } from "../Integer"
 import { anyIs } from "../internalHelpers"
 import {
+	accumulate,
 	append__overload$1 as append,
 	append__overload$2 as appendContentsOf,
 	compare,
+	contains__overload$2 as contains,
 	createList,
+	everyItem__overload$1 as everyItem,
+	everyItem__overload$2 as everyItemIn,
 	hasDuplicates__overload$1 as hasDuplicates,
 	insert,
 	is,
+	isSorted,
 	item__overload$1 as item,
+	join,
+	lastIndex__overload$3 as lastIndexWhere,
 	length,
 	type ListType,
 	map,
 	materialise,
+	mode,
 	ownItemsOf,
+	partition__overload$1 as partition,
 	prepend__overload$1 as prepend,
 	reduce__overload$1 as reduce,
+	reduce__overload$2 as reduceWithStep,
 	remove,
 	removeDuplicates__overload$1 as removeDuplicates,
+	removeEvery__overload$3 as removeEveryIn,
 	replace__overload$1 as replace,
 	reverse,
+	runs as runsWhere,
 	slice,
 	sort__overload$1 as sort,
+	sort__overload$3 as sortOn,
+	split__overload$3 as splitWhere,
 	toString as listToString,
 	viewOf,
 } from "../List"
@@ -113,6 +127,32 @@ const generatorFrom = (seed: number): (() => number) => {
 		return state / 4294967296
 	}
 }
+
+// NOTE: A box that ALREADY CARRIES A LOG, which is what nearly everything below
+// needs. A box has none until a positional write mints one — the first write on
+// a bare Array copies, and the COPY is what the log is attached to — so a test
+// that writes a fresh List once has tested the old copying path and nothing
+// else. One write of the item that is already there mints the log and changes
+// no item, which is the shortest way to a box the next write can write in place.
+const logged = (values: Array<number>): ListType<IntegerType> => {
+	let fresh = integers(values)
+	let first = values.length === 0 ? 0 : values[0]
+	let minted = replace(fresh, createInteger(BigInt(first)), createInteger(0n))
+
+	expect(minted.writes).toBeDefined()
+
+	return minted
+}
+
+// NOTE: The write that makes every OTHER box on a run stale — in place, so the
+// Array changes under them. It answers the new box, and the receiver is the one
+// left behind.
+const written = (
+	box: ListType<IntegerType>,
+	value: number,
+	position: number,
+): ListType<IntegerType> =>
+	replace(box, createInteger(BigInt(value)), createInteger(BigInt(position)))
 
 type Tracked = { box: ListType<IntegerType>; items: Array<number> }
 
@@ -485,6 +525,10 @@ const edits: Array<
 const runSchedule = (seed: number, turns: number): void => {
 	let next = generatorFrom(seed)
 	let pool: Array<Tracked> = [
+		{
+			box: logged([1, 2, 3, 4, 5, 6, 7, 8]),
+			items: [1, 2, 3, 4, 5, 6, 7, 8],
+		},
 		trackedOf([1, 2, 3, 4, 5, 6, 7, 8]),
 		trackedOf([]),
 		trackedOf([9]),
@@ -496,6 +540,40 @@ const runSchedule = (seed: number, turns: number): void => {
 		let grown = edit(chosen, next)
 
 		pool.push(grown)
+
+		// NOTE: DERIVE, WRITE, THEN READ WHAT WAS DERIVED. A box only goes
+		// behind when the box it shares a run with is written IN PLACE, and
+		// that only happens where a log already exists — so a schedule that
+		// merely picked operations at random would spend nearly all of its
+		// turns on the copying path and prove nothing about this one. Every
+		// turn therefore derives from the value just made, writes the value
+		// itself a few times, and reads the derivatives afterwards.
+		let derived: Array<Tracked> = []
+
+		for (let share = 0; share < 3; share++) {
+			let [, deriving] = edits[Math.floor(next() * edits.length)]
+
+			derived.push(deriving(grown, next))
+		}
+
+		let latest = grown
+
+		for (let write = 0; write < 3; write++) {
+			if (latest.items.length === 0) {
+				break
+			}
+
+			let [, writing] = edits[Math.floor(next() * 2)]
+
+			latest = writing(latest, next)
+		}
+
+		pool.push(latest)
+
+		for (let each of derived) {
+			pool.push(each)
+			expect(itemsOf(each.box)).toEqual(each.items)
+		}
 
 		let [, read] = readers[Math.floor(next() * readers.length)]
 
@@ -526,28 +604,28 @@ describe("positional writes against a model", () => {
 })
 
 describe("persistent use", () => {
-	// NOTE: The plainest shape of it: one value written over and over, with
-	// every version kept. Each is a box left further behind on the same Array
-	// than the last, and each has to answer exactly the items it was made with.
+	// NOTE: One value written over and over, with every version kept. Each is a
+	// box left further behind on the same Array than the last, and each has to
+	// answer exactly the items it was made with. The positions REPEAT, so one
+	// log holds the same position more than once — which is the only shape that
+	// can tell undoing the log backwards from undoing it forwards apart.
 	test("every version of a chain answers its own items", () => {
-		let base = integers([0, 1, 2, 3, 4, 5, 6, 7])
 		let versions: Array<Tracked> = [
-			{ box: base, items: [0, 1, 2, 3, 4, 5, 6, 7] },
+			{
+				box: logged([0, 1, 2, 3, 4, 5, 6, 7]),
+				items: [0, 1, 2, 3, 4, 5, 6, 7],
+			},
 		]
 
-		for (let turn = 0; turn < 20; turn++) {
+		for (let turn = 0; turn < 24; turn++) {
 			let previous = versions[versions.length - 1]
-			let position = turn % 8
+			let position = turn % 3
 			let changed = previous.items.slice()
 
 			changed[position] = 100 + turn
 
 			versions.push({
-				box: replace(
-					previous.box,
-					createInteger(BigInt(100 + turn)),
-					createInteger(BigInt(position)),
-				),
+				box: written(previous.box, 100 + turn, position),
 				items: changed,
 			})
 		}
@@ -567,74 +645,141 @@ describe("persistent use", () => {
 	// same thing it always did, which is the whole of what is claimed here —
 	// what it costs is `optimisations` business, not this file's.
 	test("writing the same old value over and over answers every time", () => {
-		let base = integers([0, 1, 2, 3, 4, 5, 6, 7])
+		let base = logged([0, 1, 2, 3, 4, 5, 6, 7])
 
 		for (let turn = 0; turn < 20; turn++) {
-			let written = replace(
-				base,
-				createInteger(BigInt(turn)),
-				createInteger(BigInt(turn % 8)),
-			)
+			let changed = written(base, turn, turn % 8)
 			let expected = [0, 1, 2, 3, 4, 5, 6, 7]
 
 			expected[turn % 8] = turn
 
-			expect(itemsOf(written)).toEqual(expected)
+			expect(itemsOf(changed)).toEqual(expected)
 			expect(itemsOf(base)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
 		}
 	})
 
-	// NOTE: A box that shares a run because it was GROWN from one, rather than
-	// written from one — the sharing sites are where a log has to be carried
-	// along, and a box handed a logged Array without one would read whatever
-	// the next write left there.
-	test("a box grown from a written one answers its own items", () => {
-		let base = integers([0, 1, 2, 3, 4, 5, 6, 7])
-		let written = replace(base, createInteger(50n), createInteger(0n))
-		let appended = append(written, createInteger(60n))
-		let prepended = prepend(written, createInteger(70n))
-		let window = slice(written, createInteger(2n), createInteger(6n))
-		let dropped = remove(written, createInteger(1n))
+	// NOTE: EVERY SITE THAT SHARES A BACK RUN, each asked the same question: a
+	// box handed a logged Array must be handed the version it views with it, or
+	// it reads whatever the next write leaves there. The source is written IN
+	// PLACE after the box is derived and before it is read, which is the only
+	// order in which a forgotten log shows.
+	const sharers: Array<
+		[
+			string,
+			(
+				source: ListType<IntegerType>,
+			) => [ListType<IntegerType>, Array<number>],
+		]
+	> = [
+		[
+			"append",
+			(source) => [
+				append(source, createInteger(60n)),
+				[0, 1, 2, 3, 4, 5, 6, 7, 60],
+			],
+		],
+		[
+			"append(contentsOf:)",
+			(source) => [
+				appendContentsOf(source, integers([60, 61])),
+				[0, 1, 2, 3, 4, 5, 6, 7, 60, 61],
+			],
+		],
+		[
+			"prepend onto a flat box",
+			(source) => [
+				prepend(source, createInteger(70n)),
+				[70, 0, 1, 2, 3, 4, 5, 6, 7],
+			],
+		],
+		[
+			"prepend twice",
+			(source) => [
+				prepend(
+					prepend(source, createInteger(70n)),
+					createInteger(71n),
+				),
+				[71, 70, 0, 1, 2, 3, 4, 5, 6, 7],
+			],
+		],
+		[
+			"a window at the front",
+			(source) => [
+				slice(source, createInteger(0n), createInteger(6n)),
+				[0, 1, 2, 3, 4, 5],
+			],
+		],
+		[
+			"dropping the last item",
+			(source) => [
+				remove(source, createInteger(7n)),
+				[0, 1, 2, 3, 4, 5, 6],
+			],
+		],
+		[
+			"a window of a two-run box",
+			(source) => [
+				slice(
+					prepend(source, createInteger(70n)),
+					createInteger(0n),
+					createInteger(5n),
+				),
+				[70, 0, 1, 2, 3],
+			],
+		],
+		[
+			"writing the front of a two-run box",
+			(source) => [
+				written(prepend(source, createInteger(70n)), 99, 0),
+				[99, 0, 1, 2, 3, 4, 5, 6, 7],
+			],
+		],
+	]
 
-		replace(written, createInteger(51n), createInteger(1n))
-		replace(written, createInteger(52n), createInteger(2n))
+	for (let [label, share] of sharers) {
+		test(`${label} carries the log it shares`, () => {
+			let source = logged([0, 1, 2, 3, 4, 5, 6, 7])
+			let [derived, expected] = share(source)
 
-		expect(itemsOf(appended)).toEqual([50, 1, 2, 3, 4, 5, 6, 7, 60])
-		expect(itemsOf(prepended)).toEqual([70, 50, 1, 2, 3, 4, 5, 6, 7])
-		expect(itemsOf(window)).toEqual([2, 3, 4, 5])
-		expect(itemsOf(dropped)).toEqual([50, 2, 3, 4, 5, 6, 7])
-		expect(itemsOf(written)).toEqual([50, 1, 2, 3, 4, 5, 6, 7])
-		expect(itemsOf(base)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
-	})
+			// NOTE: Three writes, so the derived box is three versions behind
+			// and a log that is undone the wrong way round answers the wrong
+			// items rather than the right ones by luck.
+			let once = written(source, 91, 1)
+			let twice = written(once, 92, 2)
 
-	// NOTE: The grower reading a box that is BEHIND. `append` and `prepend`
+			written(twice, 93, 1)
+
+			expect(itemsOf(derived)).toEqual(expected)
+			expect(itemsOf(source)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
+		})
+	}
+
+	// NOTE: The GROWERS reading a box that is BEHIND. `append` and `prepend`
 	// read a box's fields without a view, so each catches its receiver up
 	// itself — a box that pushed onto the Array it is behind on would hand the
 	// answer items it never held.
 	test("growing a box that is behind answers its items and the new one", () => {
-		let base = integers([0, 1, 2, 3])
+		let stale = () => {
+			let base = logged([0, 1, 2, 3])
 
-		replace(base, createInteger(9n), createInteger(0n))
+			written(base, 9, 0)
 
-		expect(itemsOf(append(base, createInteger(4n)))).toEqual([
+			expect(base.writes?.seen).not.toBe(base.writes?.log.version)
+
+			return base
+		}
+
+		expect(itemsOf(append(stale(), createInteger(4n)))).toEqual([
 			0, 1, 2, 3, 4,
 		])
-
-		let second = integers([0, 1, 2, 3])
-
-		replace(second, createInteger(9n), createInteger(3n))
-
-		expect(itemsOf(prepend(second, createInteger(-1n)))).toEqual([
+		expect(itemsOf(prepend(stale(), createInteger(-1n)))).toEqual([
 			-1, 0, 1, 2, 3,
 		])
-
-		let third = integers([0, 1, 2, 3])
-
-		replace(third, createInteger(9n), createInteger(1n))
-
-		expect(itemsOf(appendContentsOf(third, integers([4, 5])))).toEqual([
+		expect(itemsOf(appendContentsOf(stale(), integers([4, 5])))).toEqual([
 			0, 1, 2, 3, 4, 5,
 		])
+		expect(itemsOf(written(stale(), 8, 3))).toEqual([0, 1, 2, 8])
+		expect(Number(length(stale()).value)).toBe(4)
 	})
 
 	// NOTE: An upgraded receiver — two runs, and a position in each. A front
@@ -642,11 +787,11 @@ describe("persistent use", () => {
 	// it has to agree with the flat half item for item.
 	test("a two-run box answers a write in either run", () => {
 		let built = prepend(
-			prepend(integers([3, 4, 5]), createInteger(2n)),
+			prepend(logged([3, 4, 5]), createInteger(2n)),
 			createInteger(1n),
 		)
-		let inFront = replace(built, createInteger(9n), createInteger(0n))
-		let inBack = replace(built, createInteger(9n), createInteger(4n))
+		let inFront = written(built, 9, 0)
+		let inBack = written(built, 9, 4)
 
 		expect(itemsOf(inFront)).toEqual([9, 2, 3, 4, 5])
 		expect(itemsOf(inBack)).toEqual([1, 2, 3, 4, 9])
@@ -655,87 +800,255 @@ describe("persistent use", () => {
 })
 
 describe("reentrancy", () => {
-	// NOTE: THE HAZARD THE SEAL IS FOR. The fold is seeded with the very List
-	// it walks, so the first `replace` would write the run the walk is holding
-	// — a walk fixes its counts on entry, but an item it has not reached yet
-	// would be the one the callback just wrote. The reader sealed the run, so
-	// the write copies and the walk answers the items the List held at entry.
-	test("a fold whose callback writes the walked List sees the entry items", () => {
-		let list = integers([1, 2, 3, 4, 5])
+	// NOTE: THE HAZARD THE SEAL IS FOR, asked of EVERY native that hands a raw
+	// run to code that may call back into Essence. Each walk below is run over a
+	// List that carries a log and is current for it, with a callback that writes
+	// that very List — so without the seal the write would land in the Array the
+	// walk is holding, and the walk would visit an item nobody ever put there.
+	// The walk must visit exactly the items the List held at entry, which is
+	// what it visited when every write copied.
+	//
+	// NOTE: The list is what makes the audit checkable: a native that takes a
+	// Function or a conformance and reads its receiver belongs here, and one
+	// that is missing is a native that may have forgotten to seal.
+	const walks: Array<
+		[
+			string,
+			(
+				list: ListType<IntegerType>,
+				visit: (item: IntegerType) => void,
+			) => void,
+		]
+	> = [
+		["map", (list, visit) => void map(list, (item) => (visit(item), item))],
+		[
+			"reduce",
+			(list, visit) =>
+				void reduce(
+					list,
+					list,
+					(accumulator, item) => (visit(item), accumulator),
+				),
+		],
+		[
+			"reduce(step:)",
+			(list, visit) =>
+				void reduceWithStep(list, list, (accumulator, item) => {
+					visit(item)
+
+					return {
+						[typeKeySymbol]: "Step#Continue",
+						state: accumulator,
+					}
+				}),
+		],
+		[
+			"accumulate",
+			(list, visit) =>
+				void accumulate(
+					list,
+					list,
+					(accumulator, item) => (visit(item), accumulator),
+				),
+		],
+		[
+			"everyItem(where:)",
+			(list, visit) =>
+				void everyItem(
+					list,
+					(item) => (visit(item), createBoolean(true)),
+				),
+		],
+		[
+			"partition",
+			(list, visit) =>
+				void partition(
+					list,
+					(item) => (visit(item), createBoolean(true)),
+				),
+		],
+		[
+			"lastIndex(where:)",
+			(list, visit) =>
+				void lastIndexWhere(
+					list,
+					(item) => (visit(item), createBoolean(false)),
+				),
+		],
+		[
+			"split(where:)",
+			(list, visit) =>
+				void splitWhere(
+					list,
+					(item) => (visit(item), createBoolean(false)),
+				),
+		],
+		[
+			"runs(where:)",
+			(list, visit) =>
+				void runsWhere(
+					list,
+					(item) => (visit(item), createBoolean(true)),
+				),
+		],
+		[
+			"is",
+			(list, visit) =>
+				void is(list, list, {
+					is: (first: IntegerType, second: IntegerType) => (
+						visit(first),
+						createBoolean(first.value === second.value)
+					),
+				}),
+		],
+		[
+			"compare",
+			(list, visit) =>
+				void compare(list, list, {
+					compare: (first: IntegerType, second: IntegerType) => (
+						visit(first),
+						compareIntegers(first, second)
+					),
+				}),
+		],
+		[
+			"isSorted",
+			(list, visit) =>
+				void isSorted(list, ascending, {
+					compare: (first: IntegerType, second: IntegerType) => (
+						visit(first),
+						compareIntegers(first, second)
+					),
+				}),
+		],
+		[
+			"join",
+			(list, visit) =>
+				void join(list, createString(","), {
+					toString: (value: IntegerType) => (
+						visit(value),
+						createString(String(value.value))
+					),
+				}),
+		],
+		[
+			"toString",
+			(list, visit) =>
+				void listToString(list, {
+					toString: (value: IntegerType) => (
+						visit(value),
+						createString(String(value.value))
+					),
+				}),
+		],
+		[
+			"sort(on:)",
+			(list, visit) =>
+				void sortOn(list, (item) => (visit(item), item), ascending, {
+					compare: compareIntegers,
+				}),
+		],
+		[
+			"removeDuplicates",
+			(list, visit) => void removeDuplicates(list, visiting(visit)),
+		],
+		[
+			"hasDuplicates",
+			(list, visit) => void hasDuplicates(list, visiting(visit)),
+		],
+		[
+			"everyItem(in:)",
+			(list, visit) =>
+				void everyItemIn(list, integers([1, 2]), visiting(visit)),
+		],
+		[
+			"removeEvery(in:)",
+			(list, visit) =>
+				void removeEveryIn(list, integers([1, 2]), visiting(visit)),
+		],
+		[
+			"contains(contentsOf:)",
+			(list, visit) => void contains(list, list, visiting(visit)),
+		],
+		["mode", (list, visit) => void mode(visitedThrough(list, visit))],
+		[
+			"group(on:)",
+			(list, visit) =>
+				void group(
+					list,
+					(item) => (visit(item), item),
+					integerEquality,
+				),
+		],
+		[
+			"tally",
+			(list, visit) =>
+				void tally(visitedThrough(list, visit), integerEquality),
+		],
+	]
+
+	// NOTE: A witness that reports every item it is asked about. The set-shaped
+	// natives reach their items through `keyEncoding`, which asks the witness
+	// rather than the walk, so this is how a visit is seen from there.
+	function visiting(visit: (item: IntegerType) => void) {
+		return {
+			is: (first: IntegerType, second: IntegerType) => (
+				visit(first),
+				createBoolean(first.value === second.value)
+			),
+		}
+	}
+
+	// NOTE: `mode` and `tally` take no Function at all — what they ask about
+	// each item is the item's own encoding — so the visit is reported by a
+	// mapped copy standing in front of them. The List they walk is still the
+	// one being written, which is what the seal is being asked about.
+	function visitedThrough(
+		list: ListType<IntegerType>,
+		visit: (item: IntegerType) => void,
+	): ListType<IntegerType> {
+		return map(list, (item) => (visit(item), item))
+	}
+
+	for (let [label, walk] of walks) {
+		test(`${label} over a List its callback writes sees the entry items`, () => {
+			let list = logged([1, 2, 3, 4, 5])
+			let latest = list
+			let visited: Array<number> = []
+
+			walk(list, (item) => {
+				visited.push(Number(item.value))
+				latest = written(latest, 99, 4)
+			})
+
+			expect(visited.length).toBeGreaterThan(0)
+
+			for (let seen of visited) {
+				expect([1, 2, 3, 4, 5]).toContain(seen)
+			}
+
+			expect(itemsOf(list)).toEqual([1, 2, 3, 4, 5])
+			expect(itemsOf(latest)).toEqual([1, 2, 3, 4, 99])
+		})
+	}
+
+	// NOTE: The fold seeded with the very List it walks — the shape the first
+	// reentrancy rule was written for, now with a WRITE in it rather than an
+	// append. The accumulator IS the walked box, so its first write would land
+	// in the run the walk is reading.
+	test("a fold seeded with the List it walks answers the entry items", () => {
+		let list = logged([1, 2, 3, 4, 5])
 		let visited: Array<number> = []
 
-		reduce(list, list, (accumulator, each) => {
+		let answer = reduce(list, list, (accumulator, each) => {
 			visited.push(Number(each.value))
 
-			return replace(accumulator, createInteger(99n), createInteger(4n))
+			return written(accumulator, 99, 4)
 		})
 
 		expect(visited).toEqual([1, 2, 3, 4, 5])
 		expect(itemsOf(list)).toEqual([1, 2, 3, 4, 5])
-	})
-
-	test("a map whose transform writes the walked List sees the entry items", () => {
-		let list = integers([1, 2, 3, 4, 5])
-		let written = list
-		let mapped = map(list, (each) => {
-			written = replace(written, createInteger(99n), createInteger(4n))
-
-			return each
-		})
-
-		expect(itemsOf(mapped)).toEqual([1, 2, 3, 4, 5])
-		expect(itemsOf(list)).toEqual([1, 2, 3, 4, 5])
-		expect(itemsOf(written)).toEqual([1, 2, 3, 4, 99])
-	})
-
-	// NOTE: The same hazard through the readers that do NOT trim — the
-	// set-shaped natives ask an item's own witness about every item while they
-	// hold the run, and a witness is user code.
-	test("a witness that writes the walked List sees the entry items", () => {
-		let list = integers([1, 2, 3, 2, 1])
-		let written = list
-		let writingEquality = {
-			is: (first: IntegerType, second: IntegerType) => {
-				written = replace(
-					written,
-					createInteger(99n),
-					createInteger(0n),
-				)
-
-				return createBoolean(first.value === second.value)
-			},
-		}
-
-		expect(itemsOf(removeDuplicates(list, writingEquality))).toEqual([
-			1, 2, 3,
-		])
-		expect(itemsOf(list)).toEqual([1, 2, 3, 2, 1])
-		expect(itemsOf(written)).toEqual([99, 2, 3, 2, 1])
-	})
-
-	// NOTE: And through the one that hands its OWN Array over — `sort(on:)`
-	// reads a key off every item while holding it, and the Rewriter's inlined
-	// walks read their items the same way.
-	test("a comparison that writes the sorted List sees the entry items", () => {
-		let list = integers([5, 3, 1, 4, 2])
-		let written = list
-		let writingOrder = {
-			compare: (first: IntegerType, second: IntegerType) => {
-				written = replace(
-					written,
-					createInteger(99n),
-					createInteger(0n),
-				)
-
-				return compareIntegers(first, second)
-			},
-		}
-
-		expect(itemsOf(sort(list, ascending, writingOrder))).toEqual([
-			1, 2, 3, 4, 5,
-		])
-		expect(itemsOf(list)).toEqual([5, 3, 1, 4, 2])
-		expect(itemsOf(written)).toEqual([99, 3, 1, 4, 2])
+		expect(itemsOf(answer)).toEqual([1, 2, 3, 4, 99])
 	})
 })
 
