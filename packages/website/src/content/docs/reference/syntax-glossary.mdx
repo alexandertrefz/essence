@@ -463,7 +463,7 @@ Taught on [Method calls](/docs/language/method-calls).
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| An escape for the character after it. There are seven: `\"`, `\\`, `\{`, `\}`, `\n`, `\r` and `\t`. `\{` and `\}` exist because a bare `{` opens an interpolation hole. | Inside a string literal. | A Unicode escape. `\u` and every other backslash are [`invalid-escape`](/docs/reference/diagnostics#invalid-escape); write the character itself. |
+| An escape for the character after it. There are eight: `\"`, `\\`, `\{`, `\}`, `\n`, `\r`, `\t` and `\u{…}`. `\{` and `\}` exist because a bare `{` opens an interpolation hole; `\u{…}` names one character by its code point, written in one to six hexadecimal digits. | Inside a string literal. | A JavaScript `\u00e9`. The braces are not optional: that is [`unbraced-unicode-escape`](/docs/reference/diagnostics#unbraced-unicode-escape). Every other backslash is [`invalid-escape`](/docs/reference/diagnostics#invalid-escape). |
 
 </div>
 
@@ -473,6 +473,8 @@ implementation {
 	Terminal.print("a \\ b") § a \ b
 	Terminal.print("\{not a hole\}") § {not a hole}
 	Terminal.print("tab\there"::length()) § 8
+	Terminal.print("\u{1F600}") § 😀
+	Terminal.print("\u{1B}"::length()) § 1
 }
 ```
 

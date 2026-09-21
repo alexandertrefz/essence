@@ -1,6 +1,12 @@
 import { type common, lexer } from "@essence-lang/interfaces"
 
 import { foreignPunctuation } from "../helpers/foreign"
+import {
+	characterAt,
+	codePointName,
+	printsAsItself,
+	spelledCharacter,
+} from "../helpers/terminalText"
 
 const TokenType = lexer.TokenType
 type Token = lexer.Token
@@ -16,7 +22,31 @@ type Cursor = common.Cursor
 export type LexingError = {
 	message: string
 	position: common.Position
-	code: "invalid-number" | "invalid-escape" | "comment-in-hole"
+	code:
+		| "invalid-number"
+		| "invalid-escape"
+		| "comment-in-hole"
+		| "unbraced-unicode-escape"
+		| "malformed-unicode-escape"
+		| "unicode-escape-out-of-range"
+		| "surrogate-unicode-escape"
+	// NOTE: The rest of the report, for the one family that can not be rebuilt
+	// from its code alone. A `\u{…}` can be wrong in six ways that share four
+	// codes, and each Help writes the reader's own digits back at them — which
+	// digits those are, and which mistake it was, are known only where the
+	// escape was read. Rebuilding that from the span at the reporting site would
+	// be the same analysis written a second time, in a second place, free to
+	// drift. Every other code's text is still built where it is reported.
+	report?: EscapeReport
+}
+
+// NOTE: What a refused `\u{…}` says under its code — the label that sits on the
+// span, the Note that states the rule it broke, and the Helps, which are the
+// edits that work and are withheld when none does.
+export type EscapeReport = {
+	label: string
+	notes: Array<string>
+	helps: Array<string>
 }
 
 // NOTE: A String Literal that CLOSED, built where the unterminated-String
@@ -142,6 +172,10 @@ const backslashCode = "\\".charCodeAt(0)
 const endsWord = 1
 const isDigit = 2
 const isSpace = 4
+// NOTE: Hexadecimal is not a spelling the language has anywhere else — there is
+// no `0xFF` Number Literal, and `invalid-number` exists to say so — so this flag
+// is read by `readUnicodeEscape` and by nothing else.
+const isHexDigit = 8
 
 const characterClasses = new Uint8Array(128)
 // NOTE: Every character above 127 that belongs to a class, which is the two
@@ -179,12 +213,183 @@ for (let character of numbers) {
 	addClass(character, isDigit)
 }
 
+for (let character of [...numbers, ..."abcdefABCDEF"]) {
+	addClass(character, isHexDigit)
+}
+
 function classOfCode(code: number): number {
 	if (code < 128) {
 		return characterClasses[code]!
 	}
 
 	return wideClasses.get(code) ?? 0
+}
+
+// NOTE: WHERE a `\u{…}` holds a character that is not a hexadecimal digit,
+// rather than whether it does. `parseInt` would not say: it reads the longest
+// prefix it understands and answers for that — `parseInt("1G", 16)` is 1 — so a
+// refusal built on it would quietly become a wrong character instead.
+function firstNonHexDigit(digits: string): number {
+	for (let offset = 0; offset < digits.length; offset++) {
+		if ((classOfCode(digits.charCodeAt(offset)) & isHexDigit) === 0) {
+			return offset
+		}
+	}
+
+	return -1
+}
+
+// NOTE: Whether a number names a character a String can hold. The range has two
+// holes: nothing above U+10FFFF is a code point at all, and the surrogates are
+// the two halves UTF-16 writes an astral character in — neither names a
+// character on its own, which is why `\u{D800}` is refused and `\u{1F600}`, the
+// character a surrogate pair stands for, is the escape to write instead.
+function isScalarValue(value: number): boolean {
+	return (
+		value <= highestCodePoint &&
+		(value < firstSurrogate || value > lastSurrogate)
+	)
+}
+
+// NOTE: A code point spelled the way this language spells it, which is what
+// every rewrite Help hands back. UPPER CASE, because that is how the Unicode
+// standard names a code point and how the runtime's own quoted rendering prints
+// one. A Help that merely re-brackets the reader's OWN digits keeps their case
+// instead — see `readUnbracedEscape`.
+function bracedEscape(value: number): string {
+	return `\\u{${value.toString(16).toUpperCase()}}`
+}
+
+// NOTE: The same digits with their leading zeros gone, which is what a rewrite
+// of the reader's own text writes back: `\u001B` is offered as `\u{1B}` rather
+// than `\u{001B}`, and a file written in lower case keeps reading that way.
+function withoutLeadingZeros(digits: string): string {
+	let offset = 0
+
+	while (offset < digits.length - 1 && digits[offset] === "0") {
+		offset++
+	}
+
+	return digits.slice(offset)
+}
+
+// NOTE: The character a surrogate pair spells, from the two halves UTF-16
+// writes it in — the arithmetic the standard gives, written once because both
+// spellings of a pair need it.
+function characterOfPair(high: number, low: number): number {
+	return 0x10000 + ((high - firstSurrogate) << 10) + (low - firstLowSurrogate)
+}
+
+// NOTE: The one Help a surrogate ever gets, and the reason it is written here
+// rather than at each of the two places that offer it: the Quick Fix reads the
+// spelling back OUT of this sentence (`literalFixes.ts`), so the sentence is the
+// contract between the Lexer and the Editor and two spellings of it are two
+// contracts.
+function pairedCharacterHelp(high: number, low: number): string {
+	return `Write the character as one escape: '${bracedEscape(
+		characterOfPair(high, low),
+	)}'.`
+}
+
+// NOTE: The rule every malformed `\u{…}` broke, said once. Five refusals carry
+// it, and five spellings of one sentence is five chances for a reader to be told
+// something slightly different about the same escape.
+const unicodeEscapeRule =
+	"A Unicode escape is written '\\u{…}' — one to six hexadecimal digits in braces, naming one character."
+
+// NOTE: Said apart from the rule above, because a surrogate is the one refusal
+// where the digits ARE a well-formed escape and the number itself is the
+// mistake. A reader who wrote one is a reader who knows UTF-16, and what they
+// need to hear is that Essence counts characters and not the units they are
+// stored in.
+const surrogateRule =
+	"U+D800 through U+DFFF are the halves UTF-16 writes a character above U+FFFF in; a String holds characters, so an escape names one of those directly."
+
+// NOTE: `\u{U+1B}` — a code point written the way it is NAMED rather than the
+// way it is spelled. The `U+` prefix is how the standard and every chart write
+// one, so it arrives inside the braces often enough to answer for itself; the
+// digits behind it are the reader's own and are handed straight back.
+function namedCodePointHelps(digits: string): Array<string> {
+	let named =
+		digits.length > 2 &&
+		(digits[0] === "U" || digits[0] === "u") &&
+		digits[1] === "+"
+			? digits.slice(2)
+			: null
+
+	if (
+		named !== null &&
+		named.length <= 6 &&
+		firstNonHexDigit(named) === -1 &&
+		isScalarValue(Number.parseInt(named, 16))
+	) {
+		return [
+			`Write the digits alone: '\\u{${named}}' — the 'U+' names a code point rather than spelling one.`,
+		]
+	}
+
+	return [
+		"Write the code point in hexadecimal: '\\u{1B}' is the escape character, '\\u{1F600}' a grinning face.",
+	]
+}
+
+// NOTE: Seven digits or more, which is one or more leading zeros in every case
+// a reader meant — `\u{00001B}` is the JavaScript habit padded out. The zeros
+// come off where what is left names a character, and where it does not there is
+// nothing to offer: the escape is wrong twice over and the Note says the rule.
+function trimmedDigitHelps(digits: string): Array<string> {
+	let trimmed = withoutLeadingZeros(digits)
+
+	return trimmed.length <= 6 && isScalarValue(Number.parseInt(trimmed, 16))
+		? [`Drop the leading zeros: '\\u{${trimmed}}'.`]
+		: []
+}
+
+// NOTE: `\u{128512}` — the code point read off a chart in DECIMAL and written
+// into an escape that reads hexadecimal. It is worth answering for because the
+// mistake is invisible: every decimal digit is a hexadecimal digit too, so
+// nothing about the text looks wrong and the number they name is simply too
+// large. Offered CONDITIONALLY rather than as an instruction: the condition is
+// written into the sentence — 'where the character numbered 128512 was meant' —
+// and only the reader can say whether it holds, because which base they meant
+// is the one thing the source does not record. It is the one Help of this
+// family no Quick Fix applies, since applying it would decide that for them.
+//
+// WITHHELD JUST ABOVE THE TOP. Unicode's last plane ends at U+10FFFF, so the
+// smallest escape this refusal ever sees is `\u{110000}` — the top missed by
+// one, in hexadecimal, by a reader who knows exactly where it is. Asking them
+// whether they meant the decimal 110,000 is noise, and the whole of the first
+// plane above the last real one reads the same way: someone counting planes,
+// not someone copying a decimal off a chart. Above it, `\u{128512}` has no
+// reading as a boundary at all and the question is the only thing worth asking.
+//
+// NOTE: `isScalarValue` can not fire and stays as a belt: six digits is the
+// most this reads, the smallest of them above the top is `110000`, and its
+// decimal reading is 110,000 — past every surrogate and far below U+10FFFF. So
+// every decimal reading that reaches here already names a character. It is kept
+// because the day the digit limit moves is the day a decimal surrogate becomes
+// reachable, and a Help that spells an escape the next run refuses is the one
+// thing a Help may not do.
+const firstPlaneAboveTheTop = 0x11ffff
+
+function decimalReadingHelps(digits: string, value: number): Array<string> {
+	if (value <= firstPlaneAboveTheTop) {
+		return []
+	}
+
+	for (let offset = 0; offset < digits.length; offset++) {
+		if ((classOfCode(digits.charCodeAt(offset)) & isDigit) === 0) {
+			return []
+		}
+	}
+
+	let decimal = Number.parseInt(digits, 10)
+
+	return isScalarValue(decimal)
+		? [
+				`The digits are read as hexadecimal — write '${bracedEscape(decimal)}' where the character numbered ${decimal} was meant.`,
+			]
+		: []
 }
 
 // NOTE: One table lookup where a ladder of twenty string compares stood. A
@@ -280,7 +485,9 @@ for (let symbol of symbols) {
 // NOTE: The escape set every String Literal understands. A backslash before
 // anything else is an `invalid-escape` — reported, then read as the character
 // alone so the rest of the String still lexes. `\{` and `\}` are how a literal
-// brace is written now that a bare `{` opens an interpolation hole.
+// brace is written now that a bare `{` opens an interpolation hole. `\u` is not
+// in the table because it is the one escape that is longer than two characters
+// and can be wrong in six ways of its own; `readUnicodeEscape` reads it.
 const stringEscapes: { [char: string]: string } = {
 	'"': '"',
 	"\\": "\\",
@@ -290,6 +497,23 @@ const stringEscapes: { [char: string]: string } = {
 	"{": "{",
 	"}": "}",
 }
+
+// NOTE: The escape set spelled for a reader, in the order the Notes and the
+// documentation spell it. One constant, because the sentence is written into
+// three Diagnostics and getting a different list in two of them is exactly the
+// sort of drift a reader has no way to resolve.
+export const escapeSetSentence =
+	"'\\\"', '\\\\', '\\n', '\\r', '\\t', '\\{', '\\}' and '\\u{…}'"
+
+// NOTE: The highest Unicode scalar value, and the surrogate range that is not
+// one. A lone surrogate is half of a UTF-16 pair and names no character on its
+// own, so `\u{D800}` is refused where `\u{1F600}` — the character that pair
+// stands for — is the escape to write instead.
+const highestCodePoint = 0x10ffff
+const firstSurrogate = 0xd800
+const lastSurrogate = 0xdfff
+const highSurrogateEnd = 0xdbff
+const firstLowSurrogate = 0xdc00
 
 const interpolationStartCode = "{".charCodeAt(0)
 const rightBraceCode = "}".charCodeAt(0)
@@ -945,6 +1169,20 @@ export class Lexer {
 				decoded += data.slice(runStart, index)
 				hasEscape = true
 
+				// NOTE: The one escape that is longer than two characters, and
+				// the one the table above can not answer — read before the table
+				// is asked, and it reports whatever it has to report itself.
+				if (escaped === "u") {
+					let read = this.readUnicodeEscape(index, line, column)
+
+					decoded += read.decoded
+					column = read.column
+					index = read.index
+					runStart = index
+
+					continue
+				}
+
 				let escapeStart = { line, column }
 
 				column++
@@ -959,8 +1197,19 @@ export class Lexer {
 				let replacement = stringEscapes[escaped]
 
 				if (replacement === undefined) {
+					// NOTE: The character is the READER'S, and this message is
+					// read on a terminal — a backslash before a BEL rang the
+					// bell of whoever ran the Compiler, and one before an
+					// override reordered the line it was written on. Where it
+					// prints as itself it is quoted as the escape it was meant
+					// to be; where it does not, it is named, and the sentence
+					// is built around the name rather than around `'\…'`.
+					let offender = characterAt(data, index + 1)
+
 					this.errors.push({
-						message: `'\\${escaped}' is not a valid escape`,
+						message: printsAsItself(offender)
+							? `'\\${offender}' is not a valid escape`
+							: `A backslash before ${codePointName(offender)} is not a valid escape`,
 						position: { start: escapeStart, end: { line, column } },
 						code: "invalid-escape",
 					})
@@ -995,6 +1244,393 @@ export class Lexer {
 			value: hasEscape ? decoded + run : run,
 			terminator: "eof",
 		}
+	}
+
+	// NOTE: `\u{1F600}` — one to six hexadecimal digits in braces, naming ONE
+	// Unicode scalar value, decoded here into the character it names. It is read
+	// by hand rather than looked up in `stringEscapes` because it is the only
+	// escape whose spelling runs past two characters and because every part of
+	// it can be wrong on its own: the braces can be missing, hold nothing, hold
+	// something that is not a digit, hold too many of them, or hold a number
+	// that names no character.
+	//
+	// NOTE: A refused escape contributes NO character. There is none it could
+	// contribute — it named none — and the two other readings are worse: the
+	// digits kept as text would put `1B` into a value whose author wrote an
+	// escape, and a replacement character would put one there that nothing in
+	// the file asked for.
+	//
+	// NOTE: WHERE THE SCAN STOPS is the whole of the recovery. Looking for the
+	// closing brace, it stops at the characters that end the reading of the
+	// literal itself — the closing quote, the backslash that opens the next
+	// escape, a line break, and the `{` that opens a hole — and it does not
+	// consume them. So an escape that was never closed takes nothing with it:
+	// the quote still closes the String, the `{` still opens its hole, and a
+	// String that really is unclosed is still reported about its own quote.
+	protected readUnicodeEscape(
+		start: number,
+		line: number,
+		column: number,
+	): { index: number; column: number; decoded: string } {
+		let data = this.data
+		let opening = start + 2
+
+		if (data.charCodeAt(opening) !== interpolationStartCode) {
+			return this.readUnbracedEscape(start, line, column)
+		}
+
+		let scan = opening + 1
+
+		while (scan < data.length) {
+			let code = data.charCodeAt(scan)
+
+			if (code === rightBraceCode) {
+				break
+			}
+
+			if (
+				code === stringLiteralCode ||
+				code === backslashCode ||
+				code === linebreakCode ||
+				code === carriageReturnCode ||
+				code === interpolationStartCode
+			) {
+				break
+			}
+
+			scan++
+		}
+
+		let digits = data.slice(opening + 1, scan)
+
+		if (scan >= data.length || data.charCodeAt(scan) !== rightBraceCode) {
+			return this.refuseUnclosedEscape(start, scan, line, column, digits)
+		}
+
+		let end = scan + 1
+		let offending = firstNonHexDigit(digits)
+
+		if (digits.length === 0) {
+			return this.refuseEscape(
+				start,
+				end,
+				line,
+				column,
+				"malformed-unicode-escape",
+				"'\\u{}' names no code point",
+				{
+					label: "nothing stands between the braces",
+					notes: [unicodeEscapeRule],
+					helps: [
+						"Write the code point's hexadecimal digits between the braces: '\\u{1B}' is the escape character.",
+					],
+				},
+			)
+		}
+
+		if (offending !== -1) {
+			return this.refuseEscape(
+				start,
+				end,
+				line,
+				column,
+				"malformed-unicode-escape",
+				`${spelledCharacter(characterAt(digits, offending))} is not a hexadecimal digit`,
+				{
+					label: "a code point is written in hexadecimal",
+					notes: [unicodeEscapeRule],
+					helps: namedCodePointHelps(digits),
+				},
+			)
+		}
+
+		if (digits.length > 6) {
+			return this.refuseEscape(
+				start,
+				end,
+				line,
+				column,
+				"malformed-unicode-escape",
+				`'\\u{${digits}}' has ${digits.length} digits`,
+				{
+					label: "a code point takes at most six digits",
+					notes: [unicodeEscapeRule],
+					helps: trimmedDigitHelps(digits),
+				},
+			)
+		}
+
+		let value = Number.parseInt(digits, 16)
+
+		if (value > highestCodePoint) {
+			return this.refuseEscape(
+				start,
+				end,
+				line,
+				column,
+				"unicode-escape-out-of-range",
+				`U+${digits.toUpperCase()} is above the highest character`,
+				{
+					label: "no character has this code point",
+					notes: [
+						"The highest Unicode code point is U+10FFFF, so '\\u{10FFFF}' is the largest escape there is.",
+					],
+					helps: decimalReadingHelps(digits, value),
+				},
+			)
+		}
+
+		if (value >= firstSurrogate && value <= lastSurrogate) {
+			// NOTE: A high half with its low half directly behind it is ONE
+			// mistake and is refused as one: the report spans both escapes, the
+			// reading resumes past both, and the Help — which the Quick Fix
+			// applies to the span it underlines — rewrites the whole of what it
+			// answers. Reported a half at a time, following that Help left the
+			// second half standing and the reader was refused all over again.
+			let pair =
+				value <= highSurrogateEnd ? this.lowSurrogateBehind(end) : null
+
+			if (pair !== null) {
+				return this.refuseEscape(
+					start,
+					pair.end,
+					line,
+					column,
+					"surrogate-unicode-escape",
+					`U+${digits.toUpperCase()} and U+${pair.value.toString(16).toUpperCase()} are the two halves of one character`,
+					{
+						label: "one character, written as the units it is stored in",
+						notes: [surrogateRule],
+						helps: [pairedCharacterHelp(value, pair.value)],
+					},
+				)
+			}
+
+			return this.refuseEscape(
+				start,
+				end,
+				line,
+				column,
+				"surrogate-unicode-escape",
+				`U+${digits.toUpperCase()} is a surrogate, which names no character`,
+				{
+					label: "this is half of a character, not one",
+					notes: [surrogateRule],
+					helps: [],
+				},
+			)
+		}
+
+		return {
+			index: end,
+			column: column + (end - start),
+			decoded: String.fromCodePoint(value),
+		}
+	}
+
+	// NOTE: `\u001B` and `\u1B` — the JavaScript and JSON habit, which writes the
+	// digits with no braces around them. It is a habit rather than a slip, so it
+	// is answered the way the rest of them are (`helpers/foreign.ts`): with the
+	// Essence spelling of the very character the reader wrote.
+	//
+	// WHICH digits those are is the whole of the care here. JavaScript's `\u`
+	// takes exactly four, so `ABC` is `A` followed by `BC` there, and a Help
+	// that offered `\u{41BC}` would hand back a String its reader never meant.
+	// Four are taken where four or more are written, all of them where fewer are,
+	// and where a `}` stands directly behind them the `{` alone was lost, so the
+	// whole of `\u1B}` is rewritten.
+	//
+	// The shape that is neither is the SURROGATE PAIR — `😀`, how
+	// JavaScript writes an astral character. Neither half names a character, so
+	// neither half has a rewrite of its own; the two together do, and that one
+	// escape is what the Help offers.
+	protected readUnbracedEscape(
+		start: number,
+		line: number,
+		column: number,
+	): { index: number; column: number; decoded: string } {
+		let data = this.data
+		let runStart = start + 2
+		let runEnd = runStart
+
+		while (
+			runEnd < data.length &&
+			(classOfCode(data.charCodeAt(runEnd)) & isHexDigit) !== 0
+		) {
+			runEnd++
+		}
+
+		let written = data.slice(runStart, runEnd)
+		let closed =
+			written.length >= 1 &&
+			written.length <= 6 &&
+			data.charCodeAt(runEnd) === rightBraceCode
+		let taken = closed
+			? written
+			: written.length >= 4
+				? written.slice(0, 4)
+				: written
+		let end = closed ? runEnd + 1 : runStart + taken.length
+		let helps: Array<string> = []
+
+		if (taken.length === 0) {
+			helps.push(
+				"Write the code point's hexadecimal digits in braces: '\\u{1B}' is the escape character.",
+			)
+		} else {
+			let value = Number.parseInt(taken, 16)
+			let pair =
+				closed || value < firstSurrogate || value > highSurrogateEnd
+					? null
+					: this.lowSurrogateBehind(end)
+
+			if (pair !== null) {
+				end = pair.end
+				helps.push(pairedCharacterHelp(value, pair.value))
+			} else if (isScalarValue(value)) {
+				helps.push(
+					`Write it in braces: '\\u{${withoutLeadingZeros(taken)}}'.`,
+				)
+			}
+		}
+
+		return this.refuseEscape(
+			start,
+			end,
+			line,
+			column,
+			"unbraced-unicode-escape",
+			taken.length === 0
+				? "'\\u' is missing the braces around its code point"
+				: `'\\u${taken}' is missing the braces around its code point`,
+			{
+				label: "a code point is written in braces",
+				notes: [unicodeEscapeRule],
+				helps,
+			},
+		)
+	}
+
+	// NOTE: The second half of a surrogate pair standing DIRECTLY behind the
+	// first, in either spelling: `\uDE00`, which is how JavaScript writes one,
+	// and `\u{DE00}`, which is how a reader who has been told the rule once
+	// writes the same mistake out the long way. Both are read here because the
+	// two halves need not agree with each other — `\uD83D\u{DE00}` is what
+	// rewriting a pair one half at a time leaves behind — and each of the four
+	// arrangements is one character written in two escapes just as much as the
+	// matching pair is.
+	//
+	// `end` matters as much as `value`: the caller refuses the WHOLE pair under
+	// one Diagnostic and resumes past it, so the half found here is never read
+	// again as an escape of its own and the rewrite the Help spells replaces all
+	// of what the report underlines. Refusing the halves separately was a
+	// preferred Quick Fix that left its own refusal standing.
+	//
+	// The unbraced form takes exactly FOUR digits, as JavaScript's `\u` does;
+	// the braced form takes one to six and its closing brace.
+	protected lowSurrogateBehind(
+		index: number,
+	): { value: number; end: number } | null {
+		let data = this.data
+
+		if (
+			data.charCodeAt(index) !== backslashCode ||
+			data[index + 1] !== "u"
+		) {
+			return null
+		}
+
+		let braced = data.charCodeAt(index + 2) === interpolationStartCode
+		let digitStart = braced ? index + 3 : index + 2
+		let limit = digitStart + (braced ? 6 : 4)
+		let scan = digitStart
+
+		while (
+			scan < data.length &&
+			scan < limit &&
+			(classOfCode(data.charCodeAt(scan)) & isHexDigit) !== 0
+		) {
+			scan++
+		}
+
+		if (
+			braced
+				? scan === digitStart ||
+					data.charCodeAt(scan) !== rightBraceCode
+				: scan - digitStart < 4
+		) {
+			return null
+		}
+
+		let value = Number.parseInt(data.slice(digitStart, scan), 16)
+
+		return value >= firstLowSurrogate && value <= lastSurrogate
+			? { value, end: braced ? scan + 1 : scan }
+			: null
+	}
+
+	// NOTE: `\u{1B` — the escape was opened and the reading ran into something
+	// that ends the literal. The span covers what was read and stops short of
+	// that character, which is what leaves the closing quote and any hole below
+	// it to be read as themselves.
+	protected refuseUnclosedEscape(
+		start: number,
+		end: number,
+		line: number,
+		column: number,
+		digits: string,
+	): { index: number; column: number; decoded: string } {
+		let closing =
+			digits.length === 0
+				? "Write the code point's hexadecimal digits and a closing '}': '\\u{1B}'."
+				: digits.length <= 6 &&
+					  firstNonHexDigit(digits) === -1 &&
+					  isScalarValue(Number.parseInt(digits, 16))
+					? `Close it with a '}': '\\u{${digits}}'.`
+					: null
+
+		return this.refuseEscape(
+			start,
+			end,
+			line,
+			column,
+			"malformed-unicode-escape",
+			"this '\\u{' is never closed",
+			{
+				label: "no '}' closes this escape",
+				notes: [unicodeEscapeRule],
+				helps: closing === null ? [] : [closing],
+			},
+		)
+	}
+
+	// NOTE: One refusal of a `\u{…}` — four codes and six shapes, but one SPAN
+	// and one recovery: the report covers the escape exactly as far as it was
+	// read, the reading resumes at `end`, and the String is given no character.
+	// Every one of them sits on a single line, because a line break is one of the
+	// characters the scan stops at.
+	protected refuseEscape(
+		start: number,
+		end: number,
+		line: number,
+		column: number,
+		code: LexingError["code"],
+		message: string,
+		report: EscapeReport,
+	): { index: number; column: number; decoded: string } {
+		let endColumn = column + (end - start)
+
+		this.errors.push({
+			message,
+			position: {
+				start: { line, column },
+				end: { line, column: endColumn },
+			},
+			code,
+			report,
+		})
+
+		return { index: end, column: endColumn, decoded: "" }
 	}
 
 	protected throwUnterminatedString(cursor: Cursor, openedAt: Cursor): never {

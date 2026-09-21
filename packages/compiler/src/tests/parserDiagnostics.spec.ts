@@ -108,10 +108,379 @@ describe("Parser Diagnostics", () => {
 
 		it("should not report a known escape", () => {
 			let { diagnostics } = parseWithDiagnostics(
-				'implementation { constant x = "a\\nb\\t\\"c\\\\d\\{e\\}" }',
+				'implementation { constant x = "a\\nb\\t\\"c\\\\d\\{e\\}\\u{1B}" }',
 			)
 
 			expect(diagnostics).toEqual([])
+		})
+
+		// NOTE: The same rule where the backslash stands in front of a
+		// character that acts on the terminal. `'\<BEL>' is not a valid escape`
+		// rings the bell of whoever reads the report, so the character is named
+		// rather than echoed — and the shape of the sentence changes with it,
+		// because `'\U+0007'` is not a thing anyone wrote.
+		it("should name an escaped character that acts on the terminal", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				'implementation { constant x = "a\\\u0007b" }',
+			)
+
+			expect(diagnostics[0].code).toBe("invalid-escape")
+			expect(diagnostics[0].message).toBe(
+				"A backslash before U+0007 is not a valid escape",
+			)
+		})
+
+		// NOTE: The one sentence a reader who wrote a backslash is told the
+		// escape set by. It is built from `escapeSetSentence`, which the
+		// documentation and the showcase are captured from, so a set that grows
+		// grows in one place.
+		it("should name the Unicode escape among the escapes a String understands", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				'implementation { constant x = "bad \\q here" }',
+			)
+
+			expect(diagnostics[0].notes).toEqual([
+				"A String understands '\\\"', '\\\\', '\\n', '\\r', '\\t', '\\{', '\\}' and '\\u{…}'; every other backslash is an error.",
+			])
+		})
+	})
+
+	// NOTE: One `\u{…}` can be wrong in six ways under four codes, and what is
+	// tested of each is the whole of what a reader gets: the code, the span the
+	// label sits on, and the Help — which is an EDIT, so each one is written
+	// back into the probe and compiled.
+	describe("Unicode escapes", () => {
+		it("should rewrite the JavaScript habit into the braced spelling", () => {
+			let source = 'implementation { constant x = "caf\\u00e9" }'
+			let { diagnostics } = parseWithDiagnostics(source)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unbraced-unicode-escape")
+			expect(diagnostics[0].message).toBe(
+				"'\\u00e9' is missing the braces around its code point",
+			)
+			expect(diagnostics[0].position).toEqual({
+				start: { line: 1, column: 35 },
+				end: { line: 1, column: 41 },
+			})
+			expect(helpsOf(source)).toEqual(["Write it in braces: '\\u{e9}'."])
+			expect(
+				compiles('implementation { constant x = "caf\\u{e9}" }'),
+			).toBe(true)
+		})
+
+		// NOTE: The pair is the habit's other half — `😀` is how a
+		// language with no astral escape writes one character. Neither half is a
+		// character, so neither has a rewrite of its own and the Help offers the
+		// one escape both of them stood for.
+		it("should offer the whole character for a surrogate pair", () => {
+			let source = 'implementation { constant x = "\\uD83D\\uDE00" }'
+
+			expect(helpsOf(source)).toEqual([
+				"Write the character as one escape: '\\u{1F600}'.",
+			])
+			expect(
+				compiles('implementation { constant x = "\\u{1F600}" }'),
+			).toBe(true)
+		})
+
+		// NOTE: ONE report over BOTH halves, and the span is the whole of what
+		// the Help rewrites. A pair reported half at a time was the bug this
+		// test was written against and did not see: following the first Help
+		// left the second half standing and the reader was refused again, which
+		// is exactly what a Help may not do.
+		it("should offer the whole character for a braced surrogate pair", () => {
+			let source = 'implementation { constant x = "\\u{D83D}\\u{DE00}" }'
+			let { diagnostics } = parseWithDiagnostics(source)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"surrogate-unicode-escape",
+			])
+			expect(diagnostics[0].position).toEqual({
+				start: { line: 1, column: 32 },
+				end: { line: 1, column: 48 },
+			})
+			expect(diagnostics[0].notes).toEqual([
+				"U+D800 through U+DFFF are the halves UTF-16 writes a character above U+FFFF in; a String holds characters, so an escape names one of those directly.",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Write the character as one escape: '\\u{1F600}'.",
+			])
+			expect(
+				compiles('implementation { constant x = "\\u{1F600}" }'),
+			).toBe(true)
+		})
+
+		// NOTE: The two halves need not be written the same way. A reader
+		// rewriting a JavaScript pair one half at a time leaves exactly these
+		// behind, and each of them is still one character written in two
+		// escapes — so each is one report offering the character both halves
+		// stood for, and following it leaves nothing behind.
+		it("should read a pair whose halves are spelled differently", () => {
+			for (let written of ['"\\uD83D\\u{DE00}"', '"\\u{D83D}\\uDE00"']) {
+				let source = `implementation { constant x = ${written} }`
+				let { diagnostics } = parseWithDiagnostics(source)
+
+				expect([written, diagnostics.length]).toEqual([written, 1])
+				expect([written, helpsOf(source)]).toEqual([
+					written,
+					["Write the character as one escape: '\\u{1F600}'."],
+				])
+			}
+
+			expect(
+				compiles('implementation { constant x = "\\u{1F600}" }'),
+			).toBe(true)
+		})
+
+		// NOTE: What is NOT a pair, so the report that spans two escapes is
+		// held to spanning exactly the two that spell one character: halves in
+		// the wrong order, a high half in front of an ordinary escape, and a
+		// pair that something stands between. Each half is its own refusal
+		// there, and none of them is offered an edit.
+		it("should offer nothing where two escapes are not a pair", () => {
+			for (let [written, reports] of [
+				['"\\u{DC00}\\u{D800}"', 2],
+				['"\\u{D800}\\u{41}"', 1],
+				['"\\u{D800}x\\u{DC00}"', 2],
+				['"\\u{D800}{ 1 }\\u{DC00}"', 2],
+			] as Array<[string, number]>) {
+				let source = `implementation { constant x = ${written} }`
+				let { diagnostics } = parseWithDiagnostics(source)
+
+				expect([written, diagnostics.length]).toEqual([
+					written,
+					reports,
+				])
+				expect([written, helpsOf(source)]).toEqual([written, []])
+			}
+		})
+
+		// NOTE: A lone surrogate has no rewrite — there is no character it
+		// stands for — so nothing is offered rather than something that would be
+		// refused on the next run.
+		it("should offer nothing for a lone surrogate", () => {
+			let source = 'implementation { constant x = "\\u{D800}" }'
+			let { diagnostics } = parseWithDiagnostics(source)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("surrogate-unicode-escape")
+			expect(diagnostics[0].message).toBe(
+				"U+D800 is a surrogate, which names no character",
+			)
+			expect(helpsOf(source)).toEqual([])
+		})
+
+		it("should refuse an escape holding nothing", () => {
+			let source = 'implementation { constant x = "\\u{}" }'
+			let { diagnostics } = parseWithDiagnostics(source)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("malformed-unicode-escape")
+			expect(diagnostics[0].message).toBe("'\\u{}' names no code point")
+			expect(helpsOf(source)).toEqual([
+				"Write the code point's hexadecimal digits between the braces: '\\u{1B}' is the escape character.",
+			])
+			expect(compiles('implementation { constant x = "\\u{1B}" }')).toBe(
+				true,
+			)
+		})
+
+		it("should name the character that is not a hexadecimal digit", () => {
+			let source = 'implementation { constant x = "\\u{1G}" }'
+			let { diagnostics } = parseWithDiagnostics(source)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("malformed-unicode-escape")
+			expect(diagnostics[0].message).toBe(
+				"'G' is not a hexadecimal digit",
+			)
+			expect(helpsOf(source)).toEqual([
+				"Write the code point in hexadecimal: '\\u{1B}' is the escape character, '\\u{1F600}' a grinning face.",
+			])
+			expect(
+				compiles('implementation { constant x = "\\u{1F600}" }'),
+			).toBe(true)
+		})
+
+		// NOTE: The character the message names is the READER'S, and a report
+		// is read on a terminal. An override in it reorders the line the
+		// Compiler wrote; a BEL rings the bell; a byte order mark leaves
+		// `'' is not a hexadecimal digit`, which names nothing at all. Every
+		// one of them is NAMED instead — the spelling a chart uses — so
+		// printing the message can not do what the character does.
+		it("should name an offending character that acts on the terminal", () => {
+			for (let [character, named] of [
+				["\u202E", "U+202E"],
+				["\u0007", "U+0007"],
+				["\uFEFF", "U+FEFF"],
+				["\u2028", "U+2028"],
+			] as Array<[string, string]>) {
+				let { diagnostics } = parseWithDiagnostics(
+					`implementation { constant x = "\\u{${character}41}" }`,
+				)
+
+				expect([named, diagnostics[0].message]).toEqual([
+					named,
+					`${named} is not a hexadecimal digit`,
+				])
+				expect([named, diagnostics[0].message]).not.toContain(character)
+			}
+		})
+
+		// NOTE: And the character that prints as itself still prints as itself:
+		// naming every one of them would tell a reader who typed 'G' about
+		// U+0047.
+		it("should quote an offending character that prints as itself", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				'implementation { constant x = "\\u{1\u00E9}" }',
+			)
+
+			expect(diagnostics[0].message).toBe(
+				"'\u00E9' is not a hexadecimal digit",
+			)
+		})
+
+		// NOTE: `U+1B` is how a code point is NAMED everywhere it is written
+		// down, so it arrives inside the braces often enough to be answered for
+		// rather than left to the general rule.
+		it("should take the 'U+' off a code point written by name", () => {
+			let source = 'implementation { constant x = "\\u{U+1B}" }'
+
+			expect(helpsOf(source)).toEqual([
+				"Write the digits alone: '\\u{1B}' — the 'U+' names a code point rather than spelling one.",
+			])
+			expect(compiles('implementation { constant x = "\\u{1B}" }')).toBe(
+				true,
+			)
+		})
+
+		it("should refuse more than six digits and drop the leading zeros", () => {
+			let source = 'implementation { constant x = "\\u{0000041}" }'
+			let { diagnostics } = parseWithDiagnostics(source)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("malformed-unicode-escape")
+			expect(diagnostics[0].message).toBe("'\\u{0000041}' has 7 digits")
+			expect(helpsOf(source)).toEqual([
+				"Drop the leading zeros: '\\u{41}'.",
+			])
+			expect(compiles('implementation { constant x = "\\u{41}" }')).toBe(
+				true,
+			)
+		})
+
+		it("should refuse a code point above the highest one", () => {
+			let source = 'implementation { constant x = "\\u{110000}" }'
+			let { diagnostics } = parseWithDiagnostics(source)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unicode-escape-out-of-range")
+			expect(diagnostics[0].message).toBe(
+				"U+110000 is above the highest character",
+			)
+			expect(diagnostics[0].notes).toEqual([
+				"The highest Unicode code point is U+10FFFF, so '\\u{10FFFF}' is the largest escape there is.",
+			])
+			expect(
+				compiles('implementation { constant x = "\\u{10FFFF}" }'),
+			).toBe(true)
+		})
+
+		// NOTE: Every decimal digit is a hexadecimal digit too, so a code point
+		// copied out of a chart in decimal looks exactly like a well-written
+		// escape and simply names a number that is too large. The Help offers
+		// the reading on a condition it writes out rather than instructing,
+		// because which base was meant is the one thing the source does not
+		// record.
+		it("should offer the hexadecimal spelling of a decimal code point", () => {
+			let source = 'implementation { constant x = "\\u{128512}" }'
+
+			expect(helpsOf(source)).toEqual([
+				"The digits are read as hexadecimal — write '\\u{1F600}' where the character numbered 128512 was meant.",
+			])
+			expect(
+				compiles('implementation { constant x = "\\u{1F600}" }'),
+			).toBe(true)
+		})
+
+		// NOTE: And withheld where the digits are not a chart reading at all.
+		// `\u{110000}` is U+10FFFF plus one written in HEXADECIMAL — the top of
+		// Unicode, missed by one, by a reader who knows exactly where it is.
+		// Asking them whether they meant the decimal 110,000 (a Yi syllable)
+		// is noise in the one place the refusal is already the whole answer, so
+		// the guess stops at the first plane above the last real one.
+		it("should withhold a decimal reading just above the top", () => {
+			for (let written of ["110000", "110001", "111111", "119999"]) {
+				let source = `implementation { constant x = "\\u{${written}}" }`
+				let { diagnostics } = parseWithDiagnostics(source)
+
+				expect([written, diagnostics[0].code]).toEqual([
+					written,
+					"unicode-escape-out-of-range",
+				])
+				expect([written, helpsOf(source)]).toEqual([written, []])
+			}
+		})
+
+		// NOTE: A decimal that LOOKS like it lands somewhere refusable does
+		// not. Six digits read as hexadecimal is at most 0xFFFFFF, and the
+		// smallest of them that is above the top is 0x110000, whose decimal
+		// reading is 110,000 — above every surrogate. So the arm of the
+		// withholding that guards against a decimal surrogate can not fire,
+		// and this pins the reason: `\u{55296}` — U+D800 read as decimal —
+		// never reaches the refusal at all, because 0x55296 is an ordinary
+		// character.
+		it("should read a decimal surrogate as the character its digits spell", () => {
+			expect(
+				parseWithDiagnostics(
+					'implementation { constant x = "\\u{55296}" }',
+				).diagnostics,
+			).toEqual([])
+		})
+
+		// NOTE: The refusal that could swallow the file, and the reason the scan
+		// stops where it does. The String closes where it was written, so the
+		// Statement after it is read — and `unclosed-string` is NOT reported,
+		// because nothing is unclosed.
+		it("should close the String an unclosed escape was written in", () => {
+			let source = `implementation {
+	constant s = "\\u{1B"
+	constant t = 2
+}`
+			let { program, diagnostics } = parseWithDiagnostics(source)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"malformed-unicode-escape",
+			])
+			expect(diagnostics[0].message).toBe("this '\\u{' is never closed")
+			expect(helpsOf(source)).toEqual(["Close it with a '}': '\\u{1B}'."])
+			expect(program.implementation.nodes).toHaveLength(2)
+			expect(
+				compiles(`implementation {
+	constant s = "\\u{1B}"
+	Terminal.inspect(s)
+}`),
+			).toBe(true)
+		})
+
+		// NOTE: And the hole below an unclosed escape is still a hole. This is
+		// the recovery `lexer.spec.ts` checks in Tokens, read here as the
+		// Program the Parser built out of them.
+		it("should leave a hole below an unclosed escape alone", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`implementation {
+	constant n = 2
+	constant s = "\\u{{ n }tail"
+}`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"malformed-unicode-escape",
+			])
+			expect(
+				declaredValue(program.implementation.nodes[1]),
+			).toMatchObject({ nodeType: "InterpolatedStringValue" })
 		})
 	})
 

@@ -167,6 +167,215 @@ describe("Lexer", () => {
 			expect(lexer.errors[0].code).toBe("invalid-escape")
 		})
 
+		// NOTE: The `\u{…}` escape, read end to end here and reported on in
+		// `parserDiagnostics.spec.ts`, where a Diagnostic's whole text is. What
+		// belongs here is what the VALUE turns out to be, because that is the
+		// question the rest of the Compiler and the round-trip property both
+		// ask: the decoded character, and nothing at all where it was refused.
+		it("should decode a Unicode escape into the character it names", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"\\u{1B}[0m and \\u{1F600} and \\u{e9}"')
+
+			expect(stripPosition(lexer.next())).toEqual({
+				value: "\u001B[0m and \u{1F600} and é",
+				type: TokenType.LiteralString,
+			})
+			expect(lexer.errors).toEqual([])
+		})
+
+		// NOTE: U+0000 is a Unicode scalar value like any other, so it is a
+		// character a Literal may name. Nothing downstream terminates on it:
+		// the emitted JavaScript writes it as `\0`, and `strings.spec.ts` in
+		// the compiler's test suite builds and runs a Program holding one.
+		it("should accept the null character", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"a\\u{0}b"')
+
+			expect(stripPosition(lexer.next())).toEqual({
+				value: "a\u0000b",
+				type: TokenType.LiteralString,
+			})
+			expect(lexer.errors).toEqual([])
+		})
+
+		// NOTE: The hexadecimal digits are read in either case, and the VALUE
+		// is the same either way. What the file keeps of the reader's own
+		// spelling is the formatter's business — it reprints a Literal from the
+		// source — and there is nothing of it left by the time the value exists.
+		it("should read hexadecimal digits in either case", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"\\u{1f600}\\u{1F600}"')
+
+			expect(stripPosition(lexer.next())).toEqual({
+				value: "\u{1F600}\u{1F600}",
+				type: TokenType.LiteralString,
+			})
+		})
+
+		// NOTE: NOT normalised at lex time. `"e\u{301}"` is an `e` and a
+		// combining acute, two code points of text that the runtime's own
+		// comparison then treats as equal to the one composed `é` — that is the
+		// String semantics, and it belongs to `is` and `compare` rather than to
+		// the Literal. A Lexer that composed here would leave a Program no way
+		// to write the decomposed spelling down at all.
+		//
+		// NOTE: The expected value is written with a JavaScript escape rather
+		// than as the two characters themselves. The file MUST hold the
+		// decomposed bytes for this test to mean what it says, and a source
+		// file taken through any normalising tool composes them in silence —
+		// the test would then pass against a Lexer that composed too.
+		it("should leave the code points it was given uncomposed", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"e\\u{301}"')
+
+			expect(stripPosition(lexer.next())).toEqual({
+				value: "e\u0301",
+				type: TokenType.LiteralString,
+			})
+			expect(lexer.errors).toEqual([])
+		})
+
+		// NOTE: And the character that composes ON ITS OWN, which is the half a
+		// combining mark can not test. U+2126 OHM SIGN normalises to U+03A9
+		// GREEK CAPITAL LETTER OMEGA and U+212A KELVIN SIGN to a plain `K`,
+		// each of them one code point to one code point — so a Lexer that
+		// normalised the decoded CHARACTER rather than the decoded chunk leaves
+		// `"e\u{301}"` alone and quietly rewrites these instead. A Literal is
+		// the code points it was written with, and for these two there is no
+		// other way to write them down at all.
+		it("should leave a character that composes by itself alone", () => {
+			for (let [written, value] of [
+				["\\u{2126}", "\u2126"],
+				["\\u{212A}", "\u212a"],
+			] as Array<[string, string]>) {
+				let lexer = new Lexer()
+
+				lexer.reset(`"${written}"`)
+
+				expect([written, stripPosition(lexer.next())]).toEqual([
+					written,
+					{ value, type: TokenType.LiteralString },
+				])
+				expect([written, lexer.errors]).toEqual([written, []])
+			}
+		})
+
+		// NOTE: A refused escape contributes no character — see
+		// `readUnicodeEscape`. Every one of these leaves the rest of the String
+		// to be read as itself, which is the half of the recovery that matters:
+		// the closing quote is still the closing quote.
+		it("should refuse every malformed Unicode escape and keep lexing", () => {
+			let refusals: Array<[string, string, string]> = [
+				['"a\\u{}b"', "ab", "malformed-unicode-escape"],
+				['"a\\u{1G}b"', "ab", "malformed-unicode-escape"],
+				['"a\\u{0000041}b"', "ab", "malformed-unicode-escape"],
+				['"a\\u{110000}b"', "ab", "unicode-escape-out-of-range"],
+				['"a\\u{D800}b"', "ab", "surrogate-unicode-escape"],
+				['"a\\u{DFFF}b"', "ab", "surrogate-unicode-escape"],
+				// NOTE: `\u001Bz` takes FOUR digits and leaves the `z`, which
+				// is JavaScript's own reading of it — see `readUnbracedEscape`.
+				['"a\\u001Bz"', "az", "unbraced-unicode-escape"],
+				['"a\\u1B}z"', "az", "unbraced-unicode-escape"],
+				['"a\\uz"', "az", "unbraced-unicode-escape"],
+			]
+
+			for (let [input, value, code] of refusals) {
+				let lexer = new Lexer()
+
+				lexer.reset(input)
+
+				expect([input, stripPosition(lexer.next())]).toEqual([
+					input,
+					{ value, type: TokenType.LiteralString },
+				])
+				expect([
+					input,
+					...lexer.errors.map((error) => error.code as string),
+				]).toEqual([input, code])
+			}
+		})
+
+		// NOTE: `\u{` with no `}` is the one refusal that could swallow the
+		// file. The scan stops at the characters that end the reading of the
+		// Literal and does not consume them, so the closing quote still closes
+		// the String and the `{` still opens its hole — which is what keeps the
+		// unclosed-String and hole recoveries reporting what they reported.
+		it("should stop an unclosed Unicode escape at the closing quote", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"\\u{1B" + rest')
+
+			expect(stripPosition(lexer.next())).toEqual({
+				value: "",
+				type: TokenType.LiteralString,
+			})
+			expect(lexer.errors.map((error) => error.code)).toEqual([
+				"malformed-unicode-escape",
+			])
+		})
+
+		it("should stop an unclosed Unicode escape at a hole", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"\\u{{ name }tail"')
+
+			expect(
+				stripPositionFromArray([
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+				]),
+			).toEqual([
+				{ value: "", type: TokenType.LiteralStringStart },
+				{ value: "name", type: TokenType.Identifier },
+				{ value: "tail", type: TokenType.LiteralStringEnd },
+			])
+			expect(lexer.errors.map((error) => error.code)).toEqual([
+				"malformed-unicode-escape",
+			])
+		})
+
+		// NOTE: A `\u{…}` inside a hole's own String Literal is a String
+		// Literal's escape like any other — the hole is lexed by driving
+		// `lexToken`, so nothing here knows it is nested.
+		it("should read a Unicode escape inside a hole's own String", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"a{ "\\u{1B}" }b"')
+
+			expect(
+				stripPositionFromArray([
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+				]),
+			).toEqual([
+				{ value: "a", type: TokenType.LiteralStringStart },
+				{ value: "\u001B", type: TokenType.LiteralString },
+				{ value: "b", type: TokenType.LiteralStringEnd },
+			])
+			expect(lexer.errors).toEqual([])
+		})
+
+		// NOTE: `\u` is an escape now, so `\{u{1B}}` has to go on meaning what
+		// it meant before it was one: an escaped brace, a `u`, and a hole.
+		it("should leave an escaped brace in front of a 'u' alone", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"\\{u{1B}}"')
+
+			expect(
+				stripPositionFromArray([lexer.next(), lexer.next()]),
+			).toEqual([
+				{ value: "{u", type: TokenType.LiteralStringStart },
+				{ value: "1", type: TokenType.LiteralNumber },
+			])
+		})
+
 		it("should read an escaped brace as a literal brace, not a hole", () => {
 			let lexer = new Lexer()
 

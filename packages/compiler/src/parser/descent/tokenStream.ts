@@ -7,7 +7,11 @@ import {
 	secondary,
 } from "../../diagnostics/index"
 import { holeHoldsAnEscape } from "../../helpers/stringHoles"
-import { Lexer, UnterminatedStringError } from "../../lexer/index"
+import {
+	escapeSetSentence,
+	Lexer,
+	UnterminatedStringError,
+} from "../../lexer/index"
 import {
 	type DocumentationLine,
 	type DocumentationProblem,
@@ -366,11 +370,27 @@ export class TokenStream {
 						primary(error.position, "this escape is not known"),
 					],
 					notes: [
-						"A String understands '\\\"', '\\\\', '\\n', '\\r', '\\t', '\\{' and '\\}'; every other backslash is an error.",
+						`A String understands ${escapeSetSentence}; every other backslash is an error.`,
 					],
 					helps: [
 						"Write '\\\\' for a literal backslash, or drop the backslash to keep the character as itself.",
 					],
+				})
+
+				continue
+			}
+
+			// NOTE: The `\u{…}` family, whose label, Note and Helps are built
+			// where the escape was read — see `LexingError.report`. The shape of
+			// the mistake and the reader's own digits are known only there, and
+			// the four codes it reports under are the only ones that arrive with
+			// their report already written.
+			if (error.report !== undefined) {
+				reportError(error.message, error.position, {
+					code: error.code,
+					labels: [primary(error.position, error.report.label)],
+					notes: error.report.notes,
+					helps: error.report.helps,
 				})
 
 				continue

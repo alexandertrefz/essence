@@ -364,26 +364,44 @@ A `String` is written between double quotes, and only double quotes: `'Ada'` is 
 
 [`{…}`](/docs/reference/syntax-glossary#interpolation) inside a string is a hole. It takes any expression: a method call, a list, or another string literal with holes of its own. The hole renders its value the way `print` does. Only a value that knows how to print may stand in a hole, so a union such as `Integer | String` is refused there as [`interpolation-not-printable`](/docs/reference/diagnostics#interpolation-not-printable). Calling `toString()` inside a hole is redundant, and the compiler warns about it as [`redundant-interpolation-to-string`](/docs/reference/diagnostics#redundant-interpolation-to-string).
 
-A [backslash](/docs/reference/syntax-glossary#backslash) escapes exactly seven characters: `\"`, `\\`, `\n`, `\r`, `\t`, `\{` and `\}`. The last two exist because a bare `{` opens a hole. There is no `\u` escape; write the character itself. Every other backslash is [`invalid-escape`](/docs/reference/diagnostics#invalid-escape):
+A [backslash](/docs/reference/syntax-glossary#backslash) escapes exactly eight things: `\"`, `\\`, `\n`, `\r`, `\t`, `\{`, `\}` and `\u{…}`. `\{` and `\}` exist because a bare `{` opens a hole. Every other backslash is [`invalid-escape`](/docs/reference/diagnostics#invalid-escape):
 
 <div class="error-output">
 
 ```
 [invalid-escape]
-Error: '\u' is not a valid escape
-   ╭─┤ cafe.es:2:21 │
+Error: '\d' is not a valid escape
+   ╭─┤ Folder.es:2:20 │
    │
- 2 │     Terminal.print("caf\u00e9")
-   │                        ─┐
-   │                         ╰── this escape is not known
-   │
+ 2 │     Terminal.print("C:\data")
+   │                       ─┐  
+   │                        ╰── this escape is not known
+   │ 
    │ Help: Write '\\' for a literal backslash, or drop the backslash to keep the character as itself.
-   │
-   │ Note: A String understands '\"', '\\', '\n', '\r', '\t', '\{' and '\}'; every other backslash is an error.
+   │ 
+   │ Note: A String understands '\"', '\\', '\n', '\r', '\t', '\{', '\}' and '\u{…}'; every other backslash is an error.
 ───╯
 ```
 
 </div>
+
+### Writing a character by its code point
+
+`\u{…}` names one character by its Unicode code point, written in one to six hexadecimal digits in either case. It is an escape and not a hole: `"\u{1B}[0m"` is the escape character followed by `[0m`, and `"\{u{1B}}"` still means what it meant before the escape existed.
+
+```essence
+implementation {
+	Terminal.print("\u{1F600}") § 😀
+	Terminal.print("\u{1B}"::length()) § 1
+	Terminal.print("caf\u{e9}") § café
+}
+```
+
+The escape is what lets a program write down a character an editor would otherwise eat — a control character, a combining mark standing on its own, a zero-width joiner. `"e\u{301}"` is an `e` and a combining acute: two code points, which [`::length()`](/docs/library/string#length) counts as the one character they draw, and which [`::is`](/docs/library/string#is) finds equal to the composed `"\u{e9}"`. That is the string semantics rather than the literal's — a literal holds exactly the code points that were written, and the comparison composes them.
+
+`\u{0}` is accepted: U+0000 is a Unicode scalar value like any other and nothing in the runtime ends a string on it. What is refused is anything that names no character — `\u{D800}` through `\u{DFFF}`, the halves UTF-16 writes an astral character in ([`surrogate-unicode-escape`](/docs/reference/diagnostics#surrogate-unicode-escape)), and anything above `\u{10FFFF}` ([`unicode-escape-out-of-range`](/docs/reference/diagnostics#unicode-escape-out-of-range)). The JavaScript spelling `\u00e9` is [`unbraced-unicode-escape`](/docs/reference/diagnostics#unbraced-unicode-escape), and braces that hold nothing, hold something that is not a hexadecimal digit, hold more than six digits or never close are [`malformed-unicode-escape`](/docs/reference/diagnostics#malformed-unicode-escape).
+
+**Invisible characters, in both directions.** The escape is how a program writes an invisible character down deliberately; [`quote()`](/docs/library/string#quote) and `inspect` are how one that arrived by accident becomes visible. Every renderer that quotes a string escapes the control characters, the line separators U+2028 and U+2029, the byte order mark, and the bidirectional formatting characters — U+202A through U+202E, U+2066 through U+2069 and the three marks beside them. Those last ones reorder the text around them, which is a way to make a line of source or a line of output read as something other than what it says; a printed value can not do that, because the printer writes it as `\u{202E}` rather than letting it act. What is deliberately left alone is the zero-width joiner, which holds emoji sequences together: escaping it would take a printed 👩‍💻 apart into three characters nobody wrote.
 
 Working with text, from characters to searching and cutting, is on [Strings](/docs/language/strings).
 

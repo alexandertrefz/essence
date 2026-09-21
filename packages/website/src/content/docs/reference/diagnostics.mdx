@@ -368,7 +368,7 @@ Taught on: [Programs and values › Rationals](/docs/language/programs-and-value
 
 ### `invalid-escape`
 
-**Error.** A backslash in a string is followed by a character that is not an escape. The escapes are `\"`, `\\`, `\n`, `\r`, `\t`, `\{` and `\}`. `\{` and `\}` write a brace, because every string can hold `{ … }` holes, not only a template literal.
+**Error.** A backslash in a string is followed by a character that is not an escape. The escapes are `\"`, `\\`, `\n`, `\r`, `\t`, `\{`, `\}` and `\u{…}`. `\{` and `\}` write a brace, because every string can hold `{ … }` holes, not only a template literal.
 
 <div class="error-output">
 
@@ -383,7 +383,7 @@ Error: '\d' is not a valid escape
    │ 
    │ Help: Write '\\' for a literal backslash, or drop the backslash to keep the character as itself.
    │ 
-   │ Note: A String understands '\"', '\\', '\n', '\r', '\t', '\{' and '\}'; every other backslash is an error.
+   │ Note: A String understands '\"', '\\', '\n', '\r', '\t', '\{', '\}' and '\u{…}'; every other backslash is an error.
 ───╯
 ```
 
@@ -392,6 +392,139 @@ Error: '\d' is not a valid escape
 Write `\\` for a backslash: `"C:\\data"` prints `C:\data`. Drop the backslash if it was a typo.
 
 Quick Fix: **Write '\\\\' for a literal backslash** or **Drop the backslash**.
+
+Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
+
+### `unbraced-unicode-escape`
+
+**Error.** A `\u` is written without the braces around its code point. JavaScript and JSON spell a character that way — `\u00e9`, four digits and no braces — and Essence spells it `\u{e9}`, one to six digits in braces.
+
+<div class="error-output">
+
+```
+[unbraced-unicode-escape]
+Error: '\u00e9' is missing the braces around its code point
+   ╭─┤ cafe.es:2:21 │
+   │
+ 2 │     Terminal.print("caf\u00e9")
+   │                        ───┬──  
+   │                           ╰──── a code point is written in braces
+   │ 
+   │ Help: Write it in braces: '\u{e9}'.
+   │ 
+   │ Note: A Unicode escape is written '\u{…}' — one to six hexadecimal digits in braces, naming one character.
+───╯
+```
+
+</div>
+
+The Help rebrackets exactly the digits JavaScript would have read, which is four of them where four are written: `"\u0041BC"` is `A` followed by `BC` there, so the Help offers `\u{41}` and leaves `BC` alone. A surrogate pair — `"\uD83D\uDE00"`, how a language with no astral escape writes one character — is answered with the single escape both halves stood for, `\u{1F600}`.
+
+Quick Fix: **Write it in braces**.
+
+Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
+
+### `malformed-unicode-escape`
+
+**Error.** A `\u{…}` is not written as one to six hexadecimal digits in braces. The braces may hold nothing (`"\u{}"`), hold a character that is not a hexadecimal digit (`"\u{1G}"`), hold more than six digits (`"\u{0000041}"`), or never close (`"\u{1B"`).
+
+<div class="error-output">
+
+```
+[malformed-unicode-escape]
+Error: 'G' is not a hexadecimal digit
+   ╭─┤ Digits.es:2:18 │
+   │
+ 2 │     Terminal.print("\u{1G}")
+   │                     ───┬──  
+   │                        ╰──── a code point is written in hexadecimal
+   │ 
+   │ Help: Write the code point in hexadecimal: '\u{1B}' is the escape character, '\u{1F600}' a grinning face.
+   │ 
+   │ Note: A Unicode escape is written '\u{…}' — one to six hexadecimal digits in braces, naming one character.
+───╯
+```
+
+</div>
+
+An escape that never closes stops at the closing quote without consuming it, so the string ends where it was written and every statement below it is still read. Leading zeros are the usual cause of a seventh digit, and the Help takes them off. `U+1B` written between the braces is answered by taking the `U+` off: that is how a code point is named, not how it is spelled.
+
+Quick Fix: **Drop the leading zeros**, **Close it with a '}'** or **Write the digits alone**, each where the mistake is that one.
+
+Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
+
+### `unicode-escape-out-of-range`
+
+**Error.** A `\u{…}` names a number above U+10FFFF, which is the highest Unicode code point there is.
+
+<div class="error-output">
+
+```
+[unicode-escape-out-of-range]
+Error: U+128512 is above the highest character
+   ╭─┤ Chart.es:2:18 │
+   │
+ 2 │     Terminal.print("\u{128512}")
+   │                     ─────┬────  
+   │                          ╰────── no character has this code point
+   │ 
+   │ Help: The digits are read as hexadecimal — write '\u{1F600}' where the character numbered 128512 was meant.
+   │ 
+   │ Note: The highest Unicode code point is U+10FFFF, so '\u{10FFFF}' is the largest escape there is.
+───╯
+```
+
+</div>
+
+Every decimal digit is a hexadecimal digit too, so a code point copied off a chart in decimal looks exactly like a well-written escape and simply names a number that is too large. The Help offers the hexadecimal spelling on that condition rather than assuming it — `where the character numbered 128512 was meant` is the condition, and which base was meant is the one thing the source does not record. It is the one Help among the escapes with no Quick Fix behind it: applying it would decide for the reader which base they had in mind.
+
+It is withheld just above the top. `"\u{110000}"` is U+10FFFF missed by one in hexadecimal, written by somebody who knows exactly where the top is, and so is the whole of the first plane above the last real one: asking them whether they meant the decimal 110,000 answers a question nobody asked. The refusal itself is the whole of what those need.
+
+Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
+
+### `surrogate-unicode-escape`
+
+**Error.** A `\u{…}` names a code point between U+D800 and U+DFFF. Those are the two halves UTF-16 writes a character above U+FFFF in, and neither of them names a character on its own.
+
+<div class="error-output">
+
+```
+[surrogate-unicode-escape]
+Error: U+D83D is a surrogate, which names no character
+   ╭─┤ Half.es:2:18 │
+   │
+ 2 │     Terminal.print("\u{D83D}")
+   │                     ────┬───  
+   │                         ╰───── this is half of a character, not one
+   │ 
+   │ Note: U+D800 through U+DFFF are the halves UTF-16 writes a character above U+FFFF in; a String holds characters, so an escape names one of those directly.
+───╯
+```
+
+</div>
+
+No Help is offered for a lone surrogate, because there is no character it stands for. A string holds characters rather than the units they are stored in, so an astral character is always written as a single escape.
+
+Where the other half stands directly behind it, the two are one mistake and are reported as one — over both escapes, whichever way each half is spelled (`\uD83D\uDE00`, `\u{D83D}\u{DE00}` and the two mixtures of them all read alike):
+
+<div class="error-output">
+
+```
+[surrogate-unicode-escape]
+Error: U+D83D and U+DE00 are the two halves of one character
+   ╭─┤ Halves.es:2:18 │
+   │
+ 2 │     Terminal.print("\u{D83D}\u{DE00}")
+   │                     ────────┬───────  
+   │                             ╰───────── one character, written as the units it is stored in
+   │ 
+   │ Help: Write the character as one escape: '\u{1F600}'.
+   │ 
+   │ Note: U+D800 through U+DFFF are the halves UTF-16 writes a character above U+FFFF in; a String holds characters, so an escape names one of those directly.
+───╯
+```
+
+</div>
 
 Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
 

@@ -85,12 +85,13 @@ const CORPUS = corpus()
 // could not read whole is exactly what the gate is there to prevent. Four of
 // them genuinely do not parse; the rest parse and are refused all the same,
 // because a `default-on-function-literal`, a `shorthand-in-combination`, a
-// `shorthand-on-path-key` and a `test-outside-tests` are errors like any other
-// and the formatter asks only whether there were any.
+// `shorthand-on-path-key`, a `test-outside-tests` and a malformed `\u{…}` are
+// errors like any other and the formatter asks only whether there were any.
 const REFUSED = new Set([
 	"diagnostics/Syntax.es",
 	"diagnostics/UnclosedString.es",
 	"diagnostics/SwallowedString.es",
+	"diagnostics/Escapes.es",
 	"diagnostics/DefaultsSyntax.es",
 	"diagnostics/MemberPathSyntax.es",
 	"diagnostics/RecordShorthand.es",

@@ -130,7 +130,8 @@ Double quotes only, and every string literal interpolates. `length()` counts cha
 | `s.split("\n")` | [`s::split(on "\n")`](/docs/library/string#split) | [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot) |
 | `s.indexOf(t)` is `-1` when absent | [`s::firstIndex(of t)`](/docs/library/string#firstIndex) is `#Empty` when absent | [`type-without-members`](/docs/reference/diagnostics#type-without-members) |
 | `"café" === "cafe\u0301"` is `false` | [`::is`](/docs/library/string#is) returns `true` for the same two spellings of `é` | — |
-| `"\u00e9"` | write `é` itself; there are [seven escapes](/docs/reference/syntax-glossary#backslash) | [`invalid-escape`](/docs/reference/diagnostics#invalid-escape) |
+| `"\u00e9"` | `"\u{e9}"` — the braces are not optional, and they take one to six digits | [`unbraced-unicode-escape`](/docs/reference/diagnostics#unbraced-unicode-escape), whose help rebrackets the digits you wrote |
+| `"\uD83D\uDE00"`, a surrogate pair | `"\u{1F600}"`, one escape for one character | [`unbraced-unicode-escape`](/docs/reference/diagnostics#unbraced-unicode-escape); `"\u{D83D}"` alone is [`surrogate-unicode-escape`](/docs/reference/diagnostics#surrogate-unicode-escape) |
 
 ## Collections
 

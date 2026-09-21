@@ -1108,6 +1108,126 @@ Warning: This Parameter has no '@param' line
 "
 `;
 
+exports[`Diagnostic Showcase Escapes.es should render the same report every time 1`] = `
+"[unbraced-unicode-escape]
+Error: '\\u00e9' is missing the braces around its code point
+    ╭─┤ Escapes.es:19:26 │
+    │
+ 19 │     constant accented = "caf\\u00e9"
+    │                             ───┬──  
+    │                                ╰──── a code point is written in braces
+    │ 
+    │ Help: Write it in braces: '\\u{e9}'.
+    │ 
+    │ Note: A Unicode escape is written '\\u{…}' — one to six hexadecimal digits in braces, naming one character.
+────╯
+
+[unbraced-unicode-escape]
+Error: '\\uD83D' is missing the braces around its code point
+    ╭─┤ Escapes.es:24:19 │
+    │
+ 24 │     constant face = "\\uD83D\\uDE00"
+    │                      ──────┬─────  
+    │                            ╰─────── a code point is written in braces
+    │ 
+    │ Help: Write the character as one escape: '\\u{1F600}'.
+    │ 
+    │ Note: A Unicode escape is written '\\u{…}' — one to six hexadecimal digits in braces, naming one character.
+────╯
+
+[malformed-unicode-escape]
+Error: '\\u{}' names no code point
+    ╭─┤ Escapes.es:27:20 │
+    │
+ 27 │     constant empty = "\\u{}"
+    │                       ──┬─  
+    │                         ╰─── nothing stands between the braces
+    │ 
+    │ Help: Write the code point's hexadecimal digits between the braces: '\\u{1B}' is the escape character.
+    │ 
+    │ Note: A Unicode escape is written '\\u{…}' — one to six hexadecimal digits in braces, naming one character.
+────╯
+
+[malformed-unicode-escape]
+Error: 'G' is not a hexadecimal digit
+    ╭─┤ Escapes.es:32:23 │
+    │
+ 32 │     constant mistyped = "\\u{1G}"
+    │                          ───┬──  
+    │                             ╰──── a code point is written in hexadecimal
+    │ 
+    │ Help: Write the code point in hexadecimal: '\\u{1B}' is the escape character, '\\u{1F600}' a grinning face.
+    │ 
+    │ Note: A Unicode escape is written '\\u{…}' — one to six hexadecimal digits in braces, naming one character.
+────╯
+
+[malformed-unicode-escape]
+Error: '\\u{0000041}' has 7 digits
+    ╭─┤ Escapes.es:36:21 │
+    │
+ 36 │     constant padded = "\\u{0000041}"
+    │                        ─────┬─────  
+    │                             ╰─────── a code point takes at most six digits
+    │ 
+    │ Help: Drop the leading zeros: '\\u{41}'.
+    │ 
+    │ Note: A Unicode escape is written '\\u{…}' — one to six hexadecimal digits in braces, naming one character.
+────╯
+
+[malformed-unicode-escape]
+Error: this '\\u{' is never closed
+    ╭─┤ Escapes.es:41:23 │
+    │
+ 41 │     constant unclosed = "\\u{1B"
+    │                          ──┬──  
+    │                            ╰──── no '}' closes this escape
+    │ 
+    │ Help: Close it with a '}': '\\u{1B}'.
+    │ 
+    │ Note: A Unicode escape is written '\\u{…}' — one to six hexadecimal digits in braces, naming one character.
+────╯
+
+[unicode-escape-out-of-range]
+Error: U+128512 is above the highest character
+    ╭─┤ Escapes.es:47:23 │
+    │
+ 47 │     constant tooLarge = "\\u{128512}"
+    │                          ─────┬────  
+    │                               ╰────── no character has this code point
+    │ 
+    │ Help: The digits are read as hexadecimal — write '\\u{1F600}' where the character numbered 128512 was meant.
+    │ 
+    │ Note: The highest Unicode code point is U+10FFFF, so '\\u{10FFFF}' is the largest escape there is.
+────╯
+
+[surrogate-unicode-escape]
+Error: U+D800 is a surrogate, which names no character
+    ╭─┤ Escapes.es:52:19 │
+    │
+ 52 │     constant half = "\\u{D800}"
+    │                      ────┬───  
+    │                          ╰───── this is half of a character, not one
+    │ 
+    │ Note: U+D800 through U+DFFF are the halves UTF-16 writes a character above U+FFFF in; a String holds characters, so an escape names one of those directly.
+────╯
+
+[surrogate-unicode-escape]
+Error: U+D83D and U+DE00 are the two halves of one character
+    ╭─┤ Escapes.es:57:21 │
+    │
+ 57 │     constant halves = "\\u{D83D}\\u{DE00}"
+    │                        ────────┬───────  
+    │                                ╰───────── one character, written as the units it is stored in
+    │ 
+    │ Help: Write the character as one escape: '\\u{1F600}'.
+    │ 
+    │ Note: U+D800 through U+DFFF are the halves UTF-16 writes a character above U+FFFF in; a String holds characters, so an escape names one of those directly.
+────╯
+
+─── 9 errors
+"
+`;
+
 exports[`Diagnostic Showcase ForeignNames.es should render the same report every time 1`] = `
 "[method-called-with-dot]
 Error: 'length' is a Method, not a member

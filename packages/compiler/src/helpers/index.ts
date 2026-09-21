@@ -54,6 +54,14 @@ export { bodyDefinitelyReturns } from "./returns"
 export { holeHoldsAnEscape } from "./stringHoles"
 export { closestMatch, editDistance } from "./suggest"
 export {
+	actsOnTerminal,
+	characterAt,
+	codePointName,
+	printableText,
+	printsAsItself,
+	spelledCharacter,
+} from "./terminalText"
+export {
 	answersForBase,
 	applyGenericBindings,
 	type ArgumentMatchResult,
