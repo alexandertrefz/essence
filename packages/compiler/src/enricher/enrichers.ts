@@ -12357,6 +12357,10 @@ function probeOverload(
 	scope: enricher.Scope,
 	position: common.Position,
 	typer: ArgumentTyper,
+	// NOTE: Carried, not read — `resolveConformances` is what it decides a Help
+	// in, and only the site that read the callee's name can say it. See
+	// `printingEscapeHelps`.
+	atPrintingCall = false,
 ): ProbedOverload | undefined {
 	let { result, sawErrorArgument } = typer.probeErrorArguments(() => {
 		let inferred = inferInvocation(overload, matchableArguments, typer)
@@ -12371,6 +12375,7 @@ function probeOverload(
 				inferred.bindings,
 				scope,
 				position,
+				atPrintingCall,
 			),
 		)
 
@@ -12474,6 +12479,9 @@ function selectOverload(
 	// write — one for a Method, whose receiver is unshifted in front of the
 	// Arguments, and none for anything else. Read only by `overloadProbeOrder`.
 	receiverParameters = 0,
+	// NOTE: Handed straight on to every probe, for the one Help it decides. A
+	// Method call is never a print, so the `::` rail leaves it alone.
+	atPrintingCall = false,
 ): SelectedOverload | undefined {
 	let firstArgumentMatch:
 		| { selected: SelectedOverload; sawErrorArgument: boolean }
@@ -12494,7 +12502,14 @@ function selectOverload(
 		// reports and recordings are therefore held, and only the candidate the
 		// call commits to hands them on.
 		let probe = () =>
-			probeOverload(overload, matchableArguments, scope, position, typer)
+			probeOverload(
+				overload,
+				matchableArguments,
+				scope,
+				position,
+				typer,
+				atPrintingCall,
+			)
 		let held =
 			firstArgumentMatch === undefined
 				? undefined
@@ -15651,6 +15666,21 @@ function describeInvocationCallee(name: parser.ExpressionNode): string {
 	return "This callee"
 }
 
+// NOTE: Whether this call is the one the `Terminal.inspect` escape Help is an
+// edit for. Read off the callee as WRITTEN, the same two shapes
+// `describeInvocationCallee` above reads: a Program that renames the Namespace
+// on import is not spelling this call, and a Program that shadows `Terminal`
+// with one of its own is not making it. Either way the Help is withheld rather
+// than offered wrongly, which is the direction a Help has to fail in.
+function isPrintingCall(name: parser.ExpressionNode): boolean {
+	return (
+		name.nodeType === "Lookup" &&
+		name.base.nodeType === "Identifier" &&
+		name.base.content === "Terminal" &&
+		name.member.content === "print"
+	)
+}
+
 function resolveFunctionInvocation(
 	node: parser.FunctionInvocationNode,
 	nameType: common.Type,
@@ -15694,6 +15724,8 @@ function resolveFunctionInvocation(
 			scope,
 			node.position,
 			typer,
+			0,
+			isPrintingCall(node.name),
 		)
 
 		if (selected !== undefined) {
@@ -15776,6 +15808,8 @@ function resolveFunctionInvocation(
 			scope,
 			node.position,
 			typer,
+			0,
+			isPrintingCall(node.name),
 		)
 
 		if (selected !== undefined) {

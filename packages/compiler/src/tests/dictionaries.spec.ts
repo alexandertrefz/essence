@@ -1131,9 +1131,13 @@ describe("Dictionary", () => {
 			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
 				"unsatisfied-conformance-condition",
 			])
+			// NOTE: The head of the because-chain is dropped where it only
+			// repeats the message above it, so every Note says something the
+			// reader has not been told. The last one is why no Help follows:
+			// no `for` clause can name a Function Type.
 			expect(diagnostics[0]!.notes).toEqual([
-				"Dictionary<String, (_: Integer) -> Integer> does not conform to 'Printable'.",
 				"(_: Integer) -> Integer does not conform to 'Printable'.",
+				"No Namespace can be declared for (_: Integer) -> Integer — a 'for' clause takes a named Type.",
 			])
 		})
 

@@ -384,8 +384,7 @@ Error: List<{ x: Integer }> does not conform to 'Comparable'
     │ 
     │ Help: Declare a Namespace 'for { x: Integer } is Comparable'.
     │ 
-    │ Note 1: List<{ x: Integer }> does not conform to 'Comparable'.
-    │ Note 2: { x: Integer } does not conform to 'Comparable'.
+    │ Note: { x: Integer } does not conform to 'Comparable'.
 ────╯
 
 [shadowed-type-parameter]
@@ -1719,9 +1718,8 @@ Error: (_: Integer) -> Integer does not conform to 'Equatable'
     │                     ────────┬───────  
     │                             ╰───────── this binds a Type Parameter bound to 'Equatable'
     │ 
-    │ Help: Declare a Namespace 'for (_: Integer) -> Integer is Equatable'.
-    │ 
-    │ Note: No Namespace in scope makes (_: Integer) -> Integer conform to 'Equatable'.
+    │ Note 1: No Namespace in scope makes (_: Integer) -> Integer conform to 'Equatable'.
+    │ Note 2: No Namespace can be declared for (_: Integer) -> Integer — a 'for' clause takes a named Type.
 ────╯
 
 ─── 4 errors

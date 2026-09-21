@@ -12,6 +12,7 @@ import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
+import { compiles } from "./followedHelps"
 
 // NOTE: A composite asks its members. A Record's DECLARED members decide its
 // `Equatable` and its `Printable`: each one compares and prints through its own
@@ -61,6 +62,31 @@ const money = `choice Door { Open, Shut }
 	}
 
 	constant price: Money = { cents = 1999 }`
+
+// NOTE: A member whose conformance can not be CHOSEN is a different mistake
+// from a member that has none, and it used to be no mistake at all here: the
+// member solve is asked quietly, an ambiguity is a failure it REPORTED
+// rather than described, and a reported failure was read as "leave this
+// member alone" — so the Record fell back to comparing it structurally and
+// nothing anywhere said why. `[tag]::contains(other)` reports it, `a::is(b)`
+// reports it, and `{ tag = a }::is({ tag = b })` did not. A composite does
+// not quietly skip a member it could have asked.
+const ambiguous = `type Tag = { text: String }
+
+	namespace TagsA for Tag is Equatable {
+		is(_ other: Tag) -> Boolean {
+			<- @.text::is(other.text, comparing #Insensitive)
+		}
+	}
+
+	namespace TagsB for Tag is Equatable {
+		is(_ other: Tag) -> Boolean {
+			<- @.text::is(other.text)
+		}
+	}
+
+	constant news: Tag = { text = "News" }
+	constant lower: Tag = { text = "news" }`
 
 // NOTE: The first enrichment in a process compiles the whole standard library,
 // which the five-second default does not always cover on a loaded machine — and
@@ -438,7 +464,6 @@ describe("A Record asks its declared members", () => {
 
 		expect(codesOf(source)).toEqual(["unsatisfied-conformance-condition"])
 		expect(notesOf(source)).toEqual([
-			"{ either: Tag | Integer } does not conform to 'Equatable'.",
 			"Its member 'either' does not conform to 'Equatable'.",
 			"Tag | Integer does not conform to 'Equatable'.",
 		])
@@ -574,6 +599,56 @@ describe("A Record asks its declared members how to print", () => {
 		expect(js).toContain("Record.toString")
 	})
 
+	// NOTE: THE ESCAPE HELP IS AN EDIT, so it is offered at the one call it is an
+	// edit FOR. `Terminal.print(value)` becomes `Terminal.inspect(value)` and the
+	// Program compiles; `value::toString()` does not become anything, because
+	// what the reader wanted there was a String and `inspect` answers none. The
+	// failing binding at a print may be the value itself or anything holding it —
+	// a List of Records is the shape the review found silent — and `inspect`
+	// takes all of them, so the Help follows the CALL and not the Type.
+	it("offers the inspect escape wherever a print is refused", () => {
+		let printed = `implementation {
+			constant run = (_ value: Integer) -> Integer { <- value }
+
+			Terminal.print([{ run = run }])
+		}`
+
+		expect(codesOf(printed)).toEqual(["unsatisfied-conformance-condition"])
+		expect(helpsOf(printed)[0]).toBe(
+			"Write 'Terminal.inspect(…)' instead — it renders any value structurally and asks for no conformance.",
+		)
+		// NOTE: And the edit itself, compiled — the promise a Help makes.
+		expect(
+			compiles(`implementation {
+				constant run = (_ value: Integer) -> Integer { <- value }
+
+				Terminal.inspect([{ run = run }])
+			}`),
+		).toBe(true)
+	})
+
+	it("withholds it where inspect is no edit at all", () => {
+		let direct = `implementation {
+			constant run = (_ value: Integer) -> Integer { <- value }
+
+			constant text = { run = run }::toString()
+
+			Terminal.inspect(text)
+		}`
+		let held = `implementation {
+			constant run = (_ value: Integer) -> Integer { <- value }
+
+			constant text = [{ run = run }]::toString()
+
+			Terminal.inspect(text)
+		}`
+
+		expect(codesOf(direct)).toEqual(["unsatisfied-conformance-condition"])
+		expect(helpsOf(direct)).toEqual([])
+		expect(codesOf(held)).toEqual(["unsatisfied-conformance-condition"])
+		expect(helpsOf(held)).toEqual([])
+	})
+
 	// NOTE: A member whose Choice nobody declared Printable takes the Record's
 	// printing away, which is decision 2 reaching further than a Function does:
 	// this is a Record that prints today.
@@ -596,6 +671,58 @@ describe("A Record asks its declared members how to print", () => {
 			"Declare a Namespace 'for Door is Printable' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.",
 		)
 	})
+
+	// NOTE: A member written as a BARE Case is typed as that Case and not as its
+	// Choice, and the Help a Case gets is "annotate the value at 'Door'" —
+	// which is the edit that works where the CHOICE conforms and the annotation
+	// is all that stands between the reader and it. Here nothing makes `Door`
+	// Printable, so following it lands on the same refusal one Type wider and
+	// the reader is told to declare the Namespace THEN. The Choice is in hand at
+	// the refusal, so the question it answers is asked here instead, and what is
+	// offered is the edit that works on its own: declaring the Namespace makes
+	// the Case-typed member print with no annotation at all.
+	it("offers the one edit a Case-typed member needs", () => {
+		let source = `implementation {
+			choice Door { Open, Shut }
+
+			Terminal.print({ door = Door#Open })
+		}`
+
+		expect(helpsOf(source)).toEqual([
+			"Write 'Terminal.inspect(…)' instead — it renders any value structurally and asks for no conformance.",
+			"Declare a Namespace 'for Door is Printable' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.",
+		])
+		expect(
+			compiles(`implementation {
+				choice Door { Open, Shut }
+
+				namespace Doors for Door is Printable {}
+
+				Terminal.print({ door = Door#Open })
+			}`),
+		).toBe(true)
+	})
+
+	// NOTE: And the other half of the rule — where the Choice DOES conform, the
+	// annotation is the whole edit and is what is offered. `Enumerable` is the
+	// Protocol that reaches it: a payload-free Choice derives the listing, a
+	// bound on ONE of its Cases can not be satisfied by it, and annotating the
+	// value at the Choice is all that stands between the two.
+	it("keeps the annotation where the Choice already conforms", () => {
+		let source = `implementation {
+			choice Colour { Red, Green }
+
+			function countOf<infer T is Enumerable>(_ example: T) -> Integer {
+				<- T.cases()::length()
+			}
+
+			Terminal.print(countOf(Colour#Red)::toString())
+		}`
+
+		expect(helpsOf(source)).toEqual([
+			"Annotate the value at 'Colour': a bare Case binds the Case, not the Choice.",
+		])
+	})
 })
 
 describe("A Record whose member can not compare", () => {
@@ -611,11 +738,16 @@ describe("A Record whose member can not compare", () => {
 		}`
 
 		expect(codesOf(source)).toEqual(["unsatisfied-conformance-condition"])
+		// NOTE: The chain's head is dropped where it only repeats the message,
+		// so what is left says something new on every line: which member, and
+		// what its Type can not do. The last Note is the one that withholds the
+		// Help — no `for` clause can name a Function Type.
 		expect(notesOf(source)).toEqual([
-			"{ run: (_: Integer) -> Integer, id: Integer } does not conform to 'Equatable'.",
 			"Its member 'run' does not conform to 'Equatable'.",
 			"(_: Integer) -> Integer does not conform to 'Equatable'.",
+			"No Namespace can be declared for (_: Integer) -> Integer — a 'for' clause takes a named Type.",
 		])
+		expect(helpsOf(source)).toEqual([])
 	})
 
 	// NOTE: The DOTTED PATH, which is the whole reason the refusal carries a
@@ -630,9 +762,9 @@ describe("A Record whose member can not compare", () => {
 		}`
 
 		expect(notesOf(source)).toEqual([
-			"{ inner: { run: (_: Integer) -> Integer } } does not conform to 'Equatable'.",
 			"Its member 'inner.run' does not conform to 'Equatable'.",
 			"(_: Integer) -> Integer does not conform to 'Equatable'.",
+			"No Namespace can be declared for (_: Integer) -> Integer — a 'for' clause takes a named Type.",
 		])
 	})
 
@@ -668,6 +800,113 @@ describe("A Record whose member can not compare", () => {
 				Terminal.inspect(anyRecord(holder, { run = run, id = 2 }))
 			}`),
 		).toEqual(["true", "false"])
+	})
+
+	// NOTE: The routing reads a member's conformance by the NAME of the Namespace
+	// that answers it — the two lists in `helpers/conformance.ts` — and a Program
+	// may SHADOW one of those names inside a Function, which is what
+	// `dictionaries.spec.ts` keys a Dictionary through. The question that leaves
+	// is whether a Record in such a scope quietly skips a member whose own `is`
+	// the shadowing Namespace writes. It can not: the shadowing takes the
+	// library's `String` Namespace out of that scope altogether, so `String` is
+	// not Equatable there and the Record is REFUSED — the same answer the member
+	// gets on its own, which is the whole of what decision 2 promises. At the top
+	// level the declaration is `duplicate-variable` and never compiles at all.
+	it("is refused in a scope that shadows the member's Namespace", () => {
+		let source = `implementation {
+			function borrowers() -> Boolean {
+				namespace String for NonEmptyString is Equatable {
+					is(_ other: NonEmptyString) -> Boolean {
+						<- true
+					}
+				}
+
+				constant one: { name: NonEmptyString } = { name = "Ada" }
+				constant two: { name: NonEmptyString } = { name = "ada" }
+
+				<- one::is(two)
+			}
+
+			Terminal.inspect(borrowers())
+		}`
+
+		expect(codesOf(source)).toEqual(["unsatisfied-conformance-condition"])
+		expect(notesOf(source)).toEqual([
+			"Its member 'name' does not conform to 'Equatable'.",
+			"String does not conform to 'Equatable'.",
+		])
+	})
+
+	it("says so when a member's conformance can not be chosen", () => {
+		let source = `implementation {
+			${ambiguous}
+
+			Terminal.inspect({ tag = news }::is({ tag = lower }))
+		}`
+
+		expect(codesOf(source)).toEqual(["ambiguous-conformance"])
+		// NOTE: The member's own Diagnostic, unchanged but for the sentence that
+		// says which member reaches it — so the reader is told the same thing
+		// about `Tag` that `[news]::contains(lower)` tells them, and where to
+		// look for it.
+		expect(notesOf(source)).toEqual([
+			"'TagsA' conforms to 'Equatable'.",
+			"'TagsB' conforms to 'Equatable'.",
+			"Its member 'tag' is what asks { tag: Tag } to conform.",
+		])
+		expect(helpsOf(source)).toEqual([
+			"Drop the conformance from one of them, or narrow one target Type so it is the more specific for Tag.",
+		])
+	})
+
+	// NOTE: Both rails, because they reach the member solve by different roads —
+	// the direct one through `routedRecordCall`, the bounded one through
+	// `solveConformance` — and a silence fixed on one of them is a silence still.
+	it("says so at a bounded call as well", () => {
+		let source = `implementation {
+			${ambiguous}
+
+			Terminal.inspect([{ tag = news }]::contains({ tag = lower }))
+		}`
+
+		expect(codesOf(source)).toEqual(["ambiguous-conformance"])
+	})
+
+	// NOTE: And through a member that HOLDS the ambiguous Type rather than being
+	// it. The List's own conformance is the thing that fails, and it fails
+	// silently — so without this the Record would be left structural by a
+	// failure nobody ever saw.
+	it("says so when a member merely holds the ambiguous Type", () => {
+		let source = `implementation {
+			${ambiguous}
+
+			Terminal.inspect({ tags = [news] }::is({ tags = [lower] }))
+		}`
+
+		expect(codesOf(source)).toEqual(["ambiguous-conformance"])
+		expect(notesOf(source).at(-1)).toBe(
+			"Its member 'tags' is what asks { tags: List<Tag> } to conform.",
+		)
+	})
+
+	// NOTE: One sentence per level, innermost first, which is the same path the
+	// refusal spells with dots — written as a chain here because each level adds
+	// the Type it is about, and a reader following it opens exactly the Types
+	// between the Statement they wrote and the ambiguity.
+	it("names every level of a nested member in turn", () => {
+		let source = `implementation {
+			${ambiguous}
+
+			Terminal.inspect(
+				{ inner = { tag = news } }::is({ inner = { tag = lower } }),
+			)
+		}`
+
+		expect(codesOf(source)).toEqual(["ambiguous-conformance"])
+		expect(notesOf(source).slice(-2)).toEqual([
+			"Its member 'tag' is what asks { tag: Tag } to conform.",
+			"Its member 'inner' is what asks { inner: { tag: Tag } } to conform.",
+		])
 	})
 
 	// NOTE: `Terminal.inspect` stays TOTAL — it asks for no conformance at all,
@@ -879,6 +1118,45 @@ describe("A Case payload asks its members", () => {
 				Terminal.print(Tree#Leaf::is(Tree#Leaf))
 			}`),
 		).toContain("recursive-type-declaration")
+	})
+
+	// NOTE: And decision 3 reaching the silence a Record's members reach: a
+	// payload member whose conformance can not be CHOSEN was left structural
+	// with nothing said. It is reported here without the sentence naming the
+	// member, which this rail has no name to write — the router is handed a
+	// member's Type and answers a slot, and the walk holding the names describes
+	// the whole Case. What a reader is told about `Tag` is what a direct use of
+	// a `Tag` tells them.
+	//
+	// NOTE: TWICE, and a Record's is reported once, because a Choice's derive is
+	// DECLARED: the Namespace's `is Equatable` builds the plan and meets the
+	// ambiguity there, and the call that uses it meets the same one again. That
+	// is exactly the shape a payload member with NO conformance already has —
+	// `nonconforming-namespace` at the declaration and `unsatisfied-bound` at
+	// the call — so the two mistakes are told in the same number of places.
+	it("says so when a payload member's conformance can not be chosen", () => {
+		let source = `implementation {
+			${ambiguous}
+
+			choice Box {
+				Full { tag: Tag },
+				Hollow,
+			}
+
+			namespace Boxes for Box is Equatable {}
+
+			Terminal.inspect(Box#Full({ tag = news })::is(Box#Full({ tag = lower })))
+		}`
+
+		expect(codesOf(source)).toEqual([
+			"ambiguous-conformance",
+			"ambiguous-conformance",
+		])
+		expect(new Set(helpsOf(source))).toEqual(
+			new Set([
+				"Drop the conformance from one of them, or narrow one target Type so it is the more specific for Tag.",
+			]),
+		)
 	})
 })
 

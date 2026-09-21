@@ -440,7 +440,42 @@ implementation {
 }
 ```
 
-Every record has four methods, listed under [Record](/docs/library/record) in the library: [`is`](/docs/library/record#is), [`isNot`](/docs/library/record#isNot), [`toString`](/docs/library/record#toString) and [`keys`](/docs/library/record#keys). `is` compares structurally. Two records are equal when they have the same members with equal values, in any order. A kept extra member counts, so `start` is not `here`. `toString` returns the text [`Terminal.print`](/docs/library/terminal#print) writes, and `keys()` returns the member names in the order written, like `Object.keys`, extra members included.
+Every record has four methods, listed under [Record](/docs/library/record) in the library: [`is`](/docs/library/record#is), [`isNot`](/docs/library/record#isNot), [`toString`](/docs/library/record#toString) and [`keys`](/docs/library/record#keys). Two records are equal when they have the same members with equal values, in any order. A kept extra member counts, so `start` is not `here`. `toString` returns the text [`Terminal.print`](/docs/library/terminal#print) writes, and `keys()` returns the member names in the order written, like `Object.keys`, extra members included.
+
+## A record asks its members
+
+A record compares and prints through its members. Each member the record's type *declares* is compared by that member's own [`Equatable`](/docs/library/protocols#Equatable) and written by its own [`Printable`](/docs/library/protocols#Printable), so a value that has a namespace of its own reads the same inside a record as it does outside one.
+
+```essence
+implementation {
+	choice Door {
+		Open,
+		Shut,
+	}
+
+	namespace Doors for Door is Printable {}
+
+	type Money = { cents: Integer }
+
+	namespace Monies for Money is Printable {
+		toString() -> String {
+			<- "EUR {@.cents}"
+		}
+	}
+
+	constant price: Money = { cents = 1999 }
+
+	Terminal.print([price]) § [EUR 1999]
+	Terminal.print({ price = price, door = Door#Open }) § { price = EUR 1999, door = Open }
+	Terminal.inspect({ price = price, door = Door#Open }) § { price = { cents = 1999 }, door = Door#Open }
+}
+```
+
+Only the members the *static type* declares are asked. A record value can carry more than its type sees, and those extra members are compared and printed structurally, as everything used to be. So the members of a value behind the top `Record` type, or behind `{}`, are compared and written the way the language itself defines. The same two values can therefore answer one way at a narrow type and another at a wider one. That is the price of asking a type rather than a value: a namespace attaches to a *shape*, so a `{ text = "x" }` literal already is a `Tag`, and a value carries no conformance of its own to be asked about.
+
+A record is `Equatable` only where every declared member is, and `Printable` only where every declared member is. A record holding a function is neither, exactly as a `List` of functions is neither, and the compiler says which member is the reason. [`Terminal.inspect`](/docs/library/terminal#inspect) renders any value at all and asks for no conformance, which is what to reach for then.
+
+A [dictionary](/docs/language/dictionaries) keyed by records finds a key by this same comparison; see [`canonical-key-encoding`](/docs/reference/optimisations#canonical-key-encoding) for what that costs.
 
 **Compared with JavaScript.**
 

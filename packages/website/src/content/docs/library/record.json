@@ -35,7 +35,7 @@
 					"entries": [
 						{
 							"signature": "is(_ other: Record) -> Boolean",
-							"summary": "Answers whether the Record has the same members and values as another.\n\nThe order the members stand in does not matter. Each member is compared by the structural equality the language itself defines, and not by an `is` the member's own Namespace writes. So a value whose Namespace writes its own `is` compares one way on its own and another way as a member. A Dictionary keyed by Records finds a key by this same comparison.",
+							"summary": "Answers whether the Record has the same members and values as another.\n\nThe order the members stand in does not matter. Each member the Record's Type declares is compared by that member's own `Equatable` conformance. So a value whose Namespace writes its own `is` compares the same way on its own and as a member. A member the static Type can not see is compared by the structural equality the language defines. The member sets have to match either way. A Dictionary keyed by Records finds a key by this same comparison.\n\nA Record Type whose declared members are not all `Equatable` is not `Equatable` either, exactly as a `List` of such a Type is not.",
 							"parameters": [
 								{
 									"name": "_",
@@ -65,7 +65,7 @@
 					"entries": [
 						{
 							"signature": "toString() -> String",
-							"summary": "Answers the Record and its members as a String.\n\nEach member is written as `name = value`. The value is written the way it prints, so a whole Rational member prints its numerator alone. A String member keeps its quotation marks. A Record too long for one line is written over several lines.",
+							"summary": "Answers the Record and its members as a String.\n\nEach member is written as `name = value`. Each member the Record's Type declares is written the way its own `Printable` conformance writes it. A `Money` member whose Namespace answers `EUR 1999` is written that way. A Case member is written as its Case name. A member the static Type can not see is written structurally. A whole Rational member prints its numerator alone. A String member keeps its quotation marks. A Record too long for one line is written over several lines.\n\nA Record Type whose declared members are not all `Printable` is not `Printable` either. `Terminal.inspect` renders any value and asks for no conformance. That is what to reach for then.",
 							"parameters": [],
 							"returns": "the String representation of the Record.",
 							"examples": []

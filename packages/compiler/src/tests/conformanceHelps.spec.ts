@@ -416,12 +416,40 @@ describe("A Type in want of a conformance", () => {
 		Terminal.print(parse("3"))
 	}`
 
+	// NOTE: TWO Helps, and the order is the two questions a reader has. The
+	// escape comes first because it always works at a print and costs no
+	// declaration — `Terminal.inspect` takes any value — and the declaration
+	// comes second because it is what keeps `print`. The escape is offered
+	// wherever a print is refused, whatever the failing Type is: a Record whose
+	// member can not print, a Result holding a Choice nobody declared Printable,
+	// a List of either.
 	it("should name the culprit rather than the Type the bound was on", () => {
 		expect(
 			firstOf(resultOfAChoice, "unsatisfied-conformance-condition").helps,
 		).toEqual([
+			"Write 'Terminal.inspect(…)' instead — it renders any value structurally and asks for no conformance.",
 			"Declare a Namespace 'for Problem is Printable' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.",
 		])
+	})
+
+	it("should compile with the escape it offers first", () => {
+		expect(
+			compiles(`implementation {
+				choice Problem {
+					NotANumber,
+				}
+
+				function parse(_ text: String) -> Result<String, Problem> {
+					if text::isEmpty() {
+						<- Result<String, Problem>#Failure(#NotANumber)
+					}
+
+					<- Result<String, Problem>#Value(text)
+				}
+
+				Terminal.inspect(parse("3"))
+			}`),
+		).toBe(true)
 	})
 
 	it("should compile with the empty body it promises", () => {

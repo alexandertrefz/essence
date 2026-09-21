@@ -2972,8 +2972,17 @@ describe("Enricher", () => {
 			)
 
 			expect(failure).toBeDefined()
-			expect(failure!.notes.length).toBeGreaterThanOrEqual(2)
-			expect(failure!.notes[0]).toContain("does not conform")
+			// NOTE: Two LEVELS, and the report is the level below the ask: the
+			// message names the `List<{ x: Integer }>` the bound was written
+			// on, and the Note names the Record that can not answer. The
+			// chain's head used to be repeated as Note 1 and is dropped where
+			// it says what the message already said, so what is checked here
+			// is that the reader is told where the ask ended rather than told
+			// twice where it began.
+			expect(failure!.message).toContain(
+				"List<{ x: Integer }> does not conform",
+			)
+			expect(failure!.notes.length).toBeGreaterThanOrEqual(1)
 			expect(
 				failure!.notes.some((note) =>
 					note.includes("{ x: Integer } does not conform"),

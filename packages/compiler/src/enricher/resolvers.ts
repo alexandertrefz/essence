@@ -5,6 +5,7 @@ import type { common, enricher, parser } from "@essence-lang/interfaces"
 import {
 	collectDiagnostics,
 	primary,
+	report,
 	reportedOnLine,
 	reportError,
 	reportWarning,
@@ -3743,12 +3744,25 @@ function choiceMemberRouting(
 	return {
 		types,
 		route: (type) => {
-			let solved = memberConformance(
+			let asked = memberConformance(
 				type,
 				equatableProtocolName,
 				scope,
 				position,
 			)
+			let solved = asked.result
+
+			// NOTE: Forwarded exactly as `recordMemberRouting` forwards it, and
+			// for the same reason: a payload member whose conformance can not be
+			// CHOSEN was left structural with nothing said anywhere. Without the
+			// sentence naming the member, which this rail has no name to write:
+			// the router is handed a member's TYPE and answers a slot, and the
+			// walk that knows the names describes the whole Case. A reader is
+			// told what a direct use of the member's Type tells them, at the
+			// call they wrote.
+			for (let ambiguity of asked.ambiguities) {
+				report(ambiguity)
+			}
 
 			// NOTE: A member with NO conformance takes a slot too, and that
 			// is how decision 3's other half is refused in the words the rest
@@ -4580,15 +4594,34 @@ function declaredRecordMembers(
 // empty chain, and an empty chain is read below as "leave this member alone":
 // that is what the language did before any of this, so the mistake it stands
 // for keeps exactly the Diagnostic it has always had, at the site that makes it.
+//
+// NOTE: With ONE exception, and the caller below is what makes it — an
+// AMBIGUITY. `nonconforming-namespace` is a mistake in a Namespace DECLARATION
+// and is reported where that declaration is, so raising it again here would be
+// one mistake told twice. An ambiguity is not: nothing is wrong with either
+// Namespace, the question simply has two answers, and it is asked afresh by
+// every Type that holds the member. Swallowed, it left a composite comparing a
+// member structurally with nothing said anywhere — the one place a Record
+// quietly did not ask a member it could have asked.
 function memberConformance(
 	memberType: common.Type,
 	protocolName: string,
 	scope: enricher.Scope,
 	position: common.Position,
-): ConformanceSolveResult {
-	return collectDiagnostics(() =>
+): {
+	result: ConformanceSolveResult
+	ambiguities: Array<common.Diagnostic>
+} {
+	let collected = collectDiagnostics(() =>
 		solveConformance(memberType, protocolName, scope, position),
-	).result
+	)
+
+	return {
+		result: collected.result,
+		ambiguities: collected.diagnostics.filter(
+			(diagnostic) => diagnostic.code === "ambiguous-conformance",
+		),
+	}
 }
 
 function recordMemberRouting(
@@ -4607,12 +4640,31 @@ function recordMemberRouting(
 	let conditions: Array<common.Conformance> = []
 
 	for (let [name, memberType] of members) {
-		let solved = memberConformance(
-			memberType,
-			protocolName,
-			scope,
-			position,
-		)
+		let asked = memberConformance(memberType, protocolName, scope, position)
+		let solved = asked.result
+
+		// NOTE: Forwarded whatever the member ANSWERED, because a member that
+		// merely HOLDS the ambiguous Type answers a silent failure of its own: a
+		// `List<Tag>` whose item conformance can not be chosen is refused with
+		// an empty chain, and `{ tags: List<Tag> }` would otherwise read that as
+		// "leave this member alone" as well.
+		//
+		// NOTE: One sentence added and nothing else touched, so a reader is told
+		// about `Tag` exactly what `[tag]::contains(other)` tells them, plus
+		// which member of which Type reaches it. A Record inside a Record adds
+		// one sentence per level, innermost first, because the inner level's
+		// report is raised inside THIS level's collection and is forwarded from
+		// there rather than escaping on its own — so `{ inner: { tag: Tag } }`
+		// names `tag`, then `inner`, and the reader can walk down.
+		for (let ambiguity of asked.ambiguities) {
+			report({
+				...ambiguity,
+				notes: [
+					...(ambiguity.notes ?? []),
+					`Its member '${name}' is what asks ${describeType(binding)} to conform.`,
+				],
+			})
+		}
 
 		if (!solved.ok) {
 			if (solved.chain.length === 0) {
@@ -4797,29 +4849,30 @@ export function routedRecordCall(
 				culprit,
 				solved.culprit?.protocolName ?? protocolName,
 				scope,
+				position,
 			)
 
-			reportError(
-				`${describeType(baseType)} does not conform to '${protocolName}'`,
-				position,
-				{
-					code: "unsatisfied-conformance-condition",
-					labels: [
-						primary(
-							position,
-							`this asks each declared member for its own '${protocolName}'`,
-						),
-					],
-					notes: [...solved.chain, ...missing.notes],
-					helps: [
-						...printingEscapeHelps(protocolName, baseType),
-						...missing.helps,
-					],
-					...(missing.data === undefined
-						? {}
-						: { data: missing.data }),
-				},
-			)
+			let message = `${describeType(baseType)} does not conform to '${protocolName}'`
+
+			reportError(message, position, {
+				code: "unsatisfied-conformance-condition",
+				labels: [
+					primary(
+						position,
+						`this asks each declared member for its own '${protocolName}'`,
+					),
+				],
+				notes: [
+					...withoutRepeatedHead(solved.chain, message),
+					...missing.notes,
+				],
+				// NOTE: No escape Help here, and the rail is the reason: this is
+				// `value::toString()`, where a reader asked for a String.
+				// `Terminal.inspect` answers none, so offering it would name an
+				// edit that does not compile — see `printingEscapeHelps`.
+				helps: missing.helps,
+				...(missing.data === undefined ? {} : { data: missing.data }),
+			})
 		}
 
 		return null
@@ -4838,6 +4891,22 @@ export function routedRecordCall(
 	}
 }
 
+// NOTE: A because-chain's first sentence says what was ASKED, which is what the
+// message above it already says — so a reader was told the same thing twice
+// before being told anything new. Dropped where the two really are one sentence,
+// and kept wherever they differ, because a chain whose head names a different
+// Type is the level that explains how the ask got there.
+//
+// Dropped at RENDERING and not before: the chain's LENGTH is what chooses
+// between `unsatisfied-bound` and `unsatisfied-conformance-condition`, and a
+// shortened chain would send a two-level failure to the one-level Diagnostic.
+function withoutRepeatedHead(
+	chain: Array<string>,
+	message: string,
+): Array<string> {
+	return chain[0] === `${message}.` ? chain.slice(1) : chain
+}
+
 // NOTE: The Protocol each Method the builtin Record Namespace WRITES belongs
 // to. `keys` is on neither, which keeps it out of the routing entirely; and
 // `isNot` is not here because the Namespace does not write one — `Equatable`
@@ -4849,15 +4918,23 @@ const recordRoutedMethods: Record<string, string> = {
 }
 
 // NOTE: The Help that comes FIRST when a value can not be printed, because it is
-// the one edit that always works: `inspect` takes any value at all, needs no
-// conformance and is what an author reaching for `print` on a Record of their
-// own usually wanted. Withheld for equality, which has no such escape.
+// the one edit that always works THERE: `inspect` takes any value at all and
+// needs no conformance, and is what an author reaching for `print` on a Record
+// of their own usually wanted. Withheld for equality, which has no such escape.
+//
+// NOTE: It follows the CALL and not the Type, which is the difference between a
+// Help and a sentence. `Terminal.print(value)` becomes `Terminal.inspect(value)`
+// whatever the value is — a Record whose member can not print, or a List or a
+// Dictionary or an Optional HOLDING one, which is the shape that was refused
+// with no Help at all while the Record on its own was offered one. But
+// `value::toString()` becomes nothing: the reader asked for a String and
+// `inspect` answers none, so a Help there names an edit that does not compile.
+// A `::` call is never a print, so the direct rail offers nothing at all.
 function printingEscapeHelps(
 	protocolName: string,
-	baseType: common.Type,
+	atPrintingCall: boolean,
 ): Array<string> {
-	return protocolName === printableProtocolName &&
-		declaredRecordMembers(baseType) !== null
+	return protocolName === printableProtocolName && atPrintingCall
 		? [
 				"Write 'Terminal.inspect(…)' instead — it renders any value structurally and asks for no conformance.",
 			]
@@ -5762,18 +5839,49 @@ function missingConformance(
 	culprit: common.Type,
 	protocolName: string,
 	scope: enricher.Scope,
+	// NOTE: Where the refusal is being made, which only the bare-Case branch
+	// below reads — it asks a conformance question of its own, quietly, and
+	// every question about a conformance is asked somewhere.
+	position: common.Position,
 ): {
 	notes: Array<string>
 	helps: Array<string>
 	data?: common.DiagnosticData
+	// NOTE: Set where the culprit is WORK rather than a value — a Future or a
+	// Started standing where its answer was wanted. It is what withholds the
+	// `Terminal.inspect` escape beside these: `inspect` takes work as happily as
+	// it takes anything, and printing a description of work instead of its
+	// answer is the one outcome nobody wanted. The edit is the missing word.
+	describesWork?: true
 } {
+	// NOTE: A bare Case is typed as the CASE and not as its Choice, and no
+	// Namespace can target one — `namespace X for Colour#Red` does not parse —
+	// so the edit is one Type wider. WHICH edit depends on the Choice: where it
+	// already conforms, annotating the value is the whole of it and is what is
+	// offered; where it does not, annotating lands the reader on this same
+	// refusal about the Choice and they are told to declare the Namespace THEN.
+	// The Choice is in hand here, so that second question is asked now and what
+	// comes back is the Choice's own answer — which works on its own, because a
+	// Namespace declared `for Door` answers for a value typed `Door#Open` as
+	// well: the annotation was never the part that was missing.
 	if (culprit.type === "Case") {
-		return {
-			notes: [],
-			helps: [
-				`Annotate the value at '${displayChoiceName(culprit.choice)}': a bare Case binds the Case, not the Choice.`,
-			],
+		let choice = choiceTypeOf(culprit, scope)
+		let conforms =
+			choice !== null &&
+			collectDiagnostics(() =>
+				solveConformance(choice, protocolName, scope, position),
+			).result.ok
+
+		if (choice === null || conforms) {
+			return {
+				notes: [],
+				helps: [
+					`Annotate the value at '${displayChoiceName(culprit.choice)}': a bare Case binds the Case, not the Choice.`,
+				],
+			}
 		}
+
+		return missingConformance(choice, protocolName, scope, position)
 	}
 
 	let unwaited = unwaitedWorkReport(
@@ -5783,7 +5891,7 @@ function missingConformance(
 	)
 
 	if (unwaited !== null) {
-		return unwaited
+		return { ...unwaited, describesWork: true }
 	}
 
 	let foreign = foreignChoiceModule(culprit, scope)
@@ -5808,14 +5916,29 @@ function missingConformance(
 		}
 	}
 
+	// NOTE: The Help is WITHHELD for the two Types a Namespace can not be
+	// declared for as they are spelled. `namespace X for (_ Integer) -> Integer`
+	// and `namespace X for Future<Integer>` are both refused by the Parser — a
+	// Function Type reaches a `for` clause only through an Alias, and a reader
+	// following "Declare a Namespace 'for (_: Integer) -> Integer is Equatable'"
+	// literally is handed a syntax error. A Help is an edit that works or it is
+	// not offered; what is left is the Note, which is the fact.
+	let undeclarable = culprit.type === "Function" || culprit.type === "Future"
+
 	return {
-		notes: [],
-		helps: [
-			protocolName === printableProtocolName &&
-			choiceCasesArePayloadFree(culprit)
-				? `Declare a Namespace 'for ${describeType(culprit)} is ${protocolName}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
-				: `Declare a Namespace 'for ${describeType(culprit)} is ${protocolName}'.`,
-		],
+		notes: undeclarable
+			? [
+					`No Namespace can be declared for ${describeType(culprit)} — a 'for' clause takes a named Type.`,
+				]
+			: [],
+		helps: undeclarable
+			? []
+			: [
+					protocolName === printableProtocolName &&
+					choiceCasesArePayloadFree(culprit)
+						? `Declare a Namespace 'for ${describeType(culprit)} is ${protocolName}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
+						: `Declare a Namespace 'for ${describeType(culprit)} is ${protocolName}'.`,
+				],
 		// NOTE: No Parameter, because the Type that failed is a concrete one —
 		// what this asks for is a Namespace declaring the conformance, which is
 		// a Declaration rather than an edit to a span, and no fix answers it.
@@ -6102,6 +6225,13 @@ export function resolveConformances(
 	bindings: GenericBindings,
 	scope: enricher.Scope,
 	position: common.Position,
+	// NOTE: Whether the call whose bounds these are is `Terminal.print`, which
+	// only the site that read the callee's name can say. It decides ONE Help —
+	// the `Terminal.inspect` escape, which is an edit for a print and for
+	// nothing else. Defaulted, so every caller that is not resolving an
+	// invocation's bounds (a written Dictionary's keys, a Case payload's, a
+	// Type Alias's) says nothing and offers nothing.
+	atPrintingCall = false,
 ): Array<common.Conformance> {
 	if (!generics.some((generic) => generic.constraint != null)) {
 		return []
@@ -6275,7 +6405,13 @@ export function resolveConformances(
 		// binding itself, which is how the plain case comes out unchanged.
 		let culprit = result.culprit?.type ?? binding
 		let culpritProtocol = result.culprit?.protocolName ?? generic.constraint
-		let missing = missingConformance(culprit, culpritProtocol, scope)
+		let missing = missingConformance(
+			culprit,
+			culpritProtocol,
+			scope,
+			position,
+		)
+		let message = `${describeType(binding)} does not conform to '${generic.constraint}'`
 
 		// NOTE: A single-level chain is the plain "no Namespace conforms" case
 		// and keeps the `unsatisfied-bound` Diagnostic. A multi-level chain is
@@ -6298,7 +6434,10 @@ export function resolveConformances(
 						...missing.notes,
 					],
 					helps: [
-						...printingEscapeHelps(generic.constraint, binding),
+						...printingEscapeHelps(
+							generic.constraint,
+							atPrintingCall && missing.describesWork !== true,
+						),
 						...missing.helps,
 					],
 					...(missing.data === undefined
@@ -6307,27 +6446,27 @@ export function resolveConformances(
 				},
 			)
 		} else {
-			reportError(
-				`${describeType(binding)} does not conform to '${generic.constraint}'`,
-				position,
-				{
-					code: "unsatisfied-conformance-condition",
-					labels: [
-						primary(
-							position,
-							`this binds a Type Parameter bound to '${generic.constraint}'`,
-						),
-					],
-					notes: [...result.chain, ...missing.notes],
-					helps: [
-						...printingEscapeHelps(generic.constraint, binding),
-						...missing.helps,
-					],
-					...(missing.data === undefined
-						? {}
-						: { data: missing.data }),
-				},
-			)
+			reportError(message, position, {
+				code: "unsatisfied-conformance-condition",
+				labels: [
+					primary(
+						position,
+						`this binds a Type Parameter bound to '${generic.constraint}'`,
+					),
+				],
+				notes: [
+					...withoutRepeatedHead(result.chain, message),
+					...missing.notes,
+				],
+				helps: [
+					...printingEscapeHelps(
+						generic.constraint,
+						atPrintingCall && missing.describesWork !== true,
+					),
+					...missing.helps,
+				],
+				...(missing.data === undefined ? {} : { data: missing.data }),
+			})
 		}
 	}
 
