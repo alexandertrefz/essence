@@ -3601,16 +3601,35 @@ const structurallyEquatableNamespaces = new Set([
 	derivedEquatableNamespaceName,
 ])
 
+// NOTE: And the Namespace whose `Equatable::is` is structural exactly when what
+// it HOLDS is compared structurally. `List::is` is the items compared pairwise
+// through the item's own witness, so `List<ItemType> is Equatable where
+// ItemType is Equatable` is structural if and only if the witness solving that
+// `where` is — recursively, since a nested List's witness is decided by the
+// same rule. A `List<NonEmptyString>` under a `namespace Loose for
+// NonEmptyString is Equatable` is the case this has to refuse: `Loose` is not
+// branded, so the List holding it is not either, and the runtime scans.
+//
+// The brand for such a Namespace is CONDITIONAL, and it is resolved where the
+// condition witnesses are: `boundConformance` reads it off the method map, asks
+// each of them, and only then puts it on the witness it builds. That is also
+// the one place the answer CAN be settled — a generic Function's `List<T>`
+// witness is built from a `T` witness forwarded in at the call, which the
+// Compiler has no name for here.
+const conditionallyStructuralNamespaces = new Set(["List"])
+
 // NOTE: Whether this witness is one of those, and is the EQUATABLE one — a
 // Namespace conforms to several Protocols and only the Equatable witness is ever
 // handed to a Dictionary. `Equatable` declares exactly `is` and `isNot`, so the
 // two names it fulfils, wherever they come from, are what identify it.
 //
-// Conditional conformances are excluded outright. None of the six Namespaces
-// is one, and `boundConformance` walks a witness's entries and curries each as
-// a FUNCTION — a `structural: true` standing among them would be called.
+// A conditional conformance is refused unless its Namespace is on the second
+// list, where the brand means "structural if the conditions are". Nothing else
+// conditional may carry it: `boundConformance` walks a witness's entries and
+// curries each as a FUNCTION, so a brand it does not know to lift out would be
+// called.
 //
-// A user Namespace SHADOWING one of the six is excluded by the same lexical
+// A user Namespace SHADOWING one of the seven is excluded by the same lexical
 // answer every member read is decided by: `namespace String for NonEmptyString
 // is Equatable { is … }` declared inside a Function arrives here as `String`,
 // and branding it would hand the Dictionary an encoding that ignores the very
@@ -3619,11 +3638,12 @@ const structurallyEquatableNamespaces = new Set([
 function isStructurallyEquatable(
 	node: common.typedSimple.ConformanceValueNode,
 ): boolean {
-	if (
-		!structurallyEquatableNamespaces.has(node.namespaceName) ||
-		node.conditions.length > 0 ||
-		isShadowingUserNamespace(node.namespaceName)
-	) {
+	let named =
+		node.conditions.length > 0
+			? conditionallyStructuralNamespaces.has(node.namespaceName)
+			: structurallyEquatableNamespaces.has(node.namespaceName)
+
+	if (!named || isShadowingUserNamespace(node.namespaceName)) {
 		return false
 	}
 
@@ -3671,10 +3691,12 @@ function rewriteConformanceValue(
 	// witness says so, rather than the runtime guessing from a tag it can not
 	// tell an override by. A witness without the brand sends every lookup down
 	// the scan path, which asks `conformance.is` and is right for any `is` at
-	// all. See `encodeKey` in `packages/runtime/src/Dictionary.ts`.
+	// all. See `encodeKey` in `packages/runtime/src/keyEncoding.ts`.
 	//
 	// It rides on the method map so it survives `providedConformance`, which
-	// spreads this object into the witness it builds.
+	// spreads this object into the witness it builds — and so that
+	// `boundConformance` below can read it off a CONDITIONAL map and put it on
+	// the bound witness only where the conditions carry it too.
 	if (isStructurallyEquatable(node)) {
 		methodMap.properties.push({
 			type: "Property",

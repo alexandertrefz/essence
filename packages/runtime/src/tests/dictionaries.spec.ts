@@ -375,23 +375,56 @@ describe("key encoding", () => {
 		).toEqual({ text: "R{5:inner=c10:Colour#Red{};};" })
 	})
 
-	// NOTE: A Case or a Record holding a part with no encoding has none itself,
-	// because such a part is compared by a rule no text spells — a List by its
-	// items through the universal comparison, a Function by identity.
-	test("everything else takes the scan path", () => {
-		expect(encodeKey(createList([integer(1)]), equality)).toBeNull()
+	// NOTE: A List spells how many items it holds and then each of them, and the
+	// count is what makes the text injective against its own NESTING: `[[1],
+	// [2]]` and `[[1, 2]]` open the same three heads in the same order and are
+	// told apart by the counts alone.
+	test("a List encodes its count and then its items", () => {
+		expect(
+			encodeKey(createList([integer(1), integer(23)]), equality),
+		).toEqual({ text: "l2:i1;i23;" })
+		expect(encodeKey(createList([]), equality)).toEqual({ text: "l0:" })
+		expect(
+			encodeKey(
+				createList([
+					createList([integer(1)]),
+					createList([integer(2)]),
+				]),
+				equality,
+			),
+		).not.toEqual(
+			encodeKey(
+				createList([createList([integer(1), integer(2)])]),
+				equality,
+			),
+		)
+		expect(encodeKey(createList([createList([])]), equality)).not.toEqual(
+			encodeKey(createList([]), equality),
+		)
+	})
+
+	// NOTE: And a Record or a Case holding one encodes now too, through the very
+	// same text — what a List spells is what the universal comparison those
+	// members are read by would answer, so one spelling serves both positions.
+	test("a composite holding a List encodes through the same text", () => {
 		expect(
 			encodeKey(
 				createRecord({ items: createList([integer(1)]) }),
 				equality,
 			),
-		).toBeNull()
+		).toEqual({ text: "R{5:items=l1:i1;};" })
 		expect(
 			encodeKey(
 				asValue(createCase("Box#Full", { item: createList([]) })),
 				equality,
 			),
-		).toBeNull()
+		).toEqual({ text: "c8:Box#Full{4:item=l0:};" })
+	})
+
+	// NOTE: A Case, a Record or a List holding a part with no encoding has none
+	// itself, because such a part is compared by a rule no text spells — a
+	// Function by identity, a Dictionary by the entries its own store organises.
+	test("everything else takes the scan path", () => {
 		expect(
 			encodeKey(
 				createRecord({ handler: asValue((() => integer(1)) as never) }),
@@ -399,6 +432,13 @@ describe("key encoding", () => {
 			),
 		).toBeNull()
 		expect(encodeKey(dictionary(), equality)).toBeNull()
+		expect(encodeKey(createList([dictionary()]), equality)).toBeNull()
+		expect(
+			encodeKey(
+				createRecord({ rows: createList([dictionary()]) }),
+				equality,
+			),
+		).toBeNull()
 	})
 
 	// NOTE: The encoding is a claim about the STANDARD LIBRARY'S equality for a
@@ -919,9 +959,15 @@ describe("composite keys", () => {
 })
 
 describe("the scan path", () => {
-	test("a Record holding a List is found through the witness", () => {
+	// NOTE: A Dictionary is the part with no text — its entries are organised by
+	// a store of its own and equality over them is order-insensitive, which no
+	// length-prefixed spelling of what it HOLDS would answer.
+	test("a Record holding a Dictionary is found through the witness", () => {
 		let held = dictionary([
-			createRecord({ id: integer(1), tags: createList([text("a")]) }),
+			createRecord({
+				id: integer(1),
+				tags: dictionary([text("a"), integer(1)]),
+			}),
 			integer(10),
 		])
 
@@ -933,7 +979,7 @@ describe("the scan path", () => {
 					held,
 					createRecord({
 						id: integer(1),
-						tags: createList([text("a")]),
+						tags: dictionary([text("a"), integer(1)]),
 					}),
 					equality,
 				),
@@ -2172,8 +2218,8 @@ describe("everyEntry and removeEvery", () => {
 	})
 
 	test("a scan-path key stays a scan-path key in the answer", () => {
-		let listed = createRecord({ items: createList([integer(1)]) })
-		let held = dictionary([listed, integer(2)], [text("a"), integer(1)])
+		let nested = createRecord({ rows: dictionary([text("x"), integer(1)]) })
+		let held = dictionary([nested, integer(2)], [text("a"), integer(1)])
 		let even = everyEntry(held, isEven)
 
 		expect(held.store.unencoded).toBe(1)
@@ -2184,7 +2230,7 @@ describe("everyEntry and removeEvery", () => {
 			heldNumber(
 				valueAt(
 					even,
-					createRecord({ items: createList([integer(1)]) }),
+					createRecord({ rows: dictionary([text("x"), integer(1)]) }),
 					equality,
 				),
 			),

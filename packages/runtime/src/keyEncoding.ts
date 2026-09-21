@@ -2,6 +2,8 @@ import { reduced } from "./bigRational"
 import type { BooleanType } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import { canonical } from "./Integer"
+import type { ListType } from "./List"
+import { runsOf } from "./List"
 import type { RationalType } from "./Rational"
 import type { StringType } from "./String"
 import { normalisedFormOf } from "./String"
@@ -133,33 +135,44 @@ export function canonicalEncoding(key: AnyType): EncodedKey | null {
 		return (key as BooleanType).value
 	}
 
-	// NOTE: A Case or a Record encodes as the text `compositeText` spells,
-	// where every part of it encodes, and takes the scan path where one does
-	// not. The rule the whole of this rests on is stated there.
+	// NOTE: A Case, a Record or a List encodes as the text `compositeText`
+	// spells, where every part of it encodes, and takes the scan path where one
+	// does not. The rule the whole of this rests on is stated there.
 	let text = compositeText(key, tag)
 
 	if (text !== null) {
 		return { text }
 	}
 
-	// NOTE: THE SCAN PATH — Lists, Dictionaries, Algebraics, Transcendentals,
-	// Functions, a Case or a Record holding one of those, and anything else.
-	// Such a key is found by walking the slots and asking the Equatable
+	// NOTE: THE SCAN PATH — Dictionaries, Algebraics, Transcendentals,
+	// Functions, a Case, a Record or a List holding one of those, and anything
+	// else. Such a key is found by walking the slots and asking the Equatable
 	// witness, which is correct for every key Type the language has and costs
 	// O(n) for the Types that take it. It is invisible from Essence: the same
 	// Methods answer the same things, only slower.
 	return null
 }
 
-// NOTE: The text a Case or a Record encodes to, or `null` for a value that is
-// neither or that holds a part with no encoding. It is only ever asked under a
-// BRANDED witness, and the two witnesses that can carry the brand for these
-// kinds are the ones this text is written to agree with: `Record::is` is the
-// universal structural comparison over the members, whatever `is` a member's
-// own Namespace writes (see `Record.es`), and a Choice's DERIVED equality is
-// the same comparison over the payload after the tag has decided the Case. A
+// NOTE: The text a Case, a Record or a List encodes to, or `null` for a value
+// that is none of those or that holds a part with no encoding. It is only ever
+// asked under a BRANDED witness, and the witnesses that can carry the brand for
+// these kinds are the ones this text is written to agree with: `Record::is` is
+// the universal structural comparison over the members, whatever `is` a
+// member's own Namespace writes (see `Record.es`); a Choice's DERIVED equality
+// is the same comparison over the payload after the tag has decided the Case;
+// and `List::is` is the items compared pairwise through the ITEM's witness,
+// which is branded exactly when that item witness is — see `encodeKey`. A
 // Choice whose Namespace writes an `is` of its own is never branded, so its
-// keys never reach here.
+// keys never reach here, and neither does a List whose items are compared by
+// such a Namespace.
+//
+// NOTE: One text serves two comparisons, which is what makes a List safe to
+// spell in both positions. As a KEY a List is compared by `List::is` through
+// the item witness the Compiler branded; INSIDE a Record or a Case payload it
+// is compared by `anyIs`, the universal structural walk, which asks no witness
+// at all. The two agree wherever the item witness is branded, because a branded
+// witness IS `anyIs` restricted to its kind — that is what the brand means —
+// and where it is not branded no List reaches here in the first place.
 //
 // NOTE: The text is INJECTIVE over the values that have one: every part is
 // length-prefixed or terminated, so a reader could take it apart again, and two
@@ -191,6 +204,10 @@ const unitCaseTextKey: unique symbol = Symbol("unitCaseText")
 function compositeText(value: AnyType, tag: unknown): string | null {
 	if (tag === "Record") {
 		return membersText("R", Object.keys(value), value)
+	}
+
+	if (tag === "List") {
+		return listText(value as ListType<AnyType>)
 	}
 
 	if (typeof tag !== "string" || !tag.includes("#")) {
@@ -239,6 +256,54 @@ function membersText(
 	}
 
 	return `${text}};`
+}
+
+// NOTE: The text a List encodes to — how many items, then each item's own part
+// text — which is the shape `List::is` decides equality by read out in order:
+// the lengths first, then the items pairwise. A List holding one item with no
+// part text has no text itself and takes the scan path with it, which is what
+// a `List<Number>` holding an Algebraic does.
+//
+// NOTE: The COUNT is what makes the text injective against its own NESTING. A
+// part is self-delimiting, so a reader could take a text apart again — but
+// with the head alone `[[], []]` and `[[[]]]` both spell three heads and
+// nothing else, and a Dictionary would then hold one slot for two keys its own
+// `hasKey` calls distinct. `l` joins the letters already spoken for by the
+// parts below (`s i r t f`) and by the composites above (`R c`).
+//
+// NOTE: `runsOf` rather than `viewOf`, for two reasons on top of the one
+// `GroupedList` gives. Encoding a key is a READ that happens on every lookup,
+// and `viewOf` would trim and store back the run Arrays of a List the Program
+// merely asked a question about. And it is the cheaper import: `viewOf` calls
+// `runsOf`, so asking for it would put both functions into every Program
+// holding a Dictionary of ANY key Type — this file is reached by all of them —
+// where `runsOf` alone costs 671 bytes. The two runs are walked directly, as
+// every other native that visits each item once walks them.
+function listText(value: ListType<AnyType>): string | null {
+	let view = runsOf(value)
+	let text = `l${view.total}:`
+
+	for (let index = view.frontCount - 1; index >= 0; index--) {
+		let item = partText(view.front[index])
+
+		if (item === null) {
+			return null
+		}
+
+		text += item
+	}
+
+	for (let index = 0; index < view.backCount; index++) {
+		let item = partText(view.back[index])
+
+		if (item === null) {
+			return null
+		}
+
+		text += item
+	}
+
+	return text
 }
 
 // NOTE: One part of a composite key, spelled so that the parts of one text can

@@ -121,19 +121,48 @@ export function noDispatchCaseMatched(): never {
 // helper (`List.compare`) receives as its hidden trailing conformance
 // Arguments. The unconditional case never reaches here: the Rewriter emits its
 // method map as a plain object literal instead.
+//
+// NOTE: And the one entry of a map that is NOT a Method: the `structural` brand
+// a Dictionary reads, which on a conditional conformance means "structural if
+// the conditions are". `List<ItemType> is Equatable where ItemType is
+// Equatable` compares its items through the witness solving that `where`, so
+// the encoding may stand in for it exactly when that witness is branded too —
+// and a nested List answers the same question of its own condition, so the
+// recursion is the nesting. Currying the brand as if it were a Method would
+// have handed the Dictionary a Function where it reads `=== true`, which is
+// why it is lifted out rather than copied.
+//
+// NOTE: The check is per witness BUILT, not per lookup, and the Optimiser pools
+// a witness built from constants into one Module const — so a Dictionary keyed
+// by a List asks it once for the whole Program.
 export function boundConformance(
 	// NOTE: The fulfilling Methods carry concrete runtime signatures
 	// (`List.compare` takes its own conformance Argument), so the map is
 	// typed loosely here — the curried witnesses restore the exact shape the
-	// bounded helper expects.
-	methods: Record<string, (...args: Array<any>) => unknown>,
+	// bounded helper expects. The brand rides in the same map, which is what
+	// the `true` is doing in the value Type.
+	methods: Record<string, ((...args: Array<any>) => unknown) | true>,
 	conditions: Array<unknown>,
-): Record<string, (...args: Array<any>) => unknown> {
-	let bound: Record<string, (...args: Array<any>) => unknown> = {}
+): Record<string, ((...args: Array<any>) => unknown) | true> {
+	let bound: Record<string, ((...args: Array<any>) => unknown) | true> = {}
 
 	for (let [name, method] of Object.entries(methods)) {
+		if (typeof method !== "function") {
+			continue
+		}
+
 		bound[name] = (...args: Array<unknown>) =>
 			method(...args, ...conditions)
+	}
+
+	if (
+		methods.structural === true &&
+		conditions.every(
+			(condition) =>
+				(condition as { structural?: true }).structural === true,
+		)
+	) {
+		bound.structural = true
 	}
 
 	return bound
@@ -154,11 +183,15 @@ export function boundConformance(
 // always been, and a conditional one is `boundConformance`'s answer handed in
 // here so the conditions are curried on before the provided Methods close over
 // it.
+// NOTE: The `structural` brand rides through untouched, whether it stood in a
+// plain map or `boundConformance` put it there: the spread copies it and the
+// loop below only ever writes the names the Protocol PROVIDES, which a brand is
+// not one of.
 export function providedConformance(
-	methods: Record<string, (...args: Array<any>) => unknown>,
+	methods: Record<string, ((...args: Array<any>) => unknown) | true>,
 	provided: Record<string, (...args: Array<any>) => unknown>,
-): Record<string, (...args: Array<any>) => unknown> {
-	let witness: Record<string, (...args: Array<any>) => unknown> = {
+): Record<string, ((...args: Array<any>) => unknown) | true> {
+	let witness: Record<string, ((...args: Array<any>) => unknown) | true> = {
 		...methods,
 	}
 
