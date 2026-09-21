@@ -788,12 +788,19 @@ function foldedRun(
 	return run
 }
 
-// NOTE: The receiver's characters as the WALKS read them — its own Array where
-// the call folds nothing, and a folded copy of its own window where it does.
-// The walks below visit every character of the receiver anyway, so folding it
-// once costs what the walk costs; folding inside the comparison instead costs a
-// branch per character of every walk that never folds, and `split` measured
-// 36.2 ms that way against 33.1 here.
+// NOTE: The receiver's characters as the WHOLE-RECEIVER WALKS read them — its
+// own Array where the call folds nothing, and a folded copy of its own window
+// where it does. Those walks visit every character of the receiver anyway, so
+// folding it once costs what the walk costs; folding inside the comparison
+// instead costs a branch per character of every walk that never folds, and
+// `split` measured 36.2 ms that way against 33.1 here.
+//
+// NOTE: THE TWO FIRST-MATCH SEARCHES NO LONGER READ THIS, and that is the whole
+// of what a folded `firstIndex` used to cost: they visit as far as the match
+// and this folds as far as the END, so asking one per turn of a drain was
+// quadratic where the case-sensitive twin beside it was linear. They fold a
+// chunk at a time through `foldedRun` instead, for the reason `FOLD_CHUNK`
+// gives.
 //
 // NOTE: A window is folded into a copy of ITS OWN characters, never its
 // parent's, which is why the answer carries the offset to read it from.
@@ -942,8 +949,123 @@ function isInsensitive(sensitivity: CaseSensitivityType): boolean {
 // ASCII maps each unit to one unit, so a position in the folded text IS a
 // position in the original — which is what lets the intrinsic keep answering
 // for the receiver.
+//
+// NOTE: Read by the walks that visit the WHOLE receiver by nature — `count`,
+// `everyIndex`, `split`'s two replacements — where folding it once per call is
+// what the walk costs anyway. The two FIRST-MATCH searches fold a chunk at a
+// time instead, for the reason `foldedChunkWidth` gives.
 function foldedText(string: StringType, insensitive: boolean): string {
 	return insensitive ? string.value.toLowerCase() : string.value
+}
+
+// NOTE: HOW MUCH OF THE RECEIVER A FOLDED FIRST-MATCH SEARCH READS AT A TIME.
+// Folding the whole receiver to find a part near its front is what made a drain
+// asking `firstIndex(of:, comparing #Insensitive)` per turn quadratic in pure
+// ASCII, where the case-sensitive search beside it cost the DISTANCE to the
+// match: `indexOf` stops where it finds, and `toLowerCase` never stops at all.
+// So the folded searches fold a CHUNK, search it, and fold the next one only if
+// the part was not in it — the answer is found at the cost of the distance, and
+// the engine's own search still does the searching.
+//
+// NOTE: The chunks DOUBLE, so a part standing late in a long receiver is reached
+// in a logarithmic number of foldings, the chunks are DISJOINT bar their
+// overlap, and the whole receiver is therefore folded about once by a search
+// that has to read all of it. A fixed chunk would be a fold and a call per 256
+// characters all the way down such a receiver, and a chunk that never grew
+// could not carry its per-call cost.
+//
+// NOTE: A CHUNK SWALLOWS A TAIL NO LONGER THAN ITSELF rather than leaving it to
+// a chunk of its own, which is what keeps a MEDIUM receiver paying nothing for
+// the chunking: 50,000 searches of a 340-character receiver that does not hold
+// the part measured 13.7 ms cut in two and 11.2 ms whole, which is what the
+// whole-receiver folding beside it costs. It also bounds what the rule can
+// waste — a chunk reads at most twice its own width, so the text folded in all
+// stays inside twice the distance to the match.
+//
+// NOTE: The floor is TWICE THE PART, and it has to be at least the part plus
+// one: a chunk overlaps the one before it by `part.length - 1` units — the
+// width a match STRADDLING the boundary can hang over it by — so a chunk no
+// wider than the part would overlap the whole of itself and the walk would
+// stand still. Twice rather than one more keeps a long part from walking a unit
+// at a time before the doubling catches up.
+//
+// NOTE: TWO FLOORS, because a chunk costs the two routes different things. On
+// the ASCII route a chunk is three ENGINE CALLS — a cut, a folding and a search
+// — so it has to be big enough to carry them, and at 256 every receiver up to
+// 512 units is still read in the ONE call these have always made. On the view
+// route a chunk is a loop entry and an Array of its own, which is cheap enough
+// that it can be small — and small is what makes a match near the front cost
+// the front: 16 characters.
+const FOLD_CHUNK = 256
+const FOLD_RUN = 16
+
+function foldedChunkWidth(partWidth: number, floor: number): number {
+	return partWidth * 2 < floor ? floor : partWidth * 2
+}
+
+// NOTE: The FIRST position the folded part stands at, read in growing chunks
+// from the front. The part arrives folded; the receiver's chunk is folded here,
+// and `indexOf` answers a position inside it that `from` carries back to the
+// receiver — which holds because lower-casing ASCII maps each unit to one unit,
+// the same reason `foldedText` gives, and because ASCII has no folding that
+// depends on what stands beside it. A text outside ASCII has both: "İ" folds to
+// two code points and a final sigma folds by its neighbours, so no chunk of one
+// could be folded on its own. That is why this is the ASCII route's Function
+// alone.
+function foldedFirstIndexOf(text: string, part: string): number {
+	let total = text.length
+	let width = foldedChunkWidth(part.length, FOLD_CHUNK)
+
+	if (total <= width * 2) {
+		return text.toLowerCase().indexOf(part)
+	}
+
+	let from = 0
+
+	for (;;) {
+		let to = total - from > width * 2 ? from + width : total
+		let found = text.slice(from, to).toLowerCase().indexOf(part)
+
+		if (found >= 0) {
+			return from + found
+		}
+
+		if (to === total) {
+			return -1
+		}
+
+		from = to - part.length + 1
+		width *= 2
+	}
+}
+
+// NOTE: The LAST position, read in growing chunks from the back, where the
+// overlap hangs the other way: a match the chunk cut off begins before its
+// first unit, so the next chunk ENDS `part.length - 1` units inside this one.
+function foldedLastIndexOf(text: string, part: string): number {
+	let width = foldedChunkWidth(part.length, FOLD_CHUNK)
+
+	if (text.length <= width * 2) {
+		return text.toLowerCase().lastIndexOf(part)
+	}
+
+	let to = text.length
+
+	for (;;) {
+		let from = to > width * 2 ? to - width : 0
+		let found = text.slice(from, to).toLowerCase().lastIndexOf(part)
+
+		if (found >= 0) {
+			return from + found
+		}
+
+		if (from === 0) {
+			return -1
+		}
+
+		to = from + part.length - 1
+		width *= 2
+	}
 }
 
 // NOTE: The grapheme route's PART, folded per character for the reason above.
@@ -975,29 +1097,76 @@ function firstIndexIn(
 	insensitive: boolean,
 ): number {
 	if (bothAscii(originalString, part)) {
-		return foldedText(originalString, insensitive).indexOf(
-			foldedText(part, insensitive),
-		)
+		return insensitive
+			? foldedFirstIndexOf(originalString.value, part.value.toLowerCase())
+			: originalString.value.indexOf(part.value)
 	}
 
 	let { clusters, start, count } = viewOf(originalString)
 	let separator = foldedPart(part, insensitive)
-	let walk = foldedWalk(clusters, start, count, insensitive)
 
-	for (let position = 0; position + separator.length <= count; position++) {
-		if (
-			partMatchesAt(
-				walk.characters,
-				walk.at + position,
-				count - position,
-				separator,
-			)
+	// NOTE: A walk that folds NOTHING reads the receiver's own Array where it
+	// stands, and is written out on its own because the folding walk below must
+	// not cost it anything. Sharing one loop between the two means a question
+	// per position — has the folding reached this far? — which the
+	// case-sensitive walk can only ever answer yes to. Measured on 200 folded
+	// searches of a 20,000-character receiver that does NOT hold the part, the
+	// three shapes of this Function: 24.9 ms folding the whole receiver up
+	// front, 30.7 ms asking that question of four million positions, 27.0 ms
+	// reading it in chunks as below.
+	if (!insensitive) {
+		for (
+			let position = 0;
+			position + separator.length <= count;
+			position++
 		) {
-			return position
+			if (
+				partMatchesAt(
+					clusters,
+					start + position,
+					count - position,
+					separator,
+				)
+			) {
+				return position
+			}
 		}
+
+		return -1
 	}
 
-	return -1
+	// NOTE: Folded in growing chunks, the same shape `foldedFirstIndexOf` takes
+	// on the ASCII route — a chunk is folded, walked, and the next one folded
+	// only if the part was not in it, so a match near the front is answered at
+	// the cost of the front. The chunk after this one begins
+	// `separator.length - 1` characters back inside it, which is how far a
+	// match this chunk cut off can hang over its last character.
+	let width = foldedChunkWidth(separator.length, FOLD_RUN)
+	let from = 0
+
+	for (;;) {
+		let to = count - from > width * 2 ? from + width : count
+		let folded = foldedRun(clusters, start + from, to - from)
+
+		for (
+			let position = from;
+			position + separator.length <= to;
+			position++
+		) {
+			if (
+				partMatchesAt(folded, position - from, to - position, separator)
+			) {
+				return position
+			}
+		}
+
+		if (to === count) {
+			return -1
+		}
+
+		from = to - separator.length + 1
+		width *= 2
+	}
 }
 
 // NOTE: The LAST occurrence, which can overlap an earlier one: `"aaa"` holds
@@ -1010,29 +1179,71 @@ function lastIndexIn(
 	insensitive: boolean,
 ): number {
 	if (bothAscii(originalString, part)) {
-		return foldedText(originalString, insensitive).lastIndexOf(
-			foldedText(part, insensitive),
-		)
+		return insensitive
+			? foldedLastIndexOf(originalString.value, part.value.toLowerCase())
+			: originalString.value.lastIndexOf(part.value)
 	}
 
 	let { clusters, start, count } = viewOf(originalString)
 	let separator = foldedPart(part, insensitive)
-	let walk = foldedWalk(clusters, start, count, insensitive)
 
-	for (let position = count - separator.length; position >= 0; position--) {
-		if (
-			partMatchesAt(
-				walk.characters,
-				walk.at + position,
-				count - position,
-				separator,
-			)
+	if (!insensitive) {
+		for (
+			let position = count - separator.length;
+			position >= 0;
+			position--
 		) {
-			return position
+			if (
+				partMatchesAt(
+					clusters,
+					start + position,
+					count - position,
+					separator,
+				)
+			) {
+				return position
+			}
 		}
+
+		return -1
 	}
 
-	return -1
+	// NOTE: Folded in growing chunks from the BACK, where the forward search
+	// folds ahead of itself into one Array. An Array grows at its end for
+	// nothing and can not grow at its front for nothing — that is the `unshift`
+	// `separate` was quadratic on — so a backward walk re-folds a chunk twice
+	// the width of the last instead, which reads under twice the distance from
+	// the end in all and allocates only what it reads.
+	//
+	// NOTE: The chunk before this one ENDS `separator.length - 1` characters
+	// inside it, which is how far a match this chunk cut off can hang over its
+	// first character.
+	let width = foldedChunkWidth(separator.length, FOLD_RUN)
+	let to = count
+
+	for (;;) {
+		let from = to > width * 2 ? to - width : 0
+		let folded = foldedRun(clusters, start + from, to - from)
+
+		for (
+			let position = to - separator.length;
+			position >= from;
+			position--
+		) {
+			if (
+				partMatchesAt(folded, position - from, to - position, separator)
+			) {
+				return position
+			}
+		}
+
+		if (from === 0) {
+			return -1
+		}
+
+		to = from + separator.length - 1
+		width *= 2
+	}
 }
 
 // NOTE: The occurrences that do NOT overlap — the ones `split` cuts at — so

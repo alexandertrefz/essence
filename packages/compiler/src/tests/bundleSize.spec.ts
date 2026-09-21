@@ -88,7 +88,16 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("HelloWorld.es")).toBeLessThan(6_950)
 	})
 
-	// NOTE: 84,039 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 84,939 measured. The 900 it rose by are the folded searches reading
+	// their receiver in growing chunks — the two chunked walks of the ASCII
+	// route, the chunk-width rule they share, and the case-sensitive walk of the
+	// view route written out on its own so that it pays none of it. This file
+	// reaches them through `contains`, and what they buy it is a search that
+	// costs the distance to its match rather than the whole String: a drain
+	// asking one per turn over 80,000 characters measured 68.0 ms and measures
+	// 0.62.
+	//
+	// NOTE: 84,039 measured before that. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
 	//
@@ -208,7 +217,7 @@ describe("Bundle Size", () => {
 	// headroom fails for the next person to write a line rather than for the
 	// next person to drag in a tower, and that is not what it is for.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(85_100)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(86_000)
 	})
 
 	// NOTE: 39,165 measured; a reintroduced `Number` spread was 54,849 against

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import { insensitive } from "../CaseSensitivity"
 import { createInteger, type IntegerType } from "../Integer"
 import { firstCharacter, lastCharacter } from "../NonEmptyString"
 import type { OptionalType } from "../Optional"
@@ -12,7 +13,9 @@ import {
 	createString,
 	ends__overload$1 as ends,
 	firstIndex__overload$1 as firstIndex,
+	firstIndex__overload$3 as firstIndexFolded,
 	lastIndex__overload$1 as lastIndex,
+	lastIndex__overload$3 as lastIndexFolded,
 	length,
 	lowercase,
 	repeat,
@@ -49,6 +52,13 @@ const last = (text: string, part: string) =>
 	positionOf(lastIndex(string(text), string(part)))
 const occurrences = (text: string, part: string) =>
 	Number(count(string(text), string(part)).value)
+
+// NOTE: The same two questions asked with the case folded, which is the route
+// that reads the receiver in chunks.
+const folded = (text: string, part: string) =>
+	positionOf(firstIndexFolded(string(text), string(part), insensitive))
+const foldedLast = (text: string, part: string) =>
+	positionOf(lastIndexFolded(string(text), string(part), insensitive))
 
 // NOTE: The two Symbol keys `String.ts` remembers a String's ASCII-ness and
 // character count under, found by their descriptions — they are private to
@@ -195,6 +205,89 @@ describe("searching by either route", () => {
 		expect(last("añb", "a")).toBe(0)
 		expect(occurrences("añbñb", "b")).toBe(2)
 		expect(ends(string("añb"), string("b")).value).toBeTrue()
+	})
+
+	// NOTE: THE FOLDED FIRST-MATCH SEARCHES READ THE RECEIVER IN CHUNKS, so
+	// that one costs the distance to its match rather than the whole receiver
+	// — and a chunk can cut a match in half. Each chunk therefore begins
+	// `part.length - 1` characters back inside the one before it, and ends that
+	// far inside it walking from the back, which is the widest a match can hang
+	// over a boundary by.
+	//
+	// NOTE: THE RECEIVERS HERE ARE LONG ON PURPOSE, and the part is put at
+	// EVERY position of one rather than at the boundaries a reader worked out.
+	// Neither route chunks a receiver under twice its chunk — 512 units on the
+	// ASCII route, 32 characters on the view route — so every other search test
+	// in this repository reads a receiver that takes the whole text in ONE call
+	// and could not see a boundary bug at all. Sweeping every position needs no
+	// arithmetic about where the chunks fall, and keeps holding when they move.
+	test("a folded match is found at every position of a chunked receiver", () => {
+		let filler = "ab".repeat(700)
+		let units = 1_200
+
+		for (let at = 0; at + 3 <= units; at++) {
+			let text =
+				filler.slice(0, at) + "QRS" + filler.slice(0, units - at - 3)
+
+			expect(text).toHaveLength(units)
+			expect(folded(text, "qrs")).toBe(at)
+			expect(foldedLast(text, "qrs")).toBe(at)
+		}
+
+		// NOTE: A receiver the ASCII scan refuses, walked the same way — its
+		// chunks are counted in CHARACTERS, and each `é` is one character and
+		// one unit, so the position a search answers is the position the sweep
+		// put the part at.
+		let accents = "é".repeat(400)
+		let characters = 300
+
+		for (let at = 0; at + 3 <= characters; at++) {
+			let text =
+				accents.slice(0, at) +
+				"QRS" +
+				accents.slice(0, characters - at - 3)
+
+			expect(folded(text, "qrs")).toBe(at)
+			expect(foldedLast(text, "qrs")).toBe(at)
+		}
+	})
+
+	// NOTE: The answers a chunked walk has to keep giving when there is nothing
+	// to find, or nothing long enough to find it in — the three ways out of the
+	// loop that the sweep above never takes.
+	test("a folded search of a long receiver answers where there is no match", () => {
+		let filler = "ab".repeat(700)
+
+		expect(folded(filler, "qrs")).toBe(-1)
+		expect(foldedLast(filler, "qrs")).toBe(-1)
+		expect(folded(filler, `${filler}z`)).toBe(-1)
+		expect(foldedLast(filler, `${filler}z`)).toBe(-1)
+		expect(folded(filler, filler.toUpperCase())).toBe(0)
+		expect(foldedLast(filler, filler.toUpperCase())).toBe(0)
+
+		let accents = "é".repeat(400)
+
+		expect(folded(accents, "qrs")).toBe(-1)
+		expect(foldedLast(accents, "qrs")).toBe(-1)
+		expect(folded(accents, `${accents}z`)).toBe(-1)
+		expect(foldedLast(accents, `${accents}z`)).toBe(-1)
+	})
+
+	// NOTE: The LAST match of a receiver holding several, which is what a
+	// backward walk stopping at the first chunk that holds one has to answer —
+	// and the FIRST where a forward walk would meet the later one too.
+	test("a folded walk answers the end it started from", () => {
+		let filler = "ab".repeat(700)
+		let text = `QRS${filler.slice(0, 600)}QRS${filler.slice(0, 600)}`
+
+		expect(folded(text, "qrs")).toBe(0)
+		expect(foldedLast(text, "qrs")).toBe(603)
+
+		let accents = "é".repeat(400)
+		let view = `QRS${accents.slice(0, 200)}QRS${accents.slice(0, 200)}`
+
+		expect(folded(view, "qrs")).toBe(0)
+		expect(foldedLast(view, "qrs")).toBe(203)
 	})
 })
 

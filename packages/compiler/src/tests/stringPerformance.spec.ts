@@ -89,6 +89,13 @@ const LINES = "abcdefghijklmnopqrstuvwxyz0123456789\n".repeat(300)
 // quadratic one, and three against a doubling is reached by no linear Program
 // and missed by no quadratic one.
 //
+// NOTE: THE THRESHOLD IS THE SAME THREE FOR EVERY GROWTH CASE HERE and the
+// LADDER is what each one claims. A case claiming its cost grows no faster than
+// its receiver doubles its lengths, where three catches the quadratic it fears;
+// a case claiming its cost does not grow with the receiver AT ALL quadruples
+// them, where three catches the linear one. Reading which claim a case makes is
+// therefore reading its ladder.
+//
 // NOTE: The lengths start where the quadratic term OUTGROWS THE SPAWN, which is
 // the whole of what makes this guard able to see its own defect. The subprocess
 // costs some 22 ms whatever it runs and the grouping costs 0.2 ms at 40,000
@@ -101,7 +108,46 @@ const LINES = "abcdefghijklmnopqrstuvwxyz0123456789\n".repeat(300)
 // guard is written to keep asking until one of them arrives.
 const GROUPED_LENGTHS = [40_000, 80_000, 160_000, 320_000]
 const GROUP_WIDTH = 3
-const GROWTH_PER_DOUBLING = 3
+const GROWTH_THRESHOLD = 3
+
+// NOTE: A FOLDED FIRST-MATCH SEARCH COSTS THE DISTANCE TO THE MATCH, which is
+// what the case-sensitive search beside it has always cost and what the folded
+// one did not: it lower-cased the WHOLE receiver and then searched, so a drain
+// asking `firstIndex(of:, comparing #Insensitive)` per turn read the rest of
+// its String every turn — the same n² the copying was, and in pure ASCII, where
+// the same drain asking the case-sensitive question was linear.
+//
+// NOTE: The lengths QUADRUPLE and the turn count is FIXED, so the Program asks
+// exactly as many searches at every length and only the receiver grows. A
+// search costing the distance therefore reads FLAT and one reading the whole
+// receiver reads four times per step, which is what the threshold catches.
+//
+// NOTE: BOTH ROUTES ARE DRAINED, and the ASCII one needs eight times the turns
+// to make its claim. Folding an ASCII receiver is one engine call over the
+// whole text, where folding a segmented one is a call per character — so at the
+// same turn count the ASCII defect hides inside the subprocess spawn and the
+// guard could not see it. Measured end to end, best of three, with the folding
+// put back the way it was: ASCII 117, 631 and 2,686 ms against 28, 28 and 29 as
+// it stands; the view route 143, 519 and 2,017 against 27, 28 and 35.
+const ASCII_SEARCH_LENGTHS = [20_000, 80_000, 320_000]
+const ASCII_SEARCH_TURNS = 17_600
+const VIEW_SEARCH_LENGTHS = [11_000, 44_000, 176_000]
+const VIEW_SEARCH_TURNS = 2_200
+
+// NOTE: "ZZ" every twenty-two characters, so a drain that has eaten any number
+// of them still has one within twenty-one of the front of what is LEFT. The
+// positions it reads therefore cycle 0, 21, 20 … 1 over each period and sum to
+// the arithmetic series 231 a period — which is what the Program prints, and
+// what makes a search that answered the wrong position, or threw, fail rather
+// than win. The turns are a whole number of periods and are fewer than the
+// SHORTEST receiver's characters, so every length prints the same sum.
+//
+// NOTE: The second period is the same text with an accent in it, which is the
+// whole of what sends the drain down the grapheme route rather than the
+// intrinsics — so the two cases below differ in ONE character.
+const ASCII_PERIOD = "ZZcafe cafe cafe cafe "
+const VIEW_PERIOD = "ZZcaf\u00e9 caf\u00e9 caf\u00e9 caf\u00e9 "
+const PERIOD_SUM = 231
 
 function millisecondsToRun(source: string, printed: string): number {
 	let parsed = parseWithDiagnostics(source)
@@ -197,15 +243,16 @@ function printedGroupedLength(length: number): string {
 // what keeps a failure quick, since the length after the one that caught a
 // quadratic Program is the one that would run for long enough to be killed by
 // the runner and report a timeout instead of its growth.
-function expectLinearGrowth(
+function expectGrowthUnderThreshold(
+	lengths: Array<number>,
 	sourceFor: (length: number) => string,
 	printedFor: (length: number) => string,
 ): void {
 	let measured: Array<number> = []
 	let tooSteep: Array<string> = []
 
-	for (let index = 0; index < GROUPED_LENGTHS.length; index++) {
-		let length = GROUPED_LENGTHS[index]!
+	for (let index = 0; index < lengths.length; index++) {
+		let length = lengths[index]!
 
 		measured.push(millisecondsToRun(sourceFor(length), printedFor(length)))
 
@@ -215,9 +262,9 @@ function expectLinearGrowth(
 
 		let grewBy = measured[index]! / measured[index - 1]!
 
-		if (grewBy >= GROWTH_PER_DOUBLING) {
+		if (grewBy >= GROWTH_THRESHOLD) {
 			tooSteep.push(
-				`${GROUPED_LENGTHS[index - 1]} to ${length}: ${grewBy.toFixed(1)}x`,
+				`${lengths[index - 1]} to ${length}: ${grewBy.toFixed(1)}x`,
 			)
 
 			break
@@ -225,6 +272,45 @@ function expectLinearGrowth(
 	}
 
 	expect(tooSteep).toEqual([])
+}
+
+// NOTE: The seed is CUT before it is put in the State, so that the walk carries
+// a String where the Literal proves a NonEmptyString — which is the Type the
+// drain really has, since it cuts a character off every turn and the Type has
+// to hold on the last one too.
+//
+// NOTE: A counted drain rather than one that runs until its String is empty,
+// and the count is what makes the lengths comparable: the same searches are
+// asked whatever the receiver is. A drain running to empty would ask more
+// questions of a longer String and could not tell a search that GREW from a
+// drain that simply ran longer — and, as the List spec found, a defect that
+// answers the wrong length hangs such a drain, and a suite that hangs says
+// nothing at all.
+function searchDrainSource(
+	period: string,
+	turns: number,
+	length: number,
+): string {
+	return `implementation {
+	constant text = "${period}"::repeat(times ${Math.floor(length / period.length)})
+	constant summed = loop(from 1, through ${turns}, startingWith {
+		rest = text::slice(from 0),
+		total = 0,
+	}, (_, state) {
+		<- {
+			rest = state.rest::slice(from 1),
+			total = state.total::add(
+				state.rest::firstIndex(of "zz", comparing #Insensitive)::value(defaultingTo 0),
+			),
+		}
+	})
+
+	Terminal.print(summed.total)
+}`
+}
+
+function printedDrainSum(turns: number): string {
+	return String((turns / ASCII_PERIOD.length) * PERIOD_SUM)
 }
 
 function position(answer: ReturnType<typeof firstIndex>): number {
@@ -306,10 +392,41 @@ describe("String performance", () => {
 		RUNNER_MILLISECONDS,
 	)
 
+	for (let [route, period, lengths, turns] of [
+		[
+			"an ASCII receiver",
+			ASCII_PERIOD,
+			ASCII_SEARCH_LENGTHS,
+			ASCII_SEARCH_TURNS,
+		],
+		[
+			"a segmented receiver",
+			VIEW_PERIOD,
+			VIEW_SEARCH_LENGTHS,
+			VIEW_SEARCH_TURNS,
+		],
+	] as const) {
+		it(
+			`finds a folded match in ${route} at the cost of the distance to it`,
+			() => {
+				expectGrowthUnderThreshold(
+					lengths,
+					(length) => searchDrainSource(period, turns, length),
+					() => printedDrainSum(turns),
+				)
+			},
+			RUNNER_MILLISECONDS,
+		)
+	}
+
 	it(
 		"groups one String in time proportional to its length",
 		() => {
-			expectLinearGrowth(groupingSource, printedGroupedLength)
+			expectGrowthUnderThreshold(
+				GROUPED_LENGTHS,
+				groupingSource,
+				printedGroupedLength,
+			)
 		},
 		RUNNER_MILLISECONDS,
 	)
