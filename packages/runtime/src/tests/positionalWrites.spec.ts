@@ -907,6 +907,32 @@ describe("persistent use", () => {
 		expect(Number(length(stale()).value)).toBe(4)
 	})
 
+	// NOTE: WHAT `prepend`'s CATCH-UP IS FOR, which is cost rather than
+	// soundness — `prepend` hands the answer the receiver's `writes` pair, so an
+	// answer made from a receiver that is behind is behind the same way and
+	// repairs itself when it is read. What the eager repair buys is that the two
+	// of them share ONE repaired Array, and the copies are what says so: a
+	// stale box prepended to and then read, with the answer read as well, makes
+	// one new Array between them. Without the line each of them catches up on
+	// its own and there are two.
+	test("prepending to a box that is behind repairs the run once, not twice", () => {
+		let source = logged([0, 1, 2, 3, 4])
+		let ahead = written(source, 91, 1)
+
+		written(ahead, 92, 3)
+
+		let answer = prepend(source, createInteger(-1n))
+		let arrays = new Set<Array<IntegerType>>()
+
+		expect(itemsOf(answer)).toEqual([-1, 0, 1, 2, 3, 4])
+		expect(itemsOf(source)).toEqual([0, 1, 2, 3, 4])
+
+		arrays.add(answer.value)
+		arrays.add(source.value)
+
+		expect(arrays.size).toBe(1)
+	})
+
 	// NOTE: A receiver whose SEAM MOVES under it. Cutting an interior window
 	// rebuilds both of the receiver's runs as fresh Arrays of its own, so the
 	// log it was carrying describes an Array it no longer holds — and a write

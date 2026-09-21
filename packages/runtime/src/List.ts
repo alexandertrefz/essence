@@ -108,12 +108,28 @@ export type ListView<ItemType extends AnyType> = {
 // answered for are frozen for good, since the copying paths only ever write
 // Arrays of their own.
 //
+// NOTE: That paragraph is about a run GROWING, and a run can CHANGE now as
+// well — a positional write lands in one in place. So it is no longer the whole
+// of why a walked position stays what it was, and a reader checking this rule
+// against `replace` should read THE SECOND REENTRANCY RULE below next: what
+// holds a position still under a walk is the SEAL that walk leaves on the run.
+//
 // NOTE: THE READING view — the two runs and the fixed counts, with the
 // receiver's runs trimmed to what it views where THE HALF RULE below says to
-// trim them. Every native that reads a List's ITEMS reads it through here,
-// whether it visits one of them or all of them: what the rule asks is not how
-// much a caller is about to read but how much of an Array a box is keeping
-// alive, which is a question about the box rather than about the caller.
+// trim them. Every native that reads a List's ITEMS and may be asked for them
+// AGAIN reads it through here, whether it visits one of them or all of them:
+// what the rule asks is not how much a caller is about to read but how much of
+// an Array a box is keeping alive, which is a question about the box rather
+// than about the caller.
+//
+// NOTE: The readers that do NOT come through here are the ones with no second
+// reading to make, and each says so where it stands: `ownItemsOf` and
+// `pushItemsOf`, which copy the items out and hand the copy on; the set-shaped
+// walks, `GroupedList` and `Dictionary.of(entries:)`, which visit every item
+// once; `keyEncoding`'s `listText`; `Randomness.pick`; `Generators`;
+// `String.of(codePoints:)`. Trimming a run for a walk that will never look
+// again buys nothing and costs the copy — which is this same rule, applied
+// where the caller happens to be known.
 //
 // NOTE: THE SECOND REENTRANCY RULE, which a positional write in place needs.
 // A run can now also CHANGE mid-walk: `list::reduce(startingWith list, (acc,
@@ -842,9 +858,15 @@ export function prepend__overload$1<ItemType extends AnyType>(
 	item: ItemType,
 ): ListType<ItemType> {
 	// NOTE: Reads the box's fields rather than a view, so it catches a box that
-	// is behind up itself — the answer keeps the receiver's BACK run whichever
-	// branch it takes, and an Array that has been written under the receiver has
-	// to be repaired before a second box is given it.
+	// is behind up itself — and unlike `append`'s, this catch-up is for COST
+	// rather than for soundness. Every branch below hands the answer the
+	// receiver's `writes` pair along with its Array, so an answer made from a
+	// receiver that is behind is behind in exactly the same way and repairs
+	// itself the first time it is read. What the eager repair buys is that the
+	// two of them share ONE repaired Array: left to themselves the receiver and
+	// the answer would catch up separately and copy the run twice. Deleting the
+	// line leaves every spec in this package green except the one that counts
+	// those copies.
 	caughtUp(originalList)
 
 	let backCount = originalList.length ?? originalList.value.length
