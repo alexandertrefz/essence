@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import type { common } from "@essence-lang/interfaces"
 
+import type { BooleanType } from "../Boolean"
 import { createBoolean } from "../Boolean"
 import { keys } from "../Dictionary"
 import { group, tally } from "../GroupedList"
@@ -48,6 +49,7 @@ import {
 	viewOf,
 } from "../List"
 import { firstItem, lastItem } from "../NonEmptyList"
+import type { OrderingType } from "../Ordering"
 import { createString } from "../String"
 import { getStringRepresentation } from "../Terminal"
 import { type AnyType, isValueOfType, typeKeySymbol } from "../type"
@@ -86,6 +88,47 @@ const integerPrinting = {
 }
 
 const ascending = { [typeKeySymbol]: "SortOrder#Ascending" } as const
+
+// NOTE: The walk a generic Choice's derived `Equatable` runs — the descriptor
+// says the Case's one member is a List of the Type Parameter, so every item
+// is compared by the witness, which is user code with BOTH runs held. It is
+// in this file rather than beside the Choice tests because what it is being
+// asked here is a question about `List`'s runs.
+const choiceHoldingListIs = boundChoiceIs({
+	"Held#Items": { items: { k: "list", of: { k: "w", i: 0 } } },
+})
+
+const holding = (items: ListType<IntegerType>) =>
+	({ [typeKeySymbol]: "Held#Items", items }) as never
+
+// NOTE: Reports the item it is asked ABOUT rather than the one it is compared
+// against, which is the other way round from `visiting` further down.
+// The scan path in `keyEncoding` calls the witness as `is(storedKey, key)`,
+// so the second Argument is the item the walk has just reached — a receiver
+// item while the key set is built, and an ARGUMENT item while the argument is
+// looked up. Reporting the first one instead would never name an argument
+// item at all, and an entry that can not name one can not see a write into
+// one: `visiting` left these three blind to their own hazard.
+function visitingKey(visit: (item: IntegerType) => void) {
+	return {
+		is: (first: IntegerType, second: IntegerType) => (
+			visit(second),
+			createBoolean(first.value === second.value)
+		),
+	}
+}
+
+// NOTE: A Type Parameter's witness is declared over `AnyType`, since it
+// stands for whatever the Program bound the Parameter to — the two casts are
+// what "this Program bound it to Integer" looks like from here.
+const holdingWitness = (visit: (item: IntegerType) => void) => ({
+	is: (first: AnyType, second: AnyType) => (
+		visit(second as IntegerType),
+		createBoolean(
+			(first as IntegerType).value === (second as IntegerType).value,
+		)
+	),
+})
 
 const integerList: common.Type = {
 	type: "List",
@@ -351,12 +394,82 @@ const readers: Array<[string, (tracked: Tracked) => void]> = [
 	],
 ]
 
+type ComparisonWitness = {
+	is: (first: IntegerType, second: IntegerType) => BooleanType
+	compare: (first: IntegerType, second: IntegerType) => OrderingType
+}
+
+// NOTE: Whichever way the comparison at hand says "these two hold the same
+// items" — an ordering of `Equal`, or a Boolean `true`.
+const saysEqual = (answer: AnyType): boolean =>
+	answer[typeKeySymbol] === "Ordering#Equal" ||
+	(answer as unknown as BooleanType).value === true
+
+// NOTE: A COMPARISON WHOSE ARGUMENT IS FRESHLY LOGGED, which is the only state
+// a missing seal can be seen in: the twin carries a log, is current for it and
+// has never been read, so a write from inside the witness would land in the very
+// Array the comparison is reading. A twin anything had read first would already
+// be sealed and the turn would prove nothing — which is exactly how the D1
+// review's first fuzzer came out green on the bug it was written to find.
+//
+// NOTE: The twin holds the receiver's own items, so `Equal` is the answer owed
+// whatever the schedule did beforehand, and the witness writes the twin at a
+// position the walk has NOT yet reached — never position 0, whose items are
+// both read before the first witness call. That is what makes the ANSWER the
+// assertion: both Lists are intact afterwards and only the answer about them
+// could have been corrupted.
+function comparedAgainstATwin(
+	comparing: (
+		first: ListType<IntegerType>,
+		second: ListType<IntegerType>,
+		conformance: ComparisonWitness,
+	) => AnyType,
+): (tracked: Tracked, next: () => number) => Tracked {
+	return ({ box, items }, next) => {
+		if (items.length < 2) {
+			return { box, items }
+		}
+
+		let twin = logged(items)
+		let position = 1 + Math.floor(next() * (items.length - 1))
+		let value = Math.floor(next() * 40)
+		let latest = twin
+		let changed = items.slice()
+		let meddle = () => {
+			latest = written(latest, value, position)
+		}
+
+		changed[position] = value
+
+		let answer = comparing(box, twin, {
+			is: (first, second) => (
+				meddle(),
+				createBoolean(first.value === second.value)
+			),
+			compare: (first, second) => (
+				meddle(),
+				compareIntegers(first, second)
+			),
+		})
+
+		expect(saysEqual(answer)).toBe(true)
+		expect(itemsOf(twin)).toEqual(items)
+
+		return { box: latest, items: changed }
+	}
+}
+
 // NOTE: EVERY EDIT THAT CAN MAKE A NEW VALUE OUT OF AN OLD ONE, including the
 // three positions `replace` treats apart — inside the List, counted back from
 // the end, and outside it, where the receiver is answered untouched. The
 // operations that SHARE a run are what put two boxes on one Array, which is the
 // only way a write in place can be seen at all, so `append`, `prepend`, `slice`
 // and `remove` matter here as much as `replace` does.
+//
+// NOTE: The last three are not edits but COMPARISONS, and they are in this
+// table because what they answer is the one thing a missing seal corrupts. They
+// leave the twin they compared against in the pool, so the schedule goes on
+// reading it like any other value.
 const edits: Array<
 	[string, (tracked: Tracked, next: () => number) => Tracked]
 > = [
@@ -513,6 +626,18 @@ const edits: Array<
 				items: [...items, ...other],
 			}
 		},
+	],
+	["is against a freshly logged twin", comparedAgainstATwin(is)],
+	["compare against a freshly logged twin", comparedAgainstATwin(compare)],
+	[
+		"a generic Choice's derived is against a freshly logged twin",
+		comparedAgainstATwin((first, second, conformance) =>
+			choiceHoldingListIs(
+				holding(first),
+				holding(second),
+				conformance as never,
+			),
+		),
 	],
 ]
 
@@ -1135,47 +1260,6 @@ describe("reentrancy", () => {
 			true,
 		],
 	]
-
-	// NOTE: The walk a generic Choice's derived `Equatable` runs — the descriptor
-	// says the Case's one member is a List of the Type Parameter, so every item
-	// is compared by the witness, which is user code with BOTH runs held. It is
-	// in this file rather than beside the Choice tests because what it is being
-	// asked here is a question about `List`'s runs.
-	const choiceHoldingListIs = boundChoiceIs({
-		"Held#Items": { items: { k: "list", of: { k: "w", i: 0 } } },
-	})
-
-	const holding = (items: ListType<IntegerType>) =>
-		({ [typeKeySymbol]: "Held#Items", items }) as never
-
-	// NOTE: `visiting` reports the item it is asked ABOUT rather than the one it
-	// is compared against, which is the other way round from the sweep above.
-	// The scan path in `keyEncoding` calls the witness as `is(storedKey, key)`,
-	// so the second Argument is the item the walk has just reached — a receiver
-	// item while the key set is built, and an ARGUMENT item while the argument is
-	// looked up. Reporting the first one instead would never name an argument
-	// item at all, and an entry that can not name one can not see a write into
-	// one: `visiting` left these three blind to their own hazard.
-	function visitingKey(visit: (item: IntegerType) => void) {
-		return {
-			is: (first: IntegerType, second: IntegerType) => (
-				visit(second),
-				createBoolean(first.value === second.value)
-			),
-		}
-	}
-
-	// NOTE: A Type Parameter's witness is declared over `AnyType`, since it
-	// stands for whatever the Program bound the Parameter to — the two casts are
-	// what "this Program bound it to Integer" looks like from here.
-	const holdingWitness = (visit: (item: IntegerType) => void) => ({
-		is: (first: AnyType, second: AnyType) => (
-			visit(second as IntegerType),
-			createBoolean(
-				(first as IntegerType).value === (second as IntegerType).value,
-			)
-		),
-	})
 
 	for (let [label, walk, owed] of argumentWalks) {
 		test(`${label} over an argument its callback writes answers about the entry items`, () => {
