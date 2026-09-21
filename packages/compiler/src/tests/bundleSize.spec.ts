@@ -64,19 +64,19 @@ async function bundleSizeOfSource(source: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: 5,929 measured, and it is the floor every Program pays: the runtime
+	// NOTE: 5,852 measured, and it is the floor every Program pays: the runtime
 	// a bundle links whatever it calls. HelloWorld.es names no number, no
 	// container and no constant — what it measures is what a `Terminal.print`
 	// and a String interpolation drag in, and what NOTHING else does.
 	//
-	// NOTE: 189 of those bytes arrived with the character WINDOW, and they are
+	// NOTE: 112 of those bytes arrived with the character WINDOW, and they are
 	// all in the ONE function this Program reaches of it: building a String's
 	// character view. It never cuts a String, so it links none of the cutting —
-	// what it pays for is the view remembering two things a cut will need, the
-	// text its clusters partition where that is not the String's own text, and
-	// whether the Segmenter ran. The second is read by no Program and only by
-	// the specs that assert a drain segments its String once; it is 82 bytes,
-	// and it buys the strongest guard in `stringWindows.spec.ts`.
+	// what it pays for is the view remembering the text its clusters partition
+	// where that is not the String's own text, which a cut will need. They were
+	// 189 while the view also remembered whether the Segmenter had run, which no
+	// Program read: `stringWindows.spec.ts` counts the Segmenter's own runs
+	// instead, and that guard costs a bundle nothing.
 	//
 	// NOTE: It was 6,930 until the transcendental basis registry stopped
 	// deriving its canonical order in a top-level call, which no bundler can
@@ -88,7 +88,7 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("HelloWorld.es")).toBeLessThan(6_950)
 	})
 
-	// NOTE: 81,445 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 84,039 measured. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
 	//
@@ -151,7 +151,7 @@ describe("Bundle Size", () => {
 	// before treating a rise from one of them as a regression: unminified,
 	// escodegen's indentation is most of it.
 	//
-	// NOTE: 3,325 of those bytes are the character WINDOW — a cut of a String
+	// NOTE: 3,235 of those bytes are the character WINDOW — a cut of a String
 	// sharing its parent's cluster Array by offset rather than copying it,
 	// which is what made consuming a String from the front linear (2,245 ms to
 	// 35 for the gap analysis's 40,000-character drain). This file reaches all
@@ -162,7 +162,7 @@ describe("Bundle Size", () => {
 	// they share gave back the 305 of the one it replaced and whole-receiver
 	// folding 183.
 	//
-	// NOTE: A Program that never CUTS a String pays 189 of it, all in the one
+	// NOTE: A Program that never CUTS a String pays 112 of it, all in the one
 	// function that builds a view; `HelloWorld.es` above prices exactly that.
 	// The one thing every String-touching Program pays is 74 bytes in `append`,
 	// which marks a join the ASCII scan would refuse rather than leaving the
@@ -188,21 +188,31 @@ describe("Bundle Size", () => {
 	// NOTE: 1,373 of them are `list-in-place-writes`: the catching up every
 	// reader of a List now does, the sealing the walks do, and the `writes` a
 	// box carries through the sharing literals. A Program that never reaches a
-	// List pays NONE of it — the floor above is unmoved at 5,740 — and one that
+	// List pays NONE of it — the floor above did not move for it — and one that
 	// reaches one pays it whether or not it writes a position, because catching
 	// a box up is what every READER owes. `replace` itself shakes out of a
 	// Program that does not call it, and a Program that does is smaller than it
 	// was: the Essence body it replaces was a guard, a `remove` and an
 	// `insert`.
-	// NOTE: The ceiling is 80,000 rather than the measured figure plus a
-	// handful, because a gate with twenty bytes of headroom fails for the next
-	// person to write a line rather than for the next person to drag in a
-	// tower, and that is not what it is for.
+	//
+	// NOTE: 350 more are what the independent review of those two List changes
+	// cost: the seam move filling its two runs in bulk on three branches rather
+	// than item by item, `materialise` combining into an Array sized once, and
+	// the SECOND seal a comparison owes — the List it is handed, not only the
+	// one it is called on. The first two bought back a middle window that had
+	// become twelve times dearer than the copy it replaced; the third closed a
+	// comparison that could be written in place while it was being made.
+	//
+	// NOTE: The ceiling stands about a kilobyte above the measured figure rather
+	// than a handful of bytes above it, because a gate with twenty bytes of
+	// headroom fails for the next person to write a line rather than for the
+	// next person to drag in a tower, and that is not what it is for.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(84_800)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(85_100)
 	})
 
-	// NOTE: 38,056 measured; a reintroduced `Number` spread was 54,849. The same
+	// NOTE: 39,165 measured; a reintroduced `Number` spread was 54,849 against
+	// the 38,056 this file measured when that was tried. The same
 	// claim as Everyday's, on a Program that takes square roots rather than
 	// doing arithmetic — so it reads the other side of several trades. A pass
 	// that pays text for work on Everyday takes bytes OFF here, because a file
@@ -231,7 +241,8 @@ describe("Bundle Size", () => {
 		// NOTE: 1,047 are `list-in-place-writes`, which Everyday's note above
 		// accounts for. This file names no List at all and still pays, because a
 		// conformance witness carries `List`'s own Methods with it — the very thing
-		// the note above this one is about.
+		// the note above this one is about. 62 more are the review fixes to the
+		// two List changes, which Everyday's note accounts for as well.
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(40_200)
 	})
 
@@ -283,9 +294,9 @@ describe("Bundle Size", () => {
 	//
 	// NOTE: What says this is the fixture and not the runtime is the three
 	// figures that did NOT move with it: `Everyday.es`, the removeDuplicates
-	// Program below, and `HelloWorld.es` at 5,740. `Everyday.es`
-	// reads 78,120 now, and nothing it has taken since is anything a Dictionary
-	// reaches: 48 bytes of `List` Methods becoming Overloads, 381 of the range
+	// Program below, and `HelloWorld.es`, which stood at 5,740. `Everyday.es`
+	// read 78,120 by then, and nothing it had taken since was anything a
+	// Dictionary reaches: 48 bytes of `List` Methods becoming Overloads, 381 of the range
 	// natives folding into one walk, 27 of `List.split` becoming an Overload
 	// entry, 67 of the transcendental registry, and the 1,832 of the String
 	// vocabulary wave its own note above accounts for. A Dictionary runtime
@@ -310,9 +321,16 @@ describe("Bundle Size", () => {
 	// kind, and the `Http.get` ceiling below is where it is written out.
 	//
 	// NOTE: And a Program that holds no Dictionary and asks a List no set-shaped
-	// question pays NOTHING: `HelloWorld.es` (5,740), `Everyday.es` (78,120) and
-	// `Irrational.es` (38,056) are byte-identical across the change. That is the
-	// claim the module split was made for, and it still holds.
+	// question paid NOTHING for it: `HelloWorld.es`, `Everyday.es` and
+	// `Irrational.es` were byte-identical across the change, at the 5,740,
+	// 78,120 and 38,056 they measured then. That is the claim the module split
+	// was made for, and it held.
+	//
+	// NOTE: 60,673 measured now. Between the 59,045 above and this stand
+	// `list-window-trimming` (96, which this file reaches through `slice`),
+	// `list-in-place-writes` (the 1,356 the note inside the test accounts for),
+	// the character view's builder (112, the floor's own note) and 64 of review
+	// fixes to the two List changes.
 	it("charges a Dictionary Program for the container it uses", async () => {
 		// NOTE: 1,356 are `list-in-place-writes`, which Everyday's note accounts
 		// for; `Dictionary.of(entries:)` walks a List of entry Records and seals it,
@@ -320,9 +338,9 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(61_600)
 	})
 
-	// NOTE: 12,272 measured, where the same Program without the one call
-	// measures 3,893 — so `removeDuplicates` costs 8,379 bytes, more than twice
-	// as much as the Program that calls it. It was 18,607 while the body was
+	// NOTE: 13,542 measured, where the same Program without the one call
+	// measures 5,069 — so `removeDuplicates` costs 8,473 bytes, well over the
+	// Program that calls it. It was 18,607 while the body was
 	// `@::tally()::keys()` on `GroupedList`: a List Method reached the whole
 	// second container, and the store, the kind registry, the registration and
 	// the written form all arrived with it. It is a List native over a plain
@@ -330,7 +348,7 @@ describe("Bundle Size", () => {
 	// two containers share — `keyEncoding.ts`, a runtime module of its own so
 	// that this one can rest on it alone.
 	//
-	// NOTE: What the 8,379 buys is the Method being linear: one call over
+	// NOTE: What the 8,473 buys is the Method being linear: one call over
 	// 20,000 items with 2,000 distinct measured 106 ms as a fold on `contains`
 	// and 22 ms here, and with all 20,000 distinct 650 ms against 22 ms — both
 	// best of three with 21 ms of subprocess startup inside. The figure is here so the trade
@@ -359,8 +377,8 @@ describe("Bundle Size", () => {
 		).toBeLessThan(14_400)
 	})
 
-	// NOTE: 10,152 measured, where the same Program calling `median` measures
-	// 2,760 — so `mode` costs 7,392 bytes, the count and the canonical key
+	// NOTE: 11,304 measured, where the same Program calling `median` measures
+	// 2,760 — so `mode` costs 8,544 bytes, the count and the canonical key
 	// encoding it counts by, 709 of them the List arm that arrived last and
 	// that `mode` itself can not reach: it counts Integers, Rationals and
 	// Numbers, and pays for the arm because the encoding is one function.
@@ -419,6 +437,12 @@ describe("Bundle Size", () => {
 	// carries the reader: `anyIs` has a List arm, and that arm reads a view.
 	// Those two figures together are what say where the weight falls, which is
 	// why both are written down.
+	//
+	// NOTE: 24,471 measured now. What stands between the 23,578 above and this
+	// is what the Lists and Strings a request's headers are made of took in the
+	// same campaign — the trimming rule, the in-place writes' catching up, the
+	// character view's builder and a window's normal form — none of it this
+	// Namespace's own.
 	//
 	// NOTE: What was weighed against it: reaching a List through the kind
 	// registry instead, so that only a Program carrying `List.ts` pays. It
@@ -488,7 +512,7 @@ describe("Bundle Size", () => {
 
 		expect(inBundle.length).toBeGreaterThan(0)
 		expect(inBundle.length).toBeLessThanOrEqual(inPrelude.length)
-		// NOTE: 16,273 measured, and the ceiling keeps the ~500 bytes this
+		// NOTE: 16,347 measured, and the ceiling keeps the ~500 bytes this
 		// test's own rule asks for. It had five, which is not a guard but a
 		// tripwire: it fires on the next ordinary edit and says nothing
 		// about what moved. It even deformed the runtime — `String.append`
@@ -510,6 +534,9 @@ describe("Bundle Size", () => {
 		//
 		// NOTE: 1,197 came off again with the transcendental registry, which no
 		// Module here names: the floor test above says what that change was.
+		//
+		// NOTE: 74 more are `append` marking a join the ASCII scan would refuse,
+		// which Everyday's note explains and every String-joining Program pays.
 		//
 		// NOTE: 82 more are the Integer `toString` binding under its Overload
 		// name: the plain entry is an Overload entry now, so
