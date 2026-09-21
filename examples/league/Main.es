@@ -5,6 +5,11 @@ import {
 		teams
 	}
 	from "./Standings.es" {
+		§ `Outcome` is named nowhere below and is load-bearing all the same: a
+		§ Standing's `form` is a `List<Outcome>`, and a Record's members decide
+		§ its equality — so `supposedLeader::is(leader)` reaches Outcome's
+		§ derived `Equatable`, which is in scope only where the Choice is.
+		Outcome
 		Standing
 		Standings
 	}

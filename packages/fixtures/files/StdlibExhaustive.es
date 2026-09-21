@@ -67,6 +67,15 @@ implementation {
 		<- value
 	}
 
+	§ And the narrowing this one is: a Record's DECLARED members decide its
+	§ equality, so passing a wider Record through a Parameter that names one
+	§ member is how a Program says "compare the rest structurally". The Record
+	§ section reads it for a Function member, which is the one value no
+	§ conformance can be declared for.
+	function identified(_ value: { id: Integer }) -> { id: Integer } {
+		<- value
+	}
+
 	§ The two transforms `everyValue` is shown with. Each is declared rather
 	§ than written at the call, for the reason given there.
 	function evenAsText(_ item: Integer) -> Optional<String> {
@@ -3558,22 +3567,32 @@ c"::quote())
 	show("Record.isNot(_ \{\}) [equal]", point::isNot({ x = 1, y = 2 }))
 
 	§ A Function is the one value with no Type tag on it, and reading that
-	§ missing tag used to THROW here rather than answer — a Record holding a
-	§ Function could not be compared with itself at all. Equality of Functions
-	§ is identity: the same Function is equal to itself, two separately written
+	§ missing tag used to THROW rather than answer. Equality of Functions is
+	§ identity: the same Function is equal to itself, two separately written
 	§ ones are not, which is the most that is decidable.
-	constant double        = (_ value: Integer) -> Integer {
+	§
+	§ A Record whose Type DECLARES a Function member is not Equatable at all —
+	§ `{ fn: (_ Integer) -> Integer }::is(…)` is refused, naming `fn` — so the
+	§ one way left to reach this comparison is the WIDTH rule: a member the
+	§ static Type can not see is compared structurally, and structurally a
+	§ Function is its identity. These two lines are what is left of the four
+	§ that used to stand here.
+	constant double      = (_ value: Integer) -> Integer {
 		<- value::multiply(with 2)
 	}
-	constant holdingDouble = { fn = double }
+	constant carried     = { id = 1, fn = double }
+	constant alsoCarried = {
+		id = 1,
+		fn = (_ value: Integer) -> Integer { <- value },
+	}
 
 	show(
-		"Record.is(_ \{\}) [holding a Function]",
-		holdingDouble::is(holdingDouble),
+		"Record.is(_ \{\}) [an unseen Function member]",
+		identified(carried)::is(identified(carried)),
 	)
 	show(
-		"Record.is(_ \{\}) [differing Functions]",
-		holdingDouble::is({ fn = (_ value: Integer) -> Integer { <- value } }),
+		"Record.is(_ \{\}) [unseen, differing Functions]",
+		identified(carried)::is(identified(alsoCarried)),
 	)
 	show("Record.keys()", point::keys())
 	show("Record.toString()", point::toString())

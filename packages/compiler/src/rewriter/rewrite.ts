@@ -3062,6 +3062,8 @@ function dispatchCaseCall(
 			dispatchCase.derivedDescriptor,
 			dispatchCase.omittedParameterIndices.length > 0,
 			dispatchCase.providedBy,
+			undefined,
+			dispatchCase.derivedMembers,
 		),
 		arguments: openOmittedArguments(
 			[receiver],
@@ -3638,6 +3640,7 @@ function rewriteConformanceValue(
 					false,
 					undefined,
 					node.derivedCases,
+					node.derivedMembers,
 				),
 				kind: "init",
 				method: false,
@@ -3840,6 +3843,16 @@ function calleeExpression(
 	return rewriteExpression(node.name)
 }
 
+// NOTE: The runtime helper each routed Record Method answers to. Two names
+// rather than three: `Record.es` writes `is` and `toString` and no `isNot`, so
+// the negation is `Equatable`'s own PROVIDED body, which reads `is` off the
+// very witness it is curried with — a routed one included. That is why nothing
+// here has to negate anything, and why the two answers can not drift apart.
+const recordRoutingHelperNames: Record<string, string> = {
+	is: "boundRecordIs",
+	toString: "boundRecordToString",
+}
+
 // NOTE: One reference to a member of a standard library Namespace, in the one
 // place every emission site routes through. A native member — Method or static
 // Property — stays a read off the plain `import * as <Namespace>`, which esbuild
@@ -3871,6 +3884,9 @@ function namespaceMember(
 	// the two sites that reach that derive — a Lookup and a conformance witness
 	// — and by nothing else.
 	derivedCases?: Array<string>,
+	// NOTE: The DECLARED member names a Record routes, in declaration order. Set
+	// by the same two kinds of site the descriptor is, and by nothing else.
+	derivedMembers?: Array<string>,
 ): estree.Expression {
 	// NOTE: A Protocol's provided Method, whose const is named out of the
 	// Namespace scheme's way. Asked first, because a Namespace of the same name
@@ -3879,6 +3895,39 @@ function namespaceMember(
 		return {
 			type: "Identifier",
 			name: protocolMemberIdentifier(providedBy, memberName),
+		}
+	}
+
+	// NOTE: A Record that routes a declared member through that member's own
+	// conformance. The Namespace is still the builtin `Record` — a Record
+	// conforms conditionally on its members exactly as a List conforms
+	// conditionally on its items — so the routing is named by the member list
+	// rather than by a Namespace nobody declared, and a Record that routes
+	// NOTHING never arrives here at all and emits the native it always did.
+	//
+	// NOTE: Curried with the member names, so the member witnesses arrive as the
+	// helper's trailing Parameters — appended directly at a plain call, or
+	// curried on by `boundConformance` at a bounded one. That is the same shape
+	// the widened `boundChoiceIs` takes its descriptor in.
+	if (
+		derivedMembers !== undefined &&
+		namespaceName === "Record" &&
+		!isShadowingUserNamespace(namespaceName)
+	) {
+		return {
+			type: "CallExpression",
+			optional: false,
+			callee: {
+				type: "MemberExpression",
+				optional: false,
+				computed: false,
+				object: { type: "Identifier", name: "$helpers" },
+				property: {
+					type: "Identifier",
+					name: recordRoutingHelperNames[memberName] ?? memberName,
+				},
+			},
+			arguments: [jsonExpression(derivedMembers)],
 		}
 	}
 
@@ -4008,6 +4057,8 @@ function rewriteMethodInvocation(
 			node.derivedDescriptor,
 			node.omitsArguments === true,
 			node.providedBy,
+			undefined,
+			node.derivedMembers,
 		),
 		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
 	}
@@ -4058,6 +4109,8 @@ function rewriteUnionMethodInvocation(
 								dispatchCase.derivedDescriptor,
 								dispatchCase.omittedParameterIndices.length > 0,
 								dispatchCase.providedBy,
+								undefined,
+								dispatchCase.derivedMembers,
 							),
 							{
 								type: "ArrayExpression",

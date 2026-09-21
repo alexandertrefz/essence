@@ -178,6 +178,9 @@ function compile(
 			omittedParameterIndices:
 				branch.dispatchCase.omittedParameterIndices,
 			derivedDescriptor: branch.dispatchCase.derivedDescriptor,
+			...(branch.dispatchCase.derivedMembers === undefined
+				? {}
+				: { derivedMembers: branch.dispatchCase.derivedMembers }),
 			providedBy: branch.dispatchCase.providedBy,
 		})),
 		type: node.type,

@@ -10,6 +10,11 @@ import {
 		teams
 	}
 	from "./Standings.es" {
+		§ Named nowhere below, and load-bearing: a Standing's `form` is a
+		§ `List<Outcome>`, and a Record's members decide its equality — so a
+		§ `require` comparing two tables reaches Outcome's derived `Equatable`,
+		§ which is in scope only where the Choice is.
+		Outcome
 		Standing
 		Standings
 	}

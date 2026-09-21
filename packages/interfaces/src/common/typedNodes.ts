@@ -431,6 +431,13 @@ export interface MethodInvocationNode {
 	// generic payloads through the hidden conformance Arguments. Absent
 	// otherwise, so a non-generic Choice's call emits the plain `choiceIs`.
 	derivedDescriptor?: DerivedEquatableDescriptor
+	// NOTE: Set only when this call's receiver is a RECORD whose DECLARED members do
+	// not all compare — or print — the way the universal structural walk does:
+	// the routed member names, in declaration order, lining up with the member
+	// witnesses that arrive as the hidden trailing conformance Arguments. Absent
+	// for an all-structural Record, which keeps emitting the builtin
+	// `Record.is`/`Record.toString` it always did, byte for byte.
+	derivedMembers?: Array<string>
 	// NOTE: Set for Union-typed receivers whose Method resolves per member
 	// Type — `namespace` and `overloadedMethodIndex` then hold placeholders,
 	// and each case carries its own statically resolved target.

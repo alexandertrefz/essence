@@ -138,6 +138,7 @@ import {
 	type NameContext,
 	applyTypeArguments,
 	resolveMethodLookupNamespacesForReceiverType,
+	routedRecordCall,
 	resolveMethodType,
 	resolveOverloadedFunctionStatementType,
 	resolveProtocolDeclarationStatementType,
@@ -1162,6 +1163,7 @@ function enrichMethodInvocation(
 		conformances,
 		omittedParameterIndices,
 		derivedDescriptor,
+		derivedMembers,
 		dispatch,
 	} = resolved
 
@@ -1192,6 +1194,7 @@ function enrichMethodInvocation(
 		conformances,
 		omittedParameterIndices,
 		derivedDescriptor,
+		derivedMembers,
 		dispatch,
 	}
 }
@@ -12902,6 +12905,11 @@ type ResolvedMethodInvocation = {
 	// its widened runtime helper interprets. Absent for every other call, so a
 	// non-generic Choice emits the plain `choiceIs`.
 	derivedDescriptor?: common.DerivedEquatableDescriptor
+	// NOTE: Set only for a RECORD receiver that routes a declared member — the
+	// names its runtime helper is curried with, lined up with the conformances
+	// beside them. Absent for every all-structural Record, which is what keeps
+	// those calls emitting the native member read they always did.
+	derivedMembers?: Array<string>
 	dispatch: Array<common.DispatchCase> | null
 }
 
@@ -15012,12 +15020,31 @@ function resolveMethodInvocation(
 			report(diagnostic)
 		}
 
+		// NOTE: A direct `is`/`isNot`/`toString` on a RECORD is the one call the
+		// conformance rail never asked about: the builtin Record Namespace
+		// declares no `where` clause, so nothing solved its members. It is asked
+		// here, and what it answers becomes this call's own hidden Arguments.
+		let routedRecord = routedRecordCall(
+			resolvedMethod.namespace.name,
+			resolvedMethod.namespace.type,
+			node.member.content,
+			baseType,
+			scope,
+			node.position,
+		)
+
 		return {
 			namespace: resolvedMethod.namespace,
 			type: resolvedMethod.type,
 			overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
-			conformances: resolvedMethod.conformances,
+			conformances:
+				routedRecord === null
+					? resolvedMethod.conformances
+					: routedRecord.conformances,
 			omittedParameterIndices: resolvedMethod.omittedParameterIndices,
+			...(routedRecord === null
+				? {}
+				: { derivedMembers: routedRecord.members }),
 			// NOTE: A direct `is`/`isNot` on a generic Choice widens at emission
 			// — the descriptor its runtime helper follows is recovered from the
 			// receiver's Choice, whose DECLARED Alias the applied receiver Type

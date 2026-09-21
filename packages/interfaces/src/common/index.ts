@@ -1297,6 +1297,15 @@ export type ConformanceSource =
 			// for every written Namespace and every non-generic Choice, which
 			// keeps their witness emission byte-identical.
 			derivedDescriptor?: DerivedEquatableDescriptor
+			// NOTE: Set only when this source is a RECORD whose DECLARED members
+			// do not all compare — or print — the way the universal structural
+			// walk does: the routed member names, in declaration order, lining up
+			// with the `conditions` beside them. The Namespace is still `Record`,
+			// because it is: a Record conforms conditionally on its members
+			// exactly as a List conforms conditionally on its items. Absent for
+			// an all-structural Record, whose witness emission is byte-identical
+			// to what it always was.
+			derivedMembers?: Array<string>
 			// NOTE: Set only when this source is a Choice's derived
 			// `Enumerable` — the Case tags its one Method answers with, which
 			// no Namespace holds a body for. Absent for every written
@@ -1337,6 +1346,10 @@ export type DispatchCase = {
 	// otherwise, so a non-generic Choice's dispatch branch emits the plain
 	// `choiceIs` unchanged.
 	derivedDescriptor?: DerivedEquatableDescriptor
+	// NOTE: Set only when this branch's receiver is a RECORD that routes a
+	// declared member, read exactly as the field of the same name on a plain
+	// Method Invocation.
+	derivedMembers?: Array<string>
 	// NOTE: The Protocol that PROVIDED this branch's Method, when one did.
 	// `namespaceName` is the Namespace whose conformance put the Method in
 	// reach, which declares no Method of that name — so this is what sends the

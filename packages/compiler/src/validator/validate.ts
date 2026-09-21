@@ -827,12 +827,25 @@ function checkConformanceArity(
 		(generic) => generic.constraint != null,
 	).length
 
-	if (bounded === node.conformances.length) {
+	// NOTE: A RECORD that routes a declared member is the one call whose hidden
+	// Arguments the Signature does not count. A Record's members are not Type
+	// Parameters, so the builtin Namespace declares no bound for them — what the
+	// call carries is one witness per ROUTED member, and `derivedMembers` is the
+	// very list the emission curries the helper with. The two are checked against
+	// each other here for the reason everything else in this Function is: a
+	// mismatch shifts every Argument of the emitted call.
+	let expected =
+		node.nodeType === "MethodInvocation" &&
+		node.derivedMembers !== undefined
+			? node.derivedMembers.length
+			: bounded
+
+	if (expected === node.conformances.length) {
 		return
 	}
 
 	throw new Error(
-		`${describeCallee()} was given ${countOf(node.conformances.length, "conformance Argument")} for a Signature with ${countOf(bounded, "Protocol-bounded Type Parameter")}. This is a bug in the Compiler.`,
+		`${describeCallee()} was given ${countOf(node.conformances.length, "conformance Argument")} for a Signature with ${countOf(expected, "Protocol-bounded Type Parameter")}. This is a bug in the Compiler.`,
 	)
 }
 

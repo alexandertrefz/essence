@@ -412,6 +412,13 @@ function simplifyMethodInvocation(
 			simplifyConformanceArguments(node.conformances),
 		),
 		derivedDescriptor: node.derivedDescriptor,
+		// NOTE: The routed member names of a Record receiver, carried for the
+		// reason the descriptor above is: the Namespace is the builtin `Record`
+		// either way, and this is what tells the Rewriter to reach for the
+		// member-routing helper rather than the flat native.
+		...(node.derivedMembers === undefined
+			? {}
+			: { derivedMembers: node.derivedMembers }),
 		// NOTE: Read off the resolved Namespace, which is the Protocol's pseudo
 		// Namespace for a provided Method and carries the Protocol's name. The
 		// Rewriter needs it because the Namespace NAME does not say whether a
@@ -455,6 +462,9 @@ function simplifyUnionMethodInvocation(
 			),
 			omittedParameterIndices: dispatchCase.omittedParameterIndices,
 			derivedDescriptor: dispatchCase.derivedDescriptor,
+			...(dispatchCase.derivedMembers === undefined
+				? {}
+				: { derivedMembers: dispatchCase.derivedMembers }),
 			providedBy: dispatchCase.providedBy,
 		})),
 		arguments: node.arguments.map((arg) => simplifyArgument(arg)),
@@ -544,6 +554,12 @@ function conformanceExpression(
 			: { providedMethods: conformance.source.providedMethods }),
 		conditions: conformance.source.conditions.map(conformanceExpression),
 		derivedDescriptor: conformance.source.derivedDescriptor,
+		// NOTE: The routed member names a Record's conditional witness is built
+		// from, carried for the same reason: the method map names `Record.is`,
+		// and only this says the emission has to route rather than read it.
+		...(conformance.source.derivedMembers === undefined
+			? {}
+			: { derivedMembers: conformance.source.derivedMembers }),
 		// NOTE: The Case tags a derived `Enumerable` witness is built from,
 		// carried for the reason the descriptor beside it is: no Namespace
 		// holds the Method, so the emission has nothing else to read.

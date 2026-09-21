@@ -12,11 +12,14 @@ import {
 } from "../diagnostics/index"
 import { oneBoundOnly } from "../helpers/bounds"
 import {
+	type ConformanceMethodMap,
 	computeConformanceMethodMap,
+	conformanceIsStructural,
 	conformanceKey,
 	derivedEnumerableNamespaceName,
 	derivedEquatableNamespaceName,
 	derivedPrintableNamespaceName,
+	equatableProtocolName,
 	missingRequirements,
 	providedMethodProtocol,
 } from "../helpers/conformance"
@@ -2772,6 +2775,12 @@ type ConformanceSolveResult =
 			ok: false
 			chain: Array<string>
 			culprit?: { type: common.Type; protocolName: string }
+			// NOTE: The member of a RECORD the refusal is really about, dotted
+			// through every Record it is nested inside. Absent for every other
+			// refusal, which is what tells a Record above this one whether the
+			// name it is about to write down is the whole path or only the last
+			// step of one.
+			memberPath?: string
 	  }
 
 type ScopeConformanceState = {
@@ -4251,6 +4260,343 @@ function derivedConformanceSource(
 	}
 }
 
+// NOTE: What a Record's DECLARED members say about the Record's own conformance
+// — "structural" where every one of them compares (or prints) exactly the way
+// the universal structural walk does, "routed" where at least one of them does
+// not and hands its own witness over, and "refused" where one of them has no
+// such conformance at all.
+//
+// THE WIDTH RULE lives in the first line of this: only the members the static
+// Type DECLARES are asked. A Record value may carry more than its Type can see,
+// and those extra members are compared and printed structurally as they always
+// were — so the top `Record` Type and `{}` declare nothing, route nothing, and
+// answer exactly what they answered before. The consequence is written down in
+// `Record.es`: the answer at a narrower static Type may differ from the answer
+// at the wider one, and that is the price of asking a Type rather than a value.
+type RecordMemberRouting =
+	| { kind: "structural" }
+	| {
+			kind: "routed"
+			members: Array<string>
+			conditions: Array<common.Conformance>
+	  }
+	| {
+			kind: "refused"
+			memberPath: string
+			chain: Array<string>
+			culprit?: { type: common.Type; protocolName: string }
+	  }
+
+// NOTE: The members a Record Type declares, in declaration order, or null where
+// the Type is not a Record carrying any. Refinements are erased first: a
+// refinement declares no members of its own and its conformance resolves to the
+// base Namespace's, so a refined Record is asked the question its base is.
+function declaredRecordMembers(
+	type: common.Type,
+): Array<[string, common.Type]> | null {
+	let erased = eraseRefinements(type)
+
+	if (erased.type !== "Record") {
+		return null
+	}
+
+	let members = Object.entries(erased.members)
+
+	return members.length === 0 ? null : members
+}
+
+// NOTE: Asked of every member, and asked QUIETLY. `solveConformance` reports
+// `ambiguous-conformance` and `nonconforming-namespace` itself, and this is a
+// speculative question about a MEMBER — a Diagnostic it raised would land on
+// whatever Statement happened to print the Record, about a Type that Statement
+// never named. A failure it REPORTED rather than described comes back with an
+// empty chain, and an empty chain is read below as "leave this member alone":
+// that is what the language did before any of this, so the mistake it stands
+// for keeps exactly the Diagnostic it has always had, at the site that makes it.
+function memberConformance(
+	memberType: common.Type,
+	protocolName: string,
+	scope: enricher.Scope,
+	position: common.Position,
+): ConformanceSolveResult {
+	return collectDiagnostics(() =>
+		solveConformance(memberType, protocolName, scope, position),
+	).result
+}
+
+function recordMemberRouting(
+	binding: common.Type,
+	protocolName: string,
+	scope: enricher.Scope,
+	position: common.Position,
+): RecordMemberRouting {
+	let members = declaredRecordMembers(binding)
+
+	if (members === null) {
+		return { kind: "structural" }
+	}
+
+	let routed: Array<string> = []
+	let conditions: Array<common.Conformance> = []
+
+	for (let [name, memberType] of members) {
+		let solved = memberConformance(
+			memberType,
+			protocolName,
+			scope,
+			position,
+		)
+
+		if (!solved.ok) {
+			if (solved.chain.length === 0) {
+				continue
+			}
+
+			// NOTE: The dotted path a reader can follow, built as the refusal
+			// travels up: a nested Record answers with its own member's path and
+			// this level writes its name in front of it, so `{ inner: { run: … } }`
+			// names `inner.run` rather than leaving a reader to open two Types to
+			// work out which member it meant. What is kept of the chain below is
+			// the LAST sentence alone, because every sentence above it is about a
+			// Record member and has been folded into the path.
+			let memberPath =
+				solved.memberPath === undefined
+					? name
+					: `${name}.${solved.memberPath}`
+
+			return {
+				kind: "refused",
+				memberPath,
+				chain:
+					solved.memberPath === undefined
+						? solved.chain
+						: solved.chain.slice(-1),
+				...(solved.culprit === undefined
+					? {}
+					: { culprit: solved.culprit }),
+			}
+		}
+
+		if (conformanceIsStructural(solved.source, protocolName)) {
+			continue
+		}
+
+		routed.push(name)
+		conditions.push({
+			genericName: name,
+			protocolName,
+			source: solved.source,
+		})
+	}
+
+	return routed.length === 0
+		? { kind: "structural" }
+		: { kind: "routed", members: routed, conditions }
+}
+
+// NOTE: Whether this candidate is the standard library's blanket Record
+// Namespace. The name alone will not do: a Program may declare
+// `namespace Record for { x: Integer }`, which shadows the library's in the
+// Scope's Namespace table and is a written `is` that has to keep deciding for
+// itself. The library's is the one whose target is the TOP Record, and nothing
+// shadowing it can carry that target without being an ambiguity the solve has
+// already refused.
+function isBuiltinRecordNamespace(
+	name: string,
+	declaredTarget: NamespaceTarget,
+): boolean {
+	let target = declaredTarget.targetType
+
+	return (
+		name === "Record" &&
+		target !== null &&
+		target.type === "Record" &&
+		Object.keys(target.members).length === 0
+	)
+}
+
+// NOTE: The witness a Record gets when its members decide its conformance, or
+// null where they leave it exactly as it was. The Namespace stays `Record`,
+// because it IS `Record`: a Record conforms conditionally on its members the way
+// a List conforms conditionally on its items, and the member names beside the
+// conditions are what tells the Rewriter to reach for the routing helper rather
+// than the flat native. A Record that routes NOTHING answers null here and
+// emits, byte for byte, what it always did.
+function routedRecordSource(
+	binding: common.Type,
+	protocolName: string,
+	methodMap: ConformanceMethodMap,
+	provided: { providedMethods?: Record<string, string> },
+	scope: enricher.Scope,
+	position: common.Position,
+): ConformanceSolveResult | null {
+	let routing = recordMemberRouting(binding, protocolName, scope, position)
+
+	if (routing.kind === "structural") {
+		return null
+	}
+
+	if (routing.kind === "refused") {
+		return {
+			ok: false,
+			memberPath: routing.memberPath,
+			// NOTE: The same shape `solveNamespaceConformance` builds for a
+			// failed `where` condition — this level says what was asked, the
+			// member says which one could not answer, and the levels below it
+			// say why. Three sentences means the caller reaches for
+			// `unsatisfied-conformance-condition`, which is the Diagnostic
+			// `List<Function>` is refused with, and the two stories read alike.
+			chain: [
+				`${describeType(binding)} does not conform to '${protocolName}'.`,
+				`Its member '${routing.memberPath}' does not conform to '${protocolName}'.`,
+				...routing.chain,
+			],
+			...(routing.culprit === undefined
+				? {}
+				: { culprit: routing.culprit }),
+		}
+	}
+
+	return {
+		ok: true,
+		source: {
+			kind: "namespace",
+			name: "Record",
+			methodMap,
+			...provided,
+			conditions: routing.conditions,
+			derivedMembers: routing.members,
+		},
+	}
+}
+
+// NOTE: The other half of the rail, and it is a different half. A BOUNDED call
+// (`Terminal.print(r)`, `same<infer T is Equatable>(…)`, a Dictionary key, a
+// String hole) reaches the routing through `solveConformance` and carries the
+// witness it answers with. A DIRECT one — `r::is(other)`, `::isNot`,
+// `::toString()` — resolves the Method off the builtin Record Namespace and was
+// never asked about a conformance at all, because the Namespace has no `where`
+// clause for the invocation to solve. So it is asked here, at the one call the
+// Namespace won, and the answer becomes the call's own conformance Arguments.
+//
+// Null where nothing routes, which is every Record whose members agree with the
+// structural walk — such a call emits the native member read it always did.
+export function routedRecordCall(
+	namespaceName: string,
+	namespace: common.NamespaceType,
+	methodName: string,
+	baseType: common.Type,
+	scope: enricher.Scope,
+	position: common.Position,
+): {
+	members: Array<string>
+	conformances: Array<common.Conformance>
+} | null {
+	// NOTE: The name as written. Neither is overloaded on the builtin Record
+	// Namespace, so there is no mangled spelling to see through here.
+	let protocolName = recordRoutedMethods[methodName]
+
+	if (
+		protocolName === undefined ||
+		// NOTE: A Method the Protocol PROVIDED is not this rail's business, and
+		// `isNot` is exactly that one: `Record.es` declares `is` and not its
+		// negation, so `record::isNot(other)` runs `Equatable`'s own body over
+		// the RECORD's witness — which the bounded rail has already routed. Its
+		// hidden Argument is that whole witness and not the member witnesses,
+		// so replacing it here shifted a witness into a value's place and the
+		// Program died inside `String.compare`.
+		namespace.providedBy !== undefined ||
+		!isBuiltinRecordNamespace(namespaceName, {
+			targetType: namespace.targetType,
+			generics: namespace.generics,
+		})
+	) {
+		return null
+	}
+
+	// NOTE: Asked LOUDLY, unlike the member solves inside it: this is the call
+	// the reader wrote, and a member of its receiver that can not compare is the
+	// reason it can not run. The refusal is `unsatisfied-conformance-condition`
+	// whatever the chain's length, because the chain a Record builds is never
+	// one sentence — it says what was asked, which member could not answer, and
+	// why — and because a direct call binds no Type Parameter for the shorter
+	// Diagnostic to be about.
+	let solved = solveConformance(baseType, protocolName, scope, position)
+
+	if (!solved.ok) {
+		if (solved.chain.length > 0) {
+			let culprit = solved.culprit?.type ?? baseType
+			let missing = missingConformance(
+				culprit,
+				solved.culprit?.protocolName ?? protocolName,
+				scope,
+			)
+
+			reportError(
+				`${describeType(baseType)} does not conform to '${protocolName}'`,
+				position,
+				{
+					code: "unsatisfied-conformance-condition",
+					labels: [
+						primary(
+							position,
+							`this asks each declared member for its own '${protocolName}'`,
+						),
+					],
+					notes: [...solved.chain, ...missing.notes],
+					helps: [
+						...printingEscapeHelps(protocolName, baseType),
+						...missing.helps,
+					],
+					...(missing.data === undefined
+						? {}
+						: { data: missing.data }),
+				},
+			)
+		}
+
+		return null
+	}
+
+	if (
+		solved.source.kind !== "namespace" ||
+		solved.source.derivedMembers === undefined
+	) {
+		return null
+	}
+
+	return {
+		members: solved.source.derivedMembers,
+		conformances: solved.source.conditions,
+	}
+}
+
+// NOTE: The Protocol each Method the builtin Record Namespace WRITES belongs
+// to. `keys` is on neither, which keeps it out of the routing entirely; and
+// `isNot` is not here because the Namespace does not write one — `Equatable`
+// provides it, over the Record's own witness, so it negates whatever `is` that
+// witness carries and can not drift from it.
+const recordRoutedMethods: Record<string, string> = {
+	is: equatableProtocolName,
+	toString: printableProtocolName,
+}
+
+// NOTE: The Help that comes FIRST when a value can not be printed, because it is
+// the one edit that always works: `inspect` takes any value at all, needs no
+// conformance and is what an author reaching for `print` on a Record of their
+// own usually wanted. Withheld for equality, which has no such escape.
+function printingEscapeHelps(
+	protocolName: string,
+	baseType: common.Type,
+): Array<string> {
+	return protocolName === printableProtocolName &&
+		declaredRecordMembers(baseType) !== null
+		? [
+				"Write 'Terminal.inspect(…)' instead — it renders any value structurally and asks for no conformance.",
+			]
+		: []
+}
+
 // NOTE: The provided half of a conformance, left OUT entirely where the Protocol
 // provides nothing or the conformer overrides everything it provides — so a
 // witness with none emits the plain object literal it always did, byte for byte.
@@ -4340,6 +4686,16 @@ type ConformanceSourceNamespace = {
 	// specialized against the receiver, so a covering Namespace answers for its
 	// whole Union and a generic one for the receiver's own item Type.
 	selfType: common.Type
+	// NOTE: What the source's WITNESS is solved for, where that is not the same
+	// Type. It is the same for every Namespace but one: the library's blanket
+	// Record Namespace conforms `for Record` and is CONDITIONAL on the receiver's
+	// own members, which the top Record declares none of — so solving its witness
+	// for the target handed `record::isNot(other)` the structural comparison
+	// however the Record's members compared, and `is` and `isNot` answered two
+	// different questions about one pair of values. Only the witness moves:
+	// `Self` stands nowhere in the signature this builds, so what a reader is
+	// shown, and what the Parameter accepts, are exactly what they were.
+	witnessType?: common.Type
 	// NOTE: The target and Generics the specificity order compares — the
 	// Namespace's own, unspecialized, exactly as a written Method's are.
 	targetType: common.Type
@@ -4429,6 +4785,12 @@ function conformanceSourcesFor(
 		sources.push({
 			name: namespace.name,
 			selfType: specializedTargetFor(namespace, baseType),
+			...(isBuiltinRecordNamespace(namespace.name, {
+				targetType: namespace.targetType,
+				generics: namespace.generics,
+			})
+				? { witnessType: baseType }
+				: {}),
 			targetType: namespace.targetType ?? baseType,
 			generics: namespace.generics,
 			writes: new Set(Object.keys(namespace.methods)),
@@ -4528,7 +4890,7 @@ function providedMethodNamespaceFor(
 					{
 						name: "Self",
 						infer: false,
-						defaultType: source.selfType,
+						defaultType: source.witnessType ?? source.selfType,
 						constraint: protocol.name,
 					},
 				],
@@ -5057,6 +5419,33 @@ function solveNamespaceConformance(
 			protocolName: condition.protocol,
 			source: solved.source,
 		})
+	}
+
+	// NOTE: And the one candidate whose conditions are not written anywhere: the
+	// library's blanket Record Namespace conforms `for Record`, and which
+	// members a particular Record HAS is the only thing that can say whether its
+	// `is` — the universal structural comparison — is the answer its members
+	// would give. A Record whose members all agree with it answers null here and
+	// keeps the plain, unconditional, byte-identical witness it always had.
+	//
+	// It stands after the written conditions rather than instead of them because
+	// the two can not both apply: the library's Namespace declares none.
+	if (
+		protocolName === equatableProtocolName &&
+		isBuiltinRecordNamespace(candidate.name, candidate.declaredTarget)
+	) {
+		let routed = routedRecordSource(
+			binding,
+			protocolName,
+			result.methodMap,
+			providedMethodsOf(result),
+			scope,
+			position,
+		)
+
+		if (routed !== null) {
+			return routed
+		}
 	}
 
 	return {

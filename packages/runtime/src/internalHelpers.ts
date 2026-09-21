@@ -422,6 +422,92 @@ export function boundChoiceIsNot(descriptor: DerivedEquatableDescriptor) {
 	): BooleanType => createBoolean(!casesEqual(a, b, descriptor, witnesses))
 }
 
+// NOTE: The runtime half of a RECORD that routes. `Record.is` compares every
+// member through `anyIs` — the universal structural rule — which is the right
+// answer only while no member's own Namespace writes a different one. Where one
+// does, the Compiler hands the member's witness in and curries this with the
+// names of the members that take one, in the order the witnesses arrive.
+//
+// NOTE: The member SETS still have to match, which is the whole difference
+// between this and the descriptor's `record` node: that one is a payload of a
+// Case, whose members are fixed by the declaration, while a Record has WIDTH —
+// a `{ tag: Tag }` value may carry an `extra` the static Type can not see. The
+// declared members route; every other member is compared by `anyIs`, which is
+// what says a narrow Type's answer may differ from the wide one's. See
+// `Record.es`.
+//
+// NOTE: The names are carried AS THEY WERE CURRIED — an Array, indexed into by
+// the walk below — and not turned into a Map of name to slot. The Map was here
+// first, on the reasoning that a lookup beats a search; measured, it does not
+// at these sizes. A routed Record names one member, or two, or three, so the
+// search is one or two comparisons of interned strings against a hash of the
+// key and a bucket read, and building the Map cost an allocation per currying
+// besides. 2,000,000 comparisons of a `{ tag: Tag, n: Integer }` through
+// `List::contains`: 0.145 s with the Map, 0.133 s without, best of five,
+// alternated, one world per process.
+//
+// NOTE: What is left above a hand-written `is` (0.036 s for the same 2,000,000)
+// is not here. It is the two `Object.keys` the member-set check allocates, the
+// rest Array this signature builds per call, and the two more `boundConformance`
+// builds around it at a bounded call — all of them shared with List, Dictionary
+// and the Choice helper beside this one, and none of them a Record's to fix
+// alone.
+export function boundRecordIs(members: Array<string>) {
+	return (
+		a: RecordType,
+		b: RecordType,
+		...witnesses: Array<EquatableWitness>
+	): BooleanType => createBoolean(recordRoutesEqual(a, b, members, witnesses))
+}
+
+// NOTE: There is no `boundRecordIsNot` beside `boundRecordIs`, and there is no
+// room for one: `Record.es` writes `is` and no negation, so
+// `record::isNot(other)` is `Equatable`'s own provided body run over the
+// Record's witness — it reads the routed `is` off that witness and negates what
+// it answers. A helper here would be a second answer to a question that already
+// has one.
+
+// NOTE: The same two key Arrays `Record.is` counts with, and for the reason
+// written there: a Record carries a Symbol key, which keeps it off the engine's
+// fast enumeration path, and `Object.keys` on a shape the engine has seen is
+// nearly free where a `for…in` is four times slower.
+//
+// NOTE: ONE pass, over the LEFT side's keys, which is what makes the member-set
+// check and the comparison the same walk: a key the right side does not carry
+// ends it, and a key neither the routed list names is compared by `anyIs`
+// exactly as the whole Record used to be. `indexOf` over the routed names is
+// the slot — see `boundRecordIs` for why a search rather than a lookup.
+function recordRoutesEqual(
+	a: RecordType,
+	b: RecordType,
+	routed: Array<string>,
+	witnesses: Array<EquatableWitness>,
+): boolean {
+	let aKeys = Object.keys(a)
+
+	if (aKeys.length !== Object.keys(b).length) {
+		return false
+	}
+
+	for (let key of aKeys) {
+		if (!Object.hasOwn(b, key)) {
+			return false
+		}
+
+		let slot = routed.indexOf(key)
+
+		if (slot < 0) {
+			if (!anyIs(a[key]!, b[key]!)) {
+				return false
+			}
+		} else if (!witnesses[slot]!.is(a[key]!, b[key]!).value) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // NOTE: The tag decides the Case first (nominal), then each payload member is
 // compared as the descriptor says. A tag the descriptor does not name carries
 // no generic payload, so it falls back to the universal structural comparison.

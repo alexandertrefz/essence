@@ -487,6 +487,13 @@ export interface ConformanceValueNode {
 	// Equatable — the Rewriter then emits `$helpers.boundChoiceIs(<descriptor>)`
 	// for each mapped Method instead of the plain `choiceIs`.
 	derivedDescriptor?: DerivedEquatableDescriptor
+	// NOTE: Set only when this witness stands for a RECORD whose DECLARED members do
+	// not all compare — or print — the way the universal structural walk does:
+	// the routed member names, in declaration order, lining up with the member
+	// witnesses that arrive as the hidden trailing conformance Arguments. Absent
+	// for an all-structural Record, which keeps emitting the builtin
+	// `Record.is`/`Record.toString` it always did, byte for byte.
+	derivedMembers?: Array<string>
 	// NOTE: Present only when this witness is a Choice's derived `Enumerable` —
 	// the Rewriter then emits `$helpers.choiceCases(<tags>)` for the one Method
 	// it maps, there being no Namespace anywhere to read it off.
@@ -523,6 +530,13 @@ export interface MethodInvocationNode {
 	// Equatable — the Rewriter then emits `$helpers.boundChoiceIs(<descriptor>)`
 	// in place of the plain `choiceIs` member read.
 	derivedDescriptor?: DerivedEquatableDescriptor
+	// NOTE: Set only when this call's receiver is a RECORD whose DECLARED members do
+	// not all compare — or print — the way the universal structural walk does:
+	// the routed member names, in declaration order, lining up with the member
+	// witnesses that arrive as the hidden trailing conformance Arguments. Absent
+	// for an all-structural Record, which keeps emitting the builtin
+	// `Record.is`/`Record.toString` it always did, byte for byte.
+	derivedMembers?: Array<string>
 	// NOTE: The Protocol that PROVIDED this Method, when one did. `base`/
 	// `namespaceName` is the Namespace whose conformance put the Method in
 	// reach — `Integer` for `5::isNot(3)` — and that Namespace declares no
@@ -572,6 +586,13 @@ export type UnionMethodDispatchCase = {
 	// derived Equatable — the Rewriter then emits
 	// `$helpers.boundChoiceIs(<descriptor>)` for the branch's Method.
 	derivedDescriptor?: DerivedEquatableDescriptor
+	// NOTE: Set only when this branch's receiver is a RECORD whose DECLARED members do
+	// not all compare — or print — the way the universal structural walk does:
+	// the routed member names, in declaration order, lining up with the member
+	// witnesses that arrive as the hidden trailing conformance Arguments. Absent
+	// for an all-structural Record, which keeps emitting the builtin
+	// `Record.is`/`Record.toString` it always did, byte for byte.
+	derivedMembers?: Array<string>
 	// NOTE: The Protocol that provided this branch's Method, read exactly as
 	// `MethodInvocationNode.providedBy` above.
 	providedBy?: string
@@ -1217,6 +1238,13 @@ export type DispatchChainCase = {
 	// derived Equatable, exactly as it is on the dispatch case it was built
 	// from — the one function that spells a Method reference reads it.
 	derivedDescriptor?: DerivedEquatableDescriptor
+	// NOTE: Set only when this branch's receiver is a RECORD whose DECLARED members do
+	// not all compare — or print — the way the universal structural walk does:
+	// the routed member names, in declaration order, lining up with the member
+	// witnesses that arrive as the hidden trailing conformance Arguments. Absent
+	// for an all-structural Record, which keeps emitting the builtin
+	// `Record.is`/`Record.toString` it always did, byte for byte.
+	derivedMembers?: Array<string>
 	// NOTE: The Protocol that PROVIDED this branch's Method, carried over from
 	// the dispatch case this branch was built from. `namespaceName` is the
 	// Namespace whose conformance offered it, so it is this that names the
