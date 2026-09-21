@@ -6406,25 +6406,58 @@ describe("Optimiser", () => {
 			// NOTE: An Overload is a member of its own by the time the Optimiser
 			// reads it, so the call below names a different Method and the
 			// Function that makes it is left alone.
+			//
+			// NOTE: The two entries take the SAME NUMBER of Arguments, and that
+			// is the point. A pair of different arities is told apart by the
+			// Argument count as well as by the member name, so it would go on
+			// declining even if the name comparison stopped working — which a
+			// mutant of exactly that comparison proved.
 			let source = `implementation {
 	namespace Steps for Integer {
 		overload stepped {
-			() -> Integer {
-				<- @::stepped(1)
+			(_ by: Integer) -> Integer {
+				<- @::stepped(times by)
 			}
 
-			(_ by: Integer) -> Integer {
-				<- @::add(by)
+			(times n: Integer) -> Integer {
+				<- @::add(n)
 			}
 		}
 	}
 
-	Terminal.print(3::stepped())
+	Terminal.print(3::stepped(4))
 }`
 			let generated = generate(source)
 
 			expect(generated).not.toContain("while (true)")
-			expect(await outputOf(generated)).toEqual(["4"])
+			expect(await outputOf(generated)).toEqual(["7"])
+		})
+
+		it("rebinds a Parameter a Handler shadows", async () => {
+			// NOTE: The Handler binds `sum`, so the `sum` the tail call hands
+			// over is the ITEM, not the Parameter of the same name. A turn that
+			// read it as the Parameter would see `sum = sum`, call it a change
+			// of nothing and assign nothing — and the walk would answer 0.
+			let source = `implementation {
+	namespace Walker for List<Integer> {
+		walked(_ sum: Integer) -> Integer {
+			constant items = @
+
+			<- match items::firstItem() -> Integer {
+				case #Empty      { <- sum }
+				case #Value(sum) { <- items::removeFirst()::walked(sum) }
+			}
+		}
+	}
+
+	Terminal.print([5, 6, 7]::walked(0))
+}`
+			let generated = generate(source)
+
+			expect(generated).toContain("sum_p = sum")
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual(["7"])
 		})
 
 		it("declines a Function whose name a Constant shadows", async () => {

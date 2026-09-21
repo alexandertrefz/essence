@@ -783,6 +783,20 @@ function total(rest, sum) {
 
 **Debugging.** Stepping still stops on the lines you wrote, and a turn steps from the tail call back to the first statement of the body. The call stack shows one frame where the source shows recursion, so a crash inside a looped function names it once rather than ten thousand times.
 
+**What it costs and what it buys.** The `while` and the assignments add between 120 and 390 bytes to a bundle per looped function. No fixture and no example in this repository writes a self tail call, so every one of them builds byte for byte what it built before — and no method of the standard library is looped either, because the library writes its walks on `loop` and `reduce` for exactly the reason this pass exists.
+
+Five programs, each doing millions of turns and nothing else, measured with the pass on and off:
+
+| what it walks | turns | Bun | Node |
+| --- | --- | --- | --- |
+| head and tail of a list | 2,000,000 | 1.03× | 1.60× |
+| a countdown accumulator | 8,000,000 | parity | 1.83× |
+| `gcd` by Euclid | ~4,000,000 | 1.00× | 1.21× |
+| a binary search | ~6,800,000 | 1.46× | 1.10× |
+| a `match`-heavy state machine | 1,000,000 | 1.02× | 1.22× |
+
+On Bun the frame was already free, so the figures are parity — the one real gain is the binary search, whose turns are short enough that the call was most of the work. The countdown is written as parity rather than as a number because it measured 0.98× in one sweep and 1.03× in another, on a machine with other work on it: that is measurement noise on either side of parity, and reading either figure as the answer would be reading the noise. On Node the frame was not free, and on Node the recursive build does not finish at all past about ten thousand turns: `Tail_10000.es` throws `RangeError: Maximum call stack size exceeded` with the pass off and prints `50005000` with it on. That is what the pass is for; the speed is a side effect.
+
 ### `eliminate-dead-code`
 
 Drops a constant nothing reads.

@@ -433,7 +433,33 @@ A function that calls itself repeats work too. It needs a base case, a path that
 
 Recursion is the general tool. It fits work that is not a count or a walk over one list. [Functions](/docs/language/functions) are hoisted, so a call may stand above the function it calls, and two functions can call each other.
 
-Every call that has not returned holds a frame on the JavaScript call stack. `countdown` still has work to do after its own call returns, since it puts the result into a string. Called with `from 1000000`, it stops the program with a `RangeError` (`Maximum call stack size exceeded`). A tail call, one that is the last thing a function returns, can give up its frame first. That depends on the JavaScript engine: Bun does, and Node does not. A `loop` runs a million turns on either without growing the stack, so use `loop` when the count can grow large.
+### A self tail call is a loop
+
+A **tail call** is one whose answer is the function's own answer, with nothing left to do with it. A function's tail calls to *itself* are compiled into a loop over its parameters, on every host, by the [`loop-self-tail-calls`](/docs/reference/optimisations#loop-self-tail-calls) pass. So this walks a list of any length:
+
+```essence
+implementation {
+	function total(_ rest: List<Integer>, _ sum: Integer) -> Integer {
+		<- match rest::firstItem() -> Integer {
+			case #Empty       { <- sum }
+			case #Value(head) { <- total(rest::removeFirst(), sum::add(head)) }
+		}
+	}
+
+	Terminal.print(total(List.of(integersFrom 1, through 100000), 0)) § 5000050000
+}
+```
+
+`countdown` above is **not** a tail call: it puts the answer of its own call into a string, so there is still work to do when that call returns. It holds a frame per turn, and called with `from 1000000` it stops the program with a `RangeError` (`Maximum call stack size exceeded`).
+
+### What still uses the stack
+
+Every call that has not returned holds a frame on the JavaScript call stack, and two kinds of recursion still do:
+
+- **Non-tail recursion**, like `countdown` and like `fib`, which adds two calls together.
+- **Mutual recursion**, where two functions answer with each other. Only a function's calls to *itself* become a loop.
+
+How many frames there are depends on the engine, not on Essence. Node and Deno run out at about ten thousand; Bun has proper tail calls and so goes far deeper on a tail call, but not on either of the two above. When the depth can grow with your data, write the walk as a self tail call, or reach for [`loop`](/docs/library/loop) or [`reduce`](/docs/library/list#reduce), which run a million turns on any engine without growing the stack at all.
 
 <SeeAlso links={[
 	{ label: "loop", href: "/docs/library/loop" },

@@ -87,6 +87,41 @@ function unoptimisedModule(
 	return { text, map: decodeInlineMap(text) }
 }
 
+// NOTE: And the same Module with the Optimiser ON, for the one claim that can
+// not be made with it off: `loop-self-tail-calls` only rewrites an optimised
+// Program, and what it emits has to keep pointing at the lines that were
+// written. A debug session compiles with every pass off and never sees a loop —
+// but `essence build --sourcemap` does, and a stack trace out of a shipped
+// bundle is read through the map it carries.
+function optimisedModule(
+	filePath: string,
+	source: string,
+): { text: string; map: RawSourceMap } {
+	let parsed = parseWithDiagnostics(source)
+
+	expect(containsErrors(parsed.diagnostics)).toBe(false)
+
+	let enriched = enrich(parsed.program, { modulePath: filePath })
+
+	expect(containsErrors(enriched.diagnostics)).toBe(false)
+	expect(containsErrors(validate(enriched.program))).toBe(false)
+
+	let generated = rewriteModules(
+		[
+			{
+				filePath,
+				program: optimise(simplify(enriched.program, { source })),
+				sourceText: source,
+			},
+		],
+		filePath,
+		{ sourcemap: true },
+	)
+	let text = generated.sources.get(generated.entry)!
+
+	return { text, map: decodeInlineMap(text) }
+}
+
 const inlineMapPrefix = "//# sourceMappingURL=data:application/json;base64,"
 
 function decodeInlineMap(moduleText: string): RawSourceMap {
@@ -165,6 +200,75 @@ describe("Source Maps", () => {
 
 			expect([specifier, withoutComment]).toEqual([specifier, plainText])
 		}
+	})
+
+	// NOTE: A turn of a looped Function still points at the line the recursion
+	// was written on. What a reader steps through is a `continue`, but where the
+	// debugger says it IS is the `<- total(…)` they wrote — and the statements
+	// the turn is made of, the Arguments it holds and the Parameters it assigns,
+	// all carry that one position, because all of them stand for that one
+	// Return.
+	it("maps a looped tail call back onto the call that was written", () => {
+		let filePath = join(tmpdir(), "essence-sourcemaps", "Walk.es")
+		let source = `implementation {
+	function total(_ rest: List<Integer>, _ sum: Integer) -> Integer {
+		<- match rest::firstItem() -> Integer {
+			case #Empty       { <- sum }
+			case #Value(head) { <- total(rest::removeFirst(), sum::add(head)) }
+		}
+	}
+
+	Terminal.print(total([1, 2, 3], 0))
+}
+`
+		let { text, map } = optimisedModule(filePath, source)
+		let lines = text.split("\n")
+		let continueLine =
+			lines.findIndex((line) => line.includes("continue $tail_0")) + 1
+		let writtenLine =
+			source.split("\n").findIndex((line) => line.includes("<- total(")) +
+			1
+
+		expect(continueLine).toBeGreaterThan(0)
+		expect(writtenLine).toBeGreaterThan(0)
+
+		let consumer = new SourceMapConsumer(map)
+		let original = consumer.originalPositionFor({
+			line: continueLine,
+			column: lines[continueLine - 1]!.indexOf("continue"),
+		})
+
+		expect(original.source).toBe(filePath)
+		expect(original.line).toBe(writtenLine)
+
+		// NOTE: And the Statements the turn is made of, which is what a reader
+		// stepping it stops on before the `continue`. Read as every mapping on
+		// those lines rather than as one column, for the reason the `define`
+		// case above gives: which token boundary a debugger's query lands on is
+		// its own business, and what has to hold is that none of them names
+		// another line.
+		let turnLines = new Set(
+			lines.flatMap((line, index) =>
+				/^\s*(?:const \$tail_\d+_t\d+ = |sum = |rest = )/.test(line)
+					? [index + 1]
+					: [],
+			),
+		)
+
+		expect(turnLines.size).toBe(4)
+
+		let named = new Set<number>()
+
+		consumer.eachMapping((mapping) => {
+			if (
+				turnLines.has(mapping.generatedLine) &&
+				mapping.originalLine !== null
+			) {
+				named.add(mapping.originalLine)
+			}
+		})
+
+		expect([...named]).toEqual([writtenLine])
 	})
 
 	// NOTE: An empty map would not help — esbuild ignores one and self-maps the
