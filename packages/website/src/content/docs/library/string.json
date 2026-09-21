@@ -39,7 +39,7 @@
 					"origin": "declared",
 					"protocol": null,
 					"condition": null,
-					"summary": "Builds a String out of Unicode code points.\n\nA point that names no character answers nothing. A surrogate names none, and neither does a point past the last one Unicode gives.",
+					"summary": "Builds a String out of Unicode code points.\n\nA point that names no character answers nothing. A surrogate names none, and neither does a point past the last one Unicode gives.\n\nA point known while the Program is being written is a `\\u{…}` escape instead. The escape character is written `\"\\u{1B}\"`, and answers a `String` rather than an `Optional<String>`. These entries are for a point worked out while the Program runs.",
 					"returns": null,
 					"examples": [],
 					"entries": [

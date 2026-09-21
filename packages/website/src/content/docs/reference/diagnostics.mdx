@@ -420,7 +420,7 @@ Error: '\u00e9' is missing the braces around its code point
 
 The Help rebrackets exactly the digits JavaScript would have read, which is four of them where four are written: `"\u0041BC"` is `A` followed by `BC` there, so the Help offers `\u{41}` and leaves `BC` alone. A surrogate pair — `"\uD83D\uDE00"`, how a language with no astral escape writes one character — is answered with the single escape both halves stood for, `\u{1F600}`.
 
-Quick Fix: **Write it in braces**.
+Quick Fix: **Write it as '\u{e9}'** — the spelling the report named, whichever it named.
 
 Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
 
@@ -449,7 +449,7 @@ Error: 'G' is not a hexadecimal digit
 
 An escape that never closes stops at the closing quote without consuming it, so the string ends where it was written and every statement below it is still read. Leading zeros are the usual cause of a seventh digit, and the Help takes them off. `U+1B` written between the braces is answered by taking the `U+` off: that is how a code point is named, not how it is spelled.
 
-Quick Fix: **Drop the leading zeros**, **Close it with a '}'** or **Write the digits alone**, each where the mistake is that one.
+Quick Fix: **Write it as '\u{41}'** — offered wherever the report spells a rewrite, which is the seventh digit, the escape that never closed, and the `U+` written between the braces. Braces holding nothing or holding a character that is not a digit are offered none: what was meant there is not something the source says.
 
 Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
 
@@ -503,7 +503,7 @@ Error: U+D83D is a surrogate, which names no character
 
 </div>
 
-No Help is offered for a lone surrogate, because there is no character it stands for. A string holds characters rather than the units they are stored in, so an astral character is always written as a single escape.
+No Help is offered for a lone surrogate, and so no Quick Fix either, because there is no character it stands for. A string holds characters rather than the units they are stored in, so an astral character is always written as a single escape.
 
 Where the other half stands directly behind it, the two are one mistake and are reported as one — over both escapes, whichever way each half is spelled (`\uD83D\uDE00`, `\u{D83D}\u{DE00}` and the two mixtures of them all read alike):
 
@@ -525,6 +525,8 @@ Error: U+D83D and U+DE00 are the two halves of one character
 ```
 
 </div>
+
+Quick Fix: **Write it as '\u{1F600}'**, where a pair was written — it replaces both escapes, so following it leaves nothing behind.
 
 Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
 

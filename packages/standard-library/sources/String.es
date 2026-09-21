@@ -94,6 +94,8 @@ declarations {
 		§§ Builds a String out of Unicode code points.
 		§§
 		§§ A point that names no character answers nothing. A surrogate names none, and neither does a point past the last one Unicode gives.
+		§§
+		§§ A point known while the Program is being written is a `\u{…}` escape instead. The escape character is written `"\u{1B}"`, and answers a `String` rather than an `Optional<String>`. These entries are for a point worked out while the Program runs.
 		overload static of {
 			§§ @example
 			§§   expect String.of(codePoint 97)::is("a")

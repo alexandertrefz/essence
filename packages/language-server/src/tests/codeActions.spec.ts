@@ -2268,6 +2268,119 @@ describe("Code Actions", () => {
 		})
 	})
 
+	// NOTE: One fix over four codes, and what it writes is the Diagnostic's own
+	// Help — so what is checked here is that the contract between the Lexer and
+	// this holds for each shape the Lexer spells one for, and that the shape it
+	// spells NO rewrite for is offered none.
+	describe("the Unicode escapes", () => {
+		it("rebrackets the JavaScript habit", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant cafe = "caf\\u00e9"',
+				"}",
+			]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual(["Write it as '\\u{e9}'"])
+			expect(fixes[0].diagnosticCode).toBe("unbraced-unicode-escape")
+			expect(fixes[0].isPreferred).toBe(true)
+			expect(applied(lines, fixes[0])).toEqual([
+				"implementation {",
+				'\tconstant cafe = "caf\\u{e9}"',
+				"}",
+			])
+			expect(codesOf(applied(lines, fixes[0]))).not.toContain(
+				"unbraced-unicode-escape",
+			)
+		})
+
+		// NOTE: Both halves, in every spelling a pair is written in — and the
+		// APPLIED buffer re-checked, which is the half of this that matters.
+		// The fix is PREFERRED, so an Editor's "fix this" applies it without
+		// asking; a preferred fix that leaves the very code it answers standing
+		// is worse than no fix at all, and that is what a braced pair did while
+		// every test here asserted only the title.
+		it("writes a surrogate pair as the one character it spells", () => {
+			for (let written of [
+				'"\\uD83D\\uDE00"',
+				'"\\u{D83D}\\u{DE00}"',
+				'"\\uD83D\\u{DE00}"',
+				'"\\u{D83D}\\uDE00"',
+			]) {
+				let lines = [
+					"implementation {",
+					`\tconstant face = ${written}`,
+					"}",
+				]
+				let fixes = quickFixes(lines)
+
+				expect([written, titles(fixes)]).toEqual([
+					written,
+					["Write it as '\\u{1F600}'"],
+				])
+				expect([written, applied(lines, fixes[0])]).toEqual([
+					written,
+					["implementation {", '\tconstant face = "\\u{1F600}"', "}"],
+				])
+				expect([written, codesOf(applied(lines, fixes[0]))]).toEqual([
+					written,
+					[],
+				])
+			}
+		})
+
+		it("drops the leading zeros off a seventh digit", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant a = "\\u{0000041}"',
+				"}",
+			]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual(["Write it as '\\u{41}'"])
+			expect(codesOf(applied(lines, fixes[0]))).not.toContain(
+				"malformed-unicode-escape",
+			)
+		})
+
+		it("closes an escape that was never closed", () => {
+			let lines = ["implementation {", '\tconstant a = "\\u{1B"', "}"]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual(["Write it as '\\u{1B}'"])
+			expect(applied(lines, fixes[0])).toEqual([
+				"implementation {",
+				'\tconstant a = "\\u{1B}"',
+				"}",
+			])
+		})
+
+		it("takes the 'U+' off a code point written by name", () => {
+			let lines = ["implementation {", '\tconstant a = "\\u{U+1B}"', "}"]
+
+			expect(titles(quickFixes(lines))).toEqual(["Write it as '\\u{1B}'"])
+		})
+
+		// NOTE: A lone surrogate has no character it stands for, and a code
+		// point that is simply too large is answered with a QUESTION about
+		// which base was meant — which a Quick Fix must not answer on the
+		// reader's behalf. Neither is offered a fix.
+		it("offers nothing where no rewrite is an answer", () => {
+			for (let written of ['"\\u{D800}"', '"\\u{110000}"', '"\\u{1G}"']) {
+				let lines = [
+					"implementation {",
+					`\tconstant a = ${written}`,
+					"}",
+				]
+
+				expect([written, titles(quickFixes(lines))]).toEqual([
+					written,
+					[],
+				])
+			}
+		})
+	})
+
 	describe("partial-decimal-literal", () => {
 		it("should write the missing whole part of a leading point", () => {
 			let lines = ["implementation {", "\tconstant share = .5", "}"]

@@ -85,6 +85,7 @@ import {
 	mixedRationalActions,
 	ordinaryCommentAction,
 	partialDecimalActions,
+	unicodeEscapeActions,
 } from "./literalFixes"
 import {
 	makeGeneratableAction,
@@ -555,6 +556,12 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(waitForValueAction(diagnostic)),
 	"invalid-escape": ({ diagnostic, lines }) =>
 		invalidEscapeActions(diagnostic, lines),
+	// NOTE: Four codes, one fix. What to write in place of a malformed
+	// `\u{…}` is already spelled in the Diagnostic's own Help, and which of
+	// the six mistakes it was decides only whether there IS one — see
+	// `unicodeEscapeActions`.
+	"malformed-unicode-escape": ({ diagnostic }) =>
+		unicodeEscapeActions(diagnostic),
 	"invalid-module-specifier": ({ diagnostic, lines }) =>
 		moduleSpecifierActions(diagnostic, lines),
 	"literal-in-require": ({ diagnostic, lines }) =>
@@ -675,6 +682,10 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	// which: a near miss is a misspelling, and anything else is a word that
 	// belongs in the body or nowhere. The spelling stands above the removal
 	// where there is one, since it is what leaves the reader's intent alone.
+	"surrogate-unicode-escape": ({ diagnostic }) =>
+		unicodeEscapeActions(diagnostic),
+	"unbraced-unicode-escape": ({ diagnostic }) =>
+		unicodeEscapeActions(diagnostic),
 	"unknown-modifier": (context) => [
 		...spellingFix(context),
 		...listed(

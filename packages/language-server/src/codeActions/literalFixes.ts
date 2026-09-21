@@ -133,6 +133,46 @@ export function invalidEscapeActions(
 	]
 }
 
+// NOTE: The rewrite a `\u{…}` Diagnostic already carries. The Lexer worked out
+// which digits the reader meant and spelled them back at them — four where
+// JavaScript would have read four, a surrogate pair's whole character, the
+// leading zeros off a seventh digit, the `U+` off a named code point — and
+// re-deriving any of that here would be that reading written a second time, in
+// a place with only a span to read it from. The shape of the Help is the
+// contract between the two, and it is written in exactly one place: the
+// Helps of `readUnicodeEscape`.
+//
+// NOTE: The Help for a code point read as DECIMAL is deliberately NOT offered
+// as a fix. It offers its spelling on a condition the source can not settle —
+// whether those digits were meant as decimal at all — and a fix applied from a
+// menu settles every condition it is given, so following that one has to stay
+// the reader's own decision.
+const unicodeRewritePattern =
+	/^(?:Write it in braces|Write the character as one escape|Drop the leading zeros|Close it with a '\}'|Write the digits alone): '(\\u\{[0-9A-Fa-f]{1,6}\})'/
+
+export function unicodeEscapeActions(
+	diagnostic: common.Diagnostic & { position: common.Position },
+): Array<CodeActionEntry> {
+	return diagnostic.helps.flatMap((help) => {
+		let rewrite = unicodeRewritePattern.exec(help)
+
+		if (rewrite === null) {
+			return []
+		}
+
+		let spelling = rewrite[1] as string
+
+		return [
+			literalAction(
+				diagnostic,
+				spelling,
+				{ range: diagnostic.position, newText: spelling },
+				true,
+			),
+		]
+	})
+}
+
 // NOTE: The two halves of a decimal that was written with one side empty. A
 // digit run may be grouped with `_`, which is part of the spelling and stays in
 // whatever is written back.
