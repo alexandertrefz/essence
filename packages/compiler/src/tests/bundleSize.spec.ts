@@ -64,16 +64,19 @@ async function bundleSizeOfSource(source: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: 5,709 measured, and it is the floor every Program pays: the runtime
+	// NOTE: 5,929 measured, and it is the floor every Program pays: the runtime
 	// a bundle links whatever it calls. HelloWorld.es names no number, no
 	// container and no constant — what it measures is what a `Terminal.print`
 	// and a String interpolation drag in, and what NOTHING else does.
 	//
-	// NOTE: It FELL by 31 when a String's characters moved into a view record
-	// that a window can share, and the ceiling follows a fall as it follows a
-	// rise. This Program only measures and compares Strings, and the count it
-	// asks for reaches the view and none of the cutting built on it — so what
-	// it links is one function where it used to be two.
+	// NOTE: 189 of those bytes arrived with the character WINDOW, and they are
+	// all in the ONE function this Program reaches of it: building a String's
+	// character view. It never cuts a String, so it links none of the cutting —
+	// what it pays for is the view remembering two things a cut will need, the
+	// text its clusters partition where that is not the String's own text, and
+	// whether the Segmenter ran. The second is read by no Program and only by
+	// the specs that assert a drain segments its String once; it is 82 bytes,
+	// and it buys the strongest guard in `stringWindows.spec.ts`.
 	//
 	// NOTE: It was 6,930 until the transcendental basis registry stopped
 	// deriving its canonical order in a top-level call, which no bundler can
@@ -82,10 +85,10 @@ describe("Bundle Size", () => {
 	// all. A ceiling here is what says the next such top-level effect is
 	// noticed by a test rather than by a reader of a bundle.
 	it("keeps the floor every Program pays", async () => {
-		expect(await bundleSizeOf("HelloWorld.es")).toBeLessThan(6_710)
+		expect(await bundleSizeOf("HelloWorld.es")).toBeLessThan(6_950)
 	})
 
-	// NOTE: 80,437 measured. What this ceiling watches for is the numeric tower
+	// NOTE: 81,445 measured. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five
 	// kilobytes here, several times the headroom.
 	//
@@ -148,29 +151,24 @@ describe("Bundle Size", () => {
 	// before treating a rise from one of them as a regression: unminified,
 	// escodegen's indentation is most of it.
 	//
-	// NOTE: 2,317 of those bytes are the character WINDOW — a cut of a String
+	// NOTE: 3,325 of those bytes are the character WINDOW — a cut of a String
 	// sharing its parent's cluster Array by offset rather than copying it,
 	// which is what made consuming a String from the front linear (2,245 ms to
-	// 35 for the gap analysis's 40,000-character drain). This file reaches it
-	// through `Integer.parse` and `Rational.parse`, which slice and search.
-	// 889 are the offset table and the two makers it feeds (`offsetsOf`,
-	// `createWindowString`, `cutFromView`); 765 the view record, its one reader
-	// and the whole-Array reader beside it (`viewIn`, `viewOf`, `startIn`,
-	// `wholeOf`, `clustersOf`, against the 448 of the two it replaced); 479
-	// what `graphemesIn`, `createSegmentedString` and `slice` grew by; 420 the
-	// one matcher every grapheme search now shares, against the 305 of the one
-	// it replaced; 205 `readsByUnit`, the question that stops a window being
-	// ASCII-scanned per turn, which was the other half of the same n²; and 177
-	// the part-folding helper, where 183 of whole-receiver folding went.
+	// 35 for the gap analysis's 40,000-character drain). This file reaches all
+	// of it through `Integer.parse` and `Rational.parse`, which slice and
+	// search. The offset table and the two makers it feeds are about 1,300, the
+	// view's own readers and their keys about 1,000, and the rest is what the
+	// searches, `slice` and `graphemesIn` grew by — against which the matcher
+	// they share gave back the 305 of the one it replaced and whole-receiver
+	// folding 183.
 	//
-	// NOTE: What a Program that never CUTS a String pays for it is nothing.
-	// `HelloWorld.es` only measures and compares, so it links the count and the
-	// view and none of the machinery above, and its bundle is 31 bytes SMALLER
-	// than before. The one thing every String-touching Program does pay is 74
-	// bytes in `append`, which marks a join the ASCII scan would refuse rather
-	// than leaving the next Method to scan the whole of it — a token built one
-	// non-ASCII character at a time measured 203 ms at 80,000 characters
-	// without that mark and 33 ms with it.
+	// NOTE: A Program that never CUTS a String pays 189 of it, all in the one
+	// function that builds a view; `HelloWorld.es` above prices exactly that.
+	// The one thing every String-touching Program pays is 74 bytes in `append`,
+	// which marks a join the ASCII scan would refuse rather than leaving the
+	// next Method to scan the whole of it — a token built one non-ASCII
+	// character at a time measured 203 ms at 80,000 characters without that
+	// mark and 33 ms with it.
 	//
 	// NOTE: A Program carries the runtime reach of what it CALLS, not the
 	// amount of Essence inlined into it. That is why a change to a runtime
@@ -201,7 +199,7 @@ describe("Bundle Size", () => {
 	// person to write a line rather than for the next person to drag in a
 	// tower, and that is not what it is for.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(83_800)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(84_800)
 	})
 
 	// NOTE: 38,056 measured; a reintroduced `Number` spread was 54,849. The same
