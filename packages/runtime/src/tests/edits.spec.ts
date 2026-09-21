@@ -1049,11 +1049,33 @@ describe("what a walk over a List moves", () => {
 
 	for (let walk of walks) {
 		test(`the ${walk.name} walk moves a few items per item, not a few thousand`, () => {
-			expect(itemsMovedBy(walk.seed(), walk.turn, walk.turns)).toBeLessThan(
-				CEILING,
-			)
+			expect(
+				itemsMovedBy(walk.seed(), walk.turn, walk.turns),
+			).toBeLessThan(CEILING)
 		})
 	}
+
+	// NOTE: The other side of the rule's subject. Cutting a short window out of
+	// a box that views the WHOLE of its run must move nothing at all: the run is
+	// already as short as the receiver can make it, and the answer's own
+	// smallness is the answer's business, settled the first time it is read. A
+	// rule asked about the answer's counts here copies the whole receiver to
+	// hand out two items.
+	test("a short window of a tight box is cut without moving an item", () => {
+		let receiver = flat()
+
+		expect(
+			itemsMovedBy(
+				receiver,
+				(originalList) => {
+					slice(originalList, integer(0), integer(2))
+
+					return originalList
+				},
+				1,
+			),
+		).toBe(0)
+	})
 
 	// NOTE: The other half of the claim, and the reason the rule is a HALF rule
 	// rather than "never trim": a window that keeps only a little of a long run

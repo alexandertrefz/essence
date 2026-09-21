@@ -109,7 +109,7 @@ export function viewOf<ItemType extends AnyType>(
 ): ListView<ItemType> {
 	let view = runsOf(originalList)
 
-	trimUnderHalfRule(originalList, view, view.frontCount, view.backCount)
+	trimUnderHalfRule(originalList, view)
 
 	return view
 }
@@ -140,10 +140,13 @@ export function viewOf<ItemType extends AnyType>(
 // derive-first spelling copying from the halfway point on — 220 ms against 35
 // for the same walk with its two lines swapped.
 //
-// NOTE: The counts the rule is asked about are the ones the box that will HOLD
-// the Array views, which is the receiver's own for a read and the ANSWER's for
-// a cut. What is trimmed away is everything past the RECEIVER's view either
-// way, since that is all the receiver may promise about a run it is handing on.
+// NOTE: What the rule is asked ABOUT is always the receiver's own view, at
+// either end of a window's life — the question is how much of an Array the box
+// whose Array it is is keeping alive, and the answer a cut hands out is a box of
+// its own that will be asked the same question the first time it is read. Asking
+// about the ANSWER's counts here instead would trim a run for a two-item window
+// of a List the receiver views the whole of, copying the whole of it to hand out
+// two — which is the one shape this rule exists to refuse.
 //
 // NOTE: A front-less box views zero items of the one shared `noItems`, which is
 // zero items long, so the front rule can not fire for it and no box is ever
@@ -151,10 +154,8 @@ export function viewOf<ItemType extends AnyType>(
 function trimUnderHalfRule<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	view: ListView<ItemType>,
-	frontKept: number,
-	backKept: number,
 ): void {
-	if (backKept * 2 < view.back.length) {
+	if (view.backCount * 2 < view.back.length) {
 		let trimmed = view.back.slice(0, view.backCount)
 
 		originalList.value = trimmed
@@ -162,7 +163,7 @@ function trimUnderHalfRule<ItemType extends AnyType>(
 		view.back = trimmed
 	}
 
-	if (frontKept * 2 < view.front.length) {
+	if (view.frontCount * 2 < view.front.length) {
 		let trimmed = view.front.slice(0, view.frontCount)
 
 		originalList.front = trimmed
@@ -363,25 +364,18 @@ function stampClosed<ItemType extends AnyType>(
 // reads. What it costs in exchange is the only honest debit: a window nothing
 // reads keeps its parent's Arrays alive.
 //
-// NOTE: THE HALF RULE is asked here as well as at the read, about the counts
-// the ANSWER will view, and the trim it performs is the receiver's. A window
-// that keeps most of what the receiver viewed leaves the run alone; one that
-// keeps less than half of the Array is cut from a run trimmed to the receiver's
-// view first, so a chain of shrinking windows finds a shorter Array to share
-// every time it has halved. That is the same amortisation the read has, made to
-// hold whichever of the two a walk reaches first — see the rule's own NOTE.
+// NOTE: THE HALF RULE is asked here as well as at the read, and about the same
+// thing: cutting a window out of a box is a use of that box, so the run it is
+// cut from is trimmed exactly where reading it would have trimmed it. A chain of
+// shrinking windows then finds a shorter Array to share every time it has
+// halved, whichever of the two a walk reaches first — see the rule's own NOTE.
 function sharedWindowOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	view: ListView<ItemType>,
 	start: number,
 	end: number,
 ): ListType<ItemType> {
-	trimUnderHalfRule(
-		originalList,
-		view,
-		view.frontCount - start,
-		end - view.frontCount,
-	)
+	trimUnderHalfRule(originalList, view)
 	stampClosed(originalList, view)
 
 	let frontLen = view.frontCount - start
