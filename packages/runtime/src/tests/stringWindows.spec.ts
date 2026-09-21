@@ -786,6 +786,41 @@ describe("what a drain costs", () => {
 		expect(turns).toBe(CHARACTERS - 1)
 	})
 
+	// NOTE: And neither does the drain that ASKS ITS REST WHAT IT IS — which is
+	// the tokenizer comparing the text it has left with a keyword every turn.
+	// `is`, `compare` and every Dictionary key are decided over the NFC form,
+	// `normalisedFormOf` is where that form is taken, and it used to scan for
+	// the ASCII mark before deciding whether there was anything to normalise:
+	// O(window) a turn, on a String whose one non-ASCII character can stand at
+	// the very end where no scan can stop early. It asks the view-aware question
+	// now, and the window it declines to scan is the window it was already going
+	// to normalise.
+	//
+	// NOTE: The NORMAL FORM is allowed to be remembered here, where the ASCII
+	// mark is not: the form is the answer the call was asked for, and the mark
+	// would be the trace of a scan nothing needed.
+	test("a drain comparing its rest never scans a window", () => {
+		let rest = slice(
+			createString("café ".repeat(CHARACTERS / 5)),
+			createInteger(1),
+			createInteger(1_000_000),
+		)
+
+		let turns = 0
+
+		while (Number(length(rest).value) > 0 && turns < TURN_CAP) {
+			let window = rest
+
+			compare(window, createString("zzz"))
+			rest = slice(window, createInteger(1), createInteger(1_000_000))
+			turns++
+
+			expect(remembered(window, "$isAscii")).toBeUndefined()
+		}
+
+		expect(turns).toBe(CHARACTERS - 1)
+	})
+
 	// NOTE: The REFUSED mark rides through `append` exactly as the accepted one
 	// does, and that it does is a claim about WORK no answer can show. A join
 	// holds every unit of both sides, so a side the scan refused makes a join it

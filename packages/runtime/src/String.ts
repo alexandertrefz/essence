@@ -565,12 +565,44 @@ function createAsciiString(value: string): StringType {
 // decomposable character — so a String the scan above accepted IS its own
 // normal form and the JavaScript call is skipped outright. That is the common
 // case, and the one that used to allocate two Strings per unequal comparison.
+//
+// NOTE: A String THAT HAS A VIEW IS NEVER SCANNED HERE, which is the same
+// addition `readsByUnit` makes and the reason is the same. This is the Function
+// `is`, `compare`, every Dictionary key, `codePoints`, `words` and the four
+// `hasOnly` predicates reach, so the scan it used to ask was the one a
+// tokenizer comparing its `rest` with a keyword paid per turn — O(window) every
+// turn, which is the same n² the copying was. What the window pays instead is
+// the JavaScript call, and the engine answers that in constant time for a text
+// it can see is already normalised: a front drain over 20,000 characters whose
+// one non-ASCII character stands at the END measured 133 ms asking `is` per
+// turn and measures 6 ms now. A text outside Latin-1 is normalised for real and
+// stays O(window) a turn — 243 ms down to 103 — because there the answer has to
+// be computed and the only way not to pay is not to ask.
+//
+// NOTE: A window that happens to be pure ASCII is normalised rather than
+// waved through, and that costs it nothing measurable: its text is ASCII, so
+// the engine's own check answers at once. It is the same trade `readsByUnit`
+// states — a window declines a fast path it might have passed, and what it
+// costs is the route it is already on.
+//
+// NOTE: The question is SPELLED OUT here, and narrower than `readsByUnit`'s by
+// one arm: a String carrying a TRUE mark AND a view is normalised where
+// `readsByUnit` would wave it through. That arm is reachable only by a window
+// something scanned for another Method, its answer is the same either way, and
+// what asking for it costs is the BUNDLE FLOOR. This Function is what a Program
+// that merely prints a String reaches, and `readsByUnit` is what one that CUTS
+// Strings reaches: calling it from here dragged the second into every bundle
+// holding the first and `HelloWorld.es` grew 98 bytes for a branch it can never
+// take. Asked this way the floor is 77 bytes BELOW where it was.
 export function normalisedFormOf(string: StringType): string {
 	let measured = string as MeasuredString
 	let form = measured[normalisedKey]
 
 	if (form === undefined) {
-		form = isAsciiIn(string) ? string.value : string.value.normalize("NFC")
+		form =
+			measured[graphemesKey] === undefined && isAsciiIn(string)
+				? string.value
+				: string.value.normalize("NFC")
 		measured[normalisedKey] = form
 	}
 
