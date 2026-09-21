@@ -142,7 +142,7 @@ const GROWTH_THRESHOLD = 3
 // is counted, to the character, and the two lengths of a route must agree to
 // the character as well. Measured with the folding put back the way it was, the
 // old shape read ASCII 117, 631 and 2,686 ms against 28, 28 and 29; the count
-// below reads 41,581,100 characters folded against 567,600.
+// below reads 41,581,100 characters folded against 2,257,200.
 const DRAIN_TURNS = 2_200
 const ASCII_DRAIN_LENGTHS = [20_000, 80_000]
 const VIEW_DRAIN_LENGTHS = [11_000, 44_000]
@@ -492,12 +492,13 @@ describe("String work", () => {
 	// shape in place.
 	//
 	// NOTE: The figures are exact rather than bounded, and they are arithmetic
-	// rather than observation: one folding for the part, then chunks of 256,
-	// 512, 1,024 … each beginning two characters back inside the one before it,
-	// until what is left is no longer than the next chunk would be. Six chunks
-	// reach the end of 20,000 units, two reach the end of 1,000, and a receiver
-	// under twice the first chunk is folded whole. A part of its own length
-	// changes the ladder, because a chunk is never narrower than twice the part.
+	// rather than observation: one folding for the part, then chunks of 1,024,
+	// 2,048, 4,096 … each beginning two units back inside the one before it,
+	// until what is left is no longer than the next chunk would be. Four chunks
+	// reach the end of 20,000 units; 1,000 units is under twice the first chunk
+	// and is folded whole, as sixteen units are. A part LONGER than half the
+	// floor changes the ladder to three chunks, because a chunk is never
+	// narrower than twice the part.
 	it("folds an ASCII receiver in chunks that double", () => {
 		let absent = createString("qqq")
 		let folds = (text: string, part: StringType) =>
@@ -505,12 +506,12 @@ describe("String work", () => {
 				firstIndexFolded(createString(text), part, insensitive)
 			}).folds
 
-		expect(folds("cafe ".repeat(4_000), absent)).toBe(7)
-		expect(folds("cafe ".repeat(200), absent)).toBe(3)
+		expect(folds("cafe ".repeat(4_000), absent)).toBe(5)
+		expect(folds("cafe ".repeat(200), absent)).toBe(2)
 		expect(folds("Lions and tigers", absent)).toBe(2)
 		expect(
-			folds("cafe ".repeat(4_000), createString("q".repeat(300))),
-		).toBe(6)
+			folds("cafe ".repeat(4_000), createString("q".repeat(1_200))),
+		).toBe(4)
 	})
 
 	// NOTE: THE SAME LADDER ON THE VIEW ROUTE, where a folding is a call PER
@@ -588,10 +589,10 @@ describe("String work", () => {
 	// calls, and the same window a `slice` hands it.
 	//
 	// NOTE: The arithmetic, per turn. The ASCII route folds the PART (two
-	// characters) and its first chunk (256), and the match always stands inside
-	// that chunk, so a turn folds 258 characters and 2,200 turns fold 567,600 —
-	// at BOTH lengths, since neither the chunk nor the distance to the match
-	// knows how long the receiver is. On the view route a chunk is 16 characters
+	// characters) and its first chunk (1,024), and the match always stands
+	// inside that chunk, so a turn folds 1,026 characters and 2,200 turns fold
+	// 2,257,200 — at BOTH lengths, since neither the chunk nor the distance to
+	// the match knows how long the receiver is. On the view route a chunk is 16
 	// and the part is folded a character at a time: a match at 14 or nearer is
 	// inside the first chunk, which is 15 of the 22 positions in a period, and
 	// the other 7 are inside the second chunk of 32. A period therefore folds
@@ -621,18 +622,27 @@ describe("String work", () => {
 
 			return { sum, folded: counted.folded }
 		}
-		let sum = (DRAIN_TURNS / ASCII_PERIOD.length) * PERIOD_SUM
+
+		// NOTE: Each route's expected sum is worked out from ITS OWN period, so
+		// that a period changed on one side can not be judged by the other's
+		// arithmetic — the two happen to be the same length today, and the
+		// folding figures below lean on that, which is what the first assertion
+		// says out loud rather than leaving to a reader.
+		let summedOver = (period: string) =>
+			(DRAIN_TURNS / period.length) * PERIOD_SUM
+
+		expect(VIEW_PERIOD.length).toBe(ASCII_PERIOD.length)
 
 		for (let length of ASCII_DRAIN_LENGTHS) {
 			expect(drained(ASCII_PERIOD, length)).toEqual({
-				sum,
-				folded: 567_600,
+				sum: summedOver(ASCII_PERIOD),
+				folded: 2_257_200,
 			})
 		}
 
 		for (let length of VIEW_DRAIN_LENGTHS) {
 			expect(drained(VIEW_PERIOD, length)).toEqual({
-				sum,
+				sum: summedOver(VIEW_PERIOD),
 				folded: 62_000,
 			})
 		}

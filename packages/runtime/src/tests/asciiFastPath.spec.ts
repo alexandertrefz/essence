@@ -216,14 +216,24 @@ describe("searching by either route", () => {
 	//
 	// NOTE: THE RECEIVERS HERE ARE LONG ON PURPOSE, and the part is put at
 	// EVERY position of one rather than at the boundaries a reader worked out.
-	// Neither route chunks a receiver under twice its chunk — 512 units on the
+	// Neither route chunks a receiver under twice its chunk — 2,048 units on the
 	// ASCII route, 32 characters on the view route — so every other search test
 	// in this repository reads a receiver that takes the whole text in ONE call
 	// and could not see a boundary bug at all. Sweeping every position needs no
 	// arithmetic about where the chunks fall, and keeps holding when they move.
+	//
+	// NOTE: SIX THOUSAND UNITS rather than the least that chunks at all, because
+	// the ASCII receiver has to reach the DOUBLING and not merely the first
+	// boundary. Its chunks are 1,024 then 2,048, so it crosses a boundary at
+	// 1,024 and another at 3,070 and its last chunk swallows the tail; at 3,000
+	// units there would be one boundary and the doubled chunk would never be
+	// walked. The view receiver crosses three at a floor of 16. Every position
+	// of both is swept rather than the seams alone, which costs this file 90 ms
+	// — a receiver long enough to cross a fourth boundary would cost it 1.4 s,
+	// and the fourth boundary is the third one doubled again.
 	test("a folded match is found at every position of a chunked receiver", () => {
-		let filler = "ab".repeat(700)
-		let units = 1_200
+		let filler = "ab".repeat(3_000)
+		let units = 6_000
 
 		for (let at = 0; at + 3 <= units; at++) {
 			let text =
@@ -254,9 +264,11 @@ describe("searching by either route", () => {
 
 	// NOTE: The answers a chunked walk has to keep giving when there is nothing
 	// to find, or nothing long enough to find it in — the three ways out of the
-	// loop that the sweep above never takes.
+	// loop that the sweep above never takes. The receiver is over twice the
+	// ASCII floor for the same reason the sweep's is: under that it is read in
+	// one call and the loop these cases are about is never entered.
 	test("a folded search of a long receiver answers where there is no match", () => {
-		let filler = "ab".repeat(700)
+		let filler = "ab".repeat(3_000)
 
 		expect(folded(filler, "qrs")).toBe(-1)
 		expect(foldedLast(filler, "qrs")).toBe(-1)
@@ -277,11 +289,11 @@ describe("searching by either route", () => {
 	// backward walk stopping at the first chunk that holds one has to answer —
 	// and the FIRST where a forward walk would meet the later one too.
 	test("a folded walk answers the end it started from", () => {
-		let filler = "ab".repeat(700)
-		let text = `QRS${filler.slice(0, 600)}QRS${filler.slice(0, 600)}`
+		let filler = "ab".repeat(3_000)
+		let text = `QRS${filler.slice(0, 1_500)}QRS${filler.slice(0, 1_500)}`
 
 		expect(folded(text, "qrs")).toBe(0)
-		expect(foldedLast(text, "qrs")).toBe(603)
+		expect(foldedLast(text, "qrs")).toBe(1_503)
 
 		let accents = "é".repeat(400)
 		let view = `QRS${accents.slice(0, 200)}QRS${accents.slice(0, 200)}`

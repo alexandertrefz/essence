@@ -88,14 +88,16 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("HelloWorld.es")).toBeLessThan(6_950)
 	})
 
-	// NOTE: 84,939 measured. The 900 it rose by are the folded searches reading
+	// NOTE: 84,940 measured. The 901 it rose by are the folded searches reading
 	// their receiver in growing chunks — the two chunked walks of the ASCII
 	// route, the chunk-width rule they share, and the case-sensitive walk of the
 	// view route written out on its own so that it pays none of it. This file
 	// reaches them through `contains`, and what they buy it is a search that
 	// costs the distance to its match rather than the whole String: a drain
 	// asking one per turn over 80,000 characters measured 68.0 ms and measures
-	// 0.62.
+	// 0.62. The odd byte is the chunk floor's fourth digit: 1,024 rather than
+	// 256, which is what a chunk has to be to carry the three engine calls it
+	// makes (see `FOLD_CHUNK`).
 	//
 	// NOTE: 84,039 measured before that. What this ceiling watches for is the numeric tower
 	// arriving whole: a reintroduced `Number` spread measures over five

@@ -970,17 +970,28 @@ function foldedText(string: StringType, insensitive: boolean): string {
 // NOTE: The chunks DOUBLE, so a part standing late in a long receiver is reached
 // in a logarithmic number of foldings, the chunks are DISJOINT bar their
 // overlap, and the whole receiver is therefore folded about once by a search
-// that has to read all of it. A fixed chunk would be a fold and a call per 256
-// characters all the way down such a receiver, and a chunk that never grew
-// could not carry its per-call cost.
+// that has to read all of it. A fixed chunk would be a fold and a call per
+// chunk all the way down such a receiver, and a chunk that never grew could not
+// carry its per-call cost.
 //
 // NOTE: A CHUNK SWALLOWS A TAIL NO LONGER THAN ITSELF rather than leaving it to
-// a chunk of its own, which is what keeps a MEDIUM receiver paying nothing for
-// the chunking: 50,000 searches of a 340-character receiver that does not hold
-// the part measured 13.7 ms cut in two and 11.2 ms whole, which is what the
-// whole-receiver folding beside it costs. It also bounds what the rule can
-// waste — a chunk reads at most twice its own width, so the text folded in all
-// stays inside twice the distance to the match.
+// a chunk of its own. That bounds what the rule can waste — a chunk reads at
+// most twice its own width, so the text folded in all stays inside twice the
+// distance to the match — and, with the early return the same arithmetic gives,
+// it is what lets a receiver no longer than TWICE THE FLOOR be read in the ONE
+// call these searches have always made: 2,047 units and below on the ASCII
+// route, which is a log line, a paragraph or a block of headers. Measured,
+// 50,000 searches of a 340-character receiver that does not hold the part:
+// 13.7 ms cut in two and 11.2 ms whole.
+//
+// NOTE: WHAT IT DOES NOT BUY is a longer receiver for nothing, and the floor
+// below is where that was measured. A receiver of 3,000 to 10,000 units
+// searched for a part that is NOT there is read in two or three calls where one
+// call read it before, and pays 1.04x to 1.09x for them; at 20,000 units and
+// beyond that is 1.03x, and under 2,048 units there is nothing to pay. The same
+// search for a part that IS there is faster by the whole distance it no longer
+// reads. That is the price of the quadratic's removal and it is paid only by
+// the search that has to read everything anyway.
 //
 // NOTE: The floor is TWICE THE PART, and it has to be at least the part plus
 // one: a chunk overlaps the one before it by `part.length - 1` units — the
@@ -991,12 +1002,26 @@ function foldedText(string: StringType, insensitive: boolean): string {
 //
 // NOTE: TWO FLOORS, because a chunk costs the two routes different things. On
 // the ASCII route a chunk is three ENGINE CALLS — a cut, a folding and a search
-// — so it has to be big enough to carry them, and at 256 every receiver up to
-// 512 units is still read in the ONE call these have always made. On the view
-// route a chunk is a loop entry and an Array of its own, which is cheap enough
-// that it can be small — and small is what makes a match near the front cost
-// the front: 16 characters.
-const FOLD_CHUNK = 256
+// — and the cut COPIES the chunk where the folding copies it again, so a
+// receiver read in two calls pays for a second copy of itself and the floor has
+// to be wide enough to carry that. 256 was not: swept over mixed-case receivers
+// searched for a part that is not there, one world per process and the worlds
+// alternated, a receiver just above twice it cost 1.29x the single call it
+// replaced, and the band stayed above 1.10x all the way to 10,000 units. At
+// 1,024 the worst reading over every length from 340 to 40,000 units is 1.09x
+// and most are 1.00x. 2,048 reads no better (1.06x) and doubles again what the
+// first chunk costs a match near the front.
+//
+// NOTE: WHAT THE FLOOR COSTS is the least a folded search can read, and that is
+// the whole of what buying the band back cost: 4,000 searches of a long
+// receiver for a part at position 10 measured 0.71 ms at 256 and 2.15 ms at
+// 1,024 — against 85.8 ms over a 20,000-unit receiver, 356 ms over 80,000 and
+// 1,682 ms over 320,000 for the whole-receiver folding this replaced.
+//
+// NOTE: On the view route a chunk is a loop entry and an Array of its own,
+// which is cheap enough that it can be small — and small is what makes a match
+// near the front cost the front: 16 characters.
+const FOLD_CHUNK = 1024
 const FOLD_RUN = 16
 
 function foldedChunkWidth(partWidth: number, floor: number): number {
