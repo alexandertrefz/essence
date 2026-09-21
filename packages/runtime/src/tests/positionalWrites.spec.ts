@@ -914,11 +914,17 @@ describe("persistent use", () => {
 	// the old Array to undo a position in a different one. This is the shape
 	// that found it: a box derived before the cut, read after two writes made
 	// past it.
+	//
+	// NOTE: Six items of eight, because the move is made under THE THREE
+	// QUARTERS RULE — a window of a half is copied outright now and moves no
+	// seam, so a smaller window here would leave the test asserting about a path
+	// it never took. The front run the cut leaves behind is what says it did.
 	test("a box whose seam moves lets go of the log it was carrying", () => {
 		let source = logged([0, 1, 2, 3, 4, 5, 6, 7])
 		let derived = append(source, createInteger(60n))
-		let interior = slice(source, createInteger(2n), createInteger(6n))
+		let interior = slice(source, createInteger(1n), createInteger(7n))
 
+		expect(source.front).toBeDefined()
 		expect(source.writes).toBeUndefined()
 
 		let once = written(source, 91, 1)
@@ -926,7 +932,7 @@ describe("persistent use", () => {
 		written(once, 92, 2)
 
 		expect(itemsOf(derived)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 60])
-		expect(itemsOf(interior)).toEqual([2, 3, 4, 5])
+		expect(itemsOf(interior)).toEqual([1, 2, 3, 4, 5, 6])
 		expect(itemsOf(source)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
 	})
 
