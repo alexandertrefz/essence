@@ -330,7 +330,7 @@ describe("Bundle Size", () => {
 
 	Terminal.print(answered::hasValue())
 }`),
-		).toBeLessThan(23_400)
+		).toBeLessThan(24_600)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far

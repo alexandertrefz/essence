@@ -536,6 +536,28 @@ describe("a key read again after a newer value was derived from it", () => {
 		).toBeTrue()
 	})
 
+	// NOTE: The same claim for a box that was NEVER encoded before the append,
+	// which is the half the memo can not answer for: the one above would pass
+	// on a remembered text however the walk read the run, and only this one
+	// asks what the walk reads. The box views two items of an Array that now
+	// holds three.
+	test("spells its own two items, never having been encoded before", () => {
+		let key = createList([integer(1), integer(2)])
+
+		append(key, integer(3))
+
+		expect(encodeKey(key, equality)).toEqual({ text: "l2:i1;i2;" })
+	})
+
+	// NOTE: And the same for a front run, which `prepend` grows the same way.
+	test("spells its own front items after a second prepend", () => {
+		let base = prepend(createList([integer(2)]), integer(1))
+
+		prepend(base, integer(0))
+
+		expect(encodeKey(base, equality)).toEqual({ text: "l2:i1;i2;" })
+	})
+
 	test("keeps finding its entry in a Dictionary after the append", () => {
 		let witness = listEquality(equality)
 		let key = createList([integer(1), integer(2)])
