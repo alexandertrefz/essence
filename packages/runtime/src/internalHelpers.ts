@@ -5,7 +5,7 @@ import type { BooleanType } from "./Boolean"
 import { is as boolIs, createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
-import { createList, itemOfView, viewOf } from "./List"
+import { createList, itemOfView, viewOf, walkOf } from "./List"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
@@ -478,12 +478,15 @@ function memberEqual(
 		case "w":
 			return witnesses[node.i].is(a, b).value
 		case "list": {
-			// NOTE: The counts are fixed before the walk, for the reason
-			// `List.ts` gives: the item comparison is a witness call and so
-			// user code, which may append to a List whose run either side is
-			// being read out of.
-			let aView = viewOf(a as ListType<AnyType>)
-			let bView = viewOf(b as ListType<AnyType>)
+			// NOTE: The counts are fixed before the walk and BOTH runs are
+			// sealed, for the reason `List.is` gives: the item comparison is a
+			// witness call and so user code, which may append to a List whose
+			// run either side is being read out of — or write a position of one
+			// in place, which would change an item this walk has yet to reach
+			// and answer `false` about two Choices that hold equal Lists.
+			// Neither side is the receiver here, so `walkOf` is owed to both.
+			let aView = walkOf(a as ListType<AnyType>)
+			let bView = walkOf(b as ListType<AnyType>)
 
 			if (aView.total !== bView.total) {
 				return false

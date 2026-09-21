@@ -7,7 +7,7 @@ import { keys } from "../Dictionary"
 import { group, tally } from "../GroupedList"
 import type { IntegerType } from "../Integer"
 import { compare as compareIntegers, createInteger } from "../Integer"
-import { anyIs } from "../internalHelpers"
+import { anyIs, boundChoiceIs } from "../internalHelpers"
 import {
 	accumulate,
 	append__overload$1 as append,
@@ -50,7 +50,7 @@ import {
 import { firstItem, lastItem } from "../NonEmptyList"
 import { createString } from "../String"
 import { getStringRepresentation } from "../Terminal"
-import { isValueOfType, typeKeySymbol } from "../type"
+import { type AnyType, isValueOfType, typeKeySymbol } from "../type"
 
 // NOTE: THE DIFFERENTIAL SPEC for positional writes. `replace` writes a run
 // Array IN PLACE where it can — `listWrites.ts` holds the why — and every box
@@ -1051,6 +1051,153 @@ describe("reentrancy", () => {
 			}
 
 			expect(itemsOf(list)).toEqual([1, 2, 3, 4, 5])
+			expect(itemsOf(latest)).toEqual([1, 2, 3, 4, 99])
+		})
+	}
+
+	// NOTE: THE OTHER HALF OF THE HAZARD, and the one the sweep above can not
+	// see: a native holding a SECOND List's raw run across the same user code.
+	// The sweep above passes one box as both operands, so the receiver's seal
+	// covers the argument and the argument path is never walked — which is how
+	// `is` shipped reading an unsealed argument and stayed green through every
+	// guard in this file. Each entry here is given a DISTINCT argument, freshly
+	// logged and never yet read, and the callback writes THAT one.
+	//
+	// NOTE: Never read before the call, and that is the whole of what makes the
+	// entries sharp. Sealing is permanent and per-Array, so one `itemsOf` of the
+	// argument beforehand would close its log and no missing seal could be seen
+	// again — the same trap the D1 review's first fuzzer fell into.
+	//
+	// NOTE: Each entry says what the native OWES for two Lists holding equal
+	// items, and the answer is checked as well as the items visited. That is what
+	// makes the entries sharp: a missing seal need not show up in either List —
+	// both are intact afterwards — and shows up only in what the native ANSWERED
+	// about them, which is what an Essence Program sees.
+	const argumentWalks: Array<
+		[
+			string,
+			(
+				list: ListType<IntegerType>,
+				other: ListType<IntegerType>,
+				visit: (item: IntegerType) => void,
+			) => unknown,
+			unknown,
+		]
+	> = [
+		[
+			"is",
+			(list, other, visit) =>
+				is(list, other, {
+					is: (first: IntegerType, second: IntegerType) => (
+						visit(second),
+						createBoolean(first.value === second.value)
+					),
+				}).value,
+			true,
+		],
+		[
+			"compare",
+			(list, other, visit) =>
+				compare(list, other, {
+					compare: (first: IntegerType, second: IntegerType) => (
+						visit(second),
+						compareIntegers(first, second)
+					),
+				})[typeKeySymbol],
+			"Ordering#Equal",
+		],
+		[
+			"contains(contentsOf:)",
+			(list, other, visit) =>
+				contains(list, other, visitingKey(visit)).value,
+			true,
+		],
+		[
+			"everyItem(in:)",
+			(list, other, visit) =>
+				itemsOf(everyItemIn(list, other, visitingKey(visit))),
+			[1, 2, 3, 4, 5],
+		],
+		[
+			"removeEvery(in:)",
+			(list, other, visit) =>
+				itemsOf(removeEveryIn(list, other, visitingKey(visit))),
+			[],
+		],
+		[
+			"a generic Choice's derived is",
+			(list, other, visit) =>
+				choiceHoldingListIs(
+					holding(list),
+					holding(other),
+					holdingWitness(visit),
+				).value,
+			true,
+		],
+	]
+
+	// NOTE: The walk a generic Choice's derived `Equatable` runs — the descriptor
+	// says the Case's one member is a List of the Type Parameter, so every item
+	// is compared by the witness, which is user code with BOTH runs held. It is
+	// in this file rather than beside the Choice tests because what it is being
+	// asked here is a question about `List`'s runs.
+	const choiceHoldingListIs = boundChoiceIs({
+		"Held#Items": { items: { k: "list", of: { k: "w", i: 0 } } },
+	})
+
+	const holding = (items: ListType<IntegerType>) =>
+		({ [typeKeySymbol]: "Held#Items", items }) as never
+
+	// NOTE: `visiting` reports the item it is asked ABOUT rather than the one it
+	// is compared against, which is the other way round from the sweep above.
+	// The scan path in `keyEncoding` calls the witness as `is(storedKey, key)`,
+	// so the second Argument is the item the walk has just reached — a receiver
+	// item while the key set is built, and an ARGUMENT item while the argument is
+	// looked up. Reporting the first one instead would never name an argument
+	// item at all, and an entry that can not name one can not see a write into
+	// one: `visiting` left these three blind to their own hazard.
+	function visitingKey(visit: (item: IntegerType) => void) {
+		return {
+			is: (first: IntegerType, second: IntegerType) => (
+				visit(second),
+				createBoolean(first.value === second.value)
+			),
+		}
+	}
+
+	// NOTE: A Type Parameter's witness is declared over `AnyType`, since it
+	// stands for whatever the Program bound the Parameter to — the two casts are
+	// what "this Program bound it to Integer" looks like from here.
+	const holdingWitness = (visit: (item: IntegerType) => void) => ({
+		is: (first: AnyType, second: AnyType) => (
+			visit(second as IntegerType),
+			createBoolean(
+				(first as IntegerType).value === (second as IntegerType).value,
+			)
+		),
+	})
+
+	for (let [label, walk, owed] of argumentWalks) {
+		test(`${label} over an argument its callback writes answers about the entry items`, () => {
+			let list = logged([1, 2, 3, 4, 5])
+			let other = logged([1, 2, 3, 4, 5])
+			let latest = other
+			let visited: Array<number> = []
+
+			let answer = walk(list, other, (item) => {
+				visited.push(Number(item.value))
+				latest = written(latest, 99, 4)
+			})
+
+			expect(answer).toEqual(owed)
+			expect(visited.length).toBeGreaterThan(0)
+
+			for (let seen of visited) {
+				expect([1, 2, 3, 4, 5]).toContain(seen)
+			}
+
+			expect(itemsOf(list)).toEqual([1, 2, 3, 4, 5])
+			expect(itemsOf(other)).toEqual([1, 2, 3, 4, 5])
 			expect(itemsOf(latest)).toEqual([1, 2, 3, 4, 99])
 		})
 	}

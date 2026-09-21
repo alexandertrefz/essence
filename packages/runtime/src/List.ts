@@ -157,13 +157,31 @@ export function viewOf<ItemType extends AnyType>(
 // thing for the walks that must not trim, and `materialise` seals for itself,
 // because what it hands back is the box's own Array.
 //
-// NOTE: THE AUDIT this rests on is finite and mechanical: a native that takes a
-// Function or a conformance and reads its receiver's items says `walkOf` or
-// `sealedRunsOf`. `viewOf` is left to the readers that visit ONE item —
-// `item(at:)`, `firstItem`, `lastItem` — which hand no Array to anybody, and
-// which must not seal, or "read the cell before, write this one" would copy the
-// whole table every turn. Every one of these walks is held against a callback
-// that writes the List being walked, in `positionalWrites.spec.ts`.
+// NOTE: THE AUDIT this rests on is finite and mechanical, and the rule is about
+// the RUN rather than about the receiver: a native that can run user code — a
+// Function or a conformance witness — while it holds ANY List's raw run says
+// `walkOf` or `sealedRunsOf` for THAT run. Every run it holds, on every operand.
+//
+// NOTE: Written that way because the narrower wording — "reads its receiver's
+// items" — is what let `is` ship holding its ARGUMENT's run unsealed while the
+// item witness wrote into it, and the generic Choice member walk in
+// `internalHelpers.ts` hold both of its runs that way. A native with two List
+// operands has two debts, and the one that is not the receiver is the one a rule
+// phrased around receivers can not see. The natives this reaches are the ones
+// taking a second List or a List inside an operand: `is`, `compare`,
+// `contains(contentsOf:)`, `everyItem(in:)`, `removeEvery(in:)` and that member
+// walk. Everything else with two List operands — `append(contentsOf:)`, `pair`,
+// `flatten`, `transpose`, `split(of:)`, the edits — runs no user code at all
+// while it holds a run, and owes nothing.
+//
+// NOTE: `viewOf` is left to the readers that visit ONE item — `item(at:)`,
+// `firstItem`, `lastItem` — which hand no Array to anybody, and which must not
+// seal, or "read the cell before, write this one" would copy the whole table
+// every turn. Every one of these walks is held against a callback that writes
+// the List being walked, in `positionalWrites.spec.ts` — the receiver of it in
+// one sweep and, because one box passed as both operands hides exactly this
+// class of bug behind the receiver's own seal, a DISTINCT freshly logged
+// argument in a second.
 export function walkOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListView<ItemType> {
@@ -729,6 +747,14 @@ function listSharingFrontOf<ItemType extends AnyType>(
 // upgraded — and two Lists holding the same items are equal whichever way round
 // they are stored, so both are read through a view rather than off their
 // Arrays.
+//
+// NOTE: BOTH sides are walked, and the ARGUMENT's seal is as load-bearing as the
+// receiver's: the witness is user code running with both raw runs held, so an
+// argument left unsealed could be written in place from inside the very
+// comparison reading it, and every later position would be compared against an
+// item nobody ever put in that List. That answers `false` about two Lists that
+// are equal and never change — a corrupted ANSWER rather than a corrupted value,
+// which nothing in the value can be inspected to find.
 export function is<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	otherList: ListType<ItemType>,
@@ -737,7 +763,7 @@ export function is<ItemType extends AnyType>(
 	},
 ): BooleanType {
 	let original = walkOf(originalList)
-	let other = viewOf(otherList)
+	let other = walkOf(otherList)
 
 	if (original.total !== other.total) {
 		return createBoolean(false)
