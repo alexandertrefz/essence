@@ -1580,6 +1580,12 @@ function scopeWithGenerics(
 	generics: Array<parser.GenericDeclarationNode>,
 	scope: Scope,
 	context: WalkContext,
+	// NOTE: The Type Parameters the ENCLOSING Namespace declares. An entry of a
+	// Method's `<…>` naming one of them declares nothing — it bounds the
+	// Namespace's Parameter for that Method — so the name is a USE and must be
+	// recorded as one, or renaming the Namespace's declaration would leave the
+	// bound behind and the Method reading a name nothing declares.
+	enclosing: Set<string> = new Set(),
 ): Scope {
 	let genericScope = createScope(scope)
 
@@ -1592,6 +1598,12 @@ function scopeWithGenerics(
 
 		if (generic.constraint !== null) {
 			reference(scope, "types", generic.constraint, context)
+		}
+
+		if (enclosing.has(generic.name.content)) {
+			reference(scope, "types", generic.name, context)
+
+			continue
 		}
 
 		declareInScope(
@@ -1616,8 +1628,16 @@ function walkFunctionDefinition(
 	// body's own Statements, which can be empty or dropped by error recovery
 	// while the cursor sits inside an incomplete Statement.
 	range: common.Position,
+	// NOTE: A Namespace Method's enclosing Type Parameters — see
+	// `scopeWithGenerics`. Empty for every Function, which encloses none.
+	enclosing: Set<string> = new Set(),
 ) {
-	let functionScope = scopeWithGenerics(definition.generics, scope, context)
+	let functionScope = scopeWithGenerics(
+		definition.generics,
+		scope,
+		context,
+		enclosing,
+	)
 
 	context.scopes.push({
 		range,
@@ -1849,6 +1869,9 @@ function walkNamespaceDefinition(
 	// scope is built first — a `where Item is Comparable` condition then binds
 	// `Item` to the Generic's declaration, and renaming either end moves both.
 	let genericScope = scopeWithGenerics(node.generics, scope, context)
+	// NOTE: The names a Method's `<…>` may not re-declare — see
+	// `scopeWithGenerics`.
+	let declared = new Set(node.generics.map((generic) => generic.name.content))
 
 	// NOTE: A clause's Protocol resolves in the outer Scope, its `where`
 	// conditions' LHS Generic through the Namespace's own Type Parameters, and
@@ -1953,7 +1976,7 @@ function walkNamespaceDefinition(
 		// source (see `server.ts`), which is the only place a native signature
 		// can appear. Indexing is what colours and highlights them.
 		for (let signature of nativeSignaturesOf(member)) {
-			walkNativeSignature(signature, genericScope, context)
+			walkNativeSignature(signature, genericScope, context, declared)
 		}
 
 		// NOTE: Only bodied Methods have a Function definition to walk.
@@ -1963,6 +1986,7 @@ function walkNamespaceDefinition(
 				genericScope,
 				context,
 				method.position,
+				declared,
 			)
 		}
 	}
@@ -1972,8 +1996,14 @@ function walkNativeSignature(
 	signature: parser.NativeMethodSignatureNode,
 	scope: Scope,
 	context: WalkContext,
+	enclosing: Set<string> = new Set(),
 ) {
-	let signatureScope = scopeWithGenerics(signature.generics, scope, context)
+	let signatureScope = scopeWithGenerics(
+		signature.generics,
+		scope,
+		context,
+		enclosing,
+	)
 
 	for (let parameter of signature.parameters) {
 		walkTypeDeclaration(parameter.type, signatureScope, context)

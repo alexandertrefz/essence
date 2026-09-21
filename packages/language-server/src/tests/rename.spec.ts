@@ -233,6 +233,33 @@ describe("Rename", () => {
 		)
 	})
 
+	// NOTE: A Method bounding the Namespace's Parameter MENTIONS it rather than
+	// declaring it, so a rename of the Namespace's own declaration has to reach
+	// into the Method's `<…>` as well — the two names are one name.
+	it("should rename a per-Method bound along with the Parameter", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Boxes<infer Item> for { items: List<Item> } {",
+			"\t\tbiggest<Item is Comparable>() -> Optional<Item> {",
+			"\t\t\t<- @.items::sort()::lastItem()",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 24 }, "Held")).toBe(
+			[
+				"implementation {",
+				"\tnamespace Boxes<infer Held> for { items: List<Held> } {",
+				"\t\tbiggest<Held is Comparable>() -> Optional<Held> {",
+				"\t\t\t<- @.items::sort()::lastItem()",
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+	})
+
 	it("should rename a generic Choice's Type Parameter from its declaration", () => {
 		let source = [
 			"implementation {",
