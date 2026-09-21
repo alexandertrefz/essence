@@ -14,10 +14,9 @@ import {
 } from "@essence-lang/compiler/enricher/resolvers"
 import {
 	applyGenericBindings,
-	createInferenceContext,
+	bindNamespaceTarget,
 	flattenUnionMembers,
 	type GenericBindings,
-	matchesTypeWithBindings,
 	providedMethodProtocol,
 } from "@essence-lang/compiler/helpers"
 import type { common } from "@essence-lang/interfaces"
@@ -125,6 +124,14 @@ export function namedTypeNamespaces(
 	return listing === null ? [] : [listing]
 }
 
+// NOTE: Through `bindNamespaceTarget`, which is the Enricher's own door, so the
+// Editor offers a Method exactly where a call to it would resolve. It renames
+// the Namespace's Generics before it matches, and that matters HERE for the
+// answer rather than for the time: a receiver written in a Function Parameter
+// spelled like the Namespace's own binds a Parameter to a Type mentioning
+// itself, and the occurs check behind the door is what keeps this process from
+// spinning on that — without the renaming the Editor stays responsive and
+// quietly stops offering the Method. See the completion spec named for it.
 function targetTypeMatches(
 	namespace: common.NamespaceType,
 	baseType: common.Type,
@@ -133,23 +140,25 @@ function targetTypeMatches(
 		return false
 	}
 
-	let context = createInferenceContext(namespace.generics)
-
 	if (namespace.targetType.type === "UnionType") {
 		// NOTE: A Union-typed receiver (`Ordering`, `Number`) matches the
 		// Union target as a whole — the per-member check below only covers
 		// receivers of a single member Type. Mirrors the Enricher's
 		// `resolveMethodLookupNamespacesForReceiverType`.
-		if (matchesTypeWithBindings(namespace.targetType, baseType, context)) {
+		if (bindNamespaceTarget(namespace, baseType) !== null) {
 			return true
 		}
 
-		return namespace.targetType.types.some((type) =>
-			matchesTypeWithBindings(type, baseType, context),
+		return namespace.targetType.types.some(
+			(type) =>
+				bindNamespaceTarget(
+					{ targetType: type, generics: namespace.generics },
+					baseType,
+				) !== null,
 		)
 	}
 
-	return matchesTypeWithBindings(namespace.targetType, baseType, context)
+	return bindNamespaceTarget(namespace, baseType) !== null
 }
 
 // NOTE: `workspaceNamespaces` are Namespaces other Modules publish that this

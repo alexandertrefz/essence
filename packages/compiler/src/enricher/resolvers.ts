@@ -46,12 +46,11 @@ import {
 	applyGenericBindings,
 	borrowedGenericName,
 	buildUnion,
-	createInferenceContext,
+	bindNamespaceTarget,
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
 	isPartialOf,
 	matchesType,
-	matchesTypeWithBindings,
 	refinementWithTypeArguments,
 	resolveUnknownSlots,
 	type GenericBindings,
@@ -2637,13 +2636,13 @@ export function specializedNamespacesFor(
 			continue
 		}
 
-		let context = createInferenceContext(namespace.generics)
+		let bindings = bindNamespaceTarget(namespace, baseType)
 
 		specialized.set(
 			name,
-			matchesTypeWithBindings(namespace.targetType, baseType, context)
-				? specializeNamespace(namespace, context.bindings)
-				: namespace,
+			bindings === null
+				? namespace
+				: specializeNamespace(namespace, bindings),
 		)
 	}
 
@@ -4298,11 +4297,11 @@ function specializedTargetFor(
 		return namespace.targetType
 	}
 
-	let context = createInferenceContext(namespace.generics)
+	let bindings = bindNamespaceTarget(namespace, baseType)
 
-	return matchesTypeWithBindings(namespace.targetType, baseType, context)
-		? applyGenericBindings(namespace.targetType, context.bindings)
-		: baseType
+	return bindings === null
+		? baseType
+		: applyGenericBindings(namespace.targetType, bindings)
 }
 
 // NOTE: Where a receiver's conformance to one Protocol comes from. Every
@@ -4756,6 +4755,8 @@ function solveNamespaceConformance(
 			continue
 		}
 
+		let targetBindings = bindNamespaceTarget(namespace, binding)
+
 		// NOTE: A generic Namespace (`List<Item>`) conforms to the binding
 		// when its target Type unifies with it — `List<Item>` binds `Item`
 		// to `Integer` against a `List<Integer>` receiver. The Namespace is
@@ -4763,15 +4764,13 @@ function solveNamespaceConformance(
 		// Method signatures read concretely from here on. The builtin table
 		// singleton is never mutated — `specializeNamespace` builds fresh
 		// objects.
-		let context = createInferenceContext(namespace.generics)
-
-		if (matchesTypeWithBindings(namespace.targetType, binding, context)) {
+		if (targetBindings !== null) {
 			candidates.push({
 				name,
-				type: specializeNamespace(namespace, context.bindings),
+				type: specializeNamespace(namespace, targetBindings),
 				declaredTarget,
 				conditions: orderedConditions,
-				conditionBindings: context.bindings,
+				conditionBindings: targetBindings,
 			})
 		}
 	}
@@ -7461,7 +7460,9 @@ function computeNamespacesTargeting(
 	// NOTE: Generic Namespaces match their target Type by binding the
 	// Namespace's Generics against the receiver — the bindings are only used
 	// for the selection here, Method resolution re-binds them from the
-	// receiver Argument.
+	// receiver Argument. `bindNamespaceTarget` alpha-renames those Generics
+	// first, which is what keeps a receiver written in the CALLER's identically
+	// spelled Parameter from binding one of them to a Type mentioning itself.
 	for (let { name, namespace } of namespaceCandidatesFor(
 		namespaces,
 		baseType,
@@ -7471,36 +7472,26 @@ function computeNamespacesTargeting(
 				// NOTE: A Union-typed receiver (`Ordering`, `Number`) matches
 				// the Union target as a whole — the per-member loop below only
 				// covers receivers of a single member Type.
-				if (
-					matchesTypeWithBindings(
-						namespace.targetType,
-						baseType,
-						createInferenceContext(namespace.generics),
-					)
-				) {
+				if (bindNamespaceTarget(namespace, baseType) !== null) {
 					matchingNamespaces.set(name, namespace)
 					continue
 				}
 
 				for (let type of namespace.targetType.types) {
 					if (
-						matchesTypeWithBindings(
-							type,
+						bindNamespaceTarget(
+							{
+								targetType: type,
+								generics: namespace.generics,
+							},
 							baseType,
-							createInferenceContext(namespace.generics),
-						)
+						) !== null
 					) {
 						matchingNamespaces.set(name, namespace)
 						break
 					}
 				}
-			} else if (
-				matchesTypeWithBindings(
-					namespace.targetType,
-					baseType,
-					createInferenceContext(namespace.generics),
-				)
-			) {
+			} else if (bindNamespaceTarget(namespace, baseType) !== null) {
 				matchingNamespaces.set(name, namespace)
 			}
 		}

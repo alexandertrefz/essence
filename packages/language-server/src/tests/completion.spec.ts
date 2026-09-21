@@ -2245,6 +2245,41 @@ describe("Completion of a Choice's derived Case listing", () => {
 // `Item.is(a, b)` compile and run — and only `cases` was ever offered, because
 // the Case listing was the one real member a probe could be spelled with. The
 // NAME in front of the dot is read instead, which asks nothing of a member.
+// NOTE: The Editor asks "does this Namespace target that value" through the very
+// door the Enricher does, and this is the guard on THAT — see `targetTypeMatches`
+// in `../namespaces`. The receiver below is written in a Function Parameter
+// spelled exactly as the Namespace's own, which is the collision the door
+// renames away: with the renaming missing the Editor does not spin (the occurs
+// check is the backstop for that), it simply stops offering the Method, and no
+// other spec here notices because every other receiver is spelled differently.
+describe("Completion through a Parameter spelled like a Namespace's", () => {
+	const source = [
+		"implementation {",
+		"\tfunction distinct<infer Item is Equatable>(_ items: List<Item>) -> Integer {",
+		"\t\t<- items::removeDuplicates()::length()",
+		"\t}",
+		"",
+		"\tnamespace Pairing<infer Item> for { left: Item, right: Item } {",
+		"\t\tdiffering<Item is Equatable>() -> Integer {",
+		"\t\t\t<- distinct([@.left, @.right])",
+		"\t\t}",
+		"\t}",
+		"",
+		"\tfunction viaNamespaceMethod<infer Item is Equatable>(",
+		"\t\t_ pair: { left: List<Item>, right: List<Item> },",
+		"\t) -> Integer {",
+		"\t\t<- pair::",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should offer the bounded Method of the Namespace that targets it", () => {
+		expect(labelsOf(source, { line: 15, column: 12 })).toContain(
+			"differing",
+		)
+	})
+})
+
 describe("Completion of a Protocol-bounded Type Parameter", () => {
 	it("should offer a static the bound requires", () => {
 		let source = [

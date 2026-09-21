@@ -441,6 +441,23 @@ export function unfreshenBindings(
 		return bindings
 	}
 
+	// NOTE: The usual shape, and the one `bindNamespaceTarget` asks a thousand
+	// times over a Program: every binding is a Type the SUBJECT produced, which
+	// can mention no fresh name of this invocation, so the two substitutions
+	// below have nothing to substitute and only the KEYS change. Asked of the
+	// memoised mention set rather than by walking, which is what makes this
+	// cheaper than the work it skips — a pin is the one thing that puts a fresh
+	// name in a value, and a pin is rare.
+	if (!bindingsMentionAPin(bindings, freshToOriginal)) {
+		let renamedKeys: GenericBindings = new Map()
+
+		for (let [name, type] of bindings) {
+			renamedKeys.set(freshToOriginal.get(name) ?? name, type)
+		}
+
+		return renamedKeys
+	}
+
 	let reverse: GenericBindings = new Map()
 
 	for (let [fresh, original] of freshToOriginal) {
@@ -459,6 +476,27 @@ export function unfreshenBindings(
 	return result
 }
 
+// NOTE: Whether any binding VALUE names something the translation above would
+// rewrite — a Parameter this invocation bound (which is what `settlePins`
+// settles) or a fresh name (which is what the reverse rename replaces). False
+// means both passes are the identity and only the keys have to move. Asked of
+// `mentionedGenericNames`, which remembers its walk per Type object and answers
+// the empty Set for everything the Arguments built.
+function bindingsMentionAPin(
+	bindings: GenericBindings,
+	freshToOriginal: Map<common.GenericName, common.GenericName>,
+): boolean {
+	for (let [, type] of bindings) {
+		for (let mentioned of mentionedGenericNames(type)) {
+			if (bindings.has(mentioned) || freshToOriginal.has(mentioned)) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // NOTE: A Namespace as the specificity order below sees it — the target Type
 // exactly as DECLARED, plus the Generics that are open in it. Never a
 // specialized copy: `List<Integer>` specialized out of `List<ItemType>` is
@@ -469,50 +507,161 @@ export type NamespaceTarget = {
 	generics: Array<common.GenericDeclaration>
 }
 
+// NOTE: A Namespace's own Generics bound from a receiver, in the Namespace's OWN
+// names — null where its target Type does not cover that receiver at all. THE
+// one door every "does this Namespace target that value" question goes through:
+// Method dispatch's candidate set, the specialized target a Diagnostic prints,
+// the conformance search, and the specificity order below.
+//
+// The pattern's Generics are alpha-renamed before the match, exactly as
+// `createFreshenedInference` does for a call's Parameters, and the bindings are
+// translated back afterwards. The rename itself is remembered per Namespace —
+// see `renamedNamespaceTarget`, which is where the reason one set of fresh names
+// serves every receiver is written down. Namespaces spell their Generics alike (`ItemType`
+// throughout the stdlib, `Item` in a Program) and Generic identity is by NAME,
+// so without the rename the pattern's bindable `ItemType` and the subject's
+// opaque one are a single symbol. Two things go wrong then, and both are why
+// this is one function rather than a rename each caller remembers:
+//
+//   • `List<List<ItemType>>` binds `ItemType` to a Type mentioning itself, reads
+//     as covering `List<ItemType>`, and the two targets tie in the specificity
+//     order that has to tell them apart.
+//   • A `namespace Pairing<infer Item> for { left: Item, right: Item }` reached
+//     from a `via<infer Item>(_ pair: { left: List<Item>, right: List<Item> })`
+//     binds `Item := List<Item>` off the FIRST member; the second re-checks
+//     `Item` against that binding, and chasing the name through itself never
+//     ends. On master that Program spun the Enricher for 363 million
+//     `matchGenericUse` turns and never returned. `isOpenBindable`'s occurs
+//     check is what makes any such binding terminate; the rename here is what
+//     keeps it from arising, so the Namespace is FOUND and the call resolves.
+export function bindNamespaceTarget(
+	pattern: NamespaceTarget,
+	subject: common.Type,
+): GenericBindings | null {
+	if (pattern.targetType === null) {
+		return null
+	}
+
+	if (pattern.generics.length === 0) {
+		return matchesType(pattern.targetType, subject) ? new Map() : null
+	}
+
+	let renamed = renamedNamespaceTarget(pattern.targetType, pattern.generics)
+	let context = createInferenceContext(renamed.generics)
+
+	if (!matchesTypeWithBindings(renamed.target, subject, context)) {
+		return null
+	}
+
+	return unfreshenBindings(context.bindings, renamed.freshToOriginal)
+}
+
+// NOTE: The alpha-renamed half of `bindNamespaceTarget` — the Namespace's
+// Generics under fresh names, its target Type rewritten to use them, and the way
+// back. It depends on the PATTERN alone: the same Namespace against a thousand
+// receivers renames once.
+type RenamedNamespaceTarget = {
+	generics: Array<common.GenericDeclaration>
+	target: common.Type
+	freshToOriginal: Map<common.GenericName, common.GenericName>
+	declaredGenerics: Array<common.GenericDeclaration>
+}
+
+// NOTE: Remembered per target TYPE object, because that is the stable half of a
+// Namespace here: `solveNamespaceConformance` wraps `{ targetType, generics }`
+// in a fresh literal per candidate, so the wrapper is no key at all, while the
+// Type it names and the Generics array it hands on are the Namespace's own
+// objects and live as long as the analysis does. The entry carries the Generics
+// it was built from and is rebuilt when a different array turns up against the
+// same Type — two Namespaces can share a target object, and the rename has to
+// follow the Generics rather than the Type.
+//
+// WEAK, and keyed on an OBJECT rather than on a name, because the Language
+// Server is a process that outlives any one analysis: a file edited and
+// re-enriched builds fresh Types, which are fresh keys, and the entries of the
+// analysis it replaced die with it. A `Map` keyed by the Namespace's NAME would
+// answer the second analysis with the first one's target.
+const renamedNamespaceTargets = new WeakMap<
+	common.Type,
+	RenamedNamespaceTarget
+>()
+
+// NOTE: ONE set of fresh names per Namespace, reused by every question asked of
+// it. What makes that sound is what makes the renaming work in the first place:
+//
+//   • the names are counter-unique — `Item`, a zero-width space and a number
+//     that only ever goes up — so no two Namespaces, and no two renames of one
+//     Namespace, can ever mint the same name;
+//   • no SUBJECT can hold one. Subjects are Types built from source, and the
+//     separator is not a character an Identifier may contain; the only place a
+//     fresh name exists is inside this pattern and inside the inference context
+//     of a match against it, and `unfreshenBindings` translates every binding —
+//     keys and values both — back into the Namespace's own names before a single
+//     one is returned;
+//   • nothing here is written to. Each match makes its own `createInferenceContext`
+//     over these declarations, so two questions asked of one Namespace share the
+//     pattern and share no bindings.
+//
+// What would break it is a fresh name ESCAPING into a Type that later comes back
+// as a subject — a caller keeping `context.bindings` untranslated, or
+// `unfreshenBindings` ceasing to rewrite binding values. The pattern's bindable
+// `Item` and a subject's opaque `Item` would be one symbol again, which is the
+// collision this renaming exists to prevent and, one level down, the spin
+// `isOpenBindable`'s occurs check is the backstop for.
+//
+// Exported for its guard alone: "one rename per Namespace" is a claim about WORK
+// that nothing about an answer can show, since the whole point of the names is
+// that none of them is ever seen from outside.
+export function renamedNamespaceTarget(
+	targetType: common.Type,
+	declaredGenerics: Array<common.GenericDeclaration>,
+): RenamedNamespaceTarget {
+	let remembered = renamedNamespaceTargets.get(targetType)
+
+	if (
+		remembered !== undefined &&
+		remembered.declaredGenerics === declaredGenerics
+	) {
+		return remembered
+	}
+
+	let rename: GenericBindings = new Map()
+	let freshToOriginal = new Map<common.GenericName, common.GenericName>()
+
+	for (let generic of declaredGenerics) {
+		let freshName = `${generic.name}${freshGenericSeparator}${(freshGenericCounter += 1)}`
+
+		freshToOriginal.set(freshName, generic.name)
+		rename.set(generic.name, { type: "GenericUse", name: freshName })
+	}
+
+	let renamed: RenamedNamespaceTarget = {
+		generics: declaredGenerics.map((generic) => ({
+			...generic,
+			name: (rename.get(generic.name) as common.GenericUse).name,
+			defaultType:
+				generic.defaultType === null
+					? null
+					: applyGenericBindings(generic.defaultType, rename),
+		})),
+		target: applyGenericBindings(targetType, rename),
+		freshToOriginal,
+		declaredGenerics,
+	}
+
+	renamedNamespaceTargets.set(targetType, renamed)
+
+	return renamed
+}
+
 // NOTE: Whether `pattern`'s target Type covers `subject` with the pattern's own
 // Generics OPEN — `List<ItemType>` covers `List<Integer>` and `List<List<X>>`,
-// while `List<List<ItemType>>` covers only the nested one. The pattern's
-// Generics are alpha-renamed first, exactly as `createFreshenedInference` does
-// for a call's Parameters: Namespaces spell their Generics alike (`ItemType`
-// throughout the stdlib) and Generic identity is by name, so without the rename
-// the pattern's bindable `ItemType` and the subject's opaque one are a single
-// symbol — `List<List<ItemType>>` binds `ItemType` to a Type mentioning itself,
-// reads as covering `List<ItemType>`, and the two targets tie.
+// while `List<List<ItemType>>` covers only the nested one.
 function targetCoversAsPattern(
 	pattern: NamespaceTarget,
 	subject: common.Type,
 ): boolean {
-	if (pattern.targetType === null) {
-		return false
-	}
-
-	if (pattern.generics.length === 0) {
-		return matchesType(pattern.targetType, subject)
-	}
-
-	let rename: GenericBindings = new Map()
-
-	for (let generic of pattern.generics) {
-		rename.set(generic.name, {
-			type: "GenericUse",
-			name: `${generic.name}${freshGenericSeparator}${(freshGenericCounter += 1)}`,
-		})
-	}
-
-	let generics = pattern.generics.map((generic) => ({
-		...generic,
-		name: (rename.get(generic.name) as common.GenericUse).name,
-		defaultType:
-			generic.defaultType === null
-				? null
-				: applyGenericBindings(generic.defaultType, rename),
-	}))
-
-	return matchesTypeWithBindings(
-		applyGenericBindings(pattern.targetType, rename),
-		subject,
-		createInferenceContext(generics),
-	)
+	return bindNamespaceTarget(pattern, subject) !== null
 }
 
 // NOTE: THE specificity order over overlapping Namespaces, shared by Method
@@ -2679,17 +2828,107 @@ export function matchesTypeWithBindings(
 // call, so the map is empty between top-level matches.
 const activeCasePairs = new Map<common.CaseType, Set<common.CaseType>>()
 
+// NOTE: The Generic names a binding mentions, remembered per Type object. The
+// question is asked of one binding on every later occurrence of its Parameter,
+// and the answer can not change — a Type is never edited in place, so one walk
+// per distinct binding is the whole cost. Keyed by the binding rather than by
+// the context, because the same Type is bound under many. The answer is almost
+// always the empty Set, which is what makes the chase below free.
+const bindingMentionsMemo = new WeakMap<common.Type, Set<common.GenericName>>()
+
+function mentionedGenericNames(binding: common.Type): Set<common.GenericName> {
+	let remembered = bindingMentionsMemo.get(binding)
+
+	if (remembered === undefined) {
+		remembered = genericNamesMentioned(binding)
+		bindingMentionsMemo.set(binding, remembered)
+	}
+
+	return remembered
+}
+
+// NOTE: Whether following a Parameter's binding, and the bindings of everything
+// that binding mentions, leads back to the Parameter itself. THE occurs check,
+// written over the whole binding graph rather than over one edge of it: the
+// plain shape is `Item := List<Item>`, but two Parameters can hold each other
+// instead — `Key := List<Value>` beside `Value := List<Key>` — and a check that
+// only read its own binding waved that pair through and let the matcher chase
+// the pair around forever. Neither cycle stands for any finite Type, so a
+// Parameter caught in one is no longer open to binding.
+//
+// Bounded by the bindable names, which are one invocation's Type Parameters:
+// a handful, and the walk stops at the first binding that mentions nothing.
+function bindingCyclesBackTo(
+	name: common.GenericName,
+	context: GenericInferenceContext,
+): boolean {
+	// NOTE: The answer for very nearly every binding, and worth its own line
+	// because this is asked on EVERY later occurrence of a bound Parameter: a
+	// Type the Arguments produced mentions no Generic at all, so there is
+	// nothing for the walk below to follow. Reading that off the memoised
+	// mention set costs two lookups, where discovering it by walking costs a Set
+	// and a queue per question.
+	let held = context.bindings.get(name)
+
+	if (held === undefined || mentionedGenericNames(held).size === 0) {
+		return false
+	}
+
+	let seen = new Set<common.GenericName>([name])
+	let pending: Array<common.GenericName> = [name]
+
+	while (pending.length > 0) {
+		let binding = context.bindings.get(pending.pop()!)
+
+		if (binding === undefined) {
+			continue
+		}
+
+		for (let mentioned of mentionedGenericNames(binding)) {
+			if (mentioned === name) {
+				return true
+			}
+
+			if (!context.bindableNames.has(mentioned) || seen.has(mentioned)) {
+				continue
+			}
+
+			seen.add(mentioned)
+			pending.push(mentioned)
+		}
+	}
+
+	return false
+}
+
 // NOTE: Whether a Generic name is still OPEN to binding here — bindable AND not
-// already pinned to a use of its own name. A SELF-referential binding
-// (`ItemType := ItemType`) arises when a callee's bindable Generic shares a
-// spelling with the caller's opaque one: a Method generic in `ItemType` calling
-// `List.reduce`, whose namespace Generic is also `ItemType`, binds
-// `ItemType := ItemType` off the receiver. That pins the callee's Generic to the
-// caller's opaque symbol, so from then on it must behave EXACTLY like an opaque
-// Generic — matching only another occurrence of itself, and falling THROUGH the
-// bindable dispatch so an expected Union can still accept it as a member (the
-// `ItemType` arm of a bound `Result` of `ItemType | String`). Left as "open" it
-// would instead be chased through its own binding forever.
+// already pinned to a Type that MENTIONS its own name. Such a binding arises
+// when a callee's bindable Generic shares a spelling with the caller's opaque
+// one, and the two are one symbol because Generic identity is by name. The plain
+// case is `ItemType := ItemType`: a Method generic in `ItemType` calling
+// `List.reduce`, whose namespace Generic is also `ItemType`, binds it off the
+// receiver. That pins the callee's Generic to the caller's opaque symbol, so
+// from then on it must behave EXACTLY like an opaque Generic — matching only
+// another occurrence of itself, and falling THROUGH the bindable dispatch so an
+// expected Union can still accept it as a member (the `ItemType` arm of a bound
+// `Result` of `ItemType | String`). Left as "open" it would instead be chased
+// through its own binding forever.
+//
+// NOTE: The occurs check is the whole rule, not just the `X := X` shape it was
+// first written for, and it is asked of the binding GRAPH — see
+// `bindingCyclesBackTo`. `Item := List<Item>` is the same collision one level
+// down —
+// a `namespace Pairing<infer Item> for { left: Item, right: Item }` reached from
+// a Function whose own Parameter is also spelled `Item`, over a receiver of
+// `{ left: List<Item>, right: List<Item> }`. The FIRST member records the
+// binding, the SECOND re-checks `Item` against it, and chasing `Item` through
+// `List<Item>` never ends: on master that program spun the Enricher for
+// 363 million `matchGenericUse` turns with flat memory and never returned. No
+// finite Type satisfies `Item = List<Item>`, so treating the Parameter as the
+// opaque symbol it was pinned to is both terminating and the honest reading; the
+// collision itself is kept from arising in the first place by alpha-renaming a
+// Namespace's Generics before its target is matched, and this is the backstop
+// that holds for every spelling, including ones no rule anticipates.
 function isOpenBindable(
 	name: string,
 	context: GenericInferenceContext | null,
@@ -2698,13 +2937,7 @@ function isOpenBindable(
 		return false
 	}
 
-	let binding = context.bindings.get(name)
-
-	return !(
-		binding !== undefined &&
-		binding.type === "GenericUse" &&
-		binding.name === name
-	)
+	return !(context.bindings.has(name) && bindingCyclesBackTo(name, context))
 }
 
 // NOTE: Whether a Type Parameter already stands for a refinement. A Parameter

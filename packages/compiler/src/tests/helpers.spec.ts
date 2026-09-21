@@ -34,6 +34,7 @@ import { stripPosition, stripPositionFromArray } from "../helpers/nodes"
 import { closestMatch } from "../helpers/suggest"
 import {
 	applyGenericBindings,
+	bindNamespaceTarget,
 	buildUnion,
 	canonicalPredicateConjuncts,
 	closePendingRefinementCopies,
@@ -47,6 +48,7 @@ import {
 	pendingRefinementCopiesOf,
 	predicateConjunctKey,
 	refinementWithTypeArguments,
+	renamedNamespaceTarget,
 	resolveOverloadedMethodName,
 	resolveUnknownSlots,
 	typeContainsError,
@@ -2217,6 +2219,94 @@ describe("Helpers", () => {
 				expect(applyGenericBindings(genericT, bindings)).toEqual(
 					genericT,
 				)
+			})
+		})
+
+		// NOTE: Every "does this Namespace target that value" question goes
+		// through `bindNamespaceTarget`, and each one alpha-renames the
+		// Namespace's Generics before it matches. The rename depends on the
+		// PATTERN alone, so doing it per question is work proportional to the
+		// CALLS in a Program rather than to the Namespaces in it — it cost a
+		// 440-Namespace Program 24 % of its Enricher. That it happens ONCE is a
+		// claim about work no answer can show, because no fresh name is ever
+		// visible from outside: the guard is the identity of the remembered
+		// pattern, with the answers on either side of it to say the sharing
+		// changed none of them.
+		describe("bindNamespaceTarget", () => {
+			const item: GenericUse = { type: "GenericUse", name: "Item" }
+
+			function pairing(): {
+				targetType: Type
+				generics: Array<common.GenericDeclaration>
+			} {
+				return {
+					targetType: {
+						type: "Record",
+						members: { left: item, right: item },
+					},
+					generics: [
+						{ name: "Item", infer: true, defaultType: null },
+					],
+				}
+			}
+
+			function pairOf(left: Type, right: Type): Type {
+				return { type: "Record", members: { left, right } }
+			}
+
+			it("should rename a Namespace's Generics once, however many receivers ask", () => {
+				let pattern = pairing()
+				let first = renamedNamespaceTarget(
+					pattern.targetType,
+					pattern.generics,
+				)
+
+				expect(
+					renamedNamespaceTarget(
+						pattern.targetType,
+						pattern.generics,
+					),
+				).toBe(first)
+
+				// NOTE: Asked the way the Enricher asks it — through the door,
+				// once per receiver — which is the path the memo sits on.
+				bindNamespaceTarget(pattern, pairOf(integer, integer))
+				bindNamespaceTarget(pattern, pairOf(string, string))
+
+				expect(
+					renamedNamespaceTarget(
+						pattern.targetType,
+						pattern.generics,
+					),
+				).toBe(first)
+			})
+
+			it("should rename again for other Generics over the same target", () => {
+				let pattern = pairing()
+				let first = renamedNamespaceTarget(
+					pattern.targetType,
+					pattern.generics,
+				)
+				let second = renamedNamespaceTarget(pattern.targetType, [
+					{ name: "Item", infer: true, defaultType: string },
+				])
+
+				expect(second).not.toBe(first)
+				expect(second.generics[0]!.defaultType).toEqual(string)
+			})
+
+			it("should answer in the Namespace's own names for every receiver", () => {
+				let pattern = pairing()
+
+				expect(
+					bindNamespaceTarget(pattern, pairOf(integer, integer)),
+				).toEqual(new Map([["Item", integer]]))
+				expect(
+					bindNamespaceTarget(pattern, pairOf(string, string)),
+				).toEqual(new Map([["Item", string]]))
+				expect(
+					bindNamespaceTarget(pattern, pairOf(integer, string)),
+				).toBe(null)
 			})
 		})
 

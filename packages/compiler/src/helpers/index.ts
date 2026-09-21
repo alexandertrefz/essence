@@ -87,6 +87,7 @@ export {
 	type MatchableArgument,
 	matchArguments,
 	matchesType,
+	bindNamespaceTarget,
 	matchesTypeWithBindings,
 	mentionsUnsolvedTypeParameter,
 	mergedRecordType,
