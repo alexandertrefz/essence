@@ -301,9 +301,17 @@ function membersText(
 // two-run representation rests on: a box's LOGICAL ITEMS never change. A run
 // Array may grow, be trimmed, or be replaced by the two runs combined, and none
 // of those moves an item a box has already answered for — "the positions a box
-// has already answered for are frozen for good" is how `List.ts` puts it. A
-// future edit that wrote into a position an older box views would break this
-// memo, and it would break that box's own `is` and `join` first.
+// has already answered for are frozen for good" is how `List.ts` puts it.
+//
+// That invariant is about the ITEMS rather than about the array, which is what
+// carries it through the in-place positional writes of `listWrites.ts`.
+// `replace` really does write over a cell an older box views, and `runsOf` is
+// what keeps the promise: a box left behind by a write is repaired to its own
+// items — the array copied and the writes made since undone — before any reader
+// is handed a run of it, and the spelling below reads through `runsOf` exactly
+// as every other reader does. So a box keyed before a write and the same box
+// keyed afterwards spell one text, because they hold one set of items; the
+// written box is a DIFFERENT box, and carries a memo of its own.
 const listTextKey: unique symbol = Symbol("listText")
 
 function listText(value: ListType<AnyType>): string | null {
