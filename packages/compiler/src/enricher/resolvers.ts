@@ -5265,13 +5265,16 @@ export function resolveConformances(
 			continue
 		}
 
-		// NOTE: A binding is read in the invocation's OWN names, and a PINNED
-		// Parameter's may still name a sibling the Arguments bind: a generic
-		// Namespace's `Self` is pinned to `List<ItemType>`, and what the
-		// Arguments made of `ItemType` is what the witness has to be solved
-		// for. Every other binding is a Type the Arguments produced, which
-		// names no Parameter of this invocation and comes back unchanged.
-		let binding = applyGenericBindings(bound, bindings)
+		// NOTE: Read as it stands. A PINNED Parameter's binding may name a
+		// sibling the Arguments bind — a generic Namespace's `Self` is pinned
+		// to `List<ItemType>` — and that is settled where this invocation's
+		// Generics still carry their FRESH names, in `settlePins`. Substituting
+		// the invocation's bindings HERE instead is what made `distinct(keys)`
+		// inside a `nestedDistinct<infer Key>` receive a `List<List<Key>>`
+		// witness for a `List<Key>` binding: by this point every binding is a
+		// Type the ARGUMENTS produced, written in the CALLER's names, and a
+		// caller Type Parameter spelled like a callee's was rewritten with it.
+		let binding = bound
 
 		// NOTE: An unknown Protocol was already diagnosed at the declaration.
 		if (findProtocolInScope(generic.constraint, scope) === null) {

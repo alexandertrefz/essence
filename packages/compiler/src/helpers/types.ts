@@ -382,12 +382,57 @@ export function borrowedGenericName(
 	return `${name}${freshGenericSeparator}`
 }
 
+// NOTE: Substitutes what each Parameter of ONE invocation bound into every
+// other binding of that same invocation that still names it, until nothing
+// moves. A binding the Arguments produced names no Parameter of the invocation
+// and comes back as itself; a `defaultType` PIN is the one that does — a
+// provided Method's `Self` is pinned to `List<ItemType>`, and what the
+// Arguments made of `ItemType` is what the witness has to be solved for.
+//
+// Run while the names are still FRESH, which is the whole point: a fresh name
+// carries a counter no source Generic can spell and no other invocation shares,
+// so substituting this map can not reach a Type Parameter belonging to the
+// CALLER. Once `unfreshenBindings` below puts the declared names back, the
+// callee's `Key` and the caller's `Key` are one name and the same substitution
+// rewrites both — which is exactly the bug this moved the work out of
+// `resolveConformances` to fix.
+//
+// Bounded by the number of bindings: each pass either settles one more name or
+// stops. Nothing can declare a pair of Parameters pinned to each other today —
+// a `defaultType` naming a sibling is refused where it is written, and the only
+// pins the Compiler fabricates name Parameters that carry no pin of their own —
+// so the cap is what keeps that a statement about this code rather than a
+// promise about the language.
+function settlePins(bindings: GenericBindings): GenericBindings {
+	let settled = bindings
+
+	for (let pass = 0; pass < bindings.size; pass += 1) {
+		let next: GenericBindings = new Map()
+		let moved = false
+
+		for (let [name, type] of settled) {
+			let applied = applyGenericBindings(type, settled)
+
+			moved ||= applied !== type
+			next.set(name, applied)
+		}
+
+		if (!moved) {
+			return settled
+		}
+
+		settled = next
+	}
+
+	return settled
+}
+
 // NOTE: Translates the bindings collected against freshened Generic names back
 // to the Generics the signature declares, so the return-Type substitution and
 // conformance resolution downstream read in the original names. Binding VALUES
 // come from the Arguments, which never mention the callee's fresh names — but a
-// `defaultType` that referenced a sibling Generic could, so they are
-// un-freshened too.
+// `defaultType` pin does, so `settlePins` above settles those first, under the
+// fresh names that still tell this invocation's Parameters from the caller's.
 export function unfreshenBindings(
 	bindings: GenericBindings,
 	freshToOriginal: Map<common.GenericName, common.GenericName>,
@@ -404,7 +449,7 @@ export function unfreshenBindings(
 
 	let result: GenericBindings = new Map()
 
-	for (let [name, type] of bindings) {
+	for (let [name, type] of settlePins(bindings)) {
 		result.set(
 			freshToOriginal.get(name) ?? name,
 			applyGenericBindings(type, reverse),
