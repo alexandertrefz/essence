@@ -25,28 +25,26 @@ const TURNS = 60_000
 const CEILING_MILLISECONDS = 1_000
 
 // NOTE: The same claim for the other direction — taking a List APART one item
-// at a time. `remove(at 0)` on a List built by prepending shrinks the front run
-// by one and shares both runs, so a whole drain moves no items at all; the
-// composition it replaced sliced and rejoined the List at every step, which is
-// quadratic the way the copying builds were. Measured on this machine, best of
-// five, subprocess startup included in both figures: 24 ms for the drain of a
-// twenty thousand item List, against 497 ms for the same Program before the
-// native. The ceiling is 300 — an order of magnitude above the linear drain, so
-// a far slower machine still passes, and well below what the quadratic one
-// costs on a fast one.
-const DRAIN_TURNS = 20_000
-const DRAIN_CEILING_MILLISECONDS = 300
+// at a time, and reading it as it goes, which is what every walk below does.
+// These are held to a RATIO rather than to a ceiling. What they claim is that a
+// Program's cost grows with the length of its List rather than with the square
+// of it, and that is a claim about the SHAPE of four measurements rather than
+// about any one of them — so it holds on a machine under any load, where an
+// absolute ceiling has to sit an order of magnitude above the linear figure to
+// be safe and can then only catch a regression costing more than that. Doubling
+// the length doubles a linear cost and quadruples a quadratic one, so the guard
+// is three against a doubling: no linear Program reaches it and no quadratic one
+// misses it. Measured on this machine at the four lengths below, subprocess
+// startup inside every figure: the head/tail walk ran 30, 31, 35 and 44 ms —
+// ratios of 1.0, 1.1 and 1.3 — where before the half rule it ran 47, 111, 344
+// and 1274, which is 2.4, 3.1 and 3.7.
+const WALK_LENGTHS = [10_000, 20_000, 40_000, 80_000]
+const GROWTH_PER_DOUBLING = 3
 
-// NOTE: The same drain of a List built by APPENDING, which is the half the
-// tests above did not cover and the half that was quadratic: a flat box could
-// share no suffix, so every step copied the whole back run. Now a box whose
-// seam is at zero upgrades itself once when a suffix is asked of it, and the
-// rest of the drain is windows. Sixty thousand turns rather than twenty, so
-// that the quadratic drain stands clear of the ceiling: measured best of
-// three on this machine, subprocess startup included, `remove(at 0)` took
-// 1606 ms and `removeFirst()` 943 ms before the upgrade, against 21 and 25 ms
-// after it — and 23 for the prepend-built drain of the same length.
-const APPEND_DRAIN_TURNS = 60_000
+// NOTE: Best of three at each length, because one slow run anywhere in the four
+// moves a ratio twice — up at its own length and down at the next — and a guard
+// that a scheduling hiccup can fail is a guard nobody trusts.
+const ATTEMPTS = 3
 
 // NOTE: A subprocess rather than an import, because what is being measured is
 // the Program's own wall time and a test runner's process has already paid for
@@ -103,6 +101,56 @@ function buildingSource(method: string): string {
 }`
 }
 
+// NOTE: Every doubling held to the same ratio, rather than the whole span held
+// to one — a Program that turns quadratic only past some length fails at the
+// doubling where it does, and the message names it. Compiling happens outside
+// the figure, since the timer starts at the spawn, so asking for the same length
+// three times costs the test its own wall time and costs the measurement
+// nothing.
+//
+// NOTE: The lengths are measured one at a time and the walk STOPS at the first
+// doubling that is too steep, which is what keeps a failure quick: a quadratic
+// Program is caught at twenty or forty thousand and is never asked for eighty,
+// where it would run for long enough to be killed by the runner's own timeout
+// and report that instead of its growth.
+function expectLinearGrowth(
+	sourceFor: (length: number) => string,
+	printedFor: (length: number) => string,
+): void {
+	let measured: Array<number> = []
+	let tooSteep: Array<string> = []
+
+	for (let index = 0; index < WALK_LENGTHS.length; index++) {
+		let length = WALK_LENGTHS[index]!
+		let best = Number.POSITIVE_INFINITY
+
+		for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+			best = Math.min(
+				best,
+				millisecondsToRun(sourceFor(length), printedFor(length)),
+			)
+		}
+
+		measured.push(best)
+
+		if (index === 0) {
+			continue
+		}
+
+		let grewBy = best / measured[index - 1]!
+
+		if (grewBy >= GROWTH_PER_DOUBLING) {
+			tooSteep.push(
+				`${WALK_LENGTHS[index - 1]} to ${length}: ${grewBy.toFixed(1)}x`,
+			)
+
+			break
+		}
+	}
+
+	expect(tooSteep).toEqual([])
+}
+
 // NOTE: The List is built by prepending, so every item of it lives in the front
 // run — and then it is emptied from that end, one item per turn, which is where
 // the front run pays for itself. Or it is built by appending, so every item
@@ -129,6 +177,35 @@ function drainingSource(
 }`
 }
 
+// NOTE: The walk's State is a Record of what is left and what has been added
+// up, so that one source stands for every shape of walk — the body is the whole
+// of the difference between them.
+function walkingSource(length: number, walk: string): string {
+	return `implementation {
+	constant items = List.of(integersFrom 1, through ${length})
+
+	constant total = loop(startingWith { rest = items, sum = 0 }, step (state) {
+		<- ${walk}
+	})
+
+	Terminal.print(total)
+}`
+}
+
+// NOTE: The sum each walk prints, checked for the reason the drains' length is:
+// a build that threw, or one that added up the wrong items, would otherwise be
+// the fastest run of all. The two full walks add up every item; the two-ended
+// one stops at the middle and adds up the first half.
+function printedSumFor(name: string, length: number): string {
+	if (name === "both ends") {
+		let half = length / 2
+
+		return String((half * (half + 1)) / 2)
+	}
+
+	return String((length * (length + 1)) / 2)
+}
+
 describe("List performance", () => {
 	it("appends sixty thousand items in under a second", () => {
 		expect(
@@ -142,46 +219,81 @@ describe("List performance", () => {
 		).toBeLessThan(CEILING_MILLISECONDS)
 	})
 
-	it("drains twenty thousand items from the front in well under the quadratic time", () => {
-		expect(
-			millisecondsToRun(
-				drainingSource("prepend", DRAIN_TURNS, "remove(at 0)"),
-				"1",
-			),
-		).toBeLessThan(DRAIN_CEILING_MILLISECONDS)
-	})
+	// NOTE: The four drains, each held to its growth rather than to a ceiling.
+	// `remove(at 0)` on a prepend-built List shrinks the front run by one and
+	// shares both runs; on an append-built one the box upgrades itself once and
+	// the rest of the drain is windows. Both used to slice and rejoin the List at
+	// every step, which is quadratic the way the copying builds were.
+	for (let [built, step] of [
+		["prepend", "remove(at 0)"],
+		["prepend", "removeFirst()"],
+		["append", "remove(at 0)"],
+		["append", "removeFirst()"],
+	] as const) {
+		it(`drains a ${built}-built List through ${step} in linear time`, () => {
+			expectLinearGrowth(
+				(length) => drainingSource(built, length, step),
+				() => "1",
+			)
+		})
+	}
 
-	// NOTE: The same drain through the stdlib Method rather than the native, and
-	// a guard on a SECOND thing: `removeFirst()` is `@::slice(from 1, to
-	// @::length())`, so it is only as cheap as the shrinking window `slice`
-	// answers with stays cheap to ask the length of. A `length` that trimmed its
-	// receiver would copy the whole front run at every turn and this would be
-	// quadratic again while the one above stayed fast — 103 ms against 25 on
-	// this machine, best of five, when that was measured.
-	it("drains twenty thousand items through removeFirst just as fast", () => {
-		expect(
-			millisecondsToRun(
-				drainingSource("prepend", DRAIN_TURNS, "removeFirst()"),
-				"1",
-			),
-		).toBeLessThan(DRAIN_CEILING_MILLISECONDS)
-	})
-
-	it("drains sixty thousand appended items from the front in well under the quadratic time", () => {
-		expect(
-			millisecondsToRun(
-				drainingSource("append", APPEND_DRAIN_TURNS, "remove(at 0)"),
-				"1",
-			),
-		).toBeLessThan(DRAIN_CEILING_MILLISECONDS)
-	})
-
-	it("drains sixty thousand appended items through removeFirst just as fast", () => {
-		expect(
-			millisecondsToRun(
-				drainingSource("append", APPEND_DRAIN_TURNS, "removeFirst()"),
-				"1",
-			),
-		).toBeLessThan(DRAIN_CEILING_MILLISECONDS)
-	})
+	// NOTE: THE CANONICAL FUNCTIONAL WALK — take the head, go on with the tail —
+	// which is `item(at 0)` on a box `slice` has just answered a window for.
+	// Reading one item of that window used to copy the whole of it, so the walk
+	// moved n−k items a turn and was quadratic while the drains beside it, which
+	// read nothing, were flat. The half rule in `List.ts` is what this holds.
+	for (let [name, walk] of [
+		[
+			"head/tail",
+			`match state.rest::firstItem() -> Step<{ rest: List<Integer>, sum: Integer }, Integer> {
+			case #Empty { <- #Done(state.sum) }
+			case #Value(head) {
+				<- #Continue({
+					rest = state.rest::removeFirst(),
+					sum = state.sum::add(head),
+				})
+			}
+		}`,
+		],
+		[
+			"init/last",
+			`match state.rest::lastItem() -> Step<{ rest: List<Integer>, sum: Integer }, Integer> {
+			case #Empty { <- #Done(state.sum) }
+			case #Value(tail) {
+				<- #Continue({
+					rest = state.rest::removeLast(),
+					sum = state.sum::add(tail),
+				})
+			}
+		}`,
+		],
+		[
+			// NOTE: Both ends a turn, which is a palindrome check's shape. The
+			// window it asks for holds NEITHER end of the box it is cut from,
+			// and could be shared by nobody until such a box learned to move its
+			// seam into the middle of the window.
+			"both ends",
+			`match state.rest::firstItem() -> Step<{ rest: List<Integer>, sum: Integer }, Integer> {
+			case #Empty { <- #Done(state.sum) }
+			case #Value(head) {
+				if state.rest::length()::isLessThan(2) {
+					<- #Done(state.sum::add(head))
+				} else {
+					<- #Continue({
+						rest = state.rest::removeFirst()::removeLast(),
+						sum = state.sum::add(head),
+					})
+				}
+			}
+		}`,
+		],
+	] as const) {
+		it(`walks a List ${name} in linear time`, () => {
+			expectLinearGrowth(
+				(length) => walkingSource(length, walk),
+				(length) => printedSumFor(name, length),
+			)
+		})
+	}
 })
