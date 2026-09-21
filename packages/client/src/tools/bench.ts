@@ -119,7 +119,10 @@ type ListBox = {
 // so a box left behind on that run has to undo the writes made since it looked
 // before its items are read. `marshal-runtime.ts` says why at length, and
 // `packages/runtime/src/listWrites.ts` is the authority.
-function backRunSeenBy(box: ListBox): Array<unknown> {
+// NOTE: Exported for the differential spec alone, which holds this copy of the
+// replay against the runtime's own. Nothing else here is exported and nothing
+// ships from `tools/`.
+export function backRunSeenBy(box: ListBox): Array<unknown> {
 	let writes = box.writes
 
 	if (writes === undefined || writes.seen === writes.log.version) {
@@ -674,4 +677,10 @@ async function main(): Promise<void> {
 
 // #endregion
 
-await main()
+// NOTE: Run as a tool, imported as a module. `undoReplay.spec.ts` reaches in
+// for the one function below that is a COPY of something — the undo replay —
+// and a file that benchmarked itself on the way in would make that spec take
+// a minute rather than a millisecond.
+if (import.meta.main) {
+	await main()
+}

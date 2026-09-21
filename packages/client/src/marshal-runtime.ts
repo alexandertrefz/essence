@@ -279,7 +279,7 @@ export type Interpreter = {
 // boundary to write into a bundle's values at all. It also may not hand the
 // combined Array over — that Array is the box's, and a host that pushed onto it
 // would be editing a value the Module still holds.
-type ListBox = {
+export type ListBox = {
 	value: Array<unknown>
 	length?: number
 	front?: Array<unknown>
@@ -305,7 +305,10 @@ type ListBox = {
 // importing would reach for a second copy of it. Read-only, for the reason
 // nothing else here writes back — the runtime repairs such a box wherever IT
 // reads one, so a box this side leaves alone loses nothing by it.
-function backRunSeenBy(list: ListBox): Array<unknown> {
+// NOTE: Exported for the differential spec that holds all four copies of this
+// replay against the runtime's own — `tests/undoReplay.spec.ts`. An export
+// nothing else reaches is shaken out of a bundle, so it costs a host nothing.
+export function backRunSeenBy(list: ListBox): Array<unknown> {
 	let writes = list.writes
 
 	if (writes === undefined || writes.seen === writes.log.version) {

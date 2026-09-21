@@ -124,14 +124,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 			// with the other boxes of the chain and can hold items this box
 			// never had, so what is shown is the view and never the Array: a
 			// box viewing four items may not be drawn as five.
-			// NOTE: A box the chain has WRITTEN PAST holds an Array whose
-			// items have moved on — a positional write changes a run in place
-			// and counts a version up, and `writes` is the log of what each
-			// write overwrote beside the version this box views
-			// (runtime/src/listWrites.ts is the authority). Undoing back to
-			// this box's version is how it says what it holds, and it is done
-			// into a copy: the runtime repairs such a box where it reads one,
-			// and looking at a paused Program may not write to it.
+			//
 			// NOTE: A box the chain has WRITTEN PAST holds an Array
 			// whose items have moved on — a positional write changes a
 			// run in place and counts a version up, and `writes` is the
