@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test"
 
 import { insensitive, sensitive } from "../CaseSensitivity"
 import { createInteger, type IntegerType } from "../Integer"
+import { encodeKey } from "../keyEncoding"
 import { firstCharacter, lastCharacter } from "../NonEmptyString"
 import type { OptionalType } from "../Optional"
-import { encodeKey } from "../keyEncoding"
 import {
 	append,
 	character__overload$1 as character,
@@ -97,7 +97,9 @@ function matchesAtModel(
 		return false
 	}
 
-	return needle.every((cluster, offset) => haystack[position + offset] === cluster)
+	return needle.every(
+		(cluster, offset) => haystack[position + offset] === cluster,
+	)
 }
 
 function firstIndexModel(model: Model, part: Model, folding: boolean): number {
@@ -191,17 +193,17 @@ function compareWithModel(value: StringType, model: Model, note: string) {
 	expect(`${note} length ${Number(length(value).value)}`).toBe(
 		`${note} length ${model.clusters.length}`,
 	)
-	expect(`${note} characters ${JSON.stringify(characters(value).value.map((one) => one.value))}`).toBe(
-		`${note} characters ${JSON.stringify(model.clusters)}`,
-	)
+	expect(
+		`${note} characters ${JSON.stringify(characters(value).value.map((one) => one.value))}`,
+	).toBe(`${note} characters ${JSON.stringify(model.clusters)}`)
 
 	for (let index of [0, 1, 2, -1, -2, 7, 500, -500]) {
 		let expected =
 			model.clusters[resolveRead(index, model.clusters.length)] ?? null
 
-		expect(`${note} character(at ${index}) ${characterAt(value, index)}`).toBe(
-			`${note} character(at ${index}) ${expected}`,
-		)
+		expect(
+			`${note} character(at ${index}) ${characterAt(value, index)}`,
+		).toBe(`${note} character(at ${index}) ${expected}`)
 	}
 
 	if (model.clusters.length > 0) {
@@ -222,9 +224,9 @@ function compareWithModel(value: StringType, model: Model, note: string) {
 	// those are decided over the same form. A window whose text is not the text
 	// its characters spell is caught here even where its own `value` reads
 	// right.
-	expect(`${note} key ${String(encodeKey(value, { structural: true } as never))}`).toBe(
-		`${note} key ${model.value.normalize("NFC")}`,
-	)
+	expect(
+		`${note} key ${String(encodeKey(value, { structural: true } as never))}`,
+	).toBe(`${note} key ${model.value.normalize("NFC")}`)
 
 	for (let part of PARTS) {
 		let partModel = raw(part)
@@ -240,10 +242,14 @@ function compareWithModel(value: StringType, model: Model, note: string) {
 		expect(`${label} count ${Number(count(value, other).value)}`).toBe(
 			`${label} count ${part === "" ? 0 : countModel(model, partModel)}`,
 		)
-		expect(`${label} starts ${startsFolded(value, other, sensitive).value}`).toBe(
+		expect(
+			`${label} starts ${startsFolded(value, other, sensitive).value}`,
+		).toBe(
 			`${label} starts ${matchesAtModel(model.clusters, partModel.clusters, 0)}`,
 		)
-		expect(`${label} startsFolded ${startsFolded(value, other, insensitive).value}`).toBe(
+		expect(
+			`${label} startsFolded ${startsFolded(value, other, insensitive).value}`,
+		).toBe(
 			`${label} startsFolded ${matchesAtModel(foldedModel(model, true), foldedModel(partModel, true), 0)}`,
 		)
 		expect(`${label} ends ${ends(value, other).value}`).toBe(
@@ -256,7 +262,9 @@ function compareWithModel(value: StringType, model: Model, note: string) {
 				)
 			}`,
 		)
-		expect(`${label} endsFolded ${endsFolded(value, other, insensitive).value}`).toBe(
+		expect(
+			`${label} endsFolded ${endsFolded(value, other, insensitive).value}`,
+		).toBe(
 			`${label} endsFolded ${
 				partModel.clusters.length <= model.clusters.length &&
 				matchesAtModel(
@@ -266,7 +274,9 @@ function compareWithModel(value: StringType, model: Model, note: string) {
 				)
 			}`,
 		)
-		expect(`${label} split ${JSON.stringify(split(value, other).value.map((piece) => piece.value))}`).toBe(
+		expect(
+			`${label} split ${JSON.stringify(split(value, other).value.map((piece) => piece.value))}`,
+		).toBe(
 			`${label} split ${JSON.stringify(splitModel(model, partModel).map((piece) => piece.join("")))}`,
 		)
 	}
@@ -424,7 +434,10 @@ describe("a window answers what a copy answered", () => {
 						break
 					}
 					default: {
-						let read = character(values[first]!, createInteger(from))
+						let read = character(
+							values[first]!,
+							createInteger(from),
+						)
 
 						if (read[typeKeySymbol] === "Optional#Empty") {
 							continue
@@ -467,6 +480,13 @@ describe("a window answers what a copy answered", () => {
 describe("what a drain costs", () => {
 	const CHARACTERS = 20_000
 
+	// NOTE: Every drain here is bounded by the turns it is KNOWN to take, and
+	// the bound is asserted afterwards rather than trusted. A drain runs until
+	// the String is empty, so a change that stops a cut shortening its receiver
+	// would not fail this file — it would hang it, and a suite that hangs says
+	// nothing at all. The turn count is the assertion, the cap is the seatbelt.
+	const TURN_CAP = CHARACTERS + 10
+
 	function drainWork(text: StringType) {
 		let arrays = new Set<Array<string>>()
 		let segmentations = 0
@@ -474,7 +494,7 @@ describe("what a drain costs", () => {
 		let rest = text
 		let turns = 0
 
-		while (Number(length(rest).value) > 0) {
+		while (Number(length(rest).value) > 0 && turns < TURN_CAP) {
 			let view = viewOf(rest)
 
 			if (!arrays.has(view.clusters)) {
@@ -511,7 +531,7 @@ describe("what a drain costs", () => {
 		let rest = createString("cafe ".repeat(CHARACTERS / 5))
 		let turns = 0
 
-		while (Number(length(rest).value) > 0) {
+		while (Number(length(rest).value) > 0 && turns < TURN_CAP) {
 			expect(hasCharacterView(rest)).toBeFalse()
 			rest = slice(rest, createInteger(1), createInteger(1_000_000))
 			turns++
@@ -577,10 +597,15 @@ describe("what a drain costs", () => {
 			createInteger(1_000_000),
 		)
 
-		while (Number(length(rest).value) > 0) {
+		let turns = 0
+
+		while (Number(length(rest).value) > 0 && turns < TURN_CAP) {
 			expect(remembered(rest, "$isAscii")).toBeUndefined()
 			rest = slice(rest, createInteger(1), createInteger(1_000_000))
+			turns++
 		}
+
+		expect(turns).toBe(CHARACTERS - 1)
 	})
 
 	// NOTE: A prefix test costs the PREFIX. Folding the whole receiver is not
@@ -591,9 +616,11 @@ describe("what a drain costs", () => {
 		let rest = createString("café ".repeat(CHARACTERS / 5))
 		let arrays = new Set<Array<string>>()
 		let clustersHeld = 0
+		let turns = 0
 
-		while (Number(length(rest).value) > 0) {
+		while (Number(length(rest).value) > 0 && turns < TURN_CAP) {
 			startsFolded(rest, createString("ZZ"), insensitive)
+			turns++
 
 			let view = viewOf(rest)
 
@@ -605,6 +632,7 @@ describe("what a drain costs", () => {
 			rest = slice(rest, createInteger(1), createInteger(1_000_000))
 		}
 
+		expect(turns).toBe(CHARACTERS)
 		expect(clustersHeld).toBeLessThan(3 * CHARACTERS)
 	})
 })
