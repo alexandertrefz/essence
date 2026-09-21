@@ -66,6 +66,7 @@ describe("Optimisation Passes", () => {
 			"list-tail-sharing",
 			"list-window-trimming",
 			"canonical-key-encoding",
+			"list-in-place-writes",
 		])
 	})
 

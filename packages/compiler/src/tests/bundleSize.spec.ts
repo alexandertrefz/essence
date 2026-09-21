@@ -157,12 +157,21 @@ describe("Bundle Size", () => {
 	// unchanged to the byte, which is what says the reach is `slice`'s and not
 	// everything's.
 	//
+	// NOTE: 1,373 of them are `list-in-place-writes`: the catching up every
+	// reader of a List now does, the sealing the walks do, and the `writes` a
+	// box carries through the sharing literals. A Program that never reaches a
+	// List pays NONE of it — the floor above is unmoved at 5,740 — and one that
+	// reaches one pays it whether or not it writes a position, because catching
+	// a box up is what every READER owes. `replace` itself shakes out of a
+	// Program that does not call it, and a Program that does is smaller than it
+	// was: the Essence body it replaces was a guard, a `remove` and an
+	// `insert`.
 	// NOTE: The ceiling is 80,000 rather than the measured figure plus a
 	// handful, because a gate with twenty bytes of headroom fails for the next
 	// person to write a line rather than for the next person to drag in a
 	// tower, and that is not what it is for.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(81_400)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(81_500)
 	})
 
 	// NOTE: 38,056 measured; a reintroduced `Number` spread was 54,849. The same
@@ -191,6 +200,10 @@ describe("Bundle Size", () => {
 	// NOTE: 63 are the transcendental registry change Everyday's note above
 	// explains, which every file that reaches the tower pays alike.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
+		// NOTE: 1,047 are `list-in-place-writes`, which Everyday's note above
+		// accounts for. This file names no List at all and still pays, because a
+		// conformance witness carries `List`'s own Methods with it — the very thing
+		// the note above this one is about.
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(40_200)
 	})
 
@@ -273,6 +286,9 @@ describe("Bundle Size", () => {
 	// `Irrational.es` (38,056) are byte-identical across the change. That is the
 	// claim the module split was made for, and it still holds.
 	it("charges a Dictionary Program for the container it uses", async () => {
+		// NOTE: 1,356 are `list-in-place-writes`, which Everyday's note accounts
+		// for; `Dictionary.of(entries:)` walks a List of entry Records and seals it,
+		// which is where this file meets them.
 		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(61_600)
 	})
 
@@ -310,6 +326,8 @@ describe("Bundle Size", () => {
 
 	Terminal.print(names::removeDuplicates()::join(with ", "))
 }`),
+			// NOTE: 1,080 are `list-in-place-writes`, which Everyday's note accounts
+			// for.
 		).toBeLessThan(14_400)
 	})
 
@@ -332,6 +350,9 @@ describe("Bundle Size", () => {
 
 	Terminal.print(numbers::mode(defaultingTo 0)::toString())
 }`),
+			// NOTE: 1,058 are `list-in-place-writes`, which Everyday's note accounts
+			// for, and it is the smallest Program here that reaches a List — so it is
+			// the honest price of the change for anything that touches one.
 		).toBeLessThan(12_300)
 	})
 

@@ -1010,7 +1010,7 @@ The seed is the list being walked, so the first `append` finds it at its tip and
 
 **`createList` takes ownership of the array it is given.** It stores the array without copying it, and a later `append` may push onto it. So no caller may keep the array it passed. Every caller in the runtime and in emitted code builds a fresh one. `build-lists-in-place` relies on the same rule, which is why it copies a seed the program already held. A host of the client package builds lists through a second constructor that copies, so an array a host keeps is never one Essence pushes onto.
 
-**Edits share the runs they do not touch.** A sub-list that still contains the seam, the point where the front run ends and the back run begins, can be returned without copying anything. Shrinking the front count drops leading items, and shrinking the back count drops trailing ones. A flat list keeps its seam at the start, so it can share only its prefixes. A `slice` at an end therefore costs a small object and no items, which makes [`removeLast()`](/docs/library/list#removeLast) free, and [`removeFirst()`](/docs/library/list#removeFirst) free on a list that was prepended to. [`remove(at:)`](/docs/library/list#remove) shares at either end the same way. [`replace(_:at:)`](/docs/library/list#replace) copies only the run the position falls in. [`insert(_:at:)`](/docs/library/list#insert) uses `prepend` and `append` at the ends. A window that misses the seam and keeps less than half the list is still a copy, made once from the two runs; one that keeps at least half of it makes the list move its seam into the middle of the window instead, and is then shared like any other. That is what `list-window-trimming` below is about.
+**Edits share the runs they do not touch.** A sub-list that still contains the seam, the point where the front run ends and the back run begins, can be returned without copying anything. Shrinking the front count drops leading items, and shrinking the back count drops trailing ones. A flat list keeps its seam at the start, so it can share only its prefixes. A `slice` at an end therefore costs a small object and no items, which makes [`removeLast()`](/docs/library/list#removeLast) free, and [`removeFirst()`](/docs/library/list#removeFirst) free on a list that was prepended to. [`remove(at:)`](/docs/library/list#remove) shares at either end the same way. [`replace(_:at:)`](/docs/library/list#replace) writes its item into the run the position falls in, in place where it can — that is `list-in-place-writes` below. [`insert(_:at:)`](/docs/library/list#insert) uses `prepend` and `append` at the ends. A window that misses the seam and keeps less than half the list is still a copy, made once from the two runs; one that keeps at least half of it makes the list move its seam into the middle of the window instead, and is then shared like any other. That is what `list-window-trimming` below is about.
 
 **A shared window is copied when it is read, and only its own items.** A read copies the window's items, never the whole parent array, and lets the parent go — under the half rule described below, which is what decides when a read pays for that. `length` reads no items at all, so it leaves the window exactly as it found it.
 
@@ -1098,6 +1098,62 @@ This is invisible from Essence. The same methods answer the same things either w
 It costs the text, which a dictionary holds for as long as it holds the entry: about 17 characters for a two-integer list key, against 26 for the same pair written as a record, and about 3 MB for 100,000 remembered texts.
 
 Building a dictionary of 8,000 two-integer list keys took 818 ms and takes 29. It is flat to 64,000 keys, at 47 ms, against 52 ms for the same table keyed by a record. `removeDuplicates()` over 10,000 two-item lists took 1,929 ms and takes 1.8. `hasDuplicates()` over the same took 2,022 ms and takes 2.0. Grouping 10,000 items under 2,000 list keys took 418 ms and takes 1.8. One list of 10,000 integers looked up 10,000 times took 3,804 ms and takes 1.
+
+<SeeAlso links={[
+	{ label: "Command line: --without-optimisation", href: "/docs/reference/cli#build--without-optimisation" },
+	{ label: "essence.json: build.withoutOptimisations", href: "/docs/reference/project-file#build-withoutOptimisations" },
+	{ label: "Debugging", href: "/docs/guides/debugging" },
+	{ label: "Using the compiler", href: "/docs/guides/using-the-compiler" },
+]} />
+### `list-in-place-writes`
+
+Writing one cell of a list — [`replace(_:at:)`](/docs/library/list#replace) — used to copy the run the position fell in. A push only ever extends an array, so the lists sharing it keep every position they have already answered for, but a write changes a position they view, and copying was the only honest answer to that. An accumulator written cell by cell therefore cost its own length every turn, which is quadratic. A sieve, a dynamic programming table, a binary heap, a board, a histogram and a grid are all that shape, and in JavaScript every one of them is `xs[i] = i`.
+
+**The newest list of a chain owns its array, and writes into it.** Behind every written run is an undo log: the writer records what stood at the position, writes over it, and counts the log one version up. The answer views the new version and the receiver is left viewing the old one. Every list sharing that array says which version it views, so a list left behind can still say exactly what it holds — the first time anything reads it, it copies the array and undoes the writes made since it looked. That is the copy `replace` used to make, deferred to whoever actually reads, and never made at all for the receiver a loop throws away.
+
+```essence
+implementation {
+	constant size  = 40_000
+	constant zeros = List.repeat(0, times size)
+
+	constant filled = loop(
+		from 0,
+		upTo size,
+		startingWith zeros,
+		(index, cells) { <- cells::replace(index, at index) },
+	)
+
+	Terminal.print(filled::lastItem())
+}
+```
+
+Forty thousand cells measured 2,739 ms before and 26 ms after, and the fill is flat from there: 80,000, 160,000, 320,000 and 640,000 measure 31, 38, 47 and 65 ms, of which about 20 ms is starting the process. A sieve of Eratosthenes to 30,000 measured 2,425 ms and now measures 28 ms; a dynamic programming table of 20,000 cells, which reads the cell before it and writes the next, measured 684 ms and now measures 26 ms, with 100,000 cells at 33 ms; twenty thousand pushes onto a binary heap, two writes and a read per sift, measured 2,005 ms and now measure 30 ms.
+
+**A list with no log copies once, and the copy carries the log.** Every list that has never met a positional write holds a bare array — a literal the optimiser wrote out, a fresh one a method built, one handed over by a host — and could never learn of a write into it. So the first write copies, exactly as before, and the log is attached to the array that write makes. The sieve pays one copy and then writes in place for good. A log is minted only where a fresh array is minted, and from there it travels with that array to every list the array is shared with.
+
+**A walk seals the run it is reading.** A list's items are read by handing a run array to the method walking it, and that method calls code the program wrote — a transform, a check, a comparison, an item's own equality. That code can reach the list being walked:
+
+```essence
+implementation {
+	constant cells = [1, 2, 3, 4, 5]
+
+	constant walked = cells::reduce(startingWith cells, (accumulated, item) {
+		<- accumulated::replace(0, at 4)
+	})
+
+	Terminal.print(cells) § [1, 2, 3, 4, 5]
+}
+```
+
+The fold is seeded with the very list it walks, so without a rule the first write would land in the array the walk is reading and the walk would visit an item nobody ever put there. The rule is that any reader handing a raw run to such code seals that run's log, and a sealed log refuses writes in place for good: the next `replace` copies and starts a fresh log. A walk is linear work anyway, so the copy it may cause is paid for. The readers that look at one item — [`item(at:)`](/docs/library/list#item), [`firstItem()`](/docs/library/nonemptylist#firstItem), [`lastItem()`](/docs/library/nonemptylist#lastItem) — hand no array to anybody and do not seal, which is what keeps "read the cell before, write this one" out of the copying path.
+
+**The log is bounded by the run it belongs to.** Past that length the next write copies to a fresh array with a fresh log, so a chain holds at most its array and about as much again, and the copies amortise to constant work per write. The old array and its log are left exactly as they are, because whoever is behind on them still catches up through them.
+
+This is invisible for the reason the rest of the representation is: a list always answers exactly the items its view holds, and nothing in the language can ask whether two values are the same value. What makes that a claim rather than a hope is that every reader reaches a list through one of the same few doors — the two views, `materialise`, and the three methods that grow a list — and each of them catches a list up before a single item of it is read. The two readers outside the runtime that walk a list's runs directly, the client boundary and the debugger, undo the log into a copy of their own rather than repairing the value they are looking at.
+
+What it does not fix is branching persistent use: keeping an old list and writing it again and again, as backtracking over a board does. Every write but the first finds its receiver behind, catches it up with a copy, and then writes — which is what every write cost before this, and it measures the same. A nine queens search over a board of nine squares measured 37 ms before and 32 ms after. [`insert(_:at:)`](/docs/library/list#insert) and [`remove(at:)`](/docs/library/list#remove) in the middle still move the items after the position, the way `splice` does in JavaScript; only the ends of a list are cheaper than that, and they are shared rather than moved.
+
+What it costs is a field on every list that has met a positional write, the log itself, and one question — "have I been written past?" — at each of those doors. Measured against the same build without any of it: a grid read by position 36 ms against 35, map to filter to fold over 100,000 items twenty times 54 ms against 52, an append build of 400,000 items 38 ms against 35, a prepend build 37 against 35, a head/tail drain 33 against 32, and equality, sorting, printing and a string-keyed dictionary together 75 ms against 71. A bundle that reaches a list at all grows by about a kilobyte; one that never reaches one is unchanged.
 
 <SeeAlso links={[
 	{ label: "Command line: --without-optimisation", href: "/docs/reference/cli#build--without-optimisation" },
