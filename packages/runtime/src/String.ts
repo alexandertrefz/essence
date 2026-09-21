@@ -620,6 +620,15 @@ export function normalisedFormOf(string: StringType): string {
 // window of a String the scan refused declines a fast path it might have passed;
 // what that costs it is the view route, which is the route it is already on, and
 // its parent's own answer is what it would have had to scan to find.
+//
+// NOTE: WHAT THAT TRADE COSTS, measured. The shape it costs anything at all is
+// a String whose non-ASCII characters all stand at the FRONT: once a drain has
+// consumed them the remainder is pure ASCII, and before this it was rescanned
+// every turn and found its way back to the intrinsic from there. One `é`
+// followed by pure ASCII, consumed a character at a time: 80,000 characters
+// 33 ms against the intrinsic's 32, 320,000 characters 58 against 51 — linear
+// either way, about 1.2x. Buying the intrinsic back means a scan per cut, which
+// is the O(n²) the window exists to remove, so it is not bought back.
 function readsByUnit(string: StringType): boolean {
 	let measured = string as MeasuredString
 	let answer = measured[isAsciiKey]
