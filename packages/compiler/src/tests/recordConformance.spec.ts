@@ -250,6 +250,47 @@ describe("A Record asks its declared members", () => {
 		).toEqual(["true"])
 	})
 
+	// NOTE: And the other half of that: the names are lined up with the
+	// witnesses BY POSITION, so a Record whose routed members are written out of
+	// alphabetical order is the one shape that can tell the two lists apart. The
+	// two Namespaces here answer DIFFERENTLY on the same pair of Strings — one
+	// case-insensitive, one exact — because a swap between two witnesses that
+	// agree is a swap nothing can see. `{ zebra: …, apple: … }` reversed is the
+	// whole point of the declaration; every other Record in this file happens to
+	// be written in sorted order, which is how a slot-sorting mutant survived a
+	// full guard set once.
+	it("reads its witnesses in the order the members were declared", async () => {
+		expect(
+			await run(`implementation {
+				type Loose = { v: String }
+				type Strict = { w: String }
+
+				namespace Looses for Loose is Equatable {
+					is(_ other: Loose) -> Boolean {
+						<- @.v::is(other.v, comparing #Insensitive)
+					}
+				}
+
+				namespace Stricts for Strict is Equatable {
+					is(_ other: Strict) -> Boolean {
+						<- @.w::is(other.w)
+					}
+				}
+
+				type Pair = { zebra: Loose, apple: Strict }
+
+				constant pair: Pair = { zebra = { v = "News" }, apple = { w = "x" } }
+				constant loosely: Pair = { zebra = { v = "NEWS" }, apple = { w = "x" } }
+				constant strictly: Pair = { zebra = { v = "News" }, apple = { w = "X" } }
+
+				Terminal.inspect(pair::is(loosely))
+				Terminal.inspect(pair::is(strictly))
+				Terminal.inspect([pair = 1]::hasKey(loosely))
+				Terminal.inspect([pair = 1]::hasKey(strictly))
+			}`),
+		).toEqual(["true", "false", "true", "false"])
+	})
+
 	// NOTE: A nested Record routes AS A WHOLE, through its own — itself
 	// conditional — witness, rather than being flattened into the outer one's
 	// plan. That is what keeps the plan a flat list of names however deep the
@@ -838,5 +879,235 @@ describe("A Case payload asks its members", () => {
 				Terminal.print(Tree#Leaf::is(Tree#Leaf))
 			}`),
 		).toContain("recursive-type-declaration")
+	})
+})
+
+describe("A routed key and the comparison agree", () => {
+	// NOTE: PART C, and it needs no code of its own: `boundConformance` brands a
+	// witness structural only where the method map says so AND every curried
+	// condition is branded, and a Record that routes has, by construction, a
+	// condition whose witness is not — that is WHY it routes. So the brand can
+	// not be put on it, and `encodeKey` sends such a key down the scan path,
+	// which asks the witness's own `is`. The claim is that the Dictionary and
+	// the comparison never disagree, so it is tested as an ANSWER rather than as
+	// an emission.
+	it("finds a routed Record key by the is its member writes", async () => {
+		expect(
+			await run(`implementation {
+				${tag}
+
+				constant held = [{ tag = news } = 1]
+
+				Terminal.inspect(held::hasKey({ tag = lower }))
+				Terminal.inspect(
+					held::value(at { tag = lower })::is(Optional<Integer>#Value(1)),
+				)
+				Terminal.inspect([{ tag = news } = 1, { tag = lower } = 2]::length())
+			}`),
+		).toEqual(["true", "true", "1"])
+	})
+
+	// NOTE: One level of generic forwarding, and two. A witness that is right at
+	// the first hop and dropped at the second is a bug the first hop can not
+	// see — and the Dictionary is where it would show, because an unbranded
+	// witness arriving as a branded one silently opens a second slot for a key
+	// the Program calls one key.
+	it("keeps the routing through two levels of forwarding", async () => {
+		expect(
+			await run(`implementation {
+				${tag}
+
+				function held<infer Key is Equatable>(_ key: Key, _ other: Key) -> Boolean {
+					<- [key = 1]::hasKey(other)
+				}
+
+				function heldAgain<infer Key is Equatable>(
+					_ key: Key,
+					_ other: Key,
+				) -> Boolean {
+					<- held(key, other)
+				}
+
+				Terminal.inspect(held({ tag = news }, { tag = lower }))
+				Terminal.inspect(heldAgain({ tag = news }, { tag = lower }))
+				Terminal.inspect(heldAgain([{ tag = news }], [{ tag = lower }]))
+			}`),
+		).toEqual(["true", "true", "true"])
+	})
+
+	// NOTE: Caller and callee spelling their Type Parameter THE SAME — the
+	// name-collision witness bug `genericWitnessArity.spec.ts` is the permanent
+	// guard for. A routed Record is a witness with conditions of its own, which
+	// is the shape that bug ate.
+	it("survives caller and callee naming their Parameter alike", async () => {
+		expect(
+			await run(`implementation {
+				${tag}
+
+				function inner<infer Item is Equatable>(_ a: Item, _ b: Item) -> Boolean {
+					<- [a = 1]::hasKey(b)
+				}
+
+				function outer<infer Item is Equatable>(_ a: Item, _ b: Item) -> Boolean {
+					<- inner(a, b)
+				}
+
+				Terminal.inspect(outer({ tag = news }, { tag = lower }))
+			}`),
+		).toEqual(["true"])
+	})
+
+	// NOTE: And a routed CASE key, which is decision 3 reaching the same place.
+	it("finds a routed Case key the same way", async () => {
+		expect(
+			await run(`implementation {
+				${tag}
+				${box}
+
+				Terminal.inspect(
+					[Box#Full({ tag = news }) = 1]::hasKey(Box#Full({ tag = lower })),
+				)
+			}`),
+		).toEqual(["true"])
+	})
+
+	// NOTE: The other half, and the one a mutant that brands everything would
+	// pass: an ALL-STRUCTURAL Record key is still branded and still encoded, so
+	// it is found in one step rather than by a scan. Read off the emission,
+	// because both paths answer the same and only the cost differs.
+	it("keeps an all-structural Record key branded and encoded", () => {
+		let structural = generate(`implementation {
+			Terminal.print([{ x = 1, name = "a" } = 1]::hasKey({ x = 1, name = "a" }))
+		}`)
+
+		expect(structural).toContain("structural: true")
+
+		let routed = generate(`implementation {
+			${tag}
+
+			Terminal.print([{ tag = news } = 1]::hasKey({ tag = lower }))
+		}`)
+
+		expect(routed).not.toContain("structural: true")
+	})
+})
+
+// NOTE: Every test above declares ONE routed Record Type per Program, and a
+// Program with one witness can not show two of them being confused for each
+// other. These declare TWO, routing the same member Type under DIFFERENT names:
+// their witnesses name the same Namespace, carry the same one-entry method map
+// and the same curried member conformance, and differ in nothing but the member
+// NAMES the helper is curried with — which is exactly the shape the Optimiser's
+// constant pool keys witnesses by. A key that dropped the names would declare
+// ONE constant and hand it to both Types, so one of them would be asked about
+// the other's members.
+describe("Two Record Types routing the same member Type", () => {
+	// NOTE: The silent half, and the reason this is a guard rather than a NOTE.
+	// A name the value does not carry is not an error at runtime: the walk finds
+	// no slot for it and falls through to `anyIs`, so the Record is compared
+	// STRUCTURALLY and answers false where its own `is` says true. The direct
+	// rail stays right either way — it is emitted inline at the call — so the
+	// test asks all four rails of BOTH Types and they must agree.
+	it("answers each Type's questions with that Type's own members", async () => {
+		expect(
+			await run(`implementation {
+				${tag}
+
+				function same<infer T is Equatable>(_ x: T, _ y: T) -> Boolean {
+					<- x::is(y)
+				}
+
+				type Figged = { fig: Tag }
+				type Zebraed = { zebra: Tag }
+
+				constant fig: Figged = { fig = news }
+				constant figToo: Figged = { fig = lower }
+				constant zebra: Zebraed = { zebra = news }
+				constant zebraToo: Zebraed = { zebra = lower }
+
+				Terminal.inspect(fig::is(figToo))
+				Terminal.inspect(same(fig, figToo))
+				Terminal.inspect([fig]::contains(figToo))
+				Terminal.inspect([fig = 1]::hasKey(figToo))
+				Terminal.inspect(zebra::is(zebraToo))
+				Terminal.inspect(same(zebra, zebraToo))
+				Terminal.inspect([zebra]::contains(zebraToo))
+				Terminal.inspect([zebra = 1]::hasKey(zebraToo))
+			}`),
+		).toEqual([
+			"true",
+			"true",
+			"true",
+			"true",
+			"true",
+			"true",
+			"true",
+			"true",
+		])
+	})
+
+	// NOTE: And the loud half. Here the name one Type routes is a name the other
+	// carries too, under a different Type — `fig` is a Money in one and an
+	// Integer in the other — so a shared witness does not fall through to
+	// `anyIs`, it calls Money's `is` on an Integer and dies reading `.cents` off
+	// it. Same bug, and the shape that says a wrong answer is not the worst of
+	// it.
+	it("does not hand one Type's witness to the other's member", async () => {
+		expect(
+			await run(`implementation {
+				type Money = { cents: Integer, note: String }
+
+				namespace Monies for Money is Equatable {
+					is(_ other: Money) -> Boolean {
+						<- @.cents::is(other.cents)
+					}
+				}
+
+				function same<infer T is Equatable>(_ x: T, _ y: T) -> Boolean {
+					<- x::is(y)
+				}
+
+				type Priced = { fig: Money, kiwi: String }
+				type Counted = { fig: Integer, zebra: Money }
+
+				constant priced: Priced = { fig = { cents = 5, note = "x" }, kiwi = "k" }
+				constant pricedToo: Priced = { fig = { cents = 5, note = "y" }, kiwi = "k" }
+				constant counted: Counted = { fig = 1, zebra = { cents = 5, note = "x" } }
+				constant countedToo: Counted = { fig = 1, zebra = { cents = 5, note = "y" } }
+
+				Terminal.inspect(same(priced, pricedToo))
+				Terminal.inspect(counted::is(countedToo))
+				Terminal.inspect(same(counted, countedToo))
+				Terminal.inspect(counted::isNot(countedToo))
+			}`),
+		).toEqual(["true", "true", "true", "false"])
+	})
+
+	// NOTE: Read off the emission as well, because both tests above would also
+	// pass if the pool were switched off altogether — and the pool is what makes
+	// a Program that builds the same witness in twenty places emit it once. The
+	// two Types here DO share everything but their member names, so a pool that
+	// keys by the names declares two constants and a pool that does not declares
+	// one.
+	it("declares one pooled witness per routed member list", () => {
+		let emitted = generate(`implementation {
+			${tag}
+
+			function same<infer T is Equatable>(_ x: T, _ y: T) -> Boolean {
+				<- x::is(y)
+			}
+
+			type Figged = { fig: Tag }
+			type Zebraed = { zebra: Tag }
+
+			constant fig: Figged = { fig = news }
+			constant zebra: Zebraed = { zebra = news }
+
+			Terminal.print(same(fig, { fig = lower }))
+			Terminal.print(same(zebra, { zebra = lower }))
+		}`)
+
+		expect(emitted).toContain(`boundRecordIs(["fig"])`)
+		expect(emitted).toContain(`boundRecordIs(["zebra"])`)
 	})
 })

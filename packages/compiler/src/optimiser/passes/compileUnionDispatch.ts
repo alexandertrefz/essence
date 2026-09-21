@@ -267,7 +267,12 @@ function planBranches(
 // witnesses are two different calls and must keep their tests, and two carrying
 // the SAME witness is a shape nothing writes today and would cost a structural
 // comparison of Expressions to recognise. A derived descriptor is refused on the
-// same footing — it is the branch's own, spelt per member Type.
+// same footing — it is the branch's own, spelt per member Type — and so is a
+// routed Record's member list, which is the branch's own for the same reason:
+// two arms of a Union of Record Types route DIFFERENT names. Today a branch
+// carrying either one also carries the witnesses it curries them onto, so the
+// Argument count already refuses it; it is asked here so that the refusal rests
+// on this branch's own reading rather than on a coupling in another file.
 function collapsedIfUniform(
 	branches: Array<PlannedBranch>,
 ): Array<PlannedBranch> {
@@ -287,6 +292,7 @@ function collapsedIfUniform(
 			// yet agreeing on the Method — this is the rest of that question.
 			branch.dispatchCase.providedBy === first.dispatchCase.providedBy &&
 			branch.dispatchCase.derivedDescriptor === undefined &&
+			branch.dispatchCase.derivedMembers === undefined &&
 			branch.dispatchCase.conformanceArguments.length === 0 &&
 			branch.dispatchCase.contextualArguments.length === 0 &&
 			// NOTE: Two branches that leave different Parameters out make two

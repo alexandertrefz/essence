@@ -224,13 +224,20 @@ function conformanceKeyOf(
 		methods: node.methodMap,
 		provided: node.providedMethods ?? null,
 		descriptor: node.derivedDescriptor ?? null,
-		// NOTE: LOAD-BEARING for the Case listing a Choice derives. Every
-		// Choice's witness names one Namespace and one Method — the map is
-		// `{ cases: cases }` for all of them — and what tells two of them apart
-		// is the tags the helper is curried with. A key without these would
-		// declare one const for two Choices and answer the second one's
-		// `cases()` with the first one's Cases.
+		// NOTE: LOAD-BEARING for the Case listing a Choice derives, and for the
+		// members a Record routes — the same rule twice. Every Choice's witness
+		// names one Namespace and one Method — the map is `{ cases: cases }` for
+		// all of them — and what tells two of them apart is the tags the helper
+		// is curried with; every routed Record's names the builtin `Record`
+		// Namespace with the same one-entry map, and what tells two of THEM
+		// apart is the member NAMES. A key without these would declare one const
+		// for two Choices and answer the second one's `cases()` with the first
+		// one's Cases, or one const for `{ fig: Tag }` and `{ zebra: Tag }` and
+		// ask the second Record about a member it does not carry — which is not
+		// an error at run time but a silent fall-through to the structural
+		// comparison, and a crash where the name IS carried under another Type.
 		cases: node.derivedCases ?? null,
+		members: node.derivedMembers ?? null,
 		conditions,
 	})}`
 }
