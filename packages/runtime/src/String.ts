@@ -247,6 +247,13 @@ function clusterTextOf(string: StringType): string {
 // prefix and suffix tests and the searches — read the parent's Array through
 // the offset instead and never come here, which is the whole of why a window
 // exists.
+//
+// NOTE: And neither do three that WALK the whole receiver, which is worth
+// saying because it reads like an oversight and is not. The two replacements
+// walk the shared Array where it stands, through `viewOf`, and build their
+// answer out of the clusters they pass — they need no Array of their own, so
+// they take none and leave the window sharing. `words` and `codePoints` read
+// the TEXT rather than the characters, and a window's text is its own.
 function graphemesIn(string: StringType): Array<string> {
 	let measured = string as MeasuredString
 	let clusters = clustersIn(measured)
