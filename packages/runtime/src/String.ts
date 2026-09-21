@@ -2140,6 +2140,26 @@ export function replaceFirst__overload$2(
 // `trim` and `pad` already read was taken over a two-Case Choice of its own,
 // which would have cost the six registration sites a Choice costs for one
 // Method.
+// NOTE: THE GROUPS ARE CUT FORWARD whichever end the counting starts at, and
+// that is the whole of what made one call quadratic. Counting from the end used
+// to walk the characters backwards and `unshift` each group onto the front of
+// the answer, which moves every group already standing there — (n/w)² moves
+// over a single call, where the `#Start` arm doing exactly as much cutting cost
+// n/w. Measured on 20,000 characters in threes, best of five: 3.27 ms that way
+// against 0.25 for the forward arm beside it.
+//
+// NOTE: The end the counting starts at decides ONE thing, and once it is said
+// this way the two arms are one walk: which end the SHORT group lands at. Every
+// group after the first is a full one, so `#End` is the same forward walk with
+// a first group of `((count - 1) % width) + 1` characters — the remainder,
+// except that a count the width divides leaves a full group rather than none.
+//
+// NOTE: An ASCII receiver cuts its groups OUT OF ITS TEXT and never builds the
+// Array of units to slice and join them back out of: each of its units IS a
+// character, so a group is one engine cut between two positions. That is the
+// same answer the character walk gives, for the reason `isSingleUnitAscii`
+// states, and it is the common receiver — a numeral or a card number. Measured
+// on 20,000 characters in threes: 0.26 ms through the Array against 0.10 here.
 export function separate(
 	originalString: StringType,
 	size: IntegerType,
@@ -2148,27 +2168,30 @@ export function separate(
 ): StringType {
 	let width = Number(size.value)
 	let characters = isAsciiIn(originalString)
-		? originalString.value.split("")
+		? null
 		: graphemesIn(originalString)
+	let count =
+		characters === null ? originalString.value.length : characters.length
 
-	if (characters.length <= width) {
+	if (count <= width) {
 		return originalString
 	}
 
+	let text = originalString.value
 	let groups: Array<string> = []
+	let at = 0
+	let end =
+		side[typeKeySymbol] === "Side#Start" ? width : ((count - 1) % width) + 1
 
-	if (side[typeKeySymbol] === "Side#Start") {
-		for (let index = 0; index < characters.length; index += width) {
-			groups.push(characters.slice(index, index + width).join(""))
-		}
-	} else {
-		for (let end = characters.length; end > 0; end -= width) {
-			groups.unshift(
-				characters
-					.slice(end - width < 0 ? 0 : end - width, end)
-					.join(""),
-			)
-		}
+	while (at < count) {
+		groups.push(
+			characters === null
+				? text.slice(at, end)
+				: characters.slice(at, end).join(""),
+		)
+
+		at = end
+		end = end + width < count ? end + width : count
 	}
 
 	return createString(groups.join(separator.value))

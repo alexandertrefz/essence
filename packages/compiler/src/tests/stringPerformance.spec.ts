@@ -80,6 +80,29 @@ const RUNNER_MILLISECONDS = 60_000
 // the shape a Program reading text takes.
 const LINES = "abcdefghijklmnopqrstuvwxyz0123456789\n".repeat(300)
 
+// NOTE: `separate` makes a claim no single figure can carry: ONE call groups a
+// String in time proportional to its length. It used to walk the characters
+// backwards and `unshift` each group onto the front of its answer, which moves
+// every group already standing there — quadratic inside a single call, and the
+// only String Method that was. So this is held to GROWTH, the way the List
+// spec's walks are: doubling the length doubles a linear cost and quadruples a
+// quadratic one, and three against a doubling is reached by no linear Program
+// and missed by no quadratic one.
+//
+// NOTE: The lengths start where the quadratic term OUTGROWS THE SPAWN, which is
+// the whole of what makes this guard able to see its own defect. The subprocess
+// costs some 22 ms whatever it runs and the grouping costs 0.2 ms at 40,000
+// characters, so at any shorter length BOTH shapes read as the spawn and both
+// read as flat. Measured with the Method put back the way it was: 37, 75 and
+// 251 ms — caught at the second doubling at 3.3x — against 22, 22, 23 and 24 ms
+// as it stands, which is 1.0, 1.1 and 1.0. The spawn inside every figure is also
+// why a quadratic Program reads under four here: it dilutes the shortest lengths
+// most, so the ratios CLIMB towards four rather than starting there, and the
+// guard is written to keep asking until one of them arrives.
+const GROUPED_LENGTHS = [40_000, 80_000, 160_000, 320_000]
+const GROUP_WIDTH = 3
+const GROWTH_PER_DOUBLING = 3
+
 function millisecondsToRun(source: string, printed: string): number {
 	let parsed = parseWithDiagnostics(source)
 
@@ -149,6 +172,59 @@ function replacingSource(): string {
 
 	Terminal.print(characters)
 }`
+}
+
+// NOTE: One call per Program, so what is timed is the grouping of ONE String
+// rather than a drain over many — the defect was inside a single call.
+function groupingSource(length: number): string {
+	return `implementation {
+	constant text = "1234567890"::repeat(times ${length / 10})
+
+	Terminal.print(text::separate(every ${GROUP_WIDTH}, with ",")::length())
+}`
+}
+
+// NOTE: The separator goes BETWEEN the groups, so the answer is as long as the
+// receiver plus one character for every group after the first. Checked for the
+// reason every other printed answer here is: a call that threw, or grouped the
+// wrong way, would otherwise be the fastest run of all.
+function printedGroupedLength(length: number): string {
+	return String(length + Math.ceil(length / GROUP_WIDTH) - 1)
+}
+
+// NOTE: Every doubling held to the same ratio rather than the whole span held to
+// one, and the walk STOPS at the first doubling that is too steep — which is
+// what keeps a failure quick, since the length after the one that caught a
+// quadratic Program is the one that would run for long enough to be killed by
+// the runner and report a timeout instead of its growth.
+function expectLinearGrowth(
+	sourceFor: (length: number) => string,
+	printedFor: (length: number) => string,
+): void {
+	let measured: Array<number> = []
+	let tooSteep: Array<string> = []
+
+	for (let index = 0; index < GROUPED_LENGTHS.length; index++) {
+		let length = GROUPED_LENGTHS[index]!
+
+		measured.push(millisecondsToRun(sourceFor(length), printedFor(length)))
+
+		if (index === 0) {
+			continue
+		}
+
+		let grewBy = measured[index]! / measured[index - 1]!
+
+		if (grewBy >= GROWTH_PER_DOUBLING) {
+			tooSteep.push(
+				`${GROUPED_LENGTHS[index - 1]} to ${length}: ${grewBy.toFixed(1)}x`,
+			)
+
+			break
+		}
+	}
+
+	expect(tooSteep).toEqual([])
 }
 
 function position(answer: ReturnType<typeof firstIndex>): number {
@@ -226,6 +302,14 @@ describe("String performance", () => {
 					`${REPLACE_TURNS * (CHARACTERS - 2)}`,
 				),
 			).toBeLessThan(CEILING_MILLISECONDS)
+		},
+		RUNNER_MILLISECONDS,
+	)
+
+	it(
+		"groups one String in time proportional to its length",
+		() => {
+			expectLinearGrowth(groupingSource, printedGroupedLength)
 		},
 		RUNNER_MILLISECONDS,
 	)
