@@ -14,6 +14,7 @@ import type {
 import { DEFAULT_CASES } from "@essence-lang/runtime/Testing"
 
 import { primary, secondary } from "../diagnostics/index"
+import { printableText } from "../helpers/terminalText"
 
 // NOTE: What a test RUN is, read back out of the event stream, and the
 // Diagnostics a run produces. It lives in the Compiler rather than in the
@@ -526,6 +527,17 @@ export function rowLabel(
 		: `row ${test.row + 1}`
 }
 
+// NOTE: What a test is CALLED wherever a person reads it — the suite steps and
+// the name, with every character that would ACT on the terminal spelled as the
+// escape a Literal writes it with. A name is the reader's own text and is
+// printed rather than quoted, so nothing else about it is touched; what is
+// spelled is only what would drive the terminal rather than draw on it. Written
+// here beside the Diagnostic that carries one, because the reporter and the
+// Problems panel have to call a test the same thing.
+export function testDisplayPath(steps: Array<string>): string {
+	return steps.map(printableText).join(" › ")
+}
+
 // NOTE: One failed assertion as an ordinary Essence Diagnostic, so that a test
 // failure is rendered by the very pipeline every other Diagnostic is — same
 // excerpt, same colours, same margin, in the terminal and in an editor alike.
@@ -567,7 +579,7 @@ export function testFailureDiagnostic(
 
 	return {
 		severity: "error",
-		message: `'${[...path, test.name].join(" › ")}'${
+		message: `'${testDisplayPath([...path, test.name])}'${
 			row === null ? "" : ` (${row})`
 		} failed`,
 		position: span,

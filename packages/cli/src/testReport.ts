@@ -3,6 +3,7 @@ import {
 	displayPath,
 	renderDiagnostic,
 } from "@essence-lang/compiler/diagnostics/render"
+import { printableText } from "@essence-lang/compiler/helpers"
 import {
 	benchmarkHelps,
 	benchmarkNotes,
@@ -22,6 +23,7 @@ import {
 	rowLabel,
 	type TestRecord,
 	type TestRun,
+	testDisplayPath,
 	testFailureDiagnostic,
 } from "@essence-lang/compiler/testing"
 import type { common } from "@essence-lang/interfaces"
@@ -106,7 +108,7 @@ function testLine(test: TestRecord, context: ReportContext): string {
 	// NOTE: A row whose name says nothing about which row it is says so as the
 	// row it is — the template it shares with its siblings is the heading right
 	// above it, and reading it again N times names nothing.
-	let written = rowLabel(test) ?? test.name
+	let written = rowLabel(test) ?? printableText(test.name)
 	let name =
 		test.state === "passed" || test.state === "failed"
 			? written
@@ -246,7 +248,7 @@ export function renderTestTree(
 			) {
 				lines.push(
 					`${" ".repeat(1 + INDENT.length * (depth + 1))}${palette.strong(
-						test.suitePath[depth],
+						printableText(test.suitePath[depth] as string),
 					)}`,
 				)
 			}
@@ -434,10 +436,9 @@ export function renderTestFailures(
 
 			if (diagnostic === null || sourceText === null) {
 				lines.push(
-					`${INDENT}${palette.error(theme.symbols.fail)} ${[
-						...test.suitePath,
-						test.name,
-					].join(" › ")}`,
+					`${INDENT}${palette.error(theme.symbols.fail)} ${testDisplayPath(
+						[...test.suitePath, test.name],
+					)}`,
 				)
 
 				continue
@@ -461,7 +462,7 @@ export function renderTestFailures(
 		if (test.benchmark?.status === "regressed") {
 			lines.push(
 				`${INDENT}${palette.error(theme.symbols.fail)} ${palette.error(
-					[...test.suitePath, test.name].join(" › "),
+					testDisplayPath([...test.suitePath, test.name]),
 				)} ${palette.muted("is slower than it was")}`,
 			)
 			lines.push(
@@ -481,7 +482,7 @@ export function renderTestFailures(
 		if (test.error !== null && test.benchmark?.status !== "regressed") {
 			lines.push(
 				`${INDENT}${palette.error(theme.symbols.fail)} ${palette.error(
-					[...test.suitePath, test.name].join(" › "),
+					testDisplayPath([...test.suitePath, test.name]),
 				)} ${palette.muted("stopped with an error")}`,
 			)
 			// NOTE: A property test that STOPPED rather than failed an
@@ -545,7 +546,9 @@ export function renderFocusedTests(
 				`${INDENT}${context.palette.error(
 					context.theme.symbols.fail,
 				)} ${focused
-					.map((test) => [...test.suitePath, test.name].join(" › "))
+					.map((test) =>
+						testDisplayPath([...test.suitePath, test.name]),
+					)
 					.join(", ")} ${context.palette.muted("is focused")}`,
 			)
 

@@ -1417,6 +1417,63 @@ describe("the test reporter", () => {
 		expect(diagnostic.notes).toEqual(["`is` compared 3 with 2"])
 	})
 
+	// NOTE: A test NAME is the reader's own text and it is PRINTED rather than
+	// quoted, which was fine while no Program could write a control character
+	// at all. `\u{…}` made one writable, and `"\u{1B}[2K"` in a name erases the
+	// line the report had just written; an override reorders it. Every printer
+	// of a name spells those, and only those — a name is not a value, so
+	// nothing else about it is escaped.
+	it("spells the characters in a name that act on the terminal", () => {
+		let nasty = "erase\u001B[2Khere‮reversed\u0007"
+		let spelled = "erase\\u{1B}[2Khere\\u{202E}reversed\\u{7}"
+		let rows: Array<TestEvent> = [
+			{
+				schema: 1,
+				kind: "test-start",
+				id: "/Nasty.es/outer/inner",
+				name: nasty,
+				suitePath: ["suite\u001B[1A"],
+				module: "/Nasty.es",
+				row: null,
+			},
+			{
+				schema: 1,
+				kind: "test-fail",
+				id: "/Nasty.es/outer/inner",
+				name: nasty,
+				duration: 1,
+				expectations: 1,
+				failures: [
+					{
+						form: "expect",
+						span: {
+							start: { line: 3, column: 3 },
+							end: { line: 3, column: 9 },
+							source: "n::is(1)",
+						},
+						values: [],
+						comparison: null,
+					},
+				],
+				error: null,
+			},
+		]
+		let run = collectTestRun(rows)
+		let failed = run.tests.find((test) => test.state === "failed")!
+		let tree = renderTestTree(run, reportContext).join("\n")
+
+		expect(tree).toContain(spelled)
+		expect(tree).toContain("suite\\u{1B}[1A")
+		expect(tree).not.toContain("\u001B[2K")
+		expect(tree).not.toContain("‮")
+		expect(
+			renderTestFailures(run, reportContext, () => null).join("\n"),
+		).not.toContain("\u001B[2K")
+		expect(testFailureDiagnostic(failed, failed.failures[0])!.message).toBe(
+			`'suite\\u{1B}[1A › ${spelled}' failed`,
+		)
+	})
+
 	// NOTE: A table test whose name interpolates nothing renders the same text
 	// for every row, under a heading that already says it — so the row says
 	// which row it is instead, in the tree and in the Diagnostic alike.
