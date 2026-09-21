@@ -64,6 +64,18 @@ const REPLACE_TURNS = 5_000
 // first case, asserted rather than timed.
 const CEILING_MILLISECONDS = 300
 
+// NOTE: How long the RUNNER may wait for either of the two timed cases, which
+// is a different number from the ceiling above and does a different job. The
+// ceiling judges the best of three subprocess runs; this is the patience the
+// test runner has for compiling the Program and spawning it those three times.
+// The runner's own default is five seconds, and on a machine running four
+// suites at once that is not enough to SPAWN three processes: one run of this
+// file in twenty took 8,210 ms and failed as a timeout, with the 300 ms
+// assertion never reached and no claim about the Program disproved. A timeout
+// that fires while the thing it guards is still true is a flake, so the
+// patience is a minute and the claim is left where it is.
+const RUNNER_MILLISECONDS = 60_000
+
 // NOTE: Three hundred lines of thirty-six characters and a line break, which is
 // the shape a Program reading text takes.
 const LINES = "abcdefghijklmnopqrstuvwxyz0123456789\n".repeat(300)
@@ -195,18 +207,26 @@ describe("String work", () => {
 })
 
 describe("String performance", () => {
-	it("searches a ten kilobyte String twenty thousand times without building its pieces", () => {
-		expect(millisecondsToRun(searchingSource(), "0")).toBeLessThan(
-			CEILING_MILLISECONDS,
-		)
-	})
+	it(
+		"searches a ten kilobyte String twenty thousand times without building its pieces",
+		() => {
+			expect(millisecondsToRun(searchingSource(), "0")).toBeLessThan(
+				CEILING_MILLISECONDS,
+			)
+		},
+		RUNNER_MILLISECONDS,
+	)
 
-	it("replaces the first occurrence five thousand times with two cuts", () => {
-		expect(
-			millisecondsToRun(
-				replacingSource(),
-				`${REPLACE_TURNS * (CHARACTERS - 2)}`,
-			),
-		).toBeLessThan(CEILING_MILLISECONDS)
-	})
+	it(
+		"replaces the first occurrence five thousand times with two cuts",
+		() => {
+			expect(
+				millisecondsToRun(
+					replacingSource(),
+					`${REPLACE_TURNS * (CHARACTERS - 2)}`,
+				),
+			).toBeLessThan(CEILING_MILLISECONDS)
+		},
+		RUNNER_MILLISECONDS,
+	)
 })
