@@ -228,6 +228,9 @@ describe("A Record asks its declared members", () => {
 	// fixed by its declaration, a Record's value may carry more than its Type
 	// can see. An extra member on either side makes two Records unequal exactly
 	// as it did before, and an extra member on BOTH is compared structurally.
+	// Both DIRECTIONS, because only the second needs the counts: a key the
+	// right-hand side lacks is caught by `hasOwn` on the way past, and a key
+	// only the RIGHT side has is caught by nothing else.
 	it("still refuses two Records with differing member sets", async () => {
 		expect(
 			await run(`implementation {
@@ -248,8 +251,11 @@ describe("A Record asks its declared members", () => {
 						narrow({ tag = lower, extra = 2 }),
 					),
 				)
+				Terminal.inspect(
+					narrow({ tag = news })::is(narrow({ tag = lower, extra = 1 })),
+				)
 			}`),
-		).toEqual(["false", "true", "false"])
+		).toEqual(["false", "true", "false", "false"])
 	})
 
 	// NOTE: Member ORDER is not a member of the answer. The routing is a list of
@@ -1018,6 +1024,47 @@ describe("A Case payload asks its members", () => {
 				Terminal.inspect([Box#Full({ tag = news }) = 1]::hasKey(Box#Full({ tag = lower })))
 			}`),
 		).toEqual(["true", "true", "true"])
+	})
+
+	// NOTE: A generic Choice whose Case carries BOTH a Type Parameter and a
+	// routed member is the one Program that can tell the slots apart. The
+	// Parameters keep the slots their declaration order gives them and the
+	// routed members take the ones after, so `item` reads witness 0 and `tag`
+	// reads witness 1 — put them the other way round and the Tag is compared by
+	// Integer's `is`. Every other Choice in this file has Parameters or routed
+	// members and never both, so nothing else can see a swap at all.
+	//
+	// The THIRD line is the one that sees it. Integer's `is` in the wrong slot
+	// reads `.value` off a Record, finds `undefined` on both sides and answers
+	// TRUE — so two Tags that differ have to be compared for the mutant to show,
+	// and two that merely differ in case do not.
+	it("keeps a Type Parameter's slot in front of a routed member's", async () => {
+		expect(
+			await run(`implementation {
+				${tag}
+
+				choice Pair<Item> {
+					Both { item: Item, tag: Tag },
+					Neither,
+				}
+
+				Terminal.inspect(
+					Pair<Integer>#Both({ item = 1, tag = news })::is(
+						Pair<Integer>#Both({ item = 1, tag = lower }),
+					),
+				)
+				Terminal.inspect(
+					Pair<Integer>#Both({ item = 1, tag = news })::is(
+						Pair<Integer>#Both({ item = 2, tag = news }),
+					),
+				)
+				Terminal.inspect(
+					Pair<Integer>#Both({ item = 1, tag = news })::is(
+						Pair<Integer>#Both({ item = 1, tag = { text = "Sport" } }),
+					),
+				)
+			}`),
+		).toEqual(["true", "false", "false"])
 	})
 
 	// NOTE: And a Choice whose payload routes NOTHING keeps the flat helper it
