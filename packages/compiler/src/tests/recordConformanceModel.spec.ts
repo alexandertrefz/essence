@@ -1,4 +1,4 @@
-import { describe, expect, it, setDefaultTimeout } from "bun:test"
+import { describe, expect, it } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -33,11 +33,6 @@ import { validate } from "../validator/index"
 // picked because they generate different shapes, not because they were the ones
 // that passed: the reviewer's own harness ran four over 2,400 assertions, and
 // these two carry the same shapes in a size the suite can afford.
-
-// NOTE: The first enrichment in a process compiles the whole standard library,
-// which the five-second default does not always cover on a loaded machine. See
-// the same NOTE in `recordConformance.spec.ts`.
-setDefaultTimeout(60_000)
 
 // NOTE: One Essence Type and the pairs that stand for it — each pair being two
 // spellings and what the MODEL says about them. `Tag` is case-insensitive by

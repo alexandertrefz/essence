@@ -36,19 +36,6 @@ import { validate } from "../validator/index"
 
 const TURNS = 200_000
 
-// NOTE: How long the RUNNER may wait for one case here, which is not a claim
-// about anything: every case in this file COMPILES a Program — the standard
-// library with it — and most of them then spawn an engine to run it, twice. The
-// runner's own patience is five seconds, and on a machine building four other
-// branches at once that is not enough to compile one Program: the first case of
-// a run, which pays for the cold prelude, was seen at 7,465 ms and a fuzzer case
-// at 14,995 ms while every claim it makes still held. A timeout that fires while
-// the thing it guards is still true is a flake, and a timed-out case here is
-// worse than one elsewhere: the runner moves on while the abandoned case is
-// still running, and what it prints then lands in the output the NEXT case is
-// capturing. So the patience is a minute and no claim moves.
-const RUNNER_MILLISECONDS = 60_000
-
 // NOTE: One Program per shape the pass has to reach, each counting to the same
 // answer so a wrong one names the shape rather than the arithmetic.
 const ANSWER = String((TURNS * (TURNS + 1)) / 2)
@@ -252,29 +239,25 @@ describe("self tail calls", () => {
 		// otherwise this would pass just as happily against a pass that did
 		// nothing at all.
 		for (let walk of walks) {
-			it(
-				`leaves no self call in the answer of ${walk.name}`,
-				() => {
-					let body = emittedBody(generate(walk.source), walk.looped)
+			it(`leaves no self call in the answer of ${walk.name}`, () => {
+				let body = emittedBody(generate(walk.source), walk.looped)
 
-					expect(body).toContain("while (true)")
-					expect(body).toMatch(/continue \$tail_\d+/)
-					expect(body).not.toMatch(
-						new RegExp(`return \\w*\\.?${walk.looped}\\(`),
-					)
+				expect(body).toContain("while (true)")
+				expect(body).toMatch(/continue \$tail_\d+/)
+				expect(body).not.toMatch(
+					new RegExp(`return \\w*\\.?${walk.looped}\\(`),
+				)
 
-					let unlooped = emittedBody(
-						generate(walk.source, withoutPass),
-						walk.looped,
-					)
+				let unlooped = emittedBody(
+					generate(walk.source, withoutPass),
+					walk.looped,
+				)
 
-					expect(unlooped).not.toContain("while (true)")
-					expect(unlooped).toMatch(
-						new RegExp(`return \\w*\\.?${walk.looped}\\(`),
-					)
-				},
-				RUNNER_MILLISECONDS,
-			)
+				expect(unlooped).not.toContain("while (true)")
+				expect(unlooped).toMatch(
+					new RegExp(`return \\w*\\.?${walk.looped}\\(`),
+				)
+			})
 		}
 	})
 
@@ -288,19 +271,12 @@ describe("self tail calls", () => {
 			it.skip("runs each walk at 200,000 turns (no `node` on the PATH)", () => {})
 		} else {
 			for (let walk of walks) {
-				it(
-					`runs ${walk.name} at ${TURNS} turns on Node ${node}`,
-					async () => {
-						let result = runUnder(
-							"node",
-							await bundled(walk.source),
-						)
+				it(`runs ${walk.name} at ${TURNS} turns on Node ${node}`, async () => {
+					let result = runUnder("node", await bundled(walk.source))
 
-						expect(result.stderr).toBe("")
-						expect(result.stdout).toBe(ANSWER)
-					},
-					RUNNER_MILLISECONDS,
-				)
+					expect(result.stderr).toBe("")
+					expect(result.stdout).toBe(ANSWER)
+				})
 			}
 
 			// NOTE: What makes the four above a guard rather than four passing
@@ -310,21 +286,17 @@ describe("self tail calls", () => {
 			// about V8's stack, which is a deterministic limit far below 200,000
 			// frames in every configuration it has; an engine that grew proper
 			// tail calls would fail HERE, which is the right place to hear it.
-			it(
-				"overflows Node's stack with the pass off",
-				async () => {
-					let result = runUnder(
-						"node",
-						await bundled(headAndTail, withoutPass),
-					)
+			it("overflows Node's stack with the pass off", async () => {
+				let result = runUnder(
+					"node",
+					await bundled(headAndTail, withoutPass),
+				)
 
-					expect(result.stdout).toBe("")
-					expect(result.stderr).toContain(
-						"Maximum call stack size exceeded",
-					)
-				},
-				RUNNER_MILLISECONDS,
-			)
+				expect(result.stdout).toBe("")
+				expect(result.stderr).toContain(
+					"Maximum call stack size exceeded",
+				)
+			})
 		}
 	})
 
@@ -599,20 +571,16 @@ ${extra}	Terminal.print(${called(
 		}
 
 		for (let index = 0; index < CASES; index++) {
-			it(
-				`answers the same with the pass off — case ${index}`,
-				() => {
-					let source = fuzzed(index)
-					let looped = runUnder("bun", generate(source))
-					let plain = runUnder("bun", generate(source, withoutPass))
+			it(`answers the same with the pass off — case ${index}`, () => {
+				let source = fuzzed(index)
+				let looped = runUnder("bun", generate(source))
+				let plain = runUnder("bun", generate(source, withoutPass))
 
-					expect(looped.stderr).toBe("")
-					// NOTE: The source is in the message, because a generated
-					// counterexample nobody can read is a failure nobody can fix.
-					expect({ source, ...looped }).toEqual({ source, ...plain })
-				},
-				RUNNER_MILLISECONDS,
-			)
+				expect(looped.stderr).toBe("")
+				// NOTE: The source is in the message, because a generated
+				// counterexample nobody can read is a failure nobody can fix.
+				expect({ source, ...looped }).toEqual({ source, ...plain })
+			})
 		}
 	})
 })

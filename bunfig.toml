@@ -1,0 +1,4 @@
+[test]
+# Every spec gets the patience `scripts/testBudget.ts` explains. It is a preload
+# because Bun 1.4 ignores a `timeout` written here.
+preload = ["./scripts/testBudget.ts"]

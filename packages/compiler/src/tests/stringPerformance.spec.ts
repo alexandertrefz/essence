@@ -64,19 +64,6 @@ import { validate } from "../validator/index"
 // what stays timed is only what a count can not say.
 const CHARACTERS = 10_800
 
-// NOTE: How long the RUNNER may wait for either of the two timed cases, which
-// is a different number from the ceiling above and does a different job. The
-// ceiling judges the best of three subprocess runs; this is the patience the
-// test runner has for compiling the Program and spawning it those three times —
-// or six, where a too-steep doubling asks for its second reading.
-// The runner's own default is five seconds, and on a machine running four
-// suites at once that is not enough to SPAWN three processes: one run of this
-// file in twenty took 8,210 ms and failed as a timeout, with the 300 ms
-// assertion never reached and no claim about the Program disproved. A timeout
-// that fires while the thing it guards is still true is a flake, so the
-// patience is a minute and the claim is left where it is.
-const RUNNER_MILLISECONDS = 60_000
-
 // NOTE: Three hundred lines of thirty-six characters and a line break, which is
 // the shape a Program reading text takes.
 const LINES = "abcdefghijklmnopqrstuvwxyz0123456789\n".repeat(300)
@@ -661,27 +648,19 @@ describe("String work", () => {
 })
 
 describe("String performance", () => {
-	it(
-		"finds a part near the front of any length of String at the same cost",
-		() => {
-			expectGrowthUnderThreshold(
-				CONTAINS_LENGTHS,
-				containsSource,
-				() => `${CONTAINS_TURNS}`,
-			)
-		},
-		RUNNER_MILLISECONDS,
-	)
+	it("finds a part near the front of any length of String at the same cost", () => {
+		expectGrowthUnderThreshold(
+			CONTAINS_LENGTHS,
+			containsSource,
+			() => `${CONTAINS_TURNS}`,
+		)
+	})
 
-	it(
-		"groups one String in time proportional to its length",
-		() => {
-			expectGrowthUnderThreshold(
-				GROUPED_LENGTHS,
-				groupingSource,
-				printedGroupedLength,
-			)
-		},
-		RUNNER_MILLISECONDS,
-	)
+	it("groups one String in time proportional to its length", () => {
+		expectGrowthUnderThreshold(
+			GROUPED_LENGTHS,
+			groupingSource,
+			printedGroupedLength,
+		)
+	})
 })

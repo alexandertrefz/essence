@@ -1,4 +1,4 @@
-import { describe, expect, it, setDefaultTimeout } from "bun:test"
+import { describe, expect, it } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -87,13 +87,6 @@ const ambiguous = `type Tag = { text: String }
 
 	constant news: Tag = { text = "News" }
 	constant lower: Tag = { text = "news" }`
-
-// NOTE: The first enrichment in a process compiles the whole standard library,
-// which the five-second default does not always cover on a loaded machine — and
-// a test that times out here never restores the `console.log` it patched, so the
-// NEXT test reads an empty capture and the file fails twice for one reason. The
-// repo's other slow specs set the same generous ceiling; nothing below is timed.
-setDefaultTimeout(60_000)
 
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
