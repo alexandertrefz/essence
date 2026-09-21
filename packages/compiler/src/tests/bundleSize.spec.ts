@@ -242,7 +242,7 @@ describe("Bundle Size", () => {
 	//
 	// NOTE: What says this is the fixture and not the runtime is the three
 	// figures that did NOT move with it: `Everyday.es`, the removeDuplicates
-	// Program below at 11,563, and `HelloWorld.es` at 5,740. `Everyday.es`
+	// Program below, and `HelloWorld.es` at 5,740. `Everyday.es`
 	// reads 78,120 now, and nothing it has taken since is anything a Dictionary
 	// reaches: 48 bytes of `List` Methods becoming Overloads, 381 of the range
 	// natives folding into one walk, 27 of `List.split` becoming an Overload
@@ -250,13 +250,28 @@ describe("Bundle Size", () => {
 	// vocabulary wave its own note above accounts for. A Dictionary runtime
 	// that grew would move the second of those, which reaches the whole store
 	// through one call and none of the new Methods.
+	//
+	// NOTE: 59,045 measured now, and the 717 bytes it rose by are a List
+	// becoming a key kind that ENCODES rather than one that scans. They are the
+	// same 717 in the two Programs below, because they are one thing:
+	// `keyEncoding.ts` reaching `List.runsOf` — 671 bytes of reader, which this
+	// file no longer gets for free from the Methods it already calls — and the
+	// spelling and the memo beside it. A Program holding a Dictionary of ANY
+	// key Type pays them, since the encoding is one function with an arm per
+	// kind; measured on a Program whose only Dictionary is String-keyed, 16,588
+	// before and 17,808 after.
+	//
+	// NOTE: This ceiling and the two below are now about 270 bytes clear rather
+	// than the kilobyte the note at the top of this file asks for. They are left
+	// where they stand deliberately: the rise is accounted for above, and a
+	// ceiling raised in the same change that spends it stops being evidence.
 	it("charges a Dictionary Program for the container it uses", async () => {
 		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(59_300)
 	})
 
-	// NOTE: 11,563 measured, where the same Program without the one call
-	// measures 3,893 — so `removeDuplicates` costs 7,670 bytes, twice as
-	// much as the Program that calls it. It was 18,607 while the body was
+	// NOTE: 12,272 measured, where the same Program without the one call
+	// measures 3,893 — so `removeDuplicates` costs 8,379 bytes, more than twice
+	// as much as the Program that calls it. It was 18,607 while the body was
 	// `@::tally()::keys()` on `GroupedList`: a List Method reached the whole
 	// second container, and the store, the kind registry, the registration and
 	// the written form all arrived with it. It is a List native over a plain
@@ -264,7 +279,7 @@ describe("Bundle Size", () => {
 	// two containers share — `keyEncoding.ts`, a runtime module of its own so
 	// that this one can rest on it alone.
 	//
-	// NOTE: What the 7,670 buys is the Method being linear: one call over
+	// NOTE: What the 8,379 buys is the Method being linear: one call over
 	// 20,000 items with 2,000 distinct measured 106 ms as a fold on `contains`
 	// and 22 ms here, and with all 20,000 distinct 650 ms against 22 ms — both
 	// best of three with 21 ms of subprocess startup inside. The figure is here so the trade
@@ -273,6 +288,14 @@ describe("Bundle Size", () => {
 	// `everyItem(alsoIn:)`, `removeEvery(contentsOf:)` and
 	// `contains(everyItemOf:)` — rest on the same module, so this figure
 	// stands for all of them.
+	//
+	// NOTE: 709 of those bytes are the LAST thing that module took: a List
+	// becoming a key kind that encodes. What they buy here is the same Methods
+	// staying linear when the items are Lists rather than Strings — the call
+	// over 10,000 two-item Lists measured 1,929 ms before and 1.8 ms now,
+	// because a List key used to answer no encoding and fall onto the scan.
+	// The Dictionary ceiling above accounts for the same 709 in a Program that
+	// holds a Dictionary instead.
 	it("charges a removeDuplicates Program for the key encoding behind it", async () => {
 		expect(
 			await bundleSizeOfSource(`implementation {
@@ -283,9 +306,12 @@ describe("Bundle Size", () => {
 		).toBeLessThan(12_550)
 	})
 
-	// NOTE: 9,443 measured, where the same Program calling `median` measures
-	// 2,760 — so `mode` costs 6,683 bytes, the count and the canonical key
-	// encoding it counts by. It measured 20,560 while the body was
+	// NOTE: 10,152 measured, where the same Program calling `median` measures
+	// 2,760 — so `mode` costs 7,392 bytes, the count and the canonical key
+	// encoding it counts by, 709 of them the List arm that arrived last and
+	// that `mode` itself can not reach: it counts Integers, Rationals and
+	// Numbers, and pays for the arm because the encoding is one function.
+	// It measured 20,560 while the body was
 	// `@::tally()::entries()::highestItem(on .value).key`: a List Method
 	// reached the whole second container, and the store, the kind registry,
 	// the registration and the written form all arrived with it. That is the
@@ -323,6 +349,24 @@ describe("Bundle Size", () => {
 	// top-level side effect added to `Http.ts` is caught HERE as well as by the
 	// floor above: a Program that sends nothing must carry none of this, and a
 	// Program that sends must carry no more than a request needs.
+	//
+	// NOTE: 23,578 measured now, and this is the one ceiling a List becoming an
+	// encodable key kind had to MOVE rather than fit under. The 1,220 bytes are
+	// `keyEncoding.ts` reaching `List.runsOf`: 671 of reader, 20 of the empty
+	// run beside it, and the spelling and the memo. This Program holds a
+	// `Dictionary<String, String>` and no List at all, so every one of those
+	// bytes is dead weight in it — which is the true price of the encoding
+	// being ONE function with an arm per kind, and is why the number is written
+	// out here rather than folded into a wider ceiling.
+	//
+	// NOTE: What was weighed against it: reaching a List through the kind
+	// registry instead, so that only a Program carrying `List.ts` pays. It
+	// moves about 420 bytes onto EVERY Program that holds a List, which is
+	// nearly all of them, to take 1,220 off the ones that hold a Dictionary and
+	// no List — a Program paying for a container it does not use, in the other
+	// direction. And a Dictionary keyed by Lists would then encode only where
+	// something had registered the reader first, which is a correctness answer
+	// that depends on what else the Program happens to call.
 	it("charges a Program that sends one request for the request", async () => {
 		expect(
 			await bundleSizeOfSource(`implementation {

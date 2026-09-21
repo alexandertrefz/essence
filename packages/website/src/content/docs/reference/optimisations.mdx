@@ -1053,6 +1053,52 @@ This is invisible for the reason the rest of the representation is: a list alway
 
 What it costs is retention, bounded. A list may now hold an array up to twice the length of what it views, where trimming at every read held exactly what it viewed — and in exchange no walk pays for a trim it does not need. A window that is never read at all still holds its parent, which is what a deferred copy has always cost. Reading a ten-item window of a million-item list releases the parent under this rule exactly as it did before: measured as live heap after a collection, 0.0 MB held, against 38.2 MB if positional reads never trimmed at all. The head/tail walk over 200,000 items peaks at 60 MB under the rule and 176 MB when every read trims.
 
+### `canonical-key-encoding`
+
+A dictionary finds a key in one step where it can reduce that key to something a `Map` can be keyed by, and by comparing it against every live slot where it cannot. The same encoding is what the set-shaped list methods hold their seen keys in: [`removeDuplicates`](/docs/library/list#removeDuplicates), [`hasDuplicates`](/docs/library/list#hasDuplicates), [`contains(everyItemOf:)`](/docs/library/list#contains), [`everyItem(alsoIn:)`](/docs/library/list#everyItem), [`removeEvery(contentsOf:)`](/docs/library/list#removeEvery), [`mode`](/docs/library/list#mode) and the groupings.
+
+**These key types are found in one step.** String, Integer, Rational, Boolean, the covering `Number`, a record whose every member is one of these, a case of a choice whose equality the language derives, and a list whose every item is one of these, nested to any depth. A refinement counts as what it refines, so a `NonEmptyString` key and a `NonEmptyList<NonEmptyString>` key are found the same way as the types they refine.
+
+**These take the scan.** Algebraic, Transcendental, a function, a dictionary, and anything holding one of those. A list of numbers is found in one step until an algebraic lands in it; that key alone then takes the scan, and the rest of the dictionary keeps its index.
+
+A key is reduced to a JavaScript primitive where one spells it exactly — a string's NFC form, an integer's number or bigint, a boolean — and to a text where no primitive does. A rational spells its reduced parts, a record its members in name order, a case its tag and then its payload, and a list how many items it holds and then each item's own text. Every part is length-prefixed or terminated, so no two different keys spell one text: `[1, 23]` and `[12, 3]` differ by where the terminators fall, `[[1], [2]]` and `[[1, 2]]` by the counts in their heads, and a string holding `l1:i1;` is spelled by its own length-prefixed form rather than read as the list it imitates.
+
+**The encoding is used only where it is the equality the key is compared by.** A namespace that writes an `is` of its own replaces the standard library's, and its keys are then found by asking that `is` about every live slot:
+
+```essence
+implementation {
+	function nameCount() -> Integer {
+		namespace Loose for NonEmptyString is Equatable {
+			is(_ other: NonEmptyString) -> Boolean {
+				<- true
+			}
+		}
+
+		constant ada: NonEmptyString = "Ada"
+		constant bob: NonEmptyString = "bob"
+		constant seen = Dictionary.of([
+			{ key = [ada], value = 1 },
+			{ key = [bob], value = 2 },
+		])
+
+		<- seen::length()
+	}
+
+	§ One entry, because the written `is` decides and not the text.
+	Terminal.print(nameCount()) § 1
+}
+```
+
+A list carries that answer up from its items. `List<ItemType> is Equatable where ItemType is Equatable` compares its items with the item type's own `is`, so a list key is found in one step exactly when its items would be, and a written `is` anywhere inside it, at any depth, puts the whole key on the scan.
+
+**A list key's text is remembered on the value, under a symbol key**, as a string's NFC form and a rational's reduced form are. Spelling a key costs one pass over its items, and a lookup would otherwise spell it again every time. A list's items never change, so a remembered text cannot go stale.
+
+This is invisible from Essence. The same methods answer the same things either way, and only the time differs. A dictionary holds the key value that arrived first, so keys read back as they were written rather than as the text they share, and two spellings of one value — `3` and `3/1`, an accent written as one code point or as two — land in one slot because the comparison calls them one value.
+
+It costs the text, which a dictionary holds for as long as it holds the entry: about 17 characters for a two-integer list key, against 26 for the same pair written as a record, and about 3 MB for 100,000 remembered texts.
+
+Building a dictionary of 8,000 two-integer list keys took 818 ms and takes 29. It is flat to 64,000 keys, at 47 ms, against 52 ms for the same table keyed by a record. `removeDuplicates()` over 10,000 two-item lists took 1,929 ms and takes 1.8. `hasDuplicates()` over the same took 2,022 ms and takes 2.0. Grouping 10,000 items under 2,000 list keys took 418 ms and takes 1.8. One list of 10,000 integers looked up 10,000 times took 3,804 ms and takes 1.
+
 <SeeAlso links={[
 	{ label: "Command line: --without-optimisation", href: "/docs/reference/cli#build--without-optimisation" },
 	{ label: "essence.json: build.withoutOptimisations", href: "/docs/reference/project-file#build-withoutOptimisations" },
