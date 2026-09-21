@@ -608,6 +608,13 @@ describe("what a drain costs", () => {
 	// — so it is this one that holds the rule. Six thousand characters are at
 	// least half of the ten-thousand-character window and well under half of the
 	// twenty-thousand-character Array underneath it.
+	//
+	// NOTE: And then the same thing over SKEWED clusters, because on a text
+	// whose characters are all one unit wide the unit half of the rule happens
+	// to answer the root question too — the two are proportional there. Where
+	// the window holds the WIDE clusters it is not: 1,500 of the window's 2,000
+	// characters are 72% of the whole text's units and pass that question, and
+	// only the root's Array length refuses them.
 	test("a cut of a window is measured against the root's Array", () => {
 		let text = createString("café ".repeat(CHARACTERS / 5))
 		let half = slice(text, createInteger(0), createInteger(CHARACTERS / 2))
@@ -617,6 +624,16 @@ describe("what a drain costs", () => {
 		expect(viewOf(most).clusters).not.toBe(viewOf(text).clusters)
 		expect(viewOf(most).clusters).toHaveLength(6_000)
 		expect(viewOf(most).count).toBe(6_000)
+
+		let wide = `e${String.fromCodePoint(769).repeat(20)}`
+		let skewed = createString(wide.repeat(2_000) + "a".repeat(2_000))
+		let heavy = slice(skewed, createInteger(0), createInteger(2_000))
+		let inside = slice(heavy, createInteger(0), createInteger(1_500))
+
+		expect(viewOf(heavy).clusters).toBe(viewOf(skewed).clusters)
+		expect(viewOf(inside).clusters).not.toBe(viewOf(skewed).clusters)
+		expect(viewOf(inside).clusters).toHaveLength(1_500)
+		expect(viewOf(inside).count).toBe(1_500)
 	})
 
 	// NOTE: THE HALF RULE IS ASKED IN BOTH UNITS, and this is the shape that
