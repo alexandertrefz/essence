@@ -10,17 +10,12 @@
 // exactly what the Namespace's target bought. The proof is spent HERE, which is
 // why neither of the two ends could be written in Essence: the language has no
 // way to be told that it holds.
-import {
-	createAsciiString,
-	createString,
-	graphemesIn,
-	isAsciiIn,
-	type StringType,
-} from "./String"
+import { characterIn, type StringType } from "./String"
 
-// NOTE: Both ends take the two-branch shape `String::character(at:)` takes: an
-// ASCII String is read by UNIT, and every other one comes through the view.
-// Reading one end off the view builds the whole Array of characters to hand
+// NOTE: Both ends are `String::character(at:)` without its `Optional` — the
+// same one reader, which takes the two-branch shape that Method takes: an ASCII
+// String is read by UNIT, and every other one comes through the character view.
+// Reading one end off the WHOLE view builds an Array of every character to hand
 // back one of them, which made the PROVEN Method several times slower than the
 // unproven one whose Optional it was meant to spare a Program — 200 reads of a
 // 117,003-character ASCII String measured 120,758 µs through the view against
@@ -29,22 +24,18 @@ import {
 // receiver's own scan and nothing else. The unit is marked ASCII, as a piece
 // of a `split` is, so a Method asked about the answer does not rescan it, and
 // that mark is what `asciiFastPath.spec.ts` reads to say which branch ran.
+//
+// NOTE: The `!` is where the proof is spent. A position inside the String
+// answers a character, and 0 and -1 are inside every String that has one; the
+// `undefined` the reader answers past either end is what only an EMPTY receiver
+// could reach, and that this one is not empty is exactly what the Namespace's
+// target bought.
 export function firstCharacter(string: StringType): StringType {
-	if (isAsciiIn(string)) {
-		return createAsciiString(string.value[0]!)
-	}
-
-	return createString(graphemesIn(string)[0]!)
+	return characterIn(string, 0)!
 }
 
 export function lastCharacter(string: StringType): StringType {
-	if (isAsciiIn(string)) {
-		return createAsciiString(string.value[string.value.length - 1]!)
-	}
-
-	let characters = graphemesIn(string)
-
-	return createString(characters[characters.length - 1]!)
+	return characterIn(string, -1)!
 }
 
 // NOTE: Everything below is `String`'s own Function under this Namespace's

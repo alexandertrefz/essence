@@ -171,7 +171,7 @@ describe("Bundle Size", () => {
 	// person to write a line rather than for the next person to drag in a
 	// tower, and that is not what it is for.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(81_500)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(83_800)
 	})
 
 	// NOTE: 38,056 measured; a reintroduced `Number` spread was 54,849. The same
