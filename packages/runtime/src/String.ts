@@ -1354,6 +1354,33 @@ export function character__overload$1(
 // COPIES a window's characters to hand back one of them, which is O(n) per
 // call and O(n²) over the drain that asks for the front character every turn;
 // this reads the cluster where it stands.
+//
+// NOTE: WHAT THE ONE READER COSTS, both ends named. It is an O(n) removed and
+// a few nanoseconds paid, and the nanoseconds are paid on EVERY read, not only
+// on the window that needed them. Measured as 200,000 reads of one HELD String,
+// one runtime per process, alternated, the answer consumed — which is the only
+// way these came out reproducible; two runtimes in one process measure the
+// second one twice its true cost, and an answer nothing consumes is deleted
+// outright:
+//                                  master    here
+//   ascii  firstCharacter (held)    0.565   1.281 ms   (2.3x, +3.6 ns a call)
+//   ascii  lastCharacter  (held)    0.564   0.560 ms   (1.0x)
+//   ascii  character(at 5000)       0.565   0.554 ms   (1.0x)
+//   view   firstCharacter (held)    0.673   1.070 ms   (1.6x, +2.0 ns)
+//   view   lastCharacter  (held)    0.675   0.575 ms   (0.9x)
+//   window firstCharacter           0.022   0.019 ms   (0.9x)
+// Against which the same call over an 80,000-character non-ASCII front drain
+// went from 9,602 ms to 49 — and that is `slice` as much as this reader, since
+// master's window owned its own Array by the time it was asked.
+//
+// NOTE: ONE case stayed dearer and it is worth saying which and why: the FIRST
+// character of a held ASCII String. Master's specialised body indexed the text
+// at a CONSTANT zero, which an engine reads about as cheaply as a field; here
+// the position is a `number | bigint` parameter resolved at run time, and no
+// amount of hoisting makes a computed index as cheap as a literal one — the
+// LAST character, which master computed too, measures the same on both sides.
+// Three and a half nanoseconds on a nanosecond-scale read, for one body where
+// there were three, and the O(n) it removes from every window.
 export function characterIn(
 	string: StringType,
 	index: number | bigint,
@@ -1376,6 +1403,14 @@ export function characterIn(
 	// a miss, and this is the read `NonEmptyString`'s two proven ends are:
 	// 200,000 `firstCharacter` of one held ASCII String measured 11.4 ns
 	// apiece with both keys read and 8.6 with one.
+	//
+	// NOTE: The position is resolved INLINE for a `number`, where it went
+	// through `positionFromEnd` — a call whose whole body, for the positions
+	// these two ends ask, is one `typeof` on a `number | bigint` and a compare.
+	// A bigint index still goes to the Function, because what it answers is a
+	// rule (it is past either end of any String) and a rule belongs in one
+	// place. 200,000 `firstCharacter` of one held String measured 1.79 ms with
+	// the call and 1.16 without, and 200,000 `lastCharacter` 0.81 against 0.66.
 	let measured = string as MeasuredString
 	let marked = measured[isAsciiKey]
 
@@ -1385,19 +1420,50 @@ export function characterIn(
 			measured[graphemesKey] === undefined &&
 			isAsciiIn(string))
 	) {
+		// NOTE: The bound is COMPARED rather than read off a missing unit, and
+		// that was measured rather than assumed. Answering `undefined` by
+		// indexing past the end instead is CORRECT here — the text is the
+		// String's OWN `value`, so beyond its ends there is nothing to read —
+		// and it costs the read its fast path where the engine can not see the
+		// position is in range: 200,000 `lastCharacter` of one held ASCII
+		// String measured 1.324 ms that way against 0.590 with the compare.
+		//
+		// NOTE: The view arm below compares its bound for a second reason,
+		// which no measurement could have found. There the Array is the one the
+		// window BORROWS, so a position past the window's own count reads the
+		// character standing NEXT to it rather than nothing at all — a mutant
+		// that dropped that compare answered the sixth character of a
+		// five-character window and walked through the whole 10,172-test suite.
 		let text = string.value
-		let position = positionFromEnd(index, text.length)
+		let units = text.length
+		let position =
+			typeof index === "number"
+				? index < 0
+					? index + units
+					: index
+				: positionFromEnd(index, units)
 
-		if (position < 0 || position >= text.length) {
+		if (position < 0 || position >= units) {
 			return undefined
 		}
 
 		return createAsciiString(text[position]!)
 	}
 
-	let clusters = clustersIn(string)
+	// NOTE: The remembered Array is read where it stands rather than through
+	// `clustersIn`, which would read the same key inside a call to answer what
+	// the key already says — a String this far down either HAS a view or is
+	// about to be given one, and the one that has it is the drain's case and
+	// the held String's. The count beside it is safe to read with `!` for the
+	// reason `graphemesIn` gives: every writer of the Array writes the count.
+	let clusters = measured[graphemesKey] ?? clustersIn(string)
 	let count = measured[graphemeCountKey]!
-	let position = positionFromEnd(index, count)
+	let position =
+		typeof index === "number"
+			? index < 0
+				? index + count
+				: index
+			: positionFromEnd(index, count)
 
 	if (position < 0 || position >= count) {
 		return undefined
