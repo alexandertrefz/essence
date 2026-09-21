@@ -142,20 +142,29 @@ describe("Bundle Size", () => {
 	// before treating a rise from one of them as a regression: unminified,
 	// escodegen's indentation is most of it.
 	//
-	// NOTE: 2,319 of those bytes are the character WINDOW — a cut of a String
+	// NOTE: 2,317 of those bytes are the character WINDOW — a cut of a String
 	// sharing its parent's cluster Array by offset rather than copying it,
 	// which is what made consuming a String from the front linear (2,245 ms to
-	// 35 for the 40,000-character drain). This file reaches it through
-	// `Integer.parse` and `Rational.parse`, which slice and search. 1,334 are
-	// the pieces that did not exist: the view record and its reader (`viewIn`,
-	// `viewOf`, `startIn`, 708), the offset table and the two makers it feeds
-	// (`offsetsOf`, `createWindowString`, `cutFromView`, 889 — counted with the
-	// 263 that `graphemesIn`, `createSegmentedString` and `slice` grew by).
-	// 420 are the one matcher every grapheme search now shares, against the 305
-	// of the one it replaced, and 205 are `readsByUnit` — the question that
-	// stops a window being ASCII-scanned per turn, which was the other half of
-	// the same n². 177 are the part-folding helper, where 183 of whole-receiver
-	// folding went; `graphemeCountIn` gave back 167 and `graphemesOf` 171.
+	// 35 for the gap analysis's 40,000-character drain). This file reaches it
+	// through `Integer.parse` and `Rational.parse`, which slice and search.
+	// 889 are the offset table and the two makers it feeds (`offsetsOf`,
+	// `createWindowString`, `cutFromView`); 765 the view record, its one reader
+	// and the whole-Array reader beside it (`viewIn`, `viewOf`, `startIn`,
+	// `wholeOf`, `clustersOf`, against the 448 of the two it replaced); 479
+	// what `graphemesIn`, `createSegmentedString` and `slice` grew by; 420 the
+	// one matcher every grapheme search now shares, against the 305 of the one
+	// it replaced; 205 `readsByUnit`, the question that stops a window being
+	// ASCII-scanned per turn, which was the other half of the same n²; and 177
+	// the part-folding helper, where 183 of whole-receiver folding went.
+	//
+	// NOTE: What a Program that never CUTS a String pays for it is nothing.
+	// `HelloWorld.es` only measures and compares, so it links the count and the
+	// view and none of the machinery above, and its bundle is 31 bytes SMALLER
+	// than before. The one thing every String-touching Program does pay is 74
+	// bytes in `append`, which marks a join the ASCII scan would refuse rather
+	// than leaving the next Method to scan the whole of it — a token built one
+	// non-ASCII character at a time measured 203 ms at 80,000 characters
+	// without that mark and 33 ms with it.
 	//
 	// NOTE: A Program carries the runtime reach of what it CALLS, not the
 	// amount of Essence inlined into it. That is why a change to a runtime

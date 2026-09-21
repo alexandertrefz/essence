@@ -543,7 +543,15 @@ function graphemeCountIn(string: StringType): number {
 	let characterCount = measured[graphemeCountKey]
 
 	if (characterCount === undefined) {
-		characterCount = readsByUnit(string)
+		// NOTE: `isAsciiIn` rather than `readsByUnit`, and the two are the SAME
+		// question here: a String that has a view was given its count when the
+		// view was made, so a String with no count has no view either and there
+		// is nothing for the window rule to take into account. Asking the
+		// narrower question is also what keeps a Program that only MEASURES
+		// Strings from carrying the cutting machinery — `HelloWorld.es` reaches
+		// this and nothing else of the view, and its bundle is 29 bytes smaller
+		// than it was before there were windows.
+		characterCount = isAsciiIn(string)
 			? string.value.length
 			: viewIn(string).clusters.length
 
