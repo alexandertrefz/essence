@@ -1,4 +1,11 @@
-import { afterAll, afterEach, describe, expect, it } from "bun:test"
+import {
+	afterAll,
+	afterEach,
+	describe,
+	expect,
+	it,
+	setDefaultTimeout,
+} from "bun:test"
 import { spawnSync } from "node:child_process"
 import {
 	existsSync,
@@ -90,6 +97,19 @@ import {
 	visibleLength,
 } from "../theme"
 import { within, withFiles } from "./harness"
+
+// NOTE: An explicit budget for the whole file, because tests in it wait on a
+// CHILD PROCESS — a Program or the CLI itself is compiled, spawned and read
+// back — and how long that takes is a property of the host rather than of the
+// code. Bun's default of five seconds is ample on an idle machine and is not a
+// claim any test here makes: with three suites running beside this package's,
+// a `beforeAll` build in `terminalInput.spec.ts` and a project run in
+// `testRunner.spec.ts` timed out at 5,002 and 5,008 ms, where each takes under
+// a second alone, with nothing about the CLI disproved. A timeout that fires
+// while the thing it guards is still true is a flake, so the patience is the
+// minute the Language Server's long specs already carry, and a test that truly
+// hangs still fails — a minute later.
+setDefaultTimeout(60_000)
 
 // NOTE: A directory of this run's own, so that a spec compiling a fixture
 // neither answers out of the user's bundle cache nor fills it. It is set before
