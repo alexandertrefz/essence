@@ -33,6 +33,7 @@ import {
 	partition__overload$1 as partition,
 	prepend__overload$1 as prepend,
 	reduce__overload$1 as reduce,
+	remove,
 	reduce__overload$2 as reduceWithStep,
 	reverse,
 	slice,
@@ -50,6 +51,7 @@ import {
 	prepend as prependContentsOf,
 	replace__overload$1 as replace,
 } from "../NonEmptyList"
+import { equal } from "../Ordering"
 import { createString } from "../String"
 import { getStringRepresentation } from "../Terminal"
 import { type AnyType, isValueOfType, typeKeySymbol } from "../type"
@@ -697,4 +699,481 @@ describe("the Array a build enters with", () => {
 		expect(seed.value.length).toBe(4)
 		expect(itemsOf(grown)).toEqual([1, 2, 3, 4])
 	})
+})
+
+// NOTE: A RANDOM CHAIN of operations against a plain Array model, and the only
+// proof a representation trick of this size can rest on. Every claim in this
+// file is that nothing in the language can tell a shared run from a copied one;
+// the tests above make that claim one shape at a time, and this makes it against
+// shapes nobody thought of. Each turn draws a box out of everything built so
+// far, derives a new one from it, and then asks EVERY box ever built for
+// everything the language can ask — its length, the item at every position
+// inside it and at four outside it, its equality with a flat List of the same
+// items, its ordering against one, and the text it prints as.
+//
+// NOTE: PERSISTENCE is what the pool is for. A box is asked again after boxes
+// have been derived from it, after boxes it was derived from have been read and
+// possibly trimmed, and after both — which is the order the trimming policy
+// makes interesting, since a trim writes a fresh Array back under a box whose
+// children hold the old one.
+//
+// NOTE: The seeds are PINNED, so a failure here is a failure anybody can run
+// again. They were not chosen for anything: they are the first six of a count.
+const CHAIN_SEEDS = [
+	0x115701, 0x115702, 0x115703, 0x115704, 0x115705, 0x115706, 0x115707,
+	0x115708, 0x115709, 0x11570a, 0x11570b, 0x11570c,
+]
+
+// NOTE: mulberry32, copied from `dictionaries.spec.ts` for the reason it says —
+// four lines, no dependency, and the same sequence on every engine.
+const seededRandom = (seed: number): (() => number) => {
+	let state = seed >>> 0
+
+	return () => {
+		state = (state + 0x6d2b79f5) | 0
+
+		let mixed = Math.imul(state ^ (state >>> 15), 1 | state)
+
+		mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed
+
+		return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296
+	}
+}
+
+// NOTE: What each operation MEANS, written against a plain JavaScript Array —
+// the same references `edits.spec.ts` holds the edits against, kept here rather
+// than shared so that a change made for one file's sake can not quietly change
+// what the other one is comparing against.
+const referenceSlice = (
+	items: Array<number>,
+	from: number,
+	to: number,
+): Array<number> => {
+	let count = items.length
+	let resolvedFrom = from < 0 ? from + count : from
+	let resolvedTo = to < 0 ? to + count : to
+	let start = resolvedFrom < 0 ? 0 : resolvedFrom > count ? count : resolvedFrom
+	let end = resolvedTo < 0 ? 0 : resolvedTo > count ? count : resolvedTo
+
+	return end <= start ? [] : items.slice(start, end)
+}
+
+const referenceRemove = (
+	items: Array<number>,
+	position: number,
+): Array<number> => {
+	let resolved = position < 0 ? position + items.length : position
+
+	if (resolved < 0 || resolved >= items.length) {
+		return items
+	}
+
+	let answer = items.slice()
+
+	answer.splice(resolved, 1)
+
+	return answer
+}
+
+const referenceInsert = (
+	items: Array<number>,
+	value: number,
+	position: number,
+): Array<number> => {
+	let resolved = position < 0 ? position + items.length : position
+	let clamped =
+		resolved < 0 ? 0 : resolved > items.length ? items.length : resolved
+	let answer = items.slice()
+
+	answer.splice(clamped, 0, value)
+
+	return answer
+}
+
+const referenceReplace = (
+	items: Array<number>,
+	value: number,
+	position: number,
+): Array<number> => {
+	let resolved = position < 0 ? position + items.length : position
+
+	if (resolved < 0 || resolved >= items.length) {
+		return items
+	}
+
+	let answer = items.slice()
+
+	answer[resolved] = value
+
+	return answer
+}
+
+// NOTE: What the model says the box holds, and the whole of what is compared.
+type Held = { list: ListType<IntegerType>; items: Array<number> }
+
+// NOTE: Everything the language can ask a List, asked of one box against the
+// Array the model says it holds. `item(at:)` is asked at every position inside
+// the List and at four outside it, because a position that names no item is an
+// answer too. `is` and `compare` are asked against a FLAT List built here, so
+// the two sides are in different representations whenever the box is not flat —
+// which is where a view read off the wrong run would show.
+const expectAnswers = (held: Held): void => {
+	expect(Number(length(held.list).value)).toBe(held.items.length)
+
+	for (
+		let position = -held.items.length - 2;
+		position <= held.items.length + 1;
+		position++
+	) {
+		let expected =
+			position < -held.items.length || position >= held.items.length
+				? null
+				: held.items.at(position)
+
+		expect(itemAt(held.list, position)).toBe(expected ?? null)
+	}
+
+	let flat = integers(...held.items)
+
+	expect(is(held.list, flat, integerEquality).value).toBe(true)
+	expect(is(flat, held.list, integerEquality).value).toBe(true)
+	expect(compare(held.list, flat, integerOrder)).toEqual(equal)
+	expect(
+		is(held.list, integers(...held.items, 7), integerEquality).value,
+	).toBe(false)
+	expect(listToString(held.list, integerPrinting).value).toBe(
+		`[${held.items.join(", ")}]`,
+	)
+	expect(getStringRepresentation(held.list)).toBe(
+		getStringRepresentation(flat),
+	)
+}
+
+describe("a random chain of List operations against an Array model", () => {
+	// NOTE: Eighty turns over a pool that starts with four boxes, which is deep
+	// enough for a box to be a window of a window of a window and for every
+	// operation to have been asked of every shape the chain reaches. The whole
+	// run of twelve seeds is well under a second.
+	const TURNS = 80
+
+	// NOTE: The positions an operation is given — inside, at both ends, and past
+	// both of them, in the two spellings a position has.
+	const positionIn = (draw: () => number, items: Array<number>): number => {
+		let span = items.length + 2
+		let position = Math.floor(draw() * (span * 2 + 1)) - span
+
+		return position
+	}
+
+	for (let seed of CHAIN_SEEDS) {
+		test(`every box a chain builds keeps answering for itself, at seed ${seed.toString(16)}`, () => {
+			let draw = seededRandom(seed)
+			let pool: Array<Held> = [
+				{ list: integers(), items: [] },
+				{ list: integers(1), items: [1] },
+				{ list: integers(1, 2, 3, 4, 5), items: [1, 2, 3, 4, 5] },
+				{ list: upgraded(), items: [1, 2, 3, 4, 5] },
+			]
+
+			const pick = (): Held =>
+				pool[Math.floor(draw() * pool.length)] as Held
+
+			// NOTE: One operation per turn, and the answer joins the pool. Each
+			// of them is written twice over — once as the native, once against
+			// the model — and the two are compared at the end of the turn and
+			// at the end of every turn after it.
+			const turns: Array<() => Held> = [
+				() => {
+					let held = pick()
+					let value = Math.floor(draw() * 20) - 5
+
+					return {
+						list: append(held.list, createInteger(BigInt(value))),
+						items: [...held.items, value],
+					}
+				},
+				() => {
+					let held = pick()
+					let value = Math.floor(draw() * 20) - 5
+
+					return {
+						list: prepend(held.list, createInteger(BigInt(value))),
+						items: [value, ...held.items],
+					}
+				},
+				() => {
+					let first = pick()
+					let second = pick()
+
+					return {
+						list: appendContentsOf(first.list, second.list),
+						items: [...first.items, ...second.items],
+					}
+				},
+				() => {
+					let held = pick()
+					let from = positionIn(draw, held.items)
+					let to = positionIn(draw, held.items)
+
+					return {
+						list: slice(
+							held.list,
+							createInteger(BigInt(from)),
+							createInteger(BigInt(to)),
+						),
+						items: referenceSlice(held.items, from, to),
+					}
+				},
+				() => {
+					let held = pick()
+					let at = positionIn(draw, held.items)
+
+					return {
+						list: remove(held.list, createInteger(BigInt(at))),
+						items: referenceRemove(held.items, at),
+					}
+				},
+				() => {
+					let held = pick()
+					let at = positionIn(draw, held.items)
+					let value = Math.floor(draw() * 20) - 5
+
+					return {
+						list: insert(
+							held.list,
+							createInteger(BigInt(value)),
+							createInteger(BigInt(at)),
+						),
+						items: referenceInsert(held.items, value, at),
+					}
+				},
+				() => {
+					let held = pick()
+					let at = positionIn(draw, held.items)
+					let value = Math.floor(draw() * 20) - 5
+
+					return held.items.length === 0
+						? held
+						: {
+								list: replace(
+									held.list,
+									createInteger(BigInt(value)),
+									createInteger(BigInt(at)),
+								),
+								items: referenceReplace(held.items, value, at),
+							}
+				},
+				() => {
+					let held = pick()
+
+					return {
+						list: map(held.list, (item) =>
+							createInteger(BigInt(Number(item.value) + 1)),
+						),
+						items: held.items.map((item) => item + 1),
+					}
+				},
+				() => {
+					let held = pick()
+
+					return {
+						list: everyItem(held.list, (item) =>
+							createBoolean(Number(item.value) % 2 === 0),
+						),
+						items: held.items.filter((item) => item % 2 === 0),
+					}
+				},
+				() => {
+					let held = pick()
+
+					return {
+						list: reverse(held.list),
+						items: [...held.items].reverse(),
+					}
+				},
+				() => {
+					let held = pick()
+
+					return {
+						list: sortByOwnOrder(held.list, ascending, integerOrder),
+						items: [...held.items].sort(
+							(first, second) => first - second,
+						),
+					}
+				},
+				// NOTE: The canonical functional walk's two halves, drawn as
+				// operations of their own so that the chain builds the shrinking
+				// windows the trimming policy is about — and reads the head off
+				// the box before cutting the tail out of it, which is the order
+				// that used to decide what the walk cost.
+				() => {
+					let held = pick()
+
+					itemAt(held.list, 0)
+
+					return {
+						list: slice(
+							held.list,
+							createInteger(1n),
+							length(held.list),
+						),
+						items: held.items.slice(1),
+					}
+				},
+				() => {
+					let held = pick()
+					let tail = slice(
+						held.list,
+						createInteger(0n),
+						createInteger(BigInt(held.items.length - 1)),
+					)
+
+					itemAt(held.list, -1)
+
+					return { list: tail, items: held.items.slice(0, -1) }
+				},
+				() => {
+					let held = pick()
+
+					return {
+						list: slice(
+							held.list,
+							createInteger(1n),
+							createInteger(BigInt(held.items.length - 1)),
+						),
+						items: held.items.slice(1, -1),
+					}
+				},
+			]
+
+			for (let turn = 0; turn < TURNS; turn++) {
+				pool.push((turns[Math.floor(draw() * turns.length)] as () => Held)())
+
+				// NOTE: Every box, in an order the draw decides — because what
+				// a read may do to a box is trim it, and a trim under one box is
+				// felt by whichever of its relatives is read next.
+				let order = pool.map((_, index) => index)
+
+				for (let index = order.length - 1; index > 0; index--) {
+					let other = Math.floor(draw() * (index + 1))
+
+					;[order[index], order[other]] = [
+						order[other] as number,
+						order[index] as number,
+					]
+				}
+
+				for (let index of order) {
+					expectAnswers(pool[index] as Held)
+				}
+			}
+
+			// NOTE: And once more from each end, so that no box was only ever
+			// asked before its children were read, or only ever after.
+			for (let held of pool) {
+				expectAnswers(held)
+			}
+
+			for (let index = pool.length - 1; index >= 0; index--) {
+				expectAnswers(pool[index] as Held)
+			}
+		})
+	}
+})
+
+// NOTE: THE REENTRANCY RULE, fuzzed. A callback may edit the very List being
+// walked — `List.ts` names the fold seeded with its own receiver — and the walk
+// must cover the items the box viewed when it started and no others, whatever
+// the callback pushed onto the Array it is reading. The trimming policy decides
+// when a run is replaced under a box, so it is exactly the kind of change that
+// could make a walk read the wrong Array halfway through.
+describe("a callback that edits the List being walked", () => {
+	const shapes: Array<[string, () => ListType<IntegerType>, Array<number>]> = [
+		["a flat box", () => integers(1, 2, 3, 4, 5), [1, 2, 3, 4, 5]],
+		["an upgraded box", upgraded, [1, 2, 3, 4, 5]],
+		[
+			"a shared window",
+			() =>
+				slice(
+					integers(0, 1, 2, 3, 4, 5, 6),
+					createInteger(1n),
+					createInteger(6n),
+				),
+			[1, 2, 3, 4, 5],
+		],
+		[
+			"a stale box",
+			() => {
+				let seed = integers(1, 2, 3, 4, 5)
+
+				append(seed, createInteger(9n))
+
+				return seed
+			},
+			[1, 2, 3, 4, 5],
+		],
+	]
+
+	for (let [name, build, items] of shapes) {
+		test(`a fold over ${name} seeded with itself answers its items twice`, () => {
+			let list = build()
+
+			expect(
+				itemsOf(
+					reduce(list, list, (accumulator, item) =>
+						append(accumulator, item),
+					),
+				),
+			).toEqual([...items, ...items])
+			expect(itemsOf(list)).toEqual(items)
+		})
+
+		test(`a map over ${name} appending to it answers its entry-time items`, () => {
+			let list = build()
+
+			expect(
+				itemsOf(
+					map(list, (item) => {
+						append(list, item)
+
+						return item
+					}),
+				),
+			).toEqual(items)
+			expect(itemsOf(list)).toEqual(items)
+		})
+
+		test(`a map over ${name} prepending to it answers its entry-time items`, () => {
+			let list = build()
+
+			expect(
+				itemsOf(
+					map(list, (item) => {
+						prepend(list, item)
+
+						return item
+					}),
+				),
+			).toEqual(items)
+			expect(itemsOf(list)).toEqual(items)
+		})
+
+		test(`a filter over ${name} slicing it answers its entry-time items`, () => {
+			let list = build()
+
+			expect(
+				itemsOf(
+					everyItem(list, (item) => {
+						slice(list, createInteger(1n), length(list))
+						itemAt(list, 0)
+
+						return createBoolean(
+							Math.abs(Number(item.value)) % 2 === 1,
+						)
+					}),
+				),
+			).toEqual(items.filter((item) => Math.abs(item) % 2 === 1))
+			expect(itemsOf(list)).toEqual(items)
+		})
+	}
 })
