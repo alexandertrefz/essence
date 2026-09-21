@@ -261,10 +261,11 @@ function graphemesIn(string: StringType): Array<string> {
 // it rather than copied out first, which is what keeps a prefix test at the
 // cost of the prefix and a front drain linear.
 //
-// NOTE: The three hot readers — `length`, `character(at:)` and `slice` — read
-// the three parts directly instead, because they are asked once per turn of a
-// drain and this allocates an object per call. A search is asked once per call
-// and walks characters afterwards, so the object is nothing beside the walk.
+// NOTE: The readers a DRAIN asks per turn — `length`, `character(at:)`,
+// `slice` and the prefix and suffix tests — read the three parts directly
+// instead, because this allocates a record per call and they do nothing else
+// big enough to hide it. A search is asked once per call and walks the receiver
+// afterwards, so there the record is nothing beside the walk.
 //
 // NOTE: Exported for `NonEmptyString.ts`'s two proven ends — the same reason
 // `List.ts` exports `viewOf` for `NonEmptyList.ts` — and for the specs that
@@ -287,14 +288,6 @@ export function viewOf(string: StringType): CharacterWindow {
 		count: (string as MeasuredString)[graphemeCountKey]!,
 		segmented: view.segmented,
 	}
-}
-
-// NOTE: A whole Array read as such a window, for the two walks that COLLECT
-// the characters they pass — `split` and the limited `split` — and so ask
-// `graphemesIn` for the Array anyway. It is here so that the matcher below is
-// the only comparison any of them makes.
-function wholeOf(clusters: Array<string>): CharacterWindow {
-	return { clusters, start: 0, count: clusters.length, segmented: false }
 }
 
 // NOTE: Whether this String has had its character view BUILT — the one
@@ -621,9 +614,16 @@ export function append(
 // hundred lines of thirty-six characters measured 49 µs with `every` and 22 µs
 // with the loop.
 //
-// NOTE: The receiver is read WHERE IT STANDS — `base` is where its characters
-// begin in `clusters` and `count` is how many are its own — so a window is
-// searched in its parent's Array rather than copied out of it first.
+// NOTE: The receiver is read WHERE IT STANDS — `at` is where the run being
+// tested begins in `clusters` and `remaining` is how many of the receiver's own
+// characters stand from there — so a window is searched inside its parent's
+// Array rather than copied out of it first.
+//
+// NOTE: The three arrive as plain arguments rather than as the window record
+// `viewOf` answers. The record reads better and costs a property load PER
+// CHARACTER, because the pushes at the call sites could reach anything as far
+// as the engine knows: 200 `replaceEvery` over a 10,800-character String
+// measured 19.7 ms that way against 17.6 here, and `split` 37.8 against 33.1.
 //
 // NOTE: The part arrives folded where the call folds, and the receiver is
 // folded ONE CHARACTER AT A TIME here. Folding the whole receiver up front is
@@ -631,29 +631,60 @@ export function append(
 // comparing #Insensitive)` on a 10,800-character String measured 70.6 ms that
 // way and 0.1 ms this way, because this way reads three characters.
 function partMatchesAt(
-	view: CharacterWindow,
+	clusters: Array<string>,
+	at: number,
+	remaining: number,
 	part: Array<string>,
-	position: number,
-	insensitive: boolean,
 ): boolean {
-	if (position + part.length > view.count) {
+	if (part.length > remaining) {
 		return false
 	}
 
-	let clusters = view.clusters
-	let at = view.start + position
-
 	for (let offset = 0; offset < part.length; offset++) {
-		let character = clusters[at + offset]!
-
-		if (
-			(insensitive ? character.toLowerCase() : character) !== part[offset]
-		) {
+		if (clusters[at + offset] !== part[offset]) {
 			return false
 		}
 	}
 
 	return true
+}
+
+// NOTE: A run of the receiver's own characters, folded — as many as the part
+// covers and NO MORE. It is what keeps a prefix or a suffix test at the cost of
+// the prefix: folding the whole receiver to compare two characters is what made
+// a drain asking `starts(with:, comparing #Insensitive)` per turn quadratic.
+function foldedRun(
+	clusters: Array<string>,
+	at: number,
+	width: number,
+): Array<string> {
+	let run: Array<string> = []
+
+	for (let offset = 0; offset < width; offset++) {
+		run.push(clusters[at + offset]!.toLowerCase())
+	}
+
+	return run
+}
+
+// NOTE: The receiver's characters as the WALKS read them — its own Array where
+// the call folds nothing, and a folded copy of its own window where it does.
+// The walks below visit every character of the receiver anyway, so folding it
+// once costs what the walk costs; folding inside the comparison instead costs a
+// branch per character of every walk that never folds, and `split` measured
+// 36.2 ms that way against 33.1 here.
+//
+// NOTE: A window is folded into a copy of ITS OWN characters, never its
+// parent's, which is why the answer carries the offset to read it from.
+function foldedWalk(
+	clusters: Array<string>,
+	start: number,
+	count: number,
+	insensitive: boolean,
+): { characters: Array<string>; at: number } {
+	return insensitive
+		? { characters: foldedRun(clusters, start, count), at: 0 }
+		: { characters: clusters, at: start }
 }
 
 // NOTE: The first of two entries, and the two are the same Function. The
@@ -728,13 +759,13 @@ export function split__overload$1(
 	}
 
 	let separator = graphemesIn(splitterString)
-	let whole = wholeOf(characters)
+	let total = characters.length
 	let pieces: Array<Array<string>> = []
 	let current: Array<string> = []
 	let index = 0
 
-	while (index < characters.length) {
-		if (partMatchesAt(whole, separator, index, false)) {
+	while (index < total) {
+		if (partMatchesAt(characters, index, total - index, separator)) {
 			pieces.push(current)
 			current = []
 			index += separator.length
@@ -828,15 +859,19 @@ function firstIndexIn(
 		)
 	}
 
-	let view = viewOf(originalString)
+	let { clusters, start, count } = viewOf(originalString)
 	let separator = foldedPart(part, insensitive)
+	let walk = foldedWalk(clusters, start, count, insensitive)
 
-	for (
-		let position = 0;
-		position + separator.length <= view.count;
-		position++
-	) {
-		if (partMatchesAt(view, separator, position, insensitive)) {
+	for (let position = 0; position + separator.length <= count; position++) {
+		if (
+			partMatchesAt(
+				walk.characters,
+				walk.at + position,
+				count - position,
+				separator,
+			)
+		) {
 			return position
 		}
 	}
@@ -859,15 +894,19 @@ function lastIndexIn(
 		)
 	}
 
-	let view = viewOf(originalString)
+	let { clusters, start, count } = viewOf(originalString)
 	let separator = foldedPart(part, insensitive)
+	let walk = foldedWalk(clusters, start, count, insensitive)
 
-	for (
-		let position = view.count - separator.length;
-		position >= 0;
-		position--
-	) {
-		if (partMatchesAt(view, separator, position, insensitive)) {
+	for (let position = count - separator.length; position >= 0; position--) {
+		if (
+			partMatchesAt(
+				walk.characters,
+				walk.at + position,
+				count - position,
+				separator,
+			)
+		) {
 			return position
 		}
 	}
@@ -906,12 +945,20 @@ function eachOccurrence(
 		return
 	}
 
-	let view = viewOf(originalString)
+	let { clusters, start, count } = viewOf(originalString)
 	let separator = foldedPart(part, insensitive)
+	let walk = foldedWalk(clusters, start, count, insensitive)
 	let index = 0
 
-	while (index + separator.length <= view.count) {
-		if (partMatchesAt(view, separator, index, insensitive)) {
+	while (index + separator.length <= count) {
+		if (
+			partMatchesAt(
+				walk.characters,
+				walk.at + index,
+				count - index,
+				separator,
+			)
+		) {
 			visit(index)
 			index += separator.length
 		} else {
@@ -970,9 +1017,29 @@ function startsIn(
 			: text.startsWith(needle)
 	}
 
-	let view = viewOf(originalString)
+	// NOTE: The three parts read directly rather than through `viewOf`, which
+	// allocates a record per call — a drain asks this per turn, and the record
+	// measured 220 ns against 200 for 2,000 prefix tests of a held String.
+	let clusters = viewIn(originalString).clusters
+	let start = startIn(originalString)
+	let count = graphemeCountIn(originalString)
+	let prefixCharacters = foldedPart(prefix, insensitive)
 
-	return partMatchesAt(view, foldedPart(prefix, insensitive), 0, insensitive)
+	if (prefixCharacters.length > count) {
+		return false
+	}
+
+	// NOTE: Only the receiver's first `prefixCharacters.length` characters are
+	// folded, for the reason the ASCII route above gives — a prefix test costs
+	// the prefix, whichever route answers it.
+	return partMatchesAt(
+		insensitive
+			? foldedRun(clusters, start, prefixCharacters.length)
+			: clusters,
+		insensitive ? 0 : start,
+		count,
+		prefixCharacters,
+	)
 }
 
 function endsIn(
@@ -993,18 +1060,27 @@ function endsIn(
 			: text.endsWith(needle)
 	}
 
-	let view = viewOf(originalString)
+	// NOTE: Read directly, for the reason `starts` gives.
+	let clusters = viewIn(originalString).clusters
+	let start = startIn(originalString)
+	let count = graphemeCountIn(originalString)
 	let suffixCharacters = foldedPart(suffix, insensitive)
 
-	if (suffixCharacters.length > view.count) {
+	if (suffixCharacters.length > count) {
 		return false
 	}
 
+	let at = start + count - suffixCharacters.length
+
+	// NOTE: The receiver's LAST `suffixCharacters.length` characters, folded,
+	// for the reason `starts` gives.
 	return partMatchesAt(
-		view,
+		insensitive
+			? foldedRun(clusters, at, suffixCharacters.length)
+			: clusters,
+		insensitive ? 0 : at,
+		suffixCharacters.length,
 		suffixCharacters,
-		view.count - suffixCharacters.length,
-		insensitive,
 	)
 }
 
@@ -1214,7 +1290,28 @@ export function characterIn(
 	// Array of all of them, and the unit is marked ASCII as a piece of a
 	// `split` is. Measured on a 10,800-character ASCII String: 380 µs through
 	// the view, 8 µs here, most of which is the scan.
-	if (readsByUnit(string)) {
+	//
+	// NOTE: The two keys are read ONCE, here, rather than through `readsByUnit`
+	// and `viewIn` in turn — this is the read `NonEmptyString`'s two proven ends
+	// are, and a Program walking a String asks it per character. Reading them
+	// twice measured 15.0 ns against 11.8 for 200,000 reads of one held String.
+	// The question the two of them answer is `readsByUnit`'s, spelled out: the
+	// remembered mark decides where there is one, and a String with a view is
+	// never scanned for one.
+	// NOTE: The view's own key is read only where the MARK does not already
+	// decide, which the `||` sees to — reading a key a value does not carry is
+	// a miss, and this is the read `NonEmptyString`'s two proven ends are:
+	// 200,000 `firstCharacter` of one held ASCII String measured 11.4 ns
+	// apiece with both keys read and 8.6 with one.
+	let measured = string as MeasuredString
+	let marked = measured[isAsciiKey]
+
+	if (
+		marked === true ||
+		(marked === undefined &&
+			measured[viewKey] === undefined &&
+			isAsciiIn(string))
+	) {
 		let text = string.value
 		let position = positionFromEnd(index, text.length)
 
@@ -1225,15 +1322,15 @@ export function characterIn(
 		return createAsciiString(text[position]!)
 	}
 
-	let view = viewIn(string)
-	let count = (string as MeasuredString)[graphemeCountKey]!
+	let clusters = viewIn(string).clusters
+	let count = measured[graphemeCountKey]!
 	let position = positionFromEnd(index, count)
 
 	if (position < 0 || position >= count) {
 		return undefined
 	}
 
-	return createString(view.clusters[startIn(string) + position]!)
+	return createString(clusters[(measured[viewStartKey] ?? 0) + position]!)
 }
 
 // NOTE: Native — the characters between two positions, where the Essence body
@@ -1268,6 +1365,20 @@ export function slice(
 		return createAsciiString(end <= start ? "" : text.slice(start, end))
 	}
 
+	return cutThroughView(originalString, from, to)
+}
+
+// NOTE: The view route of the cut above, in a Function of its own so that the
+// ASCII route stays SMALL. An engine inlines a hot callee by its size, and a
+// drain cuts once per turn: with both routes in one body, the ASCII drain of
+// 5,000 characters measured 9.7 ms against master's 5.0 — the cut itself was
+// no slower, and neither was the count beside it, but the pair of them was.
+// Split, the same drain measures what it always did.
+function cutThroughView(
+	originalString: StringType,
+	from: IntegerType,
+	to: IntegerType,
+): StringType {
 	let view = viewIn(originalString)
 	let count = (originalString as MeasuredString)[graphemeCountKey]!
 	let first = positionFromEnd(from.value, count)
@@ -1696,15 +1807,15 @@ export function split__overload$5(
 
 	let characters = graphemesIn(originalString)
 	let separator = graphemesIn(splitterString)
-	let whole = wholeOf(characters)
+	let total = characters.length
 	let pieces: Array<Array<string>> = []
 	let current: Array<string> = []
 	let index = 0
 
-	while (index < characters.length) {
+	while (index < total) {
 		if (
 			pieces.length < limit - 1 &&
-			partMatchesAt(whole, separator, index, false)
+			partMatchesAt(characters, index, total - index, separator)
 		) {
 			pieces.push(current)
 			current = []
@@ -1756,19 +1867,27 @@ export function replaceEvery__overload$2(
 		return createString(pieces.join(replacement.value))
 	}
 
-	let view = viewOf(originalString)
+	let { clusters, start, count } = viewOf(originalString)
 	let separator = foldedPart(part, insensitive)
+	let walk = foldedWalk(clusters, start, count, insensitive)
 	let pieces: Array<string> = []
 	let current: Array<string> = []
 	let index = 0
 
-	while (index < view.count) {
-		if (partMatchesAt(view, separator, index, insensitive)) {
+	while (index < count) {
+		if (
+			partMatchesAt(
+				walk.characters,
+				walk.at + index,
+				count - index,
+				separator,
+			)
+		) {
 			pieces.push(current.join(""))
 			current = []
 			index += separator.length
 		} else {
-			current.push(view.clusters[view.start + index]!)
+			current.push(clusters[start + index]!)
 			index++
 		}
 	}
