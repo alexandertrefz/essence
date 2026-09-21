@@ -619,6 +619,52 @@ describe("what a drain costs", () => {
 		expect(viewOf(most).count).toBe(6_000)
 	})
 
+	// NOTE: THE HALF RULE IS ASKED IN BOTH UNITS, and this is the shape that
+	// tells the two apart: 2,000 clusters of 21 code units each followed by
+	// 2,000 of one. A window over the narrow half is exactly half the
+	// CHARACTERS and a twenty-second of the TEXT, so the character rule alone
+	// let it share — and what it shared was the whole 44,000-unit text, held
+	// for as long as the window was. Measured over this very drain, the worst
+	// text a window pinned was 21 times its own; it is 2 now, and the price is
+	// three more Arrays over a drain of four thousand turns.
+	//
+	// NOTE: Both claims are asserted every turn rather than at the end, because
+	// a window that pins too much pins it from the moment it is made, and the
+	// text it borrowed is gone by the time the drain is over. The borrowed text
+	// is read by the Symbol key's description, as the ASCII mark is — what a
+	// window HOLDS is not observable any other way.
+	test("a drain over skewed clusters pins no more text than it holds", () => {
+		let wide = `e${String.fromCodePoint(769).repeat(20)}`
+		let skewed = createString(wide.repeat(2_000) + "a".repeat(2_000))
+		let arrays = new Set<Array<string>>()
+		let clustersHeld = 0
+		let rest = skewed
+		let turns = 0
+
+		while (Number(length(rest).value) > 0 && turns < 4_010) {
+			let view = viewOf(rest)
+			let pinned = remembered(rest, "$viewText")
+
+			if (!arrays.has(view.clusters)) {
+				arrays.add(view.clusters)
+				clustersHeld += view.clusters.length
+			}
+
+			expect(view.clusters.length).toBeLessThanOrEqual(2 * view.count)
+
+			if (typeof pinned === "string") {
+				expect(pinned.length).toBeLessThanOrEqual(2 * rest.value.length)
+			}
+
+			rest = slice(rest, createInteger(1), createInteger(1_000_000))
+			turns++
+		}
+
+		expect(turns).toBe(4_000)
+		expect(arrays.size).toBeLessThanOrEqual(24)
+		expect(clustersHeld).toBeLessThan(5 * 4_000)
+	})
+
 	// NOTE: A window of a window shares the ROOT's Array rather than standing
 	// on a chain of windows, so reading a character is one Array read however
 	// many cuts deep the String is.

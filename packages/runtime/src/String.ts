@@ -392,13 +392,16 @@ function offsetsIn(string: StringType, clusters: Array<string>): Int32Array {
 // downstream — `is`, `compare`, `normalisedFormOf`, printing, the Dictionary
 // key encoding — therefore answers what it answered before, because it is
 // handed the same text it was handed before.
+//
+// NOTE: The offset table arrives rather than being looked up here, because the
+// rule below had to read it to decide this cut at all.
 function createWindowString(
 	original: StringType,
 	clusters: Array<string>,
 	start: number,
 	count: number,
+	offsets: Int32Array,
 ): StringType {
-	let offsets = offsetsIn(original, clusters)
 	let text = clusterTextOf(original)
 	let string = createString(
 		text.slice(offsets[start]!, offsets[start + count]!),
@@ -422,14 +425,43 @@ function createWindowString(
 // otherwise. What the rule bounds is RETENTION — a window holds the whole Array
 // of clusters, the offset table and the whole text they were cut from alive,
 // and a six-character token cut out of a five-megabyte source must not pin the
-// source for as long as the token is held. Under the rule a window pins at most
-// twice its own characters.
+// source for as long as the token is held.
+//
+// NOTE: IT IS ASKED IN BOTH UNITS, and it has to be. A window pins three things
+// and the character count bounds only two of them: the Array and the table hold
+// one entry per CHARACTER, and the text holds one entry per CODE UNIT — and
+// cluster widths are not uniform, so half the characters of a text can be a
+// thousandth of its units. A text of 20,000 one-unit clusters followed by
+// 20,000 clusters 301 units wide is 12 MB, and a window over its narrow half is
+// exactly half the characters and 20,000 units: under the character rule alone
+// each such window held 5.1 MB of resident memory against the 2.2 MB the copy
+// it replaced held, and NOTHING CAPPED THE RATIO — it is the mean cluster width
+// outside the window over the mean inside it, and a chat log of emoji beside
+// ASCII has five to eleven for free. Both questions asked, the same shape holds
+// 2.0 MB a window, which is what the copy holds. That is what makes the
+// sentence "a window pins at most twice its own characters AND twice its own
+// text" true.
+//
+// NOTE: The CHARACTER question is asked first, and that ordering is the cost
+// argument. The unit question needs the offset table, which is O(n) to build on
+// an Array nothing has cut yet — and a cut the character rule already refuses
+// must not pay for a table to be refused twice. Where the character rule
+// passes, the table is what the window being made needs anyway.
 //
 // NOTE: The rule costs nothing asymptotically, and the HALF is why: a drain
 // from either end shares every step down to half, copies ONCE there, shares
 // down to half of that, and so on — so the copies over a whole drain add up to
 // 2n clusters against the n²/2 of copying at every step. A copy is exactly what
-// a cut cost before this, so no cut that was cheap became dear.
+// a cut cost before this, so no cut that was cheap became dear. Two questions
+// rather than one do not change that: each copy halves the characters or halves
+// the units of what the next window can share, and neither can halve more than
+// its own logarithm of times. Measured on a 20,000-character front drain over a
+// text of 10,000 clusters 21 units wide followed by 10,000 of one unit: 17
+// Arrays where the character rule alone held 14, and 81,000 clusters copied in
+// all where it copied 40,000 — four times the characters rather than twice, for
+// the same 32 ms of wall clock. Every text whose clusters are of a kind — the
+// drains over accents, combining marks, CRLF, joined emoji and flags — copies
+// exactly what it copied before, because there the two questions are one.
 //
 // NOTE: The copy JOINS its clusters rather than cutting the text, and that is
 // the other half of the retention story: an engine's sliced String keeps the
@@ -448,7 +480,17 @@ function cutFromView(
 	count: number,
 ): StringType {
 	if (count * 2 >= clusters.length) {
-		return createWindowString(original, clusters, start, count)
+		let offsets = offsetsIn(original, clusters)
+
+		// NOTE: The table's LAST entry is the whole text's length, because the
+		// clusters partition it — so the two numbers the unit question needs
+		// are both reads of the table the window would carry anyway.
+		if (
+			(offsets[start + count]! - offsets[start]!) * 2 >=
+			offsets[clusters.length]!
+		) {
+			return createWindowString(original, clusters, start, count, offsets)
+		}
 	}
 
 	return createSegmentedString(clusters.slice(start, start + count))
