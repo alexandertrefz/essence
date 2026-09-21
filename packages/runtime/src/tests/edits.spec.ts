@@ -764,19 +764,18 @@ describe("draining from the front", () => {
 		})
 	}
 
-	test("an append-built drain moves no items after its first step", () => {
+	test("an append-built drain upgrades once and stays on a front run", () => {
 		let drained = createList([11, 22, 33, 44, 55, 66].map(integer))
 
 		drained = remove(drained, integer(0))
 
-		let front = drained.front
-
-		expect(front).toBeDefined()
+		expect(drained.front).toBeDefined()
 
 		for (let step = 0; step < 4; step++) {
 			drained = remove(drained, integer(0))
 
-			expect(drained.front).toBe(front)
+			expect(drained.front).toBeDefined()
+			expect(drained.value.length).toBe(0)
 		}
 
 		expect(itemsOf(drained)).toEqual([66])

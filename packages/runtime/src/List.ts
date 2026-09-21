@@ -102,12 +102,52 @@ export function viewOf<ItemType extends AnyType>(
 ): ListView<ItemType> {
 	let view = runsOf(originalList)
 
-	// NOTE: A box whose view is shorter than its run is holding the whole of
-	// its chain's high-water Array alive. Reading it trims that away and stores
-	// the trimmed Array back, so the work happens once however often the box is
-	// read afterwards — and the Array a reader is handed keeps its identity
-	// across reads.
-	if (view.backCount !== view.back.length) {
+	trimUnderHalfRule(originalList, view, view.frontCount, view.backCount)
+
+	return view
+}
+
+// NOTE: THE HALF RULE FOR RUNS, and the whole of the trimming policy. A box
+// whose view is shorter than its run is holding the whole of its chain's
+// high-water Array alive, and trimming that away and storing the trimmed Array
+// back is what releases it. What the rule decides is WHEN: only when the view
+// that will be held is less than HALF of the Array holding it. Above a half the
+// box is told to keep the Array it has.
+//
+// NOTE: The rule is what keeps a SHRINK CHAIN linear, which is the whole reason
+// it is a rule rather than "always". `removeFirst()` answers a window one item
+// shorter, and the canonical functional walk — take `firstItem()`, recurse on
+// `removeFirst()` — reads each of those windows once. Trimming every one of
+// them copies n−k items per turn and the walk is quadratic: 50,000 items
+// measured 634 ms that way against 36 ms under this rule. Under it the chain
+// trims at n/2, n/4, n/8 … which is n items of copying over the whole walk,
+// amortised O(1) a turn, and what the walk holds never exceeds twice what it
+// views.
+//
+// NOTE: Held to at BOTH ends of a window's life — where one is read, above, and
+// where one is CUT, in `sharedWindowOf` below. That is what makes the walk cost
+// the same whichever way round its two lines are written: a turn that derives
+// the next window before reading this one trims the run at the cut, and a turn
+// that reads first trims it at the read, and the other of the two then finds a
+// run it already views more than half of. Trimming at the read alone left the
+// derive-first spelling copying from the halfway point on — 220 ms against 35
+// for the same walk with its two lines swapped.
+//
+// NOTE: The counts the rule is asked about are the ones the box that will HOLD
+// the Array views, which is the receiver's own for a read and the ANSWER's for
+// a cut. What is trimmed away is everything past the RECEIVER's view either
+// way, since that is all the receiver may promise about a run it is handing on.
+//
+// NOTE: A front-less box views zero items of the one shared `noItems`, which is
+// zero items long, so the front rule can not fire for it and no box is ever
+// given a front run it did not have.
+function trimUnderHalfRule<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	view: ListView<ItemType>,
+	frontKept: number,
+	backKept: number,
+): void {
+	if (backKept * 2 < view.back.length) {
 		let trimmed = view.back.slice(0, view.backCount)
 
 		originalList.value = trimmed
@@ -115,18 +155,13 @@ export function viewOf<ItemType extends AnyType>(
 		view.back = trimmed
 	}
 
-	// NOTE: A front-less box views zero items of the one shared `noItems`, which
-	// is zero items long, so this can not fire for it and no box is ever given a
-	// front run it did not have.
-	if (view.frontCount !== view.front.length) {
+	if (frontKept * 2 < view.front.length) {
 		let trimmed = view.front.slice(0, view.frontCount)
 
 		originalList.front = trimmed
 		originalList.frontLen = view.frontCount
 		view.front = trimmed
 	}
-
-	return view
 }
 
 // NOTE: The same two runs and the same fixed counts, read WITHOUT writing
@@ -313,18 +348,32 @@ function stampClosed<ItemType extends AnyType>(
 // asked for a suffix, when `upgradedForSuffix` below moves its seam to the end.
 //
 // NOTE: The answer is a STALE box, and that is the point. It holds both of the
-// receiver's Arrays and views less of them, so the first read trims it —
-// copying exactly the WINDOW's size, never the parent Array's, and releasing the
-// parent then. A shared window is a copy deferred to the first read and sized by
-// the answer rather than by the receiver, and no copy at all for a value nothing
-// ever reads. What it costs in exchange is the only honest debit: an unread
-// window keeps its parent's Arrays alive.
+// receiver's Arrays and views less of them, so a read trims it — copying
+// exactly the WINDOW's size, never the parent Array's, and releasing the parent
+// then. A shared window is a copy deferred to the read and sized by the answer
+// rather than by the receiver, and no copy at all for a value nothing ever
+// reads. What it costs in exchange is the only honest debit: a window nothing
+// reads keeps its parent's Arrays alive.
+//
+// NOTE: THE HALF RULE is asked here as well as at the read, about the counts
+// the ANSWER will view, and the trim it performs is the receiver's. A window
+// that keeps most of what the receiver viewed leaves the run alone; one that
+// keeps less than half of the Array is cut from a run trimmed to the receiver's
+// view first, so a chain of shrinking windows finds a shorter Array to share
+// every time it has halved. That is the same amortisation the read has, made to
+// hold whichever of the two a walk reaches first — see the rule's own NOTE.
 function sharedWindowOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	view: ListView<ItemType>,
 	start: number,
 	end: number,
 ): ListType<ItemType> {
+	trimUnderHalfRule(
+		originalList,
+		view,
+		view.frontCount - start,
+		end - view.frontCount,
+	)
 	stampClosed(originalList, view)
 
 	let frontLen = view.frontCount - start
@@ -386,6 +435,66 @@ function upgradedForSuffix<ItemType extends AnyType>(
 		back,
 		backCount: 0,
 		total: view.backCount,
+	}
+}
+
+// NOTE: The same trade for a window that contains NEITHER end. Only the windows
+// holding a box's seam can be shared, so a box asked for an interior one had to
+// copy it — and a walk that drops an item from BOTH ends per turn, which is what
+// a palindrome check is, copied everything it had left at every turn and was
+// quadratic: 50,000 items measured 1203 ms. Asked for such a window, the box
+// puts its seam in the MIDDLE of it, and every window that shrinks towards that
+// middle from either side is a shared window afterwards. One copy pays for the
+// whole walk: the same 50,000 measure 31 ms.
+//
+// NOTE: The middle, rather than either end of the window, because a walk that
+// drops from both ends moves the two ends TOWARDS each other and the seam has to
+// outlast both. A seam placed at the middle of what is kept is passed by neither
+// end until the walk is over, which is what turns the one copy into the whole of
+// what the walk moves.
+//
+// NOTE: THE HALF RULE again, and the caller applies it as `upgradedForSuffix`'s
+// callers do: the split costs the whole List where the plain copy costs the
+// window, so it is worth it exactly when the window keeps at least half of what
+// the box holds.
+//
+// NOTE: Item by item rather than the bulk `slice` and `reverse` above, because
+// the items being split may lie across both of the receiver's runs and in either
+// order. Both Arrays are sized once and filled by index, never pushed onto, and
+// the walk runs ONCE for a whole drain where the copy it replaces ran every
+// turn.
+function upgradedAroundWindow<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	view: ListView<ItemType>,
+	first: number,
+	last: number,
+): ListView<ItemType> {
+	let total = view.total
+	let seam = first + ((last - first) >> 1)
+	// oxlint-disable-next-line unicorn/no-new-array -- the run's own length
+	let front: Array<ItemType> = new Array(seam)
+	// oxlint-disable-next-line unicorn/no-new-array -- the run's own length
+	let back: Array<ItemType> = new Array(total - seam)
+
+	for (let index = 0; index < seam; index++) {
+		front[seam - 1 - index] = itemOfView(view, index)
+	}
+
+	for (let index = seam; index < total; index++) {
+		back[index - seam] = itemOfView(view, index)
+	}
+
+	originalList.value = back
+	originalList.length = total - seam
+	originalList.front = front
+	originalList.frontLen = seam
+
+	return {
+		front,
+		frontCount: seam,
+		back,
+		backCount: total - seam,
+		total,
 	}
 }
 
@@ -920,6 +1029,18 @@ export function slice<ItemType extends AnyType>(
 		return sharedWindowOf(
 			originalList,
 			upgradedForSuffix(originalList, view),
+			first,
+			last,
+		)
+	}
+
+	// NOTE: An interior window of a box whose seam is at neither end of it, under
+	// the half rule — the box moves its seam into the middle of the window, and
+	// a walk dropping an item from each end per turn is windows from here on.
+	if ((last - first) * 2 >= length) {
+		return sharedWindowOf(
+			originalList,
+			upgradedAroundWindow(originalList, view, first, last),
 			first,
 			last,
 		)

@@ -148,7 +148,7 @@ describe("Bundle Size", () => {
 	// why moving a body into Essence can shrink a String-heavy Program while
 	// growing this one.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(79_100)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(80_200)
 	})
 
 	// NOTE: 38,056 measured; a reintroduced `Number` spread was 54,849. The same
