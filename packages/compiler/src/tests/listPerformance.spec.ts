@@ -113,15 +113,19 @@ function buildingSource(method: string): string {
 // Program is caught at twenty or forty thousand and is never asked for eighty,
 // where it would run for long enough to be killed by the runner's own timeout
 // and report that instead of its growth.
+// NOTE: A TOO-STEEP READING IS TAKEN TWICE BEFORE IT IS BELIEVED, and both of
+// its lengths are measured again — the rule `stringPerformance.spec.ts` follows,
+// for its reason. Every figure here carries a subprocess spawn, several suites
+// can share the machine, and a spawn that stalls under load moves a ratio of two
+// small figures further than any regression in these Methods could: two of
+// these cases went red at loads of 17 and 52 with their claims perfectly true.
+// A Program that really did turn quadratic reads steep every time it is asked,
+// so asking twice costs a failing run a few seconds and a passing run nothing.
 function expectLinearGrowth(
 	sourceFor: (length: number) => string,
 	printedFor: (length: number) => string,
 ): void {
-	let measured: Array<number> = []
-	let tooSteep: Array<string> = []
-
-	for (let index = 0; index < WALK_LENGTHS.length; index++) {
-		let length = WALK_LENGTHS[index]!
+	let bestOf = (length: number) => {
 		let best = Number.POSITIVE_INFINITY
 
 		for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
@@ -131,17 +135,35 @@ function expectLinearGrowth(
 			)
 		}
 
-		measured.push(best)
+		return best
+	}
+	let measured: Array<number> = []
+	let tooSteep: Array<string> = []
+
+	for (let index = 0; index < WALK_LENGTHS.length; index++) {
+		let length = WALK_LENGTHS[index]!
+
+		measured.push(bestOf(length))
 
 		if (index === 0) {
 			continue
 		}
 
-		let grewBy = best / measured[index - 1]!
+		let grewBy = () => measured[index]! / measured[index - 1]!
 
-		if (grewBy >= GROWTH_PER_DOUBLING) {
+		if (grewBy() < GROWTH_PER_DOUBLING) {
+			continue
+		}
+
+		measured[index - 1] = Math.min(
+			measured[index - 1]!,
+			bestOf(WALK_LENGTHS[index - 1]!),
+		)
+		measured[index] = Math.min(measured[index]!, bestOf(length))
+
+		if (grewBy() >= GROWTH_PER_DOUBLING) {
 			tooSteep.push(
-				`${WALK_LENGTHS[index - 1]} to ${length}: ${grewBy.toFixed(1)}x`,
+				`${WALK_LENGTHS[index - 1]} to ${length}: ${grewBy().toFixed(1)}x`,
 			)
 
 			break
