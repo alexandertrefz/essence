@@ -142,117 +142,132 @@ function clustersOf(text: string): Array<string> {
 // thousand names normalised twenty thousand times — for a thousand distinct
 // answers. `isAscii` is remembered beside it because it is what decides whether
 // there is anything to normalise at all.
-const viewKey = Symbol("$view")
+const graphemesKey = Symbol("$graphemes")
 const viewStartKey = Symbol("$viewStart")
+const viewTextKey = Symbol("$viewText")
+const viewOffsetsKey = Symbol("$viewOffsets")
+const segmentedKey = Symbol("$segmented")
 const graphemeCountKey = Symbol("$graphemeCount")
 const isAsciiKey = Symbol("$isAscii")
 const normalisedKey = Symbol("$normalised")
 
-// NOTE: The view a String's characters live in, and the thing a WINDOW of a
-// String shares with it rather than copying. `clusters` is the character view
-// itself; `text` is the text those clusters were cut from and PARTITION, so
-// cutting it between two of their offsets answers exactly the characters
-// between them joined; `offsets` is where each cluster begins in that text,
-// counted in code units and built on the first cut.
+// NOTE: A String's characters live in `graphemesKey`'s Array, and a WINDOW of a
+// String shares that Array rather than copying it — `viewStartKey` says where
+// its own characters begin in it and `graphemeCountKey` how many are its own.
+// Both are ABSENT on a String that is the whole of its Array, so a `split`
+// piece, a `reverse` and a copied window carry exactly the two keys they
+// carried before there were windows at all.
 //
-// NOTE: `text` is not always the String's own `value`. The clusters are of the
-// NFC form — `is`, `compare` and every position Method are — and a String may
-// be written in a form that is not NFC, so `value` is the text as written and
-// `text` is the text its characters are in. A window cut from `text` therefore
-// holds the NFC text of the characters it names, which is the very String
-// `characters.slice(…).join("")` answered before there were windows.
+// NOTE: That absence is the design. A record holding the four parts together
+// reads far better, and costs an OBJECT PER STRING: a tokenizer holding 250,000
+// six-character tokens cut out of a five-megabyte source measured 53.6 MB of
+// retained heap that way against 42.1 MB — an AST keeps its tokens for the life
+// of the Program, and eleven megabytes of record is what the reading would have
+// cost it.
 //
-// NOTE: `segmented` says the Segmenter RAN for this view, rather than the view
-// being handed in — a `split` piece, a `reverse`, a copied window. Nothing in
-// the runtime reads it; `viewOf` hands it to the specs that assert a drain
-// segments its String ONCE and copies O(n) clusters in all.
-type CharacterView = {
-	clusters: Array<string>
-	text: string
-	offsets: Int32Array | null
-	segmented: boolean
-}
-
-// NOTE: `viewStartKey` is where this String's first character stands in its
-// view's `clusters`, and its ABSENCE means zero — so a String that is the whole
-// of its view carries no such key, and only a window pays for one. A String
-// that has a view always has its count beside it, which is what lets `length`
-// on a window answer without looking at the Array at all.
+// NOTE: The other three keys are what a window needs to cut its TEXT, and they
+// are shared references rather than answers of their own. `viewTextKey` is the
+// text the clusters partition, carried only where it is not the String's own
+// `value`: the clusters are of the NFC form — `is`, `compare` and every
+// position Method are — so a String written in another form has its characters
+// in a text it does not itself spell. `viewOffsetsKey` is where each cluster
+// begins in that text, and `segmentedKey` says the Segmenter RAN for this
+// Array, which nothing in the runtime reads and `viewOf` hands to the specs
+// that assert a drain segments its String ONCE.
 type MeasuredString = StringType & {
-	[viewKey]?: CharacterView
+	[graphemesKey]?: Array<string>
 	[viewStartKey]?: number
+	[viewTextKey]?: string
+	[viewOffsetsKey]?: Int32Array
+	[segmentedKey]?: boolean
 	[graphemeCountKey]?: number
 	[isAsciiKey]?: boolean
 	[normalisedKey]?: string
 }
 
-// NOTE: The view this String's characters live in, built at most once. A
+// NOTE: The Array this String's characters live in, built at most once. A
 // String the ASCII scan accepted is split into its code units instead of being
 // segmented, for the reason `isSingleUnitAscii` gives: each unit IS a cluster,
 // and the text is its own NFC form. That is the same view the Segmenter
 // answers, without the Segmenter. Measured on a 10,800-character ASCII String,
 // best of three: 415 µs to segment against 14 µs to split.
-function viewIn(string: StringType): CharacterView {
+function clustersIn(string: StringType): Array<string> {
 	let measured = string as MeasuredString
-	let view = measured[viewKey]
+	let clusters = measured[graphemesKey]
 
-	if (view === undefined) {
+	if (clusters === undefined) {
 		let unitPerCharacter = isAsciiIn(string)
 		let text = normalisedFormOf(string)
-		let clusters = unitPerCharacter ? text.split("") : clustersOf(text)
 
-		view = { clusters, text, offsets: null, segmented: !unitPerCharacter }
-		measured[viewKey] = view
+		clusters = unitPerCharacter ? text.split("") : clustersOf(text)
+		measured[graphemesKey] = clusters
 		measured[graphemeCountKey] = clusters.length
+
+		if (!unitPerCharacter) {
+			measured[segmentedKey] = true
+
+			// NOTE: Carried only where the NFC form is not the text the String
+			// spells, which is the only case where the two differ.
+			if (text !== string.value) {
+				measured[viewTextKey] = text
+			}
+		}
 	}
 
-	return view
+	return clusters
 }
 
-// NOTE: Where this String's first character stands in its view's Array — zero
-// for everything but a window, which is why the key is absent there.
+// NOTE: Where this String's first character stands in its Array — zero for
+// everything but a window, which is why the key is absent there.
 function startIn(string: StringType): number {
 	return (string as MeasuredString)[viewStartKey] ?? 0
 }
 
+// NOTE: The text this String's clusters were cut from and PARTITION, so that
+// cutting it between two of their offsets answers exactly the characters
+// between them joined. It is the String's own text wherever the two agree,
+// which is everything but a String written in a form that is not NFC and the
+// windows cut from one.
+function clusterTextOf(string: StringType): string {
+	return (string as MeasuredString)[viewTextKey] ?? string.value
+}
+
 // NOTE: The segmented view of a String as a WHOLE Array, for the readers that
 // walk all of it — `split`, `reverse`, `separate`. A String that IS the whole
-// of its view hands back the remembered Array itself rather than a copy of it,
-// so every caller here only ever READS it: one that needs to change it has to
-// copy first.
+// of its Array hands back the remembered one rather than a copy of it, so every
+// caller here only ever READS it: one that needs to change it has to copy
+// first.
 //
 // NOTE: A WINDOW is copied out of its parent's Array HERE, once, and keeps the
-// copy as a view of its own — which is both what these readers want (an Array
-// they may index from zero and measure with `.length`) and what lets the
-// parent's Array go once the window is all that is left of it. The readers a
-// drain asks per turn — `length`, `character(at:)`, `slice`, the prefix and
-// suffix tests and the searches — read the parent's Array through the offset
-// instead and never come here, which is the whole of why a window exists.
+// copy as its own — which is both what these readers want (an Array they may
+// index from zero and measure with `.length`) and what lets the parent's Array,
+// text and offset table go once the window is all that is left of them. The
+// readers a drain asks per turn — `length`, `character(at:)`, `slice`, the
+// prefix and suffix tests and the searches — read the parent's Array through
+// the offset instead and never come here, which is the whole of why a window
+// exists.
 function graphemesIn(string: StringType): Array<string> {
 	let measured = string as MeasuredString
-	let view = viewIn(measured)
+	let clusters = clustersIn(measured)
 	let start = measured[viewStartKey] ?? 0
 	let count = measured[graphemeCountKey]!
 
-	if (start === 0 && count === view.clusters.length) {
-		return view.clusters
+	if (start === 0 && count === clusters.length) {
+		return clusters
 	}
 
-	let clusters = view.clusters.slice(start, start + count)
+	let own = clusters.slice(start, start + count)
 
 	// NOTE: The window's own `value` IS these clusters joined — that is what
-	// cutting the parent's text between their offsets produced — so the copy is
-	// a view of the String it stands on, with nothing left to normalise or
-	// segment.
-	measured[viewKey] = {
-		clusters,
-		text: string.value,
-		offsets: null,
-		segmented: false,
-	}
+	// cutting the parent's text between their offsets produced — so what it
+	// borrowed is given up here rather than left to say something false about
+	// the Array it now has.
+	measured[graphemesKey] = own
 	measured[viewStartKey] = 0
+	measured[viewTextKey] = undefined
+	measured[viewOffsetsKey] = undefined
 
-	return clusters
+	return own
 }
 
 // NOTE: THE ONE VIEW READER, for everything that reads a String's characters
@@ -280,13 +295,14 @@ export type CharacterWindow = {
 }
 
 export function viewOf(string: StringType): CharacterWindow {
-	let view = viewIn(string)
+	let clusters = clustersIn(string)
+	let measured = string as MeasuredString
 
 	return {
-		clusters: view.clusters,
-		start: startIn(string),
-		count: (string as MeasuredString)[graphemeCountKey]!,
-		segmented: view.segmented,
+		clusters,
+		start: measured[viewStartKey] ?? 0,
+		count: measured[graphemeCountKey]!,
+		segmented: measured[segmentedKey] === true,
 	}
 }
 
@@ -303,7 +319,7 @@ export function viewOf(string: StringType): CharacterWindow {
 // carries it: an export nothing reaches is shaken out exactly as an unreached
 // native is.
 export function hasCharacterView(string: StringType): boolean {
-	return (string as MeasuredString)[viewKey] !== undefined
+	return (string as MeasuredString)[graphemesKey] !== undefined
 }
 
 // NOTE: A String assembled FROM a known character view keeps that view — the
@@ -314,36 +330,36 @@ export function hasCharacterView(string: StringType): boolean {
 // re-pair however they happen to stand. The handed-in array is remembered
 // as-is, so a caller building one must not change it afterwards.
 function createSegmentedString(characters: Array<string>): StringType {
-	let text = characters.join("")
-	let string = createString(text) as MeasuredString
+	let string = createString(characters.join("")) as MeasuredString
 
-	string[viewKey] = {
-		clusters: characters,
-		text,
-		offsets: null,
-		segmented: false,
-	}
+	string[graphemesKey] = characters
 	string[graphemeCountKey] = characters.length
 
 	return string
 }
 
-// NOTE: Where each cluster of a view begins in its text, counted in code units
-// and cumulative, so that the text of ANY window of the view is one engine
-// `slice` between two of them. Built on the FIRST cut of a view and never
-// rebuilt: a drain that cuts a String twenty thousand times pays for it once,
-// where the cut it replaces joined the remaining clusters every turn — 556 ms
-// of the 20,000-character drain's 581, measured as the joins alone.
+// NOTE: Where each cluster begins in the text it partitions, counted in code
+// units and cumulative, so that the text of ANY window of that Array is one
+// engine `slice` between two of them. Built on the FIRST cut and never rebuilt:
+// a drain that cuts a String twenty thousand times pays for it once, where the
+// cut it replaces joined the remaining clusters every turn — 556 ms of the
+// 20,000-character drain's 581, measured as the joins alone.
 //
 // NOTE: An `Int32Array` rather than an Array of numbers. It is one number per
 // character of the String, it never grows, and no unit count can leave the
 // range — four bytes an entry against the eight a boxed element costs, and not
 // one element for the collector to walk.
-function offsetsOf(view: CharacterView): Int32Array {
-	let offsets = view.offsets
+//
+// NOTE: Remembered on the String that was cut, and handed to every window cut
+// from it, so that a window of a window is a read of the same table. Every
+// String that shares an Array therefore reaches the table without reaching the
+// String it was cut from.
+function offsetsIn(string: StringType, clusters: Array<string>): Int32Array {
+	let measured = string as MeasuredString
+	let offsets = measured[viewOffsetsKey]
 
-	if (offsets === null) {
-		let clusters = view.clusters
+	if (offsets === undefined) {
+		let text = clusterTextOf(string)
 		let offset = 0
 
 		offsets = new Int32Array(clusters.length + 1)
@@ -353,38 +369,50 @@ function offsetsOf(view: CharacterView): Int32Array {
 			offsets[index + 1] = offset
 		}
 
-		view.offsets = offsets
+		// NOTE: The table is of the WHOLE Array, so a String that is a window
+		// of it must say which text it was built over — its own `value` is only
+		// the part it names.
+		measured[viewOffsetsKey] = offsets
+		measured[viewTextKey] = text
 	}
 
 	return offsets
 }
 
-// NOTE: A WINDOW of a view: the same clusters read from an offset, with its
-// text cut out of the view's text in ONE engine call. This is what makes
-// consuming a String from the front linear. The cut it replaces copied n−1
-// cluster Strings into a fresh Array and joined them back into a fresh text,
-// which is O(n) per turn and O(n²) over a drain — measured on the gap
-// analysis's own Program at 40,000 characters, 2,245 ms that way.
+// NOTE: A WINDOW: the same clusters read from an offset, with its text cut out
+// of the text they partition in ONE engine call. This is what makes consuming a
+// String from the front linear. The cut it replaces copied n−1 cluster Strings
+// into a fresh Array and joined them back into a fresh text, which is O(n) per
+// turn and O(n²) over a drain — measured on the gap analysis's own Program at
+// 40,000 characters, 2,245 ms that way.
 //
-// NOTE: The text is the SAME String the joined clusters spelled, byte for
-// byte, and that is not an approximation: the clusters PARTITION the view's
-// text, so the text between two clusters' offsets is those clusters joined.
-// Everything downstream — `is`, `compare`, `normalisedFormOf`, printing, the
-// Dictionary key encoding — therefore answers what it answered before, because
-// it is handed the same text it was handed before.
+// NOTE: The text is the SAME String the joined clusters spelled, byte for byte,
+// and that is not an approximation: the clusters PARTITION that text, so the
+// text between two of their offsets IS those clusters joined. Everything
+// downstream — `is`, `compare`, `normalisedFormOf`, printing, the Dictionary
+// key encoding — therefore answers what it answered before, because it is
+// handed the same text it was handed before.
 function createWindowString(
-	view: CharacterView,
+	original: StringType,
+	clusters: Array<string>,
 	start: number,
 	count: number,
 ): StringType {
-	let offsets = offsetsOf(view)
+	let offsets = offsetsIn(original, clusters)
+	let text = clusterTextOf(original)
 	let string = createString(
-		view.text.slice(offsets[start]!, offsets[start + count]!),
+		text.slice(offsets[start]!, offsets[start + count]!),
 	) as MeasuredString
 
-	string[viewKey] = view
+	string[graphemesKey] = clusters
 	string[viewStartKey] = start
 	string[graphemeCountKey] = count
+	string[viewOffsetsKey] = offsets
+	string[viewTextKey] = text
+
+	if ((original as MeasuredString)[segmentedKey] === true) {
+		string[segmentedKey] = true
+	}
 
 	return string
 }
@@ -392,8 +420,8 @@ function createWindowString(
 // NOTE: THE HALF RULE, the same one `List.ts` applies to a shared suffix: a cut
 // SHARES its parent's Array only where it is at least half of it, and is copied
 // otherwise. What the rule bounds is RETENTION — a window holds the whole Array
-// of clusters, the offset table and the whole text they were cut from alive, and
-// a six-character token cut out of a five-megabyte source must not pin the
+// of clusters, the offset table and the whole text they were cut from alive,
+// and a six-character token cut out of a five-megabyte source must not pin the
 // source for as long as the token is held. Under the rule a window pins at most
 // twice its own characters.
 //
@@ -403,21 +431,27 @@ function createWindowString(
 // 2n clusters against the n²/2 of copying at every step. A copy is exactly what
 // a cut cost before this, so no cut that was cheap became dear.
 //
-// NOTE: The copy JOINS its clusters rather than cutting the view's text, and
-// that is the other half of the retention story: an engine's sliced String
-// keeps the String it was cut from alive, so a small window cut that way would
-// pin the whole source text even once its clusters were its own. The join costs
-// what the Array copy beside it costs, and both are what the cut cost before.
+// NOTE: The copy JOINS its clusters rather than cutting the text, and that is
+// the other half of the retention story: an engine's sliced String keeps the
+// String it was cut from alive, so a small window cut that way would pin the
+// whole source text even once its clusters were its own. The join costs what
+// the Array copy beside it costs, and both are what the cut cost before.
+//
+// NOTE: A copied cut carries the two keys a `split` piece carries and NOT ONE
+// MORE, which is what keeps a tokenizer's retained heap where it was: 250,000
+// six-character tokens out of a five-megabyte source hold 42.1 MB, the figure
+// they held before there were windows.
 function cutFromView(
-	view: CharacterView,
+	original: StringType,
+	clusters: Array<string>,
 	start: number,
 	count: number,
 ): StringType {
-	if (count * 2 >= view.clusters.length) {
-		return createWindowString(view, start, count)
+	if (count * 2 >= clusters.length) {
+		return createWindowString(original, clusters, start, count)
 	}
 
-	return createSegmentedString(view.clusters.slice(start, start + count))
+	return createSegmentedString(clusters.slice(start, start + count))
 }
 
 // NOTE: Whether counting this String's characters can skip the Segmenter
@@ -523,7 +557,7 @@ function readsByUnit(string: StringType): boolean {
 		return answer
 	}
 
-	return measured[viewKey] === undefined && isAsciiIn(string)
+	return measured[graphemesKey] === undefined && isAsciiIn(string)
 }
 
 // NOTE: How many characters a String holds, counted at most once. A String
@@ -546,7 +580,7 @@ function graphemeCountIn(string: StringType): number {
 		// than it was before there were windows.
 		characterCount = isAsciiIn(string)
 			? string.value.length
-			: viewIn(string).clusters.length
+			: clustersIn(string).length
 
 		measured[graphemeCountKey] = characterCount
 	}
@@ -1020,7 +1054,7 @@ function startsIn(
 	// NOTE: The three parts read directly rather than through `viewOf`, which
 	// allocates a record per call — a drain asks this per turn, and the record
 	// measured 220 ns against 200 for 2,000 prefix tests of a held String.
-	let clusters = viewIn(originalString).clusters
+	let clusters = clustersIn(originalString)
 	let start = startIn(originalString)
 	let count = graphemeCountIn(originalString)
 	let prefixCharacters = foldedPart(prefix, insensitive)
@@ -1061,7 +1095,7 @@ function endsIn(
 	}
 
 	// NOTE: Read directly, for the reason `starts` gives.
-	let clusters = viewIn(originalString).clusters
+	let clusters = clustersIn(originalString)
 	let start = startIn(originalString)
 	let count = graphemeCountIn(originalString)
 	let suffixCharacters = foldedPart(suffix, insensitive)
@@ -1309,7 +1343,7 @@ export function characterIn(
 	if (
 		marked === true ||
 		(marked === undefined &&
-			measured[viewKey] === undefined &&
+			measured[graphemesKey] === undefined &&
 			isAsciiIn(string))
 	) {
 		let text = string.value
@@ -1322,7 +1356,7 @@ export function characterIn(
 		return createAsciiString(text[position]!)
 	}
 
-	let clusters = viewIn(string).clusters
+	let clusters = clustersIn(string)
 	let count = measured[graphemeCountKey]!
 	let position = positionFromEnd(index, count)
 
@@ -1379,7 +1413,7 @@ function cutThroughView(
 	from: IntegerType,
 	to: IntegerType,
 ): StringType {
-	let view = viewIn(originalString)
+	let clusters = clustersIn(originalString)
 	let count = (originalString as MeasuredString)[graphemeCountKey]!
 	let first = positionFromEnd(from.value, count)
 	let last = positionFromEnd(to.value, count)
@@ -1390,7 +1424,12 @@ function cutThroughView(
 		return createSegmentedString([])
 	}
 
-	return cutFromView(view, startIn(originalString) + start, end - start)
+	return cutFromView(
+		originalString,
+		clusters,
+		startIn(originalString) + start,
+		end - start,
+	)
 }
 
 // NOTE: Native — the String joined to itself, where the Essence body built a
