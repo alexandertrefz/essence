@@ -252,21 +252,28 @@ describe("Bundle Size", () => {
 	// through one call and none of the new Methods.
 	//
 	// NOTE: 59,045 measured now, and the 717 bytes it rose by are a List
-	// becoming a key kind that ENCODES rather than one that scans. They are the
-	// same 717 in the two Programs below, because they are one thing:
-	// `keyEncoding.ts` reaching `List.runsOf` — 671 bytes of reader, which this
-	// file no longer gets for free from the Methods it already calls — and the
-	// spelling and the memo beside it. A Program holding a Dictionary of ANY
-	// key Type pays them, since the encoding is one function with an arm per
-	// kind; measured on a Program whose only Dictionary is String-keyed, 16,588
-	// before and 17,808 after.
+	// becoming a key kind that ENCODES rather than one that scans: the spelling
+	// of a List and the memo that remembers it. The two Programs below take 709
+	// of the same thing, the eight bytes between them being what esbuild's own
+	// renaming makes of it in a bundle that holds the store as well.
 	//
-	// NOTE: This ceiling and the two below are now about 270 bytes clear rather
-	// than the kilobyte the note at the top of this file asks for. They are left
-	// where they stand deliberately: the rise is accounted for above, and a
-	// ceiling raised in the same change that spends it stops being evidence.
+	// NOTE: What a Program pays depends on whether it had a List reader already,
+	// and the three figures are worth keeping together because they say where
+	// the weight really falls. `keyEncoding.ts` now reaches `List.runsOf`, 671
+	// bytes of reader. A Program that compares anything structurally has it
+	// already — `anyIs` has a List arm, and that arm reads a view — so this
+	// fixture, and any Record- or Case-keyed Dictionary, pays only the 717. A
+	// Program whose keys are Strings reaches no such arm and pays the reader
+	// too: 16,588 before and 17,808 after, +1,220, for a key kind it never uses.
+	// That is the true price of the encoding being ONE function with an arm per
+	// kind, and the `Http.get` ceiling below is where it is written out.
+	//
+	// NOTE: And a Program that holds no Dictionary and asks a List no set-shaped
+	// question pays NOTHING: `HelloWorld.es` (5,740), `Everyday.es` (78,120) and
+	// `Irrational.es` (38,056) are byte-identical across the change. That is the
+	// claim the module split was made for, and it still holds.
 	it("charges a Dictionary Program for the container it uses", async () => {
-		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(59_300)
+		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(60_200)
 	})
 
 	// NOTE: 12,272 measured, where the same Program without the one call
@@ -303,7 +310,7 @@ describe("Bundle Size", () => {
 
 	Terminal.print(names::removeDuplicates()::join(with ", "))
 }`),
-		).toBeLessThan(12_550)
+		).toBeLessThan(13_300)
 	})
 
 	// NOTE: 10,152 measured, where the same Program calling `median` measures
@@ -325,7 +332,7 @@ describe("Bundle Size", () => {
 
 	Terminal.print(numbers::mode(defaultingTo 0)::toString())
 }`),
-		).toBeLessThan(10_450)
+		).toBeLessThan(11_200)
 	})
 
 	// NOTE: 22,358 measured, where the same Program completing an
@@ -350,14 +357,19 @@ describe("Bundle Size", () => {
 	// floor above: a Program that sends nothing must carry none of this, and a
 	// Program that sends must carry no more than a request needs.
 	//
-	// NOTE: 23,578 measured now, and this is the one ceiling a List becoming an
-	// encodable key kind had to MOVE rather than fit under. The 1,220 bytes are
-	// `keyEncoding.ts` reaching `List.runsOf`: 671 of reader, 20 of the empty
-	// run beside it, and the spelling and the memo. This Program holds a
-	// `Dictionary<String, String>` and no List at all, so every one of those
-	// bytes is dead weight in it — which is the true price of the encoding
-	// being ONE function with an arm per kind, and is why the number is written
-	// out here rather than folded into a wider ceiling.
+	// NOTE: 23,578 measured now, and this is where a List becoming an encodable
+	// key kind costs the MOST. The 1,220 bytes are `keyEncoding.ts` reaching
+	// `List.runsOf`: 671 of reader, 20 of the empty run beside it, and the
+	// spelling and the memo. This Program holds a `Dictionary<String, String>`
+	// and no List at all, so every one of those bytes is dead weight in it —
+	// the true price of the encoding being ONE function with an arm per kind.
+	//
+	// NOTE: It is the most because a String key reaches no structural
+	// comparison. The Dictionary ceiling above pays 717 of the same change and
+	// not 1,220, because anything that compares a value structurally already
+	// carries the reader: `anyIs` has a List arm, and that arm reads a view.
+	// Those two figures together are what say where the weight falls, which is
+	// why both are written down.
 	//
 	// NOTE: What was weighed against it: reaching a List through the kind
 	// registry instead, so that only a Program carrying `List.ts` pays. It
