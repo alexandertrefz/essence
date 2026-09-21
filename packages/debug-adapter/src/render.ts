@@ -123,13 +123,9 @@ function describeEssenceValues(...values: Array<unknown>): string {
 	function shownTag(tag: string): string {
 		let separator = tag.lastIndexOf("#")
 
-		if (separator === -1) {
-			return tag
-		}
-
-		let choice = tag.lastIndexOf("#", separator - 1)
-
-		return choice === -1 ? tag : tag.slice(choice + 1)
+		return separator === -1
+			? tag
+			: tag.slice(tag.lastIndexOf("#", separator - 1) + 1)
 	}
 
 	function render(value: unknown, depth: number): string | null {

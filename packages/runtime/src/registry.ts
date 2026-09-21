@@ -47,16 +47,25 @@ export const singleLineMaxLength = 60
 // untouched — and a tag with no `#` at all is no Case, so it does too. Two
 // Modules that both declare a `Door` therefore both print `Door#Open`: the
 // values stay distinct, only their rendering collides.
+//
+// NOTE: A tag carrying ONE `#` needs no cell of its own, and the arithmetic
+// rather than a second guard is what says so: `lastIndexOf` answers -1 for the
+// separator that is not there, and slicing from 0 is the whole tag. A guard for
+// it stood here until mutation testing found that no mutant of it could go red
+// — there is no tag it would answer differently about.
+//
+// NOTE: The guard that is LEFT is a reader's, not the arithmetic's. A tag with
+// no `#` at all comes out whole either way, because JavaScript clamps a
+// negative `fromIndex` to 0 and the search then fails — so breaking this guard
+// is an equivalent mutant too. It stays because `Integer` is not a Case and the
+// line should say so, rather than leaving a reader to work out that two
+// separate clamping rules happen to meet on the right answer.
 export function caseText(tag: string): string {
 	let separator = tag.lastIndexOf("#")
 
-	if (separator === -1) {
-		return tag
-	}
-
-	let choice = tag.lastIndexOf("#", separator - 1)
-
-	return choice === -1 ? tag : tag.slice(choice + 1)
+	return separator === -1
+		? tag
+		: tag.slice(tag.lastIndexOf("#", separator - 1) + 1)
 }
 
 // NOTE: How the printer renders a value it does not know: the same four

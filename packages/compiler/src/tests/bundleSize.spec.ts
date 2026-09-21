@@ -32,6 +32,16 @@ import { validate } from "../validator/index"
 // NOTE: What each figure was and why it moved is in the commit that moved it.
 // What is written here is what the ceiling is FOR.
 //
+// NOTE: 152 bytes arrived with `caseText`, the rule that renders a Case as
+// `Choice#Case` rather than with the Module its tag carries. Every Program that
+// PRINTS a Case pays them and no other pays anything: nineteen of the
+// thirty-two fixtures moved by exactly 152 and the other thirteen came out
+// byte-identical, because a Program that renders no Case never reaches the
+// helper and esbuild drops it. It was 218 until mutation testing took a branch
+// out that no mutant could turn red. No ceiling moved for it — each had the
+// headroom — and it is written here rather than at one test because it is not
+// one Program's cost.
+//
 // NOTE: `bundle` imports esbuild lazily and costs a few hundred ms per call, so
 // this is kept to the files that actually regressed. `write: false` keeps it
 // off the file system — nothing reaches disk.
