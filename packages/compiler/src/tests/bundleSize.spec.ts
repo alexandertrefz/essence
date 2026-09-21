@@ -108,20 +108,27 @@ describe("Bundle Size", () => {
 		expect(await bundleSizeOf("HelloWorld.es")).toBeLessThan(6_950)
 	})
 
-	// NOTE: 84,940 measured. The 901 it rose by are the folded searches reading
-	// their receiver in growing chunks — the two chunked walks of the ASCII
-	// route, the chunk-width rule they share, and the case-sensitive walk of the
-	// view route written out on its own so that it pays none of it. This file
-	// reaches them through `contains`, and what they buy it is a search that
-	// costs the distance to its match rather than the whole String: a drain
-	// asking one per turn over 80,000 characters measured 68.0 ms and measures
-	// 0.62. The odd byte is the chunk floor's fourth digit: 1,024 rather than
-	// 256, which is what a chunk has to be to carry the three engine calls it
-	// makes (see `FOLD_CHUNK`).
+	// NOTE: 86,982 measured with the five changes of one campaign together, and
+	// the notes below account for every byte between it and the 84,039 that
+	// campaign started from: 901 of folded searches, 1,788 of quoted printer,
+	// 152 of a Case's path-free text and 102 of a Record's member renderers.
+	// Each was measured on its own branch and they add up to the byte, which is
+	// the check that no two of them paid for the same code twice.
 	//
-	// NOTE: 84,039 measured before that. What this ceiling watches for is the numeric tower
-	// arriving whole: a reintroduced `Number` spread measures over five
-	// kilobytes here, several times the headroom.
+	// NOTE: 84,940 measured with the first of them alone. The 901 it rose by are
+	// the folded searches reading their receiver in growing chunks — the two
+	// chunked walks of the ASCII route, the chunk-width rule they share, and the
+	// case-sensitive walk of the view route written out on its own so that it pays
+	// none of it. This file reaches them through `contains`, and what they buy it
+	// is a search that costs the distance to its match rather than the whole
+	// String: a drain asking one per turn over 80,000 characters measured 68.0 ms
+	// and measures 0.62. The odd byte is the chunk floor's fourth digit: 1,024
+	// rather than 256, which is what a chunk has to be to carry the three engine
+	// calls it makes (see `FOLD_CHUNK`).
+	//
+	// NOTE: 84,039 measured before that. What this ceiling watches for is the
+	// numeric tower arriving whole: a reintroduced `Number` spread measures over
+	// five kilobytes here, several times the headroom.
 	//
 	// NOTE: 1,832 of those bytes are the String vocabulary wave, and this file
 	// calls three of its entries: `Integer.parse`, `Integer.parse(defaultingTo:)`
@@ -259,15 +266,20 @@ describe("Bundle Size", () => {
 	// headroom fails for the next person to write a line rather than for the
 	// next person to drag in a tower, and that is not what it is for.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(87_400)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(88_000)
 	})
 
-	// NOTE: 39,165 measured; a reintroduced `Number` spread was 54,849 against
-	// the 38,056 this file measured when that was tried. The same
-	// claim as Everyday's, on a Program that takes square roots rather than
-	// doing arithmetic — so it reads the other side of several trades. A pass
-	// that pays text for work on Everyday takes bytes OFF here, because a file
-	// that mostly compares reaches fewer bodies to write out.
+	// NOTE: 41,207 measured now, and what stands between it and the 39,165
+	// below is what Everyday's note accounts for, less the folded searches this
+	// file never reaches: the quoted printer (1,788), a Case's path-free text
+	// (152) and a Record's member renderers (102).
+	//
+	// NOTE: 39,165 measured before that; a reintroduced `Number` spread was 54,849
+	// against the 38,056 this file measured when that was tried. The same claim as
+	// Everyday's, on a Program that takes square roots rather than doing
+	// arithmetic — so it reads the other side of several trades. A pass that pays
+	// text for work on Everyday takes bytes OFF here, because a file that mostly
+	// compares reaches fewer bodies to write out.
 	//
 	// NOTE: It moves on Methods it never names. A conformance witness carries
 	// its Protocol's PROVIDED bodies whether the Program calls them or not, so
@@ -297,7 +309,7 @@ describe("Bundle Size", () => {
 		// conformance witness carries `List`'s own Methods with it — the very thing
 		// the note above this one is about. 62 more are the review fixes to the
 		// two List changes, which Everyday's note accounts for as well.
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(41_600)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(42_300)
 	})
 
 	// NOTE: 47,794 measured. The two tests above watch a Dictionary being shaken
@@ -346,16 +358,16 @@ describe("Bundle Size", () => {
 	// gave 1,177 bytes back here and 1,190 to every Program that names no
 	// constant at all.
 	//
-	// NOTE: What says this is the fixture and not the runtime is the three
-	// figures that did NOT move with it: `Everyday.es`, the removeDuplicates
-	// Program below, and `HelloWorld.es`, which stood at 5,740. `Everyday.es`
-	// read 78,120 by then, and nothing it had taken since was anything a
-	// Dictionary reaches: 48 bytes of `List` Methods becoming Overloads, 381 of the range
-	// natives folding into one walk, 27 of `List.split` becoming an Overload
-	// entry, 67 of the transcendental registry, and the 1,832 of the String
-	// vocabulary wave its own note above accounts for. A Dictionary runtime
-	// that grew would move the second of those, which reaches the whole store
-	// through one call and none of the new Methods.
+	// NOTE: What says this is the fixture and not the runtime is the three figures
+	// that did NOT move with it: `Everyday.es`, the removeDuplicates Program
+	// below, and `HelloWorld.es`, which stood at 5,740. `Everyday.es` read 78,120
+	// by then, and nothing it had taken since was anything a Dictionary reaches:
+	// 48 bytes of `List` Methods becoming Overloads, 381 of the range natives
+	// folding into one walk, 27 of `List.split` becoming an Overload entry, 67 of
+	// the transcendental registry, and the 1,832 of the String vocabulary wave its
+	// own note above accounts for. A Dictionary runtime that grew would move the
+	// second of those, which reaches the whole store through one call and none of
+	// the new Methods.
 	//
 	// NOTE: 59,045 measured now, and the 717 bytes it rose by are a List
 	// becoming a key kind that ENCODES rather than one that scans: the spelling
@@ -380,15 +392,19 @@ describe("Bundle Size", () => {
 	// 78,120 and 38,056 they measured then. That is the claim the module split
 	// was made for, and it held.
 	//
-	// NOTE: 60,806 measured now, and the 133 it rose by are the Case head
-	// remembered per tag in `keyEncoding.ts`. A Case that carries a payload
-	// spells its text afresh on every lookup because the payload is a different
-	// value every time, and the head is the part of it that never is — which is
-	// what a Dictionary keyed by an `Optional`, a `Result` or a generic Choice
-	// of a Program's own now reaches. This file pays it for a String-keyed
-	// Dictionary that encodes no Case at all, because the memo lives inside a
-	// Function every Dictionary Program reaches and a write inside a reached
-	// Function can not be shaken out.
+	// NOTE: 62,861 measured now: the 60,806 below, the quoted printer's 1,801
+	// and the 254 a Case's path-free text and a Record's member renderers cost
+	// every Program that renders a value.
+	//
+	// NOTE: 60,806 measured before those, and the 133 it rose by are the Case head
+	// remembered per tag in `keyEncoding.ts`. A Case that carries a payload spells
+	// its text afresh on every lookup because the payload is a different value
+	// every time, and the head is the part of it that never is — which is what a
+	// Dictionary keyed by an `Optional`, a `Result` or a generic Choice of a
+	// Program's own now reaches. This file pays it for a String-keyed Dictionary
+	// that encodes no Case at all, because the memo lives inside a Function every
+	// Dictionary Program reaches and a write inside a reached Function can not be
+	// shaken out.
 	//
 	// NOTE: 60,673 measured before that. Between the 59,045 above and this stand
 	// `list-window-trimming` (96, which this file reaches through `slice`),
@@ -401,9 +417,9 @@ describe("Bundle Size", () => {
 	// esbuild naming the imports of a larger module graph.
 	it("charges a Dictionary Program for the container it uses", async () => {
 		// NOTE: 1,356 are `list-in-place-writes`, which Everyday's note accounts
-		// for; `Dictionary.of(entries:)` walks a List of entry Records and seals it,
-		// which is where this file meets them.
-		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(63_400)
+		// for; `Dictionary.of(entries:)` walks a List of entry Records and seals
+		// it, which is where this file meets them.
+		expect(await bundleSizeOf("Dictionary.es")).toBeLessThan(63_900)
 	})
 
 	// NOTE: 13,675 measured, the 133 above accounting for the rise, where the
@@ -417,15 +433,15 @@ describe("Bundle Size", () => {
 	// two containers share — `keyEncoding.ts`, a runtime module of its own so
 	// that this one can rest on it alone.
 	//
-	// NOTE: What the 8,473 buys is the Method being linear: one call over
-	// 20,000 items with 2,000 distinct measured 106 ms as a fold on `contains`
-	// and 22 ms here, and with all 20,000 distinct 650 ms against 22 ms — both
-	// best of three with 21 ms of subprocess startup inside. The figure is here so the trade
-	// is a number rather than a surprise, and so that either half of it moving
-	// is caught. The set-shaped Methods beside it — `hasDuplicates`,
+	// NOTE: What the 8,473 buys is the Method being linear: one call over 20,000
+	// items with 2,000 distinct measured 106 ms as a fold on `contains` and 22 ms
+	// here, and with all 20,000 distinct 650 ms against 22 ms — both best of three
+	// with 21 ms of subprocess startup inside. The figure is here so the trade is
+	// a number rather than a surprise, and so that either half of it moving is
+	// caught. The set-shaped Methods beside it — `hasDuplicates`,
 	// `everyItem(alsoIn:)`, `removeEvery(contentsOf:)` and
-	// `contains(everyItemOf:)` — rest on the same module, so this figure
-	// stands for all of them.
+	// `contains(everyItemOf:)` — rest on the same module, so this figure stands
+	// for all of them.
 	//
 	// NOTE: 709 of those bytes are the LAST thing that module took: a List
 	// becoming a key kind that encodes. What they buy here is the same Methods
@@ -441,8 +457,8 @@ describe("Bundle Size", () => {
 
 	Terminal.print(names::removeDuplicates()::join(with ", "))
 }`),
-			// NOTE: 1,080 are `list-in-place-writes`, which Everyday's note accounts
-			// for.
+			// NOTE: 1,080 are `list-in-place-writes`, which Everyday's note
+			// accounts for.
 		).toBeLessThan(14_700)
 	})
 
@@ -466,9 +482,10 @@ describe("Bundle Size", () => {
 
 	Terminal.print(numbers::mode(defaultingTo 0)::toString())
 }`),
-			// NOTE: 1,058 are `list-in-place-writes`, which Everyday's note accounts
-			// for, and it is the smallest Program here that reaches a List — so it is
-			// the honest price of the change for anything that touches one.
+			// NOTE: 1,058 are `list-in-place-writes`, which Everyday's note
+			// accounts for, and it is the smallest Program here that reaches a
+			// List — so it is the honest price of the change for anything that
+			// touches one.
 		).toBeLessThan(12_450)
 	})
 
@@ -508,9 +525,13 @@ describe("Bundle Size", () => {
 	// Those two figures together are what say where the weight falls, which is
 	// why both are written down.
 	//
-	// NOTE: 24,471 measured now. What stands between the 23,578 above and this
-	// is what the Lists and Strings a request's headers are made of took in the
-	// same campaign — the trimming rule, the in-place writes' catching up, the
+	// NOTE: 24,604 measured now. The 133 it rose by are the Case head the key
+	// encoding remembers per tag (the Dictionary note above), which a request's
+	// headers reach because they are a Dictionary.
+	//
+	// NOTE: 24,471 measured before that. What stands between the 23,578 above and
+	// this is what the Lists and Strings a request's headers are made of took in
+	// the same campaign — the trimming rule, the in-place writes' catching up, the
 	// character view's builder and a window's normal form — none of it this
 	// Namespace's own.
 	//
@@ -529,7 +550,7 @@ describe("Bundle Size", () => {
 
 	Terminal.print(answered::hasValue())
 }`),
-		).toBeLessThan(25_400)
+		).toBeLessThan(25_700)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far
