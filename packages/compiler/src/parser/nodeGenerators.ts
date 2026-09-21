@@ -1054,6 +1054,7 @@ export function genericFunctionDefinition(
 	parameterListPosition: common.Position,
 	documentation: common.Documentation | null = null,
 	completing = false,
+	genericListPosition: common.Position | null = null,
 ): parser.FunctionDefinitionNode {
 	return {
 		nodeType: "FunctionDefinition",
@@ -1063,6 +1064,7 @@ export function genericFunctionDefinition(
 		body,
 		documentation,
 		parameterListPosition,
+		...(genericListPosition === null ? {} : { genericListPosition }),
 		...(completing ? { completing: true as const } : {}),
 	}
 }

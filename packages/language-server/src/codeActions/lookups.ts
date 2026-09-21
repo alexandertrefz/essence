@@ -646,6 +646,52 @@ export function enclosingNamespaceMethod(
 	return method === null ? null : { namespace, method }
 }
 
+// NOTE: The `<…>` a Diagnostic's span points INTO, with the entry it points at —
+// what the two fixes that rewrite one entry work from. Found by the entry's own
+// Position rather than by walking out to a Method, because the span is the
+// entry's and a Method's Position does not always reach back over its head.
+export function genericEntryAt(
+	program: parser.Program,
+	range: common.Position,
+): {
+	generics: Array<parser.GenericDeclarationNode>
+	index: number
+	parameterListPosition: common.Position
+	// NOTE: The span of the whole `<…>`, brackets included — what an edit
+	// removing the last entry has to take with it, and the one thing no entry's
+	// own Position says. Null where the Parser recorded none, which is a head
+	// that wrote no list at all.
+	genericListPosition: common.Position | null
+} | null {
+	let found: {
+		generics: Array<parser.GenericDeclarationNode>
+		index: number
+		parameterListPosition: common.Position
+		genericListPosition: common.Position | null
+	} | null = null
+
+	walk(program, (node) => {
+		if (node.nodeType !== "FunctionValue") {
+			return
+		}
+
+		let index = node.value.generics.findIndex((generic) =>
+			containsRange(generic.position, range),
+		)
+
+		if (index !== -1) {
+			found = {
+				generics: node.value.generics,
+				index,
+				parameterListPosition: node.value.parameterListPosition,
+				genericListPosition: node.value.genericListPosition ?? null,
+			}
+		}
+	})
+
+	return found
+}
+
 // NOTE: Where a Type Parameter of that name is DECLARED, looked for in every
 // head a range is written under — a Function's, a Method's, the Namespace
 // around them — because an unsatisfied bound is reported at the CALL and what

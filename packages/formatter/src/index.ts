@@ -72,6 +72,7 @@ function stripPositions(value: unknown): unknown {
 		if (
 			key === "position" ||
 			key === "parameterListPosition" ||
+			key === "genericListPosition" ||
 			key === "headPosition" ||
 			key === "declarationPosition" ||
 			key === "keywordPosition" ||

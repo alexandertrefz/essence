@@ -4181,6 +4181,277 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("a Namespace's own Type Parameter", () => {
+		// NOTE: The bound goes on the METHOD the call stands in, not on a
+		// declaration — the Parameter is the Namespace's and its declaration is
+		// the one place a bound is refused.
+		it("should bound the Method the call is written in", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Boxes<infer Item> for { items: List<Item> } {",
+				"\t\tordered() -> List<Item> {",
+				"\t\t\t<- @.items::sort()",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.inspect(1)",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe(
+				"Bound it for this Method: '<Item is Comparable>'",
+			)
+			expect(result[2]).toBe(
+				"\t\tordered<Item is Comparable>() -> List<Item> {",
+			)
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should add the bound beside the Method's own Parameters", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Boxes<infer Item> for { items: List<Item> } {",
+				"\t\tordered<infer Other>(_ other: Other) -> List<Item> {",
+				"\t\t\t<- @.items::sort()",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.inspect(1)",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result[2]).toBe(
+				"\t\tordered<infer Other, Item is Comparable>(_ other: Other) -> List<Item> {",
+			)
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should drop a re-declaration that carries no bound", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Boxes<infer Item> for List<Item> {",
+				"\t\theld<Item>() -> Integer {",
+				"\t\t\t<- 0",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.inspect(1)",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe(
+				"Drop 'Item' from this Method's Type Parameters",
+			)
+			expect(result[2]).toBe("\t\theld() -> Integer {")
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should drop the 'infer' a bound restates", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Boxes<infer Item> for List<Item> {",
+				"\t\tordered<infer Item is Comparable>() -> List<Item> {",
+				"\t\t\t<- @::sort()",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.inspect(1)",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Write '<Item is Comparable>'")
+			expect(result[2]).toBe(
+				"\t\tordered<Item is Comparable>() -> List<Item> {",
+			)
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A restated `infer` with no bound has nothing to keep, so the
+		// edit is the removal rather than the loss of the word — the `data`
+		// names the edit, and this is the fix it names.
+		it("should drop a restated 'infer' that carries no bound", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Boxes<infer Item> for List<Item> {",
+				"\t\theld<infer Item>() -> Integer {",
+				"\t\t\t<- 0",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.inspect(1)",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe(
+				"Drop 'Item' from this Method's Type Parameters",
+			)
+			expect(result[2]).toBe("\t\theld() -> Integer {")
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A list the Formatter broke across lines puts the `<` on the
+		// line ABOVE the entry, so an edit that starts one column before the
+		// entry eats the indentation and leaves the `<` standing — a buffer
+		// that no longer parses. Every layout below asks for the same edit, and
+		// the assertion that matters in each is `codesOf`: the buffer compiles.
+		it("should drop a lone re-declaration written across lines", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Boxes<infer Item> for List<Item> {",
+				"\t\theld<",
+				"\t\t\tItem,",
+				"\t\t>() -> Integer {",
+				"\t\t\t<- 0",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.inspect(1)",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result[2]).toBe("\t\theld() -> Integer {")
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should drop the first of several written across lines", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Boxes<infer Item> for List<Item> {",
+				"\t\theld<",
+				"\t\t\tItem,",
+				"\t\t\tinfer Other,",
+				"\t\t>(_ other: Other) -> Integer {",
+				"\t\t\t<- 0",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.inspect(1)",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result.slice(2, 5)).toEqual([
+				"\t\theld<",
+				"\t\t\tinfer Other,",
+				"\t\t>(_ other: Other) -> Integer {",
+			])
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should drop the middle of several written across lines", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Boxes<infer Item> for List<Item> {",
+				"\t\theld<",
+				"\t\t\tinfer First,",
+				"\t\t\tItem,",
+				"\t\t\tinfer Other,",
+				"\t\t>(_ first: First, _ other: Other) -> Integer {",
+				"\t\t\t<- 0",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.inspect(1)",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result.slice(2, 6)).toEqual([
+				"\t\theld<",
+				"\t\t\tinfer First,",
+				"\t\t\tinfer Other,",
+				"\t\t>(_ first: First, _ other: Other) -> Integer {",
+			])
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should drop the last of several written across lines", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Boxes<infer Item> for List<Item> {",
+				"\t\theld<",
+				"\t\t\tinfer Other,",
+				"\t\t\tItem,",
+				"\t\t>(_ other: Other) -> Integer {",
+				"\t\t\t<- 0",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.inspect(1)",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result.slice(2, 5)).toEqual([
+				"\t\theld<",
+				"\t\t\tinfer Other,",
+				"\t\t>(_ other: Other) -> Integer {",
+			])
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should drop a lone re-declaration written with a trailing comma", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Boxes<infer Item> for List<Item> {",
+				"\t\theld<Item,>() -> Integer {",
+				"\t\t\t<- 0",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.inspect(1)",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0])
+
+			expect(result[2]).toBe("\t\theld() -> Integer {")
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// NOTE: A Comment inside the `<…>` is the reader's own text, and the
+		// span this edit removes would take it along. Nothing is offered rather
+		// than something that deletes a sentence nobody asked about — the
+		// Diagnostic's Help still says what to write by hand.
+		it("should withhold the drop where a Comment sits in the list", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Boxes<infer Item> for List<Item> {",
+				"\t\theld<",
+				"\t\t\t§ the receiver already says what Item is",
+				"\t\t\tItem,",
+				"\t\t>() -> Integer {",
+				"\t\t\t<- 0",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.inspect(1)",
+				"}",
+			]
+
+			expect(titles(quickFixes(lines))).toEqual([])
+		})
+	})
+
 	describe("unsatisfied-bound", () => {
 		const SIZED = [
 			"implementation {",

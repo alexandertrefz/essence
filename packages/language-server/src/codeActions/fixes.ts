@@ -37,6 +37,7 @@ import {
 	bodyReturns,
 	enclosingNamespace,
 	enclosingNamespaceMethod,
+	genericEntryAt,
 	findConstantDeclaration,
 	findFunctionDefinition,
 	findGenericDeclaration,
@@ -1595,6 +1596,7 @@ export function methodBoundAction(
 export function reDeclaredParameterAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
+	lines: Array<string>,
 ): CodeActionEntry | null {
 	let data = diagnostic.data
 
@@ -1605,11 +1607,9 @@ export function reDeclaredParameterAction(
 		return null
 	}
 
-	let found = enclosingNamespaceMethod(program, diagnostic.position)
-	let generics = found?.method.value.generics ?? []
-	let index = generics.findIndex(
-		(generic) => generic.name.content === data.parameter,
-	)
+	let found = genericEntryAt(program, diagnostic.position)
+	let generics = found?.generics ?? []
+	let index = found?.index ?? -1
 	let entry = generics[index]
 
 	if (found === null || entry === undefined) {
@@ -1617,32 +1617,39 @@ export function reDeclaredParameterAction(
 	}
 
 	if (data.kind === "restated-inferred-parameter") {
+		let word = {
+			start: entry.position.start,
+			end: entry.name.position.start,
+		}
+
+		if (sliceOf(lines, word).includes("§")) {
+			return null
+		}
+
 		return {
 			title: `Write '<${data.parameter} is ${data.protocol}>'`,
 			kind: "quickfix",
 			diagnosticCode: diagnostic.code,
 			diagnosticPosition: diagnostic.position,
 			isPreferred: true,
-			edits: [
-				{
-					range: {
-						start: entry.position.start,
-						end: entry.name.position.start,
-					},
-					newText: "",
-				},
-			],
+			edits: [{ range: word, newText: "" }],
 		}
 	}
 
 	let previous = generics[index - 1]
 	let next = generics[index + 1]
+
+	// NOTE: A lone entry takes the angle brackets with it — an empty `<>` is not
+	// a spelling — so the span removed is the LIST's own, which the Parser hands
+	// over whole. Worked out from the entry it would be wrong the moment the
+	// list is broken across lines: the `<` is then on the line above, and an
+	// edit starting one column before the entry eats the indentation and leaves
+	// the `<` standing. A list with several entries is cut between entries
+	// instead, where the Parser's Positions are all that is needed at any
+	// layout.
 	let range =
 		generics.length === 1
-			? {
-					start: entry.position.start,
-					end: found.method.value.parameterListPosition.start,
-				}
+			? found.genericListPosition
 			: next !== undefined
 				? { start: entry.position.start, end: next.position.start }
 				: {
@@ -1650,30 +1657,22 @@ export function reDeclaredParameterAction(
 						end: entry.position.end,
 					}
 
-	// NOTE: A lone entry takes the angle brackets with it, and the span given
-	// runs from the entry to the Parameter list — which covers the `>` and
-	// whatever stands between. The `<` is one character before the entry.
+	// NOTE: A Comment inside the `<…>` is the reader's own text, and every span
+	// above is a span this edit DELETES — so where one sits in it, nothing is
+	// offered. The Diagnostic's Help says the same edit in words, and a reader
+	// doing it by hand keeps what they wrote; a Quick Fix that silently drops a
+	// sentence is worse than no Quick Fix.
+	if (range === null || sliceOf(lines, range).includes("§")) {
+		return null
+	}
+
 	return {
 		title: `Drop '${data.parameter}' from this Method's Type Parameters`,
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
 		isPreferred: true,
-		edits: [
-			{
-				range:
-					generics.length === 1
-						? {
-								start: {
-									...range.start,
-									column: range.start.column - 1,
-								},
-								end: range.end,
-							}
-						: range,
-				newText: "",
-			},
-		],
+		edits: [{ range, newText: "" }],
 	}
 }
 

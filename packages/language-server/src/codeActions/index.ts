@@ -716,10 +716,10 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		...listed(methodBoundAction(diagnostic, program)),
 		...listed(declarationImportAction(diagnostic, imports)),
 	],
-	"shadowed-type-parameter": ({ diagnostic, program }) =>
-		listed(reDeclaredParameterAction(diagnostic, program)),
-	"restated-inferred-parameter": ({ diagnostic, program }) =>
-		listed(reDeclaredParameterAction(diagnostic, program)),
+	"shadowed-type-parameter": ({ diagnostic, program, lines }) =>
+		listed(reDeclaredParameterAction(diagnostic, program, lines)),
+	"restated-inferred-parameter": ({ diagnostic, program, lines }) =>
+		listed(reDeclaredParameterAction(diagnostic, program, lines)),
 	"unsatisfied-conformance-condition": ({ diagnostic, imports }) =>
 		listed(declarationImportAction(diagnostic, imports)),
 	"unused-future": ({ diagnostic }) => discardedFutureActions(diagnostic),

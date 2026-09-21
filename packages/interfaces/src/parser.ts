@@ -1245,6 +1245,13 @@ export interface FunctionDefinitionNode {
 	// the Parameter list. Carried so that an Inlay Hint for an inferred return
 	// Type has somewhere to sit.
 	parameterListPosition: Position
+	// NOTE: The span of the whole `<…>`, angle brackets included — absent where
+	// none is written. An entry's own Position says where the entry is; this is
+	// the only thing that says where the list AROUND it begins, which is what an
+	// edit removing the last entry has to take with it. Read off the Parser
+	// rather than worked out from a column, because `<` need not sit beside the
+	// entry: a list broken across lines puts it on the line before.
+	genericListPosition?: Position
 	// NOTE: Set where this body writes a `complete` of its OWN — one that is not
 	// inside a Function literal written in it, which has a body and a mark of its
 	// own. Such a body is a COMPLETING body: it suspends, so it has to declare

@@ -3738,6 +3738,16 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
         "value": {
           "body": [],
           "documentation": null,
+          "genericListPosition": {
+            "end": {
+              "column": 27,
+              "line": 1,
+            },
+            "start": {
+              "column": 18,
+              "line": 1,
+            },
+          },
           "generics": [
             {
               "constraint": null,
@@ -3889,6 +3899,16 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
             },
           ],
           "documentation": null,
+          "genericListPosition": {
+            "end": {
+              "column": 16,
+              "line": 2,
+            },
+            "start": {
+              "column": 7,
+              "line": 2,
+            },
+          },
           "generics": [
             {
               "constraint": null,
@@ -4111,6 +4131,16 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
             },
           ],
           "documentation": null,
+          "genericListPosition": {
+            "end": {
+              "column": 16,
+              "line": 2,
+            },
+            "start": {
+              "column": 7,
+              "line": 2,
+            },
+          },
           "generics": [
             {
               "constraint": null,
@@ -4333,6 +4363,16 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
             },
           ],
           "documentation": null,
+          "genericListPosition": {
+            "end": {
+              "column": 16,
+              "line": 2,
+            },
+            "start": {
+              "column": 7,
+              "line": 2,
+            },
+          },
           "generics": [
             {
               "constraint": null,
@@ -4542,6 +4582,16 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Functi
             },
           ],
           "documentation": null,
+          "genericListPosition": {
+            "end": {
+              "column": 16,
+              "line": 2,
+            },
+            "start": {
+              "column": 7,
+              "line": 2,
+            },
+          },
           "generics": [
             {
               "constraint": null,
@@ -18918,6 +18968,16 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
             },
           ],
           "documentation": null,
+          "genericListPosition": {
+            "end": {
+              "column": 52,
+              "line": 2,
+            },
+            "start": {
+              "column": 26,
+              "line": 2,
+            },
+          },
           "generics": [
             {
               "constraint": {
@@ -19238,6 +19298,16 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
             },
           ],
           "documentation": null,
+          "genericListPosition": {
+            "end": {
+              "column": 61,
+              "line": 2,
+            },
+            "start": {
+              "column": 26,
+              "line": 2,
+            },
+          },
           "generics": [
             {
               "constraint": {

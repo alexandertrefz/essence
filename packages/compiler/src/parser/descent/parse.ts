@@ -3947,7 +3947,8 @@ class DescentParser {
 		| parser.FunctionValueNode
 		| parser.NativeMethodSignatureNode {
 		let documentation = this.documentationHere()
-		let generics = this.parseOptionalGenericList()
+		let genericList = this.parseOptionalGenericListWithPosition()
+		let generics = genericList.generics
 		let parameterList = this.parseParameterList()
 		let returnType = this.parseReturnType()
 
@@ -3966,6 +3967,7 @@ class DescentParser {
 							parameterList.position,
 							documentation,
 							completes,
+							genericList.position,
 						)
 					: generators.functionDefinition(
 							parameterList.parameters,
@@ -7713,6 +7715,7 @@ class DescentParser {
 				parameterList.position,
 				documentation,
 				completes,
+				genericList.position,
 			),
 			{
 				start: parameterList.position.start,
@@ -7738,11 +7741,22 @@ class DescentParser {
 	// #region Functions
 
 	protected parseOptionalGenericList(): Array<parser.GenericDeclarationNode> {
+		return this.parseOptionalGenericListWithPosition().generics
+	}
+
+	// NOTE: The same list, with the span of the `<…>` the entries were written
+	// in — null where none was. Only a Method keeps it (see
+	// `FunctionDefinitionNode.genericListPosition`); the readers that take the
+	// entries alone go through `parseOptionalGenericList` above.
+	protected parseOptionalGenericListWithPosition(): {
+		generics: Array<parser.GenericDeclarationNode>
+		position: common.Position | null
+	} {
 		if (this.tokens.peek()?.type === TokenType.SymbolLeftAngle) {
-			return this.parseGenericList().generics
+			return this.parseGenericList()
 		}
 
-		return []
+		return { generics: [], position: null }
 	}
 
 	protected parseGenericList(): {
