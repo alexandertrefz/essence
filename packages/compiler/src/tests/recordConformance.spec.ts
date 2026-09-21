@@ -35,6 +35,24 @@ const tag = `type Tag = { text: String }
 	constant news: Tag = { text = "News" }
 	constant lower: Tag = { text = "news" }`
 
+// NOTE: And the receiver the PRINTING half is written against: a Choice whose
+// derived printing answers `Open` where the structural walk writes `Door#Open`,
+// and a Record whose Namespace writes `EUR 1999` where the walk writes
+// `{ cents = 1999 }`. Two members, two different reasons the walk is wrong.
+const money = `choice Door { Open, Shut }
+
+	namespace Doors for Door is Printable {}
+
+	type Money = { cents: Integer }
+
+	namespace Monies for Money is Printable {
+		toString() -> String {
+			<- "EUR {@.cents}"
+		}
+	}
+
+	constant price: Money = { cents = 1999 }`
+
 // NOTE: The first enrichment in a process compiles the whole standard library,
 // which the five-second default does not always cover on a loaded machine — and
 // a test that times out here never restores the `console.log` it patched, so the
@@ -97,6 +115,10 @@ function diagnosticsOf(source: string): Array<common.Diagnostic> {
 
 function codesOf(source: string): Array<string> {
 	return diagnosticsOf(source).map((diagnostic) => diagnostic.code ?? "")
+}
+
+function helpsOf(source: string): Array<string> {
+	return diagnosticsOf(source).flatMap((diagnostic) => diagnostic.helps ?? [])
 }
 
 function notesOf(source: string): Array<string> {
@@ -402,6 +424,127 @@ describe("A Record asks its declared members", () => {
 		}`)
 
 		expect(js).toContain(`boundRecordIs(["tag"])`)
+	})
+})
+
+describe("A Record asks its declared members how to print", () => {
+	// NOTE: Decision 4 read from the other side. The structural walk writes a
+	// Case as `Door#Open` and a `Money` as `{ cents = 1999 }`; the Namespaces
+	// that own them answer `Open` and `EUR 1999`. A Record printed for a READER
+	// asks them, which is what `[EUR 1999]` and `["k" = EUR 1999]` have always
+	// done for a List and a Dictionary holding the same value.
+	it("prints each member through its own toString", async () => {
+		expect(
+			await run(`implementation {
+				${money}
+
+				Terminal.inspect({ price = price, door = Door#Open }::toString())
+			}`),
+		).toEqual(['"\\{ price = EUR 1999, door = Open \\}"'])
+	})
+
+	// NOTE: A String member keeps its quotes, because inside a composite the
+	// quoted form is what every reader already gets — `[ "a" ]`, `{ name = "a" }`
+	// — and routing a String through its own `toString` would take them away.
+	// A whole Rational member still prints its numerator alone. Both are claims
+	// about the printing list being different from the equality one.
+	it("keeps a String quoted and a whole Rational bare", async () => {
+		expect(
+			await run(`implementation {
+				${money}
+
+				Terminal.inspect(
+					{ name = "a", ratio = 1/2::add(1/2), price = price }::toString(),
+				)
+			}`),
+		).toEqual(['"\\{ name = \\"a\\", ratio = 1, price = EUR 1999 \\}"'])
+	})
+
+	// NOTE: `Terminal.inspect` is the STRUCTURAL rendering and stays exactly
+	// where it was — it asks for no conformance, so it can not ask a member for
+	// one. The same Record therefore reads two ways on purpose, and this is the
+	// test that holds the two apart.
+	it("leaves the structural rendering alone", async () => {
+		expect(
+			await run(`implementation {
+				${money}
+
+				Terminal.inspect({ price = price, door = Door#Open })
+			}`),
+		).toEqual(["{ price = { cents = 1999 }, door = Door#Open }"])
+	})
+
+	// NOTE: A String hole renders its value through the very `Printable`
+	// conformance a bounded call is handed, so an interpolated Record routes
+	// too — and that is the rail `Terminal.print` itself is written on.
+	it("routes through a String hole", async () => {
+		expect(
+			await run(`implementation {
+				${money}
+
+				constant held = { price = price }
+
+				Terminal.inspect("{held}")
+			}`),
+		).toEqual(['"\\{ price = EUR 1999 \\}"'])
+	})
+
+	// NOTE: The layout is not forked — the member renderers go INTO the one
+	// walk. So a routed Record past the sixty-character budget still breaks one
+	// member to a line, still indents what it nests, and a routed member's own
+	// multi-line answer is re-indented where it stands.
+	it("keeps the layout rules a long Record has always had", async () => {
+		expect(
+			await run(`implementation {
+				${money}
+
+				Terminal.inspect(
+					{
+						first = price,
+						second = price,
+						third = price,
+						fourth = price,
+					}::toString(),
+				)
+			}`),
+		).toEqual([
+			'"\\{\\n    first = EUR 1999,\\n    second = EUR 1999,\\n    third = EUR 1999,\\n    fourth = EUR 1999\\n\\}"',
+		])
+	})
+
+	// NOTE: And the Record that routes NOTHING prints through the native it
+	// always did. Read off the emission, because the answer is the same either
+	// way and would not notice the cost.
+	it("emits the plain native where every member is structural", () => {
+		let js = generate(`implementation {
+			Terminal.print({ x = 1, name = "a" }::toString())
+		}`)
+
+		expect(js).not.toContain("boundRecordToString")
+		expect(js).toContain("Record.toString")
+	})
+
+	// NOTE: A member whose Choice nobody declared Printable takes the Record's
+	// printing away, which is decision 2 reaching further than a Function does:
+	// this is a Record that prints today.
+	it("is refused where a member's Choice is not Printable", () => {
+		let source = `implementation {
+			choice Door { Open, Shut }
+
+			function narrow(_ value: { door: Door }) -> { door: Door } {
+				<- value
+			}
+
+			Terminal.print(narrow({ door = Door#Open }))
+		}`
+
+		expect(codesOf(source)).toEqual(["unsatisfied-conformance-condition"])
+		expect(helpsOf(source)[0]).toBe(
+			"Write 'Terminal.inspect(…)' instead — it renders any value structurally and asks for no conformance.",
+		)
+		expect(helpsOf(source)[1]).toBe(
+			"Declare a Namespace 'for Door is Printable' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.",
+		)
 	})
 })
 

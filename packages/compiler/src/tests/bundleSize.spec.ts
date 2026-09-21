@@ -42,6 +42,16 @@ import { validate } from "../validator/index"
 // headroom — and it is written here rather than at one test because it is not
 // one Program's cost.
 //
+// NOTE: And 102 more arrived with the routing a Record's DECLARED members
+// decide — one optional Parameter on `getStringRepresentation` and the read of
+// it in the Record arm. Every Program that RENDERS anything pays them, because
+// the walk is shared and the alternative was a second copy of the layout; a
+// Program that renders nothing pays nothing, and a Program that routes a member
+// pays `boundRecordToString` on top. It is the spelling that makes it 102: the
+// obvious `let routed = …; routed === undefined ? … : routed(value)` cost 158,
+// and `memberRenderers?.[key]?.(value) ?? …` says the same thing in one
+// expression. No ceiling moved for it either — each had the headroom.
+//
 // NOTE: `bundle` imports esbuild lazily and costs a few hundred ms per call, so
 // this is kept to the files that actually regressed. `write: false` keeps it
 // off the file system — nothing reaches disk.

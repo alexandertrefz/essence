@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { createDictionary } from "../Dictionary"
 import { createInteger } from "../Integer"
-import { anyIs } from "../internalHelpers"
+import { anyIs, boundRecordToString } from "../internalHelpers"
 import { createList } from "../List"
 import { formatAsFraction } from "../Rational"
 import { createRecord } from "../Record"
@@ -272,6 +272,78 @@ describe("rendering a Case", () => {
 // halves of that: the layout it produces at a deeper indent is the one it
 // produces at zero with the indent written after each newline, and a value
 // nested deeply enough that every level wraps still renders in no time at all.
+// NOTE: The renderer table a routed Record hands this walk is indexed by MEMBER
+// NAME, and a member may be named anything a reader can write — `constructor`,
+// `toString`, `valueOf`. Read off a plain object those names answer
+// `Object.prototype`'s own functions rather than nothing, so the `??` beside the
+// read never fires and the member renders as whatever calling one of them
+// returns: `[object Object]`, or `false`. The table is therefore built with no
+// prototype at all, and these are what say so.
+//
+// NOTE: The one that BITES is the member the table does not name — any other
+// member of a Record that routes something, whether the width rule left it
+// structural or its Type simply prints that way: the read invents a renderer
+// where there was none. A member the table DOES name is safe on any object,
+// because writing the entry makes it an own property that shadows the
+// prototype's; it is tested beside the other so that a fix which filtered these
+// names out of the table, rather than taking the prototype away, goes red here.
+// Only a Record that routes SOMETHING is handed a table at all, which is why
+// both cases below route a member.
+describe("rendering a Record whose member is named like Object.prototype", () => {
+	// NOTE: Every own name on `Object.prototype` that a Program can spell.
+	// `__proto__` is one of them and is refused by the Lexer, so no source text
+	// can reach here with it.
+	const prototypeNames = Object.getOwnPropertyNames(Object.prototype).filter(
+		(name) => name !== "__proto__",
+	)
+
+	// NOTE: Through `boundRecordToString` rather than by handing the walk a table
+	// this file built. The table is built by the runtime, and a test that built
+	// its own — safely, as any new code would — would pass whatever the runtime
+	// does. What is under test is the pair: the builder and the read.
+	const rendering = (name: string) => ({
+		toString: () => createString(`<${name}>`),
+	})
+
+	test("a routed member named like one prints through its own renderer", () => {
+		for (let name of prototypeNames) {
+			expect(
+				boundRecordToString([name])(
+					createRecord({ [name]: createInteger(1n) }),
+					rendering("routed"),
+				).value,
+			).toBe(`{ ${name} = <routed> }`)
+		}
+	})
+
+	test("an unrouted member named like one prints structurally", () => {
+		for (let name of prototypeNames) {
+			expect(
+				boundRecordToString(["price"])(
+					createRecord({
+						price: createInteger(1n),
+						[name]: createInteger(2n),
+					}),
+					rendering("price"),
+				).value,
+			).toBe(`{ price = <price>, ${name} = 2 }`)
+		}
+	})
+
+	// NOTE: And the same names on a Record that routes NOTHING, which is what
+	// every Program printing a Record did before any of this. It is handed no
+	// table at all, so this is the answer the two above have to match.
+	test("the same members print structurally where nothing routes", () => {
+		for (let name of prototypeNames) {
+			expect(
+				getStringRepresentation(
+					createRecord({ [name]: createInteger(2n) }),
+				),
+			).toBe(`{ ${name} = 2 }`)
+		}
+	})
+})
+
 describe("rendering a deeply nested value", () => {
 	// NOTE: One member per level and a leaf long enough that every level
 	// overflows the single-line budget, which is the shape that made the walk

@@ -60,6 +60,26 @@ export function getStringRepresentation(
 	indentLevel = 0,
 	rationalForm: (rational: RationalType) => string = formatAsRational,
 	listPadding = " ",
+	// NOTE: How to render the members a RECORD ROUTES — one entry per DECLARED
+	// member whose own Namespace prints it differently from this walk, handed in
+	// by `boundRecordToString` and by nothing else. It is consulted in the Record
+	// arm alone, and it is NOT passed down: a routed member renders through its
+	// own `toString`, which decides for everything inside it, and the members
+	// this walk reaches below the top are members no static Type named.
+	//
+	// The renderer answers at indent ZERO, exactly as the recursive call beside
+	// it does, and the multi-line branch re-indents what it gets — which is the
+	// invariant `indented` already stands for. Handing the layout a function
+	// instead of forking it is what keeps `{ price = EUR 1999 }` obeying the
+	// same sixty-character budget, the same `[` padding and the same nesting as
+	// every other Record.
+	//
+	// NOTE: `??` rather than a test for the entry, because a renderer answers a
+	// String and never nothing — an EMPTY one is not nullish, so a member that
+	// prints as `` still takes its own answer. It is written this way because
+	// this walk is carried by every Program that prints anything at all, and the
+	// spelled-out form cost 158 bytes of bundle where this costs 102.
+	memberRenderers?: Record<string, (value: AnyType) => string>,
 ): string {
 	const baseIndent = " ".repeat(4 * indentLevel)
 	const contentIndent = " ".repeat(4 * (indentLevel + 1))
@@ -84,7 +104,15 @@ export function getStringRepresentation(
 		if (entries.length > 0) {
 			let members = entries.map(
 				([key, value]) =>
-					`${key} = ${getStringRepresentation(value, 0, rationalForm, listPadding)}`,
+					`${key} = ${
+						memberRenderers?.[key]?.(value) ??
+						getStringRepresentation(
+							value,
+							0,
+							rationalForm,
+							listPadding,
+						)
+					}`,
 			)
 			let singleLineString = `{ ${members.join(", ")} }`
 

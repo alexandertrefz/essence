@@ -5430,10 +5430,7 @@ function solveNamespaceConformance(
 	//
 	// It stands after the written conditions rather than instead of them because
 	// the two can not both apply: the library's Namespace declares none.
-	if (
-		protocolName === equatableProtocolName &&
-		isBuiltinRecordNamespace(candidate.name, candidate.declaredTarget)
-	) {
+	if (isBuiltinRecordNamespace(candidate.name, candidate.declaredTarget)) {
 		let routed = routedRecordSource(
 			binding,
 			protocolName,
@@ -6032,7 +6029,10 @@ export function resolveConformances(
 						`No Namespace in scope makes ${describeType(binding)} conform to '${generic.constraint}'.`,
 						...missing.notes,
 					],
-					helps: missing.helps,
+					helps: [
+						...printingEscapeHelps(generic.constraint, binding),
+						...missing.helps,
+					],
 					...(missing.data === undefined
 						? {}
 						: { data: missing.data }),
@@ -6051,7 +6051,10 @@ export function resolveConformances(
 						),
 					],
 					notes: [...result.chain, ...missing.notes],
-					helps: missing.helps,
+					helps: [
+						...printingEscapeHelps(generic.constraint, binding),
+						...missing.helps,
+					],
 					...(missing.data === undefined
 						? {}
 						: { data: missing.data }),

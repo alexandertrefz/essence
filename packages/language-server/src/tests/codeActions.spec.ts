@@ -7372,9 +7372,16 @@ describe("Code Actions", () => {
 		// NOTE: And in a Record Literal's shorthand, where the name is the
 		// member as well as its value — `{ #Red }` is `Expected 'with'`.
 		it("should spell the member out where the name is a shorthand", () => {
+			// NOTE: The `is Printable` is load-bearing and says something
+			// about the fix rather than about the Choice: a Record's DECLARED
+			// members decide its printing, so a Record holding a `Light` is
+			// only Printable where `Light` is. Without it the applied fix
+			// leaves a Program that does not compile, and this test is the one
+			// that says the fix leaves none.
 			let lines = [
 				"implementation {",
 				"\tchoice Light { Red, Green }",
+				"\tnamespace Lights for Light is Printable {}",
 				"\tconstant lit = { Red }",
 				"",
 				"\tTerminal.print(lit::toString())",
@@ -7387,7 +7394,7 @@ describe("Code Actions", () => {
 
 			let result = applied(lines, fix)
 
-			expect(result[2]).toBe("\tconstant lit = { Red = #Red }")
+			expect(result[3]).toBe("\tconstant lit = { Red = #Red }")
 			expect(codesOf(result)).toEqual([])
 		})
 	})

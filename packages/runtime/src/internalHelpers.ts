@@ -6,12 +6,13 @@ import { is as boolIs, createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
 import { createList, itemOfView, viewOf, walkOf } from "./List"
-import type { RationalType } from "./Rational"
+import { formatAsFraction, type RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
 import { kindOf } from "./registry"
 import type { StringType } from "./String"
 import { createString, normalisedFormOf } from "./String"
+import { getStringRepresentation } from "./Terminal"
 import type { TranscendentalType } from "./Transcendental"
 import type { AnyType } from "./type"
 import { createCase, isValueOfType, typeKeySymbol } from "./type"
@@ -393,6 +394,11 @@ type UnionArm = {
 
 type DerivedEquatableDescriptor = Record<string, Record<string, DescriptorNode>>
 
+// NOTE: And the printing one, whose `toString` answers an Essence String. Read
+// the same way and curried the same way; the two are apart because a Record
+// routes each Protocol on its own list of members.
+type PrintableWitness = { toString: (value: AnyType) => StringType }
+
 // NOTE: A conformance witness as it arrives at runtime — a method map whose
 // `is` answers a Boolean. When the Type it stands for is itself conditional,
 // `boundConformance` has already curried its own nested witnesses onto `is`, so
@@ -458,6 +464,64 @@ export function boundRecordIs(members: Array<string>) {
 		b: RecordType,
 		...witnesses: Array<EquatableWitness>
 	): BooleanType => createBoolean(recordRoutesEqual(a, b, members, witnesses))
+}
+
+// NOTE: And the printing half. `Record.toString` renders every member through
+// the structural walk, which is the right answer only while no member's own
+// Namespace prints it differently — and far more members do than compare
+// differently: every Case (`Door#Open` where `Door::toString` answers `Open`),
+// every Optional and Result (`Optional#Value(3)` against `Value(3)`), and every
+// Namespace anybody wrote a `toString` for.
+//
+// NOTE: The Arguments are `Record.toString`'s own — indent zero,
+// `formatAsFraction` so a whole Rational member prints its numerator alone, and
+// the empty `[` padding that makes a List member read as `List::toString`
+// answers it. The layout is not forked: the renderers go IN, and the walk keeps
+// the one-line budget, the nesting and the quoting it already had.
+export function boundRecordToString(members: Array<string>) {
+	return (
+		record: RecordType,
+		...witnesses: Array<PrintableWitness>
+	): StringType =>
+		createString(
+			getStringRepresentation(
+				record,
+				0,
+				formatAsFraction,
+				"",
+				renderersOf(members, witnesses),
+			),
+		)
+}
+
+// NOTE: Built per CALL rather than at currying: the witnesses arrive as
+// Arguments, so there is nothing to build until one is made. A Record is printed
+// far less often than it is compared, which is why this one is allowed an
+// allocation the comparison would not be.
+//
+// NOTE: WITH NO PROTOTYPE, because the READER names these keys. A Record member
+// may be called `constructor`, `toString`, `valueOf` or `hasOwnProperty`, and
+// the walk reads this table by member name — off a plain `{}` those names find
+// `Object.prototype`'s own functions, which are not nullish, so the `??` beside
+// the read never fires and the member renders as whatever calling one of them
+// answers: `[object Object]`, or `false`. It bites the members this table does
+// NOT name, which is every other member of a Record that routes something. The
+// equality half reads no table at all — it walks the routed names — so it was
+// never exposed to this.
+function renderersOf(
+	members: Array<string>,
+	witnesses: Array<PrintableWitness>,
+): Record<string, (value: AnyType) => string> {
+	let renderers: Record<string, (value: AnyType) => string> =
+		Object.create(null)
+
+	for (let [index, name] of members.entries()) {
+		let witness = witnesses[index]!
+
+		renderers[name] = (value) => witness.toString(value).value
+	}
+
+	return renderers
 }
 
 // NOTE: There is no `boundRecordIsNot` beside `boundRecordIs`, and there is no
