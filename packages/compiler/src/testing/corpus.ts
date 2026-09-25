@@ -56,18 +56,14 @@ export const CORPUS_SCHEMA = 1
 // failures is a value the search is no longer learning anything from.
 export const CORPUS_LIMIT = 10
 
-export type CorpusFile = { schema: number; entries: CorpusStore }
-
 // NOTE: THE FORMAT, and the whole of it: JSON, one object of entries keyed by
 // the test's identity without its Module step, each holding its
 // counterexamples newest FIRST. It is JSON rather than the `.snap` format
 // beside it because what is stored is DATA rather than text a value printed —
 // nested, typed and never read by eye — and JSON is the one spelling of that
 // nobody has to learn.
-//
-// It is printed with tab indentation and its keys in name order so that
-// recording one twice writes the same bytes: a diff then shows what changed
-// rather than what moved.
+export type CorpusFile = { schema: number; entries: CorpusStore }
+
 // NOTE: Null for a file that is not a corpus at all — mangled JSON, a merge
 // conflict, the wrong schema. It is an answer rather than an empty store
 // because the two must never be confused: an empty store is a file the next
@@ -134,6 +130,9 @@ function readCounterexamples(stored: unknown): Array<StoredCounterexample> {
 	})
 }
 
+// NOTE: Printed with tab indentation and its keys in name order so that
+// recording one twice writes the same bytes: a diff then shows what changed
+// rather than what moved.
 export function printCorpusFile(entries: CorpusStore): string {
 	let sorted: CorpusStore = {}
 
@@ -152,11 +151,6 @@ function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-// NOTE: The stored counterexamples of every Module of the run, keyed by the
-// Module's canonical path — the shape the runtime's `RunOptions.counterexamples`
-// takes. A Module with no companion file has an empty entry rather than none,
-// so that looking one up is always a lookup and never a question about the
-// disk.
 // NOTE: What a read found, in two halves: the stores a run consults, and the
 // Modules whose companion EXISTS but could not be read — which the run treats
 // as holding nothing, and the writer refuses to touch. A missing file is an
@@ -167,6 +161,11 @@ type CorpusReading = {
 	unreadable: Array<{ module: string; problem: string }>
 }
 
+// NOTE: The stored counterexamples of every Module of the run, `stores` keyed
+// by the Module's canonical path — the shape the runtime's
+// `RunOptions.counterexamples` takes. A Module with no companion file has an
+// empty entry rather than none, so that looking one up is always a lookup and
+// never a question about the disk.
 export async function readCorpus(
 	modules: Iterable<string>,
 ): Promise<CorpusReading> {
