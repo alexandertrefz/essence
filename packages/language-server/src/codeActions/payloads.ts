@@ -167,11 +167,6 @@ function shortenActions(
 	]
 }
 
-// NOTE: Whether the Enricher wrapped the payload, which is what says the
-// SHORTHAND was written. The Record it wraps with stands at the value's own
-// Position and holds that value under the Case's one member name — a written
-// Literal's member always stands inside the braces it is written in, so the two
-// can not be confused.
 // NOTE: Whether the SOURCE wrote the Case's member out — `{ radius = … }` — as
 // opposed to handing the member's value over on its own. Read off the Parser AST,
 // which is the only tree that still knows: the Enricher wraps a bare value in a
@@ -185,6 +180,11 @@ function writesTheMemberItself(
 	)
 }
 
+// NOTE: Whether the Enricher wrapped the payload, which is what says the
+// SHORTHAND was written. The Record it wraps with stands at the value's own
+// Position and holds that value under the Case's one member name — a written
+// Literal's member always stands inside the braces it is written in, so the two
+// can not be confused.
 function wrapsItsPayload(
 	node: common.typed.CaseValueNode,
 	name: string,
