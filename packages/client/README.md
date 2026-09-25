@@ -799,4 +799,4 @@ not during the load.
   esbuild. What a browser can run is the *output* — which is what the bundler
   plugins are for.
 - **Checked refinements.** A refined Type marshals as its base, unproven. The
-  predicate belongs at the boundary, and will run there once refinements land.
+  predicate belongs at the boundary, and the boundary does not run it yet.
