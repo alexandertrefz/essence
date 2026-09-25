@@ -35,7 +35,7 @@ declarations {
 		§ is the same claim. A Record whose members are all structural keeps
 		§ the plain witness, which is branded `structural`. Its keys encode
 		§ into one Map lookup through `compositeText` in the runtime's
-		§ `Dictionary.ts`. A Record that routes a member carries a condition
+		§ `keyEncoding.ts`. A Record that routes a member carries a condition
 		§ whose witness is not branded, which is why it routes. So the
 		§ Record's witness is not branded either, and its keys scan through
 		§ the witness's own `is`. A change here changes that encoding too.
