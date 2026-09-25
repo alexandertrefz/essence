@@ -656,21 +656,17 @@ rule stated there.
 
 ## Editing hazards
 
-- **Two Methods of one name in a Namespace body are not reported.** The second
-  silently replaces the first, without a word. This is a gap in the Enricher,
-  not in this directory, but writing a Namespace by copying a neighbouring
-  Method is what makes it likely.
 - **Overload ORDER is load-bearing.** An Overload's position picks the
   `__overload$N` name the Simplifier emits and therefore the runtime export it
   binds to, natives included. Reordering an `overload` block silently rebinds
   every Overload in it.
 - **A file calling a Method whose Type Parameter carries a bound imports the
-  PROTOCOL.** `@::sort()` and `@::tally()` thread a conformance witness the
-  Enricher can only build with the bound's Protocol in Scope, and the file
-  spells neither `Comparable` nor `Equatable` anywhere else. Without the
-  import the Enricher throws an Internal Compiler Error naming the Method and
-  the count of witnesses it was given, which reads as a Compiler bug rather
-  than as a missing line. `NumberList.es` imports both for this reason alone.
+  PROTOCOL.** `@::sort()` threads a conformance witness the Enricher can only
+  build with the bound's Protocol in Scope, and a file calling it need spell
+  `Comparable` nowhere else. Without the import the Enricher throws an
+  Internal Compiler Error naming the Method and the count of witnesses it was
+  given, which reads as a Compiler bug rather than as a missing line.
+  `NumberList.es` imports `Comparable` for this reason alone.
 - **A named Union is only NAMED.** `type Number = Integer | Rational |
   Irrational` gives the Union a name, and Hovers, Inlay Hints and Diagnostics
   print it — `Number`, not the three members spelled out. Assignability ignores
