@@ -47,21 +47,19 @@ export type OptimiserPass = {
 	// last of those true.
 	name: string
 	// NOTE: The Namespaces the Program declares are HANDED to a pass rather
-	// than looked up by it. Seven passes need them, the walk that answers
-	// reaches every object the Program holds — Types included — and seven of
-	// those walks was half of this phase on a large file.
+	// than looked up by it. The walk that answers reaches every object the
+	// Program holds, Types included, so it runs once per phase rather than once
+	// per pass that reads the answer.
 	//
-	// NOTE: One answer serves the whole registry because no pass can change it:
-	// nothing here builds a `NamespaceDefinitionStatement`, the Simplifier is
-	// the only thing that does, and `eliminate-dead-code` — the one pass that
-	// removes a Statement at all — removes Constants. So the set is a property
-	// of the Program the PHASE was given, not of the Program a pass was given,
-	// and a pass added later that declares a Namespace has to compute its own.
+	// NOTE: One answer serves the whole registry because no pass adds to it: no
+	// pass declares a Namespace the Simplifier did not. A pass that drops code,
+	// such as `eliminate-dead-code` or `prune-dead-match-arms`, can drop only a
+	// nested declaration, and a nested name left in the set only makes a pass
+	// hold back. A pass that declares a Namespace has to compute its own.
 	//
 	// NOTE: Handed in rather than memoised behind `declaredNamespaces`, because
-	// a memo keyed on Program identity would never hit: a pass rebuilds the
-	// Program whenever it changes anything, and measured on the fixtures every
-	// one of the seven is preceded by a pass that did.
+	// a pass rebuilds the Program whenever it changes anything, and a memo keyed
+	// on Program identity misses after every such pass.
 	//
 	// NOTE: The Options the phase is running under, so that a pass the caller
 	// ASKED for can tell it was asked. Only `instrument-coverage` reads them —
@@ -251,9 +249,10 @@ export function optimise(
 	}
 
 	let result = erased
-	// NOTE: Asked of the erased Program, which is what the first pass is given
-	// — and, by the argument on `OptimiserPass.run`, what every pass after it
-	// would answer for itself.
+	// NOTE: Asked of the erased Program, which is what the first pass is
+	// given. By the argument on `OptimiserPass.run`, a later pass's own answer
+	// could lack only a nested name this one holds, and such a name only makes
+	// a pass hold back.
 	let namespaces = declaredNamespaces(erased)
 
 	for (let pass of optimiserPasses) {
