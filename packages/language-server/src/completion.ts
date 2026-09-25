@@ -65,23 +65,26 @@ import {
 } from "./snippets"
 import type { WorkspaceOffer } from "./workspace"
 
-// NOTE: Completion has three modes, told apart by the text immediately
-// before the cursor:
+// NOTE: Completion's modes are told apart by the text immediately before the
+// cursor:
 //
+// - Inside an `import { … }` or `export { … }` block: the specifiers and names
+//   the block can hold.
 // - After `::` (optionally with a `<Namespace>` specifier): Methods of every
 //   Namespace whose target Type matches the receiver.
 // - After `.`: Members of a Record, or the properties and Methods of a
 //   Namespace accessed statically.
+// - After `#`: the Cases a Case reference can name there.
 // - Otherwise: every name visible in lexical Scope at the cursor (from the
 //   same Scope model `rename.ts` builds), split into the value or the Type
 //   space by what precedes the identifier being typed.
 //
 // Member and Method completion resolve the receiver's Type with a "probe":
-// the document text up to the trigger is re-parsed with `.lspProbeMember`
-// appended (and enough closing brackets to balance it back into a valid
-// Program) — the enriched Program's Lookup node for that synthetic member
-// carries the receiver's Type in `base.type`, at the Scope the cursor is
-// actually in (its enclosing Function's Parameters, `@`, and so on).
+// the document text up to the trigger is re-parsed with `.lspProbeMember` or
+// `::lspProbeMember()` appended, and enough closing brackets to balance it back
+// into a valid Program. The enriched Lookup or Method Invocation of that
+// synthetic member carries the receiver's Type in `base.type`, at the Scope the
+// cursor is actually in (its enclosing Function's Parameters, `@`, and so on).
 
 // NOTE: Every rename Declaration kind plus `case`, `keyword`, `module` and
 // `snippet` — none is a lexical Declaration (a Case resolves through its

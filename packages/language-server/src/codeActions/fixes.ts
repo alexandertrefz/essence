@@ -184,8 +184,9 @@ export function unreachableCaseAction(
 	}
 }
 
-// NOTE: A near miss written back over the name that was misspelled — the one
-// fix eight codes share, since a misspelling reads the same wherever it stands.
+// NOTE: A near miss written back over the name that was misspelled. The fixes
+// of several codes share it, since a misspelling reads the same wherever it
+// stands.
 //
 // The span is read off the buffer first, as everything here is. A Diagnostic a
 // client echoed back may be several keystrokes old and a span that has slid by

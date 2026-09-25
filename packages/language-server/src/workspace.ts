@@ -1158,9 +1158,10 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return entry.index
 	}
 
-	// NOTE: The three things a request answering ABOUT a document needs, in one
-	// read: Completion, Signature Help and the Namespace listing all used to
-	// derive every one of them for themselves, several times per request.
+	// NOTE: What a request answering about a document needs, in one read: the
+	// parse, the typed Program, the rename index and the Module view.
+	// Completion, Signature Help and every request the Server answers through
+	// `parseAndEnrich` read it.
 	//
 	// The index is deliberately part of it. Building one rebuilds the whole
 	// builtin top level Scope — every builtin value and Type, as fresh
