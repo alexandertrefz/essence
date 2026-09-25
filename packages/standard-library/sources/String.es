@@ -20,8 +20,8 @@ import {
 
 declarations {
 
-	§ `trim(at:)` and `pad(…, at:)` are its two users, so it is declared beside
-	§ them.
+	§ `trim(at:)`, `pad(…, at:)` and `separate(…, from:)` read it, so it is
+	§ declared beside them. `List.es` imports it for its own `pad`.
 
 	§§ Which end of a String a Method works on: the start, the end, or both ends.
 	§§

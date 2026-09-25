@@ -20,7 +20,8 @@ import {
 
 declarations {
 
-	§ The Choice is declared beside its only user.
+	§ The Choice is declared beside `sort` and `isSorted`, and `Dictionary.es`
+	§ imports it for its own `sort`.
 
 	§§ Which way `sort` runs: `#Ascending` from the lowest, or `#Descending` from the highest.
 	§§

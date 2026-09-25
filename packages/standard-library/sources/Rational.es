@@ -24,7 +24,9 @@ import {
 
 declarations {
 
-	§ The Choice is declared beside its only user.
+	§ The Choice is declared beside the Rational formatter. `Integer.es`,
+	§ `Algebraic.es` and `Transcendental.es` import it for their own `as:`
+	§ entries.
 
 	§ The exponent of the scientific form is written `e` and a decimal number,
 	§ with a minus sign and never a plus, so `1.23e3` and `5e-4`. The
