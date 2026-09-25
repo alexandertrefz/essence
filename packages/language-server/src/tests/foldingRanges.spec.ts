@@ -307,3 +307,21 @@ describe("Folding Ranges under start and complete", () => {
 		})
 	})
 })
+
+describe("Folding Ranges inside a refused value", () => {
+	it("should fold a List written across lines in front of the brackets", () => {
+		let source = [
+			"implementation {",
+			"\tconstant first = [",
+			"\t\t2,",
+			"\t\t3,",
+			"\t][0]",
+			"}",
+		].join("\n")
+
+		expect(foldingRangesOf(source)).toContainEqual({
+			startLine: 2,
+			endLine: 4,
+		})
+	})
+})

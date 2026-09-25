@@ -345,6 +345,9 @@ function collectFromNode(
 		case "Complete":
 			collectFromNode(node.expression, ranges)
 			return
+		case "RefusedValue":
+			collectFromNode(node.base, ranges)
+			return
 		// NOTE: A path is written on one line and folds nothing, but it has to
 		// be named here all the same — this switch has no `default`, so a
 		// nodeType it does not list is a hole nothing reports.
