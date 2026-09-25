@@ -176,16 +176,14 @@ purpose** — wherever it stands. A refinement erases before anything runs, so a
 entry whose promise is about the answer can not say it in Essence and has to be
 native; where the entry it stands beside is an Essence body performing the SAME
 operation, the runtime writes that operation out a second time rather than
-instead of it. Five do. `NonEmptyList` holds two — `prepend(contentsOf:)` and
-`replace(_:at:)`, each written in Essence on `List` — `List.repeat`'s
-`PositiveInteger` entry is the third, native because the entry beside it answers
-a `List`, and an expression that is not empty is not one the language can be
-told is not empty; and `NonZeroRational::reciprocal` and `negate` are the fourth
-and fifth, for the same reason one level along. `NonEmptyString::characters` was
-the sixth until `String::characters` went native itself: its answer is a
-`List<Character>`, which is a promise about the ANSWER, so the base entry could
-not stay in Essence either — and the refined entry re-exports that one runtime
-Function now.
+instead of it. `NonEmptyList::prepend(contentsOf:)` does, since `List` writes
+that entry in Essence. So does `List.repeat`'s `PositiveInteger` entry, native
+because the entry beside it answers a `List`, and an expression that is not
+empty is not one the language can be told is not empty. So do
+`NonZeroRational::reciprocal` and `negate`, for the same reason one level along.
+`NonEmptyString::characters` does not: `String::characters` is native, because
+its answer is a `List<Character>`, a promise about the answer, and the refined
+entry re-exports that one runtime Function.
 `NonEmptyList::firstItem`, `NonEmptyString::firstCharacter` and
 `NonEmptyDictionary::firstEntry` are on no such list, though each stands beside
 an entry of the same name: an entry that unwraps an Optional performs a
@@ -193,18 +191,20 @@ different operation from the one that answers it. Two of those three write the
 operation out, because `List::firstItem` and `String::firstCharacter` are
 Essence bodies with no runtime Function to read. The third does not:
 `Dictionary::firstEntry` is native, and `NonEmptyDictionary` reads the
-`firstLiveEntry` it exports for exactly that. Every other refined entry READS
-off the native beside it — `NonNegativeInteger::squareRoot` is the shape to
-copy — and the five above can not, because the entry each stands beside is an
-Essence body and so exports no runtime Function to import. That is the
+`firstLiveEntry` it exports for exactly that. Every other refined entry reads
+off the native beside it, as `NonNegativeInteger::squareRoot` does. One that
+stands beside an Essence body can not, because that body exports no runtime
+Function to import. That is the
 exception the rule above allows, and it is only safe because
 `StdlibExhaustive.es` calls both entries over the same inputs, wherever they
 stand: the golden capture is what stops the two from drifting. Writing another
 one means adding those lines too.
 
-Most of `NonEmptyList` is native, but not all of it. `replace(at:_:)` hands the
-transformed item to the native `replace(_:at:)`, and `lowestItem(on:)` and
-`highestItem(on:)` read `List`'s Optional answer off the native `firstItem()`.
+Most of `NonEmptyList` is native, but not all of it. `reduce` folds the rest of
+the List into what the native `firstItem()` answers, `replace(at:_:)` hands the
+transformed item to the native `replace(_:at:)`, and both entries of
+`lowestItem` and `highestItem` read `List`'s Optional answer off the native
+`firstItem()`.
 An Essence body can carry a proof another entry already holds; what it can not
 do is mint one. `indices()` was written that way — on the
 `List.of(integersFrom:downTo:)` that promises a non-empty answer, and on the

@@ -2346,20 +2346,22 @@ declarations {
 	§ Method of `List`. A Namespace of its own is for the Methods that answer
 	§ better for having the proof.
 	§
-	§ Five Methods spend the proof: `firstItem`, `lastItem`, `length`,
-	§ `lowestItem(on:)` and `highestItem(on:)`. Everything else here carries
-	§ it forward. Most answer with one item for every item they were handed,
-	§ or with those items and more besides. So they can not empty a List that
-	§ was not empty. Splitting regroups the items instead, and every group it
-	§ opens holds one. Pairing demands the second proof of its Argument,
-	§ because it stops with the shorter List. They are declared in the order
-	§ `List` declares them, so the two can be read side by side.
+	§ `firstItem`, `lastItem`, `length`, `reduce`, `lowestItem` and
+	§ `highestItem` spend the proof. Everything else here carries it forward.
+	§ Most answer with one item for every item they were handed, or with
+	§ those items and more besides. So they can not empty a List that was not
+	§ empty. Splitting regroups the items instead, and every group it opens
+	§ holds one. Pairing demands the second proof of its Argument, because it
+	§ stops with the shorter List. Apart from `length`, the entries stand in
+	§ the order `List` declares them in, so the two can be read side by side.
 	§
-	§ Every entry is native, because the promise can not be said in Essence:
-	§ `<- @::map(transform)` is the right answer and its Type is
-	§ `List<Other>`. Three of them are written in Essence on `List`, and the
-	§ runtime writes those out twice; see DEVELOPMENT.md, Native and Essence in
-	§ one Namespace.
+	§ Most entries are native, because the promise can not be said in
+	§ Essence: `<- @::map(transform)` is the right answer and its Type is
+	§ `List<Other>`. The Essence bodies here, for `reduce`, `replace(at:_:)`,
+	§ `lowestItem` and `highestItem`, are written on natives that already
+	§ spend or carry the proof. On `List`, `prepend(contentsOf:)` is an
+	§ Essence body, and the runtime writes this entry out a second time; see
+	§ DEVELOPMENT.md, Native and Essence in one Namespace.
 	§
 	§ What the proof does not survive stays on `List`, from `everyItem` and
 	§ `slice` to `partition` and `removeEvery(where:)`. The single-item
@@ -2526,10 +2528,10 @@ declarations {
 			§§ @returns — the List with the item replaced, which is never empty.
 			(_ item: ItemType, at index: Integer) -> NonEmptyList<ItemType>
 
-			§ Written on the entry above, which is native and carries the
-			§ proof, so this one carries it too — the shape `sort(on:)` has
-			§ here. It is the same body `List` gives the transform entry, over
-			§ the proven `replace` instead of the plain one.
+			§ Written on `replace(_:at:)`, which is native and carries the
+			§ proof, so this one carries it too. It is the same body `List`
+			§ gives the transform entry, over the proven `replace` instead of
+			§ the plain one.
 
 			§§ Answers a new List with the item at the given position replaced by what the transform answers for it.
 			§§
