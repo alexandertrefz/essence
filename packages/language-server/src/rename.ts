@@ -317,10 +317,10 @@ export function isValidIdentifierName(name: string): boolean {
 	)
 }
 
-// NOTE: The Keywords the grammar's Identifier rule reads as ordinary
-// Identifiers — the Parser's `identifierTokenTypes`. The standard library
-// already writes labels with them (`slice(from 1, to 3)`, `normalize(as
-// #ComposedCanonical)`), so a LABEL may be renamed to any of these even though
+// NOTE: Keywords the grammar's Identifier rule reads as ordinary Identifiers,
+// drawn from the Parser's `identifierTokenTypes`. The standard library already
+// writes labels with them (`slice(from 1, to 3)`, `normalize(as
+// #ComposedCanonical)`), so a LABEL may be renamed to any of these even where
 // an ordinary binding must not be: a binding named `with` would collide with
 // the `{ … with … }` Combination the moment it is read in one.
 const keywordIdentifiers = new Set([
@@ -367,7 +367,7 @@ export function isValidBindingLabelName(name: string): boolean {
 //
 //   • the edit reaches this document only. Every call site of a standard
 //     library Method is in a file a single-document rename never sees, and the
-//     Language Server has no project-wide index to find them with.
+//     workspace index holds nothing for a standard library source.
 //   • the name IS the runtime binding. A body-less signature is bound to the
 //     export of the same name in `@essence-lang/runtime`, so renaming
 //     `exclusiveOr` to `xor` type-checks, emits ZERO Diagnostics and produces
@@ -380,11 +380,12 @@ export function isValidBindingLabelName(name: string): boolean {
 // builtin; its Methods, Parameters and local Type names were not.
 //
 // NOTE: What stands between a mis-bound native and a broken build is the
-// runtime-export cross-check in `src/tests/builtins.spec.ts` — it drives
-// `nativeBindings` against the real `@essence-lang/runtime` modules in both directions,
-// and it is what fails on the rename above. It is the LAST line of defence now
-// that the standard library is only Essence source, and it can only speak for
-// Namespaces its `runtimeModules` table names.
+// runtime-export cross-check in the Compiler's `src/tests/builtins.spec.ts`,
+// which drives `nativeBindings` against the real `@essence-lang/runtime`
+// modules in both directions and fails on renaming `exclusiveOr` to `xor`. It
+// is the last line of defence, since the standard library is only Essence
+// source, and it can only speak for Namespaces its `runtimeModules` table
+// names.
 export function findRenameableOccurrence(
 	program: parser.Program,
 	cursor: common.Cursor,
@@ -1041,8 +1042,8 @@ function walkBody(
 	context: WalkContext,
 	{ hoist }: { hoist: boolean },
 ) {
-	// NOTE: Only the top level hoists — nested bodies bind in order, exactly
-	// like the Enricher.
+	// NOTE: Only a Section other than a test's body hoists (see
+	// `walkSections`); nested bodies bind in order, exactly like the Enricher.
 	if (hoist) {
 		hoistDeclarations(nodes, scope)
 	}
