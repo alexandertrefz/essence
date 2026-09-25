@@ -83,18 +83,17 @@ type Allowance = {
 // rather than the fix failing — and each entry names the code that hole
 // reports, so a fix that starts leaving a DIFFERENT one fails here.
 //
-// Unused entries fail this spec (see "every allowance is still earned"): an
+// Unused entries fail this spec (see "has every allowance still earned"): an
 // allowlist nobody checks is how a guard rots into a list of things that used
 // to be true.
 //
-// The scaffolds the fixers named that the corpus does NOT reach — `Make 'X'
-// Generatable` as a Quick Fix rather than as the rewrite below, `Add
-// '<generic>'` for an unknown `where` name, the `define` arm and the `else`
-// branch — are deliberately absent. An allowance for a fix nothing here offers
-// is a claim about the Compiler that nothing checks; the day a fixture reaches
-// one, this spec fails and whoever wrote the fixture writes the reason down,
-// which is what happened to `Implement 'X'` below when the corpus grew a
-// Namespace that declares a conformance it does not keep.
+// The scaffolds the fixers name that the corpus does not reach are
+// deliberately absent: `Make 'X' Generatable` as a Quick Fix rather than as the
+// rewrite below, the `define` arm and the `else` branch. An allowance for a fix
+// nothing here offers is a claim about the Compiler that nothing checks; the
+// day a fixture reaches one, this spec fails and whoever wrote the fixture
+// writes the reason down, which is what happened to `Implement 'X'` below when
+// the corpus grew a Namespace that declares a conformance it does not keep.
 const ALLOWED: Array<Allowance> = [
 	{
 		code: "ambiguous-case",
@@ -450,8 +449,7 @@ const NEARBY_LINES = 1
 // fix commonly rewrites the whole line it underlines part of, and no mutant this
 // is written against is a matter of columns. INSIDE those lines rather than
 // overlapping them, because an edit that rewrites the file from its first line
-// to its last overlaps everything — which is the shape three of the mutants
-// take.
+// to its last overlaps everything.
 function reachesTooFar(
 	entry: CodeActionEntry,
 	edit: CodeActionEdit,
@@ -966,12 +964,9 @@ describe("The allowlist", () => {
 	})
 })
 
-// NOTE: The guard's own guard. Everything above asks questions of the fixes the
-// Server really offers, and every one of them passes — which says as much about
-// the questions as about the fixes, and is exactly what an audit is entitled to
-// disbelieve. So the questions are asked of fixes that are deliberately, and
-// differently, WRONG: each mutant below is an honest fix carrying something no
-// reader asked for, and each has to be caught.
+// NOTE: The guard's own guard: each mutant is a deliberately wrong fix, most of
+// them the honest fix carrying something no reader asked for, and each has to
+// be caught.
 //
 // Three of them ride along with an honest edit and change something else in the
 // file, which only question (v) catches, and one is caught only by following the
