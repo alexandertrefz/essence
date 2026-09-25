@@ -17,11 +17,12 @@ declarations {
 	§ declaration, as equality by tag is. So the answer is derived wherever a
 	§ Choice carries no payload.
 	§
-	§ The alternative was a clause beside `is Equatable, is Printable` on all
-	§ ten mode Choices. It can not be written. `Ordering.es` and `Terminal.es`
-	§ would each import this file, this file imports `List.es`, and `List.es`
-	§ imports `Ordering.es`. That is two new cycles for a clause saying what the
-	§ Choice already said.
+	§ The alternative was a clause beside `is Equatable, is Printable` on every
+	§ Choice of payload-free Cases. It can not be written. `Ordering.es` would
+	§ import this file, this file imports `List.es`, and `List.es` imports
+	§ `Ordering.es`. And `List.es`, `String.es`, `Integer.es` and `Rational.es`
+	§ would pull this file into the cycle they already share. The loader
+	§ refuses both, and the clause would say what the Choice already said.
 	§
 	§ A Namespace over a Choice can write `cases` of its own, and that replaces
 	§ the derived answer wherever the Namespace declares `is Enumerable`. Without
