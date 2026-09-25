@@ -228,10 +228,11 @@ function readDefine(
 // settled against the room left on the page when the run is reached, which is
 // something only the renderer knows.
 //
-// The `-> Type` is the enclosing Function's, copied as it was spelled. A
-// `define` does NOT take its Type from the `<-` it stands under — that is what
-// lets an arm answer with a bare `#Case` at all — so an if/else whose branches
-// leaned on the return Type would stop compiling without it.
+// The `-> Type` is what a `<-` at the rewritten Statement answers, the
+// enclosing Function's or Match's (see `answeredTypes`), copied as it was
+// spelled. A `define` does not take its Type from the `<-` it stands under,
+// which is what lets an arm answer with a bare `#Case` at all, so an if/else
+// whose branches leaned on the return Type would stop compiling without it.
 function writtenDefine(
 	arms: Array<Arm>,
 	returnType: parser.TypeDeclarationNode | null,
@@ -270,8 +271,8 @@ function writtenDefine(
 // a ladder of five arms at one indentation instead of five.
 //
 // The `-> Type` a `define` may carry is dropped: a `<-` takes its Type from the
-// Function's return Type, which is where the annotation came from in the first
-// place.
+// enclosing Function's or Match's return Type, which is where the annotation
+// came from in the first place.
 function writtenIfElse(
 	arms: Array<Arm>,
 	lines: Array<string>,
