@@ -40,6 +40,7 @@ import {
 	LogMessageNotification,
 	MessageType,
 	RenameRequest,
+	SignatureHelpRequest,
 	WillRenameFilesRequest,
 } from "vscode-languageserver/node"
 
@@ -2223,13 +2224,7 @@ describe("A Compiler throw while a request enriches a document", () => {
 	].join("\n")
 	const stdlibPath = path.join(STDLIB_DIRECTORY, "Boolean.es")
 
-	// NOTE: Every enrichment through the Server's compilation seam throws while
-	// `run` is in flight and only then, so opening and settling the document
-	// are untouched.
-	async function withEnrichmentThrowing<Result>(
-		session: LspSession,
-		run: () => Promise<Result>,
-	): Promise<{ result: Result; errors: Array<string> }> {
+	function loggedErrors(session: LspSession): Array<string> {
 		let errors: Array<string> = []
 
 		session.client.onNotification(LogMessageNotification.type, (params) => {
@@ -2238,6 +2233,17 @@ describe("A Compiler throw while a request enriches a document", () => {
 			}
 		})
 
+		return errors
+	}
+
+	// NOTE: Every enrichment through the Server's compilation seam throws while
+	// `run` is in flight and only then, so opening and settling the document
+	// are untouched.
+	async function withEnrichmentThrowing<Result>(
+		session: LspSession,
+		run: () => Promise<Result>,
+	): Promise<{ result: Result; errors: Array<string> }> {
+		let errors = loggedErrors(session)
 		let enrichment = spyOn(
 			compilation,
 			"enrichDocument",
@@ -2249,6 +2255,48 @@ describe("A Compiler throw while a request enriches a document", () => {
 			return { result: await run(), errors }
 		} finally {
 			enrichment.mockRestore()
+		}
+	}
+
+	// NOTE: Only the enrichment of the document's own text throws. The probes
+	// written from it enrich as usual, so a request that reads both still
+	// types what it probes.
+	async function withDocumentEnrichmentThrowing<Result>(
+		session: LspSession,
+		documentText: string,
+		run: () => Promise<Result>,
+	): Promise<{ result: Result; errors: Array<string> }> {
+		let errors = loggedErrors(session)
+		let parse = compilation.parseDocument
+		let enrich = compilation.enrichDocument
+		let documentPrograms = new Set<unknown>()
+		let parsing = spyOn(compilation, "parseDocument").mockImplementation(
+			(text, documentPath) => {
+				let parsed = parse(text, documentPath)
+
+				if (text === documentText) {
+					documentPrograms.add(parsed.program)
+				}
+
+				return parsed
+			},
+		)
+		let enrichment = spyOn(
+			compilation,
+			"enrichDocument",
+		).mockImplementation((program, documentPath, options) => {
+			if (documentPrograms.has(program)) {
+				throw new Error("the enrichment exploded")
+			}
+
+			return enrich(program, documentPath, options)
+		})
+
+		try {
+			return { result: await run(), errors }
+		} finally {
+			enrichment.mockRestore()
+			parsing.mockRestore()
 		}
 	}
 
@@ -2308,6 +2356,126 @@ describe("A Compiler throw while a request enriches a document", () => {
 			expect(errors[0]).toContain(stdlibPath)
 			expect(errors[0]).toContain("the enrichment exploded")
 			expect(errors[0]).toMatch(/\n\s+at /)
+		} finally {
+			await session.dispose()
+		}
+	})
+
+	// NOTE: Every probe throws as well, so nothing types `person` and the list
+	// is empty. The request answers all the same.
+	it("should log the throw and still answer a member completion", async () => {
+		let text = [
+			"implementation {",
+			'\tconstant person = { name = "Ada" }',
+			"\tconstant greeting = person.",
+			"}",
+			"",
+		].join("\n")
+		let session = startSession()
+
+		try {
+			await session.initialize([])
+			await session.open(stdlibPath, text)
+			await session.settle()
+
+			let { result, errors } = await withEnrichmentThrowing(
+				session,
+				async () =>
+					(
+						await session.request<Array<{ label: string }>>(
+							CompletionRequest.type,
+							{
+								textDocument: { uri: uriOf(stdlibPath) },
+								position: { line: 2, character: 28 },
+							},
+						)
+					).result,
+			)
+
+			expect(result).toEqual([])
+			expect(errors).toHaveLength(1)
+			expect(errors[0]).toContain(stdlibPath)
+			expect(errors[0]).toContain("the enrichment exploded")
+		} finally {
+			await session.dispose()
+		}
+	})
+
+	// NOTE: The call's Arguments match no Overload yet, so Signature Help lists
+	// what every Namespace for the receiver offers, which reads the document's
+	// own Namespaces and Protocols.
+	it("should log the throw once and still answer a Signature Help", async () => {
+		let text = [
+			"implementation {",
+			'\tconstant greeting = "Hello"::append(',
+			"}",
+			"",
+		].join("\n")
+		let session = startSession()
+
+		try {
+			await session.initialize([])
+			await session.open(stdlibPath, text)
+			await session.settle()
+
+			let { result, errors } = await withDocumentEnrichmentThrowing(
+				session,
+				text,
+				async () =>
+					(
+						await session.request<{
+							signatures: Array<{ label: string }>
+						} | null>(SignatureHelpRequest.type, {
+							textDocument: { uri: uriOf(stdlibPath) },
+							position: { line: 1, character: 37 },
+						})
+					).result,
+			)
+
+			expect(
+				result?.signatures.map((signature) => signature.label),
+			).toEqual(["append(_ String) -> String"])
+			expect(errors).toHaveLength(1)
+			expect(errors[0]).toContain(stdlibPath)
+			expect(errors[0]).toContain("the enrichment exploded")
+		} finally {
+			await session.dispose()
+		}
+	})
+
+	it("should log the throw once and still offer a receiver's Methods", async () => {
+		let text = [
+			"implementation {",
+			'\tconstant greeting = "Hello"::',
+			"}",
+			"",
+		].join("\n")
+		let session = startSession()
+
+		try {
+			await session.initialize([])
+			await session.open(stdlibPath, text)
+			await session.settle()
+
+			let { result, errors } = await withDocumentEnrichmentThrowing(
+				session,
+				text,
+				async () =>
+					(
+						await session.request<Array<{ label: string }>>(
+							CompletionRequest.type,
+							{
+								textDocument: { uri: uriOf(stdlibPath) },
+								position: { line: 1, character: 30 },
+							},
+						)
+					).result,
+			)
+
+			expect(result.map((item) => item.label)).toContain("append")
+			expect(errors).toHaveLength(1)
+			expect(errors[0]).toContain(stdlibPath)
+			expect(errors[0]).toContain("the enrichment exploded")
 		} finally {
 			await session.dispose()
 		}

@@ -22,7 +22,7 @@ import {
 import type { common } from "@essence-lang/interfaces"
 
 import type { DocumentAnalysis } from "./analyse"
-import { enrichDocument, parseDocument } from "./compilation"
+import { documentAnalysisOf } from "./moduleLink"
 import { typedProgramBodies, typedProgramNodes } from "./sections"
 
 // NOTE: Shared between Completion's `::` Method listing and Signature
@@ -176,6 +176,10 @@ export function matchingNamespaces(
 	workspaceNamespaces: Array<common.NamespaceType> = [],
 	document: DocumentAnalysis | null = null,
 ): Array<common.NamespaceType> {
+	// NOTE: Derived for a caller that hands in no analysis, once for every
+	// listing below that reads the document.
+	let analysed = document ?? documentAnalysisOf(documentText, documentPath)
+
 	// NOTE: A receiver whose Type is a Protocol-bounded Type Parameter
 	// resolves only through its Protocol — mirroring the Enricher's Method
 	// resolution, but named after the Protocol for readable listings.
@@ -183,7 +187,7 @@ export function matchingNamespaces(
 		let constraint = baseType.constraint
 		let allProtocols = [
 			...builtinProtocols(),
-			...collectProtocolTypes(documentText, documentPath, document),
+			...collectProtocolTypes(analysed),
 		]
 		let protocol = allProtocols.find(
 			(candidate) => candidate.name === constraint,
@@ -236,11 +240,7 @@ export function matchingNamespaces(
 	// builtin twin is dropped. Without this every signature is listed TWICE:
 	// Completion happens to dedupe by Method name and hides it, Signature Help
 	// does not, and an Overload set would double entry for entry.
-	let documentNamespaces = collectNamespaceTypes(
-		documentText,
-		documentPath,
-		document,
-	)
+	let documentNamespaces = collectNamespaceTypes(analysed)
 
 	let shadowed = isStdlibDocument(documentPath)
 		? new Set(documentNamespaces.map((namespace) => namespace.name))
@@ -251,7 +251,7 @@ export function matchingNamespaces(
 			(namespace) => !shadowed.has(namespace.name),
 		),
 		...documentNamespaces,
-		...importedNamespaces(document),
+		...importedNamespaces(analysed),
 		...workspaceNamespaces,
 	]
 
@@ -284,7 +284,7 @@ export function matchingNamespaces(
 
 	for (let protocol of [
 		...builtinProtocols(),
-		...collectProtocolTypes(documentText, documentPath, document),
+		...collectProtocolTypes(analysed),
 	]) {
 		if (
 			protocol.providedMethods === undefined ||
@@ -544,40 +544,26 @@ function unionReceiverNamespaces(
 	return namespaces
 }
 
-// NOTE: A best-effort Enrichment of the whole (unmodified) document — a
-// "probe" built from the text up to the cursor only sees Namespaces declared
-// before it, so a Namespace declared further down would otherwise be
-// invisible.
-//
-// NOTE: The unmodified document is exactly what the Workspace holds enriched,
-// so a caller that has it hands it in and this compiles nothing. Enriching here
-// anyway is what a caller WITHOUT a Workspace needs — the tests, and a document
-// the Workspace deliberately holds nothing for.
+// NOTE: Read off the whole (unmodified) document: a "probe" built from the
+// text up to the cursor only sees Namespaces declared before it, so a
+// Namespace declared further down would otherwise be invisible.
 function collectNamespaceTypes(
-	documentText: string,
-	documentPath: string | undefined,
 	document: DocumentAnalysis | null,
 ): Array<common.NamespaceType> {
-	try {
-		let enrichedProgram =
-			document?.enrichedProgram ??
-			enrichDocument(
-				parseDocument(documentText, documentPath).program,
-				documentPath,
-				{ tests: true },
-			).program
-		let namespaces: Array<common.NamespaceType> = []
+	let enrichedProgram = document?.enrichedProgram ?? null
+	let namespaces: Array<common.NamespaceType> = []
 
-		// NOTE: A Namespace declared in the `tests { … }` block is a Namespace
-		// the tests may reach through `::`, so it is offered there.
-		for (let body of typedProgramBodies(enrichedProgram)) {
-			collectNamespaceTypesInBody(body, namespaces)
-		}
-
+	if (enrichedProgram === null) {
 		return namespaces
-	} catch {
-		return []
 	}
+
+	// NOTE: A Namespace declared in the `tests { … }` block is a Namespace
+	// the tests may reach through `::`, so it is offered there.
+	for (let body of typedProgramBodies(enrichedProgram)) {
+		collectNamespaceTypesInBody(body, namespaces)
+	}
+
+	return namespaces
 }
 
 function collectNamespaceTypesInBody(
@@ -599,32 +585,25 @@ function collectNamespaceTypesInBody(
 }
 
 function collectProtocolTypes(
-	documentText: string,
-	documentPath?: string,
-	document: DocumentAnalysis | null = null,
+	document: DocumentAnalysis | null,
 ): Array<common.ProtocolType> {
-	try {
-		let enrichedProgram =
-			document?.enrichedProgram ??
-			enrichDocument(
-				parseDocument(documentText, documentPath).program,
-				documentPath,
-				{ tests: true },
-			).program
-		let protocols: Array<common.ProtocolType> = Object.values(
-			document?.module?.imported.protocols ?? {},
-		)
+	let enrichedProgram = document?.enrichedProgram ?? null
 
-		for (let node of typedProgramNodes(enrichedProgram)) {
-			if (node.nodeType === "ProtocolDeclarationStatement") {
-				protocols.push(node.protocolType)
-			}
-		}
-
-		return protocols
-	} catch {
+	if (enrichedProgram === null) {
 		return []
 	}
+
+	let protocols: Array<common.ProtocolType> = Object.values(
+		document?.module?.imported.protocols ?? {},
+	)
+
+	for (let node of typedProgramNodes(enrichedProgram)) {
+		if (node.nodeType === "ProtocolDeclarationStatement") {
+			protocols.push(node.protocolType)
+		}
+	}
+
+	return protocols
 }
 
 // NOTE: The Namespaces the import block brought in — declared in another

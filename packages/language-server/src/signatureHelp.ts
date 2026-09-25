@@ -15,7 +15,7 @@ import { typedAssertionExpressions } from "./assertionChildren"
 import { defineExpressions } from "./defineArmChildren"
 import { describe, documentationOf } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
-import { enrichProbe, moduleDocumentOf } from "./moduleLink"
+import { documentAnalysisOf, enrichProbe } from "./moduleLink"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isAtOrBefore, isSmaller } from "./positions"
 import { probeSourcesFor, stripNoise } from "./probe"
@@ -65,12 +65,15 @@ export function findSignatureHelp(
 	cursor: common.Cursor,
 	documentPath?: string,
 	analysis: DocumentAnalysis | null = null,
+	// NOTE: Told of a Compiler throw the help is answered around, so the Server
+	// can log it.
+	onInternalError: (error: unknown) => void = () => {},
 ): SignatureHelpInfo | null {
-	// NOTE: The same reading Completion makes, for the same reason — see
-	// `findCompletions`: a probe of a Module is linked against the document's
-	// dependencies, and a caller with no Workspace behind it pays for the link
-	// here rather than going without the names an import block brought in.
-	let document = analysis ?? moduleDocumentOf(documentText, documentPath)
+	// NOTE: The same reading Completion makes, for the same reason; see
+	// `findCompletions`.
+	let document =
+		analysis ??
+		documentAnalysisOf(documentText, documentPath, onInternalError)
 	let moduleView = document?.module ?? null
 	let lines = documentText.split("\n")
 	let headText = [

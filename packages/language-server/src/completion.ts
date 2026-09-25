@@ -26,7 +26,7 @@ import {
 	callSnippetsFor,
 	qualifiedCallSnippetsFor,
 } from "./callSnippets"
-import { enrichDocument, parseDocument } from "./compilation"
+import { parseDocument } from "./compilation"
 import {
 	defineConditions,
 	defineExpressions,
@@ -38,7 +38,7 @@ import {
 	moduleSectionCursor,
 } from "./importCompletion"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
-import { enrichProbe, moduleDocumentOf, type ModuleView } from "./moduleLink"
+import { documentAnalysisOf, enrichProbe, type ModuleView } from "./moduleLink"
 import { typeNamedAt } from "./namedTypes"
 import {
 	derivedEnumerableNamespace,
@@ -301,16 +301,15 @@ export function findCompletions(
 	}
 
 	// NOTE: The Workspace holds the document's own analysis for every open file
-	// and hands it in. A caller with no Workspace behind it — the tests, and
-	// anything holding a document as a string — pays here for the one thing it
-	// can not do without: a Module LINKED against its dependencies, so that the
-	// names its import block brought in are in reach of the probes below. A
-	// Program that is no Module needs nothing of the sort and gets nothing.
+	// and hands it in. Anything else derives it here, once for every listing
+	// below; a Module is linked so its imported names reach the probes.
 	//
 	// Below the Module sections on purpose: a cursor inside `import { … }` is
 	// answered by the block itself, and paying for the graph to answer it would
 	// be paying for what that answer never reads.
-	let document = analysis ?? moduleDocumentOf(documentText, documentPath)
+	let document =
+		analysis ??
+		documentAnalysisOf(documentText, documentPath, onInternalError)
 	// NOTE: What every probe of this document is read against — null wherever
 	// the document is no Module, which is where a probe enriches alone.
 	let moduleView = document?.module ?? null
@@ -394,14 +393,7 @@ export function findCompletions(
 		let namedType =
 			memberMatch !== null &&
 			(base === null || base.type.type === "Error")
-				? namedTypeBase(
-						headText,
-						cursor,
-						base,
-						documentText,
-						documentPath,
-						document,
-					)
+				? namedTypeBase(headText, cursor, base, document)
 				: null
 
 		base = namedType ?? base
@@ -471,7 +463,6 @@ export function findCompletions(
 		documentPath,
 		workspace.offers,
 		document,
-		onInternalError,
 	)
 
 	// NOTE: Record member names and Argument labels are offered *alongside*
@@ -714,8 +705,6 @@ function namedTypeBase(
 	headText: string,
 	cursor: common.Cursor,
 	probed: ProbedBase | null,
-	documentText: string,
-	documentPath: string | undefined,
 	document: DocumentAnalysis | null,
 ): ProbedBase | null {
 	let name = namedBaseIn(headText)
@@ -725,7 +714,7 @@ function namedTypeBase(
 	}
 
 	for (let program of [
-		enrichedDocumentProgram(documentText, documentPath, document),
+		document?.enrichedProgram ?? null,
 		probed?.program ?? null,
 	]) {
 		if (program === null) {
@@ -761,29 +750,6 @@ function namedBaseIn(headText: string): string | null {
 	let before = headText[headText.length - name.length - 1] ?? ""
 
 	return before === "." || before === ":" || before === "#" ? null : name
-}
-
-// NOTE: The unmodified document, enriched — what the Workspace already holds
-// for every open file, so the Server pays nothing for it. A caller without one
-// derives it, which is what the probe this replaced cost anyway.
-function enrichedDocumentProgram(
-	documentText: string,
-	documentPath: string | undefined,
-	document: DocumentAnalysis | null,
-): common.typed.Program | null {
-	if (document !== null) {
-		return document.enrichedProgram
-	}
-
-	try {
-		return enrichDocument(
-			parseDocument(documentText, documentPath).program,
-			documentPath,
-			{ tests: true },
-		).program
-	} catch {
-		return null
-	}
 }
 
 function findProbeReceiver(
@@ -2049,26 +2015,13 @@ function scopeCompletions(
 	documentPath?: string,
 	offers: Array<WorkspaceOffer> = [],
 	document: DocumentAnalysis | null = null,
-	onInternalError: (error: unknown) => void = () => {},
 ): Array<CompletionEntry> {
-	// NOTE: The unmodified document, which is what the Workspace holds parsed,
-	// enriched and indexed. Derived here only for a caller that has no Workspace
-	// behind it — the same list, at the price this one used to cost every time.
+	// NOTE: The unmodified document, parsed, enriched and indexed by the
+	// Workspace or derived once by `findCompletions`. Null only where its text
+	// does not parse.
 	let program =
 		document?.program ?? parseDocument(documentText, documentPath).program
-	let enrichedProgram: common.typed.Program | null =
-		document?.enrichedProgram ?? null
-
-	if (document === null) {
-		try {
-			enrichedProgram = enrichDocument(program, documentPath, {
-				tests: true,
-			}).program
-		} catch (error) {
-			onInternalError(error)
-		}
-	}
-
+	let enrichedProgram = document?.enrichedProgram ?? null
 	let { scopes } = document?.index ?? indexProgram(program, enrichedProgram)
 	let scope = scopeAt(scopes, cursor)
 	let described =
@@ -2585,10 +2538,8 @@ function snippetCompletions(scope: {
 		}))
 }
 
-// NOTE: The document's own Program answers this, and it is already in hand
-// wherever the caller holds an analysis. A Program that is no Module carries
-// none — the Workspace only analyses the files it links — so the document is
-// parsed here for the one reading that needs the tree rather than the Types.
+// NOTE: The document's own Program, which `findCompletions` hands in unless
+// its text does not parse; the tree rather than the Types is what this reads.
 function snippetContextOf(
 	documentText: string,
 	documentPath: string | undefined,

@@ -2156,11 +2156,13 @@ export function startServer(options: { connection?: Connection } = {}) {
 			return null
 		}
 
+		let filePath = documentFilePath(params.textDocument.uri)
 		let help = findSignatureHelp(
 			document.getText(),
 			toCursor(params.position),
 			params.textDocument.uri,
-			workspace.documentOf(documentFilePath(params.textDocument.uri)),
+			workspace.documentOf(filePath),
+			(error) => logInternalError(filePath, error),
 		)
 
 		if (help === null) {

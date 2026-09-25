@@ -4,7 +4,6 @@ import {
 	type LinkContext,
 	linkContextOf,
 	type LinkedGraph,
-	type ModuleHost,
 } from "@essence-lang/compiler/modules"
 import type { common, parser } from "@essence-lang/interfaces"
 
@@ -74,39 +73,62 @@ export function moduleViewsOf(linked: LinkedGraph): Map<string, ModuleView> {
 	return views
 }
 
-// NOTE: The way in for a caller with no Workspace behind it — the tests, and
-// anything holding a document as a string. The Language Server reads the view
-// the Workspace already holds for the file, which is the same one built from
-// the same graph; this pays for a graph of its own, once per request rather
-// than once per probe.
-//
-// Null wherever there is nothing to link against: a document that writes
+// NOTE: The document for a caller that holds no analysis of it, derived once
+// per request so that no listing enriches it again. An enrichment throw goes to
+// `onInternalError` and the document answers untyped.
+export function documentAnalysisOf(
+	documentText: string,
+	documentPath: string | undefined,
+	onInternalError: (error: unknown) => void = () => {},
+): DocumentAnalysis | null {
+	let program: parser.Program
+
+	try {
+		program = parseDocument(documentText, documentPath).program
+	} catch {
+		return null
+	}
+
+	let linked = linkedDocumentOf(program, documentText, documentPath)
+
+	if (linked !== null) {
+		return linked
+	}
+
+	let enrichedProgram: common.typed.Program | null = null
+
+	try {
+		enrichedProgram = enrichDocument(program, documentPath, {
+			tests: true,
+		}).program
+	} catch (error) {
+		onInternalError(error)
+	}
+
+	return { program, enrichedProgram, index: null, module: null }
+}
+
+// NOTE: Null wherever there is nothing to link against: a document that writes
 // neither Module section is a Program of its own, a standard library source is
 // analysed as the declaration space its loader made it, and a caller with no
 // path for the document can not name a Module at all.
-export function moduleDocumentOf(
+function linkedDocumentOf(
+	program: parser.Program,
 	documentText: string,
 	documentPath: string | undefined,
-	host: ModuleHost = diskModuleHost,
 ): DocumentAnalysis | null {
-	if (documentPath === undefined) {
+	if (documentPath === undefined || !isModule(program, documentPath)) {
 		return null
 	}
 
 	try {
-		let { program } = parseDocument(documentText, documentPath)
-
-		if (!isModule(program, documentPath)) {
-			return null
-		}
-
 		let entryPath = documentFilePath(documentPath)
 		let linked = linkModuleGraph(
 			loadModuleGraph(entryPath, {
 				readFile: (filePath) =>
 					filePath === entryPath
 						? documentText
-						: host.readFile(filePath),
+						: diskModuleHost.readFile(filePath),
 			}),
 			{ tests: true },
 		)
