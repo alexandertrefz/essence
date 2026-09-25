@@ -1084,11 +1084,11 @@ export function startServer(options: { connection?: Connection } = {}) {
 		scheduleAnalysis(changed)
 	})
 
-	// NOTE: The one request that is answered with an edit to files nobody asked
-	// about, and the one the client makes before doing something rather than
-	// after: what it wants to know is what has to change for the move to leave
-	// the workspace saying what it said. Answering nothing lets the move happen
-	// untouched, which is what a rename of something no Module names should do.
+	// NOTE: A request answered with edits to files nobody asked about, and made
+	// before the client does something rather than after: what it wants to know
+	// is what has to change for the move to leave the workspace saying what it
+	// said. Answering nothing lets the move happen untouched, which is what a
+	// rename of something no Module names should do.
 	//
 	// The buffers are not consulted, and deliberately: the Workspace answers
 	// from what it holds for each file, which IS the open buffer where there is

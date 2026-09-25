@@ -28,13 +28,12 @@ import {
 import type { CodeActionEdit, CodeActionEntry } from "./index"
 import { walk } from "./lookups"
 
-// NOTE: The one refactoring here that edits files the reader never opened —
-// three of them in the ordinary case: the Module the Declaration leaves, the
-// Module it lands in, and every Module that named it in an entry. Nothing else
-// in this Server rewrites a file nobody asked about, which is why the refusal
-// below is written first and read as the whole of what makes this safe: a
-// Declaration whose body reads something private to the file it is leaving would
-// land somewhere it can not compile, and no edit here can invent the name for it.
+// NOTE: The one refactoring here that edits files the reader never opened: the
+// Module the Declaration lands in, and every Module that named it in an entry.
+// That is why the refusal, `readsMovableNames`, is read as the whole of what
+// makes this safe: a Declaration whose body reads something private to the file
+// it is leaving would land somewhere it can not compile, and no edit here can
+// invent the name for it.
 //
 // The Statement travels as WRITTEN — the text of its lines, its `§§` block
 // included — rather than printed back from its Node. A Declaration is the
