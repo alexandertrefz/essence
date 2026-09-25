@@ -260,13 +260,13 @@ function trimUnderHalfRule<ItemType extends AnyType>(
 export function runsOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListView<ItemType> {
-	// NOTE: THE ONE PLACE A BOX LEFT BEHIND CATCHES UP. A positional write may
-	// have changed the back run under this box since it last looked, and every
-	// reader in the runtime asks for its runs here or through `viewOf` and
-	// `materialise`, which ask here too — so a box that is behind repairs itself
-	// before a single item of it is read. The three readers that reach a box's
-	// fields without a view — `append`'s two entries and `prepend` — say so
-	// themselves.
+	// NOTE: WHERE A BOX LEFT BEHIND CATCHES UP. A positional write may have
+	// changed the back run under this box since it last looked, and every view
+	// reader asks for its runs here, directly or through `viewOf`, `walkOf` and
+	// `sealedRunsOf`, so a box that is behind repairs itself before a single
+	// item of it is read. The runtime's readers that reach a box's fields
+	// without a view, `materialise`, `append`, `prepend` and the List walk in
+	// `type.ts`, call `caughtUp` themselves.
 	caughtUp(originalList)
 
 	let backCount = originalList.length ?? originalList.value.length
