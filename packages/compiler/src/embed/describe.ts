@@ -896,8 +896,8 @@ export function describeTypes(
 
 // NOTE: Whether any position of this Module's boundary is a Dictionary, which
 // is what decides whether its bundle carries the two runtime Functions a
-// Dictionary crosses through — see `RUNTIME_BRIDGE_MODULES`. It is asked of the
-// values AND of the declared Types, because both halves are the boundary: a
+// Dictionary crosses through — see `DICTIONARY_BRIDGE_MODULES`. It is asked of
+// the values AND of the declared Types, because both halves are the boundary: a
 // Dictionary a Module never exports by name still reaches a host through the
 // Type of something it does, and a Module whose only Dictionary sits in an
 // exported `type` publishes it in the declaration file and hands it to a host
