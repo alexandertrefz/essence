@@ -276,11 +276,11 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 			// its values compare — the registry in `registry.ts` is where a
 			// container's own module leaves that, and probing it HERE is what
 			// keeps this ladder the whole cost of equality for a Program that
-			// holds none of them. A Dictionary is the one such kind today: it
-			// is compared by the entries it holds rather than by the slots,
-			// versions and generation a box is made of, so falling through to
-			// the structural comparison below would have made a Dictionary
-			// unequal to its own copy.
+			// holds none of them. A Dictionary is one such kind: it is compared
+			// by the entries it holds rather than by the slots, versions and
+			// generation a box is made of, so falling through to the structural
+			// comparison below would have made a Dictionary unequal to its own
+			// copy.
 			let kind = kindOf(aTag)
 
 			if (kind !== undefined) {
@@ -351,15 +351,15 @@ export function choiceName(value: AnyType): StringType {
 // NOTE: A fresh List at every call, rather than one built beside the tags and
 // answered again — and what that buys is LOCALITY rather than a bug avoided.
 // One shared answer would in fact be safe today, for two reasons that live
-// elsewhere: `append` stamps the receiver's view closed BEFORE it pushes, which
-// is the one in-place write to a List's Array in this package and the reason it
-// can not leak an item to a second holder; and a rewritten walk seeded by a
-// CALL copies through `ownItemsOf` rather than editing the seed. Both are
-// contracts other files keep, and a shared box would make this one depend on
-// every future List operation keeping them too. Fresh costs about 12 ns a call
-// and keeps the safety here. The Cases themselves ARE shared and are meant to
-// be: `createCase` interns the payload-free ones, so the items cost nothing
-// after the first call.
+// elsewhere: every in-place write to a List's Array, a push by `append` or
+// `prepend` or a positional write by `replace`, leaves the Array's other
+// holders their items, which is what `List.ts` keeps; and a rewritten walk
+// seeded by a CALL copies through `ownItemsOf` rather than editing the seed.
+// Both are contracts other files keep, and a shared box would make this one
+// depend on every future List operation keeping them too. Fresh costs about
+// 12 ns a call and keeps the safety here. The Cases themselves ARE shared and
+// are meant to be: `createCase` interns the payload-free ones, so the items
+// cost nothing after the first call.
 //
 // NOTE: The cast is the one `Generators.ts` makes at every Case it builds, and
 // for the reason written there: `CaseInstanceType` is deliberately outside
@@ -394,9 +394,9 @@ type UnionArm = {
 
 type DerivedEquatableDescriptor = Record<string, Record<string, DescriptorNode>>
 
-// NOTE: And the printing one, whose `toString` answers an Essence String. Read
-// the same way and curried the same way; the two are apart because a Record
-// routes each Protocol on its own list of members.
+// NOTE: The printing witness, whose `toString` answers an Essence String. It is
+// read and curried the way `EquatableWitness` is; the two are apart because a
+// Record routes each Protocol on its own list of members.
 type PrintableWitness = { toString: (value: AnyType) => StringType }
 
 // NOTE: A conformance witness as it arrives at runtime — a method map whose
@@ -538,9 +538,9 @@ function renderersOf(
 //
 // NOTE: ONE pass, over the LEFT side's keys, which is what makes the member-set
 // check and the comparison the same walk: a key the right side does not carry
-// ends it, and a key neither the routed list names is compared by `anyIs`
-// exactly as the whole Record used to be. `indexOf` over the routed names is
-// the slot — see `boundRecordIs` for why a search rather than a lookup.
+// ends it, and a key the routed list does not name is compared by `anyIs`, as
+// `Record.is` compares every member. `indexOf` over the routed names is the
+// slot — see `boundRecordIs` for why a search rather than a lookup.
 function recordRoutesEqual(
 	a: RecordType,
 	b: RecordType,
