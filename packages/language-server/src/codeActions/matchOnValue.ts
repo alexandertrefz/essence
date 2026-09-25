@@ -290,6 +290,9 @@ function visitNode(
 		case "Complete":
 			visitNode(node.expression, null, visit)
 			return
+		case "RefusedValue":
+			visitNode(node.base, null, visit)
+			return
 		case "Identifier":
 			visit(node, answers)
 			return

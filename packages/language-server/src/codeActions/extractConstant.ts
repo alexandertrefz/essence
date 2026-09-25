@@ -229,6 +229,9 @@ function collectInto(
 		case "Complete":
 			collectInto(node.expression, found)
 			return
+		case "RefusedValue":
+			collectInto(node.base, found)
+			return
 		case "CaseValue":
 			if (node.value !== null) {
 				collectInto(node.value, found)

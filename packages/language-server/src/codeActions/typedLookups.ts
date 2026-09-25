@@ -139,6 +139,9 @@ function visitNode(
 		case "Complete":
 			visitNode(node.expression, visit)
 			return
+		case "RefusedValue":
+			visitNode(node.base, visit)
+			return
 		case "Combination":
 			visitNode(node.lhs, visit)
 			visitNode(node.rhs, visit)

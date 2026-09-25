@@ -9430,3 +9430,69 @@ describe("Code Actions inside a Protocol-provided Method body", () => {
 		})
 	})
 })
+
+describe("Code Actions inside a refused value", () => {
+	it("should extract an Expression in front of the brackets to a Constant", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant primes = [2, 3, 5]",
+			"\tconstant first = primes::reverse()[0]",
+			"}",
+		]
+		let action = actionsOf(
+			lines,
+			spanOf(lines, 3, "primes::reverse()"),
+		).find((entry) => entry.title === "Extract to a Constant")
+
+		expect(applied(lines, action as CodeActionEntry).slice(2, 4)).toEqual([
+			"\tconstant reverse = primes::reverse()",
+			"\tconstant first = reverse[0]",
+		])
+	})
+
+	it("should scaffold a Match on a value in front of the brackets", () => {
+		let lines = [
+			"implementation {",
+			"\tchoice Size { Small, Large }",
+			"\tconstant chosen: Size = #Small",
+			"\tconstant first = chosen[0]",
+			"}",
+		]
+
+		expect(titles(actionsOf(lines, spanOf(lines, 4, "chosen")))).toContain(
+			"Match on 'chosen'",
+		)
+	})
+
+	it("should expand a Case payload in front of the brackets", () => {
+		let lines = [
+			"implementation {",
+			"\tchoice Progress { Stopped { total: Integer } }",
+			"\tconstant first = #Stopped(1)[0]",
+			"}",
+		]
+
+		expect(titles(actionsOf(lines, spanOf(lines, 3, "(1)")))).toContain(
+			"Expand the payload to '{ total = … }'",
+		)
+	})
+
+	it("should type a Parameter read in front of the brackets when extracting a Function", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction report(_ primes: List<Integer>) -> Integer {",
+			"\t\tconstant first = primes[0]",
+			"\t\t<- 1",
+			"\t}",
+			"}",
+		]
+		let action = actionsOf(
+			lines,
+			spanOf(lines, 3, "constant first = primes[0]"),
+		).find((entry) => entry.title === "Extract to a Function")
+
+		expect(applied(lines, action as CodeActionEntry)).toContain(
+			"\tfunction extracted(_ primes: List<Integer>) -> {} {",
+		)
+	})
+})
