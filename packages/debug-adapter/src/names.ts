@@ -72,11 +72,11 @@ function demangleUserName(mangled: string): string {
 		)
 }
 
+import { isSynthesizedName } from "@essence-lang/compiler/helpers"
+
 // NOTE: One emitted name, answered as the author spelled it. The overload
 // suffix goes first — it is appended to an already-escaped name — and what
 // remains is exactly one of the Rewriter's cases, or already the name itself.
-import { isSynthesizedName } from "@essence-lang/compiler/helpers"
-
 export function demangleName(name: string): string {
 	let base = name.replace(overloadSuffix, "")
 

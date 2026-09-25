@@ -19,8 +19,10 @@ author wrote — a `match` reads as one frame, standard-library frames as
 the runtime and the prelude, and the Variables view renders values the way
 `Terminal.inspect` spells them, live inside the debuggee.
 
-The adapter deliberately does not depend on the compiler. What compiling
-*means* is a capability the host injects — `essence dap` hands in the CLI's
-in-process pipeline, and the standalone `esdap` falls back to spawning
-`essence build`. Debugging requires Node: the adapter speaks the V8 inspector
+The adapter compiles nothing itself. What compiling *means* is a capability
+the host injects: `essence dap` hands in the CLI's in-process pipeline, and
+the standalone `esdap` falls back to spawning `essence build`. From the
+compiler it imports only `isSynthesizedName`, to tell the bindings the
+compiler made from the ones the author wrote. Debugging requires Node: the
+adapter speaks the V8 inspector
 protocol to the debuggee.
