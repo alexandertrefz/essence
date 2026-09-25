@@ -597,3 +597,30 @@ describe("Signature Help under start and complete", () => {
 		)
 	})
 })
+
+describe("Signature Help inside a Protocol-provided Method body", () => {
+	it("should show the signature of a call written in the body", () => {
+		let source = [
+			"implementation {",
+			"\tfunction bump (_ value: Integer, by amount: Integer) -> Integer {",
+			"\t\t<- value",
+			"\t}",
+			"",
+			"\tprotocol Ranked {",
+			"\t\tisAbove(_ mark: Integer) -> Boolean",
+			"",
+			"\t\tbumped(_ mark: Integer) -> Integer {",
+			"\t\t\t<- bump(mark, ",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let help = findSignatureHelp(source, { line: 10, column: 18 })
+
+		expect(help?.signatures[0].label).toBe(
+			"bump(_ Integer, by: Integer) -> Integer",
+		)
+		expect(help?.activeParameter).toBe(1)
+	})
+})

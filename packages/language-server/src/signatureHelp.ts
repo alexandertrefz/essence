@@ -548,6 +548,21 @@ function findEnclosingInvocation(
 				}
 
 				return
+			case "ProtocolDeclarationStatement":
+				for (let member of Object.values(node.methods)) {
+					let methods =
+						member.nodeType === "OverloadedMethod" ||
+						member.nodeType === "OverloadedStaticMethod"
+							? member.methods
+							: [member.method]
+
+					for (let method of methods) {
+						visitDefaults(method.value.parameters)
+						visitBody(method.value.body)
+					}
+				}
+
+				return
 			case "IfStatement":
 				visitNode(node.condition)
 				visitBody(node.body)
