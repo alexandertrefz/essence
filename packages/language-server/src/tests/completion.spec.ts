@@ -3583,3 +3583,37 @@ describe("Completion under start and complete", () => {
 		expect(labels).toContain("Result")
 	})
 })
+
+describe("Completion inside a refused value", () => {
+	it("should offer the Choice a call's Parameter expects for a bare Case", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Size { Small, Large }",
+			"\tchoice Colour { Red, Blue }",
+			"",
+			"\tfunction pick(_ size: Size) -> List<Integer> {",
+			"\t\t<- [1]",
+			"\t}",
+			"",
+			"\tconstant first = pick(#)[0]",
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 9, column: 25 })).toEqual([
+			"Small",
+			"Large",
+		])
+	})
+
+	it("should carry the Type of a name a Function literal there declares", () => {
+		let source = [
+			"implementation {",
+			"\tconstant first = [1]::removeEvery(where (item) { <- item })[0]",
+			"}",
+		].join("\n")
+
+		expect(entryFor(source, { line: 2, column: 55 }, "item")?.detail).toBe(
+			"Integer",
+		)
+	})
+})

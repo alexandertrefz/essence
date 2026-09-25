@@ -1912,6 +1912,11 @@ function analyseCaseProbe(program: common.typed.Program): {
 			case "Complete":
 				visitNode(node.expression, null)
 				return
+			// NOTE: The position expects what the brackets would have read,
+			// not the value they were written after, so no Type travels in.
+			case "RefusedValue":
+				visitNode(node.base, null)
+				return
 			case "Combination":
 				visitNode(node.lhs, expectedType)
 				visitNode(node.rhs, expectedType)
@@ -2368,6 +2373,9 @@ function describeDeclarations(
 			case "Start":
 			case "Complete":
 				visitNode(node.expression)
+				return
+			case "RefusedValue":
+				visitNode(node.base)
 				return
 			case "Combination":
 				visitNode(node.lhs)
