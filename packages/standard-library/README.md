@@ -48,8 +48,9 @@ that are one, `Ordering` with them, and a Program's own alike.
 
 The only things NOT declared here are the ones no declaration could produce:
 the bare Type tags — `Boolean`, `String`, `Integer`, `Rational`, `Algebraic`,
-`Transcendental`, the open Record and the unapplied `List` — which
-live in `packages/compiler/src/enricher/primitives.ts`. `loop` — the one
+`Transcendental`, `Randomness`, `Future`, `Started`, the open Record and the
+unapplied `List` and `Dictionary` — which live in
+`packages/compiler/src/enricher/primitives.ts`. `loop` — the one
 native Function family with no Namespace to live in — is declared here after
 all, in `Loop.es`, as ordinary free Functions. Its nine entries are told apart
 by their labels, and the last label is what separates the two halves of the
@@ -81,9 +82,9 @@ of a request, `HttpMethod` and `Redirects` are the modes it takes, and
 a second attempt are `Future`'s `within` and `attempt`, and neither is repeated
 here (`Http.es`).
 
-Three of every five declared Method entries are also IMPLEMENTED here, in
-Essence — 456 of 750 as this is written, counting one entry per Overload and
-`loop`'s free Functions with them; the rest bind to `@essence-lang/runtime`.
+Three of every five of the 750 declared Method entries are also IMPLEMENTED
+here, in Essence, counting one entry per Overload and `loop`'s free Functions
+with them; the rest bind to `@essence-lang/runtime`.
 Eight more are written on a PROTOCOL rather than on a Namespace, once for every
 conformer: `Equatable.isNot`, `Comparable`'s four inequalities, `Orderable`'s
 `isBetween` and `clamp`, and `Generatable.shrink`, which answers no candidates
@@ -95,16 +96,16 @@ deliberate line, not a backlog: the primitives everything else is composed from
 (`Boolean.negate`/`is`/`and`/`or`/`compare`, integer and rational arithmetic,
 same-kind `compare`), the JavaScript intrinsics Essence has no expression for
 (`String.uppercase`, `String.trim(at:)`, `String.normalize(as:)`,
-`String.lines`/`words`, `String.codePoints` and the `String.of(codePoint:)`
+`String.words`, `String.codePoints` and the `String.of(codePoint:)`
 that reads one back, the four `String.hasOnly…` character classes, `Record`'s
 reflective Methods, and `String.compare`, which orders by code point and would
 build a List of every point of both sides in Essence), and the iteration
 primitives the rest rest on (`List.reduce`, `item(at:)`, `slice`, the eager
 filter `everyItem(where:)`, `append(contentsOf:)`, `static of`, and
-`String.split(on:)`, which is also the one native that decides what a
-"character" is: it segments into Unicode grapheme clusters (see `graphemesOf` in
-`String.ts`), so `length`, `slice`, `reverse`, `firstIndex` and the rest, all
-written on top of it, count and cut by grapheme). A fourth group joined those
+`String.split(on:)`; the runtime segments each String once into Unicode grapheme
+clusters (see `clustersIn` in `String.ts`), and `split`, `length`, `slice`,
+`reverse`, `firstIndex` and the rest read that view, so they count and cut by
+grapheme). A fourth group joined those
 three for a measured reason rather than for a reason of principle: a search or
 an ordering whose Essence body built a whole List to answer a question about one
 position. `String.firstIndex`/`lastIndex`/`count(of:)`/`everyIndex(of:)` walk
@@ -225,10 +226,10 @@ besides. The written entry is on the member's own `compare`, a bigint or a
 cross-multiplication; the provided one reads whatever `compare` the conformance
 names, and for a receiver of the covering `Number` Type that is the sixteen-cell
 cross-kind table that reaches the whole numeric tower. Deleting the member
-entries would route two Integers through it and nearly double a Program that
-only prints a greeting. Each written Overload also holds an entry for the OTHER
-kind — `Integer::isLessThan(_ Rational)` — which a Method over `Self` can not
-offer. The reasoning is written above `Integer::isLessThan`, and
+entries would leave two Integers on the provided bodies, which reach `compare`
+through the conformance rather than directly. Each written Overload also holds
+an entry for the OTHER kind — `Integer::isLessThan(_ Rational)` — which a Method
+over `Self` can not offer. The reasoning is written above `Integer::isLessThan`, and
 `packages/compiler/src/tests/bundleSize.spec.ts` is the guard.
 Before collapsing anything that looks repeated here, check whether the repeat
 is what keeps a body reaching only its own Namespace's primitives.
@@ -361,8 +362,9 @@ easy to break:
 
 ## `List`'s bounded Methods
 
-Three of `List`'s Method Generics carry a Protocol bound, and each bound is a
-statement about what the Method needs rather than a restriction to work around.
+`List`'s Method Generics carry Protocol bounds of `Printable`, `Comparable`
+and `Equatable`, and each bound is a statement about what the Method needs
+rather than a restriction to work around.
 
 `join<ItemType is Printable>(with separator: String) -> String` is
 deliberately wider than a reader might expect: joining asks nothing of the items
