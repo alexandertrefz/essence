@@ -22,8 +22,8 @@ import { programBodies, typedProgramSections } from "./sections"
 
 // NOTE: The Call Hierarchy is single-document and stateless. Nothing survives a
 // request: an Item round-trips its `selectionRange`, so the incoming and
-// outgoing requests re-parse the document and resolve the Declaration at that
-// Position again — exactly what every other request in this Server does.
+// outgoing requests resolve the Declaration at that Position again, off the
+// document's current analysis.
 //
 // Callers and callees ARE the rename index's Declarations. The index already
 // knows which name at which Position binds to which Function, Method or static
