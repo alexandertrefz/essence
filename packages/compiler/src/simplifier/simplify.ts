@@ -251,12 +251,10 @@ function simplifyCaseValue(
 // A payload that is not a Record Literal is complete by rule (see
 // `casePayloadIsPartial`), so this only ever meets one that is.
 //
-// NOTE: The values are COPIED per site. One default Node standing in several
-// constructions — in several Modules, even — is one object several Optimiser
-// passes would rewrite in place, and the copy is what keeps each site's Record
-// its own. It carries the construction's Position while it is at it: the value
-// appears where the Case is built, which is where a step and a source map should
-// stop, and the declaration it was written at may be in another file entirely.
+// NOTE: The values are built afresh per site, so no two constructions share a
+// Node, and each carries the construction's Position: the value appears where
+// the Case is built, which is where a step and a source map should stop, and the
+// declaration it was written at may be in another file entirely.
 function fillCasePayloadDefault(
 	value: common.typedSimple.ExpressionNode,
 	written: common.typed.ExpressionNode,
