@@ -436,14 +436,6 @@ export type EnrichedProgramInput = {
 	source?: string
 }
 
-// NOTE: Several Programs enriched with hoisting run ONCE over every file's Nodes
-// concatenated, so the speculative rounds resolve across file boundaries — a
-// Protocol declared in one file and a Namespace conforming to it in another
-// hoist in whichever order they happen to resolve, exactly as two Statements in
-// one file do. That is what the standard library's load relies on, and it is
-// also the only way a cycle of Modules can be enriched: nothing inside an SCC
-// can be resolved before the rest of it. Diagnostics are collected per Program,
-// so each stays attributable to the file it came from.
 // NOTE: The MODE covers every Program of the group — one compile is one mode,
 // so a graph linked for a contract run synthesizes goals in every Module of it.
 export type EnrichProgramsOptions = CompileMode & {
@@ -465,6 +457,15 @@ export type EnrichProgramsOptions = CompileMode & {
 	annotationsFor?: number
 }
 
+// NOTE: Several Programs enriched with hoisting run ONCE over every file's Nodes
+// concatenated, so the speculative rounds resolve across file boundaries — a
+// Protocol declared in one file and a Namespace conforming to it in another
+// hoist in whichever order they happen to resolve, exactly as two Statements in
+// one file do. That is what the standard library's load relies on, and it is
+// also the only way a cycle of Modules can be enriched: nothing inside an SCC
+// can be resolved before the rest of it. Diagnostics are collected per Program,
+// so each stays attributable to the file it came from.
+//
 // NOTE: Annotations are collected around the WHOLE run rather than around one
 // Program's enrichment, because the hoist — which runs once over every input —
 // is where a top level declaration's written Types resolve, and they are
