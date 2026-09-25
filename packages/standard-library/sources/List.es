@@ -325,7 +325,7 @@ declarations {
 		§§ @returns — `true` for the empty List.
 		isEmpty() -> Boolean {
 			§ Asking for `List.length` costs nothing: it is native and O(1),
-			§ reading the underlying array's length. The body of
+			§ reading the count of items the List keeps. The body of
 			§ `String.isEmpty` is the same, but there `length` walks the
 			§ characters.
 			<- @::length()::is(0)
