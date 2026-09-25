@@ -121,13 +121,12 @@ import {
 } from "./testFixes"
 import { bareCaseAction, removeEntryAction } from "./valueFixes"
 
-// NOTE: Every edit here is computed from the text handed in, on a fresh
-// analysis — never from a Diagnostic the client echoed back. Published
+// NOTE: Every edit here is computed from the text handed in and the analysis of
+// that text, never from a Diagnostic the client echoed back. Published
 // Diagnostics are debounced, so the Positions the client holds belong to a
 // buffer that may be several keystrokes old, while an edit is applied to the
-// buffer as it is now. Every other request in this server re-parses for the
-// same reason; the client's own Diagnostics are only ever used to attach the
-// originating one to the action it produced.
+// buffer as it is now. The client's own Diagnostics are only ever used to
+// attach the originating one to the action it produced.
 
 export type CodeActionEdit = {
 	// NOTE: An insertion is a zero-width range — `start` and `end` at the
