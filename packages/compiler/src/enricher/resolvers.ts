@@ -2270,6 +2270,21 @@ export function scopeWithGenerics(
 	return childScope(scope, { types })
 }
 
+// NOTE: The Type Parameters a Choice DECLARES, with their bounds — looked up by
+// the Choice's own name, which every Case of it carries. Empty where the name
+// resolves to no generic Choice, which is every non-generic one.
+function declaredChoiceGenerics(
+	choiceName: string,
+	scope: enricher.Scope,
+): Array<common.GenericDeclaration> {
+	let declared = findTypeInScope(displayChoiceName(choiceName), scope)
+
+	// NOTE: A generic Choice's name is a GenericAlias, whose own `generics` ARE
+	// the declaration's Parameters, bounds and all. A non-generic one resolves
+	// to the Union of its Cases and has none.
+	return declared?.type === "GenericAlias" ? declared.generics : []
+}
+
 // NOTE: The bounds a Namespace's Type Parameters carry because its TARGET Type
 // demands them. `choice SortedBox<Item is Comparable>` can not be built out of
 // anything else, so every `SortedBox<X>` there can ever be is a proof that `X`
@@ -2286,21 +2301,6 @@ export function scopeWithGenerics(
 // question is what the target says about them, and the report it makes while
 // they are unbounded is the one this exists to answer. The real resolution runs
 // afterwards with the answer in hand.
-// NOTE: The Type Parameters a Choice DECLARES, with their bounds — looked up by
-// the Choice's own name, which every Case of it carries. Empty where the name
-// resolves to no generic Choice, which is every non-generic one.
-function declaredChoiceGenerics(
-	choiceName: string,
-	scope: enricher.Scope,
-): Array<common.GenericDeclaration> {
-	let declared = findTypeInScope(displayChoiceName(choiceName), scope)
-
-	// NOTE: A generic Choice's name is a GenericAlias, whose own `generics` ARE
-	// the declaration's Parameters, bounds and all. A non-generic one resolves
-	// to the Union of its Cases and has none.
-	return declared?.type === "GenericAlias" ? declared.generics : []
-}
-
 export function impliedTargetBounds(
 	node: parser.NamespaceDefinitionStatementNode,
 	scope: enricher.Scope,
@@ -2690,13 +2690,6 @@ function resolveProtocolMethodType(
 	}
 }
 
-// NOTE: Resolves how each Protocol-bounded Type Parameter of an invocation's
-// signature is fulfilled, given what the invocation bound it to. A binding
-// that is itself a bounded Type Parameter forwards the enclosing Function's
-// conformance parameter; a concrete binding requires exactly one conforming
-// Namespace in scope — the exact-target ones win over covering ones, and
-// anything else is a Diagnostic. Failures report and yield no source; the
-// Diagnostic gates codegen, so a missing source never reaches the Rewriter.
 // NOTE: A generic Namespace specialized against the bindings that unified its
 // target Type with a receiver — its target Type and every Method signature are
 // rewritten through those bindings so it reads as a concrete Namespace from the
@@ -6215,6 +6208,13 @@ function enclosingMethodName(scope: enricher.Scope): string | null {
 	return null
 }
 
+// NOTE: Resolves how each Protocol-bounded Type Parameter of an invocation's
+// signature is fulfilled, given what the invocation bound it to. A binding
+// that is itself a bounded Type Parameter forwards the enclosing Function's
+// conformance parameter; a concrete binding requires exactly one conforming
+// Namespace in scope — the exact-target ones win over covering ones, and
+// anything else is a Diagnostic. Failures report and yield no source; the
+// Diagnostic gates codegen, so a missing source never reaches the Rewriter.
 export function resolveConformances(
 	generics: Array<common.GenericDeclaration>,
 	bindings: GenericBindings,
@@ -7946,17 +7946,13 @@ function namespaceCacheIsCurrent(
 	return index === cached.versions.length
 }
 
-// NOTE: `::<Name>method()` where `Name` means something other than a Namespace
-// here. Reported rather than skipped past: the call site named ONE Namespace,
-// and answering with a Namespace of that name from further out would type-check
-// the call against something the emitted code can not reach — the nearer
-// binding is what the name compiles to.
-// NOTE: And the specifiers it has refused. A `::<total>append("!")` whose `total`
-// names an Integer is ONE mistake, and the lookup behind it comes back empty —
-// which read as "no Namespace targets this value" and printed a second report
-// saying so, about a receiver whose Namespace was right there (`"hello"::append`
-// compiles). Remembered on the Node, so a caller can tell an empty answer it has
-// already been told about from an empty answer that is news.
+// NOTE: The specifiers `reportSpecifierIsNotANamespace` has refused. A
+// `::<total>append("!")` whose `total` names an Integer is one mistake, and the
+// lookup behind it comes back empty, which would read as "no Namespace targets
+// this value" and print a second report about a receiver whose Namespace is
+// right there (`"hello"::append` compiles). Remembered on the Node, so a caller
+// can tell an empty answer it has already been told about from an empty answer
+// that is news.
 let refusedSpecifiers = new WeakSet<parser.IdentifierNode>()
 
 export function specifierWasRefused(
@@ -7965,6 +7961,11 @@ export function specifierWasRefused(
 	return identifier != null && refusedSpecifiers.has(identifier)
 }
 
+// NOTE: `::<Name>method()` where `Name` means something other than a Namespace
+// here. Reported rather than skipped past: the call site named ONE Namespace,
+// and answering with a Namespace of that name from further out would type-check
+// the call against something the emitted code can not reach — the nearer
+// binding is what the name compiles to.
 function reportSpecifierIsNotANamespace(
 	identifier: parser.IdentifierNode,
 	value: common.Type,
