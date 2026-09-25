@@ -3016,9 +3016,6 @@ export function startServer(options: { connection?: Connection } = {}) {
 	connection.listen()
 }
 
-// NOTE: The inverse of the decoding `documentFilePath` does. Each segment is
-// encoded on its own so that the separators survive — a file named `a b.es`
-// becomes `a%20b.es`, and the client matches the URI it handed over.
 // NOTE: Accepting a TYPE Hint writes its own label at its own position, which
 // the protocol asks for as an edit — and an insertion is an empty Range there
 // rather than a Position of its own. A VALUE Hint has nothing to accept: what a
@@ -3058,6 +3055,9 @@ export function toLspInlayHint(hint: InlayHintEntry): InlayHint {
 	}
 }
 
+// NOTE: The inverse of the decoding `documentFilePath` does. Each segment is
+// encoded on its own so that the separators survive — a file named `a b.es`
+// becomes `a%20b.es`, and the client matches the URI it handed over.
 export function uriOf(filePath: string): string {
 	return `file://${filePath.split("/").map(encodeURIComponent).join("/")}`
 }
