@@ -1678,6 +1678,8 @@ function renamePooledReferences(
 
 // #endregion
 
+export type PreludeReach = "reached" | "whole"
+
 // NOTE: Which Essence-implemented Methods the emitted Program actually needs,
 // and the const for each. A const is emitted only where something names it:
 // unlike a native, whose unused `import * as <Name>` esbuild shakes away, an
@@ -1705,8 +1707,6 @@ function renamePooledReferences(
 // NOTE: Exported for the tests. The fixed point is the part of this that can
 // silently be wrong — a Method reached only through another one is exactly what
 // the standard library will produce more of as the conversion goes on.
-export type PreludeReach = "reached" | "whole"
-
 export function reachableEssenceMethods(
 	prelude: Array<PreludeNamespace>,
 	implementation: Array<estree.ModuleDeclaration | estree.Statement>,
@@ -1768,10 +1768,10 @@ export function reachableEssenceMethods(
 		freeFunctions.map((freeFunction) => freeFunction.name),
 	)
 
-	// NOTE: The native Methods this prelude carries a shim for — the fourth
-	// table, and the one that is only consulted where a call OMITS an Argument,
-	// exactly as `namespaceMember` only routes to a shim there. A native called
-	// at full arity is a plain member read and draws no edge at all.
+	// NOTE: The native Methods this prelude carries a shim for — the table that
+	// is only consulted where a call OMITS an Argument, exactly as
+	// `namespaceMember` only routes to a shim there. A native called at full
+	// arity is a plain member read and draws no edge at all.
 	let shimmed = new Set(
 		namespaces.flatMap((namespace) =>
 			namespace.node.nativeShims.map(
@@ -1794,10 +1794,10 @@ export function reachableEssenceMethods(
 		),
 	)
 
-	// NOTE: The static Properties this prelude gives a value to — the third
-	// table, keyed like `implemented` because a Property read is spelled exactly
-	// like a static Method reference and the two are told apart by which table
-	// answers. A native Property is in neither, so it stays a member read.
+	// NOTE: The static Properties this prelude gives a value to, keyed like
+	// `implemented` because a Property read is spelled exactly like a static
+	// Method reference and the two are told apart by which table answers. A
+	// native Property is in neither, so it stays a member read.
 	let implementedProperties = new Set(
 		namespaces.flatMap((namespace) =>
 			Object.keys(namespace.node.properties).map(
@@ -1995,11 +1995,11 @@ export function reachableEssenceMethods(
 
 // NOTE: The Essence Methods a typed Method body reaches, restricted to the ones
 // a given prelude implements. This MUST recognise every shape `namespaceMember`
-// turns into a bare `$es_…` Identifier, because those are the four emission
-// sites the seed's `referencedNames` will find in the finished tree — if the two
+// turns into a bare `$es_…` Identifier, because those are the emission sites
+// the seed's `referencedNames` will find in the finished tree — if the two
 // disagree, a Method reached only through a shape missing here is named in the
 // emitted body but its const is never pulled in, a `ReferenceError` at run time
-// that compiles green. The shapes, one per `namespaceMember` call site:
+// that compiles green. The shapes this recognises:
 //
 //   MethodInvocation        `@::m(…)`            — base.name, member.name
 //   UnionMethodInvocation    a Union receiver    — each case's namespaceName +
