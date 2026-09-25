@@ -88,6 +88,39 @@ describe("Signature Help", () => {
 		expect(help?.activeParameter).toBe(2)
 	})
 
+	it("should count the commas after a String holding an escaped quote", () => {
+		let source = [
+			"implementation {",
+			"\tfunction combine (first: String, second: String) -> String {",
+			"\t\t<- first",
+			"\t}",
+			'\tcombine("5\\" screen", ',
+			"}",
+		].join("\n")
+
+		let help = findSignatureHelp(source, { line: 5, column: 24 })
+
+		expect(help?.activeParameter).toBe(1)
+	})
+
+	// NOTE: A hole is code, so the String inside it is a String of its own and
+	// its comma is noise.
+	it("should not count a comma inside a String an interpolation hole holds", () => {
+		let source = [
+			"implementation {",
+			"\tfunction combine (first: String, second: String) -> String {",
+			"\t\t<- first",
+			"\t}",
+			'\tconstant tags = ["new", "sale"]',
+			'\tcombine("Tags: {tags::join(with ", ")}", ',
+			"}",
+		].join("\n")
+
+		let help = findSignatureHelp(source, { line: 6, column: 43 })
+
+		expect(help?.activeParameter).toBe(1)
+	})
+
 	it("should resolve to the innermost call and count only its own commas", () => {
 		let source = [
 			"implementation {",

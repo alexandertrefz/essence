@@ -317,6 +317,21 @@ describe("Completion", () => {
 			])
 		})
 
+		it("should work after a String holding an escaped quote", () => {
+			let source = [
+				"implementation {",
+				'\tconstant person = { firstName = "Ada", lastName = "Lovelace" }',
+				'\tconstant size = "5\\" screen"',
+				"\tconstant names = [person.",
+				"}",
+			].join("\n")
+
+			expect(labelsOf(source, { line: 4, column: 27 })).toEqual([
+				"firstName",
+				"lastName",
+			])
+		})
+
 		it("should carry the member's Type as detail", () => {
 			let source = [
 				"implementation {",
@@ -3416,6 +3431,42 @@ describe("Completion in a Module", () => {
 	// `red` is a Colour, and a Colour has no members at all.
 	it("should offer nothing on a value named after nothing it imports", () => {
 		expect(labelsFor("constant member = red.")).toEqual([])
+	})
+})
+
+describe("Completion inside an interpolation hole", () => {
+	let person =
+		'\tconstant person = { firstName = "Ada", lastName = "Lovelace" }'
+
+	it("should list the members of a name written in the hole", () => {
+		let source = [
+			"implementation {",
+			person,
+			'\tconstant greeting = "Hi {person.',
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 3, column: 34 })).toEqual([
+			"firstName",
+			"lastName",
+		])
+	})
+
+	it("should list them in a hole written in an Argument", () => {
+		let source = [
+			"implementation {",
+			person,
+			"\tfunction show (_ text: String) -> String {",
+			"\t\t<- text",
+			"\t}",
+			'\tshow("Hi {person.',
+			"}",
+		].join("\n")
+
+		expect(labelsOf(source, { line: 6, column: 19 })).toEqual([
+			"firstName",
+			"lastName",
+		])
 	})
 })
 

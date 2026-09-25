@@ -79,3 +79,59 @@ describe("the define arm readings", () => {
 		expect(probeSourcesFor(mentioned, "::lspProbeMember()")).toHaveLength(3)
 	})
 })
+
+describe("the closing brackets", () => {
+	let plainReadingOf = (lines: Array<string>) =>
+		probeSourcesFor(["implementation {", ...lines].join("\n"))[0]
+
+	it("closes a bracket opened after a String holding an escaped quote", () => {
+		let reading = plainReadingOf([
+			'\tconstant quote = "\\""',
+			"\tconstant marks = [quote",
+		])
+
+		expect(reading).toEndWith("[quote]}")
+	})
+
+	it("counts no bracket inside a String an interpolation hole holds", () => {
+		let reading = plainReadingOf([
+			'\tconstant names = ["Ada", "Bob"]',
+			'\tconstant listed = "({names::join(with "), (")})"',
+			"\tconstant all = [listed",
+		])
+
+		expect(reading).toEndWith("[listed]}")
+	})
+
+	it("closes an open interpolation hole and then its String", () => {
+		let reading = plainReadingOf([
+			'\tconstant person = { name = "Ada" }',
+			'\tconstant greeting = "Hi {person',
+		])
+
+		expect(reading).toEndWith('"Hi {person}"}')
+	})
+
+	// NOTE: The Unicode escape is left unclosed on purpose. The Lexer still ends
+	// its String at the quote, and a `}` would close a hole opened at its brace.
+	it("opens no hole at an escaped brace or a Unicode escape", () => {
+		let reading = plainReadingOf([
+			'\tconstant brace = "\\{"',
+			'\tconstant smile = "\\u{1F600"',
+			"\tconstant list = [brace, smile",
+		])
+
+		expect(reading).toEndWith("[brace, smile]}")
+	})
+
+	// NOTE: The Lexer reports a Comment in a hole and ends it at the first `}`,
+	// so the hole and its String still close.
+	it("ends a Comment written in a hole at the hole's brace", () => {
+		let reading = plainReadingOf([
+			'\tconstant noted = "{1 § one} ["',
+			"\tconstant list = [noted",
+		])
+
+		expect(reading).toEndWith("[noted]}")
+	})
+})

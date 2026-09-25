@@ -4,58 +4,109 @@
 // resolve Types at a cursor position that, as typed, does not parse on its
 // own (`person.`, `greet(`, …).
 
-// NOTE: Blanks out String and Comment content — their contents are not part
-// of the Program's structure, so brackets, commas and quotes inside them must
-// not be counted. Every character is replaced by a space rather than removed,
-// so offsets into the result still line up with the original text. Strings
-// may span lines (the Lexer runs to the next `"` regardless of newlines), so
-// this scans characters instead of working line by line.
+// NOTE: Blanks String text and Comments out, one space per UTF-16 unit, so the
+// brackets and commas inside them go uncounted and offsets still line up. An
+// interpolation hole is code and stays; only its braces are blanked.
 export function stripNoise(text: string): string {
+	return scanNoise(text).stripped
+}
+
+// NOTE: `openHoles` holds the offset of the `{` of every interpolation hole
+// still open at the end of the text, outermost first.
+type Noise = {
+	stripped: string
+	openHoles: Array<number>
+}
+
+// NOTE: `hole` is the offset of the `{` of the hole the scan is in, or -1 while
+// it is in the String's text; `depth` counts the braces open inside that hole.
+type OpenString = {
+	hole: number
+	depth: number
+}
+
+function scanNoise(text: string): Noise {
 	let stripped = ""
-	let inString = false
+	let strings: Array<OpenString> = []
 	let inComment = false
 
-	for (let character of text) {
+	for (let index = 0; index < text.length; index++) {
+		let character = text[index]!
+		let innermost = strings.at(-1)
+
 		if (character === "\n") {
 			inComment = false
 			stripped += character
 			continue
 		}
 
-		if (inComment) {
-			stripped += " "
-			continue
-		}
-
-		if (inString) {
+		if (innermost?.hole === -1) {
 			stripped += " "
 
 			if (character === '"') {
-				inString = false
+				strings.pop()
+			} else if (character === "{") {
+				innermost.hole = index
+			} else if (character === "\\" && index + 1 < text.length) {
+				// NOTE: The brace of a `\u{…}` escape opens no hole.
+				let escaped =
+					text[index + 1] === "u" && text[index + 2] === "{" ? 2 : 1
+
+				stripped +=
+					text[index + 1] === "\n" ? "\n" : " ".repeat(escaped)
+				index += escaped
 			}
 
 			continue
 		}
 
-		if (character === '"') {
-			inString = true
+		// NOTE: From here on the scan is in code: at the top level, or in the
+		// hole of `innermost`. The Lexer ends a Comment in a hole at a `}`.
+		if (inComment && !(character === "}" && innermost !== undefined)) {
 			stripped += " "
 			continue
 		}
 
-		if (character === "§") {
+		inComment = false
+
+		if (character === '"') {
+			strings.push({ hole: -1, depth: 0 })
+			stripped += " "
+		} else if (character === "§") {
 			inComment = true
 			stripped += " "
-			continue
+		} else if (innermost !== undefined && character === "{") {
+			innermost.depth++
+			stripped += character
+		} else if (innermost !== undefined && character === "}") {
+			if (innermost.depth === 0) {
+				innermost.hole = -1
+				stripped += " "
+			} else {
+				innermost.depth--
+				stripped += character
+			}
+		} else {
+			stripped += character
 		}
-
-		stripped += character
 	}
 
-	return stripped
+	return {
+		stripped,
+		openHoles: strings.flatMap((string) =>
+			string.hole === -1 ? [] : [string.hole],
+		),
+	}
 }
 
-const closers: Record<string, string> = { "{": "}", "(": ")", "[": "]" }
+// NOTE: An open interpolation hole is closed by its `}` and then by the `"` of
+// the String it stands in.
+const closers: Record<string, string> = {
+	"{": "}",
+	"(": ")",
+	"[": "]",
+	'"{': '}"',
+}
 
 // NOTE: `opensDefine` says this `{` is a `define`'s own block rather than any
 // other kind — a Record Literal, a Function body, a block an arm's VALUE opened.
@@ -67,15 +118,21 @@ type OpenBracket = {
 }
 
 // NOTE: The Keyword is read as a whole word — `redefine` opens no `define` — off
-// text `stripNoise` has already blanked every String and Comment out of. It is
+// text `stripNoise` has blanked all String text and Comments out of. It is
 // claimed by the next `{`, which is that `define`'s block: `define -> Type {`
 // writes a Type between the two and no brace, so nothing else can take it.
-function openBrackets(text: string): Array<OpenBracket> {
+function openBrackets(
+	text: string,
+	openHoles: Array<number>,
+): Array<OpenBracket> {
 	let stack: Array<OpenBracket> = []
 	let word = ""
 	let pendingDefine = false
+	let holes = new Set(openHoles)
 
-	for (let character of text) {
+	for (let index = 0; index < text.length; index++) {
+		let character = text[index]!
+
 		if (/[A-Za-z0-9_]/.test(character)) {
 			word += character
 
@@ -88,7 +145,13 @@ function openBrackets(text: string): Array<OpenBracket> {
 
 		word = ""
 
-		if (character === "{" || character === "(" || character === "[") {
+		if (holes.has(index)) {
+			stack.push({ opener: '"{', opensDefine: false })
+		} else if (
+			character === "{" ||
+			character === "(" ||
+			character === "["
+		) {
 			stack.push({
 				opener: character,
 				opensDefine: character === "{" && pendingDefine,
@@ -144,8 +207,8 @@ function closingSuffixFor(
 const MAXIMUM_DECLARATION_READINGS = 2
 
 export function probeSourcesFor(headText: string, suffix = ""): Array<string> {
-	let stripped = stripNoise(headText)
-	let stack = openBrackets(stripped)
+	let { stripped, openHoles } = scanNoise(headText)
+	let stack = openBrackets(stripped, openHoles)
 	let sources = [`${headText}${suffix}${closingSuffixFor(stack)}`]
 
 	let parentheses = stack.flatMap((bracket, index) =>
@@ -191,7 +254,7 @@ const STATEMENT_TAILS = [" {}", " -> {} {}"]
 const DEFINE_TAILS = [" otherwise", " as {} otherwise"]
 
 // NOTE: What says the arm readings are worth building. `define` is a reserved
-// Keyword and `stripNoise` has already blanked every String and Comment, so the
+// Keyword and `stripNoise` has blanked all String text and Comments, so the
 // word standing anywhere above the cursor means a `define` was opened there —
 // possibly one already closed again, which is why this is a cheap test that can
 // never turn away a head that needs the arm readings rather than a reading of
