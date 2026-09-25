@@ -44,10 +44,9 @@ type NamespaceBodyNode = Parameters<
 	typeof generators.namespaceDefinitionStatement
 >[4][number]
 
-// NOTE: These token types form the Identifier rule of the grammar — the
-// keywords `with`, `static`, `case`, `infer`, `choice`, `import`, `export`,
-// `from` and `as` are valid Identifiers. The Module keywords are on this list
-// for the same reason the rest are: `from` and `as` are Argument labels the
+// NOTE: These token types form the Identifier rule of the grammar: every
+// Keyword in the Set is a valid Identifier. The Module keywords are on it for
+// the same reason the rest are: `from` and `as` are Argument labels the
 // standard library already writes (`slice(from 1, to 3)`,
 // `normalize(as #ComposedCanonical)`), so they can only ever be Keywords where
 // a Module section is being read.
@@ -67,12 +66,12 @@ type NamespaceBodyNode = Parameters<
 // are: each opens its own form only where an Expression follows it and nothing
 // carries the word itself on, and is a name everywhere else. The two are a
 // harder case than the assertions, because their form is an EXPRESSION rather
-// than a Statement — see `opensAsynchrony` below for the two narrowings that
-// takes and the two readings it still costs.
+// than a Statement — see `opensAsynchrony` for the two narrowings that takes
+// and the name and the reading it still costs.
 //
-// NOTE: A Set rather than an Array, here and for the two lists below. Each is
-// asked of a Token, in a loop over every Token — a scan of ten strings per
-// question is what a membership test costs when it is written as one.
+// NOTE: A Set rather than an Array, here and for every other Token-type list in
+// this file. Each is asked of a Token, in a loop over every Token, and a
+// membership test written as a scan pays for every entry on every question.
 const identifierTokenTypes = new Set([
 	TokenType.Identifier,
 	TokenType.KeywordWith,
