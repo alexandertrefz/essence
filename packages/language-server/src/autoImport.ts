@@ -302,9 +302,9 @@ export function insertImportsEdit(
 	)
 }
 
-// NOTE: The group a run of names is written as. One name is what the Formatter
-// writes on one line, and so are several — a group is broken over lines by its
-// width, which is the Formatter's to decide and not a fix's.
+// NOTE: The group a run of names is written as, on one line. The Formatter
+// writes a group of two or more names one to a line, so a group of several
+// written here is one it rewrites.
 export function spellNames(names: Array<string>, specifier: string): string {
 	return `from "${specifier}" { ${names.join(" ")} }`
 }
