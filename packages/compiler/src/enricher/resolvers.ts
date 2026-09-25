@@ -77,11 +77,12 @@ import {
 	modulePathOf,
 } from "./scope"
 
-// NOTE: Type-declaration and signature resolution. Expressions are no longer
-// typed here — enrichment is the only Expression walker, and a Node's Type is
-// read off its enriched children. What remains resolves the Types written in
-// annotations, plus a fully annotated Function signature.
-//
+// NOTE: Type resolution: the Types written in annotations and signatures, the
+// Types declarations resolve to, the Types a Combination, a Lookup and a Record
+// or List literal answer from their enriched children, conformance solving,
+// and the Namespaces a Scope can see. No Expression is walked here; enrichment
+// is the only Expression walker.
+
 // NOTE: THE choke point where a written annotation meets the Type it resolves
 // to, which is why the annotation index is recorded here and nowhere else. The
 // switch below recurses back through this function for a Generic's Arguments, a
@@ -995,7 +996,7 @@ function answersWithoutArguments(method: common.MethodType): boolean {
 		overload.parameterTypes
 			// NOTE: The receiver occupies the first Parameter of every instance
 			// signature and is written left of the `::` — see
-			// `describeMethodOverloads`.
+			// `OverloadCandidate`.
 			.slice(
 				method.type === "SimpleMethod" ||
 					method.type === "OverloadedMethod"
@@ -8913,9 +8914,6 @@ export function namespacesDeclaringMethod(
 	return matchingNamespaces
 }
 
-// NOTE: The enclosing Namespace's Generics are merged into every Method
-// signature, so that each signature is self-contained for inference — the
-// receiver Argument re-binds them on every invocation.
 // NOTE: The Parameter Types of a signature, carrying whatever documents each
 // Parameter. A Parameter is described either by a `§§` block of its own or by
 // the `@param` line standing at its position in the Declaration's.
@@ -9457,11 +9455,10 @@ export function reportDocumentationParameters(
 // things besides — a run that stops before the last Parameter, and a line
 // naming a Parameter's INTERNAL name where the signature gives it a label.
 //
-// `"strict"` is what every Program is held to. The docs pass of
-// `plans/2026-08-18-stdlib-readability.md` rewrote the standard library's tags
-// to the label-or-`_` form and this constant went with it. `"lenient"` stays
-// as the named alternative `documentationParameterProblems` can be asked for,
-// which is how `documentation.spec.ts` reads each half of the rule on its own.
+// `"strict"` is what every Program is held to, the standard library's own tags
+// included. `"lenient"` stays as the named alternative
+// `documentationParameterProblems` can be asked for, which is how
+// `documentation.spec.ts` reads each half of the rule on its own.
 //
 // A block writing NO `@param` at all is left alone in both modes. It documents
 // the Declaration as a whole, which is what most of them do; asking for a line
@@ -9889,15 +9886,17 @@ export function splitMethodGenerics(
 }
 
 // NOTE: Which Namespace Generics belong on one Method signature, ahead of the
-// Method's own. A Namespace Generic is merged in when the resolved signature —
-// the injected `self` Parameter, the declared Parameters and the return Type —
-// mentions it, or when the Method BOUNDS it: a Generic nothing in the signature
-// names and nothing requires could never be bound by inference at a call site,
-// so carrying it would leave a phantom Type Parameter (and a hidden conformance
-// Parameter with nothing to prove it). A bounded one is retained whatever the
-// signature mentions, because its witness is passed at every call and the
-// emitted arity has to agree; where nothing can bind it the call reports that,
-// which is the honest answer rather than a silently dropped requirement.
+// Method's own, so that the signature is self-contained for inference and the
+// receiver Argument re-binds them at every invocation. A Namespace Generic is
+// merged in when the resolved signature — the injected `self` Parameter, the
+// declared Parameters and the return Type — mentions it, or when the Method
+// BOUNDS it: a Generic nothing in the signature names and nothing requires
+// could never be bound by inference at a call site, so carrying it would leave
+// a phantom Type Parameter (and a hidden conformance Parameter with nothing to
+// prove it). A bounded one is retained whatever the signature mentions, because
+// its witness is passed at every call and the emitted arity has to agree; where
+// nothing can bind it the call reports that, which is the honest answer rather
+// than a silently dropped requirement.
 //
 // A Method Generic of the same name no longer shadows — `splitMethodGenerics`
 // has already taken those entries out, so what arrives here declares names the
