@@ -56,7 +56,7 @@ afterAll(() => {
 // Deterministic and with no timing assertion: the corpus is a sorted directory
 // listing and every edit is a function of the text it is applied to. The
 // questions are asked by `answerFailures` and `chainFailures`, which the mutants
-// at the foot of this file are asked in turn: a guard that has never caught
+// in "The guard itself" are asked in turn: a guard that has never caught
 // anything is a guard nobody has a reason to believe.
 
 // NOTE: Codes the Parser and the Lexer raise, which is what "does it still
@@ -338,19 +338,34 @@ function offsetOf(text: string, cursor: common.Cursor): number {
 	return offset + cursor.column - 1
 }
 
-// NOTE: The same edit algebra `codeActions.spec.ts` applies, and deliberately
-// the same one: edits are written back to front so that an earlier edit's span
-// is still measured against the text it was read off.
+// NOTE: Spans are measured against the original text and written in position
+// order, since an action's own order means nothing; insertions at one point
+// keep the order listed, ahead of a replacement that starts there.
 function applyEdits(text: string, edits: Array<CodeActionEdit>): string {
-	let result = text
+	let spans = edits
+		.map((edit) => ({
+			start: offsetOf(text, edit.range.start),
+			end: offsetOf(text, edit.range.end),
+			newText: edit.newText,
+		}))
+		.sort(
+			(left, right) =>
+				left.start - right.start ||
+				Number(left.end > left.start) - Number(right.end > right.start),
+		)
+	let result = ""
+	let cursor = 0
 
-	for (let edit of [...edits].reverse()) {
-		result = `${result.slice(0, offsetOf(result, edit.range.start))}${
-			edit.newText
-		}${result.slice(offsetOf(result, edit.range.end))}`
+	for (let span of spans) {
+		if (span.start < cursor) {
+			throw new Error(`overlapping edits at offset ${span.start}`)
+		}
+
+		result += text.slice(cursor, span.start) + span.newText
+		cursor = span.end
 	}
 
-	return result
+	return result + text.slice(cursor)
 }
 
 // NOTE: A Diagnostic as the identity a loop is measured by: the same code, the
@@ -463,10 +478,8 @@ function reachesTooFar(
 }
 
 // NOTE: The guard's own questions, as a function rather than as a wall of
-// assertions, so that the mutants at the foot of this file can be asked them
-// too. It answers the list of questions the fix FAILED, empty where it passed
-// all of them — a guard nothing has ever been caught by is a guard nobody has
-// any reason to believe.
+// assertions, so that the mutants in "The guard itself" can be asked them too.
+// It answers the questions the fix failed, empty where it passed all of them.
 function answerFailures(
 	source: string,
 	entry: CodeActionEntry,
@@ -1074,5 +1087,51 @@ describe("The guard itself", () => {
 		expect(
 			verdict(rewritten((text) => text.replaceAll("Red", "Crimson"))),
 		).toEqual(["(v) wrote elsewhere in the file: lines 1-15"])
+	})
+})
+
+describe("The edit applier", () => {
+	let text = "one two three"
+	let first: CodeActionEdit = {
+		range: { start: { line: 1, column: 1 }, end: { line: 1, column: 4 } },
+		newText: "1",
+	}
+	let last: CodeActionEdit = {
+		range: {
+			start: { line: 1, column: 9 },
+			end: { line: 1, column: 14 },
+		},
+		newText: "3",
+	}
+
+	it("applies an action's edits the same in whatever order it lists them", () => {
+		expect(applyEdits(text, [first, last])).toBe("1 two 3")
+		expect(applyEdits(text, [last, first])).toBe("1 two 3")
+	})
+
+	it("writes insertions at one point in the order the action lists them", () => {
+		let at = last.range.start
+
+		expect(
+			applyEdits(text, [
+				last,
+				{ range: { start: at, end: at }, newText: "a " },
+				{ range: { start: at, end: at }, newText: "b " },
+			]),
+		).toBe("one two a b 3")
+	})
+
+	it("refuses edits that overlap", () => {
+		let across: CodeActionEdit = {
+			range: {
+				start: { line: 1, column: 3 },
+				end: { line: 1, column: 6 },
+			},
+			newText: "",
+		}
+
+		expect(() => applyEdits(text, [first, across])).toThrow(
+			"overlapping edits",
+		)
 	})
 })
