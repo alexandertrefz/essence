@@ -5592,12 +5592,11 @@ class DescentParser {
 	}
 
 	// NOTE: `define { as VALUE if CONDITION … as VALUE otherwise }`. The arms
-	// are told apart by their `as` and by nothing else — a line break is
-	// invisible to this Parser, so nothing about the layout may be relied on —
-	// and that is enough because an Expression ends at the first Token that can
-	// not carry it on. Neither `if` nor `otherwise` is one of the three that
-	// can, so `as 0 if x::isZero()` and `as 10 otherwise` each read to their
-	// end without a lookahead.
+	// are told apart by their `as` and by nothing else, not by the lines they
+	// stand on, and that is enough because an Expression ends at the first
+	// Token that can not carry it on. Neither `if` nor `otherwise` is one of
+	// the three that can, so `as 0 if x::isZero()` and `as 10 otherwise` each
+	// read to their end without a lookahead.
 	//
 	// NOTE: Which is also what lets `otherwise` be a name — it is on
 	// `identifierTokenTypes` — without the two readings ever meeting. An arm's
@@ -8497,9 +8496,9 @@ class DescentParser {
 	// #region Types
 
 	// NOTE: `|` binds loosest, so a Union is parsed on top of Generic
-	// application — `List<Item> | Nothing` is a Union of `List<Item>` and
-	// `Nothing`, not a Generic over a Union. A Union is still reachable as a
-	// Generic argument (`List<Item | Nothing>`), where the angle brackets
+	// application — `List<Item> | String` is a Union of `List<Item>` and
+	// `String`, not a Generic over a Union. A Union is still reachable as a
+	// Generic argument (`List<Item | String>`), where the angle brackets
 	// delimit it.
 	protected parseType(): parser.TypeDeclarationNode {
 		this.enterNesting()
