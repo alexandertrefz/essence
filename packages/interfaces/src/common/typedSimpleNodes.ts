@@ -1477,15 +1477,6 @@ export type StatementNode =
 	| TailCallStatementNode
 	| IntrinsicStatementNode
 
-// NOTE: `expect EXPR` / `require EXPR`, and both `is MATCHER` forms. What
-// differs between the two words is one thing: a failed `require` ends the test
-// where it stands, which is emitted as an early return in front of the
-// Constants its Matcher binds.
-//
-// NOTE: `value` is what has to hold. It is a RAW JavaScript boolean where a
-// Matcher was written — a Matcher's test is a chain of `&&`s, not an Essence
-// value — and an Essence Boolean otherwise, which the Rewriter unwraps. The
-// `matcher` says which of the two it is looking at.
 // NOTE: What `matches snapshot` compares against, once the value itself is an
 // ordinary Expression of the assertion — the rendered String. `name` is written
 // for a STORED snapshot, kept in the file's `__snapshots__` companion; an inline
@@ -1501,6 +1492,15 @@ export type TestSnapshot = {
 	slot: number
 }
 
+// NOTE: `expect EXPR`, `require EXPR`, `require MATCHER = EXPR`, and either
+// word with `matches snapshot`. A failed `require` ends the test where it
+// stands, which is emitted as an early return in front of the Constants its
+// Matcher binds.
+//
+// NOTE: `value` is what has to hold. It is a RAW JavaScript boolean where a
+// Matcher was written — a Matcher's test is a chain of `&&`s, not an Essence
+// value — and an Essence Boolean otherwise, which the Rewriter unwraps. The
+// `matcher` says which of the two it is looking at.
 export interface TestAssertionStatementNode {
 	nodeType: "TestAssertionStatement"
 	form: "expect" | "require"

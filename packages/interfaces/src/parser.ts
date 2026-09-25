@@ -1,16 +1,5 @@
 import type { Documentation, Position } from "./common/index"
 
-// NOTE: What the Parser could not read, kept so that no later stage reports the
-// same mistake a second time in its own words. A dropped Statement leaves two
-// holes: the names it would have declared, which every read of them would
-// otherwise be answered as undeclared, and the LINES it was written across,
-// which is what tells a later stage that what it is judging is not what was
-// written.
-//
-// It rides on the Program rather than beside it because it travels everywhere
-// the Program does — into the Enricher for the names, and through a Module
-// graph to the Validator for the lines — and a second value threaded alongside
-// is a second thing every caller has to remember to carry.
 // NOTE: One name an abandoned Statement declared, and WHERE it stood — because
 // the silence a dropped Declaration buys is owed to the reads that Declaration
 // would have answered and to no others. A `total` dropped out of one Function's
@@ -42,14 +31,25 @@ export type AbandonedDeclaration = {
 	atSectionLevel: boolean
 }
 
+// NOTE: What the Parser could not read, kept so that no later stage reports the
+// same mistake a second time in its own words. A dropped Statement leaves two
+// holes: the names it would have declared, which every read of them would
+// otherwise be answered as undeclared, and the LINES it was written across,
+// which is what tells a later stage that what it is judging is not what was
+// written.
+//
+// It rides on the Program rather than beside it because it travels everywhere
+// the Program does — into the Enricher for the names, and through a Module
+// graph to the Validator for the lines — and a second value threaded alongside
+// is a second thing every caller has to remember to carry.
 export type Recovery = {
-	// NOTE: The names an abandoned Statement declared, as far as its opening
-	// Tokens say: `constant NAME`, `function NAME`, `namespace NAME`,
-	// `type NAME`, `choice NAME`, `protocol NAME`, `static NAME`, and the
-	// `NAME(…)` a Method in a Namespace body opens with. A Statement whose
-	// shape says nothing about a name contributes none, which is the whole of
-	// what this being incomplete costs: a read of such a name is answered
-	// exactly as it always was.
+	// NOTE: The names an abandoned Statement declared, as far as its Tokens
+	// say: the name behind a declaring Keyword, the `NAME(…)` a Method in a
+	// Namespace body opens with, the Parameters of a dropped head, and the
+	// members of a dropped `namespace`, `protocol` or `choice`. A Statement
+	// whose shape says nothing about a name contributes none, which is the
+	// whole of what this being incomplete costs: a read of such a name is
+	// answered exactly as it always was.
 	declarations: Array<AbandonedDeclaration>
 	// NOTE: Every line the Parser abandoned text on. A construct written
 	// across one of them is a construct it did not read whole, so what that
