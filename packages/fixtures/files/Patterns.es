@@ -183,8 +183,8 @@ implementation {
 		<- n::isEven()
 	})
 
-	Terminal.print(accepted) § [ 2, 4 ]
-	Terminal.print(refused) § [ 1, 3 ]
+	Terminal.print(accepted) § [2, 4]
+	Terminal.print(refused) § [1, 3]
 
 	constant point = { origin = { x = 1, y = 2 }, label = "p" }
 

@@ -3,7 +3,7 @@ implementation {
 	§ Essence has no loop Statement — a loop is a value-driven walk instead. The
 	§ `loop` family threads a State from one turn to the next, and where a `step`
 	§ callback answers with a `Step`, `#Continue` carries the State on while
-	§ `#Done` stops with a Result. Early exit is an ordinary value, so a Match
+	§ `#Done` stops with the answer. Early exit is an ordinary value, so a Match
 	§ sees it and `<-` keeps its one meaning.
 
 	§ The counted loop — once per Integer from `from` through `through`,

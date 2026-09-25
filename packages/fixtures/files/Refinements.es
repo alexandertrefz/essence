@@ -18,19 +18,19 @@
 
 implementation {
 
-	§ `NonZeroInteger` is the standard library's own — the refinement the whole
-	§ design was written for, and the one `Rational::denominator` answers with —
-	§ so it is USED here rather than declared, as `NonEmptyString` and
-	§ `NonEmptyList<Item>` are further down. Everything else below is a
-	§ Program's own, declared exactly the way those three are.
+	§ `NonZeroInteger` is the standard library's own, and the one `Rational.of`
+	§ asks of a denominator. So it is used here rather than declared, as
+	§ `NonEmptyString` and `NonEmptyList<Item>` are. Every refinement this
+	§ file declares is a Program's own, written exactly the way those three
+	§ are.
 
 	§ A List with something in it. The base is an APPLIED List — `List<String>`,
 	§ never a bare `List`, whose item Type nothing has decided.
 	type NonEmptyStrings = List<String> where @::hasItems()
 
-	§ `isBetween` is not Integer's own — it is declared once over the whole
-	§ numeric tower, and the conjunct records the Namespace that ANSWERED it,
-	§ which is `Number`.
+	§ `isBetween` is not written on Integer: it is `Orderable`'s provided
+	§ Method, and the conjunct records the Namespace whose conformance
+	§ answered it, which is `Integer`.
 	type Digit = Integer where @::isBetween(0, and 9)
 
 	§ A conjunction. `::and(…)` chains flatten, so this proves two things and so
@@ -125,14 +125,6 @@ implementation {
 	§ wrote it down. So a value of the standard library's `NonEmptyList<String>` is
 	§ accepted by `lengthOf`, which asked for this Program's own.
 	constant colours: NonEmptyList<String> = ["red", "green", "blue"]
-
-	§ A proof CARRIES through a transform that can not spend it. Sorting a List
-	§ moves its items about and drops none, so what comes back has something in
-	§ it exactly because what went in did — and `NonEmptyList` says so in the
-	§ return Type. That is what lets these two read as they do: `sort` hands its
-	§ answer straight to the total `firstItem`, with no `if` between them, and
-	§ `reverse` hands its own to a Function asking for the refinement, with no
-	§ doorway and nothing written down.
 
 	§ A Match Handler's Guard proves things about `@` the same way, and it runs
 	§ before any Statement of the body.
@@ -314,6 +306,14 @@ implementation {
 	Terminal.inspect(colours::firstItem())
 	Terminal.inspect(colours::lastItem())
 	Terminal.inspect(lengthOf(colours))
+
+	§ A proof carries through a transform that can not spend it. Sorting a List
+	§ moves its items about and drops none, so what comes back has something in
+	§ it exactly because what went in did, and `NonEmptyList` says so in the
+	§ return Type. So `sort` hands its answer straight to the total
+	§ `firstItem`, with no `if` between them, and `reverse` hands its own to a
+	§ Function asking for the refinement, with no doorway and nothing written
+	§ down.
 	Terminal.inspect(colours::sort()::firstItem())
 	Terminal.inspect(lengthOf(colours::reverse()))
 

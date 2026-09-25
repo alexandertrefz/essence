@@ -1,7 +1,5 @@
 § Doubling the Comment sigil turns a private note into Documentation of
-
 § whatever is declared below it. A `§§` block is Markdown, and an Editor shows
-
 § it on Hover, in Signature Help and next to a Completion.
 
 implementation {
