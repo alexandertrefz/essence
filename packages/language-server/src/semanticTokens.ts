@@ -308,6 +308,22 @@ function collectCasesFromNode(
 			}
 
 			return
+		case "ProtocolDeclarationStatement":
+			for (let member of Object.values(node.methods)) {
+				let signatures =
+					member.nodeType === "OverloadedProtocolMethod" ||
+					member.nodeType === "OverloadedStaticProtocolMethod"
+						? member.signatures
+						: [member.signature]
+
+				for (let { body } of signatures) {
+					if (body !== null) {
+						collectCasesFromDefinition(body.value, tokens)
+					}
+				}
+			}
+
+			return
 		case "FunctionStatement":
 			collectCasesFromDefinition(node.value, tokens)
 			return
@@ -397,7 +413,6 @@ function collectCasesFromNode(
 		// NOTE: A path holds no Case; its steps colour as members through the
 		// rename index, off the Lookups the Enricher synthesizes for them.
 		case "MemberPath":
-		case "ProtocolDeclarationStatement":
 		case "TypeAliasStatement":
 		case "Identifier":
 		case "Self":

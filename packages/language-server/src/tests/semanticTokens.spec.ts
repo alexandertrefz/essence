@@ -631,3 +631,23 @@ describe("Semantic Tokens around start and complete", () => {
 		expect(tokenAt(source, 6, 51)?.type).toBe("enumMember")
 	})
 })
+
+describe("Semantic Tokens of a Case written in a Protocol-provided Method", () => {
+	it("should colour a Case in the body as an enum member", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Size { Small, Large }",
+			"",
+			"\tprotocol Sized {",
+			"\t\tsize() -> Integer",
+			"",
+			"\t\tbucket() -> Size {",
+			"\t\t\t<- #Large",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(tokenAt(source, 8, 8)?.type).toBe("enumMember")
+	})
+})
