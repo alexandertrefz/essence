@@ -135,6 +135,7 @@
       "dependencies": {
         "@essence-lang/compiler": "workspace:*",
         "@essence-lang/interfaces": "workspace:*",
+        "@essence-lang/runtime": "workspace:*",
       },
       "devDependencies": {
         "@essence-lang/fixtures": "workspace:*",
@@ -195,6 +196,7 @@
         "@essence-lang/formatter": "workspace:*",
         "@essence-lang/interfaces": "workspace:*",
         "@essence-lang/standard-library": "workspace:*",
+        "@mdx-js/mdx": "3.1.1",
         "astro": "7.1.3",
         "github-slugger": "2.0.0",
       },

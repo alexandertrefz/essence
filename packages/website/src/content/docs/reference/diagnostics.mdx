@@ -420,7 +420,7 @@ Error: '\u00e9' is missing the braces around its code point
 
 The Help rebrackets exactly the digits JavaScript would have read, which is four of them where four are written: `"\u0041BC"` is `A` followed by `BC` there, so the Help offers `\u{41}` and leaves `BC` alone. A surrogate pair — `"\uD83D\uDE00"`, how a language with no astral escape writes one character — is answered with the single escape both halves stood for, `\u{1F600}`.
 
-Quick Fix: **Write it as '\u{e9}'** — the spelling the report named, whichever it named.
+Quick Fix: **Write it as '\u\{e9\}'** — the spelling the report named, whichever it named.
 
 Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
 
@@ -449,7 +449,7 @@ Error: 'G' is not a hexadecimal digit
 
 An escape that never closes stops at the closing quote without consuming it, so the string ends where it was written and every statement below it is still read. Leading zeros are the usual cause of a seventh digit, and the Help takes them off. `U+1B` written between the braces is answered by taking the `U+` off: that is how a code point is named, not how it is spelled.
 
-Quick Fix: **Write it as '\u{41}'** — offered wherever the report spells a rewrite, which is the seventh digit, the escape that never closed, and the `U+` written between the braces. Braces holding nothing or holding a character that is not a digit are offered none: what was meant there is not something the source says.
+Quick Fix: **Write it as '\u\{41\}'** — offered wherever the report spells a rewrite, which is the seventh digit, the escape that never closed, and the `U+` written between the braces. Braces holding nothing or holding a character that is not a digit are offered none: what was meant there is not something the source says.
 
 Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
 
@@ -526,7 +526,7 @@ Error: U+D83D and U+DE00 are the two halves of one character
 
 </div>
 
-Quick Fix: **Write it as '\u{1F600}'**, where a pair was written — it replaces both escapes, so following it leaves nothing behind.
+Quick Fix: **Write it as '\u\{1F600\}'**, where a pair was written — it replaces both escapes, so following it leaves nothing behind.
 
 Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
 
@@ -5209,7 +5209,7 @@ Two shapes get a different Help, because adding the name would be the wrong edit
 
 </div>
 
-A module with no export block at all — or an empty one — has nothing to add to, so the Help asks for the block: **Open an 'export { … }' block in ./Geometry.es and list 'area' in it.**
+A module with no export block at all — or an empty one — has nothing to add to, so the Help asks for the block: **Open an 'export \{ … \}' block in ./Geometry.es and list 'area' in it.**
 
 Taught on: [Modules › Importing names](/docs/language/modules#importing-names)
 
@@ -5322,7 +5322,7 @@ Error: 'volume' is not declared in this Module
 
 Declare the name, or stop exporting it.
 
-Where one of this module's own dependencies publishes the name, forwarding is an answer and the Help spells the specifier rather than a placeholder: **Forward it from the Module that declares it: 'from "./Money.es" { Money }'.**
+Where one of this module's own dependencies publishes the name, forwarding is an answer and the Help spells the specifier rather than a placeholder: **Forward it from the Module that declares it: 'from "./Money.es" \{ Money \}'.**
 
 Quick Fix: **Forward 'volume' from ./Solids.es**, when a module in the workspace exports the name.
 
