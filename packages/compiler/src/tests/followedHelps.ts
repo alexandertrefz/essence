@@ -18,8 +18,8 @@ import { parse, parseWithDiagnostics } from "../parser/index"
 // ONE file, because two of them is two answers to "does this compile?": the
 // audit briefly had a second harness whose `compiles` stopped after the
 // Enricher, and a Help followed into a Validator refusal read there as a
-// success. `compiles` runs every stage, through `analyseSource`, and the
-// Enricher-only readers below say so in their names.
+// success. `compiles` runs every stage, through `analyseSource`, while
+// `firstOf` and `enrichedDiagnosticsFor` stop after the Enricher.
 
 // NOTE: Not exported: `firstOf` below is what a spec reaches for, and an export
 // nobody imports is a promise to keep a reader for.
@@ -50,10 +50,9 @@ export function firstOf(
 	return found
 }
 
-// NOTE: What a Help promises, checked by compiling it. Every Program a test
-// passes here is the probe from the test above it with the Help's own spelling
-// written into it, so a Help that stops compiling fails the test that prints it
-// rather than a reader's afternoon.
+// NOTE: What a Help promises, checked by compiling it. A test passes here its
+// own probe with the Help's spelling written into it, so a Help that stops
+// compiling fails the test that prints it rather than a reader's afternoon.
 //
 // The whole pipeline, so that a Help followed into a Validator refusal fails
 // here rather than reading as a success — `analyseSource` is the one
@@ -65,9 +64,10 @@ export function compiles(
 	return !containsErrors(analysedDiagnosticsFor(source, options))
 }
 
-// NOTE: The Enricher alone, for the reports that never reach the Validator — a
-// probe whose point is a Type error stops there, and running the Validator over
-// a Program the Enricher gave up on only adds what it could not judge.
+// NOTE: The Parser and the Enricher, for the reports that never reach the
+// Validator: a probe whose point is a Type error stops there, and running the
+// Validator over a Program the Enricher gave up on only adds what it could not
+// judge.
 export function enrichedDiagnosticsFor(
 	source: string,
 ): Array<common.Diagnostic> {
