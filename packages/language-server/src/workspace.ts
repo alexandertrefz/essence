@@ -1438,9 +1438,9 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 	}
 
 	// NOTE: Answered from the parses, and from the same walk the outline is
-	// built with — a workspace symbol is a document symbol whose document the
-	// reader has not opened, so answering it any other way would be a second
-	// definition of what counts as a symbol.
+	// built with: a workspace symbol is a document symbol of any file the
+	// workspace holds, open or not, so answering it any other way would be a
+	// second definition of what counts as a symbol.
 	function symbols(query: string): Array<WorkspaceSymbolEntry> {
 		let entries: Array<WorkspaceSymbolEntry> = []
 		let lowercased = query.toLowerCase()
@@ -2108,8 +2108,8 @@ function matchesQuery(name: string, query: string): boolean {
 
 // NOTE: The kinds a top level declaration can be, off the Parser AST — the same
 // question `modules/link.ts` answers for the export surface, asked here without
-// enriching anything, because auto-import and workspace symbols both need it for
-// every file and neither needs a Type.
+// enriching anything, because auto-import needs it for every file and needs no
+// Type. Workspace symbols read the outline instead (see `symbols`).
 //
 // NOTE: The tests section is left out on purpose, as it is everywhere the
 // export surface is the question: a name declared there is private to the

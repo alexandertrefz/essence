@@ -3062,9 +3062,9 @@ export function uriOf(filePath: string): string {
 	return `file://${filePath.split("/").map(encodeURIComponent).join("/")}`
 }
 
-// NOTE: A workspace symbol IS a document symbol whose document is not open, so
-// it renders under the same kinds — there is one table, and the outline and the
-// search can not disagree about what a Namespace looks like.
+// NOTE: A workspace symbol is a document symbol, open or not, so it renders
+// under the same kinds: there is one table, and the outline and the search can
+// not disagree about what a Namespace looks like.
 function toLspWorkspaceSymbol(entry: WorkspaceSymbolEntry): LspWorkspaceSymbol {
 	return {
 		name: entry.name,
