@@ -968,10 +968,10 @@ function simplifyConstantDeclarationStatement(
 		// NOTE: A Matcher's subject is INSTRUMENTED, the whole of it — every
 		// sub-expression that computes and the value itself. It is what
 		// `require MATCHER = EXPR` has to explain a failure out of: the
-		// assertion behind this
-		// Statement drains what was recorded here, so a report says what
-		// `rows()::firstItem()` answered rather than only that an expect
-		// failed. Every other synthesized Constant is glue nobody is shown.
+		// assertion behind this Statement drains what was recorded here, so a
+		// report says what `rows()::firstItem()` answered rather than only that
+		// an expect failed. Every other synthesized Constant is glue nobody is
+		// shown.
 		value:
 			node.synthesized === "subject"
 				? instrumentAssertion(
@@ -1405,8 +1405,9 @@ function simplifyParameter(
 // what the default supplies: a COMPLETE Record default is merged too, because
 // the Argument a caller writes against one may itself be partial, and because
 // the merge is also what projects a whole Argument to the members the Type
-// declares — the same soundness Step 0 buys a `with`, at the one other place a
-// value of one Record Type is built out of another.
+// declares — the same soundness the Rewriter's `projectedCombination` gives a
+// `with`, at the one other place a value of one Record Type is built out of
+// another.
 function hasRecordDefault(node: common.typed.ParameterNode): boolean {
 	return node.defaultValue !== null && node.type.type === "Record"
 }
