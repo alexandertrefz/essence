@@ -265,10 +265,10 @@ declarations {
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare(to other: Integer) -> Ordering
 
-		§ The two `as:` entries are Integer's rung of a Method a `Scalar`
-		§ receiver dispatches over, and each hands the Integer to `Rational`
-		§ over one. A Program that never names a format never reaches them,
-		§ and pays none of the formatter they bring.
+		§ The `as:` entries are Integer's rung of a Method a `Scalar` receiver
+		§ dispatches over, and each hands the Integer to `Rational` over one. A
+		§ Program that never names a format never reaches them, and pays none
+		§ of the formatter they bring.
 
 		§§ Answers the Integer as a String.
 		§§
@@ -773,13 +773,9 @@ declarations {
 		}
 
 		§ These four override `Comparable`'s provided Methods of the same
-		§ names, and are kept to answer an Integer question on this Namespace's
-		§ own rung. Integer's `compare` is a bigint comparison, while
-		§ `Number::compare` is the sixteen-cell cross-kind table, and a Program
-		§ that only compares two Integers must reach the first. Deleting these
-		§ entries once routed every Integer comparison through that table and
-		§ grew `HelloWorld.es` from 18,271 to 35,729 bytes, the regression
-		§ `eb27756` fixed. See DEVELOPMENT.md, Why bodies look the way they
+		§ names. The Integer entries are written on Integer's own `compare`, a
+		§ bigint comparison, rather than on `Number::compare`, the sixteen-cell
+		§ cross-kind table. See DEVELOPMENT.md, Why bodies look the way they
 		§ do. The Rational entries answer here what the covering `Number`'s
 		§ rung would otherwise be reached for. Each is the flipped call, since
 		§ `@` is below a Rational exactly when that Rational is above `@`.
