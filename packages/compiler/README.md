@@ -23,6 +23,11 @@ than one barrel — a front end composes the stages it needs:
 | `@essence-lang/compiler/helpers` | shared utilities |
 | `@essence-lang/compiler/printType` | rendering a Type back to Essence notation |
 | `@essence-lang/compiler/cache` | where the toolchain's on-disk caches live |
+| `@essence-lang/compiler/analysis` | every stage's Diagnostics for linked Modules, in one list |
+| `@essence-lang/compiler/compileMode` | what a compile asks for beyond the implementation: tests, contracts |
+| `@essence-lang/compiler/configuration` | reading the `essence.json` project file |
+| `@essence-lang/compiler/testing` | a test run's events, read back into results and Diagnostics |
+| `@essence-lang/compiler/mutation` | the mutation sites a simplified Program admits |
 
 Two things every process would otherwise rebuild — the enriched standard
 library, and the simplified and optimised prelude derived from it — are kept as
