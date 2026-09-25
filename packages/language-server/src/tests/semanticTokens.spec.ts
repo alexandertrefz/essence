@@ -651,3 +651,17 @@ describe("Semantic Tokens of a Case written in a Protocol-provided Method", () =
 		expect(tokenAt(source, 8, 8)?.type).toBe("enumMember")
 	})
 })
+
+describe("Semantic Tokens of a Case written in a refused value", () => {
+	it("should colour a Case in front of the brackets as an enum member", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Size { Small, Large }",
+			"\tconstant first = [#Small, #Large][0]",
+			"}",
+		].join("\n")
+
+		expect(tokenAt(source, 3, 21)?.type).toBe("enumMember")
+		expect(tokenAt(source, 3, 29)?.type).toBe("enumMember")
+	})
+})
