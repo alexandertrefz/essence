@@ -567,3 +567,36 @@ describe("Document Symbols under start and complete", () => {
 		expect(detailOf(detailedSymbolsOf(source), "inner")).toBe("Integer")
 	})
 })
+
+describe("Document Symbols inside a Protocol-provided Method body", () => {
+	let source = [
+		"implementation {",
+		"\tprotocol Ranked {",
+		"\t\tisAbove(_ mark: Integer) -> Boolean",
+		"",
+		"\t\tisAtMost(_ mark: Integer) -> Boolean {",
+		"\t\t\tconstant flipped = @::isAbove(mark)::negate()",
+		"\t\t\t<- flipped",
+		"\t\t}",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should nest what the body declares under the Method", () => {
+		let [protocol] = symbolsOf(source)
+
+		expect(
+			protocol.children.map((child) => [
+				child.name,
+				child.children.map((nested) => nested.name),
+			]),
+		).toEqual([
+			["isAbove", []],
+			["isAtMost", ["flipped"]],
+		])
+	})
+
+	it("should put the inferred Type beside it", () => {
+		expect(detailOf(detailedSymbolsOf(source), "flipped")).toBe("Boolean")
+	})
+})

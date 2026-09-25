@@ -458,6 +458,7 @@ function protocolMembers(
 			member.nodeType === "OverloadedStaticProtocolMethod"
 
 		let range = member.name.position
+		let children: Array<DocumentSymbolEntry> = []
 
 		for (let signature of signatures) {
 			// NOTE: A PROVIDED Method's symbol spans its block as well — the
@@ -467,6 +468,10 @@ function protocolMembers(
 				range,
 				signature.body?.position ?? signature.position,
 			)
+
+			if (signature.body !== null) {
+				children.push(...symbolsOfBody(signature.body.value.body))
+			}
 		}
 
 		members.push({
@@ -475,7 +480,7 @@ function protocolMembers(
 			detail: null,
 			range,
 			selectionRange: member.name.position,
-			children: [],
+			children,
 		})
 	}
 
@@ -667,6 +672,20 @@ function collectDetail(
 					)
 				}
 
+				let methods =
+					member.nodeType === "OverloadedMethod" ||
+					member.nodeType === "OverloadedStaticMethod"
+						? member.methods
+						: [member.method]
+
+				for (let method of methods) {
+					collectDetails(method.value.body, details)
+				}
+			}
+
+			return
+		case "ProtocolDeclarationStatement":
+			for (let member of Object.values(node.methods)) {
 				let methods =
 					member.nodeType === "OverloadedMethod" ||
 					member.nodeType === "OverloadedStaticMethod"
