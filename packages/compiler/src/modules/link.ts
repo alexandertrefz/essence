@@ -208,10 +208,10 @@ function exportedEntries(
 
 // NOTE: The canonical order of an import block: by specifier, then by name, then
 // by the local name — never the order the entries were written in. It is the
-// order `esfmt` writes the block in (`compareImportEntries`), and Namespace
-// dispatch is seeded in it, so re-sorting a block can never change which
-// Namespace a Method call resolves to. Compared by code unit rather than by
-// locale, so every machine agrees.
+// order `esfmt` writes the block in (`compareGroups` and `compareEntries` in the
+// Formatter's `sections.ts`), and Namespace dispatch is seeded in it, so
+// re-sorting a block can never change which Namespace a Method call resolves
+// to. Compared by code unit rather than by locale, so every machine agrees.
 function compareEntries(left: parser.ImportNode, right: parser.ImportNode) {
 	let keyOf = (entry: parser.ImportNode) => [
 		entry.source.path,
@@ -281,14 +281,6 @@ function isRuntimeName(surface: ExportSurface | null, name: string): boolean {
 	return surface !== null && surface.values[name] !== undefined
 }
 
-// NOTE: The two sections as the emitted Program needs them, attached to the
-// typed Program linking hands back. Enrichment leaves both null: whether an
-// entry names something the JavaScript binds is read off the other Module's
-// export surface, and enrichment never sees one.
-//
-// Only an entry that bound is carried. One that did not names something the
-// Module can not reach, which is a Diagnostic already — and code generation
-// never runs over a Module that reported one.
 // NOTE: What a Hover over an entry prints — the member bound under the local
 // name, or the Type where only a Type came across. A name bound in both tables
 // answers with the member, which is what the name means in expression position.
@@ -299,6 +291,14 @@ function boundEntryType(
 	return scope.members[name] ?? scope.types[name] ?? null
 }
 
+// NOTE: The two sections as the emitted Program needs them, attached to the
+// typed Program linking hands back. Enrichment leaves both null: whether an
+// entry names something the JavaScript binds is read off the other Module's
+// export surface, and enrichment never sees one.
+//
+// Only an entry that bound is carried. One that did not names something the
+// Module can not reach, which is a Diagnostic already — and code generation
+// never runs over a Module that reported one.
 function moduleSections(
 	state: ModuleState,
 	surface: ExportSurface,
@@ -926,8 +926,9 @@ function linkGroup(
 		[...states.values()].map((state) => ({
 			program: state.module.program,
 			scope: state.scope,
-			// NOTE: Only a test compile reads it, and only to compile the
-			// `@example` blocks of a `§§` block out of the file's own lines.
+			// NOTE: Only a test compile reads it: the `@example` blocks of a `§§`
+			// block are compiled out of the file's own lines, and a value
+			// comment outside the tests is found in them.
 			source: state.module.sourceText,
 		})),
 		{
@@ -1559,16 +1560,13 @@ function usedNames(
 			names.add(record["name"])
 		}
 
-		// NOTE: A named Type the tree RESOLVED to used to count as a use, which
-		// answered the right question far too widely: EVERY Type object
-		// anywhere in either tree carries a name, so an import whose Type
-		// merely flows through — `import { Standing, make }` where only
-		// `make()` is called, and `Standing` is what it answers — was never
-		// reported although removing the entry compiles. What that rule was
-		// written for is the Choice reaching this file as a Type Argument,
-		// whose Equatable is derived by looking the Choice up BY NAME: that
-		// lookup is recorded where it happens now, and arrives here as
-		// `derivedTypeNames`.
+		// NOTE: A named Type the tree resolved to does not count as a use.
+		// Every Type object in either tree carries a name, so if it counted, an
+		// import whose Type merely flows through, `Standing` beside a `make`
+		// that answers one, would never be reported although removing the
+		// entry compiles. A Choice reaching this file as a Type Argument, whose
+		// Equatable is derived by looking the Choice up by name, is recorded
+		// where that lookup happens and arrives here as `derivedTypeNames`.
 
 		for (let value of Object.values(record)) {
 			visit(value)
