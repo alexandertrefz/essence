@@ -1,9 +1,9 @@
-§§ Three mistakes, one per stage of the Compiler, in one file.
-§§
-§§ The Enricher's `unknown-name` used to be the whole report: the Validator
-§§ only ran over a Program the Enricher had nothing to say about, so the two
-§§ Diagnostics above it took two more runs to find. Every stage runs now, and
-§§ the report comes out in the order the lines are written.
+§ Three mistakes in one file, from two stages of the Compiler: the Validator
+§ reports the first two and the Enricher the third.
+§
+§ Every stage runs whatever the stage before it found, so one report holds
+§ all three, in the order the lines are written.
+
 implementation {
 	type Point = { x: Integer, y: Integer }
 

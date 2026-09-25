@@ -23,7 +23,7 @@ implementation {
 	§ no-matching-overload — the Argument refused, and every candidate listed.
 	constant piece = "essence"::prepend(1)
 
-	§ no-namespace-for-value.
+	§ unknown-method, on a Record: the library's `Record` Namespace is searched.
 	constant nowhere = { x = 1 }::describe()
 
 	§ unknown-name — the closest name in Scope is offered.
