@@ -132,9 +132,6 @@ describe("A Module described", () => {
 		})
 	})
 
-	// NOTE: `Optional<T>` is the one Union with a JavaScript spelling of its
-	// own, and the only one that collapses. A Union that merely CONTAINS an
-	// Optional still decides arm by arm.
 	// NOTE: The invariant the two halves of a payload default rest on: a Case
 	// payload member marked omittable carries the VALUE it is filled with, since
 	// nothing stands between a host's object and the Case for a callee to fill
@@ -217,6 +214,9 @@ describe("A Module described", () => {
 		expect(seen).toBe(15)
 	})
 
+	// NOTE: `Optional<T>` is the one Union with a JavaScript spelling of its
+	// own, and the only one that collapses. A Union that merely CONTAINS an
+	// Optional still decides arm by arm.
 	it("collapses an Optional and leaves every other Union alone", () => {
 		let calls = moduleDescriptor("Calls.es")
 

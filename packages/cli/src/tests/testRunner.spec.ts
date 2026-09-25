@@ -2100,8 +2100,6 @@ describe("essence test — snapshots", () => {
 	})
 })
 
-// NOTE: What a property test looks like from the command line: the report a
-// failure prints, the replay it names, and the two flags that pin a run.
 // NOTE: The whole of asynchrony, driven through the real command. A test body
 // may `complete` whatever it likes, and what these ask is that the RUNNER waits
 // for it: that a value only a finished run can hold reaches an `expect`, that
@@ -2210,6 +2208,8 @@ describe("essence test — a test that waits", () => {
 	})
 })
 
+// NOTE: What a property test looks like from the command line: the report a
+// failure prints, the replay it names, and the two flags that pin a run.
 describe("essence test — property tests", () => {
 	// NOTE: The draws fold in the file's path, which is new every run, so the
 	// failing property breaks on any List of five or more items, which every

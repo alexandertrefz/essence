@@ -709,13 +709,6 @@ export {
 	})
 })
 
-// NOTE: A Choice whose every Case is payload-less crosses as the bare NAME of
-// the Case — `"Up"`, never `{ $case: 'Direction#Up' }` — in both directions. It
-// is the one shape whose JavaScript spelling was chosen for the HOST rather
-// than derived from the Essence value, and the whole of why is in what a
-// declaration then reads: `turn(direction: "Up" | "Down")` is an enumeration a
-// TypeScript reader already knows, where the object form was this Module's
-// bookkeeping made a caller's problem.
 // NOTE: The conditional door is decided from what the boundary DECLARES, and a
 // Record is structurally open — the outbound walk reads the value's members —
 // so a Dictionary can reach a position no Type names, where there is no door to
@@ -756,6 +749,13 @@ export {
 	})
 })
 
+// NOTE: A Choice whose every Case is payload-less crosses as the bare NAME of
+// the Case — `"Up"`, never `{ $case: 'Direction#Up' }` — in both directions. It
+// is the one shape whose JavaScript spelling was chosen for the HOST rather
+// than derived from the Essence value, and the whole of why is in what a
+// declaration then reads: `turn(direction: "Up" | "Down")` is an enumeration a
+// TypeScript reader already knows, where the object form was this Module's
+// bookkeeping made a caller's problem.
 describe("A unit Choice", () => {
 	it("carries each of its Cases as the bare name", () => {
 		expect(called("direction", "Up")).toBe("Up")

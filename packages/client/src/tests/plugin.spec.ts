@@ -235,11 +235,6 @@ export const pi = PI
 		expect(pi.toString()).toBe("157/50")
 	})
 
-	// NOTE: A Choice across the boundary, which is the one value whose spelling
-	// the WRAPPER and the BUNDLE have to agree on: a Case is tagged with a path
-	// relative to the entry it was emitted for, and the Descriptor bakes that
-	// same tag. Disagree by one character and `areaOf` would match `#Blank` and
-	// answer 0 — no error, a wrong number.
 	// NOTE: The whole asynchrony door through a real build: a `.es` file whose
 	// Function answers work, imported by an entry that simply awaits it. The
 	// wrapper, the interpreter and `Future.ts` all have to be the ones the host
@@ -258,6 +253,11 @@ export const doubling = doubled(21n)
 		expect(await (bundle.doubling as Promise<bigint>)).toBe(42n)
 	})
 
+	// NOTE: A Choice across the boundary, which is the one value whose spelling
+	// the WRAPPER and the BUNDLE have to agree on: a Case is tagged with a path
+	// relative to the entry it was emitted for, and the Descriptor bakes that
+	// same tag. Disagree by one character and `areaOf` would match `#Blank` and
+	// answer 0 — no error, a wrong number.
 	it("carries a Choice across as a discriminated union", async () => {
 		let directory = project({
 			"Shapes.es": SHAPES_MODULE,
@@ -1018,16 +1018,10 @@ export {
 		)
 	})
 
-	// NOTE: A dev server never rebuilds from the top — entries load one at a
-	// time, and only the changed ones again — so the compiler's record of WHO
-	// the entries are goes stale the moment a file changes. A refactor that
-	// folds one entry into the other's graph collided with the record of an
-	// entry that no longer is one, and refused a one-entry build until the
-	// server was restarted.
 	// NOTE: A dev server compiles a file where it is asked for, and an edit can
-	// turn two unrelated entries into one graph. Nothing here refuses that any
-	// more — what it has to do is stop answering with the JavaScript the OLD
-	// sources emitted, which is the whole of what `watchChange` is for.
+	// turn two unrelated entries into one graph. Nothing refuses that; what the
+	// plugin has to do is stop answering with the JavaScript the old sources
+	// emitted, which is the whole of what `watchChange` is for.
 	it("lets an edit refactor one entry into the other's graph", async () => {
 		let shared = `implementation {
 
