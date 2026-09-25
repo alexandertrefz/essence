@@ -112,9 +112,10 @@ export function refusesTheText(error: ParseError): boolean {
 	return error.reported || !rewoundCodes.has(error.code)
 }
 
-// NOTE: All parse failures are routed through this single helper. The
-// statement loops catch the resulting ParseError, report it as a Diagnostic
-// and resynchronise.
+// NOTE: The plain parse failure, a `syntax-error` with nothing to add. A
+// failure that carries a code, a second Label, notes, Helps or Quick Fix data
+// throws its ParseError directly. The statement loops catch either, report it
+// as a Diagnostic and resynchronise.
 export function fail(
 	message: string,
 	position?: common.Position,
@@ -309,11 +310,12 @@ export class TokenStream {
 		this.hadLexerError = false
 		this.documentationLines = new Map()
 
-		// NOTE: The Lexer throws on unterminated String Literals — its only
-		// error case. That is reported as a positioned Diagnostic here and
+		// NOTE: An unterminated String Literal is the one mistake the Lexer
+		// throws on. That is reported as a positioned Diagnostic here and
 		// lexing stops; the parser continues on the Tokens read so far and
 		// suppresses the end-of-input errors the truncation necessarily
-		// causes.
+		// causes. Every other mistake it collects in `errors`, and those are
+		// reported without stopping.
 		try {
 			let token = sourceLexer.next()
 			while (token !== undefined) {
