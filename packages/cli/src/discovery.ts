@@ -19,8 +19,8 @@ import { looksLikeGlob } from "./inputs"
 // pointed at a project, and walks it with the Compiler's `essenceFilesUnder`,
 // the walk the Formatter shares.
 
-// NOTE: The convention from the design: a file that is nothing but imports and
-// a `tests { … }` block, named after the Module it tests. It is discovered by
+// NOTE: The `.tests.es` convention: a file that is nothing but imports and a
+// `tests { … }` block, named after the Module it tests. It is discovered by
 // its NAME as well as by its content, so a `Season.tests.es` that does not
 // parse is still compiled and still reports its Diagnostic — a file that can
 // not be read can not be shown to hold no tests.

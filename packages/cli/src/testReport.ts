@@ -648,7 +648,7 @@ export function tallyMutants(
 	}
 }
 
-// NOTE: The design's own summary line, and a block per SURVIVOR: a mutant
+// NOTE: The summary line, and a block per SURVIVOR: a mutant
 // nothing noticed is the whole finding, and the count above it is the context
 // it is read in.
 //
@@ -834,7 +834,7 @@ function excerpt(mutant: MutantRecord, sourceOf: SourceLookup): Array<string> {
 
 // #region Coverage
 
-// NOTE: What a `--coverage` run says, as the design's table: a row per file
+// NOTE: What a `--coverage` run says, as a table: a row per file
 // with lines and branches as percentages, Match arms as taken out of total,
 // and — spilling down the last column — every branch and arm nothing reached,
 // named by the Method or Function it stands in. Under it, one line per Case of

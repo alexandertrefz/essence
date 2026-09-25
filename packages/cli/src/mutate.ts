@@ -58,8 +58,8 @@ import {
 	tallyMutants,
 } from "./testReport"
 
-// NOTE: `essence test --mutate` — the driver of the design's §12. Coverage says
-// a line RAN; this says a bug there would be CAUGHT.
+// NOTE: The driver of `essence test --mutate`. Coverage says a line RAN; this
+// says a bug there would be CAUGHT.
 //
 // The shape of a run is three movements. A BASELINE compile with the counters
 // in and every Module asked what lies it admits, run once with each test saying

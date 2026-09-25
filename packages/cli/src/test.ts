@@ -806,9 +806,9 @@ export function printReport(
 	coverage: CoverageSummary = emptyCoverage,
 	snapshots: SnapshotWrites = noWrites,
 	// NOTE: Whether the compile this run stands on emitted nothing, every entry
-	// of it having been in the bundle cache already. It is the design's own
-	// note at the end of the summary, and it is the difference between a fast
-	// run and a fast run that also compiled the project.
+	// of it having been in the bundle cache already. It is the note at the end
+	// of the summary, and it is the difference between a fast run and a fast
+	// run that also compiled the project.
 	cacheWarm = false,
 	// NOTE: What the run recorded as baselines, which is what a snapshot count
 	// is beside it: a measurement written for the first time is a pass that
