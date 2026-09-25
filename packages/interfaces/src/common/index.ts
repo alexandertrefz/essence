@@ -870,8 +870,9 @@ export type Parameter = {
 export type DefaultNesting = { readonly [member: string]: DefaultNesting }
 
 // NOTE: `documentation` is optional in the type, but every builtin Namespace
-// Method declared in `packages/standard-library/sources/*.es` does carry it — the completion gate in
-// builtins.spec.ts fails on any Method that ships without documentation.
+// Method declared in `packages/standard-library/sources/*.es` does carry it —
+// the completion gate in builtins.spec.ts fails on any Method that ships
+// without documentation.
 export type BaseFunction = {
 	parameterTypes: Array<Parameter>
 	generics: Array<GenericDeclaration>
@@ -1011,12 +1012,12 @@ export type ProtocolType = {
 // NOTE: `name` is set on the Union a `choice` declaration creates (and on
 // builtins like `Ordering` and `Number`, and non-generic Type Aliases) —
 // assignability ignores it entirely, it only gives Diagnostics and Hovers a
-// readable name for the Union.
-// `alias` is its parameterized sibling, set on the Union an applied Generic
-// Alias produces (`Labelled<Integer>` for a `type Labelled<T> = T | String`). Its Type Arguments are real Types, so
+// readable name for the Union. `alias` is its parameterized sibling, set on the
+// Union an applied Generic Alias produces (`Labelled<Integer>` for a
+// `type Labelled<T> = T | String`). Its Type Arguments are real Types, so
 // generic substitution rewrites them alongside the members and the applied
-// spelling stays accurate — a plain string name would go stale instead.
-// Equally ignored by assignability.
+// spelling stays accurate — a plain string name would go stale instead. Equally
+// ignored by assignability.
 export type UnionType = {
 	type: "UnionType"
 	types: Array<Type | GenericUse>
