@@ -53,8 +53,7 @@ const debounceInMilliseconds = 450
 const deadlineInMilliseconds = 60_000
 
 type TestSessionOptions = {
-	// NOTE: Every `.es` file the workspace knows, and — for each of them —
-	// whether it wrote a `tests { … }` block and which files a change to it
+	// NOTE: The workspace's test files, and every file a change to one file
 	// reaches. The session asks rather than searches: the Workspace already
 	// holds the parses and the edges, and a second walk would be a second
 	// answer to disagree with.
