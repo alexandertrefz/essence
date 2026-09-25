@@ -10599,10 +10599,11 @@ function refinedLiteralReceiverType(
 	// the value. A Program declaring refinements of its own paid a multiple of it
 	// at every literal it wrote.
 	//
-	// The answer is a pure function of the Scope chain and the value, so the only
-	// thing that can stale it is a Type DECLARED after it was remembered — which
-	// is what the count guards. A written List is left off, because the Type of
-	// its items is part of the question and its spelling is not part of the key.
+	// The answer is a pure function of the Scope chain and the value. It goes
+	// stale when a Type is declared or when hoisting fills in or poisons an
+	// Alias' predicate, and each of those bumps the count that guards it. A
+	// written List is left off, because the Type of its items is part of the
+	// question and its spelling is not part of the key.
 	let key = writtenReceiverKey(base)
 
 	if (key === null) {
