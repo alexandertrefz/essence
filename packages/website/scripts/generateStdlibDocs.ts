@@ -22,11 +22,12 @@
  *
  * ── Why generated at all ──────────────────────────────────────────────────
  *
- * Because the alternative is 427 members that fall out of date one at a time,
- * silently, and a reference that lies is worse than no reference. The gate in
- * `tests/stdlibMembers.spec.ts` is the other half: it fails when a member has
- * no place, or a place the library no longer backs, so adding a Method breaks
- * the build until somebody decides where it goes and runs `--sync`.
+ * Because the alternative is hundreds of members that fall out of date one at
+ * a time, silently, and a reference that lies is worse than no reference. The
+ * gate in `tests/stdlibMembers.spec.ts` is the other half: it fails when a
+ * member has no place, or a place the library no longer backs, so adding a
+ * Method breaks the build until somebody decides where it goes and runs
+ * `--sync`.
  */
 
 import { spawnSync } from "node:child_process"

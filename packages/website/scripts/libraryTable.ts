@@ -16,8 +16,6 @@
  *
  * `description` and `taughtOn` only seed a page the generator creates. Once a
  * page exists they are its own, and `--sync` keeps them.
- *
- * Seeded from the documentation campaign's `library.json` (2026-09-11).
  */
 
 export interface GroupDefinition {

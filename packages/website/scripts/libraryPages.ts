@@ -20,10 +20,10 @@
  *   5. A free Function family gets a page named after itself (`loop`), and
  *      every Protocol goes to the Protocols page — Generatable too, though
  *      `Randomness.es` declares it.
- *   6. One override, `Step`: its file declares the Choice and nothing a page
- *      could hang from. It goes to `loop`, because the callback of a `step`
- *      form of `loop` returns one. The only other callback that does is
- *      `List::reduce`'s early-stopping form; a plain `loop` body does not.
+ *   6. The overrides in `OVERRIDES`. `Step`'s file declares the Choice and
+ *      nothing a page could hang from, so it goes to `loop`, because the
+ *      callback of a `step` form of `loop` returns one. `Started` and the
+ *      Namespaces about work go to Future.
  *
  * "The first Type a file declares a page for" is the first Namespace in the
  * file over a Type no file declares (`Integer`, `List`), over a refinement of
@@ -75,9 +75,9 @@ export const LIBRARY_ROOT = "/docs/library"
 const PROTOCOLS = "protocols"
 
 /*
- * The one declaration no rule can place. `Step.es` declares the Choice and no
- * Namespace, so nothing names a page it belongs on — and a reader meets it
- * where a callback has to return one: the `step` forms of `loop`, and the
+ * Declarations placed by hand. `Step.es` declares the Choice and no Namespace,
+ * so nothing names a page it belongs on, and a reader meets it where a
+ * callback has to return one: the `step` forms of `loop`, and the
  * early-stopping form of `List::reduce`.
  */
 const OVERRIDES: Record<string, string> = {
