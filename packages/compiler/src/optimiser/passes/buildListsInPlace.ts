@@ -477,11 +477,9 @@ function appendCall(node: common.typedSimple.ExpressionNode): {
 // the State's name declines for the same reason, because the declaration is a
 // mention like any other.
 //
-// NOTE: A Type is walked like everything else and the `seen` set is why that is
-// safe: a Choice whose payload names the Choice builds a Type graph that leads
-// back into itself, and every structural walker in this stage carries a guard
-// for it. Nothing in a Type is an Identifier Node, so walking one only ever
-// costs time.
+// NOTE: A Type is walked like everything else. Types are shared between Nodes,
+// and the `seen` set walks an object reached twice only once. Nothing in a Type
+// is an Identifier Node, so walking one only ever costs time.
 function mentions(root: unknown, name: string): boolean {
 	let seen = new Set<object>()
 	let found = false

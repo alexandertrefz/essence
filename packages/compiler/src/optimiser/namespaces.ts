@@ -1,9 +1,10 @@
 import type { common } from "@essence-lang/interfaces"
 
 // NOTE: The Namespaces a Program DECLARES, and — separately — the ones it
-// declares below its own top level. Two passes ask about them for two different
-// reasons, and the difference between the two sets is the whole of what tells
-// the standard library's own Namespaces from a Program's.
+// declares below its own top level. `pool-constants` reads both, every pass that
+// reads a Namespace by name as the standard library's reads the nested one, and
+// the difference between the two sets is the whole of what tells the standard
+// library's own Namespaces from a Program's.
 //
 // NOTE: Asked ONCE per optimisation and handed to every pass that needs it —
 // see `OptimiserPass.run` for why one answer serves the whole registry. The
@@ -25,10 +26,11 @@ export type DeclaredNamespaces = {
 	// and a class is not hoisted, so a const band above it can not read one.
 	all: ReadonlySet<string>
 	// NOTE: The ones a block declares rather than the Program — the only ones
-	// that can be standing in front of a builtin. `lower-scalar-operations`
-	// reads this: `Integer` naming a Program's own Namespace is a Method the
-	// Program wrote, and lowering it to a bigint comparison would answer for
-	// code nobody wrote.
+	// that can be standing in front of a builtin. Every pass that reads a
+	// Namespace by name as the standard library's reads this: `Integer` naming a
+	// Program's own Namespace is a Method the Program wrote, and lowering it to a
+	// bigint comparison, as `lower-scalar-operations` would, answers for code
+	// nobody wrote.
 	nested: ReadonlySet<string>
 }
 
@@ -45,8 +47,7 @@ export function declaredNamespaces(
 	//
 	// NOTE: The question is monotone — "collect every name" — so each object is
 	// visited once, the way `typeWalkFinds` visits a Type: a Node's Types ride
-	// along in the search, they are DAGs as they are actually held, and a
-	// Choice's payload may name the Choice.
+	// along in the search, and they are DAGs as they are actually held.
 	let visited = new Set<object>()
 
 	let visitNested = (value: unknown): void => {

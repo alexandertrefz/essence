@@ -127,12 +127,12 @@ function poolKeyOf(
 }
 
 // NOTE: `JSON.stringify`, with the one answer it lacks: a descriptor whose
-// object graph leads back into itself — the shape a Choice's payload naming the
-// Choice builds, and the one every structural Type walker in the stage carries
-// a guard for. A back-edge becomes a bare `<cycle:N>` marker naming how many
-// objects up the walk it returns to — no value can collide with it (a string of
-// that spelling keeps its quotes), and the distance keeps two graphs that
-// unfold differently from keying, and so pooling, alike. Only the objects
+// object graph leads back into itself. The Enricher refuses a recursive Type
+// declaration, so none is expected, and the guard keeps one that did arrive from
+// recursing without end. A back-edge becomes a bare `<cycle:N>` marker naming
+// how many objects up the walk it returns to — no value can collide with it (a
+// string of that spelling keeps its quotes), and the distance keeps two graphs
+// that unfold differently from keying, and so pooling, alike. Only the objects
 // currently OPEN are held, not everything seen, so a shared sub-object still
 // serializes fully at every reach and equal descriptors keep equal keys.
 function serializeKey(value: unknown, visiting: Array<object> = []): string {
