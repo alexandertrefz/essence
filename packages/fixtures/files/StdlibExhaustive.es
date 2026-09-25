@@ -3671,7 +3671,7 @@ c"::quote())
 		"List.contains<ItemType is Equatable>(_ ItemType) [absent]",
 		numbers::contains(9),
 	)
-	§ The subset question, and the first of the four set-shaped entries. How
+	§ The subset question, and the first of the set-shaped entries. How
 	§ many times an item occurs is not asked, so a receiver holding one `1`
 	§ contains every item of a List holding two.
 	show(

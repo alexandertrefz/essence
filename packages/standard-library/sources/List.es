@@ -346,7 +346,7 @@ declarations {
 				<- @::hasItems(where (candidate) { <- candidate::is(item) })
 			}
 
-			§ One of the four set-shaped entries; the note above
+			§ One of the set-shaped entries; the note above
 			§ `removeDuplicates` says what they rest on. This one is the
 			§ subset question. It counts nothing: a List is a bag, and
 			§ `count(of:)` is what answers how many times an item occurs.
@@ -1033,7 +1033,7 @@ declarations {
 				<- @::everyItem(where (item) { <- check(item)::negate() })
 			}
 
-			§ The difference, and one of the four set-shaped entries; the note
+			§ The difference, and one of the set-shaped entries; the note
 			§ above `removeDuplicates` says what they rest on. The label
 			§ mirrors `append(contentsOf:)`, which is the other Method here
 			§ that is about a whole List rather than one item.
@@ -1214,7 +1214,7 @@ declarations {
 			§§ @returns — the List of accepted items.
 			(where check: (_: ItemType) -> Boolean) -> List<ItemType>
 
-			§ The intersection, and one of the four set-shaped entries; the
+			§ The intersection, and one of the set-shaped entries; the
 			§ note above `removeDuplicates` says what they rest on. It is a
 			§ filter like the entry above rather than a set operation. An item
 			§ the other List holds is kept every time it occurs, so
@@ -1982,14 +1982,14 @@ declarations {
 			})
 		}
 
-		§ The set-shaped Methods, and the one structure all four rest on. Each
+		§ The set-shaped Methods, and the one structure they all rest on. Each
 		§ holds what it has met in a Map keyed by the canonical encoding, in
 		§ `keyEncoding.ts` in the runtime. So each is linear, where a fold on
-		§ `contains` is quadratic. The other three are
+		§ `contains` is quadratic. The others are `hasDuplicates`,
 		§ `contains(everyItemOf:)`, `everyItem(alsoIn:)` and
-		§ `removeEvery(contentsOf:)`. There is no fifth: the union of two
-		§ Lists is `append(contentsOf other)::removeDuplicates()`, and needs
-		§ no name of its own.
+		§ `removeEvery(contentsOf:)`. The union of two Lists is
+		§ `append(contentsOf other)::removeDuplicates()`, and needs no name of
+		§ its own.
 		§
 		§ The item's own `is` still decides. A witness the Compiler brands
 		§ structural is what the encoding stands in for. Any other is scanned

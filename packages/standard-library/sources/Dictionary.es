@@ -731,7 +731,7 @@ declarations {
 	§ A fourth, `removeDuplicates`, used to cross and come back. It was
 	§ `tally`'s keys, and it dragged the whole store into any Program asking a
 	§ List for its distinct items. It is a `List` native over a plain Map now,
-	§ beside three other set-shaped Methods. The encoding it needs is a
+	§ beside the other set-shaped Methods. The encoding it needs is a
 	§ runtime module of its own; the note above `List::removeDuplicates` says
 	§ why.
 	§
