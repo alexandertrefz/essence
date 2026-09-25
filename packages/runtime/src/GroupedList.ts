@@ -16,10 +16,11 @@
 // as one written down.
 //
 // NOTE: The List is walked as every List native walks one, with the two runs'
-// counts fixed before the first item is read — `runsOf` rather than `viewOf`,
-// because no Method here visits an item twice and there is no reason to trim
-// the caller's List for it. A List built at the front holds its first items in
-// a second run, stored reversed, which is what the backwards loop is.
+// counts fixed before the first item is read. `sealedRunsOf` rather than
+// `walkOf`: no Method here visits an item twice, so there is no reason to trim
+// the caller's List for it, and each hands the items to a key Function or a
+// witness, so the run is sealed. A List built at the front holds its first
+// items in a second run, stored reversed, which is what the backwards loop is.
 import type { DictionaryType, Store } from "./Dictionary"
 import {
 	dictionaryOverFreshStore,

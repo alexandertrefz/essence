@@ -642,9 +642,9 @@ export function dictionaryOverFreshStore<
 
 // NOTE: The List of entry Records a Program writes a Dictionary down as. The
 // two runs are walked as every List native walks them, with the counts fixed
-// before the first entry is read — `runsOf` rather than `viewOf` because
-// nothing here is going to visit the items twice and there is no reason to trim
-// the caller's List for it.
+// before the first entry is read. `sealedRunsOf` rather than `walkOf`: nothing
+// here visits the items twice, so there is no reason to trim the caller's List
+// for it, and the key witness is user code, so the run is sealed.
 export function of__overload$1<Key extends AnyType, Value extends AnyType>(
 	entries: ListType<EntryRecord<Key, Value>>,
 	conformance: EquatableWitness<Key>,
