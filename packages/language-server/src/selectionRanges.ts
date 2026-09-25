@@ -366,6 +366,9 @@ function collectFromNode(
 		case "Complete":
 			descend(node.expression, cursor, chain)
 			return
+		case "RefusedValue":
+			descend(node.base, cursor, chain)
+			return
 		case "CaseValue":
 			if (node.value !== null) {
 				descend(node.value, cursor, chain)

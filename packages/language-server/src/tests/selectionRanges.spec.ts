@@ -329,3 +329,22 @@ describe("Selection Ranges inside a Protocol-provided Method body", () => {
 		])
 	})
 })
+
+describe("Selection Ranges inside a refused value", () => {
+	it("should widen from a name in front of the brackets out through them", () => {
+		let source = [
+			"implementation {",
+			"\tconstant primes = [2, 3, 5]",
+			"\tconstant first = primes::reverse()[0]",
+			"}",
+		].join("\n")
+
+		expect(selectionRangesOf(source, { line: 3, column: 20 })).toEqual([
+			{ start: { line: 3, column: 19 }, end: { line: 3, column: 25 } },
+			{ start: { line: 3, column: 19 }, end: { line: 3, column: 36 } },
+			{ start: { line: 3, column: 19 }, end: { line: 3, column: 39 } },
+			{ start: { line: 3, column: 2 }, end: { line: 3, column: 39 } },
+			{ start: { line: 1, column: 1 }, end: { line: 4, column: 2 } },
+		])
+	})
+})
