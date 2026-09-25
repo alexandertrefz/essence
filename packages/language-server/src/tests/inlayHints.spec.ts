@@ -144,6 +144,29 @@ describe("Inlay Hints", () => {
 		])
 	})
 
+	it("should annotate declarations inside a Protocol-provided Method body", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Ranked {",
+			"\t\tisAbove(_ mark: Integer) -> Boolean",
+			"",
+			"\t\tisAtMost(_ mark: Integer) -> Boolean {",
+			"\t\t\tconstant flipped = @::isAbove(mark)::negate()",
+			"\t\t\t<- flipped",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hintsOf(source)).toEqual([
+			{
+				position: { line: 6, column: 20 },
+				label: ": Boolean",
+				kind: "type",
+			},
+		])
+	})
+
 	// NOTE: Parameter name hints are deliberately absent — a labelled
 	// Parameter requires its label at the call site, and a label-less one has
 	// no name to show, so a hint could only ever repeat what is already there.
