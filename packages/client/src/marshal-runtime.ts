@@ -300,14 +300,14 @@ export type ListBox = {
 // log of what each write overwrote beside the version this box views. A box that
 // is behind undoes the writes made since it looked, into a copy of its own view.
 //
-// NOTE: The arithmetic is repeated here rather than imported, for the reason the
-// run layout above is repeated: a Module's runtime is inlined in its bundle, and
-// importing would reach for a second copy of it. Read-only, for the reason
-// nothing else here writes back — the runtime repairs such a box wherever IT
-// reads one, so a box this side leaves alone loses nothing by it.
-// NOTE: Exported for the differential spec that holds all four copies of this
-// replay against the runtime's own — `tests/undoReplay.spec.ts`. An export
-// nothing else reaches is shaken out of a bundle, so it costs a host nothing.
+// NOTE: Repeated rather than imported because the runtime's `caughtUp` writes
+// the replayed run back onto the box, and this side never writes into a
+// bundle's values. The runtime repairs such a box wherever it reads one, so a
+// box left alone here loses nothing by it.
+//
+// NOTE: Exported for `tests/undoReplay.spec.ts`, which holds this copy and the
+// one in `tools/bench.ts` against the runtime's own. An export nothing else
+// reaches is shaken out of a bundle, so it costs a host nothing.
 export function backRunSeenBy(list: ListBox): Array<unknown> {
 	let writes = list.writes
 
