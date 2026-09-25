@@ -331,12 +331,12 @@ describe("The runtime half", () => {
 		)
 	}
 
-	// NOTE: Both files a bundler would FOLLOW, rather than the marshaller
+	// NOTE: The marshaller and `bare-cases.ts`, rather than the marshaller
 	// alone. It imports `bare-cases.ts` for a VALUE — the one rule about a unit
 	// Choice, which the generated declarations read out of the same file — so a
 	// Compiler import added over there reaches a browser exactly as one added
-	// here would, and an assertion that only ever read one file would not say a
-	// word about it.
+	// here would. A bundler follows `errors.ts` and `rational.ts` as well, and
+	// neither is read here.
 	const MARSHALLER = sourceOf("marshal-runtime.ts")
 	const SHARED_RULE = sourceOf("bare-cases.ts")
 	const SOURCES = [MARSHALLER, SHARED_RULE]
