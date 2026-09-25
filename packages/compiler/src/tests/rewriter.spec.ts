@@ -89,11 +89,6 @@ const sameItems = (
 describe("Rewriter", () => {
 	describe("Runtime", () => {
 		describe("Internal Helpers", () => {
-			// NOTE: `isFirstRationalBigger` is gone — the `lowestNumber` and
-			// `highestNumber` List entries it served are written in Essence
-			// now (`packages/standard-library/sources/Number.es`), folding the pairwise
-			// entries, which read the members' own `compare`.
-
 			describe("anyIs", () => {
 				it("returns true if the elements are identical", () => {
 					expect(anyIs(optionalEmpty(), optionalEmpty())).toBeTrue()
@@ -1780,19 +1775,10 @@ describe("Rewriter", () => {
 		})
 
 		describe("Protocol runtime gap fills", () => {
-			// NOTE: `String.toString` is implemented in Essence now
-			// (`packages/standard-library/sources/String.es`, `<- @`) and covered by the golden
-			// harness; only `List.toString`, which has a representation to
-			// build, is still native.
-			// NOTE: `List.toString` is written in Essence now
-			// (`packages/standard-library/sources/List.es`) — the Printable conformance
-			// is conditional on the items, and the golden harness covers the
-			// filled, empty and single-item renderings.
-			// NOTE: There was a third entry here, for `Nothing.is`, `isNot` and
-			// `toString`. `Nothing` is gone as a Type — a Function that answers
-			// nothing useful answers `{}` now, and absence is `Optional`'s
-			// `#Empty` — so there is no Namespace left to gap-fill for. The
-			// empty Record reaches `Record`'s own conformances like any other.
+			// NOTE: `String.toString` is written in Essence
+			// (`packages/standard-library/sources/String.es`, `<- @`), and
+			// `List.toString`, which has a representation to build, is native.
+			// The golden harness covers both.
 		})
 
 		describe("Number", () => {

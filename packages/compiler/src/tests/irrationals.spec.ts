@@ -1349,15 +1349,6 @@ describe("Irrationals", () => {
 	})
 
 	describe("Number cross-kind semantics", () => {
-		// NOTE: cross-kind `Number.is` is Essence now (`packages/standard-library/sources/Number.es`) and covered by the golden harness.
-		// NOTE: the List entries of `lowestNumber`/`highestNumber` — and the
-		// empty Optional they answer for an empty List — are Essence now
-		// (`packages/standard-library/sources/Number.es`), folds over the pairwise
-		// entries seeded with `#Empty`; the golden harness covers every entry
-		// including the empty Lists.
-		// NOTE: the `isLessThan` family is Essence now (`packages/standard-library/sources/Number.es`) — its agreement with `compare` is covered by the golden harness.
-		// NOTE: the `isLessThan` family is Essence now (`packages/standard-library/sources/Number.es`); its symmetry with itself is covered by the golden harness.
-
 		// NOTE: The reason the grid family is spelled the same way on all four
 		// kinds. A `Number` reaches a Method only where every member Namespace
 		// declares one of the signature, so this is what the `approximate`

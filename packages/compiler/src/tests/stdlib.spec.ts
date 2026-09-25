@@ -26,11 +26,11 @@ const str = (value: string) => string.createString(value)
 const bool = (value: boolean) => boolean.createBoolean(value)
 const ints = (...values: Array<bigint>) => list.createList(values.map(int))
 
-// NOTE: `Optional` is a nominal Choice now (packages/standard-library/sources/Optional.es), not a
-// Type Alias for `ItemType | Nothing`, so a fallible native no longer answers
-// its result bare — it answers `Optional#Value { item }` or `Optional#Empty`.
-// These two build exactly what the natives build, so an assertion about a
-// fallible native names the whole answer rather than reaching past the wrapper.
+// NOTE: `Optional` is a nominal Choice
+// (`packages/standard-library/sources/Optional.es`), so a fallible native
+// answers `Optional#Value { item }` or `Optional#Empty`. These two build
+// exactly what the natives build, so an assertion about a fallible native
+// names the whole answer rather than reaching past the wrapper.
 const value = <ItemType extends AnyType>(item: ItemType) =>
 	optional.createValue(item)
 const empty = () => optional.createEmpty()
@@ -131,19 +131,11 @@ describe("Stdlib", () => {
 		})
 
 		it("negates a value", () => {
-			// NOTE: absolute, parity (isEven/isOdd), sign (isPositive/
-			// isNegative/isZero) and clamp are implemented in Essence
-			// now (packages/standard-library/sources/Integer.es); the golden harness covers them. Only
-			// negate stays native here.
+			// NOTE: Parity, sign and `clamp` are written in Essence, and the
+			// golden harness covers them and the native `absolute`. This drives
+			// the native `negate`.
 			expect(integer.negate(int(5n))).toEqual(int(-5n))
 		})
-
-		// NOTE: `parse` is written in Essence now
-		// (`packages/standard-library/sources/Integer.es`) — a fold over the characters
-		// with the digit's value read off its position in "0123456789". The
-		// golden harness covers the same shapes the runtime-direct test here
-		// asserted: plain, negative, leading zeroes, and the refusals — plus
-		// sign, double sign, inner sign, decimal point, empty and non-digits.
 	})
 
 	describe("Rational everyday Methods", () => {
@@ -153,19 +145,6 @@ describe("Stdlib", () => {
 			expect(rational.numerator(rat(3n, -4n))).toEqual(int(-3n))
 			expect(rational.denominator(rat(3n, -4n))).toEqual(int(4n))
 		})
-
-		// NOTE: `absolute`, `negate`, `reciprocal` and `isWholeNumber` used to
-		// be tested here against the runtime functions directly. They are
-		// written in Essence now — `packages/standard-library/sources/Rational.es` — so there is no
-		// runtime function left to call, and the golden harness
-		// (`testFiles/StdlibExhaustive.es`) covers every one of them, including
-		// the reciprocal of zero. The same move was made for the Integer
-		// everyday Methods above.
-
-		// NOTE: `round` and `truncate` joined them — `truncate` is the
-		// Euclidean quotient corrected towards zero, `round` steps away from
-		// zero on a fractional part of at least one half — and the golden
-		// harness covers both directions of both, negatives included.
 
 		it("raises to a power, exactly in both directions", () => {
 			expect(
@@ -184,21 +163,12 @@ describe("Stdlib", () => {
 				empty(),
 			)
 		})
-
-		// NOTE: `parse` is written in Essence now
-		// (`packages/standard-library/sources/Rational.es`) — one leading sign, then a
-		// split on `/` or `.` with each piece read by `Integer.parse`. The
-		// golden harness covers the same shapes the runtime-direct test here
-		// asserted — fractions, decimals and wholes, each signed and not —
-		// and the refusals: a zero or signed denominator, a double sign, two
-		// slashes or dots, a dangling dot, and plain non-digits.
 	})
 
-	// NOTE: `absolute` and `is` are written in Essence now for both Algebraic
-	// (packages/standard-library/sources/Algebraic.es) and Transcendental
-	// (packages/standard-library/sources/Transcendental.es), so only `negate` is still native here.
-	// Their behaviour is covered through the language by
-	// testFiles/Irrational.es and the golden output.
+	// NOTE: `negate` is native on both Algebraic and Transcendental, and is
+	// driven here. The golden harness,
+	// `packages/fixtures/files/StdlibExhaustive.es`, covers the rest of their
+	// sign Methods.
 	describe("Irrational sign Methods", () => {
 		it("negates an Algebraic", () => {
 			const rootTwo = algebraic.createAlgebraic(
@@ -219,29 +189,6 @@ describe("Stdlib", () => {
 			expect(transcendental.negate(negatedPi)).toEqual(number.Pi)
 		})
 	})
-
-	// NOTE: `sum`, `product` and `average` are written in Essence now
-	// (`packages/standard-library/sources/Number.es`) — folds over the members' own
-	// arithmetic, with the mixed entries collapsing a whole total back to an
-	// Integer. The golden harness covers every entry, the empty Lists and the
-	// mixed collapse included, so the runtime-direct tests that lived here are
-	// retired.
-
-	// NOTE: `Number.isBetween` used to be tested here, against the runtime
-	// function directly. It is written in Essence now — `packages/standard-library/sources/Number.es`
-	// — so there is no runtime function left to call, and the same five cases
-	// are asserted end to end in `codeGeneration.spec.ts` ("runs isBetween from
-	// the merged const" and the two beside it), where they exercise the
-	// compiled Method the way a Program reaches it. The same move was made for
-	// `Boolean.isNot` when it became the first Method to be written in Essence.
-
-	// NOTE: `Boolean.exclusiveOr` is implemented in Essence now
-	// (`packages/standard-library/sources/Boolean.es`) — the golden harness exercises it end to end,
-	// so the runtime-direct test that lived here is retired.
-
-	// NOTE: `Optional.otherwise` is implemented in Essence now
-	// (`packages/standard-library/sources/Optional.es`) — the golden harness exercises it end to end,
-	// so the runtime-direct test that lived here is retired.
 
 	describe("List round trips and construction", () => {
 		// NOTE: `join` is bounded by `Printable` rather than fixed to a
@@ -270,11 +217,6 @@ describe("Stdlib", () => {
 				}).value,
 			).toBe("1, 2, 3")
 		})
-
-		// NOTE: `List.repeat` is implemented in Essence now
-		// (`packages/standard-library/sources/List.es`), on top of the `List.of` below — the golden
-		// harness covers a count of three, zero and minus one, so the
-		// runtime-direct test that lived here is retired.
 
 		// NOTE: The four range natives share one walk, and what tells them
 		// apart is the step it is handed and whether the answer is promised to
@@ -322,13 +264,6 @@ describe("Stdlib", () => {
 			).toEqual(ints(1n, 2n, 3n))
 		})
 
-		// NOTE: `lastIndex` (and `firstIndex`) are written in Essence now,
-		// counting their way through the ITEMS with `reduce` and stopping at the
-		// first match; their behaviour is covered by the golden harness over
-		// every Method, and by `stdlibSearch.spec.ts` for the item Types that
-		// contain `Nothing` — where reading each position with `item(at:)`
-		// skipped a stored `nothing` instead of comparing it.
-
 		// NOTE: The equality counterpart of "sorts nested Lists through a bound
 		// conformance" below. `List is Equatable` is conditional, so the witness
 		// a `List<List<Integer>>` is compared through is `List.is` curried with
@@ -364,11 +299,6 @@ describe("Stdlib", () => {
 				),
 			).toEqual(bool(false))
 		})
-
-		// NOTE: `List.partition` is native again, one walk offering the check
-		// each item once (`packages/runtime/src/List.ts`); the golden harness
-		// covers both halves and the empty List, and `sharing.spec.ts` holds it
-		// against a two-run receiver, so no runtime-direct test lives here.
 
 		it("pairs position by position, stopping with the shorter List", () => {
 			const pairs = list.pair(
@@ -491,10 +421,10 @@ describe("Stdlib", () => {
 	})
 
 	describe("Enricher typings", () => {
-		// NOTE: `otherwise` used to be typed by picking the non-`Nothing` member
-		// out of the Union the Alias stood for. `Optional` is a nominal Choice
-		// now, so what it is typed by is the Choice's own Type Argument — the
-		// `item` the `#Value` Case carries — and the fallback has to match that.
+		// NOTE: `Optional` is a nominal Choice, so `value(defaultingTo:)` is
+		// typed by the Choice's own Type Argument, the `item` the `#Value` Case
+		// carries, and the fallback has to match that.
+		//
 		// NOTE: The List is bound to a `List` Type. A written one proves it
 		// holds an item, and `firstItem` on a proven receiver answers no
 		// Optional for `value(defaultingTo:)` to collapse.
