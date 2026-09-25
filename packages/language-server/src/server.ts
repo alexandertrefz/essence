@@ -713,11 +713,11 @@ export function startServer(options: { connection?: Connection } = {}) {
 			})
 			.catch(() => {})
 
-		// NOTE: The one setting this Server reads. Pulled rather than taken off
-		// the notification — the notification only says that something under
-		// `essence` changed, not what it is now — and pulled again on every
-		// change, with a refresh so open editors drop or regain their Hints
-		// without waiting for an edit to invalidate them.
+		// NOTE: What this Server reads of the client's settings. Pulled rather
+		// than taken off the notification, which only says that something
+		// under `essence` changed and not what it is now, and pulled again on
+		// every change, with a refresh so open editors drop or regain their
+		// Hints without waiting for an edit to invalidate them.
 		if (clientSupportsConfiguration) {
 			let readInlayHintSetting = () =>
 				connection.workspace

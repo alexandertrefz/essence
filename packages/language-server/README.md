@@ -67,10 +67,10 @@ are written out in `src/testProtocol.ts`.
   A request is answered even while `essence.tests.enabled` is false: what the
   setting declines is running on every keystroke, not running when asked.
 
-The server reads one configuration section, `essence.tests`, through
-`workspace/configuration` whenever the client says something under `essence`
-changed: `enabled` (default true) stops the session running by itself,
-`debounce` is how long a burst of edits may be before it costs a run
+Beside `essence.inlayHints.enabled`, the server reads the `essence.tests`
+section through `workspace/configuration` whenever the client says something
+under `essence` changed: `enabled` (default true) stops the session running by
+itself, `debounce` is how long a burst of edits may be before it costs a run
 (default 450 ms), and `coverage` (default false) makes every run count what it
 reached. A client that answers nothing keeps the defaults. Every one of the
 three is a fact about the reader; what a project RUNS — the tags it skips,
