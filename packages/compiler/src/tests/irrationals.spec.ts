@@ -842,9 +842,8 @@ describe("Irrationals", () => {
 			)
 
 			expect(doubled[typeKeySymbol]).toBe("Transcendental")
-			// NOTE: `Transcendental.is` is written in Essence now
-			// (packages/standard-library/sources/Transcendental.es) — `anyIs` compares the canonical
-			// form the same way the deleted native did.
+			// NOTE: `anyIs` compares the canonical form, the same form the
+			// native `Transcendental.is` compares.
 			expect(anyIs(doubled, number.Tau)).toBeTrue()
 		})
 
@@ -1431,9 +1430,9 @@ describe("Irrationals", () => {
 		// take the items' own `is` as a witness instead — `anyIs` still answers
 		// for a Record's members and for a literal Matcher, so it keeps these
 		// tests, and `List.is` is exercised through that witness beside them.
-		// `Algebraic.is` and `Transcendental.is` are Essence
-		// (both read `compare`), so the witnesses are spelled out here the
-		// way the Simplifier passes them.
+		// `Algebraic.is` is written in Essence (it reads `compare`), so no
+		// runtime function answers it, and one witness is spelled out here
+		// with `anyIs` for both kinds, in the shape the Simplifier passes.
 		const irrationalIs = (
 			first: algebraic.AlgebraicType | transcendental.TranscendentalType,
 			second: algebraic.AlgebraicType | transcendental.TranscendentalType,

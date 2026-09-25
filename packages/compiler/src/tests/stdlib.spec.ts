@@ -332,15 +332,6 @@ describe("Stdlib", () => {
 			).toEqual(list.createList([]))
 		})
 
-		// NOTE: `List.sorted` is implemented in Essence now
-		// (`packages/standard-library/sources/List.es`) — it hands its hidden conformance Argument's
-		// `compare` straight to `sort__overload$2`, and the golden harness covers the
-		// flat case. What is NOT covered there, and what the two tests below
-		// keep, is the WITNESS a nested List is sorted through: the Essence
-		// body only ever sees `conformance.compare`, so the currying
-		// `boundConformance` does is what makes the nesting work. They call
-		// `sort__overload$2` with exactly the Function the Essence body passes on.
-
 		it("compares Lists lexicographically", () => {
 			let integerConformance = { compare: number.compare }
 
@@ -371,6 +362,10 @@ describe("Stdlib", () => {
 			).toBe("Ordering#Less")
 		})
 
+		// NOTE: `List::sort` is native, and the golden harness covers the flat
+		// case. The nested sorts keep the witness a nested List is sorted
+		// through: the `compare` that `boundConformance` curries the inner
+		// ordering onto, handed to the `by:` entry.
 		it("sorts nested Lists through a bound conformance", () => {
 			// NOTE: The witness the codegen builds for `List<List<Integer>>` —
 			// `boundConformance` curries the inner Integer ordering onto

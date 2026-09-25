@@ -186,10 +186,10 @@ describe("Runtime Internals", () => {
 		})
 
 		it("answers from Record.toString for a Function, bare or in a List", () => {
-			// NOTE: `List.toString` is Essence now and bounded by `Printable`,
-			// so a List of Functions has no `toString` of its own — but the
-			// universal printer still reaches one through a Record, and the
-			// gap fill is what keeps that from throwing.
+			// NOTE: `List.toString` is bounded by `Printable`, so a List of
+			// Functions has no `toString` of its own, but the universal
+			// printer still reaches one through a Record, and the gap fill is
+			// what keeps that from throwing.
 			expect(
 				record.toString(
 					record.createRecord({ callback: functionValue() }),

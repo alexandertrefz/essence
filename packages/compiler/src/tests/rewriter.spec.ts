@@ -605,12 +605,6 @@ describe("Rewriter", () => {
 				})
 			})
 
-			// NOTE: `isNot` is not here because it is not native any more — it
-			// is written in Essence in `packages/standard-library/sources/Boolean.es` and reaches the
-			// emitted Program through the standard library prelude. There is
-			// nothing in this module left to call; what it does now is asserted
-			// end to end in `codeGeneration.spec.ts`.
-
 			describe("and", () => {
 				it("returns true if both sides are true", () => {
 					expect(boolean.and(booleanTrue(), booleanTrue())).toEqual(
@@ -654,22 +648,14 @@ describe("Rewriter", () => {
 					)
 				})
 			})
-
-			// NOTE: `toString` and `exclusiveOr` are implemented in Essence now
-			// (`packages/standard-library/sources/Boolean.es`); the golden harness covers them.
 		})
 
 		describe("String", () => {
-			// NOTE: Most of this Namespace is written in Essence now
-			// (`packages/standard-library/sources/String.es`) and the golden harness covers it —
-			// `isEmpty`, `is`, `prepend`, `contains`, `length`, `characters`,
-			// `character`, `trimmed`, `startsWith`, `endsWith`, `repeat`,
-			// `reverse`, `slice`, `firstIndex`, `pad`,
-			// and `toString`, alongside the negations
-			// (`hasCharacters`, `isNot`, `doesNotContain`, `doesNotStart`,
-			// `doesNotEnd`) that moved earlier. What is left below is the
-			// native floor those Essence bodies stand on, and it is where the
-			// code-point behaviour is actually decided.
+			// NOTE: Much of this Namespace is written in Essence
+			// (`packages/standard-library/sources/String.es`) and the golden
+			// harness covers it. What is tested here is the native floor those
+			// Essence bodies stand on, and it is where the code-point behaviour
+			// is actually decided.
 
 			describe("append", () => {
 				// NOTE: The TEXT, not the wrapper. A joined String may carry
@@ -804,12 +790,6 @@ describe("Rewriter", () => {
 				})
 			})
 
-			// NOTE: `replaceEvery` is now written in Essence
-			// (`split(on part)::join(with replacement)`, with the empty part a
-			// no-op), so it is no longer a runtime native to test here — its
-			// behaviour, the empty part included, is covered by the stdlib
-			// golden harness.
-
 			describe("compare", () => {
 				it("orders lexicographically by code point", () => {
 					// NOTE: This is also the whole of String equality —
@@ -845,8 +825,6 @@ describe("Rewriter", () => {
 		})
 
 		describe("Integer", () => {
-			// NOTE: isNot / isOdd are implemented in Essence now (packages/standard-library/sources/Integer.es); the golden harness covers them.
-
 			describe("add", () => {
 				it("adds 2 integers correctly", () => {
 					expect(
@@ -894,12 +872,6 @@ describe("Rewriter", () => {
 					).toEqual(integer.createInteger(200n))
 				})
 			})
-
-			// NOTE: the Rational-operand entries of `add`, `multiply` and the
-			// four comparisons are written in Essence now
-			// (`packages/standard-library/sources/Integer.es`) — each is the flipped
-			// call onto Rational's own mixed entry — and the golden harness
-			// covers them. Only the Integer-Integer entries stay native above.
 
 			describe("toString", () => {
 				it("returns the correct strings", () => {
@@ -956,24 +928,12 @@ describe("Rewriter", () => {
 					).toEqual(rationalOneHalf())
 				})
 			})
-
-			// NOTE: is, isNot, compare and subtract were already Essence; the
-			// whole arithmetic cluster followed — `add`, `multiply`, `divide`,
-			// all four comparisons, `round`, `truncate`, `parse` and the
-			// no-Argument `toString` are written in Essence now
-			// (`packages/standard-library/sources/Rational.es`), on the lowest-terms
-			// accessors and `Rational.of`, and the golden harness covers every
-			// one. Only `of`, the accessors, `raise`, `squareRoot`, `compare`,
-			// the decimal `toString(as:)` and the Algebraic-operand
-			// `divide` stay native.
 		})
 
 		describe("Number", () => {
-			// NOTE: every `lowestNumber`/`highestNumber` overload is
-			// implemented in Essence now (`packages/standard-library/sources/Number.es`)
-			// — the List forms fold the pairwise ones — as are `sum`,
-			// `product` and `average`. The golden harness covers them all;
-			// only the constants and the covering `compare` stay native.
+			// NOTE: `lowest`, `highest`, `sum`, `product` and `average` are
+			// written in Essence (`packages/standard-library/sources/Number.es`),
+			// and the golden harness covers them.
 		})
 
 		describe("List", () => {
@@ -1070,8 +1030,6 @@ describe("Rewriter", () => {
 				})
 			})
 
-			// NOTE: isNot / hasItems / doesNotContain are implemented in Essence now (packages/standard-library/sources/List.es); the golden harness covers them.
-
 			describe("length", () => {
 				it("returns the number of items in the list", () => {
 					expect(list.length(listEmpty())).toEqual(integerZero())
@@ -1106,18 +1064,6 @@ describe("Rewriter", () => {
 					).toEqual(integer.createInteger(4n))
 				})
 			})
-
-			// NOTE: isEmpty / firstItem (both forms) / lastItem / removeFirst (both
-			// forms) / removeEvery (both forms) / removeLast (both forms) /
-			// prepend (both forms) / append(_:) / contains / hasItems (all
-			// three) / count (both forms) / insert / replace / sorted / repeat
-			// are implemented in Essence now
-			// (packages/standard-library/sources/List.es), so there is no runtime Function left to call
-			// here — and so is removeDuplicates, on `tally` in `Dictionary.es`.
-			// The golden harness covers them end to end; the entries of a
-			// mixed `overload` block that are still native keep their tests below.
-			// `remove(at:)` came BACK from Essence and has a describe of its own
-			// beside `slice`.
 
 			describe("append", () => {
 				// NOTE: Asked through the runtime's own `is` rather than of the
@@ -1285,10 +1231,6 @@ describe("Rewriter", () => {
 					).toEqual(optional.createValue(integerOne()))
 				})
 			})
-
-			// NOTE: `firstIndex`/`lastIndex` are written in Essence now, walking
-			// the positions with `loop` and stopping at the first match; their
-			// behaviour is covered by the golden harness over every Method.
 
 			describe("slice", () => {
 				const abcd = () =>
@@ -1740,8 +1682,6 @@ describe("Rewriter", () => {
 				})
 			})
 
-			// NOTE: isNot is implemented in Essence now (packages/standard-library/sources/Record.es); the golden harness covers it.
-
 			describe("toString", () => {
 				it("prints correctly", () => {
 					expect(record.toString(recordEmpty())).toEqual(
@@ -1761,12 +1701,9 @@ describe("Rewriter", () => {
 		})
 
 		describe("Ordering", () => {
-			// NOTE: `Ordering.is`, `isNot` and `toString` are implemented in
-			// Essence now (`packages/standard-library/sources/Ordering.es`) — the golden harness
-			// exercises them end to end. `Integer.compare` and
-			// `Rational.compare` are Essence too now (both route through the
-			// native `Number.compare`); only the runtime `anyIs` remains
-			// native and keeps its unit test.
+			// NOTE: `Ordering.is`, `isNot` and `toString` are derived for the
+			// Choice, and the golden harness covers them. The runtime `anyIs`
+			// keeps its unit test.
 			it("compares Ordering values with anyIs", () => {
 				expect(anyIs(ordering.less, ordering.less)).toBeTrue()
 				expect(anyIs(ordering.less, ordering.equal)).toBeFalse()
@@ -1782,11 +1719,11 @@ describe("Rewriter", () => {
 		})
 
 		describe("Number", () => {
-			// NOTE: `Number.is`, `isNot`, `toString` and the `isLessThan`
-			// family are implemented in Essence now
-			// (`packages/standard-library/sources/Number.es`) and covered by the golden harness.
-			// Only `compare`, the one ordering primitive they all fall
-			// out of, stays native.
+			// NOTE: `Number.is` and `toString` are written in Essence
+			// (`packages/standard-library/sources/Number.es`), `isNot` is
+			// provided by `Equatable` and the inequalities by `Comparable`, and
+			// the golden harness covers them all. `compare`, which `is` and the
+			// inequalities read, is native.
 			it("orders numerically across members", () => {
 				expect(number.compare(integerOne(), rationalOneHalf())).toBe(
 					ordering.greater,
