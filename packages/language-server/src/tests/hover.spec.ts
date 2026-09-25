@@ -1852,3 +1852,25 @@ describe("Hover over start and complete", () => {
 		expect(hover(source, { line: 2, column: 40 })).toBe("Future<Integer>")
 	})
 })
+
+describe("Hover inside a refused value", () => {
+	let source = [
+		"implementation {",
+		"\tconstant primes = [2, 3, 5]",
+		"\tconstant first = primes::reverse()[0]",
+		"}",
+	].join("\n")
+
+	it("should describe what was written in front of the brackets", () => {
+		expect(hover(source, { line: 3, column: 19 })).toBe(
+			"primes: List<Integer>",
+		)
+		expect(hover(source, { line: 3, column: 28 })).toBe(
+			"reverse<ItemType>() -> List<ItemType>",
+		)
+	})
+
+	it("should say nothing about the brackets themselves", () => {
+		expect(hover(source, { line: 3, column: 37 })).toBeNull()
+	})
+})

@@ -778,6 +778,11 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			consider(state, node.position, node.type, null)
 			visitNode(node.expression, state)
 			return
+		// NOTE: The refused value itself is an `Error` and says nothing; what
+		// was written in front of the brackets still answers.
+		case "RefusedValue":
+			visitNode(node.base, state)
+			return
 		case "Match":
 			consider(state, node.position, node.type, null)
 			visitNode(node.value, state)
