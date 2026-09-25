@@ -1,6 +1,7 @@
 import type { common } from "@essence-lang/interfaces"
 
 import { builtinNamespaces, builtinProtocols } from "../enricher/builtins"
+import { declaredCases } from "../helpers/describe"
 import { overloadIndexOf, resolveOverloadedMethodName } from "../helpers/types"
 import { withoutOverloadSuffix } from "../optimiser/purity"
 import { rewriteNodes } from "../optimiser/walk"
@@ -834,7 +835,9 @@ function readContext(program: common.typedSimple.Program): MutationContext {
 				}
 
 				if (node.nodeType === "TypeAliasStatement") {
-					for (let type of declaredCases(node.type, node.name.name)) {
+					let cases = declaredCases(node.type, node.name.name) ?? []
+
+					for (let type of cases) {
 						remember(type)
 					}
 				}
@@ -912,35 +915,6 @@ function collectCondition(
 			},
 		},
 	)
-}
-
-// NOTE: A Choice's own Cases, read off the Type Alias it erased to — the same
-// reading `instrument-coverage` does, and for the same reason: what tells a
-// Choice from an ordinary alias is that its Union is Cases, that they all
-// belong to one Choice, and that the Choice is the one the alias names.
-function declaredCases(
-	type: common.Type,
-	name: string,
-): Array<common.CaseType> {
-	if (type.type === "GenericAlias") {
-		return declaredCases(type.aliasedType, name)
-	}
-
-	if (type.type !== "UnionType" || type.types.length === 0) {
-		return []
-	}
-
-	let cases: Array<common.CaseType> = []
-
-	for (let member of type.types) {
-		if (member.type !== "Case" || member.choice !== name) {
-			return []
-		}
-
-		cases.push(member)
-	}
-
-	return cases
 }
 
 // #endregion

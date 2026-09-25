@@ -1,6 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
-import { describeType, displayChoiceName } from "../../helpers/describe"
+import { declaredCases, describeType } from "../../helpers/describe"
 import type { OptimiserPass } from "../index"
 import { rewriteNodes } from "../walk"
 
@@ -561,11 +561,7 @@ function displayMemberName(name: string): string {
 	return name.replace(overloadSuffix, "")
 }
 
-// NOTE: Every Choice the Module DECLARES. A Choice erases to a Type Alias by
-// this point, so what tells one apart from an ordinary alias is that its Union
-// is Cases, that they all belong to one Choice, and that the Choice is the one
-// the alias names — `type Answer = Optional<Integer>` is a Union of Cases too,
-// and is not a declaration of anything.
+// NOTE: Every Choice the Module declares, with the tag of each of its Cases.
 function choicesOf(
 	program: common.typedSimple.Program,
 ): Array<common.typedSimple.CoverageChoice> {
@@ -584,7 +580,9 @@ function choicesOf(
 					if (cases !== null) {
 						choices.push({
 							name: node.name.name,
-							cases,
+							cases: cases.map(
+								(member) => `${member.choice}#${member.name}`,
+							),
 							position: node.position,
 						})
 					}
@@ -596,31 +594,6 @@ function choicesOf(
 	)
 
 	return choices
-}
-
-function declaredCases(type: common.Type, name: string): Array<string> | null {
-	if (type.type === "GenericAlias") {
-		return declaredCases(type.aliasedType, name)
-	}
-
-	if (type.type !== "UnionType" || type.types.length === 0) {
-		return null
-	}
-
-	let tags: Array<string> = []
-
-	for (let member of type.types) {
-		if (
-			member.type !== "Case" ||
-			displayChoiceName(member.choice) !== name
-		) {
-			return null
-		}
-
-		tags.push(`${member.choice}#${member.name}`)
-	}
-
-	return tags
 }
 
 // #endregion

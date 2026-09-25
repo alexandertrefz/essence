@@ -78,12 +78,14 @@ const DEFINE_SOURCE = [
 	"",
 ].join("\n")
 
-function simplified(source: string = SOURCE) {
+// NOTE: A `modulePath` makes this a Module compile, as every command-line
+// compile is: its Choices are then identified by path and name together.
+function simplified(source: string = SOURCE, modulePath?: string) {
 	let parsed = parseWithDiagnostics(source)
 
 	expect(containsErrors(parsed.diagnostics)).toBe(false)
 
-	let enriched = enrich(parsed.program)
+	let enriched = enrich(parsed.program, { modulePath })
 
 	expect(containsErrors(enriched.diagnostics)).toBe(false)
 
@@ -197,6 +199,16 @@ describe("Mutation sites", () => {
 
 	it("swaps a construction for the next sibling Case", () => {
 		expect(only(sitesOf(), "case")).toEqual(["17 swap #Win for #Draw"])
+	})
+
+	// NOTE: Nothing constructs `#Draw`, so only the declaration can offer it.
+	it("swaps for the declared next sibling in a Module compile", () => {
+		let sites = enumerateMutations(
+			simplified(SOURCE, "/modules/Fixture.es"),
+			"Fixture.es",
+		)
+
+		expect(only(sites, "case")).toEqual(["17 swap #Win for #Draw"])
 	})
 
 	// NOTE: The whole reason a site can be named by a number. Two enumerations

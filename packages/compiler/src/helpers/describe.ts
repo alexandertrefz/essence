@@ -96,6 +96,37 @@ export function displayChoiceName(identity: string): string {
 	return identity.slice(identity.lastIndexOf("#") + 1)
 }
 
+// NOTE: The Cases of the Choice a Type Alias declares, or null for an alias such
+// as `type Answer = Optional<Integer>` whose Cases belong to another Choice. The
+// alias holds the written name, not the Choice's identity.
+export function declaredCases(
+	type: common.Type,
+	name: string,
+): Array<common.CaseType> | null {
+	if (type.type === "GenericAlias") {
+		return declaredCases(type.aliasedType, name)
+	}
+
+	if (type.type !== "UnionType" || type.types.length === 0) {
+		return null
+	}
+
+	let cases: Array<common.CaseType> = []
+
+	for (let member of type.types) {
+		if (
+			member.type !== "Case" ||
+			displayChoiceName(member.choice) !== name
+		) {
+			return null
+		}
+
+		cases.push(member)
+	}
+
+	return cases
+}
+
 // NOTE: The Type Arguments an applied refinement is spelled with in a HOVER, or
 // null when the bare Alias name says everything. A non-generic refinement carries
 // none at all, and an instantiation that bound every Parameter to a Parameter —
