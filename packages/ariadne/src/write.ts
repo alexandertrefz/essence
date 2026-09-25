@@ -9,9 +9,9 @@
 //   - Yes, it needs rewriting
 //   - No, you are not expected to understand it.
 //
-// This port intentionally follows the upstream logic statement-by-statement
-// (bugs included) so that its output stays verifiable against the upstream
-// snapshot test suite.
+// This port follows the upstream logic statement by statement, except where
+// the README's "Differences from upstream" lists otherwise, so that its output
+// stays verifiable against the upstream snapshot test suite.
 
 import { type Color, paint, stripAnsi } from "./color"
 import type { Config } from "./config"

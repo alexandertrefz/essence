@@ -2,9 +2,10 @@
 
 A TypeScript port of [ariadne](https://codeberg.org/zesterer/ariadne), a
 fancy compiler diagnostics & error reporting crate for Rust by Joshua
-Barretto, licensed under MIT. The renderer is a statement-by-statement port
-of upstream `src/report/write.rs` and is verified against the upstream
-snapshot test suite (see `report.spec.ts`).
+Barretto, licensed under MIT. The renderer follows upstream
+`src/report/write.rs` statement by statement, except where listed under
+[Differences from upstream](#differences-from-upstream), and is verified
+against the upstream snapshot test suite (see `report.spec.ts`).
 
 ```
 Error: can't compare apples with oranges
@@ -59,12 +60,12 @@ for everything that can be tuned.
   styling, `stripAnsi: true` additionally strips codes embedded in messages).
 - A `Report`'s `code` sits on its own line above the header, in the note
   color, rather than sharing the header line and the kind's color.
+- A source's `displayLineOffset` shifts the line numbers in the gutter as well
+  as the header location; upstream shifts only the header.
 - Character display widths use a compact approximation of the Unicode
   East-Asian-width tables rather than the full `unicode-width` data.
 
-## Package extraction
+## Dependencies
 
-This directory is deliberately self-contained (no imports from the rest of
-the compiler, no external dependencies, no runtime-specific APIs) so it can
-be extracted into a standalone package by moving the folder and adding a
-`package.json`.
+The package is self-contained: no imports from the rest of the repository,
+no external dependencies and no runtime-specific APIs.
