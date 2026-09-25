@@ -111,7 +111,7 @@ const ARITHMETIC_SWAPS = new Map<string, Array<string>>([
 
 // NOTE: Every mutation this Program admits, in walk order. Deterministic
 // throughout: the walk is the Optimiser's own, which is a fixed reading of the
-// tree, and every table above is an array rather than a set.
+// tree, and every table above is read in the order it was written.
 export function enumerateMutations(
 	program: common.typedSimple.Program,
 	module: string | null = null,
@@ -387,10 +387,11 @@ function mutateExpression(
 // tell apart rather than one — but all of them at the `define`'s OWN Position
 // rather than at the answer that moves, which is a decision about the per-line
 // cap. An arm's line carries its Condition too: `as "A" if score::isGreater\
-// ThanOrEqualTo(90)` already spends three literal nudges and two rotations
-// there, and a sixth site on that line is dropped. That is the cap working as
-// written, and it would have meant this operator never appearing on the
-// commonest ladder there is. The line a `define` opens with holds nothing else.
+// ThanOrEqualTo(90)` already offers three literal nudges and two rotations
+// there, more than `SITES_PER_LINE` keeps, so an arm swap on that line would be
+// dropped. That is the cap working as written, and it would have meant this
+// operator never appearing on the commonest ladder there is. The line a
+// `define` opens with holds nothing else.
 //
 // NOTE: Which arm moved is then the DESCRIPTION's to say, counted from one as a
 // reader counts them. The Position is the `define`, so a report points at the
