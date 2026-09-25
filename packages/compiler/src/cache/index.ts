@@ -26,7 +26,7 @@ import { fileURLToPath } from "node:url"
 // NOTE: It lives in the COMPILER rather than in a package of its own because
 // the client already depends on the Compiler and nothing depends on the client
 // — the one placement that leaves both able to reach it without a cycle, and
-// without a fourteenth package whose whole content is this file.
+// without a package of its own whose whole content is this file.
 
 // NOTE: The area is the leaf directory AND the name of the variable that moves
 // it: `compiler` is `ESSENCE_COMPILER_CACHE`, `client` is
