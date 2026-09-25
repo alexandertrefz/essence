@@ -4596,17 +4596,6 @@ function reportUndecidedAnswerType(
 
 // #region Assertions
 
-// NOTE: `expect` and `require`, which differ in exactly two things: what a
-// failure does to the rest of the test, and whether either may take a value
-// apart. Both are typed here, together, because everything else about them is
-// one thing.
-//
-// It answers with a LIST because `require MATCHER = EXPR` is three Statements:
-// the Constant holding what was asserted, the assertion itself, and one
-// Constant per name the Matcher binds. That is the same desugar a Pattern
-// Declaration does, and for the same reason: what the Matcher binds has to be
-// a name the rest of the block reads, and the value it is read off has to be
-// evaluated once.
 // NOTE: One builder for the two, because a Node whose `nodeType` is a UNION of
 // the two spellings fits neither of them — the two Statements have identical
 // fields and TypeScript still has to be told which one is being made.
@@ -6234,14 +6223,23 @@ function enrichSnapshotValue(
 	}
 }
 
+// NOTE: `expect` and `require`, which differ in exactly two things: what a
+// failure does to the rest of the test, and whether either may take a value
+// apart. Both are typed here, together, because everything else about them is
+// one thing.
+//
+// It answers with a LIST because `require MATCHER = EXPR` is three Statements:
+// the Constant holding what was asserted, the assertion itself, and one
+// Constant per name the Matcher binds. That is the same desugar a Pattern
+// Declaration does, and for the same reason: what the Matcher binds has to be
+// a name the rest of the block reads, and the value it is read off has to be
+// evaluated once.
 function enrichAssertionStatement(
 	node: parser.ExpectStatementNode | parser.RequireStatementNode,
 	scope: enricher.Scope,
 ): Array<common.typed.ImplementationNode> {
-	// NOTE: The Boolean form asserts an Expression and reads it once, so there
-	// is nothing to hold and nothing to bind. The Validator is what refuses a
-	// value that is no Boolean, where `condition-not-boolean` is refused, so
-	// that the two questions are answered in one place and read alike.
+	// NOTE: A snapshot compares the value as it prints, so it holds nothing and
+	// binds nothing.
 	if (node.snapshot !== null) {
 		return [
 			assertionNode(
@@ -6266,6 +6264,9 @@ function enrichAssertionStatement(
 		]
 	}
 
+	// NOTE: The Boolean form asserts an Expression and reads it once, so there
+	// is nothing to hold and nothing to bind. The Validator refuses a value that
+	// is no Boolean, as `expect-not-boolean`.
 	if (node.matcher === null) {
 		return [
 			assertionNode(
