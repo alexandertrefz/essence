@@ -19,9 +19,8 @@ export function conformanceParameterName(genericName: string): string {
 // purpose: the Lexer reads `_` as a Symbol, so no Identifier holds one, and the
 // `$` keeps it clear of the Rewriter's own `_self`.
 //
-// Asked in three places that can none of them see the Enricher's own flag: a
-// Hover reads a typed Identifier, the debug adapter reads a JavaScript binding
-// name, and a Diagnostic reads whatever the Validator was handed. They must
+// Asked where the Enricher's own flag can not be seen: a Hover reads a typed
+// Identifier, and the debug adapter reads a JavaScript binding name. They must
 // agree, so they agree here.
 export function isSynthesizedName(name: string): boolean {
 	return /^\$(pattern|parameter)_\d+_\d+$/.test(name)

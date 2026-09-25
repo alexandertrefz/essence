@@ -33,11 +33,10 @@ export type PatternBinding = {
 }
 
 // NOTE: Every name a Pattern brings into scope, in source order, whatever the
-// nesting. Four stages need exactly this list and must never disagree about
+// nesting. Every reader needs exactly this list and must never disagree about
 // it: the Enricher desugars one Constant per entry, the Module linker reports
-// a Declaration per entry so a top-level Pattern can be exported, the Language
-// Server declares a rename target per entry, and the Validator counts them to
-// tell a Pattern that binds nothing from one that binds.
+// a Declaration per entry so a top-level Pattern can be exported, and the
+// Language Server declares a rename target per entry.
 //
 // A `name = literal` member contributes nothing — it constrains the value and
 // the value is written right there, so there is no name to bring in.
