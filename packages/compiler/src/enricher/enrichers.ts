@@ -2559,26 +2559,11 @@ function enrichInterpolatedStringValue(
 	}
 }
 
-// NOTE: A Future or a Started in a hole, which is the forgotten `complete`
-// wearing another Diagnostic's clothes: `"{fetched()}"` was told that a
-// `Future<Integer>` is not Printable and left to work out why an Integer-shaped
-// thing is not one. What is missing is the word, and what the hole would print
-// is what the work answers with — so this says both, in the voice the Validator
-// and `unknown-method` already say them in.
-//
-// The word is only offered where it may STAND: `complete` waits inside a body
-// that answers a Future and at a Program's top level, and nowhere else — the
-// rule `asynchronyEvidence` follows, and the reason the Help is replaced by a
-// Note about the enclosing Function's Type in every other position. The
-// `asynchrony-mismatch` payload rides along wherever the word may be written,
-// which is what the Quick Fix inserting it reads.
-//
-// Null for every other hole, which leaves `interpolation-not-printable` exactly
-// as it was for an Optional and a bare Union.
 // NOTE: What a hole that can not print its value is told, which is three
 // different things:
 //
-// - A Future or a Started is the forgotten `complete` above.
+// - A Future or a Started is the forgotten `complete`, which
+//   `unwaitedWorkReport` describes.
 // - A Type PARAMETER is a missing BOUND, and the Union Help is unfollowable for
 //   one: `Item` is no Union to match apart and no Optional to unwrap, and a
 //   reader who tried had nothing to write a Case for. Whose Parameter it is
@@ -12731,17 +12716,6 @@ function reportUnboundGenerics(
 	}
 }
 
-// NOTE: The Arguments of a `::` call as matching reads them, with the receiver
-// unshifted in front of them: it occupies the first Parameter of every
-// non-static Method signature. One builder for selection and for the report that
-// explains a failed selection — a second spelling of this list would be a second
-// answer to what the call passed, and the report would be describing a call
-// nothing resolved.
-//
-// `receiverType` stands in for the receiver where a Union receiver's dispatch
-// resolves the Method once per member, so each member is matched as if the
-// receiver had that Type. Otherwise the receiver is the Type the base was
-// already enriched to.
 // NOTE: What every written Argument offers a match — its label, its Type under
 // whichever Parameter Type is being tried, and the four answers only the typer
 // can give. Spelled once for the three sites that build it, which had three
@@ -12764,9 +12738,17 @@ function argumentMatchables(
 	}))
 }
 
-// NOTE: And the same, with the RECEIVER in front of them: a `::` call matches
-// its receiver as an Argument like any other, which is what lets one Method
-// signature carry both.
+// NOTE: The Arguments of a `::` call as matching reads them, with the receiver
+// unshifted in front of them: it occupies the first Parameter of every
+// non-static Method signature. One builder for selection and for the report that
+// explains a failed selection — a second spelling of this list would be a second
+// answer to what the call passed, and the report would be describing a call
+// nothing resolved.
+//
+// `receiverType` stands in for the receiver where a Union receiver's dispatch
+// resolves the Method once per member, so each member is matched as if the
+// receiver had that Type. Otherwise the receiver is the Type the base was
+// already enriched to.
 function methodMatchableArguments(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
@@ -12982,11 +12964,6 @@ function unimportedNamespaceHelps(
 		)
 }
 
-// NOTE: The Namespaces that were searched are the useful half of "no such
-// Method" — without them the reader can not tell whether they misspelled the
-// Method or the value is not the Type they thought it was. The near miss is
-// offered from the same set, so a suggestion is always a Method that would
-// actually resolve.
 // NOTE: Every Method name a set of Namespaces declares, for the near miss two
 // unknown-method reports each want — the one for a plain receiver, and the one
 // per-member dispatch raises for a Union.
@@ -13355,6 +13332,11 @@ function asynchronyEvidence(
 	}
 }
 
+// NOTE: The Namespaces that were searched are the useful half of "no such
+// Method" — without them the reader can not tell whether they misspelled the
+// Method or the value is not the Type they thought it was. The near miss is
+// offered from the same set, so a suggestion is always a Method that would
+// actually resolve.
 function reportUnknownMethod(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
@@ -17845,25 +17827,6 @@ function resolveMatcherBindings(
 	]
 }
 
-// NOTE: What a Case Matcher's payload Pattern REQUIRES, keyed by the dotted
-// spine that reaches each requirement from the matched value. Without it a
-// payload Pattern would say where to read and never what must be there:
-// `case #Fired({ x, y })` on a `Fired { payload: Click | KeyPress }` would
-// accept every `#Fired` and then read `x` off a KeyPress.
-//
-// Beside the Matcher rather than inside it, which is the same split
-// `memberLiterals` makes and for the same reason: `matcher` says WHICH ARM this
-// is, and the Validator reads it to decide both coverage and reachability.
-// Narrowing it would claim the Case is only partly handled AND that the Handler
-// is dead — the second of which is plainly false.
-//
-// Only the member the Pattern's own spine reaches is required. Anything deeper
-// is already inside that requirement, because a Pattern's Type is a Record whose
-// members are Records in turn, and the runtime check walks the whole of it.
-//
-// The value-constrained members are collected on the way, under the same
-// spines — which is where the tie-break shows in the emitted test: the Record
-// reading compares `@.width`, the shorthand reading `@.state.index`.
 // NOTE: A payload Pattern naming a member no arm of the payload carries. The
 // same shape `reportUnknownMember` writes for a Lookup, because it is the same
 // mistake — the Pattern reads a member off the payload, and the payload has not
@@ -17902,6 +17865,25 @@ function reportUnknownPayloadMember(
 	)
 }
 
+// NOTE: What a Case Matcher's payload Pattern REQUIRES, keyed by the dotted
+// spine that reaches each requirement from the matched value. Without it a
+// payload Pattern would say where to read and never what must be there:
+// `case #Fired({ x, y })` on a `Fired { payload: Click | KeyPress }` would
+// accept every `#Fired` and then read `x` off a KeyPress.
+//
+// Beside the Matcher rather than inside it, which is the same split
+// `memberLiterals` makes and for the same reason: `matcher` says WHICH ARM this
+// is, and the Validator reads it to decide both coverage and reachability.
+// Narrowing it would claim the Case is only partly handled AND that the Handler
+// is dead — the second of which is plainly false.
+//
+// Only the member the Pattern's own spine reaches is required. Anything deeper
+// is already inside that requirement, because a Pattern's Type is a Record whose
+// members are Records in turn, and the runtime check walks the whole of it.
+//
+// The value-constrained members are collected on the way, under the same
+// spines — which is where the tie-break shows in the emitted test: the Record
+// reading compares `@.width`, the shorthand reading `@.state.index`.
 type PayloadRequirements = {
 	// NOTE: What the Handler TESTS, keyed by dotted spine.
 	memberTypes: Record<string, common.Type> | null
