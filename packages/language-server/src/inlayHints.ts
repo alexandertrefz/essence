@@ -225,6 +225,9 @@ function visitNode(node: common.typed.ImplementationNode, hints: Hints) {
 		case "Complete":
 			visitNode(node.expression, hints)
 			return
+		case "RefusedValue":
+			visitNode(node.base, hints)
+			return
 		case "Combination":
 			visitNode(node.lhs, hints)
 			visitNode(node.rhs, hints)

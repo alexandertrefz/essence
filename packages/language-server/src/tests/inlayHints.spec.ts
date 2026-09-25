@@ -996,3 +996,18 @@ describe("Inlay Hints that write a name", () => {
 		expect(analyseDocument(applyHints(source)).diagnostics).toEqual([])
 	})
 })
+
+describe("Inlay Hints inside a refused value", () => {
+	it("should annotate a contextual Function literal written in front of the brackets", () => {
+		let source = [
+			"implementation {",
+			"\tconstant first = [1]::removeEvery(where (item) { <- true })[0]",
+			"}",
+		].join("\n")
+
+		let labels = hintsOf(source).map((hint) => hint.label)
+
+		expect(labels).toContain(": Integer")
+		expect(labels).toContain(" -> Boolean")
+	})
+})
