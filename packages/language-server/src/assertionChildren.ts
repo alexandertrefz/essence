@@ -7,8 +7,8 @@ import { matcherValueExpressions } from "./matchHandlerChildren"
 // no body to descend into. So a walker that has no case for them descends into
 // nothing at all, and the whole of a test body is invisible to it. This is the
 // one answer to "what is written inside an assertion", asked the way
-// `matchHandlerChildren` asks it of a Match Handler, so that the fourteen
-// walkers below can not disagree about it.
+// `matchHandlerChildren` asks it of a Match Handler, so that the walkers
+// reading it can not disagree about it.
 //
 // Returned in SOURCE order — the Matcher stands left of the `=` — so a walker
 // searching for the first match in a document finds it where it lexically is.
@@ -20,7 +20,7 @@ type TypedAssertion =
 	| common.typed.RequireStatementNode
 
 // NOTE: A Matcher's own Expressions are the values it constrains members
-// against — `require { points = total } = standing` — which is the same
+// against, the `3` of `require { points = 3 } = standing`, which is the same
 // question a Match Handler asks, reached from the other side of the grammar.
 export function assertionExpressions(
 	node: ParsedAssertion,

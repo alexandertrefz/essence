@@ -1071,8 +1071,8 @@ function findProbeReceiverInNode(
 			return null
 		}
 		// NOTE: What an assertion asserts, and the values its Matcher compares
-		// against — `require { points = total.|  } = standing`. Where a Matcher
-		// was written the asserted Expression is a synthesized name and the
+		// against. Where a Matcher was written, as in `require { points = 3 } =
+		// standing.|`, the asserted Expression is a synthesized name and the
 		// Expression itself is the Statement in front of this one, which this
 		// walk reaches on its own.
 		case "ExpectStatement":
