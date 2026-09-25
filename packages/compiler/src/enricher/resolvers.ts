@@ -1736,9 +1736,9 @@ export function resolveIdentifierType(
 			// the thing that reaches it, and that is evidence from the site
 			// rather than a guess.
 			//
-			// A Namespace merely in SCOPE is the weaker half of that. Sixteen
-			// plain lowercase names — `head`, `write`, `get`, `send` — are
-			// statics of the prelude, and a `head` written one line under
+			// A Namespace merely in SCOPE is the weaker half of that. Plain
+			// lowercase names — `head`, `write`, `get`, `send` — are statics of
+			// the prelude, and a `head` written one line under
 			// `constant heads = [1, 2]` is a misspelling of the Constant far
 			// more often than it is `Http.head` without its Namespace. So the
 			// near miss is asked there too, and it LEADS where there is one: it

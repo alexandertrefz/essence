@@ -264,9 +264,9 @@ export const enrich = (
 			// NOTE: The collector opens AFTER the builtin tables are built, and
 			// that is not a matter of taste either. Building them is what loads
 			// the standard library on the first call of a process, and that
-			// load enriches ~20 OTHER files — every annotation in every one of
-			// them would land in THIS document's index, at Positions that mean
-			// nothing here.
+			// load enriches every library file — every annotation in every one
+			// of them would land in THIS document's index, at Positions that
+			// mean nothing here.
 			let collected = collectAnnotations(enrichSections)
 
 			annotations = collected.annotations
