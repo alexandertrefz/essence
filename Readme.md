@@ -52,8 +52,8 @@ You can find the most recent and working example of syntax in [HelloWorld.es](pa
 as well as the other files in [packages/fixtures/files](packages/fixtures/files). It also should be noted that the
 syntax is meant to be viewed with a font with code ligatures, like FiraCode.
 
-The standard library is written in Essence and lives in [packages/standard-library/sources](packages/standard-library/sources); its
-[README](packages/standard-library/README.md) is the most substantial writing about the language there is.
+The standard library is written in Essence and lives in [packages/standard-library/sources](packages/standard-library/sources).
+The language itself is documented at [essencelang.org](https://essencelang.org), built from [packages/website](packages/website).
 
 # Examples
 Four larger programs, each with a README saying what it shows and a test keeping it honest:
@@ -287,4 +287,5 @@ nothing else, so it wants the server's own entry point rather than the `essence 
 server's TypeScript directly, so there is no bundle to rebuild.
 
 # Disclaimer
-This language is still a work in progress. It is not ready for use yet and there is no documentation as most things are in flux. Generally: Here be dragons!
+This language is still a work in progress. It is not ready for use yet and most things are in flux; the documentation at
+[essencelang.org](https://essencelang.org) describes the current release. Generally: Here be dragons!

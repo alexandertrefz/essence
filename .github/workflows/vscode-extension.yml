@@ -1,8 +1,7 @@
 # NOTE: This builds the extension and attaches the `.vsix` to a release; it
-# does not publish to the Marketplace or to Open VSX. Publishing needs a
-# publisher account and a PAT held as a repository secret, neither of which
-# exists yet — when they do, it is an additional job here, next to `release`,
-# and nothing below has to change for it.
+# does not publish to the Marketplace or to Open VSX. Publishing is done by
+# hand as the `essence` publisher, as `packages/vscode-extension/DEVELOPMENT.md`
+# describes.
 #
 # NOTE: The `.vsix` is self-contained. `bun run package` bundles the Language
 # Server and the extension itself, and `--no-dependencies` stops vsce walking
