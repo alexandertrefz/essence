@@ -110,13 +110,13 @@ function refuseUnexpectedCycles(graph: ModuleGraph): void {
 }
 
 // NOTE: A standard library file that writes no `export { … }` block offers
-// everything it declares. The builtin tables are built from the export SURFACES,
-// and a surface forwards only what its block lists — so without this a file with
-// no block would contribute nothing and the name would simply not exist in the
-// language. Writing the block out is what a source SHOULD do, and every file in
-// `packages/standard-library/sources` does; this is what keeps a library assembled in a
-// test from having to, and what makes the rule "everything declared is a
-// builtin" hold whether or not the block was written.
+// everything it declares. The builtin tables are built from the export
+// SURFACES, and a surface forwards only what its block lists — so without this
+// a file with no block would contribute nothing and the name would simply not
+// exist in the language. Writing the block out is what a source SHOULD do, and
+// every file in `packages/standard-library/sources` does; this is what keeps a
+// library assembled in a test from having to, and what makes the rule
+// "everything declared is a builtin" hold whether or not the block was written.
 function exportingEverything(program: parser.Program): parser.Program {
 	if (program.exports !== null) {
 		return program
@@ -204,9 +204,9 @@ type StdlibSource = {
 
 export type Stdlib = {
 	// NOTE: The three Scope tables the Enricher and the Language Server start
-	// from — everything `packages/standard-library/sources/*.es` declared, listed in
-	// `builtinMemberOrder`/`builtinTypeOrder`. `members` also carries the
-	// native Functions, which have no Namespace to be declared in.
+	// from — everything `packages/standard-library/sources/*.es` declared,
+	// listed in `builtinMemberOrder`/`builtinTypeOrder`. `members` also carries
+	// the free Functions, which have no Namespace to be declared in.
 	members: Record<string, common.Type>
 	types: Record<string, common.Type>
 	protocols: Record<string, common.ProtocolType>
@@ -286,9 +286,9 @@ function throwOnAnyDiagnostics(
 // Two callers, for two different reasons:
 //
 //   - The loader, to know which of the names now in the bootstrap Scope came
-//     from a standard library FILE rather than from `nativeFunctions` or
-//     `primitiveTypes` — those are the ones whose Documentation Positions have
-//     to be stripped, because a builtin is sourceless to every consumer.
+//     from a standard library FILE rather than from `primitiveTypes` — those
+//     are the ones whose Documentation Positions have to be stripped, because
+//     a builtin is sourceless to every consumer.
 //   - `documents.ts`, to tell the Enricher which builtins a USER Program
 //     shadows with a declaration of its own.
 //
@@ -371,12 +371,14 @@ function inBuiltinOrder<Entry>(
 // NOTE: A Documentation Position read out of a standard library file points
 // into a file no consumer of these tables has opened — Hover, Signature Help
 // and `go to definition` all treat a builtin as SOURCELESS, and would otherwise
-// offer to jump into `packages/standard-library/sources/List.es` from a user's project. Stripping it
-// here makes it impossible to hand out a Position with no file attached.
+// offer to jump into `packages/standard-library/sources/List.es` from a user's
+// project. Stripping it here makes it impossible to hand out a Position with no
+// file attached.
 //
 // NOTE: The Language Server DOES open the standard library sources — as
 // ordinary documents, enriched in their own right. That path never goes through
-// this loader, so `go to definition` inside `packages/standard-library/sources` keeps working.
+// this loader, so `go to definition` inside `packages/standard-library/sources`
+// keeps working.
 function stripPosition(documentation: common.Documentation | undefined): void {
 	if (documentation != null) {
 		documentation.position = null
@@ -549,8 +551,8 @@ export function loadStdlibFrom(
 	// tables alone, so a file writing `import { from "./Integer.es" { Integer } }`
 	// would otherwise collide with the TAG rather than with the Namespace it
 	// asked for, be refused as a `duplicate-import`, and lose Integer dispatch
-	// entirely. Every one of the eight tags is also a Namespace some file
-	// declares, so that would fire eight ways over.
+	// entirely. Every tag is also a Namespace some file declares, so that would
+	// fire once per tag.
 	//
 	// It costs one thing, stated here rather than left to be discovered: a
 	// standard library file writing `type Integer = …` now shadows the tag
@@ -775,9 +777,10 @@ export function parseStdlibSource(
 	return { fileName, sourceText, program, diagnostics }
 }
 
-// NOTE: `@essence-lang/standard-library` finds and reads the files — it owns them, so it is
-// the one that knows where they are, and it hands them over already sorted.
-// Parsing is what stays here, because parsing is the Compiler's half.
+// NOTE: `@essence-lang/standard-library` finds and reads the files — it owns
+// them, so it is the one that knows where they are, and it hands them over
+// already sorted. Parsing is what stays here, because parsing is the Compiler's
+// half.
 function readStdlibSources(): {
 	sources: Array<StdlibSource>
 	parseDuration: number
@@ -820,11 +823,10 @@ function isStdlib(value: unknown): boolean {
 // once no matter how many files are compiled.
 //
 // NOTE: And once per MACHINE rather than once per process, through the
-// snapshot. Reading seventeen files, parsing, enriching and validating them
-// costs seventy milliseconds and produces a value that depends on nothing a
-// user typed — paid by every `esc`, by every worker thread, by every Language
-// Server start and by every Debug Adapter session. Deserialising the finished
-// object costs under two.
+// snapshot. Reading, parsing, enriching and validating the files produces a
+// value that depends on nothing a user typed, and would be paid by every `esc`,
+// every worker thread, every Language Server start and every Debug Adapter
+// session; deserialising the finished object costs a small part of that.
 let cachedStdlib: Stdlib | null = null
 
 // NOTE: The library built from the standard library ON DISK, as opposed to
