@@ -949,6 +949,29 @@ describe("Hover inside a Protocol or Choice declaration", () => {
 		)
 	})
 
+	it("should describe what a provided Method's body reads", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Ranked {",
+			"\t\tisAbove(_ mark: Integer) -> Boolean",
+			"",
+			"\t\tisAtMost(_ mark: Integer) -> Boolean {",
+			"\t\t\tconstant flipped = @::isAbove(mark)::negate()",
+			"\t\t\t<- flipped",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 6, column: 14 })).toBe("flipped: Boolean")
+		expect(hover(source, { line: 6, column: 28 })).toBe(
+			"isAbove(_ Integer) -> Boolean",
+		)
+		expect(hover(source, { line: 6, column: 35 })).toBe("mark: Integer")
+		expect(hover(source, { line: 7, column: 8 })).toBe("flipped: Boolean")
+		expect(hover(source, { line: 5, column: 15 })).toBe("mark: Integer")
+	})
+
 	it("should describe a Choice's Type Parameters and payload members", () => {
 		let source = [
 			"implementation {",

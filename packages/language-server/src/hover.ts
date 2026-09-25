@@ -629,6 +629,21 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				}
 			}
 
+			// NOTE: A provided Method's name and signature head are answered off
+			// the parsed source by `visitProtocolBodies`; its Parameters and body
+			// are typed here.
+			for (let member of Object.values(node.methods)) {
+				let methods =
+					member.nodeType === "OverloadedMethod" ||
+					member.nodeType === "OverloadedStaticMethod"
+						? member.methods
+						: [member.method]
+
+				for (let method of methods) {
+					visitFunctionDefinition(method.value, state)
+				}
+			}
+
 			return
 		}
 		case "IfStatement":
