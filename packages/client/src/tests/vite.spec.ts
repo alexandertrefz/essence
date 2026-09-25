@@ -156,8 +156,8 @@ async function changed(server: ViteDevServer, file: string): Promise<void> {
 		Date.now(),
 		...modules.map((module) => module.lastHMRTimestamp + 1),
 	)
-	// NOTE: Under bun's own per-test timeout of five seconds, for the reason
-	// `client.spec.ts` gives: a wait that gives up after the test already
+	// NOTE: Under the per-test budget `scripts/testBudget.ts` sets, for the
+	// reason `client.spec.ts` gives: a wait that gives up after the test already
 	// has throws where nobody is listening, and bun reports that as a second
 	// failure between tests, attributed to nothing.
 	let deadline = Date.now() + 4_000

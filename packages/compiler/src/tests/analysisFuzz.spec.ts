@@ -264,15 +264,9 @@ const mutants = files.flatMap((file) =>
 	mutantsOf(file).map((mutation) => ({ file: file.name, mutation })),
 )
 
-// NOTE: Every sweep below carries an explicit 60,000 ms instead of Bun's
-// default 5,000. None of them is a performance assertion: each walks a FIXED
-// set of a few hundred mutants and stops, so the only thing the default budget
-// ever measured was how busy the machine was — `never throws and never blames
-// itself` takes ~1,000 ms on an idle host and timed out at 6,314 ms under a
-// load average of 15, with three other test suites running beside it. A budget
-// no load can reach is the honest way to say "this is bounded work, not a
-// stopwatch", and it is the number `dap.spec.ts` and `testWatch.spec.ts`
-// already give their own long specs.
+// NOTE: The sweeps write out the budget `scripts/testBudget.ts` gives every
+// spec. None of them is a performance assertion: each walks a fixed set of a
+// few hundred mutants and stops.
 
 describe("analysing a broken Program", () => {
 	it("has a corpus to break", () => {

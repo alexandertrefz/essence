@@ -417,11 +417,11 @@ function listeners(): {
 		waiting: Array<(value: Value) => void>,
 		what: string,
 	): Promise<Value> =>
-		// NOTE: Under bun's own per-test timeout of five seconds, and
-		// deliberately so. A deadline that fires AFTER the test has already
-		// timed out rejects a Promise nobody is waiting on any more, which
-		// bun reports as an "unhandled error between tests" — a second
-		// failure, unattributed, for the price of one.
+		// NOTE: Under the per-test budget `scripts/testBudget.ts` sets, and
+		// deliberately so. A deadline that fires after the test has timed
+		// out rejects a Promise nobody is waiting on, which bun reports as an
+		// unattributed "unhandled error between tests": a second failure for
+		// the price of one.
 		new Promise((resolve, reject) => {
 			let timeout = setTimeout(
 				() => reject(new Error(`No ${what} arrived within 4 seconds.`)),
