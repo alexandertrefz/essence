@@ -1306,8 +1306,10 @@ function validateFunctionInvocation(
 			node.position,
 		)
 	} else {
-		// Dynamic methods, being called in a manually via `.` are being validated here,
-		// as opposed to methods that are being called with `::` which get validated by `validateMethodInvocation`
+		// NOTE: Every other callee: a Method with a receiver called through
+		// `.`, as `Namespace.method(…)`, and an Overload set, an `overload
+		// function` called by its name among them. A `::` call is
+		// `validateMethodInvocation`'s.
 		if (
 			functionType.type === "OverloadedMethod" ||
 			functionType.type === "OverloadedStaticMethod"
