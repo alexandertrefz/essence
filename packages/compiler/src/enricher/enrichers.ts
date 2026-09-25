@@ -3936,14 +3936,6 @@ function resolveMatcher(
 	}
 }
 
-// NOTE: `start expr` — a `Future<Value>` becomes the `Started<Value>` that
-// stands for one run of it. Nothing about this waits, so it asks nothing of the
-// body it stands in and is legal wherever an Expression is.
-//
-// NOTE: An operand that is not a Future is answered with ITSELF rather than with
-// an Error Type. The Warning below says what is wrong, and a Program that then
-// reads the value goes on reading exactly what it wrote down — an Error Type
-// here would cascade a second Diagnostic through everything the value reaches.
 // NOTE: What `start` and `complete` answer with, MEMBER BY MEMBER. A Union of
 // work is reachable from a `define`, a `match` or an `if` whose arms answer
 // different Future Types, and the runtime answers each member on its own: a
@@ -3982,6 +3974,14 @@ function unwrapWork(
 	return unwrapped ? buildUnion(members) : null
 }
 
+// NOTE: `start expr` — a `Future<Value>` becomes the `Started<Value>` that
+// stands for one run of it. Nothing about this waits, so it asks nothing of the
+// body it stands in and is legal wherever an Expression is.
+//
+// NOTE: An operand that is not a Future is answered with ITSELF rather than with
+// an Error Type. The Warning below says what is wrong, and a Program that then
+// reads the value goes on reading exactly what it wrote down — an Error Type
+// here would cascade a second Diagnostic through everything the value reaches.
 function enrichStart(
 	node: parser.StartNode,
 	scope: enricher.Scope,
@@ -6112,12 +6112,7 @@ function refuseUngeneratableType(
 
 	return null
 }
-// NOTE: What a snapshot RECORDS: the asserted value rendered through
-// `Printable`, which is the Protocol the design names — so a Type that says
-// what it looks like is recorded in that form rather than in a structural dump
-// of its members. It is built as the interpolation an author could have written
-// (`"{value}"`), which is the one lowering of `toString` the whole Compiler
-// already has, witness and all.
+
 // NOTE: A value that is a Function, under every spelling the Type union has for
 // one. It is the one shape `snapshot-not-printable` can not offer a conformance
 // to: a Namespace targets a Type a reader can NAME, and none of these is one.
@@ -6131,6 +6126,12 @@ function isFunctionType(type: common.Type): boolean {
 	)
 }
 
+// NOTE: What a snapshot RECORDS: the asserted value rendered through
+// `Printable`, which is the Protocol the design names — so a Type that says
+// what it looks like is recorded in that form rather than in a structural dump
+// of its members. It is built as the interpolation an author could have written
+// (`"{value}"`), which is the one lowering of `toString` the whole Compiler
+// already has, witness and all.
 function enrichSnapshotValue(
 	node: parser.ExpressionNode,
 	scope: enricher.Scope,
@@ -7238,28 +7239,6 @@ function enrichNamespaceDefinitionStatement(
 	}
 }
 
-// NOTE: Threads each conditional conformance's bounds into the Methods that
-// fulfil it, in place on the Namespace Type, and answers the Generic
-// Declarations to inject into their typed Nodes. Run TWICE for every hoisted
-// Namespace — once speculatively while it hoists, so a use site above the
-// Statement solves against the bounded Type, and once from the Statement, which
-// is the only pass with typed Nodes to inject into. Idempotent on the Type:
-// `retainNamespaceBounds` retains and bounds the same set every time.
-//
-// `report` is off for the speculative pass: a Diagnostic during hoisting keeps
-// the Namespace out of Scope entirely. The injected Declarations are built in
-// the reporting pass alone — resolving a Generic's default Type can report as
-// well, and they have nowhere to go until there are typed Nodes.
-// NOTE: The two `<…>` entries a Method may write against one of the Namespace's
-// OWN Type Parameters that are not per-Method bounds and can not be read as one.
-// Reported once, from the reporting pass, and never from the hoist: a Diagnostic
-// there keeps the whole Namespace out of Scope.
-//
-// Both are refusals of a SPELLING, not of an intention. `splitMethodGenerics`
-// has already taken the entry out of the Method's own Generics, so the analysis
-// that follows sees the Namespace's Parameter and one mistake gives one
-// Diagnostic — the second of the two is even read as the bound it means, so a
-// Program carrying it still resolves everywhere else.
 // NOTE: One `<…>` naming a Type Parameter twice. Only one of the two can take
 // effect — every reader downstream keys a Generic list by name, and the LAST
 // writing wins — so the first was dropped in silence, which is how
@@ -7329,6 +7308,16 @@ function refuseDuplicateTypeParameters(
 	}
 }
 
+// NOTE: The two `<…>` entries a Method may write against one of the Namespace's
+// OWN Type Parameters that are not per-Method bounds and can not be read as one.
+// Reported once, from the reporting pass, and never from the hoist: a Diagnostic
+// there keeps the whole Namespace out of Scope.
+//
+// Both are refusals of a SPELLING, not of an intention. `splitMethodGenerics`
+// has already taken the entry out of the Method's own Generics, so the analysis
+// that follows sees the Namespace's Parameter and one mistake gives one
+// Diagnostic — the second of the two is even read as the bound it means, so a
+// Program carrying it still resolves everywhere else.
 function refuseMalformedMethodBounds(
 	node: parser.NamespaceDefinitionStatementNode,
 	type: common.NamespaceType,
@@ -7476,9 +7465,8 @@ function refuseMalformedMethodBounds(
 	}
 }
 
-// NOTE: Every `<…>` entry a Namespace Method writes, across every form of it,
-// flattened — the reporting above is about entries one at a time and has no use
-// for which Overload each came from.
+// NOTE: Every `<…>` list a Namespace Method writes, one per form, for the
+// question that is asked of one list at a time.
 function methodGenericForms(
 	method: parser.NamespaceMethods[string],
 ): Array<Array<parser.GenericDeclarationNode>> {
@@ -7498,6 +7486,9 @@ function methodGenericForms(
 	}
 }
 
+// NOTE: Every `<…>` entry a Namespace Method writes, across every form of it,
+// flattened — for the reporting that is about entries one at a time and has no
+// use for which Overload each came from.
 function methodGenericEntries(
 	method: parser.NamespaceMethods[string],
 ): Array<parser.GenericDeclarationNode> {
@@ -7517,6 +7508,18 @@ function methodGenericEntries(
 	}
 }
 
+// NOTE: Threads each conditional conformance's bounds into the Methods that
+// fulfil it, in place on the Namespace Type, and answers the Generic
+// Declarations to inject into their typed Nodes. Run TWICE for every hoisted
+// Namespace — once speculatively while it hoists, so a use site above the
+// Statement solves against the bounded Type, and once from the Statement, which
+// is the only pass with typed Nodes to inject into. Idempotent on the Type:
+// `retainNamespaceBounds` retains and bounds the same set every time.
+//
+// `report` is off for the speculative pass: a Diagnostic during hoisting keeps
+// the Namespace out of Scope entirely. The injected Declarations are built in
+// the reporting pass alone — resolving a Generic's default Type can report as
+// well, and they have nowhere to go until there are typed Nodes.
 function weaveMethodBounds(
 	node: parser.NamespaceDefinitionStatementNode,
 	type: common.NamespaceType,
