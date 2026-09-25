@@ -10,12 +10,12 @@ import type { AnyType } from "./type"
 // exactly what it holds — it copies the Array and undoes the writes made since,
 // which is the copy `replace` used to make, deferred to whoever actually reads.
 //
-// NOTE: The log lives in a Module of its own for the reason `keyEncoding.ts`
-// does: `type.ts` is the Module EVERY Program carries and it walks a List's runs
-// raw rather than reaching into `List.ts`, which would tie the two in a cycle.
-// A box left behind has to catch up before anything reads its items, type tests
-// included, so the catching up has to be reachable from both sides. Nothing here
-// writes a List literal — that stays `List.ts`'s alone.
+// NOTE: The log lives in a Module of its own because `type.ts` is the Module
+// EVERY Program carries and it walks a List's runs raw rather than reaching
+// into `List.ts`, which would tie the two in a cycle. A box left behind has to
+// catch up before anything reads its items, type tests included, so the
+// catching up has to be reachable from both sides. Nothing here writes a List
+// literal — that stays `List.ts`'s alone.
 export type WriteLog<ItemType extends AnyType> = {
 	// NOTE: `version` counts the writes applied to the Array, and is always the
 	// number of entries: entry k says what stood at `positions[k]` before the

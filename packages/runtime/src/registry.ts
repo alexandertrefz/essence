@@ -68,8 +68,8 @@ export function caseText(tag: string): string {
 		: tag.slice(tag.lastIndexOf("#", separator - 1) + 1)
 }
 
-// NOTE: How the printer renders a value it does not know: the same four
-// arguments `getStringRepresentation` carries, handed back so a registered
+// NOTE: How the printer renders a value it does not know: the first four
+// arguments `getStringRepresentation` takes, handed back so a registered
 // renderer can render what its value HOLDS through the one walk rather than
 // through a second reading of it.
 export type RenderPart = (
