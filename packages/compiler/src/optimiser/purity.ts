@@ -13,17 +13,16 @@ import type { common } from "@essence-lang/interfaces"
 // optimisation, and a wrong one costs a `Terminal.print`.
 //
 // NOTE: What "matters" means, exactly, in the language as it stands:
-//   - it PRINTS. `Terminal` is the only observable effect a Program has —
-//     `write` reaches a stream and `inspect` reaches stdout, and `print` is
-//     written on `write`.
-//   - it ASSIGNS. A variable assignment is the only mutation there is, and it
-//     is an Expression here as well as a Statement.
+//   - it PRINTS or STARTS. `Terminal` writes and reads the host's streams, and
+//     `print` is written on `write`. Work that is started, an `Http.send`
+//     among it, reaches the host as well.
+//   - it ASSIGNS or DRAWS. A variable assignment is an Expression here as well
+//     as a Statement, and a draw advances the `Randomness` it reads.
 //   - it DIVERGES or THROWS. Neither is an effect the language offers on
-//     purpose — the throws are `noCaseMatched` and the descriptor's own
-//     Compiler-bug guard — but a Program that stops running is telling its
-//     author something, and skipping the call that would have stopped it is
-//     not an optimisation. A Function call may reach any of the three, and
-//     recursion may reach none of them and still never come back.
+//     purpose, but a Program that stops running is telling its author
+//     something, and skipping the call that would have stopped it is not an
+//     optimisation. A Function call may reach any of the three, and recursion
+//     may reach none of them and still never come back.
 //
 // NOTE: Which is why a CALL is impure unless it is one of the shapes named
 // below. Everything else — a literal, a name, a member read, a value built out
