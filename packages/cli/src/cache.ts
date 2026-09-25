@@ -19,13 +19,11 @@ import {
 import type { CompileRequest } from "./pipeline"
 
 // NOTE: The bundles `esc` has already emitted, kept under the hash of
-// everything they were emitted FROM and BY. The whole back half of the pipeline
-// — simplify, optimise, generate, bundle — is a pure function of the linked
-// graph and the Options, and is most of what a build costs: seventy of the
-// hundred milliseconds one file takes, and two thirds of the five hundred that
-// this repository's twenty-three fixtures take. A name that can only mean this
-// text is what lets a repeat build skip every one of those stages rather than
-// run them and discover it wrote the same file again.
+// everything they were emitted FROM and BY. The back half of the pipeline
+// (simplify, optimise, generate, bundle) is a pure function of the linked graph
+// and the Options, and is most of what a build costs. A name that can only mean
+// this text is what lets a repeat build skip every one of those stages rather
+// than run them and discover it wrote the same file again.
 //
 // NOTE: A separate AREA from the JavaScript client's, though the keys could
 // safely share a directory — the client's bundles carry its runtime bridge and

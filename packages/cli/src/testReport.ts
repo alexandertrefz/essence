@@ -37,8 +37,9 @@ import { formatDuration, pluralise } from "./report"
 // — the fold of the event stream, and the Diagnostics a failure produces — is
 // the Compiler's, because the Language Server publishes the same ones.
 
-// NOTE: Re-exported so that everything about a test RUN is still reached
-// through one name from inside the command line, wherever it is defined.
+// NOTE: The Compiler's test-run helpers, re-exported for the command line.
+// Not the only way in: some modules import them from
+// `@essence-lang/compiler/testing` directly.
 export {
 	type BenchmarkRecord,
 	collectBenchmarks,

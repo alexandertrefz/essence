@@ -49,7 +49,7 @@ const AREA = "results"
 // under the old meaning, rather than leaving them to be read and refused one at
 // a time.
 //
-// NOTE: `2` because the rule below about a bundle that reaches the world is a
+// NOTE: `2` because the exception for a bundle that reaches the world is a
 // change to what a record MEANS: a store written before it can hold an answer
 // this version would never have remembered, and the only way to be sure of not
 // replaying one is to stop reading the names it was written under.

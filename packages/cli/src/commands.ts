@@ -134,8 +134,8 @@ const sourcemapOption: OptionSpec = {
 	summary: "Emit a source map next to the output",
 }
 
-// NOTE: The three flags below are the way out of the settings the three above
-// them mirror — `build.sourcemap`, `build.minify` and `build.embed`, written
+// NOTE: `--no-sourcemap`, `--no-minify` and `--no-embed` are the way out of
+// the settings `build.sourcemap`, `build.minify` and `build.embed`, written
 // once in essence.json and in force for every run. A project that always emits
 // a map still needs a build without one on demand, and a flag that could only
 // ever turn a thing ON would leave that project no way to ask. The flag wins
