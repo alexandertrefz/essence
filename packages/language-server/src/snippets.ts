@@ -16,12 +16,12 @@
 
 // NOTE: The block a body parses in, which is what says whether it is offered.
 // Some of these carry no body of their own and still earn their place by what
-// they REFUSE: a cursor inside a `match` or a `define` is offered the handlers
-// and arms that belong there rather than the `function` and `namespace` a
-// statement position would offer, neither of which parses inside an
-// Expression. `choice`, `overload` and `parameters` are refusals and nothing
-// else — a Case list, a list of signatures and a Parameter list each take one
-// shape of writing that no snippet here is.
+// they refuse: a cursor inside a `match` is offered the handlers that belong
+// there rather than the `function` and `namespace` a statement position would
+// offer, neither of which parses inside an Expression. `define`, `choice`,
+// `overload` and `parameters` are refusals and nothing else: an arm list, a
+// Case list, a list of signatures and a Parameter list each take one shape of
+// writing that no snippet here is.
 //
 // `top` is beside the sections rather than inside one — above the imports,
 // between the implementation and the tests, below the exports — which is where
