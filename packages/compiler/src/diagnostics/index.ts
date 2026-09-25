@@ -24,7 +24,7 @@ function isDuplicate(diagnostic: common.Diagnostic): boolean {
 
 // NOTE: Label constructors rather than object literals, so that the common
 // case — a primary Label on the Diagnostic's own Position — stays one short
-// line at the ~100 report sites and the `kind` is never left to a default.
+// line at every report site and the `kind` is never left to a default.
 export function primary(
 	position: common.Position,
 	message: string,

@@ -2,7 +2,7 @@
 // own phases import the module they actually need — `./types`, `./describe` and
 // the rest — so that a file's imports say which of these concerns it depends on.
 // This barrel exists for the packages OUTSIDE the Compiler, which have one
-// subpath to reach rather than nine.
+// subpath to reach rather than one per module.
 
 export {
 	computeConformanceMethodMap,
