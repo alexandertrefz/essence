@@ -81,15 +81,16 @@ declarations {
 
 	§ A character here is a Unicode grapheme cluster: a base with its
 	§ combining marks, a ZWJ emoji sequence, a flag's two regional
-	§ indicators. The native `split` decides the segmentation (`graphemesOf`
-	§ in `String.ts`), and `characters` is `split(on "")`. Every position
-	§ Method is written on one of those two or reads the same view natively,
-	§ so none cuts a character in half. Both sides of a comparison are
-	§ normalized to NFC first, so an accent composed and one decomposed
-	§ count, order and compare the same.
+	§ indicators. The runtime segments a String once (`clustersIn` in
+	§ `String.ts`), and `split`, `characters` and the other position natives
+	§ read that view. Every other position Method is written on them, so none
+	§ cuts a character in half. Both sides of a comparison are normalized to
+	§ NFC first, so an accent composed and one decomposed count, order and
+	§ compare the same.
 	namespace String for String is Equatable, is Printable, is Comparable {
 		§ Native, both entries. A code point that names no character has to
-		§ be refused, and no Essence expression names a code point at all.
+		§ be refused. No Essence expression turns an Integer into a character:
+		§ a `\u{…}` escape takes only a point written in the source.
 
 		§§ Builds a String out of Unicode code points.
 		§§
@@ -143,7 +144,8 @@ declarations {
 		§§
 		§§ A `CaseSensitivity` of `#Insensitive` folds the case first.
 		overload compare {
-			§ Native. No Essence expression names a character's code point.
+			§ Native. It orders by code point, and an Essence body over
+			§ `codePoints()` would build a List of every point of both sides.
 
 			§§ @param to — the String to order against
 			§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
@@ -207,12 +209,12 @@ declarations {
 		§ its own answer in its `§§` block; the natives in `String.ts` point
 		§ back here.
 		§
-		§ The three searches are native, so that a question about a position
-		§ never builds the pieces `split` builds. The two Booleans and the two
-		§ replacements are written on them. Measured on a 10,800-character
-		§ ASCII String, one `contains` of a part that does not occur: 504 µs
-		§ on `split`, 8 µs on the native `firstIndex`. A Program making
-		§ 20,000 of them took 1,856 ms and takes 33 ms.
+		§ The searches are native, so that a question about a position never
+		§ builds the pieces `split` builds. The two Booleans and `replaceFirst`
+		§ are written on them. Measured on a 10,800-character ASCII String, one
+		§ `contains` of a part that does not occur: 504 µs on `split`, 8 µs on
+		§ the native `firstIndex`. A Program making 20,000 of them took 1,856 ms
+		§ and takes 33 ms.
 
 		§ Every entry below taking a `CaseSensitivity` folds each character
 		§ on its own, where `is` and `compare` fold the whole String. A
