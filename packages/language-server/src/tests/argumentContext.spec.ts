@@ -127,3 +127,39 @@ describe("Argument context inside a define arm", () => {
 		expect(context?.kind).toBe("record")
 	})
 })
+
+describe("Argument context inside a Protocol-provided Method body", () => {
+	let source = [
+		"implementation {",
+		"\ttype Point = { x: Integer, y: Integer }",
+		"",
+		"\tfunction isOrigin (_ point: Point) -> Boolean {",
+		"\t\t<- point.x::is(0)",
+		"\t}",
+		"",
+		"\tprotocol Placed {",
+		"\t\tplace() -> Point",
+		"",
+		"\t\tisHome() -> Boolean {",
+		"\t\t\t<- isOrigin({ x = 0, y = 0 })",
+		"\t\t}",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should offer the callee's Parameters at the call", () => {
+		expect(contextAt(source, { line: 12, column: 15 })?.kind).toBe(
+			"arguments",
+		)
+	})
+
+	it("should offer the Record's members inside the literal", () => {
+		expect(contextAt(source, { line: 12, column: 20 })).toEqual({
+			kind: "record",
+			memberTypes: { x: { type: "Integer" }, y: { type: "Integer" } },
+			presentMembers: ["x", "y"],
+			omittableMembers: [],
+			shorthand: true,
+		})
+	})
+})

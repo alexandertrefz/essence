@@ -155,6 +155,21 @@ function visitNode(
 			}
 
 			return
+		case "ProtocolDeclarationStatement":
+			for (let member of Object.values(node.methods)) {
+				let methods =
+					member.nodeType === "OverloadedMethod" ||
+					member.nodeType === "OverloadedStaticMethod"
+						? member.methods
+						: [member.method]
+
+				for (let method of methods) {
+					visitDefaults(method.value.parameters, state)
+					visitBody(method.value.body, null, state)
+				}
+			}
+
+			return
 		case "IfStatement":
 			visitNode(node.condition, null, state)
 			visitBody(node.body, null, state)
