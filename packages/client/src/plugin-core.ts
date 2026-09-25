@@ -65,11 +65,10 @@ import { mangled, memberName } from "./names"
 // `@essence-lang/runtime` directly, which the build resolves to the very copy
 // those values were built by.
 //
-// NOTE: Both plugins — `essence` in `./vite-plugin` and `essenceEsbuild` in
-// `./esbuild-plugin` — are the same three lines of work behind two shapes,
-// because there is exactly one interesting question here (what does this `.es`
-// file compile to) and two bundlers that ask it differently. This module is
-// that one question.
+// NOTE: `essence` in `./vite-plugin`, `essenceEsbuild` in `./esbuild-plugin`
+// and `essenceBun` in `./bun-plugin` answer one question (what does this `.es`
+// file compile to) for hosts that ask it differently. This module is that
+// question.
 
 // NOTE: How much of a Descriptor rides along into the build. `full` keeps every
 // `shown` — the Type as the Compiler printed it — which is what makes a refusal
@@ -86,9 +85,9 @@ export type PluginOptions = WrapperOptions & {
 	host?: ModuleHost
 	optimisation?: OptimiserOptions
 	// NOTE: Whether a `<Name>.d.es.ts` is written beside each compiled `.es`
-	// file. On while a dev server is serving, off in a build and off under
-	// esbuild — a build writes its output where it was told to, and a file
-	// appearing beside a source is a development convenience.
+	// file. On by default only while Vite's dev server is serving: a build
+	// writes its output where it was told to, and a file appearing beside a
+	// source is a development convenience.
 	declarations?: boolean
 }
 
@@ -130,8 +129,7 @@ export function rawSpecifier(entryPath: string): string {
 
 // NOTE: The file a raw id names, or `null` where the id is not one. A leading
 // `\0` is Rollup's mark for a module no filesystem holds, and it is stripped
-// here so that the two plugins can spell their own ids the way their own host
-// expects.
+// here so that each plugin can spell its own ids the way its host expects.
 export function rawFile(id: string): string | null {
 	let specifier = id.startsWith("\0") ? id.slice(1) : id
 

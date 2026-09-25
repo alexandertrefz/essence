@@ -84,8 +84,8 @@ export {
 } from "./esbuild-plugin"
 // NOTE: `wrapperFor` is on the root because it is the whole of what a plugin
 // does that a host could not have written itself: the Module a build imports,
-// spelled out of a Descriptor. A host bundler neither of the two plugins fits
-// needs that and its own three hooks.
+// spelled out of a Descriptor. A host bundler none of the plugins fits needs
+// that and hooks of its own.
 export {
 	declarationsPath,
 	type Diagnostics,
