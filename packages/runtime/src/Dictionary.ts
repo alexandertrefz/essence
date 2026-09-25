@@ -30,7 +30,7 @@ import { type AnyType, typeKeySymbol } from "./type"
 // NOTE: The doctrine is `List.ts`'s, applied to keys rather than to items:
 // "None of this is observable. Every Essence value is immutable and the
 // language has no way to ask whether two values are the SAME value, so a shared
-// structure is indistinguishable from a copied one for as long as every box
+// Array is indistinguishable from a copied one for as long as every box
 // answers exactly the items its view holds." What keeps that promise here is
 // that every reader — lookup, iteration, printing, equality, `keys`, `values`,
 // `entries`, `map` — reads through `liveValueOf` and through nothing else.
@@ -380,9 +380,10 @@ function boxAt<Key extends AnyType, Value extends AnyType>(
 }
 
 // NOTE: The builder every construction path shares — `of`, `createDictionary`,
-// `map` and `freshStore`, the door the gathering natives come through, each
-// fill a store of their own and hand it over, so `group`, `tally` and `index`
-// reach it through that last one. Every slot it opens carries one version at
+// `createDictionaryFrom`, `repack`, `map`, the filters and the sorts, and
+// `freshStore`, the door the gathering natives come through, each fill a store
+// of their own and hand it over, so `group`, `tally` and `index` reach it
+// through that last one. Every slot it opens carries one version at
 // generation zero, so the finished store is already in the shape a repack would
 // leave it in.
 function emptyStore<Key extends AnyType, Value extends AnyType>(): Store<
@@ -503,10 +504,10 @@ function addToFreshStore<Key extends AnyType, Value extends AnyType>(
 	openFreshSlot(store, key, encoded, value)
 }
 
-// NOTE: The door a host or the Compiler's own emitted code comes through, and
-// the one the slice-2 Dictionary literal will use. The Array of pairs is read
-// and not kept: the store is the box's own from the first entry on, so nothing
-// here takes ownership of anything the caller may still hold.
+// NOTE: The door the Compiler's emitted Dictionary literal comes through, and
+// the natives that build a Dictionary from finished pairs. The Array of pairs
+// is read and not kept: the store is the box's own from the first entry on, so
+// nothing here takes ownership of anything the caller may still hold.
 export function createDictionary<Key extends AnyType, Value extends AnyType>(
 	entries: Array<[Key, Value]>,
 	conformance: EquatableWitness<Key> | null,
@@ -1308,9 +1309,10 @@ export function sort__overload$2<
 	)
 }
 
-// NOTE: The live view as pairs, for the two answers below that have to hold one
-// side while they search the other, and for the difference a failing test
-// writes. It is the same four lines every reader here is, materialised.
+// NOTE: The live view as pairs, for the rendering, for `equalsUniversally` and
+// `equalsByParts`, which walk one side while they search the other, and for
+// the difference a failing test writes. It is the same four lines every reader
+// here is, materialised.
 function livePairs<Key extends AnyType, Value extends AnyType>(
 	dictionary: DictionaryType<Key, Value>,
 ): Array<[Key, Value]> {
@@ -1475,8 +1477,8 @@ function equalsByParts(
 	return true
 }
 
-// NOTE: The one registration, and the reason it is a call from the three doors
-// a Dictionary is built through rather than a line at the top of this module.
+// NOTE: The one registration, and the reason it is a call from every door a
+// Dictionary is built through rather than a line at the top of this module.
 // The head of every emitted Program imports every runtime module and leans on
 // esbuild to shake away the ones it does not name — and a top-level call is a
 // side effect a bundler must keep, so it would pin the whole of this file into
