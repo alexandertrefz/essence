@@ -13,9 +13,9 @@ import { rewriteExpressions } from "../walk"
 // it is `value[<Type key>] === "Ordering#Less"`, so that is what is emitted.
 //
 // NOTE: This is the standard library's whole comparison family. `isLessThan` is
-// `@::compare(to other)::is(#Less)`, and `isGreaterThanOrEqualTo`,
-// `isLessThanOrEqualTo` and `isGreaterThan` are written on those — every one of
-// them ends in this shape, inside the prelude, which the Optimiser runs over
+// `@::compare(to other)::is(#Less)`, `isGreaterThan` is the same with
+// `#Greater`, and the two `…OrEqualTo` Methods are written on those. Every one
+// of them ends in this shape, inside the prelude, which the Optimiser runs over
 // alongside the Program. So the Method a loop's `a <= b` reaches is lowered
 // once and every Program is compiled against the lowered one.
 //
