@@ -811,10 +811,9 @@ export async function runMutation(
 	}
 }
 
-// NOTE: The baseline's stream read down to the three things the rest of the run
-// needs from it — which tests there were, which of them reach which point, and
-// how long each of them took while the code still told the truth. Spelled apart
-// so the events themselves are unreferenced the moment it answers.
+// NOTE: The baseline read down to what the rest of the run needs from it: which
+// tests reach which point, and how long each test took while the code still
+// told the truth. The caller empties the event stream once this answers.
 function foldBaseline(
 	baseline: TestRun,
 	events: Array<TestEvent>,
