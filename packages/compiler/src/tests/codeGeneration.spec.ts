@@ -2395,10 +2395,11 @@ describe("Code Generation", () => {
 				Terminal.inspect(true::exclusiveOr(false))
 			}`)
 
-			// NOTE: The Namespace is imported under its own name — no `$native_`
-			// alias, no merged const — and the one Essence Method is a top-level
-			// const beside it. The native half stays a member read off the plain
-			// import, which is what keeps it tree-shakeable.
+			// NOTE: The Namespace is imported under its own name, with no
+			// `$native_` alias and no merged const, and the Essence Method the
+			// Program reaches is a top-level const beside it. The native half stays
+			// a member read off the plain import, which is what keeps it
+			// tree-shakeable.
 			expect(code).toContain('import * as Boolean from "')
 			expect(code).not.toContain("$native_Boolean")
 			expect(code).not.toContain("const Boolean = {")
@@ -2406,8 +2407,8 @@ describe("Code Generation", () => {
 				"const $es_Boolean_exclusiveOr = function (_self, other) {",
 			)
 
-			// NOTE: Every other Namespace is wholly native, so it keeps the plain
-			// import and gains no const.
+			// NOTE: A Namespace whose Essence Methods the Program does not reach
+			// keeps the plain import and gains no const.
 			expect(code).toContain('import * as String from "')
 			expect(code).not.toContain("$es_String_")
 		})
@@ -2475,13 +2476,12 @@ describe("Code Generation", () => {
 		})
 
 		// NOTE: The regression is the merged const, whose whole cost was the
-		// spread that materialised a module namespace object — `{ ...Number, … }`,
-		// whether the spread names `$native_Number` (the old shape) or the bare
-		// `Number` import. No emitted Program spreads anything at all today, so an
-		// object literal opening with a spread names the mechanism directly, where
-		// the bundle-size ceilings catch it arriving by any other route.
-		// `Everyday.es` reaches an Essence Method AND a large runtime module, the
-		// exact shape that used to spread.
+		// spread that materialised a module namespace object: `{ ...Number, … }`.
+		// `Everyday.es` reaches an Essence Method and a large runtime module, the
+		// shape that spread, and writes no spread of its own, so an object
+		// literal opening with a spread in its output names the mechanism
+		// directly. The bundle-size ceilings catch it arriving by any other
+		// route.
 		it("never spreads a runtime module", () => {
 			const source = readFileSync(fixturePath("Everyday.es"), {
 				encoding: "utf-8",
@@ -2522,9 +2522,9 @@ describe("Code Generation", () => {
 		// NOTE: The conformance witness reads the Essence Method as the bare
 		// `$es_Boolean_toString` const rather than off the runtime module, so a
 		// Boolean that reaches a bounded generic finds the Essence
-		// implementation. `Printable` and not `Equatable`, because Equatable's
-		// one requirement — `is` — is a native on every conformer; `isNot` is
-		// PROVIDED and so is never in a witness at all.
+		// implementation. `Printable` and not `Equatable`, because Boolean's
+		// own `is` is native, and the `isNot` an Equatable witness carries is
+		// `Equatable`'s provided Method rather than Boolean's.
 		it("witnesses Printable with the Essence Method", async () => {
 			const source = `implementation {
 				function describe <infer Value is Printable>(_ a: Value) -> String {
@@ -2685,11 +2685,10 @@ describe("Code Generation", () => {
 		})
 
 		// NOTE: The `__overload$N` suffix is the Overload's position in the
-		// Method TYPE. A native holds its slot even though the prelude emits
+		// Method Type. A native holds its slot even though the prelude emits
 		// nothing for it, because the runtime export it binds to already answers
-		// to that name — emitting the bodied Overload under the filtered index
-		// would define `combine__overload$1` on top of the spread and clobber
-		// the native.
+		// to that name. Emitted under the filtered index, the bodied Overload
+		// would take the native's name, and a call of the native would run it.
 		it("numbers a mixed overload block by its position in the Method Type", () => {
 			let stdlib = loadStdlibFrom([
 				parseStdlibSource(
@@ -2797,12 +2796,11 @@ describe("Code Generation", () => {
 			})
 		})
 
-		// NOTE: The search has to run to a FIXED POINT: an Essence Method may be
-		// reached only through the BODY of another one. Both Essence Methods today
-		// call natives only, so this is driven directly over a synthetic prelude
-		// — and it is the case that starts happening for real as the conversion
-		// goes on. The edges are read off the typed body, so injecting a prelude
-		// the process-wide one does not know is exactly what this must handle.
+		// NOTE: The search has to run to a fixed point: an Essence Method may be
+		// reached only through the body of another one. It is driven here over
+		// a synthetic prelude. The edges are read off the typed body, so
+		// injecting a prelude the process-wide one does not know is exactly
+		// what this must handle.
 		describe("reachability", () => {
 			// NOTE: `Outer.quadruple` calls `Inner.double`, and nothing else
 			// mentions `Inner`.
@@ -3125,13 +3123,12 @@ describe("Code Generation", () => {
 				})
 			})
 
-			// NOTE: The edge finder must recognise EVERY shape `namespaceMember`
+			// NOTE: The edge finder must recognise every shape `namespaceMember`
 			// turns into a `$es_…` Identifier, or a Method reached only through a
 			// missing shape is named in an emitted body while its const is never
-			// pulled in — a `ReferenceError` at run time that compiles green. Fed
-			// each shape directly, because the two live Essence Methods reach
-			// other Methods only through a `MethodInvocation`, so the prelude
-			// never exercises the witness and static-reference shapes on its own.
+			// pulled in: a `ReferenceError` at run time that compiles green. Each
+			// shape is fed in directly, so none of them rests on what the real
+			// prelude happens to write.
 			describe("edge shapes", () => {
 				const implemented = new Set([
 					"Target instance",
@@ -4114,10 +4111,10 @@ declarations {
 
 			// NOTE: The edge the reachability walk has to draw for the two
 			// above to be emittable at all. `Http.get` is an Essence body that
-			// writes `Http.send({ url, method, headers })` and omits nothing, so
-			// the const it names is pulled in by a full-arity call or by
-			// nothing — and `checkEssenceMethodsAreDeclared` turns a missing one
-			// into a thrown Compiler bug rather than a broken Program.
+			// writes `Http.send({ url, method = #Get, headers })` and omits no
+			// Argument, so the const it names is pulled in by a full-arity call
+			// or by nothing, and `checkEssenceMethodsAreDeclared` turns a missing
+			// one into a thrown Compiler bug rather than a broken Program.
 			it("pulls the shim in from an Essence body that calls it at full arity", () => {
 				let code = generate(`implementation {
 	constant answered = complete Http.get("http://x.test/")
@@ -4130,8 +4127,8 @@ declarations {
 			})
 		})
 
-		// NOTE: A Namespace whose every member is native has nothing to merge —
-		// it keeps its plain import, and no const is emitted for it.
+		// NOTE: A Namespace whose every member is native keeps its plain import,
+		// and no const is emitted for it.
 		it("skips a Namespace with no Essence-implemented member", () => {
 			let stdlib = loadStdlibFrom([
 				parseStdlibSource(
