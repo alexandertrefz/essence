@@ -46,13 +46,6 @@ export type PreludeNamespace = {
 	protocol?: true
 }
 
-// NOTE: The Simplifier is the stage that turns `is__overload$1` into a name and
-// unshifts the hidden `_self` Parameter, and it does both by WRITING INTO the
-// typed Node it was handed. The standard library's typed Programs are a
-// process-wide singleton every consumer shares, so they are copied before they
-// are simplified — otherwise the first compilation would leave overload-mangled
-// names behind in a table the Language Server and the tests read afterwards,
-// and a second simplification would mangle them a second time.
 export type PreludeFreeFunction = {
 	name: string
 	node: common.typedSimple.FunctionStatementNode
@@ -89,6 +82,10 @@ function buildStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 	let freeFunctions: Array<PreludeFreeFunction> = []
 
 	for (let typedProgram of stdlib.typedPrograms) {
+		// NOTE: The typed Programs are one process-wide value the Language
+		// Server and the tests read too. The Simplifier and the Optimiser only
+		// read their input, and the copy keeps the prelude from sharing any
+		// object with it.
 		let program = optimise(
 			simplify(structuredClone(typedProgram)),
 			currentOptimiserOptions,
