@@ -357,26 +357,13 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		)
 	}
 
-	// NOTE: What the project itself said is not its source — `exclude` in the
-	// nearest `essence.json` at or above the file. A project holds files that
-	// are `.es` without being ITS: a corpus kept deliberately broken, a vendored
-	// copy of a library, the output some other tool writes into it. Nothing can
-	// tell those from sources by looking at them, and reporting on them is how a
-	// Problems panel that speaks for the whole workspace becomes one nobody
-	// reads.
-	//
-	// NOTE: The settings governing one FILE, rather than one list for the whole
-	// workspace. A workspace is two folders as easily as one and a folder holds
-	// a nested project as easily as none, and the union the two used to be let
-	// one folder's `exclude` silence a directory of the same name in the other.
-	// The Server reads the test settings through here too, so what an entry runs
-	// under is the project that entry belongs to.
-	//
-	// Answered once per directory and held, because the walk it narrows is
-	// answered once and held. `setFolders` is what forgets both — a project
-	// drawing its own boundary somewhere else is a different project from the
-	// one every cached answer was derived for — and `forgetConfiguration` drops
-	// the settings alone, which is all a `package.json` can ask for.
+	// NOTE: The settings governing one file: those of the nearest
+	// `essence.json` at or above it. A workspace may hold several folders and
+	// nested projects, so each file answers to its own, and the Server reads
+	// the test settings an entry runs under through here too. Answered once per
+	// directory and held: `setFolders` forgets every answer, and
+	// `forgetConfiguration` drops the settings alone, which is all a
+	// `package.json` can ask for.
 	function configurationFor(filePath: string): ProjectConfiguration {
 		return configurations.forFile(filePath)
 	}
@@ -417,6 +404,14 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		configurations.clear()
 	}
 
+	// NOTE: What the project itself said is not its source: `exclude` in the
+	// nearest `essence.json` at or above the file. A project holds files that
+	// are `.es` without being ITS: a corpus kept deliberately broken, a vendored
+	// copy of a library, the output some other tool writes into it. Nothing can
+	// tell those from sources by looking at them, and reporting on them is how a
+	// Problems panel that speaks for the whole workspace becomes one nobody
+	// reads.
+	//
 	// NOTE: Whether the discovery walk stays out of a path — and ONLY the walk.
 	// A file named by an import is still linked, still checked and still
 	// reported, because a file this project imports is this project's whatever
