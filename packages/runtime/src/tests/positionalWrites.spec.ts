@@ -1137,17 +1137,17 @@ describe("reentrancy", () => {
 			(list, visit) => void hasDuplicates(list, visiting(visit)),
 		],
 		[
-			"everyItem(in:)",
+			"everyItem(alsoIn:)",
 			(list, visit) =>
 				void everyItemIn(list, integers([1, 2]), visiting(visit)),
 		],
 		[
-			"removeEvery(in:)",
+			"removeEvery(contentsOf:)",
 			(list, visit) =>
 				void removeEveryIn(list, integers([1, 2]), visiting(visit)),
 		],
 		[
-			"contains(contentsOf:)",
+			"contains(everyItemOf:)",
 			(list, visit) => void contains(list, list, visiting(visit)),
 		],
 		["mode", (list, visit) => void mode(visitedThrough(list, visit))],
@@ -1264,19 +1264,19 @@ describe("reentrancy", () => {
 			"Ordering#Equal",
 		],
 		[
-			"contains(contentsOf:)",
+			"contains(everyItemOf:)",
 			(list, other, visit) =>
 				contains(list, other, visitingKey(visit)).value,
 			true,
 		],
 		[
-			"everyItem(in:)",
+			"everyItem(alsoIn:)",
 			(list, other, visit) =>
 				itemsOf(everyItemIn(list, other, visitingKey(visit))),
 			[1, 2, 3, 4, 5],
 		],
 		[
-			"removeEvery(in:)",
+			"removeEvery(contentsOf:)",
 			(list, other, visit) =>
 				itemsOf(removeEveryIn(list, other, visitingKey(visit))),
 			[],
