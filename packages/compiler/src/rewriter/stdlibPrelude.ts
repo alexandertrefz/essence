@@ -218,7 +218,7 @@ let currentOptimiserOptions: OptimiserOptions = defaultOptimiserOptions
 
 // NOTE: Coverage is taken OUT here and nowhere else. The standard library is
 // never instrumented — a report about a project is a report about the project's
-// own files, and counting seventeen library Programs into every bundle would
+// own files, and counting the library's Programs into every bundle would
 // cost far more than the answer is worth. Stripping it at the door also keeps
 // the prelude cache from splitting: a coverage run and a plain one build one
 // prelude between them, because with coverage gone the two Options spell the
@@ -289,9 +289,9 @@ function isStdlibArtifacts(value: unknown): boolean {
 }
 
 // NOTE: The same artifacts, kept between processes as well as within one. Every
-// process that EMITS anything pays this — forty-odd milliseconds of simplifying
-// and optimising seventeen Programs — for a result that depends on the standard
-// library and the Optimiser Options and on nothing else. Both are in the key.
+// process that emits anything pays for simplifying and optimising every
+// standard library Program, for a result that depends on the standard library
+// and the Optimiser Options and on nothing else. Both are in the key.
 //
 // NOTE: Only for the library the real sources produced. A test installs one of
 // its own through `useStdlib`, and a snapshot keyed by what the DISK hashes to

@@ -40,7 +40,7 @@ import { rewriteNodes } from "../walk"
 // NOTE: The standard library is never instrumented. The prelude is built with
 // coverage stripped out of the Options (see `withOptimiserOptions` in
 // `rewriter/stdlibPrelude.ts`) — a report about a project is a report about the
-// project's own files, and instrumenting seventeen library Programs into every
+// project's own files, and instrumenting the library's Programs into every
 // bundle would cost far more than the answer is worth.
 
 export const instrumentCoverage: OptimiserPass = {
