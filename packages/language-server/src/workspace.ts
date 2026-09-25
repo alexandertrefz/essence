@@ -104,9 +104,8 @@ export type WorkspaceOccurrence = {
 export type WorkspaceSymbol = {
 	name: string
 	kind: DeclarationKind
-	// NOTE: Carried from the Declaration for the reason it exists there: a
-	// Parameter whose name doubles as its call site label is renamed through
-	// this path as well, and the gate has to know that here too.
+	// NOTE: The declaring site's mark for a Parameter whose name doubles as its
+	// call site label, which holds a rename of it to the label rules as well.
 	labelled?: boolean
 	// NOTE: Null when nothing in the workspace declares it: an entry naming
 	// something no reachable Module exports still joins its own occurrences, so
@@ -1557,6 +1556,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		return {
 			name: occurrence.name,
 			kind: occurrence.declaration.kind,
+			labelled: occurrence.declaration.labelled,
 			filePath,
 			definition: occurrence.declaration.definition,
 			occurrences: occurrence.declaration.occurrences.map((site) => ({
@@ -1623,6 +1623,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 type SiteData = {
 	name: string
 	kind: DeclarationKind | null
+	labelled?: boolean
 	filePath: string | null
 	definition: common.Position | null
 	occurrences: Array<WorkspaceOccurrence>
@@ -1948,6 +1949,7 @@ function joinComponent(
 		return {
 			name: anchor.name,
 			kind: anchor.kind ?? "constant",
+			labelled: anchor.labelled,
 			filePath: anchor.filePath,
 			definition: anchor.definition,
 			occurrences: members.flatMap(([, site]) => site.occurrences),

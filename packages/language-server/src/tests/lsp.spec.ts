@@ -27,6 +27,7 @@ import {
 	type Diagnostic,
 	DiagnosticSeverity,
 	DiagnosticTag,
+	ErrorCodes,
 	InsertTextFormat,
 	type TextEdit,
 	TextDocumentSyncKind,
@@ -35,6 +36,7 @@ import {
 import {
 	CodeActionRequest,
 	HoverRequest,
+	RenameRequest,
 	WillRenameFilesRequest,
 } from "vscode-languageserver/node"
 
@@ -1753,6 +1755,123 @@ describe("A file about to be renamed", () => {
 			await session.dispose()
 			files.dispose()
 		}
+	})
+})
+
+// NOTE: The Server picks the rule a new name has to satisfy from the symbol the
+// workspace joined, so a Parameter whose name doubles as its label has to reach
+// it still marked as one.
+describe("A rename asked of the Server", () => {
+	const source = [
+		"implementation {",
+		"\tconstant result = compute(seed 1)",
+		"",
+		"\tfunction compute (seed: Integer) -> Integer {",
+		"\t\t<- seed",
+		"\t}",
+		"",
+		"\tconstant scaled = scale(by 2)",
+		"",
+		"\tfunction scale (by factor: Integer) -> Integer {",
+		"\t\t<- factor",
+		"\t}",
+		"}",
+		"",
+	].join("\n")
+
+	// NOTE: The lines a rename rewrote, or the error it was refused with.
+	async function renameEach(
+		requests: Array<{ at: string; newName: string }>,
+	): Promise<Array<{ lines: Array<number> } | { refused: object }>> {
+		let files = makeSessionWorkspace({ "Main.es": source })
+		let session = startSession()
+		let lines = source.split("\n")
+
+		try {
+			await session.initialize([files.root])
+			await session.open(files.pathOf("Main.es"), source)
+			await session.settle()
+
+			let answers: Array<{ lines: Array<number> } | { refused: object }> =
+				[]
+
+			for (let { at, newName } of requests) {
+				let line = lines.findIndex((text) => text.includes(at))
+
+				try {
+					let { result } = await session.request<WorkspaceEdit>(
+						RenameRequest.type,
+						{
+							textDocument: {
+								uri: uriOf(files.pathOf("Main.es")),
+							},
+							position: {
+								line,
+								character: lines[line]!.indexOf(at),
+							},
+							newName,
+						},
+					)
+
+					answers.push({
+						lines: Object.values(result.changes ?? {})
+							.flat()
+							.map((edit) => edit.range.start.line)
+							.sort((left, right) => left - right),
+					})
+				} catch (error) {
+					let { code, message } = error as {
+						code: number
+						message: string
+					}
+
+					answers.push({ refused: { code, message } })
+				}
+			}
+
+			return answers
+		} finally {
+			await session.dispose()
+			files.dispose()
+		}
+	}
+
+	it("should refuse a prefix Keyword for a Parameter that doubles as its label, as for a label", async () => {
+		expect(
+			await renameEach([
+				{ at: "seed:", newName: "start" },
+				{ at: "seed:", newName: "complete" },
+				{ at: "by factor", newName: "start" },
+			]),
+		).toEqual([
+			{
+				refused: {
+					code: ErrorCodes.InvalidParams,
+					message: "'start' is not a valid Identifier.",
+				},
+			},
+			{
+				refused: {
+					code: ErrorCodes.InvalidParams,
+					message: "'complete' is not a valid Identifier.",
+				},
+			},
+			{
+				refused: {
+					code: ErrorCodes.InvalidParams,
+					message: "'start' is not a valid Identifier.",
+				},
+			},
+		])
+	})
+
+	it("should accept a name valid as both, and a prefix Keyword behind a label of its own", async () => {
+		expect(
+			await renameEach([
+				{ at: "seed:", newName: "amount" },
+				{ at: "factor:", newName: "start" },
+			]),
+		).toEqual([{ lines: [1, 3, 4] }, { lines: [9, 10] }])
 	})
 })
 

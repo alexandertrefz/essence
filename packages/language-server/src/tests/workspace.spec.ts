@@ -419,6 +419,32 @@ describe("Workspace", () => {
 			expect(symbol?.filePath).toBe(pathOf("Geometry.es"))
 			expect(symbol?.definition?.start.line).toBe(3)
 		})
+
+		// NOTE: The mark is what holds a rename of such a Parameter to the label
+		// rules as well, and the Server reads it off the joined symbol.
+		it("should carry the mark of a Parameter whose name doubles as its label", () => {
+			let compute = [
+				"implementation {",
+				"\tconstant result = compute(seed 1, by 2)",
+				"",
+				"\tfunction compute (seed: Integer, by factor: Integer) -> Integer {",
+				"\t\t<- seed::multiply(with factor)",
+				"\t}",
+				"}",
+				"",
+			].join("\n")
+			let { workspace, pathOf } = makeWorkspace({ "Compute.es": compute })
+			let symbolAt = (line: number, needle: string) =>
+				workspace.symbolAt(
+					pathOf("Compute.es"),
+					cursorAt(compute, line, needle),
+				)
+
+			expect(symbolAt(4, "seed:")?.kind).toBe("parameter")
+			expect(symbolAt(4, "seed:")?.labelled).toBe(true)
+			expect(symbolAt(2, "seed 1")?.labelled).toBe(true)
+			expect(symbolAt(4, "factor:")?.labelled).toBeUndefined()
+		})
 	})
 
 	// NOTE: Hover reads the linked enrichment — its annotations resolved on the
