@@ -4,7 +4,8 @@ import { typeKeySymbol } from "./type"
 
 // NOTE: The exact bigint-rational core the numeric tower is built on: a plain
 // `{ numerator, denominator }` pair, treated as immutable everywhere. The
-// module is dependency- and side-effect-free so a Program only carries the
+// module is side-effect-free and its one value import is the Type key from
+// `type.ts`, which every Program carries anyway, so a Program only carries the
 // helpers it reaches. `reduced` establishes the two invariants every consumer
 // relies on — the sign lives on the numerator, never on the denominator, and
 // zero has exactly one lowest-terms form, `0/1`.
@@ -113,8 +114,8 @@ export function rationalSign(rational: BigRational): -1n | 0n | 1n {
 export function bigRationalOf(value: IntegerType | RationalType): BigRational {
 	// NOTE: THE boundary between the hybrid Integer and the numeric tower.
 	// Everything past here — Rational, Algebraic, Transcendental — is written
-	// on pairs of bigints, and this is the one place an Integer that may be
-	// holding a number is normalised into one, so the tower needs to know
+	// on pairs of bigints, and an Integer that may be holding a number is
+	// normalised into one here, so the arithmetic past it needs to know
 	// nothing about the two representations.
 	if (value[typeKeySymbol] === "Integer") {
 		return { numerator: BigInt(value.value), denominator: 1n }

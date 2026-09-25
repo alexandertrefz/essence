@@ -51,7 +51,7 @@ function rationalValueOf(rational: BigRational): RationalType {
 // NOTE: floor(√value) by Newton's method on bigints. The first estimate is
 // 2^⌈bits/2⌉, which is at least the root, so the iteration only ever descends
 // and stops at the floor. Shared by the normalisation below, by the test two
-// radicands meet under, and by the interval evaluation at the end of the file.
+// radicands meet under, and by the interval evaluation, `scaledIntervalOf`.
 export function integerSquareRoot(value: bigint): bigint {
 	if (value < 2n) {
 		return value
