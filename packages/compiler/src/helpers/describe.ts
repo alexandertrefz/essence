@@ -154,8 +154,8 @@ export function displayedRefinementArguments(
 
 // NOTE: A compact, one-line description of a Type for Diagnostics — the
 // spelling a reader would recognise from their own source, not the internal
-// Type tag. `printType` in the Language Server is its Hover-oriented sibling;
-// this one is what every Diagnostic message names a Type with.
+// Type tag. `printType` is its Hover-oriented sibling; this one is what every
+// Diagnostic message names a Type with.
 export function describeType(type: common.Type): string {
 	switch (type.type) {
 		case "UnionType":

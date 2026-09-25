@@ -6,9 +6,9 @@ import {
 	displayedRefinementArguments,
 } from "./helpers/describe"
 
-// NOTE: A human-oriented Type printer for Hovers. The Validator's
-// `describeType` is its Diagnostics-oriented sibling — unlike it, this one
-// prints full Function signatures instead of collapsing them to "Function".
+// NOTE: A human-oriented Type printer for Hovers. `describeType` is its
+// Diagnostics-oriented sibling. Where that one names an Overload set
+// "Function", this one prints its first signature and counts the rest.
 //
 // NOTE: What this prints is a TYPE, and a Type is something an author can write
 // down: the Inlay Hint that shows a Declaration's inferred Type is offered by
