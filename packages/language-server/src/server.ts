@@ -173,15 +173,12 @@ export const serverCapabilities: ServerCapabilities = {
 	documentHighlightProvider: true,
 	documentSymbolProvider: true,
 	documentFormattingProvider: true,
-	// NOTE: No `resolveProvider` — every action carries its edits already,
+	// NOTE: No `resolveProvider`: every action carries its edits already,
 	// computed on the buffer as it is now. Deliberately no `source.fixAll`
-	// either: not one of these fixes is both unambiguous and
-	// semantics-preserving, so applying them in bulk is exactly what a reader
-	// must not be able to ask for. `source.organizeImports` is admitted by
-	// that same rule rather than in spite of it: removing an import nothing
-	// uses is both of those things, which is what a bulk action has to be. The
-	// reasoning is written out under "Why there is no fix-all" in the
-	// Diagnostics reference.
+	// either: removing an import nothing uses is the one fix that is both
+	// unambiguous and semantics-preserving, which is what a bulk action has to
+	// be, and `source.organizeImports` is that fix. The Editor setup guide says
+	// so under "What is not there".
 	codeActionProvider: {
 		codeActionKinds: [
 			CodeActionKind.QuickFix,
@@ -1839,8 +1836,8 @@ export function startServer(options: { connection?: Connection } = {}) {
 	})
 
 	// NOTE: An Item round-trips its uri and its selectionRange, so the
-	// Declaration it names is resolved again from a fresh parse — nothing is
-	// kept between the prepare and the expansion that follows it.
+	// Declaration it names is resolved again from the document's current
+	// analysis. Nothing is kept between the prepare and the expansion.
 	connection.languages.callHierarchy.onIncomingCalls(
 		async (params, token) => {
 			if (!(await isCurrent(params.item.uri, token))) {
@@ -2130,8 +2127,9 @@ export function startServer(options: { connection?: Connection } = {}) {
 						specifiers: workspace.specifiersFor(filePath),
 					}
 				: { offers: [], namespaces: [] },
-			// NOTE: The unmodified document, which every one of the three
-			// listings below the probe used to derive again for itself.
+			// NOTE: The analysis of the unmodified document, as the Workspace
+			// holds it; `findCompletions` derives one itself only where this is
+			// null.
 			workspace.documentOf(filePath),
 			(error) => logInternalError(filePath, error),
 		)
@@ -2998,11 +2996,10 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// truth again.
 		workspace.changed(filePath)
 
-		// NOTE: Nothing is cleared, and that is the change: what this file's
-		// Diagnostics say is still true the moment its buffer goes, because they
-		// are what the file on disk says. The Problems panel reports on a
-		// workspace rather than on a set of tabs, so a Module closed while
-		// broken keeps its squiggles.
+		// NOTE: Nothing is cleared: what this file's Diagnostics say is still
+		// true the moment its buffer goes, because they are what the file on
+		// disk says. The Problems panel reports on a workspace rather than on a
+		// set of tabs, so a Module closed while broken keeps its squiggles.
 		//
 		// What has to happen is that the roots reaching it run again, against
 		// the file rather than against the buffer — nothing else will ask them
