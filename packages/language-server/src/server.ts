@@ -3137,10 +3137,10 @@ function toLspCallHierarchyItem(
 }
 
 // NOTE: An entry's kinds are spelled as the protocol spells them, so this
-// table reads as an identity — and it is written out all the same, because it
-// is where a kind that is offered and a kind that is announced are made to be
-// the same list. A kind on one side and not the other is a lightbulb an Editor
-// never opens.
+// table reads as an identity; its Record Type requires a row for every kind an
+// entry can carry. `serverCapabilities` announces the kinds in a list of its
+// own, which has to hold the same ones: a kind offered and not announced is a
+// lightbulb an Editor never opens.
 const codeActionKinds: Record<CodeActionEntry["kind"], CodeActionKind> = {
 	quickfix: CodeActionKind.QuickFix,
 	"refactor.rewrite": CodeActionKind.RefactorRewrite,
