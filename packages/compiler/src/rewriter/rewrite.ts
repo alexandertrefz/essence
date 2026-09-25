@@ -4740,13 +4740,13 @@ function rewriteDictionaryValue(
 // static Property read (`Number.Pi`) and a plain Record member access
 // (`record.field`). Only the first two name a Namespace, and WHICH of the three
 // this is has to be read off the base's resolved Type, not off its spelling: a
-// local may be named after a Namespace — `constant Optional = { otherwise = 5 }`
+// local may be named after a Namespace — `constant Optional = { isEmpty = 5 }`
 // is a legal Program the Enricher types as a Record — and deciding by the name
-// alone sent `Optional.otherwise` through `namespaceMember`, which answered with
-// the standard library's `$es_Optional_otherwise` Function in place of the
-// field. That miscompiled silently: it type checks, it emits, and the value is
-// simply the wrong one. Every other base — a shadowing local, a chained access,
-// a call result — keeps the plain member read.
+// alone would send `Optional.isEmpty` through `namespaceMember`, which answers
+// with the standard library's `$es_Optional_isEmpty` Function in place of the
+// field. That would miscompile silently: it type checks, it emits, and the
+// value is simply the wrong one. Every other base — a shadowing local, a
+// chained access, a call result — keeps the plain member read.
 function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
 	// NOTE: A member read off a bounded Type Parameter's conformance rather
 	// than off the Namespace the base spells — `T.cases()` is
@@ -5849,16 +5849,18 @@ function answerStatements(
 	return [resultStatement(result, answer.value()), ...breakOut(redirect)]
 }
 
-// NOTE: What a lowered Statement standing INSIDE a Handler body is emitted
-// against, when that body's Return Statements are being written somewhere other
-// than a JavaScript Return. A Match in Statement position holds a Match in
-// Return position holds another, and each of them answers the OUTERMOST one's
-// question — so the redirect travels down and the label is the outermost one's.
+// NOTE: What a lowered Statement standing inside a Handler body or an inlined
+// callback's is emitted against, when that body's Return Statements are being
+// written somewhere other than a JavaScript Return. A Match in Statement
+// position holds a Match in Return position holds another, and each of them
+// answers the OUTERMOST one's question — so the redirect travels down and the
+// label is the outermost one's.
 type ReturnRedirect = {
 	result: RedirectTarget
 	label: string
-	// NOTE: True only for the LAST Statement of a Handler's own body, where
-	// nothing follows the answer and there is nothing to break out of.
+	// NOTE: True only for the last Statement of the body being redirected, a
+	// Handler's or an inlined callback's, where nothing follows the answer and
+	// there is nothing to break out of.
 	isTail: boolean
 	broke: () => void
 }
@@ -6066,13 +6068,13 @@ function breakOut(redirect: ReturnRedirect | null): Array<estree.Statement> {
 	]
 }
 
-// NOTE: A Handler's body, with every Return Statement in it written where the
-// lowered Statement's answer goes instead. Only three kinds of Statement can
-// hold one: a Return itself, a Conditional's bodies, and a lowered Statement
-// that answers with a Return of its own. Everything else is emitted exactly as
-// it always is — a Function declared inside a Handler has Returns of its own and
-// they are ITS Returns, which is why this descends by name rather than by
-// searching.
+// NOTE: A Handler's body or an inlined callback's, with every Return Statement
+// in it written where the redirect's target says instead. Only three kinds of
+// Statement can hold one: a Return itself, a Conditional's bodies, and a
+// lowered Statement that answers with a Return of its own. Everything else is
+// emitted exactly as it always is — a Function declared inside a Handler has
+// Returns of its own and they are ITS Returns, which is why this descends by
+// name rather than by searching.
 function redirectedStatements(
 	nodes: Array<common.typedSimple.ImplementationNode>,
 	redirect: ReturnRedirect,
