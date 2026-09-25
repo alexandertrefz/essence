@@ -406,6 +406,9 @@ function collectItemsFromNode(
 		case "Complete":
 			collectItemsFromNode(node.expression, container, items)
 			return
+		case "RefusedValue":
+			collectItemsFromNode(node.base, container, items)
+			return
 		case "Combination":
 			collectItemsFromNode(node.lhs, container, items)
 			collectItemsFromNode(node.rhs, container, items)
@@ -891,6 +894,9 @@ function visitNode(
 		case "Start":
 		case "Complete":
 			visitNode(node.expression, caller, context, sites)
+			return
+		case "RefusedValue":
+			visitNode(node.base, caller, context, sites)
 			return
 		case "Combination":
 			visitNode(node.lhs, caller, context, sites)

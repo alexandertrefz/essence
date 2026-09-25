@@ -544,3 +544,45 @@ describe("Call Hierarchy of a Protocol-provided Method", () => {
 		])
 	})
 })
+
+describe("Call Hierarchy inside a refused value", () => {
+	let source = [
+		"implementation {",
+		"\tfunction helper(_ value: Integer) -> List<Integer> {",
+		"\t\t<- [value]",
+		"\t}",
+		"",
+		"\tconstant first = helper(1)[0]",
+		"\tconstant kept = [1]::removeEvery(where (item) {",
+		"\t\tfunction keep(_ value: Integer) -> Boolean {",
+		"\t\t\t<- true",
+		"\t\t}",
+		"",
+		"\t\t<- keep(item)",
+		"\t})[0]",
+		"}",
+	].join("\n")
+
+	it("should count a call written in front of the brackets", () => {
+		expect(summarise(incoming(source, { line: 2, column: 11 }))).toEqual([
+			{
+				name: "implementation",
+				kind: "implementation",
+				container: null,
+				calls: 1,
+			},
+		])
+	})
+
+	it("should prepare a Function declared in front of the brackets", () => {
+		expect(prepare(source, { line: 8, column: 13 })?.name).toBe("keep")
+		expect(summarise(incoming(source, { line: 8, column: 13 }))).toEqual([
+			{
+				name: "implementation",
+				kind: "implementation",
+				container: null,
+				calls: 1,
+			},
+		])
+	})
+})
