@@ -84,8 +84,8 @@ link or `#anchor` that resolves to nothing.
 Netlify, configured by `netlify.toml` at the repository root — it installs with
 Bun from the root (this package resolves through the workspace's
 `node_modules`), builds here, checks every link in the build, and publishes
-`packages/website/dist`. A broken link fails the deploy. `BUN_VERSION` there is
-kept in lockstep with `.bun-version`.
+`packages/website/dist`. A broken link fails the deploy. `tests/deploy.spec.ts`
+holds its `BUN_VERSION` to `.bun-version`.
 
 The old GitHub Pages workflow and the root `docs` symlink are gone. The one URL
 that outlived them, `/diagnostics`, is a 301 in `netlify.toml` to

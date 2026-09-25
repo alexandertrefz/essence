@@ -10,8 +10,8 @@ command = "bun install --frozen-lockfile && bun run --cwd packages/website build
 publish = "packages/website/dist"
 
 [build.environment]
-# NOTE: Keep in lockstep with `.bun-version`.
-BUN_VERSION = "1.3.14"
+# NOTE: `packages/website/tests/deploy.spec.ts` holds this to `.bun-version`.
+BUN_VERSION = "1.4.2"
 
 # The diagnostics page used to be served at `/diagnostics` by GitHub Pages.
 # Every terminal report and Language Server client that ever printed that URL
