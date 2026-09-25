@@ -423,7 +423,7 @@ function heldIndex(
 // Parser AST its edits are measured against, the enriched Program for a fix
 // that has to name a Type, the buffer's lines, and what an import can be
 // written from. One shape rather than a parameter list per code, so that a fix
-// which grows a need does not move the call sites of the fifteen beside it.
+// which grows a need does not move the call site of every other fix.
 export type FixContext = {
 	diagnostic: common.Diagnostic & { position: common.Position }
 	program: parser.Program
@@ -488,7 +488,7 @@ const documentationSpellingFix: FixProvider = ({ diagnostic, lines }) =>
 // in the order they are offered in. The table is what makes a Quick Fix a
 // self-contained addition: a fix is a function in one of the `*Fixes` modules
 // beside this one and a line here, and two of them landing at once meet in a
-// sorted list rather than in the middle of one function.
+// table rather than in the middle of one function.
 const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"ambiguous-case": ({ diagnostic, lines }) =>
 		choicePrefixActions(diagnostic, lines),
@@ -498,11 +498,11 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		wrapInHoldingCaseActions(diagnostic, program),
 	"argument-label-mismatch": ({ diagnostic, lines }) =>
 		listed(argumentLabelAction(diagnostic, lines)),
-	// NOTE: Every mismatch in the language arrives under these three codes, and
-	// what picks the asynchrony ones out is the `data` the Validator carried on
-	// the report — `waitForValueAction` answers nothing where there is none.
-	// An Argument is where a reader meets this most: `show(work)` is the shape
-	// a missing `complete` takes in everyday code.
+	// NOTE: Every Type mismatch code shares `mismatchFixes`, and what picks the
+	// asynchrony ones out is the `data` the Validator carried on the report:
+	// `waitForValueAction` answers nothing where there is none. An Argument is
+	// where a reader meets this most: `show(work)` is the shape a missing
+	// `complete` takes in everyday code.
 	"argument-type-mismatch": mismatchFixes,
 	"assignment-type-mismatch": mismatchFixes,
 	"at-in-static-method": ({ diagnostic, program, lines }) =>
@@ -557,10 +557,11 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(waitForValueAction(diagnostic)),
 	"invalid-escape": ({ diagnostic, lines }) =>
 		invalidEscapeActions(diagnostic, lines),
-	// NOTE: Four codes, one fix. What to write in place of a malformed
-	// `\u{…}` is already spelled in the Diagnostic's own Help, and which of
-	// the six mistakes it was decides only whether there IS one — see
-	// `unicodeEscapeActions`.
+	// NOTE: `unicodeEscapeActions` answers the Unicode escape codes whose Help
+	// can spell a rewrite to apply: this one, `surrogate-unicode-escape` and
+	// `unbraced-unicode-escape`. `unicode-escape-out-of-range` has no entry:
+	// its Help, where it has one, is a decimal reading, which stays the
+	// reader's decision.
 	"malformed-unicode-escape": ({ diagnostic }) =>
 		unicodeEscapeActions(diagnostic),
 	"invalid-module-specifier": ({ diagnostic, lines }) =>
@@ -679,14 +680,14 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		...namespaceImportActions(context.diagnostic, context.imports),
 		...spellingFix(context),
 	],
-	// NOTE: A Modifier that is not one has two answers and the Diagnostic says
-	// which: a near miss is a misspelling, and anything else is a word that
-	// belongs in the body or nowhere. The spelling stands above the removal
-	// where there is one, since it is what leaves the reader's intent alone.
 	"surrogate-unicode-escape": ({ diagnostic }) =>
 		unicodeEscapeActions(diagnostic),
 	"unbraced-unicode-escape": ({ diagnostic }) =>
 		unicodeEscapeActions(diagnostic),
+	// NOTE: A Modifier that is not one has two answers and the Diagnostic says
+	// which: a near miss is a misspelling, and anything else is a word that
+	// belongs in the body or nowhere. The spelling stands above the removal
+	// where there is one, since it is what leaves the reader's intent alone.
 	"unknown-modifier": (context) => [
 		...spellingFix(context),
 		...listed(
