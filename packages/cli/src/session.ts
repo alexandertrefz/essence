@@ -58,12 +58,9 @@ export type CompileSession = {
 	// Diagnostics read best in.
 	modules: (fileName: string) => Array<Module>
 	linked: (fileName: string) => Array<LinkedModule>
-	// NOTE: Simplifying is not something a Program survives twice: the
-	// Simplifier writes an overloaded Method's mangled name onto the typed Node
-	// it read it off, so a second pass mangles the mangled name and the emitted
-	// call names a Method nothing declares. One typed Program is reached by
-	// every entry that imports it, so each is put through once — keyed by the
-	// Program itself, because that is what may not be simplified twice.
+	// NOTE: One typed Program is reached by every entry that imports it, so
+	// each is simplified once and answers with the same simplified Program
+	// every time, which is what lets `optimise` key its cache on that Program.
 	simplify: (
 		program: common.typed.Program,
 		options?: SimplifyOptions,

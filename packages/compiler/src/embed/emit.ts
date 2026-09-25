@@ -62,7 +62,7 @@ export type EmitRequest = {
 
 // NOTE: Who does the work, when somebody other than this file should. Both
 // caches are `esc`'s: one typed Program is reached by every entry that imports
-// it, and simplifying is not something a Program survives twice.
+// it, and each is simplified and optimised once.
 export type EmitHooks = {
 	// NOTE: The Options carry the Module's own text, which only a test compile
 	// reads — the span table a test lowering emits slices the source of every
