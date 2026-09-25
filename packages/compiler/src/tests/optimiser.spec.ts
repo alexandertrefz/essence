@@ -4247,9 +4247,9 @@ describe("Optimiser", () => {
 		// NOTE: `inline-loops` writes a callee's BODY out where the call stands,
 		// and the callee's own default parameters are what would have filled the
 		// missing Argument in — there is no binding at the call site for them to
-		// fill. None of the seven callees it inlines carries a default today, so
-		// the guard is asserted against a Namespace that shadows one of them:
-		// with the guard, the call keeps its frame and answers correctly.
+		// fill. None of the callees it inlines carries a default, so the guard
+		// is asserted against a Namespace that shadows one of them: with the
+		// guard, the call keeps its frame and answers correctly.
 		describe("a walk this pass inlines, given a default", () => {
 			// NOTE: The filter is an Overload entry, so what stands in the
 			// source is the entry's own signature with no name on it. The

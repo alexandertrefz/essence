@@ -2408,10 +2408,11 @@ describe("everyEntry and removeEvery", () => {
 	})
 })
 
-// NOTE: The two natives that GATHER a Dictionary rather than being handed one
-// — `GroupedList.group` and `GroupedList.tally`
-// (`packages/standard-library/sources/Dictionary.es`). They build through this
-// module's own fresh-store doors, so what is asked of them here is what is
+// NOTE: Two of the natives that gather a Dictionary rather than being handed
+// one: `GroupedList.group` and `GroupedList.tally`
+// (`packages/standard-library/sources/Dictionary.es`). The third,
+// `GroupedList.index`, is held in `groupedList.spec.ts`. The two build through
+// this module's own fresh-store doors, so what is asked of them here is what is
 // asked of every other construction: which entries are live, in what order, and
 // that the answer is a store of its own a write may be made on.
 describe("grouping a List", () => {

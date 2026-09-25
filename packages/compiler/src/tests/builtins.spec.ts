@@ -111,8 +111,8 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	SignStyle: signStyle,
 	Division: division,
 	SortOrder: sortOrder,
-	// NOTE: A Namespace with no native either, for the reason `Scalar` has
-	// none: all three of its Methods are derived from the Choice.
+	// NOTE: A Namespace with no native either: every one of its Methods is
+	// derived from the Choice.
 	Stream: stream,
 	Record: record,
 	List: list,
@@ -158,7 +158,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	// as `NestedResult`'s one is.
 	Response: response,
 	// NOTE: Two Choices with no native either, for the reason `Stream` has
-	// none: all three Methods of each are derived from the Choice.
+	// none: every Method of each is derived from the Choice.
 	HttpMethod: httpMethod,
 	Redirects: redirects,
 	// NOTE: And the third, which does carry one — its Cases have a reason to

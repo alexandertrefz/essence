@@ -474,11 +474,11 @@ describe("gathering a Dictionary out of a List, against a plain model", () => {
 
 	// NOTE: The arrangement the fresh-store search has no fallthrough for, held
 	// here so it can not quietly stop being reachable — or quietly become
-	// UNSOUND. A branded `Number` witness covers five kinds, two of which have
+	// UNSOUND. A branded `Number` witness covers four kinds, two of which have
 	// no encoding, so one store carries encoded slots and unencoded ones at
 	// once. It is right today only because an Algebraic and a Transcendental
 	// are provably irrational and so can never equal an Integer or a Rational:
-	// no encoded key is ever the key an unencoded slot holds. A sixth branded
+	// no encoded key is ever the key an unencoded slot holds. Another branded
 	// Namespace whose `is` crossed that line would gather two slots for one
 	// key, where `slotHolding` — which falls through to the scan while
 	// `unencoded` stands — would find the one.
