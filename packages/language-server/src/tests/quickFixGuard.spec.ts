@@ -32,32 +32,28 @@ afterAll(() => {
 	madeFolders = []
 })
 
-// NOTE: The standing guard over every Quick Fix this Server offers, applied to
-// every deliberately broken file there is. The Help audit found fixes that
-// LOOPED — offered again on the very Diagnostic they had just been applied to —
-// fixes that RAISED the count, and fixes that left a buffer that no longer
-// parses, and each of them was found by a person reading one report at a time.
-// This asks the same questions of all of them at once, so the next one fails
-// here rather than in a reader's editor.
+// NOTE: The standing guard over every Quick Fix this Server offers, asked of
+// every deliberately broken file there is. Each fix, applied alone to the
+// original text:
+//   (i)   raises no report the file did not already carry, except the codes
+//         its allowance names, and without an allowance neither count rises
+//   (ii)  does not leave the Diagnostic it was offered for with the identical
+//         code, message and place, which is the definition of a loop
+//   (iii) leaves a result that still parses, unless the original did not
+//   (v)   writes only on the lines its Diagnostic stands on or their
+//         neighbours, unless a reach allowance names the fix
 //
-// The five questions, per fix, applied ALONE to the original text:
-//   (i)   it raised no report the file did not already carry, and neither
-//         count rose
-//   (ii)  the Diagnostic it was offered FOR is gone, or has moved on to a
-//         different code — never the identical code and message in the same
-//         place, which is the definition of a loop
-//   (iii) the result still PARSES, unless the original did not
-//   (iv)  the same-titled fix is not offered again on the identical Diagnostic,
-//         followed up to eight rounds with the count never rising
-//   (v)   every edit it makes stands on the lines the Diagnostic stands on, or
-//         on their neighbours — a fix answers the report the reader asked about
-//         and does not rewrite the rest of their file on the way past
+// And each fix starts a chain, followed for up to eight rounds or until the
+// result offers no quick fix. A round applies the quick fix offered for a report
+// the previous round raised, or else the first one offered.
+//   (iv)  no round raises the report or error count, a scaffold's round counted
+//         without the codes its allowance names; no round breaks the parse;
+//         and no fix is offered again on the Diagnostic it was applied to
 //
 // Deterministic and with no timing assertion: the corpus is a sorted directory
 // listing and every edit is a function of the text it is applied to. The
-// questions are asked by `answerFailures` and `chainFailures`, which the mutants
-// in "The guard itself" are asked in turn: a guard that has never caught
-// anything is a guard nobody has a reason to believe.
+// questions are asked by `answerFailures` and `chainFailures`, and the mutants
+// in "The guard itself" check that each of them can fail.
 
 // NOTE: Codes the Parser and the Lexer raise, which is what "does it still
 // parse" is asked with — a fix that leaves a buffer the Parser can not read has
@@ -585,55 +581,109 @@ function reachFailures(entry: CodeActionEntry): Array<string> {
 	return failures
 }
 
-// NOTE: The fourth question, which is about the fix being offered AGAIN rather
-// than about what one application left behind — so it rolls the text forward
-// under its own edits rather than judging one result.
+const CHAIN_ROUNDS = 8
+
+function sameFix(left: CodeActionEntry, right: CodeActionEntry): boolean {
+	return left.title === right.title && keyOf(left) === keyOf(right)
+}
+
+function answers(
+	entry: CodeActionEntry,
+	diagnostic: common.Diagnostic,
+): boolean {
+	return (
+		entry.diagnosticCode === diagnostic.code &&
+		entry.diagnosticPosition !== null &&
+		diagnostic.position !== null &&
+		entry.diagnosticPosition.start.line ===
+			diagnostic.position.start.line &&
+		entry.diagnosticPosition.start.column ===
+			diagnostic.position.start.column
+	)
+}
+
+// NOTE: One round of a chain. A scaffold's round is counted without the codes
+// its allowance names, since those reports are the holes it leaves by design.
+function roundFailures(
+	fix: CodeActionEntry,
+	before: Array<common.Diagnostic>,
+	after: Array<common.Diagnostic>,
+): Array<string> {
+	let failures: Array<string> = []
+	let holes = allowanceFor(fix)?.followUp ?? []
+	let counted = (diagnostics: Array<common.Diagnostic>) =>
+		diagnostics.filter((diagnostic) => !holes.includes(diagnostic.code))
+	let aside = holes.length === 0 ? "" : ` not counting ${holes.join(", ")}`
+
+	if (errorsIn(counted(after)) > errorsIn(counted(before))) {
+		failures.push(
+			`the error count rose from ${errorsIn(counted(before))} to ${errorsIn(counted(after))}${aside}`,
+		)
+	}
+
+	if (counted(after).length > counted(before).length) {
+		failures.push(
+			`the report count rose from ${counted(before).length} to ${counted(after).length}${aside}`,
+		)
+	}
+
+	if (parsesIn(before) && !parsesIn(after)) {
+		failures.push("the result no longer parses")
+	}
+
+	return failures
+}
+
+// NOTE: The fourth question follows a fix the way a reader presses through
+// lightbulbs: apply it, read the Diagnostics again, then apply the quick fix
+// the result offers for a report that round raised, or else the first it offers.
 function chainFailures(source: string, entry: CodeActionEntry): Array<string> {
 	let failures: Array<string> = []
 	let text = source
-	let counts = [analyse(text, undefined, { tests: true }).length]
-	let title = entry.title
-	let identity = keyOf(entry)
+	let reports = analyse(text, undefined, { tests: true })
+	let applied: Array<CodeActionEntry> = []
 	let applying: CodeActionEntry | undefined = entry
 
-	for (let round = 0; round < 8; round++) {
-		if (applying === undefined) {
-			break
-		}
+	for (
+		let round = 0;
+		round < CHAIN_ROUNDS && applying !== undefined;
+		round++
+	) {
+		let fix: CodeActionEntry = applying
 
-		text = applyEdits(text, applying.edits)
-		counts.push(analyse(text, undefined, { tests: true }).length)
+		applied.push(fix)
+		text = applyEdits(text, fix.edits)
 
-		let again: CodeActionEntry | undefined = actionsOn(text).find(
-			(candidate) =>
-				candidate.kind === "quickfix" &&
-				candidate.title === title &&
-				keyOf(candidate) === identity,
+		let after = analyse(text, undefined, { tests: true })
+		let along = applied.map((step) => step.title).join(" → ")
+		let offered = actionsOn(text).filter(
+			(candidate) => candidate.kind === "quickfix",
+		)
+		let again = offered.find((candidate) =>
+			applied.some((step) => sameFix(step, candidate)),
 		)
 
-		// NOTE: A fix offered again on the identical Diagnostic, after it was
-		// applied, is the loop. One round is enough to say so.
-		if (again !== undefined) {
-			failures.push(`(iv) offered again in round ${round}`)
+		for (let failure of roundFailures(fix, reports, after)) {
+			failures.push(`(iv) ${failure} in round ${round}, along ${along}`)
+		}
 
+		if (again !== undefined) {
+			failures.push(
+				`(iv) ${again.title} offered again in round ${round}, along ${along}`,
+			)
+		}
+
+		if (failures.length > 0) {
 			break
 		}
 
-		applying = again
-	}
+		let raised = freshReports(reports, after)
 
-	// NOTE: And the count never climbs along the way, allowance or not — a
-	// scaffold leaves ONE hole, not a hole per round.
-	if (allowanceFor(entry) === undefined) {
-		for (let index = 1; index < counts.length; index++) {
-			if ((counts[index] as number) > (counts[index - 1] as number)) {
-				failures.push(
-					`(iv) the report count climbed to ${counts[index]} in round ${index}`,
-				)
-
-				break
-			}
-		}
+		applying =
+			offered.find((candidate) =>
+				raised.some((diagnostic) => answers(candidate, diagnostic)),
+			) ?? offered[0]
+		reports = after
 	}
 
 	return failures
@@ -696,10 +746,7 @@ describe("Every Quick Fix on every broken file", () => {
 				}
 			})
 
-			// (iv) And no fix chain that never ends: the same-titled fix on the
-			// same Diagnostic, round after round, is a lightbulb a reader can
-			// press forever.
-			it("never offers the same fix again on the same report", () => {
+			it("follows every fix's chain without a loop or a rising count", () => {
 				for (let entry of entries) {
 					let where = `${showcase.name} · ${entry.title}`
 
@@ -926,10 +973,9 @@ describe("The allowlist", () => {
 // differently, WRONG: each mutant below is an honest fix carrying something no
 // reader asked for, and each has to be caught.
 //
-// They are the seven the Help audit's review built by hand against this spec,
-// three of which it got past — the three that ride along with an honest edit and
-// change something else in the file. Those are the reason question (v) exists,
-// and they are asked here so that it can not quietly stop working.
+// Three of them ride along with an honest edit and change something else in the
+// file, which only question (v) catches, and one is caught only by following the
+// chain past its first round.
 describe("The guard itself", () => {
 	// NOTE: Written here rather than read out of the corpus: a mutant has to
 	// know what it is corrupting — a comment, a binding, a Case — and a fixture
@@ -989,8 +1035,8 @@ describe("The guard itself", () => {
 		expect(reachAllowanceFor(honest)).toBeUndefined()
 	})
 
-	// NOTE: The control. A guard that failed everything would catch all seven
-	// below and be worth nothing.
+	// NOTE: The control. A guard that failed everything would catch every mutant
+	// and be worth nothing.
 	it("passes the honest fix", () => {
 		expect(verdict(honest)).toEqual([])
 	})
@@ -1019,7 +1065,7 @@ describe("The guard itself", () => {
 		expect(verdict(mutant([{ range: whole, newText: SUBJECT }]))).toEqual([
 			"(ii) left 'unknown-name 11:17 'greetingg' is not declared' where it was",
 			"(v) wrote elsewhere in the file: lines 1-15",
-			"(iv) offered again in round 0",
+			"(iv) Change to 'greeting' offered again in round 0, along Change to 'greeting'",
 		])
 	})
 
@@ -1038,6 +1084,7 @@ describe("The guard itself", () => {
 			"(i) raised 'unexpected-token Unexpected 'implementation' after the end of the Program'",
 			"(iii) the result no longer parses",
 			"(v) wrote elsewhere in the file: lines 15-15",
+			"(iv) the result no longer parses in round 0, along Change to 'greeting'",
 		])
 	})
 
@@ -1046,6 +1093,7 @@ describe("The guard itself", () => {
 			"(i) raised 'syntax-error Expected 'implementation' but found end of input.'",
 			"(iii) the result no longer parses",
 			"(v) wrote elsewhere in the file: lines 1-15",
+			"(iv) the result no longer parses in round 0, along Change to 'greeting'",
 		])
 	})
 
@@ -1087,6 +1135,26 @@ describe("The guard itself", () => {
 		expect(
 			verdict(rewritten((text) => text.replaceAll("Red", "Crimson"))),
 		).toEqual(["(v) wrote elsewhere in the file: lines 1-15"])
+	})
+
+	// NOTE: Caught by no question but the chain: the fix moves the misspelled
+	// name into a declaration whose uses it masks, and the next fix unmasks them.
+	it("catches a count that rises further down the chain", () => {
+		let trap = mutant([
+			{
+				range: {
+					start: { line: 11, column: 1 },
+					end: { line: 11, column: (lines[10] as string).length + 1 },
+				},
+				newText:
+					"\tconstant copy = greetingg\n\tcopy::a()\n\tcopy::b()",
+			},
+		])
+
+		expect(verdict(trap)).toEqual([
+			"(iv) the error count rose from 1 to 2 in round 1, along Change to 'greeting' → Change to 'greeting'",
+			"(iv) the report count rose from 1 to 2 in round 1, along Change to 'greeting' → Change to 'greeting'",
+		])
 	})
 })
 
