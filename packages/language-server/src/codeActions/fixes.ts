@@ -859,10 +859,10 @@ export function wrapInHoldingCaseActions(
 		return []
 	}
 
-	// NOTE: Found on a fresh parse, as every edit here is: a Position from a
-	// stale analysis would wrap whatever now stands in its place. An Argument's
-	// value is a Node of its own, so the Position the Warning carries is one the
-	// walk finds exactly rather than by containment.
+	// NOTE: Found on the current parse, as every edit here is: a Position from
+	// a stale analysis would wrap whatever now stands in its place. An
+	// Argument's value is a Node of its own, so the Position the Warning
+	// carries is one the walk finds exactly rather than by containment.
 	let argument = findNodeAt(program, diagnostic.position)
 
 	if (argument === null) {
