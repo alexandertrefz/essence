@@ -66,7 +66,7 @@ export const inlineLoops: OptimiserPass = {
 		// their mangled `loop__overload$N` name, an `overload function` block is
 		// refused outside the standard library, and no name a Program can write
 		// holds a `_` — the Lexer reads it as a Symbol. There is no Program that
-		// can put a different Function behind those four names.
+		// can put a different Function behind those names.
 		let shadowed = namespaces.nested
 		let inlining = new Inlining(shadowed)
 
@@ -108,11 +108,10 @@ class Inlining {
 	}
 
 	// NOTE: A loop standing where a Statement may be written, which is where the
-	// arrow around it is not needed — the same three positions
-	// `lower-matches-to-statements` lifts a Match out of, and a fourth: a walk
-	// written for its effects. That pass runs BEFORE this one and can not see a
-	// loop this one has not made yet, so the lifting is done here rather than
-	// there.
+	// arrow around it is not needed: the positions `lower-matches-to-statements`
+	// lifts a Match out of, a walk written for its effects among them. That pass
+	// runs BEFORE this one and can not see a loop this one has not made yet, so
+	// the lifting is done here rather than there.
 	statement(
 		node: common.typedSimple.ImplementationNode,
 	): common.typedSimple.ImplementationNode {
@@ -183,11 +182,11 @@ class Inlining {
 		// the CALLEE'S BODY out where the call stands, and the callee's own
 		// default parameters are what would have filled the Argument in — there
 		// is no binding here for them to fill, and the Argument list this pass
-		// reads is the one the call WROTE. None of the seven callees it inlines
-		// carries a default today (`loop`'s entries and `reduce`'s are dispatched
-		// by their label sets, which is what an `overload` block is for), so this
-		// costs nothing; it is here so that a default written on one of them
-		// later is a missed optimisation rather than a wrong Program.
+		// reads is the one the call WROTE. None of the callees it inlines
+		// carries a default (`loop`'s entries and `reduce`'s are dispatched by
+		// their label sets, which is what an `overload` block is for), so this
+		// costs nothing; it is here so that a default written on one of them is
+		// a missed optimisation rather than a wrong Program.
 		if (node.nodeType === "FunctionInvocation") {
 			return node.omitsArguments === true ? null : this.freeLoop(node)
 		}
