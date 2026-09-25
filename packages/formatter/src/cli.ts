@@ -191,7 +191,7 @@ async function resolveFiles(patterns: Array<string>): Promise<Array<string>> {
 	let { exclude } = readProjectConfiguration()
 
 	for (let pattern of patterns) {
-		// NOTE: A plain path is its own match — `glob` would treat characters
+		// NOTE: A plain path is its own match: `glob` would treat characters
 		// like `[` in a file name as a pattern rather than as the name. A named
 		// file is taken as it is, whatever its extension and even when the
 		// project excludes it; only a directory filters, because there the
