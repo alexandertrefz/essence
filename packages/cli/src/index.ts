@@ -24,10 +24,6 @@ import {
 } from "./projectOptions"
 import { runWatch } from "./watch"
 
-// NOTE: `run` returns an exit code instead of calling `process.exit`, so that
-// the whole CLI can be driven from a test without ending the test runner along
-// with it. The executable in bin/ is the only thing that exits.
-
 function printUsageError(context: CLIContext, error: UsageError): void {
 	let { palette, terminal, theme } = context
 
@@ -283,6 +279,9 @@ async function dispatch(
 	}
 }
 
+// NOTE: Returns an exit code instead of calling `process.exit`, so that the
+// whole CLI can be driven from a test without ending the test runner along with
+// it. The executables in bin/ set `process.exitCode` from what it answers.
 export async function run(
 	argv: Array<string>,
 	programName: string = DEFAULT_PROGRAM_NAME,
