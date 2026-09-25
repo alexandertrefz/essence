@@ -470,9 +470,9 @@ export function testIdentityKey(
 // failing-example corpus live in the Module's own companion directory, so
 // spelling the path inside the file as well would be the one fact written
 // twice, and a Module that moved would take a store its keys no longer name.
-// A benchmark's baseline leaves the row off as well, the way a snapshot's
-// name does: the rows share a body, and the run numbers the entry it
-// recorded.
+// A table row's key ends with its row, the way a stored snapshot's name does:
+// the rows share a body, and one entry for all of them would be one entry the
+// rows overwrite in turn.
 export function relativeIdentityKey(
 	identity: common.typed.TestIdentity,
 	row: number | null = null,
