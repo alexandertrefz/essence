@@ -430,11 +430,10 @@ function nearestSource(fileName: string): string | null {
 	}
 }
 
-// NOTE: A Help on each of the three, because the answer is in hand at every one
-// of them and none of them had one. What a reader is told to do with a
-// directory used to be written into the MESSAGE, which is the one line a report
-// repeats everywhere — the advice belongs where every other Diagnostic here
-// puts it.
+// NOTE: A Help on every branch, because the answer is in hand at each of them.
+// The advice goes in the Help, where every other Diagnostic here puts it,
+// rather than in the MESSAGE, which is the one line a report repeats
+// everywhere.
 function readError(error: unknown, fileName: string): common.Diagnostic {
 	let code = (error as NodeJS.ErrnoException | undefined)?.code
 
