@@ -11881,9 +11881,8 @@ describe("Enricher", () => {
 
 	// NOTE: The Dictionary Type as a Program can reach it — the annotation, the
 	// arity, assignability between two of them, and a user Namespace written for
-	// one. Nothing here constructs a Dictionary: slice 1 builds one only through
-	// `Dictionary.of`, which the standard library does not declare yet, so every
-	// Dictionary a test can get hold of arrives as a Parameter.
+	// one. Every Dictionary here arrives as a Parameter, so what is asked is the
+	// Type alone.
 	describe("Dictionary Types", () => {
 		function parameterTypeOf(source: string, methodName: string): string {
 			let { program, diagnostics } = enrichSource(source)

@@ -2067,10 +2067,9 @@ describe("Optimiser", () => {
 	// or off — `--no-optimise` compiles the Program as it was written, and a
 	// Program as it was written still has no run-time notion of a predicate.
 	//
-	// NOTE: There is no syntax for a refinement yet, so one is written into a
-	// simplified Program by hand — which is also how the Rewriter's refusal below
-	// can be asked at all, since every route through the stage takes it away
-	// first.
+	// NOTE: A refinement is written into a simplified Program by hand, which is
+	// the only way the Rewriter's refusal can be asked at all: every route
+	// through the stage takes it away first.
 	describe("erasing checked refinements", () => {
 		const integer: common.Type = { type: "Integer" }
 

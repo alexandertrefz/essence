@@ -104,8 +104,7 @@ describe("Type matching", () => {
 	// NOTE: The same two rules for the two-slot container, and the one they do
 	// not share: a Dictionary is compared SLOT BY SLOT, so two of them agreeing
 	// on their keys and disagreeing on their values are two Types. Every
-	// Dictionary here arrives as a Parameter — slice 1 builds one only through
-	// `Dictionary.of`, which the standard library does not declare yet.
+	// Dictionary here arrives as a Parameter.
 	describe("Dictionary annotations", () => {
 		it("should accept a Dictionary of the same two slots", () => {
 			expect(
@@ -732,9 +731,9 @@ describe("Type matching", () => {
 		})
 	})
 
-	// NOTE: Checked refinements have no syntax yet, so these build the Types
-	// directly — which is also the only way to state the rules on their own,
-	// away from whatever a Declaration will decide about them.
+	// NOTE: These build the refinement Types directly, which is the only way to
+	// state the rules on their own, away from whatever a Declaration will
+	// decide about them.
 	//
 	// NOTE: The direction is the whole of it. A refinement flows into its base
 	// for free, because forgetting evidence loses nothing; the base does NOT

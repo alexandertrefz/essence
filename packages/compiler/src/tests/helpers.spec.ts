@@ -4047,11 +4047,10 @@ describe("Matching a signature that promises a default", () => {
 	})
 })
 
-// NOTE: The two-slot container, asked of the helpers directly. Nothing a Program
-// can write builds a Dictionary with an UNDECIDED slot yet — there is no literal
-// syntax until slice 2 — and the whole of what a second slot changes is that the
-// two are decided, substituted and compared apart, so the rules are written down
-// here where both halves can be spelled.
+// NOTE: The two-slot container, asked of the helpers directly. The whole of
+// what a second slot changes is that the two are decided, substituted and
+// compared apart, so the rules are written down here where both halves can be
+// spelled.
 describe("Dictionary Types", () => {
 	let bare: common.GenericDictionaryType = {
 		type: "GenericDictionary",

@@ -1054,9 +1054,9 @@ describe("Resolvers", () => {
 		})
 	})
 
-	// NOTE: Checked refinements have no syntax yet, so the receiver is built
-	// directly and asked of the standard library's own Namespaces — which is what
-	// makes these about resolution rather than about a Declaration.
+	// NOTE: The receiver is built directly and asked of the standard library's
+	// own Namespaces, which is what makes these about resolution rather than
+	// about a Declaration.
 	//
 	// NOTE: There are two halves and both are load-bearing. A refined receiver
 	// has to keep every Method its base had, or refining a Type would take its
