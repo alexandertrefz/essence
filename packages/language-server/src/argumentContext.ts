@@ -240,6 +240,9 @@ function visitNode(
 		case "Complete":
 			visitNode(node.expression, null, state)
 			return
+		case "RefusedValue":
+			visitNode(node.base, null, state)
+			return
 		case "Combination": {
 			visitNode(node.lhs, expected, state)
 

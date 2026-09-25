@@ -163,3 +163,30 @@ describe("Argument context inside a Protocol-provided Method body", () => {
 		})
 	})
 })
+
+describe("Argument context inside a refused value", () => {
+	let source = [
+		"implementation {",
+		"\ttype Point = { x: Integer, y: Integer }",
+		"",
+		"\tfunction around (_ point: Point) -> List<Point> {",
+		"\t\t<- [point]",
+		"\t}",
+		"",
+		"\tconstant first = around({ x = 0, y = 0 })[0]",
+		"}",
+	].join("\n")
+
+	it("should offer the callee's Parameters at the call", () => {
+		expect(contextAt(source, { line: 8, column: 25 })?.kind).toBe(
+			"arguments",
+		)
+	})
+
+	it("should offer the Record's members inside the literal", () => {
+		expect(contextAt(source, { line: 8, column: 29 })).toMatchObject({
+			kind: "record",
+			presentMembers: ["x", "y"],
+		})
+	})
+})
