@@ -1720,8 +1720,8 @@ const seededBuilds = `implementation {
 // must refuse: an Argument that PRINTS, which is the whole of what folding
 // through a call would cost, and a mixed-kind sum, which reaches a Method whose
 // body is not the one being reproduced. The Rationals are the ones that matter
-// most — `1/2 + 1/4` must fold to what the Essence body STORES and not to the
-// lowest-terms value it is worth.
+// most: a fold has to store what the operation stores, which is lowest terms
+// for the native `1/2 + 1/4` and the written parts for `4/2`.
 const constantFolding = `implementation {
 	§§ Prints as it answers, so that an operation folded away would show.
 	§§

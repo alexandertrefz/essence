@@ -106,8 +106,7 @@ describe("List.of counts the direction its label says", () => {
 		).toEqual(['"[0, 1, 2]"', '"[]"', '"[]"'])
 	})
 
-	// NOTE: The first value is always answered, which is what the Type says and
-	// what the two Essence bodies written on this entry rest on.
+	// NOTE: The first value is always answered, which is what the Type says.
 	it("counts down through an included end, and always answers the first value", async () => {
 		expect(
 			await ranges(
@@ -191,9 +190,9 @@ describe("List.of counts the direction its label says", () => {
 		).toEqual(['"4"', '"1"', '"Value(1)"'])
 	})
 
-	// NOTE: The two Essence bodies the proof is what makes writable.
-	// `NonEmptyList::indices` counts down and turns the answer round, and
-	// `List.repeat` needs the up-counting entry to answer nothing below one.
+	// NOTE: `NonEmptyList::indices` is native and answers a List that is never
+	// empty, and `List.repeat` is written on the up-counting entry, which
+	// answers nothing for a count below one.
 	it("keeps the promises the library's own bodies rest on", async () => {
 		expect(
 			await run(`implementation {

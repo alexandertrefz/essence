@@ -870,9 +870,9 @@ describe("Stdlib Call Graph", () => {
 			// neither needs anything the Record does not hold.
 			"Response.header",
 			"Response.isSuccessful",
-			// NOTE: Every Method of the carrier that says why, and every one
-			// of them is written in Essence — `toString` is the one native,
-			// for the reason `Optional.toString` is one.
+			// NOTE: Every Method of the carrier that says why but `toString`
+			// is written in Essence. `toString` is native, for the reason
+			// `Optional.toString` is.
 			"Result.andThen",
 			"Result.hasFailed",
 			"Result.hasValue__overload$1",

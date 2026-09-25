@@ -37,14 +37,13 @@ import { validate } from "../validator/index"
 // numerator, and zero is `0/1` — plus the two places they historically leaked:
 // an Integer-operand `divide` that handed the sign to the DENOMINATOR, which
 // every ordering primitive then read backwards, and a `reduce` that bailed on
-// a zero operand, so a cancelled `0/4` could never reduce itself. The
-// arithmetic is written in Essence now (`packages/standard-library/sources/Rational.es`)
-// and funnels every result through `Rational.of` into `createRational`, so the
-// direct half of these tests checks THAT gateway — the one place the invariants
-// are enforced — and the compiled Programs below check the same behaviour
-// through the Essence bodies, because the damage the leaks did was visible from
-// Essence: `absolute()`, `round(toward:)` and `isWholeNumber()` are all written on
-// top of them.
+// a zero operand, so a cancelled `0/4` could never reduce itself. Every
+// Rational is built through `createRational`: the Essence bodies of
+// `packages/standard-library/sources/Rational.es` that build one reach it
+// through `Rational.of`, and the same-kind arithmetic natives reach it
+// directly. So the direct half of these tests checks that gateway, and the
+// compiled Programs check the same behaviour through the Essence bodies written
+// on top of the invariants, such as `round(toward:)` and `isWholeNumber()`.
 
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
