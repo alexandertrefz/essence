@@ -2828,11 +2828,11 @@ function conformanceStateFor(scope: enricher.Scope): ScopeConformanceState {
 	return state
 }
 
-// NOTE: The three fabricated Namespace names moved to `helpers/conformance.ts`,
-// where the two lists that read them live — a name spelled beside its readers is
-// a name the Rewriter's brand and the Enricher's routing can not disagree about.
-// They are re-exported under their own names, so every site that reaches them
-// through this module still does.
+// NOTE: The three fabricated Namespace names live in `helpers/conformance.ts`,
+// which the Rewriter imports as well, so the Rewriter's brand and the
+// Enricher's routing read one spelling and can not disagree about it. They are
+// re-exported under their own names, so every site that reaches them through
+// this module still does.
 export {
 	derivedEnumerableNamespaceName,
 	derivedEquatableNamespaceName,
@@ -2840,15 +2840,14 @@ export {
 }
 
 // NOTE: The Protocol printing is derived for. Named once and exported, because
-// three places ask whether a conformance is that one — the two below and the
-// Language Server's mirror of them — and a typo in any of them would silently
-// derive nothing.
+// several places ask whether a conformance is that one, the Language Server
+// among them, and a typo in any of them would silently derive nothing.
 export const printableProtocolName = "Printable"
 
 // NOTE: The Protocol a Choice's own Cases are listed through, and the one
 // Method it asks for. Both are named once for the reason the Protocol above is:
-// the derive is found by name in four places, and a typo in any of them would
-// leave a Choice quietly answering nothing.
+// the derive is found by name in several places, and a typo in any of them
+// would leave a Choice quietly answering nothing.
 export const enumerableProtocolName = "Enumerable"
 
 export const enumerableMethodName = "cases"
