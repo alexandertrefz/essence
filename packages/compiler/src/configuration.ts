@@ -1079,9 +1079,6 @@ function readTable(
 	}
 }
 
-// NOTE: What jsonc-parser says about a syntax error, as a sentence. Its codes
-// are `PropertyNameExpected` and the like — readable, but not to a reader who
-// did not write the parser.
 // NOTE: The edit jsonc's own verdict names, where it names one. More than half
 // of these errors say exactly which Token was expected at the offset, and what
 // a reader does about that is write it — one Help per shape, spelling the
@@ -1125,6 +1122,9 @@ function parseErrorHelp(error: ParseError, first: boolean): Array<string> {
 	}
 }
 
+// NOTE: What jsonc-parser says about a syntax error, as a sentence. Its codes
+// are `PropertyNameExpected` and the like — readable, but not to a reader who
+// did not write the parser.
 function describeParseError(error: ParseError): string {
 	switch (printParseErrorCode(error.error)) {
 		case "InvalidSymbol":
