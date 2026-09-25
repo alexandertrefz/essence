@@ -1,8 +1,8 @@
 // NOTE: The runtime module of the `GroupedNonEmptyList` Namespace — the three
 // crossings with the receiver's proof in hand. All three are `GroupedList`'s
 // own natives re-exported straight through, so each entry is one Function
-// under two names and can not come apart. `removeDuplicates` is `NonEmptyList`'s
-// now, over a plain Map rather than over a store.
+// under two names and can not come apart. `removeDuplicates` is a `List`
+// native over a `KeySet`, which `NonEmptyList` re-exports.
 //
 // NOTE: A refinement erases before anything runs, so what the proof buys is
 // spent while compiling and the walk that produces the answer is the same one. A

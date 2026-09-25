@@ -14,7 +14,7 @@ import { type AnyType, typeKeySymbol } from "./type"
 // one of them is a container: `Dictionary.ts` finds a slot by it, and the
 // set-shaped List natives — `removeDuplicates`, `hasDuplicates`,
 // `everyItem(alsoIn:)`, `removeEvery(contentsOf:)` and
-// `contains(everyItemOf:)` — hold their seen keys in a plain Map keyed by it.
+// `contains(everyItemOf:)` — hold their seen keys in plain Sets keyed by it.
 // A List Program that asks one of those questions carries this file and
 // nothing else of the second container: no store, no version stamps, no kind
 // registry and no written form. Measured on the Program
