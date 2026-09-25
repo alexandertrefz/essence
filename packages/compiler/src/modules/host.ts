@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 
 // NOTE: Everything loading a graph needs of the world, which is one question:
-// what does this file say? Kept an interface because the two callers answer it
+// what does this file say? Kept an interface because callers answer it
 // differently — `esc` reads disk, while the Language Server has to answer from
 // the documents the Editor holds open, whose unsaved text is the only truthful
 // version of a file that may not even exist on disk yet. Anything the host can

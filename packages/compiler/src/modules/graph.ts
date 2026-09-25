@@ -190,15 +190,16 @@ function reportRejection(
 					notes: [
 						"A specifier is read exactly as written — no extension is appended and no directory is tried — so what it names is what is read.",
 					],
-					// NOTE: Three answers, because appending '.es' is right for
-					// exactly one of them. A specifier that already carries an
-					// extension names a file of some other kind, and
-					// './clock.js.es' is not a file anybody has — so the Help
-					// says what is true instead, and says nothing a Quick Fix
-					// could read back as an edit. JavaScript gets its own
-					// sentence because it is the one other kind with an answer:
-					// the interop runs the other way round, from a JavaScript
-					// Program embedding a built Essence one.
+					// NOTE: One answer per shape, because appending '.es' is right
+					// for exactly one of them. A path ending in '/' names a
+					// directory, and the Help asks for the file. A specifier that
+					// already carries an extension names a file of some other
+					// kind, and './clock.js.es' is not a file anybody has — so
+					// the Help says what is true instead, and says nothing a
+					// Quick Fix could read back as an edit. JavaScript gets its
+					// own sentence because it is the one other kind with an
+					// answer: the interop runs the other way round, from a
+					// JavaScript Program embedding a built Essence one.
 					helps: [
 						specifier.endsWith("/")
 							? "Name the file itself, ending in '.es'."
@@ -288,8 +289,9 @@ function reportMissingModule(
 }
 
 // NOTE: One resolution per distinct specifier text, but one Diagnostic per
-// ENTRY — two entries naming the same unreachable Module are two mistakes to
-// underline, and Diagnostics dedup by Position, so each is reported once.
+// written specifier: two groups naming the same unreachable Module are two
+// mistakes to underline, and Diagnostics dedup by Position, so each is reported
+// once.
 function resolveDependencies(
 	module: Module,
 	readModule: (filePath: string) => Module | null,
@@ -538,9 +540,8 @@ function resolveAll(
 // and parsed by its own package before the Compiler ever sees it, resolves a
 // specifier against that set by name rather than against the file system.
 // EVERY entry is a root: a collection loaded as a whole has files nothing
-// imports, and `Terminal.es` is exactly that. Nothing in the standard library
-// reaches it, so a graph rooted at one entry would leave printing out of the
-// language.
+// imports, `Prelude.es` among them, and a graph rooted at one entry would leave
+// those out.
 export function loadModuleGraphOver(
 	entries: Array<{
 		filePath: string
