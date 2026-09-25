@@ -844,10 +844,13 @@ declarations {
 	}
 
 	§ A List with an item in it has a lowest item, a highest item and a mean,
-	§ so these three answer bare. Every other question the Namespaces above
-	§ answer is already total, and is not repeated here. Each body is the
-	§ delegation the general Namespaces write. The receiver carries its proof
-	§ into the static, whose proven entry answers.
+	§ and the statistics beyond it. So every entry here answers bare. The
+	§ general Namespaces' `sum`, `product` and `runningTotal` are total
+	§ already, so they are not repeated here. The extrema and the mean
+	§ delegate as the general Namespaces do, and the receiver carries its
+	§ proof into the static, whose proven entry answers. The statistics are
+	§ declared here, and the general entries hand their proven receiver on
+	§ to them.
 	namespace NonEmptyIntegerList for NonEmptyList<Integer> {
 		§§ The lowest item, which a non-empty List always has.
 		§§
