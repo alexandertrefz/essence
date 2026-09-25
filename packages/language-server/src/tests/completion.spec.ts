@@ -2678,6 +2678,56 @@ describe("Completion of a label inside a Parameter's default", () => {
 	})
 })
 
+describe("Completion inside a Protocol-provided Method body", () => {
+	let within = (line: string) =>
+		[
+			"implementation {",
+			"\tchoice Size { Small, Large }",
+			"\tchoice Colour { Red, Blue }",
+			"",
+			"\tprotocol Ranked {",
+			"\t\tisAbove(_ mark: Integer) -> Boolean",
+			"",
+			"\t\tsize(_ mark: Integer) -> Size {",
+			"\t\t\tconstant flipped = @::isAbove(mark)::negate()",
+			`\t\t\t${line}`,
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+	it("should list a Parameter's Methods after a ::", () => {
+		expect(
+			labelsOf(within("<- mark::"), { line: 10, column: 13 }),
+		).toContain("isNot")
+	})
+
+	it("should list the Protocol's own Methods after @::", () => {
+		expect(labelsOf(within("<- @::"), { line: 10, column: 10 })).toEqual([
+			"isAbove",
+			"size",
+		])
+	})
+
+	it("should offer the Choice the body returns for a bare Case", () => {
+		expect(labelsOf(within("<- #"), { line: 10, column: 8 })).toEqual([
+			"Small",
+			"Large",
+		])
+	})
+
+	it("should carry the Types of the names the body declares", () => {
+		let source = within("<- ")
+
+		expect(
+			entryFor(source, { line: 10, column: 7 }, "flipped")?.detail,
+		).toBe("Boolean")
+		expect(entryFor(source, { line: 10, column: 7 }, "mark")?.detail).toBe(
+			"Integer",
+		)
+	})
+})
+
 // NOTE: A `#` inside a Case payload's default has an expected Type just as one
 // inside a Parameter's does — the member of the payload it is filling in — and
 // without the walk reaching there it has none at all.

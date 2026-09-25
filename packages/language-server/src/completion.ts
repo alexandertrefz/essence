@@ -899,6 +899,24 @@ function findProbeReceiverInNode(
 		case "RefusedValue":
 			return findProbeReceiverInNode(node.base)
 		case "ProtocolDeclarationStatement":
+			for (let member of Object.values(node.methods)) {
+				let methods =
+					member.nodeType === "OverloadedMethod" ||
+					member.nodeType === "OverloadedStaticMethod"
+						? member.methods
+						: [member.method]
+
+				for (let method of methods) {
+					let found =
+						findProbeReceiverInDefaults(method.value.parameters) ??
+						findProbeReceiver(method.value.body)
+
+					if (found !== null) {
+						return found
+					}
+				}
+			}
+
 			return null
 		// NOTE: No path-key reading for a Method's Arguments, for the reason
 		// `argumentContext` reads none of their Record members either: the
@@ -1832,6 +1850,20 @@ function analyseCaseProbe(program: common.typed.Program): {
 				}
 
 				return
+			case "ProtocolDeclarationStatement":
+				for (let member of Object.values(node.methods)) {
+					let methods =
+						member.nodeType === "OverloadedMethod" ||
+						member.nodeType === "OverloadedStaticMethod"
+							? member.methods
+							: [member.method]
+
+					for (let method of methods) {
+						visitFunction(method.value)
+					}
+				}
+
+				return
 			case "IfStatement":
 				visitNode(node.condition, null)
 				visitBody(node.body, null)
@@ -1962,7 +1994,6 @@ function analyseCaseProbe(program: common.typed.Program): {
 
 				return
 			case "TypeAliasStatement":
-			case "ProtocolDeclarationStatement":
 			case "Identifier":
 			case "Self":
 			case "StringValue":
@@ -2281,6 +2312,22 @@ function describeDeclarations(
 						describe(node.protocolType.documentation ?? null) ||
 						null,
 				})
+
+				for (let member of Object.values(node.methods)) {
+					let methods =
+						member.nodeType === "OverloadedMethod" ||
+						member.nodeType === "OverloadedStaticMethod"
+							? member.methods
+							: [member.method]
+
+					for (let method of methods) {
+						visitFunction(
+							method.value,
+							documentationOf(method.type),
+						)
+					}
+				}
+
 				return
 			case "FunctionValue":
 				visitFunction(node.value, null)
