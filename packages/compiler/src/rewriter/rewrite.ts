@@ -497,8 +497,8 @@ function preludeModule(
 	}
 }
 
-// NOTE: The three runtime modules that are not a builtin Namespace, under the
-// aliases every emission site reads them by.
+// NOTE: The runtime modules every emission site reads under an alias of the
+// Compiler's own rather than as a builtin Namespace.
 const runtimeModuleAliases = [
 	["$_", "functions"],
 	["$type", "type"],
@@ -3374,7 +3374,7 @@ function boxedValue(node: estree.Expression): estree.Expression | null {
 
 	// NOTE: A Property's value is an Expression or a Pattern, and only a
 	// destructuring writes the latter — this one was written by `boxedInteger`,
-	// three lines up, out of an Expression.
+	// out of an Expression.
 	return held.value as estree.Expression
 }
 
@@ -3596,12 +3596,12 @@ function rewriteCaseValue(
 // curries each as a FUNCTION, so a brand it does not know to lift out would be
 // called.
 //
-// A user Namespace SHADOWING one of the seven is excluded by the same lexical
-// answer every member read is decided by: `namespace String for NonEmptyString
-// is Equatable { is … }` declared inside a Function arrives here as `String`,
-// and branding it would hand the Dictionary an encoding that ignores the very
-// `is` the Program wrote. The derived name carries a `_` no Essence source can
-// spell, so it can not be shadowed.
+// A user Namespace SHADOWING a name on either list is excluded by the same
+// lexical answer every member read is decided by: `namespace String for
+// NonEmptyString is Equatable { is … }` declared inside a Function arrives here
+// as `String`, and branding it would hand the Dictionary an encoding that
+// ignores the very `is` the Program wrote. The derived name carries a `_` no
+// Essence source can spell, so it can not be shadowed.
 function isStructurallyEquatable(
 	node: common.typedSimple.ConformanceValueNode,
 ): boolean {
@@ -4856,18 +4856,19 @@ const reservedJavaScriptWords = new Set([
 ])
 
 // NOTE: The names the emitted Program binds — or reads off the host — for its
-// OWN purposes: the runtime Namespace imports (`List`, `String`, …), the three
-// module aliases beside them, and the global `Object` a Combination's
-// `Object.assign` reaches for. None of them is an Essence keyword and none can
-// be reported to the author as taken, so a Program is free to bind any of them
-// itself — and ordinary JavaScript lexical scoping then rebinds every emitted
-// `List.createList(…)`, `$type.isValueOfType(…)` and `Object.assign(…)` below it
-// to the user's value. `constant List = 5` beside a List literal is a
-// `TypeError` out of a Program that compiled green, and `$type`/`$helpers` are
-// worse: `$` is a legal Essence identifier character, so they are names a user
-// can write without any way of knowing they are spoken for. Every one of them is
-// therefore a name the user half of the Program can not hold — `escapeName`
-// mangles it instead, at the binding and at every reference alike.
+// OWN purposes: the runtime Namespace imports (`List`, `String`, …), the module
+// aliases beside them, and the globals the emission reaches for, such as the
+// `Object` of a Combination's `Object.assign`. None of them is an Essence
+// keyword and none can be reported to the author as taken, so a Program is free
+// to bind any of them itself — and ordinary JavaScript lexical scoping then
+// rebinds every emitted `List.createList(…)`, `$type.isValueOfType(…)` and
+// `Object.assign(…)` below it to the user's value. `constant List = 5` beside a
+// List literal is a `TypeError` out of a Program that compiled green, and
+// `$type`/`$helpers` are worse: `$` is a legal Essence identifier character, so
+// they are names a user can write without any way of knowing they are spoken
+// for. Every one of them is therefore a name the user half of the Program can
+// not hold — `escapeName` mangles it instead, at the binding and at every
+// reference alike.
 const compilerOwnedNames = new Set([
 	...runtimeNamespaceNames,
 	"$_",
