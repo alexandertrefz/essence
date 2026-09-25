@@ -327,12 +327,12 @@ function isPureIntrinsic(
 //
 // NOTE: The Namespace name is the Type name on purpose: `Integer`'s entry is the
 // Method called on an Integer and GIVEN an Integer, which is the shape whose
-// body is exact integer arithmetic and nothing else. `add` and the comparisons are Overloads that also
-// take a Rational, an Algebraic and a Transcendental, and those entries are
-// written on the covering `Number` Namespace rather than on the native — a
-// different Method, weighed separately or not at all. Requiring the Types
-// closes the enumeration over the bodies it was read against instead of over
-// every Overload that happens to share a name.
+// body is exact integer arithmetic and nothing else. `add` and the comparisons
+// are Overloads that also take a Rational, an Algebraic and a Transcendental,
+// and those entries are written on the covering `Number` Namespace rather than
+// on the native — a different Method, weighed separately or not at all.
+// Requiring the Types closes the enumeration over the bodies it was read against
+// instead of over every Overload that happens to share a name.
 //
 // NOTE: It is short on purpose, and every entry is here for the same three
 // reasons: the Method prints nothing and assigns nothing, it answers for EVERY
@@ -356,9 +356,9 @@ function isPureIntrinsic(
 // that answers one of two literals, `Rational`'s is its numerator and
 // denominator with a slash between them — or its numerator alone when the
 // Rational is whole, which is one more read of the same two. `Rational` is
-// otherwise absent: its
-// arithmetic reduces through a gcd on every operation, which is a decision
-// somebody should take on its own merits rather than get for free here.
+// otherwise absent: its arithmetic reduces through a gcd on every operation,
+// which is a decision somebody should take on its own merits rather than get for
+// free here.
 //
 // NOTE: What is deliberately absent, so that adding one is a decision rather
 // than an oversight. `Number`'s covering comparison reaches π's interval
