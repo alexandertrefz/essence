@@ -17,7 +17,7 @@ import { validate } from "../validator/index"
 // terms. `stdlibGolden.spec.ts` can not cover it — that harness works by
 // calling `Terminal.inspect`, so a `Terminal.print` beside it would print
 // twice and a `Terminal.write` would put text in the middle of a captured line
-// — so this is where the three Methods' behaviour is pinned.
+// — so this is where the behaviour of the Methods that write is pinned.
 //
 // NOTE: What has to be true, and is not true of any other standard library
 // Method: `print` renders through `Printable` and ENDS THE LINE, `inspect`

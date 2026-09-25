@@ -845,10 +845,10 @@ describe("Dispatch and Resolution", () => {
 			expect(underlinedText(source, diagnostics[0].labels[0]!)).toBe("1")
 		})
 
-		// NOTE: The `loop` shape — four entries told apart by their label sets
-		// alone. Defaulting `while` would give the first entry the fourth's
-		// written shape, and two entries resolved purely by label would have
-		// become indistinguishable.
+		// NOTE: The `loop` shape: entries told apart by their label sets
+		// alone. Defaulting `while` would give the first entry here the
+		// second's written shape, and two entries resolved purely by label
+		// would become indistinguishable.
 		it("should refuse a default that reduces one label set to another", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				namespace Counters for Integer {
