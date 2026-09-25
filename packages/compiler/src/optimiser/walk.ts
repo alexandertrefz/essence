@@ -43,12 +43,11 @@ type ExpressionRewrite = (node: ExpressionNode) => ExpressionNode
 // hooks, the Expression one first, because it is both things at once.
 type StatementRewrite = (node: ImplementationNode) => ImplementationNode
 
-// NOTE: And the same for a BODY — every place a run of Statements stands, which
-// is a Program's own nodes, a Function's body, a Match Handler's, a Conditional's
-// two and an inlined callback's. It is the one hook that can answer with a
-// DIFFERENT NUMBER of Statements than it was given, which is what
-// `eliminate-dead-code` needs and what neither hook above can do: a Statement
-// rewrite maps one Node to one Node.
+// NOTE: And the same for a body: a Program's own nodes, a Function's body, a
+// Match Handler's, a Conditional's two, an inlined callback's and a test's. It
+// is the one hook that can answer with a different number of Statements than it
+// was given, which is what `eliminate-dead-code` needs: a Statement rewrite maps
+// one Node to one Node.
 //
 // NOTE: Offered AFTER every Statement in it has been walked, like everything
 // else here, and expected to answer with the array it was GIVEN where it changes
@@ -309,7 +308,7 @@ export function rewriteExpressionsIn(
 
 // NOTE: One run of Statements, walked and then offered whole. Every place a body
 // can stand goes through this — which is what makes "every body, exactly once"
-// a property of this function rather than of five call sites remembering to
+// a property of this function rather than of each call site remembering to
 // agree.
 function walkBody(
 	nodes: Array<ImplementationNode>,
@@ -320,12 +319,10 @@ function walkBody(
 	return rewrites.body === undefined ? walked : rewrites.body(walked)
 }
 
-// NOTE: The copy is not made until something is IN it. Most passes leave most
-// of the tree alone — fourteen of them walk it and each is written for one
-// shape — so the common answer here is the array that was given, and building
-// one to throw away is the whole of what a no-op walk used to cost. Every entry
-// is still mapped, in order, exactly once: the laziness is in the allocation,
-// not in the work.
+// NOTE: The copy is not made until something is IN it. Every pass walks the
+// tree and each is written for one shape, so the common answer here is the
+// array that was given. Every entry is still mapped, in order, exactly once: the
+// laziness is in the allocation, not in the work.
 function mapArray<Value>(
 	values: Array<Value>,
 	map: (value: Value) => Value,
