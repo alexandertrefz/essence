@@ -49,7 +49,7 @@ const CONTRACT_CASES = 25
 const ANSWER = "$answer"
 
 // NOTE: The suite every goal is reported under. A written suite of the same
-// name is REFUSED where the synthesis happens — see `reservedSuiteName` in
+// name is REFUSED where the synthesis happens — see `refuseReservedSuite` in
 // tests.ts — because two suites sharing one identity share the corpus, the
 // seeds and the focus that identity anchors, and a collision the author can
 // not see is a collision nothing can diagnose.
@@ -269,10 +269,10 @@ function namespaceGoals(
 	return synthesis
 }
 
-// NOTE: One entry as the property test it is, or null where anything it needs
-// refused. Everything here happens inside the caller's speculative collection:
-// a null answer and a reported Diagnostic mean the same thing to it, and a goal
-// that half-built leaves nothing behind but a Scope nobody keeps.
+// NOTE: One entry as the property test it is, or a `GoalSkip` saying why it
+// has none. Everything here happens inside the caller's speculative collection:
+// a skip and a reported Diagnostic mean the same thing to it, and a goal that
+// half-built leaves nothing behind but a Scope nobody keeps.
 function goalOf(
 	namespace: common.NamespaceType,
 	methodName: string,
