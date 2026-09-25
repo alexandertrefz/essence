@@ -462,6 +462,7 @@ function readSources(entryPath: string, options: EmbedOptions): ReadSources {
 			// spelled before there was a target to name still names the same
 			// bytes, and a host's Modules can never be served out of a cache
 			// under a bundle's name.
+			//
 			// NOTE: And the compile MODE, for the same reason and through the
 			// one Function that spells it — `modeKey`, which `esc`'s own key
 			// reads too, so a facet can not join the mode without joining both

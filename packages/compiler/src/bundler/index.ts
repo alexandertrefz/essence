@@ -52,9 +52,8 @@ export type BundleOptions = {
 	minify?: boolean
 	sourcemap?: boolean
 	// NOTE: `linked` writes the map beside the output; `inline` rides it inside
-	// the bundle itself, which is what `esc run`'s transient output needs — the
-	// directory the map would sit beside is deleted the moment the Program
-	// exits.
+	// the bundle itself, which is what a bundle with no name of its own needs:
+	// `essence run` without `--out`, and a host handed one string.
 	sourcemapMode?: "linked" | "inline"
 }
 
