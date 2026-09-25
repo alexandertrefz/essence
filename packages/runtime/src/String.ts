@@ -181,10 +181,13 @@ function surrogateEscapeAt(
 // NOTE: A String written the way a Program would write it down — the text in
 // quotes, with everything a Literal has to escape escaped, and nothing else. It
 // is here rather than beside its callers because it is the one answer to one
-// question, and four readers ask it: `List.toString`, `Optional.toString`, the
-// structural rendering `Terminal.inspect` and `Record.toString` share, and the
-// `quote` native at the foot of this file, which hands the same text to a
-// Program.
+// question. The renderings that quote a String ask it: `itemText`, which
+// `List`, `Optional`, `Result` and `Dictionary` print their items through, the
+// structural rendering `Terminal.inspect` and `Record.toString` share,
+// `HttpFailure.toString` and the formatter's snapshot printer. The `quote`
+// native hands the same text to a Program. The Debug Adapter's Variables view
+// draws a String through an inlined copy, `quoted` in
+// `packages/debug-adapter/src/render.ts`.
 //
 // NOTE: THE PROMISE IT MAKES is that its answer READS BACK. Whatever it prints,
 // pasted into a source file as it stands, is a String Literal the Lexer accepts
@@ -264,7 +267,8 @@ export function quotedText(value: string): string {
 // renders `x`, because there the String IS the whole of the text; inside a List
 // or a Case it is one piece beside others, and `["a", "", "b"]` has to be told
 // from `[a, , b]`. `Record.toString` has quoted its String members all along,
-// and this is the same rule where a List and an Optional read their items.
+// and this is the same rule where a List, an Optional, a Result and a
+// Dictionary read what they hold.
 //
 // NOTE: The tag is read rather than the conformance, because a `Printable`
 // witness says how a value renders and not what kind it is: `String.toString`
@@ -346,8 +350,8 @@ function clustersOf(text: string): Array<string> {
 // question of the same String: what its NFC form is. Normalising allocates a
 // String per call and both sides of every comparison paid it, so sorting a
 // thousand names normalised twenty thousand times — for a thousand distinct
-// answers. `isAscii` is remembered beside it because it is what decides whether
-// there is anything to normalise at all.
+// answers. The ASCII mark (`isAsciiKey`) is remembered beside it because it is
+// what decides whether there is anything to normalise at all.
 const graphemesKey = Symbol("$graphemes")
 const viewStartKey = Symbol("$viewStart")
 const viewTextKey = Symbol("$viewText")
@@ -496,9 +500,8 @@ function graphemesIn(string: StringType): Array<string> {
 // big enough to hide it. A search is asked once per call and walks the receiver
 // afterwards, so there the record is nothing beside the walk.
 //
-// NOTE: Exported for `NonEmptyString.ts`'s two proven ends — the same reason
-// `List.ts` exports `viewOf` for `NonEmptyList.ts` — and for the specs that
-// assert WORK: which Array a window shares, and how much of it is its own.
+// NOTE: Exported for the specs that assert WORK: which Array a window shares,
+// and how much of it is its own.
 // `hasCharacterView` below answers the question this one can not, because this
 // one BUILDS the view it reports; and how often the Segmenter RAN is counted
 // where it is asked, by the spec, rather than remembered here for the spec's
@@ -753,12 +756,11 @@ function isAsciiIn(string: StringType): boolean {
 
 // NOTE: A String its maker KNOWS the scan would accept, marked so without the
 // scan and given the count that follows from the mark: its characters are its
-// units. Every Method that maps ASCII to ASCII answers through here — `repeat`,
-// the case mappings, `trim`, `slice`, `character(at:)`, and the pieces of a
-// `split` or a `words` taken off an ASCII receiver — so that a loop measuring
-// what it built does not rescan it. `append` alone writes the two keys itself,
-// for the reason it gives. The caller is answerable for the claim, and the
-// note at each call says why it holds.
+// units. Every Method that maps ASCII to ASCII answers through here —
+// `append`, `repeat`, the case mappings, `trim`, `slice`, `character(at:)`, and
+// the pieces of a `split` or a `words` taken off an ASCII receiver — so that a
+// loop measuring what it built does not rescan it. The caller is answerable
+// for the claim, and the note at each call says why it holds.
 function createAsciiString(value: string): StringType {
 	let string = createString(value) as MeasuredString
 
@@ -1031,16 +1033,14 @@ export function split__overload$1(
 	originalString: StringType,
 	splitterString: StringType,
 ): ListType<StringType> {
-	// NOTE: The one place the runtime decides what a character is, and every
-	// position Method rests on it: `characters()` is `split("")`, and `length`,
-	// `character`, `slice`, `reverse`, `pad` and the rest are written on top
-	// of those, while the searches beside it — `firstIndex`, `lastIndex`,
-	// `count` — read the same view the same way. Both sides are taken as
-	// grapheme clusters (see `clustersOf`), so the empty separator splits into
-	// characters and a non-empty one matches only as a WHOLE run of characters
-	// — a separator can never land inside a cluster and tear it, and the pieces
-	// come back on cluster boundaries. NFC on both sides means the match is by
-	// canonical equivalence, like `is`.
+	// NOTE: `characters()` is `split("")`, and `length`, `character(at:)`,
+	// `slice`, `reverse` and the searches `firstIndex`, `lastIndex` and `count`
+	// read the character view `clustersIn` builds, as this does. Both sides are
+	// taken as grapheme clusters (see `clustersOf`), so the empty separator
+	// splits into characters and a non-empty one matches only as a WHOLE run of
+	// characters — a separator can never land inside a cluster and tear it, and
+	// the pieces come back on cluster boundaries. NFC on both sides means the
+	// match is by canonical equivalence, like `is`.
 	//
 	// NOTE: Two Strings the ASCII scan accepted are split by the JavaScript
 	// intrinsic instead, and that IS the grapheme answer: each unit is a
@@ -1159,7 +1159,7 @@ function isInsensitive(sensitivity: CaseSensitivityType): boolean {
 // NOTE: Read by the walks that visit the WHOLE receiver by nature — `count`,
 // `everyIndex`, `split`'s two replacements — where folding it once per call is
 // what the walk costs anyway. The two FIRST-MATCH searches fold a chunk at a
-// time instead, for the reason `foldedChunkWidth` gives.
+// time instead, for the reason `FOLD_CHUNK` gives.
 function foldedText(string: StringType, insensitive: boolean): string {
 	return insensitive ? string.value.toLowerCase() : string.value
 }
@@ -1185,7 +1185,7 @@ function foldedText(string: StringType, insensitive: boolean): string {
 // most twice its own width, so the text folded in all stays inside twice the
 // distance to the match — and, with the early return the same arithmetic gives,
 // it is what lets a receiver no longer than TWICE THE FLOOR be read in the ONE
-// call these searches have always made: 2,047 units and below on the ASCII
+// call these searches have always made: 2,048 units and below on the ASCII
 // route, which is a log line, a paragraph or a block of headers. Measured,
 // 50,000 searches of a 340-character receiver that does not hold the part:
 // 13.7 ms cut in two and 11.2 ms whole.
@@ -1194,10 +1194,10 @@ function foldedText(string: StringType, insensitive: boolean): string {
 // below is where that was measured. A receiver of 3,000 to 10,000 units
 // searched for a part that is NOT there is read in two or three calls where one
 // call read it before, and pays 1.04x to 1.09x for them; at 20,000 units and
-// beyond that is 1.03x, and under 2,048 units there is nothing to pay. The same
-// search for a part that IS there is faster by the whole distance it no longer
-// reads. That is the price of the quadratic's removal and it is paid only by
-// the search that has to read everything anyway.
+// beyond that is 1.03x, and at 2,048 units and below there is nothing to pay.
+// The same search for a part that IS there is faster by the whole distance it
+// no longer reads. That is the price of the quadratic's removal and it is paid
+// only by the search that has to read everything anyway.
 //
 // NOTE: The floor is TWICE THE PART, and it has to be at least the part plus
 // one: a chunk overlaps the one before it by `part.length - 1` units — the
@@ -1852,7 +1852,7 @@ export function character__overload$1(
 // way these came out reproducible; two runtimes in one process measure the
 // second one twice its true cost, and an answer nothing consumes is deleted
 // outright:
-//                                  master    here
+//                                  bodies  reader
 //   ascii  firstCharacter (held)    0.565   1.281 ms   (2.3x, +3.6 ns a call)
 //   ascii  lastCharacter  (held)    0.564   0.560 ms   (1.0x)
 //   ascii  character(at 5000)       0.565   0.554 ms   (1.0x)
@@ -1860,15 +1860,15 @@ export function character__overload$1(
 //   view   lastCharacter  (held)    0.675   0.575 ms   (0.9x)
 //   window firstCharacter           0.022   0.019 ms   (0.9x)
 // Against which the same call over an 80,000-character non-ASCII front drain
-// went from 9,602 ms to 49 — and that is `slice` as much as this reader, since
-// master's window owned its own Array by the time it was asked.
+// went from 9,602 ms to 49, and `slice` earned that as much as this reader.
 //
 // NOTE: ONE case stayed dearer and it is worth saying which and why: the FIRST
-// character of a held ASCII String. Master's specialised body indexed the text
-// at a CONSTANT zero, which an engine reads about as cheaply as a field; here
-// the position is a `number | bigint` parameter resolved at run time, and no
-// amount of hoisting makes a computed index as cheap as a literal one — the
-// LAST character, which master computed too, measures the same on both sides.
+// character of a held ASCII String. The specialised body it replaced indexed
+// the text at a CONSTANT zero, which an engine reads about as cheaply as a
+// field; here the position is a `number | bigint` parameter resolved at run
+// time, and no amount of hoisting makes a computed index as cheap as a literal
+// one — the LAST character, which the bodies computed too, measures the same
+// on both sides.
 // Three and a half nanoseconds on a nanosecond-scale read, for one body where
 // there were three, and the O(n) it removes from every window.
 export function characterIn(
@@ -1882,12 +1882,12 @@ export function characterIn(
 	// the view, 8 µs here, most of which is the scan.
 	//
 	// NOTE: The two keys are read ONCE, here, rather than through `readsByUnit`
-	// and `viewIn` in turn — this is the read `NonEmptyString`'s two proven ends
-	// are, and a Program walking a String asks it per character. Reading them
-	// twice measured 15.0 ns against 11.8 for 200,000 reads of one held String.
-	// The question the two of them answer is `readsByUnit`'s, spelled out: the
-	// remembered mark decides where there is one, and a String with a view is
-	// never scanned for one.
+	// and `clustersIn` in turn — this is the read `NonEmptyString`'s two proven
+	// ends are, and a Program walking a String asks it per character. Reading
+	// them twice measured 15.0 ns against 11.8 for 200,000 reads of one held
+	// String. The question the two of them answer is `readsByUnit`'s, spelled
+	// out: the remembered mark decides where there is one, and a String with a
+	// view is never scanned for one.
 	// NOTE: The view's own key is read only where the MARK does not already
 	// decide, which the `||` sees to — reading a key a value does not carry is
 	// a miss, and this is the read `NonEmptyString`'s two proven ends are:
@@ -2000,8 +2000,9 @@ export function slice(
 // NOTE: The view route of the cut above, in a Function of its own so that the
 // ASCII route stays SMALL. An engine inlines a hot callee by its size, and a
 // drain cuts once per turn: with both routes in one body, the ASCII drain of
-// 5,000 characters measured 9.7 ms against master's 5.0 — the cut itself was
-// no slower, and neither was the count beside it, but the pair of them was.
+// 5,000 characters measured 9.7 ms against 5.0 with them apart — the cut
+// itself was no slower, and neither was the count beside it, but the pair of
+// them was.
 // Split, the same drain measures what it always did.
 function cutThroughView(
 	originalString: StringType,
