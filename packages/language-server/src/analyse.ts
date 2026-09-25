@@ -75,10 +75,10 @@ type AnalysisOptions = {
 	// edited in another tab is exactly the case the graph has to see. The entry
 	// document is answered from the text handed in whatever the host says.
 	host?: ModuleHost
-	// NOTE: Whether this analysis asked for the tests — see `enrichDocument`.
-	// The Editor's ordinary analysis leaves it off, so what a writer sees in a
-	// file is what a build sees; the test session is what turns it on, and it
-	// keeps a cache of its own for exactly that reason.
+	// NOTE: Whether this analysis types the `tests { … }` section, as
+	// `enrichDocument` reads it. The Server passes it on every call here, as
+	// its Workspace does: a build drops the section, so the Editor is where its
+	// mistakes show.
 	tests?: boolean
 }
 

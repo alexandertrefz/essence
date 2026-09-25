@@ -410,8 +410,8 @@ export function startServer(options: { connection?: Connection } = {}) {
 		// nothing else would ever tell a writer that an assertion is not a
 		// Boolean or that a name inside a test body does not exist — an editor
 		// that says nothing about a section is an editor claiming it is
-		// correct. Running the tests is a different question, and a session
-		// that compiles and instruments them is still a Workspace of its own.
+		// correct. Running the tests is a different question, which the test
+		// session answers by compiling each entry in its Worker.
 		tests: true,
 	})
 	// NOTE: Which URIs this Server has published Diagnostics to, by the ENTRY
