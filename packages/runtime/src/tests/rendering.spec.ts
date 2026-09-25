@@ -266,12 +266,6 @@ describe("rendering a Case", () => {
 	})
 })
 
-// NOTE: The walk renders every child ONCE, at indent zero, and re-indents that
-// rendering for the nested layout — so what it costs is the size of the value
-// and not two renderings per level of nesting. The two tests below are the two
-// halves of that: the layout it produces at a deeper indent is the one it
-// produces at zero with the indent written after each newline, and a value
-// nested deeply enough that every level wraps still renders in no time at all.
 // NOTE: The renderer table a routed Record hands this walk is indexed by MEMBER
 // NAME, and a member may be named anything a reader can write — `constructor`,
 // `toString`, `valueOf`. Read off a plain object those names answer
@@ -344,6 +338,12 @@ describe("rendering a Record whose member is named like Object.prototype", () =>
 	})
 })
 
+// NOTE: The walk renders every child ONCE, at indent zero, and re-indents that
+// rendering for the nested layout — so what it costs is the size of the value
+// and not two renderings per level of nesting. Its two tests are the two halves
+// of that: the layout it produces at a deeper indent is the one it produces at
+// zero with the indent written after each newline, and a value nested deeply
+// enough that every level wraps still renders in no time at all.
 describe("rendering a deeply nested value", () => {
 	// NOTE: One member per level and a leaf long enough that every level
 	// overflows the single-line budget, which is the shape that made the walk

@@ -1256,8 +1256,6 @@ describe("Benchmarks", () => {
 		).toEqual(["deselected", "run"])
 	})
 
-	// NOTE: Every row is a benchmark in its own right, held to a baseline of its
-	// own — the rows share one body and one key, so an entry they overwrote in
 	// NOTE: Seven batches of a body that takes seconds is a minute nobody
 	// asked to wait — and the editor's run-by-id door has a session deadline
 	// behind it. The tiers are arithmetic over the injected clock, like
@@ -1312,6 +1310,8 @@ describe("Benchmarks", () => {
 		expect(summary.passed).toBe(1)
 	})
 
+	// NOTE: Every row is a benchmark in its own right, held to a baseline of its
+	// own — the rows share one body and one key, so an entry they overwrote in
 	// turn could only ever match the last row that ran.
 	test("keeps one stored entry per row of a table benchmark", async () => {
 		let { clock, tick } = workClock(1)
@@ -1919,10 +1919,6 @@ describe("The failing-example corpus", () => {
 		expect(event.encoded).toBeNull()
 	})
 
-	// NOTE: The key the Compiler's `relativeIdentityKey` spells, worked out
-	// again here because a bundle imports nothing from the Compiler. The two
-	// are pinned to each other by this string and its twin in the Compiler's
-	// own spec.
 	// NOTE: The key is the Compiler's, read off the manifest — the runtime
 	// derives nothing, so the escaping exists in exactly one place and the
 	// event repeats what the entry already said.

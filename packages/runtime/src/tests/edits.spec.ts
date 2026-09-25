@@ -846,7 +846,8 @@ describe("draining from the front", () => {
 // the count is not the whole of the claim. `upgradedAroundWindow` shipped
 // filling its runs item by item at about 6.5x the per-item cost of the copy it
 // stood in for, inside this metric's bound the whole time. The per-item half of
-// the claim is guarded as a RATIO at the end of this file.
+// the claim has no guard in this file, for the reason the NOTE over "what an
+// interior window moves" gives.
 const itemsMovedBy = (
 	seed: ListType<IntegerType>,
 	turn: (originalList: ListType<IntegerType>) => ListType<IntegerType>,
@@ -1164,8 +1165,7 @@ describe("what a walk over a List moves", () => {
 // GOOD side as high as 3.03x and the bad side as low as 3.54x. There is no
 // threshold between those two, so any such guard is a flake, and a flake that
 // fires on a loaded machine is worse than no guard. The per-item cost is held
-// by the bench in essence-d-perf/fix-l/ and by the numbers in the NOTE beside
-// `upgradedAroundWindow` instead.
+// by the numbers in the NOTE beside `upgradedAroundWindow` instead.
 //
 // NOTE: What IS expressible is the other half of the same fix — that a one-shot
 // interior window of about half moves no more than the copy it asked for, which
