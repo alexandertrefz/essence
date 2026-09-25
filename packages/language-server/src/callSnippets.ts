@@ -85,11 +85,11 @@ function snippetsFrom(
 	}))
 }
 
-// NOTE: `$` opens a tabstop and `}` closes one, and neither is a Symbol the
-// Lexer knows — both are ordinary Identifier characters, so a name or a label
-// may carry one, and an unescaped one would turn the rest of the call into
-// snippet syntax. Exported because the Server's fallback insert text is also
-// snippet-formatted and has to spell a name the same way this does.
+// NOTE: `$` opens a tabstop and `}` closes one. `$` is an ordinary Identifier
+// character, so a name or a label may carry one, and an unescaped one would
+// turn the rest of the call into snippet syntax. Exported because the Server's
+// fallback insert text is also snippet-formatted and has to spell a name the
+// same way this does.
 export function escapeSnippet(text: string): string {
 	return text.replace(/[$}\\]/g, "\\$&")
 }
