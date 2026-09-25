@@ -445,9 +445,9 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 	/*************************/
 
 	// NOTE: The out-edges of one file, and the reverse edges that go with them.
-	// Called from two places: a graph that was just linked, which knows every
-	// Module's dependencies exactly and for free, and a refresh, which reads
-	// them off a parse.
+	// A graph that was just linked knows every Module's dependencies exactly
+	// and for free, a refresh reads them off a parse, and a Program that is no
+	// Module has none.
 	function recordEdges(filePath: string, targets: Iterable<string>): void {
 		let next = new Set(targets)
 		let previous = outEdges.get(filePath)
