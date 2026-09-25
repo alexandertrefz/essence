@@ -8,21 +8,23 @@ import { loadStdlib } from "./stdlib"
 // builtin registered here reaches resolution, completion, rename and
 // semantic tokens in one step, and can not be half-wired again.
 //
-// NOTE: The standard library itself is written in Essence, under `packages/standard-library/sources`.
-// Nothing a Program starts with is declared in TypeScript any more: `loadStdlib`
-// reads those sources once per process and the accessors at the foot of this
-// file hand out what it produced. What is left in this file is the ORDER those
-// names are listed in — the one thing a source file can not say about itself,
-// because each declares only its own name.
+// NOTE: The standard library itself is written in Essence, under
+// `packages/standard-library/sources`. Of what a Program starts with, only the
+// bare Type tags are declared in TypeScript, in `primitives.ts`: `loadStdlib`
+// reads the sources once per process and hands those tags out beside what the
+// sources declared, and the accessors at the foot of this file hand out what it
+// produced. What is left in this file is the ORDER those names are listed in —
+// the one thing a source file can not say about itself, because each declares
+// only its own name.
 
 // NOTE: The order the builtin members are listed in. A source declaration is
 // enriched INTO the Scope, so it lands where insertion put it — which is the
 // order `readStdlibSources` happened to sort the file names in, and nothing an
-// editor of `packages/standard-library/sources` would think to control. The order is observable:
-// `builtinNamespaces()` derives from it, Completion dedupes members
-// first-Namespace-wins (`lsp/completion.ts`), and the Enricher builds its
-// `matchingNamespaces` in the same order — so it is stated here, once, rather
-// than left to the file system.
+// editor of `packages/standard-library/sources` would think to control. The
+// order is observable: `builtinNamespaces()` derives from it, the Language
+// Server's Completion dedupes members first-Namespace-wins, and the Enricher
+// builds its `matchingNamespaces` in the same order — so it is stated here,
+// once, rather than left to the file system.
 //
 // NOTE: This is the order BETWEEN Namespaces. The order WITHIN one — its
 // Methods and Properties — is a property of the declaration itself, and is
@@ -126,15 +128,13 @@ export const builtinMemberOrder: Array<string> = [
 	// `remainder` takes. All three of its Methods are derived, so it shares no
 	// Method name with anything here and its position decides nothing else.
 	"Division",
-	// NOTE: With the other mode Choices, and after them because it is the
-	// newest. `SortOrder` is declared beside `sort` in `List.es` rather than
-	// with these, and it shares no Method name with any Namespace here — all
-	// three of its Methods are derived — so its position decides nothing but
-	// where a reader of this list meets it.
+	// NOTE: With the other mode Choices. `SortOrder` is declared beside `sort`
+	// in `List.es` rather than with these, and it shares no Method name with
+	// any Namespace here — all three of its Methods are derived — so its
+	// position decides nothing but where a reader of this list meets it.
 	"SortOrder",
-	// NOTE: With the other mode Choices, and last among them because it is the
-	// newest and shares no Method name with anything here — all three of its
-	// Methods are derived.
+	// NOTE: With the other mode Choices. It shares no Method name with anything
+	// here — all three of its Methods are derived.
 	"Stream",
 	// NOTE: And the two a request is written in, with the mode Choices for the
 	// reason `Stream` is here rather than beside `Terminal`: what puts a
@@ -152,8 +152,8 @@ export const builtinMemberOrder: Array<string> = [
 	// decides how the two are PRESENTED. The Enricher builds
 	// `matchingNamespaces` in this order and Completion dedupes members
 	// first-Namespace-wins, so a `List<List<…>>` receiver has to meet the
-	// general `List` FIRST and pick up `NestedList::flattened` as the extra it
-	// is — putting it ahead of `List` would make the narrow Namespace the first
+	// general `List` FIRST and pick up `NestedList::flatten` as the extra it is
+	// — putting it ahead of `List` would make the narrow Namespace the first
 	// one searched for every Method a nested List has, and would name it first
 	// in every "searched Namespaces" Diagnostic. It is listed here at all,
 	// rather than left to fall to the end, so that the two Namespaces a List
@@ -176,19 +176,19 @@ export const builtinMemberOrder: Array<string> = [
 	// takes a check, and `OptionalList` before this one means neither `values`
 	// hides the other on a receiver that can only reach one of them.
 	"ResultList",
-	// NOTE: And after those, for the fourth time and the same reason. `NonEmptyList`
-	// targets a refinement of `List`, and its `firstItem`/`lastItem` are named by
-	// `List` as well — so `List` has to be met FIRST, or Completion on any List
-	// would offer the total pair that only a proven List can answer. Which
-	// Namespace a call RESOLVES to is not decided here either: the refined target
-	// beats the base one regardless of this order.
+	// NOTE: And after those, for the same reason. `NonEmptyList` targets a
+	// refinement of `List`, and its `firstItem`/`lastItem` are named by `List`
+	// as well — so `List` has to be met FIRST, or Completion on any List would
+	// offer the total pair that only a proven List can answer. Which Namespace
+	// a call RESOLVES to is not decided here either: the refined target beats
+	// the base one regardless of this order.
 	"NonEmptyList",
-	// NOTE: And after both of the Namespaces it narrows, for the same reason a
-	// fourth time. `NonEmptyNestedList` targets a proven List of proven Lists,
-	// which is a `List<List<…>>` and a `NonEmptyList` as well, so a receiver of
-	// that Type reaches `NestedList::flatten` and `NonEmptyList::firstItem`
-	// too. Both have to be met FIRST, or Completion on a nested List would
-	// offer the total `flatten` that only two proofs can answer.
+	// NOTE: And after both of the Namespaces it narrows, for the same reason
+	// again. `NonEmptyNestedList` targets a proven List of proven Lists, which
+	// is a `List<List<…>>` and a `NonEmptyList` as well, so a receiver of that
+	// Type reaches `NestedList::flatten` and `NonEmptyList::firstItem` too.
+	// Both have to be met FIRST, or Completion on a nested List would offer the
+	// total `flatten` that only two proofs can answer.
 	"NonEmptyNestedList",
 	// NOTE: And after all of them, for the same reason once more. Each of
 	// these targets a List of a particular Number Type — `List<Integer>`,
@@ -246,11 +246,11 @@ export const builtinMemberOrder: Array<string> = [
 	// Namespace's own members either way.
 	"GroupedList",
 	"GroupedNonEmptyList",
-	// NOTE: Last, and not because it is newest. `Randomness` targets a Type
-	// nothing else targets and shares not one Method name with the Namespaces
-	// above it, so its position decides nothing at all — and a reader of this
-	// list meets the Namespaces of the values a Program works with before the
-	// one only a property test is handed.
+	// NOTE: After the containers. `Randomness` targets a Type nothing else
+	// targets and shares not one Method name with the Namespaces above it, so
+	// its position decides nothing at all — and a reader of this list meets the
+	// Namespaces of the values a Program works with before the one only a
+	// property test is handed.
 	"Randomness",
 	// NOTE: After it, and for the same reason twice over: each targets a Type
 	// nothing else targets, and a reader of this list meets the Namespaces of
@@ -390,8 +390,8 @@ export const builtinTypeOrder: Array<string> = [
 	// NOTE: Beside the mode Choice it is one of, and after `Rounding` for the
 	// reason it follows `Rounding` in the member order above.
 	"SortOrder",
-	// NOTE: With the other mode Choices, and last among them for the reason it
-	// is last in the member order above.
+	// NOTE: With the other mode Choices, for the reason it follows them in the
+	// member order above.
 	"Stream",
 	// NOTE: And the two a request is written in, for the reason they follow
 	// `Stream` in the member order above.
@@ -427,10 +427,10 @@ export const builtinTypeOrder: Array<string> = [
 // looked up — Hover and Completion both build their list by spreading this, and
 // `rename` walks it — so leaving it to fall out of whatever order the sources
 // were merged in makes an editor's list reorder itself for reasons no one
-// editing `packages/standard-library/sources` would think to control. It is the order they
-// are declared in, which is also the order they build on each other: `Comparable`
-// is the first whose signature names a Type rather than only bare tags, and
-// `Orderable` extends it.
+// editing `packages/standard-library/sources` would think to control. It is the
+// order they are declared in, which is also the order they build on each other:
+// `Comparable` is the first whose signature names a Type rather than only bare
+// tags, and `Orderable` extends it.
 //
 // NOTE: It is the order a receiver's PROVIDED Methods are offered in as well —
 // they belong to no Namespace, so a listing appends them per Protocol, and this
@@ -454,9 +454,9 @@ export const builtinProtocolOrder: Array<string> = [
 
 // NOTE: Accessors rather than consts, because what they answer with is read
 // from Essence source at first call. `loadStdlib` parses, enriches and
-// validates `packages/standard-library/sources/*.es`, caches the result for the process, and hands
-// back the SAME object every time — so these stay as cheap as the consts they
-// replaced after the first call.
+// validates `packages/standard-library/sources/*.es`, caches the result for the
+// process, and hands back the SAME object every time — so these stay as cheap
+// as the consts they replaced after the first call.
 export function builtinMembers(): Record<string, common.Type> {
 	return loadStdlib().members
 }
