@@ -713,20 +713,12 @@ describe("a callback that edits the List being walked", () => {
 })
 
 // NOTE: The brand on a CONDITIONAL conformance means "structural if the
-// conditions are", and `boundConformance` settles that with `every`. Today the
-// rule is latent rather than live: `List` is the only Namespace the Rewriter
-// brands conditionally, and `List<ItemType> is Equatable where ItemType is
-// Equatable` has exactly ONE condition — so `every` and `some` answer alike for
-// every Program that can be written, and no end-to-end test can tell them
-// apart. `some` in its place survived the whole encoding suite.
-//
-// It is worth a guard all the same, because the day a second Namespace joins
-// that set the difference is a soundness hole rather than a nicety: a
+// conditions are", and `boundConformance` settles that with `every`. `Result`
+// and a generic Choice's derived witness can carry two conditions, and a
 // two-condition conformance branded because ONE of its conditions is structural
-// sends a key down the encoded path while the other condition's written `is` is
-// what the Program asked for. So the rule is held here directly, over a
-// conformance the language can not spell yet, with both conditions branded,
-// each one alone, and neither.
+// would send a key down the encoded path while the other condition's written
+// `is` is what the Program asked for. So the rule is held here directly, with
+// both conditions branded, each one alone, and neither.
 describe("a conditional conformance branded across two conditions", () => {
 	// NOTE: Two Methods, because the currying is the other half of what
 	// `boundConformance` does and it must not change with the brand: whatever
