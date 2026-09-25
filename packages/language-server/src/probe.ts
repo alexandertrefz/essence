@@ -117,10 +117,11 @@ type OpenBracket = {
 	opensDefine: boolean
 }
 
-// NOTE: The Keyword is read as a whole word — `redefine` opens no `define` — off
-// text `stripNoise` has blanked all String text and Comments out of. It is
-// claimed by the next `{`, which is that `define`'s block: `define -> Type {`
-// writes a Type between the two and no brace, so nothing else can take it.
+// NOTE: The Keyword is read as a whole word, so `redefine` opens no `define`,
+// off text `stripNoise` has blanked String text and Comments out of. The next
+// opening bracket claims it, and only a `{` is then the `define`'s block:
+// `define -> Type {` loses it wherever its Type writes a bracket of its own,
+// such as a Function Type's `(` or a Record Type's `{`.
 function openBrackets(
 	text: string,
 	openHoles: Array<number>,
@@ -254,14 +255,8 @@ const STATEMENT_TAILS = [" {}", " -> {} {}"]
 const DEFINE_TAILS = [" otherwise", " as {} otherwise"]
 
 // NOTE: What says the arm readings are worth building. `define` is a reserved
-// Keyword and `stripNoise` has blanked all String text and Comments, so the
-// word standing anywhere above the cursor means a `define` was opened there —
-// possibly one already closed again, which is why this is a cheap test that can
-// never turn away a head that needs the arm readings rather than a reading of
-// where the cursor stands. What it buys is that a cursor no reading explains in
-// a file with no `define` above it pays what it always paid: the readings are
-// tried in turn until one answers, so the ones nothing answers with are exactly
-// the ones that parse and enrich the document for nothing.
+// Keyword and `stripNoise` has blanked String text and Comments, so the word
+// anywhere before the cursor means a `define` was opened, perhaps closed again.
 const definePattern = /\bdefine\b/
 
 // NOTE: A tail is written immediately before the closer of the `{` whose block
