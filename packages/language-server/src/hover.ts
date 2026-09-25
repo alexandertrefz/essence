@@ -286,9 +286,6 @@ function documentationFor(
 	return signatures[0].documentation ?? fallback
 }
 
-// NOTE: Ties go to the newer candidate — children are visited after their
-// parents, so the deeper node wins. Every node in the Program is offered, so
-// the Type is only printed once a candidate has actually won.
 // NOTE: The entries of the two Module sections. The typed entry carries what it
 // bound but flattens its names to plain text, and the parser entry still holds
 // the Identifiers with their Positions — so the pair is matched by the entry's
@@ -370,6 +367,9 @@ function visitModuleSections(
 	}
 }
 
+// NOTE: Ties go to the newer candidate — children are visited after their
+// parents, so the deeper node wins. Every node in the Program is offered, so
+// the Type is only printed once a candidate has actually won.
 function wins(state: State, position: common.Position): boolean {
 	if (!contains(position, state.cursor)) {
 		return false
@@ -1026,9 +1026,9 @@ function aliasedRecordShape(type: common.Type): common.Type | null {
 		: null
 }
 
-// NOTE: A Namespace's own Type Parameter, rendered as declared — `infer Item`,
-// or `Item is Comparable` where it carries a bound. Used only for the
-// declaration-head Hover; call sites render Generics through `printType`.
+// NOTE: A Type Parameter, rendered as declared: `infer Item`, or `Item is
+// Comparable` where it carries a bound. Used for the Hovers of declarations;
+// call sites render Generics through `printType`.
 function printGenericDeclaration(generic: common.GenericDeclaration): string {
 	let inferKeyword = generic.infer ? "infer " : ""
 	let constraint =
