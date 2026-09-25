@@ -61,10 +61,6 @@ describe("Simplifier Positions", () => {
 		)
 	})
 
-	// NOTE: A body promising unit — the empty Record, `{}` — may fall off its
-	// end, and the Simplifier appends the `<- {}` the Signature promised. That
-	// Return is the one node here no source was written for, so it is the one
-	// node that must carry no position.
 	// NOTE: A default is an Expression written where it stands, and it keeps the
 	// Position it was written at — so stepping into a call that took one stops
 	// on the `= …` in the source, which is where the work is happening. The
@@ -209,6 +205,9 @@ describe("Simplifier Positions", () => {
 		})
 	})
 
+	// NOTE: A body promising unit, the empty Record `{}`, may fall off its end,
+	// and the Simplifier appends the `<- {}` the Signature promised. No source
+	// was written for that Return, so it carries no position.
 	it("leaves the synthesised trailing Return position-less", () => {
 		let { simplified } = simplifyWithTyped(`implementation {
 			function noop () -> {} {

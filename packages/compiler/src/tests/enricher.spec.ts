@@ -1468,8 +1468,8 @@ describe("Enricher", () => {
 
 		it("should infer map's result Type from the callback's return", () => {
 			// NOTE: `Result` occurs only in the callback's return position and
-			// in `map`'s own return — the case 0.5b unblocked. The callback is
-			// contextually typed, so `n` needs no annotation.
+			// in `map`'s own return. The callback is contextually typed, so `n`
+			// needs no annotation.
 			// NOTE: Printed rather than compared whole, because a written
 			// receiver proves it holds items and `NonEmptyList::map` carries
 			// that proof onto the answer — the item Type is what this is about.
@@ -6082,12 +6082,6 @@ describe("Enricher", () => {
 		})
 	})
 
-	// NOTE: A Module's Choices are identified by its canonical path, and every
-	// rail that reaches a Choice BY NAME has to keep working: the Type Scope is
-	// keyed by the name the declaration wrote, so a lookup that went looking for
-	// the identity would find nothing — and answering nothing is not a
-	// Diagnostic anywhere, it is a Choice that silently stops deriving its
-	// equality or resolving its Cases.
 	// NOTE: `= expression` at the end of a Parameter. The scoping rule is one
 	// ordering — a default is enriched before its own Parameter is declared —
 	// and every case here is that ordering seen from a different side.
@@ -6739,6 +6733,12 @@ describe("Enricher", () => {
 		})
 	})
 
+	// NOTE: A Module's Choices are identified by its canonical path, and every
+	// rail that reaches a Choice BY NAME has to keep working: the Type Scope is
+	// keyed by the name the declaration wrote, so a lookup that went looking for
+	// the identity would find nothing — and answering nothing is not a
+	// Diagnostic anywhere, it is a Choice that silently stops deriving its
+	// equality or resolving its Cases.
 	describe("Module Identity", () => {
 		function diagnosticsForModule(
 			source: string,

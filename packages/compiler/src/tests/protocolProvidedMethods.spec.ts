@@ -1154,13 +1154,6 @@ describe("Protocol-provided Methods", () => {
 		})
 	})
 
-	// NOTE: A provided Method is a candidate of EVERY Namespace that declares
-	// the conformance, ranked by that Namespace's target exactly as a written
-	// Method is — so a question the narrow Namespace's rung rejects falls to the
-	// covering one's, which is the continuation `5::compare(1/2)` has always
-	// had. The standard library is where the ladder has more than one rung:
-	// `Integer`, `Rational` and `Algebraic` each conform to `Orderable`, and the
-	// covering `Number` conforms too.
 	// NOTE: `Namespace.method(receiver, …)` is how an instance Method is called
 	// on its Namespace — `Number.compare(3, to 4)` — and a provided Method is a
 	// Method of that Namespace, so it answers the same spelling. `Self` is the
@@ -1399,6 +1392,13 @@ describe("Protocol-provided Methods", () => {
 		})
 	})
 
+	// NOTE: A provided Method is a candidate of EVERY Namespace that declares
+	// the conformance, ranked by that Namespace's target exactly as a written
+	// Method is — so a question the narrow Namespace's rung rejects falls to the
+	// covering one's, which is the continuation `5::compare(1/2)` has always
+	// had. The standard library is where the ladder has more than one rung:
+	// `Integer`, `Rational` and `Algebraic` each conform to `Orderable`, and the
+	// covering `Number` conforms too.
 	describe("the specificity ladder", () => {
 		it("should fall from a narrow Namespace's rung to the covering one", async () => {
 			expect(

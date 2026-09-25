@@ -1918,10 +1918,6 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// NOTE: A user's `overload` block defines every Overload itself, so the
-	// emitted names run 1, 2, 3 in written order — the same numbering the call
-	// site resolves against the Method Type. Only the Namespaces the standard
-	// library declares can leave a gap, where a native holds the slot.
 	// NOTE: A default is lowered to the JavaScript default parameter, whose
 	// semantics are the language's term for term. A call that leaves an Argument
 	// out therefore emits SHORT where nothing follows the hole, and passes
@@ -2092,6 +2088,10 @@ describe("Code Generation", () => {
 		})
 	})
 
+	// NOTE: A user's `overload` block defines every Overload itself, so the
+	// emitted names run 1, 2, 3 in written order — the same numbering the call
+	// site resolves against the Method Type. Only the Namespaces the standard
+	// library declares can leave a gap, where a native holds the slot.
 	describe("Overload Numbering", () => {
 		it("should number a Namespace's own Overloads in written order", async () => {
 			const source = `implementation {
@@ -2563,15 +2563,12 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"true"'])
 		})
 
-		// NOTE: `Number.isBetween` is the SECOND Method written in Essence —
-		// which is what makes the tests below more than a repeat of the Boolean
-		// ones: the reachability fixed point now has two candidate consts, and
-		// each has to be emitted exactly when the Program reaches it.
+		// NOTE: `Orderable.isBetween` is written in Essence as well, and reaches
+		// other Essence consts in turn. Each of them has to be emitted exactly
+		// when the Program reaches it.
 		//
-		// NOTE: These seven cases are the ones `stdlib.spec.ts` used to assert
-		// against the runtime `isBetween` before it was deleted — both bounds
-		// included, both bounds excluded from outside, and a pair written the
-		// other way round — now run through the compiled Method instead. The
+		// NOTE: Both bounds included, both bounds excluded from outside, and a
+		// pair written the other way round, run through the compiled Method. The
 		// last two are what makes the exchange visible: the same range named
 		// backwards holds `5` and does not hold `15`.
 		it("runs isBetween from its const", async () => {
@@ -2617,10 +2614,8 @@ describe("Code Generation", () => {
 		})
 
 		// NOTE: Each Essence Method's const is emitted exactly where the Program
-		// reaches it. `Orderable.isBetween` reaches three more provided consts
-		// and the conformance's own `compare`, and nothing else — under the old
-		// per-Namespace gate reaching `Number` pulled the whole `Boolean` const
-		// in with it, and the per-Method gate is precise enough not to.
+		// reaches it, gated per Method rather than per Namespace, so reaching
+		// `Orderable.isBetween` pulls in no `Boolean` const.
 		it("emits each Essence Method's const only where it is reached", () => {
 			const both = generate(`implementation {
 				Terminal.inspect(5::isBetween(1, and 10)::exclusiveOr(false))
@@ -2637,8 +2632,7 @@ describe("Code Generation", () => {
 			expect(booleanOnly).not.toContain("$es_Orderable__isBetween")
 			expect(booleanOnly).toContain("const $es_Boolean_exclusiveOr")
 
-			// NOTE: `isBetween` alone reaches only natives, so its const stands
-			// alone.
+			// NOTE: `isBetween` alone, which reaches no `Boolean` const.
 			const numberReached = generate(`implementation {
 				Terminal.inspect(5::isBetween(1, and 10))
 			}`)

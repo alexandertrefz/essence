@@ -425,11 +425,6 @@ describe("Rationals", () => {
 		})
 	})
 
-	// NOTE: `#NearestEven` is the one Rounding Case whose answer depends on the
-	// step below rather than only on the distance to it, so every test here
-	// pairs a tie with the parity of its floor. `round` is written in Essence,
-	// so all of them go through a compiled Program: there is no native to
-	// drive.
 	// NOTE: The fixed-width formatter rounds the one digit it cuts, and the
 	// direction is what decides which way. It works on the MAGNITUDE with the
 	// sign prefixed afterwards, so `#Down` and `#Up` have to read the sign back
@@ -501,6 +496,11 @@ describe("Rationals", () => {
 		})
 	})
 
+	// NOTE: `#NearestEven` is the one Rounding Case whose answer depends on the
+	// step below rather than only on the distance to it, so every test here
+	// pairs a tie with the parity of its floor. `round` is written in Essence,
+	// so all of them go through a compiled Program: there is no native to
+	// drive.
 	describe("Banker's rounding", () => {
 		it("sends a tie to the even step on either side of zero", async () => {
 			expect(

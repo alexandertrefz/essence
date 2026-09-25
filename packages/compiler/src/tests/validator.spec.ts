@@ -58,18 +58,11 @@ describe("Validator", () => {
 		})
 
 		it("should treat an Optional and its payload Union as different Types", () => {
-			// NOTE: `Optional<ItemType>` was a Type Alias for
-			// `ItemType | Nothing`, so `Optional<Integer | Rational>` and the
-			// hand-written `Integer | Rational | Nothing` were two spellings
-			// of one Type and assignability accepted both directions.
-			// Optional is a nominal Choice now — a value is `#Value(payload)`
-			// or `#Empty`, which is not the payload sitting in a Union — and
-			// `Nothing` is gone, so the flattened spelling cannot even be
-			// written. What is left to check is that the wrapper and its
-			// payload Union stay apart: neither direction is assignable, and
-			// that is the point, because no hand-written Union can be
-			// Optional-shaped by accident and the wrapper is what carries the
-			// Namespace a bare `Integer | Rational` never had.
+			// NOTE: Optional is a nominal Choice: a value is `#Value(payload)`
+			// or `#Empty`, not the payload sitting in a Union. So the wrapper and
+			// its payload Union stay apart and neither direction is assignable:
+			// no hand-written Union can be Optional-shaped by accident, and the
+			// wrapper carries the Namespace a bare `Integer | Rational` does not.
 			expect(
 				diagnosticsFor(`implementation {
 					constant nested: Optional<Integer | Rational> = #Value(1)
@@ -103,13 +96,11 @@ describe("Validator", () => {
 		})
 
 		it("should keep a nested Optional distinct from the Optional it wraps", () => {
-			// NOTE: The other half of the same change, and the reason it was
-			// worth making. As a Type Alias `Optional<Optional<Integer>>`
-			// flattened to `Integer | Nothing`, so a `List<Optional<Integer>>`
-			// could not say whether `firstItem()` had found an empty Optional
-			// or had found nothing at all. The Choice keeps the two levels
-			// apart: `#Value(#Empty)` is not `#Empty`, and only
-			// `NestedOptional::flatten` collapses one into the other.
+			// NOTE: The Choice keeps the two levels of a nested Optional apart:
+			// `#Value(#Empty)` is not `#Empty`, and only
+			// `NestedOptional::flatten` collapses one into the other. So a
+			// `List<Optional<Integer>>` can say whether `firstItem()` found an
+			// empty Optional or found nothing at all.
 			expect(
 				diagnosticsFor(`implementation {
 					constant inner: Optional<Integer> = #Empty
@@ -2354,14 +2345,6 @@ describe("Validator", () => {
 		})
 	})
 
-	// NOTE: The two cross-checks are about the COMPILER rather than about a
-	// Program — while the Compiler is right, nothing anyone can write reaches
-	// them — so each failing case is a typed Program put by hand into the state a
-	// fixed hole used to produce: a witness dropped on the way (the `List<Unknown>`
-	// hole), a Signature that grew its bound after the call was typed (the
-	// hoisting-order hole), a witness forwarded out of a Function that declares no
-	// such Parameter (the declared-Case fallback hole). Each of those compiled
-	// green and failed at run time, which is what these turn into a Diagnostic.
 	// NOTE: The Validator's side of `= expression` defaults — what a call that
 	// leaves an Argument out is judged against, and what a signature that
 	// accepts a RANGE of Argument counts says about itself.
@@ -2485,6 +2468,11 @@ describe("Validator", () => {
 		})
 	})
 
+	// NOTE: The cross-checks are about the Compiler rather than about a
+	// Program: while the Compiler is right, nothing anyone can write reaches
+	// them. So each failing case is a typed Program put by hand into a state no
+	// source produces, such as a dropped witness or a call committed to an
+	// Overload that refuses its Arguments.
 	describe("Compiler cross-checks", () => {
 		function enrichedProgram(source: string): common.typed.Program {
 			let { program, diagnostics } = enrich(parse(source))

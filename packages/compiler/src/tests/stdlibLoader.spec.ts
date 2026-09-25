@@ -1409,9 +1409,6 @@ describe("Standard Library Loader", () => {
 		).toThrow(/must open with 'declarations/)
 	})
 
-	// NOTE: Enriched once per process — every consumer reads the same object,
-	// so the library is parsed, hoisted and validated exactly once no matter
-	// how many files are compiled.
 	// NOTE: The member table is listed in ONE canonical order, stated in
 	// `builtinMemberOrder`, not in the order the files happened to sort in. A
 	// source declaration is enriched INTO the Scope and lands where insertion
@@ -2081,6 +2078,9 @@ describe("Standard Library Loader", () => {
 		})
 	})
 
+	// NOTE: Enriched once per process — every consumer reads the same object,
+	// so the library is parsed, hoisted and validated exactly once no matter
+	// how many files are compiled.
 	it("caches the loaded standard library", () => {
 		expect(loadStdlib()).toBe(loadStdlib())
 	})
