@@ -41,7 +41,7 @@ export type Template = "article" | "guide" | "reference" | "type"
  * The templates whose pages are read in order. A `type` page and a `reference`
  * page are lookup tables — nobody reads `List` and then turns the page to
  * `Dictionary` — so the chain skips them wherever they sit: it runs through
- * the library's overview and past its seventeen type pages.
+ * the library's overview and past its type pages.
  */
 const CHAINED_TEMPLATES: ReadonlySet<Template> = new Set(["article", "guide"])
 

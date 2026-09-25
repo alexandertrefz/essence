@@ -1,6 +1,5 @@
 // NOTE: Everything the site says about itself that is not content. Kept in one
-// place because the version is printed in four different chrome positions and a
-// drifted copy is the kind of wrong nobody notices.
+// place because a drifted copy is the kind of wrong nobody notices.
 
 import cliPackage from "../../../cli/package.json" with { type: "json" }
 
@@ -25,10 +24,9 @@ export const HERO_SUBLINE =
 
 /**
  * The version of the toolchain the site documents, read at build time from
- * the command line's own `package.json` — the packages carry it in lockstep,
- * and a number typed here drifted from it once already. Nothing displays it
- * at the moment; a page that names the release imports it rather than
- * writing the number down.
+ * the command line's own `package.json`, since the packages carry it in
+ * lockstep. The installation page and "What Essence is" display it; a page
+ * that names the release imports it rather than writing the number down.
  */
 export const VERSION: string = cliPackage.version
 

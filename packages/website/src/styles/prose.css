@@ -84,11 +84,9 @@
 
 /*
  * Inline code. Plain mono in body prose; the accent pill belongs to the lede
- * alone — 1f/7b pill `match` in the opening paragraph and leave `@` and `->`
- * further down plain. NOTE: the pill is deliberately not the default. Docs
- * prose names a type or a method in nearly every sentence (276 inline spans on
- * the diagnostics page), and pilling all of them turns a reference into a field
- * of red instead of emphasising anything.
+ * alone. NOTE: the pill is deliberately not the default. Docs prose names a
+ * type or a method in nearly every sentence, and pilling all of them turns a
+ * reference into a field of red instead of emphasising anything.
  */
 
 .prose :not(pre) > code {
@@ -107,10 +105,9 @@
 }
 
 /*
- * Two ledes sit outside `.prose` — the reference entry's (1h, above the body)
- * and the "Most Read" blurb on the overview. They are rendered by `RichText`,
- * whose `<code>` is another component's element and so is out of reach of any
- * scoped rule; these have to be global.
+ * The reference entry's lede sits outside `.prose`, above the body. It is
+ * rendered by `RichText`, whose `<code>` is another component's element and so
+ * is out of reach of any scoped rule; this has to be global.
  */
 
 .ref__lede code,
@@ -123,7 +120,7 @@
 	color: var(--code-text);
 }
 
-/* Lists. The marker is an accent em-dash, matching "Where Matching Is Allowed". */
+/* Lists. The marker is an accent em-dash. */
 
 .prose ul,
 .prose ol {

@@ -18,11 +18,9 @@ import { SECTIONS } from "../content.config.ts"
 
 type Section = (typeof SECTIONS)[number]
 
-// NOTE: The heading a result groups under. It duplicates the sidebar's labels
-// rather than importing them, because the grouping order has to survive into
-// the browser: `lib/` may not import `astro:content`, and the palette's client
-// script must not pull the content collection into the page bundle. The order
-// itself travels as `groupOrder` on every entry.
+// NOTE: The heading a result groups under: a second copy of the labels in
+// `SECTIONS` of `lib/navigation.ts`, which this build-time route could import
+// instead. The order travels to the browser as `groupOrder` on every entry.
 const SECTION_LABELS: Record<Section, string> = {
 	"getting-started": "Getting started",
 	language: "Language",

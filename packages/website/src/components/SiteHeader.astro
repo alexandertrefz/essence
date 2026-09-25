@@ -1,12 +1,11 @@
 ---
 /*
- * The full-width hairline rail every page wears — screens 1a/1d/7a (marketing,
- * 72px) and 1e–1h/7b (docs, 64px).
+ * The full-width hairline rail every page wears, the same height in the
+ * marketing and the docs variant.
  *
  * Sticky, with the header's own translucent fill and a blur behind it, so the
  * hatch and the hero glow keep moving underneath as the page scrolls. Below
- * 800px both variants collapse to the rows of 1j / 1k and hand off to
- * `MobileMenu`.
+ * 800px both variants collapse to the narrow row and hand off to `MobileMenu`.
  */
 
 import Logo from "./Logo.astro"
@@ -273,10 +272,10 @@ function current(href: string): "page" | undefined {
 	 * Named in its own right, so the brand slides between pages rather than
 	 * dissolving in place. Inside the header's snapshot it was a flat image
 	 * cross-fading from one position to another; lifted out, the browser has an
-	 * old box and a new box and tweens between them. It is 72px of pure sideways
-	 * travel — x=120 on the marketing gutter, x=48 on the documentation's — at
-	 * the same size and the same height on every page, which is what makes it a
-	 * translate and not a resize.
+	 * old box and a new box and tweens between them. It is pure sideways travel,
+	 * from the marketing gutter to the documentation's, at the same size and the
+	 * same height on every page, which is what makes it a translate and not a
+	 * resize.
 	 *
 	 * Safe to hang off the class even though both header rows carry one: only
 	 * ever one of the two rows is rendered, and an element with `display: none`
@@ -455,7 +454,7 @@ function current(href: string): "page" | undefined {
 
 	/*
 	 * Centred in the documentation's bar, but only while there is room for it:
-	 * the row's left cluster and the Reference/GitHub pair on the right both grow
+	 * the row's left cluster and the GitHub link on the right both grow
 	 * towards the middle, so below the point where a centred 300px field would
 	 * meet them it goes back to sitting on the right, as it does everywhere else.
 	 * `position: absolute` is what takes it out of the flex flow, so the centring

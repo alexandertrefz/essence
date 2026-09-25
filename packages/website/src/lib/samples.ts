@@ -60,10 +60,8 @@ export function readSampleMarker(code: string): SampleMarker {
 	return { code, fragment: false, file: undefined }
 }
 
-// NOTE: The fence as `SP/checkSamples.ts` read it while the pages were written
-// — every block those pages were proven against is the block this finds. The
-// pages open every Essence fence at the start of a line with no meta string,
-// so the pattern needs no more than that.
+// NOTE: The pages open every Essence fence at the start of a line with no meta
+// string, so the pattern needs no more than that.
 const ESSENCE_FENCE = /```essence[^\n]*\n([\s\S]*?)```/g
 
 const EXPECTED_OUTPUT = /Terminal\.(?:print|inspect)\(.*\)\s*§ (.*)$/
