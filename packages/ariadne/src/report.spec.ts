@@ -1,6 +1,8 @@
 // Port of ariadne's snapshot test suite (`src/report/tests.rs`). The
 // expected outputs are taken verbatim from upstream, which is what makes the
-// renderer port verifiable.
+// renderer port verifiable, except in this port's own tests: a code on a line
+// of its own, a display line offset that moves the margin, and the colour and
+// ANSI-stripping tests.
 
 import { describe, expect, test } from "bun:test"
 
