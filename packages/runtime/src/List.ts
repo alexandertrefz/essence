@@ -338,7 +338,7 @@ export function materialise<ItemType extends AnyType>(
 	// JavaScriptCore at 8, 64, 1,000 and 100,000 items: two `push` loops into an
 	// empty Array cost 2.1, 34.6, 33.3 and 38.8 ms for the same work this does in
 	// 1.9, 13.8, 19.5 and 14.0, and `slice().reverse().concat()` — which is what
-	// `upgradedAroundWindow` above is right to use — costs 5.9 and 54.6 at the
+	// `upgradedAroundWindow` is right to use — costs 5.9 and 54.6 at the
 	// two ends, because it allocates three Arrays where this allocates one.
 	// oxlint-disable-next-line unicorn/no-new-array -- the answer's length
 	let combined: Array<ItemType> = new Array(frontCount + backCount)
@@ -613,7 +613,7 @@ function upgradedForSuffix<ItemType extends AnyType>(
 // one-shot "take the middle" slice of about half, which amortises nothing
 // because nothing follows it, goes back to the plain copy it can afford. At a
 // half that one shot measured 6.7 ms for fifty middles of 50,000 items against
-// master's 3.4; at three quarters it is 3.4 again.
+// the plain copy's 3.4; at three quarters it is 3.4 again.
 //
 // NOTE: Both runs are assembled in BULK — `slice`, an in-place `reverse` and at
 // most one `concat` — for the reason `upgradedForSuffix` gives, and the
@@ -622,10 +622,10 @@ function upgradedForSuffix<ItemType extends AnyType>(
 // index through `itemOfView` instead — a call and a branch per item, into an
 // Array JavaScriptCore has to grow into from an empty butterfly — measured
 // about 6.5x the bulk copy PER ITEM, which no count of items moved can see, and
-// was worth 37.5 ms against master's 3.8 for four hundred interior windows of
-// 50,000 items. The three branches are the three places this seam can fall
-// against the receiver's own: a flat box, a seam inside the front run, and a
-// seam inside the back run.
+// was worth 37.5 ms against the plain copy's 3.8 for four hundred interior
+// windows of 50,000 items. The three branches are the three places this seam
+// can fall against the receiver's own: a flat box, a seam inside the front run,
+// and a seam inside the back run.
 function upgradedAroundWindow<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	view: ListView<ItemType>,
@@ -679,14 +679,15 @@ function upgradedAroundWindow<ItemType extends AnyType>(
 // closed first, for the reason every sharing answer stamps: the two boxes hold
 // that run's Array between them from here on.
 //
-// NOTE: Exported, and the only two things `NonEmptyList::replace` has to answer
-// such an edit with. Every branded List literal in the runtime is written in
-// THIS file, and deliberately: what a box owes the receiver whose run it is
-// about to share — both counts written down, before the two of them hold that
-// Array between them — is an invariant of this file, and a second module writing
-// the literal where it stands would be a second place for that debt to be
-// forgotten. Nothing is traded for the indirection: inlining both of them into
-// `replace` measures no slower than the calls, on either branch.
+// NOTE: `replace` answers a copying edit with one of these two; they are
+// exported, and nothing outside this file calls them. Every branded List
+// literal in the runtime is written in THIS file, and deliberately: what a box
+// owes the receiver whose run it is about to share — both counts written down,
+// before the two of them hold that Array between them — is an invariant of
+// this file, and a second module writing the literal where it stands would be
+// a second place for that debt to be forgotten. Nothing is traded for the
+// indirection: inlining both of them into `replace` measures no slower than
+// the calls, on either branch.
 export function listRebuildingFront<ItemType extends AnyType>(
 	front: Array<ItemType>,
 	originalList: ListType<ItemType>,
@@ -802,10 +803,11 @@ export function is<ItemType extends AnyType>(
 }
 
 // NOTE: Counting is not reading — `runsOf`, for the reason stated there. The
-// stdlib writes `removeFirst()` as `@::slice(from 1, to @::length())`, so a
-// drain from the front asks each shrinking answer for its length before slicing
-// it again, and a `length` that trimmed would copy the whole front run at every
-// turn and hand back exactly the shrink `slice` had just bought.
+// stdlib's `removeFirst()` is `@::slice(from 1)`, whose end defaults to
+// `@::length()`, so a drain from the front asks each shrinking answer for its
+// length before slicing it again, and a `length` that trimmed would copy the
+// whole front run at every turn and hand back exactly the shrink `slice` had
+// just bought.
 // `removeFirst(count)` and `removeLast(count)` are the same composition.
 export function length(originalList: ListType<AnyType>): IntegerType {
 	return createInteger(runsOf(originalList).total)
@@ -1006,8 +1008,8 @@ export function reduce__overload$1<
 // answers with a `Step` rather than the accumulator outright, so it can leave
 // the walk before its end: `#Continue` carries the accumulator to the next item,
 // `#Done` finishes the whole fold at once with its value and no later item is
-// visited. Native for the same reason `firstItem(where:)` is — no Essence
-// expression can stop a walk partway, and stopping is the whole point.
+// visited. Native because no Essence expression can stop a walk partway, and
+// stopping is the whole point.
 export function reduce__overload$2<
 	ItemType extends AnyType,
 	Answer extends AnyType,
@@ -1934,7 +1936,7 @@ export function indices__overload$1(
 // `@::indices()::map(…)`, and reading each item back by position builds an
 // Optional per item to take apart again.
 //
-// NOTE: `materialise` rather than a view, for the reason `pair` uses one: the
+// NOTE: `materialise` rather than a view, as `pair` reads its two Lists: the
 // answer is a fresh Array of the receiver's whole length either way, so there
 // is nothing to gain by walking the two runs apart.
 export function enumerate<ItemType extends AnyType>(
