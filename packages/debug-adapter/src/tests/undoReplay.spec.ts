@@ -19,10 +19,11 @@ import { DESCRIBE_BATCH_SOURCE, LIST_ITEMS_SOURCE } from "../render"
 // version up, so a box left behind on that run has to undo the writes made
 // since it looked before its items can be read — `runtime/src/listWrites.ts`
 // is the authority, and `caughtUp` there is the original. The renderer in
-// `render.ts` carries two more, one for the line the Variables view shows and
-// one for expanding a List, and the client boundary carries a fourth (guarded
-// in `packages/client/src/tests/undoReplay.spec.ts`, which is the same idea
-// pointed at the other two).
+// `render.ts` carries two copies, one for the line the Variables view shows
+// and one for expanding a List, and the client package carries the other two,
+// in its boundary and in its bench (guarded in
+// `packages/client/src/tests/undoReplay.spec.ts`, which is the same idea
+// pointed at those).
 //
 // NOTE: The copies are not a mistake to be collapsed. This source is evaluated
 // INSIDE the debuggee through `Runtime.callFunctionOn`, where nothing else of
