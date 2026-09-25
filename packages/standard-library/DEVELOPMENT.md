@@ -393,9 +393,10 @@ not have to know that `Integer.es` carries the same one.
 `String::compare(to:comparing:)` and `Rational::round` do.
 
 **A Method Generic has to be written `infer`.** A Generic without it never
-enters `bindableNames`, and inference then leaves it unbound. Every Method
-level Generic here is written `<infer Other>` or
-`<infer ItemType is Equatable>`.
+enters `bindableNames`, and inference then leaves it unbound. Every Generic a
+Method adds here is written that way, as `<infer Other>` or
+`<infer Key is Comparable>`. A bound on the Namespace's own Parameter
+re-declares that Parameter bare, as `<ItemType is Equatable>`, and shadows it.
 
 **A written literal is its own refinement proof.** The Compiler reads the value
 of a literal, so `2` is a NonZeroInteger and `1/2` a NonZeroRational — a written
@@ -695,8 +696,8 @@ rule stated there.
 - **Every Method of a Namespace answers for the Namespace's target Type.**
   There is no per-Method receiver, and a Method that only some values of the
   target Type can answer does not belong there. Reach for a **bounded Method
-  Generic** first — `sort<infer ItemType is Comparable>()` and
-  `join<infer ItemType is Printable>(with:)` stay Methods of `List`, which
+  Generic** first — `sort<ItemType is Comparable>()` and
+  `join<ItemType is Printable>(with:)` stay Methods of `List`, which
   targets every List, and the bound is what a use site has to satisfy. The
   Method Generic shadows the Namespace's `ItemType` outright, and the bound's
   conformance arrives as a hidden trailing Argument, so the runtime
@@ -884,7 +885,7 @@ shim, which nothing references, is dropped by the bundler.
 witness is passed positionally, after everything the signature declares, exactly
 as it is to a bodied Method — so a shim listing only the declared Parameters
 takes the witness in the slot the default opened and hands the default on as the
-witness. `sort<infer ItemType is Comparable>(in order: SortOrder = #Ascending)`
+witness. `sort<ItemType is Comparable>(in order: SortOrder = #Ascending)`
 is the first native with both, and the shim now ends with one Parameter per
 bounded Type Parameter:
 
