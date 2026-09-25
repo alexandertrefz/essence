@@ -25,13 +25,11 @@ import { backRunSeenBy as benchReplay } from "../tools/bench"
 // `packages/debug-adapter/src/tests/undoReplay.spec.ts`, which is this same
 // idea pointed at those).
 //
-// NOTE: The copies are not a mistake to be collapsed. This boundary imports
-// values from three files and no others — `descriptor.spec.ts` asserts exactly
-// that, because a Module's runtime is inlined in ITS bundle and an import from
-// here would reach for a second copy of it in the HOST's. So what ties the
-// copies together is a guard rather than a refactor, and this is it: random
-// boxes left behind in every way a chain can leave one behind, read through
-// each copy, and compared against what the runtime itself answers.
+// NOTE: Neither copy imports the runtime's `caughtUp`, which writes the
+// caught-up Array back into the box where each copy here only reads it. What
+// ties the copies together is a guard rather than a refactor, and this is it:
+// random boxes left behind in every way a chain can leave one behind, read
+// through each copy, and compared against what the runtime itself answers.
 const integer = (value: number) => createInteger(BigInt(value))
 
 const integers = (values: Array<number>): ListType<IntegerType> =>
