@@ -3415,8 +3415,9 @@ export class Printer {
 
 	// #region Patterns
 
-	// NOTE: One Pattern, shared by the four positions that take a value apart:
-	// a Matcher, a Case payload, a Parameter and a Declaration.
+	// NOTE: One Pattern, shared by every position that takes a value apart: a
+	// Matcher (in a `match` arm or a test's `require`), a Case payload, a
+	// Parameter and a Declaration.
 	//
 	// What was written is what comes back. The safety gate compares TOKENS, so
 	// canonicalising a spelling here — writing out the elided Type of `{ x }`,
@@ -3424,14 +3425,14 @@ export class Printer {
 	// `#Done({ value = x })` as `#Done(x)` — is not a diff a reader would
 	// argue with. It is a blanket refusal to format the file at all.
 	//
-	// `breakable` is false in Matcher position, and only there. `printMatch`
-	// measures a Matcher's width from its FLAT rendering and admits the
-	// Handler to a brace-alignment run without asking whether the Matcher
-	// itself can break — so a Pattern that broke there would drop the run's
-	// padding after its own closing brace and drag its short siblings apart
-	// with it. That is the stance a Case value and a Type application already
-	// take, reached here by flattening: a Pattern holds no hard break, so the
-	// one-line rendering always exists.
+	// `breakable` is false in a `match` arm's Matcher, and only there.
+	// `printMatch` measures a Matcher's width from its FLAT rendering and
+	// admits the Handler to a brace-alignment run without asking whether the
+	// Matcher itself can break — so a Pattern that broke there would drop the
+	// run's padding after its own closing brace and drag its short siblings
+	// apart with it. That is the stance a Case value and a Type application
+	// already take, reached here by flattening: a Pattern holds no hard break,
+	// so the one-line rendering always exists.
 	private printPattern(node: parser.PatternNode, breakable: boolean): Doc {
 		let members = Object.values(node.members)
 
