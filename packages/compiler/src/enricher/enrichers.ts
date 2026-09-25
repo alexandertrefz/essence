@@ -293,8 +293,10 @@ export function enrichNode(
 
 // NOTE: `expectedType` is what the surrounding position wants the Expression
 // to be — a Declaration's annotation, an Assignment's target, the declared
-// return Type at a `<-`. Only bare Case Expressions consume it (they resolve
-// against it before scanning the scope); everything else infers bottom-up.
+// return Type at a `<-`. An Invocation, a Record, List or Dictionary literal, a
+// member path, a `define` and a Case construction read it; everything else
+// infers bottom-up.
+//
 // NOTE: Every Expression that stands where a VALUE is read. A Function or Method
 // taken as a value keeps its whole signature and loses its defaults: a default
 // is filled in by the callee's own frame, and only a DIRECT call reaches that
@@ -4138,10 +4140,9 @@ function reportMisplacedComplete(
 	})
 }
 
-// NOTE: Kept as local names because half this file reads them, while the walks
-// themselves live beside `modulePathOf` in `scope.ts` — the Resolver asks the
-// same questions about a bound it is about to refuse, and the two must not
-// answer them two ways.
+// NOTE: Local names for the walks, which live beside `modulePathOf` in
+// `scope.ts` — the Resolver asks the same questions about a bound it is about
+// to refuse, and the two must not answer them two ways.
 const completionContextOf = completionContextIn
 const findExpectedReturnType = expectedReturnTypeIn
 
@@ -10057,7 +10058,7 @@ function collectConditionEvidence(
 // NOTE: A Match Handler's payload binding is a Constant like any other and
 // narrows like one — but a GUARD reads it as `@.member` rather than under its
 // name, because the Constant the body reads does not exist yet where a Guard runs
-// (`scopeLendingBinding` says why). What the Program wrote is the name, and the
+// (`scopeLendingBindings` says why). What the Program wrote is the name, and the
 // name is what a shadow can be declared under, so a member read of a LENT name
 // answers with it. `@.item` written out by hand answers the same, and says the
 // same thing about the same value.
@@ -11504,13 +11505,13 @@ function makeArgumentTyper(
 	return {
 		expectedType,
 		getType(value, expectedType, bindings = null) {
-			// NOTE: Only a Function literal with omitted annotations reacts to
-			// the expected Type, and it may resolve differently per probe — so it
-			// is resolved fresh here rather than enriched once.
+			// NOTE: A Function literal with omitted annotations reacts to the
+			// expected Type, and it may resolve differently per probe, so it is
+			// resolved fresh here rather than enriched once.
 			// `resolveFunctionValueType` records the resolution AND the position
 			// it was resolved against, which the final enriched Node reads back
-			// as the finished call decided it. Every other Expression ignores the
-			// expected Type, so its one enriched Type serves every probe.
+			// as the finished call decided it. An Expression that reacts to
+			// nothing is enriched once, and its one Type serves every probe.
 			if (
 				value.nodeType === "FunctionValue" &&
 				needsContext(value.value)
@@ -11525,19 +11526,19 @@ function makeArgumentTyper(
 				)
 			}
 
-			// NOTE: The other Expression that reacts — a Case construction,
-			// whichever way it is spelled. The prefixed form and the bare unit
-			// sigil have nothing of their own to read their Choice's Type
-			// Arguments off and take the position's answer whatever it is; the
-			// bare form carrying a payload asks the position first and reads its
-			// payload where the position decided nothing.
+			// NOTE: A Case construction reacts too, whichever way it is
+			// spelled. The prefixed form and the bare unit sigil have nothing
+			// of their own to read their Choice's Type Arguments off and take
+			// the position's answer whatever it is; the bare form carrying a
+			// payload asks the position first and reads its payload where the
+			// position decided nothing.
 			if (value.nodeType === "CaseValue") {
 				return noteErrors(
 					probedCaseValueType(value, expectedType, bindings),
 				)
 			}
 
-			// NOTE: And the third — a member path IS the Function the position
+			// NOTE: So does a member path, which is the Function the position
 			// asks for, so the position is the only thing that says what it
 			// reads its members off. Asked silently: the enrichment pass reads
 			// the very recording this leaves behind and reports there, once,
@@ -11550,11 +11551,11 @@ function makeArgumentTyper(
 
 			let type = noteErrors(enrichOnce(value).type)
 
-			// NOTE: The third — and the only one that answers a Type the
-			// Expression itself was never resolved to. A value written DOWN where
-			// a refinement stands is admitted by deciding the predicate while
-			// compiling: `3` really is a NonZeroInteger, so the Argument answers
-			// with the refinement and the call needs no branch in front of it.
+			// NOTE: The one answer that is a Type the Expression itself was
+			// never resolved to. A value written down where a refinement stands
+			// is admitted by deciding the predicate while compiling: `3` really
+			// is a NonZeroInteger, so the Argument answers with the refinement
+			// and the call needs no branch in front of it.
 			//
 			// The Node keeps its own Type and nothing is written to it. That is
 			// what makes this safe under the Overload probes: the admission is an
@@ -11848,7 +11849,7 @@ function undecidedBindingNames(
 // a `NonEmptyList<String>`, so the fold carries a List of Strings whatever the
 // brackets that seeded it left open.
 //
-// Both are read the same way — the DECLARED Type unified against the answer, with
+// Each is read the same way — the DECLARED Type unified against the answer, with
 // everything the Arguments did decide substituted into it first, so the open
 // Parameter is the only one standing in it. Unification at the outermost position
 // binds a Type Parameter to a refinement's BASE (see `matchTypes`), which is
@@ -18468,10 +18469,11 @@ const contextualMemberPathTypes = new WeakMap<
 >()
 
 // NOTE: What ONE probe of a candidate resolved for the Nodes that react to an
-// expected Type — a contextually typed Function literal's signature, and the
-// Parameter Type a prefixed Case construction reads its Type Arguments off.
-// Both are only right for the candidate that wins, so both are held aside
-// together and committed together.
+// expected Type — a contextually typed Function literal's signature, the
+// Parameter Type a Case construction or a member path is read against, and
+// what the candidate decided for its Argument Nodes. Each is only right for the
+// candidate that wins, so all of them are held aside together and committed
+// together.
 type ContextualFunctionTypeRecording = {
 	functions: Map<
 		parser.FunctionDefinitionNode,
@@ -18479,7 +18481,7 @@ type ContextualFunctionTypeRecording = {
 	>
 	cases: Map<parser.CaseValueNode, RecordedCaseValueContext>
 	paths: Map<parser.MemberPathNode, RecordedCaseValueContext>
-	// NOTE: And what a candidate decided for the Argument Nodes it was matched
+	// NOTE: What a candidate decided for the Argument Nodes it was matched
 	// against — held as the work rather than as a Type, because the Node it
 	// writes onto belongs to the typer of whichever Invocation is being probed,
 	// and a nested one is probed inside its caller's probe. See
