@@ -250,16 +250,16 @@ export function conformanceKey(
 const displayFields = new Set(["name", "alias"])
 
 function stableSerialize(value: unknown): string {
-	// NOTE: A Choice's payload may name the Choice, so the walk can lead back
-	// to an object it is inside — the same back-edge `resolveUnknownSlots`
-	// guards for. Meeting one is answered with a bare `<cycle:N>` marker naming
-	// how many objects up the walk it returns to: no value can collide with it
-	// (a string of that spelling keeps its quotes), and the distance keeps two
-	// Types that unfold differently from sharing a memo key. Only the objects
-	// currently OPEN are held, not everything seen: a resolved Type is a DAG,
-	// and a shared object reached twice sideways has to serialize fully both
-	// times, or two structurally identical Types built with different sharing
-	// would stop producing the same key.
+	// NOTE: The back-edge guard `resolveUnknownSlots` carries, and defence in
+	// the same way: the Enricher refuses a Type declaration that names itself.
+	// A walk that leads back to an object it is inside is answered with a bare
+	// `<cycle:N>` marker naming how many objects up the walk it returns to: no
+	// value can collide with it (a string of that spelling keeps its quotes),
+	// and the distance keeps two Types that unfold differently from sharing a
+	// memo key. Only the objects currently open are held, not everything seen:
+	// a resolved Type is a DAG, and a shared object reached twice sideways has
+	// to serialize fully both times, or two structurally identical Types built
+	// with different sharing would stop producing the same key.
 	let visiting: Array<object> = []
 
 	let serialize = (value: unknown): string => {

@@ -25,18 +25,16 @@ import type { common } from "@essence-lang/interfaces"
 // library's simplified Program is a process-wide value handed out again and
 // again, and the caches around it are keyed by what they were given.
 //
-// NOTE: It runs in two passes because a Type can lead back to itself — a
-// Choice's payload may name the Choice — and a rebuild that discovers what
-// changed WHILE recursing answers a cycle's back-edge before it knows. The
-// original one-pass form did exactly that: the back-edge was answered with the
-// original object, the parent concluded nothing under it had changed, and a
-// refinement standing anywhere on the cycle survived into emission, where the
-// ICE guard turned a legal Program into a compile failure. So the question
-// "does anything under here need erasing?" is answered FIRST, over the whole
-// graph, where a cycle is just an edge already followed; only then does the
-// rebuild run, and only over the values the first pass named. A rebuilt value
-// is registered BEFORE its children are filled in, so a cycle's back-edge wires
-// to the replacement rather than to the original it was built to replace.
+// NOTE: It runs in two passes so that a graph leading back to itself erases
+// whole: a rebuild that discovers what changed while recursing answers a
+// cycle's back-edge before it knows, and a refinement on the cycle survives.
+// The Enricher refuses a Type declaration that names itself, so this is
+// defence. The question "does anything under here need erasing?" is answered
+// first, over the whole graph, where a cycle is just an edge already followed;
+// only then does the rebuild run, and only over the values the first pass
+// named. A rebuilt value is registered before its children are filled in, so a
+// cycle's back-edge wires to the replacement rather than to the original it was
+// built to replace.
 export function eraseRefinements(type: common.Type): common.Type
 export function eraseRefinements(
 	program: common.typedSimple.Program,

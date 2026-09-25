@@ -1908,15 +1908,12 @@ function withoutRefinements(type: common.Type): common.Type {
 //
 // NOTE: Identity-preserving, like every walk here: a Type holding no named Record
 // comes back as itself, so the common descriptor allocates nothing. The visiting
-// set is the back-edge guard `resolveUnknownSlots` carries, for the same reason —
-// a Choice's payload may name the Choice.
+// set is the back-edge guard `resolveUnknownSlots` carries.
 //
 // A back edge is answered with the type UNSTRIPPED, which is defence rather than
-// an answer that arises: the only Types that lead back to themselves go through
-// a Choice, whose Cases carry no display spelling, and a Record that named itself
-// would have been refused as a recursive Alias long before this. What the guard
-// is really for is that a Language Server which walks into a cycle stops
-// answering at all.
+// an answer that arises: the Enricher refuses a Type declaration that names
+// itself, directly or around a cycle. The guard keeps a Language Server that
+// walks into a cycle from hanging.
 export function withoutRecordNames(type: common.Type): common.Type {
 	let visiting = new Set<common.Type>()
 
@@ -2152,8 +2149,8 @@ export function resolveUnknownSlots(
 	stored: common.Type,
 	value: common.Type,
 ): common.Type {
-	// NOTE: A Choice's payload may name the Choice, so a Union arm can lead
-	// back to a Type already being walked.
+	// NOTE: The Types being walked. The Enricher refuses a Type declaration
+	// that names itself, so meeting one of them again is defence only.
 	let visiting = new Set<common.Type>()
 
 	let resolve = (stored: common.Type, written: common.Type): common.Type => {
