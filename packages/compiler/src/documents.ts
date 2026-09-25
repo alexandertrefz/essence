@@ -80,14 +80,14 @@ export function canonicalPath(filePath: string): string {
 const CANONICAL_STDLIB_DIRECTORY = canonicalPath(STDLIB_DIRECTORY)
 
 // NOTE: The Language Server is handed URIs
-// (`file:///…/packages/standard-library/sources/List.es`) and the tests plain paths;
-// both are matched, and a `%20` or the like is decoded first so a path with a
-// space is not missed.
+// (`file:///…/packages/standard-library/sources/List.es`) and the tests plain
+// paths; both are matched, and a `%20` or the like is decoded first so a path
+// with a space is not missed.
 //
 // The document has to live in THE standard library — the one this compiler
-// loads, resolved off the loader's own module — not merely in a directory
-// spelled `src/stdlib`. Essence is a language: a user's own project may well
-// have one, and matching by shape would tell them in their Editor that a
+// loads, resolved off the loader's own module — not merely in a directory of
+// the same name. Essence is a language: a user's own project may well have one,
+// and matching by shape would tell them in their Editor that a
 // `declarations { … }` block is fine while `esc` rejects it.
 export function isStdlibDocument(documentPath: string | undefined): boolean {
 	if (documentPath === undefined) {
