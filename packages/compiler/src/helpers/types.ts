@@ -2843,10 +2843,13 @@ const activeCasePairs = new Map<common.CaseType, Set<common.CaseType>>()
 
 // NOTE: The Generic names a binding mentions, remembered per Type object. The
 // question is asked of one binding on every later occurrence of its Parameter,
-// and the answer can not change — a Type is never edited in place, so one walk
-// per distinct binding is the whole cost. Keyed by the binding rather than by
-// the context, because the same Type is bound under many. The answer is almost
-// always the empty Set, which is what makes the chase below free.
+// so one walk per distinct binding is the whole cost. A remembered answer never
+// misses a name because no edit made in place adds one: filling in a
+// refinement's predicate adds none, and poisoning a refinement into its base
+// can only drop the names the refinement's own spelling carried. Keyed by the
+// binding rather than by the context, because the same Type is bound under
+// many. The answer is almost always the empty Set, which is what makes the
+// chase below free.
 const bindingMentionsMemo = new WeakMap<common.Type, Set<common.GenericName>>()
 
 function mentionedGenericNames(binding: common.Type): Set<common.GenericName> {
