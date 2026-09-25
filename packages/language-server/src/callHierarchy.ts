@@ -361,6 +361,9 @@ function collectItemsFromNode(
 		case "NamespaceDefinitionStatement":
 			collectNamespaceItems(node, items)
 			return
+		case "ProtocolDeclarationStatement":
+			collectProtocolItems(node, items)
+			return
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
@@ -470,7 +473,6 @@ function collectItemsFromNode(
 		// NOTE: A path reads members and calls nothing, so it names no edge —
 		// `path-is-members-only` is what makes that true rather than a guess.
 		case "MemberPath":
-		case "ProtocolDeclarationStatement":
 		case "TypeAliasStatement":
 		case "Identifier":
 		case "Self":
@@ -562,6 +564,57 @@ function collectNamespaceItems(
 		for (let method of methods) {
 			if (method.nodeType === "FunctionValue") {
 				collectItems(method.value.body, null, items)
+			}
+		}
+	}
+}
+
+// NOTE: Only a provided Method is an Item. The rename index binds no call to a
+// requirement, so an Item for one would never expand into anything.
+function collectProtocolItems(
+	node: parser.ProtocolDeclarationStatementNode,
+	items: Map<string, CallHierarchyItem>,
+) {
+	let container = node.name.content
+
+	for (let member of Object.values(node.methods)) {
+		let signatures =
+			member.nodeType === "OverloadedProtocolMethod" ||
+			member.nodeType === "OverloadedStaticProtocolMethod"
+				? member.signatures
+				: [member.signature]
+
+		if (signatures.every((signature) => signature.body === null)) {
+			continue
+		}
+
+		let isStatic =
+			member.nodeType === "StaticProtocolMethod" ||
+			member.nodeType === "OverloadedStaticProtocolMethod"
+
+		let range = member.name.position
+
+		for (let signature of signatures) {
+			range = spanning(
+				range,
+				signature.body?.position ?? signature.position,
+			)
+		}
+
+		addItem(
+			{
+				name: member.name.content,
+				kind: isStatic ? "staticMethod" : "method",
+				container,
+				range,
+				selectionRange: member.name.position,
+			},
+			items,
+		)
+
+		for (let { body } of signatures) {
+			if (body !== null) {
+				collectItems(body.value.body, null, items)
 			}
 		}
 	}
@@ -742,6 +795,31 @@ function visitNode(
 			}
 
 			return
+		case "ProtocolDeclarationStatement":
+			for (let member of Object.values(node.methods)) {
+				let methods =
+					member.nodeType === "OverloadedMethod" ||
+					member.nodeType === "OverloadedStaticMethod"
+						? member.methods
+						: [member.method]
+				let methodCaller = callerFor(
+					member.name.position,
+					caller,
+					context,
+				)
+
+				for (let method of methods) {
+					visitDefaults(
+						method.value.parameters,
+						methodCaller,
+						context,
+						sites,
+					)
+					visitBody(method.value.body, methodCaller, context, sites)
+				}
+			}
+
+			return
 		case "IfStatement":
 			visitNode(node.condition, caller, context, sites)
 			visitBody(node.body, caller, context, sites)
@@ -885,7 +963,6 @@ function visitNode(
 			}
 
 			return
-		case "ProtocolDeclarationStatement":
 		case "TypeAliasStatement":
 		case "Identifier":
 		case "Self":

@@ -480,3 +480,67 @@ describe("Call Hierarchy through start and complete", () => {
 		])
 	})
 })
+
+describe("Call Hierarchy of a Protocol-provided Method", () => {
+	let source = [
+		"implementation {",
+		"\tfunction scaled(_ value: Rational) -> Rational {",
+		"\t\t<- value",
+		"\t}",
+		"",
+		"\tprotocol Shape {",
+		"\t\tarea() -> Rational",
+		"",
+		"\t\tdoubled() -> Rational {",
+		"\t\t\t<- scaled(@::area())::add(@::area())",
+		"\t\t}",
+		"\t}",
+		"",
+		"\ttype Square = { side: Rational }",
+		"",
+		"\tnamespace Squares for Square is Shape {",
+		"\t\tarea() -> Rational {",
+		"\t\t\t<- @.side",
+		"\t\t}",
+		"\t}",
+		"",
+		"\tconstant square: Square = { side = 3/1 }",
+		"\tTerminal.inspect(square::doubled())",
+		"}",
+	].join("\n")
+
+	it("should prepare it with the Protocol it belongs to", () => {
+		let item = prepare(source, { line: 9, column: 3 })
+
+		expect(item?.name).toBe("doubled")
+		expect(item?.kind).toBe("method")
+		expect(item?.container).toBe("Shape")
+	})
+
+	it("should prepare nothing on a requirement", () => {
+		expect(prepare(source, { line: 7, column: 3 })).toBeNull()
+	})
+
+	it("should list what its body calls as its outgoing calls", () => {
+		expect(summarise(outgoing(source, { line: 9, column: 3 }))).toEqual([
+			{ name: "scaled", kind: "function", container: null, calls: 1 },
+		])
+	})
+
+	it("should list it as a caller of what its body calls", () => {
+		expect(summarise(incoming(source, { line: 2, column: 11 }))).toEqual([
+			{ name: "doubled", kind: "method", container: "Shape", calls: 1 },
+		])
+	})
+
+	it("should list a conformer's call of it as an incoming call", () => {
+		expect(summarise(incoming(source, { line: 9, column: 3 }))).toEqual([
+			{
+				name: "implementation",
+				kind: "implementation",
+				container: null,
+				calls: 1,
+			},
+		])
+	})
+})
