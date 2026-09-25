@@ -44,9 +44,11 @@ import {
 	matchesType,
 	matchesTypeWithBindings,
 	mentionsUnsolvedTypeParameter,
+	NotHoistedYet,
 	openPendingRefinementCopies,
 	pendingRefinementCopiesOf,
 	predicateConjunctKey,
+	provenConjuncts,
 	refinementWithTypeArguments,
 	renamedNamespaceTarget,
 	resolveOverloadedMethodName,
@@ -3510,6 +3512,46 @@ describe("Helpers", () => {
 				closePendingRefinementCopies()
 
 				expect(pendingRefinementCopiesOf(pending)).toEqual([])
+			})
+
+			// NOTE: Inside a hoist a pending predicate is a declaration read too
+			// early, which the rounds retry. Outside one it is a Compiler bug.
+			it("should ask the rounds to retry a pending predicate read during a hoist", () => {
+				let thrownBy = (read: () => unknown): unknown => {
+					try {
+						read()
+					} catch (error) {
+						return error
+					}
+
+					return null
+				}
+				let reads = [
+					() => provenConjuncts(pendingFilled()),
+					() => conformanceKey("Equatable", pendingFilled()),
+				]
+
+				openPendingRefinementCopies()
+
+				try {
+					for (let read of reads) {
+						expect(thrownBy(read)).toBeInstanceOf(NotHoistedYet)
+					}
+				} finally {
+					closePendingRefinementCopies()
+				}
+
+				for (let read of reads) {
+					expect(thrownBy(read)).toBeInstanceOf(Error)
+				}
+			})
+
+			// NOTE: A crash reporter prints what it caught with `String` unless it
+			// is an `Error`, and a retry that escapes the rounds is not one.
+			it("should read as its message when a retry escapes the rounds", () => {
+				let message = "Protocol 'Named' has not been hoisted yet"
+
+				expect(String(new NotHoistedYet(message))).toBe(message)
 			})
 
 			it("should read an undecided slot through the base", () => {

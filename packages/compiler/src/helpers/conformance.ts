@@ -4,6 +4,7 @@ import {
 	type GenericBindings,
 	applyGenericBindings,
 	findFulfillingMethod,
+	refusePendingPredicate,
 	resolveOverloadedMethodName,
 } from "./types"
 
@@ -288,10 +289,8 @@ function stableSerialize(value: unknown): string {
 				(value as Record<string, unknown>).type === "Refinement" &&
 				(value as Record<string, unknown>).conjuncts === null
 			) {
-				throw new Error(
-					`Internal Compiler Error: the predicate of refinement '${String(
-						(value as Record<string, unknown>).name,
-					)}' was read before it resolved`,
+				refusePendingPredicate(
+					String((value as Record<string, unknown>).name),
 				)
 			}
 

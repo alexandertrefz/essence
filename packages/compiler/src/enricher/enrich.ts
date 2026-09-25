@@ -13,6 +13,7 @@ import {
 import { patternBindings } from "../helpers/patterns"
 import {
 	closePendingRefinementCopies,
+	NotHoistedYet,
 	openPendingRefinementCopies,
 	pendingRefinementCopiesOf,
 } from "../helpers/types"
@@ -1504,8 +1505,21 @@ function hoistDeclarationsInner(
 						}
 					},
 				)
-			} catch {
-				remainingNodes.push(pending)
+			} catch (error) {
+				// NOTE: Only `NotHoistedYet` is retried. Any other throw is a
+				// Compiler bug, reported against the declaration, which is then
+				// left to the in-order enrichment like any that does not hoist.
+				if (error instanceof NotHoistedYet) {
+					remainingNodes.push(pending)
+				} else {
+					sink(
+						node,
+						collectDiagnostics(() =>
+							reportInternalError(error, node.position),
+						).diagnostics,
+					)
+				}
+
 				continue
 			}
 
@@ -1693,32 +1707,15 @@ function hoistDeclarationsInner(
 	// the in-order enrichment from resolving — and re-declaring — it again.
 	for (let { node, scope } of recursiveNodes) {
 		let { result, diagnostics } = collectDiagnostics((): common.Type => {
-			// NOTE: The same guard the rounds above keep, for the same reason:
-			// resolving a declaration is expected to report and recover, so
-			// anything thrown past here is a Compiler bug — and one that would
-			// otherwise escape `enrich` altogether rather than becoming a
-			// Diagnostic. The seeded Error stays in its place, which is what
-			// the rest of the Program is enriched against.
+			// NOTE: A throw here is a Compiler bug, reported as one rather than
+			// escaping `enrich`. The seeded Error stays for the rest of the
+			// Program to be enriched against.
 			try {
 				return node.nodeType === "TypeAliasStatement"
 					? resolveTypeAliasStatementType(node, scope)
 					: resolveChoiceDeclarationStatementType(node, scope)
 			} catch (error) {
-				reportError(
-					`Internal Compiler Error: ${
-						error instanceof Error ? error.message : String(error)
-					}`,
-					node.position,
-					{
-						code: "internal-error",
-						labels: [
-							primary(node.position, "the Compiler threw here"),
-						],
-						notes: [
-							"This is a bug in the Compiler, not in the Program.",
-						],
-					},
-				)
+				reportInternalError(error, node.position)
 
 				return { type: "Error" }
 			}
@@ -1778,20 +1775,24 @@ const guarded = <NodeType>(
 	try {
 		return enrich()
 	} catch (error) {
-		reportError(
-			`Internal Compiler Error: ${
-				error instanceof Error ? error.message : String(error)
-			}`,
-			position,
-			{
-				code: "internal-error",
-				labels: [primary(position, "the Compiler threw here")],
-				notes: ["This is a bug in the Compiler, not in the Program."],
-			},
-		)
+		reportInternalError(error, position)
 
 		return []
 	}
+}
+
+function reportInternalError(error: unknown, position: common.Position): void {
+	reportError(
+		`Internal Compiler Error: ${
+			error instanceof Error ? error.message : String(error)
+		}`,
+		position,
+		{
+			code: "internal-error",
+			labels: [primary(position, "the Compiler threw here")],
+			notes: ["This is a bug in the Compiler, not in the Program."],
+		},
+	)
 }
 
 // NOTE: What every item of a tests section is read against — where it sits and

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import type { common } from "@essence-lang/interfaces"
+import type { common, parser } from "@essence-lang/interfaces"
 
 import { builtinNamespaces, builtinProtocols } from "../enricher/builtins"
 import { nestingLevelProbes } from "../enricher/enrichers"
@@ -1345,6 +1345,97 @@ describe("Enricher", () => {
 				"Type 'Name' is already declared",
 			)
 			expect(diagnostics[0].position?.start.line).toBe(3)
+		})
+
+		it("should hoist a Protocol extending one declared after it", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					protocol Fancy is Named {
+						describe() -> String {
+							<- "*{@::name()}*"
+						}
+					}
+
+					protocol Named {
+						name() -> String
+					}
+
+					type Person = { who: String }
+
+					namespace People for Person is Fancy {
+						name() -> String {
+							<- @.who
+						}
+					}
+
+					constant person: Person = { who = "Ada" }
+					constant described = person::describe()
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: `Proper` hoists with its predicate still unread, so the first
+		// round's reading of `greet("Ada")` has to wait for the fill.
+		it("should retry a declaration that reads a predicate not filled yet", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Proper = String where @::isProper()
+
+					namespace Naming for String {
+						isProper() -> Boolean {
+							<- @::hasCharacters()
+						}
+					}
+
+					function greet(_ name: Proper) -> String {
+						<- name
+					}
+
+					namespace Greeter {
+						static hello = greet("Ada")
+					}
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: Only the first read throws, so the throw is one only hoisting
+		// meets and the in-order enrichment reads the Function whole.
+		it("should report a throw during hoisting where it happened", () => {
+			let program = parse(`implementation {
+				function answer() -> Integer {
+					<- 42
+				}
+			}`)
+			let node = program.implementation
+				.nodes[0] as parser.FunctionStatementNode
+			let value = node.value
+			let reads = 0
+
+			Object.defineProperty(node, "value", {
+				get: () => {
+					reads += 1
+
+					if (reads === 1) {
+						throw new Error("the resolver broke")
+					}
+
+					return value
+				},
+			})
+
+			expect(
+				enrich(program).diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.message,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([
+				[
+					"internal-error",
+					"Internal Compiler Error: the resolver broke",
+					2,
+				],
+			])
 		})
 	})
 

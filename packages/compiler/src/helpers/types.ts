@@ -749,6 +749,31 @@ export function closePendingRefinementCopies(): void {
 	}
 }
 
+// NOTE: What a declaration throws when it reads something the hoist has not
+// reached yet, and the only throw the rounds retry. Like the parser's
+// `ParseError` it is not an `Error`, so `toString` gives crash reports its text.
+export class NotHoistedYet {
+	name = "NotHoistedYet"
+	message: string
+
+	constructor(message: string) {
+		this.message = message
+	}
+
+	toString(): string {
+		return this.message
+	}
+}
+
+// NOTE: During a hoist a predicate still unread asks the rounds to retry its
+// reader once the predicate is filled. Outside one nothing is left to fill it,
+// so reading it is a Compiler bug.
+export function refusePendingPredicate(name: string): never {
+	let message = `Internal Compiler Error: the predicate of refinement '${name}' was read before it resolved`
+
+	throw openHoists === 0 ? new Error(message) : new NotHoistedYet(message)
+}
+
 // NOTE: THE door every copy of a refinement goes through, and the reason there
 // are only two callers rather than a spread at each site: a copy taken while the
 // predicate is still unread is a promise to finish it, and the promise is kept by
@@ -766,14 +791,10 @@ function trackedRefinementCopy(
 		return copy
 	}
 
-	// NOTE: Outside an open hoist the throw stays and means what it always
-	// meant. There is no fill left to complete the copy, so a pending refinement
-	// reaching here at all is a Compiler bug — the same one every other reader of
-	// `conjuncts` refuses by throwing.
+	// NOTE: Outside an open hoist no fill is left to complete the copy, so a
+	// pending refinement reaching here is a Compiler bug.
 	if (openHoists === 0) {
-		throw new Error(
-			`Internal Compiler Error: the predicate of refinement '${source.name}' was read before it resolved`,
-		)
+		refusePendingPredicate(source.name)
 	}
 
 	let copies = pendingRefinementCopies.get(source)
@@ -1705,22 +1726,14 @@ function boundArgument(
 		: { numerator, denominator }
 }
 
-// NOTE: The one door to a refinement's conjuncts. They are null while the
-// predicate is still unresolved — the state a refined Alias hoists in when the
-// Namespace answering its predicate has not hoisted yet — and NOTHING may be
-// decided about a predicate nobody has read: not assignability, not literal
-// admission, not a narrowing, and above all nothing a memo would keep. So the
-// null is refused by throwing, which the hoisting rounds already read as "not
-// this round" — the asker is retried once the predicate has been written in.
-// Hoisting guarantees the null does not survive it, so a throw reaching anyone
-// ELSE is a Compiler bug by definition, and the message says so.
+// NOTE: The one door to a refinement's conjuncts. They are null while a refined
+// Alias waits for the Namespace answering its predicate to hoist, and nothing
+// may be decided about a predicate nobody has read, so the null is refused.
 export function provenConjuncts(
 	refinement: common.RefinementType,
 ): Array<common.PredicateConjunct> {
 	if (refinement.conjuncts === null) {
-		throw new Error(
-			`Internal Compiler Error: the predicate of refinement '${refinement.name}' was read before it resolved`,
-		)
+		refusePendingPredicate(refinement.name)
 	}
 
 	return refinement.conjuncts

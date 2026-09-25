@@ -59,6 +59,7 @@ import {
 	flattenUnionMembers,
 	isPartialOf,
 	matchesType,
+	NotHoistedYet,
 	refinementWithTypeArguments,
 	resolveUnknownSlots,
 	type GenericBindings,
@@ -2566,7 +2567,7 @@ function resolveExtendedProtocol(
 
 	if (ancestor === null) {
 		if (options.deferOnPendingProtocols?.has(identifier.content) === true) {
-			throw new Error(
+			throw new NotHoistedYet(
 				`Protocol '${identifier.content}' has not been hoisted yet`,
 			)
 		}
@@ -6565,7 +6566,7 @@ export function silentCheckedConformances(
 				findProtocolInScope(name, scope) === null &&
 				pendingProtocols.has(name)
 			) {
-				throw new Error(
+				throw new NotHoistedYet(
 					`Protocol '${name}' has not been hoisted yet — deferring Namespace '${node.name.content}'`,
 				)
 			}
