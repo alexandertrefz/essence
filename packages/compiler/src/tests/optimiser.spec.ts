@@ -2713,10 +2713,10 @@ describe("Optimiser", () => {
 		})
 
 		// NOTE: The lever this pass was written for. `isLessThan` is
-		// `@::compare(to other)::is(#Less)` and the other three inequalities are
-		// written on it, so every comparison in every Program ends in this
-		// shape — inside the standard library, which is optimised with the
-		// Program that reaches it.
+		// `@::compare(to other)::is(#Less)`, `isGreaterThan` is the same against
+		// `#Greater`, and the other two inequalities are written on those, so
+		// every comparison in every Program ends in this shape — inside the
+		// standard library, which is optimised with the Program that reaches it.
 		// NOTE: Asked with `lower-scalar-operations` off, because that pass
 		// takes the same body further — a comparison of two Integers becomes
 		// one bigint comparison and the body stops being emitted at all. What

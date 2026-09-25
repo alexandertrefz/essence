@@ -464,10 +464,6 @@ describe("Contract tests", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The Scope answers with the MERGED Namespace, so without the
-		// own-members filter a second declaration of one name would goal an
-		// inherited Method once per statement — one spelled name, twice in one
-		// manifest, colliding in everything the identity anchors.
 		// NOTE: A second same-file declaration of one Namespace is its own
 		// compile error, but the enrichment carries on — and the Scope answers
 		// BOTH statements with the SURVIVING Namespace, so without the
