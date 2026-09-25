@@ -324,8 +324,8 @@ function membersText(
 // NOTE: It can not go stale, and it rests on exactly the invariant the whole
 // two-run representation rests on: a box's LOGICAL ITEMS never change. A run
 // Array may grow, be trimmed, or be replaced by the two runs combined, and none
-// of those moves an item a box has already answered for — "the positions a box
-// has already answered for are frozen for good" is how `List.ts` puts it.
+// of those moves an item a box has already answered for, which is what THE
+// REENTRANCY RULE in `List.ts` rests on too.
 //
 // That invariant is about the ITEMS rather than about the array, which is what
 // carries it through the in-place positional writes of `listWrites.ts`.

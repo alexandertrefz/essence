@@ -97,57 +97,25 @@ export type ListView<ItemType extends AnyType> = {
 	total: number
 }
 
-// NOTE: THE REENTRANCY RULE. Every native fixes its item counts ONCE, here or
-// in `materialise`, and never asks a run Array for its length again. A run can
-// GROW mid-walk, because a callback may append to the very List being walked:
+// NOTE: THE REENTRANCY RULE. Every native that runs user code while it holds a
+// run fixes its item counts once, in the view it reads or in `materialise`, and
+// never asks that run for its length again. A run can grow mid-walk, because a
+// callback may append to the very List being walked:
 // `list::reduce(startingWith list, (acc, item) { <- acc::append(item) })` seeds
 // the accumulator with the walked List, and its first append pushes onto the
-// Array the walk is reading. The walk must cover the items the box viewed when
-// it started, which is what it did when every operation copied. That is sound
-// because a push only ever EXTENDS an Array: the positions a box has already
-// answered for are frozen for good, since the copying paths only ever write
-// Arrays of their own.
+// Array the walk is reading. A push only ever extends an Array, so the walk
+// still covers exactly the items the box viewed when it started. A run can
+// also change mid-walk, through a positional write in place, and THE SECOND
+// REENTRANCY RULE at `walkOf` is what holds a walk against that.
 //
-// NOTE: That paragraph is about a run GROWING, and a run can CHANGE now as
-// well — a positional write lands in one in place. So it is no longer the whole
-// of why a walked position stays what it was, and a reader checking this rule
-// against `replace` should read THE SECOND REENTRANCY RULE below next: what
-// holds a position still under a walk is the SEAL that walk leaves on the run.
-//
-// NOTE: THE READING view — the two runs and the fixed counts, with the
-// receiver's runs trimmed to what it views where THE HALF RULE below says to
-// trim them. Every native that reads a List's ITEMS and may be asked for them
-// AGAIN reads it through here, whether it visits one of them or all of them:
-// what the rule asks is not how much a caller is about to read but how much of
-// an Array a box is keeping alive, which is a question about the box rather
-// than about the caller.
-//
-// NOTE: The readers that do NOT come through here are the ones with no second
-// reading to make, and each says so where it stands: `ownItemsOf` and
-// `pushItemsOf`, which copy the items out and hand the copy on; the set-shaped
-// walks, `GroupedList` and `Dictionary.of(entries:)`, which visit every item
-// once; `keyEncoding`'s `listText`; `Randomness.pick`; `Generators`;
-// `String.of(codePoints:)`. Trimming a run for a walk that will never look
-// again buys nothing and costs the copy — which is this same rule, applied
-// where the caller happens to be known.
-//
-// NOTE: THE SECOND REENTRANCY RULE, which a positional write in place needs.
-// A run can now also CHANGE mid-walk: `list::reduce(startingWith list, (acc,
-// item) { <- acc::replace(item, at 0) })` seeds the accumulator with the walked
-// List again, and its first `replace` would write the very Array the walk is
-// reading. So this reader SEALS the run's log — the writes below refuse a sealed
-// log for good and copy instead. Every reader that hands a raw run to code that
-// may call back into Essence has to seal: this one, `materialise`, and the
-// handful of walks that read through `runsOf` and ask a witness or a key
-// Function about each item, which say `sealedRunsOf` instead.
-//
-// NOTE: The POSITIONAL readers must not seal, and that is what keeps the sieve
-// and the DP table linear: `item(at:)`, `firstItem` and `lastItem` read a
-// position and hand no Array to anybody, so they read through `runsOf`. A
-// sealing `item(at:)` would make "read the cell before, write this one" copy the
-// whole table every turn, which is the very cliff the log is here to close —
-// and a reader that visits ONE item has no more business trimming a run than
-// sealing it, so what the half rule decides is no longer asked there.
+// NOTE: THE READING view: `runsOf`, with the receiver's runs trimmed to what it
+// views where THE HALF RULE (`trimUnderHalfRule`) says to trim them. It does
+// not seal, so it is for readers that run no user code while they hold a run.
+// The positional readers, `item(at:)` and `NonEmptyList`'s `firstItem` and
+// `lastItem`, read through here because they must not seal, for the reason
+// `walkOf` gives. A reader that should not trim the receiver reads through
+// `runsOf` instead, or through `sealedRunsOf` where it hands the run to user
+// code.
 export function viewOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListView<ItemType> {
@@ -158,14 +126,14 @@ export function viewOf<ItemType extends AnyType>(
 	return view
 }
 
-// NOTE: THE WALKER'S VIEW — `viewOf` for a native that hands the raw run to code
-// that may call back into Essence, which every native taking a Function or a
-// conformance does. A run can now CHANGE mid-walk, not only grow:
+// NOTE: THE SECOND REENTRANCY RULE, and the walker's view: `viewOf`, sealed, for
+// a native that hands the raw run to code that may call back into Essence, a
+// Function or a conformance witness. A run can change mid-walk, not only grow:
 // `list::reduce(startingWith list, (acc, item) { <- acc::replace(item, at 0) })`
 // seeds the accumulator with the walked List again, and its first `replace`
-// would write the very Array the walk is reading. Sealing the log is what
-// refuses that: the writes below copy instead, and the walk answers the items
-// the List held at entry — which is what it answered when every write copied.
+// would write the very Array the walk is reading. So this reader seals the
+// run's log. A write refuses a sealed log and copies instead, and the walk
+// answers the items the List held at entry.
 //
 // NOTE: Sealed for good rather than for the walk's length. A walk is linear work
 // anyway, so the one copy the next write then makes is paid for, and there is no
@@ -176,7 +144,8 @@ export function viewOf<ItemType extends AnyType>(
 // NOTE: THE AUDIT this rests on is finite and mechanical, and the rule is about
 // the RUN rather than about the receiver: a native that can run user code — a
 // Function or a conformance witness — while it holds ANY List's raw run says
-// `walkOf` or `sealedRunsOf` for THAT run. Every run it holds, on every operand.
+// `walkOf`, `sealedRunsOf` or `materialise` for THAT run. Every run it holds, on
+// every operand.
 //
 // NOTE: Written that way because the narrower wording — "reads its receiver's
 // items" — is what let `is` ship holding its ARGUMENT's run unsealed while the
@@ -185,19 +154,23 @@ export function viewOf<ItemType extends AnyType>(
 // operands has two debts, and the one that is not the receiver is the one a rule
 // phrased around receivers can not see. The natives this reaches are the ones
 // taking a second List or a List inside an operand: `is`, `compare`,
-// `contains(contentsOf:)`, `everyItem(in:)`, `removeEvery(in:)` and that member
-// walk. Everything else with two List operands — `append(contentsOf:)`, `pair`,
-// `flatten`, `transpose`, `split(of:)`, the edits — runs no user code at all
-// while it holds a run, and owes nothing.
+// `contains(everyItemOf:)`, `everyItem(alsoIn:)`, `removeEvery(contentsOf:)`
+// and that member walk. Everything else with two List operands —
+// `append(contentsOf:)`, `pair`, `flatten`, `transpose`, the edits — runs no
+// user code at all while it holds a run, and owes nothing.
 //
-// NOTE: `viewOf` is left to the readers that visit ONE item — `item(at:)`,
-// `firstItem`, `lastItem` — which hand no Array to anybody, and which must not
-// seal, or "read the cell before, write this one" would copy the whole table
-// every turn. Every one of these walks is held against a callback that writes
-// the List being walked, in `positionalWrites.spec.ts` — the receiver of it in
-// one sweep and, because one box passed as both operands hides exactly this
-// class of bug behind the receiver's own seal, a DISTINCT freshly logged
-// argument in a second.
+// NOTE: The readers that visit ONE item, `item(at:)` and `NonEmptyList`'s
+// `firstItem` and `lastItem`, read through `viewOf` instead. They hand no Array
+// to anybody, and a reader that sealed would make "read the cell before, write
+// this one" copy the whole table every turn.
+//
+// NOTE: Every call of `walkOf` and `sealedRunsOf` here that hands items to user
+// code, and the `materialise` in `sort(on:)`, is held against a callback that
+// writes the List being walked, in `positionalWrites.spec.ts`. `is`, `compare`,
+// `contains(everyItemOf:)`, `everyItem(alsoIn:)`, `removeEvery(contentsOf:)`
+// and the generic Choice member walk in `internalHelpers.ts` are held against a
+// distinct freshly logged argument as well, because one box passed as both
+// operands hides exactly this class of bug behind the receiver's own seal.
 export function walkOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListView<ItemType> {
@@ -338,7 +311,7 @@ export function materialise<ItemType extends AnyType>(
 	// it while calling user code — `sort(on:)` reads its key off every item, and
 	// the Rewriter's inlined walks read their items here. So a box that is behind
 	// catches up first and a box that is current is sealed, for the reason
-	// `viewOf` seals. The two paths that build a fresh Array below need neither:
+	// `walkOf` seals. The two paths that build a fresh Array need no seal:
 	// nothing else holds what they answer with.
 	caughtUp(originalList)
 
@@ -388,7 +361,7 @@ export function materialise<ItemType extends AnyType>(
 }
 
 // NOTE: A run handed to code that may call back into Essence can not be written
-// in place any more, for the reason `viewOf` gives. Sealing the log says so, and
+// in place any more, for the reason `walkOf` gives. Sealing the log says so, and
 // says it about the ARRAY rather than about this box: every box sharing that
 // Array reads the same log, so one of them being walked closes the Array to all
 // of them. A box that carries no log is already closed — there is nothing for a
@@ -401,11 +374,12 @@ function sealWrites(originalList: ListType<AnyType>): void {
 	}
 }
 
-// NOTE: `runsOf` for the walks that must NOT trim the receiver and DO hand its
-// runs to user code — the set-shaped natives here, which ask an item's own
-// witness or a key Function about every item, and the walks `GroupedList` and
-// `Dictionary.of(entries:)` are. Trimming is wrong for them for the reason
-// `runsOf` gives; sealing is right for them for the reason `viewOf` gives.
+// NOTE: `runsOf`, sealed, for the walks that must not trim the receiver:
+// `keySetOver`, `meetsAKeyTwice` and the argument of `contains(everyItemOf:)`
+// here, which ask an item's own witness or a key Function about every item,
+// the walks in `GroupedList` and `Dictionary.of(_:)`, and `mode`. Trimming is
+// wrong for them for the reason `runsOf` gives, and sealing is right for the
+// ones that hand the items to user code, for the reason `walkOf` gives.
 export function sealedRunsOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListView<ItemType> {
@@ -2378,8 +2352,9 @@ export function hasDuplicates__overload$2<
 	return meetsAKeyTwice(originalList, keyOf, conformance)
 }
 
-// NOTE: Sealed like the set-shaped natives above: the tally asks each item's
-// own witness while the run Array is held.
+// NOTE: Sealed as the set-shaped natives are, though it asks no witness: every
+// item is counted by its canonical encoding alone, so no user code runs while
+// the run Array is held.
 //
 // NOTE: The item counted highest, and the sixth Method resting on
 // `keyEncoding.ts` rather than on a container. It is here beside the
