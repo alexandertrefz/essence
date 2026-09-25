@@ -19,11 +19,25 @@ import { type AnyType, typeKeySymbol } from "./type"
 // Essence on top of those.
 //
 // NOTE: `getStringRepresentation` lives here rather than in `functions.ts`
-// because `inspect` is its only caller in the language — `functions.ts` keeps
-// the `loop` drivers and nothing else now. It stays EXPORTED because two other
-// readers ask it a question of the same shape outside a Program:
-// `Record.toString`, which asks for the printable form, and the Debug Adapter,
-// whose variables pane shows a value the way a `Terminal.inspect` would.
+// because `inspect` and `describe` are what the language reaches it through;
+// `functions.ts` keeps the `loop` drivers and nothing else. It is EXPORTED for
+// the runtime modules that render with it, `Record.toString`,
+// `boundRecordToString` and the difference in `Testing.ts`, and for the Debug
+// Adapter's spec, which holds the variables pane to what `Terminal.inspect`
+// prints.
+
+// NOTE: What a rendering at indent zero becomes at a deeper one. Every arm of
+// the walk below writes its own newlines followed by four spaces per level and
+// nothing else — a String is quoted, so its own newlines and control characters
+// are escaped rather than written — which makes a rendering at any level the
+// rendering at zero with the level's indent after each newline. That is what
+// lets a child be rendered ONCE, for the single-line pass, and re-used for the
+// nested one. Rendering it twice made the walk double per level of nesting: a
+// chain of single-member Records measured 1.1, 15, 62, 260 and 1,153 ms at
+// depths 12, 16, 18, 20 and 22, against 0.03 ms at depth 22 this way.
+function indented(text: string, indent: string): string {
+	return text.includes("\n") ? text.replaceAll("\n", `\n${indent}`) : text
+}
 
 // NOTE: Two readers, one walk. `Terminal.inspect` asks for the STRUCTURAL
 // rendering — what a value IS — and `Record.toString` asks for the PRINTABLE
@@ -42,19 +56,6 @@ import { type AnyType, typeKeySymbol } from "./type"
 // anything at all, and measured 331 bytes of `Irrational.es` against the 139
 // the handed-in Function costs. The padding is a String rather than a Function
 // because there is nothing behind it to carry.
-// NOTE: What a rendering at indent zero becomes at a deeper one. Every arm of
-// the walk below writes its own newlines followed by four spaces per level and
-// nothing else — a String is quoted, so its own newlines and control characters
-// are escaped rather than written — which makes a rendering at any level the
-// rendering at zero with the level's indent after each newline. That is what
-// lets a child be rendered ONCE, for the single-line pass, and re-used for the
-// nested one. Rendering it twice made the walk double per level of nesting: a
-// chain of single-member Records measured 1.1, 15, 62, 260 and 1,153 ms at
-// depths 12, 16, 18, 20 and 22, against 0.03 ms at depth 22 this way.
-function indented(text: string, indent: string): string {
-	return text.includes("\n") ? text.replaceAll("\n", `\n${indent}`) : text
-}
-
 export function getStringRepresentation(
 	obj: AnyType,
 	indentLevel = 0,
@@ -218,9 +219,8 @@ export function getStringRepresentation(
 		// NOTE: A kind the walk above does not know may still have said how it
 		// is rendered — the registry in `registry.ts` is where a container's
 		// own module leaves that, and probing it HERE is what keeps the arms
-		// above the whole cost of printing for a Program that holds none. A
-		// Dictionary is the one such kind today, and its arm cost every Program
-		// that printed anything 1,281 bytes before it moved.
+		// above the whole cost of printing for a Program that holds none.
+		// `Dictionary.ts` and `Future.ts` register such kinds.
 		let kind = kindOf(obj[typeKeySymbol])
 
 		if (kind !== undefined) {
@@ -261,19 +261,17 @@ export type OutputStream = "output" | "error"
 // writes anything.
 export type OutputSink = (text: string, stream: OutputStream) => void
 
-// NOTE: A dynamically scoped binding, installed for the length of ONE
-// synchronous call and restored by the `finally` below — not a mode something
-// switches on and leaves on. That is what makes it safe to say a Program's
-// output belongs to whatever `withOutputSink` was wrapped around: nothing
-// outside that call can observe it, because nothing else runs during it. Tests
-// are synchronous and run one at a time in phase 1, so one test's output can
-// not reach another's capture.
+// NOTE: A dynamically scoped binding, installed for the length of ONE call and
+// put back when that call is over, not a mode something switches on and leaves
+// on. That is what makes it safe to say a Program's output belongs to whatever
+// `withOutputSink` was wrapped around. The test runner runs one test at a time,
+// so one test's output can not reach another's capture.
 //
-// The day tasks land, or the runner runs tests in parallel inside one realm,
-// this becomes an `AsyncLocalStorage` — the SHAPE stays what it is here, a
-// capability resolved where the writing happens rather than a parameter
-// threaded through every Method that might print. Workers need nothing: a
-// worker is its own realm and holds its own binding.
+// A runner that ran tests in parallel inside one realm would need an
+// `AsyncLocalStorage` here, and the SHAPE would stay what it is: a capability
+// resolved where the writing happens rather than a parameter threaded through
+// every Method that might print. Workers need nothing: a worker is its own
+// realm and holds its own binding.
 let outputSink: OutputSink | null = null
 
 // NOTE: A run that WAITS keeps the sink for as long as it waits. The test
@@ -292,8 +290,8 @@ let outputSink: OutputSink | null = null
 // nothing left to print. See `testBody` in the Rewriter.
 //
 // NOTE: The promise is recognised rather than awaited, so the synchronous shape
-// — every run that completes nothing — costs exactly the `try`/`finally` it
-// always did and never a turn of the microtask queue.
+// — every run that completes nothing — costs a `try` and one `then` test and
+// never a turn of the microtask queue.
 export function withOutputSink<Value>(
 	sink: OutputSink | null,
 	run: () => Value,
@@ -484,9 +482,9 @@ let input: InputState = {
 	decoder: null,
 }
 
-// NOTE: The reading half of `withOutputSink`, and the same shape: a dynamically
-// scoped binding installed for the length of ONE synchronous call and put back
-// by the `finally`. `text` is the whole of the input for that call, and `null`
+// NOTE: The reading half of `withOutputSink`: a dynamically scoped binding
+// installed for the length of one synchronous call and put back by the
+// `finally`. `text` is the whole of the input for that call, and `null`
 // is the host's own descriptor read from the start. Both replace the buffer
 // above, which is what makes a read that is staged repeatable — the state a
 // reading Program carries is the one thing a caller can not otherwise reach.
