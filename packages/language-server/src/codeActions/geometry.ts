@@ -772,10 +772,11 @@ export function labelBefore(
 	}
 }
 
-// NOTE: The mirror, for a fallback somebody wrote ahead of another Argument. The
-// comma after it is what separates the two, and a `)` says this Argument was
-// last. The blanks on the far side of the comma go with it here, so the
-// Argument that follows keeps the one space in front of it that it had.
+// NOTE: The mirror of `commaBefore`, for a fallback somebody wrote ahead of
+// another Argument. The comma after it is what separates the two, and a `)`
+// says this Argument was last. The blanks on the far side of the comma go with
+// it here, so the Argument that follows keeps the one space in front of it that
+// it had.
 export function commaAfter(
 	lines: Array<string>,
 	end: common.Cursor,
