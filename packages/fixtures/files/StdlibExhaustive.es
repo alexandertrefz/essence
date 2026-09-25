@@ -2,9 +2,9 @@ implementation {
 
 	§ Every declared Method of every standard library Namespace, called at
 	§ least once and printed with a label that names it. This file exists to
-	§ be a behaviour net: `src/tests/stdlibGolden.spec.ts` runs it and diffs
-	§ its output against a golden capture, so a Method whose result changes
-	§ says so by name.
+	§ be a behaviour net: `packages/compiler/src/tests/stdlibGolden.spec.ts`
+	§ runs it and diffs its output against a golden capture, so a Method whose
+	§ result changes says so by name.
 	§
 	§ The label is the Method's signature — Namespace, name, Type Parameters
 	§ and Parameters, minus the return Type — because a Method with an
@@ -12,9 +12,10 @@ implementation {
 	§ different runtime Functions. It is spelled EXACTLY as `printSignature`
 	§ spells it, so the coverage test in `stdlibGolden.spec.ts` can compare
 	§ the labels this file uses against the declared Methods as two sets: a
-	§ Method added to `src/stdlib` and not called here fails that test by
-	§ name. A `[note]` suffix separates the extra calls that exercise an edge
-	§ case from the everyday one, and is ignored by the comparison.
+	§ Method added to `packages/standard-library/sources` and not called here
+	§ fails that test by name. A `[note]` suffix separates the extra calls that
+	§ exercise an edge case from the everyday one, and is ignored by the
+	§ comparison.
 	§
 	§ The label and the value are separated by ` => ` rather than ` -> `,
 	§ because a signature spells a Function Parameter with an arrow of its
@@ -3553,12 +3554,6 @@ c"::quote())
 	)
 
 	§ ——— Record ———————————————————————————————————————————————————————————
-	§ LOAD-BEARING: `point` prints as `{ x = 1, y = 2 }`, well under sixty
-	§ characters. `getStringRepresentation` has a bug where a Record whose
-	§ single-line form reaches sixty characters is printed with every field
-	§ doubled and wrapped across lines — which would put a value on more than
-	§ one line and break the one-line-per-call contract the golden test reads
-	§ by. Keep every printed Record here short until that bug is fixed.
 	constant point = { x = 1, y = 2 }
 
 	show("Record.is(_ \{\})", point::is({ x = 1, y = 2 }))
@@ -4200,8 +4195,7 @@ c"::quote())
 
 	§ The keyed entries, which is what a member path was built for. Every one
 	§ of them reads its key with one, so the calls below are also what says the
-	§ desugar reaches an Argument position. Each printed Record is kept short
-	§ for the reason `point` is.
+	§ desugar reaches an Argument position.
 	§ Each `m` is annotated where it is bound rather than inside the literal:
 	§ a List literal takes its item Type from the items, so three Records
 	§ holding an Integer, a Rational and an Integer answer three shapes rather
@@ -4581,11 +4575,6 @@ c"::quote())
 		"List.join<ItemType is Printable>(with: String) [single]",
 		singleNumber::join(with ", "),
 	)
-	§ LOAD-BEARING: `partition` returns a Record, and its printed form
-	§ `{ accepted = [2, 4], refused = [3, 1, 1] }` sits at forty-two
-	§ characters — eighteen under the sixty at which `getStringRepresentation`
-	§ trips its field-doubling bug and wraps across lines. A larger `numbers`
-	§ List here would cross that line and break the golden. Keep it short.
 	show(
 		"List.partition<ItemType>(where: (_ ItemType) -> Boolean)",
 		numbers::partition(where (item) { <- item::isEven() }),
@@ -4620,9 +4609,6 @@ c"::quote())
 	§ carry it are declared as plain Lists, which is what keeps these calls on
 	§ the entries `List` itself declares. `pair` asks the ARGUMENT for a proof
 	§ too, so the empty case reaches `List` through what is paired with it.
-	§
-	§ One pair only: the pretty printer wraps a Record List past sixty
-	§ characters, and every line of this file's output has to stay one line.
 	constant oneWord: List<String>      = ["a"]
 	constant fiveNumbers: List<Integer> = [1, 2, 3, 4, 5]
 
@@ -5229,8 +5215,8 @@ c"::quote())
 		"NonEmptyList.replace<ItemType>(_ ItemType, at: Integer) [proof carried]",
 		provenNumbers::replace(99, at -99)::lastItem(),
 	)
-	§ The transform entry, which carries the proof through the `by:`-shaped
-	§ route: it hands the entry above an item and answers what that answers.
+	§ The transform entry, which carries the proof by handing
+	§ `replace(_:at:)` an item and answering what that answers.
 	show(
 		"NonEmptyList.replace<ItemType>(at: Integer, _ (_ ItemType) -> ItemType)",
 		provenNumbers::replace(at 0, (item) { <- item::multiply(with 10) }),
@@ -5250,8 +5236,7 @@ c"::quote())
 			::lastItem(),
 	)
 	§ Pairing asks the Argument for the proof the receiver carries, since the
-	§ pairing stops with the shorter of the two. One pair only, for the reason
-	§ `List`'s own entry shows one.
+	§ pairing stops with the shorter of the two.
 	show(
 		"NonEmptyList.pair<ItemType, Other>(with: NonEmptyList)",
 		provenOne::pair(with provenWords),
@@ -5597,11 +5582,10 @@ c"::quote())
 	)
 
 	§ ——— NonEmptyIntegerList, NonEmptyRationalList, NonEmptyNumberList ————
-	§ The same three questions answered BARE, which is what the proof buys. A
-	§ written List in receiver position has been proven nothing, so each
-	§ receiver here is built by a Method that says what it builds is not empty
-	§ — `append` and `List.of` — and the label is what says the call landed in
-	§ the proven Namespace rather than the general one.
+	§ The same questions answered bare, which is what the proof buys.
+	§ Most receivers here are built by `append` or `List.of`, which say that
+	§ what they build is not empty, and the label is what says the call landed
+	§ in the proven Namespace rather than the general one.
 	show(
 		"NonEmptyIntegerList.lowestNumber()",
 		noNumbers::append(5)::append(2)::lowestNumber(),
@@ -6321,8 +6305,7 @@ c"::quote())
 	)
 	§ The groups as a List of Records, which is what `entries` recovers. The
 	§ key is read with a member path, as `sort(on:)` reads its key, and the
-	§ items are read down to their tags for the reason the `[tie]` lines above
-	§ are: a Record per item would wrap the line.
+	§ items are read down to their tags, as the `[tie]` lines are.
 	show(
 		"GroupedList.group<ItemType, Key is Equatable>(on: (_ ItemType) -> Key) [entries]",
 		tiedRows
