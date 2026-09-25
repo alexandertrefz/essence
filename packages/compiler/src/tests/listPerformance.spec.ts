@@ -1,8 +1,9 @@
 import { describe, expect, it } from "bun:test"
-import { spawnSync } from "node:child_process"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
@@ -52,7 +53,10 @@ const ATTEMPTS = 3
 // leaving it in the runner's heap would be felt by whatever runs next. The
 // startup Bun charges for the subprocess is inside the figure, which is the
 // honest direction: it makes the measurement larger, not smaller.
-function millisecondsToRun(source: string, printed: string): number {
+async function millisecondsToRun(
+	source: string,
+	printed: string,
+): Promise<number> {
 	let parsed = parseWithDiagnostics(source)
 
 	expect(containsErrors(parsed.diagnostics)).toBe(false)
@@ -70,9 +74,7 @@ function millisecondsToRun(source: string, printed: string): number {
 
 	try {
 		let start = performance.now()
-		let result = spawnSync(process.execPath, [file], {
-			encoding: "utf-8",
-		})
+		let result = await spawnAndWait([process.execPath, file])
 		let elapsed = performance.now() - start
 
 		// NOTE: The Program prints the length it answered, and it is checked
@@ -121,17 +123,17 @@ function buildingSource(method: string): string {
 // these cases went red at loads of 17 and 52 with their claims perfectly true.
 // A Program that really did turn quadratic reads steep every time it is asked,
 // so asking twice costs a failing run a few seconds and a passing run nothing.
-function expectLinearGrowth(
+async function expectLinearGrowth(
 	sourceFor: (length: number) => string,
 	printedFor: (length: number) => string,
-): void {
-	let bestOf = (length: number) => {
+): Promise<void> {
+	let bestOf = async (length: number) => {
 		let best = Number.POSITIVE_INFINITY
 
 		for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
 			best = Math.min(
 				best,
-				millisecondsToRun(sourceFor(length), printedFor(length)),
+				await millisecondsToRun(sourceFor(length), printedFor(length)),
 			)
 		}
 
@@ -143,7 +145,7 @@ function expectLinearGrowth(
 	for (let index = 0; index < WALK_LENGTHS.length; index++) {
 		let length = WALK_LENGTHS[index]!
 
-		measured.push(bestOf(length))
+		measured.push(await bestOf(length))
 
 		if (index === 0) {
 			continue
@@ -157,9 +159,9 @@ function expectLinearGrowth(
 
 		measured[index - 1] = Math.min(
 			measured[index - 1]!,
-			bestOf(WALK_LENGTHS[index - 1]!),
+			await bestOf(WALK_LENGTHS[index - 1]!),
 		)
-		measured[index] = Math.min(measured[index]!, bestOf(length))
+		measured[index] = Math.min(measured[index]!, await bestOf(length))
 
 		if (grewBy() >= GROWTH_PER_DOUBLING) {
 			tooSteep.push(
@@ -229,15 +231,15 @@ function printedSumFor(name: string, length: number): string {
 }
 
 describe("List performance", () => {
-	it("appends sixty thousand items in under a second", () => {
+	it("appends sixty thousand items in under a second", async () => {
 		expect(
-			millisecondsToRun(buildingSource("append"), `${TURNS + 1}`),
+			await millisecondsToRun(buildingSource("append"), `${TURNS + 1}`),
 		).toBeLessThan(CEILING_MILLISECONDS)
 	})
 
-	it("prepends sixty thousand items in under a second", () => {
+	it("prepends sixty thousand items in under a second", async () => {
 		expect(
-			millisecondsToRun(buildingSource("prepend"), `${TURNS + 1}`),
+			await millisecondsToRun(buildingSource("prepend"), `${TURNS + 1}`),
 		).toBeLessThan(CEILING_MILLISECONDS)
 	})
 
@@ -252,8 +254,8 @@ describe("List performance", () => {
 		["append", "remove(at 0)"],
 		["append", "removeFirst()"],
 	] as const) {
-		it(`drains a ${built}-built List through ${step} in linear time`, () => {
-			expectLinearGrowth(
+		it(`drains a ${built}-built List through ${step} in linear time`, async () => {
+			await expectLinearGrowth(
 				(length) => drainingSource(built, length, step),
 				() => "1",
 			)
@@ -311,8 +313,8 @@ describe("List performance", () => {
 		}`,
 		],
 	] as const) {
-		it(`walks a List ${name} in linear time`, () => {
-			expectLinearGrowth(
+		it(`walks a List ${name} in linear time`, async () => {
+			await expectLinearGrowth(
 				(length) => walkingSource(length, walk),
 				(length) => printedSumFor(name, length),
 			)

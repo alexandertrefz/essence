@@ -11,5 +11,8 @@
 	"dependencies": {
 		"@essence-lang/client": "workspace:*",
 		"@essence-lang/runtime": "workspace:*"
+	},
+	"devDependencies": {
+		"@essence-lang/fixtures": "workspace:*"
 	}
 }

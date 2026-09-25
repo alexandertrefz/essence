@@ -26,5 +26,8 @@
 	],
 	"dependencies": {
 		"@essence-lang/interfaces": "workspace:*"
+	},
+	"devDependencies": {
+		"@essence-lang/fixtures": "workspace:*"
 	}
 }

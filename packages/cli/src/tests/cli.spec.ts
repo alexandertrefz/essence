@@ -1,5 +1,4 @@
 import { afterAll, afterEach, describe, expect, it } from "bun:test"
-import { spawnSync } from "node:child_process"
 import {
 	existsSync,
 	mkdirSync,
@@ -23,6 +22,7 @@ import { closestMatch } from "@essence-lang/compiler/helpers"
 import { optimiserPassNames } from "@essence-lang/compiler/optimiser"
 import { testDiagnostic } from "@essence-lang/compiler/tests/diagnosticFactory"
 import { fixturePath } from "@essence-lang/fixtures"
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 
 import { EXIT_SUCCESS, EXIT_USAGE, runCheck, runRun } from "../actions"
@@ -2277,16 +2277,16 @@ describe("essence run", () => {
 				let binary = fileURLToPath(
 					import.meta.resolve("../../bin/essence"),
 				)
-				let result = spawnSync(
-					process.execPath,
+				let result = await spawnAndWait(
 					[
+						process.execPath,
 						binary,
 						"run",
 						path.join(directory, "Overflow.es"),
 						"--json",
 						"--no-optimise",
 					],
-					{ encoding: "utf-8", env: { ...process.env } },
+					{ env: { ...process.env } },
 				)
 
 				let report = JSON.parse(result.stdout) as JSONReport
@@ -2296,7 +2296,7 @@ describe("essence run", () => {
 				expect(result.stderr).toContain(
 					"Maximum call stack size exceeded",
 				)
-				expect(result.status).not.toBe(EXIT_SUCCESS)
+				expect(result.code).not.toBe(EXIT_SUCCESS)
 			},
 		)
 	})
@@ -2343,13 +2343,18 @@ describe("essence run", () => {
 				let binary = fileURLToPath(
 					import.meta.resolve("../../bin/essence"),
 				)
-				let result = spawnSync(
-					process.execPath,
-					[binary, "run", path.join(directory, "Main.es"), "--quiet"],
-					{ encoding: "utf-8", env: { ...process.env } },
+				let result = await spawnAndWait(
+					[
+						process.execPath,
+						binary,
+						"run",
+						path.join(directory, "Main.es"),
+						"--quiet",
+					],
+					{ env: { ...process.env } },
 				)
 
-				expect(result.status).toBe(EXIT_SUCCESS)
+				expect(result.code).toBe(EXIT_SUCCESS)
 				// NOTE: The Program's own three lines, after whatever the
 				// command wrote about what it compiled.
 				expect(
@@ -2384,10 +2389,15 @@ describe("essence run", () => {
 				// Bun does not carry a `process.env` a spec assigned into a
 				// child, and the bundle cache this suite compiles against is
 				// named by exactly such an assignment.
-				let result = spawnSync(
-					process.execPath,
-					[binary, "run", path.join(directory, "Noisy.es"), "--json"],
-					{ encoding: "utf-8", env: { ...process.env } },
+				let result = await spawnAndWait(
+					[
+						process.execPath,
+						binary,
+						"run",
+						path.join(directory, "Noisy.es"),
+						"--json",
+					],
+					{ env: { ...process.env } },
 				)
 
 				let report = JSON.parse(result.stdout) as JSONReport
@@ -2395,7 +2405,7 @@ describe("essence run", () => {
 				expect(report.command).toBe("run")
 				expect(report.ok).toBe(true)
 				expect(result.stderr).toContain("hello from the program")
-				expect(result.status).toBe(EXIT_SUCCESS)
+				expect(result.code).toBe(EXIT_SUCCESS)
 			},
 		)
 	})
@@ -2617,23 +2627,23 @@ describe("a project's build settings, end to end", () => {
 	// compile driven from inside a directory this spec then removes leaves
 	// every later build in this process resolving against a directory that is
 	// no longer there.
-	function build(
+	async function build(
 		directory: string,
 		essenceArguments: Array<string>,
-	): { code: number; err: string } {
+	): Promise<{ code: number; err: string }> {
 		let binary = fileURLToPath(import.meta.resolve("../../bin/essence"))
-		let result = spawnSync(
-			process.execPath,
-			[binary, "build", ...essenceArguments, "--no-color"],
-			{
-				cwd: directory,
-				encoding: "utf-8",
-				env: { ...process.env },
-				timeout: 120_000,
-			},
+		let result = await spawnAndWait(
+			[
+				process.execPath,
+				binary,
+				"build",
+				...essenceArguments,
+				"--no-color",
+			],
+			{ cwd: directory, env: { ...process.env } },
 		)
 
-		return { code: result.status ?? 1, err: result.stderr }
+		return { code: result.code ?? 1, err: result.stderr }
 	}
 
 	it("writes where the project says, with the map it asked for", async () => {
@@ -2643,7 +2653,7 @@ describe("a project's build settings, end to end", () => {
 				"Quiet.es": 'implementation {\n\tTerminal.write("")\n}\n',
 			},
 			async (directory) => {
-				let { code, err } = build(directory, ["Quiet.es"])
+				let { code, err } = await build(directory, ["Quiet.es"])
 				let written = path.join(directory, "dist", "Quiet.js")
 
 				expect([code, err]).toEqual([EXIT_SUCCESS, err])
@@ -2662,7 +2672,7 @@ describe("a project's build settings, end to end", () => {
 				"Quiet.es": 'implementation {\n\tTerminal.write("")\n}\n',
 			},
 			async (directory) => {
-				let { code, err } = build(directory, [
+				let { code, err } = await build(directory, [
 					"Quiet.es",
 					"--no-sourcemap",
 				])

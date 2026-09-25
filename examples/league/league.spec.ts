@@ -3,6 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
+
 // NOTE: The showcase's own tests are Essence — `Standings.es` writes a
 // `tests { … }` section and `Season.tests.es` is a file of nothing else. What
 // is left here is the one thing a bun spec can say that they can not: that
@@ -31,11 +33,11 @@ afterAll(() => {
 	rmSync(results, { recursive: true, force: true })
 })
 
-function test(
+async function test(
 	directory: string,
 	essenceArguments: Array<string> = [],
-): { code: number; out: string; err: string } {
-	let run = Bun.spawnSync(
+): Promise<{ code: number | null; out: string; err: string }> {
+	let run = await spawnAndWait(
 		[process.execPath, ESSENCE, "test", ...essenceArguments, "--no-color"],
 		{
 			cwd: directory,
@@ -44,16 +46,10 @@ function test(
 				ESSENCE_CLI_CACHE: cache,
 				ESSENCE_RESULTS_CACHE: results,
 			},
-			stdout: "pipe",
-			stderr: "pipe",
 		},
 	)
 
-	return {
-		code: run.exitCode,
-		out: run.stdout.toString(),
-		err: run.stderr.toString(),
-	}
+	return { code: run.code, out: run.stdout, err: run.stderr }
 }
 
 describe("examples/league", () => {
@@ -62,8 +58,8 @@ describe("examples/league", () => {
 	// the example takes 1,242 ms on an idle machine and several times that on a
 	// busy one, which is the only thing the default budget ever measures — the
 	// work itself is bounded and deterministic.
-	it("passes its own tests", () => {
-		let { code, out } = test(EXAMPLE)
+	it("passes its own tests", async () => {
+		let { code, out } = await test(EXAMPLE)
 
 		expect(out).toContain("Standings.es")
 		expect(out).toContain("Season.tests.es")
@@ -73,12 +69,12 @@ describe("examples/league", () => {
 		expect(code).toBe(0)
 	}, 60_000)
 
-	it("still compiles and runs the program itself", () => {
+	it("still compiles and runs the program itself", async () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "essence-league-"))
 
 		try {
 			let output = path.join(directory, "league.js")
-			let build = Bun.spawnSync(
+			let build = await spawnAndWait(
 				[
 					process.execPath,
 					ESSENCE,
@@ -95,21 +91,16 @@ describe("examples/league", () => {
 						ESSENCE_CLI_CACHE: cache,
 						ESSENCE_RESULTS_CACHE: results,
 					},
-					stdout: "pipe",
-					stderr: "pipe",
 				},
 			)
 
-			expect(build.stderr.toString()).toBe("")
-			expect(build.exitCode).toBe(0)
+			expect(build.stderr).toBe("")
+			expect(build.code).toBe(0)
 
-			let run = Bun.spawnSync([process.execPath, output], {
-				stdout: "pipe",
-				stderr: "pipe",
-			})
+			let run = await spawnAndWait([process.execPath, output])
 
-			expect(run.stderr.toString()).toBe("")
-			expect(run.exitCode).toBe(0)
+			expect(run.stderr).toBe("")
+			expect(run.code).toBe(0)
 
 			// NOTE: Every claim this program makes, and nothing about the shape
 			// around them. The table's own layout is asserted by the Essence
@@ -117,7 +108,7 @@ describe("examples/league", () => {
 			// is left here is `Main.es`'s own reading of the season, which is
 			// written nowhere a tests section can reach — a Program's body is
 			// not a Method anybody can call.
-			let printed = run.stdout.toString()
+			let printed = run.stdout
 
 			for (let claim of [
 				"Riverside lead Harbour Rovers by 1 point.",
@@ -140,7 +131,7 @@ describe("examples/league", () => {
 	// NOTE: A test that fails, in a directory of its own, so that the exit code
 	// CI reads is proven against a run that really did fail rather than assumed
 	// from the run that passed.
-	it("exits non-zero when a test fails", () => {
+	it("exits non-zero when a test fails", async () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "essence-failing-"))
 
 		try {
@@ -156,7 +147,7 @@ describe("examples/league", () => {
 				].join("\n"),
 			)
 
-			let { code, err, out } = test(directory)
+			let { code, err, out } = await test(directory)
 
 			expect(out).toContain("1 failed")
 			expect(err).toContain("test-failed")

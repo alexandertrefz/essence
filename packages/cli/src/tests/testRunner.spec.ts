@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test"
-import { spawnSync } from "node:child_process"
 import {
 	existsSync,
 	mkdirSync,
@@ -19,6 +18,7 @@ import {
 	readProjectConfiguration,
 } from "@essence-lang/compiler/configuration"
 import { CORPUS_DIRECTORY } from "@essence-lang/compiler/testing"
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 import type { TestEvent } from "@essence-lang/runtime/Testing"
 
 import { EXIT_FAILURE, EXIT_FOCUSED, EXIT_SUCCESS } from "../actions"
@@ -145,28 +145,33 @@ function runTests(
 // process — including the ones in other spec files — resolving against a
 // directory that is no longer there. A child of its own takes its working
 // directory with it.
-function runTestsIn(
+async function runTestsIn(
 	directory: string,
 	essenceArguments: Array<string> = [],
-): { code: number; out: string; err: string } {
+): Promise<{ code: number; out: string; err: string }> {
 	let binary = fileURLToPath(import.meta.resolve("../../bin/essence"))
-	let result = spawnSync(
-		process.execPath,
-		[binary, "test", "--jobs", "1", "--no-color", ...essenceArguments],
+	let result = await spawnAndWait(
+		[
+			process.execPath,
+			binary,
+			"test",
+			"--jobs",
+			"1",
+			"--no-color",
+			...essenceArguments,
+		],
 		{
 			cwd: directory,
-			encoding: "utf-8",
 			// NOTE: Carried over rather than inherited: the two caches this
 			// suite names are assigned into `process.env` above, and a child
 			// answering out of the reader's own stores is a child answering
 			// about a project it has never seen.
 			env: { ...process.env },
-			timeout: 120_000,
 		},
 	)
 
 	return {
-		code: result.status ?? 1,
+		code: result.code ?? 1,
 		out: result.stdout,
 		err: result.stderr,
 	}
@@ -641,7 +646,7 @@ describe("essence test — project configuration", () => {
 				"Rules.es": passing,
 			},
 			async (directory) => {
-				let { code, err, out } = runTestsIn(directory)
+				let { code, err, out } = await runTestsIn(directory)
 
 				expect(err).toContain("moved-setting")
 				expect(err).toContain(
@@ -661,7 +666,7 @@ describe("essence test — project configuration", () => {
 		await withFiles(
 			{ "essence.json": `{}`, "Rules.es": passing },
 			async (directory) => {
-				let { err } = runTestsIn(directory, ["--verbose"])
+				let { err } = await runTestsIn(directory, ["--verbose"])
 
 				expect(err).toContain("settings read from")
 				expect(err).toContain("essence.json")
@@ -932,26 +937,25 @@ describe("essence test — running", () => {
 				let binary = fileURLToPath(
 					import.meta.resolve("../../bin/essence"),
 				)
-				let result = spawnSync(
-					process.execPath,
-					[binary, "test", directory, "--no-color", "--jobs", "1"],
-					{
-						encoding: "utf-8",
-						env: { ...process.env },
-						timeout: 60_000,
-						// NOTE: The loop this guards against yields to
-						// nothing, so the child is killed outright rather
-						// than asked to stop.
-						killSignal: "SIGKILL",
-					},
+				let result = await spawnAndWait(
+					[
+						process.execPath,
+						binary,
+						"test",
+						directory,
+						"--no-color",
+						"--jobs",
+						"1",
+					],
+					{ env: { ...process.env } },
 				)
 
-				// NOTE: A killed child is the hang itself — `status` is null
-				// there, so the exit code below would pass it by.
+				// NOTE: The deadline rejects a hang; this catches a child
+				// killed by some other signal, where `code` is null.
 				expect(result.signal).toBeNull()
 				expect(result.stderr).toContain("table-row-type-mismatch")
 				expect(result.stderr).toContain("did not compile")
-				expect(result.status).toBe(EXIT_FAILURE)
+				expect(result.code).toBe(EXIT_FAILURE)
 			},
 		)
 	})
@@ -1150,10 +1154,17 @@ describe("essence test --json", () => {
 				let binary = fileURLToPath(
 					import.meta.resolve("../../bin/essence"),
 				)
-				let result = spawnSync(
-					process.execPath,
-					[binary, "test", directory, "--json", "--jobs", "1"],
-					{ encoding: "utf-8", env: { ...process.env } },
+				let result = await spawnAndWait(
+					[
+						process.execPath,
+						binary,
+						"test",
+						directory,
+						"--json",
+						"--jobs",
+						"1",
+					],
+					{ env: { ...process.env } },
 				)
 
 				for (let line of result.stdout.split("\n")) {
@@ -1163,7 +1174,7 @@ describe("essence test --json", () => {
 				}
 
 				expect(result.stderr).toContain("hello from the Module")
-				expect(result.status).toBe(EXIT_SUCCESS)
+				expect(result.code).toBe(EXIT_SUCCESS)
 			},
 		)
 	})

@@ -4,6 +4,8 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
+
 import { STDLIB_DIRECTORY } from "../index"
 
 // NOTE: The standard library's own `@example` blocks, run the way a reader
@@ -40,8 +42,8 @@ afterAll(() => {
 // idle machine, and several times that on a host running other work, which is
 // the only thing the default budget would ever catch. The work is bounded and
 // deterministic, so the budget is set where no load can reach it.
-it("runs every example the standard library documents", () => {
-	let answer = Bun.spawnSync(
+it("runs every example the standard library documents", async () => {
+	let answer = await spawnAndWait(
 		[process.execPath, essence, "test", "--no-color"],
 		{
 			cwd: STDLIB_DIRECTORY,
@@ -52,10 +54,10 @@ it("runs every example the standard library documents", () => {
 			},
 		},
 	)
-	let out = answer.stdout.toString()
-	let err = answer.stderr.toString()
+	let out = answer.stdout
+	let err = answer.stderr
 
-	expect([answer.exitCode, err]).toEqual([0, err])
+	expect([answer.code, err]).toEqual([0, err])
 	expect(out).toContain("examples")
 	expect(out).toContain("passed")
 	// NOTE: A number rather than a name: which Methods carry an example is the

@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test"
-import { spawnSync } from "node:child_process"
 import {
 	mkdtempSync,
 	readdirSync,
@@ -22,6 +21,7 @@ import {
 	describeTypes,
 } from "@essence-lang/compiler/embed/describe"
 import { canonicalPath } from "@essence-lang/compiler/modules"
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 
 import type { EssenceValue } from "../bridge"
 import { descriptorPath, loadPrebuilt, type PrebuiltModule } from "../prebuilt"
@@ -250,13 +250,13 @@ describe("`esc build --embed`", () => {
 	// fixture neither answers out of the user's store nor fills it — and so that
 	// the first build below is a miss and the second a hit, which is the whole
 	// point of building twice.
-	function esc(...args: Array<string>): { code: number; output: string } {
-		let run = spawnSync(
-			path.join(REPOSITORY, "packages", "cli", "bin", "esc"),
-			args,
+	async function esc(
+		...args: Array<string>
+	): Promise<{ code: number; output: string }> {
+		let run = await spawnAndWait(
+			[path.join(REPOSITORY, "packages", "cli", "bin", "esc"), ...args],
 			{
 				cwd: REPOSITORY,
-				encoding: "utf8",
 				env: {
 					...process.env,
 					ESSENCE_CLI_CACHE: path.join(directory, "cli-cache"),
@@ -264,16 +264,13 @@ describe("`esc build --embed`", () => {
 			},
 		)
 
-		return {
-			code: run.status ?? 1,
-			output: `${run.stdout ?? ""}${run.stderr ?? ""}`,
-		}
+		return { code: run.code ?? 1, output: `${run.stdout}${run.stderr}` }
 	}
 
 	it("writes a pair `loadPrebuilt` can read", async () => {
 		let built = path.join(directory, "built")
 		let bundle = path.join(built, "Calls.js")
-		let run = esc(
+		let run = await esc(
 			"build",
 			path.relative(REPOSITORY, clientFixture("Calls.es")),
 			"-o",
@@ -338,7 +335,7 @@ export {
 `,
 		)
 
-		let run = esc("build", source, "-o", bundle, "--embed", "--quiet")
+		let run = await esc("build", source, "-o", bundle, "--embed", "--quiet")
 
 		expect(run.code).toBe(0)
 
@@ -379,7 +376,7 @@ export {
 `,
 		)
 
-		let run = esc("build", source, "-o", bundle, "--embed", "--quiet")
+		let run = await esc("build", source, "-o", bundle, "--embed", "--quiet")
 
 		expect(run.code).toBe(0)
 
@@ -418,7 +415,7 @@ export {
 `,
 		)
 
-		let run = esc("build", source, "-o", bundle, "--embed", "--quiet")
+		let run = await esc("build", source, "-o", bundle, "--embed", "--quiet")
 
 		expect(run.code).toBe(0)
 
@@ -462,7 +459,7 @@ export {
 
 	// NOTE: And the other direction of the same decision: `esc` leaves the whole
 	// of `Future.ts` out of a bundle whose boundary names no work.
-	it("leaves the asynchrony door out of a pair that names none", () => {
+	it("leaves the asynchrony door out of a pair that names none", async () => {
 		let built = path.join(directory, "sync")
 		let bundle = path.join(built, "Sync.js")
 		let source = path.join(directory, "Sync.es")
@@ -482,7 +479,7 @@ export {
 `,
 		)
 
-		let run = esc("build", source, "-o", bundle, "--embed", "--quiet")
+		let run = await esc("build", source, "-o", bundle, "--embed", "--quiet")
 
 		expect(run.code).toBe(0)
 
@@ -522,7 +519,7 @@ export {
 	it("writes the pair for a build that found its bundle", async () => {
 		let again = path.join(directory, "again")
 		let bundle = path.join(again, "Calls.js")
-		let run = esc(
+		let run = await esc(
 			"build",
 			path.relative(REPOSITORY, clientFixture("Calls.es")),
 			"-o",
@@ -557,10 +554,10 @@ export {
 	// program to run. A build that did not ask for the pair leaves no half of it
 	// behind — and is not the same bundle, which is what its own entry in the
 	// store has to be keyed apart by.
-	it("writes nothing beside a build that did not ask for it", () => {
+	it("writes nothing beside a build that did not ask for it", async () => {
 		let plain = path.join(directory, "plain-build")
 		let bundle = path.join(plain, "Calls.js")
-		let run = esc(
+		let run = await esc(
 			"build",
 			path.relative(REPOSITORY, clientFixture("Calls.es")),
 			"-o",
@@ -593,7 +590,7 @@ export {
 	it("bakes which Choices cross as bare names", async () => {
 		let embedded = path.join(directory, "marshal")
 		let bundle = path.join(embedded, "Marshal.js")
-		let run = esc(
+		let run = await esc(
 			"build",
 			path.relative(REPOSITORY, clientFixture("Marshal.es")),
 			"-o",

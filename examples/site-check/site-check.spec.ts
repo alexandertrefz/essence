@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 import type { Server } from "bun"
 
 // NOTE: The survey is tested where it is written — `Survey.es` and `Page.es`
@@ -40,10 +41,9 @@ function pageAt(title: string | null, body: string): Response {
 	)
 }
 
-// NOTE: Spawned and AWAITED rather than run with `spawnSync`. The host the
-// command is pointed at is this process, and a synchronous wait would hold the
-// event loop that has to answer it — every request would then time out against
-// a server that is right here.
+// NOTE: Awaited, because the host the command is pointed at is this process. A
+// synchronous wait would hold the event loop that has to answer it, and every
+// request would time out against a server that is right here.
 async function check(
 	urls: Array<string>,
 ): Promise<{ lines: Array<string>; code: number }> {
@@ -86,8 +86,8 @@ afterAll(() => {
 })
 
 describe("examples/site-check", () => {
-	it("passes the survey's own tests", () => {
-		let run = Bun.spawnSync(
+	it("passes the survey's own tests", async () => {
+		let run = await spawnAndWait(
 			[process.execPath, ESSENCE, "test", "survey", "--no-color"],
 			{
 				cwd: EXAMPLE,
@@ -96,18 +96,16 @@ describe("examples/site-check", () => {
 					ESSENCE_CLI_CACHE: cache,
 					ESSENCE_RESULTS_CACHE: results,
 				},
-				stdout: "pipe",
-				stderr: "pipe",
 			},
 		)
-		let out = run.stdout.toString()
+		let out = run.stdout
 
 		expect(out).toContain(
 			"reports a 404 as an answer rather than a failure",
 		)
 		expect(out).toContain("reads the text between the two tags")
 		expect(out).not.toContain("failed")
-		expect(run.exitCode).toBe(0)
+		expect(run.code).toBe(0)
 	}, 60_000)
 
 	it("reads a status and a title off every address, in the order given", async () => {
@@ -146,17 +144,17 @@ describe("examples/site-check", () => {
 		expect(code).toBe(0)
 	}, 60_000)
 
-	it("typechecks against the declarations the plugin wrote", () => {
-		let tsc = Bun.spawnSync(
+	it("typechecks against the declarations the plugin wrote", async () => {
+		let tsc = await spawnAndWait(
 			[
 				process.execPath,
 				path.join(REPOSITORY, "node_modules", ".bin", "tsc"),
 				"--noEmit",
 			],
-			{ cwd: EXAMPLE, stdout: "pipe", stderr: "pipe" },
+			{ cwd: EXAMPLE },
 		)
 
-		expect(tsc.stdout.toString() + tsc.stderr.toString()).toBe("")
-		expect(tsc.exitCode).toBe(0)
+		expect(tsc.stdout + tsc.stderr).toBe("")
+		expect(tsc.code).toBe(0)
 	}, 60_000)
 })

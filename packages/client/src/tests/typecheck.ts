@@ -2,6 +2,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
+
 export const REPOSITORY = path.join(import.meta.dirname, "..", "..", "..", "..")
 
 // NOTE: The real class rather than a copy of its shape. A consumer of a
@@ -21,10 +23,10 @@ export const BORROWED_MODULE = path.join(import.meta.dirname, "..", "borrowed")
 // `generateDeclarations` writes them, and the declarations as a PLUGIN writes
 // them beside a source. Both are the same claim: a reader's code compiles
 // against what was generated for it.
-export function typecheck(files: Record<string, string>): {
-	code: number
+export async function typecheck(files: Record<string, string>): Promise<{
+	code: number | null
 	output: string
-} {
+}> {
 	let directory = mkdtempSync(path.join(tmpdir(), "essence-dts-"))
 
 	try {
@@ -51,7 +53,7 @@ export function typecheck(files: Record<string, string>): {
 		// NOTE: The repository's own `tsc`, by path. `bun x tsc` from a directory
 		// with no `node_modules` above it goes to the network for one, which
 		// makes the test both slow and a liar about which compiler it ran.
-		let run = Bun.spawnSync(
+		let run = await spawnAndWait(
 			[
 				path.join(REPOSITORY, "node_modules", ".bin", "tsc"),
 				"--project",
@@ -60,12 +62,7 @@ export function typecheck(files: Record<string, string>): {
 			{ cwd: directory },
 		)
 
-		return {
-			code: run.exitCode,
-			output: `${new TextDecoder().decode(
-				run.stdout,
-			)}${new TextDecoder().decode(run.stderr)}`,
-		}
+		return { code: run.code, output: `${run.stdout}${run.stderr}` }
 	} finally {
 		rmSync(directory, { recursive: true, force: true })
 	}

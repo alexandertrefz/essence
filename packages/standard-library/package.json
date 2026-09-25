@@ -22,5 +22,8 @@
 		"essence",
 		"language",
 		"standard-library"
-	]
+	],
+	"devDependencies": {
+		"@essence-lang/fixtures": "workspace:*"
+	}
 }

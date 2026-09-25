@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test"
-import { spawnSync } from "node:child_process"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 import type { common } from "@essence-lang/interfaces"
 
 import { bundle } from "../bundler/index"
@@ -198,31 +198,36 @@ function emittedBody(generated: string, name: string): string {
 // NOTE: `node` if there is one on the PATH, and null where there is not. It is
 // resolved by ASKING it rather than by looking for a file, so a shim, a version
 // manager's shell function and a real binary all answer the same way.
-function nodeVersion(): string | null {
-	let result = spawnSync("node", ["--version"], { encoding: "utf-8" })
+async function nodeVersion(): Promise<string | null> {
+	try {
+		let result = await spawnAndWait(["node", "--version"])
 
-	return result.status === 0 ? result.stdout.trim() : null
+		return result.code === 0 ? result.stdout.trim() : null
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+			return null
+		}
+
+		throw error
+	}
 }
 
-const node = nodeVersion()
+const node = await nodeVersion()
 
 // NOTE: A subprocess, and the emitted Module written to a file — an import into
 // the runner's own process would run it on Bun, which is the engine this whole
 // file exists to look past.
-function runUnder(
+async function runUnder(
 	command: string,
 	javaScript: string,
-): { stdout: string; stderr: string } {
+): Promise<{ stdout: string; stderr: string }> {
 	let directory = mkdtempSync(join(tmpdir(), "essence-tail-calls-"))
 	let file = join(directory, "program.mjs")
 
 	writeFileSync(file, javaScript)
 
 	try {
-		let result = spawnSync(command, [file], {
-			encoding: "utf-8",
-			maxBuffer: 64 * 1024 * 1024,
-		})
+		let result = await spawnAndWait([command, file])
 
 		return { stdout: result.stdout.trim(), stderr: result.stderr }
 	} finally {
@@ -272,7 +277,10 @@ describe("self tail calls", () => {
 		} else {
 			for (let walk of walks) {
 				it(`runs ${walk.name} at ${TURNS} turns on Node ${node}`, async () => {
-					let result = runUnder("node", await bundled(walk.source))
+					let result = await runUnder(
+						"node",
+						await bundled(walk.source),
+					)
 
 					expect(result.stderr).toBe("")
 					expect(result.stdout).toBe(ANSWER)
@@ -287,7 +295,7 @@ describe("self tail calls", () => {
 			// frames in every configuration it has; an engine that grew proper
 			// tail calls would fail HERE, which is the right place to hear it.
 			it("overflows Node's stack with the pass off", async () => {
-				let result = runUnder(
+				let result = await runUnder(
 					"node",
 					await bundled(headAndTail, withoutPass),
 				)
@@ -571,10 +579,10 @@ ${extra}	Terminal.print(${called(
 		}
 
 		for (let index = 0; index < CASES; index++) {
-			it(`answers the same with the pass off — case ${index}`, () => {
+			it(`answers the same with the pass off — case ${index}`, async () => {
 				let source = fuzzed(index)
-				let looped = runUnder("bun", generate(source))
-				let plain = runUnder("bun", generate(source, withoutPass))
+				let looped = await runUnder("bun", generate(source))
+				let plain = await runUnder("bun", generate(source, withoutPass))
 
 				expect(looped.stderr).toBe("")
 				// NOTE: The source is in the message, because a generated

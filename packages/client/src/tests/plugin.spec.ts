@@ -1278,7 +1278,7 @@ describe("The declarations a build writes", () => {
 
 		await plugin.load.call(context(), entry)
 
-		let run = typecheck({
+		let run = await typecheck({
 			"Shapes.d.es.ts": await readFile(declarationsPath(entry), "utf8"),
 			"consumer.ts": `import { areaOf, blank, Direction, named, turn, widen } from "./Shapes.es"
 import type { Box, Shape } from "./Shapes.es"

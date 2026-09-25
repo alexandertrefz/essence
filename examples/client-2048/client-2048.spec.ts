@@ -15,6 +15,7 @@ import {
 	generateDeclarations,
 	loadModule,
 } from "@essence-lang/client"
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 import { build } from "vite"
 
 import type * as Rules from "./src/Game.es"
@@ -50,8 +51,8 @@ describe("examples/client-2048", () => {
 	// write a `tests { … }` section — and nothing below reaches them: the specs
 	// here call the exports through the client boundary. This is the one thing
 	// a bun spec can say that they can not, and what CI runs is `bun test`.
-	it("passes its own tests", () => {
-		let run = Bun.spawnSync(
+	it("passes its own tests", async () => {
+		let run = await spawnAndWait(
 			[process.execPath, ESSENCE, "test", "src", "--no-color"],
 			{
 				cwd: EXAMPLE,
@@ -60,17 +61,15 @@ describe("examples/client-2048", () => {
 					ESSENCE_CLI_CACHE: cache,
 					ESSENCE_RESULTS_CACHE: results,
 				},
-				stdout: "pipe",
-				stderr: "pipe",
 			},
 		)
 
-		let out = run.stdout.toString()
+		let out = run.stdout
 
 		expect(out).toContain("a new tile")
 		expect(out).toContain("fills one square, with a 2 or a 4")
 		expect(out).not.toContain("failed")
-		expect(run.exitCode).toBe(0)
+		expect(run.code).toBe(0)
 	}, 30_000)
 
 	it("slides and merges a row once, left to right", async () => {
@@ -210,16 +209,16 @@ describe("examples/client-2048", () => {
 			),
 		)
 
-		let tsc = Bun.spawnSync(
+		let tsc = await spawnAndWait(
 			[
 				process.execPath,
 				path.join(REPOSITORY, "node_modules", ".bin", "tsc"),
 				"--noEmit",
 			],
-			{ cwd: EXAMPLE, stdout: "pipe", stderr: "pipe" },
+			{ cwd: EXAMPLE },
 		)
 
-		expect(tsc.stdout.toString() + tsc.stderr.toString()).toBe("")
-		expect(tsc.exitCode).toBe(0)
+		expect(tsc.stdout + tsc.stderr).toBe("")
+		expect(tsc.code).toBe(0)
 	}, 60_000)
 })

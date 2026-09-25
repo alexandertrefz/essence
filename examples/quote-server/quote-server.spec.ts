@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 import type { Subprocess } from "bun"
 
 // NOTE: The pricing rules are tested where they are written — `Pricing.es`,
@@ -71,8 +72,8 @@ afterAll(() => {
 })
 
 describe("examples/quote-server", () => {
-	it("passes the rules' own tests", () => {
-		let run = Bun.spawnSync(
+	it("passes the rules' own tests", async () => {
+		let run = await spawnAndWait(
 			[process.execPath, ESSENCE, "test", "rules", "--no-color"],
 			{
 				cwd: EXAMPLE,
@@ -81,16 +82,14 @@ describe("examples/quote-server", () => {
 					ESSENCE_CLI_CACHE: cache,
 					ESSENCE_RESULTS_CACHE: results,
 				},
-				stdout: "pipe",
-				stderr: "pipe",
 			},
 		)
-		let out = run.stdout.toString()
+		let out = run.stdout
 
 		expect(out).toContain("prices an order exactly, cent by cent")
 		expect(out).toContain("takes a rate exactly and rounds once")
 		expect(out).not.toContain("failed")
-		expect(run.exitCode).toBe(0)
+		expect(run.code).toBe(0)
 	})
 
 	it("serves the catalog as plain JSON", async () => {
@@ -172,17 +171,17 @@ describe("examples/quote-server", () => {
 		expect(notJSON.status).toBe(400)
 	})
 
-	it("typechecks against the declarations the plugin wrote", () => {
-		let tsc = Bun.spawnSync(
+	it("typechecks against the declarations the plugin wrote", async () => {
+		let tsc = await spawnAndWait(
 			[
 				process.execPath,
 				path.join(REPOSITORY, "node_modules", ".bin", "tsc"),
 				"--noEmit",
 			],
-			{ cwd: EXAMPLE, stdout: "pipe", stderr: "pipe" },
+			{ cwd: EXAMPLE },
 		)
 
-		expect(tsc.stdout.toString() + tsc.stderr.toString()).toBe("")
-		expect(tsc.exitCode).toBe(0)
+		expect(tsc.stdout + tsc.stderr).toBe("")
+		expect(tsc.code).toBe(0)
 	})
 })

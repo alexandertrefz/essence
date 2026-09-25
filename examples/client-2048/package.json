@@ -14,6 +14,7 @@
 		"@essence-lang/runtime": "workspace:*"
 	},
 	"devDependencies": {
+		"@essence-lang/fixtures": "workspace:*",
 		"typescript": "7.0.2",
 		"vite": "8.1.5"
 	}

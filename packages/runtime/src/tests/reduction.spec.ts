@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { spawnSync } from "node:child_process"
+
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 
 import { reduced } from "../bigRational"
 import { createInteger } from "../Integer"
@@ -182,14 +183,14 @@ describe("a pair that is no pair of bigints", () => {
 	// is a call that RETURNS — a synchronous loop on the very thread a spec runs
 	// on would take the whole suite down with it instead of failing, and no
 	// timeout a test runner offers can interrupt one that never yields. The
-	// test is given the longer budget of the two, so that a spin is answered by
-	// the assertion on the killed child rather than by a runner saying only
-	// that time ran out.
-	test("is reduced to an answer rather than spun on", () => {
+	// test is given the longer budget of the two, so that a spin is failed by
+	// the spawn's deadline, which names the child, rather than by a runner
+	// saying only that time ran out.
+	test("is reduced to an answer rather than spun on", async () => {
 		let module = import.meta.resolve("../bigRational")
-		let result = spawnSync(
-			process.execPath,
+		let result = await spawnAndWait(
 			[
+				process.execPath,
 				"--eval",
 				[
 					`let { reduced } = await import(${JSON.stringify(module)})`,
@@ -199,20 +200,14 @@ describe("a pair that is no pair of bigints", () => {
 					'console.log("answered")',
 				].join("\n"),
 			],
-			{
-				encoding: "utf-8",
-				timeout: 20_000,
-				// NOTE: The loop this guards against yields to nothing, so the
-				// child is killed outright rather than asked to stop.
-				killSignal: "SIGKILL",
-			},
+			{ deadline: 20_000 },
 		)
 
-		// NOTE: A killed child is the spin itself — `status` is null there, so
-		// the exit code below would pass it by.
+		// NOTE: The deadline rejects a spin; this catches a child killed by some
+		// other signal, where `code` is null.
 		expect(result.signal).toBeNull()
 		expect(result.stdout).toContain("answered")
-		expect(result.status).toBe(0)
+		expect(result.code).toBe(0)
 	}, 30_000)
 
 	// NOTE: And the guard is the same question of the bigints the loop is

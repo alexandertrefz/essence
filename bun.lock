@@ -19,6 +19,7 @@
         "@essence-lang/runtime": "workspace:*",
       },
       "devDependencies": {
+        "@essence-lang/fixtures": "workspace:*",
         "typescript": "7.0.2",
         "vite": "8.1.5",
       },
@@ -30,6 +31,9 @@
         "@essence-lang/client": "workspace:*",
         "@essence-lang/runtime": "workspace:*",
       },
+      "devDependencies": {
+        "@essence-lang/fixtures": "workspace:*",
+      },
     },
     "examples/site-check": {
       "name": "@essence-lang/example-site-check",
@@ -37,6 +41,9 @@
       "dependencies": {
         "@essence-lang/client": "workspace:*",
         "@essence-lang/runtime": "workspace:*",
+      },
+      "devDependencies": {
+        "@essence-lang/fixtures": "workspace:*",
       },
     },
     "packages/ariadne": {
@@ -170,10 +177,16 @@
       "dependencies": {
         "@essence-lang/interfaces": "workspace:*",
       },
+      "devDependencies": {
+        "@essence-lang/fixtures": "workspace:*",
+      },
     },
     "packages/standard-library": {
       "name": "@essence-lang/standard-library",
       "version": "0.5.0",
+      "devDependencies": {
+        "@essence-lang/fixtures": "workspace:*",
+      },
     },
     "packages/vscode-extension": {
       "name": "essence-language",

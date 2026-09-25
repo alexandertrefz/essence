@@ -617,7 +617,7 @@ describe("A consumer of the generated declarations", () => {
 	// that only the marshaller agreed with would be a door nobody could open.
 	it("awaits a call and writes a callback that answers work", async () => {
 		let declarations = await declarationsFor(clientFixture("Async.es"))
-		let run = typecheck({
+		let run = await typecheck({
 			"Async.d.es.ts": declarations,
 			"consumer.ts": `import { attempted, counted, doubled, loaded, running } from "./Async.es"
 
@@ -650,7 +650,7 @@ export async function tried(): Promise<string> {
 	// on does not compile.
 	it("is refused work handed in", async () => {
 		let declarations = await declarationsFor(clientFixture("Async.es"))
-		let run = typecheck({
+		let run = await typecheck({
 			"Async.d.es.ts": declarations,
 			"consumer.ts": `import { ran } from "./Async.es"
 
@@ -664,7 +664,7 @@ export let wrong = ran(Promise.resolve(1n))
 
 	it("typechecks against them", async () => {
 		let declarations = await declarationsFor(clientFixture("Marshal.es"))
-		let run = typecheck({
+		let run = await typecheck({
 			"Marshal.d.es.ts": declarations,
 			"consumer.ts": `import { areaOf, box, boxes, greeting, maybe, present, Shape, shape, third } from "./Marshal.es"
 import type { Box, Label } from "./Marshal.es"
@@ -691,7 +691,7 @@ export let ratio: string = third.toString()
 	// nothing at all.
 	it("passes a Map to a Dictionary Parameter", async () => {
 		let declarations = await declarationsFor(clientFixture("Marshal.es"))
-		let run = typecheck({
+		let run = await typecheck({
 			"Marshal.d.es.ts": declarations,
 			"consumer.ts": `import { ages, counts, headings, ledger, sizes } from "./Marshal.es"
 import type { Ledger } from "./Marshal.es"
@@ -713,7 +713,7 @@ export let one: bigint | undefined = kept.get("alex")
 
 	it("is refused a Map whose values are of the wrong Type", async () => {
 		let declarations = await declarationsFor(clientFixture("Marshal.es"))
-		let run = typecheck({
+		let run = await typecheck({
 			"Marshal.d.es.ts": declarations,
 			"consumer.ts": `import { ages } from "./Marshal.es"
 
@@ -729,7 +729,7 @@ export let wrong = ages(new Map([["alex", "39"]]))
 	// typecheck every consumer, so a passing consumer says nothing on its own.
 	it("is refused an Argument of the wrong Type", async () => {
 		let declarations = await declarationsFor(clientFixture("Marshal.es"))
-		let run = typecheck({
+		let run = await typecheck({
 			"Marshal.d.es.ts": declarations,
 			"consumer.ts": `import { box } from "./Marshal.es"
 
@@ -751,7 +751,7 @@ export let wrong = box({ width: "3", height: 4n })
 	// too — the same call is refused where its answer is annotated as a number.
 	it("takes a safe number for an Integer going in, and answers a bigint", async () => {
 		let declarations = await declarationsFor(clientFixture("Marshal.es"))
-		let accepted = typecheck({
+		let accepted = await typecheck({
 			"Marshal.d.es.ts": declarations,
 			"consumer.ts": `import { box, type Box } from "./Marshal.es"
 import type { Input } from "${BORROWED_MODULE}"
@@ -765,7 +765,7 @@ export let width: bigint = built.width
 		expect(accepted.output).toBe("")
 		expect(accepted.code).toBe(0)
 
-		let refused = typecheck({
+		let refused = await typecheck({
 			"Marshal.d.es.ts": declarations,
 			"consumer.ts": `import { box } from "./Marshal.es"
 
@@ -785,7 +785,7 @@ export let width: number = box({ width: 3, height: 4 }).width
 	// shape is refused at the constructor rather than at the crossing.
 	it("types a Case constructor by the payload it was handed", async () => {
 		let declarations = await declarationsFor(clientFixture("Marshal.es"))
-		let accepted = typecheck({
+		let accepted = await typecheck({
 			"Marshal.d.es.ts": declarations,
 			"consumer.ts": `import { Shape, areaOf } from "./Marshal.es"
 import type { Input } from "${BORROWED_MODULE}"
@@ -800,7 +800,7 @@ export let area: bigint = areaOf(Shape.Circle({ radius: 3 }))
 		expect(accepted.output).toBe("")
 		expect(accepted.code).toBe(0)
 
-		let refused = typecheck({
+		let refused = await typecheck({
 			"Marshal.d.es.ts": declarations,
 			"consumer.ts": `import { Shape } from "./Marshal.es"
 
@@ -823,7 +823,7 @@ export let wrong = Shape.Circle({ radius: "3" })
 	// would typecheck `"Left"` and throw at the crossing.
 	it("takes a bare Case as its own name or off the Choice", async () => {
 		let declarations = await declarationsFor(clientFixture("Marshal.es"))
-		let run = typecheck({
+		let run = await typecheck({
 			"Marshal.d.es.ts": declarations,
 			"consumer.ts": `import { Direction, direction, directions, marker, maybeDirection, ordering } from "./Marshal.es"
 import type { Marker } from "./Marshal.es"
@@ -851,7 +851,7 @@ export let wrong: Direction = "Left"
 	// being spelled out as the arms they hold.
 	it("is refused a Union a bare Case has no spelling in", async () => {
 		let declarations = await declarationsFor(clientFixture("Marshal.es"))
-		let run = typecheck({
+		let run = await typecheck({
 			"Marshal.d.es.ts": declarations,
 			"consumer.ts": `import { directionOrText } from "./Marshal.es"
 
@@ -868,7 +868,7 @@ export let ambiguous = directionOrText("Up")
 
 	it("reaches an export JavaScript can not spell", async () => {
 		let declarations = await declarationsFor(clientFixture("Escaped.es"))
-		let run = typecheck({
+		let run = await typecheck({
 			"Escaped.d.es.ts": declarations,
 			"consumer.ts": `import { "ok?" as ok, $$integer } from "./Escaped.es"
 
@@ -893,7 +893,7 @@ export let twelve: bigint = $$integer
 
 		expect(declarations).not.toContain("import")
 
-		let run = typecheck({
+		let run = await typecheck({
 			"Math.d.es.ts": declarations,
 			// NOTE: The value goes in as one of the Module's own — opaque, and
 			// built by the runtime the build resolved for both of them. What

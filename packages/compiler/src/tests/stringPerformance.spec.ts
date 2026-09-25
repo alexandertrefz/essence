@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test"
-import { spawnSync } from "node:child_process"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 import { insensitive } from "@essence-lang/runtime/CaseSensitivity"
 import { createInteger } from "@essence-lang/runtime/Integer"
 import { end } from "@essence-lang/runtime/Side"
@@ -151,7 +151,10 @@ const ASCII_PERIOD = "ZZcafe cafe cafe cafe "
 const VIEW_PERIOD = "ZZcaf\u00e9 caf\u00e9 caf\u00e9 caf\u00e9 "
 const PERIOD_SUM = 231
 
-function millisecondsToRun(source: string, printed: string): number {
+async function millisecondsToRun(
+	source: string,
+	printed: string,
+): Promise<number> {
 	let parsed = parseWithDiagnostics(source)
 
 	expect(containsErrors(parsed.diagnostics)).toBe(false)
@@ -172,9 +175,7 @@ function millisecondsToRun(source: string, printed: string): number {
 
 		for (let attempt = 0; attempt < 3; attempt++) {
 			let start = performance.now()
-			let result = spawnSync(process.execPath, [file], {
-				encoding: "utf-8",
-			})
+			let result = await spawnAndWait([process.execPath, file])
 
 			best = Math.min(best, performance.now() - start)
 
@@ -259,11 +260,11 @@ function printedGroupedLength(length: number): string {
 // really did grow reads steep every time it is asked, so asking twice costs a
 // failing run one more minute and a passing run nothing; the second reading is
 // taken as a BEST of the two, which is what every figure here already is.
-function expectGrowthUnderThreshold(
+async function expectGrowthUnderThreshold(
 	lengths: Array<number>,
 	sourceFor: (length: number) => string,
 	printedFor: (length: number) => string,
-): void {
+): Promise<void> {
 	let measure = (length: number) =>
 		millisecondsToRun(sourceFor(length), printedFor(length))
 	let measured: Array<number> = []
@@ -272,7 +273,7 @@ function expectGrowthUnderThreshold(
 	for (let index = 0; index < lengths.length; index++) {
 		let length = lengths[index]!
 
-		measured.push(measure(length))
+		measured.push(await measure(length))
 
 		if (index === 0) {
 			continue
@@ -286,9 +287,9 @@ function expectGrowthUnderThreshold(
 
 		measured[index - 1] = Math.min(
 			measured[index - 1]!,
-			measure(lengths[index - 1]!),
+			await measure(lengths[index - 1]!),
 		)
-		measured[index] = Math.min(measured[index]!, measure(length))
+		measured[index] = Math.min(measured[index]!, await measure(length))
 
 		if (grewBy() >= GROWTH_THRESHOLD) {
 			tooSteep.push(
@@ -648,16 +649,16 @@ describe("String work", () => {
 })
 
 describe("String performance", () => {
-	it("finds a part near the front of any length of String at the same cost", () => {
-		expectGrowthUnderThreshold(
+	it("finds a part near the front of any length of String at the same cost", async () => {
+		await expectGrowthUnderThreshold(
 			CONTAINS_LENGTHS,
 			containsSource,
 			() => `${CONTAINS_TURNS}`,
 		)
 	})
 
-	it("groups one String in time proportional to its length", () => {
-		expectGrowthUnderThreshold(
+	it("groups one String in time proportional to its length", async () => {
+		await expectGrowthUnderThreshold(
 			GROUPED_LENGTHS,
 			groupingSource,
 			printedGroupedLength,
