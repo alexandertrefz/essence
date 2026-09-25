@@ -968,6 +968,22 @@ export function walkNode(
 
 			return true
 		}
+		case "ProtocolDeclarationStatement":
+			for (let member of Object.values(node.methods)) {
+				let signatures =
+					member.nodeType === "OverloadedProtocolMethod" ||
+					member.nodeType === "OverloadedStaticProtocolMethod"
+						? member.signatures
+						: [member.signature]
+
+				for (let { body } of signatures) {
+					if (body !== null && !walkNode(body, visit)) {
+						return false
+					}
+				}
+			}
+
+			return true
 		case "IfStatement":
 			return walkNode(node.condition, visit) && walkBody(node.body, visit)
 		case "IfElseStatement":

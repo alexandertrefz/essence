@@ -611,6 +611,25 @@ describe("Snippet completion", () => {
 		)
 	})
 
+	it("offers nothing inside a provided Method's Parameter list", () => {
+		let offered = snippetsAt(
+			[
+				"implementation {",
+				"\tprotocol Ranked {",
+				"\t\tisAbove(_ mark: Integer) -> Boolean",
+				"",
+				"\t\tisAtMost(_ mark: Integer) -> Boolean {",
+				"\t\t\t<- @::isAbove(mark)",
+				"\t\t}",
+				"\t}",
+				"}",
+			],
+			{ line: 5, column: 14 },
+		)
+
+		expect(offered).toEqual([])
+	})
+
 	// NOTE: The bodies reach the Editor as snippet text, which is what makes a
 	// tab stop a tab stop rather than four literal characters.
 	it("hands the body over as snippet text, and says what it writes", () => {

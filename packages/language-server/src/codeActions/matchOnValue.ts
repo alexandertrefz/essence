@@ -226,6 +226,20 @@ function visitNode(
 			}
 
 			return
+		case "ProtocolDeclarationStatement":
+			for (let member of Object.values(node.methods)) {
+				let methods =
+					member.nodeType === "OverloadedMethod" ||
+					member.nodeType === "OverloadedStaticMethod"
+						? member.methods
+						: [member.method]
+
+				for (let method of methods) {
+					visitFunctionDefinition(method.value, visit)
+				}
+			}
+
+			return
 		// NOTE: An `if` opens no answer of its own — a `<-` inside one ends the
 		// Function around it, so what it answers with travels through.
 		case "IfStatement":
@@ -340,7 +354,6 @@ function visitNode(
 
 			return
 		case "TypeAliasStatement":
-		case "ProtocolDeclarationStatement":
 		case "Self":
 		case "StringValue":
 		case "IntegerValue":

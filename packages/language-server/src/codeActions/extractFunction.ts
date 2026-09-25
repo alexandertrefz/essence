@@ -96,6 +96,12 @@ export function extractFunctionActions(
 		return []
 	}
 
+	// NOTE: A provided Method's body can name nothing the Program declares, so
+	// the Function written beside the enclosing one is out of its reach.
+	if (liesInProtocol(enclosing.statement, span)) {
+		return []
+	}
+
 	// NOTE: `@` is the value the Method or the Match Handler around it is
 	// about, and a Function written beside them is about nothing.
 	//
@@ -338,6 +344,24 @@ function readsSelf(node: parser.ImplementationNode): boolean {
 
 	walkNode(node, (visited) => {
 		if (visited.nodeType === "Self") {
+			found = true
+		}
+	})
+
+	return found
+}
+
+function liesInProtocol(
+	node: parser.ImplementationNode,
+	span: common.Position,
+): boolean {
+	let found = false
+
+	walkNode(node, (visited) => {
+		if (
+			visited.nodeType === "ProtocolDeclarationStatement" &&
+			containsRange(visited.position, span)
+		) {
 			found = true
 		}
 	})

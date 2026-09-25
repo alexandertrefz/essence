@@ -41,6 +41,7 @@ import {
 	expandShorthandPathAction,
 } from "../codeActions/shorthandFixes"
 import { mergeModifierAction } from "../codeActions/testFixes"
+import { typedExpressionAt } from "../codeActions/typedLookups"
 
 // NOTE: Fixtures are joined line arrays with literal `\t`, so an assertion on
 // an inserted arm's indentation is an assertion on the exact characters —
@@ -1067,6 +1068,31 @@ describe("Code Actions", () => {
 				"\t\t\t\tcase String { <- point.x }",
 				"\t\t\t\tcase _ { <- 0 }",
 				"\t\t\t}",
+				"\t\t}",
+				"",
+				"\t\tcase String { <- 0 }",
+				"\t}",
+				"}",
+			]
+
+			expect(binderFixes(lines)).toEqual([])
+		})
+
+		// NOTE: `@` in a Protocol's provided Method is the conformer.
+		it("should offer nothing for a read inside a provided Method", () => {
+			let lines = [
+				...MATCHED,
+				"\tconstant found = match p -> Integer {",
+				"\t\tcase { x, y } as point {",
+				"\t\t\tprotocol Placed {",
+				"\t\t\t\tplace() -> Integer",
+				"",
+				"\t\t\t\tshifted() -> Integer {",
+				"\t\t\t\t\t<- point.x",
+				"\t\t\t\t}",
+				"\t\t\t}",
+				"",
+				"\t\t\t<- point.y",
 				"\t\t}",
 				"",
 				"\t\tcase String { <- 0 }",
@@ -9287,6 +9313,120 @@ describe("Refactorings under start and complete", () => {
 				"\tTerminal.inspect(answer)",
 				"}",
 			])
+		})
+	})
+})
+
+describe("Code Actions inside a Protocol-provided Method body", () => {
+	let within = (body: Array<string>): Array<string> => [
+		"implementation {",
+		"\tchoice Size { Small, Large }",
+		"\tchoice Progress { Stopped { total: Integer } }",
+		"",
+		"\tprotocol Ranked {",
+		"\t\tsize() -> Size",
+		"",
+		"\t\tlabel(_ chosen: Size) -> Progress {",
+		...body.map((line) => `\t\t\t${line}`),
+		"\t\t}",
+		"\t}",
+		"}",
+	]
+	let insideFunction = [
+		"implementation {",
+		"\tfunction outer(_ count: Integer) -> Integer {",
+		"\t\tprotocol Ranked {",
+		"\t\t\tisAbove(_ mark: Integer) -> Boolean",
+		"",
+		"\t\t\tisAtMost(_ mark: Integer) -> Boolean {",
+		"\t\t\t\tconstant raised = mark::add(1)",
+		"\t\t\t\t<- raised::isGreaterThan(0)",
+		"\t\t\t}",
+		"\t\t}",
+		"",
+		"\t\t<- count",
+		"\t}",
+		"}",
+	]
+
+	it("should add the missing Cases to a Match in the body", () => {
+		let lines = within([
+			"<- match chosen -> Progress {",
+			"\tcase #Small { <- #Stopped(1) }",
+			"}",
+		])
+
+		expect(titles(quickFixes(lines))).toContain("Add missing Cases")
+	})
+
+	it("should declare a reassigned Constant as a Variable", () => {
+		let lines = within([
+			"constant count = 1",
+			"count = 2",
+			"<- #Stopped(count)",
+		])
+
+		expect(titles(quickFixes(lines))).toContain(
+			"Declare 'count' as a Variable",
+		)
+	})
+
+	it("should scaffold a Match on a value in the body", () => {
+		let lines = within(["constant same = chosen", "<- #Stopped(1)"])
+
+		expect(titles(actionsOf(lines, spanOf(lines, 9, "chosen")))).toContain(
+			"Match on 'chosen'",
+		)
+	})
+
+	it("should expand a Case payload written in the body", () => {
+		let lines = within(["<- #Stopped(1)"])
+
+		expect(titles(actionsOf(lines, spanOf(lines, 9, "(1)")))).toContain(
+			"Expand the payload to '{ total = … }'",
+		)
+	})
+
+	it("should extract an Expression in the body to a Constant", () => {
+		let lines = within(["<- #Stopped(@::size()::toString()::length())"])
+		let action = actionsOf(lines, spanOf(lines, 9, "@::size()")).find(
+			(entry) => entry.title === "Extract to a Constant",
+		)
+
+		expect(applied(lines, action as CodeActionEntry).slice(8, 10)).toEqual([
+			"\t\t\tconstant size = @::size()",
+			"\t\t\t<- #Stopped(size::toString()::length())",
+		])
+	})
+
+	it("should offer no Extract to a Function out of the body", () => {
+		let range = rangeFrom(
+			insideFunction,
+			"constant raised",
+			"<- raised::isGreaterThan(0)",
+		)
+
+		expect(codesOf(insideFunction)).toEqual([])
+		expect(titles(actionsOf(insideFunction, range))).not.toContain(
+			"Extract to a Function",
+		)
+	})
+
+	// NOTE: Extract to a Function turns a provided body away before it spells a
+	// Type, so the typed lookup it shares is asked directly.
+	it("should find the typed read of a Parameter in the body", () => {
+		let analysis = analyseDocument(insideFunction.join("\n"), undefined, {
+			tests: true,
+		})
+		let read = typedExpressionAt(
+			analysis.enrichedProgram as common.typed.Program,
+			spanOf(insideFunction, 7, "mark"),
+		)
+
+		expect(read).toMatchObject({
+			nodeType: "Identifier",
+			content: "mark",
+			type: { type: "Integer" },
 		})
 	})
 })

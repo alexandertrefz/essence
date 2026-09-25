@@ -1,6 +1,6 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
-import { walk, walkNode } from "./codeActions/lookups"
+import { walk } from "./codeActions/lookups"
 import { contains, isSmaller } from "./positions"
 import { programSections } from "./sections"
 import type { ModuleSection, SnippetContext } from "./snippets"
@@ -264,19 +264,14 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 					}
 				}
 
-				// NOTE: The Nodes below a Protocol are the one part of the tree
-				// `walk` does not reach — a provided Method's body is a body
-				// like any other, so it is walked here rather than left out.
+				// NOTE: `walk` reaches a provided Method's body on its own; what
+				// is said here is whether `@` names the receiver in it.
 				for (let body of providedBodies(node)) {
 					blocks.push({
 						position: body.body.position,
 						context: base,
 						method: body.instance,
 					})
-
-					for (let statement of body.body.value.body) {
-						walkNode(statement, collect)
-					}
 				}
 
 				return

@@ -104,6 +104,19 @@ function visitNode(
 
 			return
 		case "ProtocolDeclarationStatement":
+			for (let member of Object.values(node.methods)) {
+				let methods =
+					member.nodeType === "OverloadedMethod" ||
+					member.nodeType === "OverloadedStaticMethod"
+						? member.methods
+						: [member.method]
+
+				for (let method of methods) {
+					visitFunctionDefinition(method.value, visit)
+				}
+			}
+
+			return
 		case "TypeAliasStatement":
 			return
 	}
