@@ -86,9 +86,12 @@ type AnalysisOptions = {
 // is the one description of what analysing a source means and which `esc` runs
 // too. Broken Statements are dropped from the AST, the rest is enriched, and
 // the Validator judges what the two of them established.
+//
 // NOTE: `documentPath` is what tells a standard library source apart from an
-// ordinary Program — see `./documents`. Absent, the document is an ordinary
-// one, which is what every caller outside the Language Server is.
+// ordinary Program (see `@essence-lang/compiler/documents`). Absent, the
+// document is an ordinary one and analysed on its own, since no Module graph
+// can be loaded without a path.
+//
 // NOTE: The Programs are handed back as well as the Diagnostics, for the
 // requests that answer with an edit rather than with a message: a Code Action
 // reads the source's own Nodes, and running this pipeline twice for one
