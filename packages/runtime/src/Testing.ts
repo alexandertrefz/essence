@@ -34,13 +34,14 @@ import { type AnyType, typeKeySymbol } from "./type"
 // `tests { … }` section and for nothing else, so a Program compiled by `essence
 // build` never names this module and esbuild shakes it away whole.
 //
-// NOTE: Everything a running test touches hangs off a CONTEXT object it is
+// NOTE: Most of what a running test touches hangs off a CONTEXT object it is
 // handed — the trace buffer, the captured output, the recorded expectations,
-// what failed. There is no module-level "current test" anywhere below, so two
-// tests running at once could not see each other's work even if the runner
-// stopped running them one at a time. The one exception is the REGISTRY, which
-// is state about the Modules a bundle holds rather than about a run, and is
-// written exactly once per Module as that Module is evaluated.
+// what failed. Two things that belong to the running test are module-level:
+// the coverage span (`epoch` and `touched`) and the output sink in
+// `Terminal.ts`, which is why `runTests` runs one test at a time. The REGISTRY
+// is module-level too, but it is state about the Modules a bundle holds rather
+// than about a run, and is written exactly once per Module as that Module is
+// evaluated.
 
 // #region The manifest a Module registers
 
@@ -137,9 +138,9 @@ export type Ran = void | Promise<void>
 // NOTE: The registry is per BUNDLE, not per process: esbuild inlines this
 // module into each bundle it builds, so two bundles loaded in one process hold
 // two of these. A Module registers as it is evaluated, dependencies first, so
-// the entry Module's `$testRegistry` — which is a Function rather than a value,
-// exactly so that WHEN it is asked matters as little as possible — answers with
-// every Module of the graph.
+// the `registry` the entry Module publishes under `$tests` — a Function rather
+// than a value, exactly so that WHEN it is asked matters as little as possible
+// — answers with every Module of the graph.
 const registered: Array<TestModule> = []
 
 export function register(module: TestModule): TestModule {
@@ -1622,11 +1623,10 @@ function diffValue(
 	// NOTE: A kind neither arm above names may still have said how it is taken
 	// apart — the registry in `registry.ts` is where a container's own module
 	// leaves that, and probing it here rather than writing an arm is what keeps
-	// a container's difference in the container's module. A Dictionary is the
-	// one such kind today: it is walked BY ITS KEYS, which is what it is read
-	// by — so a difference shows the one entry that moved surrounded by the
-	// ones that did not, and an entry only one side holds arrives on a line of
-	// its own.
+	// a container's difference in the container's module. A Dictionary is one
+	// such kind: it is walked BY ITS KEYS, which is what it is read by — so a
+	// difference shows the one entry that moved surrounded by the ones that did
+	// not, and an entry only one side holds arrives on a line of its own.
 	if (sameTag(left, right)) {
 		let kind = kindOf(String(left[typeKeySymbol]))
 
@@ -1814,9 +1814,8 @@ function listEntries(value: AnyType): Array<[string, AnyType]> {
 // #region Events
 
 // NOTE: ONE stream, newline-delimited JSON, every event carrying `schema` and
-// `kind`. A consumer that meets a kind it does not know must ignore it: later
-// phases add `probe`, `coverage`, `snapshot` and `property` to this list, and
-// nothing that reads the stream today may have to change for them.
+// `kind`. A consumer that meets a kind it does not know must ignore it, so that
+// a kind added to this list changes nothing that reads the stream.
 export type TestEvent =
 	| { schema: 1; kind: "run-start"; tests: number; focused: boolean }
 	| {
@@ -2546,8 +2545,8 @@ async function runOne(
 		// error — what it recorded is on the context already, and the report is
 		// about the assertion rather than about the way the test ended.
 		if (thrown !== requirementFailed) {
-			// NOTE: A GenerationFailure is the one thrown value the test
-			// runtime raises ON PURPOSE, and its message is already written for
+			// NOTE: A GenerationFailure is the one Error the test runtime
+			// raises ON PURPOSE, and its message is already written for
 			// a reader — everything under it is frames inside a staged bundle
 			// and the paths of the machinery that staged it, which is noise in
 			// a report a person reads and a CI log keeps. Anything else that
@@ -2846,9 +2845,8 @@ function failureOf(expectation: Expectation, spans: Array<Span>): FailureEvent {
 // a value runs in here, and what crosses the boundary is events — plain data,
 // already rendered.
 //
-// NOTE: An object rather than three exports, so that a later phase adding
-// coverage or snapshots to the contract adds a member rather than a name the
-// Rewriter has to learn.
+// NOTE: An object rather than an export per member, so that adding to the
+// contract adds a member rather than a name the Rewriter has to learn.
 export const entryPoints = {
 	registry,
 	// NOTE: Offered here as well as exported, for a runner that can not import
