@@ -65,7 +65,7 @@ declarations {
 	§ rung, since this target is the Union exactly. The mixed `sum` below
 	§ emits `$es_Scalar_add`, and so does the fold measured above.
 	§
-	§ `@` is rebound inside `match`, and `reduce` binds `Result` from
+	§ `@` is rebound inside `match`, and `reduce` binds `Answer` from
 	§ `startingWith`; see DEVELOPMENT.md, Why bodies look the way they do.
 	namespace Scalar for Scalar {
 		§§ Adds two Scalars.
