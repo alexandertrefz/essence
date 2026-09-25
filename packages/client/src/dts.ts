@@ -829,7 +829,7 @@ function createWalker(
 	// in both directions, so a body that crosses differently each way — a
 	// callback — is named here in its permissive form and spelled out, with the
 	// refusal on it, at the Parameter that would pass one — which is where the
-	// mistake actually is. `containsInputRefusal` is what keeps the name off
+	// mistake actually is. `crossesDifferently` is what keeps the name off
 	// such a Parameter.
 	function aliasDeclaration(name: string, node: Descriptor): string {
 		let head = `export type ${name} =`
