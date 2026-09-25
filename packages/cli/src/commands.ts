@@ -849,7 +849,10 @@ export const commands: Array<CommandSpec> = [
 				"There is nothing to configure, so a formatted file reads the " +
 				"same way for everyone who opens it.",
 			"An argument may be a path, a glob, or a directory — a directory " +
-				"stands for every .es file under it. A source that does not parse " +
+				"stands for every .es file under it. A directory or a glob skips " +
+				"node_modules, .git, dist, build and .claude, and what the " +
+				"project's essence.json excludes; a file named on its own is " +
+				"always formatted. A source that does not parse " +
 				"is reported with the Diagnostic the Parser gave and left " +
 				"untouched; formatting is refused rather than guessed at.",
 		],

@@ -46,7 +46,7 @@ A dotted name on this page is a path into the file: `test.coverage.report` is `r
 
 | Key | Type | Default | Flag | Read by |
 | --- | --- | --- | --- | --- |
-| [`exclude`](/docs/reference/project-file#exclude) | list of paths | `[]` | none | `test`, the Language Server |
+| [`exclude`](/docs/reference/project-file#exclude) | list of paths | `[]` | none | `test`, `format`, the Language Server |
 | [`test.skipTags`](/docs/reference/project-file#test-skipTags) | list of tag names | `[]` | [`--skip-tag`](/docs/reference/cli#test--skip-tag) leaves out more, [`--tag`](/docs/reference/cli#test--tag) runs a skipped tag | `test`, the editor's live test session |
 | [`test.cases`](/docs/reference/project-file#test-cases) | whole number, at least 1 | `100` | [`--cases`](/docs/reference/cli#test--cases) | `test` |
 | [`test.coverage.report`](/docs/reference/project-file#test-coverage-report) | `"lcov"` or `"json"` | none | [`--coverage-report`](/docs/reference/cli#test--coverage-report) | `test` |
@@ -79,7 +79,7 @@ The search starts at the working directory, not at the file the command is given
 
 A project can hold another project, the way a monorepo holds its packages. The nearest file wins entirely. Run from `shop/packages/payments/`, a command reads the inner file, and nothing the outer file says reaches it.
 
-Five commands read the file: `essence build`, `essence run`, `essence watch`, `essence test` and [`essence init`](/docs/reference/cli#init). Each reads it once, when it starts. `essence watch` and `essence test --watch` keep the settings they started with, so restart them to pick up a change to the file. [`essence check`](/docs/reference/cli#check), [`essence format`](/docs/reference/cli#format), [`essence dap`](/docs/reference/cli#dap) and [`essence help`](/docs/reference/cli#help) never read it, and print none of its Warnings.
+Five commands read the file: `essence build`, `essence run`, `essence watch`, `essence test` and [`essence init`](/docs/reference/cli#init). Each reads it once, when it starts. `essence watch` and `essence test --watch` keep the settings they started with, so restart them to pick up a change to the file. [`essence format`](/docs/reference/cli#format) reads only `exclude`, the same way. [`essence check`](/docs/reference/cli#check), [`essence dap`](/docs/reference/cli#dap) and [`essence help`](/docs/reference/cli#help) never read it. Neither they nor `format` print its Warnings.
 
 [`essence lsp`](/docs/reference/cli#lsp) reads nothing when it starts. The Language Server it starts reads the file itself. It finds the nearest `essence.json` at or above each directory it walks, so a nested project governs its own subtree in the editor too. It reads the file again whenever the file changes on disk, with no restart.
 
@@ -114,11 +114,11 @@ The directories under the project that are not its sources, such as a corpus kep
 - **Type:** a list of paths, relative to `essence.json`
 - **Default:** `[]`, nothing excluded
 - **Flag:** none
-- **Read by:** `essence test` and the Language Server
+- **Read by:** `essence test`, `essence format` and the Language Server
 
-The walk is how `essence test` without file arguments, and the Language Server, find a project's sources: they visit every directory under the root. `exclude` narrows the walk and nothing else. An excluded directory is skipped with everything under it. Entries compare as paths, so `fixtures/broken` leaves `fixtures/brokenish` beside it in the walk.
+The walk is how `essence test` without file arguments, and the Language Server, find a project's sources: they visit every directory under the root. `essence format` walks a directory it is given the same way. `exclude` narrows the walk and nothing else. An excluded directory is skipped with everything under it. Entries compare as paths, so `fixtures/broken` leaves `fixtures/brokenish` beside it in the walk.
 
-A file named on the command line still runs: `essence test fixtures/broken/Broken.tests.es` runs that file although its directory is excluded. So does a file that a glob on the command line matches, as in `essence test "fixtures/broken/*.es"`. A directory named on the command line is still narrowed, so `essence test fixtures/broken` finds no tests in it.
+A file named on the command line still runs: `essence test fixtures/broken/Broken.tests.es` runs that file although its directory is excluded. So does a file that a glob on the command line matches, as in `essence test "fixtures/broken/*.es"`. A directory named on the command line is still narrowed, so `essence test fixtures/broken` finds no tests in it. `essence format` narrows a glob as well: `essence format "fixtures/**/*.es"` leaves `fixtures/broken` out, while `essence format fixtures/broken/Broken.es` formats that file.
 
 Entries are paths, not globs as in the `exclude` of `tsconfig.json`. `"fix*"` excludes nothing, and no Warning says so.
 

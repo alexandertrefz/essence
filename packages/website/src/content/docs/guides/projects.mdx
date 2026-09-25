@@ -119,7 +119,7 @@ $ essence init
 
 That is the whole file: two settings at their defaults, each under a comment that says what it is for. `$schema` is for editors. Essence reads nothing from it and accepts any String there. The file is JSON with comments and trailing commas allowed. Run `essence init` a second time and it refuses with `✖ essence.json already exists.`, leaves the file alone, and exits with 2.
 
-The nearest [`essence.json`](/docs/reference/project-file) at or above the working directory marks the project root, and the editor finds the nearest one above each file; `check` and `format` never read it.
+The nearest [`essence.json`](/docs/reference/project-file) at or above the working directory marks the project root, and the editor finds the nearest one above each file; `check` never reads it, and `format` reads only `exclude`.
 
 `essence.json` is not a manifest. It lists no dependencies, pins nothing in a lockfile and holds no scripts. A module names each file it imports by its relative path, and there are no package imports, so there is nothing to install. `package.json` stays the manifest of a JavaScript project.
 

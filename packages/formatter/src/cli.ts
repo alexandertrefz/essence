@@ -1,6 +1,13 @@
 import { glob, readFile, stat, writeFile } from "node:fs/promises"
 import * as path from "node:path"
 
+import {
+	essenceFilesUnder,
+	isExcludedPath,
+	readProjectConfiguration,
+	skippedDirectories,
+} from "@essence-lang/compiler/configuration"
+
 import { format, WIDTH } from "./index"
 
 export const EXIT_SUCCESS = 0
@@ -83,7 +90,9 @@ function usage(programName: string): string {
 ${lines.join("\n")}
 
 Arguments may be paths, globs, or directories — a directory is every .es file
-under it. There is nothing to configure: Essence is written with tabs, and
+under it. A directory or a glob skips ${[...skippedDirectories].join(", ")}
+and what the project's essence.json excludes; a file named on its own is always
+formatted. There is nothing to configure: Essence is written with tabs, and
 lines are laid out to fit ${WIDTH} columns.`
 }
 
@@ -148,15 +157,46 @@ function parseArguments(argv: Array<string>): Options | string {
 	return options
 }
 
+const GLOB_CHARACTERS = /[*?[\]{}]/
+
+// NOTE: The directory a glob's walk starts in: its segments up to the first
+// one that holds a pattern.
+function globBase(pattern: string): string {
+	let segments = pattern.split("/")
+	let first = segments.findIndex((segment) => GLOB_CHARACTERS.test(segment))
+	let fixed = segments.slice(0, first).join("/")
+
+	return path.resolve(fixed === "" && pattern.startsWith("/") ? "/" : fixed)
+}
+
+// NOTE: A glob leaves out what a walk from its base would: a match under a
+// skipped directory below the base, or one the project excludes.
+function walkLeavesOut(
+	base: string,
+	match: string,
+	exclude: Array<string>,
+): boolean {
+	let directories = path.relative(base, match).split(path.sep).slice(0, -1)
+
+	return (
+		directories.some((name) => skippedDirectories.has(name)) ||
+		isExcludedPath(match, exclude)
+	)
+}
+
 async function resolveFiles(patterns: Array<string>): Promise<Array<string>> {
 	let found = new Set<string>()
+	// NOTE: The project file is found from the working directory, as every
+	// command finds it.
+	let { exclude } = readProjectConfiguration()
 
 	for (let pattern of patterns) {
 		// NOTE: A plain path is its own match — `glob` would treat characters
 		// like `[` in a file name as a pattern rather than as the name. A named
-		// file is taken as it is, whatever its extension; only a directory
-		// filters, because there the author named a place rather than a file.
-		if (!/[*?[\]{}]/.test(pattern)) {
+		// file is taken as it is, whatever its extension and even when the
+		// project excludes it; only a directory filters, because there the
+		// author named a place rather than a file.
+		if (!GLOB_CHARACTERS.test(pattern)) {
 			let resolved = path.resolve(pattern)
 			let isDirectory = await stat(resolved).then(
 				(stats) => stats.isDirectory(),
@@ -169,15 +209,21 @@ async function resolveFiles(patterns: Array<string>): Promise<Array<string>> {
 				continue
 			}
 
-			for await (let match of glob(path.join(resolved, "**/*.es"))) {
-				found.add(path.resolve(match))
+			for (let match of await essenceFilesUnder(resolved, exclude)) {
+				found.add(match)
 			}
 
 			continue
 		}
 
+		let base = globBase(pattern)
+
 		for await (let match of glob(pattern)) {
-			found.add(path.resolve(match))
+			let resolved = path.resolve(match)
+
+			if (!walkLeavesOut(base, resolved, exclude)) {
+				found.add(resolved)
+			}
 		}
 	}
 

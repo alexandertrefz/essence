@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs"
+import { type Dirent, readFileSync } from "node:fs"
+import { readdir } from "node:fs/promises"
 import * as path from "node:path"
 
 import type { common } from "@essence-lang/interfaces"
@@ -179,6 +180,47 @@ export function isExcludedPath(
 		(each) =>
 			resolved === each || resolved.startsWith(`${each}${path.sep}`),
 	)
+}
+
+// NOTE: Every `.es` file under a directory, leaving out skipped directories and
+// what `exclude` covers. A symlinked directory is read as a file rather than
+// descended into, so a link back up the tree can not send the walk round.
+export async function essenceFilesUnder(
+	directory: string,
+	exclude: Array<string> = [],
+): Promise<Array<string>> {
+	let found: Array<string> = []
+	let directories = [directory]
+
+	for (let current of directories) {
+		let entries: Array<Dirent>
+
+		try {
+			entries = await readdir(current, { withFileTypes: true })
+		} catch {
+			continue
+		}
+
+		for (let entry of entries) {
+			let entryPath = path.join(current, entry.name)
+
+			if (entry.isDirectory()) {
+				if (
+					!skippedDirectories.has(entry.name) &&
+					!isExcludedPath(entryPath, exclude)
+				) {
+					directories.push(entryPath)
+				}
+			} else if (
+				entry.name.endsWith(".es") &&
+				!isExcludedPath(entryPath, exclude)
+			) {
+				found.push(entryPath)
+			}
+		}
+	}
+
+	return found
 }
 
 // ---------------------------------------------------------------------------

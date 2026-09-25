@@ -8,6 +8,7 @@ import type { common } from "@essence-lang/interfaces"
 import {
 	createConfigurationCache,
 	defaultConfiguration,
+	essenceFilesUnder,
 	findProjectFile,
 	isExcludedPath,
 	parseProjectConfiguration,
@@ -726,6 +727,32 @@ describe("essence.json — the nearest file governs", () => {
 				exclude,
 			),
 		).toBe(false)
+	})
+
+	it("walks every source but skipped directories and excluded paths", async () => {
+		await withFiles(
+			{
+				"Main.es": "",
+				"notes.txt": "",
+				"src/deep/Nested.es": "",
+				".git/Object.es": "",
+				"node_modules/Package.es": "",
+				"fixtures/broken/Broken.es": "",
+				"fixtures/brokenish/Kept.es": "",
+			},
+			async (directory) => {
+				let exclude = [path.join(directory, "fixtures", "broken")]
+				let found = await essenceFilesUnder(directory, exclude)
+
+				expect(
+					found.map((each) => path.relative(directory, each)).sort(),
+				).toEqual([
+					"Main.es",
+					path.join("fixtures", "brokenish", "Kept.es"),
+					path.join("src", "deep", "Nested.es"),
+				])
+			},
+		)
 	})
 })
 

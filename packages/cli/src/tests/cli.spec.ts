@@ -2431,10 +2431,8 @@ describe("the project's settings against the flags", () => {
 	}
 
 	// NOTE: And which commands ask at all. `check` is about the files it was
-	// handed; the Formatter has nothing to configure; the two servers are handed
-	// a workspace by the editor, which reads the file itself. Reading it for
-	// them would cost a walk up the filesystem and, under `--verbose`, a line
-	// about a file nothing on that path would have read.
+	// handed; the Formatter reads only `exclude`, itself; the two servers are
+	// handed a workspace by the editor, which reads the file itself.
 	it("reads the project file for the commands it speaks to", () => {
 		expect(
 			commands

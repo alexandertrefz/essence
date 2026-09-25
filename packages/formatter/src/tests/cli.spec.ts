@@ -325,4 +325,54 @@ describe("cli", () => {
 			expect(await readFile(odd, "utf8")).toBe(FORMATTED)
 		})
 	})
+
+	describe("skipped and excluded paths", () => {
+		let previous = process.cwd()
+
+		// NOTE: The project file is found from the working directory, so these
+		// run from inside the project.
+		beforeEach(async () => {
+			await file("essence.json", '{ "exclude": ["broken"] }\n')
+			await file(path.join(".git", "Object.es"), MESSY)
+			await file(path.join("node_modules", "Package.es"), MESSY)
+			await file(path.join("broken", "Corpus.es"), MESSY)
+			await file("Ordinary.es", MESSY)
+
+			previous = process.cwd()
+			process.chdir(directory)
+		})
+
+		afterEach(() => {
+			process.chdir(previous)
+		})
+
+		it("leaves skipped directories and the project's exclude out of a directory", async () => {
+			let { code, stdout, stderr } = await runCaptured(["--check", "."])
+
+			expect(code).toBe(EXIT_FAILURE)
+			expect(stdout).toBe("Ordinary.es\n")
+			expect(stderr).toContain("1 of 1 files are not formatted.")
+		})
+
+		it("leaves skipped directories and the project's exclude out of a glob", async () => {
+			let { code, stdout, stderr } = await runCaptured([
+				"--check",
+				"**/*.es",
+			])
+
+			expect(code).toBe(EXIT_FAILURE)
+			expect(stdout).toBe("Ordinary.es\n")
+			expect(stderr).toContain("1 of 1 files are not formatted.")
+		})
+
+		it("formats a skipped or excluded file it is handed by name", async () => {
+			let installed = path.join("node_modules", "Package.es")
+			let excluded = path.join("broken", "Corpus.es")
+			let { code } = await runCaptured([installed, excluded])
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(await readFile(installed, "utf8")).toBe(FORMATTED)
+			expect(await readFile(excluded, "utf8")).toBe(FORMATTED)
+		})
+	})
 })

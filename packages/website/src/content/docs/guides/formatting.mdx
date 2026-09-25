@@ -73,7 +73,7 @@ essence format --check src
 essence format --check 'src/**/*.es'
 ```
 
-A directory stands for every `.es` file under it, at any depth. That includes `node_modules`, `dist` and `build`. Only directories whose names start with a dot, such as `.git`, are skipped, and there is no ignore file. So point the formatter at your sources, not at the project root. Quote a glob, so that the formatter expands it and `**` matches any depth.
+A directory stands for every `.es` file under it, at any depth. A directory or a glob skips `.git`, `node_modules`, `dist`, `build` and `.claude`, and every directory the [`exclude`](/docs/reference/project-file#exclude) of your `essence.json` lists, so the project root is a fine place to point it. A file you name is formatted even inside one of those. Quote a glob, so that the formatter expands it and `**` matches any depth.
 
 </StepItem>
 

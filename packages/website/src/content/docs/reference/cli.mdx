@@ -607,7 +607,7 @@ essence format <files...> [options]
 essence format --check <files...>
 ```
 
-`format` rewrites each source into Essence's one layout: tabs for indentation, and lines laid out to fit 80 columns. There is nothing to configure. An argument may be a path, a glob or a directory, and a directory means every `.es` file under it. A source that does not parse is reported and left untouched, and the run exits with 1:
+`format` rewrites each source into Essence's one layout: tabs for indentation, and lines laid out to fit 80 columns. There is nothing to configure. An argument may be a path, a glob or a directory, and a directory means every `.es` file under it. A directory or a glob skips `.git`, `node_modules`, `dist`, `build` and `.claude`, and every directory the project's [`exclude`](/docs/reference/project-file#exclude) lists. A file you name is formatted wherever it sits. A source that does not parse is reported and left untouched, and the run exits with 1:
 
 <div class="error-output">
 

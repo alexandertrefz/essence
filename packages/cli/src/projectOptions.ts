@@ -22,12 +22,9 @@ import type { CLIContext } from "./context"
 // answer off its context and nothing else — a second place deriving "the flag
 // unless the project said otherwise" would be a second answer to give.
 
-// NOTE: The commands a project file has something to say to. `check`, `format`,
-// `lsp`, `dap` and `help` are not among them: nothing they do is a fact about a
-// project — a check is about the files it was handed, and the two servers are
-// handed a workspace by the editor, which reads the file itself. Reading it for
-// them would cost a walk up the filesystem and print a Warning about a key
-// nothing on that path would have read.
+// NOTE: The commands a project file has something to say to. A check is about
+// the files it was handed, the two servers are handed a workspace by the editor,
+// which reads the file itself, and the Formatter reads only `exclude`, itself.
 const READING_COMMANDS = new Set(["build", "run", "watch", "test", "init"])
 
 export function readsProjectConfiguration(command: CommandSpec): boolean {

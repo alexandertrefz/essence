@@ -1,10 +1,7 @@
-import { glob, readdir, readFile, stat } from "node:fs/promises"
+import { glob, readFile, stat } from "node:fs/promises"
 import * as path from "node:path"
 
-import {
-	isExcludedPath,
-	skippedDirectories,
-} from "@essence-lang/compiler/configuration"
+import { essenceFilesUnder } from "@essence-lang/compiler/configuration"
 import { containsErrors } from "@essence-lang/compiler/diagnostics"
 import {
 	canonicalPath,
@@ -19,9 +16,8 @@ import { type CommandSpec, DEFAULT_PROGRAM_NAME } from "./commands"
 import { looksLikeGlob } from "./inputs"
 
 // NOTE: `esc build` is pointed at the files it compiles; `essence test` is
-// pointed at a project. Nothing else in the CLI walks a directory, so this is
-// the walk — one of them, with one ignore set, rather than a third variant
-// beside the Language Server's and the Formatter's.
+// pointed at a project, and walks it with the Compiler's `essenceFilesUnder`,
+// the walk the Formatter shares.
 
 // NOTE: The convention from the design: a file that is nothing but imports and
 // a `tests { … }` block, named after the Module it tests. It is discovered by
@@ -54,9 +50,6 @@ async function isDirectory(target: string): Promise<boolean> {
 	}
 }
 
-// NOTE: Symlinked directories are read as files rather than descended into, so
-// a link back up the tree can not send the walk round for ever — the same rule
-// the Language Server's walk follows.
 async function collectEssenceFiles(
 	directory: string,
 	found: Set<string>,
@@ -70,44 +63,9 @@ async function collectEssenceFiles(
 	// read no configuration, which is every caller but the two commands.
 	exclude: Array<string> = [],
 ): Promise<void> {
-	let entries: Array<{ name: string; isDirectory: boolean }> = []
-
-	try {
-		entries = (await readdir(directory, { withFileTypes: true })).map(
-			(entry) => ({
-				name: entry.name,
-				isDirectory: entry.isDirectory(),
-			}),
-		)
-	} catch {
-		return
-	}
-
-	for (let entry of entries) {
-		let entryPath = path.join(directory, entry.name)
-
-		if (entry.isDirectory) {
-			if (
-				!skippedDirectories.has(entry.name) &&
-				!isExcludedPath(entryPath, exclude)
-			) {
-				await collectEssenceFiles(
-					entryPath,
-					found,
-					allowStdlib,
-					exclude,
-				)
-			}
-
-			continue
-		}
-
-		if (!entry.name.endsWith(".es") || isExcludedPath(entryPath, exclude)) {
-			continue
-		}
-
-		if (allowStdlib || !isStdlibDocument(entryPath)) {
-			found.add(canonicalPath(entryPath))
+	for (let filePath of await essenceFilesUnder(directory, exclude)) {
+		if (allowStdlib || !isStdlibDocument(filePath)) {
+			found.add(canonicalPath(filePath))
 		}
 	}
 }
